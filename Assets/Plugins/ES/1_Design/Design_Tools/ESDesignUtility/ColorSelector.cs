@@ -12,7 +12,7 @@ namespace ES
         //GUI Color 颜色库
         public static class ColorSelector
         {
-            
+
             //使用方法↓
             //GUIColor("@ESDesignUtility.ColorSelector.Color_03")
             public static Color Color_01 = new Color(0.988f, 0.758f, 0.763f, 1);
@@ -34,7 +34,7 @@ namespace ES
             public static Color ColorForApply = new Color(0, 0.804f, 0);//应用色
 
             public static readonly Dictionary<string, Color> normalColors = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase)
-    {
+            {
         { "red", Color.red },
         { "green", Color.green },
         { "blue", Color.blue },
@@ -46,11 +46,14 @@ namespace ES
         { "gray", Color.gray },
         { "grey", Color.grey },
         { "clear", Color.clear }
-    };
+            };
+
+
+
             static void test()
             {
-                
-                
+
+
                 Color c = ESDesignUtility.ColorSelector.Color_01;
             }
         }

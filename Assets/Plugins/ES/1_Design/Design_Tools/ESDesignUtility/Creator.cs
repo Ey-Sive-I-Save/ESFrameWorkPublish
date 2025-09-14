@@ -14,12 +14,11 @@ namespace ES
         public static class Creator
         {
             #region 深拷贝
-            //深拷贝＋泛型
             /// <summary>
             /// 深拷贝<T>任意类型
             /// </summary>
-            /// <typeparam name="T"></typeparam>
-            /// <param name="obj"></param>
+            /// <typeparam name="T">克隆类型</typeparam>
+            /// <param name="obj">克隆源对象</param>
             /// <returns></returns>
             public static T DeepClone<T>(T obj)
             {
@@ -28,11 +27,11 @@ namespace ES
             /// <summary>
             /// 深拷贝任意类型
             /// </summary>
-            /// <param name="obj"></param>
-            /// <param name="invokeDirect"></param>
-            /// <param name="creator"></param>
+            /// <param name="obj">克隆源对象</param>
+            /// <param name="HardUnityObject">强制克隆UnityObject(一般取引用)</param>
+            /// <param name="seldeDefineCreater">自定义创建对象</param>
             /// <returns></returns>
-            public static object DeepCloneAnyObject(object obj, bool invokeDirect = true, Func<object> creator = null)
+            public static object DeepCloneAnyObject(object obj, bool HardUnityObject = true, Func<object> seldeDefineCreater = null)
             {
                 //为NULL返回NULL
                 if (obj == null)
@@ -40,10 +39,10 @@ namespace ES
                     return null;
                 }
 
+               
+                Type type = obj.GetType();
                 // 如果是值类型或字符串，
                 // 直接返回（值类型是不可变的，字符串是不可变引用类型）
-                Type type = obj.GetType();
-
                 if (obj is string || type.IsEnum || type.IsPrimitive)
                 {
                     return obj;
@@ -53,7 +52,7 @@ namespace ES
                 if (obj is UnityEngine.Object uObj)
                 {
                     if (uObj == null) return null;
-                    if (invokeDirect)
+                    if (HardUnityObject)
                     {
                         return UnityEngine.Object.Instantiate(uObj);
                     }
@@ -108,7 +107,7 @@ namespace ES
                 //如果是结构体("已经排除了原始类型--无法通过直接赋值来拷贝结构体，因为已经作为Struct装箱了
 
                 // 如果是普通引用类型或结构体--结合
-                var clonedObject = creator != null ? creator.Invoke() : Activator.CreateInstance(type);
+                var clonedObject = seldeDefineCreater != null ? seldeDefineCreater.Invoke() : Activator.CreateInstance(type);
                 if (clonedObject is IDeepClone deep)
                 {
                     deep.DeepCloneFrom(obj);
@@ -126,6 +125,13 @@ namespace ES
                 }
                 return clonedObject;
             }
+            /// <summary>
+            /// 深拷贝各种集合
+            /// </summary>
+            /// <param name="collection">源集合</param>
+            /// <param name="collectionType"></param>
+            /// <param name="creator"></param>
+            /// <returns></returns>
             public static object DeepCloneCollection(object collection, Type collectionType = null, Func<object> creator = null)
             {
                 collectionType ??= collection.GetType();
@@ -178,6 +184,12 @@ namespace ES
                 // 回退到通用反射方法
                 return DeepCloneCollectionByReflection_CantUSE(collection, collectionType, creator);
             }
+            /// <summary>
+            /// 深拷贝字典
+            /// </summary>
+            /// <param name="dictionary">字典源</param>
+            /// <param name="dictType">类型(可以不写)</param>
+            /// <returns></returns>
             public static object DeepCloneGenericDictionary(object dictionary, Type dictType=null)
             {
                 dictType ??= dictionary.GetType();
@@ -206,10 +218,14 @@ namespace ES
                 {
 
                 }
-
-
                 return newDict;
             }
+            /// <summary>
+            /// 深拷贝列表
+            /// </summary>
+            /// <param name="list">源列表</param>
+            /// <param name="listType">列表类型(可不写)</param>
+            /// <returns></returns>
             public static object DeepCloneGenericList(object list, Type listType=null)
             {
                 listType ??= list.GetType();
@@ -229,6 +245,12 @@ namespace ES
                 }
                 return newList;
             }
+            /// <summary>
+            /// 深拷贝HashSet
+            /// </summary>
+            /// <param name="hashSet">源HashSet</param>
+            /// <param name="hashSetType">HasSet类型(可不写)</param>
+            /// <returns></returns>
             public static object DeepCloneGenericHashSet(object hashSet, Type hashSetType=null)
             {
                 hashSetType ??= hashSet.GetType();
@@ -250,6 +272,13 @@ namespace ES
 
                 return newHashSet;
             }
+            /// <summary>
+            /// 深拷贝栈
+            /// </summary>
+            /// <param name="stack">栈源</param>
+            /// <param name="stackType">栈类型(可不写)</param>
+            /// <param name="creator">自定义元素创建</param>
+            /// <returns></returns>
             public static object DeepCloneGenericStack(object stack, Type stackType=null, Func<object> creator = null)
             {
                 stackType ??= stack.GetType();
@@ -280,12 +309,19 @@ namespace ES
                 // 将元素推入新栈（保持原始顺序）
                 foreach (var item in tempList)
                 {
-                    object clonedItem = DeepCloneAnyObject(item, false, creator: creator);
+                    object clonedItem = DeepCloneAnyObject(item, false, seldeDefineCreater: creator);
                     pushMethod.Invoke(newStack, new[] { clonedItem });
                 }
 
                 return newStack;
             }
+            /// <summary>
+            /// 深拷贝链表
+            /// </summary>
+            /// <param name="linkedList">源链表</param>
+            /// <param name="linkedListType">链表类型(可不写)</param>
+            /// <param name="creator">自定义创建元素</param>
+            /// <returns></returns>
             public static object DeepCloneGenericLinkedList(object linkedList, Type linkedListType=null, Func<object> creator = null)
             {
                 linkedListType ??= linkedList.GetType();
@@ -327,6 +363,13 @@ namespace ES
 
                 return newList;
             }
+            /// <summary>
+            /// 深拷贝队列
+            /// </summary>
+            /// <param name="queue">源队列</param>
+            /// <param name="queueType">队列类型(可不写)</param>
+            /// <param name="creator">自定义创建元素</param>
+            /// <returns></returns>
             public static object DeepCloneGenericQueue(object queue, Type queueType=null, Func<object> creator = null)
             {
                 queueType ??= queue.GetType();
@@ -367,6 +410,29 @@ namespace ES
 
                 return newQueue;
             }
+             /// <summary>
+            /// 深拷贝ArrayList
+            /// </summary>
+            /// <param name="arrayList">源ArrayList</param>
+            /// <returns></returns>
+            public static ArrayList DeepCloneArrayList(ArrayList arrayList)
+            {
+                ArrayList newList = new ArrayList(arrayList.Count);
+
+                foreach (var item in arrayList)
+                {
+                    newList.Add(DeepCloneAnyObject(item, false));
+                }
+
+                return newList;
+            }
+            /// <summary>
+            /// 反射深拷贝<目前不可用>
+            /// </summary>
+            /// <param name="collection">集合源</param>
+            /// <param name="collectionType">集合类型(不用写)</param>
+            /// <param name="creator">自定义元素创建</param>
+            /// <returns></returns>
             public static object DeepCloneCollectionByReflection_CantUSE(object collection, Type collectionType=null, Func<object> creator=null)
             {
                 collectionType ??= collection.GetType();
@@ -416,17 +482,7 @@ namespace ES
                 Debug.LogWarning($"无法深拷贝集合类型: {collectionType.Name}");
                 return collection;
             }
-            public static ArrayList DeepCloneArrayList(ArrayList arrayList)
-            {
-                ArrayList newList = new ArrayList(arrayList.Count);
-
-                foreach (var item in arrayList)
-                {
-                    newList.Add(DeepCloneAnyObject(item, false));
-                }
-
-                return newList;
-            }
+           
             #endregion
 
 

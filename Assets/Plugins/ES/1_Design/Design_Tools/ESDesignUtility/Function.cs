@@ -19,7 +19,13 @@ namespace ES
         public static class Function
         {
             #region 数学
-            //操作两个FLoat
+            /// <summary>
+            /// 操作两个Float
+            /// </summary>
+            /// <param name="f1">参数1</param>
+            /// <param name="f2">参数2</param>
+            /// <param name="twoFloatFunction">操作</param>
+            /// <returns></returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static float FunctionForHandleTwoFloat(float f1, float f2, EnumCollect.HandleTwoNumber twoFloatFunction)
             {
@@ -38,8 +44,13 @@ namespace ES
                     default: return f2;
                 }
             }
-
-            //比较两个Float
+            /// <summary>
+            /// 比较两个Float
+            /// </summary>
+            /// <param name="left">左参数</param>
+            /// <param name="right">右参数</param>
+            /// <param name="useFunction">比较符号</param>
+            /// <returns></returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static bool FunctionForCompareTwoFloat(float left, float right, EnumCollect.CompareTwoNumber useFunction)
             {
@@ -67,7 +78,7 @@ namespace ES
                         if (right == 0) return false;
                         if (left / right == (int)(left / right)) return false;
                         else return true;
-                    case EnumCollect.CompareTwoNumber.Recipprocal: return 0.01f>Mathf.Abs(left * right - 1);
+                    case EnumCollect.CompareTwoNumber.Recipprocal: return 0.01f > Mathf.Abs(left * right - 1);
                     case EnumCollect.CompareTwoNumber.NotRecipprocal: return 0.01f < Mathf.Abs(left * right - 1);
                     case EnumCollect.CompareTwoNumber.Mask_And_NotZero: return ((int)left & (int)right) != 0;
                     case EnumCollect.CompareTwoNumber.Mask_ANd_Zero: return ((int)left & (int)right) == 0;
@@ -75,8 +86,13 @@ namespace ES
                 }
                 return false;
             }
-
-            //操作两个Int
+            /// <summary>
+            /// 操作两个Int
+            /// </summary>
+            /// <param name="i1">参数1</param>
+            /// <param name="i2">参数2</param>
+            /// <param name="twoIntFunction">操作符</param>
+            /// <returns></returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static int FunctionForHandleTwoInt(int i1, int i2, EnumCollect.HandleTwoNumber twoIntFunction)
             {
@@ -95,6 +111,13 @@ namespace ES
                     default: return i2;
                 }
             }
+            /// <summary>
+            /// 操作两个布尔值
+            /// </summary>
+            /// <param name="b1">参数1</param>
+            /// <param name="b2">参数2</param>
+            /// <param name="twoBoolFunction">操作</param>
+            /// <returns></returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static bool FunctionForHandleTwoBool(bool b1, bool b2, EnumCollect.HandleTwoBool twoBoolFunction)
             {
@@ -103,10 +126,10 @@ namespace ES
                     case EnumCollect.HandleTwoBool.Set: return b2;
                     case EnumCollect.HandleTwoBool.And: return b1 && b2;
                     case EnumCollect.HandleTwoBool.Or: return b1 || b2;
-                    case EnumCollect.HandleTwoBool.SetNot: return b2?false:true;
+                    case EnumCollect.HandleTwoBool.SetNot: return b2 ? false : true;
                     case EnumCollect.HandleTwoBool.On_If: return b2 ? true : b1;
                     case EnumCollect.HandleTwoBool.Off_If: return b2 ? false : b1;
-                    case EnumCollect.HandleTwoBool.Switch_If: return b2?b1^true:b1;
+                    case EnumCollect.HandleTwoBool.Switch_If: return b2 ? b1 ^ true : b1;
                     default: return b2;
                 }
             }
@@ -115,6 +138,12 @@ namespace ES
             #endregion
 
             #region 字符串
+            /// <summary>
+            /// 字符串大小写规范
+            /// </summary>
+            /// <param name="input">输入</param>
+            /// <param name="handleType">操作类型</param>
+            /// <returns></returns>
             public static string FunctionForStringAsIndentNameCase(string input, HandleIndentStringName handleType)
             {
                 if (string.IsNullOrEmpty(input))
@@ -135,7 +164,14 @@ namespace ES
             #endregion
 
             #region 容器
-            //取出一个
+            /// <summary>
+            /// 从列表取出一个
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="values">列表</param>
+            /// <param name="selectOneType">选择方式</param>
+            /// <param name="lastIndex">上一个索引"用_丢弃"</param>
+            /// <returns></returns>
             public static T GetOne<T>(List<T> values, EnumCollect.SelectOne selectOneType, ref int lastIndex)
             {
                 if (values != null)
@@ -181,7 +217,14 @@ namespace ES
                 }
                 return default;
             }
-            //取出部分
+            /// <summary>
+            /// 从列表取出几个
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="values">列表值</param>
+            /// <param name="selectSomeType">取出类型</param>
+            /// <param name="lastIndex">上一个索引“_丢弃”</param>
+            /// <returns></returns>
             public static List<T> GetSome<T>(List<T> values, EnumCollect.SelectSome selectSomeType, ref int lastIndex)
             {
                 if (values != null)
@@ -230,7 +273,12 @@ namespace ES
             #endregion
 
             #region 集成Dotween
-            //dotween集成
+            /// <summary>
+            /// 获得CallBack
+            /// </summary>
+            /// <param name="use">Tween</param>
+            /// <param name="callBackType">类型</param>
+            /// <returns></returns>
             public static Delegate GetCallBackFromTween(Tween use, EnumCollect.CallBackType callBackType)
             {
                 if (use != null)
@@ -257,6 +305,12 @@ namespace ES
                 }
                 return default;
             }
+            /// <summary>
+            /// 设置CallBack
+            /// </summary>
+            /// <param name="use">Tween</param>
+            /// <param name="callBackType">类型</param>
+            /// <param name="action">设置为</param>
             public static void SetCallBackFromTween(Tween use, EnumCollect.CallBackType callBackType, TweenCallback action)
             {
                 if (use != null)
@@ -292,34 +346,34 @@ namespace ES
                 return;
             }
             //Function_OperationValue_InLine
-         /*   [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-            public static float OpearationFloat_Inline(float value, float Value, OperationOptionsForFloat settleType)
-            {
-                switch (settleType)
-                {
-                    case OperationOptionsForFloat.Add: return value + Value;
-                    case OperationOptionsForFloat.Sub: return value - Value;
-                    case OperationOptionsForFloat.PerUp: return value * (1 + Value);
-                    case OperationOptionsForFloat.Max: return Mathf.Clamp(value, value, Value);
-                    case OperationOptionsForFloat.Min: return Mathf.Clamp(value, Value, value);
-                    case OperationOptionsForFloat.Wave: return value + UnityEngine.Random.Range(-Value, Value);
-                    default: return value;
-                }
-            }
-            [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-            public static float OpearationFloat_Cancel_Inline(float value, float Value, OperationOptionsForFloat settleType)
-            {
-                switch (settleType)
-                {
-                    case OperationOptionsForFloat.Add: return value - Value;
-                    case OperationOptionsForFloat.Sub: return value + Value;
-                    case OperationOptionsForFloat.PerUp: return value._SafeDivide(1 + Value);
-                    case OperationOptionsForFloat.Max: return Mathf.Clamp(value, value, Value);
-                    case OperationOptionsForFloat.Min: return Mathf.Clamp(value, Value, value);
-                    case OperationOptionsForFloat.Wave: return value + UnityEngine.Random.Range(-Value, Value);
-                    default: return value;
-                }
-            }*/
+            /*   [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
+               public static float OpearationFloat_Inline(float value, float Value, OperationOptionsForFloat settleType)
+               {
+                   switch (settleType)
+                   {
+                       case OperationOptionsForFloat.Add: return value + Value;
+                       case OperationOptionsForFloat.Sub: return value - Value;
+                       case OperationOptionsForFloat.PerUp: return value * (1 + Value);
+                       case OperationOptionsForFloat.Max: return Mathf.Clamp(value, value, Value);
+                       case OperationOptionsForFloat.Min: return Mathf.Clamp(value, Value, value);
+                       case OperationOptionsForFloat.Wave: return value + UnityEngine.Random.Range(-Value, Value);
+                       default: return value;
+                   }
+               }
+               [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
+               public static float OpearationFloat_Cancel_Inline(float value, float Value, OperationOptionsForFloat settleType)
+               {
+                   switch (settleType)
+                   {
+                       case OperationOptionsForFloat.Add: return value - Value;
+                       case OperationOptionsForFloat.Sub: return value + Value;
+                       case OperationOptionsForFloat.PerUp: return value._SafeDivide(1 + Value);
+                       case OperationOptionsForFloat.Max: return Mathf.Clamp(value, value, Value);
+                       case OperationOptionsForFloat.Min: return Mathf.Clamp(value, Value, value);
+                       case OperationOptionsForFloat.Wave: return value + UnityEngine.Random.Range(-Value, Value);
+                       default: return value;
+                   }
+               }*/
             #endregion
         }
     }

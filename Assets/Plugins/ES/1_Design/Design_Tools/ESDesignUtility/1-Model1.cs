@@ -8,7 +8,7 @@ namespace ES
 {
     public static partial class ESDesignUtility
     {
-        //
+        //只作为模板
         public class xxx
         {
 

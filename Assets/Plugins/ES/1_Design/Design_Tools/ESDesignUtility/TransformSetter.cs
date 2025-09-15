@@ -12,17 +12,26 @@ namespace ES
         //变换器
         public static class TransformSetter
         {
-            public static void HandleTransformAtParent(Transform t, Transform parent, Vector3 pos = default, bool atWorld = true, bool localRot0 = true, bool localScale0 = true)
+            /// <summary>
+            /// 操作一个变换依赖父级
+            /// </summary>
+            /// <param name="me">操作</param>
+            /// <param name="parent">父级</param>
+            /// <param name="pos">位置</param>
+            /// <param name="atWorldPos">是世界空间？</param>
+            /// <param name="localRot0">局部旋转重置</param>
+            /// <param name="localScale0">局部缩放重置</param>
+            public static void HandleTransformAtParent(Transform me, Transform parent, Vector3 pos = default, bool atWorldPos = true, bool localRot0 = true, bool localScale0 = true)
             {
-                if (t == null) return;
-                if (parent != null) t.SetParent(parent);
+                if (me == null) return;
+                if (parent != null) me.SetParent(parent);
                 if (pos != null)
                 {
-                    if (atWorld) t.position = pos;
-                    else t.localPosition = pos;
+                    if (atWorldPos) me.position = pos;
+                    else me.localPosition = pos;
                 }
-                if (localRot0) t.localRotation = Quaternion.identity;
-                if (localScale0) t.localScale = Vector3.one;
+                if (localRot0) me.localRotation = Quaternion.identity;
+                if (localScale0) me.localScale = Vector3.one;
             }
         }
     }

@@ -13,37 +13,100 @@ namespace ES
     public static class ExtensionForEnum 
     {
         #region 常规
-        // 81. 检查枚举是否包含特定标志
-        public static bool HasFlag<T>(this T enumValue, T flag) where T : Enum
-        {
-            return enumValue.HasFlag(flag);
-        }
 
-        // 82. 添加枚举标志
+        /// <summary>
+        /// 添加枚举标志
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="enumValue"></param>
+        /// <param name="flag">标志Flag</param>
+        /// <returns></returns>
         public static T _AddFlag<T>(this T enumValue, T flag) where T : Enum
         {
             return (T)(object)((int)(object)enumValue | (int)(object)flag);
         }
 
-        // 83. 移除枚举标志
+        /// <summary>
+        /// 移除枚举标志
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="enumValue"></param>
+        /// <param name="flag">标志Flag</param>
+        /// <returns></returns>
         public static T _RemoveFlag<T>(this T enumValue, T flag) where T : Enum
         {
             return (T)(object)((int)(object)enumValue & ~(int)(object)flag);
         }
 
-        // 84. 切换枚举标志
+        /// <summary>
+        /// 切换枚举标志
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="enumValue"></param>
+        /// <param name="flag">标志Flag</param>
+        /// <returns></returns>
         public static T _ToggleFlag<T>(this T enumValue, T flag) where T : Enum
         {
             return enumValue.HasFlag(flag) ? enumValue._RemoveFlag(flag) : enumValue._AddFlag(flag);
         }
 
-        // 85. 获取枚举的所有值
-        public static IEnumerable<T> _GetValues<T>() where T : Enum
+        /// <summary>
+        /// 切换枚举标志
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="enumValue"></param>
+        /// <param name="flag">标志Flag</param>
+        /// <returns></returns>
+        public static T _SwitchFlag<T>(this T enumValue, T flag) where T : Enum
+        {
+            return enumValue.HasFlag(flag) ? enumValue._RemoveFlag(flag) : enumValue._AddFlag(flag);
+        }
+
+        /// <summary>
+        /// 检查是否包含所有指定标志
+        /// </summary>
+        public static bool _HasAllFlags<T>(this T enumValue, params T[] flags) where T : Enum
+        {
+            int Value = (int)(object)enumValue;
+            foreach (T flag in flags)
+            {
+                int Flag = (int)(object)(flag);
+                if ((Value & Flag) != Flag)
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// 检查是否包含任何指定标志
+        /// </summary>
+        public static bool _HasAnyFlags<T>(this T enumValue, params T[] flags) where T : Enum
+        {
+            int Value = (int)(object)enumValue;
+            foreach (T flag in flags)
+            {
+                int Flag = (int)(object)(flag);
+                if ((Value & Flag) != Flag)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 获取枚举的所有值
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public static IEnumerable<T> _GetEnumValues<T>() where T : Enum
         {
             return Enum.GetValues(typeof(T)).Cast<T>();
         }
 
-        // 86. 获取枚举的描述(如果有Description特性)
+        /// <summary>
+        /// 获取枚举的描述(如果有Description特性)
+        /// </summary>
+        /// <param name="enumValue"></param>
+        /// <returns></returns>
         public static string _GetDescription(this Enum enumValue)
         {
             var fieldInfo = enumValue.GetType().GetField(enumValue.ToString());
@@ -51,13 +114,23 @@ namespace ES
             return attributes.Length > 0 ? attributes[0].Description : enumValue.ToString();
         }
 
-        // 87. 检查枚举值是否有效
+        /// <summary>
+        /// 检查枚举值是否被显式定义
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="enumValue"></param>
+        /// <returns></returns>
         public static bool _IsDefined<T>(this T enumValue) where T : Enum
         {
             return Enum.IsDefined(typeof(T), enumValue);
         }
 
-        // 88. 获取枚举的下一个值(循环)
+        /// <summary>
+        /// 获取枚举定义的下一个值(循环)
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="enumValue"></param>
+        /// <returns></returns>
         public static T _Next<T>(this T enumValue) where T : Enum
         {
             T[] values = (T[])Enum.GetValues(typeof(T));
@@ -65,7 +138,12 @@ namespace ES
             return index >= values.Length ? values[0] : values[index];
         }
 
-        // 89. 获取枚举的上一个值(循环)
+        /// <summary>
+        /// 获取枚举定义的上一个值(循环)
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="enumValue"></param>
+        /// <returns></returns>
         public static T _Previous<T>(this T enumValue) where T : Enum
         {
             T[] values = (T[])Enum.GetValues(typeof(T));
@@ -73,13 +151,18 @@ namespace ES
             return index < 0 ? values[values.Length - 1] : values[index];
         }
 
-        // 90. 随机获取枚举值
+        /// <summary>
+        /// 随机获取定义枚举值
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
         public static T _Random<T>() where T : Enum
         {
             T[] values = (T[])Enum.GetValues(typeof(T));
             return values[UnityEngine.Random.Range(0, values.Length)];
         }
         #endregion
+
         #region ES扩展
         public static ESMessageAttribute _Get_ATT_ESMessage<T>(this T enumValue) where T : Enum
         {

@@ -19,10 +19,14 @@ namespace ES
 {
     public static partial class ESDesignUtility
     {
-        //
+        //SafeEditor提供了一系列已经被#if UnityEditor包裹的安全编辑器功能，可以直接在任何地方使用并且不需要额外处理
         public class SafeEditor
         {
             #region 获取特殊数据
+            /// <summary>
+            /// 获得全部标签
+            /// </summary>
+            /// <returns></returns>
             public static string[] GetAllTags()
             {
 #if UNITY_EDITOR
@@ -33,6 +37,10 @@ namespace ES
                 return new string[0];
 #endif
             }
+            /// <summary>
+            /// 获得全部层级字典表(layer->name)
+            /// </summary>
+            /// <returns></returns>
             public static Dictionary<int, string> GetAllLayers()
             {
 
@@ -51,24 +59,45 @@ namespace ES
                 return new Dictionary<int, string>();
 #endif
             }
-
-
+            /// <summary>
+            /// 添加标签
+            /// </summary>
+            /// <param name="tag"></param>
+            public static void AddTag(string tag)
+            {
+#if UNITY_EDITOR
+                // 获取Tags
+                UnityEditorInternal.InternalEditorUtility.AddTag(tag);
+#endif
+            }
             #endregion
 
             #region 简单包装
-            public static void SetDirty(UnityEngine.Object who, bool withRefresh = true)
+            /// <summary>
+            /// SetDirey脏标记对象
+            /// </summary>
+            /// <param name="which"></param>
+            /// <param name="Refresh">强制保存刷新</param>
+            public static void Wrap_SetDirty(UnityEngine.Object which, bool Refresh = true)
             {
 #if UNITY_EDITOR
-                if (withRefresh)
+                if (Refresh)
                 {
                     AssetDatabase.Refresh();
                     AssetDatabase.SaveAssets();
                 }
-                EditorUtility.SetDirty(who);
+                EditorUtility.SetDirty(which);
 #endif
             }
-
-            public static bool DisplayDialog(string title, string message, string ok = "好的", string cancel = "算了")
+            /// <summary>
+            /// 显示对话框
+            /// </summary>
+            /// <param name="title">标题</param>
+            /// <param name="message">信息内容</param>
+            /// <param name="ok">确定</param>
+            /// <param name="cancel">取消</param>
+            /// <returns></returns>
+            public static bool Wrap_DisplayDialog(string title, string message, string ok = "好的", string cancel = "算了")
             {
 #if UNITY_EDITOR
 
@@ -78,43 +107,78 @@ namespace ES
 #endif
 
             }
-
-            public static string SelectorFolder(string targetPath = "Assets/Resources/Data/GlobalData", string title = "选择文件夹")
+            /// <summary>
+            /// 打开选择文件夹窗口(返回路径)
+            /// </summary>
+            /// <param name="targetPath">默认目标路径</param>
+            /// <param name="title">标题</param>
+            /// <returns>(返回文件夹路径)</returns>
+            public static string Wrap_OpenSelectorFolderPanel(string targetPath = "Assets", string title = "选择文件夹")
             {
 #if UNITY_EDITOR
                 return EditorUtility.OpenFolderPanel(title, targetPath, "");
 #else
-               return targetPath;
+                return targetPath;
 #endif
             }
-
-            public static bool IsValidFolder(string path, bool want = false)
+            /// <summary>
+            /// 是有效的文件夹
+            /// </summary>
+            /// <param name="path">文件夹路径</param>
+            /// <param name="IfPlayerRunTime">如果在运行时(无法实际判断)，决定返回？？</param>
+            /// <returns></returns>
+            public static bool Wrap_IsValidFolder(string path, bool IfPlayerRunTime = false)
             {
 #if UNITY_EDITOR
                 return AssetDatabase.IsValidFolder(path);
 #else
-                return want;
+                return IfPlayerRunTime;
 #endif
             }
-
-            public static void CreateFolderDic(string path, string name)
+            /// <summary>
+            /// 创建文件夹
+            /// </summary>
+            /// <param name="parentPath">父级路径</param>
+            /// <param name="folderName">文件夹名字</param>
+            public static void Wrap_CreateFolderDic(string parentPath, string folderName)
             {
 #if UNITY_EDITOR
-                AssetDatabase.CreateFolder(path, name);
+                AssetDatabase.CreateFolder(parentPath, folderName);
 #endif
             }
-
-            public static void Copy(string content)
+            /// <summary>
+            /// 把内容放在系统粘贴板
+            /// </summary>
+            /// <param name="content">内容</param>
+            public static void Wrap_SystemCopyBuffer(string content)
             {
                 GUIUtility.systemCopyBuffer = content;
             }
+            /// <summary>
+            /// 获得资产路径
+            /// </summary>
+            /// <param name="s">资产</param>
+            /// <returns>Assets/路径</returns>
+            public static string Wrap_GetAssetPath(UnityEngine.Object s)
+            {
+#if UNITY_EDITOR
+                if (s != null)
+                {
+                    string path = AssetDatabase.GetAssetPath(s);
+                    return path;
+                }
+#endif
+                return "";
+            }
             #endregion
-
+            
             #region 资产查询
-
-
-
-            public static List<T> FindSOAssets<T>() where T : class
+            /// <summary>
+            /// 查询一类SO文件
+            /// </summary>
+            /// <typeparam name="T">SO类型</typeparam>
+            /// <returns></returns>
+            public static List<T> FindAllSOAssets<T>() where T : class
             {
                 List<T> values = new List<T>(3);
 #if UNITY_EDITOR
@@ -141,7 +205,13 @@ namespace ES
 #endif
                 return values;
             }
-            public static List<T> FindSOAssets<T>(Type typeUse) where T : class
+            /// <summary>
+            /// 查询一类SO文件(参数Type但是返回List<T>,也就是T 为同获得父类)
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="typeUse"></param>
+            /// <returns></returns>
+            public static List<T> FindAllSOAssets<T>(Type typeUse) where T : class
             {
                 List<T> values = new List<T>(3);
 #if UNITY_EDITOR
@@ -170,7 +240,12 @@ namespace ES
 #endif
                 return values;
             }
-            public static List<T> FindAllSOQuickly<T>() where T : ScriptableObject
+            /// <summary>
+            /// 快速查询一类So文件(直接按泛型名查不筛选)
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <returns></returns>
+            public static List<T> FindAllSOAssetsQuickly<T>() where T : ScriptableObject
             {
 #if UNITY_EDITOR
                 var guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}");
@@ -189,8 +264,13 @@ namespace ES
                 return  new List<T>();
 #endif
             }
-
-            public static T LoadAssetByGUIDString<T>(string s) where T : class
+            /// <summary>
+            /// 通过GUID（string）加载出资产(泛型)
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="s"></param>
+            /// <returns></returns>
+            public static T LoadAssetByGUIDString<T>(string s) where T : UnityEngine.Object
             {
 #if UNITY_EDITOR
                 GUID id = default;
@@ -205,6 +285,11 @@ namespace ES
 #endif
                 return null;
             }
+            /// <summary>
+            /// 通过GUID（string）加载出资产
+            /// </summary>
+            /// <param name="s"></param>
+            /// <returns></returns>
             public static UnityEngine.Object LoadAssetByGUIDString(string s)
             {
 #if UNITY_EDITOR
@@ -220,50 +305,47 @@ namespace ES
 #endif
                 return null;
             }
-
-            public static string GetAssetGUID(UnityEngine.Object s)
+            /// <summary>
+            /// 获得资产的GUID（string）
+            /// </summary>
+            /// <param name="uo"></param>
+            /// <returns></returns>
+            public static string GetAssetGUID(UnityEngine.Object uo)
             {
 #if UNITY_EDITOR
-                string path = AssetDatabase.GetAssetPath(s);
+                string path = AssetDatabase.GetAssetPath(uo);
                 string guid = AssetDatabase.AssetPathToGUID(path);
                 if (guid != null && !guid.IsNullOrWhitespace()) return guid;
 #endif
                 return null;
             }
 
-            public static string GetAssetPath(UnityEngine.Object s)
-            {
-#if UNITY_EDITOR
-                if (s != null)
-                {
-                    string path = AssetDatabase.GetAssetPath(s);
-                    return path;
-                }
-#endif
-                return "";
-            }
-
-
             #endregion
-
             #region 判定
+            /// <summary>
+            /// 判定一个资产是不是文件夹
+            /// </summary>
+            /// <param name="ob"></param>
+            /// <returns></returns>
             public static bool IsObjectAsFolder(UnityEngine.Object ob)
             {
 #if UNITY_EDITOR
                 if (ob != null)
                 {
-                    var path = GetAssetPath(ob);
+                    var path = Wrap_GetAssetPath(ob);
                     return AssetDatabase.IsValidFolder(path);
                 }
 #endif
                 return false;
             }
-
-
             #endregion
 
             #region 快捷功能
-            public static void PingAssetByPath(string path)
+            /// <summary>
+            /// 标记指出一个路径的资产
+            /// </summary>
+            /// <param name="path"></param>
+            public static void Quick_PingAssetByPath(string path)
             {
 #if UNITY_EDITOR
                 var asset = AssetDatabase.LoadAssetAtPath(path, typeof(UnityEngine.Object));
@@ -277,14 +359,17 @@ namespace ES
                 }
 #endif
             }
-
-            public static void SelectAssetByPath(string path)
+            /// <summary>
+            /// 强制选中一个路径的资产
+            /// </summary>
+            /// <param name="path"></param>
+            public static void Quick_SelectAssetByPath(string path)
             {
 #if UNITY_EDITOR
                 var asset = AssetDatabase.LoadAssetAtPath(path, typeof(UnityEngine.Object));
                 if (asset != null)
                 {
-                   Selection.activeObject=(asset);
+                    Selection.activeObject = (asset);
                 }
                 else
                 {
@@ -292,22 +377,11 @@ namespace ES
                 }
 #endif
             }
-
-            public static string CreateEasySelectMenu(string title, string[] select, string[] back)
-            {
-#if UNITY_EDITOR
-                GenericMenu menu = new GenericMenu();
-                for (int i = 0; i < select.Length; i++)
-                {
-
-                }
-                return null;
-#else
-                return null;
-#endif
-            }
-
-            public static void InitAsset<T>() where T : UnityEngine.Object
+            /// <summary>
+            /// 初始化一个资产（通常是SO）
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            public static void Quick_InitAsset<T>() where T : UnityEngine.Object
             {
 #if UNITY_EDITOR
                 List<T> results = new List<T>();
@@ -324,18 +398,24 @@ namespace ES
                 }
 #endif
             }
-#endregion
+            #endregion
 
             #region 资产创建
-            public static T CreateSO<T>(string savePath, string name) where T : UnityEngine.ScriptableObject
+            /// <summary>
+            /// 创建一个SO资产
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="saveFolderPath">文件夹路径</param>
+            /// <param name="name">文件名字</param>
+            /// <returns></returns>
+            public static T CreateSOAsset<T>(string saveFolderPath, string name) where T : UnityEngine.ScriptableObject
             {
-                Debug.Log("创建 SO :" + name + "在" + savePath);
                 var ins = ScriptableObject.CreateInstance<T>();
+                ins.name = name;
                 if (ins != null)
                 {
 #if UNITY_EDITOR
-                    ins.name = name;
-                    AssetDatabase.CreateAsset(ins, savePath + "/" + ins.name + ".asset");
+                    AssetDatabase.CreateAsset(ins, saveFolderPath + "/" + ins.name + ".asset");
                     AssetDatabase.Refresh();
                     AssetDatabase.SaveAssets();
 #endif
@@ -343,7 +423,17 @@ namespace ES
                 }
                 return null;
             }
-            public static T CreateSOAsset<T>(string folderPath, string assetName, bool appendRandomIfNotChangedDefaultName = false, bool hasChange = false, Action<T> beforeSave = null) where T : ScriptableObject
+            /// <summary>
+            /// 创建一个SO资产(带回调与随机)
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="folderPath">父文件夹</param>
+            /// <param name="assetName">资产名</param>
+            /// <param name="appendRandomIfNotChangedDefaultName">如果发生冲突，是否加入随机数字结尾</param>
+            /// <param name="hasCharge">是否冲突</param>
+            /// <param name="AfterCreate">完成创建后第一时间回调--才保存</param>
+            /// <returns></returns>
+            public static T CreateSOAsset<T>(string folderPath, string assetName, bool appendRandomIfNotChangedDefaultName = false, bool hasCharge = false, Action<T> AfterCreate = null) where T : ScriptableObject
             {
 #if UNITY_EDITOR
 
@@ -353,11 +443,11 @@ namespace ES
                     return null;
                 }
                 T asset = ScriptableObject.CreateInstance<T>();
-                asset.name = assetName + (appendRandomIfNotChangedDefaultName && !hasChange ? UnityEngine.Random.Range(0, 99999).ToString() : "");
+                asset.name = assetName + (appendRandomIfNotChangedDefaultName && !hasCharge ? UnityEngine.Random.Range(0, 9999).ToString() : "");
                 string path = $"{folderPath}/{asset.name}.asset";
 
                 AssetDatabase.CreateAsset(asset, path);
-                beforeSave?.Invoke(asset);
+                AfterCreate?.Invoke(asset);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
                 return asset;
@@ -365,7 +455,17 @@ namespace ES
                 return null;
 #endif
             }
-            public static ScriptableObject CreateSOAsset(Type type, string folderPath, string assetName, bool appendRandomIfNotChangedDefaultName = false, bool hasChange = false, Action<ScriptableObject> beforeSave = null)
+            /// <summary>
+            /// 创建一个SO资产(带回调与随机)
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="folderPath">父文件夹</param>
+            /// <param name="assetName">资产名</param>
+            /// <param name="appendRandomIfNotChangedDefaultName">如果发生冲突，是否加入随机数字结尾</param>
+            /// <param name="hasCharge">是否冲突</param>
+            /// <param name="afterCreate">完成创建后第一时间回调--才保存</param>
+            /// <returns></returns>
+            public static ScriptableObject CreateSOAsset(Type type, string folderPath, string assetName, bool appendRandomIfNotChangedDefaultName = false, bool hasCharge = false, Action<ScriptableObject> afterCreate = null)
             {
 #if UNITY_EDITOR
                 if (type == null) return null;
@@ -375,11 +475,11 @@ namespace ES
                     return null;
                 }
                 ScriptableObject asset = ScriptableObject.CreateInstance(type);
-                asset.name = assetName + (appendRandomIfNotChangedDefaultName && !hasChange ? UnityEngine.Random.Range(0, 99999).ToString() : "");
+                asset.name = assetName + (appendRandomIfNotChangedDefaultName && !hasCharge ? UnityEngine.Random.Range(0, 99999).ToString() : "");
                 string path = $"{folderPath}/{asset.name}.asset";
 
                 AssetDatabase.CreateAsset(asset, path);
-                beforeSave?.Invoke(asset);
+                afterCreate?.Invoke(asset);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
                 return asset;
@@ -387,9 +487,6 @@ namespace ES
                 return null;
 #endif
             }
-
-
-
             #endregion
         }
     }

@@ -27,9 +27,7 @@ namespace ES
         /// <param name="includeSeparator">保留分隔符</param>
         /// <param name="comparison">比较规则​​(自己查)​​</param>
         /// <returns></returns>
-        public static string _KeepBeforeByFirst(this string source, string separator,
-                                        bool includeSeparator = false,
-                                        StringComparison comparison = StringComparison.Ordinal)
+        public static string _KeepBeforeByFirst(this string source, string separator,bool includeSeparator = false,StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
 
@@ -48,9 +46,7 @@ namespace ES
         /// <param name="includeSeparator">保留分隔符</param>
         /// <param name="comparison">比较规则​​(自己查)</param>
         /// <returns></returns>
-        public static string _KeepBeforeByLast(this string source, string separator,
-                                        bool includeSeparator = false,
-                                        StringComparison comparison = StringComparison.Ordinal)
+        public static string _KeepBeforeByLast(this string source, string separator,bool includeSeparator = false,StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
 
@@ -69,9 +65,7 @@ namespace ES
         /// <param name="includeSeparator">保留分隔符</param>
         /// <param name="comparison">比较规则​​(自己查)​​</param>
         /// <returns></returns>
-        public static string _KeepAfterByFirst(this string source, string separator,
-                                       bool includeSeparator = false,
-                                       StringComparison comparison = StringComparison.Ordinal)
+        public static string _KeepAfterByFirst(this string source, string separator,bool includeSeparator = false,StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
 
@@ -90,9 +84,7 @@ namespace ES
         /// <param name="includeSeparator">保留分隔符</param>
         /// <param name="comparison">比较规则​​(自己查)​​</param>
         /// <returns></returns>
-        public static string _KeepAfterByLast(this string source, string separator,
-                                           bool includeSeparator = false,
-                                           StringComparison comparison = StringComparison.Ordinal)
+        public static string _KeepAfterByLast(this string source, string separator,bool includeSeparator = false,StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
 
@@ -114,12 +106,10 @@ namespace ES
         /// <param name="separator">分隔符</param>
         /// <param name="comparison">比较规则​​(自己查)​​</param>
         /// <returns></returns>
-        public static string _KeepBeforeCutFlag(this string source, string separator,
-                                       StringComparison comparison = StringComparison.Ordinal)
+        public static string _KeepBeforeCutFlag(this string source, string separator,StringComparison comparison = StringComparison.Ordinal)
         {
             return source._KeepBeforeByFirst(separator, false, comparison);
         }
-
         /// <summary>
         /// 按最后一个分隔符切断，保留最后的(不包含分隔符)
         /// </summary>
@@ -127,12 +117,10 @@ namespace ES
         /// <param name="separator">分隔符</param>
         /// <param name="comparison">比较规则​​(自己查)​​</param>
         /// <returns></returns>
-        public static string _KeepAfterCutFlag(this string source, string separator,
-                                      StringComparison comparison = StringComparison.Ordinal)
+        public static string _KeepAfterCutFlag(this string source, string separator,StringComparison comparison = StringComparison.Ordinal)
         {
             return source._KeepAfterByLast(separator, false, comparison);
         }
-
         /// <summary>
         /// 保留两个分隔符之间的内容
         /// </summary>
@@ -141,9 +129,7 @@ namespace ES
         /// <param name="endSeparator">后面的分隔符</param>
         /// <param name="comparison">比较规则​​(自己查)​​</param>
         /// <returns></returns>
-        public static string _KeepBetween(this string source, string startSeparator, string endSeparator,
-                                        bool includeSeparators = false,
-                                        StringComparison comparison = StringComparison.Ordinal)
+        public static string _KeepBetween(this string source, string startSeparator, string endSeparator,bool includeSeparators = false,StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
 
@@ -623,8 +609,6 @@ namespace ES
         {
             return float.TryParse(selfStr, out var retValue) ? retValue : defaultValue;
         }
-
-
         /// <summary>
         /// 转化为Hash值<MD5算法>
         /// </summary>

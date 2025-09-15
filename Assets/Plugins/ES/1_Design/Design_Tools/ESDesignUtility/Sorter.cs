@@ -14,7 +14,15 @@ namespace ES
         //排序器
         public static class Sorter
         {
-            public static List<Vector3> SortPath(List<Vector3> vectors, EnumCollect.PathSort sortType, Vector3 pos = default, Transform transform = null)
+            /// <summary>
+            /// 排序路径（List<V3>）
+            /// </summary>
+            /// <param name="vectors">全部路径点</param>
+            /// <param name="sortType">排序类型</param>
+            /// <param name="pos">开始点</param>
+            /// <param name="transform">出发人</param>
+            /// <returns></returns>
+            public static List<Vector3> SortVectorPath(List<Vector3> vectors, EnumCollect.PathSort sortType, Vector3 pos = default, Transform transform = null)
             {
                 if (vectors == null) return new List<Vector3>();
                 if (vectors.Count <= 1) return vectors;
@@ -49,7 +57,7 @@ namespace ES
                     case PathSort.Random:
                         return vectors.OrderBy((n) => UnityEngine.Random.value).ToList();
                     case PathSort.AlwaysFirstNear:
-                        return SortForLast_Near(vectors, pos);
+                        return SortVectorPathForLast_Nearest(vectors, pos);
                     case PathSort.AlwaysFirstFar:
                         return SortForLast(vectors, pos, (a, b) => -Vector3.Distance(a, b));
                     case PathSort.AlwaysForwardZup:
@@ -75,46 +83,61 @@ namespace ES
                 }
                 return vectors;
             }
-
-            public static List<T> SortAny<T>(List<T> vectors, Func<T, Vector3> GetPos, EnumCollect.PathSort sortType, Vector3 pos = default, Transform transform = null)
+            /// <summary>
+            /// 排序路径（List<use-> V3>）
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="vectorUsers">全部路径点持有者</param>
+            /// <param name="GetPos">持有者->点</param>
+            /// <param name="sortType">排序类型</param>
+            /// <param name="pos">开始点</param>
+            /// <param name="transform">出发人</param>
+            /// <returns></returns>
+            public static List<T> SortVectorPathFromUser<T>(List<T> vectorUsers, Func<T, Vector3> GetPos, EnumCollect.PathSort sortType, Vector3 pos = default, Transform transform = null)
             {
-                if (vectors == null) return new List<T>();
-                if (vectors.Count <= 1) return vectors;
+                if (vectorUsers == null) return new List<T>();
+                if (vectorUsers.Count <= 1) return vectorUsers;
 
                 switch (sortType)
                 {
-                    case PathSort.NoneSort: return vectors;
+                    case PathSort.NoneSort: return vectorUsers;
                     case PathSort.StartFromNearToFar:
-                        return vectors.OrderBy((n) => Vector3.Distance(pos, GetPos(n))).ToList();
+                        return vectorUsers.OrderBy((n) => Vector3.Distance(pos, GetPos(n))).ToList();
                     case PathSort.StartFromFarToNear:
-                        return vectors.OrderByDescending((n) => Vector3.Distance(pos, GetPos(n))).ToList();
+                        return vectorUsers.OrderByDescending((n) => Vector3.Distance(pos, GetPos(n))).ToList();
                     case PathSort.Yup:
-                        return vectors.OrderBy((n) => GetPos(n).y).ToList();
+                        return vectorUsers.OrderBy((n) => GetPos(n).y).ToList();
                     case PathSort.Ydown:
-                        return vectors.OrderByDescending((n) => GetPos(n).y).ToList();
+                        return vectorUsers.OrderByDescending((n) => GetPos(n).y).ToList();
                     case PathSort.Xup:
-                        return vectors.OrderBy((n) => GetPos(n).x).ToList();
+                        return vectorUsers.OrderBy((n) => GetPos(n).x).ToList();
                     case PathSort.Xdown:
-                        return vectors.OrderByDescending((n) => GetPos(n).x).ToList();
+                        return vectorUsers.OrderByDescending((n) => GetPos(n).x).ToList();
                     case PathSort.Zup:
-                        return vectors.OrderBy((n) => GetPos(n).z).ToList();
+                        return vectorUsers.OrderBy((n) => GetPos(n).z).ToList();
                     case PathSort.Zdown:
-                        return vectors.OrderByDescending((n) => GetPos(n).z).ToList();
+                        return vectorUsers.OrderByDescending((n) => GetPos(n).z).ToList();
                     case PathSort.StartForwardZup:
                         if (transform != null)
-                            return vectors.OrderBy((n) => transform.InverseTransformPoint(GetPos(n)).z).ToList();
-                        else return vectors.OrderBy((n) => GetPos(n).z).ToList();
+                            return vectorUsers.OrderBy((n) => transform.InverseTransformPoint(GetPos(n)).z).ToList();
+                        else return vectorUsers.OrderBy((n) => GetPos(n).z).ToList();
                     case PathSort.StartForwardZdown:
                         if (transform != null)
-                            return vectors.OrderByDescending((n) => transform.InverseTransformPoint(GetPos(n)).z).ToList();
-                        else return vectors.OrderByDescending((n) => GetPos(n).z).ToList();
+                            return vectorUsers.OrderByDescending((n) => transform.InverseTransformPoint(GetPos(n)).z).ToList();
+                        else return vectorUsers.OrderByDescending((n) => GetPos(n).z).ToList();
                     case PathSort.Random:
-                        return vectors.OrderBy((n) => UnityEngine.Random.value).ToList();
+                        return vectorUsers.OrderBy((n) => UnityEngine.Random.value).ToList();
 
                 }
-                return vectors;
+                return vectorUsers;
             }
-            public static List<Vector3> SortForLast_Near(List<Vector3> vectors, Vector3 pos)
+            /// <summary>
+            /// 排序路径点-每次找到离当前最近的点
+            /// </summary>
+            /// <param name="vectors"></param>
+            /// <param name="pos">开始点</param>
+            /// <returns></returns>
+            public static List<Vector3> SortVectorPathForLast_Nearest(List<Vector3> vectors, Vector3 pos)
             {
                 List<Vector3> reSort = new List<Vector3>(vectors);
 
@@ -139,6 +162,14 @@ namespace ES
                 }
                 return reSort;
             }
+            /// <summary>
+            /// 排序T-每次按照特定机制返回最小 T1 当前判据 T2 上一个确定点
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="ts"></param>
+            /// <param name="start">开始状态</param>
+            /// <param name="func">判据获取</param>
+            /// <returns>排序后(New)</returns>
             public static List<T> SortForLast<T>(List<T> ts, T start, Func<T, T, float> func)
             {
                 List<T> reSort = new List<T>(ts);
@@ -164,6 +195,14 @@ namespace ES
                 }
                 return reSort;
             }
+            /// <summary>
+            /// 排序T-每次按照特定机制返回最小 T1 当前判据 T2 上一个确定点 T3 上上1个确定点
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="ts"></param>
+            /// <param name="start">开始状态</param>
+            /// <param name="func">判据获取</param>
+            /// <returns>排序后(New)</returns>
             public static List<T> SortForLast_Three<T>(List<T> ts, T start, Func<T, T, T, float> func)
             {
                 List<T> reSort = new List<T>(ts);

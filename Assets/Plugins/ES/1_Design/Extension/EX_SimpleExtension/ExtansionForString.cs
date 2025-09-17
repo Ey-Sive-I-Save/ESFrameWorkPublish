@@ -345,7 +345,7 @@ namespace ES
             if (input._IsCSharpKeyword())
                 return false;
 
-            return false;
+            return true;
         }
 
         /// <summary>

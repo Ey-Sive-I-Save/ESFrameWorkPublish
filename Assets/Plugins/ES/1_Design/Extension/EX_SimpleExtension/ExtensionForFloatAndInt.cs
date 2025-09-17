@@ -10,24 +10,42 @@ using UnityEngine;
 
 namespace ES
 {
-
+    /// <summary>
+    /// 针对 float 和 int 的扩展方法集合
+    /// </summary>
     public static class ExtensionForFloatAndInt
     {
         #region 运算辅助
-        
+
+        /// <summary>
+        /// 安全除法，避免除以零。当除数为 0 时，强制改为 1。
+        /// </summary>
         [BurstCompile]
         public static float _SafeDivide(this float f, float b)
         {
             if (b == 0) b = 1;
             return f / b;
         }
-        // 3. 限制数值在最小最大值之间
+
+        /// <summary>
+        /// 限制数值在 [min, max] 范围内
+        /// </summary>
         public static float _Clamp(this float value, float min, float max)
         {
             return Mathf.Clamp(value, min, max);
         }
 
-        // 5. 将角度限制在0-360度
+        /// <summary>
+        /// 限制数值在 [0,1] 范围内
+        /// </summary>
+        public static float _Clamp01(this float value)
+        {
+            return Mathf.Clamp01(value);
+        }
+
+        /// <summary>
+        /// 将角度归一化到 [0, 360)
+        /// </summary>
         public static float _AsNormalizeAngle(this float angle)
         {
             angle %= 360f;
@@ -35,14 +53,9 @@ namespace ES
             return angle;
         }
 
-        public static int _RoundInt(this float pre)
-        {
-            return Mathf.RoundToInt(pre);
-        }
-
-
-
-        // 6. 将角度限制在-180到180度
+        /// <summary>
+        /// 将角度归一化到 [-180, 180)
+        /// </summary>
         public static float _AsNormalizeAngle180(this float angle)
         {
             angle %= 360f;
@@ -51,69 +64,194 @@ namespace ES
             return angle;
         }
 
-        // 8. 将值映射到新范围
+        /// <summary>
+        /// 将数值映射到新的范围
+        /// </summary>
         public static float _Remap(this float value, float fromMin, float fromMax, float toMin = 0, float toMax = 1)
         {
+            if (Mathf.Abs(fromMax - fromMin) < Mathf.Epsilon) return toMin; // 避免除0
             return toMin + (value - fromMin) * (toMax - toMin) / (fromMax - fromMin);
         }
+
+        /// <summary>
+        /// 线性插值（Clamp 在 0-1 内）
+        /// </summary>
         public static float _LerpTo(this float start, float end, float t)
         {
             return start + (end - start) * t;
         }
+        
+        /// <summary>
+        /// 平滑阻尼插值（类似 Mathf.SmoothDamp，但不强制依赖 Time.deltaTime）
+        /// </summary>
+        /// <param name="current">当前值</param>
+        /// <param name="target">目标值</param>
+        /// <param name="currentVelocity">当前速度（ref 参数，内部会更新）</param>
+        /// <param name="smoothTime">平滑时间，越小越快</param>
+        /// <param name="maxSpeed">最大速度（可选）</param>
+        /// <param name="deltaTime">
+        /// 时间步长，通常为 <see cref="Time.deltaTime"/>，也可以自定义（如固定步长模拟）
+        /// </param>
+        /// <returns>插值结果</returns>
+        public static float _SmoothDamp(this float current, float target, ref float currentVelocity, float smoothTime, float maxSpeed = Mathf.Infinity, float deltaTime = 0.02f)
+        {
+            // 注意：这里不给 deltaTime 默认 -1，而是一个安全的固定值（0.02秒 ≈ 50fps）
+            // 调用时显式传 Time.deltaTime 更清晰
+            return Mathf.SmoothDamp(current, target, ref currentVelocity, smoothTime, maxSpeed, deltaTime);
+        }
+
+
+        /// <summary>
+        /// 反插值，返回当前值在 [from, to] 范围内的归一化位置 (0-1)
+        /// </summary>
+        public static float _InverseLerp(this float value, float from, float to)
+        {
+            if (Mathf.Abs(to - from) < Mathf.Epsilon) return 0f;
+            return Mathf.Clamp01((value - from) / (to - from));
+        }
+
+        /// <summary>
+        /// 四舍五入到最接近的整数
+        /// </summary>
+        public static int _RoundInt(this float pre)
+        {
+            return Mathf.RoundToInt(pre);
+        }
+
+        /// <summary>
+        /// 将角度（度）转为弧度
+        /// </summary>
+        public static float _ToRadians(this float degrees)
+        {
+            return degrees * Mathf.Deg2Rad;
+        }
+
+        /// <summary>
+        /// 将弧度转为角度（度）
+        /// </summary>
+        public static float _ToDegrees(this float radians)
+        {
+            return radians * Mathf.Rad2Deg;
+        }
+
+        /// <summary>
+        /// 将数值循环限制在 [min, max) 范围内
+        /// </summary>
+        public static float _Wrap(this float value, float min, float max)
+        {
+            float range = max - min;
+            if (Math.Abs(range) < Mathf.Epsilon) return min;
+            return min + ((value - min) % range + range) % range;
+        }
+
         #endregion
 
         #region 判断
-        // 1. 检查float是否在范围内
+
+        /// <summary>
+        /// 检查 float 是否在给定范围内
+        /// </summary>
         public static bool _InRange(this float f, Vector2 range)
         {
             return f >= range.x && f <= range.y;
         }
 
-        // 2. 检查int是否在范围内
+        /// <summary>
+        /// 检查 int 是否在给定范围内
+        /// </summary>
         public static bool _InRange(this int i, Vector2Int range)
         {
             return i >= range.x && i <= range.y;
         }
 
-        // 4. 检查float是否接近0
+        /// <summary>
+        /// 检查 float 是否接近 0
+        /// </summary>
         public static bool _IsApproximatelyZero(this float f, float threshold = 0.001f)
         {
             return Mathf.Abs(f) < threshold;
         }
 
-        // 7. 检查两个float是否近似相等
+        /// <summary>
+        /// 检查两个 float 是否近似相等
+        /// </summary>
         public static bool _IsApproximately(this float a, float b, float threshold = 0.001f)
         {
             return Mathf.Abs(a - b) < threshold;
         }
 
-        // 9. 检查int是否为偶数
+        /// <summary>
+        /// 检查 int 是否为偶数
+        /// </summary>
         public static bool _IsEven(this int i)
         {
             return i % 2 == 0;
         }
 
-        // 10. 检查int是否为奇数
+        /// <summary>
+        /// 检查 int 是否为奇数
+        /// </summary>
         public static bool _IsOdd(this int i)
         {
             return i % 2 != 0;
+        }
+
+        /// <summary>
+        /// 检查 int 是否能被指定数整除
+        /// </summary>
+        public static bool _IsDivisibleBy(this int value, int divisor)
+        {
+            if (divisor == 0) return false;
+            return value % divisor == 0;
+        }
+
+        /// <summary>
+        /// 是否为正数
+        /// </summary>
+        public static bool _IsPositive(this float value) => value > 0f;
+        public static bool _IsPositive(this int value) => value > 0;
+
+        /// <summary>
+        /// 是否为负数
+        /// </summary>
+        public static bool _IsNegative(this float value) => value < 0f;
+        public static bool _IsNegative(this int value) => value < 0;
+
+        /// <summary>
+        /// 获取数值符号（-1, 0, 1）
+        /// </summary>
+        public static int _Sign(this float value)
+        {
+            return value > 0 ? 1 : (value < 0 ? -1 : 0);
+        }
+        public static int _Sign(this int value)
+        {
+            return value > 0 ? 1 : (value < 0 ? -1 : 0);
         }
 
         #endregion
 
         #region 显示格式
 
-
-
+        /// <summary>
+        /// 格式化为固定小数位
+        /// </summary>
         public static string _ToString_FormatToDecimalPlaces(this float num, int digits)
         {
             return num.ToString($"F{digits}");
         }
-        public static string _ToString_Percentage(this float num)
+
+        /// <summary>
+        /// 转换为百分比字符串，可指定小数位
+        /// </summary>
+        public static string _ToString_Percentage(this float num, int digits = 0)
         {
-            return $"{(num * 100):0}%";
+            return (num * 100).ToString($"F{digits}") + "%";
         }
-    
+
+        /// <summary>
+        /// 转换为日期序数（如 1st, 2nd, 3rd, 4th...）
+        /// </summary>
         public static string _ToString_DateOrdinal(this int num)
         {
             if (num % 100 / 10 == 1) return $"{num}th";
@@ -126,18 +264,24 @@ namespace ES
             }
         }
 
+        /// <summary>
+        /// 转换为带千分位的格式化字符串
+        /// </summary>
         public static string _ToFormattedString(this float num)
         {
             return num.ToString("#,0.##");
         }
 
+        /// <summary>
+        /// 转换为罗马数字
+        /// </summary>
         public static string _ToString_Roman(this int num)
         {
             var romanNumerals = new (int, string)[]
             {
-            (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
-            (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
-            (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")
+                (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
+                (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
+                (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")
             };
 
             var result = new StringBuilder();
@@ -152,23 +296,30 @@ namespace ES
             return result.ToString();
         }
 
+        /// <summary>
+        /// 转换为货币格式，使用当前区域文化
+        /// </summary>
         public static string _ToString_MoneyFormat(this int num)
         {
             return num.ToString("C", CultureInfo.CurrentCulture);
         }
+
         #endregion
 
         #region 特殊
-        //获得可枚举连续整数
-        public static IEnumerable<int> _GetIEnumable_RangeInts(this int start, int end)
+
+        /// <summary>
+        /// 获得 [start, end] 的连续整数序列
+        /// </summary>
+        public static IEnumerable<int> _GetIEnumerable_RangeInts(this int start, int end)
         {
             for (int i = start; i <= end; i++)
             {
                 yield return i;
             }
         }
-        #endregion
 
+        #endregion
     }
 }
 

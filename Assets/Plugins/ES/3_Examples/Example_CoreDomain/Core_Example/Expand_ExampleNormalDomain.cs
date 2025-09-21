@@ -28,7 +28,7 @@ namespace ES
         }
         protected override void Update()    
         {
-            Debug.Log("Update" + this);
+            //Debug.Log("Update" + this);
             base.Update();
         }
         protected override void OnDisable()

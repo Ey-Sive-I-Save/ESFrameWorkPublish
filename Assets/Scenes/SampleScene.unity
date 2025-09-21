@@ -459,8 +459,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 728943336}
-  - component: {fileID: 728943337}
   - component: {fileID: 728943338}
+  - component: {fileID: 728943339}
   m_Layer: 0
   m_Name: GameObject
   m_TagString: Untagged
@@ -484,38 +484,6 @@ Transform:
   - {fileID: 1269041001}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &728943337
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 728943334}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c3f2d4c167474f84e8c70f33f001b8d1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  OriginalDomain:
-    myCore: {fileID: 0}
-    MyModules:
-      ValuesNow:
-      - rid: 5801375500936413196
-      MayHasAddingElement: 1
-    f: 0
-    tt: 0
-  SpecialDomain:
-    rid: -2
-  fff: 666
-  references:
-    version: 2
-    RefIds:
-    - rid: -2
-      type: {class: , ns: , asm: }
-    - rid: 5801375500936413196
-      type: {class: ExampleNormal_BanAttack, ns: ES, asm: Assembly-CSharp-firstpass}
-      data:
-        _enableSelf: 1
 --- !u!61 &728943338
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -561,6 +529,18 @@ BoxCollider2D:
   serializedVersion: 2
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
+--- !u!114 &728943339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 728943334}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9b5eb84b2c2fc94eba2e90a564db28f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -753,7 +733,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 55
 --- !u!114 &1269041003
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -317,7 +317,7 @@ namespace ES
                 string guid = AssetDatabase.AssetPathToGUID(path);
                 if (guid != null && !guid.IsNullOrWhitespace()) return guid;
 #endif
-                return null;
+                return "";
             }
 
             #endregion

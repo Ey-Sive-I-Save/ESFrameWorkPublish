@@ -7,99 +7,106 @@ using UnityEngine;
 namespace ES
 {
 
-    public static class ExtensionForGameObject 
+    public static class ExtensionForGameObject
     {
-        // 41. 检查GameObject是否有特定组件
-        public static bool _HasComponent<T>(this GameObject gameObject) where T : Component
-        {
-            return gameObject.GetComponent<T>() != null;
-        }
-
-        // 42. 获取或添加组件
+        /// <summary>
+        /// 获取或者添加组件
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="gameObject"></param>
+        /// <returns></returns>
         public static T _GetOrAddComponent<T>(this GameObject gameObject) where T : Component
         {
             T component = gameObject.GetComponent<T>();
             return component != null ? component : gameObject.AddComponent<T>();
         }
 
-        public static Component[] _GetAllComponent(this GameObject gameObject)
+        /// <summary>
+        /// 获取全部组件[]数组
+        /// </summary>
+        /// <param name="gameObject"></param>
+        /// <returns></returns>
+        public static Component[] _GetAllComponents(this GameObject gameObject)
         {
-          return gameObject.GetComponents<Component>();
+            return gameObject.GetComponents<Component>();
         }
 
-        // 43. 设置GameObject的激活状态
-        public static void _SetActive(this GameObject gameObject, bool active)
+        /// <summary>
+        /// 安全地进行活动状态设置
+        /// </summary>
+        /// <param name="gameObject"></param>
+        /// <param name="active">活动状态</param>
+        public static void _SafeSetActive(this GameObject gameObject, bool active)
         {
             if (gameObject != null && gameObject.activeSelf != active)
                 gameObject.SetActive(active);
         }
 
-        // 44. 切换GameObject的激活状态
-        public static void _ToggleActive(this GameObject gameObject)
+        /// <summary>
+        /// 安全地进行活动状态切换
+        /// </summary>
+        /// <param name="gameObject">活动状态</param>
+        public static void _SafeToggleActive(this GameObject gameObject)
         {
             if (gameObject != null)
                 gameObject.SetActive(!gameObject.activeSelf);
         }
 
-        // 45. 销毁GameObject
-        public static void _Destroy(this GameObject gameObject, float delay = 0f)
+        /// <summary>
+        /// 安全销毁
+        /// </summary>
+        /// <param name="gameObject"></param>
+        /// <param name="delay"></param>
+        public static void _SafeDestroy(this GameObject gameObject, float delay = 0f)
         {
             if (gameObject != null)
                 UnityEngine.Object.Destroy(gameObject, delay);
         }
 
-        // 46. 立即销毁GameObject
-        public static void _DestroyImmediate(this GameObject gameObject)
+        /// <summary>
+        /// 安全立刻销毁
+        /// </summary>
+        /// <param name="gameObject"></param>
+        public static void _SafeDestroyImmediate(this GameObject gameObject)
         {
             if (gameObject != null)
                 UnityEngine.Object.DestroyImmediate(gameObject);
         }
 
-        // 47. 设置GameObject的层
-        public static void _SetLayer(this GameObject gameObject, int layer, bool includeChildren = false)
+        /// <summary>
+        /// 安全设置层级
+        /// </summary>
+        /// <param name="gameObject"></param>
+        /// <param name="layer"></param>
+        /// <param name="includeChildren"></param>
+        public static void _SafeSetLayer(this GameObject gameObject, int layer, bool includeChildren = false)
         {
             if (gameObject == null) return;
 
             if (includeChildren)
             {
                 Transform[] children = gameObject.GetComponentsInChildren<Transform>();
-                foreach (Transform child in children)
-                    child.gameObject.layer = layer;
-            }
+                for(int i = 0; i < children.Length; i++)
+                {
+                    children[i].gameObject.layer = layer;
+                }
+            } 
             else
             {
                 gameObject.layer = layer;
             }
         }
-
-        // 48. 检查GameObject是否在特定层
-        public static bool _IsInLayer(this GameObject gameObject, int layer)
-        {
-            return gameObject != null && gameObject.layer == layer;
-        }
+        /// <summary>
+        /// 判断是否在一个LaerMask下
+        /// </summary>
+        /// <param name="gameObject"></param>
+        /// <param name="mask"></param>
+        /// <returns></returns>
         public static bool _IsInLayerMask(this GameObject gameObject, LayerMask mask)
         {
-            return gameObject != null &&(1<<gameObject.layer & mask)>0;
-        }
-        // 49. 检查GameObject是否在特定标签
-        public static bool _IsInTag(this GameObject gameObject, string tag)
-        {
-            return gameObject != null && gameObject.CompareTag(tag);
+            return (1 << gameObject.layer & mask) > 0;
         }
 
-        // 50. 查找子物体(包含非激活物体)
-        public static Transform _FindChildRecursive(this GameObject parent, string name)
-        {
-            if (parent == null) return null;
-
-            foreach (Transform child in parent.transform)
-            {
-                if (child.name == name) return child;
-                Transform found = _FindChildRecursive(child.gameObject, name);
-                if (found != null) return found;
-            }
-            return null;
-        }
     }
 }
 

@@ -47,6 +47,8 @@ namespace ES
             return new Vector3(v.x / divisor.x, v.y / divisor.y, v.z / divisor.z);
         }
         #endregion
+
+        #region 简单操作
         /// <summary>
         /// 不要Y值，设置为0
         /// </summary>
@@ -124,7 +126,9 @@ namespace ES
             v.z *= zMulti;
             return v;
         }
+        #endregion
 
+        #region 其他
         /// <summary>
         /// 到一个点的水平距离
         /// </summary>
@@ -146,6 +150,7 @@ namespace ES
         {
             return v.sqrMagnitude < threshold * threshold;
         }
+        #endregion
     }
 }
 

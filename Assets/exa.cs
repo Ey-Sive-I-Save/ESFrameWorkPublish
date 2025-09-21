@@ -1,4 +1,5 @@
 using ES;
+using Sirenix.OdinInspector;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,16 +9,20 @@ public class exa : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-
+        StartCoroutine(ie());
     }
-    Vector3 pos;
-    Vector3 pos2;
+    IEnumerator ie()
+    {
+        yield return null;
+    }
     // Update is called once per frame
     void Update()
     {
-        for (int i = 0; i < 1000_0000; i++)
-        {
-            var v = 5;
-        }
+      
+    }
+    [Button("测试")]
+    void Debug()
+    {
+
     }
 }

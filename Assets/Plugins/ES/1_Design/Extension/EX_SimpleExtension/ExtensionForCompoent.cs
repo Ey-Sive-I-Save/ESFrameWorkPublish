@@ -113,7 +113,9 @@ namespace ES
         public static T _GetOrAddComponent<T>(this Component component) where T : Component
         {
             if (component == null) return null;
-            return component.gameObject.GetOrAddComponent<T>();
+            T c = component.gameObject.GetComponent<T>();
+            if (c == null) return component.gameObject.AddComponent<T>();
+            return c;
         }
         #endregion
 

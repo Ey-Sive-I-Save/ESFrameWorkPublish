@@ -1,0 +1,17 @@
+{
+    "name": "ES_Design",
+    "rootNamespace": "",
+    "references": [
+        "GUID:dc8f60a3ad5a07d4787d9e672b052700",
+        "GUID:2665a8d13d1b3f18800f46e256720795"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

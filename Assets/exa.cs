@@ -20,9 +20,12 @@ public class exa : MonoBehaviour
     {
       
     }
+    public float f;
+    public string s;
     [Button("测试")]
     void Debug()
     {
-
+        GlobalLinker.POOL.SendLink(f);
+        GlobalLinker.POOL.SendLink(s);
     }
 }

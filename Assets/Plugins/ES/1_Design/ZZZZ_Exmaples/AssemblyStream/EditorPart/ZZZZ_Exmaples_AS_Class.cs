@@ -26,7 +26,7 @@ public class SpecialClassAttribute : Attribute
     }
 }
 
-public class ER_SpecialClassAttribute : EditorRegisterFORClassAttribute<SpecialClassAttribute>
+public class ER_SpecialClassAttribute : EditorRegister_FOR_ClassAttribute<SpecialClassAttribute>
 {
     public override void Handle(SpecialClassAttribute attribute, Type type)
     {

@@ -36,7 +36,7 @@ public class EditorInitInvokeAttribute : Attribute
     }
 }
 
-public class ER_SpecialMethodAttribute : EditorRegisterFORMethodAttribute<EditorInitInvokeAttribute>
+public class ER_SpecialMethodAttribute : EditorRegister_FOR_MethodAttribute<EditorInitInvokeAttribute>
 {
 
 

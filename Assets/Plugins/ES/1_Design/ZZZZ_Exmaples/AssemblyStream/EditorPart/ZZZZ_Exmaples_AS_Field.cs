@@ -1,3 +1,4 @@
+using ES;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -29,7 +30,7 @@ public class SpecialFieldAttribute : Attribute
     }
 }
 
-public class ER_SpecialAttribue : EditorRegisterFORFieldAttribute<SpecialFieldAttribute>
+public class ER_SpecialAttribue : EditorRegister_FOR_FieldAttribute<SpecialFieldAttribute>
 {
     public override void Handle(SpecialFieldAttribute attribute, FieldInfo fieldInfo)
     {

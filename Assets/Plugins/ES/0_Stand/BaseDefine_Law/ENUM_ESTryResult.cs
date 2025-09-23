@@ -10,7 +10,7 @@ namespace ES
         /// <summary>
         /// 失败
         /// </summary>
-       [InspectorName("失败")] Fail = 1,
+        [InspectorName("失败")] Fail = 1,
         /// <summary>
         /// 成功
         /// </summary>
@@ -24,4 +24,6 @@ namespace ES
         /// </summary>
         [InspectorName("还没结果")] Trying = 8
     }
+
+
 }

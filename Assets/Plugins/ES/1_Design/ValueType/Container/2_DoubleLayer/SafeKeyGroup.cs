@@ -26,6 +26,7 @@ namespace ES
         public void SetAutoApplyBuffers(bool b) => AutoApplyBuffers = b;
         public void TryApplyBuffers()
         {
+            
             foreach(var (i,k) in Groups)
             {
                 k.ApplyBuffers();
@@ -117,7 +118,7 @@ namespace ES
 #endif
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IEnumerable<Element> GetGroup(Key key)
+        public IEnumerable<Element> GetGroupAsIEnumable(Key key)
         {
             if (Groups.TryGetValue(key, out var list))
             {
@@ -181,7 +182,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IEnumerable<Element> GetMayStayGroup<T>(T e) where T : Element
         {
-            return GetGroup(typeof(T));
+            return GetGroupAsIEnumable(typeof(T));
         }
     }
 

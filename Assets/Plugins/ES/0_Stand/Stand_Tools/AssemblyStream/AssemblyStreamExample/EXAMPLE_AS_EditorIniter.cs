@@ -7,7 +7,7 @@ public abstract class Initer_Abstarct
     public abstract void Init();
 }
 
-public class EditorRegisterForSingle_Initer_Abstarct : EditorRegisterFORSingleton<Initer_Abstarct>
+public class EditorRegisterForSingle_Initer_Abstarct : EditorRegister_FOR_Singleton<Initer_Abstarct>
 {
     public override void Handle(Initer_Abstarct singleton)
     {

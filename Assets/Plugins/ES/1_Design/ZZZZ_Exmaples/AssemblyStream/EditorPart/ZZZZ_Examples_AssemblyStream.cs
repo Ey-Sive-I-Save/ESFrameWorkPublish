@@ -18,7 +18,7 @@ public abstract class GlobalLinker<Link> : GlobalLinker, IReceiveLink<Link>
     }
     public abstract void OnLink(Link link);
 }
-public class EditorRegister_GlobalLinker : EditorRegisterFORSingleton<GlobalLinker>
+public class EditorRegister_GlobalLinker : EditorRegister_FOR_Singleton<GlobalLinker>
 {
     public override void Handle(GlobalLinker singleton)
     {

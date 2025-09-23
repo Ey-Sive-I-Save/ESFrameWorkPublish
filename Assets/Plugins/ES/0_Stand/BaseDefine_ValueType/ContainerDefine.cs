@@ -44,7 +44,7 @@ namespace ES
         public void TryAddRange(K key, IEnumerable<Element> adds);
         public void TryRemoveRange(K key, IEnumerable<Element> removes);
         public bool TryContains(K key, Element who);
-        public IEnumerable<Element> GetGroup(K key);
+        public IEnumerable<Element> GetGroupAsIEnumable(K key);
         public void ClearGroup(K key);
         public void Clear();
 

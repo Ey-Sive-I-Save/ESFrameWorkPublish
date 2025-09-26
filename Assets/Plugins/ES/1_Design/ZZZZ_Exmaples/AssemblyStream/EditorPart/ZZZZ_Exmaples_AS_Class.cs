@@ -1,4 +1,4 @@
-using System;
+/*using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -30,6 +30,7 @@ public class ER_SpecialClassAttribute : EditorRegister_FOR_ClassAttribute<Specia
 {
     public override void Handle(SpecialClassAttribute attribute, Type type)
     {
-        Debug.Log("通过分组" + attribute.SelectType + "/" + attribute.GroupName + ",可以创建一个" + type);
+       
     }
 }
+*/

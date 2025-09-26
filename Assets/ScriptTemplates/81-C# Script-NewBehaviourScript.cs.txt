@@ -1,0 +1,22 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+namespace ES
+{
+    #ROOTNAMESPACEBEGIN#
+    public class #SCRIPTNAME# : MonoBehaviour
+    {
+    
+        void Start()
+        {
+            #NOTRIM#
+        }
+
+    
+        void Update()
+        {
+            #NOTRIM#
+        }
+    }
+}
+#ROOTNAMESPACEEND#

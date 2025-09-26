@@ -17,7 +17,7 @@ using UnityEditor;
 
 namespace ES
 {
-    public static partial class ESStandUtility
+    internal static partial class ESStandUtility
     {
         //
         public class SafeEditor

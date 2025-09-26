@@ -13,7 +13,7 @@ namespace ES
         //创建器
         public static class Creator
         {
-            #region 深拷贝
+            #region 深拷贝部分
             /// <summary>
             /// 深拷贝<T>任意类型
             /// </summary>
@@ -482,11 +482,22 @@ namespace ES
                 Debug.LogWarning($"无法深拷贝集合类型: {collectionType.Name}");
                 return collection;
             }
-           
+
             #endregion
 
+            #region CreatePath支持
+            public static SelectDic<string, string, Type> CreatePaths = new();
 
-           
+            public class ER_CreatePath : EditorRegister_FOR_ClassAttribute<ESCreatePathAttribute>
+            {
+                public override void Handle(ESCreatePathAttribute attribute, Type type)
+                {
+                    CreatePaths.TryAddOrSet(attribute.GroupName,attribute.MyName,type);
+                }
+            }
+
+            #endregion
+
         }
 
 

@@ -112,10 +112,10 @@ namespace ES
     {
         [LabelText("正在更新", SdfIconType.ArrowRepeat), SerializeReference/*, GUIColor("@ESDesignUtility.ColorSelector.ColorForUpdating")*/]
         public List<T> ValuesNow = new List<T>(10);
-        [FoldoutGroup("缓冲中")]
+        [FoldoutGroup("缓冲中"),HideInEditorMode]
         [ShowInInspector, NonSerialized, LabelText("缓冲添加队列", SdfIconType.BoxArrowInLeft)]
         private Queue<T> ValuesBufferToAdd = new Queue<T>();
-        [FoldoutGroup("缓冲中")]
+        [FoldoutGroup("缓冲中"), HideInEditorMode]
         [ShowInInspector,NonSerialized,LabelText("缓冲移除队列", SdfIconType.BoxArrowRight)]
         private Queue<T> ValuesBufferToRemove = new Queue<T>();
         private bool isDirty;
@@ -222,7 +222,7 @@ namespace ES
         }
 
         [Button("强制更新")]
-        [FoldoutGroup("缓冲中")]
+        [FoldoutGroup("缓冲中"), HideInEditorMode]
         private void ForceUpdate()
         {
             ApplyBuffers(true);

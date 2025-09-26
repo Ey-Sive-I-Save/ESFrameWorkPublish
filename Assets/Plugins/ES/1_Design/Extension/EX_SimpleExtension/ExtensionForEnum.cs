@@ -164,6 +164,16 @@ namespace ES
         #endregion
 
         #region ES扩展
+
+        public static string _GetInspectorName<T>(this T enumValue) where T : Enum
+        {
+            Type type = enumValue.GetType();
+            FieldInfo field = type.GetField(enumValue.ToString());
+            var att = field.GetCustomAttribute<InspectorNameAttribute>();
+            return att.displayName;
+        }
+
+
         public static ESMessageAttribute _Get_ATT_ESMessage<T>(this T enumValue) where T : Enum
         {
             Type type = enumValue.GetType();

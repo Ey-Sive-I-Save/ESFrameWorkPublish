@@ -16,7 +16,7 @@ namespace ES
     public abstract class Core : MonoBehaviour, ICore
     {
         #region 模块表
-        [NonSerialized,ShowInInspector,TabGroup("常规","模块表"),ReadOnly,HideLabel,PropertyOrder(5),HideReferenceObjectPicker]
+        [NonSerialized,ShowInInspector,TabGroup("常规","模块表",TextColor = "@ESDesignUtility.ColorSelector.Color_04"),ReadOnly,HideLabel,PropertyOrder(5),HideReferenceObjectPicker]
         public Dictionary<Type, IModule> ModuleTables = new Dictionary<Type, IModule>();
         public KeyType GetMoudle<KeyType>() where KeyType : class, IModule, new()
         {

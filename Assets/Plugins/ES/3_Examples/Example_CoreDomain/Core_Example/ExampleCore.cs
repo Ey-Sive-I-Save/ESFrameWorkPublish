@@ -32,7 +32,7 @@ namespace ES
         [TabGroup("常规", "属性")]
         public float fff = 666;
         #endregion
-
+        
 
     }
     [Serializable]

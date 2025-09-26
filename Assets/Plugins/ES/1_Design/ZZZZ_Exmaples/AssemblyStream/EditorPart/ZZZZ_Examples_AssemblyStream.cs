@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class GlobalLinker
+/*public abstract class GlobalLinker
 {
     //加入这里有一个全局事件中心
     public static LinkReceivePool POOL = new LinkReceivePool();
@@ -46,4 +46,4 @@ public class Linker_AAA3 : GlobalLinker<string>
     {
         Debug.Log("事件触发"+link);
     }
-}
+}*/

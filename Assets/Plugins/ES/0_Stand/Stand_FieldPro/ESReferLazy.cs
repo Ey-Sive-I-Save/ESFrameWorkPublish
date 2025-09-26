@@ -12,6 +12,7 @@ namespace ES
     [Serializable]
     public sealed class ESReferLazy<T> where T : class
     {
+        
         #region 基本构造
         [ShowInInspector, LabelText("引用值")]
         public T Value

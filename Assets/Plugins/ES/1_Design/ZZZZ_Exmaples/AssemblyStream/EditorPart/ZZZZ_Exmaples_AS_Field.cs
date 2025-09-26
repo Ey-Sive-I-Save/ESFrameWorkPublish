@@ -1,4 +1,4 @@
-using ES;
+/*using ES;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -10,7 +10,7 @@ public class AAA
     [SpecialField("你好")]
     public string name;
     [SpecialField("哈哈哈")]
-    public float f;
+    public float f; 
 }
 
 public class AAA2
@@ -37,3 +37,4 @@ public class ER_SpecialAttribue : EditorRegister_FOR_FieldAttribute<SpecialField
         Debug.Log(fieldInfo.DeclaringType + "标记了一个字段" + fieldInfo + "这里标记为"+attribute.FlagName);
     }
 }
+*/

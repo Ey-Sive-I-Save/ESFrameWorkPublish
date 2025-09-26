@@ -289,7 +289,7 @@ namespace ES
                 TryAddModuleRunTime(use);
             }
         }
-        [Button("添加实时模块")]
+        [Button("添加实时模块"),HideInEditorMode]
         public void TryAddModuleRunTime(Module_ use)
         {
             if (use._TryRegisterToHost(this) == ESTryResult.Succeed)

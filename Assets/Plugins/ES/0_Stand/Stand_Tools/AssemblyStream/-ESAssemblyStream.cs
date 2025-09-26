@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
@@ -45,12 +46,13 @@ namespace ES
     }
     public class ESAssemblyStream
     {
-        private static List<string> RuntimeValidAssebliesName = new List<string>() {
-    "ES_Design","ES_Stand"
-    };
         private static List<string> EditorValidAssebliesName = new List<string>() {
-    "ES_Design","ES_Stand"
+    "ES_Design","ES_Stand","Assembly-CSharp-Editor-firstpass","ES_Logic"
     };
+        private static List<string> RuntimeValidAssebliesName = new List<string>() {
+    "ES_Design","ES_Stand","ES_Logic"
+    };
+
         //编辑器部分
         private class EditorPart
         {
@@ -60,24 +62,24 @@ namespace ES
             private static List<Assembly> ValidEditorAssembiles = new List<Assembly>(25);
             private static Dictionary<Assembly, Type[]> EditorTypes = new Dictionary<Assembly, Type[]>(25);
 
-            private static List<Type> EditorRegisters = new List<Type>(25);
-
+            private static List<ESAS_EditorRegister_AB> EditorRegisters = new List<ESAS_EditorRegister_AB>(25);
+                                       
             #region 支持的Define模板
             private static readonly Type Define_ClassAttribute = typeof(EditorRegister_FOR_ClassAttribute<>).GetGenericTypeDefinition();
             private static readonly Type Define_FieldAttribute = typeof(EditorRegister_FOR_FieldAttribute<>).GetGenericTypeDefinition();
             private static readonly Type Define_MethodAttribute = typeof(EditorRegister_FOR_MethodAttribute<>).GetGenericTypeDefinition();
             private static readonly Type Define_Singleton = typeof(EditorRegister_FOR_Singleton<>).GetGenericTypeDefinition();
-            #endregion
+            #endregion       
 
             #region 处理流
             private static List<Func<Type, bool>> Handler_Singleton = new List<Func<Type, bool>>();
             private static List<Func<MethodInfo, bool>> Handler_MethodAttribute = new List<Func<MethodInfo, bool>>();
             private static List<Func<FieldInfo, bool>> Handler_FieldAttribute = new List<Func<FieldInfo, bool>>();
             private static List<Func<Type, bool>> Handler_ClassAttribute = new List<Func<Type, bool>>();
-            #endregion
+            #endregion  
 
 
-            private static bool TEST_Enable = false;
+            private static bool TEST_Enable = true;
             private static int SimulateForeachTimes = 1;
 
             //编辑器下的程序集流
@@ -118,38 +120,48 @@ namespace ES
 
             private static void Editor_InitAssembiesAndRegisters()
             {
+                var listRE = new List<ESAS_EditorRegister_AB>();
                 for (int IndexASM = 0; IndexASM < EditorAssembies.Length; IndexASM++)
                 {
                     var asm = EditorAssembies[IndexASM];
                     if (Internal_IsValidAssembly(asm))
                     {
-                        //可用的程序集
+                        //可用的程序集 
                         Type[] types;
                         EditorTypes.Add(asm, types = asm.GetTypes());
                         ValidEditorAssembiles.Add(asm);
                         for (int IndexType = 0; IndexType < types.Length; IndexType++)
                         {
                             Type t = types[IndexType];
-                            if (t.IsSubclassOf(typeof(ESAS_EditorRegister_AB)))
+                            if (!t.IsAbstract&&t.IsSubclassOf(typeof(ESAS_EditorRegister_AB)))
                             {
-                                EditorRegisters.Add(t);
+                                
+                                var s= Activator.CreateInstance(t) as ESAS_EditorRegister_AB;
+                                if (s != null)
+                                {
+                                    listRE.Add(s);
+                                }
+                               
                             }
                         }
 
                     }
                 }
+                //SORT
+                EditorRegisters= listRE.OrderBy((f) => {return f.Order; }).ToList();
             }
 
             private static void Editor_ApplyRegisters()
             {
                 for (int i = 0; i < EditorRegisters.Count; i++)
                 {
-                    Type re = EditorRegisters[i];
-                    if (re.IsAbstract) continue;//必须可以创建！
+                    var register = EditorRegisters[i];
+                    var re = register.GetType();
+                    
                                                 //这里为了性能，选择直接展开写
                     int maxLevel = 3;
                     var nowType = re;
-                    while (maxLevel > 0 && nowType != null && nowType != typeof(object))
+                    while (maxLevel > 0 && nowType != typeof(object))
                     {
                         if (nowType.IsGenericType)
                         {
@@ -157,22 +169,22 @@ namespace ES
                             Type genericDefinition = nowType.GetGenericTypeDefinition();
                             if (genericDefinition == Define_ClassAttribute)
                             {
-                                Match_ClassAttribute(re, nowType);
+                                Match_ClassAttribute(re,register, nowType);
                                 break;
                             }
                             if (genericDefinition == Define_FieldAttribute)
                             {
-                                Match_FieldAttribute(re, nowType);
+                                Match_FieldAttribute(re, register, nowType);
                                 break;
                             }
                             if (genericDefinition == Define_MethodAttribute)
                             {
-                                Match_MethodAttribute(re, nowType);
+                                Match_MethodAttribute(re, register, nowType);
                                 break;
                             }
                             if (genericDefinition == Define_Singleton)
                             {
-                                Match_Singleton(re, nowType);
+                                Match_Singleton(re, register, nowType);
                                 break;
                             }
                         }
@@ -191,22 +203,28 @@ namespace ES
                     var asm = ValidEditorAssembiles[indexASM];
                     if (EditorTypes.TryGetValue(asm, out var types))
                     {
-                        int lenForTypes = types.Length;
+                        int lenForFunc_Singleton = Handler_Singleton.Count;
+                        
+                        for (int indexAction = 0; indexAction < lenForFunc_Singleton; indexAction++)
+                        {
+                            //可用的单例匹配
+                            //因为需要排序！！！
+                            var func = Handler_Singleton[indexAction];
+                            int lenForTypes = types.Length;
+                            for (int indexType = 0; indexType < lenForTypes; indexType++)
+                            {
+                                Type nowType = types[indexType];
+
+                                func.Invoke(nowType);
+                            }
+                        }
+                        int lenForTypesOut = types.Length;
                         //一组类型
-                        for (int indexType = 0; indexType < lenForTypes; indexType++)
+                        for (int indexType = 0; indexType < lenForTypesOut; indexType++)
                         {
                             Type nowType = types[indexType];
                             #region 单例类型
-                            int lenForFunc_Singleton = Handler_Singleton.Count;
-                            for (int indexAction = 0; indexAction < lenForFunc_Singleton; indexAction++)
-                            {
-                                //可用的单例匹配
-                                var func = Handler_Singleton[indexAction];
-                                if (func.Invoke(nowType))
-                                {
-                                    break;
-                                }
-                            }
+                           
                             #endregion
 
                             #region 类特性
@@ -307,7 +325,7 @@ namespace ES
                     }
                 }
             }
-            private static void Match_ClassAttribute(Type reType, Type geneType)
+            private static void Match_ClassAttribute(Type reType,ESAS_EditorRegister_AB register, Type geneType)
             {
                 var types = geneType.GetGenericArguments();
                 if (types.Length > 0)
@@ -316,7 +334,6 @@ namespace ES
 
                     try
                     {
-                        var register = Activator.CreateInstance(reType);
                         MethodInfo info = reType.GetMethod("Handle");
                         Handler_ClassAttribute.Add((classType) =>
                         {
@@ -335,7 +352,7 @@ namespace ES
                     }
                 }
             }
-            private static void Match_FieldAttribute(Type reType, Type geneType)
+            private static void Match_FieldAttribute(Type reType, ESAS_EditorRegister_AB register, Type geneType)
             {
                 var types = geneType.GetGenericArguments();
                 if (types.Length > 0)
@@ -344,7 +361,6 @@ namespace ES
 
                     try
                     {
-                        var register = Activator.CreateInstance(reType);
                         MethodInfo info = reType.GetMethod("Handle");
                         Handler_FieldAttribute.Add((fieldINFO) =>
                         {
@@ -363,7 +379,7 @@ namespace ES
                     }
                 }
             }
-            private static void Match_MethodAttribute(Type reType, Type geneType)
+            private static void Match_MethodAttribute(Type reType, ESAS_EditorRegister_AB register, Type geneType)
             {
                 var types = geneType.GetGenericArguments();
                 if (types.Length > 0)
@@ -372,7 +388,6 @@ namespace ES
 
                     try
                     {
-                        var register = Activator.CreateInstance(reType);
                         MethodInfo info = reType.GetMethod("Handle");
                         Handler_MethodAttribute.Add((methodINFO) =>
                         {
@@ -391,7 +406,7 @@ namespace ES
                     }
                 }
             }
-            private static void Match_Singleton(Type reType, Type geneType)
+            private static void Match_Singleton(Type reType, ESAS_EditorRegister_AB register, Type geneType)
             {
                 var types = geneType.GetGenericArguments();
                 if (types.Length > 0)
@@ -400,7 +415,6 @@ namespace ES
 
                     try
                     {
-                        var register = Activator.CreateInstance(reType);
                         MethodInfo info = reType.GetMethod("Handle");
                         Handler_Singleton.Add((type) =>
                         {
@@ -454,8 +468,8 @@ namespace ES
             private static bool Internal_IsValidAssembly(Assembly asm)
             {
                 var name_ = asm.GetName().Name;
-                //Debug.Log("Valid??"+name_);
-                if (EditorValidAssebliesName.Contains(name_)) return true;
+                
+                if (EditorValidAssebliesName.Contains(name_)) {  return true; }
                 //很多程序集没必要考虑的！！这里写一个方法到时候
                 return false;
             }
@@ -676,7 +690,7 @@ namespace ES
 
                                     //可用的单例匹配
                                     var func = handles_singleton[indexAction];
-                                    Debug.Log("匹配测试" + func);
+                                  //  Debug.Log("匹配测试" + func);
                                     if (func.Invoke(nowType))
                                     {
                                         break;
@@ -1073,13 +1087,15 @@ namespace ES
             {
                 Type support = types[0];
                 try
-                {
-                    MethodInfo info = reType.GetMethod("Handle");
+                    {
+                     
+                        MethodInfo info = reType.GetMethod("Handle");
                     Func<Type, bool> func = (type) =>
                     {
-                        if (!type.IsAbstract && type.IsSubclassOf(type))
+                        if (!type.IsAbstract && type.IsSubclassOf(support))
                         {
                             var singleton = Activator.CreateInstance(type);
+                          
                             info.Invoke(register, new object[] { singleton });
                             return true;//拦截
                         }
@@ -1130,8 +1146,10 @@ namespace ES
         private static bool Internal_IsValidAssembly(Assembly asm)
         {
             var name_ = asm.GetName().Name;
-            //Debug.Log("Valid??"+name_);
-            if (RuntimeValidAssebliesName.Contains(name_)) return true;
+
+                if (RuntimeValidAssebliesName.Contains(name_)) {
+                    Debug.Log("RUNTIME可用"+name_);
+                    return true; }
             //很多程序集没必要考虑的！！这里写一个方法到时候
             return false;
         }

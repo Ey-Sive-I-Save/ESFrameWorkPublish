@@ -4,6 +4,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Sirenix.Utilities;
+using static PlasticGui.WorkspaceWindow.Merge.MergeInProgress;
+using UnityEngine.WSA;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -321,6 +323,7 @@ namespace ES
             }
 
             #endregion
+
             #region 判定
             /// <summary>
             /// 判定一个资产是不是文件夹
@@ -398,6 +401,31 @@ namespace ES
                 }
 #endif
             }
+
+            public static bool Quick_TryCreateChildFolder(string parentFolder,string folderName,out string end)
+            {
+                if (AssetDatabase.IsValidFolder(parentFolder))
+                {
+                    string target = parentFolder + "/" + folderName;
+                    if (!AssetDatabase.IsValidFolder(target))
+                    {
+                        AssetDatabase.CreateFolder(parentFolder, folderName);
+                        end = target;
+                        AssetDatabase.SaveAssets();
+                        AssetDatabase.Refresh();
+                        return true;
+                    }
+                    else
+                    {
+                        end = target;
+                        return true;
+                    }
+                }
+                end = "";
+                return false;
+            }
+
+           
             #endregion
 
             #region 资产创建

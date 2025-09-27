@@ -7,7 +7,7 @@ using static UnityEditor.PlayerSettings;
 
 namespace ES
 {
-    public class ESEditorSo
+    public class ESEditorSO
     {
         public static KeyGroup<Type, ESSO> SOS = new KeyGroup<Type, ESSO>();
     }
@@ -18,7 +18,7 @@ namespace ES
         {
 
             Debug.Log("此处注册ES-SO");
-            ESEditorSo.SOS.Clear();
+            ESEditorSO.SOS.Clear();
             string[] guids = AssetDatabase.FindAssets($"t:{nameof(ESSO)}");
 
             foreach (string guid in guids)
@@ -27,7 +27,7 @@ namespace ES
                 ESSO soAsset = AssetDatabase.LoadAssetAtPath<ESSO>(assetPath);
                 if (soAsset != null)
                 {
-                    ESEditorSo.SOS.TryAdd(soAsset.GetType(), soAsset);
+                    ESEditorSO.SOS.TryAdd(soAsset.GetType(), soAsset);
                     soAsset.OnEditorInitialized();
                 }
             }
@@ -41,10 +41,10 @@ namespace ES
         public override void InitInvoke()
         {
             Debug.Log("此处应用ES-SO");
-            var keys = ESEditorSo.SOS.Groups.Keys;
+            var keys = ESEditorSO.SOS.Groups.Keys;
             foreach (var i in keys)
             {
-                var group = ESEditorSo.SOS.GetGroup(i);
+                var group = ESEditorSO.SOS.GetGroup(i);
                 foreach (var g in group)
                 {
                     g.OnEditorApply();

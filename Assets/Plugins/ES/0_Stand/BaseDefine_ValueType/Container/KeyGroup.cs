@@ -101,6 +101,24 @@ namespace ES
             return NULL;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public List<T> GetGroup<T>(Key key)
+        {
+            if (Groups.TryGetValue(key, out var list))
+            {
+                var users = new List<T>();
+                var len = list.Count;
+                for(int i = 0; i < len; i++)
+                {
+                    if( list[i] is T t)
+                    {
+                        users.Add(t);
+                    }
+                }
+                return users;
+            }
+            return null;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryContains(Key key, Element who)
         {
             if (Groups.TryGetValue(key, out var list))

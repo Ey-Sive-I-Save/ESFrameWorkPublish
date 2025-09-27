@@ -34,7 +34,7 @@ namespace ES {
 
 
             area.UpdateAtFisrt();
-            SirenixEditorGUI.DrawBorders(area.TargetArea, (int)area.TargetArea.width, 0, (int)area.TargetArea.height + 2, 0, color);
+            SirenixEditorGUI.DrawBorders(area.TargetArea, (int)area.TargetArea.width, 0, (int)area.TargetArea.height+5, 0, color);
             this.CallNextDrawer(label);
             area.UpdateAtLast();
         }

@@ -3,6 +3,7 @@ using Sirenix.OdinInspector;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
@@ -161,6 +162,14 @@ namespace ES
                 k.Clear();
             }
             Contents.Clear();
+        }
+
+        public Key[] GetKeys(Select select)
+        {
+            if (Contents.TryGetValue(select,out var keys)) {
+                return keys.Keys.ToArray();
+            }
+            return null;
         }
     }
 

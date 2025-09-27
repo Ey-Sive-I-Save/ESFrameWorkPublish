@@ -15,7 +15,7 @@ namespace ES
 
             //使用方法↓
             //GUIColor("@ESDesignUtility.ColorSelector.Color_03")
-            public static Color Color_01 = new Color(0.988f, 0.758f, 0.763f, 1);
+            public static Color Color_01 = new Color(0.588f, 0.758f, 0.763f, 1);
             public static Color Color_02 = new Color(0.9988f, 0.958f, 0.163f, 1);
             public static Color Color_03 = new Color(0.9988f, 0.958f, 0f, 1);//黄色
             public static Color Color_04 = new Color(0.1588f, 0.958f, 0.9f, 1);//色

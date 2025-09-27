@@ -39,12 +39,12 @@ namespace ES
                 rect.y += 3;
                 var rectLeft = new Rect(rect.x + 0.1f * rect.width, rect.y, rect.width * 0.4f, rect.height);
                 var rectRight = new Rect(rect.x + 0.6f * rect.width, rect.y, rect.width * 0.4f, rect.height);
-                var rectStart = new Rect(rect.x-5, rect.y, rect.width * 0.1f, rect.height);
+                var rectStart = new Rect(rect.x+3, rect.y, rect.width * 0.1f, rect.height);
                 
                 
                 
                 
-                SirenixEditorGUI.DrawBorders(rect,5);
+               
                // EditorGUI.DrawRect(rectStart, Color.yellow._WithAlpha(0.5f));
 
                 ValueEntry.SmartValue = EditorGUI.Toggle(rectStart, ValueEntry.SmartValue);
@@ -61,6 +61,7 @@ namespace ES
                     ValueEntry.SmartValue = true; // 真按钮绘制
                 }
                 GUIHelper.PopColor();
+                SirenixEditorGUI.DrawBorders(rect, 5);
             }
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(1);

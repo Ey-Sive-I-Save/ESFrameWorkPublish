@@ -22,6 +22,7 @@ namespace ES
     public abstract class SoDataGroup<SoType> : ESSO, ISoDataGroup where SoType : ScriptableObject, ISoDataInfo
     {
         [LabelText("数据组字典")]
+        [HideLabel]
         public Dictionary<string, SoType> Infos = new Dictionary<string, SoType>();
         public string FileName => name;
         public List<string> AllKeys => Infos.Keys.ToList();

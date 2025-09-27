@@ -15,6 +15,7 @@ namespace ES
     using System.IO;
     using UnityEngine.UIElements;
     using System.Linq;
+    using Sirenix.Utilities;
 
     namespace ES
     {
@@ -29,7 +30,7 @@ namespace ES
             #region 简单重写
             public override GUIContent ESWindow_GetWindowGUIContent()
             {
-                var content = new GUIContent("ES数据窗口",  "使用ES数据工具完成快速各种数据配置与开发");
+                var content = new GUIContent("ES数据窗口", "使用ES数据工具完成快速各种数据配置与开发");
                 return content;
             }
             public override void ESWindow_OnOpen()
@@ -43,7 +44,7 @@ namespace ES
                 {
                     UsingWindow.DelegateHandle();
                 }
-             
+
             }
             private void DelegateHandle()
             {
@@ -56,11 +57,11 @@ namespace ES
 
             public const string PageName_DataMake = "数据脚本生成工具";
 
-            public const string PageName_DataPackCreate = "【包】";
+            public const string PageName_DataPackCreate = "【查询\\新建包】";
 
-            public const string PageName_DataGroupCreate = "【组】";
+            public const string PageName_DataGroupCreate = "【查询\\新建组】";
 
-            public const string PageName_DataGroupOnChooseEditInfo = "【配置】";
+            public const string PageName_DataGroupOnChooseEditInfo = "【编辑组】";
 
 
             [NonSerialized] public Page_Root_Data_StartUse pageForStartUsePage;
@@ -89,7 +90,7 @@ namespace ES
                 }
                 if (UsingWindow != null)
                 {
-                    
+
                 }
                 base.OnImGUI();
             }
@@ -128,9 +129,9 @@ namespace ES
             }
 
             #endregion
-            protected override void ES_BuildMenuTree(OdinMenuTree tree)
+            protected override void ES_OnBuildMenuTree(OdinMenuTree tree)
             {
-                base.ES_BuildMenuTree(tree);
+                base.ES_OnBuildMenuTree(tree);
                 {   //独立功能块
                     Part_BuildDataScriptCodePage(tree);
                     Part_BuildSoPackPage(tree);
@@ -156,20 +157,20 @@ namespace ES
             }
             private void Part_BuildSoPackPage(OdinMenuTree tree)
             {
-                QuickBuildRootMenu(tree, PageName_DataPackCreate, ref pageForSodataPack, SdfIconType.BoxSeam);
+                QuickBuildRootMenu(tree, PageName_DataPackCreate, ref pageForSodataPack, SdfIconType.CartXFill);
                 var TypeSelect = ESSODataWindowHelper.GetPackType(pageForSodataPack.createPackType_);
                 var allPacks = ESDesignUtility.SafeEditor.FindAllSOAssets<ISoDataPack>(TypeSelect);
                 foreach (var i in allPacks)
                 {
                     if (i is ScriptableObject so)
                     {
-                        tree.Add(PageName_DataPackCreate + $"/命名：{i.FileName} 文件:{so.name}", new Page_Index_EveryDataPack() { pack = i }.ES_Refresh(), SdfIconType.Box);
+                        tree.Add(PageName_DataPackCreate + $"/包：{i.FileName} 文件:{so.name}", new Page_Index_EveryDataPack() { pack = i }.ES_Refresh(), SdfIconType.Cart);
                     }
                 }
             }
             private void Part_BuildSoDataGroupPage(OdinMenuTree tree)
             {
-                QuickBuildRootMenu(tree, PageName_DataGroupCreate, ref pageForSodataGroup, SdfIconType.BoxSeam);
+                QuickBuildRootMenu(tree, PageName_DataGroupCreate, ref pageForSodataGroup, SdfIconType.BagXFill);
                 var TypeSelect = ESSODataWindowHelper.GetGroupType(pageForSodataGroup.createGroup_);
                 var allGroups = ESDesignUtility.SafeEditor.FindAllSOAssets<ISoDataGroup>(TypeSelect);
 
@@ -177,30 +178,30 @@ namespace ES
                 {
                     if (i is ScriptableObject so)
                     {
-                        tree.Add(PageName_DataGroupCreate + $"/命名：{i.FileName} 文件:{so.name}", new Page_Index_DataQuickSeeGroup() { group = so }, SdfIconType.Bag);
+                        tree.Add(PageName_DataGroupCreate + $"/组：{i.FileName} 文件:{so.name}", new Page_Index_DataQuickSeeGroup() { group = so }, SdfIconType.Bag);
                     }
                 }
 
             }
             public void Part_BuildSoDataGroupOnChooseAndInfos(OdinMenuTree tree)
             {
-                QuickBuildRootMenu(tree, PageName_DataGroupOnChooseEditInfo, ref pageForGroupOnChoose, SdfIconType.BagCheckFill);
-                Debug.Log(1);
+                QuickBuildRootMenu(tree, PageName_DataGroupOnChooseEditInfo, ref pageForGroupOnChoose, SdfIconType.BookmarkXFill);
+
                 if (Selection.activeObject is ISoDataGroup group_)
                 {
-                    Debug.Log(2);
+                  
                     pageForGroupOnChoose.group = group_;
                 }
                 if (pageForGroupOnChoose.group != null)
                 {
-                    Debug.Log(3);
+                   
                     foreach (var i in pageForGroupOnChoose.group.AllKeys)
                     {
                         ISoDataInfo so = pageForGroupOnChoose.group.GetInfoByKey(i);
                         if (so != default)
                         {
-                            Debug.Log(pageForGroupOnChoose.group + "  " + so);
-                            tree.Add($"{MenuItems[PageName_DataGroupOnChooseEditInfo].Name}/{i} 单元", new Page_Index_DataInfoSingle() { data = so }, SdfIconType.Book); ;
+                            
+                            tree.Add($"{MenuItems[PageName_DataGroupOnChooseEditInfo].Name}/<{i}>编辑", new Page_Index_DataInfoSingle() { data = so }, SdfIconType.Bookmark); ;
                         }
                     }
                 }
@@ -222,93 +223,106 @@ namespace ES
         public class Page_Root_DataScpirtCodeTool : ESWindowPageBase
         {
             [DisplayAsString(fontSize: 30), HideLabel]
-            public string readMe = "数据层级分为DataInfo(单元),DataGroup(组),DataPack(包),现在开始填表来创建新的数据类型";
-            [LabelText("英文数据代码名(省略Info)")]
+            public string readMe = "数据分为\nDataInfo(信息),\nDataGroup(组),\nDataPack(包),\n\b现在开始填表来创建新的数据类型!\b";
+            [LabelText("英文数据代码名(如\"Actor\")")]
             public string EnglishCodeName = "DataName";
-            [LabelText("中文数据显示名(省略数据单元)")]
+            [LabelText("中文数据显示名(如\"角色\")")]
             public string ChineseDisplayName = "数据名";
             [LabelText("数据父文件夹"), FolderPath]
             public string folder = "Assets/Scripts/ESFramework/Data/DataToolScript";
-            [Button("生成")]
+
+            public override ESWindowPageBase ES_Refresh()
+            {
+                folder = ESGlobalEditorDefaultConfi.Instance.Path_SoInfoParent;
+                return base.ES_Refresh();
+            }
+
+            [Button("开始生成", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             public void GenerateData()
             {
+
                 if (AssetDatabase.IsValidFolder(folder))
                 {
-                    string toInfo = folder + "/InfoType";
-                    string toGroup = folder + "/GroupType";
-                    string toPack = folder + "/PackType";
-                    //查/创建文件夹↓
+                    if (ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folder, "InfoType", out var toInfo)
+                     && ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folder, "GroupType", out var toGroup)
+                     && ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folder, "PackType", out var toPack))
                     {
-                        if (!AssetDatabase.IsValidFolder(toInfo))
-                        {
-                            AssetDatabase.CreateFolder(folder, "InfoType");
-                        }
-                        if (!AssetDatabase.IsValidFolder(toGroup))
-                        {
-                            AssetDatabase.CreateFolder(folder, "GroupType");
-                        }
-                        if (!AssetDatabase.IsValidFolder(toPack))
-                        {
-                            AssetDatabase.CreateFolder(folder, "PackType");
-                        }
+                        string infoName = (EnglishCodeName + "DataInfo")._ToValidIdentName();
+                        ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toInfo, infoName, Attribute:
+                            $"[ESCreatePath({"数据信息"._AsStringValue()}, \"{ChineseDisplayName}数据信息\")]", parent: ": SoDataInfo");
+                        ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toGroup, EnglishCodeName + "DataGroup", Attribute:
+                            $"[ESCreatePath({"数据组"._AsStringValue()}, \"{ChineseDisplayName}数据组\")]", parent: $": SoDataGroup<{infoName}>");
+                        ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toPack, EnglishCodeName + "DataPack", Attribute:
+                            $"[ESCreatePath({"数据包"._AsStringValue()}, \"{ChineseDisplayName}数据包\")]", parent: $": SoDataPack<{infoName}>");
+                        AssetDatabase.SaveAssets();
+                        AssetDatabase.Refresh();
+
                     }
-                    Debug.Log("完毕");
-                    string infoName = EnglishCodeName + "DataInfo";
-                    /*
-                      ESTool_ScriptMaker.Instance.CreateScript(文件夹路径,Class名,继承/实现,特性,命名空间=ES);
-                     */
-                    ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toInfo, infoName, Attribute: $"[ESDisplayNameKeyToType(\"数据单元\", \"{ChineseDisplayName}数据单元\")]", parent: ": SoDataInfo");
-                    ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toGroup, EnglishCodeName + "DataGroup", Attribute: $"[ESDisplayNameKeyToType(\"数据组\", \"{ChineseDisplayName}数据组\")]", parent: $": SoDataGroup<{infoName}>");
-                    ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toPack, EnglishCodeName + "DataPack", Attribute: $"[ESDisplayNameKeyToType(\"数据包\", \"{ChineseDisplayName}数据包\")]", parent: $": SoDataPack<{infoName}>");
-                    AssetDatabase.Refresh();
+                    else
+                    {
+                        ESDesignUtility.SafeEditor.Wrap_DisplayDialog("请选择正确的文件夹", $"默认使用【{ESGlobalEditorDefaultConfi.Instance.Path_SoInfoParent}】作为生成总路径哦", "知道了");
+                    }
                 }
-                else
-                {
-                    EditorUtility.DisplayDialog("请选择正确的文件夹", "建议使用【Assets/Scripts/ESFramework/Data/DataToolScript】作为生成总路径哦", "知道了");
-                }
+
             }
         }
-        
+
         [Serializable]
         public class Page_CreateNewSoPackOrSearch : ESWindowPageBase
         {
             [Title("开始新建数据包！", "可以先选择预设类型", bold: true, titleAlignment: TitleAlignments.Centered)]
 
             [HorizontalGroup("总组")]
-            [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据")]
-            public string createText = "创建新数据包";
-            [LabelText("搜集的数据组"), SerializeReference, GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            public string createText = "【创建新数据包】";
+            [LabelText("初始化数据组"), SerializeReference, GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             [VerticalGroup("总组/数据")]
             public List<ISoDataGroup> CachingAddGroups = new List<ISoDataGroup>();
 
 
-            [DetailedInfoBox("创建一个数据包包含大量数据！", "创建一个数据包！！将会支持Buff,技能,人物,物品等", infoMessageType: InfoMessageType.Warning)]
+            [DetailedInfoBox("创建一个数据包用于引用大量数据！", "创建一个数据包！！将会支持Buff,技能,人物,物品等", infoMessageType: InfoMessageType.Info)]
             [InfoBox("请修改一下文件名否则会分配随机数字后缀", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
-            [VerticalGroup("总组/数据"), LabelText("文件命名"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("ChangeHappen")]
-            public string createName_ = "Buff新建数据包";
+            [VerticalGroup("总组/数据"), ESBackGround("yellow", 0.2f), LabelText("文件命名"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
+            public string createName_ = "新建数据包";
+           
             private bool hasChange = false;
-            private void ChangeHappen()
+            private void OnValueChanged_ChangeHappen()
             {
                 hasChange = true;
             }
             [FolderPath, OnValueChanged("Refresh")]
-            [VerticalGroup("总组/数据"), LabelText("保存文件夹"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            [VerticalGroup("总组/数据"), LabelText("保存到文件夹"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
             public string FolderPath_ = "Assets/Resources/Data/PackData";
+            [VerticalGroup("总组/数据")]
+            [ESBoolOption("自动使用父级文件夹", "直接放到指定文件夹")]
+            public bool AutoParentFolder = true;
             private void Refresh()
             {
                 AssetDatabase.Refresh();
+                createName_ = "新建" + createPackType_;
+                createText = $"--新建【{createPackType_}】--";
+            }
+            public override ESWindowPageBase ES_Refresh()
+            {
+                if (createPackType_.IsNullOrWhitespace())
+                {
+                    createPackType_ = ESSODataWindowHelper.GetPackNames().First();
+                }
+                Refresh();
+                FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_PackParent;
+                return base.ES_Refresh();
             }
 
-            [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据")]
-            public string createTypeText = "筛选数据包类型";
+            public string createTypeText = "--选择数据包类型--";
 
 
-            [OnValueChanged("ResetConfigure")]
-            [VerticalGroup("总组/数据"), Space(5), LabelText("预定义类型")]
+            [OnValueChanged("OnValueChanged_ResetConfigure")]
+            [VerticalGroup("总组/数据"), Space(5), LabelText("选择类型")]
             [ValueDropdown("@ESSODataWindowHelper.GetPackNames()", AppendNextDrawer = false)]
-            public string createPackType_ = "Buff数据包";
+            public string createPackType_ = "";
 
 
 
@@ -316,11 +330,15 @@ namespace ES
             [HorizontalGroup("总组", width: 100)]
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
-            [Button(ButtonHeight = 20, Name = "创建数据包", Icon = SdfIconType.Check2Square), GUIColor("@ ESDesignUtility.ColorSelector.Color_03")]
+            [Button(ButtonHeight = 30, Name = "新建数据包", IconAlignment = IconAlignment.RightEdge), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void CreateSoPackAsset()
             {
                 Type targetType = ESSODataWindowHelper.GetPackType(createPackType_);
-                var create = ESDesignUtility.SafeEditor.CreateSOAsset(targetType, FolderPath_, createName_, true, hasChange, beforeSave);
+                string path = FolderPath_;
+                Debug.Log(path + targetType.Name + targetType.Name._RemoveSubStrings("Data", "Pack"));
+                if (AutoParentFolder) ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(FolderPath_, targetType.Name._RemoveSubStrings("Data", "Pack"), out path);
+                Debug.Log(path);
+                var create = ESDesignUtility.SafeEditor.CreateSOAsset(targetType, path, createName_, true, hasChange, beforeSave);
                 void beforeSave(ScriptableObject so)
                 {
                     if (so is ISoDataPack pack)
@@ -340,19 +358,19 @@ namespace ES
                         Debug.LogError("非法文件夹路径或者类型错误！！");
                     }
                 }
-
             }
 
 
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
-            [Button(ButtonHeight = 20, Name = "搜集可用数据组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_04")]
+            [Button(ButtonHeight = 30, Name = "搜集数据组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_04")]
             public void FindAInfoGroupAsset()
             {
                 //找到全部数据组
-                CachingAddGroups = ESDesignUtility.SafeEditor.FindAllSOAssets<ISoDataGroup>(ESSODataWindowHelper.GetGroupType(createPackType_));
+                var GroupType = ESSODataWindowHelper.GetGroupType(createPackType_.Replace("包", "组"));
+                CachingAddGroups = ESEditorSO.SOS.GetGroup<ISoDataGroup>(GroupType) ?? CachingAddGroups;
             }
-            private void ResetConfigure()
+            private void OnValueChanged_ResetConfigure()
             {
                 hasChange = false;
                 ESSODataInfoWindow.UsingWindow.selectPackTypeName_ = createPackType_;
@@ -371,18 +389,14 @@ namespace ES
         {
             [HorizontalGroup("总组")]
 
-            [Title("开始配置数据包！!", "数据包可以把一系列数据组整合起来使用", titleAlignment: TitleAlignments.Centered, Title = @"@  ""开始配置数据包:※ 【"" + pack.FileName  + ""】""   ")]
+            [Title("配置数据包！!", "数据包引用大量数据，整合起来一次使用", titleAlignment: TitleAlignments.Centered, Title = @"@  ""配置数据包:※ 【"" + pack.FileName  + ""】""   ")]
             [VerticalGroup("总组/数据包")]
-
-            /*  [DisplayAsString(fontSize: 30), ShowInInspector, HideLabel, GUIColor("@KeyValueMatchingUtility.ColorSelector.Color_03")]
-              [VerticalGroup("总组/数据包"), PropertyOrder(-1)]
-              public string addText => "新建数据包";*/
 
             [VerticalGroup("总组/数据包"), AssetSelector, SerializeReference, LabelText("拖入或者用按钮用于缓冲的数据组")]
-            public List<ISoDataGroup> soGroups = new List<ISoDataGroup>();
-            [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            public List<ISoDataGroup> CachingGroups = new List<ISoDataGroup>();
+            [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据包")]
-            public string showText = "查看数据包详情";
+            public string showText = "--查看数据包详情--";
             [InlineEditor(Expanded = true), SerializeReference, LabelText("数据包"), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             [VerticalGroup("总组/数据包")]
             public ISoDataPack pack;
@@ -390,7 +404,7 @@ namespace ES
             public override ESWindowPageBase ES_Refresh()
             {
                 pack.Check();
-                if (pack.EnableAutoRefresh && soGroups != null)
+                if (pack.EnableAutoRefresh && CachingGroups != null)
                 {
                     Undo.RecordObject(this.pack as ScriptableObject, "this");
                     foreach (var i in pack.CachingGroups)
@@ -419,42 +433,24 @@ namespace ES
             [HorizontalGroup("总组", width: 100)]
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("自动搜集全部数据组", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("搜集匹配数据组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void SearchAllGroup()
-            {
-                //找到全部数据组
-                var all = AssetDatabase.FindAssets("t:ScriptableObject");
-                soGroups = new List<ISoDataGroup>();
-                foreach (var i in all)
-                {
-                    GUID id = default; GUID.TryParse(i, out id);
-                    Type type = AssetDatabase.GetMainAssetTypeFromGUID(id);
-
-                    if (typeof(ISoDataGroup).IsAssignableFrom(type))
-                    {
-                        string path = AssetDatabase.GUIDToAssetPath(id);
-                        UnityEngine.Object ob = AssetDatabase.LoadAssetAtPath(path, type);
-                        if (ob == null) continue;
-                        ISoDataGroup dataGroup = ob as ISoDataGroup;
-                        if (dataGroup.GetSOInfoType() == pack.GetSOInfoType())
-                        {
-                            soGroups.Add(dataGroup);
-                        }
-                    }
-                }
-
+            {   //找到全部数据组
+                var namePack = ESSODataWindowHelper.GetPackName(pack.GetType());
+                var GroupType = ESSODataWindowHelper.GetGroupType(namePack.Replace("包", "组"));
+                CachingGroups = ESEditorSO.SOS.GetGroup<ISoDataGroup>(GroupType) ?? CachingGroups;
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("缓冲入数据组", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            [Button("载入数据组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
             public void PushInDataGroup()
             {
 
-                if (soGroups != null)
+                if (CachingGroups != null)
                 {
 
                     Undo.RecordObject(this.pack as ScriptableObject, "this");
-                    foreach (var i in soGroups)
+                    foreach (var i in CachingGroups)
                     {
                         if (i == null) continue;
                         if (i is not ScriptableObject) continue;
@@ -486,20 +482,18 @@ namespace ES
         {
             [Title("开始新建配置数据组！", "可以先选择预设类型", bold: true, titleAlignment: TitleAlignments.Centered)]
             [HorizontalGroup("总组")]
-            [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据")]
-            public string createText = "创建新数据组文件配置";
-            [DetailedInfoBox("未选中任何数据组！", "创建一个数据组来快捷编辑数据内容！！将会支持Buff,技能,人物,物品等", infoMessageType: InfoMessageType.Warning)]
+            public string createText = "【创建新的数据组文件】";
+            
             [InfoBox("请修改一下文件名否则会分配随机数字后缀", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
-            [VerticalGroup("总组/数据"), LabelText("文件命名"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("ChangeHappen")]
-            public string createName_ = "Buff新建配置组";
+            [VerticalGroup("总组/数据"), ESBackGround("yellow", 0.2f), LabelText("文件命名"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
+            public string createName_ = "新建数据组";
 
             private bool hasChange = false;
-            private void ChangeHappen()
+            private void OnValueChanged_ChangeHappen()
             {
-
                 hasChange = true;
-
             }
             [FolderPath, OnValueChanged("Refresh")]
             [VerticalGroup("总组/数据"), LabelText("保存文件夹"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
@@ -508,24 +502,35 @@ namespace ES
             {
                 AssetDatabase.Refresh();
                 ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = createGroup_;
-
+                createText = $"--新建【{createGroup_}】--";
             }
-
-            [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            public override ESWindowPageBase ES_Refresh()
+            {
+                FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_GroupParent;
+                if (createGroup_.IsNullOrWhitespace())
+                {
+                    createGroup_ = ESSODataWindowHelper.GetGroupNames().First();
+                }
+                Refresh();
+                createName_ = "新建" + createGroup_;
+                return base.ES_Refresh();
+              
+            }
+            [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据")]
-            public string createTypeText = "筛选数据组类型";
+            public string createTypeText = "--筛选数据组类型--";
 
 
-            [OnValueChanged("ResetConfigure"), InfoBox("建议选择一个预设类型的配置组,或者自己创建支持,默认类型无法直接使用", infoMessageType: InfoMessageType.Warning/*, VisibleIf = "@createGroup_==EvWindowDataAndTool.DataType.None"*/)]
+            [OnValueChanged("OnValueChanged_ResetConfigure"), InfoBox("建议选择一个预设类型的配置组,或者自己创建支持,默认类型无法直接使用", infoMessageType: InfoMessageType.Warning/*, VisibleIf = "@createGroup_==EvWindowDataAndTool.DataType.None"*/)]
             [VerticalGroup("总组/数据"), Space(5), LabelText("预定义类型")]
             [ValueDropdown("@ESSODataWindowHelper.GetGroupNames()", AppendNextDrawer = false)]
-            public string createGroup_ = "Buff数据组";
+            public string createGroup_ = "";
 
             #region 按钮
             [HorizontalGroup("总组", width: 100)]
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
-            [Button(ButtonHeight = 20, Name = "创建数据组", Icon = SdfIconType.Check2Square), GUIColor("@ ESDesignUtility.ColorSelector.Color_03")]
+            [Button(ButtonHeight = 30, Name = "新建数据组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_03")]
             public void CreateInfoGroupAsset()
             {
                 Type targetType = ESSODataWindowHelper.GetGroupType(createGroup_);
@@ -537,7 +542,7 @@ namespace ES
             }
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
-            [Button(ButtonHeight = 20, Name = "选中数据组", Icon = SdfIconType.Check2Square), GUIColor("@ ESDesignUtility.ColorSelector.Color_04")]
+            [Button(ButtonHeight = 30, Name = "选中一个组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_04")]
             public void FindAInfoGroupAsset()
             {
                 //找到全部数据组
@@ -556,7 +561,7 @@ namespace ES
                 return !type.IsAbstract && !type.IsInterface && typeof(ISoDataGroup).IsAssignableFrom(type);
             }
 
-            private void ResetConfigure()
+            private void OnValueChanged_ResetConfigure()
             {
                 hasChange = false;
                 ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = createGroup_;
@@ -571,20 +576,20 @@ namespace ES
         {
             [HorizontalGroup("总组", VisibleIf = "@group!=null")]
             [VerticalGroup("总组/数据组")]
-            [DisplayAsString(fontSize: 30), GUIColor("@ESDesignUtility.ColorSelector.Color_01"), HideLabel]
-            public string readme = "双击↓SO编辑该数据组";
+            [DisplayAsString(fontSize: 30, TextAlignment.Center), GUIColor("@ESDesignUtility.ColorSelector.Color_01"), HideLabel]
+            public string readme = "--双击↓SO编辑该数据组--";
             [VerticalGroup("总组/数据组")]
             [InlineEditor(Expanded = true), ReadOnly, SerializeReference, LabelText("数据组")]
             public ScriptableObject group;
 
             [HorizontalGroup("总组", width: 100)]
             [VerticalGroup("总组/按钮组")]
-            [Button("编辑", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("编辑", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             private void EditThisGroup()
             {
                 ESSODataWindowHelper.SelectSoGroup(group);
             }
-          
+
         }
         //数据组配置页面
         [Serializable]
@@ -595,36 +600,34 @@ namespace ES
             public string s = "";
             [HorizontalGroup("总组", VisibleIf = "@group!=null")]
             [VerticalGroup("总组/数据组")]
-            [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据组")]
-            public string createText = "创建新单元配置";
-            [InfoBox("建议修改一下键名或者单元名防止重复！", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
-            [InfoBox("该元素的键已经出现了！！请修改", VisibleIf = "@!(group?.NotContainsInfo(DataKey)??false)", InfoMessageType = InfoMessageType.Error)]
-            [OnValueChanged("Change"), LabelText("数据单元的键")]
+            public string createText = "--创建新信息配置--";
+            [InfoBox("建议修改一下键名或者信息名防止重复！", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
+            [InfoBox("该元素的键已经出现了！！请修改", VisibleIf = "@!(group?.NotContainsInfoKey(DataKey)??false)", InfoMessageType = InfoMessageType.Error)]
+            [OnValueChanged("Change"),ESBackGround("yellow",0.2f), LabelText("数据信息的键")]
             [VerticalGroup("总组/数据组")]
             public string DataKey = "数据键";
-            [OnValueChanged("Change"), LabelText("数据单元的文件名")]
+            [OnValueChanged("Change"), LabelText("数据信息的文件名")]
             [VerticalGroup("总组/数据组")]
-            public string DataFileName = "数据单元";
+            public string DataFileName = "信息";
 
 
-            [VerticalGroup("总组/数据组"), LabelText("从本组复制"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), ValueDropdown("@group.AllKeys")
+            [VerticalGroup("总组/数据组"), LabelText("复制键"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), ValueDropdown("@group.AllKeys")
                 , InlineButton("pastePersis", "持久粘贴"), InlineButton("copyPersis", "持久复制")]
             public string copyFrom = "fromInfo";
 
             private bool hasChange = false;
             private void Change()
             {
+                var b = !(group?.NotContainsInfoKey(DataKey) ?? false);
                 hasChange = true;
             }
-            [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
-            [VerticalGroup("总组/数据组")]
-            public string addText = "缓冲入单元列表";
-            [VerticalGroup("总组/数据组"), LabelText("缓冲子数据"), SerializeReference]
+            [VerticalGroup("总组/数据组"), LabelText("手动载入子数据"), SerializeReference]
             public List<ISoDataInfo> soInfos = new List<ISoDataInfo>();
-            [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据组")]
-            public string showText = "查看数据组详情";
+            public string showText = "--数据组详情--";
             [InlineEditor(Expanded = true), SerializeReference, LabelText("数据组")]
             [VerticalGroup("总组/数据组"), OnValueChanged("RefreshInfos")]
             public ISoDataGroup group;
@@ -638,21 +641,24 @@ namespace ES
             [HorizontalGroup("总组", width: 100)]
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("去新建或者筛选", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            [Button("去新建或筛选组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
             public void CreateNewPage()
             {
+                ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = ESSODataWindowHelper.GetGroupName(group.GetType());
                 if (ESSODataInfoWindow.MenuItems.TryGetValue(ESSODataInfoWindow.PageName_DataGroupCreate, out var pageItem))
                 {
                     ESSODataInfoWindow.UsingWindow.MenuTree.Selection.Add(pageItem);
                 }
+                ESSODataInfoWindow.UsingWindow.pageForSodataGroup.createGroup_= ESSODataWindowHelper.GetGroupName(group.GetType());
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("新建单元数据", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("新建单元信息", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void CreateNewSoDataInfo()
             {
                 Type type = group.GetSOInfoType();
-                if (group.NotContainsInfoKey(DataKey)) {
+                if (group.NotContainsInfoKey(DataKey))
+                {
                     ScriptableObject @object = ScriptableObject.CreateInstance(type);
                     @object.name = DataFileName + DataKey + (hasChange ? "" : UnityEngine.Random.Range(0, 99999));
                     if (@object is ISoDataInfo info)
@@ -672,24 +678,25 @@ namespace ES
 
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("拷贝本组单元", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("拷贝选定信息", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void CopyFromSoDataInfo()
             {
                 var from = group.GetInfoByKey(copyFrom) as ScriptableObject;
                 if (from == null || !group.GetSOInfoType().IsAssignableFrom(from.GetType()))
                 {
-                    if (from != null) ESDesignUtility.SafeEditor.Wrap_DisplayDialog("类型不匹配！", $"想要拷贝单元数据为{from}({from?.GetType()})" +
+                    if (from != null) ESDesignUtility.SafeEditor.Wrap_DisplayDialog("类型不匹配！", $"想要拷贝信息数据为{from}({from?.GetType()})" +
                         $"，但是这个类型和当前数据组{group.GetSOInfoType()}不符");
                     else ESDesignUtility.SafeEditor.Wrap_DisplayDialog("为空！", $"没有可用的拷贝源");
                     return;
                 }
-                if (group.NotContainsInfoKey(DataKey)) {
+                if (group.NotContainsInfoKey(DataKey))
+                {
                     ScriptableObject copy = ScriptableObject.Instantiate(from);
                     copy.name = DataFileName + DataKey + (hasChange ? "" : UnityEngine.Random.Range(0, 99999));
                     if (copy is ISoDataInfo ifno)
                     {
                         ifno.SetKey(DataKey);
-                        
+
                         group._TryAddInfoToDic(DataKey, copy);
                         AssetDatabase.AddObjectToAsset(copy, AssetDatabase.GetAssetPath(group as ScriptableObject));
                         AssetDatabase.SaveAssets();
@@ -727,12 +734,13 @@ namespace ES
                     Debug.Log(group.GetSOInfoType().IsAssignableFrom(from?.GetType()) + ESSODataInfoWindow.guidForCopiedInfoKey);
                     if (from == null || !group.GetSOInfoType().IsAssignableFrom(from.GetType()))
                     {
-                        if (from != null) ESDesignUtility.SafeEditor.Wrap_DisplayDialog("类型不匹配！", $"想要拷贝单元数据为{from}({from?.GetType()})" +
+                        if (from != null) ESDesignUtility.SafeEditor.Wrap_DisplayDialog("类型不匹配！", $"想要拷贝信息数据为{from}({from?.GetType()})" +
                             $"，但是这个类型和当前数据组需要的{group.GetSOInfoType()}不符");
                         else ESDesignUtility.SafeEditor.Wrap_DisplayDialog("为空！", $"没有可用的拷贝信息<数据组>" + groupcopy + "<键>" + ESSODataInfoWindow.guidForCopiedInfoKey);
                         return;
                     }
-                    if (group.NotContainsInfoKey(DataKey)) {
+                    if (group.NotContainsInfoKey(DataKey))
+                    {
                         ScriptableObject copy = ScriptableObject.Instantiate(from);
                         copy.name = DataFileName + DataKey + (hasChange ? "" : UnityEngine.Random.Range(0, 99999));
                         if (copy is ISoDataInfo info)
@@ -783,7 +791,7 @@ namespace ES
 
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("检查数据", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("检查刷新", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void Check()
             {
                 List<string> ToRemove = new List<string>();
@@ -799,7 +807,7 @@ namespace ES
                         if (so_ != null)
                         {
                             Debug.Log("apply");
-                            if (so.GetKey()!= i)
+                            if (so.GetKey() != i)
                             {
                                 so.SetKey(i);
                                 hasChange = true;
@@ -827,7 +835,7 @@ namespace ES
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("缓冲入子数据", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("载入子数据", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void Collect()
             {
                 UnityEngine.Object ob = group as ScriptableObject;
@@ -846,23 +854,23 @@ namespace ES
             }
             #endregion
         }
-        //子层 数据单元配置页面
+        //子层 数据信息配置页面
         [Serializable]
         public class Page_Index_DataInfoSingle : ESWindowPageBase
         {
 
             [HorizontalGroup("总组")]
-            [Title("开始配置单元数据！!", "配置单个数据应用到游戏逻辑", titleAlignment: TitleAlignments.Centered, Title = "@Title()")]
+            [Title("开始配置信息数据！!", "配置单个数据应用到游戏逻辑", titleAlignment: TitleAlignments.Centered, Title = "@Title()")]
 
             [DisplayAsString(fontSize: 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), HideLabel]
             [VerticalGroup("总组/数据组")]
-            public string handleName = "文件配置相关";
+            public string handleName = "--文件相关--";
 
             [VerticalGroup("总组/数据组"), LabelText("重命名文件"), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
             public string renameFile = "新文件名";
             [VerticalGroup("总组/数据组")]
             [DisplayAsString(fontSize: 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), HideLabel]
-            public string handleSOData = "配置数据";
+            public string handleSOData = "--配置数据--";
             [InlineEditor, LabelText("数据")]
 
             [VerticalGroup("总组/数据组"), SerializeReference]
@@ -871,10 +879,10 @@ namespace ES
 
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("重命名文件", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            [Button("重命名文件", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
             public void RenameFileThis()
             {
-                 
+
                 var file = data as ScriptableObject;
                 if (file != null)
                 {
@@ -890,7 +898,7 @@ namespace ES
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("删除", ButtonHeight = 20), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("删除", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void DeleteThis()
             {
                 Undo.DestroyObjectImmediate(data as ScriptableObject);
@@ -907,7 +915,7 @@ namespace ES
             [Title("开始使用ES SO数据管理窗口！！", subtitle: "为了快速入门，我们从最简单的概念开始排列介绍和布局")]
             [DisplayAsString(alignment: TextAlignment.Center, fontSize: 20), HideLabel]
             public string titleF = "SO数据管理窗口，为SO定义，创建和修改，创建全局寻址方式，提供便捷开发工具";
-            [TabGroup("操作名词", "窗口概述",TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel, TextArea(5, 10), DisplayAsString(alignment: TextAlignment.Left)]
+            [TabGroup("操作名词", "窗口概述", TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel, TextArea(5, 10), DisplayAsString(alignment: TextAlignment.Left)]
             public string aboutThisWindow = "" +
          "该窗口主要围绕So数据的游戏核心体系展开" +
           "广泛支持实体怪物，道具,技能，状态,Buff,亦可以简单自定义\n" +
@@ -926,33 +934,33 @@ namespace ES
          " ******【2】窗口提供快速定位到项目功能，自己也要做好文件夹分组\n " +
          " ******【3】删除元素建议只在窗口进行，否则自己去进行手动刷新之类的\n" +
          "";
-            [TabGroup("概念", "关于数据单元", TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel, TextArea(5, 10), DisplayAsString(alignment: TextAlignment.Left)]
+            [TabGroup("概念", "关于数据信息", TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel, TextArea(5, 10), DisplayAsString(alignment: TextAlignment.Left)]
             public string aboutDataInfo = "" +
-         "数据单元，存放一个类型的单个数据，他是作为子资产进入(数据组)的！\n" +
-          "数据单元存放单个的独立数据，比如一个怪物，一个飞行物，一个技能\n" +
-         "在没有资源更新需求下，可以考虑直接引用数据单元，他直接作为文件用代码加载步骤略多\n，" +
-         "其中\n******【1】数据单元是一个数据组的子资产，因为共性被整合，每个有独立的完整数据\n" +
-         " ******【2】数据单元根据作用的对象编写大量数据内容\n " +
+         "数据信息，存放一个类型的单个数据，他是作为子资产进入(数据组)的！\n" +
+          "数据信息存放单个的独立数据，比如一个怪物，一个飞行物，一个技能\n" +
+         "在没有资源更新需求下，可以考虑直接引用数据信息，他直接作为文件用代码加载步骤略多\n，" +
+         "其中\n******【1】数据信息是一个数据组的子资产，因为共性被整合，每个有独立的完整数据\n" +
+         " ******【2】数据信息根据作用的对象编写大量数据内容\n " +
          " ******【3】英文Info,为它的专属名\n" +
-         " ******【#】数据单元还可以实现共享与变量体系，";
+         " ******【#】数据信息还可以实现共享与变量体系，";
 
 
             [TabGroup("概念", "关于数据组", TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel, TextArea(5, 10), DisplayAsString(alignment: TextAlignment.Left)]
             public string aboutDataGroup = "" +
-         "数据组，数据组把数个具有同特征的数据单元包含其中，作为独立的资产的最小格式！\n" +
-          "组最大的作用是分组，以一个资产包含多个子单元\n" +
+         "数据组，数据组把数个具有同特征的数据信息包含其中，作为独立的资产的最小格式！\n" +
+          "组最大的作用是分组，以一个资产包含多个子信息\n" +
          " 通常来说不推荐直接把组用来引用至游戏，而是以后面的包来完成\n，" +
-         "其中\n******【1】数据组是一个数据单元的持久字典，并且原则上把子单元都作为子资产包含其中，推荐容纳5-10个为佳\n" +
+         "其中\n******【1】数据组是一个数据信息的持久字典，并且原则上把子信息都作为子资产包含其中，推荐容纳5-10个为佳\n" +
          " ******【2】数据组一般只有分组和编辑功能，不推荐用于游戏引用，加载和取用，这只是一个建议和规范，可以自己定\n " +
          " ******【3】英文Group,为它的专属名词\n" +
-         " ******【#】以一个资产容纳一系列数据单元,高效分类整理，可以绑定到数据包来做到输出最新的内容";
+         " ******【#】以一个资产容纳一系列数据信息,高效分类整理，可以绑定到数据包来做到输出最新的内容";
 
             [TabGroup("概念", "关于数据包", TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel, TextArea(5, 10), DisplayAsString(alignment: TextAlignment.Left)]
             public string aboutDataPack = "" +
-           "数据包，同样以持久字典直接引用一些数据单元，跳过了数据组，一般来说一个包可以涵盖一套功能的基本结构！\n" +
-            "包并不推荐为数据单元重命名,而是一般简单地从多个数据组缓冲入数据，他主要是为了能快速收集足够有效数据\n" +
-           " 他的数据组主要有一个单元更新关系,，在游戏运行时，不推荐从包获得组再进行操作\n，" +
-           "其中\n******【1】包只是一类数据单元引用的持久字典\n" +
+           "数据包，同样以持久字典直接引用一些数据信息，跳过了数据组，一般来说一个包可以涵盖一套功能的基本结构！\n" +
+            "包并不推荐为数据信息重命名,而是一般简单地从多个数据组缓冲入数据，他主要是为了能快速收集足够有效数据\n" +
+           " 他的数据组主要有一个信息更新关系,，在游戏运行时，不推荐从包获得组再进行操作\n，" +
+           "其中\n******【1】包只是一类数据信息引用的持久字典\n" +
            " ******【2】包可以选定和数据组建立更新链接，以便防止忘记手动载入\n " +
            " ******【3】英文Pack,为它的专属名词\n" +
            " ******【#】建议广泛使用包来简化游戏逻辑流程";
@@ -961,7 +969,7 @@ namespace ES
             public string aboutCodeGen = "" +
                 "SO代码生成工具用于自动化创建C# Scriptable 文件\n" +
                 "用来简化类似结构代码的声明工作量,\n" +
-                "其中\n******【1】So体系生成,提供从So单元，组，包 的一键构建\n" +
+                "其中\n******【1】So体系生成,提供从So信息，组，包 的一键构建\n" +
                 "******【2】So全局配置文件生成,这种配置文件可以被轻易地引用并且提供了自动创建引导和多配置选用\n " +
                 "******【3】SharedData 与 VariableData 体系，是So游戏逻辑数据的一个标准，生成的代码主要为了指引深拷贝优化\n" +
                 "******【#】这里是关于SO的数据生成，还有更多代码生成属于其他功能模块！";
@@ -1012,28 +1020,28 @@ namespace ES
                     if (page == null || ESSODataInfoWindow.UsingWindow.MenuTree == null)
                     {
                         ESSODataInfoWindow.OpenWindow();
-                        ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
                         Debug.Log("自动打开数据窗口");
                         page = ESSODataInfoWindow.UsingWindow.pageForGroupOnChoose;
                     }
-                    if (page != null && ESSODataInfoWindow.UsingWindow.MenuTree != null)
+                   
+                    if (page != null && ESSODataInfoWindow.menuTree != null)
                     {
                         page.group = group;
-                        SelectSoGroup(group as ScriptableObject);
                         page.RefreshInfos();
-                        if (ESSODataInfoWindow.MenuItems.TryGetValue(ESSODataInfoWindow.PageName_DataGroupOnChooseEditInfo, out var item))
+                        SelectSoGroup(group as ScriptableObject);
+                        
+                       /* if (ESSODataInfoWindow.MenuItems.TryGetValue(ESSODataInfoWindow.PageName_DataGroupOnChooseEditInfo, out var item))
                         {
                             item.Name = ESSODataInfoWindow.PageName_DataGroupOnChooseEditInfo + "<" + group.FileName.Replace("新建", "") + ">";
-                            Debug.Log("Selection" + ESSODataInfoWindow.UsingWindow);
-                            Debug.Log("Selection" + ESSODataInfoWindow.UsingWindow.MenuTree.Selection);
-                            ESSODataInfoWindow.UsingWindow.MenuTree.Selection.Add(item);
-                        }
+                            ESSODataInfoWindow.menuTree.Selection.Add(item);
+                        }*/
                     }
                 }
             }
             public static void SelectSoGroup(ScriptableObject so)
             {
                 Selection.activeObject = so;
+                Debug.Log("AAA"+ ESSODataInfoWindow.MenuItems);
                 if (ESSODataInfoWindow.MenuItems.TryGetValue(ESSODataInfoWindow.PageName_DataGroupOnChooseEditInfo, out var pageItem))
                 {
                     ESSODataInfoWindow.UsingWindow.MenuTree.Selection.Add(pageItem);
@@ -1042,43 +1050,64 @@ namespace ES
             #region 简单方法
             public static string[] GetInfoNames()
             {
-                return new string[] { "" };
-                //return GlobalDataForEditorRunTime.Instance.SearchDataTypeKey.GetDic("数据单元").Keys.ToArray();
+                return ESDesignUtility.Creator.CreatePaths.GetKeys("数据信息");
             }
             public static string[] GetGroupNames()
             {
-                return new string[] { "" };
-                //return GlobalDataForEditorRunTime.Instance.SearchDataTypeKey.GetDic("数据组").Keys.ToArray();
+                return ESDesignUtility.Creator.CreatePaths.GetKeys("数据组");
             }
             public static string[] GetPackNames()
             {
-                return new string[]{ "" };
-                //return GlobalDataForEditorRunTime.Instance.SearchDataTypeKey.GetDic("数据包").Keys.ToArray();
+                return ESDesignUtility.Creator.CreatePaths.GetKeys("数据包");
             }
             public static Type GetInfoType(string name)
             {
-                return typeof(object);
-                //return GlobalDataForEditorRunTime.Instance.SearchDataTypeKey.GetElement("数据单元", name);
-            }
-            public static Type GetInfoTypeByGroupName(string name)
-            {
-
-                return GetInfoType(name.Replace("组", "单元"));
-            }
-            public static Type GetInfoTypeByPackName(string name)
-            {
-                return typeof(object);
-                //return GetInfoType(name.Replace("包", "单元"));
+                return ESDesignUtility.Creator.CreatePaths.GetElement("数据信息", name);
             }
             public static Type GetGroupType(string name)
             {
-                return typeof(object);
-                //return GlobalDataForEditorRunTime.Instance.SearchDataTypeKey.GetElement("数据组", name);
+                return ESDesignUtility.Creator.CreatePaths.GetElement("数据组", name);
             }
             public static Type GetPackType(string name)
             {
-                return typeof(object);
-                //return GlobalDataForEditorRunTime.Instance.SearchDataTypeKey.GetElement("数据包", name);
+                return ESDesignUtility.Creator.CreatePaths.GetElement("数据包", name);
+            }
+
+            public static string GetPackName(Type name)
+            {
+                var dic = ESDesignUtility.Creator.CreatePaths.GetDic("数据包");
+                foreach(var i in dic)
+                {
+                    if (i.Value == name)
+                    {
+                        return i.Key;
+                    }
+                }
+                return "";
+            }
+            public static string GetGroupName(Type name)
+            {
+                var dic = ESDesignUtility.Creator.CreatePaths.GetDic("数据组");
+                foreach (var i in dic)
+                {
+                    if (i.Value == name)
+                    {
+                        return i.Key;
+                    }
+                }
+                return "";
+            }
+            public static string GetInfoName(Type name)
+            {
+                var dic = ESDesignUtility.Creator.CreatePaths.GetDic("数据信息");
+                foreach (var i in dic)
+                {
+                    if (i.Value == name)
+                    {
+                        return i.Key;
+                    }
+                }
+                return "";
             }
             public static bool HasNull(params UnityEngine.Object[] objects)
             {

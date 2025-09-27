@@ -23,7 +23,7 @@ namespace ES
         bool EnableAutoRefresh { get; }
         void Check();
     }
-    public abstract class SoDataPack<Info> : ESSO, ISoDataPack where Info : ScriptableObject, ISoDataInfo
+    public abstract class SoDataPack<Info>: ESSO, ISoDataPack where Info : ScriptableObject, ISoDataInfo
     {
         
         [LabelText("启用自动更新")] public bool enableAutoRefresh = true;
@@ -40,7 +40,7 @@ namespace ES
 
         public IEnumerable<string> Keys => allInfos.Keys;
 
-        public string FileName => throw new NotImplementedException();
+        public string FileName => name;
 
         public Type GetSOInfoType()
         {

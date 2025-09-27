@@ -49,11 +49,11 @@ namespace ES {
         protected sealed override OdinMenuTree BuildMenuTree()
         {
             OdinMenuTree tree = menuTree = new OdinMenuTree();
-            ES_BuildMenuTree(tree);
+            ES_OnBuildMenuTree(tree);
             ES_LoadData();
             return tree;
         }
-        protected virtual void ES_BuildMenuTree(OdinMenuTree tree)
+        protected virtual void ES_OnBuildMenuTree(OdinMenuTree tree)
         {
 
         }
@@ -73,9 +73,8 @@ namespace ES {
         }
         public static void ES_RefreshWindow()
         {
-            if (UsingWindow != null)
-                UsingWindow.ESWindow_RefreshWindow();
-            else OpenWindow();
+            if (UsingWindow == null) OpenWindow();
+            UsingWindow.ESWindow_RefreshWindow();
         }
         public virtual void ESWindow_RefreshWindow()
         {

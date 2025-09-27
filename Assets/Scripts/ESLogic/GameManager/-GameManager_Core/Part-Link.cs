@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace ES
 {
-    public partial class GameCenter
+    public partial class GameManager
     {
         public static LinkReceivePool GlobalLinkPool = new LinkReceivePool();
     }

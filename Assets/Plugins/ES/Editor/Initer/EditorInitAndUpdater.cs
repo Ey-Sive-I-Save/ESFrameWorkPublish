@@ -36,12 +36,12 @@ public class EditorInitAndUpdater : EditorInvoker_Level0
         string window = windowF.titleContent.text;
         switch (window)
         {
-            case "项目":ESEditorGlobal.windowENV = ESEditorGlobalENV.Project; break;
-            case "层级": ESEditorGlobal.windowENV = ESEditorGlobalENV.Hierarchy; break;
-            case "检查器": ESEditorGlobal.windowENV = ESEditorGlobalENV.Inspector; break;
-            case "场景": ESEditorGlobal.windowENV = ESEditorGlobalENV.Scene; break;
-            case "游戏": ESEditorGlobal.windowENV = ESEditorGlobalENV.Game; break;
-            case "控制台": ESEditorGlobal.windowENV = ESEditorGlobalENV.Console; break;
+            case "项目" or "Project":ESEditorGlobal.windowENV = ESEditorGlobalENV.Project; break;
+            case "层级" or "Hierarchy": ESEditorGlobal.windowENV = ESEditorGlobalENV.Hierarchy; break;
+            case "检查器" or "Inspector": ESEditorGlobal.windowENV = ESEditorGlobalENV.Inspector; break;
+            case "场景" or "Scene": ESEditorGlobal.windowENV = ESEditorGlobalENV.Scene; break;
+            case "游戏" or "Game": ESEditorGlobal.windowENV = ESEditorGlobalENV.Game; break;
+            case "控制台" or "Console": ESEditorGlobal.windowENV = ESEditorGlobalENV.Console; break;
 
         }
     }

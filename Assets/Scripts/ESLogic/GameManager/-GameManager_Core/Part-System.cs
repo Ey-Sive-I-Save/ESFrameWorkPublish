@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace ES
 {
-    public partial class GameCenter
+    public partial class GameManager
     {
         #region 全局事件-GameCenterAwakeBefore
         protected override void OnBeforeAwakeRegister()

@@ -6,7 +6,7 @@ using UnityEngine;
 namespace ES
 {
     [DefaultExecutionOrder(-9)]
-    public partial class GameCenter : SingletonAsCore<GameCenter>
+    public partial class GameManager : SingletonAsCore<GameManager>
     {
         #region 域
         [TabGroup("扩展域", "【全局】", TabLayouting = TabLayouting.MultiRow, TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel]
@@ -31,15 +31,15 @@ namespace ES
     }
     #region 声明域和模块
     [Serializable]
-    public class GlobalDomain : Domain<GameCenter, GlobalModule>
+    public class GlobalDomain : Domain<GameManager, GlobalModule>
     {
     }
     [Serializable]
-    public abstract class GlobalModule : Module<GameCenter, GlobalDomain> { }
+    public abstract class GlobalModule : Module<GameManager, GlobalDomain> { }
 
     [Serializable]
-    public class GameRunDomain : Domain<GameCenter, GameRunModule> { }
+    public class GameRunDomain : Domain<GameManager, GameRunModule> { }
     [Serializable]
-    public abstract class GameRunModule : Module<GameCenter, GameRunDomain> { }
+    public abstract class GameRunModule : Module<GameManager, GameRunDomain> { }
     #endregion
 }

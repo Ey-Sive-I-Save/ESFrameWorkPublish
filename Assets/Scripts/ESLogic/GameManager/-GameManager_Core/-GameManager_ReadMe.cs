@@ -5,7 +5,7 @@ using UnityEngine;
 namespace ES
 {
     /*
-          GameCenter 是 全局最核心的 游戏逻辑 单例管理器
+          GameManager 是 全局最核心的 游戏逻辑 单例管理器
           把他使用 <partial> 拆分为多个文件
           他不仅是单例  同时也是一个 Core 类型
           

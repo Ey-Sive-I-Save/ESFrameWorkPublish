@@ -266,7 +266,7 @@ namespace ES
 
             }
         }
-
+        //创建数据包
         [Serializable]
         public class Page_CreateNewSoPackOrSearch : ESWindowPageBase
         {
@@ -489,7 +489,9 @@ namespace ES
             [InfoBox("请修改一下文件名否则会分配随机数字后缀", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
             [VerticalGroup("总组/数据"), ESBackGround("yellow", 0.2f), LabelText("文件命名"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
             public string createName_ = "新建数据组";
-
+            [VerticalGroup("总组/数据")]
+            [ESBoolOption("自动使用父级文件夹", "直接放到指定文件夹")]
+            public bool AutoParentFolder = true;
             private bool hasChange = false;
             private void OnValueChanged_ChangeHappen()
             {
@@ -534,11 +536,16 @@ namespace ES
             public void CreateInfoGroupAsset()
             {
                 Type targetType = ESSODataWindowHelper.GetGroupType(createGroup_);
-                ESDesignUtility.SafeEditor.CreateSOAsset(targetType, FolderPath_, createName_, true, hasChange, beforeSave);
+                string path = FolderPath_;
+                Debug.Log(path + targetType.Name + targetType.Name._RemoveSubStrings("Data", "Group"));
+                if (AutoParentFolder) ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(FolderPath_, targetType.Name._RemoveSubStrings("Data", "Group"), out path);
+                Debug.Log(path);
+                var create = ESDesignUtility.SafeEditor.CreateSOAsset(targetType, path, createName_, true, hasChange, beforeSave);
                 void beforeSave(ScriptableObject so)
                 {
                     Selection.activeObject = so;
                 }
+               
             }
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]

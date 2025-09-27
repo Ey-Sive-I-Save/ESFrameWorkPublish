@@ -118,6 +118,8 @@ namespace ES
             }
             return null;
         }
+        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryContains(Key key, Element who)
         {
@@ -169,7 +171,25 @@ namespace ES
     [Serializable, TypeRegistryItem("类型键-组")]
     public class TypeKeyGroup<Element> : KeyGroup<Type, Element>
     {
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public List<T> GetGroup<T>()
+        {
+            var listR = new List<T>(3);
+            if (Groups.TryGetValue(typeof(T), out var list))
+            {
+                int count = list.Count;
+                for(int i = 0; i < count; i++)
+                {
+                    if( list[i] is T t)
+                    {
+                        listR.Add(t);
+                    }
+                    
+                }
+                return listR;
+            }
+            return null;
+        }
     }
 
 }

@@ -53,7 +53,6 @@ namespace ES
 
                         foreach (string file in allFiles)
                         {
-                            // 转换为Unity相对路径（如 "Assets/Scenes/Menu.unity"）
                             string relativePath = "Assets" + file.Replace(Application.dataPath, "").Replace('\\', '/');
 
                             string use = relativePath;
@@ -64,11 +63,15 @@ namespace ES
                                 string display = relativePath.Substring(indexXIE, indexLast - indexXIE);
                                 menu.AddItem(new GUIContent("<场景>" + display), false, () =>
                                 {
+                                    Debug.Log(use);
+                                    ESDesignUtility.SafeEditor.Quick_PingAssetByPath(use);
                                     UnityEngine.SceneManagement.Scene activeScene = EditorSceneManager.GetActiveScene();
                                     bool b = EditorSceneManager.SaveScene(activeScene);
                                     Debug.Log("自动保存场景" + activeScene + (b ? "成功" : "失败"));
                                     if (AdditiveModel) EditorSceneManager.OpenScene(use, mode: OpenSceneMode.Additive);
                                     else EditorSceneManager.OpenScene(use);
+
+                                    
                                 });
                             }
 
@@ -154,91 +157,27 @@ namespace ES
                     EditorStyles.toolbarDropDown, GUILayout.Width(300)))
                 {
                     var menu = new GenericMenu();
-                    var ss = EditorBuildSettings.scenes;
-                    menu.AddItem(new GUIContent("<框架总文件夹>"), false, () =>
-                    {
-                        string[] guids = AssetDatabase.FindAssets("ESFramework");
-                        foreach (var i in guids)
-                        {
-                            string path = AssetDatabase.GUIDToAssetPath(i);
-                            var use = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                            Selection.activeObject = use;
-                            EditorGUIUtility.PingObject(use);
-                            break;
-                        }
-                    });
-                    menu.AddItem(new GUIContent("<框架总文件夹>"), false, () =>
-                    {
-                        string[] guids = AssetDatabase.FindAssets("ESFramework");
-                        foreach (var i in guids)
-                        {
-                            string path = AssetDatabase.GUIDToAssetPath(i);
-                            var use = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                            Selection.activeObject = use;
-                            EditorGUIUtility.PingObject(use);
-                            break;
-                        }
-                    });
-                    menu.AddItem(new GUIContent("<So数据总文件夹>"), false, () =>
-                    {
-                        string[] guids = AssetDatabase.FindAssets("SingleData");
-                        foreach (var i in guids)
-                        {
-                            string path = AssetDatabase.GUIDToAssetPath(i);
-                            var use = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                            Selection.activeObject = use;
-                            EditorGUIUtility.PingObject(use);
-                            break;
-                        }
-                    });
-                    menu.AddItem(new GUIContent("<编辑器总文件夹>"), false, () =>
-                    {
-                        string[] guids = AssetDatabase.FindAssets("Editor");
-                        foreach (var i in guids)
-                        {
-                            string path = AssetDatabase.GUIDToAssetPath(i);
-                            var use = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                            Selection.activeObject = use;
-                            EditorGUIUtility.PingObject(use);
-                            break;
-                        }
-                    });
-                    menu.AddItem(new GUIContent("<静态策略工具总文件夹>"), false, () =>
-                    {
-                        string[] guids = AssetDatabase.FindAssets("Static_KeyValueMaching_Partial");
-                        foreach (var i in guids)
-                        {
-                            string path = AssetDatabase.GUIDToAssetPath(i);
-                            var use = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                            Selection.activeObject = use;
-                            EditorGUIUtility.PingObject(use);
-                            break;
-                        }
-                    });
-                    menu.AddItem(new GUIContent("<全局数据总文件夹>"), false, () =>
-                    {
-                        string[] guids = AssetDatabase.FindAssets("GlobalData");
-                        foreach (var i in guids)
-                        {
-                            string path = AssetDatabase.GUIDToAssetPath(i);
-                            var use = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                            Selection.activeObject = use;
-                            EditorGUIUtility.PingObject(use);
-                            break;
-                        }
-                    });
 
-                    menu.AddSeparator("");
+
+
+                   
                     menu.AddItem(new GUIContent("<玩家对象>"), false, () =>
                     {
                         var player = GameObject.FindGameObjectWithTag("Player");
                         if (player != null) { Selection.activeGameObject = player; EditorGUIUtility.PingObject(player); }
                     });
-                    
+                    menu.AddSeparator("");
+                    foreach (var (k,v) in ESGlobalEditorLocation.Instance.Assets)
+                    {
+                        if (v != null) {
+                            
+                            menu.AddItem(new GUIContent($"<{k}>"), false, () => { Selection.activeObject = v; EditorGUIUtility.PingObject(v); });
+                        }
+                    }
 
                     // 添加菜单项
 
-                    var assembly = typeof(ESEditorExpand_QuickSelect).Assembly; // 获取父类所在程序集
+                   /* var assembly = typeof(ESEditorExpand_QuickSelect).Assembly; // 获取父类所在程序集
                     var use = assembly.GetTypes()
                        .Where(t => t.IsClass && !t.IsAbstract && t.BaseType == typeof(ESEditorExpand_QuickSelect))
                        .ToList();
@@ -251,7 +190,7 @@ namespace ES
                             var ob = func.Invoke();
                             if (ob != null) { Selection.activeObject = ob; EditorGUIUtility.PingObject(ob); }
                         });
-                    }
+                    }*/
 
 
                     menu.AddSeparator("");

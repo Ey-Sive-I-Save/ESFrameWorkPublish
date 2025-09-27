@@ -60,20 +60,26 @@ namespace ES
             }
 
         }
-
-        [ShowInInspector, BoxGroup("showGlobal", LabelText = "关于全局数据"), LabelText("选中单例"),ReadOnly]
+        [LabelText("被选中为主数据"), BoxGroup("showGlobal", LabelText = "关于全局数据", VisibleIf = "SHOW"), ReadOnly, PropertyOrder(-3)]
+        public bool HasConfirm = false;//选定一个
+        [ShowInInspector, BoxGroup("showGlobal"), LabelText("选中单例"),ReadOnly]
         private static This _instance;
         [ShowInInspector, BoxGroup("showGlobal"), LabelText("该类型全部数据"),ListDrawerSettings(HideAddButton =true,HideRemoveButton =true), InlineButton("TryConfirmSwitchThis", "选中为主数据")]
         private static HashSet<This> AllCaches = new HashSet<This>();
         private static Action<This> OnConfirmOneSO = (who) => { };
 
 
-        [LabelText("被选中为主数据"), BoxGroup("showGlobal"), ReadOnly, PropertyOrder(-3)]
-        public bool HasConfirm = false;//选定一个
+       
         private static Dictionary<Type, bool> HasReactiveTable = new Dictionary<Type, bool>();//敏感互动表(自动创建)
-
+        [NonSerialized]
+        public Func<bool> SHOW_Global;
+        private bool SHOW()
+        {
+            return SHOW_Global?.Invoke() ?? true;
+        }
         private void OnDestroy()
         {
+           
             if (HasConfirm)
             {
                 HasReactiveTable[typeof(This)] = false;

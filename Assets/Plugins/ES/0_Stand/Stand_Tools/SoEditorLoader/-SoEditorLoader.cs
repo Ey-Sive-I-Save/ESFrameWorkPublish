@@ -9,7 +9,7 @@ namespace ES
 {
     public class ESEditorSO
     {
-        public static KeyGroup<Type, ESSO> SOS = new KeyGroup<Type, ESSO>();
+        public static TypeKeyGroup<ESSO> SOS = new TypeKeyGroup<ESSO>();
     }
 #if UNITY_EDITOR
     public class SoEditorIniter : EditorInvoker_Level0

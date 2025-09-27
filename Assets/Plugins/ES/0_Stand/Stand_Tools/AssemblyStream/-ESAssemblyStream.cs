@@ -337,7 +337,7 @@ namespace ES
                         MethodInfo info = reType.GetMethod("Handle");
                         Handler_ClassAttribute.Add((classType) =>
                         {
-                            Debug.Log("MatchTest" + classType);
+                            
                             var at = classType.GetCustomAttribute(supportAttribute);
                             if (at != null)
                             {

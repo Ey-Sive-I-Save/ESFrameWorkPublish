@@ -1,0 +1,33 @@
+ManifestFileVersion: 0
+CRC: 3094268626
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 3127020590490ffa4278b6eaac317c44
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 48f9e47804cc6149eb45c38c55466448
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 3127020590490ffa4278b6eaac317c44
+HashAppended: 1
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 65
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- "Assets/NormalResources/Prefabs/\u84DD\u8272\u65B9\u5757 1.prefab"
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/Res/WindowsPlayer/assets_normalresources_materials_blue_mat_ae8b0c7908570443fcead950441ffc1a

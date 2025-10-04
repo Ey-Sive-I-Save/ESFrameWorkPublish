@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ff30c92106c41f4c8c9625abbf17ad6, type: 3}
+  m_Name: "\u6D4B\u8BD5\u5E93"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  Name: "\u6D4B\u8BD5\u5E93"
+  Books:
+  - Name: "\u6750\u8D28"
+    pages:
+    - Name: Blue
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 175ea344356ceff419652357e6c28c93, type: 2}
+    - Name: Mat-Blue
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 237923b86f06f334a9b97c15cb0e3f1c, type: 2}
+    - Name: MatYellow
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 1d943e7174546cd41be9bd4ff36a63f5, type: 2}
+    - Name: "\u6750\u8D281\u9ED1"
+      namedOption: 0
+      OB: {fileID: 2100000, guid: c600ee02bd31618499bfe810e7dbca98, type: 2}
+    - Name: "\u6750\u8D28mat2 1"
+      namedOption: 0
+      OB: {fileID: 2100000, guid: e694a0c3cc250404094115430ddf674b, type: 2}
+    Desc: 
+  - Name: "\u9884\u5236\u4EF6"
+    pages:
+    - Name: "\u84DD\u8272\u65B9\u5757 1"
+      namedOption: 0
+      OB: {fileID: 3297624632732339496, guid: c0d11fc04140f5b41b0bfbcaa1c0d24b, type: 3}
+    - Name: "\u84DD\u8272\u65B9\u5757"
+      namedOption: 0
+      OB: {fileID: 3297624632732339496, guid: 2da1723588195354fbc1a80435a4ea14, type: 3}
+    - Name: "\u9EC4\u8272\u65B9\u5757"
+      namedOption: 0
+      OB: {fileID: 3297624632732339496, guid: 1577a4778227bb742ae32a2cea63fcf6, type: 3}
+    - Name: "\u9ED1\u8272\u65B9\u5757"
+      namedOption: 0
+      OB: {fileID: 3297624632732339496, guid: 4088a63ea9a7ec2489a1a0cd6b976a31, type: 3}
+    Desc: 
+  - Name: "\u8D34\u56FE"
+    pages: []
+    Desc: 
+  - Name: "\u573A\u666F"
+    pages:
+    - Name: SampleScene 1
+      namedOption: 0
+      OB: {fileID: 102900000, guid: 0cc52f7c68f7efa4ab2684d987d352b2, type: 3}
+    - Name: SampleScene 2
+      namedOption: 0
+      OB: {fileID: 102900000, guid: 8697751aa3700a34dab894535e0da12b, type: 3}
+    - Name: SampleScene 3
+      namedOption: 0
+      OB: {fileID: 102900000, guid: 7703ff55c96f690468922ae739f9716d, type: 3}
+    - Name: SampleScene
+      namedOption: 0
+      OB: {fileID: 102900000, guid: 34ad714264ab69049b99ac4bdafacaa8, type: 3}
+    Desc: 
+  ContainsBuild: 1
+  IsNet: 1
+  Desc: "\u63CF\u8FF0\uFF1A\u8FD9\u662F\u4E00\u4E2A\u505A\u5565\u7684\u5E93"
+  aaa: []

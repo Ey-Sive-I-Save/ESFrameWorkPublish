@@ -3,7 +3,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using static TreeEditor.TreeGroup;
 
 public class ReceiveLink<Link> : IReceiveLink<Link>,IPoolablebAuto
 {

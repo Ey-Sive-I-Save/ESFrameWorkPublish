@@ -1,19 +1,33 @@
 using ES;
 using Sirenix.OdinInspector;
+#if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
+using UnityEditor;
+#endif
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
+
 using UnityEngine;
 using UnityEngine.Events;
 
-public class exa : MonoBehaviour 
+public class exa : SerializedMonoBehaviour 
 {
-    public LevelArea level;
-    // Update is called once per frame
+    public ESResRefer refer;
+    public ESResReferPrefab prefab;
+    public ESResReferAudioClip clip;
+    public ESResReferMat mat;
 
+    public Dictionary<string, string> keyValues = new Dictionary<string, string>();
 
+    [TextArea]
+    public string test;
+    [Button("测试")]
+    public void Test()
+    {
+
+        test= ESDesignUtility.Matcher.ToOdinJson(keyValues);
+    }
 }
 [Serializable]
 public class LevelArea

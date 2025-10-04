@@ -133,8 +133,12 @@ namespace ES
                     default: return b2;
                 }
             }
-            //操作两个bool
 
+
+
+
+
+        
             #endregion
 
             #region 字符串

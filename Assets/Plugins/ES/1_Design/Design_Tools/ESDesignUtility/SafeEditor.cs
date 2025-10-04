@@ -4,8 +4,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Sirenix.Utilities;
-using static PlasticGui.WorkspaceWindow.Merge.MergeInProgress;
-using UnityEngine.WSA;
+using System.Diagnostics;
+using System.IO;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -170,7 +170,7 @@ namespace ES
                     return path;
                 }
 #endif
-                return "";
+                return null;
             }
             #endregion
             
@@ -217,7 +217,7 @@ namespace ES
             {
                 List<T> values = new List<T>(3);
 #if UNITY_EDITOR
-                if (typeUse == null) { Debug.LogWarning("查询NULL类型"); return values; }
+                if (typeUse == null) { UnityEngine.Debug.LogWarning("查询NULL类型"); return values; }
                 var all = AssetDatabase.FindAssets("t:ScriptableObject");
                 foreach (var i in all)
                 {
@@ -358,7 +358,7 @@ namespace ES
                 }
                 else
                 {
-                    Debug.LogError("未发现资产在路径" + path);
+                    UnityEngine.Debug.LogError("未发现资产在路径" + path);
                 }
 #endif
             }
@@ -376,7 +376,7 @@ namespace ES
                 }
                 else
                 {
-                    Debug.LogError("未发现资产在路径" + path);
+                    UnityEngine.Debug.LogError("未发现资产在路径" + path);
                 }
 #endif
             }
@@ -404,6 +404,7 @@ namespace ES
 
             public static bool Quick_TryCreateChildFolder(string parentFolder,string folderName,out string end)
             {
+#if UNITY_EDITOR
                 if (AssetDatabase.IsValidFolder(parentFolder))
                 {
                     string target = parentFolder + "/" + folderName;
@@ -421,6 +422,8 @@ namespace ES
                         return true;
                     }
                 }
+
+#endif
                 end = "";
                 return false;
             }
@@ -467,7 +470,7 @@ namespace ES
 
                 if (!AssetDatabase.IsValidFolder(folderPath))
                 {
-                    Debug.LogError($"Invalid folder path_: {folderPath}");
+                    UnityEngine.Debug.LogError($"Invalid folder path_: {folderPath}");
                     return null;
                 }
                 T asset = ScriptableObject.CreateInstance<T>();
@@ -499,7 +502,7 @@ namespace ES
                 if (type == null) return null;
                 if (!AssetDatabase.IsValidFolder(folderPath))
                 {
-                    Debug.LogError($"Invalid folder path_: {folderPath}");
+                    UnityEngine.Debug.LogError($"Invalid folder path_: {folderPath}");
                     return null;
                 }
                 ScriptableObject asset = ScriptableObject.CreateInstance(type);
@@ -516,7 +519,188 @@ namespace ES
 #endif
             }
             #endregion
+            #region 更新
+            /// <summary>
+            /// 系统(安全)-获得文件夹下所有文件
+            /// </summary>
+            /// <param name="folder"></param>
+            /// <param name="patten"></param>
+            /// <returns></returns>
+            public static List<string> Quick_System_GetFiles_AlwaysSafe(string folder, string patten = "*")
+            {
+                List<string> paths = new List<string>();
+                string assetsPath = UnityEngine.Application.dataPath._KeepBeforeByLast("/Assets");
+                string path = System.IO.Path.Combine(assetsPath, folder).Replace('\\', '/');
+
+                string[] allFiles = Directory.GetFiles(path, patten, SearchOption.AllDirectories);
+
+                foreach (string file in allFiles)
+                {
+                    // 转换为Unity相对路径（如 "Assets/Scenes/Menu.unity"）
+                    string relativePath = "Assets" + file.Replace(UnityEngine.Application.dataPath, "").Replace('\\', '/');
+                    paths.Add(relativePath);
+                }
+                return paths;
+            }
+            /// <summary>
+            /// 系统(安全)-删除文件夹下的所有文件
+            /// </summary>
+            /// <param name="fullPath"></param>
+            public void Quick_System_DeleteAllFilesInFolder_Always(string fullPath)
+            {
+                if (Directory.Exists(fullPath))
+                {
+                    DirectoryInfo dirInfo = new DirectoryInfo(fullPath);
+
+                    // 删除所有文件，但跳过.meta文件
+                    foreach (FileInfo file in dirInfo.GetFiles())
+                    {
+                        if (file.Extension != ".meta")
+                        {
+                            file.Delete();
+                        }
+                    }
+
+                    UnityEngine.Debug.Log("文件删除完毕（已跳过.meta文件）。");
+
+#if UNITY_EDITOR
+                    UnityEditor.AssetDatabase.Refresh();
+#endif
+                }
+                else
+                {
+                    UnityEngine.Debug.LogWarning("目录不存在，无需删除。");
+                }
+            }
+            /// <summary>
+            /// 系统-资源管理器打开路径
+            /// </summary>
+            /// <param name="Path"></param>
+            /// <param name="FromAssets"></param>
+            public static void Quick_OpenInSystemFolder(string Path, bool FromAssets = true)
+            {
+#if UNITY_EDITOR
+                if (string.IsNullOrEmpty(Path) || !System.IO.Directory.Exists(Path))
+                {
+                    UnityEngine.Debug.LogError("目录不存在或路径无效: " + Path);
+                    return;
+                }
+
+                // 根据不同平台执行命令
+                if (UnityEngine.Application.platform == RuntimePlatform.WindowsEditor ||
+                    UnityEngine.Application.platform == RuntimePlatform.WindowsPlayer)
+                {
+                    // Windows: 使用explorer.exe
+                    // 确保路径使用反斜杠，并对路径加引号以处理空格
+                    Path = Path.Replace("/", "\\");
+                    Process.Start("explorer.exe", "\"" + Path + "\"");
+                }
+                else if (UnityEngine.Application.platform == RuntimePlatform.OSXEditor ||
+                         UnityEngine.Application.platform == RuntimePlatform.OSXPlayer)
+                {
+                    // macOS: 使用open命令
+                    Process.Start("open", "\"" + Path + "\"");
+                }
+                else
+                {
+                    UnityEngine.Debug.LogWarning("当前平台不支持直接打开文件夹。");
+                }
+#endif
+            }
+
+            public static (bool Success, string Message) Quick_System_CreateDirectory(string fullPath)
+            {
+                // 参数校验
+                if (string.IsNullOrWhiteSpace(fullPath))
+                {
+                    return (false, "提供的路径为空或无效。");
+                }
+
+                try
+                {
+                    // 检查目录是否已存在
+                    if (Directory.Exists(fullPath))
+                    {
+                        return (true, $"目录已存在：{fullPath}");
+                    }
+
+                    // 创建目录
+                    DirectoryInfo directoryInfo = Directory.CreateDirectory(fullPath);
+                    string resultMessage = $"目录创建成功：{fullPath}";
+
+                    return (true, resultMessage);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    return (false, $"权限不足，无法创建目录 '{fullPath}'。详细信息：{ex.Message}");
+                }
+                catch (PathTooLongException ex)
+                {
+                    return (false, $"路径 '{fullPath}' 过长。详细信息：{ex.Message}");
+                }
+                catch (IOException ex) // 此异常类包含 DirectoryNotFoundException 等
+                {
+                    return (false, $"创建目录时发生I/O错误：{ex.Message}");
+                }
+                catch (Exception ex) // 捕获其他未预期的异常
+                {
+                    return (false, $"创建目录 '{fullPath}' 时发生未预期的错误：{ex.Message}");
+                }
+            }
+
+            public static bool Quick_CreateFolderByFullPath(string fullPath)
+            {
+#if UNITY_EDITOR
+                // 参数检查
+                if (string.IsNullOrEmpty(fullPath) || !fullPath.StartsWith("Assets"))
+                {
+                    UnityEngine.Debug.LogError("路径无效！必须是以 'Assets' 开头的有效路径。");
+                    return false;
+                }
+
+                // 检查文件夹是否已存在
+                if (AssetDatabase.IsValidFolder(fullPath))
+                {
+
+                    return true;
+                }
+                UnityEngine.Debug.Log("尝试创建");
+                // 从完整路径中提取父文件夹路径和要创建的新文件夹名称
+                string parentFolder = Path.GetDirectoryName(fullPath);
+                string newFolderName = Path.GetFileName(fullPath);
+
+                // 检查父目录是否存在，如果不存在，则递归创建父目录
+                if (!AssetDatabase.IsValidFolder(parentFolder))
+                {
+                    // 递归调用自身来创建父目录
+                    if (!Quick_CreateFolderByFullPath(parentFolder))
+                    {
+                        return false; // 如果父目录创建失败，则直接返回
+                    }
+                }
+
+                // 创建最终的目标文件夹
+                string resultGuid = AssetDatabase.CreateFolder(parentFolder, newFolderName);
+                if (!string.IsNullOrEmpty(resultGuid))
+                {
+                    AssetDatabase.Refresh(); // 刷新数据库使新文件夹立即可见
+                    UnityEngine.Debug.Log($"文件夹创建成功：{fullPath}");
+                    return true;
+                }
+                else
+                {
+                    UnityEngine.Debug.LogError($"文件夹创建失败：{fullPath}");
+                    return false;
+                }
+#else
+                return false;
+#endif
+            }
+
+            #endregion
         }
+
+
     }
 }
 

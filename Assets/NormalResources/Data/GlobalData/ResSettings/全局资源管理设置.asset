@@ -21,5 +21,13 @@ MonoBehaviour:
     PrefabModificationsReferencedUnityObjects: []
     PrefabModifications: []
     SerializationNodes: []
-  HasConfirm: 0
-  TEST: "\u6D4B\u8BD5\u7528"
+  HasConfirm: 1
+  createText: "--\u8D44\u6E90\u7BA1\u7406\u5168\u5C40\u8BBE\u7F6E--"
+  applyPlatform: 2
+  EnablePublishMode: 1
+  CodegenMode: 1
+  Path_Net: https://eysive-teset.oss-cn-beijing.aliyuncs.com
+  Path_ResLibraryFolder: Assets/NormalResources/Data/ResLibrary
+  Path_ABHelperCodeGen: Assets/Scripts/ESLogic/CodeGen/ESABHelper
+  Path_LocalABPath: Assets/StreamingAssets/AssetBundle
+  Path_Sub_DownloadRelative: ABDownLoad

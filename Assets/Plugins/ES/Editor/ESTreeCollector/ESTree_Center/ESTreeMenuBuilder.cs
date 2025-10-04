@@ -113,9 +113,9 @@ public class ESTreeMenuShower : OdinEditorWindow
         if (menuTree == null) return;
         //EditorGUI.DrawRect(this.position,Color.black);
         //标题
-        string titleName = Test1GlobalDara.Instance.Title;
+        //string titleName = Test1GlobalDara.Instance.Title;
 
-        SirenixEditorGUI.Title(titleName+ Last._GetInspectorName(), "", TextAlignment.Center, true);
+      //  SirenixEditorGUI.Title(titleName+ Last._GetInspectorName(), "", TextAlignment.Center, true);
         //工具栏
         #region 工具栏
         GUILayout.Box("", GUILayout.Height(8), GUILayout.ExpandWidth(true));

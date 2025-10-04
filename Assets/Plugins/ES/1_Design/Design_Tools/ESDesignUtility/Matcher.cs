@@ -524,7 +524,7 @@ namespace ES
         public class ExmapleXML
         {
             // 作为 XML 元素的属性序列化
-            [XmlElement("Name")]
+            [XmlElement("PreNameToABKeys")]
             public string playerName;
 
             [XmlElement("Level")]

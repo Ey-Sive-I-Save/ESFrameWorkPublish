@@ -1,6 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Text;
 using UnityEngine;
 
 internal static class STANDExtensionForString
@@ -9,18 +13,18 @@ internal static class STANDExtensionForString
     {
         return "";
     }
-        #region 截取系列
-        // ================== 基础截取方法 ==================
+    #region 截取系列
+    // ================== 基础截取方法 ==================
 
-        /// <summary>
-        /// 按第一个分隔符保留之前的字符串
-        /// </summary>
-        /// <param name="source"></param>
-        /// <param name="separator">分隔符</param>
-        /// <param name="includeSeparator">保留分隔符</param>
-        /// <param name="comparison">比较规则​​(自己查)​​</param>
-        /// <returns></returns>
-        public static string _KeepBeforeByFirst(this string source, string separator, bool includeSeparator = false, StringComparison comparison = StringComparison.Ordinal)
+    /// <summary>
+    /// 按第一个分隔符保留之前的字符串
+    /// </summary>
+    /// <param name="source"></param>
+    /// <param name="separator">分隔符</param>
+    /// <param name="includeSeparator">保留分隔符</param>
+    /// <param name="comparison">比较规则​​(自己查)​​</param>
+    /// <returns></returns>
+    public static string _KeepBeforeByFirst(this string source, string separator, bool includeSeparator = false, StringComparison comparison = StringComparison.Ordinal)
     {
         if (string.IsNullOrEmpty(source)) return source;
 
@@ -211,5 +215,317 @@ internal static class STANDExtensionForString
 
         return str.Substring(0, maxLength) + end;
     }
+    #endregion
+    #region 特征查询部分
+    /// <summary>
+    /// 有效的邮箱
+    /// </summary>
+    /// <param name="str"></param>
+    /// <returns></returns>
+    public static bool _IsValidEmail(this string str)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(str);
+            return addr.Address == str;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    /// <summary>
+    /// 有效的URL网址
+    /// </summary>
+    /// <param name="str"></param>
+    /// <returns></returns>
+    public static bool _IsValidUrl(this string str)
+    {
+        Uri uriResult;
+        return Uri.TryCreate(str, UriKind.Absolute, out uriResult) && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps);
+    }
+    /// <summary>
+    /// 有效的数字
+    /// </summary>
+    /// <param name="str"></param>
+    /// <returns></returns>
+    public static bool _IsNumeric(this string str)
+    {
+        return double.TryParse(str, out _);
+    }
+    /// <summary>
+    /// 含有空格
+    /// </summary>
+    /// <param name="input"></param>
+    /// <returns></returns>
+    public static bool _HasSpace(this string input)
+    {
+        return input.Contains(" ");
+    }
+    /// <summary>
+    /// 包含中文汉字
+    /// </summary>
+    /// <param name="input"></param>
+    /// <returns></returns>
+    public static bool _ContainsChineseCharacterOnly(this string input)
+    {
+        return Regex.IsMatch(input, @"[\u4e00-\u9fa5]");
+    }
+    /// <summary>
+    /// 包含中文汉字或者符号
+    /// </summary>
+    /// <param name="input"></param>
+    /// <returns></returns>
+    public static bool _ContainChineseCharacterOrChineseSymbol(this string input)
+    {
+        return Regex.IsMatch(input, @"[\u4e00-\u9fa5]") || Regex.IsMatch(input, @"[。？！，、；：“”‘’（）《》——……·【】·^ ∧ ¶ =  # / ∞ △ ※ ●＋ － × ÷ ± ≌ ∽ ≤ ≥ ≠ ≡ ∫ ∮ ∑ ∏]");
+    }
+    /// <summary>
+    /// 包含中文汉字或者任意符号
+    /// </summary>
+    /// <param name="input"></param>
+    /// <returns></returns>
+    public static bool _ContainChineseCharacterOrNormalSymbol(this string input)
+    {
+        return Regex.IsMatch(input, @"[\u4e00-\u9fa5]")
+            || Regex.IsMatch(input, @"[。？！，、；：“”‘’（）《》——……·【】·^ ∧ ¶ =  # / ∞ △ ※ ●＋ － × ÷ ± ≌ ∽ ≤ ≥ ≠ ≡ ∫ ∮ ∑ ∏]")
+            || Regex.IsMatch(input, @"[. , ? ! ' "" : ; ... — –  ( )   { } + − × ÷ = ≠ ≈ ± ≤ ≥ % ° °C °F π ∫ ∑ ∏ √ ∞ / \ | # & * ~ @ $ £ € ¥ ¢ ^]");
+
+    }
+    /// <summary>
+    /// 是C# 关键字
+    /// </summary>
+    /// <param name="value"></param>
+    /// <returns></returns>
+    private static bool _IsCSharpKeyword(this string value)
+    {
+        return Array.Exists(keywords, k => k.Equals(value, StringComparison.Ordinal));
+    }
+    public static string[] keywords = {
+            "abstract", "as", "base", "bool", "break", "byte", "case", "catch",
+            "char", "checked", "class", "const", "continue", "decimal", "default",
+            "delegate", "do", "double", "else", "enum", "event", "explicit", "extern",
+            "false", "finally", "fixed", "float", "for", "foreach", "goto", "if", "implicit",
+            "in", "int", "interface", "internal", "is", "lock", "long", "namespace", "new",
+            "null", "object", "operator", "out", "override", "params", "private", "protected",
+            "public", "readonly", "ref", "return", "sbyte", "sealed", "short", "sizeof",
+            "stackalloc", "static", "string", "struct", "switch", "this", "throw", "true",
+            "try", "typeof", "uint", "ulong", "unchecked", "unsafe", "ushort", "using",
+            "virtual", "void", "volatile", "while"
+        };
+
+    /// <summary>
+    /// 是有效的标识符名字
+    /// </summary>
+    /// <param name="input"></param>
+    /// <returns></returns>
+    public static bool _IsValidIdentName(this string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return false;
+
+        // 步骤1：查询是否包含所有非字母、数字、下划线的字符[6,7](@ref)
+        if (Regex.IsMatch(input, @"\W"))
+            return false;
+
+
+        // 步骤2：查询是否以数字开头
+        if (char.IsDigit(input[0]))
+            return false;
+
+        // 步骤3：查询连续下划线
+        if (Regex.IsMatch(input, @"_{2,}"))
+            return false;
+
+        // 步骤4：防止C#关键字冲突
+        if (input._IsCSharpKeyword())
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// 获得斜线数量
+    /// </summary>
+    /// <param name="selfStr"></param>
+    /// <returns></returns>
+    public static int _GetSlashCount(this string selfStr)
+    {
+        string nor = selfStr.Replace("\\", "/");
+        return nor.Count((n) => n == '/');
+
+    }
+    #endregion
+
+    #region 操作部分
+    /// <summary>
+    /// 移除多余的空格
+    /// </summary>
+    /// <param name="str"></param>
+    /// <returns></returns>
+    public static string _RemoveExtraSpaces(this string str)
+    {
+        return Regex.Replace(str, @"\s+", " ").Trim();
+    }
+    /// <summary>
+    /// 把一系列字符串,以分隔符加入连接
+    /// </summary>
+    /// <param name="self"></param>
+    /// <param name="separator">分隔</param>
+    /// <returns></returns>
+    public static string _StringJoin(this IEnumerable<string> self, string separator)
+    {
+        return string.Join(separator, self);
+    }
+    /// <summary>
+    /// 移除各种字符串
+    /// </summary>
+    /// <param name="str"></param>
+    /// <param name="targets">各种字符串</param>
+    /// <returns></returns>
+    public static string _RemoveSubStrings(this string str, params string[] targets)
+    {
+        return targets.Aggregate(str, (current, t) => current.Replace(t, string.Empty));
+    }
+    /// <summary>
+    /// 移除最后的扩展名
+    /// </summary>
+    /// <param name="str"></param>
+    /// <returns></returns>
+    public static string _RemoveExtension(this string str)
+    {
+        int thePoint = str.LastIndexOf('.');
+        if (thePoint >= 0) return str.Substring(0, thePoint);
+        return str;
+    }
+    /// <summary>
+    /// 在前后分别添加
+    /// </summary>
+    /// <param name="str"></param>
+    /// <param name="pre">前</param>
+    /// <param name="last">后</param>
+    /// <returns></returns>
+    public static string _AddPreAndLast(this string str, string pre, string last)
+    {
+        return pre + str + last;
+    }
+    /// <summary>
+    /// 首字母大写(排除空字符)
+    /// </summary>
+    /// <param name="input"></param>
+    /// <returns></returns>
+    public static string _FirstCharToUpperCapitalize(this string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return input;
+
+        // 查找第一个非空白字符的索引
+        int firstCharIndex = 0;
+        while (firstCharIndex < input.Length && char.IsWhiteSpace(input[firstCharIndex]))
+        {
+            firstCharIndex++;
+        }
+
+        if (firstCharIndex >= input.Length)
+            return input;
+
+        // 大写化第一个有效字符
+        return input.Substring(0, firstCharIndex) +
+               char.ToUpper(input[firstCharIndex]) +
+               input.Substring(firstCharIndex + 1);
+    }
+    /// <summary>
+    /// 首字母大写(简单)
+    /// </summary>
+    /// <param name="input"></param>
+    /// <param name="culture"></param>
+    /// <returns></returns>
+    public static string _FirstUpper(this string input, CultureInfo culture)
+    {
+        // 处理单字符情况
+        if (input.Length == 1)
+            return char.ToUpper(input[0], culture).ToString();
+
+        // 处理已大写的情况（避免重复操作）
+        if (char.IsUpper(input[0]))
+            return input;
+
+        // 核心处理：首字母大写 + 剩余部分保持不变
+        return char.ToUpper(input[0], culture) + input.Substring(1);
+    }
+
+    /// <summary>
+    /// 将字符串首字母小写(简单)
+    /// </summary>
+    public static string _FirstLower(this string input, CultureInfo culture)
+    {
+        // 处理单字符情况
+        if (input.Length == 1)
+            return char.ToLower(input[0], culture).ToString();
+
+        // 处理已小写的情况（避免重复操作）
+        if (char.IsLower(input[0]))
+            return input;
+
+        // 核心处理：首字母小写 + 剩余部分保持不变
+        return char.ToLower(input[0], culture) + input.Substring(1);
+    }
+    /// <summary>
+    /// 转换为有效的标识符
+    /// </summary>
+    /// <param name="input"></param>
+    /// <returns></returns>
+    public static string _ToValidIdentName(this string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "_";
+
+        // 步骤1：替换所有非字母、数字、下划线的字符为下划线[6,7](@ref)
+        string normalized = Regex.Replace(input, @"[\W]", "_");
+
+        // 步骤2：处理开头数字（添加下划线前缀）[3,4](@ref)
+        if (char.IsDigit(normalized[0]))
+            normalized = "_" + normalized;
+
+        // 步骤3：合并连续下划线[6](@ref)
+        normalized = Regex.Replace(normalized, @"_{2,}", "_");
+
+        // 步骤4：处理C#关键字冲突（添加@前缀）[3,10](@ref)
+        if (normalized._IsCSharpKeyword())
+            return "@" + normalized;
+
+        return normalized;
+    }
+    /// <summary>
+    /// 转化成代码格式
+    /// </summary>
+    /// <param name="code"></param>
+    /// <returns></returns>
+    public static string _ToCode(this string code)
+    {
+        int indentLevel = 0;
+        string cleanedCode = Regex.Replace(code, @"\r?\n", "\n"); // 统一换行符
+        string pattern = @"[ \t]+";  // \s 匹配使用的空白符（空格、制表符等）
+        cleanedCode = Regex.Replace(cleanedCode, pattern, " "); // 最多保留两个连续空行和空格
+
+        StringBuilder sb = new StringBuilder();
+        foreach (char c in cleanedCode)
+        {
+            if (c == '{') indentLevel++;
+            else if (c == '}')
+            {
+                indentLevel = Math.Max(0, indentLevel - 1);
+            }
+
+            sb.Append(c);
+            if (c == '\n')
+            {
+                sb.Append(new string(' ', indentLevel * 4));
+            }
+        }
+
+        return sb.ToString() + "\n//ES已修正";
+    }
+    #endregion
 }
-        #endregion
+

@@ -30,24 +30,4 @@ public class SO : ScriptableObject
         
     }
 }
-public class Initer 
-{
-    [InitializeOnLoadMethod]
-    public static void AA()
-    {
-        
-        string[] guids = AssetDatabase.FindAssets($"t:{typeof(SO).Name}");
-        foreach (string guid in guids)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            Debug.Log("AT1");
-            SO globalData = AssetDatabase.LoadAssetAtPath<SO>(path);
-            if (globalData != null)
-            {
-                globalData.hideFlags = HideFlags.None;
-                EditorUtility.SetDirty(globalData);
-                Debug.Log("AT2");
-            }  
-        }
-    }
-}
+

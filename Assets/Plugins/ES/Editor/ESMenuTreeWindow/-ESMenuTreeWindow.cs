@@ -62,6 +62,16 @@ namespace ES {
             MenuItems[name] = tree.Add(name, (page ??= new P()), sdfIcon).First();
             page.ES_Refresh();
         }
+        public void QuickBuildRootMenu<P>(OdinMenuTree tree, string name, ref P page, Texture texture) where P : ESWindowPageBase, new()
+        {
+            MenuItems[name] = tree.Add(name, (page ??= new P()), texture).First();
+            page.ES_Refresh();
+        }
+        public void QuickBuildRootMenu<P>(OdinMenuTree tree, string name, ref P page, EditorIcon icon) where P : ESWindowPageBase, new()
+        {
+            MenuItems[name] = tree.Add(name, (page ??= new P()), icon).First();
+            page.ES_Refresh();
+        }
         protected override void OnImGUI()
         {
             if (UsingWindow == null)

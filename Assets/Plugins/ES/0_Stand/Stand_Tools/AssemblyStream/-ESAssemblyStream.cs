@@ -8,10 +8,11 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 
-using static PlasticGui.WorkspaceWindow.Merge.MergeInProgress;
 
 
 
@@ -52,7 +53,7 @@ namespace ES
         private static List<string> RuntimeValidAssebliesName = new List<string>() {
     "ES_Design","ES_Stand","ES_Logic"
     };
-
+#if UNITY_EDITOR
         //编辑器部分
         private class EditorPart
         {
@@ -503,7 +504,7 @@ namespace ES
 
 
         }
-
+#endif
         public class RunTimePart
         {
             private static Assembly[] InitRuntimeAssembies;

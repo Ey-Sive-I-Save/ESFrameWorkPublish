@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
-using static UnityEditor.PlayerSettings;
 
 namespace ES
 {
@@ -27,7 +26,6 @@ namespace ES
                 ESSO soAsset = AssetDatabase.LoadAssetAtPath<ESSO>(assetPath);
                 if (soAsset != null)
                 {
-                    ESEditorSO.SOS.TryAdd(soAsset.GetType(), soAsset);
                     soAsset.OnEditorInitialized();
                 }
             }
@@ -51,7 +49,7 @@ namespace ES
                 }
             }
         }
-#endif
     }
+#endif
 
 }

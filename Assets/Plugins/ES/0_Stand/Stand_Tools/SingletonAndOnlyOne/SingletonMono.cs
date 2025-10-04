@@ -60,9 +60,15 @@ namespace ES
                 {
                     _instance = this as T;
                     DontDestroyOnLoad(gameObject);
+                    DoAwake();
                     // 可在此处添加其他初始化逻辑
                 }
             }
+        }
+
+        protected virtual void DoAwake()
+        {
+
         }
     }
 }

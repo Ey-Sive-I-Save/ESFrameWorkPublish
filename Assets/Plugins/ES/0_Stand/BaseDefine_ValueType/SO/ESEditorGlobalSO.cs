@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+
 namespace ES
 {
     public class ESEditorGlobalSo<This> : ESSO where This : ESEditorGlobalSo<This>
@@ -62,14 +63,14 @@ namespace ES
         }
         [LabelText("被选中为主数据"), BoxGroup("showGlobal", LabelText = "关于全局数据", VisibleIf = "SHOW"), ReadOnly, PropertyOrder(-3)]
         public bool HasConfirm = false;//选定一个
-        [ShowInInspector, BoxGroup("showGlobal"), LabelText("选中单例"),ReadOnly]
+        [ShowInInspector, BoxGroup("showGlobal"), LabelText("选中单例"), ReadOnly]
         private static This _instance;
-        [ShowInInspector, BoxGroup("showGlobal"), LabelText("该类型全部数据"),ListDrawerSettings(HideAddButton =true,HideRemoveButton =true), InlineButton("TryConfirmSwitchThis", "选中为主数据")]
+        [ShowInInspector, BoxGroup("showGlobal"), LabelText("该类型全部数据"), ListDrawerSettings(HideAddButton = true, HideRemoveButton = true), InlineButton("TryConfirmSwitchThis", "选中为主数据")]
         private static HashSet<This> AllCaches = new HashSet<This>();
         private static Action<This> OnConfirmOneSO = (who) => { };
 
 
-       
+
         private static Dictionary<Type, bool> HasReactiveTable = new Dictionary<Type, bool>();//敏感互动表(自动创建)
         [NonSerialized]
         public Func<bool> SHOW_Global;
@@ -79,7 +80,7 @@ namespace ES
         }
         private void OnDestroy()
         {
-           
+
             if (HasConfirm)
             {
                 HasReactiveTable[typeof(This)] = false;
@@ -90,7 +91,7 @@ namespace ES
             base.OnEditorInitialized();
             if (this is This use)
             {
-                
+
                 if (HasConfirm) _instance = use;
                 if (!AllCaches.Contains(use))
                 {
@@ -98,6 +99,19 @@ namespace ES
                     OnConfirmOneSO += Delegate_OnConfirmOneSO;
                     HasReactiveTable[typeof(This)] = false;
                 }
+            }
+        }
+        public void RunTimeAwake()
+        {
+            if (_instance != null && _instance != this)
+            {
+                return;
+            }
+            if (_instance == null)
+            {
+                ConfirmThisOnly();
+                _instance = this as This;
+                // 可在此处添加其他初始化逻辑
             }
         }
         internal This ConfirmThisOnly()

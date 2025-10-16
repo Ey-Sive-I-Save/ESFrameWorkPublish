@@ -4,7 +4,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
 public class TestLink : MonoBehaviour
 {
     public string age;
@@ -16,6 +15,7 @@ public class TestLink : MonoBehaviour
     [Button("发射")]
     void Button()
     {
+        
         sort = age._ToCode();
     }
     // Update is called once per frame

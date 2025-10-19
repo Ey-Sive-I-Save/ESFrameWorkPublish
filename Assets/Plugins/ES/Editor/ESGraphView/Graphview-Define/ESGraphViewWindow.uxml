@@ -1,0 +1,6 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <ui:VisualElement name="HorGroup" style="flex-grow: 1; flex-direction: row; flex-basis: auto; background-color: rgb(0, 0, 0); min-width: 600px; min-height: 400px;">
+        <ES.ESGraphView_Part_InspectorView style="background-color: rgba(10, 10, 10, 0.77); flex-grow: 1; flex-direction: row; width: auto; min-width: 300px; min-height: 600px;" />
+        <ES.ESGraphView_Part_FlowChart name="ESGraphView_Part_FlowChart" style="flex-grow: 1; background-color: rgba(255, 141, 141, 0.57); flex-direction: row-reverse; flex-shrink: 1; min-width: 600px; min-height: 800px;" />
+    </ui:VisualElement>
+</ui:UXML>

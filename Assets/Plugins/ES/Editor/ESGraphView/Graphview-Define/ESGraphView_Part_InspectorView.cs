@@ -1,3 +1,4 @@
+using Sirenix.OdinInspector.Editor;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
@@ -85,11 +86,22 @@ namespace ES
                 UnityEngine.Object.DestroyImmediate(editorForContainer);
 
 
-                editorForContainer = Editor.CreateEditor(uo);
+                editorForContainer = OdinEditor.CreateEditor(uo); 
 
                 var contain = new IMGUIContainer(() =>
-                 {
-                     editorForContainer.OnInspectorGUI();
+                {
+                    if (uo != null)
+                    {
+                        if (editorForContainer is OdinEditor oe)
+                        {
+                            oe.OnInspectorGUI();
+                        }
+                        else
+                        {
+                            editorForContainer.OnInspectorGUI();
+                        }
+                    }
+                  
                  });
 
                 ForContainerPanel.Add(contain);
@@ -108,13 +120,20 @@ namespace ES
             var runner = nodeView.Runner;
             if (runner is UnityEngine.Object UOrunner)
             {
-                editorForNode = Editor.CreateEditor(UOrunner);
+                editorForNode = OdinEditor.CreateEditor(UOrunner);
 
                 var node = new IMGUIContainer(() =>
                 {
-                    if (nodeView != null && nodeView.Runner != null)
+                    if (nodeView != null && nodeView.Runner != null&& UOrunner!=null)
                     {
-                        editorForNode.OnInspectorGUI();
+                        if (editorForNode is OdinEditor oe)
+                        {
+                            oe.OnInspectorGUI();
+                        }
+                        else
+                        {
+                            editorForNode.OnInspectorGUI();
+                        }
                     }
                 });
                 ForNodePanel.Add(node);

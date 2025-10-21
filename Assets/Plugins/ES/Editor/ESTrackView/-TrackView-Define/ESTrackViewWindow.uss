@@ -1,0 +1,13 @@
+.custom-label {
+    font-size: 20px;
+    -unity-font-style: bold;
+    color: rgb(68, 138, 255);
+}
+
+Button:normal {
+    background-color: rgba(0, 0, 0, 0.37);
+}
+
+.normalBlock {
+    background-color: rgba(0, 0, 0, 0.63);
+}

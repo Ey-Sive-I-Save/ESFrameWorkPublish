@@ -1,0 +1,19 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="project://database/Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.uss?fileID=7433441132597879392&amp;guid=94a24e6f1db27d4449be2f6fbeb9eb40&amp;type=3#ESTrackViewWindow" />
+    <ui:ScrollView horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="AlwaysVisible" style="flex-grow: 1; background-color: rgb(45, 35, 35);">
+        <ui:VisualElement name="TopPart" style="flex-grow: 0; background-color: rgba(0, 0, 0, 0.63);">
+            <ES.ESTrackTimerToolbar name="ESTrackTimerToolbar" style="background-color: rgba(0, 0, 0, 0.65);" />
+            <ui:VisualElement class="normalBlock" style="flex-grow: 1; height: 10px; width: 100%; flex-direction: row; background-color: rgba(0, 0, 0, 0.42);" />
+        </ui:VisualElement>
+        <ui:VisualElement name="DownPart" style="flex-grow: 1; flex-direction: row; min-height: 400px; min-width: 600px;">
+            <ui:VisualElement name="DownLeftPart" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.6);">
+                <ES.ESTrackCreatorToolbar class="normalBlock" style="height: 40px; width: 100%; background-color: rgba(28, 28, 28, 0.63);" />
+            </ui:VisualElement>
+            <ui:VisualElement style="flex-grow: 0; height: 100%; width: 5px; flex-shrink: 0; background-color: rgba(255, 255, 255, 0.41);" />
+            <ui:VisualElement name="DownRightPart" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.75); width: 246px;">
+                <ES.ESTrackRuler name="ESTrackRuler" style="width: 100%; min-width: 100%; background-color: rgba(29, 29, 29, 0.6); height: 40px;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:MinMaxSlider min-value="0" max-value="131" low-limit="0" high-limit="100" name="HorSlider" style="transform-origin: left bottom; left: 500px; top: auto; position: absolute; bottom: 0; width: auto; height: 25px; margin-right: 0; padding-right: 0; padding-left: 25px; right: 15px;" />
+    </ui:ScrollView>
+</ui:UXML>

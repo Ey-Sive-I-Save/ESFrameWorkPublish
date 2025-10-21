@@ -8,7 +8,7 @@ public class TestNewWindoiw : EditorWindow
     private VisualTreeAsset m_VisualTreeAsset = default;
 
     [MenuItem("Window/UI Toolkit/TestNewWindoiw")]
-    public static void ShowExample()
+    public static void ShowExample() 
     {
         TestNewWindoiw wnd = GetWindow<TestNewWindoiw>();
         wnd.titleContent = new GUIContent("TestNewWindoiw");

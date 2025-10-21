@@ -1,0 +1,467 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-8765439335015454451
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 412536bba48de404688d94cd07a1eb8f, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u672A\u5B9A\u4E49"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: -293.14288, y: -186.85713}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692678
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692678
+      type: {class: OOPSKILL_Control4w, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        write: 0
+        timeControl: 0
+        level: 0
+--- !u!114 &-8587397351663762832
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8389ada07cbd34a4ebf77eedaa4f4042, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u73A9\u5BB6\u8EAB\u8FB9\u7684\u5B9E\u4F53"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: -645.7143, y: -78.28571}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692679
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692679
+      type: {class: OOPSKILL_Hurt2, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        damage: 0
+        isRange: 0
+--- !u!114 &-6199248303627695502
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 412536bba48de404688d94cd07a1eb8f, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u672A\u5B9A\u4E49"
+  m_EditorClassIdentifier: 
+  Flows:
+  - {fileID: -3371852386013449995}
+  nodePos: {x: -268.57144, y: 44.000004}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692682
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692682
+      type: {class: OOPSKILL_GiveBuff4, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        write: 0
+        buffID: 0
+        time: 10
+--- !u!114 &-5194597096057869126
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8389ada07cbd34a4ebf77eedaa4f4042, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u672A\u5B9A\u4E49"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: -541.7143, y: -186.85713}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692676
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692676
+      type: {class: OOPSKILL_GiveBuff2, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        buffID: 0
+        time: 10
+--- !u!114 &-3684873781765595871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8389ada07cbd34a4ebf77eedaa4f4042, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u73A9\u5BB6\u672C\u4F53\u76EE\u6807"
+  m_EditorClassIdentifier: 
+  Flows:
+  - {fileID: -6199248303627695502}
+  nodePos: {x: -565.7143, y: 122.28572}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692680
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692680
+      type: {class: OOPSKILL_Control2, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        timeControl: 0
+        level: 0
+--- !u!114 &-3371852386013449995
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dcca9254e4a7ce4488c82b7d517de316, type: 3}
+  m_Name: "zesnode-<\u5E8F\u5217>3\u5355\u5143\u961F\u5217"
+  m_EditorClassIdentifier: 
+  Flows:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  nodePos: {x: 115.99997, y: 14.285713}
+  inlineData: 0
+--- !u!114 &-2943891099740555123
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5240b1d99b7ed9248b7e4f9670983b25, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u672A\u5B9A\u4E49"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: 486.85715, y: -103.42857}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692683
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692683
+      type: {class: OOPSKILL_Hurt, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        damage: 0
+        isRange: 0
+--- !u!114 &-2614143019552517325
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1253c1395c5de745aeecee72a2678cc, type: 3}
+  m_Name: "zesnode-<\u7B5B\u9009>2\u90091"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: -97.14288, y: -346.85715}
+  inlineData: 0
+--- !u!114 &-2356184429978382562
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5240b1d99b7ed9248b7e4f9670983b25, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u9020\u6210\u4F24\u5BB3"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: 343.42856, y: 44.000004}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692684
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692684
+      type: {class: OOPSKILL_Control, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        timeControl: 0
+        level: 0
+--- !u!114 &-1490430911845577883
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87e1f97529d09b345821d83e38d64b54, type: 3}
+  m_Name: "zesnode-<\u5E8F\u5217>2\u5355\u5143\u961F\u5217"
+  m_EditorClassIdentifier: 
+  Flows:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  nodePos: {x: 47.99997, y: -240}
+  inlineData: 0
+  NUM: 10
+--- !u!114 &-1295716464356208052
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b5a062deafc78c479cbc3e8f91f6b8c, type: 3}
+  m_Name: "zesnode-<\u5E8F\u5217>\u65E0\u5E8F\u961F\u5217"
+  m_EditorClassIdentifier: 
+  Flows:
+  - {fileID: 2365269901402757835}
+  - {fileID: 42075941002212202}
+  - {fileID: 5704189190267162082}
+  - {fileID: 8554854120005745042}
+  nodePos: {x: -89.714294, y: 384.57144}
+  inlineData: 0
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3712c3b0bbb5ba54aa80ed528fd5e53b, type: 3}
+  m_Name: contain
+  m_EditorClassIdentifier: 
+  nodeRunners:
+  - {fileID: -1490430911845577883}
+  - {fileID: 5684103310246932549}
+  - {fileID: 6240373573444263676}
+  - {fileID: -2614143019552517325}
+  - {fileID: -5194597096057869126}
+  - {fileID: -8765439335015454451}
+  - {fileID: -8587397351663762832}
+  - {fileID: -3684873781765595871}
+  - {fileID: -6199248303627695502}
+  - {fileID: -3371852386013449995}
+  - {fileID: -2943891099740555123}
+  - {fileID: -2356184429978382562}
+  - {fileID: 7677183920581640588}
+  - {fileID: -1295716464356208052}
+  - {fileID: 1364751466297787061}
+  - {fileID: 42075941002212202}
+  - {fileID: 2365269901402757835}
+  - {fileID: 5704189190267162082}
+  - {fileID: 8554854120005745042}
+--- !u!114 &42075941002212202
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5240b1d99b7ed9248b7e4f9670983b25, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u672A\u5B9A\u4E49"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: 128.57144, y: 183.42857}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692686
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692686
+      type: {class: OOPSKILL_Hurt, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        damage: 0
+        isRange: 0
+--- !u!114 &1364751466297787061
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87e1f97529d09b345821d83e38d64b54, type: 3}
+  m_Name: "zesnode-<\u5E8F\u5217>\u52A8\u6001\u6570\u76EE<2>\u961F\u5217"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: -293.14288, y: 165.14287}
+  inlineData: 0
+  NUM: 5
+--- !u!114 &2365269901402757835
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5240b1d99b7ed9248b7e4f9670983b25, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u9020\u6210\u4F24\u5BB3"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: 275.42856, y: 306.2857}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692686
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692686
+      type: {class: OOPSKILL_Hurt, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        damage: 0
+        isRange: 0
+--- !u!114 &5684103310246932549
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1253c1395c5de745aeecee72a2678cc, type: 3}
+  m_Name: "zesnode-<\u7B5B\u9009>2\u90091"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: 622.8572, y: -295.42856}
+  inlineData: 0
+--- !u!114 &5704189190267162082
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5240b1d99b7ed9248b7e4f9670983b25, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u9020\u6210\u4F24\u5BB3"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: 303.42856, y: 384.57144}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692686
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692686
+      type: {class: OOPSKILL_Hurt, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        damage: 0
+        isRange: 0
+--- !u!114 &6240373573444263676
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8389ada07cbd34a4ebf77eedaa4f4042, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u672A\u5B9A\u4E49"
+  m_EditorClassIdentifier: 
+  Flows:
+  - {fileID: -2614143019552517325}
+  nodePos: {x: -541.7143, y: -346.85715}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692674
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692674
+      type: {class: OOPSKILL_Control2, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        timeControl: 0
+        level: 0
+--- !u!114 &7677183920581640588
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5240b1d99b7ed9248b7e4f9670983b25, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u9020\u6210\u4F24\u5BB3"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: 326.85715, y: -47.428574}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692685
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692685
+      type: {class: OOPSKILL_GiveBuff, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        buffID: 0
+        time: 10
+--- !u!114 &8554854120005745042
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5240b1d99b7ed9248b7e4f9670983b25, type: 3}
+  m_Name: "zesnode-<\u52A8\u6001>\u9020\u6210\u4F24\u5BB3"
+  m_EditorClassIdentifier: 
+  Flows: []
+  nodePos: {x: 275.42856, y: 481.14285}
+  inlineData: 0
+  Value:
+    rid: 2432690827057692686
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690827057692686
+      type: {class: OOPSKILL_Hurt, ns: ES.SkillSample, asm: ES_Logic}
+      data:
+        damage: 0
+        isRange: 0

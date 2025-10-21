@@ -12,6 +12,7 @@ namespace ES
             ESNodeUtility.UseNodes.TryAdd( NodeEnvironment.None, (attribute.Group, attribute.Name, type));
             foreach (var i in flags)
             {
+                if(attribute.environment.HasFlag(i)&&i!= NodeEnvironment.None)
                 ESNodeUtility.UseNodes.TryAdd(i, (attribute.Group, attribute.Name, type));
             }
            

@@ -41,7 +41,8 @@ namespace ES
         }
 
         public abstract INodeRunner Runner { get; set; }
-
+        public virtual void Refresh() { }
+        public virtual void Remake() { }
     }
     //泛型继承
     public class BaseNodeViewer<TRunner> : BaseNodeViewer where TRunner : INodeRunner
@@ -78,13 +79,15 @@ namespace ES
         {
             if (Runner != null)
             {
+                //内容填充
+                CreateIMGUIContent();
                 //入
                 var input = Runner.GetInputNode();
                 if (input != null)
                 {
                     Port part = GetPortForNode(this, Direction.Input, input.IsMutiConnect ? Port.Capacity.Multi : Port.Capacity.Single);
                     part.portName = input.Name;
-                    this.contentContainer.Add(part);
+                    this.inputContainer.Add(part);
                 }
                 /*   inputs = Runner.GetInputNodes();
                    if (inputs != null) {
@@ -97,23 +100,50 @@ namespace ES
                    }*/
 
                 //出
-                Debug.Log("OUT");
                 outputs = Runner.GetOutputNodes();
                 if (outputs != null)
                 {
                     foreach (var output in outputs)
                     {
-                        Debug.Log("OUT2");
                         Port part = GetPortForNode(this, Direction.Output, output.IsMutiConnect ? Port.Capacity.Multi : Port.Capacity.Single);
                         part.portName = output.Name;
-                        this.contentContainer.Add(part);
+                        this.outputContainer.Add(part);
                     }
                 }
 
                 this.title = Runner.GetTitle();
+               
             }
         }
+        public void CreateIMGUIContent()
+        {
+            if (Runner.IsNotNull())
+            {
+                if (Runner.EnableDrawIMGUI)
+                {
+                    
+                    var imgc = titleContainer.parent.Q<IMGUIContainer>();
+                    if (imgc != null) titleContainer.parent.Remove(imgc);
 
+                    var newIMGC = new IMGUIContainer(() =>
+                    {
+                        if (Runner.IsNotNull())
+                        {
+                            Runner.DrawIMGUI();
+                        }
+                    });
+                    newIMGC.style.maxWidth = 300;
+                    titleContainer.parent.Insert(1, newIMGC);
+                   // contentContainer.Insert(1,newIMGC);
+                   
+                    
+                }
+            }
+        }
+        public override void Refresh()
+        {
+            this.title = Runner.GetTitle();
+        }
         void aTest()
         {
 

@@ -1,4 +1,5 @@
 using Sirenix.OdinInspector;
+using Sirenix.Utilities;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -20,24 +21,35 @@ namespace ES
         public Vector2 nodePos;
         [ToggleGroup("inlineData", "内置数据")]
         public bool inlineData;
-
+        public virtual  bool MutiLineOut => false;
+        public ESNodeState State { get; set; } = ESNodeState.None;
 
         public void SetFlow(INodeRunner runner, int index = 0)
         {
             if (runner is NodeRunnerSO no)
             {
-                index = Mathf.Max(0, index);
-                if (index < Flows.Count)
+                if (this.MutiLineOut)
                 {
-                    Flows[index] = no;
+                    if (!Flows.Contains(no))
+                    {
+                        Flows.Add(no);
+                    }
                 }
                 else
                 {
-                    for (int i = Flows.Count; i < index; i++)
+                    index = Mathf.Max(0, index);
+                    if (index < Flows.Count)
                     {
-                        Flows.Add(null); // 或用默认值填充
+                        Flows[index] = no;
                     }
-                    Flows.Insert(index, no);
+                    else
+                    {
+                        for (int i = Flows.Count; i < index; i++)
+                        {
+                            Flows.Add(null); // 或用默认值填充
+                        }
+                        Flows.Insert(index, no);
+                    }
                 }
 
             }
@@ -91,27 +103,43 @@ namespace ES
         public abstract NodePort GetInputNode();
 
         public abstract List<NodePort> GetOutputNodes();
+        public virtual bool EnableDrawIMGUI { get; }
+        public virtual void DrawIMGUI()
+        {
 
+        }
         public abstract string GetTitle();
 
-        public virtual void OnEnter()
+        protected virtual void OnEnter()
         {
 
         }
 
-        public virtual void OnExit()
+        protected virtual void OnExit()
         {
-
+            State = ESNodeState.Exit;
         }
 
-        public virtual void OnRunning()
+        protected virtual void OnRunning()
         {
-
+            State = ESNodeState.Running;
         }
 
 
+        public void Editor_RefreshNode(int level=1,object userData=null)
+        {
+#if UNITY_EDITOR
+            if (ESNodeUtility.CacheMapping.TryGetValue(this, out var o))
+            {
+                ESNodeUtility.CacheMappingRefresh?.Invoke(o, level, userData);
+            }
+#endif
+        }
 
-
+        public void ConfirmFlow(int count)
+        {
+            Flows.SetLength(count);
+        }
     }
 
 

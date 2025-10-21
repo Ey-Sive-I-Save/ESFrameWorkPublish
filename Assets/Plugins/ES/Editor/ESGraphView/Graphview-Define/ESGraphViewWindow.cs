@@ -1,7 +1,9 @@
 using ES;
 using UnityEditor;
 using UnityEngine;
+using System.Collections;
 using UnityEngine.UIElements;
+using System.Collections.Generic;
 
 public class ESGraphViewWindow : EditorWindow
 {
@@ -10,16 +12,17 @@ public class ESGraphViewWindow : EditorWindow
 
     public ESGraphView_Part_FlowChart Part_FlowChart;
     public ESGraphView_Part_InspectorView Part_Inspector;
-
-
-    public INodeContainer Container { get { return m_NodeContainer; } set { if (value != m_NodeContainer) {  m_NodeContainer = value; OnTargetContainerChanged(); } } }
+    public static ESGraphViewWindow window;
+    public static INodeContainer SContainer;
+    public INodeContainer Container { get { return m_NodeContainer; } set { if (value != m_NodeContainer) { SContainer= m_NodeContainer = value; OnTargetContainerChanged();} } }
     private INodeContainer m_NodeContainer;
+
     [MenuItem("Tools/ES工具/图编辑器")]
     public static ESGraphViewWindow ShowWindow()
     {
-        ESGraphViewWindow wnd = GetWindow<ESGraphViewWindow>();
-        wnd.titleContent = new GUIContent("ESGraphViewWindow");
-        return wnd;
+        window = GetWindow<ESGraphViewWindow>();
+        window.titleContent = new GUIContent("ESGraphViewWindow");
+        return window;
     }
     public void CreateGUI()
     {
@@ -46,12 +49,12 @@ public class ESGraphViewWindow : EditorWindow
         
             if(Selection.activeObject is INodeContainer container)
             {
-                Container = container;
+                SContainer= Container = container;
             }
         };
         if (Selection.activeObject is INodeContainer container)
         {
-            Container = container;
+            SContainer= Container = container;
         }
         #endregion
 
@@ -70,6 +73,7 @@ public class ESGraphViewWindow : EditorWindow
         if (m_NodeContainer != null)
         {
             Part_Inspector.SetContainerGlobal(m_NodeContainer);
+            Part_FlowChart.ResetNodeViewers();
         }
     }
 

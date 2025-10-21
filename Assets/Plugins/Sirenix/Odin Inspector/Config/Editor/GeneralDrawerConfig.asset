@@ -18,7 +18,7 @@ MonoBehaviour:
   useOldTypeSelector: 0
   useNewObjectSelector: 1
   showNoneItem: 1
-  showCategoriesByDefault: 0
+  showCategoriesByDefault: 1
   preferNamespacesOverAssemblyCategories: 1
   useOldPolymorphicField: 0
   showBaseType: 1

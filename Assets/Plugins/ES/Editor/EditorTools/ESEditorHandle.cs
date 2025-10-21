@@ -4,6 +4,7 @@ using UnityEngine;
 namespace ES
 {
     using ES;
+    using Sirenix.Utilities;
     using System;
     using System.Collections;
     using System.Collections.Generic;
@@ -21,6 +22,7 @@ namespace ES
                 (f) => { },
                 5
                 );
+            public static Dictionary<string, int> singleKeys = new Dictionary<string, int>();
             public static Queue<ESEditorHandleTask> RunningTasks = new Queue<ESEditorHandleTask>();
             static ESEditorHandle()
             {
@@ -39,6 +41,13 @@ namespace ES
                             use.action?.Invoke();
                             if (use.OnlyOnce || use.MaxFrame <= 0 || use.CanExit())
                             {
+                                if (!use.SingleKey.IsNullOrWhitespace())
+                                {
+                                    if (singleKeys.TryGetValue(use.SingleKey, out var flag))
+                                    {
+                                        if (flag > 0) singleKeys[use.SingleKey]=-1;
+                                    }
+                                }
                                 use.TryAutoPushedToPool();
                                 RunningTasks.Dequeue();
                             }
@@ -55,9 +64,20 @@ namespace ES
                     }
                 }
             }
-            public static void AddSimpleHanldeTask(Action c, int waitframe = 3)
+            public static void AddSimpleHanldeTask(Action c, int waitframe = 3,string key="")
             {
+                if (!key.IsNullOrWhitespace())
+                {
+                    if (singleKeys.TryGetValue(key,out var flag)) {
+                        if (flag > 0) return;
+                    }
+                    else
+                    {
+                        singleKeys.Add(key,1);
+                    }
+                }
                 var use = TaskPool.GetInPool();
+                use.SingleKey = key;
                 use.waitFrame = waitframe;
                 use.action = c;
                 RunningTasks.Enqueue(use);
@@ -76,6 +96,7 @@ namespace ES
 
         public class ESEditorHandleTask : IPoolablebAuto
         {
+            public string SingleKey = "";
             public int waitFrame = 2;
             public Action action;
             public bool OnlyOnce = true;
@@ -96,6 +117,8 @@ namespace ES
                 ESEditorHandle.TaskPool.PushToPool(this);
             }
         }
+
+ 
     }
 
 }

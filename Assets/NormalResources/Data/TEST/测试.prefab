@@ -1,0 +1,108 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3966472852882984839
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 820203735065092096}
+  - component: {fileID: 8832104146333133071}
+  m_Layer: 0
+  m_Name: "\u6D4B\u8BD5"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &820203735065092096
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3966472852882984839}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8832104146333133071
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3966472852882984839}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7443a3d373567e248a92b59138673ddf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pool:
+    _InitValues:
+    - rid: 2432690984702443520
+    - rid: 2432690984702443523
+    - rid: 2432690984702443524
+    - rid: 2432690984702443525
+    - rid: 2432690984702443526
+    - rid: 2432690984702443527
+    - rid: 2432690984702443528
+    LinkRCL_Tag: {}
+    LinkRCL_Float: {}
+    LinkRCL_Vector: {}
+    LinkRCL_Int: {}
+    LinkRCL_String: {}
+    LinkRCL_Bool: {}
+    LinkRCL_ClassT: {}
+    LinkRCL_UnityObjectT: {}
+  references:
+    version: 2
+    RefIds:
+    - rid: 2432690984702443520
+      type: {class: ArchitectureTypeValue_ClassT, ns: ES, asm: ES_Logic}
+      data:
+        key: default
+        SendLink: 0
+    - rid: 2432690984702443523
+      type: {class: ArchitectureTypeValue_ClassT, ns: ES, asm: ES_Logic}
+      data:
+        key: default157
+        SendLink: 0
+    - rid: 2432690984702443524
+      type: {class: ArchitectureTypeValue_DynamicTag, ns: ES, asm: ES_Logic}
+      data:
+        key: default418
+        _value: 2.4398892
+        SendLink: 0
+        MaxUseableDURA: 999999
+    - rid: 2432690984702443525
+      type: {class: ArchitectureTypeValue_DynamicTag, ns: ES, asm: ES_Logic}
+      data:
+        key: default414
+        _value: 0.7690339
+        SendLink: 0
+        MaxUseableDURA: 999999
+    - rid: 2432690984702443526
+      type: {class: ArchitectureTypeValue_Int, ns: ES, asm: ES_Logic}
+      data:
+        key: default102
+        _value: 0
+        SendLink: 0
+    - rid: 2432690984702443527
+      type: {class: ArchitectureTypeValue_UnityObject, ns: ES, asm: ES_Logic}
+      data:
+        key: default438
+        _value: {fileID: 0}
+        SendLink: 0
+    - rid: 2432690984702443528
+      type: {class: ArchitectureTypeValue_Vector, ns: ES, asm: ES_Logic}
+      data:
+        key: default371
+        _value: {x: 0, y: 0, z: 0}
+        SendLink: 0

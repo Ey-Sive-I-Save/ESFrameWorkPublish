@@ -12,14 +12,14 @@ namespace ES {
 
     #region 应用信息更新系
     [Serializable, TypeRegistryItem("信息应用-抽象定义")]
-    public abstract class MessageProviderModule_MessageUpdateLink_AB : ESUIMessageProviderModule, IReceiveLink<Link_MessageProvider>
+    public abstract class MessageProviderModule_MessageUpdateLink_AB : ESUIMessageProviderModule, IReceiveLink<Link_MessageProviderSwitch>
     {
         [ESBoolOption("依赖Panel的信息提供更新", "依赖自己的")]
         public bool UseSelfProvider = true;
         [ESBoolOption("仅启用时更新", "实时更新"), SerializeField, HideInPlayMode]
         private bool UpdatableAlways = true;
         private int InitableCounter = 2;//最大支持次数
-        public void OnLink(Link_MessageProvider link)
+        public void OnLink(Link_MessageProviderSwitch link)
         {
             ApplyMessage(link.provider);
         }

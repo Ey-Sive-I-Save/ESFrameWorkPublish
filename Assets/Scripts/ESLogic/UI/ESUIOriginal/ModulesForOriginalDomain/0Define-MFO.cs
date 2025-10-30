@@ -34,26 +34,26 @@ namespace ES {
     }
 
     [Serializable, TypeRegistryItem("原始扩展-可选中事件ssssss")]
-    public class OriginalModule_SelectEvent2 : ESUIOriginalModule,IReceiveChannelLink_Arch_String
+    public class OriginalModule_SelectEvent2 : ESUIOriginalModule,IReceiveChannelLink_Context_String
     {
         public override Type TableKeyType => null;
-        public string archKey = "name";
+        public string ContextKey = "name";
         public TMP_Text text;
    
         protected override void OnEnable()
         {
             base.OnEnable();
-            MyCore.MyPanel.archPool.LinkRCL_String.AddReceive(archKey,this);
+            MyCore.MyPanel.ContextPool.LinkRCL_String.AddReceive(ContextKey,this);
         }
         protected override void OnDisable()
         {
             base.OnDisable();
-            MyCore.MyPanel.archPool.LinkRCL_String.RemoveReceive(archKey, this);
+            MyCore.MyPanel.ContextPool.LinkRCL_String.RemoveReceive(ContextKey, this);
         }
 
 
 
-        public void OnLink(string channel, Link_ArchEvent_StringChange link)
+        public void OnLink(string channel, Link_ContextEvent_StringChange link)
         {
             text.text = link.Value_Now;
         }

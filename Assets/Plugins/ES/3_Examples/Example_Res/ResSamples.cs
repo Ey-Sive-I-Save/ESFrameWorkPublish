@@ -5,23 +5,114 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace ES
 {
-
-    public class ResSamples : MonoBehaviour
+    [Serializable]
+    public class QuestCore : IReceiveChannelLink_Context_Int
     {
-        [HideInInspector]
-        public List<Vector222> v22s = new List<Vector222>();
+        public ContextPool BindingPool;
+        public List<QuestItem> Items = new List<QuestItem>() {
+         new QuestItem(){ Key="击杀怪物数量",target=10 },
+          new QuestItem(){ Key="拾取木头",target=100 },
+           new QuestItem(){ Key="通关第一关",target=1 }
+        };
+        public List<Text> TargetText;
 
-        public PagedListDrawSolver<Vector222> drawer = new PagedListDrawSolver<Vector222>();
 
-        [OnInspectorGUI]
-        public void draw()
+        public void StartQuest(ContextPool pool)
         {
-            drawer.Init(v22s,5);
-            drawer.Draw();
+            if (pool != null) BindingPool = pool;
+            foreach (var it in Items)
+            {
+                //如果没有会创建
+                BindingPool.SetIntDirect(it.Key, 0, EnableSendLinkIfCreateNew : true);
+                BindingPool.LinkRCL_Int.AddReceive(it.Key, this);//开始监听
+            }
+
         }
+        public void CancelOrCompleteQuest(bool complete)
+        {
+            // complete 是否完成
+            foreach (var it in Items)
+            {
+                //可以移除参数--或者置空
+                BindingPool.LinkRCL_Int.RemoveReceive(it.Key, this);//开始监听
+            }
+        }
+        //接受监听
+        public void OnLink(string channel, Link_ContextEvent_IntChange link)
+        {
+            string keyName = channel;//哪一个发生变更
+            int preValue = link.Value_Pre;//过去的值
+            int newValue = link.Value_Now;//新的值
+            Refresh();
+        }
+
+        public void Refresh()
+        {
+            /*
+             可以进行UI等刷新
+             */
+            bool com = true;
+            int index = 0;
+            foreach (var it in Items)
+            {
+                var text = TargetText[index];
+
+                text.text = it.Key + "：" + BindingPool.GetInt(it.Key) + "/" + it.target;
+
+                if (BindingPool.GetInt(it.Key) < it.target)
+                {
+                    //有的没达到目标 -- 还没完成
+                    com = false;
+                };
+                index++;
+            }
+            //完成
+            if (com) CancelOrCompleteQuest(true);
+        }
+    }
+    [Serializable]
+    public class QuestItem
+    {
+        public string Key;
+        public int target = 1;
+    }
+
+    public class ResSamples : SerializedMonoBehaviour
+    {
+        public ContextPool pool;
+        public QuestCore QuestCore;
+        public List<Text> texts = new List<Text>();
+        private void Awake()
+        {
+            pool.Init();
+        }
+        private void OnEnable()
+        {
+            pool.Enable();
+            QuestCore.TargetText = texts;
+            QuestCore.StartQuest(pool);
+            QuestCore.Refresh();
+        }
+        private void OnDisable()
+        {
+            pool.Disable();
+        }
+
+        /* [HideInInspector]
+         public List<Vector222> v22s = new List<Vector222>();
+
+         public PagedListDrawSolver<Vector222> drawer = new PagedListDrawSolver<Vector222>();
+
+         [OnInspectorGUI]
+         public void draw()
+         {
+             drawer.Init(v22s,5);
+             drawer.Draw();
+         }*/
 
 
         /* 

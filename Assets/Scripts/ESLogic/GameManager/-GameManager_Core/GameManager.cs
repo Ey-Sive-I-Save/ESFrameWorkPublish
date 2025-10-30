@@ -28,6 +28,8 @@ namespace ES
         }
         #endregion
 
+       
+
     }
     #region 声明域和模块
     [Serializable]

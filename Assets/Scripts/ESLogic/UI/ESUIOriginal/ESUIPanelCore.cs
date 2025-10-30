@@ -11,7 +11,7 @@ namespace ES
     public class ESUIPanelCore : ESUIElement
     {
         [LabelText("原型参数池"),GUIColor("@ESStaticLogicUtility.ColorSelector.ColorForESValue")]
-        public ArchPool archPool = new ArchPool();
+        public ContextPool ContextPool = new ContextPool();
         [LabelText("全部UI元素"),ReadOnly,ShowInInspector] 
         public Dictionary<string, ESUIElement> AllElements = new Dictionary<string, ESUIElement>();
 #if UNITY_EDITOR
@@ -51,17 +51,17 @@ namespace ES
         protected override void OnBeforeAwakeRegister()
         {
             base.OnBeforeAwakeRegister();
-            archPool.Init();
+            ContextPool.Init();
         }
         protected override void OnEnable()
         {
             base.OnEnable();
-            archPool.Enable();
+            ContextPool.Enable();
         }
         protected override void OnDisable()
         {
             base.OnDisable();
-            archPool.Disable();
+            ContextPool.Disable();
         }
         [Button("注册全部元素")]
         public void RegisterAllElements()

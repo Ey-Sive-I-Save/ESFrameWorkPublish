@@ -13,9 +13,9 @@ namespace ES {
     #region 演示
     public class Example_IMessageSpriteProviderEasy : IMessageSpriteProvider
     {
-        public Sprite GetMessage(MessageSpriteKey k, EnumCollect.LanguageType language = EnumCollect.LanguageType.NotClear, int hepler = 0)
+        public Sprite GetMessage(MessageSpriteKey k, EnumCollect.Envir_LanguageType language = EnumCollect.Envir_LanguageType.NotClear, int hepler = 0)
         {
-            if (language == EnumCollect.LanguageType.NotClear)
+            if (language == EnumCollect.Envir_LanguageType.NotClear)
             {
 
             }

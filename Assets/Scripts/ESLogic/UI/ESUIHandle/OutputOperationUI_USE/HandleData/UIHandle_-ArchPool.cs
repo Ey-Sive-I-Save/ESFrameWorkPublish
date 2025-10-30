@@ -7,19 +7,19 @@ using UnityEngine;
 
 
 namespace ES {
-    [Serializable, TypeRegistryItem("0※UI操作-Arch原型池", icon: SdfIconType.Vimeo)]
-    public class UIHandle_ArchPool : IOutputOperationUI
+    [Serializable, TypeRegistryItem("0※UI操作-Context原型池", icon: SdfIconType.Vimeo)]
+    public class UIHandle_ContextPool : IOutputOperationUI
     {
-        [SerializeReference, LabelText("使用的Arch池", SdfIconType.Server)]
-        public IUIArchPoolGetter ArchGetter;
+        [SerializeReference, LabelText("使用的Context池", SdfIconType.Server)]
+        public IUIContextPoolGetter ContextGetter;
         [SerializeReference, LabelText("参数键", SdfIconType.Keyboard)]
         public string key="key";
         [SerializeReference, LabelText("操作",SdfIconType.HandIndex)]
-        public ArchOperation_Abstract Handler;
+        public ContextOperation_Abstract Handler;
 
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with) {
             if (Handler == null) return;
-            var pool = ArchGetter?.Get(on,from);
+            var pool = ContextGetter?.Get(on,from);
             if (pool != null)
             {
                 Handler.TryOperation(pool, key);

@@ -123,21 +123,10 @@ namespace ES
         {
             if (this is This use)
             {
-                if (!HasConfirm)//从关到开
-                {
 
-                    HasConfirm = true;
-                    _instance = use;
-                    OnConfirmOneSO?.Invoke(use);
-
-                }
-                else //从开到验证
-                {
-                    if (_instance != this)
-                    {
-                        _instance = null;//取消确立
-                    }
-                }
+                HasConfirm = true;
+                _instance = use;
+                OnConfirmOneSO?.Invoke(use);
             }
         }
         private void Delegate_OnConfirmOneSO(This who)

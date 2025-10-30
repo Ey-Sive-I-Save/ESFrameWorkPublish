@@ -16,7 +16,7 @@ namespace ES
     /// </summary>
     /// <typeparam name="KeyType"></typeparam>
     [Serializable, TypeRegistryItem("信息应用-抽象定义")]
-    public abstract class MessageProviderModule_MessageProcesser_AB<KeyType> : MessageProviderModule_MessageUpdateLink_AB, IReceiveLink<Link_MessageProvider>
+    public abstract class MessageProviderModule_MessageProcesser_AB<KeyType> : MessageProviderModule_MessageUpdateLink_AB, IReceiveLink<Link_MessageProviderSwitch>
     {
         [LabelText("取出信息键")]
         public KeyType messageKey = default;

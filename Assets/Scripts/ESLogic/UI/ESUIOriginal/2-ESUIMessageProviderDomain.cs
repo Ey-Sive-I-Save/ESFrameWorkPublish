@@ -3,6 +3,12 @@ using System;
 using UnityEngine;
 namespace ES
 {
+    public struct Link_MessageProviderSwitch
+    {
+        public string key;
+        public IMessageProvider provider;
+        public bool isMain;
+    }
     [Serializable, TypeRegistryItem("Message提供")]
     public class ESUIMessageProviderDomain : Domain<ESUIElement, ESUIMessageProviderModule>
     {
@@ -11,7 +17,7 @@ namespace ES
         [HideInInspector]
         private IMessageProvider _mainProvider;
         [SerializeReference,LabelText("预注册主信息提供"),HideLabel,HideInPlayMode]
-        public IMessageProv_Reg_Ab RegisterMain;
+        public IMessageProviderContainer RegisterMain;
         [ESBoolOption("禁用信息更新事件发送", "启用信息更新事件发送")]
         public bool EnableMainLink = true;
         /* [ShowInInspector, DisableInEditorMode,LabelText("常规备用读取器")]
@@ -19,11 +25,11 @@ namespace ES
          [ESBoolOption("禁用常规事件发送", "启用常规事件发射")]
          public bool EnableReadersLink = false;*/
         [ShowInInspector,ReadOnly]
-        public LinkReceiveList<Link_MessageProvider> LinkReceive = new LinkReceiveList<Link_MessageProvider>();
+        public LinkReceiveList<Link_MessageProviderSwitch> LinkReceive = new LinkReceiveList<Link_MessageProviderSwitch>();
 
         public void DO_SendMainReaderLink()
         {
-             LinkReceive.SendLink(new Link_MessageProvider() { key = "Main", provider = _mainProvider, isMain = true });
+             LinkReceive.SendLink(new Link_MessageProviderSwitch() { key = "Main", provider = _mainProvider, isMain = true });
         }
 
         public void SetMainMessageProvider(IMessageProvider reader)
@@ -43,7 +49,7 @@ namespace ES
         {
             if (RegisterMain != null)
             {
-                SetMainMessageProvider(RegisterMain.Registe);
+                SetMainMessageProvider(RegisterMain.GetProvider);
             }
             base._AwakeRegisterAllModules();
         }

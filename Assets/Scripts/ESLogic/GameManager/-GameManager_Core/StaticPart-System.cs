@@ -5,6 +5,7 @@ namespace ES
 {
     public partial class GameManager
     {
+        public static EnumCollect.Envir_LanguageType Envir_Language;
         #region 全局事件-GameCenterAwakeBefore
         protected override void OnBeforeAwakeRegister()
         {

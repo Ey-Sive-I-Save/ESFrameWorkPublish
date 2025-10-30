@@ -15,12 +15,10 @@ namespace ES {
     #region 演示
     public class Example_IMessageStringProviderEasy : IMessageStringProvider
     {
-        public string GetMessage(MessageStringKey k, EnumCollect.LanguageType language = EnumCollect.LanguageType.NotClear, int hepler = 0)
+        public string GetMessage(MessageStringKey k, EnumCollect.Envir_LanguageType language = EnumCollect.Envir_LanguageType.NotClear, int hepler = 0)
         {
-            if(language== EnumCollect.LanguageType.NotClear)
-            {
-                
-            }
+            language.ToClear();//先清晰化
+
             return "";
         }
     }

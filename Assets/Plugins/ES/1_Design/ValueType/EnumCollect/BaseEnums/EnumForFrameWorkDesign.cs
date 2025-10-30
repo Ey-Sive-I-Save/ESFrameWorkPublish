@@ -2,6 +2,7 @@ using ES;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace ES
@@ -9,16 +10,19 @@ namespace ES
 
     public static partial class EnumCollect
     {
-
+        
         //支持本地化-多语言 ES全程支持
-        public enum LanguageType
+        public enum Envir_LanguageType
         {
             [InspectorName("未指定")] NotClear= Chinese | Japan| English,
             [InspectorName("中文")] Chinese=1,
             [InspectorName("日文")] Japan=2,
-
             [InspectorName("英文")] English=4
         }
+      /*  public static Envir_LanguageType ToClear(this ref Envir_LanguageType envir_)
+        {
+            if(envir_== Envir_LanguageType.NotClear)envir_=
+        }*/
 
         //有关委托集成式Link的发送类型 详见-》LinkUnityEvent
         public enum LinkEventType
@@ -31,14 +35,17 @@ namespace ES
 
 
         //原型支持的数据类型
-        public enum ArchitectureValueType
+        public enum ContextValueType
         {
             [InspectorName("动态标签")] DynamicTag,//通常是某个技能解锁后会把自己放入
             [InspectorName("浮点值判据")] FloatValue,//浮点数值 通常是属性数值或者各种无法被整数确定的
+            [InspectorName("向量值判据")] VectorValue,//向量数值 给坐标或者欧拉角使用
             [InspectorName("整数值判据")] IntValue,//整数数值 和浮点类似，适用于精准情况
             [InspectorName("字符串值判据")] StringValue,//字符串值可用于高度自定义的各种情况，是一种加强版的标签
             [InspectorName("布尔值判据")] BoolValue,//布尔值非常简单，适用于流程控制
-            [InspectorName("枚举值判据")] EnumValue//枚举值需要额外的支持，可以精确选定目标值
+            [InspectorName("枚举值判据")] EnumValue,//枚举值需要额外的支持，可以精确选定目标值
+            [InspectorName("未确定任意类型依据")] ClassTValue,//通常是某个技能解锁后会把自己放入
+            [InspectorName("UnityObject类型依据")] UnityObjectTValue,//通常是某个技能解锁后会把自己放入
         }
 
         //缓存入 目标点

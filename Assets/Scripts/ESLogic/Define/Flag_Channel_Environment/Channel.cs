@@ -20,7 +20,7 @@ public interface IChannel
 }
 public class Channel<T> : IChannel where T : Channel<T>,new()
 {
-    public static T channel = new T();
+    public static T channel_Which = new T();
     
 }
 #region 示范以类定义--支持协变

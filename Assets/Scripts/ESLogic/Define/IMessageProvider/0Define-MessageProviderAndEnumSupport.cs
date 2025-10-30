@@ -18,6 +18,10 @@ using UnityEngine;
      Float
      Int
      Bool
+     Sprite
+     GameObject
+     UnityObject
+     SystemObject
      其他的自己实现接口
      
  
@@ -27,7 +31,7 @@ namespace ES
 
     public interface IMessageProvider
     {
-        public string GetMessage(MessageStringKey k, EnumCollect.LanguageType language = EnumCollect.LanguageType.NotClear, int hepler = default)
+        public string GetMessage(MessageStringKey k, EnumCollect.Envir_LanguageType language = EnumCollect.Envir_LanguageType.NotClear, int hepler = default)
         {
             if (this is IMessageStringProvider stringProvider)
             {
@@ -35,28 +39,28 @@ namespace ES
             }
             return "NULL";
         }
-        public int GetMessage(MessageIntKey k, EnumCollect.LanguageType language = EnumCollect.LanguageType.NotClear, int hepler = default) {
+        public int GetMessage(MessageIntKey k, EnumCollect.Envir_LanguageType language = EnumCollect.Envir_LanguageType.NotClear, int hepler = default) {
             if (this is IMessageIntProvider intProvider)
             {
                 return intProvider.GetMessage(k, language, hepler);
             }
             return -1;
         }
-        public float GetMessage(MessageFloatKey k, EnumCollect.LanguageType language = EnumCollect.LanguageType.NotClear, int hepler = default) {
+        public float GetMessage(MessageFloatKey k, EnumCollect.Envir_LanguageType language = EnumCollect.Envir_LanguageType.NotClear, int hepler = default) {
             if (this is IMessageFloatProvider floatProvider)
             {
                 return floatProvider.GetMessage(k, language, hepler);
             }
             return -1f;
         }
-        public bool GetMessage(MessageBoolKey k, EnumCollect.LanguageType language = EnumCollect.LanguageType.NotClear, int hepler = default) {
+        public bool GetMessage(MessageBoolKey k, EnumCollect.Envir_LanguageType language = EnumCollect.Envir_LanguageType.NotClear, int hepler = default) {
             if (this is IMessageBoolProvider boolProvider)
             {
                 return boolProvider.GetMessage(k, language, hepler);
             }
             return false;
         }
-        public Sprite GetMessage(MessageSpriteKey k, EnumCollect.LanguageType language = EnumCollect.LanguageType.NotClear, int hepler = default)
+        public Sprite GetMessage(MessageSpriteKey k, EnumCollect.Envir_LanguageType language = EnumCollect.Envir_LanguageType.NotClear, int hepler = default)
         {
             if (this is IMessageSpriteProvider spro)
             {
@@ -66,25 +70,15 @@ namespace ES
         }
     }
     
-    [Serializable,TypeRegistryItem("信息提供注册")]//各种类型的注册器
-    public abstract class IMessageProv_Reg_Ab
+    [Serializable,TypeRegistryItem("信息提供注册")]//各种类型的注册器抽象，只是为了多态序列化 UnityObject类型
+    public abstract class IMessageProviderContainer
     {
-        public abstract IMessageProvider Registe { get; }
+        public abstract IMessageProvider GetProvider { get; }
     }
-    public struct Link_MessageProvider 
-    {
-        public string key;
-        public IMessageProvider provider;
-        public bool isMain;
-    }
-    public interface IMessageProvider<out Back> : IMessageProvider
-    {
-        Back GetBack();
-    }
-    //                                返回类型 键类型 第二判据(可以忽略)
+    //                            返回类型 键类型 第二判据(一般可以忽略)
     public interface IMessageProvider< Back, Key, Hepler> : IMessageProvider
     {
-        public Back GetMessage(Key k, EnumCollect.LanguageType language = EnumCollect.LanguageType.NotClear, Hepler hepler = default);
+        public Back GetMessage(Key k, EnumCollect.Envir_LanguageType language = EnumCollect.Envir_LanguageType.NotClear, Hepler hepler = default);
     }
 
     #region 取出键类型

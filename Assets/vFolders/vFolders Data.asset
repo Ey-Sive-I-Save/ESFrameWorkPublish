@@ -13,11 +13,6 @@ MonoBehaviour:
   m_Name: vFolders Data
   m_EditorClassIdentifier: 
   folderDatas_byGuid:
-    keys:
-    - 85852d152da91b444ac0febf0fff11dd
-    values:
-    - iconNameOrGuid: 
-      colorIndex: 4
-      isIconRecursive: 0
-      isColorRecursive: 1
+    keys: []
+    values: []
   bookmarks: []

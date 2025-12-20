@@ -6305,18 +6305,18 @@
             Any type implementing this interface will be considered to be validating itself using the implemented logic, as if a custom validator had been written for it.
             </summary>
         </member>
-        <member name="T:Sirenix.OdinInspector.Internal.ISubGroupProviderAttribute">
+        <member name="T:Sirenix.OdinInspector.Internal.ISubGroupvalueEntryAttribute">
             <summary>
             Not yet documented.
             </summary>
         </member>
-        <member name="M:Sirenix.OdinInspector.Internal.ISubGroupProviderAttribute.GetSubGroupAttributes">
+        <member name="M:Sirenix.OdinInspector.Internal.ISubGroupvalueEntryAttribute.GetSubGroupAttributes">
             <summary>
             Not yet documented.
             </summary>
             <returns>Not yet documented.</returns>
         </member>
-        <member name="M:Sirenix.OdinInspector.Internal.ISubGroupProviderAttribute.RepathMemberAttribute(Sirenix.OdinInspector.PropertyGroupAttribute)">
+        <member name="M:Sirenix.OdinInspector.Internal.ISubGroupvalueEntryAttribute.RepathMemberAttribute(Sirenix.OdinInspector.PropertyGroupAttribute)">
             <summary>
             Not yet documented.
             </summary>

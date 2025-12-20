@@ -16,9 +16,9 @@ namespace ES
         #endregion
 
         #region 可选扩展域
-        [TabGroup("信息域", Icon = SdfIconType.FileSpreadsheetFill, TextColor = "@Editor_DomainTabColor(MessageProviderDomain)")]
+        [TabGroup("信息域", Icon = SdfIconType.FileSpreadsheetFill, TextColor = "@Editor_DomainTabColor(MessagevalueEntryDomain)")]
         [SerializeReference, InlineProperty, HideLabel]
-        public ESUIMessageProviderDomain MessageProviderDomain;
+        public ESUIMessagevalueEntryDomain MessagevalueEntryDomain;
 
         #endregion
 

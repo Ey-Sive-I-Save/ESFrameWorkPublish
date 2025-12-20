@@ -19,6 +19,14 @@ namespace ES
             [InspectorName("日文")] Japan=2,
             [InspectorName("英文")] English=4
         }
+
+           //支持本地化-多语言 ES全程支持
+        public enum ValueEntryGetOrSet
+        {
+            [InspectorName("未指定")] NotClear= Get | Set,
+            [InspectorName("获取")] Get=1,
+            [InspectorName("设置")] Set=2,
+        }
       /*  public static Envir_LanguageType ToClear(this ref Envir_LanguageType envir_)
         {
             if(envir_== Envir_LanguageType.NotClear)envir_=

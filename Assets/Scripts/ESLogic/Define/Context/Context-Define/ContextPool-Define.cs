@@ -1,6 +1,8 @@
 using ES;
 using Sirenix.OdinInspector;
+#if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
+#endif
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -217,6 +219,7 @@ namespace ES
         }
         #endregion
 
+#if UNITY_EDITOR
         #region 编辑器扩展
         public void ListChangeEditor(CollectionChangeInfo info)
         {
@@ -233,7 +236,7 @@ namespace ES
         }
 
         #endregion
-
+#endif
         /*   public void TryAddNewContextValueFromSoInfoCopy(ContextitectureDataInfo info)
            {
                if (info != null && info.Values != null)

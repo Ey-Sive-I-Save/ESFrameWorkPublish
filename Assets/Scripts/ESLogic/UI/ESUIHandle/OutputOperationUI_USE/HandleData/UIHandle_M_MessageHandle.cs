@@ -12,7 +12,7 @@ namespace ES
         
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {
-            on.MyPanel.MessageProviderDomain.SetMainMessageProvider(on.MessageProviderDomain.GetMainMessageProvider());
+            on.MyPanel.MessagevalueEntryDomain.SetMainMessagevalueEntry(on.MessagevalueEntryDomain.GetMainMessagevalueEntry());
         }
         public void TryCancel(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {
@@ -26,7 +26,7 @@ namespace ES
 
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {
-            on.MyPanel.MessageProviderDomain.SetMainMessageProvider(on.MessageProviderDomain.GetMainMessageProvider());
+            on.MyPanel.MessagevalueEntryDomain.SetMainMessagevalueEntry(on.MessagevalueEntryDomain.GetMainMessagevalueEntry());
         }
         public void TryCancel(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {

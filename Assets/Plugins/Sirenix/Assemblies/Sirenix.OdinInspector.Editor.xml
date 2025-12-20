@@ -1686,9 +1686,9 @@
             This will be replaced by an IMGUIDrawingComponent in patch 3.2.
             </summary>
         </member>
-        <member name="F:Sirenix.OdinInspector.Editor.PropertyTree.ComponentProviders">
+        <member name="F:Sirenix.OdinInspector.Editor.PropertyTree.ComponentvalueEntrys">
             <summary>
-            The component providers that create components for each property in the tree. If you change this list after the tree has been used, you should call tree.RootProperty.RefreshSetup() to make the changes update properly throughout the tree.
+            The component valueEntrys that create components for each property in the tree. If you change this list after the tree has been used, you should call tree.RootProperty.RefreshSetup() to make the changes update properly throughout the tree.
             </summary>
         </member>
         <member name="P:Sirenix.OdinInspector.Editor.PropertyTree.UnitySerializedObject">

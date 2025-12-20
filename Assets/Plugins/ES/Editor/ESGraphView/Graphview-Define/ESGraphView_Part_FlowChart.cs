@@ -46,13 +46,13 @@ namespace ES
             this.RegisterCallback<KeyDownEvent>(SelfDefineCommandEvent, TrickleDown.TrickleDown);
             focusable = true;
 
-            var menuWindowProvider = ScriptableObject.CreateInstance<ESGraphViewSearchMenu>();
+            var menuWindowvalueEntry = ScriptableObject.CreateInstance<ESGraphViewSearchMenu>();
 
-            menuWindowProvider.OnSelectEntryHandler = OnMenuSelectEntry;
+            menuWindowvalueEntry.OnSelectEntryHandler = OnMenuSelectEntry;
 
             nodeCreationRequest += context =>
             {
-                SearchWindow.Open(new SearchWindowContext(context.screenMousePosition), menuWindowProvider);
+                SearchWindow.Open(new SearchWindowContext(context.screenMousePosition), menuWindowvalueEntry);
             };
 
             #endregion

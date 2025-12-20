@@ -3,58 +3,58 @@ using System;
 using UnityEngine;
 namespace ES
 {
-    public struct Link_MessageProviderSwitch
+    public struct Link_MessagevalueEntrySwitch
     {
         public string key;
-        public IMessageProvider provider;
+        public IValueEntry valueEntry;
         public bool isMain;
     }
     [Serializable, TypeRegistryItem("Message提供")]
-    public class ESUIMessageProviderDomain : Domain<ESUIElement, ESUIMessageProviderModule>
+    public class ESUIMessagevalueEntryDomain : Domain<ESUIElement, ESUIMessagevalueEntryModule>
     {
         [ShowInInspector, HideInEditorMode, LabelText("主信息提供源(运行时实时更换测试)")]
-        public IMessageProvider MainProvider { get=> _mainProvider;private set { if (_mainProvider != value) {  _mainProvider = value; if(EnableMainLink) DO_SendMainReaderLink(); } } }
+        public IValueEntry MainvalueEntry { get=> _mainvalueEntry;private set { if (_mainvalueEntry != value) {  _mainvalueEntry = value; if(EnableMainLink) DO_SendMainReaderLink(); } } }
         [HideInInspector]
-        private IMessageProvider _mainProvider;
+        private IValueEntry _mainvalueEntry;
         [SerializeReference,LabelText("预注册主信息提供"),HideLabel,HideInPlayMode]
-        public IMessageProviderContainer RegisterMain;
+        public IValueEntryContainer RegisterMain;
         [ESBoolOption("禁用信息更新事件发送", "启用信息更新事件发送")]
         public bool EnableMainLink = true;
         /* [ShowInInspector, DisableInEditorMode,LabelText("常规备用读取器")]
-         protected Dictionary<string, IMessageProvider> Readers = new Dictionary<string, IMessageProvider>();
+         protected Dictionary<string, IMessagevalueEntry> Readers = new Dictionary<string, IMessagevalueEntry>();
          [ESBoolOption("禁用常规事件发送", "启用常规事件发射")]
          public bool EnableReadersLink = false;*/
         [ShowInInspector,ReadOnly]
-        public LinkReceiveList<Link_MessageProviderSwitch> LinkReceive = new LinkReceiveList<Link_MessageProviderSwitch>();
+        public LinkReceiveList<Link_MessagevalueEntrySwitch> LinkReceive = new LinkReceiveList<Link_MessagevalueEntrySwitch>();
 
         public void DO_SendMainReaderLink()
         {
-             LinkReceive.SendLink(new Link_MessageProviderSwitch() { key = "Main", provider = _mainProvider, isMain = true });
+             LinkReceive.SendLink(new Link_MessagevalueEntrySwitch() { key = "Main", valueEntry = _mainvalueEntry, isMain = true });
         }
 
-        public void SetMainMessageProvider(IMessageProvider reader)
+        public void SetMainMessagevalueEntry(IValueEntry reader)
         {
-            if (reader != _mainProvider)
+            if (reader != _mainvalueEntry)
             {
-                _mainProvider = reader;
+                _mainvalueEntry = reader;
                 if (EnableMainLink) DO_SendMainReaderLink();
             }
         }
     
-        public IMessageProvider GetMainMessageProvider()
+        public IValueEntry GetMainMessagevalueEntry()
         {
-            return _mainProvider;
+            return _mainvalueEntry;
         }
         public override void _AwakeRegisterAllModules()
         {
             if (RegisterMain != null)
             {
-                SetMainMessageProvider(RegisterMain.GetProvider);
+                SetMainMessagevalueEntry(RegisterMain.GetValueEntry);
             }
             base._AwakeRegisterAllModules();
         }
 
-        /* public IMessageProvider GetKeyMessageProvider(string key)
+        /* public IMessagevalueEntry GetKeyMessagevalueEntry(string key)
          {
              if (Readers.TryGetValue(key, out var v))
              {
@@ -65,27 +65,27 @@ namespace ES
              }
              return null;
          }
-         public void SetKeyMessageProvider(string key, IMessageProvider reader, bool AddIfNull = false)
+         public void SetKeyMessagevalueEntry(string key, IMessagevalueEntry reader, bool AddIfNull = false)
          {
              if (Readers.TryGetValue(key, out var v))
              {
                  if (v != reader)
                  {
                      Readers[key] = reader;
-                     LinkReceive.SendLink(new Link_MessageProvider() { key = key, reader = reader, isMain = false });
+                     LinkReceive.SendLink(new Link_MessagevalueEntry() { key = key, reader = reader, isMain = false });
                  }
              }
              else if (AddIfNull)
              {
                  Readers[key] = reader;
-                 LinkReceive.SendLink(new Link_MessageProvider() { key = key, reader = reader, isMain = false });
+                 LinkReceive.SendLink(new Link_MessagevalueEntry() { key = key, reader = reader, isMain = false });
              }
          }
  */
 
     }
     [Serializable, TypeRegistryItem("UI信息提供源扩展模块")]
-    public abstract class ESUIMessageProviderModule : Module<ESUIElement, ESUIMessageProviderDomain>
+    public abstract class ESUIMessagevalueEntryModule : Module<ESUIElement, ESUIMessagevalueEntryDomain>
     {
 
     }

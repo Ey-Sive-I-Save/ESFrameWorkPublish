@@ -7,48 +7,48 @@ using UnityEngine;
 
 
 namespace ES {
-    //Module For Message Provider 
+    //Module For Message valueEntry 
 
 
     #region 应用信息更新系
     [Serializable, TypeRegistryItem("信息应用-抽象定义")]
-    public abstract class MessageProviderModule_MessageUpdateLink_AB : ESUIMessageProviderModule, IReceiveLink<Link_MessageProviderSwitch>
+    public abstract class MessagevalueEntryModule_MessageUpdateLink_AB : ESUIMessagevalueEntryModule, IReceiveLink<Link_MessagevalueEntrySwitch>
     {
         [ESBoolOption("依赖Panel的信息提供更新", "依赖自己的")]
-        public bool UseSelfProvider = true;
+        public bool UseSelfvalueEntry = true;
         [ESBoolOption("仅启用时更新", "实时更新"), SerializeField, HideInPlayMode]
         private bool UpdatableAlways = true;
         private int InitableCounter = 2;//最大支持次数
-        public void OnLink(Link_MessageProviderSwitch link)
+        public void OnLink(Link_MessagevalueEntrySwitch link)
         {
-            ApplyMessage(link.provider);
+            ApplyMessage(link.valueEntry);
         }
         /// <summary>
         /// 如果需要，可以 配合 "messageKey"来获得想要的数据并且应用 
         /// </summary>
-        /// <param name="provider"></param>
-        public abstract void ApplyMessage(IMessageProvider provider);
+        /// <param name="valueEntry"></param>
+        public abstract void ApplyMessage(IValueEntry valueEntry);
 
         protected override void OnEnable()
         {
             base.OnEnable();
             if (UpdatableAlways)
             {
-                if (UseSelfProvider)
+                if (UseSelfvalueEntry)
                 {
                     MyDomain.LinkReceive.AddReceive(this);
                 }
                 else
                 {
-                    MyCore.MyPanel.MessageProviderDomain.LinkReceive.AddReceive(this);
+                    MyCore.MyPanel.MessagevalueEntryDomain.LinkReceive.AddReceive(this);
                 }
             }
             if (InitableCounter > 0)
             {
                 InitableCounter--;
-                if (UseSelfProvider)
+                if (UseSelfvalueEntry)
                 {
-                    var pro = MyDomain.GetMainMessageProvider();
+                    var pro = MyDomain.GetMainMessagevalueEntry();
                     if (pro != null)
                     {
                         ApplyMessage(pro);
@@ -56,7 +56,7 @@ namespace ES {
                 }
                 else
                 {
-                    var pro = MyCore.MyPanel.MessageProviderDomain.GetMainMessageProvider();
+                    var pro = MyCore.MyPanel.MessagevalueEntryDomain.GetMainMessagevalueEntry();
                     if (pro != null)
                     {
                         ApplyMessage(pro);
@@ -69,13 +69,13 @@ namespace ES {
             base.OnDisable();
             if (UpdatableAlways)
             {
-                if (UseSelfProvider)
+                if (UseSelfvalueEntry)
                 {
                     MyDomain.LinkReceive.RemoveReceive(this);
                 }
                 else
                 {
-                    MyCore.MyPanel.MessageProviderDomain.LinkReceive.RemoveReceive(this);
+                    MyCore.MyPanel.MessagevalueEntryDomain.LinkReceive.RemoveReceive(this);
                 }
             }
             InitableCounter++;

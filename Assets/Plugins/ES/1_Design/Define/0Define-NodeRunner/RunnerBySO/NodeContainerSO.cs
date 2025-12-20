@@ -87,9 +87,12 @@ namespace ES
                         UnityEngine.Object.DestroyImmediate(uo,true);
                     }
                     nodeRunners.Remove(ro);
+                    #if UNITY_EDITOR
                     EditorUtility.SetDirty(this);
+                    
                     AssetDatabase.Refresh();
                     AssetDatabase.SaveAssets();
+                    #endif
                 }
             }
         }

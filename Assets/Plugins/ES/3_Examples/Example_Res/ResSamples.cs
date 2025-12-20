@@ -182,8 +182,10 @@ namespace ES
         public float y;
         public void Editor_DrawIMGUI()
         {
+            #if UNITY_EDITOR
             x = EditorGUILayout.FloatField("X", x);
             y = EditorGUILayout.FloatField("Y", y);
+            #endif
         }
     }
 }

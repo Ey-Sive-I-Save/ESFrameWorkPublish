@@ -2131,8 +2131,8 @@ MonoBehaviour:
     MyModules:
       ValuesNow: []
       MayHasAddingElement: 1
-  MessageProviderDomain:
-    rid: 2432690923676893184
+  MessagevalueEntryDomain:
+    rid: -2
   AutoOpenAndCloseByEnableState: 1
   InitOpen: 0
   Refer_Rect:
@@ -2147,11 +2147,8 @@ MonoBehaviour:
     rid: 2432690923676893185
   whenClose:
     rid: -2
-  archPool:
-    _InitValues:
-    - rid: 2432690923676893187
-    - rid: 2432690923676893188
-    - rid: 2432690923676893189
+  ContextPool:
+    _InitValues: []
     LinkRCL_Tag: {}
     LinkRCL_Float: {}
     LinkRCL_Vector: {}
@@ -2167,17 +2164,6 @@ MonoBehaviour:
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
-    - rid: 2432690923676893184
-      type: {class: ESUIMessageProviderDomain, ns: ES, asm: ES_Logic}
-      data:
-        myCore: {fileID: 0}
-        MyModules:
-          ValuesNow:
-          - rid: 2432690923676893190
-          MayHasAddingElement: 1
-        RegisterMain:
-          rid: -2
-        EnableMainLink: 1
     - rid: 2432690923676893185
       type: {class: UITweenOutputOperation, ns: ES, asm: ES_Logic}
       data:
@@ -2228,33 +2214,6 @@ MonoBehaviour:
         vector2From: {x: 0, y: 0}
         vector2: {x: -11.38, y: 0}
         isFrom: 0
-    - rid: 2432690923676893187
-      type: {class: ArchitectureTypeValue_Int, ns: ES, asm: ES_Logic}
-      data:
-        key: default
-        _value: 0
-        SendLink: 0
-    - rid: 2432690923676893188
-      type: {class: ArchitectureTypeValue_String, ns: ES, asm: ES_Logic}
-      data:
-        key: default
-        _value: 
-        SendLink: 0
-    - rid: 2432690923676893189
-      type: {class: ArchitectureTypeValue_Bool, ns: ES, asm: ES_Logic}
-      data:
-        key: default
-        _value: 0
-        SendLink: 0
-    - rid: 2432690923676893190
-      type: {class: MessageProviderModule_TMP_Text_String, ns: ES, asm: ES_Logic}
-      data:
-        _enableSelf: 1
-        UseSelfProvider: 0
-        UpdatableAlways: 1
-        messageKey: 0
-        tmp_text: {fileID: 0}
-        waiting: 
 --- !u!4 &1108918425
 Transform:
   m_ObjectHideFlags: 0
@@ -2606,7 +2565,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Pool:
-    _InitValues: []
+    _InitValues:
+    - rid: 6988048868860755968
+    - rid: 6988048868860755969
+    - rid: 6988048868860755970
     LinkRCL_Tag: {}
     LinkRCL_Float: {}
     LinkRCL_Vector: {}
@@ -2619,7 +2581,25 @@ MonoBehaviour:
   AutoEnable: 1
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 6988048868860755968
+      type: {class: ContextitectureTypeValue_Float, ns: ES, asm: ES_Logic}
+      data:
+        key: default496
+        _value: 0
+        SendLink: 0
+    - rid: 6988048868860755969
+      type: {class: ContextitectureTypeValue_Vector, ns: ES, asm: ES_Logic}
+      data:
+        key: default827
+        _value: {x: 0, y: 0, z: 0}
+        SendLink: 0
+    - rid: 6988048868860755970
+      type: {class: ContextitectureTypeValue_Float, ns: ES, asm: ES_Logic}
+      data:
+        key: default917
+        _value: 0
+        SendLink: 0
 --- !u!1 &1638486362
 GameObject:
   m_ObjectHideFlags: 0

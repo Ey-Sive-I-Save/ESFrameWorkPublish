@@ -1,5 +1,7 @@
 using ES;
+#if UNITY_EDITOR
 using Sirenix.Utilities.Editor;
+#endif
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -38,8 +40,10 @@ namespace ES
 
         public override void Draw()
         {
+            #if UNITY_EDITOR
+            if (Target == null) 
 
-            if (Target == null) return;
+            return;
 
             if (Target.Count == 0)
             {
@@ -51,6 +55,7 @@ namespace ES
                 numPage = Mathf.CeilToInt(((float)Target.Count / numItemsPerPage));
                 indexPage = Mathf.Clamp(indexPage, 1, numPage);
             }
+
             EditorGUILayout.BeginHorizontal();
 
             EditorGUILayout.LabelField($"{indexPage}/{numPage}页，共{Target.Count}元素");
@@ -93,6 +98,8 @@ namespace ES
 
             }
             base.Draw();
+            #endif
         }
+                    
     }
 }

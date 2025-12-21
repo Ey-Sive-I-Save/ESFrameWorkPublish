@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d08734f38b2cb8940a04e5b8b819bfe8, type: 3}
+  m_Name: Sample_Attribute_Wrap
+  m_EditorClassIdentifier: 
+  <WrapInt>k__BackingField: 0
+  wrapFloat: 0
+  wrapVector2: {x: 0, y: 0}
+  wrapVector2Int: {x: 0, y: 0}
+  wrapVector3: {x: 0, y: 0, z: 0}
+  wrapVector3Int: {x: 0, y: 0, z: 0}

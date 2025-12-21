@@ -83,5 +83,10 @@ MonoBehaviour:
     - 
     enabled: 1
   - builtinIcons: []
+    customIcons:
+    - UnityEditor.FindDependencies
+    - CustomTool
+    enabled: 1
+  - builtinIcons: []
     customIcons: []
     enabled: 1

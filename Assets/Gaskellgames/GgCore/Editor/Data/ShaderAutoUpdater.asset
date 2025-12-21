@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6fe45f2dff7055d42b79cbaf9e5c525a, type: 3}
+  m_Name: ShaderAutoUpdater
+  m_EditorClassIdentifier: 
+  verboseLogs: 0
+  targetRenderPipeline: 1
+  BIRP: {fileID: 4800000, guid: 80724172963c125498cd4c540827657d, type: 3}
+  URP: {fileID: 4800000, guid: 659f1e376f3eb6b449d2adf5b7b03a5d, type: 3}
+  HDRP: {fileID: 4800000, guid: b156fd13216d5b54893192c839772378, type: 3}
+  materials:
+  - {fileID: 2100000, guid: 7e415ce0d29a3dd4b9443ed0c5ba740b, type: 2}
+  - {fileID: 2100000, guid: 9eac65047898abc47af3532b1ffdc73e, type: 2}
+  - {fileID: 2100000, guid: ddbc8a60954195a42a27678325bdd9ef, type: 2}
+  - {fileID: 2100000, guid: bdc85d76144d627419a8673961355ab7, type: 2}
+  - {fileID: 2100000, guid: fb2076d1df1c1cd46b7917921709a463, type: 2}
+  - {fileID: 2100000, guid: 976a846b619283243818f009e72e6698, type: 2}

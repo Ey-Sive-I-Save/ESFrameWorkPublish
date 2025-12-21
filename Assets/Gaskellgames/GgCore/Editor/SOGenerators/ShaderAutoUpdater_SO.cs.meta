@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 6fe45f2dff7055d42b79cbaf9e5c525a
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - BIRP: {fileID: 4800000, guid: 80724172963c125498cd4c540827657d, type: 3}
+  - URP: {fileID: 4800000, guid: 659f1e376f3eb6b449d2adf5b7b03a5d, type: 3}
+  - HDRP: {fileID: 4800000, guid: b156fd13216d5b54893192c839772378, type: 3}
+  executionOrder: 0
+  icon: {fileID: 2800000, guid: cb1dfbc4a62e34a4cb8ca48aaa59e672, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

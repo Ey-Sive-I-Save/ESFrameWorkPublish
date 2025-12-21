@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 106a198fb9e878b4a9b55467e9bfdd04, type: 3}
+  m_Name: Sample_Attribute_ShowIf
+  m_EditorClassIdentifier: 
+  value1: 1
+  value2: 1
+  showIfValue1True: 0
+  <ShowIfValue2True>k__BackingField: 0
+  showIfBothTrue: 0
+  showIfEitherTrue: 0

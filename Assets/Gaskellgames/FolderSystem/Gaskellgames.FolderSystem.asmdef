@@ -1,0 +1,16 @@
+{
+    "name": "Gaskellgames.FolderSystem",
+    "rootNamespace": "Gaskellgames.FolderSystem",
+    "references": [
+        "GUID:344d6eb671e15a94aa369629b2973018"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

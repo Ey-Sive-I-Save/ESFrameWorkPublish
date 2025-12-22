@@ -28,59 +28,59 @@ using UnityEngine;
 namespace ES
 {
     [Serializable, TypeRegistryItem("0C扩展-操作两个")]
-    public class OutputOperationUI_Expand_InvokeNUM_2 : IOutputOperationUI
+    public class OutputOperationUI_Expand_InvokeNUM_2 : IOperationUI
     {
-        [SerializeReference, LabelText("第一个")] public IOutputOperationUI operation1;
-        [SerializeReference, LabelText("第二个")] public IOutputOperationUI operation2;
+        [SerializeReference, LabelText("第一个")] public IOperationUI operation1;
+        [SerializeReference, LabelText("第二个")] public IOperationUI operation2;
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {
-            operation1?.TryOperation(on, from, with);
-            operation2?.TryOperation(on, from, with);
+            operation1?.TryOperation(on,from,with);
+            operation2?.TryOperation(on,from,with);
         }
         public void TryCancel(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {
-            operation1?.TryCancel(on, from, with);
-            operation2?.TryCancel(on, from, with);
+            operation1?.TryCancel(on,from,with);
+            operation2?.TryCancel(on,from,with);
         }
     }
 
 
     [Serializable, TypeRegistryItem("0C扩展-操作三个")]
-    public class OutputOperationUI_Expand_InvokeNUM_3 : IOutputOperationUI
+    public class OutputOperationUI_Expand_InvokeNUM_3 : IOperationUI
     {
-        [SerializeReference, LabelText("第一个")] public IOutputOperationUI operation1;
-        [SerializeReference, LabelText("第二个")] public IOutputOperationUI operation2;
-        [SerializeReference, LabelText("第三个")] public IOutputOperationUI operation3;
+        [SerializeReference, LabelText("第一个")] public IOperationUI operation1;
+        [SerializeReference, LabelText("第二个")] public IOperationUI operation2;
+        [SerializeReference, LabelText("第三个")] public IOperationUI operation3;
 
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {
-            operation1?.TryOperation(on, from, with);
-            operation2?.TryOperation(on, from, with);
-            operation3?.TryOperation(on, from, with);
+            operation1?.TryOperation(on,from,with);
+            operation2?.TryOperation(on,from,with);
+            operation3?.TryOperation(on,from,with);
         }
         public void TryCancel(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {
-            operation1?.TryCancel(on, from, with);
-            operation2?.TryCancel(on, from, with);
-            operation3?.TryOperation(on, from, with);
+            operation1?.TryCancel(on,from,with);
+            operation2?.TryCancel(on,from,with);
+            operation3?.TryOperation(on,from,with);
         }
     }
 
     [Serializable, TypeRegistryItem("0C扩展-概率调用(死概率-低级)")]
-    public class OutputOperationUI_Expand_InvokeIfP : IOutputOperationUI
+    public class OutputOperationUI_Expand_InvokeIfP : IOperationUI
     {
         [LabelText("执行概率")] public float P = 0.5f;
-        [SerializeReference, LabelText("执行操作")] public IOutputOperationUI operation;
+        [SerializeReference, LabelText("执行操作")] public IOperationUI operation;
         [LabelText("可取消")] public bool CanCancel = false;
 
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {
             if (UnityEngine.Random.value < P)
-            operation?.TryOperation(on, from, with);
+            operation?.TryOperation(on,from,with);
         }
         public void TryCancel(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
         {
-           if(CanCancel)operation?.TryCancel(on, from, with);
+           if(CanCancel)operation?.TryCancel(on,from,with);
         }
     }
 }

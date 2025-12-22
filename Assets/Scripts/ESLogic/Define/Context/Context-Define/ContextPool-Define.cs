@@ -740,6 +740,13 @@ namespace ES
         }
         #endregion
     }
+    
+    [Serializable]
+    public struct ContextKeyValue
+    {
+        public string key;
+        public object value;
+    }
 }
 
 

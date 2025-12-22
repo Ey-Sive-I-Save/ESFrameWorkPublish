@@ -7,7 +7,7 @@ namespace ES
 {
     /*M Message 系列 -》*/
     [Serializable, TypeRegistryItem("M信息-【Message】提交自己的Message到父Panel")]
-    public class OutputOperationUI_Handle_MessageSubmitToPanel : IOutputOperationUI
+    public class OutputOperationUI_Handle_MessageSubmitToPanel : IOperationUI
     {
         
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
@@ -21,7 +21,7 @@ namespace ES
 
     }
     [Serializable, TypeRegistryItem("M 信息-【Message】提交自己的Message到From")]
-    public class OutputOperationUI_Handle_SubmitMessageToFrom : IOutputOperationUI
+    public class OutputOperationUI_Handle_SubmitMessageToFrom : IOperationUI
     {
 
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)

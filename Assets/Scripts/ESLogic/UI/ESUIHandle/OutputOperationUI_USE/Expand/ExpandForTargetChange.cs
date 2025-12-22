@@ -13,13 +13,13 @@ using UnityEngine;
  */
 namespace ES {
     [Serializable, TypeRegistryItem("0A扩展-转换作用源")]
-    public class OutputOperationUI_Expand_SwitchOnFrom : IOutputOperationUI
+    public class OutputOperationUI_Expand_SwitchOnFrom : IOperationUI
     {
         [SerializeReference, LabelText("作用在")]
         public ESUIElementGetter getter = new ESUIElementGetter_DirectHandRefer();
 
         [SerializeReference, LabelText("执行内容")]
-        public IOutputOperationUI op;
+        public IOperationUI op;
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

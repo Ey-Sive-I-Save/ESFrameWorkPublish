@@ -8,12 +8,12 @@ using UnityEngine;
 
 namespace ES {
     [Serializable, TypeRegistryItem("0※UI操作-Context原型池", icon: SdfIconType.Vimeo)]
-    public class UIHandle_ContextPool : IOutputOperationUI
+    public class UIHandle_ContextPool : IOperationUI
     {
         [SerializeReference, LabelText("使用的Context池", SdfIconType.Server)]
         public IUIContextPoolGetter ContextGetter;
         [SerializeReference, LabelText("参数键", SdfIconType.Keyboard)]
-        public string key="key";
+        public ContextKeyValue keyvalue=new ContextKeyValue(){ key="key"};
         [SerializeReference, LabelText("操作",SdfIconType.HandIndex)]
         public ContextOperation_Abstract Handler;
 
@@ -22,7 +22,7 @@ namespace ES {
             var pool = ContextGetter?.Get(on,from);
             if (pool != null)
             {
-                Handler.TryOperation(pool, key);
+                Handler.TryOperation(pool, keyvalue);
             }
         }
 

@@ -9,6 +9,7 @@ namespace ES
     public class ESEditorSO
     {
         public static TypeKeyGroup<ESSO> SOS = new TypeKeyGroup<ESSO>();
+        public static BidirectionalDictionary<string,Type> AllSoNames=new BidirectionalDictionary<string, Type>();
     }
 #if UNITY_EDITOR
     public class SoEditorIniter : EditorInvoker_Level0
@@ -32,7 +33,7 @@ namespace ES
 
         }
     }
-
+    
     public class SoEditorApplier : EditorInvoker_SoApply
     {
 
@@ -50,6 +51,21 @@ namespace ES
             }
         }
     }
+
+
+    public class ER_So_SubClass : EditorRegister_FOR_AsSubclass<ScriptableObject>
+    {
+        public override int Order => 10;
+
+        public override void Handle(Type SubClassType)
+        {
+
+            var Disname=SubClassType._GetTypeDisplayName();
+                       
+            ESEditorSO.AllSoNames.Add(Disname,SubClassType);
+        }
+    }
+    
 #endif
 
 }

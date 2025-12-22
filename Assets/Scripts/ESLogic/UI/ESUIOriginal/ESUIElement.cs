@@ -58,11 +58,11 @@ namespace ES
         }
 
         [TabGroup("开关执行",Icon =SdfIconType.ToggleOn), LabelText("注册时执行"), SerializeReference,ESBackGround("black",0.5f)]
-        public IOutputOperationUI whenRegister;
+        public IOperationUI whenRegister;
         [TabGroup("开关执行"), LabelText("开启时执行"), SerializeReference, ESBackGround("black", 0.5f)]
-        public IOutputOperationUI whenOpen;
+        public IOperationUI whenOpen;
         [TabGroup("开关执行"), LabelText("关闭时执行"), SerializeReference, ESBackGround("black", 0.5f)]
-        public IOutputOperationUI whenClose;
+        public IOperationUI whenClose;
 
         protected override void OnOpen()
         {

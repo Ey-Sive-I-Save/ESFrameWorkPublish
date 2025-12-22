@@ -15,7 +15,7 @@ namespace ES {
         [LabelText("获得EMS-指针点下-单接收")]
         public EMS_PointerDown_LinkSingle ems;
         [LabelText("点击事件触发"),SerializeReference]
-        public IOutputOperationUI outputOperation;
+        public IOperationUI outputOperation;
         public void OnLink(Channel_InputPointerEvent channel, Link_InputPointerEvent link)
         {
             outputOperation?.TryOperation(MyCore, MyCore.MyPanel,default);

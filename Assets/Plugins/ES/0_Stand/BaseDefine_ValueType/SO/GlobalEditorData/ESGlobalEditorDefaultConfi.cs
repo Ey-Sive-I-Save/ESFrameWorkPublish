@@ -17,5 +17,9 @@ namespace ES {
         public string Path_PackParent;
         [FolderPath, LabelText("默认的DataGroup组父文件夹")]
         public string Path_GroupParent;
+         [FolderPath, LabelText("默认的常规SO父文件夹")]
+        public string Path_NormalParent;
+          [FolderPath, LabelText("默认的全局Global父文件夹")]
+        public string Path_GlobalParent;
     }
 }

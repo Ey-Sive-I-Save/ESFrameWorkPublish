@@ -1,4 +1,4 @@
-using log4net.Core;
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -25,13 +25,20 @@ namespace ES
 
             }
         }
+        public void UpdateRuler()
+        {
+            
+        }
     }
 
     public class ESRuler : VisualElement
     {
-        public int pxPerSecond = 100;
-        public float showStart = 0;
-        public float showEnd = 5;
+        public float pxPerSecond {get{ if(ESTrackViewWindow.window!=null) return ESTrackViewWindow.window.pixelPerSecond;return 100;}}
+        
+        
+        public float showStart =>ESTrackViewWindow.window.startScale*totalTime;
+        public float showEnd =>ESTrackViewWindow.window.endScale*totalTime;
+        public float totalTime=10;
         public static Dictionary<RulerLevel, float> LevelsPX = new Dictionary<RulerLevel, float>() {
 
             { RulerLevel._001, 1f/60f },
@@ -47,25 +54,29 @@ namespace ES
 
         public ESRuler()
         {
-            generateVisualContent += DrawRuler;
+            //Paint 绘制
+            generateVisualContent += DrawRulerOnlyPaint;
         }
 
-        private void DrawRuler(MeshGenerationContext context)
+        private void DrawRulerOnlyPaint(MeshGenerationContext context)
         {
+            if(ESTrackViewWindow.window==null)return;
+            Debug.Log("DRAWING");
             var p = context.painter2D;
             rec.Clear();
             for (int i = RulerLevel._500.GetHashCode(); i >= 0; i--)
             {
                 DrawLevel(i, p, context);
             }
-
         }
+        #region  颜色
         public static Color levelup_1 = new Color(1, 1, 1, 0.7f);
         public static Color levelup_2 = new Color(1, 1, 1, 1f);
-
         public static Color levelup_down1 = new Color(1,1,1,0.1f);
-
         public static Color levelup_down2 = new Color(1, 1, 1, 0.25f);
+        #endregion
+        
+        
         public HashSet<int> rec = new HashSet<int>(100);
         public void DrawLevel(int level, Painter2D painter, MeshGenerationContext context)
         {
@@ -84,9 +95,11 @@ namespace ES
                 if (off == 0) painter.strokeColor = Color.gray;
                 else painter.strokeColor = off > 1 ? levelup_2 : levelup_1;
                 painter.lineWidth = off + 1;
-                for (float i = showStart; i <= showEnd; i += f)
+                for (float realSecondPoint = 0; realSecondPoint <= totalTime; realSecondPoint += f)
                 {
-                    int pixel = Mathf.RoundToInt((i * pxPerSecond));
+                    if(realSecondPoint<showStart||realSecondPoint>showEnd)continue;
+                    float secondsOffsetFromStart=realSecondPoint-showStart;
+                    int pixel = Mathf.RoundToInt(secondsOffsetFromStart * pxPerSecond);
                     if (rec.Contains(pixel))
                     {
 
@@ -96,9 +109,9 @@ namespace ES
                       
                         Vector2 vv = new Vector2(pixel, 0);
                         painter.BeginPath();
-                        painter.MoveTo(vv);
+                        painter.MoveTo(vv);//开始
                         vv.y = height;
-                        painter.LineTo(vv);
+                        painter.LineTo(vv);//滑下
                         painter.Stroke();
                         painter.ClosePath();
                         if (off > 0)
@@ -106,7 +119,7 @@ namespace ES
                             
                             rec.Add(pixel);
                             painter.BeginPath();
-                            context.DrawText(FormatSecondsToMinuteSecond(i), vv, FontSize, Color.white);
+                            context.DrawText(FormatSecondsToMinuteSecond(realSecondPoint), vv, FontSize, Color.white);
                             painter.lineWidth = 1;
                             painter.strokeColor = off > 1 ? levelup_down2 : levelup_down1;
 

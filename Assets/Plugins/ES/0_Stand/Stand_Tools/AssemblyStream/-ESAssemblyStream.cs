@@ -70,10 +70,14 @@ namespace ES
             private static readonly Type Define_FieldAttribute = typeof(EditorRegister_FOR_FieldAttribute<>).GetGenericTypeDefinition();
             private static readonly Type Define_MethodAttribute = typeof(EditorRegister_FOR_MethodAttribute<>).GetGenericTypeDefinition();
             private static readonly Type Define_Singleton = typeof(EditorRegister_FOR_Singleton<>).GetGenericTypeDefinition();
+             private static readonly Type Define_AsSubClass = typeof(EditorRegister_FOR_AsSubclass<>).GetGenericTypeDefinition();
+          
             #endregion       
 
             #region 处理流
             private static List<Func<Type, bool>> Handler_Singleton = new List<Func<Type, bool>>();
+             private static List<Func<Type, bool>> Handler_SubClass = new List<Func<Type, bool>>();
+
             private static List<Func<MethodInfo, bool>> Handler_MethodAttribute = new List<Func<MethodInfo, bool>>();
             private static List<Func<FieldInfo, bool>> Handler_FieldAttribute = new List<Func<FieldInfo, bool>>();
             private static List<Func<Type, bool>> Handler_ClassAttribute = new List<Func<Type, bool>>();
@@ -94,8 +98,9 @@ namespace ES
                 EditorTypes.Clear();
                 //清空 可用的注册器类型
                 EditorRegisters.Clear();
-
+                ValidEditorAssembiles.Clear();
                 Handler_Singleton.Clear();
+                Handler_SubClass.Clear();
                 Handler_MethodAttribute.Clear();
                 Handler_FieldAttribute.Clear();
                 Handler_ClassAttribute.Clear();
@@ -121,6 +126,7 @@ namespace ES
 
             private static void Editor_InitAssembiesAndRegisters()
             {
+                
                 var listRE = new List<ESAS_EditorRegister_AB>();
                 for (int IndexASM = 0; IndexASM < EditorAssembies.Length; IndexASM++)
                 {
@@ -148,6 +154,7 @@ namespace ES
 
                     }
                 }
+                ValidEditorAssembiles.OrderBy((Assembly asm)=>Internal_GetIndexForAssembly(asm));
                 //SORT
                 EditorRegisters= listRE.OrderBy((f) => {return f.Order; }).ToList();
             }
@@ -188,6 +195,11 @@ namespace ES
                                 Match_Singleton(re, register, nowType);
                                 break;
                             }
+                            if (genericDefinition == Define_AsSubClass)
+                            {
+                                Match_SubClass(re, register, nowType);
+                                break;
+                            }
                         }
                         maxLevel--;
                         nowType = nowType.BaseType; // 继续向上查找
@@ -219,6 +231,24 @@ namespace ES
                                 func.Invoke(nowType);
                             }
                         }
+
+                        int lenForFunc_SubClass = Handler_SubClass.Count;
+                        
+                        for (int indexAction = 0; indexAction < lenForFunc_SubClass; indexAction++)
+                        {
+                            //可用的单例匹配
+                            //因为需要排序！！！
+                            var func = Handler_SubClass[indexAction];
+                            int lenForTypes = types.Length;
+                            for (int indexType = 0; indexType < lenForTypes; indexType++)
+                            {
+                                Type nowType = types[indexType];
+
+                                func.Invoke(nowType);
+                            }
+                        }
+
+
                         int lenForTypesOut = types.Length;
                         //一组类型
                         for (int indexType = 0; indexType < lenForTypesOut; indexType++)
@@ -467,6 +497,66 @@ namespace ES
                     }
                 }
             }
+            
+            private static void Match_SubClass(Type reType, ESAS_EditorRegister_AB register, Type geneType)
+            {
+                var types = geneType.GetGenericArguments();
+                if (types.Length > 0)
+                {
+                    Type support = types[0];
+
+                    try
+                    {
+                        MethodInfo info = reType.GetMethod("Handle");
+                        Handler_SubClass.Add((type) =>
+                        {
+
+                            if (!type.IsAbstract && type.IsSubclassOf(support))
+                            {
+                                info.Invoke(register, new object[] { type });
+                                return true;//拦截
+                            }
+                            return false;
+                        });
+                        // 如果创建成功，在这里使用 instance
+                        // Console.WriteLine($"实例创建成功: {instance.GetType()}");
+                    }
+                    catch (ArgumentNullException ex)
+                    {
+                        Console.WriteLine($"类型参数为 null: {ex.Message}");
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        Console.WriteLine($"类型参数无效（例如是开放泛型）: {ex.Message}");
+                    }
+                    catch (NotSupportedException ex)
+                    {
+                        Console.WriteLine($"不支持创建该类型的实例: {ex.Message}");
+                    }
+                    catch (TargetInvocationException ex)
+                    {
+                        // 这是一个包装异常，真正的错误在 InnerException 中
+                        Console.WriteLine($"构造函数抛出异常: {ex.InnerException?.Message}");
+                    }
+                    catch (MissingMethodException ex)
+                    {
+                        Console.WriteLine($"未找到匹配的构造函数（例如没有无参构造函数）: {ex.Message}");
+                    }
+                    catch (MemberAccessException ex)
+                    {
+                        Console.WriteLine($"访问构造函数被拒绝（权限问题或抽象类）: {ex.Message}");
+                    }
+                    catch (TypeLoadException ex)
+                    {
+                        Console.WriteLine($"类型加载失败: {ex.Message}");
+                    }
+                    catch (Exception ex) // 捕获其他未预料到的异常
+                    {
+                        Console.WriteLine($"EditorRegister捕获单例继承失败: 原始注册器类型{reType},泛型类型{geneType}, 支持单例{support},信息{ex.Message}");
+                    }
+                }
+            }
+
             private static bool Internal_IsValidAssembly(Assembly asm)
             {
                 var name_ = asm.GetName().Name;
@@ -474,6 +564,13 @@ namespace ES
                 if (EditorValidAssebliesName.Contains(name_)) {  return true; }
                 //很多程序集没必要考虑的！！这里写一个方法到时候
                 return false;
+            }
+             private static int Internal_GetIndexForAssembly(Assembly asm)
+            {
+                var name_ = asm.GetName().Name;
+                if (EditorValidAssebliesName.Contains(name_)) {  return EditorValidAssebliesName.IndexOf(name_); }
+                //很多程序集没必要考虑的！！这里写一个方法到时候
+                return -1;
             }
 
             private static bool Internal_MatchDefineOne(Type instanceType, Type defineType, out Type matchType, int maxLevel = 3)

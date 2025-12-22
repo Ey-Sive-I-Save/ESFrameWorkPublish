@@ -11,7 +11,7 @@ namespace ES
 {
     /*T Transform 系列 -》*/
     [Serializable, TypeRegistryItem("T变换-【POS】设置锚定位置(死赋值-低级)")]
-    public class OutputOperationUI_Handle_SetAnchorPos : IOutputOperationUI
+    public class OutputOperationUI_Handle_SetAnchorPos : IOperationUI
     {
         [LabelText("设置锚定坐标")] public Vector2 pos;
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
@@ -28,7 +28,7 @@ namespace ES
 
 
     [Serializable, TypeRegistryItem("T变换-【POS】设置锚定位置<单轴>(死赋值-低级)")]
-    public class OutputOperationUI_Handle_SetAnchorPos_SingleAxis : IOutputOperationUI
+    public class OutputOperationUI_Handle_SetAnchorPos_SingleAxis : IOperationUI
     {
         [LabelText("设置锚定坐标")] public float singleValue;
         [LabelText("生效的轴")] public Axis_XOrY axis = Axis_XOrY.X;
@@ -52,7 +52,7 @@ namespace ES
 
 
     [Serializable, TypeRegistryItem("T变换-【POS】设置锚定位置(随机增益-中级)")]
-    public class OutputOperationUI_Handle_SetAnchorPos_RandomAdding : IOutputOperationUI
+    public class OutputOperationUI_Handle_SetAnchorPos_RandomAdding : IOperationUI
     {
         [LabelText("设置基本锚定坐标")] public Vector2 pos;
 
@@ -71,7 +71,7 @@ namespace ES
     }
 
     [Serializable, TypeRegistryItem("T变换-【Scale】设置缩放(死赋值-单值)")]
-    public class OutputOperationUI_Handle_SetScale_XYSame : IOutputOperationUI
+    public class OutputOperationUI_Handle_SetScale_XYSame : IOperationUI
     {
         [LabelText("设置缩放")] public float scale = 1;
 
@@ -88,7 +88,7 @@ namespace ES
 
 
     [Serializable, TypeRegistryItem("T变换-【Scale】设置缩放[XY不同](死赋值-低级)")]
-    public class OutputOperationUI_Handle_SetScale_XY : IOutputOperationUI
+    public class OutputOperationUI_Handle_SetScale_XY : IOperationUI
     {
         [LabelText("设置缩放")] public Vector2 xyScale = Vector3.one;
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
@@ -103,7 +103,7 @@ namespace ES
     }
 
     [Serializable, TypeRegistryItem("T变换-【Scale】设置缩放<单轴>(死赋值-低级)")]
-    public class OutputOperationUI_Handle_SetScale_SingleAxis : IOutputOperationUI
+    public class OutputOperationUI_Handle_SetScale_SingleAxis : IOperationUI
     {
         [LabelText("设置单轴缩放")] public float scaleSingle = 1;
         [LabelText("生效的轴")] public Axis_XY axis = Axis_XY.X;
@@ -122,7 +122,7 @@ namespace ES
     }
 
     [Serializable, TypeRegistryItem("T变换-【Scale】设置旋转[X](死赋值-低级)")]
-    public class OutputOperationUI_Handle_SetRot_X : IOutputOperationUI
+    public class OutputOperationUI_Handle_SetRot_X : IOperationUI
     {
         [LabelText("设置旋转X")] public float xRot;
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
@@ -137,7 +137,7 @@ namespace ES
     }
 
     [Serializable, TypeRegistryItem("T变换-【Scale】设置旋转[Y](死赋值-低级)")]
-    public class OutputOperationUI_Handle_SetRot_Y : IOutputOperationUI
+    public class OutputOperationUI_Handle_SetRot_Y : IOperationUI
     {
         [LabelText("设置旋转X")] public float yRot;
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)
@@ -151,7 +151,7 @@ namespace ES
 
     }
     [Serializable, TypeRegistryItem("T变换-【Scale】设置旋转[Z](死赋值-低级)")]
-    public class OutputOperationUI_Handle_SetRot_Z : IOutputOperationUI
+    public class OutputOperationUI_Handle_SetRot_Z : IOperationUI
     {
         [LabelText("设置旋转Z")] public float zRot;
         public void TryOperation(ESUIElement on, ESUIElement from, ILink_UI_OperationOptions with)

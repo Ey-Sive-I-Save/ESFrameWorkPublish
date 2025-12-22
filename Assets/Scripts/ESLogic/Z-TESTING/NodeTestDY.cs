@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace ES
 {
-    public interface IOOP_GGGloat : IOutputOperation<GameObject, GameObject, float>
+    public interface IOOP_GGGloat : IOutputOperation<GameObject, float>
     {
         public string Name { get; }
     }
@@ -34,49 +34,15 @@ namespace ES
         public bool bbb;
         public string Name => "GGF_活动设置";
 
-        public void TryCancel(GameObject on, GameObject from, float with)
+        public void TryCancel(GameObject on, float with)
         {
             on.SetActive(false);
         }
 
-        public void TryOperation(GameObject on, GameObject from, float with)
+        public void TryOperation(GameObject on, float with)
         {
             on.SetActive(true);
         }
     }
-
-    [Serializable, TypeRegistryItem("GGF_对象添加")]
-    public class OOP_GGFloat2_ : IOOP_GGGloat
-    {
-        public float sda;
-        public Vector2 bbdadb;
-        public string Name => "GGF_对象添加";
-
-        public void TryCancel(GameObject on, GameObject from, float with)
-        {
-            on.SetActive(false);
-        }
-
-        public void TryOperation(GameObject on, GameObject from, float with)
-        {
-            on.SetActive(true);
-        }
-    }
-
-    [Serializable, TypeRegistryItem("GGF_标记")]
-    public class OOP_GGFloat3_ : IOOP_GGGloat
-    {
-        public string Name => "GGF_标记";
-
-        public void TryCancel(GameObject on, GameObject from, float with)
-        {
-            on.SetActive(false);
-        }
-
-        public void TryOperation(GameObject on, GameObject from, float with)
-        {
-            on.SetActive(true);
-        }
-    }
-    #endregion
+   #endregion
 }

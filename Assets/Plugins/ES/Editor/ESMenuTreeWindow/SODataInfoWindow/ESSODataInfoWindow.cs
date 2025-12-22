@@ -61,6 +61,9 @@ namespace ES
 
             public const string PageName_DataGroupCreate = "【查询\\新建组】";
 
+             public const string PageName_NormalSoDataCreate = "【查询\\新建常规】";
+
+
             public const string PageName_DataGroupOnChooseEditInfo = "【编辑组】";
 
 
@@ -68,10 +71,14 @@ namespace ES
             [NonSerialized] public Page_Root_DataScpirtCodeTool pageRootForCodeGen;
             [NonSerialized] public Page_CreateNewSoPackOrSearch pageForSodataPack;
             [NonSerialized] public Page_CreateNewGroupOrSearch pageForSodataGroup;
+             [NonSerialized] public Page_CreateNewNormalSoOrSearch pageForNormalSo;
+
             [NonSerialized] public Page_DataGroupOnChoose pageForGroupOnChoose;
 
             public string selectPackTypeName_ = "Buff数据";
             public string selectGroupTypeName_ = "Buff数据";
+
+            public string selectNormalTypeName_ = "Normal_SO";
             private bool HasDelegate = false;
 
             public static string guidForCopiedGroup = "";
@@ -136,7 +143,9 @@ namespace ES
                     Part_BuildDataScriptCodePage(tree);
                     Part_BuildSoPackPage(tree);
                     Part_BuildSoDataGroupPage(tree);
+                    
                     Part_BuildSoDataGroupOnChooseAndInfos(tree);
+                    Part_BuildNomralSoDataPage(tree);
                     //开始使用界面
                     Part_BuildStartPage(tree);
                     //关于
@@ -183,6 +192,7 @@ namespace ES
                 }
 
             }
+           
             public void Part_BuildSoDataGroupOnChooseAndInfos(OdinMenuTree tree)
             {
                 QuickBuildRootMenu(tree, PageName_DataGroupOnChooseEditInfo, ref pageForGroupOnChoose, SdfIconType.BookmarkXFill);
@@ -210,6 +220,21 @@ namespace ES
 
                 }
                 return;
+            }
+            private void Part_BuildNomralSoDataPage(OdinMenuTree tree)
+            {
+                QuickBuildRootMenu(tree, PageName_NormalSoDataCreate, ref pageForNormalSo, SdfIconType.FileEarmarkCodeFill);
+                var TypeSelect = ESSODataWindowHelper.GetNormalType(pageForNormalSo.createNormal_);
+                var allGroups = ESDesignUtility.SafeEditor.FindAllSOAssets<ScriptableObject>(TypeSelect);
+
+                foreach (var i in allGroups)
+                {
+                    if (i is ScriptableObject so)
+                    {
+                        tree.Add(PageName_NormalSoDataCreate + $"/SO:文件:{so.name}",new Page_Index_DataQuickSeeNormalSo(){ normalSo= so}, SdfIconType.FileEarmarkCode);
+                    }
+                }
+
             }
 
             private void Part_AboutPage(OdinMenuTree tree)
@@ -917,7 +942,143 @@ namespace ES
                 ESSODataInfoWindow.UsingWindow.pageForGroupOnChoose.Check();
             }
         }
+       
+       
+         #endregion
+
+        #region 常规SO通用管理
+        [Serializable]
+        public class Page_CreateNewNormalSoOrSearch : ESWindowPageBase
+        {
+            [Title("查询和编辑常规So！", "可以筛选类型", bold: true, titleAlignment: TitleAlignments.Centered)]
+            [HorizontalGroup("总组")]
+            [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            [VerticalGroup("总组/数据")]
+            public string createText = "【创建新的So资产】";
+            
+            [InfoBox("请修改一下文件名否则会分配随机数字后缀", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
+            [VerticalGroup("总组/数据"), ESBackGround("yellow", 0.2f), LabelText("文件命名"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
+            public string createName_ = "新建SO_";
+            [VerticalGroup("总组/数据")]
+            [ESBoolOption("自动使用父级文件夹", "直接放到指定文件夹")]
+            public bool AutoParentFolder = true;
+            private bool hasChange = false;
+            private void OnValueChanged_ChangeHappen()
+            {
+                hasChange = true;
+            }
+            [FolderPath, OnValueChanged("Refresh")]
+            [VerticalGroup("总组/数据"), LabelText("保存文件夹"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            public string FolderPath_ = "Assets/Resources/Data/Normal";
+            private void Refresh()
+            {
+                AssetDatabase.Refresh();
+                ESSODataInfoWindow.UsingWindow.selectNormalTypeName_ = createNormal_;
+                createText = $"--新建【{createNormal_}】--";
+            }
+            public override ESWindowPageBase ES_Refresh()
+            {
+                
+                FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_NormalParent;
+                if (createNormal_.IsNullOrWhitespace())
+                {
+                    createNormal_ = ESSODataWindowHelper.GetNormalSONames().First();
+                }
+                Refresh();
+                createName_ = "新建" + createNormal_;
+                return base.ES_Refresh();
+              
+            }
+            [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            [VerticalGroup("总组/数据")]
+            public string createTypeText = "--筛选数据组类型--";
+
+
+            [OnValueChanged("OnValueChanged_ResetConfigure"), InfoBox("建议选择一个预设类型的配置组,或者自己创建支持,默认类型无法直接使用", infoMessageType: InfoMessageType.Warning/*, VisibleIf = "@createGroup_==EvWindowDataAndTool.DataType.None"*/)]
+            [VerticalGroup("总组/数据"), Space(5), LabelText("预定义类型")]
+            [ValueDropdown("@ESSODataWindowHelper.GetNormalSONames()", AppendNextDrawer = false)]
+            public string createNormal_ = "";
+
+            #region 按钮
+            [HorizontalGroup("总组", width: 100)]
+            [VerticalGroup("总组/按钮")]
+            [PropertySpace(15)]
+            [Button(ButtonHeight = 30, Name = "新建一个"), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            public void CreateNormalSoAsset()
+            {  
+                Type targetType = ESSODataWindowHelper.GetNormalType(createNormal_);
+                if (TypeSelectorSettingForNormalSo(targetType))
+                {
+                string path = FolderPath_;
+                Debug.Log(path + targetType.Name + targetType.Name._RemoveSubStrings());
+                if (AutoParentFolder) ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(FolderPath_, targetType.Name._RemoveSubStrings(), out path);
+                Debug.Log(path);
+                var create = ESDesignUtility.SafeEditor.CreateSOAsset(targetType, path, createName_, true, hasChange, beforeSave);
+                void beforeSave(ScriptableObject so)
+                {
+                   // Selection.activeObject = so;
+                }
+                }
+            }
+            // [VerticalGroup("总组/按钮")]
+            // [PropertySpace(15)]
+            // [Button(ButtonHeight = 30, Name = "选中一个组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_04")]
+            public void ABSOLUTE_FindAInfoGroupAsset()
+            {
+                //找到全部数据组
+                var all = ESDesignUtility.SafeEditor.FindAllSOAssets<ISoDataGroup>(ESSODataWindowHelper.GetGroupType(createNormal_));
+                foreach (var i in all)
+                {
+                    if (i is ScriptableObject so)
+                    {
+                        ESSODataWindowHelper.SelectSoGroup(so);
+                        break;
+                    }
+                }
+            }
+            private bool TypeSelectorSettingForNormalSo(Type type)
+            {
+                if(type==null)return false;
+                return !type.IsAbstract && !type.IsInterface && typeof(ScriptableObject).IsAssignableFrom(type);
+            }
+
+            private void OnValueChanged_ResetConfigure()
+            {
+                hasChange = false;
+                ESSODataInfoWindow.UsingWindow.selectNormalTypeName_ = createNormal_;
+                ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
+                createName_ = "新建" + createNormal_;
+            }
+            #endregion
+        }
+    
+  //子页面 数据组快速查看
+        [Serializable]
+        public class Page_Index_DataQuickSeeNormalSo : ESWindowPageBase
+        {
+            [HorizontalGroup("总组", VisibleIf = "@normalSo!=null")]
+            [VerticalGroup("总组/数据组")]
+            [DisplayAsString(fontSize: 30, TextAlignment.Center), GUIColor("@ESDesignUtility.ColorSelector.Color_01"), HideLabel]
+            public string readme = "--常规↓SO编辑--";
+            [VerticalGroup("总组/数据组")]
+            [InlineEditor(Expanded = true,DrawPreview =false), SerializeReference, LabelText("数据组")]
+            public ScriptableObject normalSo;
+
+            [HorizontalGroup("总组", width: 100)]
+            [VerticalGroup("总组/按钮组")]
+            [Button("选中", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            private void SelectThisSo()
+            {
+                Selection.activeObject=normalSo;
+                EditorGUIUtility.PingObject(normalSo);
+            }
+
+        }
+  
+
         #endregion
+
+
         #region 开始使用界面
         [Serializable]
         public class Page_Root_Data_StartUse : ESWindowPageBase
@@ -1070,6 +1231,10 @@ namespace ES
             {
                 return ESDesignUtility.Creator.CreatePaths.GetKeys("数据包");
             }
+            public static string[] GetNormalSONames()
+            {
+                return ESEditorSO.AllSoNames.Keys.ToArray();//.Groups.Keys.Select((n)=>n.Name).ToArray();//..Creator.CreatePaths.GetKeys("数据组");
+            }
             public static Type GetInfoType(string name)
             {
                 return ESDesignUtility.Creator.CreatePaths.GetElement("数据信息", name);
@@ -1082,7 +1247,10 @@ namespace ES
             {
                 return ESDesignUtility.Creator.CreatePaths.GetElement("数据包", name);
             }
-
+            public static Type GetNormalType(string name)
+            {
+                return ESEditorSO.AllSoNames[name];
+            }
             public static string GetPackName(Type name)
             {
                 var dic = ESDesignUtility.Creator.CreatePaths.GetDic("数据包");

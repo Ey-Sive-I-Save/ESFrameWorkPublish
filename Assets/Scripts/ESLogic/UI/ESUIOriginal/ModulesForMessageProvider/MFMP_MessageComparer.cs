@@ -15,7 +15,7 @@ namespace ES
     {
         [ESBoolOption("不相等就忽略", "不相等以NotFlag执行")] public bool NotEqual_OperationWithNotFlag = false;
         [LabelText("比对持有信息目标")] public ESUIElementGetter getter = new ESUIElementGetter_Self();
-        [LabelText("通过则执行"), SerializeReference] public IOutputOperationUI operation;
+        [LabelText("通过则执行"), SerializeReference] public IOperationUI operation;
 
         public override Type TableKeyType => typeof(MessagevalueEntryModule_EqualWithAndDo);
 

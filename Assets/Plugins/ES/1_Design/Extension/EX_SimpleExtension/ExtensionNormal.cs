@@ -3,12 +3,16 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using Sirenix.OdinInspector;
+using Sirenix.OdinInspector.Editor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace ES
 {
+    
     public static partial class ExtensionNormal
     {   
         /// <summary>
@@ -43,6 +47,22 @@ namespace ES
         public static void _Swap<T>(ref this T a, ref T b) where T : struct
         {
             (a, b) = (b, a);
+        }
+
+
+        
+        public static string _GetTypeDisplayName(this Type type)
+        {
+            var tr=type.GetCustomAttribute<TypeRegistryItemAttribute>();
+            if(tr!=null)return tr.Name;
+
+            var cf=type.GetCustomAttribute<CreateAssetMenuAttribute>();
+            if(cf!=null)return cf.menuName;
+
+           var esM=type.GetCustomAttribute<ESMessageAttribute>();
+           if(esM!=null)return esM.message;
+           
+           return type.Name;
         }
     }
 }

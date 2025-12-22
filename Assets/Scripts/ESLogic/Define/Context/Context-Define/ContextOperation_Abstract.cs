@@ -14,9 +14,9 @@ namespace ES {
      *简单值控 的实现 -》  Assets/Scripts/ESFramework/Ship_RunTimeLogic_Support/Context/ContextOperation_EasyValueSet.cs
      
      */
-    public abstract class ContextOperation_Abstract : IOperation<ContextPool, string, object>
+    public abstract class ContextOperation_Abstract : IOperation<ContextPool,ContextKeyValue>
     {
-        public abstract void TryOperation(ContextPool Context, string key, object value = null);
+        public abstract void TryOperation(ContextPool Context,ContextKeyValue keyvalue);
     }
     //池  字符串键  值
     [Serializable]

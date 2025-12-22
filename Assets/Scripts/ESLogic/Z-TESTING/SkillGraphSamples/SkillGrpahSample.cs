@@ -25,7 +25,7 @@ namespace ES.SkillSample {
         public Entity by;
         public Entity_SKill skill;
     }
-    public class OOP_EESkill : IOutputOperation<Entity, Entity, Entity_SKill>
+    public class OOP_EESkill : IOperation<Entity, Entity_SKill>
     {
         public void HandleByFill(Filler filler)
         {

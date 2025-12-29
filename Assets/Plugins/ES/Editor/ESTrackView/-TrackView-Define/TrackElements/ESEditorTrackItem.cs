@@ -53,11 +53,12 @@ namespace ES
             style.flexDirection = FlexDirection.Row;
             style.flexShrink = 0;
 
+  // 右侧面板 - 可扩展，显示轨道节点
+            CreateRightPanel();
             // 左侧面板 - 固定宽度，显示轨道信息
             CreateLeftPanel();
 
-            // 右侧面板 - 可扩展，显示轨道节点
-            CreateRightPanel();
+          
 
             // 分隔线
             var separator = new VisualElement
@@ -79,6 +80,8 @@ namespace ES
                 name = "track-left-panel",
                 style =
             {
+                 position= Position.Absolute,
+                 left=0,
                 width = 100,
                 minWidth = 100,
                 maxWidth = 100,
@@ -167,6 +170,7 @@ namespace ES
                 name = "track-right-panel",
                 style =
             {
+                
                 flexGrow = 1,
                 flexDirection = FlexDirection.Column,
                 backgroundColor = new StyleColor(new Color(0.12f, 0.12f, 0.12f, 1f)),
@@ -179,6 +183,8 @@ namespace ES
                 name = "track-nodes-container",
                 style =
             {
+                  left = 100,
+                 position= Position.Absolute,
                 flexGrow = 1,
                 flexDirection = FlexDirection.Row,
                 alignItems = Align.Center,

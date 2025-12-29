@@ -6,7 +6,9 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Sirenix.OdinInspector;
+#if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
+#endif
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -53,8 +55,11 @@ namespace ES
         
         public static string _GetTypeDisplayName(this Type type)
         {
+            #if UNITY_EDITOR
             var tr=type.GetCustomAttribute<TypeRegistryItemAttribute>();
+
             if(tr!=null)return tr.Name;
+            #endif
             var cf=type.GetCustomAttribute<CreateAssetMenuAttribute>();
             if(cf!=null)return cf.menuName;
            var esM=type.GetCustomAttribute<ESMessageAttribute>();

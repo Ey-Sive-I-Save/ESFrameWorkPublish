@@ -27,7 +27,7 @@ namespace ES
         StartTime = startTime;
         Duration = duration;
         UserData = data;
-        
+        this.focusable=true;
         // 基础样式
         AddToClassList("track-node");  
         style.position = Position.Absolute;

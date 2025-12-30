@@ -48,7 +48,7 @@ namespace ES
     public class ESAssemblyStream
     {
         private static List<string> EditorValidAssebliesName = new List<string>() {
-    "ES_Design","ES_Stand","Assembly-CSharp-Editor-firstpass","ES_Logic"
+    "ES_Design","ES_Stand","Assembly-CSharp-Editor","Assembly-CSharp-Editor-firstpass","ES_Logic","Assembly-CSharp","Assembly-CSharp-firstpass","NewAssem"
     };
         private static List<string> RuntimeValidAssebliesName = new List<string>() {
     "ES_Design","ES_Stand","ES_Logic"
@@ -75,12 +75,12 @@ namespace ES
             #endregion       
 
             #region 处理流
-            private static List<Func<Type, bool>> Handler_Singleton = new List<Func<Type, bool>>();
-             private static List<Func<Type, bool>> Handler_SubClass = new List<Func<Type, bool>>();
+            private static KeyGroup<int,Func<Type, bool>> Handler_Singleton = new KeyGroup<int, Func<Type, bool>>();
+             private static KeyGroup<int,Func<Type, bool>> Handler_SubClass = new ();
 
-            private static List<Func<MethodInfo, bool>> Handler_MethodAttribute = new List<Func<MethodInfo, bool>>();
-            private static List<Func<FieldInfo, bool>> Handler_FieldAttribute = new List<Func<FieldInfo, bool>>();
-            private static List<Func<Type, bool>> Handler_ClassAttribute = new List<Func<Type, bool>>();
+            private static KeyGroup<int,Func<MethodInfo, bool>> Handler_MethodAttribute = new ();
+            private static KeyGroup<int,Func<FieldInfo, bool>> Handler_FieldAttribute = new ();
+            private static KeyGroup<int,Func<Type, bool>> Handler_ClassAttribute = new ();
             #endregion  
 
 
@@ -210,19 +210,25 @@ namespace ES
 
             private static void Editor_LoadRegisteredTypes()
             {
+                for(int orderIndex=-100;orderIndex<100;orderIndex++){
+                var Handler_SingletonPart=Handler_Singleton.GetGroup(orderIndex);
+                 var Handler_SubClassPart=Handler_SubClass.GetGroup(orderIndex);
+                  var Handler_ClassAttributePart=Handler_ClassAttribute.GetGroup(orderIndex);
+                   var Handler_FieldAttributePart=Handler_FieldAttribute.GetGroup(orderIndex);
+                    var Handler_MethodAttributePart=Handler_MethodAttribute.GetGroup(orderIndex);
                 //有效程序集
                 for (int indexASM = 0; indexASM < ValidEditorAssembiles.Count; indexASM++)
                 {
                     var asm = ValidEditorAssembiles[indexASM];
                     if (EditorTypes.TryGetValue(asm, out var types))
                     {
-                        int lenForFunc_Singleton = Handler_Singleton.Count;
+                        int lenForFunc_Singleton = Handler_SingletonPart.Count;
                         
                         for (int indexAction = 0; indexAction < lenForFunc_Singleton; indexAction++)
                         {
                             //可用的单例匹配
                             //因为需要排序！！！
-                            var func = Handler_Singleton[indexAction];
+                            var func = Handler_SingletonPart[indexAction];
                             int lenForTypes = types.Length;
                             for (int indexType = 0; indexType < lenForTypes; indexType++)
                             {
@@ -232,13 +238,13 @@ namespace ES
                             }
                         }
 
-                        int lenForFunc_SubClass = Handler_SubClass.Count;
+                        int lenForFunc_SubClass = Handler_SubClassPart.Count;
                         
                         for (int indexAction = 0; indexAction < lenForFunc_SubClass; indexAction++)
                         {
                             //可用的单例匹配
                             //因为需要排序！！！
-                            var func = Handler_SubClass[indexAction];
+                            var func = Handler_SubClassPart[indexAction];
                             int lenForTypes = types.Length;
                             for (int indexType = 0; indexType < lenForTypes; indexType++)
                             {
@@ -255,15 +261,15 @@ namespace ES
                         {
                             Type nowType = types[indexType];
                             #region 单例类型
-                           
+                            
                             #endregion
 
                             #region 类特性
-                            int lenForFunc_ClassAttribute = Handler_ClassAttribute.Count;
+                            int lenForFunc_ClassAttribute = Handler_ClassAttributePart.Count;
                             for (int indexAction = 0; indexAction < lenForFunc_ClassAttribute; indexAction++)
                             {
                                 //可用的单例匹配
-                                var func = Handler_ClassAttribute[indexAction];
+                                var func = Handler_ClassAttributePart[indexAction];
                                 if (func.Invoke(nowType))
                                 {
                                     break;
@@ -276,11 +282,11 @@ namespace ES
                                 for (int indexField = 0; indexField < Fields.Length; indexField++)
                                 {
                                     var infoF = Fields[indexField];
-                                    int lenForFunc_FieldAttribute = Handler_FieldAttribute.Count;
+                                    int lenForFunc_FieldAttribute = Handler_FieldAttributePart.Count;
                                     for (int indexAction = 0; indexAction < lenForFunc_FieldAttribute; indexAction++)
                                     {
                                         //可用的单例匹配
-                                        var func = Handler_FieldAttribute[indexAction];
+                                        var func = Handler_FieldAttributePart[indexAction];
                                         if (func.Invoke(infoF))
                                         {
                                             break;
@@ -296,11 +302,11 @@ namespace ES
                                 for (int indexField = 0; indexField < Methods.Length; indexField++)
                                 {
                                     var infoM = Methods[indexField];
-                                    int lenForFunc_FieldAttribute = Handler_MethodAttribute.Count;
+                                    int lenForFunc_FieldAttribute = Handler_MethodAttributePart.Count;
                                     for (int indexAction = 0; indexAction < lenForFunc_FieldAttribute; indexAction++)
                                     {
                                         //可用的单例匹配
-                                        var func = Handler_MethodAttribute[indexAction];
+                                        var func = Handler_MethodAttributePart[indexAction];
                                         if (func?.Invoke(infoM) ?? false)
                                         {
                                             break;
@@ -311,6 +317,7 @@ namespace ES
                             #endregion
                         }
                     }
+                }
                 }
             }
             private static void Editor_TestForeach()
@@ -366,7 +373,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_ClassAttribute.Add((classType) =>
+                        Handler_ClassAttribute.TryAdd(register.Order,(classType) =>
                         {
                             
                             var at = classType.GetCustomAttribute(supportAttribute);
@@ -394,7 +401,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_FieldAttribute.Add((fieldINFO) =>
+                        Handler_FieldAttribute.TryAdd(register.Order,(fieldINFO) =>
                         {
                             var at = fieldINFO.GetCustomAttribute(supportAttribute);
                             if (at != null)
@@ -421,7 +428,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_MethodAttribute.Add((methodINFO) =>
+                        Handler_MethodAttribute.TryAdd(register.Order,((methodINFO) =>
                         {
                             var at = methodINFO.GetCustomAttribute(supportAttribute);
                             if (at != null)
@@ -430,7 +437,7 @@ namespace ES
                                 return true;//拦截
                             }
                             return false;
-                        });
+                        }));
                     }
                     catch (Exception ex) // 捕获其他未预料到的异常
                     {
@@ -448,7 +455,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_Singleton.Add((type) =>
+                        Handler_Singleton.TryAdd(register.Order,(type) =>
                         {
 
                             if (!type.IsAbstract && type.IsSubclassOf(support))
@@ -508,7 +515,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_SubClass.Add((type) =>
+                        Handler_SubClass.TryAdd(register.Order, (type) =>
                         {
 
                             if (!type.IsAbstract && type.IsSubclassOf(support))
@@ -558,9 +565,8 @@ namespace ES
             }
 
             private static bool Internal_IsValidAssembly(Assembly asm)
-            {
+            { 
                 var name_ = asm.GetName().Name;
-                
                 if (EditorValidAssebliesName.Contains(name_)) {  return true; }
                 //很多程序集没必要考虑的！！这里写一个方法到时候
                 return false;
@@ -1278,5 +1284,10 @@ namespace ES
 
 
     }
+
+    #region  统一规范排序
+
+
+    #endregion
 }
 }

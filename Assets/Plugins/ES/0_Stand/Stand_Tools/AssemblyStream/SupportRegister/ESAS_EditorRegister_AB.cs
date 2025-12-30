@@ -2,7 +2,7 @@ using System;
 using System.Reflection;
 using UnityEngine;
 
-public enum EditorRegisterOrder
+public enum EditorRegisterOrder //-100 100 
 {
     [InspectorName("最开始_0")]Level0,
     [InspectorName("最开始_1")] Level1,
@@ -12,7 +12,7 @@ public enum EditorRegisterOrder
     [InspectorName("刷新阶段")] Refresh,
     [InspectorName("So数据应用")] SODataApply,
     [InspectorName("建造阶段")] Build,
-    [InspectorName("最终")] EditorEnd,
+    [InspectorName("最终")] EditorEnd=100,
 
 }
 public abstract class ESAS_EditorRegister_AB

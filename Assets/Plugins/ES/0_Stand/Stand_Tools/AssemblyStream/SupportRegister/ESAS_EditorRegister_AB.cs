@@ -37,6 +37,7 @@ public abstract class EditorRegister_FOR_AsSubclass<ParentType> : global::ESAS_E
     public abstract void Handle(Type subClassType);
     
 }
+
 /// <summary>
 /// 类特性模式
 /// </summary>

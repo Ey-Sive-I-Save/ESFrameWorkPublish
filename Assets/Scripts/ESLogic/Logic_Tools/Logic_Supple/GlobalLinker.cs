@@ -18,7 +18,7 @@ namespace ES
 
     public class RR_GlobalLink : RuntimeRegister_FOR_Singleton<_GlobalLinker>
     {
-        public override ESAssemblyLoadTiming LoadTiming => ESAssemblyLoadTiming._1_BeforeFirstSceneLoad;
+        public override int LoadTiming => ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode();
 
         public override void Handle(_GlobalLinker singleton)
         {

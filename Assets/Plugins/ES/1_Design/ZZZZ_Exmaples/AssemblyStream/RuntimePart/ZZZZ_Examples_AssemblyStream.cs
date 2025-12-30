@@ -32,7 +32,7 @@ public abstract class RuntimeGlobalLinker<Link> : RuntimeGlobalLinker, IReceiveL
 }
 public class EditorRegister_FOR_RuntimeGlobalLinker_Level0 : RuntimeRegister_FOR_Singleton<RuntimeGlobalLinker>
 {
-    public override ESAssemblyLoadTiming LoadTiming =>  ESAssemblyLoadTiming._0_AfterInitAssemliesLoaded;
+    public override int LoadTiming =>  ESAssemblyLoadTiming._0_AfterInitAssemliesLoaded.GetHashCode();
 
     public override void Handle(RuntimeGlobalLinker singleton)
     {
@@ -41,7 +41,7 @@ public class EditorRegister_FOR_RuntimeGlobalLinker_Level0 : RuntimeRegister_FOR
 }
 public class EditorRegister_FOR_RuntimeGlobalLinker_Level1 : RuntimeRegister_FOR_Singleton<RuntimeGlobalLinker>
 {
-    public override ESAssemblyLoadTiming LoadTiming => ESAssemblyLoadTiming._1_BeforeFirstSceneLoad;
+    public override int LoadTiming => ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode();
     public override void Handle(RuntimeGlobalLinker singleton)
     {
         singleton.Level1();
@@ -50,7 +50,7 @@ public class EditorRegister_FOR_RuntimeGlobalLinker_Level1 : RuntimeRegister_FOR
 
 public class EditorRegister_FOR_RuntimeGlobalLinker_Level2: RuntimeRegister_FOR_Singleton<RuntimeGlobalLinker>
 {
-    public override ESAssemblyLoadTiming LoadTiming => ESAssemblyLoadTiming._2_AfterFirstSceneLoad;
+    public override int LoadTiming => ESAssemblyLoadTiming._2_AfterFirstSceneLoad.GetHashCode();
     public override void Handle(RuntimeGlobalLinker singleton)
     {
         singleton.Level2_ApplyGlobalLinker();

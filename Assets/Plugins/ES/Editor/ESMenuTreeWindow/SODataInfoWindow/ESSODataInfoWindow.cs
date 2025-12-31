@@ -1235,7 +1235,7 @@ namespace ES
             [LabelText("开发者邮箱"), ShowInInspector, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             public string DeveloperEmail => "2650026906@qq.com";
             [TitleGroup("最后的话", "来自超级依薇尔", alignment: TitleAlignments.Split), HideLabel, PropertyOrder(3), ReadOnly, TextArea(5, 10)]
-            public string WordsOnEnd = "我是哔哩哔哩的超级依薇尔，欢迎关注我，另外我创建了QQ交流群982703564\n" +
+            public string WordsOnEnd = "我是哔哩哔哩的超级依薇尔，欢迎关注我，另外我创建了QQ交流群1060717622\n" +
                 "欢迎前来进行Unity技术交流讨论和分享自己的作品和开发见解。\n" +
                 "本框架特别感谢 凉鞋大佬(Q FrameWork作者)\n" + ""
                 ;
@@ -1243,8 +1243,7 @@ namespace ES
         #endregion
 
 
-   #region 关于
-        //关于页面
+   #region 设置
         [Serializable]
         public class Page_Settings : ESWindowPageBase
         {

@@ -8,7 +8,7 @@ using UnityEngine.UIElements;
 namespace ES
 {
     #region 定义运行者和相关枚举
-    public interface INodeRunner
+    public interface INodeRunner : INodeRunner_Origin
     {
         public void Editor_SetPos(Vector2 vector);
         public Vector2 Editor_GetPos();

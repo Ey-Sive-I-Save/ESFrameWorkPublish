@@ -26,3 +26,10 @@ MonoBehaviour:
   Path_PackParent: Assets/NormalResources/Data/Pack
   Path_GroupParent: Assets/NormalResources/Data/Group
   Path_NormalParent: Assets/NormalResources/Data/Normal
+  Path_GlobalParent: 
+  ExcludePackGroupInfo: 1
+  ExcludeNameList:
+  - ESGraphViewWindow
+  - ESTrackViewWindow
+  - ESTreeMenuShower
+  ExcludeHandle: ESTreeMenuShower

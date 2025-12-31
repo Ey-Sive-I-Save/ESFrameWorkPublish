@@ -41,6 +41,7 @@ MonoBehaviour:
     - 7e45525530fa813468f6e900f7a9e319
     - 5f86f56e751e52148b845f7e9f1e3d54
     - 67b8004b7ddaaaf4fbd4ecbca4ca0837
+    - 51596fefb28827a499d9ac5279eacbc1
     values:
     - iconNameOrGuid: UnityEditor.FindDependencies
       colorIndex: 8
@@ -148,6 +149,10 @@ MonoBehaviour:
       isColorRecursive: 0
     - iconNameOrGuid: 
       colorIndex: 5
+      isIconRecursive: 0
+      isColorRecursive: 0
+    - iconNameOrGuid: 
+      colorIndex: 8
       isIconRecursive: 0
       isColorRecursive: 0
   bookmarks: []

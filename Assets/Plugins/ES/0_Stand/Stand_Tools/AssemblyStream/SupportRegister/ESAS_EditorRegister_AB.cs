@@ -45,7 +45,7 @@ public abstract class EditorRegister_FOR_AsSubclass<ParentType> : global::ESAS_E
 public abstract class EditorRegister_FOR_ClassAttribute<ForAttribute> : global::ESAS_EditorRegister_AB where ForAttribute : Attribute
 {
     public abstract void Handle(ForAttribute attribute,Type type);
-    public override int Order => 999;
+    public override int Order => 60;
 }
 /// <summary>
 /// 字段特性模式
@@ -54,7 +54,7 @@ public abstract class EditorRegister_FOR_ClassAttribute<ForAttribute> : global::
 public abstract class EditorRegister_FOR_FieldAttribute<ForAttribute> : global::ESAS_EditorRegister_AB where ForAttribute : Attribute
 {
     public abstract void Handle(ForAttribute attribute, FieldInfo fieldInfo);
-    public override int Order => 1000;
+    public override int Order => 80;
 }
 /// <summary>
 /// 方法特性模式
@@ -63,6 +63,6 @@ public abstract class EditorRegister_FOR_FieldAttribute<ForAttribute> : global::
 public abstract class EditorRegister_FOR_MethodAttribute<ForAttribute> : global::ESAS_EditorRegister_AB where ForAttribute : Attribute
 {
     public abstract void Handle(ForAttribute attribute, MethodInfo methodInfo);
-    public override int Order => 1001;
+    public override int Order => 90;
 }
 

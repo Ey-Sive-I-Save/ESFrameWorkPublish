@@ -7,7 +7,11 @@ using UnityEngine;
 
 namespace ES
 {
-    public class ESEditorGlobalSo<This> : ESSO where This : ESEditorGlobalSo<This>
+    public interface IESGlobalData
+    {
+        
+    }
+    public class ESEditorGlobalSo<This> : ESSO,IESGlobalData where This : ESEditorGlobalSo<This>
     {
         #region 单例声明
         public static This Instance

@@ -57,18 +57,19 @@ namespace ES
 
             public const string PageName_DataMake = "数据脚本生成工具";
 
-            public const string PageName_DataPackCreate = "【查询\\新建包】";
+            public const string PageName_DataPackCreate = "【包】查询\\新建";
 
-            public const string PageName_DataGroupCreate = "【查询\\新建组】";
+            public const string PageName_DataGroupCreate = "【组】查询\\新建";
 
-             public const string PageName_NormalSoDataCreate = "【查询\\新建常规】";
+             public const string PageName_NormalSoDataCreate = "【常规】查询\\新建";
 
 
-            public const string PageName_DataGroupOnChooseEditInfo = "【编辑组】";
+            public const string PageName_DataGroupOnChooseEditInfo = "【组编辑】";
 
 
             [NonSerialized] public Page_Root_Data_StartUse pageForStartUsePage;
             [NonSerialized] public Page_Root_DataScpirtCodeTool pageRootForCodeGen;
+            [NonSerialized] public Page_Part_DataScpirtNormalCodeTool pagePartForNormalCodeGen;
             [NonSerialized] public Page_CreateNewSoPackOrSearch pageForSodataPack;
             [NonSerialized] public Page_CreateNewGroupOrSearch pageForSodataGroup;
              [NonSerialized] public Page_CreateNewNormalSoOrSearch pageForNormalSo;
@@ -146,6 +147,9 @@ namespace ES
                     
                     Part_BuildSoDataGroupOnChooseAndInfos(tree);
                     Part_BuildNomralSoDataPage(tree);
+
+                    Part_AboutSettings(tree);
+                    
                     //开始使用界面
                     Part_BuildStartPage(tree);
                     //关于
@@ -163,6 +167,8 @@ namespace ES
             private void Part_BuildDataScriptCodePage(OdinMenuTree tree)
             {
                 QuickBuildRootMenu(tree, PageName_DataMake, ref pageRootForCodeGen, SdfIconType.Braces);
+
+                 QuickBuildRootMenu(tree, PageName_DataMake+"/常规", ref pagePartForNormalCodeGen, SdfIconType.VectorPen);
             }
             private void Part_BuildSoPackPage(OdinMenuTree tree)
             {
@@ -183,7 +189,7 @@ namespace ES
                 var TypeSelect = ESSODataWindowHelper.GetGroupType(pageForSodataGroup.createGroup_);
                 var allGroups = ESDesignUtility.SafeEditor.FindAllSOAssets<ISoDataGroup>(TypeSelect);
 
-                foreach (var i in allGroups)
+                foreach (var i in allGroups) 
                 {
                     if (i is ScriptableObject so)
                     {
@@ -195,7 +201,7 @@ namespace ES
            
             public void Part_BuildSoDataGroupOnChooseAndInfos(OdinMenuTree tree)
             {
-                QuickBuildRootMenu(tree, PageName_DataGroupOnChooseEditInfo, ref pageForGroupOnChoose, SdfIconType.BookmarkXFill);
+                QuickBuildRootMenu(tree, PageName_DataGroupOnChooseEditInfo, ref pageForGroupOnChoose, SdfIconType.PinAngleFill);
 
                 if (Selection.activeObject is ISoDataGroup group_)
                 {
@@ -236,7 +242,10 @@ namespace ES
                 }
 
             }
-
+            private void Part_AboutSettings(OdinMenuTree tree)
+            {
+                tree.Add("设置", new Page_Settings(){ scriptable=ESGlobalEditorDefaultConfi.Instance }, SdfIconType.DashSquareDotted);
+            }
             private void Part_AboutPage(OdinMenuTree tree)
             {
                 tree.Add("关于", new Page_About(), SdfIconType.ChatSquareQuoteFill);
@@ -291,7 +300,64 @@ namespace ES
 
             }
         }
-        //创建数据包
+       
+         public class Page_Part_DataScpirtNormalCodeTool : ESWindowPageBase
+        {
+            [DisplayAsString(fontSize: 30), HideLabel]
+            public string readMe = "常规SO的创建 现在开始填表来创建新的数据类型!\b";
+            [LabelText("英文数据代码名(如\"Bonus\")")]
+            public string EnglishCodeName = "SoName";
+            [LabelText("中文数据显示名(如\"战利品\")")]
+            public string ChineseDisplayName = "数据名";
+            [LabelText("启用按类分组So")] 
+            public bool EnableEnglishGroupCodeName = false;
+            [LabelText("英文分组代码名(如\"GameCore\")"),ShowIf("EnableEnglishGroupCodeName")] 
+            public string EnglishGroupCodeName = "NewGroup";
+            [LabelText("中文分组显示名(如\"游戏核心类\")"),ShowIf("EnableEnglishGroupCodeName")]
+            public string ChineseGroupDisplayName = "新分组";
+
+            [LabelText("数据总父文件夹"), FolderPath]
+            public string folder = "Assets/Scripts/ESFramework/Data/DataToolScript";
+            
+            public override ESWindowPageBase ES_Refresh()
+            {
+                folder = ESGlobalEditorDefaultConfi.Instance.Path_NormalParent;
+                return base.ES_Refresh();
+            }
+
+            [Button("开始生成", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            public void GenerateData()
+            {
+
+                if (AssetDatabase.IsValidFolder(folder))
+                {
+                    var folderUse=folder;
+                    var chineseGroupPathName="常规SO";
+                    if (EnableEnglishGroupCodeName)
+                    {
+                        chineseGroupPathName=chineseGroupPathName+ChineseGroupDisplayName;
+                        ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folderUse, EnglishGroupCodeName, out folderUse);
+                    }
+                    if (AssetDatabase.IsValidFolder(folderUse))
+                    {
+                        string normalName = (EnglishCodeName + "SO")._ToValidIdentName();
+                        ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(folderUse, normalName, Attribute:
+                            $"[ESCreatePath({chineseGroupPathName._AsStringValue()}, \"{ChineseDisplayName}SO\")]", parent: ": ESSO");
+                        AssetDatabase.SaveAssets();
+                        AssetDatabase.Refresh();
+
+                    }
+                    else
+                    {
+                        ESDesignUtility.SafeEditor.Wrap_DisplayDialog("请选择正确的文件夹", $"默认使用【{ESGlobalEditorDefaultConfi.Instance.Path_NormalParent}】作为生成总路径哦", "知道了");
+                    }
+                }
+
+            }
+        }
+
+        
+         //创建数据包
         [Serializable]
         public class Page_CreateNewSoPackOrSearch : ESWindowPageBase
         {
@@ -991,12 +1057,12 @@ namespace ES
             }
             [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据")]
-            public string createTypeText = "--筛选数据组类型--";
+            public string createTypeText = "--筛选常规数据类型--";
 
 
-            [OnValueChanged("OnValueChanged_ResetConfigure"), InfoBox("建议选择一个预设类型的配置组,或者自己创建支持,默认类型无法直接使用", infoMessageType: InfoMessageType.Warning/*, VisibleIf = "@createGroup_==EvWindowDataAndTool.DataType.None"*/)]
+            [OnValueChanged("OnValueChanged_ResetConfigure"), InfoBox("建议选择一个预设类型的常规SO配置,或者自己创建支持,默认类型无法直接使用", infoMessageType: InfoMessageType.Warning/*, VisibleIf = "@createGroup_==EvWindowDataAndTool.DataType.None"*/)]
             [VerticalGroup("总组/数据"), Space(5), LabelText("预定义类型")]
-            [ValueDropdown("@ESSODataWindowHelper.GetNormalSONames()", AppendNextDrawer = false)]
+            [ValueDropdown("@ESGlobalEditorDefaultConfi.GetUseableNormalSoNames()", AppendNextDrawer = false)]
             public string createNormal_ = "";
 
             #region 按钮
@@ -1006,6 +1072,7 @@ namespace ES
             [Button(ButtonHeight = 30, Name = "新建一个"), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void CreateNormalSoAsset()
             {  
+                
                 Type targetType = ESSODataWindowHelper.GetNormalType(createNormal_);
                 if (TypeSelectorSettingForNormalSo(targetType))
                 {
@@ -1174,6 +1241,18 @@ namespace ES
                 ;
         }
         #endregion
+
+
+   #region 关于
+        //关于页面
+        [Serializable]
+        public class Page_Settings : ESWindowPageBase
+        {
+            [Title("ES核心编辑器配置"),InlineEditor(Expanded =true,DrawPreview =false,DrawHeader =false)]
+            public ScriptableObject scriptable;
+        }
+        #endregion
+
         #region 辅助
         //数据源和辅助工具
         [InitializeOnLoad]

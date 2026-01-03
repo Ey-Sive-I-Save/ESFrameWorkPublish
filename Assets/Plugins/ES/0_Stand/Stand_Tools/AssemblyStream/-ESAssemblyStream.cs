@@ -722,6 +722,7 @@ namespace ES
                   HotRuntime_ApplyThisAssemblyTimingRegisters(asm, i);
                     OneTiming_HotLoadAllAssemblesRegistedTypes(i);
                 }
+                 WaitHotLoadingAssembies.Dequeue();
             }
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
             private static void RuntimeInitLoad_111_BeforeSceneLoad()
@@ -999,7 +1000,7 @@ namespace ES
                 var handler_SubClassPart = HotHandler_AsSubclass.GetGroup(timing.GetHashCode());
                 while (WaitHotLoadingAssembies.Count > 0)
                 {
-                    var hotASM = WaitHotLoadingAssembies.Dequeue();
+                    var hotASM = WaitHotLoadingAssembies.Peek();
                     var asm = hotASM;
                     if (RuntimeTypes.TryGetValue(asm, out var types))
                     {

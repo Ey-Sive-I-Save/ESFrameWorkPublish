@@ -87,6 +87,13 @@ namespace ES
             OnNodeClicked?.Invoke(this);
         });
 
+         RegisterCallback<WheelEvent>(evt =>
+        {
+            ESTrackViewWindow.window.OnRightPanelWheel(evt);
+             evt.StopPropagation(); // 节点处理后停止传播
+        }, TrickleDown.TrickleDown);
+
+
         SetTimeScaleAndStartShow(100,0);
     }
     
@@ -95,7 +102,7 @@ namespace ES
         // 根据时间尺度和持续时间设置节点宽度
         var w= Duration * pixelsPerSecond;
         var left=(StartTime-ShowStart) * pixelsPerSecond;
-        Debug.Log("WW"+w+" LL"+left+" START "+ShowStart);
+       // Debug.Log("WW"+w+" LL"+left+" START "+ShowStart);
         style.width =w;
         style.left = left;
     }

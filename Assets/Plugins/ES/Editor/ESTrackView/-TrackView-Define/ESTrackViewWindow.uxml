@@ -4,10 +4,10 @@
         <ES.ESTrackTimerToolbar name="ESTrackTimerToolbar" style="background-color: rgba(0, 0, 0, 0.65);" />
         <ui:VisualElement class="normalBlock" style="flex-grow: 1; height: 10px; width: 100%; flex-direction: row; background-color: rgba(0, 0, 0, 0.42);" />
     </ui:VisualElement>
-    <ui:ScrollView horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="AlwaysVisible" style="flex-grow: 1; background-color: rgb(45, 35, 35); max-height: none;">
-        <ui:VisualElement name="DownPart" style="flex-grow: 1; flex-direction: row; min-height: 400px; min-width: 600px;">
-            <ui:VisualElement name="DownRightPart" focusable="true" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); width: 1000px; overflow: visible; visibility: visible; display: flex; position: absolute; left: 100px; height: 800px;">
-                <ES.ESTrackRuler name="ESTrackRuler" style="width: 100%; min-width: 100%; background-color: rgba(29, 29, 29, 0.6); height: 40px;" />
+    <ui:ScrollView horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="AlwaysVisible" name="ScrollView" style="flex-grow: 1; background-color: rgb(45, 35, 35); max-height: none;">
+        <ui:VisualElement name="DownPart" style="flex-grow: 1; flex-direction: row; min-height: 400px; min-width: 800px; max-width: 800px; width: 800px;">
+            <ui:VisualElement name="DownRightPart" focusable="true" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); width: 800px; overflow: visible; visibility: visible; display: flex; position: absolute; left: 100px; height: 800px; max-width: 800px; min-width: 800px;">
+                <ES.ESTrackRuler name="ESTrackRuler" style="width: 800px; min-width: 800px; background-color: rgba(29, 29, 29, 0.6); height: 40px; max-width: 800px;" />
                 <ui:VisualElement name="Nodes" style="flex-grow: 1;" />
                 <ui:VisualElement name="SeletionContent" style="flex-grow: 1; position: absolute; background-color: rgba(121, 121, 121, 0.83); width: 158px;" />
             </ui:VisualElement>

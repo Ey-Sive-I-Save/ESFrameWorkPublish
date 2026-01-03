@@ -23,8 +23,12 @@ namespace ES
     [FolderPath, LabelText("默认的DataGroup组父文件夹")]
     public string Path_GroupParent;
     [TabGroup("文件夹管理")]
+    [FolderPath, LabelText("默认的常规SO脚本父文件夹")]
+    public string Path_NormalScriptParent;
+    [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的常规SO父文件夹")]
     public string Path_NormalParent;
+
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的全局Global父文件夹")]
     public string Path_GlobalParent;
@@ -103,20 +107,17 @@ namespace ES
             listToRemove.Add(ESEditorSO.AllSoNames.GetKey(t));
           }
         }
-      }
-
-
-
-      if (ESGlobalEditorDefaultConfi.Instance.ExcludePackGroupInfo)
-      {
-        foreach (var s in list)
+         if (ESGlobalEditorDefaultConfi.Instance.ExcludePackGroupInfo)
         {
-          if (s.Contains("DataPack") || s.Contains("DataGroup") || s.Contains("DataInfo"))
+          if (typeof(ISoDataPack).IsAssignableFrom(t) ||
+              typeof(ISoDataGroup).IsAssignableFrom(t) ||
+              typeof(ISoDataInfo).IsAssignableFrom(t))
           {
-            listToRemove.Add(s);
+            listToRemove.Add(ESEditorSO.AllSoNames.GetKey(t));
           }
         }
-      }
+        }
+      
       foreach (var s in listToRemove)
       {
         list.Remove(s);

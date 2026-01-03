@@ -19,7 +19,9 @@ namespace ES
             {
                 TopRuler.style.left = 0;
                 TopRuler.style.top = 0;
-                TopRuler.style.width = 1000;
+                TopRuler.style.width = 800;
+                TopRuler.style.minWidth = 800;
+                TopRuler.style.maxWidth = 800;
                 TopRuler.style.height = 30;
                 Add(TopRuler);
 
@@ -38,7 +40,7 @@ namespace ES
         
         public float showStart =>ESTrackViewWindow.window.startScale*totalTime;
         public float showEnd =>ESTrackViewWindow.window.endScale*totalTime;
-        public float totalTime=10;
+        public float totalTime=>ESTrackViewWindow.totalTime;
         public static Dictionary<RulerLevel, float> LevelsPX = new Dictionary<RulerLevel, float>() {
 
             { RulerLevel._001, 1f/60f },
@@ -61,12 +63,39 @@ namespace ES
         private void DrawRulerOnlyPaint(MeshGenerationContext context)
         {
             if(ESTrackViewWindow.window==null)return;
-            Debug.Log("DRAWING");
+            //Debug.Log("DRAWING");
             var p = context.painter2D;
+            
+             AutoUpdateLevel();
             rec.Clear();
             for (int i = RulerLevel._500.GetHashCode(); i >= 0; i--)
             {
                 DrawLevel(i, p, context);
+            }
+        }
+
+        public void AutoUpdateLevel()
+        {
+            if (pxPerSecond >= 200)
+            {
+                LevelLow= RulerLevel._001;
+            }
+            else  if (pxPerSecond >= 100)
+            {
+                LevelLow= RulerLevel._005;
+            }
+           else  if (pxPerSecond >= 50)
+            {
+                LevelLow= RulerLevel._010;
+            }else  if (pxPerSecond >= 20)
+            {
+                LevelLow= RulerLevel._030;
+            }else  if (pxPerSecond >=10)
+            {
+                LevelLow= RulerLevel._100;
+            }else 
+            {
+                LevelLow= RulerLevel._500;
             }
         }
         #region  颜色
@@ -85,7 +114,7 @@ namespace ES
             int off = level - LevelLow.GetHashCode();
            
             float height = 10 + off * 5;
-            float FontSize = 3 + off * 2;
+            float FontSize = 4 + off * 3;
 
            
             if (off >= 0 && off <= MaxLevelGo)

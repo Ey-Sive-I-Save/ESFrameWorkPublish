@@ -1,8 +1,33 @@
-// using System;
-// using System.Collections;
-// using System.Collections.Generic;
-// using System.Reflection;
-// using UnityEngine;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Reflection;
+using UnityEngine;
+
+namespace ES
+{
+//    public class Mm_AutoAttribute : Attribute
+//     {
+//         public string Name; 
+//         public Mm_AutoAttribute(string name_)
+//         {
+//             Name=name_;
+//         }
+//     }
+
+//     public class Register_Mm_AutoAttribute : RuntimeRegister_FOR_ClassAttribute<Mm_AutoAttribute>
+//     {
+//         public override int LoadTiming => 2; 
+
+//         public override void Handle(Mm_AutoAttribute attribute, Type type)
+//         {
+//             string ss=attribute.Name;
+//             Type t=type;
+//         }
+//     }
+
+}
+// {
 // namespace ES
 // {
 //     //类特性

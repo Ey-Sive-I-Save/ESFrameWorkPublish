@@ -321,7 +321,7 @@ namespace ES
             
             public override ESWindowPageBase ES_Refresh()
             {
-                folder = ESGlobalEditorDefaultConfi.Instance.Path_NormalParent;
+                folder = ESGlobalEditorDefaultConfi.Instance.Path_NormalScriptParent;
                 return base.ES_Refresh();
             }
 
@@ -349,7 +349,7 @@ namespace ES
                     }
                     else
                     {
-                        ESDesignUtility.SafeEditor.Wrap_DisplayDialog("请选择正确的文件夹", $"默认使用【{ESGlobalEditorDefaultConfi.Instance.Path_NormalParent}】作为生成总路径哦", "知道了");
+                        ESDesignUtility.SafeEditor.Wrap_DisplayDialog("请选择正确的文件夹", $"默认使用【{ESGlobalEditorDefaultConfi.Instance.Path_NormalScriptParent}】作为生成总路径哦", "知道了");
                     }
                 }
 

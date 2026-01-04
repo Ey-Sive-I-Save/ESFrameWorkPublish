@@ -5,29 +5,25 @@ using Sirenix.OdinInspector;
 using UnityEngine;
  namespace ES{ 
      [ESCreatePath("数据信息", "技能数据信息")]
-     public class SKillDataInfo : SoDataInfo,EditorTrackSupport_GetSequence
+     public class SKillDataInfo : SoDataInfo,IEditorTrackSupport_GetSequence
      {
          [LabelText("标准技能序列")]
          public SkillTrackSequence sequence;
 
         public ITrackSequence Sequence => sequence;
+
+        public TrackItemType trackItemType => TrackItemType.Skill;
     }
-    public interface EditorTrackSupport_GetSequence
+    public interface IEditorTrackSupport_GetSequence
     {
         public ITrackSequence Sequence{get;}
+        public TrackItemType trackItemType{get;}
     }
     [Serializable]
-    public class SkillTrackSequence : ITrackSequence
+    public class SkillTrackSequence : TrackSequenceBase<SkillTrackItem>
     {
-        public List<SkillTrackItem> tracks =new();
-
-        public IEnumerable<ITrackItem> Tracks => tracks;
-
-        public List<Type> UseableTrackTypes =>new List<Type>();
-
-
         [Button("初始化")]
-        public void InitByEditor()
+        public override void InitByEditor()
         {
 #if UNITY_EDITOR
             if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("初始化技能轨道", "清除已经做出的修改并且重置为默认状态"))

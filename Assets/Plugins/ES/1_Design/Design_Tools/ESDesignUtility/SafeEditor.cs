@@ -474,7 +474,7 @@ namespace ES
                     return null;
                 }
                 T asset = ScriptableObject.CreateInstance<T>();
-                asset.name = assetName + (appendRandomIfNotChangedDefaultName && !hasCharge ? UnityEngine.Random.Range(0, 9999).ToString() : "");
+                asset.name = assetName._ToValidIdentName() + (appendRandomIfNotChangedDefaultName && !hasCharge ? UnityEngine.Random.Range(0, 9999).ToString() : "");
                 string path = $"{folderPath}/{asset.name}.asset";
 
                 AssetDatabase.CreateAsset(asset, path);
@@ -506,7 +506,7 @@ namespace ES
                     return null;
                 }
                 ScriptableObject asset = ScriptableObject.CreateInstance(type);
-                asset.name = assetName + (appendRandomIfNotChangedDefaultName && !hasCharge ? UnityEngine.Random.Range(0, 99999).ToString() : "");
+                asset.name = assetName._ToValidIdentName() + (appendRandomIfNotChangedDefaultName && !hasCharge ? UnityEngine.Random.Range(0, 99999).ToString() : "");
                 string path = $"{folderPath}/{asset.name}.asset";
 
                 AssetDatabase.CreateAsset(asset, path);

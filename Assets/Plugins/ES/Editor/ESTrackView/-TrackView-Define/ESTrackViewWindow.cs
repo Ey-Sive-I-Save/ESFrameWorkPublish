@@ -11,7 +11,8 @@ using VFolders.Libs;
 public class ESTrackViewWindow : OdinEditorWindow
 {
     public static ESTrackViewWindow window;
-    public static ITrackSequence Sequence;
+    public static ITrackSequence Sequence  { get{ if(TrackContainer != null) return TrackContainer.Sequence; return null; }}
+    public static IEditorTrackSupport_GetSequence TrackContainer;
 
     [SerializeField]
     private VisualTreeAsset m_VisualTreeAsset = default;
@@ -51,12 +52,12 @@ public class ESTrackViewWindow : OdinEditorWindow
     public float endScale = 1;
     public float pixelPerSecond = 100;
     public float showScale = 1;
-    public static float standPixelPerSecond => (ResolveWidth()) / (totalTime+0.5f);
+    public static float standPixelPerSecond => (ResolveWidth()) / (totalTime + 0.5f);
     public float StartShow => startScale * totalTime;
-    
-    public const float totalPixel=800;
-    public const float LeftTrackPixel=200;
-    public static float dynamicTargetTotalPixel { get{ return window.horSlider.resolvedStyle.width;}}
+
+    public const float totalPixel = 800;
+    public const float LeftTrackPixel = 200;
+    public static float dynamicTargetTotalPixel { get { return window.horSlider.resolvedStyle.width; } }
 
     public static float ResolveWidth()
     {
@@ -120,15 +121,16 @@ public class ESTrackViewWindow : OdinEditorWindow
     #endregion
 
     [MenuItem("Tools/ES工具/多轨编辑器")]
-    public static void ShowExample()
+    public static void OpenWindow()
     {
         window = GetWindow<ESTrackViewWindow>();
         window.titleContent = new GUIContent("轨道编辑器");
     }
-    public static void InitNewSequence()
+    public static void InitNewSequenceAndOpenWindow()
     {
-        ShowExample();
-        window = GetWindow<ESTrackViewWindow>();
+        OpenWindow();
+        //开始重建
+
 
     }
 
@@ -141,11 +143,51 @@ public class ESTrackViewWindow : OdinEditorWindow
         VisualElement labelFromUXML = m_VisualTreeAsset.Instantiate();
         root.Add(labelFromUXML);
 
+        FindTrackAssets();
+
         BindElements();
         BindNormalHandles();
         BindButtonsHandles();
+
+
+
+        root.schedule.Execute(() =>
+                  {
+                      HandleStartEndScale(startScale, endScale);
+                      ApplyStartEndToUISlider(startScale, endScale);
+                  }).StartingIn(100);
+
+
     }
 
+    private void FindTrackAssets()
+    {
+        var allAssets = ESDesignUtility.SafeEditor.FindAllSOAssets<IEditorTrackSupport_GetSequence>();
+        if (allAssets.Count > 0)
+        {
+            foreach (var a in allAssets)
+            {
+                if (a.Sequence != null)
+                {
+                   TryUpdateTrackSequence(a);
+                }
+            }
+        }
+    }
+
+
+    public static void TryUpdateTrackSequence(IEditorTrackSupport_GetSequence newSequenceContainer)
+    {
+        if (newSequenceContainer != TrackContainer)
+        {
+            TrackContainer = newSequenceContainer;
+            InitNewSequenceAndOpenWindow();
+        }
+        else
+        {
+            ESTrackViewWindow.OpenWindow();
+        }
+    }
     private void BindButtonsHandles()
     {
         CreatorToolBar.CreateButton.RegisterCallback<ClickEvent>(OnCreatorButtonClick);
@@ -189,7 +231,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     #region  水平缩放偏移
     void HorSliderChange(ChangeEvent<Vector2> change)
-    {
+    { //HandleStartEndScale(0, 1);
         HandleStartEndScale(change.newValue.x, change.newValue.y);
     }
     private void HandleStartEndScale(float start, float end)
@@ -210,7 +252,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         //  float verEnd = Mathf.Clamp(end, start, 1f);
         float verShowScale = 1 / Mathf.Clamp(Mathf.Abs(verStart - end), 0.1f, 10);
         verScroll.scrollOffset = new Vector2(0, end);
-//         Debug.Log( verScroll.scrollOffset+"   "+new Vector2(verStart, end)+"  "+new Vector2(start, end));
+        //         Debug.Log( verScroll.scrollOffset+"   "+new Vector2(verStart, end)+"  "+new Vector2(start, end));
         // pixelPerSecond = (standPixelPerSecond * showScale);
 
     }
@@ -266,7 +308,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         float nowEdge = Mathf.Clamp(Mathf.Abs(startScale - endScale), 0.1f, 10);
         var tryStart = startScale + zoomDelta * nowEdge;
         var tryEnd = endScale - zoomDelta * nowEdge;
-      //   Debug.Log("zoomDelta"+zoomDelta+"?"+evt.delta.y );
+        //   Debug.Log("zoomDelta"+zoomDelta+"?"+evt.delta.y );
         HandleStartEndScale(tryStart, tryEnd);
         ApplyStartEndToUISlider(tryStart, tryEnd);
     }
@@ -277,14 +319,14 @@ public class ESTrackViewWindow : OdinEditorWindow
         // 计算缩放中心（鼠标位置）
         Vector2 localMousePos = m_ContentContainer.WorldToLocal(evt.mousePosition);
         m_ZoomCenter = localMousePos;
-        
+
         // 计算缩放因子
-        float zoomDelta = (evt.delta.x> 0 ? -m_ZoomSensitivity : m_ZoomSensitivity) * 250;
+        float zoomDelta = (evt.delta.x > 0 ? -m_ZoomSensitivity : m_ZoomSensitivity) * 250;
         float nowEdge = Mathf.Clamp(Mathf.Abs(verScroll.scrollOffset.x - verScroll.scrollOffset.y), 0.1f, 10);
 
 
         // var tryStart = verScroll.scrollOffset.x + zoomDelta * nowEdge;
-        var tryEnd = verScroll.scrollOffset.y -zoomDelta;
+        var tryEnd = verScroll.scrollOffset.y - zoomDelta;
         //Debug.Log("zoomDelta"+zoomDelta+"?"+evt.delta.y +"" +evt.delta.x);
         HandleVerStartEndScaleAndApply(0, tryEnd);
         // ApplyStartEndToUISlider(tryStart, tryEnd);
@@ -583,8 +625,8 @@ public class ESTrackViewWindow : OdinEditorWindow
     #region  常规按钮
     private void OnCreatorButtonClick(ClickEvent click)
     {
-        if(click.button==1)
-        HandleCreatorOpeartion();
+        if (click.button == 1)
+            HandleCreatorOpeartion();
     }
 
     private void HandleCreatorOpeartion()
@@ -631,8 +673,12 @@ public class ESTrackViewWindow : OdinEditorWindow
     }
 }
 
+
 public class ESTrackViewWindowHelper : EditorInvoker_Level0
+
 {
+    public static Dictionary<TrackItemType, List<(string name, Type type)>> AllTrackItemTypes = new Dictionary<TrackItemType, List<(string name, Type type)>>();
+
     public override void InitInvoke()
     {
         Selection.selectionChanged += ForTrackWindowSelection;
@@ -640,17 +686,46 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
 
     private static void ForTrackWindowSelection()
     {
-        if (Selection.activeObject is EditorTrackSupport_GetSequence SupportSequence)
+        if (Selection.activeObject is IEditorTrackSupport_GetSequence SupportSequence)
         {
             var se = SupportSequence.Sequence;
             if (se != null)
             {
                 if (ESTrackViewWindow.Sequence != se)
                 {
-                    ESTrackViewWindow.Sequence = se;
-                    ESTrackViewWindow.InitNewSequence();
+                    ESTrackViewWindow.TryUpdateTrackSequence(SupportSequence);
                 }
             }
         }
     }
 }
+
+#region  编辑器注册器
+
+public class ESEditorTrackItemRegister : EditorRegister_FOR_ClassAttribute<CreateTrackItemAttribute>
+{
+    public override void Handle(CreateTrackItemAttribute attribute, Type type)
+    {
+        if (ESTrackViewWindowHelper.AllTrackItemTypes.TryGetValue(attribute.itemType, out var list))
+        {
+            list.Add((attribute.menuName, type));
+        }
+        else
+        {
+            ESTrackViewWindowHelper.AllTrackItemTypes.Add(attribute.itemType, new List<(string name, Type type)> { (attribute.menuName, type) });
+        }
+    }
+}
+
+
+#endregion
+
+
+
+
+
+
+
+
+
+

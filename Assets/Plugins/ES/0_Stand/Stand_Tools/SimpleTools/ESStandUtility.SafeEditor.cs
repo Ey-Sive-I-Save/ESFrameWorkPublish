@@ -324,7 +324,7 @@ namespace ES
             public static T CreateSOAsset<T>(string savePath, string name) where T : UnityEngine.ScriptableObject
             {
                 var ins = ScriptableObject.CreateInstance<T>();
-                ins.name = name;
+                ins.name = name._ToValidIdentName();
                 if (ins != null)
                 {
 #if UNITY_EDITOR
@@ -346,7 +346,7 @@ namespace ES
                     return null;
                 }
                 T asset = ScriptableObject.CreateInstance<T>();
-                asset.name = assetName + (appendRandomIfNotChangedDefaultName && !hasChange ? UnityEngine.Random.Range(0, 9999).ToString() : "");
+                asset.name = assetName._ToValidIdentName() + (appendRandomIfNotChangedDefaultName && !hasChange ? UnityEngine.Random.Range(0, 9999).ToString() : "");
                 string path = $"{folderPath}/{asset.name}.asset";
 
                 AssetDatabase.CreateAsset(asset, path);
@@ -368,7 +368,7 @@ namespace ES
                     return null;
                 }
                 ScriptableObject asset = ScriptableObject.CreateInstance(type);
-                asset.name = assetName + (appendRandomIfNotChangedDefaultName && !hasChange ? UnityEngine.Random.Range(0, 99999).ToString() : "");
+                asset.name = assetName._ToValidIdentName() + (appendRandomIfNotChangedDefaultName && !hasChange ? UnityEngine.Random.Range(0, 99999).ToString() : "");
                 string path = $"{folderPath}/{asset.name}.asset";
 
                 AssetDatabase.CreateAsset(asset, path);

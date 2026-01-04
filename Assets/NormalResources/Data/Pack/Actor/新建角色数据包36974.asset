@@ -38,7 +38,7 @@ MonoBehaviour:
     - Name: 
       Entry: 8
       Data: 
-    - Name: allInfos
+    - Name: Infos
       Entry: 7
       Data: 1|System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[ES.ActorDataInfo,
         ES_Logic]], mscorlib

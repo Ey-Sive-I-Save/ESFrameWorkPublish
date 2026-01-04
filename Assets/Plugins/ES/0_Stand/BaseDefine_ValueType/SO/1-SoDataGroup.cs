@@ -66,5 +66,92 @@ namespace ES
 
             }
         }
+    
+        
+        
+        public virtual IEnumerable<SoType> Query(Func<SoType, bool> predicate)
+        {
+            return Infos.Values.Where(predicate);
+        }
+        // 批量获取
+        public virtual List<SoType> GetInfosByKeys(IEnumerable<string> keys)
+        {
+            var result = new List<SoType>();
+            foreach (var key in keys)
+            {
+                if (Infos.TryGetValue(key, out var info))
+                {
+                    result.Add(info);
+                }
+            }
+            return result;
+        }
+        public virtual List<SoType> GetInfosByKeys(params string[] keys)
+        {
+            var result = new List<SoType>();
+            foreach (var key in keys)
+            {
+                if (Infos.TryGetValue(key, out var info))
+                {
+                    result.Add(info);
+                }
+            }
+            return result;
+        }
+        /// <summary>
+        /// 从当前数据组的字典中查找指定 Info 对象对应的 Key
+        /// </summary>
+        /// <param name="infos">要查找的 Info 对象列表</param>
+        /// <returns>在字典中找到的对应 Key 列表</returns>
+        public virtual List<string> GetKeysByInfos(IEnumerable<SoType> infos)
+        {
+            if (infos == null)
+                return new List<string>();
+
+            var result = new List<string>();
+
+            // 遍历字典，查找匹配的 Info
+            foreach (var info in infos)
+            {
+                if (info == null) continue;
+
+                foreach (var kvp in Infos)
+                {
+                    if (ReferenceEquals(kvp.Value, info))
+                    {
+                        result.Add(kvp.Key);
+                        break; // 找到后跳出内层循环
+                    }
+                }
+            }
+
+            return result;
+        }
+        public virtual List<string> GetKeysByInfos(params SoType[] infos)
+        {
+            if (infos == null)
+                return new List<string>();
+
+            var result = new List<string>();
+
+            // 遍历字典，查找匹配的 Info
+            foreach (var info in infos)
+            {
+                if (info == null) continue;
+
+                foreach (var kvp in Infos)
+                {
+                    if (ReferenceEquals(kvp.Value, info))
+                    {
+                        result.Add(kvp.Key);
+                        break; // 找到后跳出内层循环
+                    }
+                }
+            }
+
+            return result;
+        }
+
+    
     }
 }

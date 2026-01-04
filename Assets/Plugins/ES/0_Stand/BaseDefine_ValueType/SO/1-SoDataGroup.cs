@@ -17,6 +17,7 @@ namespace ES
         ISoDataInfo GetInfoByKey(string k);
         void _TryAddInfoToDic(string key, ScriptableObject o);
         List<string> AllKeys { get; }
+        IEnumerable<ISoDataInfo> AllInfos { get; }
         void _RemoveInfoFromDic(string s);
     }
     public abstract class SoDataGroup<SoType> : ESSO, ISoDataGroup where SoType : ScriptableObject, ISoDataInfo
@@ -26,6 +27,7 @@ namespace ES
         public Dictionary<string, SoType> Infos = new Dictionary<string, SoType>();
         public string FileName => name;
         public List<string> AllKeys => Infos.Keys.ToList();
+        public IEnumerable<ISoDataInfo> AllInfos => Infos.Values;//.Cast<ISoDataInfo>().ToList();
         public void _TryAddInfoToDic(string s, ScriptableObject o)
         {
             if (Infos.ContainsKey(s))

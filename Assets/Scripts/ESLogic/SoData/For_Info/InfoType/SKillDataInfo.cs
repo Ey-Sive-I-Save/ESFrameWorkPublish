@@ -37,7 +37,7 @@ using UnityEngine;
     public class SkillTrackItem : ITrackItem
     {
         public bool enabled=true;
-        public List<SkillClip> nodes=new List<SkillClip>();
+        public List<SkillTrackClip> nodes=new List<SkillTrackClip>();
           public bool Enabled { get =>enabled; set => enabled=value; }
 
         public IEnumerable<ITrackClip> Clips => nodes;
@@ -46,7 +46,7 @@ using UnityEngine;
 
     }
     [Serializable]
-    public class SkillClip : ITrackClip
+    public class SkillTrackClip : ITrackClip
     {
         public string name="节点";
         public float startTime=0;

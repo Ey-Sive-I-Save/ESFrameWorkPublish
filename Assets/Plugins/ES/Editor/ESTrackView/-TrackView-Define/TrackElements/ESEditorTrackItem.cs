@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -42,7 +43,7 @@ namespace ES
             {
             float fS=UnityEngine.Random.Range(0,1f)+i*2;
             float fE=UnityEngine.Random.Range(0,1.5f);
-            AddNode(fS.ToString("F2")+"-"+(fS+fE).ToString("F2"), fS, fE);
+             //AddNode(fS.ToString("F2")+"-"+(fS+fE).ToString("F2"), fS, fE);
             
             }
            
@@ -57,7 +58,8 @@ namespace ES
             CreateRightPanel();
             // 左侧面板 - 固定宽度，显示轨道信息
             CreateLeftPanel();
-
+            
+            BindClipsArea();
           
 
             // 分隔线
@@ -71,6 +73,18 @@ namespace ES
             }
             };
             Add(separator);
+        }
+
+        private void BindClipsArea()
+        {
+            m_TrackClipsContainer.RegisterCallback<ContextClickEvent>(evt =>
+            {   
+                if(evt.button== 1)
+                {
+                  //  Debug.Log("右键点击轨道节点区域");
+                }
+
+            });
         }
 
         private void CreateLeftPanel()
@@ -181,9 +195,12 @@ namespace ES
             m_TrackClipsContainer = new VisualElement
             {
                 name = "track-nodes-container",
+                focusable = true,
                 style =
             {
                   left = 100,
+                width=9999,
+                minWidth=9999,
                  position= Position.Absolute,
                 flexGrow = 1,
                 flexDirection = FlexDirection.Row,
@@ -192,6 +209,7 @@ namespace ES
                  //overflow=  Overflow.Hidden,
                 flexShrink = 0  ,       // ✅ 不允许收缩
                  flexBasis = 0,
+                 backgroundColor=   new StyleColor(new Color(0.1f, 0.1f, 0.1f, 1f))
             }
             };
             // 轨道节点容器 - 修改为相对定位

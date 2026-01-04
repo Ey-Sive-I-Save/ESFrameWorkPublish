@@ -130,6 +130,32 @@ public class ESTrackViewWindow : OdinEditorWindow
     {
         OpenWindow();
         //开始重建
+        var elements = ESTrackViewWindow.window.leftPanel.Children();
+
+        // 移除并销毁每个元素
+        foreach (var element in elements)
+        {
+            if (element == null) return;
+            if (element is ESEditorTrackItem item)
+            {
+                element.RemoveFromHierarchy();
+
+                // 3. 清除引用
+                element.userData = null;
+            }
+            // 2. 移除元素
+
+        }
+        window.Items.Clear();
+
+        if(Sequence!=null)
+        {
+            foreach (var t in Sequence.Tracks)
+            {
+                 ESTrackViewWindow.window.leftPanel.Add(new ESEditorTrackItem() { item = t });
+            }
+        }
+
 
 
     }
@@ -143,9 +169,10 @@ public class ESTrackViewWindow : OdinEditorWindow
         VisualElement labelFromUXML = m_VisualTreeAsset.Instantiate();
         root.Add(labelFromUXML);
 
-        FindTrackAssets();
+
 
         BindElements();
+        FindTrackAssets();
         BindNormalHandles();
         BindButtonsHandles();
 
@@ -170,6 +197,7 @@ public class ESTrackViewWindow : OdinEditorWindow
                 if (a.Sequence != null)
                 {
                     TryUpdateTrackSequence(a);
+                    break;
                 }
             }
         }
@@ -182,6 +210,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         {
             TrackContainer = newSequenceContainer;
             InitNewSequenceAndOpenWindow();
+
         }
         else
         {
@@ -531,7 +560,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         menu.ShowAsContext();
     }
-private void ShowMenu_CompleteAndAddTrack()
+    private void ShowMenu_CompleteAndAddTrack()
     {
         // 显示上下文菜单
         var menu = new GenericMenu();
@@ -548,7 +577,8 @@ private void ShowMenu_CompleteAndAddTrack()
         if (ESTrackViewWindow.TrackContainer != null && ESTrackViewWindow.Sequence != null)
         {
             var type = ESTrackViewWindow.TrackContainer.trackItemType;
-            if (ESTrackViewWindowHelper.AllTrackItemTypes.TryGetValue(type, out var values)){
+            if (ESTrackViewWindowHelper.AllTrackItemTypes.TryGetValue(type, out var values))
+            {
 
                 foreach (var i in values)
                 {
@@ -564,7 +594,7 @@ private void ShowMenu_CompleteAndAddTrack()
             }
         }
     }
-    
+
 
 
     #endregion
@@ -685,7 +715,7 @@ private void ShowMenu_CompleteAndAddTrack()
 
     private void HandleCreatorOpeartion()
     {
-         ShowMenu_CompleteAndAddTrack();
+        ShowMenu_CompleteAndAddTrack();
     }
 
 
@@ -731,10 +761,10 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
             }
         }
     }
-    
+
     public static void AddNewTrackItemToCurrentSequence(Type itemType)
     {
-        if (ESTrackViewWindow.Sequence != null&&ESTrackViewWindow.window!=null)
+        if (ESTrackViewWindow.Sequence != null && ESTrackViewWindow.window != null)
         {
             if (itemType != null && typeof(ITrackItem).IsAssignableFrom(itemType) && itemType.GetConstructor(Type.EmptyTypes) != null)
             {
@@ -743,7 +773,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
                 {
                     if (ESTrackViewWindow.Sequence.TryAddTrackItem(newItem))
                     {
-                        ESTrackViewWindow.window.leftPanel.Add(new ESEditorTrackItem(){ item=newItem });
+                        ESTrackViewWindow.window.leftPanel.Add(new ESEditorTrackItem() { item = newItem });
                         ESDesignUtility.SafeEditor.Wrap_SetDirty(ESTrackViewWindow.TrackContainer as UnityEngine.Object);
                     }
                 }
@@ -759,6 +789,7 @@ public class ESEditorTrackItemRegister : EditorRegister_FOR_ClassAttribute<Creat
 {
     public override void Handle(CreateTrackItemAttribute attribute, Type type)
     {
+        // Debug.Log("收集-"+attribute.menuName+"-"+type);
         if (ESTrackViewWindowHelper.AllTrackItemTypes.TryGetValue(attribute.itemType, out var list))
         {
             list.Add((attribute.menuName, type));

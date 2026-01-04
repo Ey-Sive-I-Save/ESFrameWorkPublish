@@ -187,6 +187,8 @@ namespace ES
                 var all = AssetDatabase.FindAssets("t:ScriptableObject");
                 foreach (var i in all)
                 {
+                   
+
                     GUID id = default; GUID.TryParse(i, out id);
                     Type type = AssetDatabase.GetMainAssetTypeFromGUID(id);
                     if (typeof(T).IsAssignableFrom(type))
@@ -200,6 +202,25 @@ namespace ES
                         else
                         {
                             continue;
+                        }
+
+                    }else if (typeof(ISoDataGroup).IsAssignableFrom(type))
+                    {
+                         string path = AssetDatabase.GUIDToAssetPath(id);
+                        UnityEngine.Object obG = AssetDatabase.LoadAssetAtPath(path, type);
+                        if (obG is ISoDataGroup g)
+                        {
+                            if (typeof(T).IsAssignableFrom(g.GetSOInfoType()))
+                            {
+                                foreach (var info in g.AllInfos)
+                                {
+                                    if(info is T t)
+                                    {
+                                        values.Add(t);
+                                    }
+                                }
+                            }
+                            
                         }
 
                     }

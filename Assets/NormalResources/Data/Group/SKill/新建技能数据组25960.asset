@@ -22,6 +22,20 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: "\u6570\u636E\u952E"
+  sequence:
+    tracks:
+    - enabled: 1
+      nodes: []
+    - enabled: 1
+      nodes: []
+    - enabled: 1
+      nodes: []
+    - enabled: 1
+      nodes: []
+    - enabled: 1
+      nodes: []
+    - enabled: 1
+      nodes: []
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

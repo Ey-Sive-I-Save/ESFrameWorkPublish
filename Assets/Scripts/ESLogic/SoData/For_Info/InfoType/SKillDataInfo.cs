@@ -37,16 +37,16 @@ using UnityEngine;
     public class SkillTrackItem : ITrackItem
     {
         public bool enabled=true;
-        public List<SkillNode> nodes=new List<SkillNode>();
+        public List<SkillClip> nodes=new List<SkillClip>();
           public bool Enabled { get =>enabled; set => enabled=value; }
 
-        public IEnumerable<ITrackNode> Nodes => nodes;
+        public IEnumerable<ITrackClip> Clips => nodes;
 
         public Color ItemBGColor {get=>Color.yellow._WithAlpha(0.6f);}
 
     }
     [Serializable]
-    public class SkillNode : ITrackNode
+    public class SkillClip : ITrackClip
     {
         public string name="节点";
         public float startTime=0;

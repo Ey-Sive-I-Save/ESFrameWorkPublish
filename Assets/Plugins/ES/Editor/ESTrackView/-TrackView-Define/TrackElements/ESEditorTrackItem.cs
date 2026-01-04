@@ -15,7 +15,7 @@ namespace ES
         private VisualElement m_Header;
         private VisualElement m_Icon;
         private Label m_TrackNameLabel;
-        private VisualElement m_TrackNodesContainer;
+        private VisualElement m_TrackClipsContainer;
 
 
         #region  运行时
@@ -29,7 +29,7 @@ namespace ES
         private Button m_DeleteButton;
         private Button m_CollapseButton;
 
-        public List<ESEditorTrackNode> TrackNodes = new List<ESEditorTrackNode>();
+        public List<ESEditorTrackClip> TrackClips = new List<ESEditorTrackClip>();
         public ESEditorTrackItem()
         {
             CreateUIStructure();
@@ -178,7 +178,7 @@ namespace ES
             }
             };
             // 轨道节点容器
-            m_TrackNodesContainer = new VisualElement
+            m_TrackClipsContainer = new VisualElement
             {
                 name = "track-nodes-container",
                 style =
@@ -195,7 +195,7 @@ namespace ES
             }
             };
             // 轨道节点容器 - 修改为相对定位
-            m_RightPanel.Add(m_TrackNodesContainer);
+            m_RightPanel.Add(m_TrackClipsContainer);
             Add(m_RightPanel);
         }
         private void UpdateTrackColor()
@@ -224,9 +224,9 @@ namespace ES
                 // m_TrackNodesContainer.SetEnabled(!m_IsLocked);
             }
         }
-        public ESEditorTrackNode AddNode(string name, float startTime, float duration, object data = null)
+        public ESEditorTrackClip AddNode(string name, float startTime, float duration, object data = null)
         {
-            var node = new ESEditorTrackNode(name, startTime, duration, data)
+            var node = new ESEditorTrackClip(name, startTime, duration, data)
             {
                 style =
             {
@@ -235,16 +235,16 @@ namespace ES
             }
             };
 
-            m_TrackNodesContainer.Add(node);
-            TrackNodes.Add(node);
+            m_TrackClipsContainer.Add(node);
+            TrackClips.Add(node);
 
             //  OnNodeAdded?.Invoke(this, node);
             return node;
         }
 
-        public void RemoveNode(ESEditorTrackNode node)
+        public void RemoveNode(ESEditorTrackClip node)
         {
-            if (TrackNodes.Remove(node))
+            if (TrackClips.Remove(node))
             {
                 node.RemoveFromHierarchy();
                 //  OnNodeRemoved?.Invoke(this, node);
@@ -253,14 +253,14 @@ namespace ES
 
         public void ClearNodes()
         {
-            m_TrackNodesContainer.Clear();
-            TrackNodes.Clear();
+            m_TrackClipsContainer.Clear();
+            TrackClips.Clear();
         }
 
         // 公共方法：时间轴相关
         public void SetTimeScaleAndStartShow(float pixelsPerSecond, float startShowTime)
         {
-            foreach (var node in TrackNodes)
+            foreach (var node in TrackClips)
             {
                 node.SetTimeScaleAndStartShow(pixelsPerSecond, startShowTime);
             }
@@ -268,7 +268,7 @@ namespace ES
 
         public void SetCurrentTime(float time)
         {
-            foreach (var node in TrackNodes)
+            foreach (var node in TrackClips)
             {
                 node.HighlightIfActive(time);
             }

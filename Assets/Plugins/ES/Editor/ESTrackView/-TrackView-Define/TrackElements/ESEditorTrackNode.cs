@@ -8,22 +8,22 @@ using UnityEngine;
 using UnityEngine.UIElements;
 namespace ES
 {
-   public class ESEditorTrackNode : VisualElement
+   public class ESEditorTrackClip : VisualElement
 {
-    public string NodeName { get; private set; }
+    public string ClipName { get; private set; }
     public float StartTime { get; private set; }
     public float Duration { get; private set; }
     public object UserData { get; set; }
     
-    private VisualElement m_NodeContent;
-    private Label m_NodeNameLabel;
+    private VisualElement m_ClipContent;
+    private Label m_ClipNameLabel;
     
-    public event Action<ESEditorTrackNode> OnNodeClicked;
-    public event Action<ESEditorTrackNode> OnNodeDragged;
+    public event Action<ESEditorTrackClip> OnClipClicked;
+    public event Action<ESEditorTrackClip> OnClipDragged;
     
-    public ESEditorTrackNode(string name, float startTime, float duration, object data = null)
+    public ESEditorTrackClip(string name, float startTime, float duration, object data = null)
     {
-        NodeName = name;
+        ClipName = name;
         StartTime = startTime;
         Duration = duration;
         UserData = data;
@@ -52,7 +52,7 @@ namespace ES
         
         
         // 创建内容
-        m_NodeContent = new VisualElement
+        m_ClipContent = new VisualElement
         {
             style =
             {
@@ -64,7 +64,7 @@ namespace ES
             }
         };
         
-        m_NodeNameLabel = new Label(name)
+        m_ClipNameLabel = new Label(name)
         {
             style =
             {
@@ -78,13 +78,13 @@ namespace ES
             }
         };
         
-        m_NodeContent.Add(m_NodeNameLabel);
-        Add(m_NodeContent);
+        m_ClipContent.Add(m_ClipNameLabel);
+        Add(m_ClipContent);
         
         // 注册事件
         RegisterCallback<ClickEvent>(evt =>
         {
-            OnNodeClicked?.Invoke(this);
+            OnClipClicked?.Invoke(this);
         });
 
          RegisterCallback<WheelEvent>(evt =>
@@ -107,7 +107,7 @@ namespace ES
         style.left = left;
     }
     
-    public void SetNodeColor(Color color)
+    public void SetClipColor(Color color)
     {
         style.backgroundColor = color;
         style.borderLeftColor = color * 0.7f;

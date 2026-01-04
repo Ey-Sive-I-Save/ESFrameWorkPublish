@@ -13,13 +13,6 @@
             </ui:VisualElement>
             <ui:VisualElement name="DownLeftPart" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.6); width: 100px; min-width: 100px; max-width: 100px; position: absolute;">
                 <ES.ESTrackCreatorToolbar name="ESTrackCreatorToolbar" class="normalBlock" style="height: 40px; width: 100%; background-color: rgba(28, 28, 28, 0.63); max-height: 40px;" />
-                <ES.ESEditorTrackItem />
-                <ES.ESEditorTrackItem />
-                <ES.ESEditorTrackItem />
-                <ES.ESEditorTrackItem />
-                <ES.ESEditorTrackItem />
-                <ES.ESEditorTrackItem />
-                <ES.ESEditorTrackItem />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement style="flex-grow: 1;" />

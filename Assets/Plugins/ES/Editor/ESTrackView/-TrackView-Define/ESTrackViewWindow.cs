@@ -11,7 +11,7 @@ using VFolders.Libs;
 public class ESTrackViewWindow : OdinEditorWindow
 {
     public static ESTrackViewWindow window;
-    public static ITrackSequence Sequence  { get{ if(TrackContainer != null) return TrackContainer.Sequence; return null; }}
+    public static ITrackSequence Sequence { get { if (TrackContainer != null) return TrackContainer.Sequence; return null; } }
     public static IEditorTrackSupport_GetSequence TrackContainer;
 
     [SerializeField]
@@ -169,7 +169,7 @@ public class ESTrackViewWindow : OdinEditorWindow
             {
                 if (a.Sequence != null)
                 {
-                   TryUpdateTrackSequence(a);
+                    TryUpdateTrackSequence(a);
                 }
             }
         }
@@ -190,9 +190,9 @@ public class ESTrackViewWindow : OdinEditorWindow
     }
     private void BindButtonsHandles()
     {
-        CreatorToolBar.CreateButton.RegisterCallback<ClickEvent>(OnCreatorButtonClick);
-        rightPanel.RegisterCallback<ClickEvent>(OnCreatorButtonClick);
-        leftPanel.RegisterCallback<ClickEvent>(OnCreatorButtonClick);
+        CreatorToolBar.CreateButton.RegisterCallback<ClickEvent>(OnCreatorButtonClickLeft);
+        rightPanel.RegisterCallback<ClickEvent>(OnCreatorButtonClickRight);
+        leftPanel.RegisterCallback<ClickEvent>(OnCreatorButtonClickRight);
     }
 
     private void BindElements()
@@ -225,7 +225,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         rightPanel.RegisterCallback<MouseLeaveEvent>(OnMouseLeave, TrickleDown.TrickleDown);
 
         // 4. 右键上下文菜单
-        rightPanel.RegisterCallback<ContextClickEvent>(OnContextClick, TrickleDown.TrickleDown);
+        rightPanel.RegisterCallback<ContextClickEvent>(OnContextClick_CompleteMenu, TrickleDown.TrickleDown);
 
     }
 
@@ -242,7 +242,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         pixelPerSecond = standPixelPerSecond * showScale;
         //Debug.Log("更新V2");
-        UpdateNodesPos();
+        UpdateClipsPos();
     }
 
     private void HandleVerStartEndScaleAndApply(float start, float end)
@@ -494,12 +494,12 @@ public class ESTrackViewWindow : OdinEditorWindow
         }
     }
 
-    private void OnContextClick(ContextClickEvent evt)
+    private void OnContextClick_CompleteMenu(ContextClickEvent evt)
     {
         // 显示上下文菜单
         var menu = new GenericMenu();
 
-        menu.AddItem(new GUIContent("重置视图"), false, () =>
+        menu.AddItem(new GUIContent("重新加载"), false, () =>
         {
             // ResetView();
         });
@@ -511,6 +511,8 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         menu.AddSeparator("");
 
+        AppendMenuItems_AddTrack(menu);
+
         menu.AddItem(new GUIContent("视图设置"), false, () =>
         {
             // ShowViewSettings();
@@ -518,6 +520,53 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         menu.ShowAsContext();
     }
+    private void ShowMenu_AddTrack()
+    {
+        // 显示上下文菜单
+        var menu = new GenericMenu();
+
+        AppendMenuItems_AddTrack(menu);
+
+        menu.AddSeparator("");
+
+        menu.ShowAsContext();
+    }
+private void ShowMenu_CompleteAndAddTrack()
+    {
+        // 显示上下文菜单
+        var menu = new GenericMenu();
+
+        AppendMenuItems_AddTrack(menu);
+
+        menu.AddSeparator("");
+
+        menu.ShowAsContext();
+    }
+
+    public void AppendMenuItems_AddTrack(GenericMenu GenericMenu)
+    {
+        if (ESTrackViewWindow.TrackContainer != null && ESTrackViewWindow.Sequence != null)
+        {
+            var type = ESTrackViewWindow.TrackContainer.trackItemType;
+            if (ESTrackViewWindowHelper.AllTrackItemTypes.TryGetValue(type, out var values)){
+
+                foreach (var i in values)
+                {
+                    if (i.type != null && typeof(ITrackItem).IsAssignableFrom(i.type) && i.type.GetConstructor(Type.EmptyTypes) != null)
+                    {
+                        GenericMenu.AddItem(new GUIContent(i.name), false, () =>
+                        {
+                            ESTrackViewWindowHelper.AddNewTrackItemToCurrentSequence(i.type);
+                        });
+                    }
+                }
+
+            }
+        }
+    }
+    
+
+
     #endregion
     #region 辅助方法
 
@@ -623,36 +672,20 @@ public class ESTrackViewWindow : OdinEditorWindow
     #endregion
 
     #region  常规按钮
-    private void OnCreatorButtonClick(ClickEvent click)
+    private void OnCreatorButtonClickRight(ClickEvent click)
     {
         if (click.button == 1)
             HandleCreatorOpeartion();
     }
+    private void OnCreatorButtonClickLeft(ClickEvent click)
+    {
+        if (click.button == 0)
+            ShowMenu_AddTrack();
+    }
 
     private void HandleCreatorOpeartion()
     {
-        var menu = new GenericMenu();
-
-        menu.AddDisabledItem(new GUIContent("总操作"), false);
-
-        menu.AddItem(new GUIContent("重置视图"), false, () =>
-        {
-            // ResetView();
-        });
-
-        menu.AddItem(new GUIContent("适合所有内容"), false, () =>
-        {
-            //  FitToContent();
-        });
-
-        menu.AddSeparator("");
-
-        menu.AddItem(new GUIContent("视图设置"), false, () =>
-        {
-            // ShowViewSettings();
-        });
-
-        menu.ShowAsContext();
+         ShowMenu_CompleteAndAddTrack();
     }
 
 
@@ -661,7 +694,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
 
 
-    private void UpdateNodesPos()
+    private void UpdateClipsPos()
     {
 
         ruler.TopRuler.MarkDirtyRepaint();
@@ -698,6 +731,26 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
             }
         }
     }
+    
+    public static void AddNewTrackItemToCurrentSequence(Type itemType)
+    {
+        if (ESTrackViewWindow.Sequence != null&&ESTrackViewWindow.window!=null)
+        {
+            if (itemType != null && typeof(ITrackItem).IsAssignableFrom(itemType) && itemType.GetConstructor(Type.EmptyTypes) != null)
+            {
+                var newItem = Activator.CreateInstance(itemType) as ITrackItem;
+                if (newItem != null)
+                {
+                    if (ESTrackViewWindow.Sequence.TryAddTrackItem(newItem))
+                    {
+                        ESTrackViewWindow.window.leftPanel.Add(new ESEditorTrackItem(){ item=newItem });
+                        ESDesignUtility.SafeEditor.Wrap_SetDirty(ESTrackViewWindow.TrackContainer as UnityEngine.Object);
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 #region  编辑器注册器

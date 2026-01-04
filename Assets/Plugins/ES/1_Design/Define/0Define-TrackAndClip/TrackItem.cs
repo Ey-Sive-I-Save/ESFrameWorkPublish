@@ -9,6 +9,8 @@ namespace ES
         public bool Enabled{get;set;}
         public IEnumerable<ITrackClip> Clips{get;}
         public Color ItemBGColor{get;}
+
+        public string DisplayName{get;set;}
     }
     //每类轨道的枚举
     public enum TrackItemType

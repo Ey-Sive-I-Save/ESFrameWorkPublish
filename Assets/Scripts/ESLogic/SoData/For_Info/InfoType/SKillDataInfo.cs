@@ -42,8 +42,11 @@ using UnityEngine;
 
         public IEnumerable<ITrackClip> Clips => nodes;
 
-        public Color ItemBGColor {get=>Color.yellow._WithAlpha(0.6f);}
-
+        public virtual Color ItemBGColor {get=>Color.yellow._WithAlpha(0.25f);}
+         
+        public string DisplayName { get { if(displayName==""){return this.GetType()._GetTypeDisplayName();} return displayName;}
+          set { displayName=value;} } 
+        public string displayName="";
     }
     [Serializable]
     public class SkillTrackClip : ITrackClip

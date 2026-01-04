@@ -24,18 +24,17 @@ MonoBehaviour:
   KeyName: "\u6570\u636E\u952E"
   sequence:
     tracks:
-    - enabled: 1
-      nodes: []
-    - enabled: 1
-      nodes: []
-    - enabled: 1
-      nodes: []
-    - enabled: 1
-      nodes: []
-    - enabled: 1
-      nodes: []
-    - enabled: 1
-      nodes: []
+    - rid: 5686404859706212352
+  references:
+    version: 2
+    RefIds:
+    - rid: 5686404859706212352
+      type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        nodes: []
+        displayName: 
+        AnimationIM: "\u8FD9\u662F\u4E00\u4E2A\u52A8\u753B\u8F68\u9053"
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

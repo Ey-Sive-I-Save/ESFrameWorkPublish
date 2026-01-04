@@ -25,9 +25,13 @@ MonoBehaviour:
   Path_SoInfoParent: Assets/Scripts/ESLogic/SoData/For_Info
   Path_PackParent: Assets/NormalResources/Data/Pack
   Path_GroupParent: Assets/NormalResources/Data/Group
+  Path_NormalScriptParent: Assets/Scripts/ESLogic/SoData/Normal
   Path_NormalParent: Assets/NormalResources/Data/Normal
   Path_GlobalParent: 
   ExcludePackGroupInfo: 1
+  ExcludeWindow: 1
+  ExcludeNodeRunner: 1
+  ExcludeGlobal: 1
   ExcludeNameList:
   - ESGraphViewWindow
   - ESTrackViewWindow

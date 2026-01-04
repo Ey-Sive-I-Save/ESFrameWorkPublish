@@ -18,7 +18,7 @@ namespace ES
         void _TryAddInfoToDic(string key, ScriptableObject o);
         List<string> AllKeys { get; }
         IEnumerable<ISoDataInfo> AllInfos { get; }
-        void _RemoveInfoFromDic(string s);
+        void _RemoveInfoFromDic(string s); 
     }
     public abstract class SoDataGroup<SoType> : ESSO, ISoDataGroup where SoType : ScriptableObject, ISoDataInfo
     {

@@ -16,6 +16,7 @@ namespace ES
 
   public abstract class TrackSequenceBase<ItemType> : ITrackSequence where ItemType : class, ITrackItem
   {
+    [SerializeReference]
     public List<ItemType> tracks = new();
 
     public IEnumerable<ITrackItem> Tracks => tracks;
@@ -26,6 +27,7 @@ namespace ES
       {
         if (!tracks.Contains(tItem))
         {
+          Debug.Log("添加轨道项："+item.GetType()+item.DisplayName);
           tracks.Add(tItem);
           return true;
         }

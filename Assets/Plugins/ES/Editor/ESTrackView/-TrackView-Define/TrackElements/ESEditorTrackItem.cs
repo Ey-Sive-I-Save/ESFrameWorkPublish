@@ -34,33 +34,41 @@ namespace ES
         public ESEditorTrackItem()
         {
             CreateUIStructure();
-
             // 应用初始状态
-            UpdateTrackColor();
             UpdateMuteButton();
             UpdateLockButton();
-            for(int i = 0; i < 4; i++)
-            {
-            float fS=UnityEngine.Random.Range(0,1f)+i*2;
-            float fE=UnityEngine.Random.Range(0,1.5f);
-             //AddNode(fS.ToString("F2")+"-"+(fS+fE).ToString("F2"), fS, fE);
-            
-            }
-           
+
+
         }
+
+        public ESEditorTrackItem InitWithItem(ITrackItem trackItem)
+        {
+            item = trackItem;
+
+            UpdateTrackMessage();
+            UpdateTrackColor();
+            Debug.Log("初始化轨道项：" + item.GetType() + item.DisplayName);
+            return this;
+        }
+
+        private void UpdateTrackMessage()
+        {
+            m_TrackNameLabel.text = item.DisplayName;
+        }
+
         private void CreateUIStructure()
         {
             // 整个轨道项采用水平布局
             style.flexDirection = FlexDirection.Row;
             style.flexShrink = 0;
 
-  // 右侧面板 - 可扩展，显示轨道节点
+            // 右侧面板 - 可扩展，显示轨道节点
             CreateRightPanel();
             // 左侧面板 - 固定宽度，显示轨道信息
             CreateLeftPanel();
-            
+
             BindClipsArea();
-          
+
 
             // 分隔线
             var separator = new VisualElement
@@ -78,13 +86,21 @@ namespace ES
         private void BindClipsArea()
         {
             m_TrackClipsContainer.RegisterCallback<ContextClickEvent>(evt =>
-            {   
-                if(evt.button== 1)
+            {
+                if (evt.button == 1)
                 {
-                  //  Debug.Log("右键点击轨道节点区域");
+                    //  Debug.Log("右键点击轨道节点区域");
+                    ESTrackViewWindow.window.ShowMenu_SelectTrackAndAddTrack(this);
                 }
 
             });
+
+            m_TrackClipsContainer.RegisterCallback<WheelEvent>(evt =>
+            {
+                ESTrackViewWindow.window.OnRightPanelWheel(evt);
+                evt.StopPropagation(); // 节点处理后停止传播
+            }, TrickleDown.TrickleDown);
+
         }
 
         private void CreateLeftPanel()
@@ -96,9 +112,9 @@ namespace ES
             {
                  position= Position.Absolute,
                  left=0,
-                width = 100,
-                minWidth = 100,
-                maxWidth = 100,
+                width =  ESTrackViewWindow.LeftTrackPixel,
+                minWidth = ESTrackViewWindow.LeftTrackPixel,
+                maxWidth = ESTrackViewWindow.LeftTrackPixel,
                 flexDirection = FlexDirection.Column,
                 paddingTop = 4,
                 paddingBottom = 4,
@@ -184,7 +200,7 @@ namespace ES
                 name = "track-right-panel",
                 style =
             {
-                
+
                 flexGrow = 1,
                 flexDirection = FlexDirection.Column,
                 backgroundColor = new StyleColor(new Color(0.12f, 0.12f, 0.12f, 1f)),
@@ -198,7 +214,7 @@ namespace ES
                 focusable = true,
                 style =
             {
-                  left = 100,
+                  left =  ESTrackViewWindow.LeftTrackPixel,
                 width=9999,
                 minWidth=9999,
                  position= Position.Absolute,
@@ -209,7 +225,6 @@ namespace ES
                  //overflow=  Overflow.Hidden,
                 flexShrink = 0  ,       // ✅ 不允许收缩
                  flexBasis = 0,
-                 backgroundColor=   new StyleColor(new Color(0.1f, 0.1f, 0.1f, 1f))
             }
             };
             // 轨道节点容器 - 修改为相对定位
@@ -221,6 +236,10 @@ namespace ES
             if (m_Icon != null)
             {
                 m_Icon.style.backgroundColor = Color.white;
+            }
+            if (m_TrackClipsContainer != null)
+            {
+                m_TrackClipsContainer.style.backgroundColor = item.ItemBGColor;
             }
 
 

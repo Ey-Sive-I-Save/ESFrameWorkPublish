@@ -6,16 +6,16 @@
     </ui:VisualElement>
     <ui:ScrollView horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="AlwaysVisible" name="ScrollView" style="flex-grow: 1; background-color: rgb(45, 35, 35); max-height: none;">
         <ui:VisualElement name="DownPart" style="flex-grow: 1; flex-direction: row; min-height: 400px; min-width: 800px; max-width: 800px; width: 800px;">
-            <ui:VisualElement name="DownRightPart" focusable="true" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); width: 800px; overflow: visible; visibility: visible; display: flex; position: absolute; left: 100px; height: 800px; max-width: 800px; min-width: 800px;">
+            <ui:VisualElement name="DownRightPart" focusable="true" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); width: 800px; overflow: visible; visibility: visible; display: flex; position: absolute; left: 200px; height: 800px; max-width: 800px; min-width: 800px;">
                 <ES.ESTrackRuler name="ESTrackRuler" style="width: 800px; min-width: 800px; background-color: rgba(29, 29, 29, 0.6); height: 40px; max-width: 800px;" />
                 <ui:VisualElement name="Nodes" style="flex-grow: 1;" />
                 <ui:VisualElement name="SeletionContent" style="flex-grow: 1; position: absolute; background-color: rgba(121, 121, 121, 0.83); width: 158px;" />
             </ui:VisualElement>
-            <ui:VisualElement name="DownLeftPart" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.6); width: 100px; min-width: 100px; max-width: 100px; position: absolute;">
+            <ui:VisualElement name="DownLeftPart" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0.6); width: 200px; min-width: 200px; max-width: 200px; position: absolute;">
                 <ES.ESTrackCreatorToolbar name="ESTrackCreatorToolbar" class="normalBlock" style="height: 40px; width: 100%; background-color: rgba(28, 28, 28, 0.63); max-height: 40px;" />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement style="flex-grow: 1;" />
     </ui:ScrollView>
-    <ui:MinMaxSlider min-value="0" max-value="1" low-limit="0" high-limit="1" name="HorSlider" style="transform-origin: left bottom; left: 100px; top: auto; position: absolute; bottom: 0; width: auto; height: 25px; margin-right: 0; padding-right: 0; padding-left: 25px; right: 15px;" />
+    <ui:MinMaxSlider min-value="0" max-value="1" low-limit="0" high-limit="1" name="HorSlider" style="transform-origin: left bottom; left: 200px; top: auto; position: absolute; bottom: 0; width: auto; height: 25px; margin-right: 0; padding-right: 0; padding-left: 25px; right: 15px;" />
 </ui:UXML>

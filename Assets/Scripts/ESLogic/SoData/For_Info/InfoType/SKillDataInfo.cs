@@ -20,7 +20,7 @@ using UnityEngine;
         public TrackItemType trackItemType{get;}
     }
     [Serializable]
-    public class SkillTrackSequence : TrackSequenceBase<SkillTrackItem>
+    public class SkillTrackSequence : TrackSequenceBase<ISkillTrackItem>
     {
         [Button("初始化")]
         public override void InitByEditor()
@@ -28,37 +28,33 @@ using UnityEngine;
 #if UNITY_EDITOR
             if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("初始化技能轨道", "清除已经做出的修改并且重置为默认状态"))
             {
-                tracks.Clear();
+                tracks_.Clear();
             }
             #endif
         }
     }
-    [Serializable]
-    public class SkillTrackItem : ITrackItem
+
+    public interface ISkillTrackItem : ITrackItem
     {
-        public bool enabled=true;
-        public List<SkillTrackClip> nodes=new List<SkillTrackClip>();
-          public bool Enabled { get =>enabled; set => enabled=value; }
 
-        public IEnumerable<ITrackClip> Clips => nodes;
-
-        public virtual Color ItemBGColor {get=>Color.yellow._WithAlpha(0.25f);}
-         
-        public string DisplayName { get { if(displayName==""){return this.GetType()._GetTypeDisplayName();} return displayName;}
-          set { displayName=value;} } 
-        public string displayName="";
     }
+    
     [Serializable]
-    public class SkillTrackClip : ITrackClip
+    public class SkillTrackItem<SkillTrackClipT> : TrackItemBase<SkillTrackClipT>,ISkillTrackItem where SkillTrackClipT : SkillTrackClip
     {
-        public string name="节点";
-        public float startTime=0;
-        public float durationTime=1;
+       
+    }
+    
+    [Serializable,ESCreatePath("轨道项","技能标准轨道")]
+    public class SkillTrackItemStand : SkillTrackItem<SkillTrackClip>
+    {
+         
+    }
 
-        public string Name { get => name; set => name=value; }
-        public float StartTime { get => startTime; set => startTime=value; }
-        public float DurationTime { get => durationTime; set =>  durationTime=value; }
-
+    [Serializable]
+    public class SkillTrackClip : TrackClipBase
+    {
+       
     }
     }
 

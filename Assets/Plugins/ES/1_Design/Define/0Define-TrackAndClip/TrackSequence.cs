@@ -17,18 +17,18 @@ namespace ES
   public abstract class TrackSequenceBase<ItemType> : ITrackSequence where ItemType : class, ITrackItem
   {
     [SerializeReference]
-    public List<ItemType> tracks = new();
+    public List<ItemType> tracks_ = new();
 
-    public IEnumerable<ITrackItem> Tracks => tracks;
+    public IEnumerable<ITrackItem> Tracks => tracks_;
 
     public bool TryAddTrackItem(ITrackItem item)
     {
       if (item is ItemType tItem)
       {
-        if (!tracks.Contains(tItem))
+        if (!tracks_.Contains(tItem))
         {
           Debug.Log("添加轨道项："+item.GetType()+item.DisplayName);
-          tracks.Add(tItem);
+          tracks_.Add(tItem);
           return true;
         }
       }
@@ -39,9 +39,9 @@ namespace ES
     {
       if (item is ItemType tItem)
       {
-        if (tracks.Contains(tItem))
+        if (tracks_.Contains(tItem))
         {
-          tracks.Remove(tItem);
+          tracks_.Remove(tItem);
           return true;
         }
       }

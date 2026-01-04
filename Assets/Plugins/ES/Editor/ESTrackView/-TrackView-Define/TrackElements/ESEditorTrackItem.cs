@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -30,6 +31,8 @@ namespace ES
         private Button m_DeleteButton;
         private Button m_CollapseButton;
 
+        public Vector2 recordLocalClipsMousePos;
+
         public List<ESEditorTrackClip> TrackClips = new List<ESEditorTrackClip>();
         public ESEditorTrackItem()
         {
@@ -47,7 +50,8 @@ namespace ES
 
             UpdateTrackMessage();
             UpdateTrackColor();
-            Debug.Log("初始化轨道项：" + item.GetType() + item.DisplayName);
+            UpdateNodeMatch(true);
+            //Debug.Log("初始化轨道项：" + item.GetType() + item.DisplayName);
             return this;
         }
 
@@ -89,6 +93,7 @@ namespace ES
             {
                 if (evt.button == 1)
                 {
+                    recordLocalClipsMousePos = evt.localMousePosition;
                     //  Debug.Log("右键点击轨道节点区域");
                     ESTrackViewWindow.window.ShowMenu_SelectTrackAndAddTrack(this);
                 }
@@ -261,9 +266,9 @@ namespace ES
                 // m_TrackNodesContainer.SetEnabled(!m_IsLocked);
             }
         }
-        public ESEditorTrackClip AddNode(string name, float startTime, float duration, object data = null)
+        public ESEditorTrackClip AddClipTEST(string name, float startTime, float duration, object data = null)
         {
-            var node = new ESEditorTrackClip(name, startTime, duration, data)
+            var node = new ESEditorTrackClip(null, name, startTime, duration, data)
             {
                 style =
             {
@@ -279,16 +284,54 @@ namespace ES
             return node;
         }
 
-        public void RemoveNode(ESEditorTrackClip node)
+
+
+        public ESEditorTrackClip AddClip(ITrackClip clip, bool onlyUpdate = true)
         {
-            if (TrackClips.Remove(node))
+            if (clip == null)
             {
-                node.RemoveFromHierarchy();
+                Debug.LogError("尝试添加空的轨道片段");
+                return null;
+            }
+            //如果只是 Update 的话 就可以直接加  如果 是新建的话 就需要新加入
+            if (onlyUpdate || item.TryAddTrackClip(clip))
+            {
+                return CreateNewEditorClipByNormalClip(clip);
+            }
+
+            return null;
+
+            //  OnNodeAdded?.Invoke(this, node);
+
+        }
+        private ESEditorTrackClip CreateNewEditorClipByNormalClip(ITrackClip clip)
+        {
+            var clipEditor = new ESEditorTrackClip(clip, clip.DisplayName, clip.StartTime, clip.DurationTime, clip)
+            {
+                style =
+            {
+                marginLeft = 2,
+                marginRight = 2
+            }
+            };
+
+            m_TrackClipsContainer.Add(clipEditor);
+            TrackClips.Add(clipEditor);
+            return clipEditor;
+        }
+        public void RemoveClip(ESEditorTrackClip clip)
+        {
+            TrackClips.Remove(clip);
+
+            if (clip != null)
+            {
+                clip.RemoveFromHierarchy();
                 //  OnNodeRemoved?.Invoke(this, node);
+                item.TryRemoveTrackClip(clip.trackClip);
             }
         }
 
-        public void ClearNodes()
+        public void ClearClips()
         {
             m_TrackClipsContainer.Clear();
             TrackClips.Clear();
@@ -324,6 +367,33 @@ namespace ES
         internal void UpdateNodesPos()
         {
             SetTimeScaleAndStartShow(ESTrackViewWindow.window.pixelPerSecond, ESTrackViewWindow.window.StartShow);
+        }
+
+        public void UpdateNodeMatch(bool update = true)
+        {
+            var listEditorNow = this.TrackClips.ToList();
+            foreach (var clip in item.Clips)
+            {
+                var matchNode = listEditorNow.Find(n => n.trackClip == clip);
+                if (matchNode != null)
+                {
+                    //好啊 
+                    listEditorNow.Remove(matchNode);
+                }
+                else
+                {
+                    // 添加新节点
+                    AddClip(clip, true);
+                }
+            }
+
+            foreach (var toRemove in listEditorNow)
+            {
+                // 移除多余节点
+                RemoveClip(toRemove);
+            }
+
+            UpdateNodesPos();
         }
     }
 

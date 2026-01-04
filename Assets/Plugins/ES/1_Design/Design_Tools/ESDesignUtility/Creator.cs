@@ -492,7 +492,7 @@ namespace ES
             {
                 public override void Handle(ESCreatePathAttribute attribute, Type type)
                 {
-                    Debug.Log("666");
+                    
                     CreatePaths.TryAddOrSet(attribute.GroupName,attribute.MyName,type);
                 }
             }

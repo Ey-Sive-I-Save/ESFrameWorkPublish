@@ -51,6 +51,12 @@ namespace ES {
     {
         public override bool Apply(UnityEngine.Object ob)
         {
+            Debug.Log(""+ob+ ob.GetType());
+            
+            if(ob.GetType().IsSubclassOf(typeof(VisualGUIDrawerSO)))
+            {
+                return false;
+            }
             string path = AssetDatabase.GetAssetPath(ob);
             if (!string.IsNullOrEmpty(path))
             {

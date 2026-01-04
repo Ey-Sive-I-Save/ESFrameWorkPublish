@@ -66,6 +66,9 @@ namespace ES
             var esM = type.GetCustomAttribute<ESMessageAttribute>();
             if (esM != null) return esM.message;
 
+            var createPath = type.GetCustomAttribute<ESCreatePathAttribute>();
+            if (createPath != null) return createPath.GroupName + "/" + createPath.MyName;
+
             return type.Name;
         }
     }

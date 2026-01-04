@@ -40,7 +40,7 @@ namespace ES
         
         public float showStart =>ESTrackViewWindow.window.startScale*totalTime;
         public float showEnd =>ESTrackViewWindow.window.endScale*totalTime;
-        public float totalTime=>ESTrackViewWindow.totalTime;
+        public float totalTime=>ESTrackViewWindow.TotalTime;
         public static Dictionary<RulerLevel, float> LevelsPX = new Dictionary<RulerLevel, float>() {
 
             { RulerLevel._001, 1f/60f },

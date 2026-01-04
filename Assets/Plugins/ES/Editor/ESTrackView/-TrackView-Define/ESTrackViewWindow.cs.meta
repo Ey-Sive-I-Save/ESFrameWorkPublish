@@ -4,8 +4,14 @@ MonoImporter:
   externalObjects: {}
   serializedVersion: 2
   defaultReferences:
+  - m_ViewDataDictionary: {instanceID: 0}
   - m_VisualTreeAsset: {fileID: 9197481963319205126, guid: 7e39b83fc36fbbf4db5f8624fbcfc0a4,
       type: 3}
+  - drawerSOForTrackItem: {fileID: 11400000, guid: 1c2dc85be0a55e04f8c5d9536c38c5e8,
+      type: 2}
+  - drawerSOForTrackClip: {fileID: 11400000, guid: f9e858a906d224e4d89a53172935e469,
+      type: 2}
+  - Last_EditorWindowForTrackItem: {instanceID: 0}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

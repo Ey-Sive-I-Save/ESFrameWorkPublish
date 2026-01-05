@@ -9,6 +9,12 @@ using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// 相比于KeyGroup , 键使用 SafeNormalList 进行存储和管理
+    /// 适用于高频更新场景
+    /// </summary>
+    /// <typeparam name="Key"></typeparam>
+    /// <typeparam name="Element"></typeparam>
     [Serializable,TypeRegistryItem("安全键组")]
     public  class SafeKeyGroup<Key, Element> : IKeyGroup<Key, Element> ,ISafe
     {

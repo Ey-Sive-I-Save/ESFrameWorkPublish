@@ -9,7 +9,8 @@ using UnityEngine;
 
 namespace ES
 {
-    /* 键-组 通常没有 遍历需求，就算有 也是低频事件式
+    /* 键-组 值为类型列表 
+    通常没有 遍历需求，就算有 也是低频事件式
      */
     [Serializable, TypeRegistryItem("键组")]
     public class KeyGroup<Key, Element> : IKeyGroup<Key, Element>

@@ -9,7 +9,10 @@ using UnityEngine;
  * 在这个基础上的线程安全列表，会加一个Thread  依赖Lock实现
    必须在每帧或者必要时，调用他的Update
 
-    SafeLoopUpdateList_EasyQueue_SeriNot_Dirty ->SafeList
+    SafeBasicList -> 基于 List缓冲完成
+    SafeNormalList -> 基于Queue+Dirty  机制完成
+    SafeThreadBasicList -> 基于 List缓冲+Lock 完成
+    SafeThreadNormalList -> 基于Queue+Dirty +Lock 机制完成
  */
 namespace ES
 {

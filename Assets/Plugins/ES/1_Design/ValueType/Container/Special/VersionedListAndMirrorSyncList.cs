@@ -10,7 +10,11 @@ using UnityEngine;
 namespace ES
 {
     #region 定义VersionedList
-    //版本化的列表
+    /// <summary>
+    /// 版本化的列表
+    /// 主线和同步镜像，使用这个列表可以进行慢加载的版本化管理
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     [Serializable, TypeRegistryItem("版本化列表")]
     public class VersionedList<T>
     {

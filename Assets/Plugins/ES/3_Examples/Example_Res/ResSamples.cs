@@ -1,5 +1,6 @@
 using ES;
 using Sirenix.OdinInspector;
+using Sirenix.Serialization;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -8,8 +9,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 namespace ES
-{
-    [Serializable]
+{ 
+    [Serializable]   
     public class QuestCore : IReceiveChannelLink_Context_Int
     {
         public ContextPool BindingPool;
@@ -82,7 +83,8 @@ namespace ES
     }
 
     public class ResSamples : SerializedMonoBehaviour
-    {
+    {   
+        public BidirectionalDictionary<string, int> bidirectionalDictionary1;
         public ContextPool pool;
         public QuestCore QuestCore;
         public List<Text> texts = new List<Text>();

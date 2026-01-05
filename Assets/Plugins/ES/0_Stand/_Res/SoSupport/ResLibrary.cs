@@ -20,7 +20,6 @@ namespace ES
         public bool IsNet = true;
         [LabelText("描述")]
         public string Desc = "";
-        public List<string> aaa = new List<string>();
     }
     [Serializable]
     public class ResBook : Book<ResPage>
@@ -45,7 +44,7 @@ namespace ES
         private List<string> paths = new List<string>();
         public string GetSTR()
         {
-            return GetSTR();
+            return Name;
         }
 
         public void SetSTR(string str)

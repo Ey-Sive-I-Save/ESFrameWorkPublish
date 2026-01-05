@@ -3818,11 +3818,90 @@ PrefabInstance:
         type: 3}
       propertyPath: serializationData.Prefab
       value: 
-      objectReference: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
-        type: 3}
+      objectReference: {fileID: 0}
     - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
         type: 3}
       propertyPath: pool._InitValues.Array.size
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: bidirectionalDictionary.items.Array.size
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: bidirectionalDictionary1.seri_items.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: bidirectionalDictionary.items.Array.data[1].key
+      value: daa
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: bidirectionalDictionary.items.Array.data[2].key
+      value: sdas
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: serializationData.PrefabModifications.Array.size
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: bidirectionalDictionary.items.Array.data[1].value
+      value: 22
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: bidirectionalDictionary.items.Array.data[2].value
+      value: 33
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: serializationData.PrefabModifications.Array.data[0]
+      value: '"path":"bidirectionalDictionary1","value":{"$id":0,"$type":"ES.BidirectionalDictionary`2[[System.String,
+        mscorlib],[System.Int32, mscorlib]], ES_Stand","seri_items":{"$id":1,"$type":"System.Collections.Generic.List`1[[ES.BidirectionalDictionary`2+KeyValuePairInternal[[System.String,
+        mscorlib],[System.Int32, mscorlib]], ES_Stand]], mscorlib","$rlength":0,"$rcontent":[]}}'
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: serializationData.PrefabModifications.Array.data[1]
+      value: '"path":"bidirectionalDictionary1.seri_items","value":{"$id":0,"$type":"System.Collections.Generic.List`1[[ES.BidirectionalDictionary`2+KeyValuePairInternal[[System.String,
+        mscorlib],[System.Int32, mscorlib]], ES_Stand]], mscorlib","$rlength":0,"$rcontent":[]}'
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: serializationData.PrefabModifications.Array.data[2]
+      value: '"path":"bidirectionalDictionary1.seri_items.[0]","value":{"$id":0,"$type":"ES.BidirectionalDictionary`2+KeyValuePairInternal[[System.String,
+        mscorlib],[System.Int32, mscorlib]], ES_Stand","key":null,"value":0}'
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: serializationData.PrefabModifications.Array.data[3]
+      value: '"path":"bidirectionalDictionary1.seri_items.[0].key","value":null'
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: serializationData.PrefabModifications.Array.data[4]
+      value: '"path":"bidirectionalDictionary1.seri_items.[0].value","value":{"$id":0,"$type":"System.Int32,
+        mscorlib",0}'
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: bidirectionalDictionary1.seri_items.Array.data[1].key
+      value: wda
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: bidirectionalDictionary1.seri_items.Array.data[1].value
+      value: 25632
+      objectReference: {fileID: 0}
+    - target: {fileID: 8832104146333133071, guid: 6d9923328b703114385f5df1690618ba,
+        type: 3}
+      propertyPath: serializationData.PrefabModificationsReferencedUnityObjects.Array.size
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []

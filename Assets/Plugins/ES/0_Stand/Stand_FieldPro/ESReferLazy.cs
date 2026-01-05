@@ -124,7 +124,7 @@ namespace ES
                 var v = ValueSourceGetter?.Invoke();
                 if (v != _value)
                 {
-                    _SetDirtyInternal(_value =v );
+                    _SetDirtyInternal(_value = v);
                 }
                 lastUpdateTime = Time.time;
             }

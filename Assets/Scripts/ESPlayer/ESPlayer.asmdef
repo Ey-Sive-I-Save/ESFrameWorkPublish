@@ -1,0 +1,20 @@
+{
+    "name": "ESPlayer",
+    "rootNamespace": "",
+    "references": [
+        "GUID:dc8f60a3ad5a07d4787d9e672b052700",
+        "GUID:1764b38706c31e34885d5988a5436060",
+        "GUID:14fd0e2674c4b6144985a0522c97c44b",
+        "GUID:6055be8ebefd69e48b49212b09b47b2f",
+        "GUID:9e7c1cf928ca1334982d7e61737420ec"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

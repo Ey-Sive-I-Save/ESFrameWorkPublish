@@ -51,7 +51,7 @@ namespace ES
     "ES_Design","ES_Stand","Assembly-CSharp-Editor","Assembly-CSharp-Editor-firstpass","ES_Logic","Assembly-CSharp","Assembly-CSharp-firstpass","NewAssem"
     };
         private static List<string> RuntimeValidAssebliesName = new List<string>() {
-  "ES_Design","ES_Stand","Assembly-CSharp-Editor","Assembly-CSharp-Editor-firstpass","ES_Logic","Assembly-CSharp","Assembly-CSharp-firstpass","NewAssem"
+  "ES_Design","ES_Stand","Assembly-CSharp-Editor","Assembly-CSharp-Editor-firstpass","ES_Logic","Assembly-CSharp","Assembly-CSharp-firstpass","NewAssem","ESPlayer"
    
     };
 #if UNITY_EDITOR

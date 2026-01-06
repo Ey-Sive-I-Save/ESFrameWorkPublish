@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace ES
 {
+    
        //标准ES运行时逻辑持有者
     public interface IESRuntimeLogic : 
     IOpStoreKeyValueForOutputOpeation//满足委托任务

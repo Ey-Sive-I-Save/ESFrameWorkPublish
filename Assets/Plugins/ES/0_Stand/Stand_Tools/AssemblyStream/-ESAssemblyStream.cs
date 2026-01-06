@@ -617,7 +617,7 @@ namespace ES
             private static List<Assembly> ValidRuntimeAssembiles = new List<Assembly>(25);
             private static Dictionary<Assembly, Type[]> RuntimeTypes = new Dictionary<Assembly, Type[]>(25);
 
-            private static ES.KeyGroup<int, ESAS_RuntimeRegister_AB> InitRuntimeRegisters = new KeyGroup<int, ESAS_RuntimeRegister_AB>();
+            private static KeyGroup<int, ESAS_RuntimeRegister_AB> InitRuntimeRegisters = new KeyGroup<int, ESAS_RuntimeRegister_AB>();
             private static Queue<ESAS_RuntimeRegister_AB> HotRuntimeRegisters = new Queue<ESAS_RuntimeRegister_AB>(20);
             private static Queue<Assembly> WaitHotLoadingAssembies = new Queue<Assembly>(4);
             #region 支持的Define模板

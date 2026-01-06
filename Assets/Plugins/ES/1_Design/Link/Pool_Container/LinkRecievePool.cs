@@ -31,26 +31,26 @@ namespace ES
                     }
                     else if (irl != null) irl.OnLink(link);
                 }
-                else TryRemove(typeof(Link), null);
+                else Remove(typeof(Link), null);
             }
         }
         public void AddReceive<Link>(IReceiveLink<Link> e)
         {
-            TryAdd(typeof(Link), e);
+            Add(typeof(Link), e);
         }
         public void RemoveReceive<Link>(IReceiveLink<Link> e) 
         {
-            TryRemove(typeof(Link), e);
+            Remove(typeof(Link), e);
         }
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         public void AddReceive<Link>(Action<Link> e)
         {
-            TryAdd(typeof(Link), e.MakeReceive());
+            Add(typeof(Link), e.MakeReceive());
         }
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         public void RemoveReceive<Link>(Action<Link> e)
         {
-            TryRemove(typeof(Link), e.MakeReceive());
+            Remove(typeof(Link), e.MakeReceive());
         }
     }
 

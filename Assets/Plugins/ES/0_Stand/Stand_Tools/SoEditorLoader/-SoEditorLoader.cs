@@ -8,7 +8,7 @@ namespace ES
 {
     public class ESEditorSO
     {
-        public static TypeKeyGroup<ESSO> SOS = new TypeKeyGroup<ESSO>();
+        public static TypeMatchKeyGroup<ESSO> SOS = new TypeMatchKeyGroup<ESSO>();
         public static BidirectionalDictionary<string,Type> AllSoNames=new BidirectionalDictionary<string, Type>();
     }
 #if UNITY_EDITOR
@@ -43,7 +43,7 @@ namespace ES
             var keys = ESEditorSO.SOS.Groups.Keys;
             foreach (var i in keys)
             {
-                var group = ESEditorSO.SOS.GetGroup(i);
+                var group = ESEditorSO.SOS.GetGroupDirectly(i);
                 foreach (var g in group)
                 {
                     g.OnEditorApply();

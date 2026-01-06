@@ -2288,7 +2288,7 @@ MonoBehaviour:
       ValuesNow: []
       MayHasAddingElement: 1
   MessagevalueEntryDomain:
-    rid: -2
+    rid: 5686404887800446976
   AutoOpenAndCloseByEnableState: 1
   InitOpen: 0
   Refer_Rect:
@@ -2370,6 +2370,16 @@ MonoBehaviour:
         vector2From: {x: 0, y: 0}
         vector2: {x: -11.38, y: 0}
         isFrom: 0
+    - rid: 5686404887800446976
+      type: {class: ESUIMessagevalueEntryDomain, ns: ES, asm: ES_Logic}
+      data:
+        myCore: {fileID: 0}
+        MyModules:
+          ValuesNow: []
+          MayHasAddingElement: 1
+        RegisterMain:
+          rid: -2
+        EnableMainLink: 1
 --- !u!4 &1108918425
 Transform:
   m_ObjectHideFlags: 0

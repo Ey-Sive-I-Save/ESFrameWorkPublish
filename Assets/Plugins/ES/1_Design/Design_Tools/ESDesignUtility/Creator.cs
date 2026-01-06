@@ -493,7 +493,7 @@ namespace ES
                 public override void Handle(ESCreatePathAttribute attribute, Type type)
                 {
                     
-                    CreatePaths.TryAddOrSet(attribute.GroupName,attribute.MyName,type);
+                    CreatePaths.AddOrSet(attribute.GroupName,attribute.MyName,type);
                 }
             }
 

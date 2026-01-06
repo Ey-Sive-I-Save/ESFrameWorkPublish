@@ -57,7 +57,7 @@ namespace ES {
                 {
                     var newT = GetAndDecorateNewTween(on, from);
                     newT.SetAutoKill(false);
-                    on.CachingUITweens.TryAddOnly(uiTweenType, this, newT);
+                    on.CachingUITweens.Add(uiTweenType, this, newT);
                 }
                 else
                 {

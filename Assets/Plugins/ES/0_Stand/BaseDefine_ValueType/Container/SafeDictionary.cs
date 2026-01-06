@@ -59,7 +59,7 @@ namespace ES
                 if (TryGetValue(key, out var value))
                     return value;
 
-                var defaultValue = _defaultValueFactory();
+                var defaultValue = _defaultValueFactory != null ? _defaultValueFactory() : default;
                 if (_autoCreateOnAccess)
                     base[key] = defaultValue;
 
@@ -96,7 +96,7 @@ namespace ES
             if (TryGetValue(key, out var value))
                 return value;
 
-            var defaultValue = _defaultValueFactory();
+            var defaultValue = _defaultValueFactory != null ? _defaultValueFactory() : default;
             if (_autoCreateOnAccess)
                 base[key] = defaultValue;
 
@@ -120,10 +120,12 @@ namespace ES
 
         #region  设置行为
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetDefaultValueFactory(Func<TValue> factory)
         {
             _defaultValueFactory = factory ?? (() => default);
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetAutoCreateOnAccess(bool autoCreate)
         {
             _autoCreateOnAccess = autoCreate;

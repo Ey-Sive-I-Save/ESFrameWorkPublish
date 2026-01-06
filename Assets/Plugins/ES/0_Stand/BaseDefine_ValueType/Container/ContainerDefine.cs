@@ -37,12 +37,12 @@ namespace ES
     //键-组 Key分组 T为元素类型 (不一定安全)，因为很多没有更新需求
     public interface IKeyGroup<K, Element>
     {
-        public void TryAdd(K key, Element add);
+        public void Add(K key, Element add);
 
-        public void TryRemove(K key, Element remove);
+        public void Remove(K key, Element remove);
 
-        public void TryAddRange(K key, IEnumerable<Element> adds);
-        public void TryRemoveRange(K key, IEnumerable<Element> removes);
+        public void AddRange(K key, IEnumerable<Element> adds);
+        public void RemoveRange(K key, IEnumerable<Element> removes);
         public bool TryContains(K key, Element who);
         public IEnumerable<Element> GetGroupAsIEnumable(K key);
         public void ClearGroup(K key);
@@ -53,10 +53,10 @@ namespace ES
     //选择 键值对 就是带分类的键值对罢了
     public interface ISelectDic<Select, K, Element>
     {
-        public void TryAddOrSet(Select select, K key, Element add);
+        public void AddOrSet(Select select, K key, Element add);
 
-        public void TryRemove(Select select, K key);//移除只需要寻键
-        public void TryRemoveRange(Select select, IEnumerable<K> keys);
+        public void Remove(Select select, K key);//移除只需要寻键
+        public bool TryRemoveRange(Select select, IEnumerable<K> keys);
         public void ClearSelect(Select select);
         public void Clear();
     }

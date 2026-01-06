@@ -20,7 +20,7 @@ namespace ES
             if (!init_Editor)
             {
                 init_Editor = true;
-                ESEditorSO.SOS.TryAdd(this.GetType(), this);
+                ESEditorSO.SOS.Add(this.GetType(), this);
             }
 #endif
         }

@@ -18,7 +18,7 @@ namespace ES
         public static void Build_PrepareAnalyzeAssetsBundles()
         {
             //找到全部的库
-            var libs = ESEditorSO.SOS.GetGroup<ResLibrary>();
+            var libs = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
 
             //清空信息
             ESResMaster.ESResData_AssetKeys.AssetKeys.Clear();

@@ -15,17 +15,25 @@ namespace ES
     [Serializable, TypeRegistryItem("键组")]
     public class KeyGroup<Key, Element> : IKeyGroup<Key, Element>
     {
+        /// <summary>
+        /// 是否在访问不存在的键时自动加入字典
+        /// </summary>
+        public bool _autoCreateOnAccess = true;
+
+
         [SerializeReference]
         [LabelText(@"@ Editor_ShowDes ", icon: SdfIconType.ListColumnsReverse), GUIColor("Editor_ShowColor")]
         public Dictionary<Key, List<Element>> Groups = new Dictionary<Key, List<Element>>();
         public readonly static List<Element> NULL = new List<Element>();
+
+
         #region 编辑器专属
         public virtual string Editor_ShowDes => "键组";
         public virtual Color Editor_ShowColor => Color.yellow;
         #endregion
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAdd(Key k, Element e)
+        public void Add(Key k, Element e)
         {
 
             if (e == null) return;
@@ -39,7 +47,7 @@ namespace ES
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryRemove(Key k, Element e)
+        public void Remove(Key k, Element e)
         {
             if (Groups.TryGetValue(k, out var list))
             {
@@ -54,7 +62,7 @@ namespace ES
 
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAddRange(Key k, IEnumerable<Element> es)
+        public void AddRange(Key k, IEnumerable<Element> es)
         {
             if (es == null) return;
             if (Groups.TryGetValue(k, out var list))
@@ -67,7 +75,7 @@ namespace ES
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryRemoveRange(Key k, IEnumerable<Element> es)
+        public void RemoveRange(Key k, IEnumerable<Element> es)
         {
             if (es == null) return;
             if (Groups.TryGetValue(k, out var list))
@@ -90,14 +98,26 @@ namespace ES
             {
                 return list;
             }
+            if (_autoCreateOnAccess)
+            {
+                var newList = new List<Element>();
+                Groups.Add(key, newList);
+                return newList;
+            }
             return NULL;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public List<Element> GetGroup(Key key)
+        public List<Element> GetGroupDirectly(Key key)
         {
             if (Groups.TryGetValue(key, out var list))
             {
                 return list;
+            }
+            if (_autoCreateOnAccess)
+            {
+                var newList = new List<Element>();
+                Groups.Add(key, newList);
+                return newList;
             }
             return NULL;
         }
@@ -108,9 +128,9 @@ namespace ES
             {
                 var users = new List<T>();
                 var len = list.Count;
-                for(int i = 0; i < len; i++)
+                for (int i = 0; i < len; i++)
                 {
-                    if( list[i] is T t)
+                    if (list[i] is T t)
                     {
                         users.Add(t);
                     }
@@ -119,7 +139,7 @@ namespace ES
             }
             return null;
         }
-        
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryContains(Key key, Element who)
@@ -151,13 +171,13 @@ namespace ES
         {
             string s = "KeyGroup ：{  ";
             var keys = Groups.Keys;
-            foreach(var i in keys)
+            foreach (var i in keys)
             {
-                var group = GetGroup(i);
-                string onegroup = "Group : " + i +"\n{";
+                var group = GetGroupDirectly(i);
+                string onegroup = "Group : " + i + "\n{";
                 if (group != null)
                 {
-                    foreach(var item in group)
+                    foreach (var item in group)
                     {
                         onegroup += item.ToString();
                     }
@@ -165,33 +185,56 @@ namespace ES
                 onegroup += "}\n";
                 s += onegroup;
             }
-          return  s += "}";
+            return s += "}";
+        }
+        public void SetAutoCreateOnAccess(bool autoCreate)
+        {
+            _autoCreateOnAccess = autoCreate;
         }
     }
 
     [Serializable, TypeRegistryItem("类型键-组")]
-    public class TypeKeyGroup<Element> : KeyGroup<Type, Element>
+    public class TypeMatchKeyGroup<Element> : KeyGroup<Type, Element>
     {
+
+        public override string Editor_ShowDes => "类型匹配 键组";
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public List<T> GetGroup<T>()
+        public void Add<T>(T e) where T : Element
+        {
+            Add(typeof(T), e);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Remove<T>(T e) where T : Element
+        {
+            Remove(typeof(T), e);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public IEnumerable<Element> GetGroupAsIEnumable<T>() where T : Element
+        {
+            return base.GetGroupAsIEnumable(typeof(T));
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public List<T> GetNewGroupOfType<T>()
         {
             var listR = new List<T>(3);
             if (Groups.TryGetValue(typeof(T), out var list))
             {
                 int count = list.Count;
-                for(int i = 0; i < count; i++)
+                for (int i = 0; i < count; i++)
                 {
-                    if( list[i] is T t)
+                    if (list[i] is T t)
                     {
                         listR.Add(t);
                     }
-                    
                 }
                 return listR;
             }
             return null;
         }
+
     }
+
+
 
 }
 

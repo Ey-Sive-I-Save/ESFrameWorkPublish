@@ -24,7 +24,7 @@ namespace ES
             //USENODES
             var usenodes = ESNodeUtility.UseNodes;
             NodeEnvironment environment = ESGraphViewWindow.SContainer.environment;
-            var items = usenodes.GetGroup(environment);
+            var items = usenodes.GetGroupDirectly(environment);
             HashSet<string> groupNames = new HashSet<string>();
             
             foreach (var item in items)

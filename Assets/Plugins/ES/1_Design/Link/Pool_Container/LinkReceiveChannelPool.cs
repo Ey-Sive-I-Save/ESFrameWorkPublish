@@ -39,27 +39,27 @@ public class LinkReceiveChannelPool<Channel,Link>
     [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
     private void Internal_TryRemove(Channel channel, IReceiveChannelLink<Channel,Link> ir)
     {
-        CIRS.TryRemove(channel,ir);
+        CIRS.Remove(channel,ir);
     }
     [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
     public void AddReceive(Channel channel, IReceiveChannelLink<Channel,Link> e)
     {
-        CIRS.TryAdd(channel,e);
+        CIRS.Add(channel,e);
     }
     [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
     public void RemoveReceive(Channel channel, IReceiveChannelLink<Channel, Link> e)
     {
-        CIRS.TryRemove(channel,e);
+        CIRS.Remove(channel,e);
     }
 
     [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
     public void AddReceive(Channel channel, Action<Channel, Link> e)
     {
-        CIRS.TryAdd(channel, e.MakeReceive());
+        CIRS.Add(channel, e.MakeReceive());
     }
     [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
     public void RemoveReceive(Channel channel, Action<Channel, Link> e)
     {
-        CIRS.TryRemove(channel,e.MakeReceive());
+        CIRS.Remove(channel,e.MakeReceive());
     }
 }

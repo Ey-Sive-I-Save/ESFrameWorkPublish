@@ -9,11 +9,11 @@ namespace ES
         public override void Handle(CreateNodeRunnerSoMenuAttribute attribute, Type type)
         {
             var flags= ExtensionForEnum._GetEnumValues<NodeEnvironment>();
-            ESNodeUtility.UseNodes.TryAdd( NodeEnvironment.None, (attribute.Group, attribute.Name, type));
+            ESNodeUtility.UseNodes.Add( NodeEnvironment.None, (attribute.Group, attribute.Name, type));
             foreach (var i in flags)
             {
                 if(attribute.environment.HasFlag(i)&&i!= NodeEnvironment.None)
-                ESNodeUtility.UseNodes.TryAdd(i, (attribute.Group, attribute.Name, type));
+                ESNodeUtility.UseNodes.Add(i, (attribute.Group, attribute.Name, type));
             }
            
         }

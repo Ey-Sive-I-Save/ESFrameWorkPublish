@@ -15,9 +15,14 @@ namespace ES
     /// </summary>
     /// <typeparam name="Key"></typeparam>
     /// <typeparam name="Element"></typeparam>
-    [Serializable,TypeRegistryItem("安全键组")]
-    public  class SafeKeyGroup<Key, Element> : IKeyGroup<Key, Element> ,ISafe
+    [Serializable, TypeRegistryItem("安全键组")]
+    public class SafeKeyGroup<Key, Element> : IKeyGroup<Key, Element>, ISafe
     {
+        /// <summary>
+        /// 是否在访问不存在的键时自动加入字典
+        /// </summary>
+        public bool _autoCreateOnAccess = true;
+
         [SerializeReference]
         [LabelText(@"@ Editor_ShowDes ", icon: SdfIconType.ListColumnsReverse), GUIColor("Editor_ShowColor")]
         public Dictionary<Key, SafeNormalList<Element>> Groups = new Dictionary<Key, SafeNormalList<Element>>();
@@ -32,8 +37,8 @@ namespace ES
         public void SetAutoApplyBuffers(bool b) => AutoApplyBuffers = b;
         public void TryApplyBuffers()
         {
-            
-            foreach(var (i,k) in Groups)
+
+            foreach (var (i, k) in Groups)
             {
                 k.ApplyBuffers();
             }
@@ -49,7 +54,7 @@ namespace ES
             return list;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAdd(Key k, Element e)
+        public void Add(Key k, Element e)
         {
 
             if (e == null) return;
@@ -79,7 +84,7 @@ namespace ES
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryRemove(Key k, Element e)
+        public void Remove(Key k, Element e)
         {
             if (Groups.TryGetValue(k, out var list))
             {
@@ -94,7 +99,7 @@ namespace ES
 
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAddRange(Key k, IEnumerable<Element> es)
+        public void AddRange(Key k, IEnumerable<Element> es)
         {
             if (es == null) return;
             if (Groups.TryGetValue(k, out var list))
@@ -107,7 +112,7 @@ namespace ES
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryRemoveRange(Key k, IEnumerable<Element> es)
+        public void RemoveRange(Key k, IEnumerable<Element> es)
         {
             if (es == null) return;
             if (Groups.TryGetValue(k, out var list))
@@ -128,18 +133,30 @@ namespace ES
         {
             if (Groups.TryGetValue(key, out var list))
             {
-                if(AutoApplyBuffers)list.TryApplyBuffers();
+                if (AutoApplyBuffers) list.TryApplyBuffers();
                 return list;
+            }
+            if (_autoCreateOnAccess)
+            {
+                var newList = new SafeNormalList<Element>();
+                Groups.Add(key, newList);
+                return newList;
             }
             return NULL;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public SafeNormalList<Element> GetGroupDirectly(Key key,bool applyBuffer=true)
+        public SafeNormalList<Element> GetGroupDirectly(Key key, bool applyBuffer = true)
         {
             if (Groups.TryGetValue(key, out var list))
             {
                 if (applyBuffer) list.TryApplyBuffers();
                 return list;
+            }
+            if (_autoCreateOnAccess)
+            {
+                var newList = new SafeNormalList<Element>();
+                Groups.Add(key, newList);
+                return newList;
             }
             return NULL;
         }
@@ -163,37 +180,62 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-            foreach(var (i,k) in Groups)
+            foreach (var (i, k) in Groups)
             {
                 k.Clear();
             }
             Groups.Clear();
         }
+
+        public void SetAutoCreateOnAccess(bool autoCreate)
+        {
+            _autoCreateOnAccess = autoCreate;
+        }
     }
 
-    [Serializable, TypeRegistryItem("类型匹配安全键组")/*类型全匹配安全列表IOC*/]
-    public class SafeTypeMatchKeyGroup<Element> : SafeKeyGroup<Type,Element>
+    [Serializable, TypeRegistryItem("类型匹配安全键组")/*类型全匹配安全列表*/]
+    public class SafeTypeMatchKeyGroup<Element> : SafeKeyGroup<Type, Element>
     {
         public override string Editor_ShowDes => "类型匹配 键组";
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAdd<T>(T e) where T :Element
+        public void Add<T>(T e) where T : Element
         {
-            TryAdd(typeof(T), e);
+            Add(typeof(T), e);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryRemove<T>(T e) where T : Element
+        public void Remove<T>(T e) where T : Element
         {
-            TryRemove(typeof(T),e);
+            Remove(typeof(T), e);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IEnumerable<Element> GetMayStayGroup<T>(T e) where T : Element
+        public IEnumerable<Element> GetGroupAsIEnumable<T>() where T : Element
         {
-            return GetGroupAsIEnumable(typeof(T));
+            return base.GetGroupAsIEnumable(typeof(T));
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public List<T> GetNewGroupOfType<T>()
+        {
+            var listR = new List<T>(3);
+            if (Groups.TryGetValue(typeof(T), out var list))
+            {
+                list.ApplyBuffers();
+                int count = list.ValuesNow.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    if ( list.ValuesNow[i] is T t)
+                    {
+                        listR.Add(t);
+                    }
+                }
+                return listR;
+            }
+            return null;
+        }
+
     }
 
 
-   
+
 
 }
 

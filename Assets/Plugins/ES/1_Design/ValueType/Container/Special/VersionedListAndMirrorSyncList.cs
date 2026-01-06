@@ -20,12 +20,17 @@ namespace ES
     {
         [LabelText("正在更新", SdfIconType.ArrowRepeat), SerializeReference, GUIColor("@ESDesignUtility.ColorSelector.ColorForUpdating")]
         public List<T> ValuesNow = new List<T>(10);
-        [FoldoutGroup("缓冲")]
-        [ShowInInspector, NonSerialized, LabelText("缓冲添加队列", SdfIconType.BoxArrowInLeft)]
-        private Queue<T> ValuesBufferToAdd = new Queue<T>();
-        [FoldoutGroup("缓冲")]
-        [ShowInInspector, NonSerialized, LabelText("缓冲移除队列", SdfIconType.BoxArrowRight)]
-        private Queue<T> ValuesBufferToRemove = new Queue<T>();
+        // 单一有序操作缓冲（环形数组以减少 GC 分配）
+        private struct OpRecord
+        {
+            public T value;
+            public bool isAdd;
+            public OpRecord(T v, bool a) { value = v; isAdd = a; }
+        }
+        private OpRecord[] opBuffer = new OpRecord[16];
+        private int opHead = 0;
+        private int opTail = 0;
+        private int opCount = 0;
         private bool isDirty;
         public bool MayHasElement = true;
         [LabelText("最低版本")]
@@ -49,7 +54,7 @@ namespace ES
                 }
             }
         }
-        public void VersionItem(T who, bool isAdd = true)
+        private void VersionItem(T who, bool isAdd = true)
         {
             if (MirrorValidators.Count == 0)
             {
@@ -66,7 +71,7 @@ namespace ES
                 VersionedRecordChanges.Add(new VersionedRecordChange<T>() { value = who, IsAdd = isAdd });
             }
         }
-        public void TryUpdateVersion()
+        public void UpdateVersion()
         {
             if (MirrorValidators.Count == 0)
             {
@@ -75,16 +80,16 @@ namespace ES
             }
             else
             {
-                int minVersonNew = VersionMax;
+                int minVersionNew = VersionMax;
                 for (int i = 0; i < MirrorValidators.Count; i++)
                 {
                     var va = MirrorValidators[i];
                     bool available = va.Available?.Invoke() ?? false;
                     if (available)
                     {
-                        if (va.mirror.VersonNow < minVersonNew)
+                        if (va.mirror.VersionNow < minVersionNew)
                         {
-                            minVersonNew = va.mirror.VersonNow;
+                            minVersionNew = va.mirror.VersionNow;
                         }
                     }
                     else
@@ -93,89 +98,96 @@ namespace ES
                         MirrorValidators.Remove(va);
                     }
                 }
-                if (minVersonNew > VersionMin)
+                if (minVersionNew > VersionMin)
                 {
-                    int countToRemove = minVersonNew - VersionMin;
+                    int countToRemove = minVersionNew - VersionMin;
                     VersionedRecordChanges.RemoveRange(0, countToRemove);
-                    VersionMin = minVersonNew;
+                    VersionMin = minVersionNew;
                 }
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [Button("添加测试")]
-        public void TryAdd(T add, bool versonRecord = true)
+        public void Add(T add, bool versionRecord = true)
         {
-            //原生
-            ValuesBufferToAdd.Enqueue(add);
+            //原生：按调用顺序入队操作（保证顺序语义）
+            EnqueueOp(add, true);
             isDirty = true;
             MayHasElement = true;
 
             //更新
-            if (versonRecord) VersionItem(add, true);
+            if (versionRecord) VersionItem(add, true);
         }
         [Button("移除测试")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryRemove(T add, bool versonRecord = true)
+        public void Remove(T add, bool versionRecord = true)
         {
-            ValuesBufferToRemove.Enqueue(add);
+            EnqueueOp(add, false);
             isDirty = true;
 
             //更新
-            if (versonRecord) VersionItem(add, false);
+            if (versionRecord) VersionItem(add, false);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAddRange(IEnumerable<T> add)
+        public void AddRange(IEnumerable<T> add)
         {
             foreach (var i in add)
             {
-                ValuesBufferToAdd.Enqueue(i);
+                EnqueueOp(i, true);
             }
             isDirty = true;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryRemoveRange(IEnumerable<T> remove)
+        public void RemoveRange(IEnumerable<T> remove)
         {
             foreach (var i in remove)
             {
-                ValuesBufferToRemove.Enqueue(i);
+                EnqueueOp(i, false);
             }
             isDirty = true;
         }
-        public bool TryContains(T who)
+        public bool Contains(T who)
         {
-            if (ValuesBufferToRemove.Contains(who)) return false;
-            if (ValuesBufferToAdd.Contains(who)) return true;
-            return ValuesNow.Contains(who);
+            // 先基于当前生效集合判断
+            bool inNow = ValuesNow.Contains(who);
+            if (opCount == 0) return inNow;
+            // 按缓冲区的操作顺序回放该元素的操作来确定最终状态（无额外集合分配）
+            int idx = opHead;
+            var comparer = EqualityComparer<T>.Default;
+            for (int i = 0; i < opCount; i++)
+            {
+                var op = opBuffer[idx];
+                if (comparer.Equals(op.value, who)) inNow = op.isAdd;
+                idx++;
+                if (idx == opBuffer.Length) idx = 0;
+            }
+            return inNow;
         }
         public void ApplyBuffers(bool forceUpdate = false)
         {
             if (isDirty || forceUpdate)
             {
                 isDirty = false;
-                while (ValuesBufferToAdd.Count > 0)
+                while (opCount > 0)
                 {
-                    ValuesNow.Add(ValuesBufferToAdd.Dequeue());
-                }
-                while (ValuesBufferToRemove.Count > 0)
-                {
-                    ValuesNow.Remove(ValuesBufferToRemove.Dequeue());
+                    var op = DequeueOp();
+                    if (op.isAdd) ValuesNow.Add(op.value);
+                    else ValuesNow.Remove(op.value);
                 }
             }
         }
 
         //Dirty模式>相比Update,性能更好
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryApplyBuffers()
+        public void ApplyBuffersIfDirty()
         {
             if (!isDirty) return;
             isDirty = false;
-            while (ValuesBufferToAdd.Count > 0)
+            while (opCount > 0)
             {
-                ValuesNow.Add(ValuesBufferToAdd.Dequeue());
-            }
-            while (ValuesBufferToRemove.Count > 0)
-            {
-                ValuesNow.Remove(ValuesBufferToRemove.Dequeue());
+                var op = DequeueOp();
+                if (op.isAdd) ValuesNow.Add(op.value);
+                else ValuesNow.Remove(op.value);
             }
 
         }
@@ -183,8 +195,7 @@ namespace ES
         public void Clear()
         {
             ValuesNow.Clear();
-            ValuesBufferToAdd.Clear();
-            ValuesBufferToRemove.Clear();
+            ClearOpBuffer();
             MayHasElement = false;
         }
         #region 杂项
@@ -214,6 +225,58 @@ namespace ES
             }
         }
 
+        #region 内部：操作缓冲环形缓冲实现
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void EnqueueOp(T value, bool isAdd)
+        {
+            if (opCount == opBuffer.Length)
+            {
+                ResizeOpBuffer(opBuffer.Length * 2);
+            }
+            opBuffer[opTail] = new OpRecord(value, isAdd);
+            opTail++;
+            if (opTail == opBuffer.Length) opTail = 0;
+            opCount++;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private OpRecord DequeueOp()
+        {
+            var r = opBuffer[opHead];
+            opHead++;
+            if (opHead == opBuffer.Length) opHead = 0;
+            opCount--;
+            return r;
+        }
+
+        private void ResizeOpBuffer(int newSize)
+        {
+            var newArr = new OpRecord[newSize];
+            if (opCount > 0)
+            {
+                if (opHead < opTail)
+                {
+                    Array.Copy(opBuffer, opHead, newArr, 0, opCount);
+                }
+                else
+                {
+                    int right = opBuffer.Length - opHead;
+                    Array.Copy(opBuffer, opHead, newArr, 0, right);
+                    Array.Copy(opBuffer, 0, newArr, right, opTail);
+                }
+            }
+            opBuffer = newArr;
+            opHead = 0;
+            opTail = opCount % newSize;
+        }
+
+        private void ClearOpBuffer()
+        {
+            opHead = opTail = opCount = 0;
+            if (opBuffer.Length > 64) opBuffer = new OpRecord[16];
+        }
+        #endregion
+
     }
     #endregion
 
@@ -226,53 +289,53 @@ namespace ES
         [LabelText("已经初始化")]
         public bool HasInit = true;
         [LabelText("当前版本")]
-        public int VersonNow = 0;
+        public int VersionNow = 0;
         public IEnumerable<VersionedRecordChange<T>> SyncChanges()
         {
             if (Source != null)
             {
-                if (Source.VersionMax > VersonNow)
+                if (Source.VersionMax > VersionNow)
                 {
-                    int UpdateCount = Source.VersionMax - VersonNow;//更新数量是？
+                    int UpdateCount = Source.VersionMax - VersionNow;//更新数量是？
                     int count = Source.VersionedRecordChanges.Count;
                     for (int index = count - UpdateCount; index < count && UpdateCount >= 0; index++, UpdateCount--)
                     {
                         yield return Source.VersionedRecordChanges[index];
                     }
-                    VersonNow = Source.VersionMax;
-                    Source.TryUpdateVersion();
+                    VersionNow = Source.VersionMax;
+                    Source.UpdateVersion();
                 }
             }
         }
         public void UpdateVersionToMaxOnly()
         {
-            VersonNow = Source?.VersionMax ?? 0;
+            VersionNow = Source?.VersionMax ?? 0;
         }
         [Button("镜像处添加")]
-        public void TryAdd_IgnoreVersion(T t)
+        public void Add_IgnoreVersion(T t)
         {
             if (Source.MirrorValidators.Count == 1)//只有自己哈
             {
-                Source.TryAdd(t, false);
+                Source.Add(t, false);
                 UpdateVersionToMaxOnly();
             }
             else
             {
-                Source.TryAdd(t, true);
+                Source.Add(t, true);
                 UpdateVersionToMaxOnly();
             }
         }
         [Button("镜像处移除")]
-        public void TryRemove_IgnoreVersion(T t)
+        public void Remove_IgnoreVersion(T t)
         {
             if (Source.MirrorValidators.Count == 1)//只有自己哈
             {
-                Source.TryRemove(t, false);
+                Source.Remove(t, false);
                 UpdateVersionToMaxOnly();
             }
             else
             {
-                Source.TryRemove(t, true);
+                Source.Remove(t, true);
                 UpdateVersionToMaxOnly();
             }
         }

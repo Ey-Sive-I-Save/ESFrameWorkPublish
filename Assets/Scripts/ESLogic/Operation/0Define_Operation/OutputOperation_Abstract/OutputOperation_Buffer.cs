@@ -24,7 +24,7 @@ namespace ES
         public Buffer GetBufferOnEnableExpand(Target target,Logic logic)
         {
             var use = MakeTheOpeation(target, logic);
-            logic.GetFromOpStore(OutputOpeationBufferFlag.flag).TryAdd(this as This, use);
+            logic.GetFromOpStore(OutputOpeationBufferFlag.flag).Add(this as This, use);
             return use;
         }
         public Buffer GetBufferOnDisableExpand(Target target,Logic logic)

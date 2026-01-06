@@ -213,11 +213,11 @@ namespace ES
             {
                 for (int orderIndex = -100; orderIndex <= 100; orderIndex++)
                 {
-                    var Handler_SingletonPart = Handler_Singleton.GetGroup(orderIndex);
-                    var Handler_SubClassPart = Handler_SubClass.GetGroup(orderIndex);
-                    var Handler_ClassAttributePart = Handler_ClassAttribute.GetGroup(orderIndex);
-                    var Handler_FieldAttributePart = Handler_FieldAttribute.GetGroup(orderIndex);
-                    var Handler_MethodAttributePart = Handler_MethodAttribute.GetGroup(orderIndex);
+                    var Handler_SingletonPart = Handler_Singleton.GetGroupDirectly(orderIndex);
+                    var Handler_SubClassPart = Handler_SubClass.GetGroupDirectly(orderIndex);
+                    var Handler_ClassAttributePart = Handler_ClassAttribute.GetGroupDirectly(orderIndex);
+                    var Handler_FieldAttributePart = Handler_FieldAttribute.GetGroupDirectly(orderIndex);
+                    var Handler_MethodAttributePart = Handler_MethodAttribute.GetGroupDirectly(orderIndex);
                     if (Handler_SingletonPart.Count == 0 && Handler_SubClassPart.Count == 0 && Handler_ClassAttributePart.Count == 0 && Handler_FieldAttributePart.Count == 0 && Handler_MethodAttributePart.Count == 0)
                     {
                         continue;
@@ -376,7 +376,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_ClassAttribute.TryAdd(register.Order, (classType) =>
+                        Handler_ClassAttribute.Add(register.Order, (classType) =>
                         {
 
                             var at = classType.GetCustomAttribute(supportAttribute);
@@ -404,7 +404,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_FieldAttribute.TryAdd(register.Order, (fieldINFO) =>
+                        Handler_FieldAttribute.Add(register.Order, (fieldINFO) =>
                         {
                             var at = fieldINFO.GetCustomAttribute(supportAttribute);
                             if (at != null)
@@ -431,7 +431,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_MethodAttribute.TryAdd(register.Order, ((methodINFO) =>
+                        Handler_MethodAttribute.Add(register.Order, ((methodINFO) =>
                         {
                             var at = methodINFO.GetCustomAttribute(supportAttribute);
                             if (at != null)
@@ -458,7 +458,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_Singleton.TryAdd(register.Order, (type) =>
+                        Handler_Singleton.Add(register.Order, (type) =>
                         {
 
                             if (!type.IsAbstract && type.IsSubclassOf(support))
@@ -518,7 +518,7 @@ namespace ES
                     try
                     {
                         MethodInfo info = reType.GetMethod("Handle");
-                        Handler_SubClass.TryAdd(register.Order, (type) =>
+                        Handler_SubClass.Add(register.Order, (type) =>
                         {
 
                             if (!type.IsAbstract && type.IsSubclassOf(support))
@@ -783,7 +783,7 @@ namespace ES
                             {
                                 if (reType.IsAbstract) continue;
                                 var register = Activator.CreateInstance(reType) as ESAS_RuntimeRegister_AB;
-                                InitRuntimeRegisters.TryAdd(register.LoadTiming.GetHashCode(), register);
+                                InitRuntimeRegisters.Add(register.LoadTiming.GetHashCode(), register);
                             }
                         }
 
@@ -793,7 +793,7 @@ namespace ES
 
             private static void InitRuntime_ApplyThisTimingRegisters(int timing)
             {
-                var reList = InitRuntimeRegisters.GetGroup(timing.GetHashCode());
+                var reList = InitRuntimeRegisters.GetGroupDirectly(timing.GetHashCode());
                 if (reList.Count == 0) return;
                 for (int i = 0; i < reList.Count; i++)
                 {
@@ -843,11 +843,11 @@ namespace ES
 
             private static void InitRuntime_LoadRegisteredTypes(int timing)
             {
-                var handles_singleton = InitHandler_Singleton.GetGroup(timing.GetHashCode());
-                var handler_classAttribute = InitHandler_ClassAttribute.GetGroup(timing.GetHashCode());
-                var handler_fieldAttribute = InitHandler_FieldAttribute.GetGroup(timing.GetHashCode());
-                var handler_methodAttribute = InitHandler_MethodAttribute.GetGroup(timing.GetHashCode());
-                var Handler_SubClassPart = InitHandler_AsSubclass.GetGroup(timing.GetHashCode());
+                var handles_singleton = InitHandler_Singleton.GetGroupDirectly(timing.GetHashCode());
+                var handler_classAttribute = InitHandler_ClassAttribute.GetGroupDirectly(timing.GetHashCode());
+                var handler_fieldAttribute = InitHandler_FieldAttribute.GetGroupDirectly(timing.GetHashCode());
+                var handler_methodAttribute = InitHandler_MethodAttribute.GetGroupDirectly(timing.GetHashCode());
+                var Handler_SubClassPart = InitHandler_AsSubclass.GetGroupDirectly(timing.GetHashCode());
                 if (handles_singleton.Count == 0 && handler_classAttribute.Count == 0 && handler_fieldAttribute.Count == 0 && handler_methodAttribute.Count == 0)
                 {
                     return;
@@ -993,11 +993,11 @@ namespace ES
 
             private static void OneTiming_HotLoadAllAssemblesRegistedTypes(int timing)
             {
-                var handles_singleton = HotHandler_Singleton.GetGroup(timing.GetHashCode());
-                var handler_classAttribute = HotHandler_ClassAttribute.GetGroup(timing.GetHashCode());
-                var handler_fieldAttribute = HotHandler_FieldAttribute.GetGroup(timing.GetHashCode());
-                var handler_methodAttribute = HotHandler_MethodAttribute.GetGroup(timing.GetHashCode());
-                var handler_SubClassPart = HotHandler_AsSubclass.GetGroup(timing.GetHashCode());
+                var handles_singleton = HotHandler_Singleton.GetGroupDirectly(timing.GetHashCode());
+                var handler_classAttribute = HotHandler_ClassAttribute.GetGroupDirectly(timing.GetHashCode());
+                var handler_fieldAttribute = HotHandler_FieldAttribute.GetGroupDirectly(timing.GetHashCode());
+                var handler_methodAttribute = HotHandler_MethodAttribute.GetGroupDirectly(timing.GetHashCode());
+                var handler_SubClassPart = HotHandler_AsSubclass.GetGroupDirectly(timing.GetHashCode());
                 while (WaitHotLoadingAssembies.Count > 0)
                 {
                     var hotASM = WaitHotLoadingAssembies.Peek();
@@ -1228,8 +1228,8 @@ namespace ES
                             }
                             return false;
                         };
-                        if (init) InitHandler_ClassAttribute.TryAdd(timing.GetHashCode(), func);
-                        else HotHandler_ClassAttribute.TryAdd(timing.GetHashCode(), func);
+                        if (init) InitHandler_ClassAttribute.Add(timing.GetHashCode(), func);
+                        else HotHandler_ClassAttribute.Add(timing.GetHashCode(), func);
                     }
                     catch (Exception ex) // 捕获其他未预料到的异常
                     {
@@ -1257,8 +1257,8 @@ namespace ES
                             }
                             return false;
                         };
-                        if (init) InitHandler_FieldAttribute.TryAdd(timing.GetHashCode(), func);
-                        else HotHandler_FieldAttribute.TryAdd(timing.GetHashCode(), func);
+                        if (init) InitHandler_FieldAttribute.Add(timing.GetHashCode(), func);
+                        else HotHandler_FieldAttribute.Add(timing.GetHashCode(), func);
                     }
                     catch (Exception ex) // 捕获其他未预料到的异常
                     {
@@ -1286,8 +1286,8 @@ namespace ES
                             }
                             return false;
                         };
-                        if (init) InitHandler_MethodAttribute.TryAdd(timing.GetHashCode(), func);
-                        else HotHandler_MethodAttribute.TryAdd(timing.GetHashCode(), func);
+                        if (init) InitHandler_MethodAttribute.Add(timing.GetHashCode(), func);
+                        else HotHandler_MethodAttribute.Add(timing.GetHashCode(), func);
                     }
                     catch (Exception ex) // 捕获其他未预料到的异常
                     {
@@ -1316,8 +1316,8 @@ namespace ES
                             }
                             return false;
                         };
-                        if (init) InitHandler_Singleton.TryAdd(timing.GetHashCode(), func);
-                        else HotHandler_Singleton.TryAdd(timing.GetHashCode(), func);
+                        if (init) InitHandler_Singleton.Add(timing.GetHashCode(), func);
+                        else HotHandler_Singleton.Add(timing.GetHashCode(), func);
                         // 如果创建成功，在这里使用 instance
                         // Console.WriteLine($"实例创建成功: {instance.GetType()}");
                     }
@@ -1377,8 +1377,8 @@ namespace ES
                           }
                           return false;
                       };
-                        if (init) InitHandler_AsSubclass.TryAdd(timing.GetHashCode(), func);
-                        else HotHandler_AsSubclass.TryAdd(timing.GetHashCode(), func);
+                        if (init) InitHandler_AsSubclass.Add(timing.GetHashCode(), func);
+                        else HotHandler_AsSubclass.Add(timing.GetHashCode(), func);
                         // 如果创建成功，在这里使用 instance
                         // Console.WriteLine($"实例创建成功: {instance.GetType()}");
                     }

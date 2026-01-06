@@ -25,8 +25,9 @@ namespace ES
         public virtual Color Editor_ShowColor => Color.yellow;
         #endregion
 
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAddOrSet(Select t, Key k, Element e)
+        public void AddOrSet(Select t, Key k, Element e)
         {
             if (e == null) return;
             if (Contents.TryGetValue(t, out var dic))
@@ -39,7 +40,7 @@ namespace ES
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAddOnly(Select t, Key k, Element e)
+        public void Add(Select t, Key k, Element e)
         {
             if (e == null) return;
             if (Contents.TryGetValue(t, out var dic))
@@ -60,7 +61,7 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryRemove(Select t, Key k)
+        public void Remove(Select t, Key k)
         {
             if (Contents.TryGetValue(t, out var dic))
             {
@@ -69,7 +70,7 @@ namespace ES
             else
             {
 #if UNITY_EDITOR
-                throw new Exception("IOC没有这种键");
+                throw new Exception("SelectDic没有这种Select键");
 #endif
             }
         }
@@ -86,6 +87,41 @@ namespace ES
             return ifError;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGetElement(Select t, Key k, out Element element)
+        {
+            if (Contents.TryGetValue(t, out var dic))
+            {
+                if (dic.TryGetValue(k, out var value))
+                {
+                    element = value;
+                    return true;
+                }
+            }
+            element = default;
+            return false;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Contains(Select t, Key k)
+        {
+            if (Contents.TryGetValue(t, out var dic))
+            {
+                return dic.ContainsKey(k);
+            }
+            return false;
+        }
+        public Element this[Select t, Key k]
+        {
+            get
+            {
+                return GetElement(t, k, default);
+            }
+            set
+            {
+                AddOrSet(t, k, value);
+            }
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Dictionary<Key, Element> GetDic(Select k)
         {
             if (Contents.TryGetValue(k, out var dic))
@@ -95,7 +131,7 @@ namespace ES
             return NULL;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAddOrSetRange(Select t, IEnumerable<KeyValuePair<Key, Element>> keyValues)
+        public void AddOrSetRange(Select t, IEnumerable<KeyValuePair<Key, Element>> keyValues)
         {
             if (Contents.TryGetValue(t, out var dic))
             {
@@ -106,7 +142,7 @@ namespace ES
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAddRangeOnly(Select t, IEnumerable<KeyValuePair<Key, Element>> keyValues)
+        public void AddRangeOnly(Select t, IEnumerable<KeyValuePair<Key, Element>> keyValues)
         {
             if (Contents.TryGetValue(t, out var dic))
             {
@@ -123,7 +159,7 @@ namespace ES
                 }
             }
         }
-        public void TryRemoveRange(Select t, IEnumerable<Key> keys)
+        public void RemoveRange(Select t, IEnumerable<Key> keys)
         {
             if (keys != null)
                 if (Contents.TryGetValue(t, out var dic))
@@ -136,9 +172,26 @@ namespace ES
                 else
                 {
 #if UNITY_EDITOR
-                    throw new Exception("IOC没有这种键");
+                    throw new Exception("SelectDic没有这种Select键");
 #endif
                 }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryRemoveRange(Select t, IEnumerable<Key> keys)
+        {
+            if (keys == null)
+            {
+                return false;
+            }
+            if (Contents.TryGetValue(t, out var dic))
+            {
+                foreach (var i in keys)
+                {
+                    dic.Remove(i);
+                }
+                return true;
+            }
+            return false;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ClearSelect(Select t)

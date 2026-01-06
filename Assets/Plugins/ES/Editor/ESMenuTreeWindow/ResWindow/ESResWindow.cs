@@ -45,7 +45,7 @@ namespace ES
         void PartPage_Library(OdinMenuTree tree)
         {
             QuickBuildRootMenu(tree, MenuNameForLibraryRoot, ref page_root_Library, Sirenix.OdinInspector.SdfIconType.KeyboardFill);
-            var libs = ESEditorSO.SOS.GetGroup<ResLibrary>();
+            var libs = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
             if (libs != null)
             {
                 List<string> strings = new List<string>(3);
@@ -323,7 +323,7 @@ namespace ES
             }
             public override ESWindowPageBase ES_Refresh()
             {
-                libs = ESEditorSO.SOS.GetGroup<ResLibrary>();
+                libs = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
                 if (libs != null)
                 {
                     REForLibs = new ReorderableList(libs, typeof(ResLibrary))

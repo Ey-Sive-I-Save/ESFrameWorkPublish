@@ -19,7 +19,7 @@ public class LinkReceiveChannelPool<Channel,Link>
     public IReceiveChannelLink<Channel,Link> cache;
     public void SendLink(Channel c,Link link)
     {
-        CIRS.TryApplyBuffers();
+        CIRS.ApplyBuffers();
         if(CIRS.Groups.TryGetValue(c,out var irs))
         {
             int count = irs.ValuesNow.Count;
@@ -29,10 +29,10 @@ public class LinkReceiveChannelPool<Channel,Link>
                 if (cache is UnityEngine.Object ob)
                 {
                     if (ob != null) cache.OnLink(c,link);
-                    else irs.TryRemove(cache);
+                    else irs.Remove(cache);
                 }
                 else if (cache != null) cache.OnLink(c,link);
-                else irs.TryRemove(cache);
+                else irs.Remove(cache);
             }
         }
     }

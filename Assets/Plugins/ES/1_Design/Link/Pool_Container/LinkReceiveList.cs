@@ -25,37 +25,37 @@ namespace ES
                 if(cache is UnityEngine.Object ob)
                 {
                     if (ob != null) cache.OnLink(link);
-                    else IRS.TryRemove(cache);
+                    else IRS.Remove(cache);
                 }
                 else if (cache != null) cache.OnLink(link);
-                else IRS.TryRemove(cache);
+                else IRS.Remove(cache);
             }
         }
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         private void Internal_TryRemove(IReceiveLink<Link> ir)
         {
-            IRS.TryRemove(ir);
+            IRS.Remove(ir);
         }
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         public void AddReceive(IReceiveLink<Link> e) 
         {
-            IRS.TryAdd(e);
+            IRS.Add(e);
         }
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         public void RemoveReceive(IReceiveLink<Link> e)
         {
-            IRS.TryRemove(e);
+            IRS.Remove(e);
         }
 
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         public void AddReceive(Action<Link> e)
         {
-            IRS.TryAdd(e.MakeReceive());
+            IRS.Add(e.MakeReceive());
         }
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         public void RemoveReceive(Action<Link> e)
         {
-            IRS.TryRemove(e.MakeReceive());
+            IRS.Remove(e.MakeReceive());
         }
     }
 }

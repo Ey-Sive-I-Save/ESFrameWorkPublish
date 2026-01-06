@@ -87,7 +87,7 @@ namespace ES
                 if (valueEntryOp != null)
                 {
                     valueEntryOp.HandleValueEntryOpeation(target, logic, bufferSource.EvaluateToEndFrame(ref buffer.timeHasGo), OperationOptionsForFloat.Add);
-                    use.TryRemove(buffer);
+                    use.Remove(buffer);
                 } 
                 foreach(var i in use)
                 {

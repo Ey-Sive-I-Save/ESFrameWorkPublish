@@ -35,7 +35,7 @@ namespace ES
         public bool AutoApplyBuffers { [MethodImpl(MethodImplOptions.AggressiveInlining)] get; [MethodImpl(MethodImplOptions.AggressiveInlining)] set; } = true;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetAutoApplyBuffers(bool b) => AutoApplyBuffers = b;
-        public void TryApplyBuffers()
+        public void ApplyBuffers()
         {
 
             foreach (var (i, k) in Groups)
@@ -45,12 +45,12 @@ namespace ES
         }
         public static SafeNormalList<Element> TryAddInternal(SafeNormalList<Element> list, Element e)
         {
-            list.TryAdd(e);
+            list.Add(e);
             return list;
         }
-        public static SafeNormalList<Element> TryAddRangeInternal(SafeNormalList<Element> list, IEnumerable<Element> es)
+        public static SafeNormalList<Element> AddRangeInternal(SafeNormalList<Element> list, IEnumerable<Element> es)
         {
-            list.TryAddRange(es);
+            list.AddRange(es);
             return list;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -60,7 +60,7 @@ namespace ES
             if (e == null) return;
             if (Groups.TryGetValue(k, out var list))
             {
-                list.TryAdd(e);
+                list.Add(e);
             }
             else
             {
@@ -74,7 +74,7 @@ namespace ES
             if (e == null) return false;
             if (Groups.TryGetValue(k, out var list))
             {
-                list.TryAdd(e);
+                list.Add(e);
                 return false;
             }
             else
@@ -88,7 +88,7 @@ namespace ES
         {
             if (Groups.TryGetValue(k, out var list))
             {
-                list.TryRemove(e);
+                list.Remove(e);
             }
 
 
@@ -104,11 +104,11 @@ namespace ES
             if (es == null) return;
             if (Groups.TryGetValue(k, out var list))
             {
-                list.TryAddRange(es);
+                list.AddRange(es);
             }
             else
             {
-                Groups.Add(k, TryAddRangeInternal(new SafeNormalList<Element>(), es));
+                Groups.Add(k, AddRangeInternal(new SafeNormalList<Element>(), es));
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -119,7 +119,7 @@ namespace ES
             {
                 foreach (var i in es)
                 {
-                    list.TryRemove(i);
+                    list.Remove(i);
                 }
             }
 
@@ -133,7 +133,7 @@ namespace ES
         {
             if (Groups.TryGetValue(key, out var list))
             {
-                if (AutoApplyBuffers) list.TryApplyBuffers();
+                if (AutoApplyBuffers) list.ApplyBuffers();
                 return list;
             }
             if (_autoCreateOnAccess)
@@ -149,7 +149,7 @@ namespace ES
         {
             if (Groups.TryGetValue(key, out var list))
             {
-                if (applyBuffer) list.TryApplyBuffers();
+                if (applyBuffer) list.ApplyBuffers();
                 return list;
             }
             if (_autoCreateOnAccess)
@@ -165,7 +165,7 @@ namespace ES
         {
             if (Groups.TryGetValue(key, out var list))
             {
-                return list.Contains(who);
+                return Enumerable.Contains(list, who);
             }
             return false;
         }

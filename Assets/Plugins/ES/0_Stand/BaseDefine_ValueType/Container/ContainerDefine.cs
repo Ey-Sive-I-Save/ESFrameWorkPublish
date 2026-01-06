@@ -7,31 +7,23 @@ using UnityEngine;
 
 namespace ES
 {
+    #region  接口
     public interface ISafe
     {
-        public void TryApplyBuffers();//不强制更新
+        public void ApplyBuffers();//不强制更新
         public bool AutoApplyBuffers { get; set; }
         public void SetAutoApplyBuffers(bool b);
     }
     //安全列表 接口
     public interface ISafeList<T> : IEnumerable<T>, ISafe
     {
-        public IEnumerable<T> ValuesIEnumable { get; }
-        public void TryAdd(T add);
-        public void TryRemove(T remove);
-        public bool TryContains(T who);
+
+        public void Add(T add);
+        public void Remove(T remove);
+        public bool Contains(T who);
         public void ApplyBuffers(bool force = false);//可选强制更新
         public void Clear();
-        IEnumerator<T> IEnumerable<T>.GetEnumerator()
-        {
-            if (AutoApplyBuffers) TryApplyBuffers();
-            return ValuesIEnumable.GetEnumerator();
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            if (AutoApplyBuffers) TryApplyBuffers();
-            return ValuesIEnumable.GetEnumerator();
-        }
+
     }
 
     //键-组 Key分组 T为元素类型 (不一定安全)，因为很多没有更新需求
@@ -60,5 +52,43 @@ namespace ES
         public void ClearSelect(Select select);
         public void Clear();
     }
+    #endregion
+
+    #region  抽象
+    // 抽象基类：统一 SafeList 的公共成员签名（不实现缓冲逻辑）
+    [Serializable]
+    public abstract class BaseSafeList<T> : ISafeList<T>
+    {
+        // 自动应用缓冲
+        public bool AutoApplyBuffers { [MethodImpl(MethodImplOptions.AggressiveInlining)] get; [MethodImpl(MethodImplOptions.AggressiveInlining)] set; } = true;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetAutoApplyBuffers(bool b) => AutoApplyBuffers = b;
+
+        // 具有缓冲的集合需要提供：
+        protected abstract IEnumerable<T> _Internal_ValuesIEnumable { get; }
+        public abstract void Add(T add);
+        public abstract void Remove(T remove);
+        public abstract bool Contains(T who);
+        public abstract void ApplyBuffers(bool force = false);
+        
+        public abstract void Clear();
+
+        // 默认的无参 ApplyBuffers 调用（可被子类重写）
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public virtual void ApplyBuffers() => ApplyBuffers(false);
+
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
+        {
+            if (AutoApplyBuffers) ApplyBuffers();
+            return _Internal_ValuesIEnumable.GetEnumerator();
+        }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            if (AutoApplyBuffers) ApplyBuffers();
+            return _Internal_ValuesIEnumable.GetEnumerator();
+        }
+    }
+    #endregion
 }
 

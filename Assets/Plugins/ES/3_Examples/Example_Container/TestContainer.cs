@@ -7,7 +7,8 @@ namespace ES
     public class TestContainer : MonoBehaviour
     {
         #region List
-
+        
+        public List<int> ints=new List<int>();
         public SafeBasicList<int> safeBasicList = new SafeBasicList<int>();
         public SafeNormalList<int> safeNormalList = new SafeNormalList<int>();
         public SafeThreadBasicList<int> safeThreadBasicList = new SafeThreadBasicList<int>();
@@ -24,56 +25,58 @@ namespace ES
             // 注册变化回调（可用于 UI 更新或日志）
             safeBasicList.OnChange = (isAdd, item) => Debug.Log($"SafeBasicList OnChange: {(isAdd?"Add":"Remove")} {item}");
             // 单项/批量入队
-            safeBasicList.TryAdd(1);
-            safeBasicList.TryAddRange(new[] { 2, 3, 4 });
+            safeBasicList.Add(1);
+            safeBasicList.AddRange(new[] { 2, 3, 4 });
             // 单项/批量出队
-            safeBasicList.TryRemove(2);
-            safeBasicList.TryRemoveRange(new[] { 3 });
+            safeBasicList.Remove(2);
+            safeBasicList.RemoveRange(new[] { 3 });
             // 在遍历时不会立刻修改 ValuesNow（需要 ApplyBuffers 提交）
-            foreach (var v in safeBasicList.ValuesIEnumable)
+            foreach (var v in safeBasicList)
             {
                 // 读取当前生效集合
             }
             // 提交缓冲并触发回调
             safeBasicList.ApplyBuffers();
-
+         
             // --- SafeNormalList（脏标记 + 队列缓冲）
-            safeNormalList.TryAdd(10);
-            safeNormalList.TryAddRange(new List<int> { 11, 12 });
-            safeNormalList.TryRemove(11);
+            
+            safeNormalList.Add(10);
+            safeNormalList.AddRange(new List<int> { 11, 12 });
+            safeNormalList.Remove(11);
             // 检查是否存在（会考虑缓冲）
-            if (safeNormalList.TryContains(12)) { }
+            if (safeNormalList.Contains(12)) { }
             // 提交缓冲（有 isDirty 优化）
             safeNormalList.ApplyBuffers();
             // foreach 遍历当前生效元素
-            foreach (var v in safeNormalList.ValuesIEnumable)
+            foreach (var v in safeNormalList)
             {
                 // 处理 v
             }
 
             // --- SafeThreadBasicList（基本线程安全；内部通过锁保护缓冲）
             // 在其他线程中也可调用 TryAdd/TryRemove
-            safeThreadBasicList.TryAdd(100);
-            safeThreadBasicList.TryAddRange(new[] { 101, 102 });
-            safeThreadBasicList.TryRemove(101);
+            safeThreadBasicList.Add(100);
+            safeThreadBasicList.AddRange(new[] { 101, 102 });
+            safeThreadBasicList.Remove(101);
             // 安全提交（内部已使用锁）
             safeThreadBasicList.ApplyBuffers();
+
             // 线程安全遍历（读取 ValuesNow）
-            foreach (var v in safeThreadBasicList.ValuesIEnumable)
+            foreach (var v in safeThreadBasicList)
             {
                 // 读取 v（注意：ValuesNow 是普通 List，若跨线程访问需额外同步/快照）
             }
 
             // --- SafeThreadNormalList（脏标记 + 线程安全队列）
-            safeThreadNormalList.TryAdd(200);
-            safeThreadNormalList.TryAddRange(new List<int> { 201, 202 });
-            safeThreadNormalList.TryRemove(201);
+            safeThreadNormalList.Add(200);
+            safeThreadNormalList.AddRange(new List<int> { 201, 202 });
+            safeThreadNormalList.Remove(201);
             //ApplyBuffers 不考虑  isDirty 
             // TryApplyBuffers 会根据 isDirty 快速返回，适合每帧调用
             safeThreadNormalList.ApplyBuffers();
-            safeThreadNormalList.TryApplyBuffers();
+            safeThreadNormalList.ApplyBuffers();
 
-            foreach (var v in safeThreadNormalList.ValuesIEnumable)
+            foreach (var v in safeThreadNormalList)
             {
                 // 读取 v
             }
@@ -87,13 +90,11 @@ namespace ES
             
 
             // 小结（SafeList）：
-            // - 使用 TryAdd/TryRemove/TryAddRange/TryRemoveRange 入队变更，使用 ApplyBuffers/TryApplyBuffers 提交。
+            // - 使用 Add/Remove/AddRange/RemoveRange 入队变更，使用 ApplyBuffers/TryApplyBuffers 提交（旧 Try* API 已弃用）。
             // - 对于需要 UI 或日志的场景，可在 Basic 版使用 OnChange 回调。
             // - 线程安全版本在跨线程调用缓冲方法时更安全，但读取 ValuesNow 跨线程仍需谨慎或使用快照。
         }
-        #endregion/*  */
-
-      
+        #endregion/*  */ 
 
         #region KeyGroup
         public KeyGroup<string, int> keyGroup = new KeyGroup<string, int>();
@@ -112,6 +113,7 @@ namespace ES
             #region  常规的
             // 添加单个元素
             keyGroup.Add("A", 1);
+             keyGroup.Add("A", 2);
             safeKeyGroup.Add("B", 2);
 
             // 批量添加
@@ -156,7 +158,7 @@ namespace ES
             }
 
             // 应用缓冲区（安全版本）
-            safeKeyGroup.TryApplyBuffers();
+            safeKeyGroup.ApplyBuffers();
             #endregion
 
             #region  类型匹配的
@@ -237,6 +239,7 @@ namespace ES
 
             // 1) 添加（索引器/方法）
             bidirectionalDictionary["Key1"] = 123;
+            bidirectionalDictionary.Add("Key2", 456);
             bidirectionalDictionary.Add(new KeyValuePair<string, int>("Key4", 789));
             bidirectionalDictionary.Add(new BidirectionalDictionary<string, int>.KeyValuePairInternal("Key4", 789));
 

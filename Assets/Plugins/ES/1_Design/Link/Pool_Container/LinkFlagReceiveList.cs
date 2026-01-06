@@ -28,10 +28,10 @@ namespace ES
                     if (cache is UnityEngine.Object ob)
                     {
                         if (ob != null) cache.OnLink(LastFlag,link);
-                        else IRS.TryRemove(cache);
+                        else IRS.Remove(cache);
                     }
                     else if (cache != null) cache.OnLink(LastFlag, link);
-                    else IRS.TryRemove(cache);
+                    else IRS.Remove(cache);
                 }
                 LastFlag = link;
             }
@@ -39,7 +39,7 @@ namespace ES
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         private void Internal_TryRemove(IReceiveFlagLink<LinkFlag> ir)
         {
-            IRS.TryRemove(ir);
+            IRS.Remove(ir);
         }
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         public void AddReceive(ref LinkFlag nowFlag, IReceiveFlagLink<LinkFlag> e)
@@ -53,7 +53,7 @@ namespace ES
                 e.OnLink(nowFlag,LastFlag);
                 nowFlag = LastFlag;
             }
-            IRS.TryAdd(e);
+            IRS.Add(e);
         }
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         public void RemoveReceive(ref LinkFlag nowFlag, IReceiveFlagLink<LinkFlag> e)
@@ -67,7 +67,7 @@ namespace ES
                 nowFlag = DefaultFlag;
                 e.OnLink(DefaultFlag);
             }
-            IRS.TryRemove(e);
+            IRS.Remove(e);
         }
 
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]

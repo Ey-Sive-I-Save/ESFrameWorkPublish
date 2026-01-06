@@ -80,14 +80,14 @@ namespace ES
         {
             if (module is Module_ m)
             {
-                MyModules.TryRemove(m);
+                MyModules.Remove(m);
             }
         }
         public void TryAddModuleToListOnly(IESModule module)
         {
             if (module is Module_ m)
             {
-                MyModules.TryAdd(m);
+                MyModules.Add(m);
             }
         }
 
@@ -99,10 +99,10 @@ namespace ES
             {
                 if (i == null)
                 {
-                    MyModules.TryRemove(i);
+                    MyModules.Remove(i);
                 }
             }
-            if (rightNow) MyModules.TryApplyBuffers();
+            if (rightNow) MyModules.ApplyBuffers();
         }
 
         #endregion
@@ -135,7 +135,7 @@ namespace ES
         //更新子模块
         public virtual void UpdateAsHosting()
         {
-            MyModules.TryApplyBuffers();
+            MyModules.ApplyBuffers();
             int count = MyModules.ValuesNow.Count;
             for (int i = 0; i < count; i++)
             {
@@ -294,7 +294,7 @@ namespace ES
         {
             if (use._TryRegisterToHost(this) == ESTryResult.Succeed)
             {
-                MyModules.TryAdd(use);
+                MyModules.Add(use);
                 use.Signal_HasSubmit = true;
                 use.EnabledSelf = true;
             };
@@ -321,14 +321,14 @@ namespace ES
         {
             if (module is Module_ use && !MyModules.ValuesNow.Contains(use))
             {
-                MyModules.TryAdd(use);
+                MyModules.Add(use);
             }
         }
         public void _TryRemoveFromListOnly(IESModule module)
         {
             if (module is Module_ use && MyModules.ValuesNow.Contains(use))
             {
-                MyModules.TryRemove(use);
+                MyModules.Remove(use);
             }
         }
 

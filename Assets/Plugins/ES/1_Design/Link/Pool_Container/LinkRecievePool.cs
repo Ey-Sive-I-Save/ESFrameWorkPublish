@@ -27,7 +27,7 @@ namespace ES
                     if (irl is UnityEngine.Object ob)
                     {
                         if (ob != null) irl.OnLink(link);
-                        else links.TryRemove(irl);
+                        else links.Remove(irl);
                     }
                     else if (irl != null) irl.OnLink(link);
                 }

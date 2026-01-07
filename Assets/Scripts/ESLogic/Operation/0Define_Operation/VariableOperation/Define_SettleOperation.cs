@@ -3,15 +3,16 @@ using Sirenix.OdinInspector;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 
 namespace ES
 {
-    public interface ISettleOperation : IPoolablebAuto
+    public interface ISettleOperation 
     {
-        public void SetValue(float f);
-        public void SetValue(bool b);
+        public void SetEffectorValue(float f);
+        public void SetEffectorValue(bool b);
     }
 
     [TypeRegistryItem("结算操作"), Serializable]
@@ -19,55 +20,46 @@ namespace ES
         where This : SettleOperation<ValueType, Ment, This>, new()
     {
         [NonSerialized] public object Source;    // 效果来源
-        [LabelText("操作值")] public ValueType Value;      // 效果数值
+        [LabelText("操作值")] public ValueType ValueEffector;      // 效果数值
         [LabelText("优先级")] public byte Order;    // 应用优先级（数值越小越优先）
         public int CompareTo(This other)
         {
             return Order.CompareTo(other.Order);
         }
         public abstract ValueType HandleOperation(ValueType value);
+        
+        public abstract void SetEffectorValue(float f);
 
-        #region 池化
-        public bool IsRecycled { get; set; }
-
-        public void OnResetAsPoolable()
+        public abstract void SetEffectorValue(bool b);
+        
+        /// <summary>
+        /// 解决该操作所影响的值，这个值可能被动态创建和修改
+        /// </summary>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ValueType GetResolveValue()
         {
-
-        }
-        public static This GetOne()
-        {
-            return POOL.GetInPool();
-        }
-        public static ESSimplePool<This> POOL = new ESSimplePool<This>(() => new This(), null, 10);
-        public void TryAutoPushedToPool()
-        {
-            POOL.PushToPool(this as This);
+            return ValueEffector;
         }
 
-        public abstract void SetValue(float f);
-
-        public abstract void SetValue(bool b);
-
-        #endregion
     }
-
 
     [Serializable, TypeRegistryItem("布尔值结算操作")]
     public class SettleOperationBool : SettleOperation<bool, SettlementBool, SettleOperationBool>
     {
         public override bool HandleOperation(bool value)
         {
-            return value || Value; // 基类默认实现
+            return value || ValueEffector; // 基类默认实现
         }
 
-        public override void SetValue(float f)
+        public override void SetEffectorValue(float f)
         {
-            Value = f > 0;
+            ValueEffector = f > 0;
         }
 
-        public override void SetValue(bool b)
+        public override void SetEffectorValue(bool b)
         {
-            Value = b;
+            ValueEffector = b;
         }
     }
 
@@ -82,7 +74,7 @@ namespace ES
         
         public override bool HandleOperation(bool value)
         {
-            return value || Value;
+            return value || ValueEffector;
         }
     }
 
@@ -96,7 +88,7 @@ namespace ES
         
         public override bool HandleOperation(bool value)
         {
-            return value && Value;
+            return value && ValueEffector;
         }
     }
 
@@ -149,17 +141,17 @@ namespace ES
         [LabelText("特殊类型")] public SettleOperationSelfType selfType = SettleOperationSelfType.None;
         public override float HandleOperation(float value)
         {
-            return value + Value;
+            return value + GetResolveValue();
         }
 
-        public sealed override void SetValue(float f)
+        public sealed override void SetEffectorValue(float f)
         {
-            Value = f;
+            ValueEffector = f;
         }
 
-        public sealed override void SetValue(bool b)
+        public sealed override void SetEffectorValue(bool b)
         {
-            Value = b ? 1 : 0;
+            ValueEffector = b ? 1 : 0;
         }
 
         public void TryStart(SettlementFloat to, bool ForceNormal = false)
@@ -189,9 +181,10 @@ namespace ES
             Order = 20; // 第一步：基础数值运算
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
-            return value + Value;
+            return value + GetResolveValue();
         }
     }
 
@@ -203,9 +196,10 @@ namespace ES
             Order = 20; // 第一步：基础数值运算
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
-            return value - Value;
+            return value - GetResolveValue();
         }
     }
 
@@ -219,9 +213,10 @@ namespace ES
             Order = 40; // 第二步：在基础值基础上添加特效
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
-            return value + Mathf.Sin(Time.time * frequency) * Value;
+            return value + Mathf.Sin(Time.time * frequency) * GetResolveValue();
         }
     }
 
@@ -233,9 +228,10 @@ namespace ES
             Order = 60; // 第三步：倍率运算
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
-            return value * Value;
+            return value * GetResolveValue();
         }
     }
 
@@ -247,9 +243,10 @@ namespace ES
             Order = 70; // 第三步：百分比增益（与乘法同级）
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
-            return value * (1f + Value);
+            return value * (1f + GetResolveValue());
         }
     }
 
@@ -261,9 +258,10 @@ namespace ES
             Order = 100; // 第四步：最终限制，确保合理范围
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
-            return Mathf.Min(value, Value);
+            return Mathf.Min(value, GetResolveValue());
         }
     }
 
@@ -275,9 +273,10 @@ namespace ES
             Order = 100; // 第四步：最终限制，确保合理范围
         }
         
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
-            return Mathf.Max(value, Value);
+            return Mathf.Max(value, GetResolveValue());
         }
     }
 

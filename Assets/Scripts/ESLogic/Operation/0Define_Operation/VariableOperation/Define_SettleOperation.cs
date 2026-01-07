@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ES
 {
-    public interface ISettleOperation 
+    public interface ISettleOperation
     {
         public void SetEffectorValue(float f);
         public void SetEffectorValue(bool b);
@@ -27,11 +27,11 @@ namespace ES
             return Order.CompareTo(other.Order);
         }
         public abstract ValueType HandleOperation(ValueType value);
-        
+
         public abstract void SetEffectorValue(float f);
 
         public abstract void SetEffectorValue(bool b);
-        
+
         /// <summary>
         /// 解决该操作所影响的值，这个值可能被动态创建和修改
         /// </summary>
@@ -71,7 +71,7 @@ namespace ES
         {
             Order = 10; // 逻辑或，较低优先级
         }
-        
+
         public override bool HandleOperation(bool value)
         {
             return value || ValueEffector;
@@ -85,7 +85,7 @@ namespace ES
         {
             Order = 30; // 逻辑与，较高优先级
         }
-        
+
         public override bool HandleOperation(bool value)
         {
             return value && ValueEffector;
@@ -99,7 +99,7 @@ namespace ES
         {
             Order = 60; // 强制开启，最高优先级
         }
-        
+
         public override bool HandleOperation(bool value)
         {
             return true;
@@ -113,7 +113,7 @@ namespace ES
         {
             Order = 80; // 强制关闭，最高优先级
         }
-        
+
         public override bool HandleOperation(bool value)
         {
             return false;
@@ -127,7 +127,7 @@ namespace ES
         {
             Order = 100; // 取反，最低优先级
         }
-        
+
         public override bool HandleOperation(bool value)
         {
             return !value;
@@ -180,7 +180,7 @@ namespace ES
         {
             Order = 20; // 第一步：基础数值运算
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
@@ -195,7 +195,7 @@ namespace ES
         {
             Order = 20; // 第一步：基础数值运算
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
@@ -207,12 +207,12 @@ namespace ES
     public class SettleOperationFloat_Wave : SettleOperationFloat
     {
         [LabelText("震荡频率")] public float frequency = 1f;
-        
+
         public SettleOperationFloat_Wave()
         {
             Order = 40; // 第二步：在基础值基础上添加特效
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
@@ -227,7 +227,7 @@ namespace ES
         {
             Order = 60; // 第三步：倍率运算
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
@@ -242,7 +242,7 @@ namespace ES
         {
             Order = 70; // 第三步：百分比增益（与乘法同级）
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
@@ -257,7 +257,7 @@ namespace ES
         {
             Order = 100; // 第四步：最终限制，确保合理范围
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {
@@ -272,7 +272,7 @@ namespace ES
         {
             Order = 100; // 第四步：最终限制，确保合理范围
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override float HandleOperation(float value)
         {

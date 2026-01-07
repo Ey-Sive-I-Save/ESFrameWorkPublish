@@ -41,7 +41,7 @@ namespace ES {
         }
     }
     [Serializable]
-    public abstract  class SupportOperation_DirectFloat<Target,Logic> : SupportOperation_DirectInput<Target,Logic, float, OperationOptionsForFloat>
+    public abstract  class SupportOperation_DirectFloat<Target,Logic> : SupportOperation_DirectInput<Target,Logic, float, FloatValueEntryType>
     {
 
     }

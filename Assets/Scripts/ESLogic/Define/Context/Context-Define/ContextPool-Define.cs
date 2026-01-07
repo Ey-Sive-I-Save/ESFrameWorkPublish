@@ -356,19 +356,9 @@ namespace ES
 #if UNITY_EDITOR
         [TabGroup("便捷工具")]
         [ValueDropdown("FindKeyEditor",AppendNextDrawer =true),LabelText("查键"),NonSerialized,ShowInInspector,HideInPlayMode]
+#pragma warning disable CS0414 // 字段已赋值，但从未使用过
         private string FindKeyEditor_ = "";
-        private List<string> FindKeyEditor()
-        {
-            List<string> keys = new List<string>(5);
-            int i = _InitValues.Count;
-            for(int ii = 0; ii < i; ii++)
-            {
-                var value = _InitValues[ii];
-                if (value != null) keys.Add(value.TheKey);
-            }
-            return keys;
-        }
-
+#pragma warning restore CS0414
         [TabGroup("便捷工具")]
         [ValueDropdown("FindKeyRuntime", AppendNextDrawer = true), LabelText("查键"), NonSerialized, ShowInInspector,HideInEditorMode]
         private string FindKeyRuntime_ = "";

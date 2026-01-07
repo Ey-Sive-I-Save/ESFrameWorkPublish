@@ -8,17 +8,17 @@ using UnityEngine;
 
 namespace ES {
     //浮点值操作
-    public enum OperationOptionsForFloat
+    public enum FloatValueEntryType
     {
         [InspectorName("加上")] Add,
-        [InspectorName("减去")] Sub,
-        [InspectorName("百分乘1+X")] PerUp,
-        [InspectorName("限制最大")] Max,
-        [InspectorName("限制最小")] Min,
+        [InspectorName("减去")] Subtract,
+        [InspectorName("百分乘1+X")] PercentageUp,
+        [InspectorName("限制最大")] ClampMax,
+        [InspectorName("限制最小")] ClampMin,
         [InspectorName("震荡")] Wave,
     }
     //布尔值操作
-    public enum OperationOptionsForBool
+    public enum BoolValueEntryType
     {
         [InspectorName("或者")] Or,
         [InspectorName("并且")] And,
@@ -35,7 +35,7 @@ namespace ES {
     }
   
     [Flags]
-    public enum SettleSelfTypeForFloat
+    public enum SettleOperationSelfType
     {
         [InspectorName("无类型")] None,
         [InspectorName("动态的")] Dynamic = 1,

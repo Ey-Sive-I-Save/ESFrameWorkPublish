@@ -7,9 +7,9 @@ namespace ES
     
        //标准ES运行时逻辑持有者
     public interface IESRuntimeLogic : 
-    IOpStoreKeyValueForOutputOpeation//满足委托任务
+    IOpStoreDictionary//满足委托任务
     <IOperation, DeleAndCount, OutputOpeationDelegateFlag>,
-   IOpStoreSafeKeyGroupForOutputOpeation//满足缓冲任务
+   IOpStoreKeyGroup//满足缓冲任务
    <ES.OutputOperationBufferFloat_TargetAndDirectInput
    <ES.ESRuntimeTarget, ES.IESRuntimeLogic, ES.ESRuntimeOpSupport_ValueEntryFloatOperation>,
     ES.BufferOperationFloat, ES.OutputOpeationBufferFlag>
@@ -17,14 +17,14 @@ namespace ES
         public ContextPool Context{get { return Provider.contextPool; }}//上下文
         public CacherPool Cacher{get{ return Provider.cacherPool; }}//运行中缓存值
         
-         Dictionary<IOperation, DeleAndCount>  IOpStoreKeyValueForOutputOpeation//满足委托任务
+         SafeDictionary<IOperation, DeleAndCount>  IOpStoreDictionary//满足委托任务
     <IOperation, DeleAndCount, OutputOpeationDelegateFlag>.GetFromOpStore(OutputOpeationDelegateFlag flag)
         {
             return Provider.storeFordele;
         }
 
          SafeKeyGroup<OutputOperationBufferFloat_TargetAndDirectInput<ESRuntimeTarget, IESRuntimeLogic, ESRuntimeOpSupport_ValueEntryFloatOperation>, BufferOperationFloat> 
-         IOpStoreSafeKeyGroupForOutputOpeation//满足缓冲任务
+         IOpStoreKeyGroup//满足缓冲任务
    <ES.OutputOperationBufferFloat_TargetAndDirectInput
    <ES.ESRuntimeTarget, ES.IESRuntimeLogic, ES.ESRuntimeOpSupport_ValueEntryFloatOperation>,
     ES.BufferOperationFloat, ES.OutputOpeationBufferFlag>.GetFromOpStore(OutputOpeationBufferFlag flag)
@@ -57,12 +57,12 @@ namespace ES
 
         public ESRuntimeLogicProvider Provider => this;
 
-        public Dictionary<IOperation, DeleAndCount> storeFordele=new Dictionary<IOperation, DeleAndCount>();
+        public SafeDictionary<IOperation, DeleAndCount> storeFordele=new SafeDictionary<IOperation, DeleAndCount>();
         public SafeKeyGroup<OutputOperationBufferFloat_TargetAndDirectInput
         <ESRuntimeTarget, IESRuntimeLogic, ESRuntimeOpSupport_ValueEntryFloatOperation>
         , BufferOperationFloat> storeForbufer=new ();
 
-        public Dictionary<IOperation, DeleAndCount> GetFromOpStore(OutputOpeationDelegateFlag flag = null)
+        public SafeDictionary<IOperation, DeleAndCount> GetFromOpStore(OutputOpeationDelegateFlag flag = null)
         {
             return storeFordele;
         }

@@ -6,7 +6,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-namespace ES {
+namespace ES
+{
     public interface ISettleOperation : IPoolablebAuto
     {
         public void SetValue(float f);
@@ -14,15 +15,15 @@ namespace ES {
     }
 
     [TypeRegistryItem("结算操作"), Serializable]
-    public abstract class SettleOperation<ValueType, Ment, This> : ISettleOperation, IComparable<This>, IOperation 
-        where This : SettleOperation<ValueType, Ment, This>,new()
+    public abstract class SettleOperation<ValueType, Ment, This> : ISettleOperation, IComparable<This>, IOperation
+        where This : SettleOperation<ValueType, Ment, This>, new()
     {
         [NonSerialized] public object Source;    // 效果来源
         [LabelText("操作值")] public ValueType Value;      // 效果数值
-        [LabelText("优先级")] public int Priority;    // 应用优先级（数值越小越优先）
+        [LabelText("优先级")] public byte Order;    // 应用优先级（数值越小越优先）
         public int CompareTo(This other)
         {
-            return Priority.CompareTo(other.Priority);
+            return Order.CompareTo(other.Order);
         }
         public abstract ValueType HandleOperation(ValueType value);
 
@@ -31,7 +32,7 @@ namespace ES {
 
         public void OnResetAsPoolable()
         {
-           
+
         }
         public static This GetOne()
         {
@@ -45,9 +46,8 @@ namespace ES {
 
         public abstract void SetValue(float f);
 
-
         public abstract void SetValue(bool b);
-       
+
         #endregion
     }
 
@@ -55,18 +55,9 @@ namespace ES {
     [Serializable, TypeRegistryItem("布尔值结算操作")]
     public class SettleOperationBool : SettleOperation<bool, SettlementBool, SettleOperationBool>
     {
-        [LabelText("结算操作类型")] public OperationOptionsForBool settleType = OperationOptionsForBool.Or;
         public override bool HandleOperation(bool value)
         {
-            switch (settleType)
-            {
-                case OperationOptionsForBool.Or: return value || Value;
-                case OperationOptionsForBool.And: return value && Value;
-                case OperationOptionsForBool.ON: return true;
-                case OperationOptionsForBool.OFF: return false;
-                case OperationOptionsForBool.Not: return !value;
-                default: return value;
-            }
+            return value || Value; // 基类默认实现
         }
 
         public override void SetValue(float f)
@@ -80,31 +71,102 @@ namespace ES {
         }
     }
 
+    #region 布尔多态操作
+    [Serializable, TypeRegistryItem("【或||】布尔结算操作")]
+    public class SettleOperationBool_Or : SettleOperationBool
+    {
+        public SettleOperationBool_Or()
+        {
+            Order = 10; // 逻辑或，较低优先级
+        }
+        
+        public override bool HandleOperation(bool value)
+        {
+            return value || Value;
+        }
+    }
+
+    [Serializable, TypeRegistryItem("【且&&】布尔结算操作")]
+    public class SettleOperationBool_And : SettleOperationBool
+    {
+        public SettleOperationBool_And()
+        {
+            Order = 30; // 逻辑与，较高优先级
+        }
+        
+        public override bool HandleOperation(bool value)
+        {
+            return value && Value;
+        }
+    }
+
+    [Serializable, TypeRegistryItem("【开On】布尔结算操作")]
+    public class SettleOperationBool_TurnOn : SettleOperationBool
+    {
+        public SettleOperationBool_TurnOn()
+        {
+            Order = 60; // 强制开启，最高优先级
+        }
+        
+        public override bool HandleOperation(bool value)
+        {
+            return true;
+        }
+    }
+
+    [Serializable, TypeRegistryItem("【关Off】布尔结算操作")]
+    public class SettleOperationBool_TurnOff : SettleOperationBool
+    {
+        public SettleOperationBool_TurnOff()
+        {
+            Order = 80; // 强制关闭，最高优先级
+        }
+        
+        public override bool HandleOperation(bool value)
+        {
+            return false;
+        }
+    }
+
+    [Serializable, TypeRegistryItem("【非】布尔结算操作")]
+    public class SettleOperationBool_Not : SettleOperationBool
+    {
+        public SettleOperationBool_Not()
+        {
+            Order = 100; // 取反，最低优先级
+        }
+        
+        public override bool HandleOperation(bool value)
+        {
+            return !value;
+        }
+    }
+    #endregion
+
     [Serializable, TypeRegistryItem("浮点结算操作")]
     public class SettleOperationFloat : SettleOperation<float, SettlementFloat, SettleOperationFloat>
     {
-        [LabelText("特殊类型")] public SettleSelfTypeForFloat selfType = SettleSelfTypeForFloat.None;
-        [LabelText("结算操作类型")] public OperationOptionsForFloat settleType = OperationOptionsForFloat.Add;
+        [LabelText("特殊类型")] public SettleOperationSelfType selfType = SettleOperationSelfType.None;
         public override float HandleOperation(float value)
         {
-            return Operaton.OpearationFloat_Inline(value, Value, settleType);
+            return value + Value;
         }
 
-        public override void SetValue(float f)
+        public sealed override void SetValue(float f)
         {
             Value = f;
         }
 
-        public override void SetValue(bool b)
+        public sealed override void SetValue(bool b)
         {
-            Value = b ?1 : 0;
+            Value = b ? 1 : 0;
         }
 
         public void TryStart(SettlementFloat to, bool ForceNormal = false)
         {
             if (to != null)
             {
-                if (!ForceNormal && selfType.HasFlag(SettleSelfTypeForFloat.Dynamic)) to.AddDynamicOperation(this);
+                if (!ForceNormal && selfType.HasFlag(SettleOperationSelfType.Dynamic)) to.AddDynamicOperation(this);
                 else to.AddNormalOperation(this);
             }
         }
@@ -112,12 +174,114 @@ namespace ES {
         {
             if (to != null)
             {
-                if (!ForceNormal && selfType.HasFlag(SettleSelfTypeForFloat.Dynamic)) to.RemoveDynamicOperation(this);
+                if (!ForceNormal && selfType.HasFlag(SettleOperationSelfType.Dynamic)) to.RemoveDynamicOperation(this);
                 else to.RemoveNormalOperation(this);
             }
         }
     }
 
+    #region  多态完成
+    [Serializable, TypeRegistryItem("【加】浮点结算操作")]
+    public class SettleOperationFloat_Add : SettleOperationFloat
+    {
+        public SettleOperationFloat_Add()
+        {
+            Order = 20; // 第一步：基础数值运算
+        }
+        
+        public override float HandleOperation(float value)
+        {
+            return value + Value;
+        }
+    }
 
-  
+    [Serializable, TypeRegistryItem("【减】浮点结算操作")]
+    public class SettleOperationFloat_Subtract : SettleOperationFloat
+    {
+        public SettleOperationFloat_Subtract()
+        {
+            Order = 20; // 第一步：基础数值运算
+        }
+        
+        public override float HandleOperation(float value)
+        {
+            return value - Value;
+        }
+    }
+
+    [Serializable, TypeRegistryItem("【震荡】浮点结算操作")]
+    public class SettleOperationFloat_Wave : SettleOperationFloat
+    {
+        [LabelText("震荡频率")] public float frequency = 1f;
+        
+        public SettleOperationFloat_Wave()
+        {
+            Order = 40; // 第二步：在基础值基础上添加特效
+        }
+        
+        public override float HandleOperation(float value)
+        {
+            return value + Mathf.Sin(Time.time * frequency) * Value;
+        }
+    }
+
+    [Serializable, TypeRegistryItem("【乘】浮点结算操作")]
+    public class SettleOperationFloat_Multiply : SettleOperationFloat
+    {
+        public SettleOperationFloat_Multiply()
+        {
+            Order = 60; // 第三步：倍率运算
+        }
+        
+        public override float HandleOperation(float value)
+        {
+            return value * Value;
+        }
+    }
+
+    [Serializable, TypeRegistryItem("【增益】浮点结算操作")]
+    public class SettleOperationFloat_PercentageUp : SettleOperationFloat
+    {
+        public SettleOperationFloat_PercentageUp()
+        {
+            Order = 70; // 第三步：百分比增益（与乘法同级）
+        }
+        
+        public override float HandleOperation(float value)
+        {
+            return value * (1f + Value);
+        }
+    }
+
+    [Serializable, TypeRegistryItem("【限制最大】浮点结算操作")]
+    public class SettleOperationFloat_ClampMax : SettleOperationFloat
+    {
+        public SettleOperationFloat_ClampMax()
+        {
+            Order = 100; // 第四步：最终限制，确保合理范围
+        }
+        
+        public override float HandleOperation(float value)
+        {
+            return Mathf.Min(value, Value);
+        }
+    }
+
+    [Serializable, TypeRegistryItem("【限制最小】浮点结算操作")]
+    public class SettleOperationFloat_ClampMin : SettleOperationFloat
+    {
+        public SettleOperationFloat_ClampMin()
+        {
+            Order = 100; // 第四步：最终限制，确保合理范围
+        }
+        
+        public override float HandleOperation(float value)
+        {
+            return Mathf.Max(value, Value);
+        }
+    }
+
+    #endregion
+
+
 }

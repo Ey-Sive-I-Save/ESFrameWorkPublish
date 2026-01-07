@@ -24,7 +24,7 @@ namespace ES
     public abstract class OutputOpeationDelegate<Target,Logic, MakeAction> :
         OutputOperation_MustCancel<Target,Logic>
         where MakeAction : Delegate
-        where Logic : IOpStoreKeyValueForOutputOpeation<IOperation, DeleAndCount, OutputOpeationDelegateFlag>
+        where Logic : IOpStoreDictionary<IOperation, DeleAndCount, OutputOpeationDelegateFlag>
     {
         
         

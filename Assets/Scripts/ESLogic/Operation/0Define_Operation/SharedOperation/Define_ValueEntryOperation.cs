@@ -17,30 +17,30 @@ namespace ES
     public class Operaton : IOperation
     {
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-        public static float OpearationFloat_Inline(float value, float Value, OperationOptionsForFloat settleType)
+        public static float OpearationFloat_Inline(float BaseValue, float HandleValue, FloatValueEntryType settleType)
         {
             switch (settleType)
             {
-                case OperationOptionsForFloat.Add: return value + Value;
-                case OperationOptionsForFloat.Sub: return value - Value;
-                case OperationOptionsForFloat.PerUp: return value * (1 + Value);
-                case OperationOptionsForFloat.Max: return Mathf.Clamp(value, value, Value);
-                case OperationOptionsForFloat.Min: return Mathf.Clamp(value, Value, value);
-                case OperationOptionsForFloat.Wave: return value + UnityEngine.Random.Range(-Value, Value);
-                default: return value;
+                case FloatValueEntryType.Add: return BaseValue + HandleValue;
+                case FloatValueEntryType.Subtract: return BaseValue - HandleValue;
+                case FloatValueEntryType.PercentageUp: return BaseValue * (1 + HandleValue);
+                case FloatValueEntryType.ClampMax: return Mathf.Clamp(BaseValue, BaseValue, HandleValue);
+                case FloatValueEntryType.ClampMin: return Mathf.Clamp(BaseValue, HandleValue, BaseValue);
+                case FloatValueEntryType.Wave: return BaseValue + UnityEngine.Random.Range(-HandleValue, HandleValue);
+                default: return BaseValue;
             }
         }
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-        public static float OpearationFloat_Cancel_Inline(float value, float Value, OperationOptionsForFloat settleType)
+        public static float OpearationFloat_Cancel_Inline(float value, float Value, FloatValueEntryType settleType)
         {
             switch (settleType)
             {
-                case OperationOptionsForFloat.Add: return value - Value;
-                case OperationOptionsForFloat.Sub: return value + Value;
-                case OperationOptionsForFloat.PerUp: return value._SafeDivide(1 + Value);
-                case OperationOptionsForFloat.Max: return Mathf.Clamp(value, value, Value);
-                case OperationOptionsForFloat.Min: return Mathf.Clamp(value, Value, value);
-                case OperationOptionsForFloat.Wave: return value + UnityEngine.Random.Range(-Value, Value);
+                case FloatValueEntryType.Add: return value - Value;
+                case FloatValueEntryType.Subtract: return value + Value;
+                case FloatValueEntryType.PercentageUp: return value._SafeDivide(1 + Value);
+                case FloatValueEntryType.ClampMax: return Mathf.Clamp(value, value, Value);
+                case FloatValueEntryType.ClampMin: return Mathf.Clamp(value, Value, value);
+                case FloatValueEntryType.Wave: return value + UnityEngine.Random.Range(-Value, Value);
                 default: return value;
             }
         }
@@ -64,13 +64,13 @@ namespace ES
 
     #region 演示
     //Float 值通道
-    public abstract class ValueEntryFloatOperation<Target,Logic> : ValueEntryOperation<Target,Logic, float, float, OperationOptionsForFloat>
+    public abstract class ValueEntryFloatOperation<Target,Logic> : ValueEntryOperation<Target,Logic, float, float, FloatValueEntryType>
     {
-        protected sealed override void ExpandOperation(ref float or, float OperationValue, OperationOptionsForFloat SelectType_)
+        protected sealed override void ExpandOperation(ref float or, float OperationValue, FloatValueEntryType SelectType_)
         {
             or = Operaton.OpearationFloat_Inline(or, OperationValue, SelectType_);
         }
-        protected sealed override void ExpandCancel(ref float or, float OperationValue, OperationOptionsForFloat SelectType_ = OperationOptionsForFloat.Add)
+        protected sealed override void ExpandCancel(ref float or, float OperationValue, FloatValueEntryType SelectType_ = FloatValueEntryType.Add)
         {
             or = Operaton.OpearationFloat_Cancel_Inline(or, OperationValue, SelectType_);
         }

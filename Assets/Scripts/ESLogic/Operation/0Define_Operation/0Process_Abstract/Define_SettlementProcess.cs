@@ -61,9 +61,9 @@ namespace ES {
         {
             if (use == null) return;
             if (use.Source == null) use.Source = this;
-            if (!_sortedNormalOperations.TryGetValue(use.Priority, out var group))
+            if (!_sortedNormalOperations.TryGetValue(use.Order, out var group))
             {
-                _sortedNormalOperations.Add(use.Priority, group = new List<Opeation_>());
+                _sortedNormalOperations.Add(use.Order, group = new List<Opeation_>());
             }
             group.Add(use);
 
@@ -79,7 +79,7 @@ namespace ES {
         public void RemoveNormalOperation(Opeation_ use)
         {
             if (use == null) return;
-            if (_sortedNormalOperations.TryGetValue(use.Priority, out var group))
+            if (_sortedNormalOperations.TryGetValue(use.Order, out var group))
             {
                 group.Remove(use);
             }
@@ -94,7 +94,7 @@ namespace ES {
             if (!AllNormalOperations.TryGetValue(source, out var sourceList)) return;
             foreach (var i in sourceList)
             {
-                var group = _sortedNormalOperations[i.Priority];
+                var group = _sortedNormalOperations[i.Order];
                 group.Remove(i);
             }
             AllNormalOperations.Remove(source);
@@ -141,18 +141,43 @@ namespace ES {
             ReCalculateDynamic();
         }
 
-        public void AddOpearation(Opeation_ op, SettlementChannel channel)
+        public void AddOperation(Opeation_ op, SettlementChannel channel)
         {
             if (channel == SettlementChannel.Normal) AddNormalOperation(op);
             else AddDynamicOperation(op);
         }
 
-        public void RemoveOpearation(Opeation_ op, SettlementChannel channel)
+        public void RemoveOperation(Opeation_ op, SettlementChannel channel)
         {
             if (channel == SettlementChannel.Normal) RemoveNormalOperation(op);
             else RemoveDynamicOperation(op);
         }
 
+        public void ClearChannel(SettlementChannel channel)
+        {
+            if (channel == SettlementChannel.Normal)
+            {
+                _sortedNormalOperations.Clear();
+                AllNormalOperations.Clear();
+            }
+            else
+            {
+                dyncmicOperations.Clear();
+            }
+            MakeDirty();
+        }
+
+        public IReadOnlyList<Opeation_> GetOperations(SettlementChannel channel)
+        {
+            if (channel == SettlementChannel.Normal)
+            {
+                return _sortedNormalOperations.Values.SelectMany(i => i).ToList();
+            }
+            else
+            {
+                return dyncmicOperations.ToList();
+            }
+        }
     }
 
     [TypeRegistryItem("浮点结算结果值"), Serializable]

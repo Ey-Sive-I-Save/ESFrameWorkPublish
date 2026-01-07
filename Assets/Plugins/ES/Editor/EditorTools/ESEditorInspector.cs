@@ -51,7 +51,7 @@ namespace ES {
     {
         public override bool Apply(UnityEngine.Object ob)
         {
-            Debug.Log(""+ob+ ob.GetType());
+           // Debug.Log(""+ob+ ob.GetType());
             
             if(ob.GetType().IsSubclassOf(typeof(VisualGUIDrawerSO)))
             {

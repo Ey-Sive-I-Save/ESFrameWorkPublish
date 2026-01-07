@@ -14,7 +14,7 @@ namespace ES
 
     }
     public abstract class OutputOperationBuffer<Target,Logic, ValueType, Buffer, BufferSource, This> : IOutputOperation<Target,Logic>
-        where Logic : IOpStoreSafeKeyGroupForOutputOpeation<This, Buffer, OutputOpeationBufferFlag>
+        where Logic : IOpStoreKeyGroup<This, Buffer, OutputOpeationBufferFlag>
         where Buffer : BufferOperationAbstract, new()
         where BufferSource : BufferDataSource<ValueType>
         where This : OutputOperationBuffer<Target,Logic, ValueType, Buffer, BufferSource, This>
@@ -51,10 +51,10 @@ namespace ES
     //数值导向+直接输入(这种可以绕过数值传递直接Update)
     public abstract class OutputOperationBuffer_TargetAndDirectInput<Target,Logic, ValueType, Buffer, BufferSource,ValueEntryOp, This> :
         OutputOperationBuffer<Target,Logic, ValueType, Buffer, BufferSource, This>
-        where Logic : IOpStoreSafeKeyGroupForOutputOpeation<This, Buffer, OutputOpeationBufferFlag>
+        where Logic : IOpStoreKeyGroup<This, Buffer, OutputOpeationBufferFlag>
         where Buffer : BufferOperation<ValueType, BufferSource, Buffer>, new()
         where BufferSource : BufferDataSource<ValueType>
-        where ValueEntryOp : IValueEntryOperation<Target,Logic, ValueType, ValueType, OperationOptionsForFloat>
+        where ValueEntryOp : IValueEntryOperation<Target,Logic, ValueType, ValueType, FloatValueEntryType>
         where This : OutputOperationBuffer_TargetAndDirectInput<Target,Logic, ValueType, Buffer, BufferSource,ValueEntryOp, This>
     {
         [LabelText("输入缓冲源")]
@@ -72,7 +72,7 @@ namespace ES
         {
             if (valueEntryOp != null)
             {
-                valueEntryOp.HandleValueEntryOpeation(target, logic,bufferSource.EvaluateThisFrame(ref buffer.timeHasGo), OperationOptionsForFloat.Add);
+                valueEntryOp.HandleValueEntryOpeation(target, logic,bufferSource.EvaluateThisFrame(ref buffer.timeHasGo), FloatValueEntryType.Add);
                 if (buffer.timeHasGo >= bufferSource.allTime)
                 {
                     TryStopTheBuffer(target, logic,buffer);//提前退出
@@ -86,7 +86,7 @@ namespace ES
             {
                 if (valueEntryOp != null)
                 {
-                    valueEntryOp.HandleValueEntryOpeation(target, logic, bufferSource.EvaluateToEndFrame(ref buffer.timeHasGo), OperationOptionsForFloat.Add);
+                    valueEntryOp.HandleValueEntryOpeation(target, logic, bufferSource.EvaluateToEndFrame(ref buffer.timeHasGo), FloatValueEntryType.Add);
                     use.Remove(buffer);
                 } 
                 foreach(var i in use)
@@ -104,8 +104,8 @@ namespace ES
     OutputOperationBuffer_TargetAndDirectInput
     <Target,Logic, float, BufferOperationFloat, BufferDataFloatSource,ValueEntryOp
     , OutputOperationBufferFloat_TargetAndDirectInput<Target,Logic,ValueEntryOp>>
-          where Logic : IOpStoreSafeKeyGroupForOutputOpeation<OutputOperationBufferFloat_TargetAndDirectInput<Target,Logic,ValueEntryOp>, BufferOperationFloat, OutputOpeationBufferFlag>
-         where ValueEntryOp : IValueEntryOperation<Target,Logic, float, float, OperationOptionsForFloat>
+          where Logic : IOpStoreKeyGroup<OutputOperationBufferFloat_TargetAndDirectInput<Target,Logic,ValueEntryOp>, BufferOperationFloat, OutputOpeationBufferFlag>
+         where ValueEntryOp : IValueEntryOperation<Target,Logic, float, float, FloatValueEntryType>
     {
 
     }

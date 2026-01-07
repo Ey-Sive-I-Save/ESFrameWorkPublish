@@ -11,7 +11,7 @@ namespace ES
        
     }*/
     [Serializable]
-    public abstract class ESRuntimeOpSupport_ValueEntryFloatOperation : ValueEntryFloatOperation<ESRuntimeTarget,IESRuntimeLogic>
+    public abstract class ESRuntimeOpSupport_ValueEntryFloatOperation : ValueEntryFloatOperation<ESRuntimeTarget,IOpSupporter_OB>
     {
        
     }

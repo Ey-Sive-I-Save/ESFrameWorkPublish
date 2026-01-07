@@ -11,7 +11,7 @@ namespace ES
        
     }*/
     [Serializable]
-    public abstract class ESRuntimeOpSupport_SettleOutputOperation_Float_TargetAndDirectInput : OutputOperationBufferFloat_TargetAndDirectInput<ESRuntimeTarget,IESRuntimeLogic,ESRuntimeOpSupport_ValueEntryFloatOperation>
+    public abstract class ESRuntimeOpSupport_SettleOutputOperation_Float_TargetAndDirectInput : OutputOperationBufferFloat_TargetAndDirectInput<ESRuntimeTarget,IOpSupporter_OB,ESRuntimeOpSupport_ValueEntryFloatOperation>
     {
                                                                                                
     }

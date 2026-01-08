@@ -46,7 +46,7 @@ namespace ES
         /// <param name="a"></param>
         /// <param name="b"></param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void _Swap<T>(ref this T a, ref T b) where T : struct
+        public static void _Swap<T>(ref T a, ref T b) where T : struct
         {
             (a, b) = (b, a);
         }

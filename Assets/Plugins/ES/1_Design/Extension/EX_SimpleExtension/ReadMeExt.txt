@@ -192,15 +192,15 @@ Color rgb = color._WithRGB(0.8f, 0.2f, 0.9f); // 自定义RGB
 
 // 透明度操作
 Color faded = color._MultiplyAlpha(0.5f);     // 透明度减半
-Color premult = color._RGBMutiAlpha();        // RGB预乘透明度
+Color premult = color._RGBMultiAlpha();        // RGB预乘透明度
 
 // 颜色转换
-string hex = color._AsHexFormat();            // "#FF0000"
+string hex = color._ToHex16String();            // "#FF0000"
 Color fromHex = "#00FF00"._ColorFromHex();    // 绿色
 Color inverted = color._Invert();             // 青色
 
 // 亮度和灰度
-Color darker = color._WithRGBMuti(0.5f);      // 变暗
+Color darker = color._WithRGBMulti(0.5f);      // 变暗
 Color gray = color._AsGrayscale();            // 转灰度
 float brightness = color._GetGrayscale();      // 获取灰度值
 ```

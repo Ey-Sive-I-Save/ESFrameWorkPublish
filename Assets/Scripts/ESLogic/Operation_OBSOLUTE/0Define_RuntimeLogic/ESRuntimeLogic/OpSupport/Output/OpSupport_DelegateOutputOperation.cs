@@ -6,7 +6,7 @@ namespace ES
 {
     [Serializable]
     public abstract class ESRuntimeOpSupport_DelegateOutputOperation<MakeAction> : 
-    OutputOpeationDelegate<ESRuntimeTarget,IOpSupporter_OB,MakeAction>
+    OutputOpeationDelegate<ESRuntimeTarget,IOpSupporter,MakeAction>
     where MakeAction:Delegate
     {
 

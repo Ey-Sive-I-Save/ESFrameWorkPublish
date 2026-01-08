@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace ES {
     // UI 通用 可输出操作  ---  on 作用于  from 影响源  with 选通，执行类型 等
-    public interface IOperationUI : IOutputOperation<ESUIElement,ESUIElement, ILink_UI_OperationOptions>
+    public interface IOperationUI : IOutputOperation_OBSOLUTE<ESUIElement,ESUIElement, ILink_UI_OperationOptions>
     {
 
     }

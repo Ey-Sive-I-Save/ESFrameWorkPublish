@@ -8,7 +8,7 @@ using UnityEngine;
 namespace ES
 {
 
-    public static class ExtensionForCompoent 
+    public static class ExtForCompoent 
     {
         #region 常规脚本
         /// <summary>

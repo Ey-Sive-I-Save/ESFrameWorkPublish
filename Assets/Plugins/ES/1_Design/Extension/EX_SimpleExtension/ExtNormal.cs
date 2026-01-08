@@ -15,7 +15,7 @@ using UnityEngine.UIElements;
 namespace ES
 {
 
-    public static partial class ExtensionNormal
+    public static partial class ExtNormal
     {
         /// <summary>
         /// 产生一个只有自己的列表

@@ -7,7 +7,7 @@ using UnityEngine;
 namespace ES
 {
 
-    public static class ExtensionForGameObject
+    public static class ExtForGameObject
     {
         /// <summary>
         /// 获取或者添加组件

@@ -9,7 +9,7 @@ using UnityEngine;
 namespace ES
 {
     
-    public static class ExtensionForUnityObject
+    public static class ExtForUnityObject
     {
         /// <summary>
         /// 一句话完成安全调用方法 ob._TryUse()?.InvokeXXX();

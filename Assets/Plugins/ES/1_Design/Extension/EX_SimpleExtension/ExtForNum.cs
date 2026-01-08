@@ -13,7 +13,7 @@ namespace ES
     /// <summary>
     /// 针对 float 和 int 的扩展方法集合
     /// </summary>
-    public static class ExtensionForFloatAndInt
+    public static class ExtForNum
     {
         #region 运算辅助
 

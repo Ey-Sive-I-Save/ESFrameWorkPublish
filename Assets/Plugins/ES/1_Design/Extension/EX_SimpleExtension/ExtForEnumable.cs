@@ -7,7 +7,7 @@ using UnityEngine;
 namespace ES
 {
 
-    public static class ExtensionForEnumable
+    public static class ExtForEnumable
     {
 
         #region 快捷功能

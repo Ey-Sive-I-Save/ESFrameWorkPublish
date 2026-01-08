@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public static class ExtensionForCouroutine 
+public static class ExtForCouroutine 
 {
     /// <summary>
     /// 启动协程于

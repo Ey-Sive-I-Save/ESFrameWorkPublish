@@ -7,7 +7,7 @@ using UnityEngine;
 namespace ES
 {
 
-    public static class ExtensionForColor
+    public static class ExtForColor
     {
         #region RGB 通道修改
         /// <summary>

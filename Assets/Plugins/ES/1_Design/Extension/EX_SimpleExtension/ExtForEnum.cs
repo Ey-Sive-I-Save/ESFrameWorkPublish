@@ -10,7 +10,7 @@ using UnityEngine;
 namespace ES
 {
 
-    public static class ExtensionForEnum 
+    public static class ExtForEnum 
     {
         #region 常规
 

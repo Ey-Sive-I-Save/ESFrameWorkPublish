@@ -45,7 +45,7 @@ namespace ES
     /// float value = number._AsFloat(0f);  // 安全转换为浮点数
     /// </code>
     /// </summary>
-    public static class ExtensionForString
+    public static class ExtForString_Main
     {
         #region 截取系列
         // ==================================================================================

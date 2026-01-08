@@ -8,7 +8,7 @@ using UnityEngine;
 namespace ES
 {
 
-    public static class ExtensionForVector
+    public static class ExtForVector
     {
         #region V3乘除操作
         /// <summary>

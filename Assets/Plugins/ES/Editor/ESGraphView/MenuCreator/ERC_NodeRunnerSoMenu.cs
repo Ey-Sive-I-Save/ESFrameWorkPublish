@@ -8,7 +8,7 @@ namespace ES
     {
         public override void Handle(CreateNodeRunnerSoMenuAttribute attribute, Type type)
         {
-            var flags= ExtensionForEnum._GetEnumValues<NodeEnvironment>();
+            var flags= ExtForEnum._GetEnumValues<NodeEnvironment>();
             ESNodeUtility.UseNodes.Add( NodeEnvironment.None, (attribute.Group, attribute.Name, type));
             foreach (var i in flags)
             {

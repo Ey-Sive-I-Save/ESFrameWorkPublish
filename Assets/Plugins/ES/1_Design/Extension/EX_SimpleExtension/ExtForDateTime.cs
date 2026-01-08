@@ -6,7 +6,7 @@ using UnityEngine;
 
 
 namespace ES {
-    public static class ExtensionForDateTime
+    public static class ExtForDateTime
     {
         #region 浮点秒与String字符串显示的转化
 

@@ -84,6 +84,7 @@ namespace ES
 
     public class ResSamples : SerializedMonoBehaviour
     {   
+        
         public BidirectionalDictionary<string, int> bidirectionalDictionary1;
         public ContextPool pool;
         public QuestCore QuestCore;

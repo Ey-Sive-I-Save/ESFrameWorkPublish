@@ -328,6 +328,50 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &275208038
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 275208040}
+  - component: {fileID: 275208039}
+  m_Layer: 0
+  m_Name: GameObject (4)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &275208039
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 275208038}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e944035c62fa0894da9d17a52c9a8237, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &275208040
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 275208038}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.19973153, y: -0.49425262, z: 0.002980113}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &281363860
 GameObject:
   m_ObjectHideFlags: 0
@@ -2305,14 +2349,30 @@ MonoBehaviour:
     rid: -2
   ContextPool:
     _InitValues: []
-    LinkRCL_Tag: {}
-    LinkRCL_Float: {}
-    LinkRCL_Vector: {}
-    LinkRCL_Int: {}
-    LinkRCL_String: {}
-    LinkRCL_Bool: {}
-    LinkRCL_ClassT: {}
-    LinkRCL_UnityObjectT: {}
+    LinkRCL_Tag:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_Float:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_Vector:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_Int:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_String:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_Bool:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_ClassT:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_UnityObjectT:
+      CIRS:
+        _autoCreateOnAccess: 1
   testElement: "\u6D4B\u8BD5"
   _myRoot: {fileID: 0}
   references:
@@ -2735,14 +2795,30 @@ MonoBehaviour:
     - rid: 6988048868860755968
     - rid: 6988048868860755969
     - rid: 6988048868860755970
-    LinkRCL_Tag: {}
-    LinkRCL_Float: {}
-    LinkRCL_Vector: {}
-    LinkRCL_Int: {}
-    LinkRCL_String: {}
-    LinkRCL_Bool: {}
-    LinkRCL_ClassT: {}
-    LinkRCL_UnityObjectT: {}
+    LinkRCL_Tag:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_Float:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_Vector:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_Int:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_String:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_Bool:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_ClassT:
+      CIRS:
+        _autoCreateOnAccess: 1
+    LinkRCL_UnityObjectT:
+      CIRS:
+        _autoCreateOnAccess: 1
   AutoInit: 1
   AutoEnable: 1
   references:
@@ -3938,3 +4014,4 @@ SceneRoots:
   - {fileID: 3111962118458530166}
   - {fileID: 1108918425}
   - {fileID: 415723010}
+  - {fileID: 275208040}

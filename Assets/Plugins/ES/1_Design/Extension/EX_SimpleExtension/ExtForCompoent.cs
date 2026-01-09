@@ -347,6 +347,30 @@ namespace ES
                 }
             }
         }
+
+         /// <summary>
+        /// 将源 Transform 的选定属性拷贝到目标 Transform。
+        /// 使用 flags 控制包括位置/旋转/缩放（位掩码）。
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void _CopyTransform(this Transform src, Transform dst, TransformCopyFlags flags = TransformCopyFlags.All)
+        {
+            if (src == null || dst == null) return;
+            if ((flags & TransformCopyFlags.PositionLocal) != 0) dst.localPosition = src.localPosition;
+            if ((flags & TransformCopyFlags.RotationLocal) != 0) dst.localRotation = src.localRotation;
+            if ((flags & TransformCopyFlags.ScaleLocal) != 0) dst.localScale = src.localScale;
+            if ((flags & TransformCopyFlags.PositionWorld) != 0) dst.position = src.position;
+            if ((flags & TransformCopyFlags.RotationWorld) != 0) dst.rotation = src.rotation;
+        }
+
+        /// <summary>
+        /// ApplyTransform 为 _CopyTransform 的别名，便于语义使用。
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void _ApplyTransform(this Transform dst, Transform src, TransformCopyFlags flags = TransformCopyFlags.All)
+        {
+            _CopyTransform(src, dst, flags);
+        }
         #endregion
     }
 }

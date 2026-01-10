@@ -78,7 +78,7 @@ namespace ES
         /// <param name="r">新的红色分量。</param>
         /// <returns>对传入颜色的引用（ref）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Color _WithRRef(ref Color color, float r)
+        public static ref Color _WithRRef(ref this Color color, float r)
         {
             color.r = r;
             return ref color;
@@ -90,7 +90,7 @@ namespace ES
         /// <param name="g">新的绿色分量。</param>
         /// <returns>修改后的颜色引用。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Color _WithGRef(ref Color color, float g)
+        public static ref Color _WithGRef(ref this Color color, float g)
         {
             color.g = g;
             return ref color;
@@ -102,7 +102,7 @@ namespace ES
         /// <param name="b">新的蓝色分量。</param>
         /// <returns>修改后的颜色引用。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Color _WithBRef(ref Color color, float b)
+        public static ref Color _WithBRef(ref this Color color, float b)
         {
             color.b = b;
             return ref color;
@@ -116,7 +116,7 @@ namespace ES
         /// <param name="alpha">新的透明度值（0-1）。</param>
         /// <returns>修改后的颜色引用。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Color _WithAlphaRef(ref Color color, float alpha)
+        public static ref Color _WithAlphaRef(ref this Color color, float alpha)
         {
             color.a = alpha;
             return ref color;
@@ -148,7 +148,7 @@ namespace ES
         /// 就地将透明度乘以给定乘数（按引用传入）。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Color _AlphaMultiplyRef(ref Color color, float alphaMultiplier)
+        public static ref Color _AlphaMultiplyRef(ref this Color color, float alphaMultiplier)
         {
             color.a *= alphaMultiplier;
             return ref color;
@@ -169,7 +169,7 @@ namespace ES
         /// 就地预乘 Alpha（按引用传入）。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Color _RGBMultiAlphaRef(ref Color color)
+        public static ref Color _RGBMultiAlphaRef(ref this Color color)
         {
             color.r *= color.a;
             color.g *= color.a;
@@ -389,7 +389,7 @@ namespace ES
         /// 就地生成随机颜色（按引用传入），并返回对该颜色的引用。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Color _RandomColorRef(ref Color color, bool randomAlpha = false)
+        public static ref Color _RandomColorRef(ref this Color color, bool randomAlpha = false)
         {
             color = new Color(
                 UnityEngine.Random.value,
@@ -440,7 +440,7 @@ namespace ES
         /// 就地将 RGB 分量乘以给定系数（按引用传入）。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void _SetRGBMulti(ref Color color, float factor)
+        public static void _SetRGBMulti(ref this Color color, float factor)
         {
             color.r *= factor;
             color.g *= factor;
@@ -450,7 +450,7 @@ namespace ES
         /// 兼容旧名的就地方法（已弃用）：_WithRGBMutiRef -> _WithRGBMultiInplace
         /// </summary>
         [Obsolete("Use _SetRGBMulti instead")]
-        public static void _WithRGBMutiRef(ref Color color, float factor) => _SetRGBMulti(ref color, factor);
+        public static void _WithRGBMutiRef(ref this Color color, float factor) => _SetRGBMulti(ref color, factor);
     }
 }
 

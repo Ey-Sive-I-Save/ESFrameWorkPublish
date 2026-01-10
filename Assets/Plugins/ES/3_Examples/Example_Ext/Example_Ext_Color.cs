@@ -17,8 +17,9 @@ namespace ES
             // 1) 基础通道修改（返回新 Color）
             Color aR = a._WithR(0.5f); // 改变红色分量
             Debug.Log($"_WithR: {a} -> {aR}");
-
-            Color bRGB = b._WithRGB(0.9f, 0.1f, 0.2f);
+            
+            
+            Color bRGB = b._WithRGB(0.9f, 0.1f, 0.2f)._WithB(0.1f);
             Debug.Log($"_WithRGB: {b} -> {bRGB}");
 
             // 2) 透明度操作
@@ -68,12 +69,13 @@ namespace ES
             Debug.Log($"_WithRGBMulti: {b} -> {darker}");
 
             Color temp = b;
-            ExtForColor._SetRGBMulti(ref temp, 0.8f); // 就地修改示例（调用静态方法以清晰展示）
+            
+            temp._SetRGBMulti(0.1f);// 就地修改示例（调用静态方法以清晰展示）
             Debug.Log($"_SetRGBMulti (inplace): original {b} -> modified {temp}");
-
+                    
             // 8) 随机颜色（就地 ref 版本演示）
             Color rnd = Color.white;
-            ExtForColor._RandomColorRef(ref rnd, randomAlpha: true);
+            rnd._RandomColorRef(); // 就地修改
             Debug.Log($"_RandomColorRef -> {rnd}");
 
             // 9) 组合示例：将一个颜色转为 hex，再解析回来并比较

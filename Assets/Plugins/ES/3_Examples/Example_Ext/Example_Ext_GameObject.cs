@@ -58,7 +58,7 @@ namespace ES
 
             var dst = new GameObject("DstTrans");
             dst.transform.SetParent(root.transform);
-            dst.transform._CopyTransform(src.transform, TransformCopyFlags.PositionLocal | TransformCopyFlags.RotationLocal);
+            dst.transform._CopyTransform(src.transform, TransformCopyFlags.PositionLocal | TransformCopyFlags.RotationLocal );
             Debug.Log($"DstTrans position: {dst.transform.position}, rotation: {dst.transform.rotation.eulerAngles}");
 
             // 8) Destroy children (危险操作：示例仅打印并注释掉真实销毁)

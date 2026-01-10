@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using UnityEngine;
 
 // 示例：演示 ExtForEnum.cs 中常用方法
@@ -6,7 +7,7 @@ using UnityEngine;
 namespace ES
 {
     [Flags]
-    public enum ExampleFlags { A = 1, B = 2, C = 4 }
+    public enum ExampleFlags {[Description("Flag A")] A = 1, [Description("Flag B")] B = 2, [Description("Flag C")] C = 4 }
 
     public class Example_Ext_Enum : MonoBehaviour
     {

@@ -490,14 +490,12 @@ namespace ES
         /// 1. 不能为空或null
         /// 2. 只能包含字母、数字、下划线字符
         /// 3. 不能以数字开头
-        /// 4. 不能包含连续的下划线（2个或更多）
-        /// 5. 不能是C#保留关键字
+        /// 4. 不能是C#保留关键字
         /// 
         /// 【验证步骤】
         /// • 步骤1：检查是否包含非法字符（使用\W正则表达式）
         /// • 步骤2：检查是否以数字开头
-        /// • 步骤3：检查是否存在连续下划线
-        /// • 步骤4：检查是否为C#关键字
+        /// • 步骤3：检查是否为C#关键字
         /// 
         /// 【使用场景】
         /// • 代码生成器：验证生成的变量名、方法名
@@ -511,7 +509,7 @@ namespace ES
         /// "123invalid"._IsValidIdentName()       // 返回: false (以数字开头)
         /// "class"._IsValidIdentName()            // 返回: false (C#关键字)
         /// "valid_name"._IsValidIdentName()       // 返回: true
-        /// "invalid__name"._IsValidIdentName()    // 返回: false (连续下划线)
+        /// "invalid__name"._IsValidIdentName()    // 返回: true (连续下划线合法)
         /// </code>
         /// </summary>
         /// <param name="input">待验证的字符串</param>
@@ -521,20 +519,15 @@ namespace ES
             if (string.IsNullOrEmpty(input))
                 return false;
 
-            // 步骤1：查询是否包含所有非字母、数字、下划线的字符[6,7](@ref)
+            // 步骤1：查询是否包含所有非字母、数字、下划线的字符
             if (Regex.IsMatch(input, @"\W"))
                 return false;
-
 
             // 步骤2：查询是否以数字开头
             if (char.IsDigit(input[0]))
                 return false;
 
-            // 步骤3：查询连续下划线
-            if (Regex.IsMatch(input, @"_{2,}"))
-                return false;
-
-            // 步骤4：防止C#关键字冲突
+            // 步骤3：防止C#关键字冲突
             if (input._IsCSharpKeyword())
                 return false;
 

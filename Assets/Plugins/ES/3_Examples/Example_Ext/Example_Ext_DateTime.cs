@@ -23,6 +23,7 @@ namespace ES
             DateTime future = now.AddDays(3).AddHours(5);
             Debug.Log($"_DaysBetween -> {now._DaysBetween(future)} days");
             Debug.Log($"TotalDaysFromNowToThis -> {future._TotalDaysFromNowToThis()}");
+           // Debug.Log($"TotalDaysFromNowToThis -> {ago._TotalDaysFromThisToNow()}");
 
             // 4) 时间戳 / 毫秒时间戳
             long ts = now._AsTimestamp();

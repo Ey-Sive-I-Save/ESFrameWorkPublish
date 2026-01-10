@@ -53,8 +53,8 @@ namespace ES
             Debug.Log($"WeightedRandomIndex picked: {picked} (weight {weights[picked]})");
 
             // 6) 获取随机索引集合（不重复）
-           // var indices = sampleList._GetRandomIndices(3);
-           // Debug.Log($"Random indices: {string.Join(",", indices)}");
+            var indices = sampleList._GetRandomItems(3);
+            Debug.Log($"Random indices: {string.Join(",", indices)}");
 
             // 7) Bulk _RandomShuffle on array
             var arrNums = new int[] { 1, 2, 3, 4, 5, 6 };

@@ -11,7 +11,6 @@ namespace ES
     public static class ExtForEnumable
     {
 
-        #region 快捷功能
         /// <summary>
         /// 随机元素
         /// </summary>
@@ -23,10 +22,10 @@ namespace ES
         public static T _RandomItem<T>(this T[] array, T ifNullOrEmpty = default)
         {
             if (array == null || array.Length == 0) return ifNullOrEmpty;
-            if(array.Length==1) return array[0];
+            if (array.Length == 1) return array[0];
             return array[UnityEngine.Random.Range(0, array.Length)];
         }
-        
+
         /// <summary>
         /// 使用 <see cref="System.Random"/> 随机选择数组元素（便于测试与基准）。
         /// </summary>
@@ -51,7 +50,7 @@ namespace ES
             if (list.Count == 1) return list[0];
             return list[UnityEngine.Random.Range(0, list.Count)];
         }
-        
+
         /// <summary>
         /// 使用 <see cref="System.Random"/> 随机选择列表元素（便于测试与基准）。
         /// </summary>
@@ -240,7 +239,7 @@ namespace ES
             }
             return -1;
         }
-   /// <summary>
+        /// <summary>
         /// 按权重从数组中选择一个索引（权重为 int）。返回 -1 表示失败或总权重为0。
         /// </summary>
         public static int _WeightedRandomIndex(this List<int> weights)
@@ -320,12 +319,50 @@ namespace ES
             for (int i = 0; i < Math.Min(n, maxExclusive); i++) yield return indices[i];
         }
 
-       
+        /// <summary>
+        /// 针对数组：生成随机索引序列（可选择无放回或有放回）。
+        /// </summary>
+        public static IEnumerable<T> _GetRandomItems<T>(this T[] array, int n, bool withReplacement = false)
+        {
+            if (array == null || array.Length == 0 || n <= 0) yield break;
+            int maxExclusive = array.Length;
+            foreach (var idx in _GetRandomIndices(n, maxExclusive, withReplacement))
+                yield return array[idx];
+        }
 
-        #endregion
+        /// <summary>
+        /// 针对List：生成随机索引序列（可选择无放回或有放回）。
+        /// </summary>
+        public static IEnumerable<T> _GetRandomItems<T>(this List<T> list, int n, bool withReplacement = false)
+        {
+            if (list == null || list.Count == 0 || n <= 0) yield break;
+            int maxExclusive = list.Count;
+            foreach (var idx in _GetRandomIndices(n, maxExclusive, withReplacement))
+                yield return list[idx];
+        }
+
+        /// <summary>
+        /// 针对IEnumerable：生成随机索引序列（可选择无放回或有放回）。
+        /// </summary>
+        public static IEnumerable<T> _GetRandomItems<T>(this IEnumerable<T> source, int n, bool withReplacement = false)
+        {
+            if (source == null) yield break;
+            // 尝试转为ICollection以获得Count，否则ToList
+            List<T> list;
+            if (source is ICollection<T> col)
+                list = new List<T>(col);
+            else
+                list = new List<T>(source);
+            if (list.Count == 0 || n <= 0) yield break;
+            foreach (var idx in _GetRandomIndices(n, list.Count, withReplacement))
+                yield return list[idx];
+        }
 
 
-      
+        /// <summary>
+        /// 从IEnumerable中随机获取 n 个元素（可选择无放回或有放回）。
+        /// </summary>
+
+
     }
 }
-

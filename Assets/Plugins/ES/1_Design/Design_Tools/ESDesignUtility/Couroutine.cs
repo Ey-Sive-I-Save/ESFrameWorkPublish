@@ -13,19 +13,29 @@ namespace ES
     public static partial class ESDesignUtility
     {
         //
-        public static class Couroutine
+        public static class Coroutine
         {
+            // 固定时间缓存，避免在高频场景中每次 new WaitForSeconds 分配。
+            // 注意：这些是进程级别的静态缓存，生命周期与程序相同。
+            private static readonly WaitForSeconds s_wait_1s = new WaitForSeconds(1f);
+            private static readonly WaitForSeconds s_wait_0_5s = new WaitForSeconds(0.5f);
+            private static readonly WaitForSeconds s_wait_0_1s = new WaitForSeconds(0.1f);
+            private static readonly WaitForFixedUpdate s_waitFixedUpdate = new WaitForFixedUpdate();
+            private static readonly WaitForEndOfFrame s_waitEndOfFrame = new WaitForEndOfFrame();
 
-            #region Action协程包裹
+            
+            #region Action协程包裹（通用Action延迟/重复/持续/帧控制/条件执行等）
             /// <summary>
-            /// 协程重复执行
+            /// 重复执行指定的 <see cref="Action"/>。
+            /// 支持首次延时、固定间隔、指定次数或无限循环，并可通过 <see cref="CancellationTokenSource"/> 取消。
+            /// 典型场景：轮询、周期性任务、心跳或定时刷新。
             /// </summary>
-            /// <param name="action">执行</param>
-            /// <param name="startDelay">开始延迟</param>
-            /// <param name="internal_">间隔</param>
-            /// <param name="times">次数</param>
-            /// <param name="source">取消令牌</param>
-            /// <returns></returns>
+            /// <param name="action">要执行的委托，允许为 null（会被安全忽略）。</param>
+            /// <param name="startDelay">首次执行前的延迟，单位为秒。</param>
+            /// <param name="internal_">每次执行之间的间隔，单位为秒。</param>
+            /// <param name="times">执行次数；传入 -1 表示无限循环。</param>
+            /// <param name="source">可选的取消令牌源，用于外部中止协程。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>；遇取消或委托异常时安全退出。</returns>
             public static IEnumerator ActionRepeat(Action action, float startDelay = 1, float internal_ = 1, int times = -1, CancellationTokenSource source = default)
             {
 
@@ -55,12 +65,13 @@ namespace ES
                 }
             }
             /// <summary>
-            /// 协程延迟执行
+            /// 延迟指定时间后执行一个 <see cref="Action"/>，使用 Unity 的时间缩放（受 <c>Time.timeScale</c> 影响）。
+            /// 典型场景：延迟提示、冷却结束回调或需要等待一段游戏时间后执行的逻辑。
             /// </summary>
-            /// <param name="action">执行</param>
-            /// <param name="delay">延迟</param>
-            /// <param name="source">取消令牌</param>
-            /// <returns></returns>
+            /// <param name="action">要执行的委托，允许为 null（安全处理）。</param>
+            /// <param name="delay">延迟时长，单位为秒。</param>
+            /// <param name="source">可选的取消令牌源，在到达前可中止执行。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>；取消时协程静默结束。</returns>
             public static IEnumerator ActionDelay(Action action, float delay = 1, CancellationTokenSource source = default)
             {
                 yield return new WaitForSeconds(delay);
@@ -84,24 +95,72 @@ namespace ES
                 action?.Invoke();
             }
             /// <summary>
-            /// 协程延迟一帧执行
+            /// 在下一帧执行指定的 <see cref="Action"/>。
+            /// 用于等待当前帧的更新或渲染完成后再执行后续逻辑。
             /// </summary>
-            /// <param name="action">执行</param>
-            /// <returns></returns>
+            /// <param name="action">将在下一帧执行的委托，允许为 null（安全忽略）。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator ActionDelayOneFrame(Action action)
             {
                 yield return null;
                 action?.Invoke();
             }
+
             /// <summary>
-            /// 协程持续执行
+            /// 使用缓存的 WaitForSeconds(1s) 在大多数情况下避免分配，等待 1 秒后执行 action。
             /// </summary>
-            /// <param name="start">开始执行</param>
-            /// <param name="running">持续执行</param>
-            /// <param name="end">结束执行</param>
-            /// <param name="time">总时间</param>
-            /// <param name="source">取消令牌</param>
-            /// <returns></returns>
+            public static IEnumerator Delay1sCached(Action action)
+            {
+                yield return s_wait_1s;
+                action?.Invoke();
+            }
+
+            /// <summary>
+            /// 使用缓存的 WaitForSeconds(0.5s) 等待后执行 action。
+            /// </summary>
+            public static IEnumerator Delay0_5sCached(Action action)
+            {
+                yield return s_wait_0_5s;
+                action?.Invoke();
+            }
+
+            /// <summary>
+            /// 使用缓存的 WaitForSeconds(0.1s) 等待后执行 action。
+            /// </summary>
+            public static IEnumerator Delay0_1sCached(Action action)
+            {
+                yield return s_wait_0_1s;
+                action?.Invoke();
+            }
+
+            /// <summary>
+            /// 在下一次 FixedUpdate 使用缓存的 WaitForFixedUpdate 执行 action。
+            /// </summary>
+            public static IEnumerator DelayNextFixedCached(Action action)
+            {
+                yield return s_waitFixedUpdate;
+                action?.Invoke();
+            }
+
+            /// <summary>
+            /// 在当前帧末尾（EndOfFrame）使用缓存的 WaitForEndOfFrame 执行 action。
+            /// </summary>
+            public static IEnumerator DelayEndOfFrameCached(Action action)
+            {
+                yield return s_waitEndOfFrame;
+                action?.Invoke();
+            }
+            /// <summary>
+            /// 在指定的总时长内持续执行回调：先执行 <paramref name="start"/>，
+            /// 然后在每次 FixedUpdate 调用时执行 <paramref name="running"/>，最后执行 <paramref name="end"/>。
+            /// 支持通过取消令牌提前终止。
+            /// </summary>
+            /// <param name="start">开始时调用的一次性回调，允许为 null。</param>
+            /// <param name="running">运行期间每个 FixedUpdate 调用的回调，允许为 null。</param>
+            /// <param name="end">结束时调用的一次性回调，允许为 null。</param>
+            /// <param name="time">总持续时间，单位为秒。</param>
+            /// <param name="source">可选的取消令牌源，用于提前中止协程。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>；遇取消或异常时安全退出。</returns>
             public static IEnumerator ActionRunning(Action start, Action running, Action end, float time, CancellationTokenSource source = default)
             {
                 start?.Invoke();
@@ -134,12 +193,13 @@ namespace ES
                 yield return null;
             }
             /// <summary>
-            /// 延迟真实时间执行<While原理>(TimeScale!=0)
+            /// 以真实时间为基准等待指定时长（不受 <c>Time.timeScale</c> 影响），
+            /// 使用 while 循环逐帧检查以支持在等待期间响应取消请求，等待结束后执行回调。
             /// </summary>
-            /// <param name="time">等待真实时间</param>
-            /// <param name="action">执行内容</param>
-            /// <param name="source">取消源</param>
-            /// <returns></returns>
+            /// <param name="time">真实时间等待时长，单位为秒。</param>
+            /// <param name="action">等待结束后要执行的委托，允许为 null。</param>
+            /// <param name="source">可选的取消令牌源，用于在等待期间中止。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator ActionWaitForRealSecondsBaseWhile(float time, Action action, CancellationTokenSource source = default)
             {
                 float start = Time.realtimeSinceStartup;
@@ -163,17 +223,17 @@ namespace ES
                         Debug.Log("其他原因错误" + e2);
                         yield break;
                     }
-                   
+
                 }
                 action?.Invoke();
             }
             /// <summary>
-            /// 延迟真实时间执行<通用>
+            /// 使用 <see cref="WaitForSecondsRealtime"/> 在真实时间（不受 <c>Time.timeScale</c> 影响）下延迟执行回调。
             /// </summary>
-            /// <param name="time">等待真实时间</param>
-            /// <param name="action">执行内容</param>
-            /// <param name="source">取消源</param>
-            /// <returns></returns>
+            /// <param name="time">真实时间等待时长，单位为秒。</param>
+            /// <param name="action">等待结束后要执行的委托，允许为 null。</param>
+            /// <param name="source">可选的取消令牌源。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator ActionWaitForRealSeconds(float time, Action action, CancellationTokenSource source = default)
             {
                 yield return new WaitForSecondsRealtime(time);
@@ -197,32 +257,33 @@ namespace ES
                 action?.Invoke();
             }
             /// <summary>
-            /// 等待Fixed更新执行
+            /// 在下一个物理 FixedUpdate 后执行给定的 <see cref="Action"/>，适合与物理系统同步的逻辑。
             /// </summary>
-            /// <param name="action">执行内容</param>
-            /// <returns></returns>
+            /// <param name="action">将在 FixedUpdate 后调用的委托，允许为 null。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator ActionWaitForFixedUpdate(Action action)
             {
                 yield return new WaitForFixedUpdate();
                 action?.Invoke();
             }
             /// <summary>
-            /// 等待帧末执行
+            /// 在当前帧的末尾（渲染后）执行指定的 <see cref="Action"/>，常用来做帧级别的清理或统计。
             /// </summary>
-            /// <param name="action">执行内容</param>
-            /// <returns></returns>
+            /// <param name="action">将在帧末调用的委托，允许为 null。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator ActionWaitForWaitForEndOfFrame(Action action)
             {
                 yield return new WaitForEndOfFrame();
                 action?.Invoke();
             }
             /// <summary>
-            /// 重复持续执行直到--Func<bool>
+            /// 按固定间隔重复执行指定的 <see cref="Action"/>，直到提供的停止条件返回 true 为止。
+            /// 用于轮询异步条件或等待外部状态满足的场景。
             /// </summary>
-            /// <param name="action">持续执行</param>
-            /// <param name="stopCondition">直到-true停止</param>
-            /// <param name="interval">间隔</param>
-            /// <returns></returns>
+            /// <param name="action">每次迭代要执行的委托，允许为 null。</param>
+            /// <param name="stopCondition">用于判断是否停止迭代的函数，返回 true 则停止。</param>
+            /// <param name="interval">每次迭代之间的间隔，单位为秒。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator ActionRepeatExecuteUntil(Action action, Func<bool> stopCondition, float interval = 1f)
             {
                 while (!stopCondition())
@@ -231,16 +292,19 @@ namespace ES
                     yield return new WaitForSeconds(interval);
                 }
             }
+
             #endregion
 
-            #region 特殊回调
+            #region 网络与资源异步回调（下载/加载/实例化/场景等）
+            // 特殊回调：网络下载、资源加载、场景加载、网络请求、异步实例化等
             /// <summary>
-            /// 依赖URL下载图片
+            /// 根据指定 URL 异步下载图片并在完成后通过回调返回纹理。
+            /// 使用 UnityWebRequestTexture 获取资源，支持超时设置。
             /// </summary>
-            /// <param name="url">URL链接</param>
-            /// <param name="timeout">超时</param>
-            /// <param name="callback">回调<成功，资源></param>
-            /// <returns></returns>
+            /// <param name="url">图片资源的完整 URL。</param>
+            /// <param name="timeout">下载超时时长（秒），默认为 10 秒。</param>
+            /// <param name="callback">下载完成后的回调，参数为 (成功?, Texture2D)。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator CallBackTextureDownload(string url, float timeout = 10f, Action<bool, Texture2D> callback = null)
             {
                 using (UnityWebRequest request = UnityWebRequestTexture.GetTexture(url))
@@ -261,12 +325,13 @@ namespace ES
                 }
             }
             /// <summary>
-            /// 依赖URl下载AssetBundle
+            /// 根据指定 URL 异步下载 AssetBundle 并通过回调返回结果。
+            /// 使用 UnityWebRequestAssetBundle 获取，支持超时与空包判定。
             /// </summary>
-            /// <param name="url">URL</param>
-            /// <param name="timeout">超时</param>
-            /// <param name="callback">AssetBundle回调<成功？,AB包></param>
-            /// <returns></returns>
+            /// <param name="url">AssetBundle 的 URL。</param>
+            /// <param name="timeout">下载超时时长（秒），默认为 30 秒。</param>
+            /// <param name="callback">下载完成后的回调，参数为 (成功?, AssetBundle)。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator CallBackAssetBundleDownload(string url, float timeout = 30f, Action<bool, AssetBundle> callback = null)
             {
                 using (UnityWebRequest request = UnityWebRequestAssetBundle.GetAssetBundle(url))
@@ -296,12 +361,13 @@ namespace ES
                 }
             }
             /// <summary>
-            /// 加载Resource资源
+            /// 异步加载 Resources 路径下的资源（使用 <see cref="Resources.LoadAsync{T}(string)"/>）。
+            /// 加载完成后通过回调返回指定类型的资源或 null（并在控制台输出错误）。
             /// </summary>
-            /// <typeparam name="T">资源类型</typeparam>
-            /// <param name="path">路径(Resource的)</param>
-            /// <param name="callback">资源回调(可能为NULL)</param>
-            /// <returns></returns>
+            /// <typeparam name="T">资源类型，必须继承自 <see cref="UnityEngine.Object"/>。</typeparam>
+            /// <param name="path">Resources 下的相对路径（不包含扩展名）。</param>
+            /// <param name="callback">加载完成后的回调，参数为加载到的资源或 null。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator CallBackLoadResource<T>(string path, Action<T> callback) where T : UnityEngine.Object
             {
                 ResourceRequest request = Resources.LoadAsync<T>(path);
@@ -319,12 +385,13 @@ namespace ES
                 }
             }
             /// <summary>
-            /// 加载场景
+            /// 异步加载指定场景（Additive 或 Single 模式），在完成后通过回调通知结果。
+            /// 使用 allowSceneActivation 控制激活时机，并在加载完成后触发回调。
             /// </summary>
-            /// <param name="sceneName">场景名字</param>
-            /// <param name="isAdditive">是叠加的？</param>
-            /// <param name="onComplete">结束时<成功？></param>
-            /// <returns></returns>
+            /// <param name="sceneName">要加载的场景名称（须在 Build Settings 中注册）。</param>
+            /// <param name="isAdditive">是否以 Additive 模式加载，默认为 true。</param>
+            /// <param name="onComplete">加载完成后的回调，参数为是否成功。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator CallBackLoadScene(string sceneName, bool isAdditive = true, System.Action<bool> onComplete = null)
             {
                 LoadSceneMode mode = isAdditive ? LoadSceneMode.Additive : LoadSceneMode.Single;
@@ -357,11 +424,12 @@ namespace ES
                 onComplete?.Invoke(true);
             }
             /// <summary>
-            /// 从URL获得网络申请文本
+            /// 发送 HTTP GET 请求并读取响应文本，完成后通过回调返回结果。
+            /// 兼容不同 Unity 版本的错误检测逻辑（条件编译）。
             /// </summary>
-            /// <param name="url">URL</param>
-            /// <param name="onComplete">结束回调<成功?，下载文本></param>
-            /// <returns></returns>
+            /// <param name="url">请求的完整 URL。</param>
+            /// <param name="onComplete">请求完成后的回调，参数为 (成功?, string 内容)。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator CallBackHttpGetRequestText(string url, Action<bool, string> onComplete = null)
             {
                 using (UnityWebRequest request = UnityWebRequest.Get(url))
@@ -384,15 +452,17 @@ namespace ES
                 }
             }
             /// <summary>
-            /// 实例化Resource预制件
+            /// 从 Resources 异步加载并实例化一个预制体，完成后通过回调返回实例。
+            /// 若加载失败则通过回调返回 null。
             /// </summary>
-            /// <param name="path">路径(Resource的)</param>
-            /// <param name="onComplete">生成完成回调(可能为NULL)</param>
-            /// <returns></returns>
+            /// <param name="path">Resources 下的预制体路径（不带扩展名）。</param>
+            /// <param name="onComplete">实例化完成后的回调，参数为生成的 GameObject 或 null。</param>
+            /// <returns>用于 <c>StartCoroutine</c> 的 <see cref="IEnumerator"/>。</returns>
             public static IEnumerator CallBackInstantiateResourcePrefab(string path, Action<GameObject> onComplete = null)
             {
                 // 先异步加载预制体
-                yield return CallBackLoadResource<GameObject>(path, (prefab) => {
+                yield return CallBackLoadResource<GameObject>(path, (prefab) =>
+                {
                     if (prefab != null)
                     {
                         // 加载成功后，实例化并返回实例

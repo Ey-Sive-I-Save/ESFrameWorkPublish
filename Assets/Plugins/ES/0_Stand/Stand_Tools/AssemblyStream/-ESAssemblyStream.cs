@@ -1,5 +1,3 @@
-
-
 using Sirenix.Utilities;
 using System;
 using System.Collections;
@@ -11,7 +9,7 @@ using System.Reflection;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
-using UnityEngine;
+using UnityEngine; 
 
 
 
@@ -27,23 +25,23 @@ using UnityEngine;
  */
 namespace ES
 {
-    public enum ESAssemblyLoadTiming : short
+    public class ESAssemblyLoadTiming 
     {
         /// <summary>
         /// 阶段0 ： 初始化程序集后
         /// </summary>
         [InspectorName("-100：初始化程序集后")]
-        _0_AfterInitAssemliesLoaded = -100,
+        public static int _0_AfterInitAssemliesLoaded = -100;
         /// <summary>
         /// 阶段1 ： 场景开始加载前
         /// </summary>
         [InspectorName("0：场景开始加载前")]
-        _1_BeforeFirstSceneLoad = 0,
-        /// <summary>
+        public static int _1_BeforeFirstSceneLoad = 0;  
+        /// <summary> 
         /// 阶段2 ： 场景加载完成后(已经全部Awake)
         /// </summary>
         [InspectorName("50：场景加载完成后")]
-        _2_AfterFirstSceneLoad = 50,
+        public static int _2_AfterFirstSceneLoad = 50;
     }
     public class ESAssemblyStream
     {
@@ -52,7 +50,7 @@ namespace ES
     };
         private static List<string> RuntimeValidAssebliesName = new List<string>() {
   "ES_Design","ES_Stand","Assembly-CSharp-Editor","Assembly-CSharp-Editor-firstpass","ES_Logic","Assembly-CSharp","Assembly-CSharp-firstpass","NewAssem","ESPlayer"
-   
+
     };
 #if UNITY_EDITOR
         //编辑器部分
@@ -645,10 +643,12 @@ namespace ES
             private static KeyGroup<int, Func<FieldInfo, bool>> HotHandler_FieldAttribute = new KeyGroup<int, Func<FieldInfo, bool>>();
             private static KeyGroup<int, Func<Type, bool>> HotHandler_ClassAttribute = new KeyGroup<int, Func<Type, bool>>();
             #endregion
-
+ 
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
             private static void RuntimeInitLoad_000_AfterAssembliesLoaded()
             {
+                DateTime startEditorStreamTime = DateTime.Now;
+                
                 //可以进行默认的加载捏
                 InitRuntimeAssembies = AppDomain.CurrentDomain.GetAssemblies();
 
@@ -663,30 +663,33 @@ namespace ES
                 InitHandler_ClassAttribute.Clear();
 
 
-                InitRuntime_InitAssembiesAndAllRegisters();//初始化注册器--
+                 InitRuntime_InitAssembiesAndAllRegisters();//初始化注册器--
 
                 Debug.Log("完成全部初始化" + InitRuntimeRegisters.ToStringAllContent());
 
-                DateTime startEditorStreamTime = DateTime.Now;
+
                 //专属功能
                 InitRuntime_ApplyThisTimingRegisters(-100);//应用注册器
 
                 InitRuntime_LoadRegisteredTypes(-100);
-
-                Debug.Log("第零阶段耗时" + (DateTime.Now - startEditorStreamTime));
-
+ 
+   
+                int conut=0;
+                  
                 //插入 -100 到 0
-                for (int i = -100; i < ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode(); i++)
+                for (int i = -100; i < ESAssemblyLoadTiming._1_BeforeFirstSceneLoad; i++)
                 {
                     InitRuntime_ApplyThisTimingRegisters(i);//应用注册器
-
+ 
                     InitRuntime_LoadRegisteredTypes(i);
+                    conut++;
                 }
-
-
+ 
+                Debug.Log("第零阶段耗时"+conut + (DateTime.Now - startEditorStreamTime));
+                return;
                 //等待注册
                 AppDomain.CurrentDomain.AssemblyLoad += HotRuntimeLoadNewAssembly;
-            }
+            }   
             private static void HotRuntimeLoadNewAssembly(object sender, AssemblyLoadEventArgs args)
             {
                 var asm = args.LoadedAssembly;
@@ -699,62 +702,63 @@ namespace ES
 
                 HotRuntime_ApplyThisAssemblyTimingRegisters(asm, -100);
                 OneTiming_HotLoadAllAssemblesRegistedTypes(-100);
-                  for (int i = -100 + 1; i < ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode(); i++)
+                for (int i = -100 + 1; i < ESAssemblyLoadTiming._1_BeforeFirstSceneLoad; i++)
                 {
-                  HotRuntime_ApplyThisAssemblyTimingRegisters(asm, i);
-                  OneTiming_HotLoadAllAssemblesRegistedTypes(i);
-                }
-
-
-                HotRuntime_ApplyThisAssemblyTimingRegisters(asm, ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode());
-                  HotRuntime_ApplyThisAssemblyTimingRegisters(asm, ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode());
-                    for (int i = ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode() + 1; i < ESAssemblyLoadTiming._2_AfterFirstSceneLoad.GetHashCode(); i++)
-                {
-                  HotRuntime_ApplyThisAssemblyTimingRegisters(asm, i);
+                    HotRuntime_ApplyThisAssemblyTimingRegisters(asm, i);
                     OneTiming_HotLoadAllAssemblesRegistedTypes(i);
                 }
 
 
-                HotRuntime_ApplyThisAssemblyTimingRegisters(asm, ESAssemblyLoadTiming._2_AfterFirstSceneLoad.GetHashCode());
-                  HotRuntime_ApplyThisAssemblyTimingRegisters(asm, ESAssemblyLoadTiming._2_AfterFirstSceneLoad.GetHashCode());
-                    for (int i = ESAssemblyLoadTiming._2_AfterFirstSceneLoad.GetHashCode() + 1; i <=100; i++)
+                HotRuntime_ApplyThisAssemblyTimingRegisters(asm, ESAssemblyLoadTiming._1_BeforeFirstSceneLoad);
+                HotRuntime_ApplyThisAssemblyTimingRegisters(asm, ESAssemblyLoadTiming._1_BeforeFirstSceneLoad);
+                for (int i = ESAssemblyLoadTiming._1_BeforeFirstSceneLoad + 1; i < ESAssemblyLoadTiming._2_AfterFirstSceneLoad; i++)
                 {
-                  HotRuntime_ApplyThisAssemblyTimingRegisters(asm, i);
+                    HotRuntime_ApplyThisAssemblyTimingRegisters(asm, i);
                     OneTiming_HotLoadAllAssemblesRegistedTypes(i);
                 }
-                 WaitHotLoadingAssembies.Dequeue();
+
+
+                HotRuntime_ApplyThisAssemblyTimingRegisters(asm, ESAssemblyLoadTiming._2_AfterFirstSceneLoad);
+                HotRuntime_ApplyThisAssemblyTimingRegisters(asm, ESAssemblyLoadTiming._2_AfterFirstSceneLoad);
+                for (int i = ESAssemblyLoadTiming._2_AfterFirstSceneLoad + 1; i <= 100; i++)
+                {
+                    HotRuntime_ApplyThisAssemblyTimingRegisters(asm, i);
+                    OneTiming_HotLoadAllAssemblesRegistedTypes(i);
+                }
+                WaitHotLoadingAssembies.Dequeue();
             }
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
             private static void RuntimeInitLoad_111_BeforeSceneLoad()
             {
                 DateTime startEditorStreamTime = DateTime.Now;
                 //专属功能
-                InitRuntime_ApplyThisTimingRegisters(ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode());//应用注册器
+                InitRuntime_ApplyThisTimingRegisters(ESAssemblyLoadTiming._1_BeforeFirstSceneLoad);//应用注册器
 
-                InitRuntime_LoadRegisteredTypes(ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode());
+                InitRuntime_LoadRegisteredTypes(ESAssemblyLoadTiming._1_BeforeFirstSceneLoad);
 
-                Debug.Log("第一阶段耗时" + (DateTime.Now - startEditorStreamTime));
+
                 //插入 1 到 50
-                for (int i = ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode() + 1; i < ESAssemblyLoadTiming._2_AfterFirstSceneLoad.GetHashCode(); i++)
+                for (int i = ESAssemblyLoadTiming._1_BeforeFirstSceneLoad + 1; i < ESAssemblyLoadTiming._2_AfterFirstSceneLoad; i++)
                 {
                     InitRuntime_ApplyThisTimingRegisters(i);//应用注册器
 
                     InitRuntime_LoadRegisteredTypes(i);
                 }
-            }
+                Debug.Log("第一阶段耗时" + (DateTime.Now - startEditorStreamTime));
+            } 
 
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
             private static void RuntimeInitLoad_222_AfterSceneLoad()
-            {
+            { 
                 DateTime startEditorStreamTime = DateTime.Now;
                 //专属功能
-                InitRuntime_ApplyThisTimingRegisters(ESAssemblyLoadTiming._2_AfterFirstSceneLoad.GetHashCode());//应用注册器
+                InitRuntime_ApplyThisTimingRegisters(ESAssemblyLoadTiming._2_AfterFirstSceneLoad);//应用注册器
 
-                InitRuntime_LoadRegisteredTypes(ESAssemblyLoadTiming._2_AfterFirstSceneLoad.GetHashCode());
+                InitRuntime_LoadRegisteredTypes(ESAssemblyLoadTiming._2_AfterFirstSceneLoad);
                 Debug.Log("第二阶段耗时" + (DateTime.Now - startEditorStreamTime));
-
+ 
                 //插入 51 到 100
-                for (int i = ESAssemblyLoadTiming._2_AfterFirstSceneLoad.GetHashCode() + 1; i <= 100; i++)
+                for (int i = ESAssemblyLoadTiming._2_AfterFirstSceneLoad + 1; i <= 100; i++)
                 {
                     InitRuntime_ApplyThisTimingRegisters(i);//应用注册器
 
@@ -783,17 +787,17 @@ namespace ES
                             {
                                 if (reType.IsAbstract) continue;
                                 var register = Activator.CreateInstance(reType) as ESAS_RuntimeRegister_AB;
-                                InitRuntimeRegisters.Add(register.LoadTiming.GetHashCode(), register);
+                                InitRuntimeRegisters.Add(register.LoadTiming, register);
                             }
                         }
-
+ 
                     }
                 }
             }
 
             private static void InitRuntime_ApplyThisTimingRegisters(int timing)
             {
-                var reList = InitRuntimeRegisters.GetGroupDirectly(timing.GetHashCode());
+                var reList = InitRuntimeRegisters.GetGroupDirectly(timing);
                 if (reList.Count == 0) return;
                 for (int i = 0; i < reList.Count; i++)
                 {
@@ -810,27 +814,27 @@ namespace ES
                             Type genericDefinition = nowType.GetGenericTypeDefinition();
                             if (genericDefinition == Define_ClassAttribute)
                             {
-                                Match_ClassAttribute(timing.GetHashCode(), register, reType, nowType);
+                                Match_ClassAttribute(timing, register, reType, nowType);
                                 break;
                             }
                             if (genericDefinition == Define_FieldAttribute)
                             {
-                                Match_FieldAttribute(timing.GetHashCode(), register, reType, nowType);
+                                Match_FieldAttribute(timing, register, reType, nowType);
                                 break;
                             }
                             if (genericDefinition == Define_MethodAttribute)
                             {
-                                Match_MethodAttribute(timing.GetHashCode(), register, reType, nowType);
+                                Match_MethodAttribute(timing, register, reType, nowType);
                                 break;
                             }
                             if (genericDefinition == Define_Singleton)
                             {
-                                Match_Singleton(timing.GetHashCode(), register, reType, nowType);
+                                Match_Singleton(timing, register, reType, nowType);
                                 break;
                             }
                             if (genericDefinition == Define_AsSubClass)
                             {
-                                Match_SubClass(timing.GetHashCode(), register, reType, nowType);
+                                Match_SubClass(timing, register, reType, nowType);
                                 break;
                             }
                         }
@@ -843,11 +847,11 @@ namespace ES
 
             private static void InitRuntime_LoadRegisteredTypes(int timing)
             {
-                var handles_singleton = InitHandler_Singleton.GetGroupDirectly(timing.GetHashCode());
-                var handler_classAttribute = InitHandler_ClassAttribute.GetGroupDirectly(timing.GetHashCode());
-                var handler_fieldAttribute = InitHandler_FieldAttribute.GetGroupDirectly(timing.GetHashCode());
-                var handler_methodAttribute = InitHandler_MethodAttribute.GetGroupDirectly(timing.GetHashCode());
-                var Handler_SubClassPart = InitHandler_AsSubclass.GetGroupDirectly(timing.GetHashCode());
+                var handles_singleton = InitHandler_Singleton.GetGroupDirectly(timing);
+                var handler_classAttribute = InitHandler_ClassAttribute.GetGroupDirectly(timing);
+                var handler_fieldAttribute = InitHandler_FieldAttribute.GetGroupDirectly(timing);
+                var handler_methodAttribute = InitHandler_MethodAttribute.GetGroupDirectly(timing);
+                var Handler_SubClassPart = InitHandler_AsSubclass.GetGroupDirectly(timing);
                 if (handles_singleton.Count == 0 && handler_classAttribute.Count == 0 && handler_fieldAttribute.Count == 0 && handler_methodAttribute.Count == 0)
                 {
                     return;
@@ -858,38 +862,38 @@ namespace ES
                     var asm = ValidRuntimeAssembiles[indexASM];
                     if (RuntimeTypes.TryGetValue(asm, out var types))
                     {
-{
-                        int lenForFunc_Singleton = handles_singleton.Count;
-                        for (int indexAction = 0; indexAction < lenForFunc_Singleton; indexAction++)
                         {
-                            //可用的单例匹配
-                            //因为需要排序！！！
-                            var func = handles_singleton[indexAction];
-                            int lenForTypes2 = types.Length;
-                            for (int indexType = 0; indexType < lenForTypes2; indexType++)
+                            int lenForFunc_Singleton = handles_singleton.Count;
+                            for (int indexAction = 0; indexAction < lenForFunc_Singleton; indexAction++)
                             {
-                                Type nowType = types[indexType];
+                                //可用的单例匹配
+                                //因为需要排序！！！
+                                var func = handles_singleton[indexAction];
+                                int lenForTypes2 = types.Length;
+                                for (int indexType = 0; indexType < lenForTypes2; indexType++)
+                                {
+                                    Type nowType = types[indexType];
 
-                                func.Invoke(nowType);
+                                    func.Invoke(nowType);
+                                }
+                            }
+
+                            int lenForFunc_SubClass = Handler_SubClassPart.Count;
+
+                            for (int indexAction = 0; indexAction < lenForFunc_SubClass; indexAction++)
+                            {
+                                //可用的单例匹配
+                                //因为需要排序！！！
+                                var func = Handler_SubClassPart[indexAction];
+                                int lenForTypes2 = types.Length;
+                                for (int indexType = 0; indexType < lenForTypes2; indexType++)
+                                {
+                                    Type nowType = types[indexType];
+
+                                    func.Invoke(nowType);
+                                }
                             }
                         }
-
-                        int lenForFunc_SubClass = Handler_SubClassPart.Count;
-
-                        for (int indexAction = 0; indexAction < lenForFunc_SubClass; indexAction++)
-                        {
-                            //可用的单例匹配
-                            //因为需要排序！！！
-                            var func = Handler_SubClassPart[indexAction];
-                            int lenForTypes2 = types.Length;
-                            for (int indexType = 0; indexType < lenForTypes2; indexType++)
-                            {
-                                Type nowType = types[indexType];
-
-                                func.Invoke(nowType);
-                            }
-                        }
-}
 
                         int lenForTypes = types.Length;
                         //一组类型
@@ -982,7 +986,7 @@ namespace ES
                         {
                             if (reType.IsAbstract) continue;
                             var register = Activator.CreateInstance(reType) as ESAS_RuntimeRegister_AB;
-                            HotApplyRegister(register, timing.GetHashCode(), false);
+                            HotApplyRegister(register, timing, false);
                         }
                     }
 
@@ -993,18 +997,18 @@ namespace ES
 
             private static void OneTiming_HotLoadAllAssemblesRegistedTypes(int timing)
             {
-                var handles_singleton = HotHandler_Singleton.GetGroupDirectly(timing.GetHashCode());
-                var handler_classAttribute = HotHandler_ClassAttribute.GetGroupDirectly(timing.GetHashCode());
-                var handler_fieldAttribute = HotHandler_FieldAttribute.GetGroupDirectly(timing.GetHashCode());
-                var handler_methodAttribute = HotHandler_MethodAttribute.GetGroupDirectly(timing.GetHashCode());
-                var handler_SubClassPart = HotHandler_AsSubclass.GetGroupDirectly(timing.GetHashCode());
+                var handles_singleton = HotHandler_Singleton.GetGroupDirectly(timing);
+                var handler_classAttribute = HotHandler_ClassAttribute.GetGroupDirectly(timing);
+                var handler_fieldAttribute = HotHandler_FieldAttribute.GetGroupDirectly(timing);
+                var handler_methodAttribute = HotHandler_MethodAttribute.GetGroupDirectly(timing);
+                var handler_SubClassPart = HotHandler_AsSubclass.GetGroupDirectly(timing);
                 while (WaitHotLoadingAssembies.Count > 0)
                 {
                     var hotASM = WaitHotLoadingAssembies.Peek();
                     var asm = hotASM;
                     if (RuntimeTypes.TryGetValue(asm, out var types))
                     {
-    int lenForFunc_Singleton = handles_singleton.Count;
+                        int lenForFunc_Singleton = handles_singleton.Count;
                         for (int indexAction = 0; indexAction < lenForFunc_Singleton; indexAction++)
                         {
                             //可用的单例匹配
@@ -1034,7 +1038,7 @@ namespace ES
                                 func.Invoke(nowType);
                             }
                         }
-                        
+
                         int lenForTypes = types.Length;
                         //一组类型
                         for (int indexType = 0; indexType < lenForTypes; indexType++)
@@ -1108,7 +1112,7 @@ namespace ES
 
             public static void HotLoadAllAssemblesRegistedTypes()
             {
-               
+
             }
 
 
@@ -1129,27 +1133,27 @@ namespace ES
                         Type genericDefinition = nowType.GetGenericTypeDefinition();
                         if (genericDefinition == Define_ClassAttribute)
                         {
-                            Match_ClassAttribute(timing.GetHashCode(), register, reType, nowType, init);
+                            Match_ClassAttribute(timing, register, reType, nowType, init);
                             break;
                         }
                         if (genericDefinition == Define_FieldAttribute)
                         {
-                            Match_FieldAttribute(timing.GetHashCode(), register, reType, nowType, init);
+                            Match_FieldAttribute(timing, register, reType, nowType, init);
                             break;
                         }
                         if (genericDefinition == Define_MethodAttribute)
                         {
-                            Match_MethodAttribute(timing.GetHashCode(), register, reType, nowType, init);
+                            Match_MethodAttribute(timing, register, reType, nowType, init);
                             break;
                         }
                         if (genericDefinition == Define_Singleton)
                         {
-                            Match_Singleton(timing.GetHashCode(), register, reType, nowType, init);
+                            Match_Singleton(timing, register, reType, nowType, init);
                             break;
                         }
                         if (genericDefinition == Define_AsSubClass)
                         {
-                            Match_SubClass(timing.GetHashCode(), register, reType, nowType, init);
+                            Match_SubClass(timing, register, reType, nowType, init);
                             break;
                         }
                     }
@@ -1228,8 +1232,8 @@ namespace ES
                             }
                             return false;
                         };
-                        if (init) InitHandler_ClassAttribute.Add(timing.GetHashCode(), func);
-                        else HotHandler_ClassAttribute.Add(timing.GetHashCode(), func);
+                        if (init) InitHandler_ClassAttribute.Add(timing, func);
+                        else HotHandler_ClassAttribute.Add(timing, func);
                     }
                     catch (Exception ex) // 捕获其他未预料到的异常
                     {
@@ -1257,8 +1261,8 @@ namespace ES
                             }
                             return false;
                         };
-                        if (init) InitHandler_FieldAttribute.Add(timing.GetHashCode(), func);
-                        else HotHandler_FieldAttribute.Add(timing.GetHashCode(), func);
+                        if (init) InitHandler_FieldAttribute.Add(timing, func);
+                        else HotHandler_FieldAttribute.Add(timing, func);
                     }
                     catch (Exception ex) // 捕获其他未预料到的异常
                     {
@@ -1286,8 +1290,8 @@ namespace ES
                             }
                             return false;
                         };
-                        if (init) InitHandler_MethodAttribute.Add(timing.GetHashCode(), func);
-                        else HotHandler_MethodAttribute.Add(timing.GetHashCode(), func);
+                        if (init) InitHandler_MethodAttribute.Add(timing, func);
+                        else HotHandler_MethodAttribute.Add(timing, func);
                     }
                     catch (Exception ex) // 捕获其他未预料到的异常
                     {
@@ -1316,8 +1320,8 @@ namespace ES
                             }
                             return false;
                         };
-                        if (init) InitHandler_Singleton.Add(timing.GetHashCode(), func);
-                        else HotHandler_Singleton.Add(timing.GetHashCode(), func);
+                        if (init) InitHandler_Singleton.Add(timing, func);
+                        else HotHandler_Singleton.Add(timing, func);
                         // 如果创建成功，在这里使用 instance
                         // Console.WriteLine($"实例创建成功: {instance.GetType()}");
                     }
@@ -1377,8 +1381,8 @@ namespace ES
                           }
                           return false;
                       };
-                        if (init) InitHandler_AsSubclass.Add(timing.GetHashCode(), func);
-                        else HotHandler_AsSubclass.Add(timing.GetHashCode(), func);
+                        if (init) InitHandler_AsSubclass.Add(timing, func);
+                        else HotHandler_AsSubclass.Add(timing, func);
                         // 如果创建成功，在这里使用 instance
                         // Console.WriteLine($"实例创建成功: {instance.GetType()}");
                     }

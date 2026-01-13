@@ -32,7 +32,7 @@ public abstract class RuntimeGlobalLinker<Link> : RuntimeGlobalLinker, IReceiveL
 }
 public class EditorRegister_FOR_RuntimeGlobalLinker_Level0 : RuntimeRegister_FOR_Singleton<RuntimeGlobalLinker>
 {
-    public override int LoadTiming =>  ESAssemblyLoadTiming._0_AfterInitAssemliesLoaded.GetHashCode();
+    public override int LoadTiming =>  -100;
 
     public override void Handle(RuntimeGlobalLinker singleton)
     {

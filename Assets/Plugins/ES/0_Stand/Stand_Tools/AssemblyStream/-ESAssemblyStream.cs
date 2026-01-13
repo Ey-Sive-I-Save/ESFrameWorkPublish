@@ -669,14 +669,14 @@ namespace ES
 
                 DateTime startEditorStreamTime = DateTime.Now;
                 //专属功能
-                InitRuntime_ApplyThisTimingRegisters(ESAssemblyLoadTiming._0_AfterInitAssemliesLoaded.GetHashCode());//应用注册器
+                InitRuntime_ApplyThisTimingRegisters(-100);//应用注册器
 
-                InitRuntime_LoadRegisteredTypes(ESAssemblyLoadTiming._0_AfterInitAssemliesLoaded.GetHashCode());
+                InitRuntime_LoadRegisteredTypes(-100);
 
                 Debug.Log("第零阶段耗时" + (DateTime.Now - startEditorStreamTime));
 
                 //插入 -100 到 0
-                for (int i = ESAssemblyLoadTiming._0_AfterInitAssemliesLoaded.GetHashCode() + 1; i < ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode(); i++)
+                for (int i = -100; i < ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode(); i++)
                 {
                     InitRuntime_ApplyThisTimingRegisters(i);//应用注册器
 
@@ -697,9 +697,9 @@ namespace ES
                 HotHandler_MethodAttribute.Clear();
                 HotHandler_ClassAttribute.Clear();
 
-                HotRuntime_ApplyThisAssemblyTimingRegisters(asm, ESAssemblyLoadTiming._0_AfterInitAssemliesLoaded.GetHashCode());
-                OneTiming_HotLoadAllAssemblesRegistedTypes(ESAssemblyLoadTiming._0_AfterInitAssemliesLoaded.GetHashCode());
-                  for (int i = ESAssemblyLoadTiming._0_AfterInitAssemliesLoaded.GetHashCode() + 1; i < ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode(); i++)
+                HotRuntime_ApplyThisAssemblyTimingRegisters(asm, -100);
+                OneTiming_HotLoadAllAssemblesRegistedTypes(-100);
+                  for (int i = -100 + 1; i < ESAssemblyLoadTiming._1_BeforeFirstSceneLoad.GetHashCode(); i++)
                 {
                   HotRuntime_ApplyThisAssemblyTimingRegisters(asm, i);
                   OneTiming_HotLoadAllAssemblesRegistedTypes(i);

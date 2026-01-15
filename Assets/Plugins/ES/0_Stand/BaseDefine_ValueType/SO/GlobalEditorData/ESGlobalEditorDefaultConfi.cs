@@ -29,6 +29,10 @@ namespace ES
     [FolderPath, LabelText("默认的常规SO父文件夹")]
     public string Path_NormalParent;
 
+        [TabGroup("文件夹管理")]
+    [FolderPath, LabelText("默认的资源管理父文件夹")]
+    public string Path_ResourceParent;
+
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的全局Global父文件夹")]
     public string Path_GlobalParent;
@@ -59,6 +63,23 @@ namespace ES
     [ValueDropdown("@ESGlobalEditorDefaultConfi.GetUseableNormalSoNames()", AppendNextDrawer = false)]
 
     public string ExcludeHandle = "";
+
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("UnityPackage打包输出到"),FolderPath]
+    public string PackageOutputPath="Assets/../ESOutput/UnityPackage";
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("UnityPackage默认包名")]
+    public string PackageName = "ESPackage0.35_";
+    
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("收集的路径"),FolderPath]
+    public List<string> PackageCollectPath=new List<string>(){"Assets/Plugins/ES","Assets/Scripts/ESLogic"
+    };
+
+
     public void Exclude()
     {
       if (ExcludeNameList.Contains(ExcludeHandle))

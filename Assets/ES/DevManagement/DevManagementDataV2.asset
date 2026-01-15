@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5da378138b5294d44a6659c0579f3b2e, type: 3}
+  m_Name: DevManagementDataV2
+  m_EditorClassIdentifier: 
+  lastModifiedBy: asus
+  lastModifiedTime: 2026-01-15 13:09:38
+  dataVersion: 1
+  devLogs:
+  - id: 22260209-1c0d-4181-af1e-785cff9220c5
+    title: "\u6D4B\u8BD5\u65E5\u5FD7"
+    type: 0
+    priority: 2
+    content: "\u65E5\u5FD711"
+    changeDescription: 
+    tags: []
+    linkedTaskIds: []
+    createTime: 2026-01-15 13:10:16
+    lastModified: 2026-01-15 13:10:16
+    createdBy: asus
+    lastModifiedBy: asus
+    version: 1
+  tasks:
+  - id: afb4482e-998d-4835-985c-d2852787f0d4
+    taskName: "\u4EFB\u52A11"
+    description: "\u4EFB\u52A11\u8FD9\u4E2A\u662F"
+    startDate: 2026-01-15
+    dueDate: 2026-01-22
+    assignedTo: asus
+    status: 0
+    priority: 2
+    checklist:
+    - isCompleted: 0
+      content: "\u5199\u4EE3\u7801"
+      assignedTo: 
+      completedTime: 
+    - isCompleted: 0
+      content: 
+      assignedTo: 
+      completedTime: 
+    tags:
+    - "\u4F18\u5316"
+    linkedLogIds: []
+    createTime: 2026-01-15 13:11:15
+    lastModified: 2026-01-15 13:11:15
+    createdBy: asus
+    lastModifiedBy: asus
+    version: 1
+  allTags:
+  - Bug
+  - Feature
+  - "\u4F18\u5316"
+  - "\u6587\u6863"
+  - "\u6D4B\u8BD5"

@@ -1,0 +1,470 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e1318febcac3d2408cf3fe9c5186b3c, type: 3}
+  m_Name: "Unity Navmesh\u5BFC\u822A\u7CFB\u7EDF\u5B8C\u6574\u6307\u5357"
+  m_EditorClassIdentifier: 
+  documentTitle: "Unity Navmesh\u5BFC\u822A\u7CFB\u7EDF\u5B8C\u6574\u6307\u5357"
+  category: "\u6559\u7A0B"
+  author: "ES\u7CFB\u7EDF"
+  createDate: 2026-01-15
+  lastModified: 2026-01-15
+  sections:
+  - sectionTitle: "\U0001F4D6 \u4EC0\u4E48\u662FNavmesh\u5BFC\u822A\u7CFB\u7EDF"
+    content:
+    - rid: 5686405092899815426
+    - rid: 5686405092899815427
+    - rid: 5686405092899815470
+  - sectionTitle: "\U0001F527 \u73AF\u5883\u8BBE\u7F6E\u4E0E\u51C6\u5907\u5DE5\u4F5C"
+    content:
+    - rid: 5686405092899815428
+    - rid: 5686405092899815429
+    - rid: 5686405092899815430
+  - sectionTitle: "\u2699\uFE0F Bake\u53C2\u6570\u914D\u7F6E\u8BE6\u89E3"
+    content:
+    - rid: 5686405092899815431
+    - rid: 5686405092899815432
+    - rid: 5686405092899815433
+  - sectionTitle: "\U0001F916 NavMeshAgent \u7EC4\u4EF6\u4F7F\u7528"
+    content:
+    - rid: 5686405092899815434
+    - rid: 5686405092899815435
+    - rid: 5686405092899815436
+  - sectionTitle: "\U0001F4DA \u5E38\u7528API\u65B9\u6CD5\u8BE6\u89E3"
+    content:
+    - rid: 5686405092899815437
+    - rid: 5686405092899815438
+  - sectionTitle: "\U0001F6B6 \u5B9E\u6218\u6848\u4F8B\uFF1AAI\u5DE1\u903B\u7CFB\u7EDF"
+    content:
+    - rid: 5686405092899815439
+    - rid: 5686405092899815440
+  - sectionTitle: "\U0001F6A7 \u52A8\u6001\u969C\u788D\u7269\u4E0ENavMeshObstacle"
+    content:
+    - rid: 5686405092899815441
+    - rid: 5686405092899815442
+    - rid: 5686405092899815443
+    - rid: 5686405092899815444
+  - sectionTitle: "\U0001F309 Off-Mesh Link\uFF08\u8DF3\u8DC3/\u4F20\u9001\u70B9\uFF09"
+    content:
+    - rid: 5686405092899815445
+    - rid: 5686405092899815446
+    - rid: 5686405092899815447
+  - sectionTitle: "\u2753 \u5E38\u89C1\u95EE\u9898\u4E0E\u89E3\u51B3\u65B9\u6848"
+    content:
+    - rid: 5686405092899815448
+    - rid: 5686405092899815449
+    - rid: 5686405092899815450
+    - rid: 5686405092899815451
+    - rid: 5686405092899815452
+    - rid: 5686405092899815453
+    - rid: 5686405092899815454
+  - sectionTitle: "\u26A1 \u6027\u80FD\u4F18\u5316\u6280\u5DE7"
+    content:
+    - rid: 5686405092899815455
+    - rid: 5686405092899815456
+  - sectionTitle: "\U0001F517 \u53C2\u8003\u8D44\u6E90\u4E0E\u6269\u5C55\u9605\u8BFB"
+    content:
+    - rid: 5686405092899815457
+    - rid: 5686405092899815458
+    - rid: 5686405092899815459
+  references:
+    version: 2
+    RefIds:
+    - rid: 5686405092899815426
+      type: {class: ESDocText, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        content: "NavMesh\uFF08Navigation Mesh\uFF0C\u5BFC\u822A\u7F51\u683C\uFF09\u662FUnity\u4E2D\u7528\u4E8EAI\u89D2\u8272\u5BFB\u8DEF\u7684\u5F3A\u5927\u7CFB\u7EDF\u3002\u5B83\u80FD\u591F\u81EA\u52A8\u751F\u6210\u53EF\u884C\u8D70\u533A\u57DF\u7684\u7F51\u683C\uFF0C\u5E76\u63D0\u4F9B\u9AD8\u6548\u7684\u8DEF\u5F84\u89C4\u5212\u7B97\u6CD5\uFF0C\u8BA9\u6E38\u620F\u89D2\u8272\u80FD\u591F\u667A\u80FD\u5730\u5728\u573A\u666F\u4E2D\u79FB\u52A8\u3001\u907F\u969C\u548C\u5BFC\u822A\u3002"
+    - rid: 5686405092899815427
+      type: {class: ESDocAlert, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        alertType: 0
+        title: "\u6838\u5FC3\u7279\u6027"
+        content: "\u2713 \u81EA\u52A8\u751F\u6210\u5BFC\u822A\u7F51\u683C\n\u2713
+          \u52A8\u6001\u969C\u788D\u7269\u652F\u6301\n\u2713 \u591AAgent\u7C7B\u578B\u914D\u7F6E\n\u2713
+          Off-Mesh Link\u8DF3\u8DC3/\u4F20\u9001\n\u2713 \u533A\u57DF\u6210\u672C\u6743\u91CD\u7CFB\u7EDF"
+    - rid: 5686405092899815428
+      type: {class: ESDocText, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        content: "\u5728\u5F00\u59CB\u4F7F\u7528Navmesh\u4E4B\u524D\uFF0C\u9700\u8981\u5B8C\u6210\u4EE5\u4E0B\u51C6\u5907\u6B65\u9AA4\uFF1A"
+    - rid: 5686405092899815429
+      type: {class: ESDocOrderedList, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        items:
+        - "\u786E\u4FDD\u573A\u666F\u4E2D\u6709\u5730\u9762\u7269\u4F53\uFF08Plane\u3001Terrain\u7B49\uFF09"
+        - "\u9009\u4E2D\u5730\u9762\u7269\u4F53\uFF0C\u5728Inspector\u4E2D\u52FE\u9009
+          Navigation Static"
+        - "\u6253\u5F00\u5BFC\u822A\u7A97\u53E3\uFF1AWindow \u2192 AI \u2192 Navigation"
+        - "\u5728Bake\u9009\u9879\u5361\u4E2D\u914D\u7F6E\u53C2\u6570"
+        - "\u70B9\u51FB Bake \u6309\u94AE\u751F\u6210\u5BFC\u822A\u7F51\u683C"
+    - rid: 5686405092899815430
+      type: {class: ESDocAlert, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        alertType: 2
+        title: "\u6CE8\u610F\u4E8B\u9879"
+        content: "\u53EA\u6709\u6807\u8BB0\u4E3A Navigation Static \u7684\u7269\u4F53\u624D\u4F1A\u53C2\u4E0E\u5BFC\u822A\u7F51\u683C\u7684\u70D8\u7119\uFF01"
+    - rid: 5686405092899815431
+      type: {class: ESDocTable, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        tableTitle: "Navmesh\u70D8\u7119\u6838\u5FC3\u53C2\u6570"
+        headers:
+        - "\u53C2\u6570\u540D\u79F0"
+        - "\u9ED8\u8BA4\u503C"
+        - "\u4F5C\u7528\u8BF4\u660E"
+        - "\u8C03\u4F18\u5EFA\u8BAE"
+        rows:
+        - cells:
+          - Agent Radius
+          - 0.5
+          - "\u89D2\u8272\u534A\u5F84\uFF0C\u5F71\u54CD\u53EF\u901A\u8FC7\u533A\u57DF\u5BBD\u5EA6"
+          - "\u8BBE\u7F6E\u4E3A\u89D2\u8272\u78B0\u649E\u4F53\u534A\u5F84"
+        - cells:
+          - Agent Height
+          - 2.0
+          - "\u89D2\u8272\u9AD8\u5EA6\uFF0C\u5F71\u54CD\u53EF\u901A\u8FC7\u533A\u57DF\u9AD8\u5EA6"
+          - "\u8BBE\u7F6E\u4E3A\u89D2\u8272\u78B0\u649E\u4F53\u9AD8\u5EA6"
+        - cells:
+          - Max Slope
+          - 45
+          - "\u53EF\u6500\u722C\u7684\u6700\u5927\u5761\u5EA6\u89D2\u5EA6"
+          - "\u6839\u636E\u6E38\u620F\u8BBE\u8BA1\u8C03\u6574"
+        - cells:
+          - Step Height
+          - 0.4
+          - "\u53EF\u8DE8\u8D8A\u7684\u6700\u5927\u53F0\u9636\u9AD8\u5EA6"
+          - "\u5C0F\u4E8E\u6B64\u503C\u7684\u969C\u788D\u4F1A\u88AB\u5FFD\u7565"
+        - cells:
+          - Drop Height
+          - 0
+          - "\u5141\u8BB8\u6389\u843D\u7684\u6700\u5927\u9AD8\u5EA6"
+          - "0\u8868\u793A\u4E0D\u5141\u8BB8\u6389\u843D"
+    - rid: 5686405092899815432
+      type: {class: ESDocDivider, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data: 
+    - rid: 5686405092899815433
+      type: {class: ESDocImage, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        image: {fileID: 0}
+        caption: "Navmesh Bake\u9762\u677F\u793A\u610F\u56FE\uFF08\u5728Navigation\u7A97\u53E3\u4E2D\u914D\u7F6E\uFF09"
+        imagePath: 
+    - rid: 5686405092899815434
+      type: {class: ESDocText, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        content: "NavMeshAgent\u662F\u9644\u52A0\u5230\u6E38\u620F\u5BF9\u8C61\u4E0A\u7684\u7EC4\u4EF6\uFF0C\u8D1F\u8D23\u5B9E\u9645\u7684\u5BFB\u8DEF\u548C\u79FB\u52A8\u63A7\u5236\u3002"
+    - rid: 5686405092899815435
+      type: {class: ESDocCodeBlock, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        language: csharp
+        code: "using UnityEngine;\r\nusing UnityEngine.AI;\r\n\r\npublic class SimpleNavAgent
+          : MonoBehaviour\r\n{\r\n    private NavMeshAgent agent;\r\n\r\n    void
+          Start()\r\n    {\r\n        // \u83B7\u53D6NavMeshAgent\u7EC4\u4EF6\r\n       
+          agent = GetComponent<NavMeshAgent>();\r\n    }\r\n\r\n    void Update()\r\n   
+          {\r\n        // \u9F20\u6807\u70B9\u51FB\u79FB\u52A8\u793A\u4F8B\r\n       
+          if (Input.GetMouseButtonDown(0))\r\n        {\r\n            Ray ray =
+          Camera.main.ScreenPointToRay(Input.mousePosition);\r\n            RaycastHit
+          hit;\r\n\r\n            if (Physics.Raycast(ray, out hit))\r\n           
+          {\r\n                // \u8BBE\u7F6E\u76EE\u6807\u4F4D\u7F6E\r\n               
+          agent.SetDestination(hit.point);\r\n            }\r\n        }\r\n    }\r\n}"
+    - rid: 5686405092899815436
+      type: {class: ESDocTable, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        tableTitle: "NavMeshAgent\u5E38\u7528\u5C5E\u6027"
+        headers:
+        - "\u5C5E\u6027"
+        - "\u7C7B\u578B"
+        - "\u8BF4\u660E"
+        rows:
+        - cells:
+          - speed
+          - float
+          - "\u79FB\u52A8\u901F\u5EA6"
+        - cells:
+          - angularSpeed
+          - float
+          - "\u65CB\u8F6C\u901F\u5EA6"
+        - cells:
+          - acceleration
+          - float
+          - "\u52A0\u901F\u5EA6"
+        - cells:
+          - stoppingDistance
+          - float
+          - "\u505C\u6B62\u8DDD\u79BB"
+        - cells:
+          - autoBraking
+          - bool
+          - "\u81EA\u52A8\u5239\u8F66"
+        - cells:
+          - obstacleAvoidanceType
+          - enum
+          - "\u969C\u788D\u8EB2\u907F\u8D28\u91CF\u7B49\u7EA7"
+    - rid: 5686405092899815437
+      type: {class: ESDocCodeBlock, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        language: csharp
+        code: "// ========== \u79FB\u52A8\u63A7\u5236 ==========\r\n\r\n// 1. \u8BBE\u7F6E\u76EE\u6807\u4F4D\u7F6E\uFF08\u6700\u5E38\u7528\uFF09\r\nagent.SetDestination(targetPosition);\r\n\r\n//
+          2. \u68C0\u67E5\u662F\u5426\u5230\u8FBE\u76EE\u7684\u5730\r\nif (!agent.pathPending
+          && agent.remainingDistance <= agent.stoppingDistance)\r\n{\r\n    Debug.Log(\"\u5DF2\u5230\u8FBE\u76EE\u7684\u5730\");\r\n}\r\n\r\n//
+          3. \u505C\u6B62\u79FB\u52A8\r\nagent.isStopped = true;  // \u6682\u505C\r\nagent.ResetPath();      
+          // \u6E05\u9664\u8DEF\u5F84\r\n\r\n// 4. \u8BBE\u7F6E\u901F\u5EA6\r\nagent.speed
+          = 5.0f;\r\n\r\n// ========== \u8DEF\u5F84\u67E5\u8BE2 ==========\r\n\r\n//
+          \u8BA1\u7B97\u8DEF\u5F84\u4F46\u4E0D\u79FB\u52A8\r\nNavMeshPath path =
+          new NavMeshPath();\r\nagent.CalculatePath(targetPos, path);\r\n\r\nif (path.status
+          == NavMeshPathStatus.PathComplete)\r\n{\r\n    Debug.Log(\"\u627E\u5230\u5B8C\u6574\u8DEF\u5F84\");\r\n}\r\n\r\n//
+          ========== \u4F20\u9001 ==========\r\n\r\n// \u7981\u7528agent\u540E\u4F20\u9001\uFF08\u907F\u514D\u9519\u8BEF\uFF09\r\nagent.enabled
+          = false;\r\ntransform.position = newPosition;\r\nagent.enabled = true;\r\n\r\n//
+          \u6216\u4F7F\u7528Warp\uFF08\u63A8\u8350\uFF09\r\nagent.Warp(newPosition);"
+    - rid: 5686405092899815438
+      type: {class: ESDocTable, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        tableTitle: "\u6838\u5FC3\u65B9\u6CD5\u901F\u67E5\u8868"
+        headers:
+        - "\u65B9\u6CD5"
+        - "\u8FD4\u56DE\u503C"
+        - "\u529F\u80FD\u63CF\u8FF0"
+        rows:
+        - cells:
+          - SetDestination(Vector3)
+          - bool
+          - "\u8BBE\u7F6E\u76EE\u6807\u70B9\u5E76\u5F00\u59CB\u5BFB\u8DEF"
+        - cells:
+          - CalculatePath(Vector3, NavMeshPath)
+          - bool
+          - "\u8BA1\u7B97\u8DEF\u5F84\u4F46\u4E0D\u79FB\u52A8"
+        - cells:
+          - Warp(Vector3)
+          - bool
+          - "\u77AC\u79FB\u5230\u6307\u5B9A\u4F4D\u7F6E"
+        - cells:
+          - SamplePathPosition(int, float, out NavMeshHit)
+          - bool
+          - "\u5728\u8DEF\u5F84\u4E0A\u91C7\u6837\u4F4D\u7F6E"
+        - cells:
+          - ResetPath()
+          - void
+          - "\u6E05\u9664\u5F53\u524D\u8DEF\u5F84"
+    - rid: 5686405092899815439
+      type: {class: ESDocText, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        content: "\u4E0B\u9762\u6F14\u793A\u4E00\u4E2A\u5B8C\u6574\u7684AI\u5DE1\u903B\u7CFB\u7EDF\uFF0C\u5305\u542B\u591A\u70B9\u5FAA\u73AF\u5DE1\u903B\u3001\u7B49\u5F85\u65F6\u95F4\u3001\u5230\u8FBE\u68C0\u6D4B\u7B49\u529F\u80FD\u3002"
+    - rid: 5686405092899815440
+      type: {class: ESDocCodeBlock, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        language: csharp
+        code: "using UnityEngine;\r\nusing UnityEngine.AI;\r\nusing System.Collections;\r\n\r\npublic
+          class AIPatrolSystem : MonoBehaviour\r\n{\r\n    [Header(\"\u5DE1\u903B\u70B9\u8BBE\u7F6E\")]\r\n   
+          public Transform[] patrolPoints;     // \u5DE1\u903B\u70B9\u6570\u7EC4\r\n   
+          public bool loopPatrol = true;       // \u662F\u5426\u5FAA\u73AF\u5DE1\u903B\r\n   
+          \r\n    [Header(\"\u884C\u4E3A\u53C2\u6570\")]\r\n    public float waitTimeAtPoint
+          = 2f;   // \u6BCF\u4E2A\u70B9\u7684\u7B49\u5F85\u65F6\u95F4\r\n    public
+          float detectionRadius = 10f;  // \u68C0\u6D4B\u534A\u5F84\r\n    \r\n   
+          private NavMeshAgent agent;\r\n    private int currentPointIndex = 0;\r\n   
+          private bool isWaiting = false;\r\n\r\n    void Start()\r\n    {\r\n       
+          agent = GetComponent<NavMeshAgent>();\r\n        \r\n        if (patrolPoints.Length
+          > 0)\r\n        {\r\n            GoToNextPoint();\r\n        }\r\n    }\r\n\r\n   
+          void Update()\r\n    {\r\n        // \u68C0\u67E5\u662F\u5426\u5230\u8FBE\u5F53\u524D\u5DE1\u903B\u70B9\r\n       
+          if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)\r\n       
+          {\r\n            if (!agent.hasPath || agent.velocity.sqrMagnitude == 0f)\r\n           
+          {\r\n                if (!isWaiting)\r\n                {\r\n                   
+          StartCoroutine(WaitAndContinue());\r\n                }\r\n           
+          }\r\n        }\r\n    }\r\n\r\n    IEnumerator WaitAndContinue()\r\n   
+          {\r\n        isWaiting = true;\r\n        \r\n        // \u5728\u5DE1\u903B\u70B9\u7B49\u5F85\r\n       
+          yield return new WaitForSeconds(waitTimeAtPoint);\r\n        \r\n       
+          GoToNextPoint();\r\n        isWaiting = false;\r\n    }\r\n\r\n    void
+          GoToNextPoint()\r\n    {\r\n        if (patrolPoints.Length == 0) return;\r\n\r\n       
+          // \u8BBE\u7F6E\u4E0B\u4E00\u4E2A\u76EE\u6807\u70B9\r\n        agent.SetDestination(patrolPoints[currentPointIndex].position);\r\n       
+          \r\n        // \u66F4\u65B0\u7D22\u5F15\r\n        currentPointIndex++;\r\n       
+          \r\n        if (currentPointIndex >= patrolPoints.Length)\r\n        {\r\n           
+          if (loopPatrol)\r\n            {\r\n                currentPointIndex =
+          0;  // \u5FAA\u73AF\r\n            }\r\n            else\r\n           
+          {\r\n                currentPointIndex = patrolPoints.Length - 1;  // \u505C\u7559\u5728\u6700\u540E\u4E00\u70B9\r\n           
+          }\r\n        }\r\n    }\r\n\r\n    // \u8C03\u8BD5\u7ED8\u5236\u5DE1\u903B\u8DEF\u5F84\r\n   
+          void OnDrawGizmosSelected()\r\n    {\r\n        if (patrolPoints == null
+          || patrolPoints.Length < 2) return;\r\n\r\n        Gizmos.color = Color.yellow;\r\n       
+          for (int i = 0; i < patrolPoints.Length - 1; i++)\r\n        {\r\n           
+          if (patrolPoints[i] != null && patrolPoints[i + 1] != null)\r\n           
+          {\r\n                Gizmos.DrawLine(patrolPoints[i].position, patrolPoints[i
+          + 1].position);\r\n            }\r\n        }\r\n\r\n        // \u5982\u679C\u662F\u5FAA\u73AF\u5DE1\u903B\uFF0C\u8FDE\u63A5\u9996\u5C3E\r\n       
+          if (loopPatrol && patrolPoints[0] != null && patrolPoints[patrolPoints.Length
+          - 1] != null)\r\n        {\r\n            Gizmos.DrawLine(patrolPoints[patrolPoints.Length
+          - 1].position, patrolPoints[0].position);\r\n        }\r\n    }\r\n}"
+    - rid: 5686405092899815441
+      type: {class: ESDocText, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        content: "NavMeshObstacle\u7EC4\u4EF6\u7528\u4E8E\u521B\u5EFA\u52A8\u6001\u969C\u788D\u7269\uFF0C\u53EF\u4EE5\u5728\u8FD0\u884C\u65F6\u79FB\u52A8\uFF0C\u5E76\u5B9E\u65F6\u5F71\u54CD\u5BFC\u822A\u3002"
+    - rid: 5686405092899815442
+      type: {class: ESDocCodeBlock, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        language: csharp
+        code: "using UnityEngine;\r\nusing UnityEngine.AI;\r\n\r\npublic class DynamicObstacle
+          : MonoBehaviour\r\n{\r\n    private NavMeshObstacle obstacle;\r\n\r\n   
+          void Start()\r\n    {\r\n        obstacle = GetComponent<NavMeshObstacle>();\r\n       
+          \r\n        // \u914D\u7F6E\u969C\u788D\u7269\r\n        obstacle.carving
+          = true;              // \u542F\u7528\u96D5\u523B\uFF08\u4F1A\u5B9E\u65F6\u4FEE\u6539navmesh\uFF09\r\n       
+          obstacle.carveOnlyStationary = true;  // \u4EC5\u5728\u9759\u6B62\u65F6\u96D5\u523B\uFF08\u6027\u80FD\u4F18\u5316\uFF09\r\n       
+          obstacle.carvingMoveThreshold = 0.1f; // \u79FB\u52A8\u9608\u503C\r\n       
+          obstacle.carvingTimeToStationary = 0.5f; // \u591A\u4E45\u7B97\u9759\u6B62\r\n   
+          }\r\n\r\n    // \u793A\u4F8B\uFF1A\u79FB\u52A8\u969C\u788D\u7269\r\n   
+          public void MoveObstacle(Vector3 targetPos)\r\n    {\r\n        // \u53EF\u4EE5\u76F4\u63A5\u79FB\u52A8\u5E26NavMeshObstacle\u7684\u7269\u4F53\r\n       
+          transform.position = targetPos;\r\n        // NavMesh\u4F1A\u81EA\u52A8\u66F4\u65B0\r\n   
+          }\r\n}"
+    - rid: 5686405092899815443
+      type: {class: ESDocTable, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        tableTitle: "NavMeshObstacle\u5173\u952E\u53C2\u6570"
+        headers:
+        - "\u53C2\u6570"
+        - "\u8BF4\u660E"
+        - "\u6027\u80FD\u5F71\u54CD"
+        rows:
+        - cells:
+          - carving
+          - "\u662F\u5426\u96D5\u523B\u5BFC\u822A\u7F51\u683C"
+          - "\u4E2D\u7B49"
+        - cells:
+          - carveOnlyStationary
+          - "\u4EC5\u9759\u6B62\u65F6\u96D5\u523B"
+          - "\u4F18\u5316\u6027\u80FD"
+        - cells:
+          - shape
+          - "\u5F62\u72B6\uFF08\u76D2\u4F53/\u80F6\u56CA\u4F53\uFF09"
+          - "\u4F4E"
+    - rid: 5686405092899815444
+      type: {class: ESDocAlert, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        alertType: 2
+        title: "\u6027\u80FD\u8B66\u544A"
+        content: "\u5927\u91CF\u542F\u7528carving\u7684NavMeshObstacle\u4F1A\u5F71\u54CD\u6027\u80FD\uFF01\u5EFA\u8BAE\u53EA\u5728\u5FC5\u8981\u7684\u79FB\u52A8\u969C\u788D\u7269\u4E0A\u542F\u7528\u3002"
+    - rid: 5686405092899815445
+      type: {class: ESDocText, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        content: "Off-Mesh Link\u7528\u4E8E\u8FDE\u63A5\u4E0D\u76F8\u8FDE\u7684\u5BFC\u822A\u533A\u57DF\uFF0C\u6BD4\u5982\u8DF3\u8DC3\u3001\u722C\u68AF\u3001\u4F20\u9001\u7B49\u7279\u6B8A\u79FB\u52A8\u3002"
+    - rid: 5686405092899815446
+      type: {class: ESDocOrderedList, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        items:
+        - "\u521B\u5EFA\u4E24\u4E2A\u7A7A\u7269\u4F53\u4F5C\u4E3A\u8D77\u70B9\u548C\u7EC8\u70B9"
+        - "\u6DFB\u52A0 Off Mesh Link \u7EC4\u4EF6"
+        - "\u8BBE\u7F6E Start \u548C End \u4E3A\u4E24\u4E2A\u7A7A\u7269\u4F53"
+        - "\u914D\u7F6E Cost Modifier\uFF08\u8DEF\u5F84\u6210\u672C\uFF09"
+        - "\u52FE\u9009 Bi Directional\uFF08\u53CC\u5411\uFF09\u5982\u9700\u8981"
+    - rid: 5686405092899815447
+      type: {class: ESDocCodeBlock, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        language: csharp
+        code: "using UnityEngine;\r\nusing UnityEngine.AI;\r\nusing System.Collections;\r\n\r\npublic
+          class JumpController : MonoBehaviour\r\n{\r\n    private NavMeshAgent agent;\r\n   
+          private Animator animator;\r\n\r\n    void Start()\r\n    {\r\n       
+          agent = GetComponent<NavMeshAgent>();\r\n        animator = GetComponent<Animator>();\r\n   
+          }\r\n\r\n    void Update()\r\n    {\r\n        // \u68C0\u6D4B\u662F\u5426\u5728Off-Mesh
+          Link\u4E0A\r\n        if (agent.isOnOffMeshLink)\r\n        {\r\n           
+          StartCoroutine(HandleOffMeshLink());\r\n        }\r\n    }\r\n\r\n    IEnumerator
+          HandleOffMeshLink()\r\n    {\r\n        // \u83B7\u53D6Off-Mesh Link\u6570\u636E\r\n       
+          OffMeshLinkData linkData = agent.currentOffMeshLinkData;\r\n        Vector3
+          startPos = linkData.startPos;\r\n        Vector3 endPos = linkData.endPos;\r\n\r\n       
+          // \u64AD\u653E\u8DF3\u8DC3\u52A8\u753B\r\n        if (animator != null)\r\n       
+          {\r\n            animator.SetTrigger(\"Jump\");\r\n        }\r\n\r\n       
+          // \u6682\u505C\u81EA\u52A8\u79FB\u52A8\r\n        agent.isStopped = true;\r\n\r\n       
+          // \u624B\u52A8\u79FB\u52A8\u5230\u7EC8\u70B9\uFF08\u53EF\u4EE5\u7528\u66F2\u7EBF\u3001\u629B\u7269\u7EBF\u7B49\uFF09\r\n       
+          float duration = 0.5f;\r\n        float elapsed = 0f;\r\n\r\n        while
+          (elapsed < duration)\r\n        {\r\n            float t = elapsed / duration;\r\n           
+          \r\n            // \u629B\u7269\u7EBF\u8DF3\u8DC3\r\n            Vector3
+          currentPos = Vector3.Lerp(startPos, endPos, t);\r\n            currentPos.y
+          += Mathf.Sin(t * Mathf.PI) * 2f; // \u8DF3\u8DC3\u9AD8\u5EA6\r\n           
+          \r\n            transform.position = currentPos;\r\n            elapsed
+          += Time.deltaTime;\r\n            yield return null;\r\n        }\r\n\r\n       
+          transform.position = endPos;\r\n\r\n        // \u5B8C\u6210\u8DF3\u8DC3\uFF0C\u6062\u590D\u81EA\u52A8\u79FB\u52A8\r\n       
+          agent.CompleteOffMeshLink();\r\n        agent.isStopped = false;\r\n   
+          }\r\n}"
+    - rid: 5686405092899815448
+      type: {class: ESDocQuote, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        quoteText: "\u95EE\u98981\uFF1AAgent\u4E0D\u79FB\u52A8\u6216\u8005\u79FB\u52A8\u5F02\u5E38\uFF1F"
+        source: FAQ
+    - rid: 5686405092899815449
+      type: {class: ESDocUnorderedList, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        items:
+        - "\u68C0\u67E5\u662F\u5426\u70D8\u7119\u4E86NavMesh\uFF08\u573A\u666F\u4E2D\u5E94\u8BE5\u80FD\u770B\u5230\u84DD\u8272\u7F51\u683C\uFF09"
+        - "\u786E\u8BA4Agent\u8D77\u59CB\u4F4D\u7F6E\u5728NavMesh\u4E0A"
+        - "\u68C0\u67E5Agent\u7684isStopped\u662F\u5426\u4E3Atrue"
+        - "\u786E\u8BA4\u76EE\u6807\u70B9\u5728\u6709\u6548\u7684NavMesh\u533A\u57DF\u5185"
+    - rid: 5686405092899815450
+      type: {class: ESDocDivider, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data: 
+    - rid: 5686405092899815451
+      type: {class: ESDocQuote, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        quoteText: "\u95EE\u98982\uFF1AAgent\u7A7F\u6A21\u6216\u8005\u5361\u5728\u5899\u91CC\uFF1F"
+        source: FAQ
+    - rid: 5686405092899815452
+      type: {class: ESDocUnorderedList, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        items:
+        - "\u589E\u5927Agent Radius\u53C2\u6570"
+        - "\u68C0\u67E5Carve\u53C2\u6570\u662F\u5426\u6B63\u786E\u8BBE\u7F6E"
+        - "\u786E\u8BA4\u969C\u788D\u7269\u6709\u78B0\u649E\u4F53\u4E14\u6807\u8BB0\u4E3AStatic"
+    - rid: 5686405092899815453
+      type: {class: ESDocDivider, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data: 
+    - rid: 5686405092899815454
+      type: {class: ESDocAlert, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        alertType: 3
+        title: "\u91CD\u8981\uFF1A\u4F20\u9001Agent\u65F6\u7684\u6B63\u786E\u505A\u6CD5"
+        content: "\u6C38\u8FDC\u4E0D\u8981\u76F4\u63A5\u4FEE\u6539transform.position\uFF01\n\u5E94\u8BE5\u4F7F\u7528\uFF1Aagent.Warp(newPosition)
+          \u6216\u5148\u7981\u7528agent\u518D\u79FB\u52A8\u3002"
+    - rid: 5686405092899815455
+      type: {class: ESDocOrderedList, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        items:
+        - "\u51CF\u5C11NavMesh\u70D8\u7119\u7CBE\u5EA6\uFF08\u589E\u5927Cell Size\uFF09"
+        - "\u4F7F\u7528agent.updateRotation\u63A7\u5236\u662F\u5426\u81EA\u52A8\u65CB\u8F6C"
+        - "\u964D\u4F4EobstacleAvoidanceType\u8D28\u91CF\u7B49\u7EA7"
+        - "\u51CF\u5C11carving\u7684NavMeshObstacle\u6570\u91CF"
+        - "\u4F7F\u7528agent.updatePosition = false\u624B\u52A8\u63A7\u5236\u4F4D\u7F6E\u66F4\u65B0"
+        - "\u5927\u573A\u666F\u5206\u533A\u57DF\u70D8\u7119NavMesh"
+        - "\u4F7F\u7528NavMesh.SamplePosition\u4F18\u5316\u76EE\u6807\u70B9\u67E5\u8BE2"
+    - rid: 5686405092899815456
+      type: {class: ESDocCodeBlock, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        language: csharp
+        code: "// \u6027\u80FD\u4F18\u5316\u793A\u4F8B\u4EE3\u7801\r\n\r\n// 1. \u624B\u52A8\u63A7\u5236\u66F4\u65B0\u9891\u7387\r\nvoid
+          FixedUpdate()\r\n{\r\n    // \u6BCF0.2\u79D2\u66F4\u65B0\u4E00\u6B21\u8DEF\u5F84\r\n   
+          if (Time.time - lastUpdateTime > 0.2f)\r\n    {\r\n        agent.SetDestination(target.position);\r\n       
+          lastUpdateTime = Time.time;\r\n    }\r\n}\r\n\r\n// 2. \u9A8C\u8BC1\u76EE\u6807\u70B9\u662F\u5426\u5728NavMesh\u4E0A\r\nNavMeshHit
+          hit;\r\nif (NavMesh.SamplePosition(targetPos, out hit, 5f, NavMesh.AllAreas))\r\n{\r\n   
+          agent.SetDestination(hit.position); // \u4F7F\u7528\u4FEE\u6B63\u540E\u7684\u4F4D\u7F6E\r\n}\r\n\r\n//
+          3. \u6279\u91CF\u7981\u7528\u4E0D\u6D3B\u52A8\u7684Agent\r\nforeach (var
+          agent in inactiveAgents)\r\n{\r\n    agent.enabled = false;\r\n}"
+    - rid: 5686405092899815457
+      type: {class: ESDocLink, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        displayText: "Unity\u5B98\u65B9NavMesh\u6587\u6863"
+        url: https://docs.unity3d.com/Manual/nav-NavigationSystem.html
+        description: "Unity\u5B98\u65B9\u5BFC\u822A\u7CFB\u7EDF\u5B8C\u6574\u6587\u6863"
+    - rid: 5686405092899815458
+      type: {class: ESDocLink, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        displayText: "NavMeshAgent API\u53C2\u8003"
+        url: https://docs.unity3d.com/ScriptReference/AI.NavMeshAgent.html
+        description: "NavMeshAgent\u7C7B\u7684API\u6587\u6863"
+    - rid: 5686405092899815459
+      type: {class: ESDocLink, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        displayText: "Unity Learn - AI\u5BFC\u822A\u6559\u7A0B"
+        url: https://learn.unity.com/tutorial/navigation-basics
+        description: "Unity\u5B98\u65B9\u5B66\u4E60\u5E73\u53F0\u7684\u4EA4\u4E92\u5F0F\u6559\u7A0B"
+    - rid: 5686405092899815470
+      type: {class: ESDocImage, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        image: {fileID: 2800000, guid: 304f2f8d8c9af9f4089170fb69a83cce, type: 3}
+        caption: "ES\u56FE\u6807"
+        imagePath: 

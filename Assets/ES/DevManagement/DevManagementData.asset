@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3d81a1d0971e614e9293de5637a49c6, type: 3}
+  m_Name: DevManagementData
+  m_EditorClassIdentifier: 
+  lastModifiedBy: asus
+  lastModifiedTime: 2026-01-15 12:40:55
+  dataVersion: 1
+  devLogs:
+  - id: dc3b89e4-7620-469a-9a48-2b7f458d5a00
+    title: "\u6D4B\u8BD5\u65E5\u5FD7"
+    type: 0
+    priority: 2
+    content: "\u8FD9\u4E2A\u662F\u4E00\u4E2A\u6D4B\u8BD5"
+    changeDescription: 
+    tags: []
+    createTime: 2026-01-15 12:41:37
+    lastModified: 2026-01-15 12:41:37
+    createdBy: asus
+    lastModifiedBy: asus
+    version: 1
+  tasks: []

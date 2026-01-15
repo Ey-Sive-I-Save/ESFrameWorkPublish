@@ -1,0 +1,110 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e1318febcac3d2408cf3fe9c5186b3c, type: 3}
+  m_Name: "\u5185\u5BB9\u5143\u7D20\u793A\u4F8B 1"
+  m_EditorClassIdentifier: 
+  documentTitle: "\u5185\u5BB9\u5143\u7D20\u793A\u4F8B"
+  category: "\u793A\u4F8B"
+  author: "\u7CFB\u7EDF"
+  createDate: 2026-01-15
+  lastModified: 2026-01-15
+  sections:
+  - sectionTitle: "\u6587\u672C\u5143\u7D20"
+    content:
+    - rid: 5686405102388641792
+    - rid: 5686405102388641793
+    - rid: 5686405102388641794
+  - sectionTitle: "\u5217\u8868\u5143\u7D20"
+    content:
+    - rid: 5686405102388641795
+    - rid: 5686405102388641796
+  - sectionTitle: "\u4EE3\u7801\u5143\u7D20"
+    content:
+    - rid: 5686405102388641797
+  - sectionTitle: "\u8868\u683C\u5143\u7D20"
+    content:
+    - rid: 5686405102388641798
+  - sectionTitle: "\u94FE\u63A5\u548C\u5A92\u4F53"
+    content:
+    - rid: 5686405102388641799
+    - rid: 5686405102388641800
+    - rid: 5686405102388641801
+  references:
+    version: 2
+    RefIds:
+    - rid: 5686405102388641792
+      type: {class: ESDocText, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        content: "\u8FD9\u662F\u4E00\u4E2A\u666E\u901A\u7684\u6587\u672C\u6BB5\u843D\u3002\u53EF\u4EE5\u5305\u542B\u591A\u884C\u5185\u5BB9\uFF0C\u652F\u6301\u57FA\u672C\u7684\u6587\u672C\u683C\u5F0F\u3002"
+    - rid: 5686405102388641793
+      type: {class: ESDocQuote, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        quoteText: "\u8FD9\u662F\u4E00\u4E2A\u5F15\u7528\u5757\u7684\u793A\u4F8B\u3002"
+        source: "\u5F15\u7528\u6765\u6E90"
+    - rid: 5686405102388641794
+      type: {class: ESDocAlert, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        alertType: 0
+        title: "\u63D0\u793A"
+        content: "\u8FD9\u662F\u4E00\u4E2A\u4FE1\u606F\u63D0\u793A\u6846\u3002"
+    - rid: 5686405102388641795
+      type: {class: ESDocUnorderedList, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        items:
+        - "\u65E0\u5E8F\u5217\u8868\u98791"
+        - "\u65E0\u5E8F\u5217\u8868\u98792"
+        - "\u65E0\u5E8F\u5217\u8868\u98793"
+    - rid: 5686405102388641796
+      type: {class: ESDocOrderedList, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        items:
+        - "\u6709\u5E8F\u5217\u8868\u98791"
+        - "\u6709\u5E8F\u5217\u8868\u98792"
+        - "\u6709\u5E8F\u5217\u8868\u98793"
+    - rid: 5686405102388641797
+      type: {class: ESDocCodeBlock, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        language: csharp
+        code: "public class Example\n{\n    public void HelloWorld()\n    {\n       
+          Debug.Log(\"Hello, World!\");\n    }\n}"
+    - rid: 5686405102388641798
+      type: {class: ESDocTable, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        tableTitle: "\u793A\u4F8B\u8868\u683C"
+        headers:
+        - "\u52171"
+        - "\u52172"
+        - "\u52173"
+        rows:
+        - cells:
+          - "\u6570\u636E1"
+          - "\u6570\u636E2"
+          - "\u6570\u636E3"
+        - cells:
+          - "\u6570\u636E4"
+          - "\u6570\u636E5"
+          - "\u6570\u636E6"
+    - rid: 5686405102388641799
+      type: {class: ESDocLink, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        displayText: "Unity\u5B98\u65B9\u6587\u6863"
+        url: https://docs.unity3d.com
+        description: "Unity\u5F15\u64CE\u7684\u5B98\u65B9\u6587\u6863\u7F51\u7AD9"
+    - rid: 5686405102388641800
+      type: {class: ESDocDivider, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data: 
+    - rid: 5686405102388641801
+      type: {class: ESDocImage, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        image: {fileID: 0}
+        caption: "\u793A\u4F8B\u56FE\u7247"
+        imagePath: 

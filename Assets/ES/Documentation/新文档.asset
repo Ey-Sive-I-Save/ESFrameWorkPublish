@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e1318febcac3d2408cf3fe9c5186b3c, type: 3}
+  m_Name: "\u65B0\u6587\u6863"
+  m_EditorClassIdentifier: 
+  documentTitle: "\u65B0\u6587\u6863"
+  category: "\u901A\u7528"
+  author: 
+  createDate: 2026-01-15
+  lastModified: 2026-01-15
+  sections:
+  - sectionTitle: "\u7B80\u4ECB"
+    content:
+    - rid: 5686405092899815424
+  - sectionTitle: "\u7AE0\u8282"
+    content:
+    - rid: 5686405092899815425
+  references:
+    version: 2
+    RefIds:
+    - rid: 5686405092899815424
+      type: {class: ESDocAlert, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        alertType: 0
+        title: dasdasd
+        content: dasdasdasdsad \n afdsfsd
+    - rid: 5686405092899815425
+      type: {class: ESDocCodeBlock, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        language: csharp
+        code: csdfsdfsfdfsdfsdfsdfdsf

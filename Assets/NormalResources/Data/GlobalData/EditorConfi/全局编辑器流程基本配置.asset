@@ -27,13 +27,23 @@ MonoBehaviour:
   Path_GroupParent: Assets/NormalResources/Data/Group
   Path_NormalScriptParent: Assets/Scripts/ESLogic/SoData/Normal
   Path_NormalParent: Assets/NormalResources/Data/Normal
+  Path_ResourceParent: Assets/NormalResources
   Path_GlobalParent: 
   ExcludePackGroupInfo: 1
   ExcludeWindow: 1
   ExcludeNodeRunner: 1
-  ExcludeGlobal: 1
+  ExcludeGlobal: 0
   ExcludeNameList:
   - ESGraphViewWindow
   - ESTrackViewWindow
   - ESTreeMenuShower
   ExcludeHandle: ESTreeMenuShower
+  PackageOutputPath: Assets/../ESOutput/UnityPackage
+  PackageName: ESPackage0.35_
+  PackageCollectPath:
+  - Assets/Plugins/ES
+  - Assets/Scripts/ESLogic
+  - Assets/NormalResources/Data/GlobalData
+  - Assets/NuGet
+  - Assets/Scripts/ESLogic
+  - Assets/Settings

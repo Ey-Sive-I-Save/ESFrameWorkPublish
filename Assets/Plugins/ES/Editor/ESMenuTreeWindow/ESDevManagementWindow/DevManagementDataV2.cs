@@ -213,14 +213,15 @@ namespace ES
         [HorizontalGroup("Item", Width = 0.05f)]
         [LabelText(""), LabelWidth(5)]
         [ToggleLeft]
+        [OnValueChanged("OnCompletedChanged")]
         public bool isCompleted;
 
-        [HorizontalGroup("Item", Width = 0.7f)]
+        [HorizontalGroup("Item", Width = 0.65f)]
         [LabelText(""), LabelWidth(5)]
         [HideIf("isCompleted")]
         public string content;
 
-        [HorizontalGroup("Item", Width = 0.7f)]
+        [HorizontalGroup("Item", Width = 0.65f)]
         [LabelText(""), LabelWidth(5)]
         [ShowIf("isCompleted")]
         [GUIColor(0.6f, 0.8f, 0.6f)]
@@ -231,9 +232,10 @@ namespace ES
         [LabelText(""), LabelWidth(5)]
         public string assignedTo;
 
-        [HorizontalGroup("Item", Width = 0.1f)]
+        [HorizontalGroup("Item", Width = 0.15f)]
         [LabelText(""), LabelWidth(5), DisplayAsString]
         [ShowIf("isCompleted")]
+        [GUIColor(0.7f, 0.9f, 0.7f)]
         public string completedTime;
 
         public ChecklistItem()
@@ -250,6 +252,14 @@ namespace ES
             this.isCompleted = false;
             this.assignedTo = assignedTo;
             this.completedTime = "";
+        }
+
+        private void OnCompletedChanged()
+        {
+            if (isCompleted)
+                completedTime = DateTime.Now.ToString("MM-dd HH:mm");
+            else
+                completedTime = "";
         }
 
         public void ToggleComplete()

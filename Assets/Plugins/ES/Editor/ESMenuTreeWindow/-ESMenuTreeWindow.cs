@@ -59,17 +59,18 @@ namespace ES {
         }
         public void QuickBuildRootMenu<P>(OdinMenuTree tree, string name, ref P page, SdfIconType sdfIcon) where P : ESWindowPageBase, new()
         {
-            MenuItems[name] = tree.Add(name, (page ??= new P()), sdfIcon).First();
+            // Odin 的 Add("父/子", obj) 会返回多个菜单项，最后一个才是真正绑定页面的叶子节点
+            MenuItems[name] = tree.Add(name, (page ??= new P()), sdfIcon).Last();
             page.ES_Refresh();
         }
         public void QuickBuildRootMenu<P>(OdinMenuTree tree, string name, ref P page, Texture texture) where P : ESWindowPageBase, new()
         {
-            MenuItems[name] = tree.Add(name, (page ??= new P()), texture).First();
+            MenuItems[name] = tree.Add(name, (page ??= new P()), texture).Last();
             page.ES_Refresh();
         }
         public void QuickBuildRootMenu<P>(OdinMenuTree tree, string name, ref P page, EditorIcon icon) where P : ESWindowPageBase, new()
         {
-            MenuItems[name] = tree.Add(name, (page ??= new P()), icon).First();
+            MenuItems[name] = tree.Add(name, (page ??= new P()), icon).Last();
             page.ES_Refresh();
         }
         protected override void OnImGUI()

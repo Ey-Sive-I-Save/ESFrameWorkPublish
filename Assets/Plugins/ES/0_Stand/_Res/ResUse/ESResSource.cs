@@ -4,6 +4,14 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace ES
 {
+    /// <summary>
+    /// IResSource
+    /// 
+    /// 单个资源加载源抽象：
+    /// - 既是一个可枚举任务（IEnumeratorTask），用于被 ESResMaster 调度；
+    /// - 又暴露 ResName / ABName / Asset / Progress 等查询信息；
+    /// - 通过 OnLoadOKAction_Submit / WithDraw 维护回调列表，支持多处监听加载完成。
+    /// </summary>
     public interface IResSource : IEnumeratorTask
     {
         string ResName { get; }
@@ -35,6 +43,16 @@ namespace ES
         void TryAutoPushedToPool();
 
     }
+    /// <summary>
+    /// ESResSource 抽象基类
+    /// 
+    /// 实现了 IResSource 的大部分通用逻辑：
+    /// - 维护状态机（Waiting/Loading/Ready）；
+    /// - 负责记录 ABName / ResName / Asset；
+    /// - 在状态切换到 Ready 时触发已注册的回调；
+    /// - 同时实现 IPoolablebAuto，便于通过对象池反复复用。
+    /// 具体加载细节交给子类（如从本地 AB 或远程流加载）。
+    /// </summary>
     public abstract class ESResSource : IResSource, IPoolablebAuto
     {
         #region 私有保护

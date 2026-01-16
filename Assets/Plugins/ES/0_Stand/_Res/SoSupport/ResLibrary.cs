@@ -11,7 +11,14 @@ using UnityEngine;
 
 namespace ES
 {
-
+    /// <summary>
+    /// ResLibrary
+    /// 
+    /// ScriptableObject 形式的资源库：
+    /// - 继承 SoLibrary&lt;ResBook&gt;，一份 Library 可以包含多本 ResBook；
+    /// - 通过 Inspector 决定是否参与构建、是否走远程下载；
+    /// - 是上层“资源分组 / 逻辑分类”的载体，真正的 AB / 路径信息由 ResPage 决定。
+    /// </summary>
     public class ResLibrary : SoLibrary<ResBook>
     {
         [LabelText("参与构建")]
@@ -24,6 +31,10 @@ namespace ES
     [Serializable]
     public class ResBook : Book<ResPage>
     {
+        /// <summary>
+        /// 对当前 Book 的补充说明，例如“战斗相关资源”“登录场景资源”等，
+        /// 仅用于编辑器标记与文档，可结合构建管线生成报表。
+        /// </summary>
         [LabelText("描述")]
         public string Desc = "";
 

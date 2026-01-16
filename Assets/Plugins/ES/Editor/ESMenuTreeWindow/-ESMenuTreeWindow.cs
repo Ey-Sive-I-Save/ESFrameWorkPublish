@@ -55,7 +55,7 @@ namespace ES {
         }
         protected virtual void ES_OnBuildMenuTree(OdinMenuTree tree)
         {
-
+ 
         }
         public void QuickBuildRootMenu<P>(OdinMenuTree tree, string name, ref P page, SdfIconType sdfIcon) where P : ESWindowPageBase, new()
         {

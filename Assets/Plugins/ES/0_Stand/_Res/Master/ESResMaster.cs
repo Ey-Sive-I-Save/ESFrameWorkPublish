@@ -5,6 +5,15 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace ES
 {
+    /// <summary>
+    /// ESResMaster
+    /// 
+    /// 运行时资源总管：
+    /// - 作为全局单例（SingletonMono），负责初始化 ESGlobalResSetting；
+    /// - 管理 AB 主清单（MainBundle / MainManifest）；
+    /// - 串行调度所有实现了 IEnumeratorTask 的资源加载任务；
+    /// - 对外提供若干对象池（如 Loader、ResKey、ResSource）的统一入口。
+    /// </summary>
     [DefaultExecutionOrder(-10)]
     public partial class ESResMaster : SingletonMono<ESResMaster>
     {

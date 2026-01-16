@@ -7,11 +7,36 @@ using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// 托管器原始标记接口：
+    /// 用于类型约束，不包含任何成员。所有托管器的最顶层抽象。
+    /// </summary>
     public interface IESOringinHosting
     {
 
     }
-    //以Hosting声明
+    
+    /// <summary>
+    /// ES托管器核心接口：
+    /// 
+    /// **职责**：
+    /// - 管理一组 IESModule 的生命周期（Enable/Disable/Update/Start/Destroy）
+    /// - 按帧间隔批量更新所有已注册的Module
+    /// - 提供统一的启用/禁用入口，级联到所有子Module
+    /// 
+    /// **典型使用场景**：
+    /// - GameManager 作为全局 Host，管理各子系统Module
+    /// - UIPanel 作为 Host，管理其上的各功能Module（动画、输入、数据绑定等）
+    /// 
+    /// **与Module的关系**：
+    /// - Host 维护 Module 列表，但不强制持有强引用（允许Module自行销毁）
+    /// - Module 通过 _TryRegisterToHost 主动注册到Host
+    /// - Host 在自身 OnEnable/OnDisable/Update 时调用 EnableAsHosting/DisableAsHosting/UpdateAsHosting
+    /// 
+    /// **注意事项**：
+    /// - Host 自身也实现 IESWithLife，可以被更上层的Host托管（支持多层嵌套）
+    /// - _TryAddToListOnly / _TryRemoveFromListOnly 仅用于列表维护，不触发Module的生命周期回调
+    /// </summary>
     public interface IESHosting : IESOringinHosting, IESWithLife
     {
         #region 托管器专属

@@ -6,6 +6,12 @@ using UnityEngine;
 
 public class ReceiveLink<Link> : IReceiveLink<Link>,IPoolablebAuto
 {
+    /// <summary>
+    /// 针对通用 Link 的“Action 包装器”：
+    /// - 通过对象池 ESSimplePool 反复复用，降低 GC 分配；
+    /// - 将 Action&lt;Link&gt; 适配为 IReceiveLink&lt;Link&gt;，方便统一存入各种容器；
+    /// - 适合做一次性订阅或临时监听。
+    /// </summary>
     public static ESSimplePool<ReceiveLink<Link>> poolSingleton = new ESSimplePool<ReceiveLink<Link>>(()=>new ReceiveLink<Link>(null));
     public Action<Link> action;
 

@@ -8,6 +8,14 @@ using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// LinkReceiveChannelList
+    /// 
+    /// 针对单一 Channel 组的一维 Link 分发列表：
+    /// - 不区分 Channel 组，只保存该 Channel 下的所有接收者；
+    /// - 提供 SendLink(channel, link) 统一派发入口；
+    /// - 适合用于“局部子系统”的通道分发实现。
+    /// </summary>
     public class LinkReceiveChannelList<Channel, Link>
     {
         public SafeNormalList<IReceiveChannelLink<Channel, Link>> IRS = new SafeNormalList<IReceiveChannelLink<Channel, Link>>();

@@ -7,6 +7,16 @@ using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// ESResLoader
+    /// 
+    /// 负责围绕 ESResMaster 提供“单个 Loader 实例”的加载能力：
+    /// - 对外暴露同步加载接口（按 KeyIndex 取资源）；
+    /// - 提供按路径 / GUID / AB 名称 添加到异步加载队列的便捷方法；
+    /// - 自身可池化复用，通过 ESResMaster.Instance.PoolForESLoader 管理生命周期。
+    /// 
+    /// 注意：此类不直接持有全局配置，仅通过 ESResMaster 访问 JsonData 和 Key 表。
+    /// </summary>
     public class ESResLoader : IPoolablebAuto
     {
         #region 池化

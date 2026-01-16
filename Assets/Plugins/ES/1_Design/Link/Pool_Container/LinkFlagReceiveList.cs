@@ -6,6 +6,14 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 namespace ES
 {
+    /// <summary>
+    /// LinkFlagReceiveList
+    /// 
+    /// 针对“状态型 Link（Flag）”的订阅容器：
+    /// - 维护一个 SafeNormalList 的接收者列表；
+    /// - 每次状态从 LastFlag 变到新值时，通知所有监听者 (old, new)；
+    /// - 新加入监听者会立刻收到一次补发回调，以同步当前 Flag 状态。
+    /// </summary>
     public class LinkFlagReceiveList<LinkFlag>
     {
         public SafeNormalList<IReceiveFlagLink<LinkFlag>> IRS = new SafeNormalList<IReceiveFlagLink<LinkFlag>>();

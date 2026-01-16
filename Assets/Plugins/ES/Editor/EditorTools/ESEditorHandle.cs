@@ -94,7 +94,7 @@ namespace ES
             }
         }
 
-        public class ESEditorHandleTask : IPoolablebAuto
+        public class ESEditorHandleTask : IPoolableAuto
         {
             public string SingleKey = "";
             public int waitFrame = 2;

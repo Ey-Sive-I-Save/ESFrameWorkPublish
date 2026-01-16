@@ -1,7 +1,4 @@
 
 迁移到
 
-Assets/Scripts/
-ESFramework-0-Stand/
-ValueType-BaseDefine/
-Container/KeyGroup.cs
+Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/KeyGroupPro

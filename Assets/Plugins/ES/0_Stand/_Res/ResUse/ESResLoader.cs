@@ -17,7 +17,7 @@ namespace ES
     /// 
     /// 注意：此类不直接持有全局配置，仅通过 ESResMaster 访问 JsonData 和 Key 表。
     /// </summary>
-    public class ESResLoader : IPoolablebAuto
+    public class ESResLoader : IPoolableAuto
     {
         #region 池化
         public bool IsRecycled { get; set; }

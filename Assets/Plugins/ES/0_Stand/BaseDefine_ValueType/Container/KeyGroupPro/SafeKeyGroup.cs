@@ -54,7 +54,7 @@ namespace ES
             return list;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(Key k, Element e)
+        public virtual void Add(Key k, Element e)
         {
 
             if (e == null) return;
@@ -99,7 +99,7 @@ namespace ES
 
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddRange(Key k, IEnumerable<Element> es)
+        public virtual void AddRange(Key k, IEnumerable<Element> es)
         {
             if (es == null) return;
             if (Groups.TryGetValue(k, out var list))
@@ -234,8 +234,120 @@ namespace ES
 
     }
 
+    /// <summary>
+    /// 可跳转的安全键组，每个元素知道自己的分组，支持高效组间跳转
+    /// </summary>
+    /// <typeparam name="Key"></typeparam>
+    /// <typeparam name="Element"></typeparam>
+    public interface IJumpableElement<Key>
+    {
+        Key CurrentGroup { get; set; }
+    }
+
+    /// <summary>
+    /// 可跳转的安全键组，继承自 SafeKeyGroup，支持元素在组间高效跳转
+    /// </summary>
+    /// <typeparam name="Key"></typeparam>
+    /// <typeparam name="Element"></typeparam>
+    [Serializable, TypeRegistryItem("可跳转安全键组")]
+    public class JumpSafeKeyGroup<Key, Element> : SafeKeyGroup<Key, Element>
+    {
+        public override string Editor_ShowDes => "可跳转键组";
+        public override Color Editor_ShowColor => Color.cyan;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override void Add(Key k, Element e)
+        {
+            if (e == null) return;
+            base.Add(k, e);
+            if (e is IJumpableElement<Key> jumpable) jumpable.CurrentGroup = k;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override void AddRange(Key k, IEnumerable<Element> es)
+        {
+            if (es == null) return;
+            base.AddRange(k, es);
+            foreach (var e in es)
+            {
+                if (e != null && e is IJumpableElement<Key> jumpable) jumpable.CurrentGroup = k;
+            }
+        }
+
+        /// <summary>
+        /// 将元素从一个组跳转到另一个组
+        /// </summary>
+        /// <param name="from">源组键</param>
+        /// <param name="to">目标组键</param>
+        /// <param name="e">要跳转的元素</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Jump(Key from, Key to, Element e)
+        {
+            if (e == null) return;
+            if (e is IJumpableElement<Key> jumpable && !jumpable.CurrentGroup.Equals(from)) return;
+            Remove(from, e);
+            Add(to, e);
+            if (e is IJumpableElement<Key> jumpable2) jumpable2.CurrentGroup = to;
+        }
+            /// <summary>
+        /// 将元素跳转到另一个组（元素自身知道当前组）
+        /// </summary>
+        /// <param name="to">目标组键</param>
+        /// <param name="e">要跳转的可跳转元素</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Jump<TE>(Key to, TE e) where TE : Element, IJumpableElement<Key>
+        {
+            if (e == null) return;
+            Key from = e.CurrentGroup;
+            Remove(from, e);
+            Add(to, e);
+            e.CurrentGroup = to;
+        }
+        /// <summary>
+        /// 批量跳转元素到新组
+        /// </summary>
+        /// <param name="from">源组键</param>
+        /// <param name="to">目标组键</param>
+        /// <param name="elements">要跳转的元素集合</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void JumpRange(Key from, Key to, IEnumerable<Element> elements)
+        {
+            if (elements == null) return;
+            foreach (var e in elements)
+            {
+                Jump(from, to, e);
+            }
+        }
+
+
+        /// <summary>
+        /// 加载或跳转元素：如果元素已在组中，则跳转到新组；否则加载到当前组
+        /// </summary>
+        /// <param name="e">要加载或跳转的元素</param>
+        /// <param name="newGroup">新组键</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void LoadOrJump(Element e, Key newGroup)
+        {
+            if (e == null) return;
+            if (e is IJumpableElement<Key> jumpable)
+            {
+                Key current = jumpable.CurrentGroup;
+                if (Groups.ContainsKey(current) && Groups[current].Contains(e))
+                {
+                    Jump(current, newGroup, e);
+                }
+                else
+                {
+                    jumpable.CurrentGroup = newGroup;
+                    Add(newGroup, e);
+                }
+            }
+        }
+    }
+
 
 
 
 }
+
 

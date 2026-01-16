@@ -50,10 +50,10 @@ namespace ES
     /// - 维护状态机（Waiting/Loading/Ready）；
     /// - 负责记录 ABName / ResName / Asset；
     /// - 在状态切换到 Ready 时触发已注册的回调；
-    /// - 同时实现 IPoolablebAuto，便于通过对象池反复复用。
+    /// - 同时实现 IPoolableAuto，便于通过对象池反复复用。
     /// 具体加载细节交给子类（如从本地 AB 或远程流加载）。
     /// </summary>
-    public abstract class ESResSource : IResSource, IPoolablebAuto
+    public abstract class ESResSource : IResSource, IPoolableAuto
     {
         #region 私有保护
         protected string m_ResName;

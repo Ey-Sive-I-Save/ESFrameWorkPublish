@@ -123,7 +123,7 @@ namespace ES
     /// 查询特定资源的最终标识
     /// </summary>
     [Serializable]
-    public class ESResKey : IPoolablebAuto
+    public class ESResKey : IPoolableAuto
     {
 
         public ESResSourceLoadType SourceLoadType = ESResSourceLoadType.ABAsset;

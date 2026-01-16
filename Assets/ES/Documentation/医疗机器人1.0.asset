@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e1318febcac3d2408cf3fe9c5186b3c, type: 3}
+  m_Name: "\u533B\u7597\u673A\u5668\u4EBA1.0"
+  m_EditorClassIdentifier: 
+  documentTitle: "\u533B\u7597\u673A\u5668\u4EBA1.0"
+  category: "\u7528\u6237\u624B\u518C"
+  author: "\u53EF\u80FD\u662F\u5C01\u4E86"
+  createDate: 2026-01-16
+  lastModified: 2026-01-16
+  sections:
+  - sectionTitle: "\u5B66\u4E60\u76EE\u6807"
+    content:
+    - rid: 5686405134667218944
+    - rid: 5686405134667218949
+  - sectionTitle: "\u51C6\u5907\u5DE5\u4F5C"
+    content:
+    - rid: 5686405134667218945
+  - sectionTitle: "\u64CD\u4F5C\u6B65\u9AA4"
+    content:
+    - rid: 5686405134667218946
+  - sectionTitle: "\u5B8C\u6574\u793A\u4F8B"
+    content:
+    - rid: 5686405134667218947
+  - sectionTitle: "\u603B\u7ED3"
+    content:
+    - rid: 5686405134667218948
+  references:
+    version: 2
+    RefIds:
+    - rid: 5686405134667218944
+      type: {class: ESDocUnorderedList, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        items:
+        - "\u76EE\u68071 : \u5B66\u4E60"
+        - "\u76EE\u68072"
+        - "\u76EE\u68073"
+    - rid: 5686405134667218945
+      type: {class: ESDocText, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        content: "\u5F00\u59CB\u4E4B\u524D\u4F60\u9700\u8981..."
+    - rid: 5686405134667218946
+      type: {class: ESDocOrderedList, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        items:
+        - "\u6B65\u9AA41: ..."
+        - "\u6B65\u9AA42: ..."
+        - "\u6B65\u9AA43: ..."
+    - rid: 5686405134667218947
+      type: {class: ESDocCodeBlock, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        language: csharp
+        code: "// \u5B8C\u6574\u793A\u4F8B\u4EE3\u7801\n"
+    - rid: 5686405134667218948
+      type: {class: ESDocText, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        content: "\u901A\u8FC7\u672C\u6559\u7A0B\u4F60\u5B66\u4F1A\u4E86..."
+    - rid: 5686405134667218949
+      type: {class: ESDocImage, ns: ES, asm: Assembly-CSharp-Editor-firstpass}
+      data:
+        image: {fileID: 2800000, guid: 9655723d2ce61294e94a82bbbc847edb, type: 3}
+        caption: 
+        imagePath: 

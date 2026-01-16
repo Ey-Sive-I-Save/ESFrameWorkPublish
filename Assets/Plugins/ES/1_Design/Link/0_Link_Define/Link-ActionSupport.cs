@@ -4,7 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ReceiveLink<Link> : IReceiveLink<Link>,IPoolablebAuto
+public class ReceiveLink<Link> : IReceiveLink<Link>,IPoolableAuto
 {
     /// <summary>
     /// 针对通用 Link 的“Action 包装器”：
@@ -56,7 +56,7 @@ public class ReceiveLink<Link> : IReceiveLink<Link>,IPoolablebAuto
         return action?.GetHashCode()??0;
     }
 }
-public class ReceiveFlagLink<LinkFlag> : IReceiveFlagLink<LinkFlag>, IPoolablebAuto
+public class ReceiveFlagLink<LinkFlag> : IReceiveFlagLink<LinkFlag>, IPoolableAuto
 {
     public static ESSimplePool<ReceiveFlagLink<LinkFlag>> poolSingleton = new ESSimplePool<ReceiveFlagLink<LinkFlag>>(() => new ReceiveFlagLink<LinkFlag>(null));
     public Action<LinkFlag, LinkFlag> action;
@@ -102,7 +102,7 @@ public class ReceiveFlagLink<LinkFlag> : IReceiveFlagLink<LinkFlag>, IPoolablebA
         return action?.GetHashCode() ?? 0;
     }
 }
-public class ReceiveChannelLink<Channel,Link> : IReceiveChannelLink<Channel, Link>, IPoolablebAuto
+public class ReceiveChannelLink<Channel,Link> : IReceiveChannelLink<Channel, Link>, IPoolableAuto
 {
     public static ESSimplePool<ReceiveChannelLink<Channel, Link>> poolSingleton = new  ESSimplePool<ReceiveChannelLink<Channel, Link>>(() => new ReceiveChannelLink<Channel, Link>(null));
 

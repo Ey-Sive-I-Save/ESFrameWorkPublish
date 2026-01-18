@@ -1,0 +1,80 @@
+{
+    "profileName": "ES 0.37 安装",
+    "unityPackages": [
+        {
+            "name": "TextMeshPro",
+            "version": "3.0.6",
+            "description": "Unity文本渲染系统",
+            "isRequired": true,
+            "isInstalled": true,
+            "installUrl": "",
+            "packageId": "com.unity.textmeshpro",
+            "checkClass": "TMPro.TMP_Text"
+        },
+        {
+            "name": "Unity UI",
+            "version": "1.0.0",
+            "description": "Unity用户界面系统",
+            "isRequired": true,
+            "isInstalled": true,
+            "installUrl": "",
+            "packageId": "com.unity.ugui",
+            "checkClass": "UnityEngine.UI.Text"
+        },
+        {
+            "name": "Timeline",
+            "version": "1.8.2",
+            "description": "Unity时间轴系统，用于创建复杂的动画和叙事序列",
+            "isRequired": true,
+            "isInstalled": true,
+            "installUrl": "",
+            "packageId": "com.unity.timeline",
+            "checkClass": "UnityEngine.Timeline.TimelineAsset"
+        },
+        {
+            "name": "Universal RP",
+            "version": "14.0.8",
+            "description": "Universal Render Pipeline，Unity的通用渲染管线",
+            "isRequired": true,
+            "isInstalled": true,
+            "installUrl": "",
+            "packageId": "com.unity.render-pipelines.universal",
+            "checkClass": "UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset"
+        }
+    ],
+    "gitPackages": [
+        {
+            "name": "Whisper",
+            "version": "1.0.0",
+            "description": "语音转文字支持",
+            "isRequired": true,
+            "isInstalled": true,
+            "gitUrl": "https://gitcode.com/gh_mirrors/wh/whisper.unity.git?path=/Packages/com.whisper.unity",
+            "checkClass": "Whisper.WhisperManager"
+        }
+    ],
+    "userPackages": [
+        {
+            "name": "Odin Inspector",
+            "version": "3.1.0",
+            "description": "强大的Unity编辑器扩展，提供高级序列化、属性绘制器和编辑器工具",
+            "isRequired": false,
+            "isInstalled": true,
+            "checkClass": "Sirenix.OdinInspector.Editor.OdinEditorWindow",
+            "installInstructions": "从Unity Asset Store下载并导入Odin Inspector，或从Sirenix网站购买"
+        },
+        {
+            "name": "DOTween",
+            "version": "1.2.0",
+            "description": "快速、灵活的动画引擎，用于创建平滑的补间动画",
+            "isRequired": false,
+            "isInstalled": true,
+            "checkClass": "DG.Tweening.DOTween",
+            "installInstructions": "从Unity Asset Store下载并导入DOTween Pro，或使用免费版本"
+        }
+    ],
+    "parentFolderPath": "Assets\\Plugins\\ES\\Editor\\Installer\\Downloads",
+    "installationNotes": "",
+    "enableAutoCheck": true,
+    "skipNextAutoCheck": false
+}

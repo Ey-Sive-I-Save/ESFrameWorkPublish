@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 namespace ES
 {
@@ -243,12 +242,7 @@ namespace ES
             bidirectionalDictionary.Add(new KeyValuePair<string, int>("Key4", 789));
             bidirectionalDictionary.Add(new BidirectionalDictionary<string, int>.KeyValuePairInternal("Key4", 789));
 
-            // 2) 批量添加
-            bidirectionalDictionary.AddRange(new List<KeyValuePair<string, int>>()
-            {
-                new KeyValuePair<string, int>("Key5", 1001),
-                new KeyValuePair<string, int>("Key6", 1002),
-            });
+            
 
             // 3) 通过值查找键
             string key = bidirectionalDictionary.GetKey(123);

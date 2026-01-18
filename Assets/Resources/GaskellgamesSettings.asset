@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 40e3692206bba8a48a40ccea8176d3c2, type: 3}
   m_Name: GaskellgamesSettings
   m_EditorClassIdentifier: 
-  showHubOnStartup: 1
+  showHubOnStartup: 0
   debugGgTrackedTasks: 1
   showPackageBanners: 1
   editorWindowBanner: 1

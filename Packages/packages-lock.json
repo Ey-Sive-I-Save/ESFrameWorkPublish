@@ -115,7 +115,7 @@
       "url": "https://packages.unity.cn"
     },
     "com.unity.textmeshpro": {
-      "version": "3.0.7",
+      "version": "3.0.9",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -144,15 +144,12 @@
         "com.unity.modules.imgui": "1.0.0"
       }
     },
-    "com.unity.visualscripting": {
-      "version": "1.9.4",
+    "com.whisper.unity": {
+      "version": "https://gitcode.com/gh_mirrors/wh/whisper.unity.git?path=/Packages/com.whisper.unity",
       "depth": 0,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.ugui": "1.0.0",
-        "com.unity.modules.jsonserialize": "1.0.0"
-      },
-      "url": "https://packages.unity.cn"
+      "source": "git",
+      "dependencies": {},
+      "hash": "f55ed3de1fa08abc1924c95aef26ce86fba7b5dc"
     },
     "com.unity.modules.ai": {
       "version": "1.0.0",

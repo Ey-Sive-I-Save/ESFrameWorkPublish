@@ -13,23 +13,29 @@ namespace ES
   [CreateAssetMenu(fileName = "全局编辑器流程基本配置", menuName = "全局SO/全局编辑器流程基本配置")]
   public class ESGlobalEditorDefaultConfi : ESEditorGlobalSo<ESGlobalEditorDefaultConfi>
   {
+    #region 文件夹管理
+
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的SOInfo脚本父文件夹")]
     public string Path_SoInfoParent;
+
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的DataPack包父文件夹")]
     public string Path_PackParent;
+
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的DataGroup组父文件夹")]
     public string Path_GroupParent;
+
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的常规SO脚本父文件夹")]
     public string Path_NormalScriptParent;
+
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的常规SO父文件夹")]
     public string Path_NormalParent;
 
-        [TabGroup("文件夹管理")]
+    [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的资源管理父文件夹")]
     public string Path_ResourceParent;
 
@@ -37,6 +43,9 @@ namespace ES
     [FolderPath, LabelText("默认的全局Global父文件夹")]
     public string Path_GlobalParent;
 
+    #endregion
+
+    #region SO管理支持
 
     [TabGroup("SO管理支持")]
     [LabelText("常规排除Pack/Group/Info")]
@@ -57,28 +66,46 @@ namespace ES
     [TabGroup("SO管理支持")]
     [LabelText("常规排除列表")]
     public List<string> ExcludeNameList = new List<string>();
+
     [TabGroup("SO管理支持")]
     [LabelText("常规排除查询")]
     [InlineButton("Exclude", "排除")]
     [ValueDropdown("@ESGlobalEditorDefaultConfi.GetUseableNormalSoNames()", AppendNextDrawer = false)]
-
     public string ExcludeHandle = "";
+
+    #endregion
+
+    #region UnityPackage打包构建
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("UnityPackage发布打包输出到"), FolderPath]
+    public string PackageOutputPath = "Assets/../ESOutput/UnityPackage";
 
 
     [TabGroup("UnityPackage打包构建")]
-    [LabelText("UnityPackage打包输出到"),FolderPath]
-    public string PackageOutputPath="Assets/../ESOutput/UnityPackage";
+    [LabelText("UnityPackage本体汇总位置"), FolderPath]
+    public string PackageSelfPath = "Assets\\Plugins\\ES\\Editor\\Installer\\Downloads";
+
 
     [TabGroup("UnityPackage打包构建")]
     [LabelText("UnityPackage默认包名")]
     public string PackageName = "ESPackage0.35_";
-    
 
     [TabGroup("UnityPackage打包构建")]
-    [LabelText("收集的路径"),FolderPath]
-    public List<string> PackageCollectPath=new List<string>(){"Assets/Plugins/ES","Assets/Scripts/ESLogic"
-    };
+    [LabelText("收集的路径ES"), FolderPath]
+    public List<string> PackageCollectPath = new List<string>() { "Assets/Plugins/ES", "Assets/Scripts/ESLogic" };
+    
 
+    
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("发布Editor位置"), FolderPath]
+    public string PackagePublishPath ="Assets\\Plugins\\ES\\Editor\\Installer" ;
+
+
+
+    #endregion
+
+    #region 方法
 
     public void Exclude()
     {
@@ -97,7 +124,6 @@ namespace ES
 
     public static List<string> GetUseableNormalSoNames()
     {
-
       var list = ESEditorSO.AllSoNames.Keys.ToList();
 #if UNITY_EDITOR
       var types = ESEditorSO.AllSoNames.Values.ToArray();
@@ -128,7 +154,8 @@ namespace ES
             listToRemove.Add(ESEditorSO.AllSoNames.GetKey(t));
           }
         }
-         if (ESGlobalEditorDefaultConfi.Instance.ExcludePackGroupInfo)
+
+        if (ESGlobalEditorDefaultConfi.Instance.ExcludePackGroupInfo)
         {
           if (typeof(ISoDataPack).IsAssignableFrom(t) ||
               typeof(ISoDataGroup).IsAssignableFrom(t) ||
@@ -137,8 +164,8 @@ namespace ES
             listToRemove.Add(ESEditorSO.AllSoNames.GetKey(t));
           }
         }
-        }
-      
+      }
+
       foreach (var s in listToRemove)
       {
         list.Remove(s);
@@ -146,5 +173,7 @@ namespace ES
 #endif
       return list;
     }
+
+    #endregion
   }
 }

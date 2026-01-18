@@ -39,6 +39,7 @@ MonoBehaviour:
   - ESTreeMenuShower
   ExcludeHandle: ESTreeMenuShower
   PackageOutputPath: Assets/../ESOutput/UnityPackage
+  PackageSelfPath: Assets\Plugins\ES\Editor\Installer\Downloads
   PackageName: ESPackage0.35_
   PackageCollectPath:
   - Assets/Plugins/ES
@@ -47,3 +48,7 @@ MonoBehaviour:
   - Assets/NuGet
   - Assets/Scripts/ESLogic
   - Assets/Settings
+  - Assets/ES
+  - Assets/Plugins/OUT
+  - Assets/ScriptTemplates
+  PackagePublishPath: Assets\Plugins\ES\Editor\Installer

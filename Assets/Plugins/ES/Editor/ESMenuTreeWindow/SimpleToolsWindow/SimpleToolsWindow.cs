@@ -63,7 +63,7 @@ namespace ES
         public const string PageName_PrefabManagement = "Prefab管理工具";
         public const string PageName_MaterialReplacement = "材质批量替换工具";
         public const string PageName_SceneOptimization = "场景优化工具";
-        public const string PageName_AnimationBatchSetting = "动画批量设置工具";
+        public const string PageName_AnimationBatchSetting = "动画器批量设置工具";
         public const string PageName_ScriptBatchAttachment = "脚本批量挂载工具";
         public const string PageName_AssetReferenceChecker = "资源引用检查工具";
         public const string PageName_LightingSettings = "灯光设置工具";
@@ -130,7 +130,6 @@ namespace ES
                 // 资产工具集
                 QuickBuildRootMenu(tree, PageName_AssetTools + "/" + PageName_UnityPackageTool, ref pageUnityPackageTool, SdfIconType.Archive);
                 QuickBuildRootMenu(tree, PageName_AssetTools + "/" + PageName_TextureSpriteTool, ref pageTextureSpriteTool, SdfIconType.Image);
-                QuickBuildRootMenu(tree, PageName_AssetTools + "/" + PageName_AnimationBatchSetting, ref pageAnimationBatchSetting, SdfIconType.Play);
                 QuickBuildRootMenu(tree, PageName_AssetTools + "/" + PageName_AssetReferenceChecker, ref pageAssetReferenceChecker, SdfIconType.Search);
 
                 // 层级工具集
@@ -140,6 +139,7 @@ namespace ES
                 QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_PrefabManagement, ref pagePrefabManagement, SdfIconType.Box);
                 QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_MaterialReplacement, ref pageMaterialReplacement, SdfIconType.Palette);
                 QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_SceneOptimization, ref pageSceneOptimization, SdfIconType.Speedometer);
+                QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_AnimationBatchSetting, ref pageAnimationBatchSetting, SdfIconType.Play);
                 QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_ScriptBatchAttachment, ref pageScriptBatchAttachment, SdfIconType.CodeSlash);
                 QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_LightingSettings, ref pageLightingSettings, SdfIconType.Lightbulb);
                 QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_ParticleSystemAdjustment, ref pageParticleSystemAdjustment, SdfIconType.Stars);
@@ -230,7 +230,7 @@ namespace ES
         public string exportPath = "Assets/../Export";
 
         [LabelText("包含依赖"), Space(5)]
-        public bool includeDependencies = true;
+        public bool includeDependencies = false;
 
         [LabelText("选中的资源路径"), FolderPath, ListDrawerSettings(DraggableItems = false), Space(5)]
         public List<string> selectedAssets = new List<string>();
@@ -272,7 +272,7 @@ namespace ES
             {
                 try
                 {
-                    exportPath = ESGlobalEditorDefaultConfi.Instance?.PackageOutputPath ?? exportPath;
+                    exportPath = ESGlobalEditorDefaultConfi.Instance?.PackageSelfPath ?? exportPath;
                 }
                 catch
                 {
@@ -319,7 +319,7 @@ namespace ES
                 return;
             }
             config.PackageName = packageName;
-            config.PackageOutputPath = exportPath;
+            config.PackageSelfPath = exportPath;
             // 合并收集路径，去重
             var allPaths = new HashSet<string>(config.PackageCollectPath ?? new List<string>());
             foreach (var path in selectedAssets)
@@ -382,6 +382,80 @@ namespace ES
             catch (System.Exception e)
             {
                 EditorUtility.DisplayDialog("错误", $"导出失败: {e.Message}", "确定");
+            }
+        }
+
+        [Button("发布打包", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
+        public void PublishPackage()
+        {
+            var config = ESGlobalEditorDefaultConfi.Instance;
+            if (config == null)
+            {
+                EditorUtility.DisplayDialog("错误", "未找到全局配置对象！", "确定");
+                return;
+            }
+
+            // 使用PackagePublishPath作为构建路径
+            var publishPath = config.PackagePublishPath;
+            if (string.IsNullOrEmpty(publishPath))
+            {
+                EditorUtility.DisplayDialog("错误", "发布路径未设置！", "确定");
+                return;
+            }
+
+            // 检查路径是否存在
+            if (!AssetDatabase.IsValidFolder(publishPath))
+            {
+                EditorUtility.DisplayDialog("错误", $"发布路径不存在: {publishPath}", "确定");
+                return;
+            }
+
+            // 收集发布路径下的所有资源
+            var guids = AssetDatabase.FindAssets("", new[] { publishPath });
+            var assetPaths = new List<string>();
+            foreach (var guid in guids)
+            {
+                var assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (!assetPaths.Contains(assetPath))
+                    assetPaths.Add(assetPath);
+            }
+
+            if (assetPaths.Count == 0)
+            {
+                EditorUtility.DisplayDialog("错误", "发布路径下没有找到任何资源！", "确定");
+                return;
+            }
+
+            // 使用PackageOutputPath作为输出目录
+            var outputDir = config.PackageOutputPath;
+            if (string.IsNullOrEmpty(outputDir))
+            {
+                outputDir = "Assets/../ESOutput/UnityPackage";
+            }
+
+            // 确保输出目录存在
+            Directory.CreateDirectory(outputDir);
+
+            // 生成包名（使用全局配置的包名 + 时间戳）
+            var packageName = config.PackageName;
+            if (string.IsNullOrEmpty(packageName))
+            {
+                packageName = "ESPackage";
+            }
+            var timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var outputPath = Path.Combine(outputDir, $"{packageName}_{timestamp}.unitypackage");
+
+            try
+            {
+                // 不包含依赖的发布打包
+                AssetDatabase.ExportPackage(assetPaths.ToArray(), outputPath, ExportPackageOptions.Default);
+
+                EditorUtility.DisplayDialog("成功", $"发布包导出成功！\n路径: {outputPath}", "确定");
+                EditorUtility.RevealInFinder(outputPath);
+            }
+            catch (System.Exception e)
+            {
+                EditorUtility.DisplayDialog("错误", $"发布打包失败: {e.Message}", "确定");
             }
         }
 

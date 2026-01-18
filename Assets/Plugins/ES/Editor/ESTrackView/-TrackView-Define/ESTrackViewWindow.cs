@@ -7,7 +7,6 @@ using Sirenix.OdinInspector.Editor;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
-using VFolders.Libs;
 
 public class ESTrackViewWindow : OdinEditorWindow
 {

@@ -25,7 +25,9 @@ namespace ES
         private Label m_ClipNameLabel;
 
         public event Action<ESEditorTrackClip> OnClipClicked;
+#pragma warning disable CS0067
         public event Action<ESEditorTrackClip> OnClipDragged;
+#pragma warning restore CS0067
 
         public ESEditorTrackClip(ITrackClip clip, string name, float startTime, float duration, object data = null)
         {

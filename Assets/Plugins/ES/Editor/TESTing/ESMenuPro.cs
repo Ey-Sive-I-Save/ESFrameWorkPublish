@@ -7,10 +7,12 @@ using UnityEngine;
 
 public class ESMENU : PopupWindowContent
 {
+#pragma warning disable CS0414
     float f;
     bool toggle1 = true;
     bool toggle2 = true;
     bool toggle3 = true;
+#pragma warning restore CS0414
     OdinMenuTree tree;
     string usingItem;
     

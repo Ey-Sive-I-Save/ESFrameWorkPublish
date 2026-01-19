@@ -1,0 +1,17 @@
+// 示例预制件：SampleCube.prefab
+// 这是一个简单的立方体预制件，包含了SampleScript组件
+// 使用方法：
+// 1. 将此预制件拖入场景
+// 2. 调整SampleScript组件的公共变量
+// 3. 运行场景测试WASD移动和空格跳跃
+
+// 预制件结构：
+// - GameObject: SampleCube
+//   - Transform: Position(0,0,0), Rotation(0,0,0), Scale(1,1,1)
+//   - MeshFilter: Cube mesh
+//   - MeshRenderer: Default material
+//   - BoxCollider: Size(1,1,1)
+//   - Rigidbody: Use Gravity = true, Constraints = None
+//   - SampleScript: speed = 5.0, objectColor = White
+
+// 注意：这个文件是描述性的，实际的.prefab文件需要通过Unity编辑器创建

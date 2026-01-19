@@ -471,8 +471,8 @@ namespace ES
             public int Duration;
         }
 
-        async void TranscribeAudio()
-        {
+         void TranscribeAudio()
+        { 
             if (recordedClip == null)
             {
                 statusMessage = "错误: 没有录制的音频";

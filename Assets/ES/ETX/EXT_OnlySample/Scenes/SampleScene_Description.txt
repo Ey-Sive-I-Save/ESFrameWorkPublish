@@ -1,0 +1,20 @@
+// 示例场景：SampleScene.unity
+// 这是一个演示场景，展示了示例包的所有功能
+// 场景内容：
+// - Main Camera: 标准相机
+// - Directional Light: 方向光
+// - SampleCube: 示例预制件，位置(0,1,0)
+// - UI Canvas: 包含按钮、文本和滑块的UI界面
+//   - SampleButton: 连接到SampleUIScript.OnSampleButtonClick
+//   - SampleText: TextMesh Pro文本组件
+//   - SampleSlider: 连接到SampleUIScript.OnSliderValueChanged
+
+// 使用方法：
+// 1. 打开此场景
+// 2. 运行游戏
+// 3. 使用WASD键移动立方体
+// 4. 按空格键让立方体跳跃
+// 5. 点击UI按钮观察文本变化
+// 6. 拖动滑块观察文本颜色变化
+
+// 注意：这个文件是描述性的，实际的.unity文件需要通过Unity编辑器创建

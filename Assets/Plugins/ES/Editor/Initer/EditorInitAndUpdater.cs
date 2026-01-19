@@ -11,7 +11,7 @@ public class EditorInitAndUpdater : EditorInvoker_Level0
 
     public override void InitInvoke()
     {
-        Debug.Log("Editor SetHeight");
+        //Debug.Log("Editor SetHeight");
         EditorApplication.update += Update;
        
     }
@@ -50,7 +50,7 @@ public class EditorInit1 : EditorInvoker_Level1
 {
     public override void InitInvoke()
     {
-        Debug.Log("Editor SetHeight"+1);
+//        Debug.Log("Editor SetHeight"+1);
         EditorApplication.update += Update;
     }
 
@@ -63,7 +63,7 @@ public class EditorInit2 : EditorInvoker_Level2
 {
     public override void InitInvoke()
     {
-        Debug.Log("Editor SetHeight"+2 );
+//        Debug.Log("Editor SetHeight"+2 );
         EditorApplication.update += Update;
     }
 

@@ -7,6 +7,11 @@ using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities;
 
+// 抑制私有字段未使用警告
+#pragma warning disable CS0414
+// 抑制无法访问的代码警告（提前return）
+#pragma warning disable CS0162
+
 namespace ES
 {
     /// <summary>
@@ -1271,7 +1276,11 @@ namespace ES
         {
             if (alert == null) return;
 
+#pragma warning disable CS0168
+#pragma warning disable CS0219
             MessageType msgType = MessageType.Info;
+#pragma warning restore CS0219
+#pragma warning restore CS0168
             string icon = "ℹ️";
             Color bgColor = new Color(0.5f, 0.7f, 0.95f, 0.2f);
             Color borderColor = new Color(0.3f, 0.5f, 0.9f, 0.6f);
@@ -1470,3 +1479,7 @@ namespace ES
         }
     }
 }
+
+// 恢复警告
+#pragma warning restore CS0414
+#pragma warning restore CS0162

@@ -46,7 +46,9 @@ namespace ES
 
         #region 加载任务链
 
+#pragma warning disable CS0414
         private int mMaxCoroutineCount = 8; //最快协成大概在6到8之间
+#pragma warning restore CS0414
         private LinkedList<IEnumeratorTask> ResLoadTasks = new LinkedList<IEnumeratorTask>();
         private bool isLoading = false;
         private void TryStartLoadTask()

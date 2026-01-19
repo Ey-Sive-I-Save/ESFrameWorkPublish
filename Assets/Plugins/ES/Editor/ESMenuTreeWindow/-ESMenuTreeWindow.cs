@@ -39,7 +39,7 @@ namespace ES {
             UsingWindow = GetWindow<T>();
             UsingWindow.ESWindow_OnOpen();
             UsingWindow.titleContent = UsingWindow.ESWindow_GetWindowGUIContent();
-            UsingWindow.minSize = new Vector2(800, 600);
+            UsingWindow.minSize = new Vector2(500, 600);
             UsingWindow.maxSize = new Vector2(2500, 1800);
             UsingWindow.maximized = true;
             UsingWindow.MenuWidth = 200;

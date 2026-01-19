@@ -17,7 +17,7 @@ namespace ES
         public override void InitInvoke()
         {
 
-            Debug.Log("此处注册ES-SO");
+            //Debug.Log("此处注册ES-SO");
             ESEditorSO.SOS.Clear();
             string[] guids = AssetDatabase.FindAssets($"t:{nameof(ESSO)}");
 
@@ -39,7 +39,7 @@ namespace ES
 
         public override void InitInvoke()
         {
-            Debug.Log("此处应用ES-SO");
+//            Debug.Log("此处应用ES-SO");
             var keys = ESEditorSO.SOS.Groups.Keys;
             foreach (var i in keys)
             {

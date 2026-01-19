@@ -1,0 +1,32 @@
+{
+    "displayName": "Whisper 语音识别",
+    "folderName": "Whisper",
+    "version": "1.0.0",
+    "description": "集成OpenAI Whisper语音识别功能的扩展包，提供实时语音转文字和音频处理能力",
+    "unityDependencies": [],
+    "gitDependencies": [
+        {
+            "name": "Whisper",
+            "version": "1.0.0",
+            "gitUrl": "https://gitcode.com/gh_mirrors/wh/whisper.unity.git?path=/Packages/com.whisper.unity",
+            "checkClass": "Whisper.WhisperManager",
+            "isRequired": true
+        }
+    ],
+    "userDependencies": [],
+    "requiredMainPackages": [
+        "es_main"    
+    ],
+    "installationNotes": "安装完成后，请确保您的项目支持音频输入，并配置适当的麦克风权限。",
+    "tags": [
+        "AI",
+        "语音识别",
+        "音频处理",
+        "机器学习"
+    ],
+    "author": "ES Framework Team",
+    "website": "https://esframework.com/extensions/whisper",
+    "license": "MIT",
+    "checkClass": "",
+    "assetPath": "Assets/StreamingAssets/OUT/Whisper"
+}

@@ -39,7 +39,7 @@ MonoBehaviour:
   - ESTreeMenuShower
   ExcludeHandle: ESTreeMenuShower
   PackageOutputPath: Assets/../ESOutput/UnityPackage
-  PackageSelfPath: Assets\Plugins\ES\Editor\Installer\Downloads
+  PackageSelfPath: Assets/Plugins/ES/Editor/Installer/Downloads/Main
   PackageName: ESPackage0.35_
   PackageCollectPath:
   - Assets/Plugins/ES
@@ -51,4 +51,22 @@ MonoBehaviour:
   - Assets/ES
   - Assets/Plugins/OUT
   - Assets/ScriptTemplates
+  IncludeDependencies: 1
   PackagePublishPath: Assets\Plugins\ES\Editor\Installer
+  ExtendedPackageConfigs:
+  - ConfigName: "Whisper\u652F\u6301"
+    OutputPath: Assets/Plugins/ES/Editor/Installer/Downloads/Whisper
+    PackageName: ESPackage_Ext_1_Whisper
+    CollectPaths:
+    - Assets/StreamingAssets/OUT/Whisper
+    ExcludeFolders: []
+    IsEnabled: 1
+    IncludeDependencies: 1
+  - ConfigName: ES ETX Only Sample
+    OutputPath: Assets/Plugins/ES/Editor/Installer/Downloads/OnlySamples
+    PackageName: ESPackage_Ext_Only Sample
+    CollectPaths:
+    - Assets/ES/ETX/EXT_OnlySample
+    ExcludeFolders: []
+    IsEnabled: 1
+    IncludeDependencies: 1

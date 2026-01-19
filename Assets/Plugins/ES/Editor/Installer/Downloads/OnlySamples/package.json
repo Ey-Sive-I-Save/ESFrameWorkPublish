@@ -1,0 +1,91 @@
+{
+    "displayName": "ES Framework ext Sample Package",
+    "folderName": "OnlySamples",
+    "version": "1.0.0",
+    "description": "一个扩展功能示例包，展示ES安装器的所有功能，包括各种类型的依赖、配置和安装说明。",
+    "checkClass": "ESSampleClass",
+    "assetPath": "Assets/OnlySamples",
+    "installationNotes": "这是一个示例包，用于演示ES框架安装器的各种功能。安装后，您可以查看Assets/OnlySamples文件夹中的示例代码和资源。",
+    "unityDependencies": [
+        {
+            "name": "TextMesh Pro",
+            "version": "3.0.6",
+            "description": "Unity官方的文本渲染系统，提供高级文本功能",
+            "packageId": "com.unity.textmeshpro",
+            "isRequired": true,
+            "checkClass": "TMPro.TextMeshProUGUI"
+        },
+        {
+            "name": "Unity UI",
+            "version": "1.0.0",
+            "description": "Unity用户界面系统的基础包",
+            "packageId": "com.unity.ugui",
+            "isRequired": false,
+            "checkClass": "UnityEngine.UI.Button"
+        }
+    ],
+    "gitDependencies": [
+        {
+            "name": "DOTween",
+            "version": "1.2.420",
+            "description": "强大的动画引擎，用于创建平滑的动画效果",
+            "gitUrl": "https://github.com/Demigiant/dotween.git",
+            "isRequired": true,
+            "checkClass": "DG.Tweening.DOTween"
+        },
+        {
+            "name": "NaughtyAttributes",
+            "version": "2.1.4",
+            "description": "为Unity Inspector添加更多属性的工具",
+            "gitUrl": "https://github.com/dbrizov/NaughtyAttributes.git",
+            "isRequired": false,
+            "checkClass": "NaughtyAttributes.ButtonAttribute"
+        }
+    ],
+    "userDependencies": [
+        {
+            "name": "Custom User Package",
+            "version": "1.0.0",
+            "description": "一个用户需要手动安装的自定义包",
+            "checkClass": "MyCustomNamespace.MyCustomClass",
+            "installInstructions": "请从以下链接下载并导入：https://example.com/custom-package.unitypackage",
+            "isRequired": false
+        },
+        {
+            "name": "Third Party Plugin",
+            "version": "2.0.0",
+            "description": "第三方插件，需要用户从Asset Store购买",
+            "checkClass": "ThirdParty.PluginClass",
+            "installInstructions": "请从Unity Asset Store购买并导入此插件。",
+            "isRequired": true
+        }
+    ],
+    "assetFileDependencies": [
+        {
+            "name": "Sample Texture",
+            "version": "1.0.0",
+            "description": "示例纹理文件，用于演示资产文件依赖",
+            "assetPath": "Assets/OnlySamples/Textures/SampleTexture.png",
+            "checkClass": "",
+            "isRequired": false
+        },
+        {
+            "name": "Sample Script",
+            "version": "1.0.0",
+            "description": "示例脚本文件",
+            "assetPath": "Assets/OnlySamples/Scripts/SampleScript.cs",
+            "checkClass": "OnlySamples.SampleScript",
+            "isRequired": true
+        }
+    ],
+    "requiredMainPackages": [],
+    "tags": [
+        "sample",
+        "example",
+        "demo",
+        "tutorial"
+    ],
+    "author": "ES ",
+    "website": "https://esframework.com",
+    "license": "MIT"
+}

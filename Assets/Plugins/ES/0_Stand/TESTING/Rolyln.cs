@@ -19,7 +19,7 @@ namespace ES
         public override void InitInvoke()
         {
           
-            Debug.Log("开始工作");
+//            Debug.Log("开始工作");
            
           /*  if (!MSBuildLocator.IsRegistered)
             {

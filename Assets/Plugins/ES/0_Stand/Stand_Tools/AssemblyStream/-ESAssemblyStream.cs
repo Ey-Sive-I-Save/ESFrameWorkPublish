@@ -120,7 +120,7 @@ namespace ES
                         Editor_TestForeach();//模拟遍历
                     }
                 }
-                Debug.Log("耗时" + (DateTime.Now - startEditorStreamTime));
+                Debug.Log("【程序集流】耗时" + (DateTime.Now - startEditorStreamTime));
             }
 
             private static void Editor_InitAssembiesAndRegisters()
@@ -688,7 +688,9 @@ namespace ES
                 Debug.Log("第零阶段耗时"+conut + (DateTime.Now - startEditorStreamTime));
                 return;
                 //等待注册
+#pragma warning disable CS0162
                 AppDomain.CurrentDomain.AssemblyLoad += HotRuntimeLoadNewAssembly;
+#pragma warning restore CS0162
             }   
             private static void HotRuntimeLoadNewAssembly(object sender, AssemblyLoadEventArgs args)
             {

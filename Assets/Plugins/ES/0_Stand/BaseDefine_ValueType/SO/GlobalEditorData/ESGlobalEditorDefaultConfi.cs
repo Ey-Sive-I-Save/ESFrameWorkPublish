@@ -95,13 +95,80 @@ namespace ES
     [LabelText("收集的路径ES"), FolderPath]
     public List<string> PackageCollectPath = new List<string>() { "Assets/Plugins/ES", "Assets/Scripts/ESLogic" };
     
-
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("包含依赖项")]
+    public bool IncludeDependencies = true;
     
     [TabGroup("UnityPackage打包构建")]
     [LabelText("发布Editor位置"), FolderPath]
     public string PackagePublishPath ="Assets\\Plugins\\ES\\Editor\\Installer" ;
 
 
+
+    #endregion
+
+    #region UnityPackage扩展打包配置
+
+    [Serializable]
+    public class UnityPackageConfig
+    {
+        [LabelText("配置名称")]
+        public string ConfigName = "新配置";
+
+        [LabelText("UnityPackage输出位置"), FolderPath]
+        public string OutputPath = "Assets/../ESOutput/UnityPackage";
+
+        [LabelText("UnityPackage包名")]
+        public string PackageName = "ESPackage_Ext_";
+
+        [LabelText("收集的路径列表"), FolderPath]
+        public List<string> CollectPaths = new List<string>() { "Assets/Plugins/ES" };
+
+        [LabelText("排除的文件夹列表"), FolderPath]
+        public List<string> ExcludeFolders = new List<string>();
+
+        [LabelText("是否启用")]
+        public bool IsEnabled = true;
+
+        [LabelText("包含依赖项")]
+        public bool IncludeDependencies = true;
+    }
+
+    [TabGroup("UnityPackage扩展配置")]
+    [LabelText("扩展打包配置列表")]
+    [ListDrawerSettings(ShowIndexLabels = true, ListElementLabelName = "ConfigName")]
+    public List<UnityPackageConfig> ExtendedPackageConfigs = new List<UnityPackageConfig>();
+
+    [TabGroup("UnityPackage扩展配置")]
+    [Button("添加新配置", ButtonSizes.Medium)]
+    [GUIColor(0.5f, 0.8f, 1f)]
+    public void AddNewPackageConfig()
+    {
+        var newConfig = new UnityPackageConfig
+        {
+            ConfigName = $"配置 {ExtendedPackageConfigs.Count + 1}",
+            OutputPath = "Assets/../ESOutput/UnityPackage",
+            PackageName = $"ESPackage_Ext_{ExtendedPackageConfigs.Count + 1}_",
+            CollectPaths = new List<string>() { "Assets/Plugins/ES" },
+            ExcludeFolders = new List<string>(),
+            IsEnabled = true
+        };
+        ExtendedPackageConfigs.Add(newConfig);
+#if UNITY_EDITOR
+        EditorUtility.SetDirty(this);
+#endif
+    }
+
+    [TabGroup("UnityPackage扩展配置")]
+    [Button("清理禁用配置", ButtonSizes.Medium)]
+    [GUIColor(1f, 0.6f, 0.6f)]
+    public void CleanDisabledConfigs()
+    {
+        ExtendedPackageConfigs.RemoveAll(config => !config.IsEnabled);
+#if UNITY_EDITOR
+        EditorUtility.SetDirty(this);
+#endif
+    }
 
     #endregion
 

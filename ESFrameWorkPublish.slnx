@@ -10,8 +10,8 @@
   <Project Path="Assembly-CSharp-firstpass.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="Gaskellgames.FolderSystem.csproj" />
-  <Project Path="DOTween.Modules.csproj" />
   <Project Path="ESInstaller.csproj" />
+  <Project Path="DOTween.Modules.csproj" />
   <Project Path="ESPlayer.csproj" />
   <Project Path="Sirenix.OdinInspector.Modules.UnityMathematics.csproj" />
 </Solution>

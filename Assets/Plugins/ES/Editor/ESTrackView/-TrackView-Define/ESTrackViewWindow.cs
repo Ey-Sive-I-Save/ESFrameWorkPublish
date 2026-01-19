@@ -8,6 +8,11 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
+// 抑制私有字段未使用警告
+#pragma warning disable CS0414
+// 抑制无法访问的代码警告（提前return）
+#pragma warning disable CS0162
+
 public class ESTrackViewWindow : OdinEditorWindow
 {
     public static ESTrackViewWindow window;
@@ -786,7 +791,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     private void UpdateCursor()
     {
-        switch (m_CurrentMode)
+       // switch (m_CurrentMode)
         {
             // case InteractionMode.Panning:
             //     rightPanel.style.cursor = LoadCursor("PanCursor");
@@ -1057,6 +1062,10 @@ public class ESEditorTrackItemRegister : EditorRegister_FOR_ClassAttribute<Creat
 
 
 #endregion
+
+// 恢复警告
+#pragma warning restore CS0414
+#pragma warning restore CS0162
 
 
 

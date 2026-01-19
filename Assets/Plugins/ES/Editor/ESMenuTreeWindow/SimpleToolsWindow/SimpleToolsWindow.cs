@@ -54,7 +54,9 @@ namespace ES
         public const string PageName_HierarchyTools = "【层级工具集】";
         public const string PageName_ESIntegrationTools = "【ES集成工具集】";
         public const string PageName_ObjectPool = "对象池工具";
+        public const string PageName_TopToolbar = "顶部工具栏";
         [NonSerialized] public Page_ObjectPool pageObjectPool;
+        [NonSerialized] public Page_TopToolbar pageTopToolbar;
         public const string PageName_UnityPackageTool = "UnityPackage打包工具";
         public const string PageName_BatchRename = "批量重命名";
         public const string PageName_PhysicsAlign = "物理对齐";
@@ -143,6 +145,7 @@ namespace ES
 
                 // ES集成工具集
                 QuickBuildRootMenu(tree, PageName_ESIntegrationTools + "/" + PageName_ObjectPool, ref pageObjectPool, SdfIconType.Droplet);
+                QuickBuildRootMenu(tree, PageName_ESIntegrationTools + "/" + PageName_TopToolbar, ref pageTopToolbar, SdfIconType.Map);
             }
             ES_LoadData();
         }

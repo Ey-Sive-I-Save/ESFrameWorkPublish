@@ -1,0 +1,56 @@
+{
+  "commandId": "example_basic_scene",
+  "timestamp": "2026-01-20T10:00:00",
+  "description": "创建基础场景 - 地面、灯光和材质",
+  "commands": [
+    {
+      "type": "CreatePrimitive",
+      "id": "floor",
+      "name": "Floor",
+      "primitiveType": "Plane",
+      "position": [0, 0, 0],
+      "scale": [10, 1, 10],
+      "color": [0.8, 0.8, 0.8, 1]
+    },
+    {
+      "type": "CreateGameObject",
+      "id": "light",
+      "name": "DirectionalLight",
+      "position": [0, 10, 0],
+      "rotation": [50, -30, 0]
+    },
+    {
+      "type": "AddComponent",
+      "target": "{{light}}",
+      "component": "Light"
+    },
+    {
+      "type": "CreateMaterial",
+      "id": "floor_mat",
+      "name": "FloorMaterial",
+      "shader": "Standard",
+      "color": [0.7, 0.7, 0.7, 1],
+      "metallic": 0.0,
+      "smoothness": 0.5
+    },
+    {
+      "type": "AssignMaterial",
+      "target": "{{floor}}",
+      "material": "{{floor_mat}}"
+    },
+    {
+      "type": "CreatePrimitive",
+      "id": "cube",
+      "name": "TestCube",
+      "primitiveType": "Cube",
+      "position": [0, 1, 0],
+      "scale": [1, 1, 1]
+    }
+  ],
+  "memory": {
+    "save": {
+      "scene_floor": "{{floor.gameObjectId}}",
+      "floor_material": "{{floor_mat}}"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "commandId": "create_random_cubes_at_height_10",
+  "description": "在高度10米位置随机摆放5个彩色方块",
+  "commands": [
+    {
+      "type": "CreatePrimitive",
+      "id": "cube1",
+      "name": "RandomCube_1",
+      "primitiveType": "Cube",
+      "position": [-3.5, 10, 2.1],
+      "scale": [1, 1, 1],
+      "color": [1, 0.2, 0.2, 1]
+    },
+    {
+      "type": "CreatePrimitive",
+      "id": "cube2",
+      "name": "RandomCube_2",
+      "primitiveType": "Cube",
+      "position": [1.8, 10, -4.2],
+      "scale": [1, 1, 1],
+      "color": [0.2, 1, 0.2, 1]
+    },
+    {
+      "type": "CreatePrimitive",
+      "id": "cube3",
+      "name": "RandomCube_3",
+      "primitiveType": "Cube",
+      "position": [4.7, 10, 3.8],
+      "scale": [1, 1, 1],
+      "color": [0.2, 0.2, 1, 1]
+    },
+    {
+      "type": "CreatePrimitive",
+      "id": "cube4",
+      "name": "RandomCube_4",
+      "primitiveType": "Cube",
+      "position": [-1.2, 10, -2.9],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 0.2, 1]
+    },
+    {
+      "type": "CreatePrimitive",
+      "id": "cube5",
+      "name": "RandomCube_5",
+      "primitiveType": "Cube",
+      "position": [2.3, 10, 1.5],
+      "scale": [1, 1, 1],
+      "color": [1, 0.2, 1, 1]
+    }
+  ],
+  "memory": {
+    "save": {
+      "random_cubes": ["{{cube1}}", "{{cube2}}", "{{cube3}}", "{{cube4}}", "{{cube5}}"],
+      "cube_height": 10,
+      "total_cubes": 5
+    }
+  }
+}

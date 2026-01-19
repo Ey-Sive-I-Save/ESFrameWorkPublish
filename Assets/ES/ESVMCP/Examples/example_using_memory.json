@@ -1,0 +1,11 @@
+{
+  "commandId": "example_using_memory",
+  "timestamp": "2026-01-20T10:05:00",
+  "description": "使用记忆系统的示例 - 在已有floor上添加墙壁",
+  "memory": {
+    "load": ["scene_floor", "floor_material"],
+    "save": {
+      "wall_count": 4
+    }
+  }
+}

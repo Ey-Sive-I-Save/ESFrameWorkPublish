@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eddd4633ea10ba344ba02c393deccffe, type: 3}
+  m_Name: ESSceneGlobalData
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  HasConfirm: 1
+  CustomScenes:
+  - DisplayName: SampleScene
+    ScenePath: Assets/Scenes/SampleScene.unity
+    SceneAsset: {fileID: 102900000, guid: 99c9720ab356a0642a771bea13969a05, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
+  - DisplayName: 2 - Microphone
+    ScenePath: Assets/ES/AIPreview/Special/Wispwer_Voice/Samples/2 - Microphone/2
+      - Microphone.unity
+    SceneAsset: {fileID: 102900000, guid: 2b6d678b6a8b949d0bbe7c64a49abbed, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u6838\u5FC3\u573A\u666F"
+    Enabled: 1
+  - DisplayName: SampleScene_GgCore
+    ScenePath: Assets/Gaskellgames/GgCore/Editor/Scenes/SampleScene_GgCore.unity
+    SceneAsset: {fileID: 102900000, guid: a56d4590da976e043ad16449b33b45fa, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
+  SceneGroups:
+  - "\u9ED8\u8BA4"
+  - "\u6838\u5FC3\u573A\u666F"
+  - "\u6D4B\u8BD5\u573A\u666F"
+  - "UI\u573A\u666F"
+  CustomAssets:
+  - DisplayName: SampleScene
+    Asset: {fileID: 102900000, guid: 99c9720ab356a0642a771bea13969a05, type: 3}
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
+  - DisplayName: "\U0001F4C1 OBSOLUTE"
+    Asset: {fileID: 102900000, guid: 63b50f818d503904fa3c39903080c36b, type: 3}
+    Group: "\u6587\u4EF6\u5939"
+    Enabled: 1
+  AssetGroups:
+  - "\u9ED8\u8BA4"
+  - "\u811A\u672C"
+  - "\u9884\u5236\u4F53"
+  - "\u914D\u7F6E"
+  - "\u6750\u8D28"
+  AutoSaveBeforeSwitch: 1
+  UseAdditiveMode: 0
+  ShowScenePath: 0
+  IncludeBuildScenes: 1
+  IncludeAllScenes: 0

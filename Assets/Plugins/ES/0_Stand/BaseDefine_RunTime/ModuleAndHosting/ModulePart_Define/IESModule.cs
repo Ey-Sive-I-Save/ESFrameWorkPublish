@@ -25,75 +25,6 @@ namespace ES
     {
 
     }
-    /*public interface IESOriginalModule<in Host> : IESOriginalModule where Host : IESOringinHosting
-    {
-        bool Start(Host host);//开始-
-    }*/
-
-    /// <summary>
-    /// ES模块核心接口：
-    /// 
-    /// **核心职责**：
-    /// - 作为功能单元，被Host托管并按需启用/禁用/更新
-    /// - 实现 IESWithLife 的完整生命周期（TryEnableSelf/TryDisableSelf/TryUpdateSelf/TryDestroySelf）
-    /// - 维护自身的启用状态（EnabledSelf）与活动状态（Signal_IsActiveAndEnable）
-    /// 
-    /// **生命周期流程**：
-    /// 1. 创建：new XxxModule()
-    /// 2. 注册：module._TryRegisterToHost(host)  → Signal_HasSubmit = true
-    /// 3. 启动：host 调用 module.Start()        → HasStart = true
-    /// 4. 启用：host 调用 TryEnableSelf()        → Signal_IsActiveAndEnable = true, OnEnable()
-    /// 5. 更新：host 每帧调用 TryUpdateSelf()    → Update()
-    /// 6. 禁用：host 调用 TryDisableSelf()       → Signal_IsActiveAndEnable = false, OnDisable()
-    /// 7. 销毁：host 调用 TryDestroySelf()       → HasDestroy = true, OnDestroy()
-    /// 
-    /// **状态标志说明**：
-    /// - EnabledSelf：自身是否希望被启用（可由外部设置，如UI勾选框）
-    /// - Signal_IsActiveAndEnable：当前是否真正活跃（受Host启用状态与EnabledSelf共同影响）
-    /// - Signal_HasSubmit：是否已注册到Host
-    /// - HasStart / HasDestroy：生命周期阶段标记
-    /// - Singal_Dirty：用于延迟更新/批处理的脏标记
-    /// 
-    /// **典型实现模式**：
-    /// ```csharp
-    /// public class MyFeatureModule : BaseESModule, IESModule<MyHost>
-    /// {
-    ///     public MyHost GetHost { get; private set; }
-    ///     
-    ///     public ESTryResult _TryRegisterToHost(MyHost host)
-    ///     {
-    ///         if (Signal_HasSubmit) return ESTryResult.ReTry;
-    ///         GetHost = host;
-    ///         Signal_HasSubmit = true;
-    ///         host._TryAddToListOnly(this);
-    ///         return ESTryResult.Success;
-    ///     }
-    ///     
-    ///     protected override void OnEnable()
-    ///     {
-    ///         // 订阅Host的事件/消息
-    ///         GetHost.OnSomeEvent += HandleEvent;
-    ///     }
-    ///     
-    ///     protected override void OnDisable()
-    ///     {
-    ///         // 取消订阅
-    ///         GetHost.OnSomeEvent -= HandleEvent;
-    ///     }
-    ///     
-    ///     protected override void Update()
-    ///     {
-    ///         // 每帧逻辑
-    ///     }
-    /// }
-    /// ```
-    /// 
-    /// **注意事项**：
-    /// - Module 不应直接持有UnityEngine.Object的强引用（如Transform/GameObject），
-    ///   应通过Host提供的接口访问，避免Host销毁后Module成为悬空引用
-    /// - _TryTestActiveAndEnable / _TryTestInActiveAndDisable 是框架内部调用的带条件检查方法，
-    ///   外部应使用 TryEnableSelf / TryDisableSelf
-    /// </summary>
     public interface IESModule : IESOriginalModule, IESWithLife
     {
         //这个是模块专属哈
@@ -106,7 +37,7 @@ namespace ES
         ESTryResult _TryRegisterToHost(IESOringinHosting host);//带条件尝试开始
 
         bool Signal_HasSubmit { get; set; }
-        bool Singal_Dirty { get; set; }
+        bool Signal_Dirty { get; set; }
         void _SetHost(IESOringinHosting host);
         bool HasStart { get; set; }
         bool HasDestroy { get; set; }
@@ -191,7 +122,7 @@ namespace ES
         {
             if (_hasSubmit&& HostEnable)//只有在Submit时，才有权造成因为Self引起的状态改变
             {
-                Singal_Dirty = true;
+                Signal_Dirty = true;
                 if (_isActiveAndEnable && !_enableSelf) _TryTestInActiveAndDisable();
                 else if (!_isActiveAndEnable && _enableSelf) _TryTestActiveAndEnable();
             }
@@ -249,7 +180,7 @@ namespace ES
             }
         }
 
-        public bool Singal_Dirty { [MethodImpl(MethodImplOptions.AggressiveInlining)] get; set; } = true;
+        public bool Signal_Dirty { [MethodImpl(MethodImplOptions.AggressiveInlining)] get; set; } = true;
         public bool HasStart { get; set; }
         public bool HasDestroy { get; set; }
 

@@ -9,51 +9,41 @@ using UnityEditor;
 using UnityEngine;
 namespace ES
 {
-    /// <summary>
-    /// 这部分用于生成必要的JsonData--->_Path_NetABPath/ESResData
-    /// 键包：
-    /// </summary>
     public partial class ESResMaster
     {
-        public const string PathParent_ESResJsonData = "ESResData";//这个文件夹下只有这一种应用场景
-        /*        public const string PathChild_ESResDataLib = "Libs";//这里存放每一个库*/
-        /**/
-        public const string PathFileName_ESABHashs = "ABHashes.json";//这里存放AB  获得的 Hash值 string ABName->Hash
-        public const string PathFileName_ESDependences = "ABDependences.json"; //这里存放Ab 的 依赖关系 AbName-> SomeAB
-        public const string PathFileName_ESAssetkeys = "AssetKeys.json";
-        public const string PathFileName_ESABkeys = "ABKeys.json";
+        public static ESResJsonData_AssetsKeys MainESResData_AssetKeys = new ESResJsonData_AssetsKeys();
+        public static ESResJsonData_ABKeys MainESResData_ABKeys = new ESResJsonData_ABKeys();
+        public static ESResJsonData_Hashes MainESResData_WithHashes = new ESResJsonData_Hashes();
+        public static ESResJsonData_Dependences MainESResData_Dependences = new ESResJsonData_Dependences();
 
-        public static ESResJsonData_AssetsKeys ESResData_AssetKeys = new ESResJsonData_AssetsKeys();
-        public static ESResJsonData_ABKeys ESResData_ABKeys = new ESResJsonData_ABKeys();
-        public static ESResJsonData_Hashes ESResData_WithHashes = new ESResJsonData_Hashes();
-        public static ESResJsonData_Dependences ESResData_Dependences = new ESResJsonData_Dependences();
-      
         public static string[] ABNames;
+
+
+           /// <summary>
+        /// 将当前的 `ESResData_AssetKeys` 序列化为 JSON 并写入远端构建输出路径下的 `ESResData/AssetKeys.json`。
+        /// 说明：历史上此方法会清理子目录（已弃用），相关旧代码已移除以简化实现。
+        /// </summary>
         public static void JsonData_CreateAssetKeys(bool clearAtFirst = true)
         {
-            //目前是废案
-            /* string path = ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath + "/" + PathParent_ESResJsonData + "/" + PathChild_ESResDataLib;
-             //可以先清除
-             if (clearAtFirst) ESStandUtility.SafeEditor.Quick_System_DeleteAllFilesInFolder_Always(path);
- */
-            //此处已经完成键储备
-            string path = ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath+"/"+ RunTimePlatformFolderName(ESGlobalResSetting.Instance.applyPlatform) + "/" + PathParent_ESResJsonData;
-            byte[] Keys_jsonBytes = Sirenix.Serialization.SerializationUtility.SerializeValue(ESResData_AssetKeys, DataFormat.JSON);
+            // 目标目录：Path_RemoteResOutBuildPath/{Platform}/ESResData
+            string path = ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath + "/" + RunTimePlatformFolderName(ESGlobalResSetting.Instance.applyPlatform) + "/" + PathParentFolder_ESResJsonData;
+
+            byte[] Keys_jsonBytes = Sirenix.Serialization.SerializationUtility.SerializeValue(MainESResData_AssetKeys, DataFormat.JSON);
             string Keys_Json = System.Text.Encoding.UTF8.GetString(Keys_jsonBytes);
             string Keys_Path = path + "/" + PathFileName_ESAssetkeys;
 
             ESStandUtility.SafeEditor.Quick_System_CreateDirectory(path);
 
             File.WriteAllText(Keys_Path, Keys_Json);
-#if UNITY_EDITOR
+    #if UNITY_EDITOR
             AssetDatabase.Refresh();
             AssetDatabase.SaveAssets();
-#endif 
+    #endif
         }
         public static void JsonData_CreateHashAndDependence()
         {
 #if UNITY_EDITOR
-            string path = ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath + "/" + RunTimePlatformFolderName(ESGlobalResSetting.Instance.applyPlatform) + "/" + PathParent_ESResJsonData;
+            string path = ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath + "/" + RunTimePlatformFolderName(ESGlobalResSetting.Instance.applyPlatform) + "/" + PathParentFolder_ESResJsonData;
             ABNames = AssetDatabase.GetAllAssetBundleNames();
             //先卸载加载
             AssetBundle.UnloadAllAssetBundles(unloadAllObjects: false);
@@ -63,9 +53,9 @@ namespace ES
             AssetBundleManifest manifest = MainBundle.LoadAsset<AssetBundleManifest>("AssetBundleManifest");
             //带Hash值的AB
             string[] AllABWithHash = manifest.GetAllAssetBundles();
-            ESResData_WithHashes.PreToHashes.Clear();
-            ESResData_Dependences.Dependences.Clear();
-            ESResData_ABKeys.ABKeys.Clear();
+            MainESResData_WithHashes.PreToHashes.Clear();
+            MainESResData_Dependences.Dependences.Clear();
+            MainESResData_ABKeys.ABKeys.Clear();
 
             int len = ABNames.Length;
             for (int index = 0; index < len; index++)
@@ -76,36 +66,39 @@ namespace ES
                     string pre = PathAndNameTool_GetPreName(withHash);
                     if (pre == abName)
                     {
-                        ESResData_WithHashes.PreToHashes.TryAdd(abName, withHash);
-                        ESResData_WithHashes.HashesToPre.TryAdd(withHash,abName);
+                        MainESResData_WithHashes.PreToHashes.TryAdd(abName, withHash);
+                        MainESResData_WithHashes.HashesToPre.TryAdd(withHash, abName);
+
                         string[] abDepend = manifest.GetAllDependencies(withHash);
                         for (int i = 0; i < abDepend.Length; i++)
                         {
                             abDepend[i] = PathAndNameTool_GetPreName(abDepend[i]);
                         }
-                        if (abDepend.Length > 0) ESResData_Dependences.Dependences.Add(abName, abDepend);
+                        if (abDepend.Length > 0)
+                            MainESResData_Dependences.Dependences.Add(abName, abDepend);
 
                         ESResKey key = new ESResKey() { LibName = null, ABName = pre, SourceLoadType = ESResSourceLoadType.AssetBundle, ResName = withHash, TargetType = typeof(AssetBundle) };
-                        int count = ESResData_ABKeys.ABKeys.Count;
-                        ESResData_ABKeys.ABKeys.Add(key);
-                        Debug.Log(pre);
-                        ESResData_ABKeys.NameToABKeys.TryAdd(pre, count);
+                        int count = MainESResData_ABKeys.ABKeys.Count;
+                        MainESResData_ABKeys.ABKeys.Add(key);
+                        // 去掉噪音日志：若需要打印，请考虑使用可控日志封装
+                        // Debug.Log(pre);
+                        MainESResData_ABKeys.NameToABKeys.TryAdd(pre, count);
                     }
                 }
             }
             ESStandUtility.SafeEditor.Quick_System_CreateDirectory(path);
-            byte[] HASH_jsonBytes = Sirenix.Serialization.SerializationUtility.SerializeValue(ESResData_WithHashes, DataFormat.JSON);
+            byte[] HASH_jsonBytes = Sirenix.Serialization.SerializationUtility.SerializeValue(MainESResData_WithHashes, DataFormat.JSON);
             string HASH_Json = System.Text.Encoding.UTF8.GetString(HASH_jsonBytes);
-            string Hash_Path = path + "/" + PathFileName_ESABHashs;
+            string Hash_Path = path + "/" + PathJsonFileName_ESABHashs;
             File.WriteAllText(Hash_Path, HASH_Json);
 
-            byte[] Depend_jsonBytes = Sirenix.Serialization.SerializationUtility.SerializeValue(ESResData_Dependences, DataFormat.JSON);
+            byte[] Depend_jsonBytes = Sirenix.Serialization.SerializationUtility.SerializeValue(MainESResData_Dependences, DataFormat.JSON);
             string Depend_Json = System.Text.Encoding.UTF8.GetString(Depend_jsonBytes);
-            string Depend_Path = path + "/" + PathFileName_ESDependences;
+            string Depend_Path = path + "/" + PathJsonFileName_ESDependences;
             File.WriteAllText(Depend_Path, Depend_Json);
 
 
-            byte[] ABkeys_jsonBytes = Sirenix.Serialization.SerializationUtility.SerializeValue(ESResData_ABKeys, DataFormat.JSON);
+            byte[] ABkeys_jsonBytes = Sirenix.Serialization.SerializationUtility.SerializeValue(MainESResData_ABKeys, DataFormat.JSON);
             string ABkeys_Json = System.Text.Encoding.UTF8.GetString(ABkeys_jsonBytes);
             string ABkeys_Path = path + "/" + PathFileName_ESABkeys;
             File.WriteAllText(ABkeys_Path, ABkeys_Json);
@@ -117,9 +110,11 @@ namespace ES
 #endif 
 
         }
+
+
     }
 
-    /// <summary>
+        /// <summary>
     /// 查询特定资源的最终标识
     /// </summary>
     [Serializable]
@@ -191,6 +186,5 @@ namespace ES
         [NonSerialized, OdinSerialize]
         public Dictionary<string, int> NameToABKeys = new Dictionary<string, int>();
     }
-
 
 }

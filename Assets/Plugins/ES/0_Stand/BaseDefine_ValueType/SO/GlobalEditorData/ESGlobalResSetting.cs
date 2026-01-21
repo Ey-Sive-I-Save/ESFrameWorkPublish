@@ -16,7 +16,7 @@ namespace ES
 {
     [HideMonoScript]
     //为快速定位准备的匹配信息
-    [CreateAssetMenu(fileName = "全局资源管理设置", menuName = "全局SO/全局资源管理设置")]
+    [CreateAssetMenu(fileName = "全局资源管理设置", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "全局资源管理设置")]
     public class ESGlobalResSetting : ESEditorGlobalSo<ESGlobalResSetting>
     {
 

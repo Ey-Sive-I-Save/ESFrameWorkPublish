@@ -9,7 +9,7 @@ namespace ES
     /// <summary>
     /// 开发管理数据 V2 - 增强版
     /// </summary>
-    [CreateAssetMenu(fileName = "DevManagementDataV2", menuName = "ES/开发管理数据 V2")]
+    [CreateAssetMenu(fileName = "DevManagementDataV2", menuName = MenuItemPathDefine.ASSET_DEV_MANAGEMENT_PATH + "开发管理数据 V2")]
     public class DevManagementDataV2 : ScriptableObject
     {
         [Title("元数据")]

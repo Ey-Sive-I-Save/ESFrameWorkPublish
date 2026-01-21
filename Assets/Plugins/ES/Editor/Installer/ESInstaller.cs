@@ -762,7 +762,7 @@ namespace ES.ESInstaller
 
         #region 菜单项
 
-        [MenuItem("ES/安装管理器", false, 0)]
+        [MenuItem(MenuItemPathDefine.INSTALL_DEPENDENCY_PATH + "安装管理器", false, 0)]
         static void ShowInstaller()
         {
             if (installer == null)
@@ -791,7 +791,7 @@ namespace ES.ESInstaller
             _ = installer.CheckAllPackagesInstallStateAsync();
         }
 
-        [MenuItem("ES/检查依赖", false, 2)]
+        [MenuItem(MenuItemPathDefine.INSTALL_DEPENDENCY_PATH + "检查依赖", false, 2)]
         static void QuickCheckDependencies()
         {
             // 异步检查依赖并显示结果

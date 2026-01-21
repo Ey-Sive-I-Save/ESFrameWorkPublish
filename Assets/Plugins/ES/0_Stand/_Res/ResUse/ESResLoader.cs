@@ -69,7 +69,7 @@ namespace ES
 
         public void AddAsset2LoadByPathSourcer(string path, Action<bool, IResSource> listener = null, bool AtLastOrFirst = true)
         {
-            if(ESResMaster.ESResData_AssetKeys.PathToAssetKeys.TryGetValue(path,out int index))
+            if(ESResMaster.MainESResData_AssetKeys.PathToAssetKeys.TryGetValue(path,out int index))
             {
                 Add2LoadByKeyIndex(index, ESResSourceLoadType.ABAsset, listener,AtLastOrFirst);
             }
@@ -77,7 +77,7 @@ namespace ES
 
         public void AddAsset2LoadByGUIDSourcer(string guid, Action<bool, IResSource> listener = null, bool AtLastOrFirst = true)
         {
-            if (ESResMaster.ESResData_AssetKeys.GUIDToAssetKeys.TryGetValue(guid, out int index))
+            if (ESResMaster.MainESResData_AssetKeys.GUIDToAssetKeys.TryGetValue(guid, out int index))
             {
                 Add2LoadByKeyIndex(index, ESResSourceLoadType.ABAsset, listener, AtLastOrFirst);
             }
@@ -85,7 +85,7 @@ namespace ES
 
         public void AddAB2LoadByABPreNameSourcer(string abName, Action<bool, IResSource> listener = null, bool AtLastOrFirst = true)
         {
-            if (ESResMaster.ESResData_ABKeys.NameToABKeys.TryGetValue(abName, out int index))
+            if (ESResMaster.MainESResData_ABKeys.NameToABKeys.TryGetValue(abName, out int index))
             {
                 Add2LoadByKeyIndex(index, ESResSourceLoadType.AssetBundle, listener, AtLastOrFirst);
             }
@@ -93,7 +93,7 @@ namespace ES
 
         public void Add2LoadByKeyIndex(int keyIndex, ESResSourceLoadType loadType, Action<bool, IResSource> listener = null, bool AtLastOrFirst = true)
         {
-            var key = loadType == ESResSourceLoadType.AssetBundle ? ESResMaster.ESResData_ABKeys.ABKeys[keyIndex] : ESResMaster.ESResData_AssetKeys.AssetKeys[keyIndex];
+            var key = loadType == ESResSourceLoadType.AssetBundle ? ESResMaster.MainESResData_ABKeys.ABKeys[keyIndex] : ESResMaster.MainESResData_AssetKeys.AssetKeys[keyIndex];
             var res = FindResInThisLoaderList(key);
             if (res != null)
             {
@@ -139,7 +139,7 @@ namespace ES
         }
         public IResSource FindResInThisLoaderList(int keyIndex,ESResSourceLoadType loadType)
         {
-            var key = loadType== ESResSourceLoadType.ABAsset? ESResMaster.ESResData_AssetKeys.AssetKeys[keyIndex] : ESResMaster.ESResData_ABKeys.ABKeys[keyIndex];
+            var key = loadType== ESResSourceLoadType.ABAsset? ESResMaster.MainESResData_AssetKeys.AssetKeys[keyIndex] : ESResMaster.MainESResData_ABKeys.ABKeys[keyIndex];
             int index = LoaderResSources.Count;
             if (index > 0)
             {

@@ -139,7 +139,7 @@ namespace ES
             for (int i = 0; i < count; i++)
             {
                 var use = MyModules.ValuesNow[i];
-                if (use.Singal_Dirty && TestModuleStateBefoUpdate(use) == ESTryResult.Fail) { }
+                if (use.Signal_Dirty && TestModuleStateBefoUpdate(use) == ESTryResult.Fail) { }
                 else use.TryUpdateSelf();
             }
 
@@ -353,7 +353,7 @@ namespace ES
                 }
                 return ESTryResult.Fail;
             }
-            module.Singal_Dirty = false;
+            module.Signal_Dirty = false;
             return ESTryResult.Succeed;
         }
     }

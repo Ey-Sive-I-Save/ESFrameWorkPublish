@@ -56,13 +56,13 @@ namespace ES
             MyDomain = host;
             MyCore = host.MyCore;
             Awake();
-            Singal_Dirty = true;
+            Signal_Dirty = true;
             Signal_HasSubmit = true;
         }
         public sealed override void TryDestroySelf()
         {
             Signal_HasSubmit = false;
-            Singal_Dirty = true;
+            Signal_Dirty = true;
             //不再等待
             if (!Signal_IsActiveAndEnable)
             {

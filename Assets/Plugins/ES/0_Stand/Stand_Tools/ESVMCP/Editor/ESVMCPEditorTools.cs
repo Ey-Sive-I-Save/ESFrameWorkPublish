@@ -10,7 +10,7 @@ namespace ES.VMCP.Editor
     /// </summary>
     public static class ESVMCPEditorTools
     {
-        public const string MenuRoot = "Tools/【ESVMCP】/";
+        public const string MenuRoot = MenuItemPathDefine.VMCP_SYSTEM_PATH;
         private const string DefaultDataFolderRoot = "Assets/ES/ESVMCP/RunningData";
         private const string DefaultRootFolder = "Assets/ES/ESVMCP";
 
@@ -101,7 +101,7 @@ namespace ES.VMCP.Editor
             return count;
         }
 
-        [MenuItem(MenuRoot + "系统/【一键安装】", priority = 200)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_SYSTEM_MANAGEMENT + "/【一键安装】", priority = 200)]
         public static void CompleteSetup()
         {
             Debug.Log("=== ESVMCP 完整安装开始 ===");
@@ -136,7 +136,7 @@ namespace ES.VMCP.Editor
                 "确定");
         }
 
-        [MenuItem(MenuRoot + "导出记忆", priority = 20)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_ASSET_MANAGEMENT + "/导出记忆", priority = 20)]
         public static void ExportCurrentMemory()
         {
             var config = ESVMCPConfig.Instance;
@@ -180,7 +180,7 @@ namespace ES.VMCP.Editor
             }
         }
 
-        [MenuItem(MenuRoot + "系统/【查看状态】", priority = 201)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_SYSTEM_MANAGEMENT + "/【查看状态】", priority = 201)]
         public static void ShowSystemStatus()
         {
             var config = ESVMCPConfig.Instance;
@@ -395,7 +395,7 @@ namespace ES.VMCP.Editor
             return report.ToString();
         }
 
-        [MenuItem(MenuRoot + "创建文件夹结构", priority = 21)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_ASSET_MANAGEMENT + "/创建文件夹结构", priority = 21)]
         public static void CreateFolderStructure()
         {
             Debug.Log("[ESVMCP] 开始创建文件夹结构...");
@@ -428,7 +428,7 @@ namespace ES.VMCP.Editor
             Debug.Log("[ESVMCP] 文件夹结构创建完成！");
         } 
 
-        [MenuItem(MenuRoot + "创建配置资产", priority = 22)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_ASSET_MANAGEMENT + "/创建配置资产", priority = 22)]
         public static ESVMCPConfig CreateConfigAsset()
         {
             Debug.Log("[ESVMCP] 创建配置资产...");
@@ -463,7 +463,7 @@ namespace ES.VMCP.Editor
             return config;
         }
 
-        [MenuItem(MenuRoot + "创建记忆资产", priority = 23)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_ASSET_MANAGEMENT + "/创建记忆资产", priority = 23)]
         public static ESVMCPMemoryAssetEnhanced CreateMemoryAsset()
         {
             Debug.Log("[ESVMCP] 创建记忆资产...");
@@ -498,7 +498,7 @@ namespace ES.VMCP.Editor
             return memoryAsset;
         }
 
-        [MenuItem(MenuRoot + "在场景中添加记忆组件", priority = 24)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_ASSET_MANAGEMENT + "/在场景中添加记忆组件", priority = 24)]
         public static void AddMemoryComponentToScene()
         {
             Debug.Log("[ESVMCP] 在场景中添加记忆组件...");
@@ -526,35 +526,35 @@ namespace ES.VMCP.Editor
             Debug.Log("[ESVMCP] 记忆组件已添加到场景");
         }
 
-        [MenuItem(MenuRoot + "系统/打开文件夹/打开Input文件夹", priority = 210)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_SYSTEM_MANAGEMENT + "/打开文件夹/打开Input文件夹", priority = 210)]
         public static void OpenInputFolder()
         {
             string path = Path.Combine(Application.dataPath, "..", DataFolderRoot, "Input");
             OpenFolder(path);
         }
 
-        [MenuItem(MenuRoot + "系统/打开文件夹/打开Archive文件夹", priority = 211)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_SYSTEM_MANAGEMENT + "/打开文件夹/打开Archive文件夹", priority = 211)]
         public static void OpenArchiveFolder()
         {
             string path = Path.Combine(Application.dataPath, "..", DataFolderRoot, "Archive");
             OpenFolder(path);
         }
 
-        [MenuItem(MenuRoot + "系统/打开文件夹/打开Memory文件夹", priority = 212)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_SYSTEM_MANAGEMENT + "/打开文件夹/打开Memory文件夹", priority = 212)]
         public static void OpenMemoryFolder()
         {
             string path = Path.Combine(Application.dataPath, "..", DataFolderRoot, "Memory");
             OpenFolder(path);
         }
 
-        [MenuItem(MenuRoot + "系统/打开文件夹/打开Logs文件夹", priority = 213)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_SYSTEM_MANAGEMENT + "/打开文件夹/打开Logs文件夹", priority = 213)]
         public static void OpenLogsFolder()
         {
             string path = Path.Combine(Application.dataPath, "..", DataFolderRoot, "Logs");
             OpenFolder(path);
         }
 
-        [MenuItem(MenuRoot + "系统/资产/选择配置资产", priority = 220)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_SYSTEM_MANAGEMENT + "/资产/选择配置资产", priority = 220)]
         public static void SelectConfigAsset()
         {
             // 查找全局资产：加载并选择配置资产
@@ -570,7 +570,7 @@ namespace ES.VMCP.Editor
             }
         }
 
-        [MenuItem(MenuRoot + "系统/资产/选择记忆资产", priority = 221)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_SYSTEM_MANAGEMENT + "/资产/选择记忆资产", priority = 221)]
         public static void SelectMemoryAsset()
         {
             // 查找全局资产：加载并选择记忆资产
@@ -586,7 +586,7 @@ namespace ES.VMCP.Editor
             }
         }
 
-        [MenuItem(MenuRoot + "创建示例JSON", priority = 25)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_ASSET_MANAGEMENT + "/创建示例JSON", priority = 25)]
         public static void CreateExampleJson()
         {
             string exampleJson = @"{
@@ -620,7 +620,7 @@ namespace ES.VMCP.Editor
             EditorUtility.RevealInFinder(path);
         }
 
-        [MenuItem(MenuRoot + "帮助/打开README", priority = 51)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_HELP + "/打开README", priority = 51)]
         public static void OpenReadme()
         {
             string readmePath = Path.Combine(DefaultRootFolder, "README.md");
@@ -637,7 +637,7 @@ namespace ES.VMCP.Editor
             }
         }
 
-        [MenuItem(MenuRoot + "帮助/打开实现指南", priority = 52)]
+        [MenuItem(MenuRoot + MenuItemPathDefine.VMCP_HELP + "/打开实现指南", priority = 52)]
         public static void OpenImplementationGuide()
         {
             string guidePath = Path.Combine(DefaultRootFolder, "IMPLEMENTATION_GUIDE.md");

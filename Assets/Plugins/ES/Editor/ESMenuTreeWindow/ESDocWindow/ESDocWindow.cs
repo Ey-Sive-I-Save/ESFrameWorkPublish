@@ -16,7 +16,7 @@ namespace ES
         /// </summary>
         public class ESDocWindow : ESMenuTreeWindowAB<ESDocWindow>
         {
-            [MenuItem("Tools/ES工具/ES文档创建窗口")]
+            [MenuItem(MenuItemPathDefine.EDITOR_DOCS_PATH + "ES文档创建窗口")]
             public static void TryOpenWindow()
             {
                 OpenWindow();

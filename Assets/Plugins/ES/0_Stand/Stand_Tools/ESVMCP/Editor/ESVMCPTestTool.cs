@@ -16,7 +16,7 @@ namespace ES.VMCP
         private ESVMCPExecutionReport lastReport;
         private ESVMCPBatchReport lastBatchReport;
 
-        [MenuItem(ESVMCPEditorTools.MenuRoot + "系统/测试工具", priority = 200)]
+        [MenuItem(ESVMCPEditorTools.MenuRoot + MenuItemPathDefine.VMCP_SYSTEM_MANAGEMENT + "/测试工具", priority = 200)]
         public static void ShowWindow()
         {
             var window = GetWindow<ESVMCPTestTool>("ESVMCP 测试工具");
@@ -275,7 +275,7 @@ namespace ES.VMCP
         private static bool isBatchExecuting = false;
 
 
-        [MenuItem(ESVMCPEditorTools.MenuRoot + "记忆系统示例", priority = 21)]
+        [MenuItem(ESVMCPEditorTools.MenuRoot + MenuItemPathDefine.VMCP_ASSET_MANAGEMENT + "/记忆系统示例", priority = 21)]
         public static void ExecuteMemoryExample()
         {
             string path = Path.Combine(Application.dataPath, "ES/ESVMCP/Examples/example_using_memory.json");

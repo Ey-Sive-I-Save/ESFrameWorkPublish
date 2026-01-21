@@ -29,7 +29,7 @@ namespace ES.VMCP
     /// <summary>
     /// ESVMCP配置文件
     /// </summary>
-    [CreateAssetMenu(fileName = "ESVMCPConfig", menuName = "ES/VMCP/配置文件")]
+    [CreateAssetMenu(fileName = "ESVMCPConfig", menuName = MenuItemPathDefine.VMCP_ASSET_CREATION_PATH + "配置文件")]
     public class ESVMCPConfig : ESEditorGlobalSo<ESVMCPConfig>
     {
         [Title("文件路径配置")]

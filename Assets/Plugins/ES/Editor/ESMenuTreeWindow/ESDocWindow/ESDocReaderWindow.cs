@@ -21,7 +21,7 @@ namespace ES
     /// </summary>
     public class ESDocReaderWindow : ESMenuTreeWindowAB<ESDocReaderWindow>
     {
-        [MenuItem("Tools/ES文档/ES文档阅读器")]
+        [MenuItem(MenuItemPathDefine.EDITOR_DOCS_PATH + "ES文档阅读器")]
         private static new void OpenWindow()
         {
             OpenDocReaderWindow("📖 ES文档阅读器");

@@ -139,12 +139,12 @@ namespace ES
 
             if (loadType == ESResSourceLoadType.AssetBundle)
             {
-                var key = ESResData_ABKeys.ABKeys[keyIndex];
+                var key = MainESResData_ABKeys.ABKeys[keyIndex];
                 retRes = CreateResSource_AssetBundle(key);
             }
             else if (loadType == ESResSourceLoadType.ABAsset)
             {
-                var key = ESResData_AssetKeys.AssetKeys[keyIndex];
+                var key = MainESResData_AssetKeys.AssetKeys[keyIndex];
                 retRes = CreateResSource_ABAsset(key);
             }
             /*.Where(creator => creator.Match(resSearchKeys))

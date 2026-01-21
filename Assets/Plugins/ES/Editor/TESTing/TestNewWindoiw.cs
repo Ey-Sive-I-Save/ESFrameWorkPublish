@@ -1,30 +1,32 @@
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
-
-public class TestNewWindoiw : EditorWindow
+namespace ES
 {
-    [SerializeField]
-    private VisualTreeAsset m_VisualTreeAsset = default;
-
-    [MenuItem("Window/UI Toolkit/TestNewWindoiw")]
-    public static void ShowExample() 
+    public class TestNewWindoiw : EditorWindow
     {
-        TestNewWindoiw wnd = GetWindow<TestNewWindoiw>();
-        wnd.titleContent = new GUIContent("TestNewWindoiw");
-    }
+        [SerializeField]
+        private VisualTreeAsset m_VisualTreeAsset = default;
 
-    public void CreateGUI()
-    {
-        // Each editor window contains a root VisualElement object
-        VisualElement root = rootVisualElement;
+        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "测试窗口")]
+        public static void ShowExample()
+        {
+            TestNewWindoiw wnd = GetWindow<TestNewWindoiw>();
+            wnd.titleContent = new GUIContent("TestNewWindoiw");
+        }
 
-        // VisualElements objects can contain other VisualElement following a tree hierarchy.
-        VisualElement label = new Label("Hello World! From C#");
-        root.Add(label);
+        public void CreateGUI()
+        {
+            // Each editor window contains a root VisualElement object
+            VisualElement root = rootVisualElement;
 
-        // Instantiate UXML
-        VisualElement labelFromUXML = m_VisualTreeAsset.Instantiate();
-        root.Add(labelFromUXML);
+            // VisualElements objects can contain other VisualElement following a tree hierarchy.
+            VisualElement label = new Label("Hello World! From C#");
+            root.Add(label);
+
+            // Instantiate UXML
+            VisualElement labelFromUXML = m_VisualTreeAsset.Instantiate();
+            root.Add(labelFromUXML);
+        }
     }
 }

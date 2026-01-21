@@ -128,7 +128,7 @@ namespace ES
             {
                 foreach (var i in ModulesIEnumable)
                 {
-                    if (i.Singal_Dirty &&TestModuleStateBefoUpdate(i) == ESTryResult.Fail) { }
+                    if (i.Signal_Dirty &&TestModuleStateBefoUpdate(i) == ESTryResult.Fail) { }
                     else i.TryUpdateSelf();
                 }
             }
@@ -178,7 +178,7 @@ namespace ES
                 module.OnDestroy();
                 return ESTryResult.Fail;
             }
-            module.Singal_Dirty = false;
+            module.Signal_Dirty = false;
             return ESTryResult.Succeed;
         }
 

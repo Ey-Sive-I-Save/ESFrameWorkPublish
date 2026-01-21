@@ -10,8 +10,17 @@ namespace ES
     /// <summary>
     /// ESRes 总工具
     /// </summary>
-    public partial class ESResMaster 
+    public partial class ESResMaster
     {
+        public const string PathParentFolder_ESResJsonData = "ESResData";//这个文件夹下只有这一种应用场景
+        /*        public const string PathChild_ESResDataLib = "Libs";//这里存放每一个库*/
+        /**/
+        public const string PathJsonFileName_ESABHashs = "ABHashes.json";//这里存放AB  获得的 Hash值 string ABName->Hash
+        public const string PathJsonFileName_ESDependences = "ABDependences.json"; //这里存放Ab 的 依赖关系 AbName-> SomeAB
+        public const string PathFileName_ESAssetkeys = "AssetKeys.json";
+        public const string PathFileName_ESABkeys = "ABKeys.json";
+
+
         #region ABHash获取，包名和其他处理流程
         [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
         public static string PathAndNameTool_GetHash(string input)
@@ -72,9 +81,10 @@ namespace ES
             StringBuilder safeName = new StringBuilder();
             foreach (char c in normalized)
             {
-                if ((c >= '\u4e00' && c <= '\u9fa5')) {
+                if ((c >= '\u4e00' && c <= '\u9fa5'))
+                {
                     //中文
-                    string py= NPinyin.Pinyin.GetPinyin(c, Encoding.UTF8);
+                    string py = NPinyin.Pinyin.GetPinyin(c, Encoding.UTF8);
                     safeName.Append(py);
                 }
                 else if ((char.IsLetterOrDigit(c) || c == '_'))
@@ -111,12 +121,12 @@ namespace ES
 
         public string GetDownloadNetPathWithPlatform()
         {
-           return Settings.Path_Net + "/" + RunTimePlatformFolderName(Application.platform);
+            return Settings.Path_Net + "/" + RunTimePlatformFolderName(Application.platform);
         }
 
         public string GetDownloadLocalPath()
         {
-            return Application.persistentDataPath + "/" +Settings.Path_Sub_DownloadRelative;
+            return Application.persistentDataPath + "/" + Settings.Path_Sub_DownloadRelative;
         }
 
         #region 平台

@@ -9,7 +9,7 @@ namespace ES.VMCP
     /// <summary>
     /// 增强的持久记忆资产 - 支持多种引用方式和智能衰减
     /// </summary>
-    [CreateAssetMenu(fileName = "ESVMCPMemoryAssetEnhanced", menuName = "ES/VMCP/增强记忆资产")]
+    [CreateAssetMenu(fileName = "ESVMCPMemoryAssetEnhanced", menuName = MenuItemPathDefine.VMCP_ASSET_CREATION_PATH + "增强记忆资产")]
     public class ESVMCPMemoryAssetEnhanced : ScriptableObject
     {
         [Title("持久记忆系统")]

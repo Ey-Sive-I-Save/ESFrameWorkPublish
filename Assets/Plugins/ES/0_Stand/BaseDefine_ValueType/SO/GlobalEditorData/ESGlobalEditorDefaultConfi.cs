@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace ES
 {
-  [CreateAssetMenu(fileName = "全局编辑器流程基本配置", menuName = "全局SO/全局编辑器流程基本配置")]
+  [CreateAssetMenu(fileName = "全局编辑器流程基本配置", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "全局编辑器流程基本配置")]
   public class ESGlobalEditorDefaultConfi : ESEditorGlobalSo<ESGlobalEditorDefaultConfi>
   {
     #region 文件夹管理

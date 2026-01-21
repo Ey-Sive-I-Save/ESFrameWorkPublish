@@ -32,7 +32,7 @@ MonoBehaviour:
   ExcludePackGroupInfo: 1
   ExcludeWindow: 1
   ExcludeNodeRunner: 1
-  ExcludeGlobal: 0
+  ExcludeGlobal: 1
   ExcludeNameList:
   - ESGraphViewWindow
   - ESTrackViewWindow

@@ -12,7 +12,7 @@ namespace ES
     /// <summary>
     /// 文档页面基类 - 支持丰富的文档元素
     /// </summary>
-    [CreateAssetMenu(fileName = "新文档", menuName = "ES文档/文档页面")]
+    [CreateAssetMenu(fileName = "新文档", menuName = MenuItemPathDefine.ASSET_DOCUMENTATION_PATH + "文档页面")]
     public class ESDocumentPageBase : ScriptableObject
     {
         [Title("文档信息")]

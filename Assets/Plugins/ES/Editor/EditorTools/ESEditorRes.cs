@@ -20,9 +20,9 @@ namespace ES
             var libs = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
 
             //清空信息
-            ESResMaster.ESResData_AssetKeys.AssetKeys.Clear();
-            ESResMaster.ESResData_AssetKeys.GUIDToAssetKeys.Clear();
-            ESResMaster.ESResData_AssetKeys.PathToAssetKeys.Clear();
+            ESResMaster.MainESResData_AssetKeys.AssetKeys.Clear();
+            ESResMaster.MainESResData_AssetKeys.GUIDToAssetKeys.Clear();
+            ESResMaster.MainESResData_AssetKeys.PathToAssetKeys.Clear();
             //扫描应用一遍资源
             {
                 foreach (var lib in libs)
@@ -70,7 +70,7 @@ namespace ES
         }
         private static void _TryAddRes(string LibName, string path, UnityEngine.Object OB, ResPage page, bool InFolder, string FolderPath = null)
         {
-            if (ESResMaster.ESResData_AssetKeys.PathToAssetKeys.TryGetValue(path, out int index))
+            if (ESResMaster.MainESResData_AssetKeys.PathToAssetKeys.TryGetValue(path, out int index))
             {
                 //没必要重复，重复直接忽略
                 Caching_ReAsset.Add(path);
@@ -101,14 +101,14 @@ namespace ES
             ai.assetBundleName = ABNameSafe;
             //开始应用
             var key = new ESResKey() { LibName = LibName, ABName = ABNameSafe, SourceLoadType= ESResSourceLoadType.ABAsset, ResName = OB.name, TargetType = OB.GetType() };
-            var count = ESResMaster.ESResData_AssetKeys.AssetKeys.Count;
-            ESResMaster.ESResData_AssetKeys.AssetKeys.Add(key);
+            var count = ESResMaster.MainESResData_AssetKeys.AssetKeys.Count;
+            ESResMaster.MainESResData_AssetKeys.AssetKeys.Add(key);
             var guid = AssetDatabase.AssetPathToGUID(path);
-            if (!ESResMaster.ESResData_AssetKeys.PathToAssetKeys.TryAdd(path, count))
+            if (!ESResMaster.MainESResData_AssetKeys.PathToAssetKeys.TryAdd(path, count))
             {
                 Debug.LogWarning("ES预-构建发现了意外的重复的路径!!!" + path);
             };
-            if (!ESResMaster.ESResData_AssetKeys.GUIDToAssetKeys.TryAdd(guid, count))
+            if (!ESResMaster.MainESResData_AssetKeys.GUIDToAssetKeys.TryAdd(guid, count))
             {
                 Debug.LogWarning("ES预-构建发现了意外的重复的GUID!!!" + guid);
             }

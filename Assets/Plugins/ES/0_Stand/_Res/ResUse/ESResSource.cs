@@ -197,7 +197,7 @@ namespace ES
             {
                 //抓AB
                 string pre = withHash ? ESResMaster.PathAndNameTool_GetPreName(dependsAB[i]) : dependsAB[i];
-                if (ESResMaster.ESResData_ABKeys.NameToABKeys.TryGetValue(pre, out int index))
+                if (ESResMaster.MainESResData_ABKeys.NameToABKeys.TryGetValue(pre, out int index))
                 {
                     var res = ESResMaster.Instance.GetResSourceByKey(index, ESResSourceLoadType.AssetBundle);
                     if (res == null || res.State != ResSourceState.Ready)
@@ -286,7 +286,7 @@ namespace ES
                 for (int i = 0; i < dependsAB.Length; i++)
                 {
                     string pre = withHash ? ESResMaster.PathAndNameTool_GetPreName(dependsAB[i]) : dependsAB[i];
-                    if (ESResMaster.ESResData_ABKeys.NameToABKeys.TryGetValue(pre, out int index))
+                    if (ESResMaster.MainESResData_ABKeys.NameToABKeys.TryGetValue(pre, out int index))
                     {
                         var res = ESResMaster.Instance.GetResSourceByKey(index, ESResSourceLoadType.AssetBundle);
                         if (res == null || res.State != ResSourceState.Ready)
@@ -321,7 +321,7 @@ namespace ES
                 for (int i = 0; i < dependsAB.Length; i++)
                 {
                     string pre = withHash ? ESResMaster.PathAndNameTool_GetPreName(dependsAB[i]) : dependsAB[i];
-                    if (ESResMaster.ESResData_ABKeys.NameToABKeys.TryGetValue(pre, out int index))
+                    if (ESResMaster.MainESResData_ABKeys.NameToABKeys.TryGetValue(pre, out int index))
                     {
                         var res = ESResMaster.Instance.GetResSourceByKey(index, ESResSourceLoadType.AssetBundle);
                         if (res == null || res.State != ResSourceState.Ready)
@@ -368,7 +368,7 @@ namespace ES
     {
         public override bool LoadSync()
         {
-            if (ESResMaster.ESResData_ABKeys.NameToABKeys.TryGetValue(ABName, out int index))
+            if (ESResMaster.MainESResData_ABKeys.NameToABKeys.TryGetValue(ABName, out int index))
             {
                 var abResSou = ESResMaster.Instance.GetResSourceByKey(index, ESResSourceLoadType.AssetBundle);
                 if (abResSou == null || abResSou.State != ResSourceState.Ready)
@@ -391,7 +391,7 @@ namespace ES
         public override IEnumerator DoTaskAsync(Action finishCallback)
         {
             if (State == ResSourceState.Ready) yield break;
-            if (ESResMaster.ESResData_ABKeys.NameToABKeys.TryGetValue(ABName, out int index))
+            if (ESResMaster.MainESResData_ABKeys.NameToABKeys.TryGetValue(ABName, out int index))
             {
                 var abResSou = ESResMaster.Instance.GetResSourceByKey(index, ESResSourceLoadType.AssetBundle);
                 abResSou.OnLoadOKAction_Submit((b, res) =>

@@ -160,7 +160,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     #endregion
 
-    [MenuItem("Tools/ES工具/多轨编辑器")]
+    [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "多轨编辑器", false, 2)]
     public static void OpenWindow()
     {
         window = GetWindow<ESTrackViewWindow>();
@@ -508,7 +508,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         UpdateCursor();
 
-        Debug.Log("开始平移");
+        // Debug.Log("开始平移");
     }
 
     private void HandlePanning(MouseMoveEvent evt)
@@ -564,7 +564,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         UpdateCursor();
 
-        Debug.Log("结束平移");
+        // Debug.Log("结束平移");
     }
     #endregion
 
@@ -648,7 +648,7 @@ public class ESTrackViewWindow : OdinEditorWindow
            }
            trackItem.UpdateNodeMatch();
            Last_EditorWindowForTrackItem = InspectObject(drawerSOForTrackItem);
-           Debug.Log("开始编辑轨道" + trackItem.item.GetType() + trackItem.item.DisplayName);
+           // Debug.Log("开始编辑轨道" + trackItem.item.GetType() + trackItem.item.DisplayName);
            Last_EditorWindowForTrackItem.titleContent = new GUIContent("编辑轨道" + "<" + trackItem.item.DisplayName);
 
            Last_EditorWindowForTrackItem.OnClose += () =>
@@ -758,7 +758,7 @@ public class ESTrackViewWindow : OdinEditorWindow
                             var clipEditor = forItem.AddClip(clip, false);
                             // 将绝对位置转换为相对于targetArea的本地位置
                             clipEditor.style.left = forItem.recordLocalClipsMousePos.x;
-                            Debug.Log("添加片段 位置" + forItem.recordLocalClipsMousePos.x);
+                            // Debug.Log("添加片段 位置" + forItem.recordLocalClipsMousePos.x);
                             clipEditor.MatchTimeFromDynamicPos();
                         }
                     });
@@ -835,7 +835,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         UpdateCursor();
 
-        Debug.Log($"开始选择: {m_SelectionStart}");
+        // Debug.Log($"开始选择: {m_SelectionStart}");
     }
 
     private void HandleSelection(MouseMoveEvent evt)
@@ -877,7 +877,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         UpdateCursor();
 
-        Debug.Log($"结束选择: {m_SelectionRect}");
+        // Debug.Log($"结束选择: {m_SelectionRect}");
     }
 
     private void UpdateSelectionVisual()

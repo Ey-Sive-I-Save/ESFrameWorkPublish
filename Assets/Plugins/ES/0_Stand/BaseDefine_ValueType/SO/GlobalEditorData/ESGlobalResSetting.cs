@@ -53,6 +53,12 @@ namespace ES
         [InlineButton("Ping_", "<*>")]
         public string Path_ResLibraryFolder = "";
 
+        
+        [VerticalGroup("总体/文件夹路径")]
+        [FolderPath, LabelText("默认库放置文件夹")]
+        [InlineButton("Ping_", "<*>")]
+        public string Path_AllLibraryFolder = "Assets/ResourcesNormal/Data/Library";
+
         [VerticalGroup("总体/文件夹路径")]
         [FolderPath, LabelText("AB帮助代码生成文件夹")]
         [InlineButton("Ping_", "<*>")]

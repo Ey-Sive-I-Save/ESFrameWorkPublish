@@ -342,8 +342,15 @@ namespace ES
 
                 if (!AssetDatabase.IsValidFolder(folderPath))
                 {
-                     UnityEngine.Debug.LogError($"Invalid folder path_: {folderPath}");
-                    return null;
+                    if (Quick_CreateFolderByFullPath(folderPath))
+                    {
+                        UnityEngine.Debug.Log($"自动创建了文件夹: {folderPath}");
+                    }
+                    else
+                    {
+                        UnityEngine.Debug.LogWarning($"无法创建文件夹路径: {folderPath}");
+                        return null;
+                    }
                 }
                 T asset = ScriptableObject.CreateInstance<T>();
                 asset.name = assetName._ToValidIdentName() + (appendRandomIfNotChangedDefaultName && !hasChange ? UnityEngine.Random.Range(0, 9999).ToString() : "");
@@ -364,8 +371,15 @@ namespace ES
                 if (type == null) return null;
                 if (!AssetDatabase.IsValidFolder(folderPath))
                 {
-                     UnityEngine.Debug.LogError($"Invalid folder path_: {folderPath}");
-                    return null;
+                    if (Quick_CreateFolderByFullPath(folderPath))
+                    {
+                        UnityEngine.Debug.Log($"自动创建了文件夹: {folderPath}");
+                    }
+                    else
+                    {
+                        UnityEngine.Debug.LogWarning($"无法创建文件夹路径: {folderPath}");
+                        return null;
+                    }
                 }
                 ScriptableObject asset = ScriptableObject.CreateInstance(type);
                 asset.name = assetName._ToValidIdentName() + (appendRandomIfNotChangedDefaultName && !hasChange ? UnityEngine.Random.Range(0, 99999).ToString() : "");

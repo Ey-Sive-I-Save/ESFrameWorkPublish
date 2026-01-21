@@ -11,9 +11,9 @@ using UnityEngine.UIElements;
 using System.Linq;
 
 namespace ES {
-    public abstract class ESMenuTreeWindowAB<T> : OdinMenuEditorWindow where T : ESMenuTreeWindowAB<T>
+    public abstract class ESMenuTreeWindowAB<This> : OdinMenuEditorWindow where This : ESMenuTreeWindowAB<This>
     {
-        public static T UsingWindow;
+        public static This UsingWindow;
         public static OdinMenuTree menuTree;
         private static Texture2D blackTexture;
         public static Dictionary<string, OdinMenuItem> MenuItems = new Dictionary<string, OdinMenuItem>();
@@ -36,7 +36,7 @@ namespace ES {
         }
         public static void OpenWindow()
         {
-            UsingWindow = GetWindow<T>();
+            UsingWindow = GetWindow<This>();
             UsingWindow.ESWindow_OnOpen();
             UsingWindow.titleContent = UsingWindow.ESWindow_GetWindowGUIContent();
             UsingWindow.minSize = new Vector2(500, 600);
@@ -77,7 +77,7 @@ namespace ES {
         {
             if (UsingWindow == null)
             {
-                UsingWindow = this as T;
+                UsingWindow = this as This;
             }
             GUI.DrawTexture(new Rect(0, 0, position.width, position.height), blackTexture);
             base.OnImGUI();

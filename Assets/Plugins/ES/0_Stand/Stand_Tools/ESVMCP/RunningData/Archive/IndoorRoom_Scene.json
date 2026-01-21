@@ -1,0 +1,1043 @@
+{
+   "commandId": "indoor_room_scene",
+  "description": "创建完整的室内房间场景",
+  "commands": [
+    {
+      "type": "CommonSceneOperation",
+      "id": "create_room_scene",
+      "operation": "CreateScene",
+      "sceneName": "IndoorRoom",
+      "scenePath": "Assets/Scenes/IndoorRoom.unity"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_room_structure",
+      "operation": "Create",
+      "name": "RoomStructure",
+      "saveToMemory": true,
+      "memoryKey": "room_structure"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_floor",
+      "operation": "Create",
+      "name": "Floor",
+      "saveToMemory": true,
+      "memoryKey": "floor"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_floor",
+      "operation": "SetTransform",
+      "target": "Floor",
+      "position": [0, 0, 0],
+      "rotation": [0, 0, 0],
+      "scale": [20, 1, 20]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_floor_mesh",
+      "operation": "Add",
+      "target": "Floor",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_floor_renderer",
+      "operation": "Add",
+      "target": "Floor",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_floor_collider",
+      "operation": "Add",
+      "target": "Floor",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_wall_north",
+      "operation": "Create",
+      "name": "Wall_North",
+      "saveToMemory": true,
+      "memoryKey": "wall_north"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_wall_north",
+      "operation": "SetTransform",
+      "target": "Wall_North",
+      "position": [0, 5, 10],
+      "rotation": [0, 0, 0],
+      "scale": [20, 10, 1]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_north_mesh",
+      "operation": "Add",
+      "target": "Wall_North",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_north_renderer",
+      "operation": "Add",
+      "target": "Wall_North",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_north_collider",
+      "operation": "Add",
+      "target": "Wall_North",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_wall_south",
+      "operation": "Create",
+      "name": "Wall_South",
+      "saveToMemory": true,
+      "memoryKey": "wall_south"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_wall_south",
+      "operation": "SetTransform",
+      "target": "Wall_South",
+      "position": [0, 5, -10],
+      "rotation": [0, 0, 0],
+      "scale": [20, 10, 1]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_south_mesh",
+      "operation": "Add",
+      "target": "Wall_South",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_south_renderer",
+      "operation": "Add",
+      "target": "Wall_South",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_south_collider",
+      "operation": "Add",
+      "target": "Wall_South",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_wall_east",
+      "operation": "Create",
+      "name": "Wall_East",
+      "saveToMemory": true,
+      "memoryKey": "wall_east"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_wall_east",
+      "operation": "SetTransform",
+      "target": "Wall_East",
+      "position": [10, 5, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1, 10, 20]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_east_mesh",
+      "operation": "Add",
+      "target": "Wall_East",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_east_renderer",
+      "operation": "Add",
+      "target": "Wall_East",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_east_collider",
+      "operation": "Add",
+      "target": "Wall_East",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_wall_west",
+      "operation": "Create",
+      "name": "Wall_West",
+      "saveToMemory": true,
+      "memoryKey": "wall_west"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_wall_west",
+      "operation": "SetTransform",
+      "target": "Wall_West",
+      "position": [-10, 5, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1, 10, 20]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_west_mesh",
+      "operation": "Add",
+      "target": "Wall_West",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_west_renderer",
+      "operation": "Add",
+      "target": "Wall_West",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_wall_west_collider",
+      "operation": "Add",
+      "target": "Wall_West",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_ceiling",
+      "operation": "Create",
+      "name": "Ceiling",
+      "saveToMemory": true,
+      "memoryKey": "ceiling"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_ceiling",
+      "operation": "SetTransform",
+      "target": "Ceiling",
+      "position": [0, 10, 0],
+      "rotation": [0, 0, 0],
+      "scale": [20, 1, 20]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_ceiling_mesh",
+      "operation": "Add",
+      "target": "Ceiling",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_ceiling_renderer",
+      "operation": "Add",
+      "target": "Ceiling",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_ceiling_collider",
+      "operation": "Add",
+      "target": "Ceiling",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "create_wall_material",
+      "operation": "CreateMaterial",
+      "assetName": "Wall_Green",
+      "shaderName": "Universal Render Pipeline/Lit",
+      "persistent": true,
+      "saveToMemory": true,
+      "memoryKey": "wall_green_material"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "set_wall_color",
+      "operation": "SetColor",
+      "target": "memory:wall_green_material",
+      "propertyName": "_BaseColor",
+      "color": [0.2, 0.8, 0.2, 1.0]
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_wall_material_north",
+      "operation": "ApplyToRenderer",
+      "target": "Wall_North",
+      "propertyName": "memory:wall_green_material"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_wall_material_south",
+      "operation": "ApplyToRenderer",
+      "target": "Wall_South",
+      "propertyName": "memory:wall_green_material"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_wall_material_east",
+      "operation": "ApplyToRenderer",
+      "target": "Wall_East",
+      "propertyName": "memory:wall_green_material"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_wall_material_west",
+      "operation": "ApplyToRenderer",
+      "target": "Wall_West",
+      "propertyName": "memory:wall_green_material"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "create_wood_material",
+      "operation": "CreateMaterial",
+      "assetName": "Wood_DarkRed",
+      "shaderName": "Universal Render Pipeline/Lit",
+      "persistent": true,
+      "saveToMemory": true,
+      "memoryKey": "wood_darkred_material"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "set_wood_color",
+      "operation": "SetColor",
+      "target": "memory:wood_darkred_material",
+      "propertyName": "_BaseColor",
+      "color": [0.4, 0.1, 0.1, 1.0]
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "create_floor_material",
+      "operation": "CreateMaterial",
+      "assetName": "Floor_Wood",
+      "shaderName": "Universal Render Pipeline/Lit",
+      "persistent": true,
+      "saveToMemory": true,
+      "memoryKey": "floor_wood_material"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "set_floor_color",
+      "operation": "SetColor",
+      "target": "memory:floor_wood_material",
+      "propertyName": "_BaseColor",
+      "color": [0.6, 0.4, 0.2, 1.0]
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_floor_material",
+      "operation": "ApplyToRenderer",
+      "target": "Floor",
+      "propertyName": "memory:floor_wood_material"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "create_ceiling_material",
+      "operation": "CreateMaterial",
+      "assetName": "Ceiling_White",
+      "shaderName": "Universal Render Pipeline/Lit",
+      "persistent": true,
+      "saveToMemory": true,
+      "memoryKey": "ceiling_white_material"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "set_ceiling_color",
+      "operation": "SetColor",
+      "target": "memory:ceiling_white_material",
+      "propertyName": "_BaseColor",
+      "color": [0.9, 0.9, 0.9, 1.0]
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_ceiling_material",
+      "operation": "ApplyToRenderer",
+      "target": "Ceiling",
+      "propertyName": "memory:ceiling_white_material"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_table",
+      "operation": "Create",
+      "name": "Table",
+      "saveToMemory": true,
+      "memoryKey": "table"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_table",
+      "operation": "SetTransform",
+      "target": "Table",
+      "position": [0, 1, 0],
+      "rotation": [0, 0, 0],
+      "scale": [3, 0.2, 2]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_mesh",
+      "operation": "Add",
+      "target": "Table",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_renderer",
+      "operation": "Add",
+      "target": "Table",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_collider",
+      "operation": "Add",
+      "target": "Table",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_table_material",
+      "operation": "ApplyToRenderer",
+      "target": "Table",
+      "propertyName": "memory:wood_darkred_material"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_table_leg1",
+      "operation": "Create",
+      "name": "Table_Leg1",
+      "saveToMemory": true,
+      "memoryKey": "table_leg1"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_table_leg1",
+      "operation": "SetTransform",
+      "target": "Table_Leg1",
+      "position": [-1.3, 0.5, -0.8],
+      "rotation": [0, 0, 0],
+      "scale": [0.1, 1, 0.1]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg1_mesh",
+      "operation": "Add",
+      "target": "Table_Leg1",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg1_renderer",
+      "operation": "Add",
+      "target": "Table_Leg1",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg1_collider",
+      "operation": "Add",
+      "target": "Table_Leg1",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_table_leg1_material",
+      "operation": "ApplyToRenderer",
+      "target": "Table_Leg1",
+      "propertyName": "memory:wood_darkred_material"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_table_leg2",
+      "operation": "Create",
+      "name": "Table_Leg2",
+      "saveToMemory": true,
+      "memoryKey": "table_leg2"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_table_leg2",
+      "operation": "SetTransform",
+      "target": "Table_Leg2",
+      "position": [1.3, 0.5, -0.8],
+      "rotation": [0, 0, 0],
+      "scale": [0.1, 1, 0.1]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg2_mesh",
+      "operation": "Add",
+      "target": "Table_Leg2",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg2_renderer",
+      "operation": "Add",
+      "target": "Table_Leg2",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg2_collider",
+      "operation": "Add",
+      "target": "Table_Leg2",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_table_leg2_material",
+      "operation": "ApplyToRenderer",
+      "target": "Table_Leg2",
+      "propertyName": "memory:wood_darkred_material"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_table_leg3",
+      "operation": "Create",
+      "name": "Table_Leg3",
+      "saveToMemory": true,
+      "memoryKey": "table_leg3"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_table_leg3",
+      "operation": "SetTransform",
+      "target": "Table_Leg3",
+      "position": [-1.3, 0.5, 0.8],
+      "rotation": [0, 0, 0],
+      "scale": [0.1, 1, 0.1]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg3_mesh",
+      "operation": "Add",
+      "target": "Table_Leg3",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg3_renderer",
+      "operation": "Add",
+      "target": "Table_Leg3",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg3_collider",
+      "operation": "Add",
+      "target": "Table_Leg3",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_table_leg3_material",
+      "operation": "ApplyToRenderer",
+      "target": "Table_Leg3",
+      "propertyName": "memory:wood_darkred_material"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_table_leg4",
+      "operation": "Create",
+      "name": "Table_Leg4",
+      "saveToMemory": true,
+      "memoryKey": "table_leg4"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_table_leg4",
+      "operation": "SetTransform",
+      "target": "Table_Leg4",
+      "position": [1.3, 0.5, 0.8],
+      "rotation": [0, 0, 0],
+      "scale": [0.1, 1, 0.1]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg4_mesh",
+      "operation": "Add",
+      "target": "Table_Leg4",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg4_renderer",
+      "operation": "Add",
+      "target": "Table_Leg4",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_table_leg4_collider",
+      "operation": "Add",
+      "target": "Table_Leg4",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_table_leg4_material",
+      "operation": "ApplyToRenderer",
+      "target": "Table_Leg4",
+      "propertyName": "memory:wood_darkred_material"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_chair",
+      "operation": "Create",
+      "name": "Chair",
+      "saveToMemory": true,
+      "memoryKey": "chair"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_chair",
+      "operation": "SetTransform",
+      "target": "Chair",
+      "position": [2, 0.8, 0],
+      "rotation": [0, 0, 0],
+      "scale": [0.8, 0.1, 0.8]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_chair_mesh",
+      "operation": "Add",
+      "target": "Chair",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_chair_renderer",
+      "operation": "Add",
+      "target": "Chair",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_chair_collider",
+      "operation": "Add",
+      "target": "Chair",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_chair_material",
+      "operation": "ApplyToRenderer",
+      "target": "Chair",
+      "propertyName": "memory:wood_darkred_material"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_bookshelf",
+      "operation": "Create",
+      "name": "Bookshelf",
+      "saveToMemory": true,
+      "memoryKey": "bookshelf"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_bookshelf",
+      "operation": "SetTransform",
+      "target": "Bookshelf",
+      "position": [-8, 3, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1, 6, 4]
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_bookshelf_mesh",
+      "operation": "Add",
+      "target": "Bookshelf",
+      "component": "MeshFilter"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_bookshelf_renderer",
+      "operation": "Add",
+      "target": "Bookshelf",
+      "component": "MeshRenderer"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_bookshelf_collider",
+      "operation": "Add",
+      "target": "Bookshelf",
+      "component": "BoxCollider"
+    },
+    {
+      "type": "CommonMaterialOperation",
+      "id": "apply_bookshelf_material",
+      "operation": "ApplyToRenderer",
+      "target": "Bookshelf",
+      "propertyName": "memory:wood_darkred_material"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_main_light",
+      "operation": "Create",
+      "name": "MainLight",
+      "saveToMemory": true,
+      "memoryKey": "main_light"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_light_component",
+      "operation": "Add",
+      "target": "MainLight",
+      "component": "Light"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_main_light",
+      "operation": "SetTransform",
+      "target": "MainLight",
+      "position": [0, 9, 0],
+      "rotation": [60, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_main_light_color",
+      "operation": "SetColor",
+      "target": "MainLight",
+      "color": [1.0, 0.0, 0.0, 1.0]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_main_light_intensity",
+      "operation": "SetIntensity",
+      "target": "MainLight",
+      "intensity": 1.5
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_torch1",
+      "operation": "Create",
+      "name": "Torch1",
+      "saveToMemory": true,
+      "memoryKey": "torch1"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_torch1_light",
+      "operation": "Add",
+      "target": "Torch1",
+      "component": "Light"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_torch1",
+      "operation": "SetTransform",
+      "target": "Torch1",
+      "position": [8, 8, 8],
+      "rotation": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch1_color",
+      "operation": "SetColor",
+      "target": "Torch1",
+      "color": [1.0, 0.3, 0.0, 1.0]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch1_intensity",
+      "operation": "SetIntensity",
+      "target": "Torch1",
+      "intensity": 2.0
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch1_range",
+      "operation": "SetRange",
+      "target": "Torch1",
+      "range": 5.0
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_torch2",
+      "operation": "Create",
+      "name": "Torch2",
+      "saveToMemory": true,
+      "memoryKey": "torch2"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_torch2_light",
+      "operation": "Add",
+      "target": "Torch2",
+      "component": "Light"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_torch2",
+      "operation": "SetTransform",
+      "target": "Torch2",
+      "position": [-8, 8, 8],
+      "rotation": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch2_color",
+      "operation": "SetColor",
+      "target": "Torch2",
+      "color": [1.0, 0.3, 0.0, 1.0]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch2_intensity",
+      "operation": "SetIntensity",
+      "target": "Torch2",
+      "intensity": 2.0
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch2_range",
+      "operation": "SetRange",
+      "target": "Torch2",
+      "range": 5.0
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_torch3",
+      "operation": "Create",
+      "name": "Torch3",
+      "saveToMemory": true,
+      "memoryKey": "torch3"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_torch3_light",
+      "operation": "Add",
+      "target": "Torch3",
+      "component": "Light"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_torch3",
+      "operation": "SetTransform",
+      "target": "Torch3",
+      "position": [8, 8, -8],
+      "rotation": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch3_color",
+      "operation": "SetColor",
+      "target": "Torch3",
+      "color": [1.0, 0.3, 0.0, 1.0]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch3_intensity",
+      "operation": "SetIntensity",
+      "target": "Torch3",
+      "intensity": 2.0
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch3_range",
+      "operation": "SetRange",
+      "target": "Torch3",
+      "range": 5.0
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_torch4",
+      "operation": "Create",
+      "name": "Torch4",
+      "saveToMemory": true,
+      "memoryKey": "torch4"
+    },
+    {
+      "type": "CommonComponentOperation",
+      "id": "add_torch4_light",
+      "operation": "Add",
+      "target": "Torch4",
+      "component": "Light"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "position_torch4",
+      "operation": "SetTransform",
+      "target": "Torch4",
+      "position": [-8, 8, -8],
+      "rotation": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch4_color",
+      "operation": "SetColor",
+      "target": "Torch4",
+      "color": [1.0, 0.3, 0.0, 1.0]
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch4_intensity",
+      "operation": "SetIntensity",
+      "target": "Torch4",
+      "intensity": 2.0
+    },
+    {
+      "type": "CommonLightOperation",
+      "id": "set_torch4_range",
+      "operation": "SetRange",
+      "target": "Torch4",
+      "range": 5.0
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_wall_north_parent",
+      "operation": "SetParent",
+      "target": "Wall_North",
+      "parent": "RoomStructure"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_wall_south_parent",
+      "operation": "SetParent",
+      "target": "Wall_South",
+      "parent": "RoomStructure"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_wall_east_parent",
+      "operation": "SetParent",
+      "target": "Wall_East",
+      "parent": "RoomStructure"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_wall_west_parent",
+      "operation": "SetParent",
+      "target": "Wall_West",
+      "parent": "RoomStructure"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_floor_parent",
+      "operation": "SetParent",
+      "target": "Floor",
+      "parent": "RoomStructure"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_ceiling_parent",
+      "operation": "SetParent",
+      "target": "Ceiling",
+      "parent": "RoomStructure"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_furniture_group",
+      "operation": "Create",
+      "name": "Furniture",
+      "saveToMemory": true,
+      "memoryKey": "furniture_group"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_table_parent",
+      "operation": "SetParent",
+      "target": "Table",
+      "parent": "Furniture"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_table_leg1_parent",
+      "operation": "SetParent",
+      "target": "Table_Leg1",
+      "parent": "Table"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_table_leg2_parent",
+      "operation": "SetParent",
+      "target": "Table_Leg2",
+      "parent": "Table"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_table_leg3_parent",
+      "operation": "SetParent",
+      "target": "Table_Leg3",
+      "parent": "Table"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_table_leg4_parent",
+      "operation": "SetParent",
+      "target": "Table_Leg4",
+      "parent": "Table"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_chair_parent",
+      "operation": "SetParent",
+      "target": "Chair",
+      "parent": "Furniture"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_bookshelf_parent",
+      "operation": "SetParent",
+      "target": "Bookshelf",
+      "parent": "Furniture"
+    },
+    {
+      "type": "CommonGameObjectOperation",
+      "id": "create_lighting_group",
+      "operation": "Create",
+      "name": "Lighting",
+      "saveToMemory": true,
+      "memoryKey": "lighting_group"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_main_light_parent",
+      "operation": "SetParent",
+      "target": "MainLight",
+      "parent": "Lighting"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_torch1_parent",
+      "operation": "SetParent",
+      "target": "Torch1",
+      "parent": "Lighting"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_torch2_parent",
+      "operation": "SetParent",
+      "target": "Torch2",
+      "parent": "Lighting"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_torch3_parent",
+      "operation": "SetParent",
+      "target": "Torch3",
+      "parent": "Lighting"
+    },
+    {
+      "type": "CommonTransformOperation",
+      "id": "set_torch4_parent",
+      "operation": "SetParent",
+      "target": "Torch4",
+      "parent": "Lighting"
+    },
+    {
+      "type": "CommonSceneOperation",
+      "id": "save_scene",
+      "operation": "SaveScene"
+    }
+  ]
+}

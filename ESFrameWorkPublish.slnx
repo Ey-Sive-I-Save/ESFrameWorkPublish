@@ -3,12 +3,12 @@
   <Project Path="Gaskellgames.csproj" />
   <Project Path="VFolders.csproj" />
   <Project Path="ES_Design.csproj" />
+  <Project Path="ES_Stand.csproj" />
   <Project Path="ES_Logic.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
-  <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
-  <Project Path="ES_Stand.csproj" />
   <Project Path="Assembly-CSharp-firstpass.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="Gaskellgames.FolderSystem.csproj" />
   <Project Path="ESInstaller.csproj" />
   <Project Path="DOTween.Modules.csproj" />

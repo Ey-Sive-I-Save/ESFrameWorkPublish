@@ -1,0 +1,81 @@
+[
+  {
+    "comment": "示例1：使用路径定位创建对象并保存到记忆",
+    "id": "create_enemy",
+    "type": "CreateGameObject",
+    "name": "Enemy_01",
+    "saveToMemory": true,
+    "memoryKey": "spawnedEnemy"
+  },
+  {
+    "comment": "示例2：使用记忆键设置位置",
+    "type": "TransformOperation",
+    "operation": "SetPosition",
+    "target": "memory:spawnedEnemy",
+    "position": [10.0, 0.0, 5.0],
+    "local": false
+  },
+  {
+    "comment": "示例3：添加组件并保存",
+    "type": "ComponentOperation",
+    "operation": "Add",
+    "target": "memory:spawnedEnemy",
+    "component": "Rigidbody",
+    "saveToMemory": true,
+    "memoryKey": "enemyRigidbody"
+  },
+  {
+    "comment": "示例4：使用Tag定位批量操作",
+    "type": "ComponentOperation",
+    "operation": "SetEnabled",
+    "target": "tag:Enemy",
+    "component": "Collider",
+    "enabled": false
+  },
+  {
+    "comment": "示例5：场景路径定位",
+    "type": "TransformOperation",
+    "operation": "SetRotation",
+    "target": "path:/Environment/Buildings/MainBuilding",
+    "rotation": [0.0, 90.0, 0.0],
+    "local": true
+  },
+  {
+    "comment": "示例6：特征匹配定位（查找带Camera组件的对象）",
+    "type": "TransformOperation",
+    "operation": "SetPosition",
+    "target": "feature:Camera",
+    "position": [0.0, 10.0, -10.0]
+  },
+  {
+    "comment": "示例7：LookAt操作使用不同定位方式",
+    "type": "TransformOperation",
+    "operation": "LookAt",
+    "source": "feature:Camera",
+    "target": "tag:Player",
+    "saveToMemory": true,
+    "memoryKey": "cameraLookSetup"
+  },
+  {
+    "comment": "示例8：复制组件",
+    "type": "ComponentOperation",
+    "operation": "Copy",
+    "source": "path:/Templates/EnemyTemplate",
+    "target": "memory:spawnedEnemy",
+    "component": "MeshRenderer"
+  },
+  {
+    "comment": "示例9：保存记忆供后续使用",
+    "type": "MemoryOperation",
+    "operation": "Save",
+    "key": "enemySpawnPoint",
+    "value": [10.0, 0.0, 5.0],
+    "memoryType": "LongTerm"
+  },
+  {
+    "comment": "示例10：加载记忆并使用",
+    "type": "MemoryOperation",
+    "operation": "Load",
+    "key": "enemySpawnPoint"
+  }
+]

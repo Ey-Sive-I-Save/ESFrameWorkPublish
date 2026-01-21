@@ -1,0 +1,74 @@
+{
+  "commandId": "indoor_room_scene",
+  "description": "创建完整的室内房间场景",
+  "commands": [
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Floor", "primitiveType": "Cube", "position": {"x": 0, "y": -0.5, "z": 0}, "saveToMemory": true, "memoryKey": "floor"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:floor", "scale": {"x": 20, "y": 1, "z": 20}},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Wall_North", "primitiveType": "Cube", "position": {"x": 0, "y": 5, "z": 10}, "saveToMemory": true, "memoryKey": "wall_north"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:wall_north", "scale": {"x": 20, "y": 10, "z": 1}},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Wall_South", "primitiveType": "Cube", "position": {"x": 0, "y": 5, "z": -10}, "saveToMemory": true, "memoryKey": "wall_south"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:wall_south", "scale": {"x": 20, "y": 10, "z": 1}},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Wall_East", "primitiveType": "Cube", "position": {"x": 10, "y": 5, "z": 0}, "saveToMemory": true, "memoryKey": "wall_east"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:wall_east", "scale": {"x": 1, "y": 10, "z": 20}},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Wall_West", "primitiveType": "Cube", "position": {"x": -10, "y": 5, "z": 0}, "saveToMemory": true, "memoryKey": "wall_west"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:wall_west", "scale": {"x": 1, "y": 10, "z": 20}},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Ceiling", "primitiveType": "Cube", "position": {"x": 0, "y": 10.5, "z": 0}, "saveToMemory": true, "memoryKey": "ceiling"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:ceiling", "scale": {"x": 20, "y": 1, "z": 20}},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Table", "primitiveType": "Cube", "position": {"x": 0, "y": 1, "z": 0}, "saveToMemory": true, "memoryKey": "table"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:table", "scale": {"x": 3, "y": 0.2, "z": 2}},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Chair_Seat", "primitiveType": "Cube", "position": {"x": 3, "y": 0.5, "z": 0}, "saveToMemory": true, "memoryKey": "chair_seat"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:chair_seat", "scale": {"x": 1, "y": 0.1, "z": 1}},
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Chair_Back", "primitiveType": "Cube", "position": {"x": 3, "y": 1.5, "z": -0.4}, "saveToMemory": true, "memoryKey": "chair_back"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:chair_back", "scale": {"x": 1, "y": 2, "z": 0.1}},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "Bookshelf", "primitiveType": "Cube", "position": {"x": -8, "y": 5, "z": 0}, "saveToMemory": true, "memoryKey": "bookshelf"},
+    {"type": "CommonTransformOperation", "operation": "SetScale", "target": "memory:bookshelf", "scale": {"x": 1, "y": 10, "z": 4}},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "MainLight", "saveToMemory": true, "memoryKey": "main_light"},
+    {"type": "CommonComponentOperation", "operation": "Add", "target": "memory:main_light", "component": "Light"},
+    {"type": "CommonLightOperation", "operation": "SetType", "target": "memory:main_light", "lightType": "Directional"},
+    {"type": "CommonLightOperation", "operation": "SetIntensity", "target": "memory:main_light", "intensity": 1.2},
+    {"type": "CommonLightOperation", "operation": "SetColor", "target": "memory:main_light", "color": {"r": 1, "g": 0.95, "b": 0.9, "a": 1}},
+    {"type": "CommonTransformOperation", "operation": "SetRotation", "target": "memory:main_light", "rotation": {"x": 50, "y": -30, "z": 0}},
+    
+    {"type": "CommonEnvironmentOperation", "operation": "SetAmbientLight", "color": {"r": 0.3, "g": 0.3, "b": 0.4, "a": 1}},
+    
+    {"type": "CommonMaterialOperation", "operation": "CreateMaterial", "shaderName": "Universal Render Pipeline/Lit", "assetName": "WoodMaterial", "saveToMemory": true, "memoryKey": "wood_mat"},
+    {"type": "CommonMaterialOperation", "operation": "SetColor", "target": "memory:wood_mat", "propertyName": "_BaseColor", "color": {"r": 0.6, "g": 0.4, "b": 0.2, "a": 1}},
+    
+    {"type": "CommonMaterialOperation", "operation": "CreateMaterial", "shaderName": "Universal Render Pipeline/Lit", "assetName": "MetalMaterial", "saveToMemory": true, "memoryKey": "metal_mat"},
+    {"type": "CommonMaterialOperation", "operation": "SetColor", "target": "memory:metal_mat", "propertyName": "_BaseColor", "color": {"r": 0.8, "g": 0.8, "b": 0.9, "a": 1}},
+    {"type": "CommonMaterialOperation", "operation": "SetFloat", "target": "memory:metal_mat", "propertyName": "_Metallic", "floatValue": 0.9},
+    
+    {"type": "CommonMaterialOperation", "operation": "CreateMaterial", "shaderName": "Universal Render Pipeline/Lit", "assetName": "FabricMaterial", "saveToMemory": true, "memoryKey": "fabric_mat"},
+    {"type": "CommonMaterialOperation", "operation": "SetColor", "target": "memory:fabric_mat", "propertyName": "_BaseColor", "color": {"r": 0.9, "g": 0.1, "b": 0.1, "a": 1}},
+    
+    {"type": "ApplyMaterialToMultiple", "targets": ["memory:table", "memory:bookshelf"], "materialName": "Assets/Materials/WoodMaterial.mat"},
+    {"type": "ApplyMaterialToMultiple", "targets": ["memory:floor", "memory:ceiling"], "materialName": "Assets/Materials/MetalMaterial.mat"},
+    {"type": "ApplyMaterialToMultiple", "targets": ["memory:chair_seat", "memory:chair_back"], "materialName": "Assets/Materials/FabricMaterial.mat"},
+    
+    {"type": "CommonComponentOperation", "operation": "Add", "target": "memory:table", "component": "BoxCollider"},
+    {"type": "CommonComponentOperation", "operation": "Add", "target": "memory:bookshelf", "component": "BoxCollider"},
+    {"type": "CommonComponentOperation", "operation": "Add", "target": "memory:chair_seat", "component": "BoxCollider"},
+    {"type": "CommonComponentOperation", "operation": "Add", "target": "memory:chair_back", "component": "BoxCollider"},
+    
+    {"type": "CommonGameObjectOperation", "operation": "Create", "name": "RoomStructure", "saveToMemory": true, "memoryKey": "room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:floor", "parent": "memory:room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:wall_north", "parent": "memory:room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:wall_south", "parent": "memory:room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:wall_east", "parent": "memory:room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:wall_west", "parent": "memory:room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:ceiling", "parent": "memory:room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:table", "parent": "memory:room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:chair_seat", "parent": "memory:room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:chair_back", "parent": "memory:room_group"},
+    {"type": "CommonTransformOperation", "operation": "SetParent", "target": "memory:bookshelf", "parent": "memory:room_group"}
+  ]
+}

@@ -110,6 +110,28 @@ MonoBehaviour:
     createdBy: asus
     lastModifiedBy: asus
     version: 2
+  - id: 2919d02d-bbc3-4308-ba84-08c9da04ae5c
+    taskName: "\u4E25\u91CD\u7F3A\u4E4F\u8FD9\u4E9B\u4E1C\u897F"
+    description: "| \u7279\u6027\u7C7B\u522B | ES Framework | ET Framework | FairyGUI
+      |\r\n|----------|--------------|--------------|----------|\r\n| \u793A\u4F8B\u9879\u76EE
+      | \u274C | \u2705\u2705\u2705 | \u2705\u2705 |\r\n| API\u6587\u6863 | \u26A0\uFE0F
+      \u90E8\u5206 | \u2705\u2705 | \u2705\u2705\u2705 |\r\n| \u8BCA\u65AD\u5DE5\u5177
+      | \u274C | \u2705\u2705 | \u2705 |\r\n| \u6D4B\u8BD5\u8986\u76D6 | \u274C |
+      \u2705 | \u2705 |\r\n| \u9519\u8BEF\u6536\u96C6 | \u274C | \u2705 | \u26A0\uFE0F
+      |"
+    startDate: 2026-01-21
+    dueDate: 2026-01-28
+    assignedTo: asus
+    status: 0
+    priority: 2
+    checklist: []
+    tags: []
+    linkedLogIds: []
+    createTime: 2026-01-21 18:29:19
+    lastModified: 2026-01-21 18:29:19
+    createdBy: asus
+    lastModifiedBy: asus
+    version: 1
   allTags:
   - "\u65B0\u6807\u7B7E"
   - "\u65B0\u6807\u7B7E"

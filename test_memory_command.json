@@ -1,0 +1,7 @@
+{
+  "type": "MemoryOperation",
+  "operation": "Save",
+  "key": "testKey",
+  "value": "testValue",
+  "memoryType": "ShortTerm"
+}

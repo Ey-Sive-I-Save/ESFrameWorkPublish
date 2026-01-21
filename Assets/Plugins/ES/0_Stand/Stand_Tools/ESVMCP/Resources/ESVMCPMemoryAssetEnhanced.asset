@@ -1,0 +1,229 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 033382799398e454e9c1bc58f0c56501, type: 3}
+  m_Name: ESVMCPMemoryAssetEnhanced
+  m_EditorClassIdentifier: 
+  memoryItemsList:
+  - Key: wood_mat
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:07:37
+    LastAccessTime: 2026-01-21 03:07:37
+    AccessCount: 7
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/WoodMaterial 16.mat
+    AssetGUID: 93a100bd71e3c8e4193b3391c9e5b33d
+    AssetName: WoodMaterial 16
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: wood_mat_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:07:37
+    LastAccessTime: 2026-01-21 03:07:37
+    AccessCount: 6
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/WoodMaterial 16.mat
+    AssetGUID: 93a100bd71e3c8e4193b3391c9e5b33d
+    AssetName: WoodMaterial 16
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: metal_mat
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:07:37
+    LastAccessTime: 2026-01-21 03:07:37
+    AccessCount: 8
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/MetalMaterial 16.mat
+    AssetGUID: 1ef84781356e9034bbc41ea9dff52edf
+    AssetName: MetalMaterial 16
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: metal_mat_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:07:37
+    LastAccessTime: 2026-01-21 03:07:37
+    AccessCount: 6
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/MetalMaterial 16.mat
+    AssetGUID: 1ef84781356e9034bbc41ea9dff52edf
+    AssetName: MetalMaterial 16
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: fabric_mat
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:07:37
+    LastAccessTime: 2026-01-21 03:07:37
+    AccessCount: 7
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/FabricMaterial 16.mat
+    AssetGUID: 90c5fcae2826bd94181af9ff2bf8e231
+    AssetName: FabricMaterial 16
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: fabric_mat_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:07:37
+    LastAccessTime: 2026-01-21 03:07:37
+    AccessCount: 6
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/FabricMaterial 16.mat
+    AssetGUID: 90c5fcae2826bd94181af9ff2bf8e231
+    AssetName: FabricMaterial 16
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: wall_green_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:12:04
+    LastAccessTime: 2026-01-21 03:12:04
+    AccessCount: 5
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Wall_Green 1.mat
+    AssetGUID: 203e35fda97e0ff40a124d9444c9a869
+    AssetName: Wall_Green 1
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: wall_green_material_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:12:04
+    LastAccessTime: 2026-01-21 03:12:04
+    AccessCount: 0
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Wall_Green 1.mat
+    AssetGUID: 203e35fda97e0ff40a124d9444c9a869
+    AssetName: Wall_Green 1
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: wood_darkred_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:12:04
+    LastAccessTime: 2026-01-21 03:12:04
+    AccessCount: 8
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Wood_DarkRed 1.mat
+    AssetGUID: 2dd279e7cf5149040ad260fcd1461b41
+    AssetName: Wood_DarkRed 1
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: wood_darkred_material_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:12:04
+    LastAccessTime: 2026-01-21 03:12:04
+    AccessCount: 0
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Wood_DarkRed 1.mat
+    AssetGUID: 2dd279e7cf5149040ad260fcd1461b41
+    AssetName: Wood_DarkRed 1
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: floor_wood_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:12:04
+    LastAccessTime: 2026-01-21 03:12:04
+    AccessCount: 2
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Floor_Wood 1.mat
+    AssetGUID: 53bdf441a7ea7b04f8d208dd29551946
+    AssetName: Floor_Wood 1
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: floor_wood_material_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:12:04
+    LastAccessTime: 2026-01-21 03:12:04
+    AccessCount: 0
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Floor_Wood 1.mat
+    AssetGUID: 53bdf441a7ea7b04f8d208dd29551946
+    AssetName: Floor_Wood 1
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: ceiling_white_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:12:04
+    LastAccessTime: 2026-01-21 03:12:04
+    AccessCount: 2
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Ceiling_White 1.mat
+    AssetGUID: 633dfaba3aab52545a64cdc25d79d601
+    AssetName: Ceiling_White 1
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  - Key: ceiling_white_material_material
+    ItemType: 1
+    CreatedTime: 2026-01-21 03:12:04
+    LastAccessTime: 2026-01-21 03:12:04
+    AccessCount: 0
+    ImportanceScore: 70
+    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Ceiling_White 1.mat
+    AssetGUID: 633dfaba3aab52545a64cdc25d79d601
+    AssetName: Ceiling_White 1
+    InstanceID: 0
+    GameObjectName: 
+    GameObjectPath: 
+    ComponentType: 
+    PrimitiveValue: 
+    CustomData: 
+  EnableDecay: 1
+  DecayThreshold: 20
+  MaxMemoryItems: 1000
+  RetentionDays: 30

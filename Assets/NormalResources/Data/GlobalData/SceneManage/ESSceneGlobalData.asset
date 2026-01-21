@@ -45,6 +45,13 @@ MonoBehaviour:
     Description: 
     Group: "\u9ED8\u8BA4"
     Enabled: 1
+  - DisplayName: NullScene
+    ScenePath: Assets/Scenes/NullScene.unity
+    SceneAsset: {fileID: 102900000, guid: abe9eb92e1fa8cb4a9ae52b3a515e684, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
   SceneGroups:
   - "\u9ED8\u8BA4"
   - "\u6838\u5FC3\u573A\u666F"

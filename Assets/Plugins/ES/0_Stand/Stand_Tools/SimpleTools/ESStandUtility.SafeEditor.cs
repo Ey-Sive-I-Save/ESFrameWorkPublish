@@ -5,15 +5,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using Sirenix.Utilities;
 using System.IO;
-using System.Diagnostics;
 
 #if UNITY_EDITOR
 using UnityEditor;
-#endif
-
-
-#if UNITY_EDITOR
-
 #endif
 
 
@@ -24,6 +18,12 @@ namespace ES
         //
         public class SafeEditor
         {
+            private static string _NormalizeAssetPath(string path)
+            {
+                if (string.IsNullOrEmpty(path)) return path;
+                return path.Replace('\\', '/');
+            }
+
             #region 获取特殊数据
             public static string[] GetAllTags()
             {
@@ -44,8 +44,8 @@ namespace ES
                 var layers = UnityEditorInternal.InternalEditorUtility.layers;
                 foreach (var i in layers)
                 {
-                    int mask = LayerMask.GetMask(i);
-                    int layer = mask > 0 ? (int)Mathf.Round(Mathf.Log(mask, (2))) : 0;
+                    int layer = LayerMask.NameToLayer(i);
+                    if (layer < 0) continue;
                     keyValuePairs.TryAdd(layer, i);
                 }
                 return keyValuePairs;
@@ -65,15 +65,21 @@ namespace ES
             #endregion
 
             #region 简单包装
-            public static void Wrap_SetDirty(UnityEngine.Object which, bool Refresh = true)
+            public static void Wrap_SetDirty(UnityEngine.Object which, bool saveAndRefresh = true)
             {
 #if UNITY_EDITOR
-                if (Refresh)
-                {
-                    AssetDatabase.Refresh();
-                    AssetDatabase.SaveAssets();
-                }
+                Wrap_SetDirty(which, saveAssets: saveAndRefresh, refresh: saveAndRefresh);
+#endif
+            }
+
+            public static void Wrap_SetDirty(UnityEngine.Object which, bool saveAssets, bool refresh)
+            {
+#if UNITY_EDITOR
+                if (which == null) return;
+
                 EditorUtility.SetDirty(which);
+                if (saveAssets) AssetDatabase.SaveAssets();
+                if (refresh) AssetDatabase.Refresh();
 #endif
             }
 
@@ -321,28 +327,60 @@ namespace ES
             #endregion
 
             #region 资产创建
-            public static T CreateSOAsset<T>(string savePath, string name) where T : UnityEngine.ScriptableObject
+            public static T CreateSOAsset<T>(string savePath, string name, bool autoCreateFolder = true, bool saveAssets = true, bool refresh = true) where T : UnityEngine.ScriptableObject
             {
                 var ins = ScriptableObject.CreateInstance<T>();
                 ins.name = name._ToValidIdentName();
                 if (ins != null)
                 {
 #if UNITY_EDITOR
+                    savePath = _NormalizeAssetPath(savePath);
+                    if (string.IsNullOrEmpty(savePath) || !savePath.StartsWith("Assets", StringComparison.Ordinal))
+                    {
+                        UnityEngine.Debug.LogWarning($"CreateSOAsset 失败：folderPath 无效：{savePath}");
+                        return null;
+                    }
+
+                    string safeName = (name ?? string.Empty)._ToValidIdentName();
+                    if (string.IsNullOrEmpty(safeName))
+                    {
+                        UnityEngine.Debug.LogWarning("CreateSOAsset 失败：name 为空或非法。");
+                        return null;
+                    }
+
+                    if (!AssetDatabase.IsValidFolder(savePath))
+                    {
+                        if (!autoCreateFolder)
+                        {
+                            UnityEngine.Debug.LogWarning($"CreateSOAsset 失败：目标文件夹不存在：{savePath}");
+                            return null;
+                        }
+
+                        if (!Quick_CreateFolderByFullPath(savePath, refresh: false))
+                        {
+                            UnityEngine.Debug.LogWarning($"CreateSOAsset 失败：无法创建文件夹路径：{savePath}");
+                            return null;
+                        }
+                    }
+
+                    ins.name = safeName;
                     AssetDatabase.CreateAsset(ins, savePath + "/" + ins.name + ".asset");
-                    AssetDatabase.Refresh();
-                    AssetDatabase.SaveAssets();
+                    if (saveAssets) AssetDatabase.SaveAssets();
+                    if (refresh) AssetDatabase.Refresh();
 #endif
                     return ins;
                 }
                 return null;
             }
-            public static T CreateSOAsset<T>(string folderPath, string assetName, bool appendRandomIfNotChangedDefaultName = false, bool hasChange = false, Action<T> AfterCreate = null) where T : ScriptableObject
+            public static T CreateSOAsset<T>(string folderPath, string assetName, bool appendRandomIfNotChangedDefaultName = false, bool hasChange = false, Action<T> AfterCreate = null, bool saveAssets = true, bool refresh = true) where T : ScriptableObject
             {
 #if UNITY_EDITOR
 
+                folderPath = _NormalizeAssetPath(folderPath);
+
                 if (!AssetDatabase.IsValidFolder(folderPath))
                 {
-                    if (Quick_CreateFolderByFullPath(folderPath))
+                    if (Quick_CreateFolderByFullPath(folderPath, refresh: false))
                     {
                         UnityEngine.Debug.Log($"自动创建了文件夹: {folderPath}");
                     }
@@ -358,20 +396,22 @@ namespace ES
 
                 AssetDatabase.CreateAsset(asset, path);
                 AfterCreate?.Invoke(asset);
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
+                if (saveAssets) AssetDatabase.SaveAssets();
+                if (refresh) AssetDatabase.Refresh();
                 return asset;
 #else
                 return null;
 #endif
             }
-            public static ScriptableObject CreateSOAsset(Type type, string folderPath, string assetName, bool appendRandomIfNotChangedDefaultName = false, bool hasChange = false, Action<ScriptableObject> afterCreate = null)
+            public static ScriptableObject CreateSOAsset(Type type, string folderPath, string assetName, bool appendRandomIfNotChangedDefaultName = false, bool hasChange = false, Action<ScriptableObject> afterCreate = null, bool saveAssets = true, bool refresh = true)
             {
 #if UNITY_EDITOR
                 if (type == null) return null;
+
+                folderPath = _NormalizeAssetPath(folderPath);
                 if (!AssetDatabase.IsValidFolder(folderPath))
                 {
-                    if (Quick_CreateFolderByFullPath(folderPath))
+                    if (Quick_CreateFolderByFullPath(folderPath, refresh: false))
                     {
                         UnityEngine.Debug.Log($"自动创建了文件夹: {folderPath}");
                     }
@@ -387,8 +427,8 @@ namespace ES
 
                 AssetDatabase.CreateAsset(asset, path);
                 afterCreate?.Invoke(asset);
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
+                if (saveAssets) AssetDatabase.SaveAssets();
+                if (refresh) AssetDatabase.Refresh();
                 return asset;
 #else
                 return null;
@@ -401,9 +441,22 @@ namespace ES
             {
                 List<string> paths = new List<string>();
                 string assetsPath = Application.dataPath._KeepBeforeByLast("/Assets");
-                string path = System.IO.Path.Combine(assetsPath,folder).Replace('\\', '/');
-                
-                string[] allFiles = Directory.GetFiles(path, patten, SearchOption.AllDirectories);
+                string path = System.IO.Path.Combine(assetsPath, folder).Replace('\\', '/');
+
+                if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
+                {
+                    return paths;
+                }
+
+                string[] allFiles;
+                try
+                {
+                    allFiles = Directory.GetFiles(path, patten, SearchOption.AllDirectories);
+                }
+                catch
+                {
+                    return paths;
+                }
 
                 foreach (string file in allFiles)
                 {
@@ -438,34 +491,39 @@ namespace ES
                     UnityEngine.Debug.LogWarning("目录不存在，无需删除。");
                 }
             }
-            public static void Quick_OpenInSystemFolder(string folderPath, bool FromAssets=true)
+            public static void Quick_OpenInSystemFolder(string folderPath, bool FromAssets = true)
             {
 #if UNITY_EDITOR
-                if (string.IsNullOrEmpty(folderPath) || !System.IO.Directory.Exists(folderPath))
+                if (string.IsNullOrEmpty(folderPath))
                 {
-                    UnityEngine.Debug.LogError("目录不存在或路径无效: " + folderPath);
+                    UnityEngine.Debug.LogError("路径为空。");
                     return;
                 }
 
-                // 根据不同平台执行命令
-                if (Application.platform == RuntimePlatform.WindowsEditor ||
-                    Application.platform == RuntimePlatform.WindowsPlayer)
+                string targetPath = folderPath;
+                if (FromAssets)
                 {
-                    // Windows: 使用explorer.exe
-                    // 确保路径使用反斜杠，并对路径加引号以处理空格
-                    folderPath = folderPath.Replace("/", "\\");
-                    Process.Start("explorer.exe", "\"" + folderPath + "\"");
+                    targetPath = _NormalizeAssetPath(targetPath);
+
+                    // 兼容传入："Assets/..." 或 "SomeFolder"（默认当作 Assets 下相对路径）
+                    if (!targetPath.StartsWith("Assets", StringComparison.Ordinal))
+                    {
+                        targetPath = "Assets/" + targetPath.TrimStart('/');
+                    }
+
+                    // 转成磁盘绝对路径
+                    targetPath = Application.dataPath + targetPath.Substring("Assets".Length);
                 }
-                else if (Application.platform == RuntimePlatform.OSXEditor ||
-                         Application.platform == RuntimePlatform.OSXPlayer)
+
+                targetPath = targetPath.Replace('/', System.IO.Path.DirectorySeparatorChar);
+                if (!System.IO.Directory.Exists(targetPath) && !System.IO.File.Exists(targetPath))
                 {
-                    // macOS: 使用open命令
-                    Process.Start("open", "\"" + folderPath + "\"");
+                    UnityEngine.Debug.LogError("目录/文件不存在或路径无效: " + targetPath);
+                    return;
                 }
-                else
-                {
-                    UnityEngine.Debug.LogWarning("当前平台不支持直接打开文件夹。");
-                }
+
+                // Unity 官方跨平台实现：在资源管理器/访达中定位
+                EditorUtility.RevealInFinder(targetPath);
 #endif
             }
 
@@ -509,14 +567,20 @@ namespace ES
                 }
             }
 
-            public static bool Quick_CreateFolderByFullPath(string fullPath)
+            public static bool Quick_CreateFolderByFullPath(string fullPath, bool refresh = true)
             {
 #if UNITY_EDITOR
                 // 参数检查
-                if (string.IsNullOrEmpty(fullPath) || !fullPath.StartsWith("Assets"))
+                fullPath = _NormalizeAssetPath(fullPath);
+                if (string.IsNullOrEmpty(fullPath) || !fullPath.StartsWith("Assets", StringComparison.Ordinal))
                 {
                      UnityEngine.Debug.LogError("路径无效！必须是以 'Assets' 开头的有效路径。");
                     return false;
+                }
+
+                if (string.Equals(fullPath, "Assets", StringComparison.Ordinal))
+                {
+                    return true;
                 }
 
                 // 检查文件夹是否已存在
@@ -525,16 +589,22 @@ namespace ES
                     
                     return true;
                 }
-                 UnityEngine.Debug.Log("尝试创建");
+
                 // 从完整路径中提取父文件夹路径和要创建的新文件夹名称
-                string parentFolder = Path.GetDirectoryName(fullPath);
+                string parentFolder = _NormalizeAssetPath(Path.GetDirectoryName(fullPath));
                 string newFolderName = Path.GetFileName(fullPath);
+
+                if (string.IsNullOrEmpty(parentFolder) || string.IsNullOrEmpty(newFolderName))
+                {
+                    UnityEngine.Debug.LogError($"路径解析失败：{fullPath}");
+                    return false;
+                }
 
                 // 检查父目录是否存在，如果不存在，则递归创建父目录
                 if (!AssetDatabase.IsValidFolder(parentFolder))
                 {
                     // 递归调用自身来创建父目录
-                    if (!Quick_CreateFolderByFullPath(parentFolder))
+                    if (!Quick_CreateFolderByFullPath(parentFolder, refresh: false))
                     {
                         return false; // 如果父目录创建失败，则直接返回
                     }
@@ -544,7 +614,7 @@ namespace ES
                 string resultGuid = AssetDatabase.CreateFolder(parentFolder, newFolderName);
                 if (!string.IsNullOrEmpty(resultGuid))
                 {
-                    AssetDatabase.Refresh(); // 刷新数据库使新文件夹立即可见
+                    if (refresh) AssetDatabase.Refresh(); // 需要立即可见时才刷新（批量创建建议外层统一 Refresh）
                      UnityEngine.Debug.Log($"文件夹创建成功：{fullPath}");
                     return true;
                 }

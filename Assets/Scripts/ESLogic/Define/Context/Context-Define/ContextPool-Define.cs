@@ -358,12 +358,13 @@ namespace ES
         [ValueDropdown("FindKeyEditor",AppendNextDrawer =true),LabelText("查键"),NonSerialized,ShowInInspector,HideInPlayMode]
 #pragma warning disable CS0414 // 字段已赋值，但从未使用过
         private string FindKeyEditor_ = "";
-#pragma warning restore CS0414
+
         [TabGroup("便捷工具")]
         [ValueDropdown("FindKeyRuntime", AppendNextDrawer = true), LabelText("查键"), NonSerialized, ShowInInspector,HideInEditorMode]
         private string FindKeyRuntime_ = "";
+#pragma warning restore CS0414 
         private List<string> FindKeyRuntime()
-        {
+        { 
             return _ContextValues.Keys.ToList();
         }
 #endif
@@ -377,11 +378,11 @@ namespace ES
             
             if (_ContextValues.TryGetValue(key, out var vv))
             {
-                vv.SetBool(ESDesignUtility.Function.FunctionForHandleTwoBool(vv.GetBool(), use, function));
+                vv.SetBool(ESDesignUtility.Function.HandleTwoBool(vv.GetBool(), use, function));
             }
             else
             {
-                AddContextValueTruelyToCreate(key, new ContextitectureTypeValue_Bool() { Value = ESDesignUtility.Function.FunctionForHandleTwoBool(true, use, function) });
+                AddContextValueTruelyToCreate(key, new ContextitectureTypeValue_Bool() { Value = ESDesignUtility.Function.HandleTwoBool(true, use, function) });
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -390,11 +391,11 @@ namespace ES
         {
             if (_ContextValues.TryGetValue(key, out var vv))
             {
-                vv.SetFloat(ESDesignUtility.Function.FunctionForHandleTwoFloat(vv.GetFloat(), use, function));
+                vv.SetFloat(ESDesignUtility.Function.HandleTwoFloat(vv.GetFloat(), use, function));
             }
             else
             {
-                AddContextValueTruelyToCreate(key, new ContextitectureTypeValue_Float() { Value = ESDesignUtility.Function.FunctionForHandleTwoFloat(0, use, function) });
+                AddContextValueTruelyToCreate(key, new ContextitectureTypeValue_Float() { Value = ESDesignUtility.Function.HandleTwoFloat(0, use, function) });
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -403,11 +404,11 @@ namespace ES
         {
             if (_ContextValues.TryGetValue(key, out var vv))
             {
-                vv.SetInt(ESDesignUtility.Function.FunctionForHandleTwoInt(vv.GetInt(), use, function));
+                vv.SetInt(ESDesignUtility.Function.HandleTwoInt(vv.GetInt(), use, function));
             }
             else
             {
-                AddContextValueTruelyToCreate(key, new ContextitectureTypeValue_Int() { Value = ESDesignUtility.Function.FunctionForHandleTwoInt(0, use, function) });
+                AddContextValueTruelyToCreate(key, new ContextitectureTypeValue_Int() { Value = ESDesignUtility.Function.HandleTwoInt(0, use, function) });
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

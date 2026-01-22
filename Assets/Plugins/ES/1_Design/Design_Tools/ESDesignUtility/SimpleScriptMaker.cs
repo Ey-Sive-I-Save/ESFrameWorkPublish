@@ -14,12 +14,31 @@ namespace ES
 {
     public static partial class ESDesignUtility
     {
-
+        /// <summary>
+        /// 【可用】✅ 简易脚本生成工具 - 提供动态生成C#代码片段和文件的功能
+        /// 主要用于编辑器模式下的代码生成，支持：
+        /// - 创建类/方法/字段/属性等代码结构
+        /// - 字符串转合法标识符名称
+        /// - C#关键字冲突处理
+        /// </summary>
+        /// <remarks>
+        /// ⚠️ 注意：此工具主要在编辑器模式下使用，部分功能依赖 UnityEditor API
+        /// </remarks>
         public class SimpleScriptMaker
         {
             public static string defaultCodeClassName = "NewCSharp";
             public static string defaultSavePath = "Assets/Scripts/ESFramework/CodeGen/Default";
 
+            /// <summary>
+            /// 【可用】✅ 创建脚本文件（完整版） - 支持自定义using、命名空间和内容
+            /// </summary>
+            /// <param name="Folderpath">保存文件夹路径（如 "Assets/Scripts"）</param>
+            /// <param name="fileName">文件名（需包含.cs后缀）</param>
+            /// <param name="using_">using语句部分（如 "using System;"）</param>
+            /// <param name="nameSpace">命名空间名称（默认"ES"）</param>
+            /// <param name="content">类或其他代码内容</param>
+            /// <param name="TruelyCreate">是否真正创建文件（false则只返回代码字符串用于预览）</param>
+            /// <returns>生成的脚本代码字符串</returns>
             public static string CreateScriptBounds(string Folderpath, string fileName,string using_="", string nameSpace = "ES",string content="",bool TruelyCreate=false)
             {
                 if (string.IsNullOrEmpty(fileName))
@@ -58,6 +77,15 @@ $@"{using_}
                
             }
 
+            /// <summary>
+            /// 【可用】✅ 创建简单的MonoBehaviour脚本文件
+            /// </summary>
+            /// <param name="Folderpath">保存文件夹路径</param>
+            /// <param name="className">类名</param>
+            /// <param name="parent">父类（默认":MonoBehaviour"）</param>
+            /// <param name="Attribute">类特性（如 "[RequireComponent(typeof(Rigidbody))]"）</param>
+            /// <param name="nameSpace">命名空间（默认"ES"）</param>
+            /// <param name="AdditonFileName">附加文件名后缀</param>
             public static void CreateScriptEasy(string Folderpath, string className, string parent = ":MonoBehaviour", string Attribute = "", string nameSpace = "ES",string AdditonFileName="")
             {
                 if (string.IsNullOrEmpty(className))

@@ -43,6 +43,17 @@ namespace ES
     [FolderPath, LabelText("默认的全局Global父文件夹")]
     public string Path_GlobalParent;
 
+    [VerticalGroup("总体/文件夹路径")]
+    [FolderPath, LabelText("默认Library库放置文件夹")]
+    [InlineButton("Ping_", "<*>")]
+    public string Path_AllLibraryFolder_ = "Assets/NormalResources/Data/Library";
+
+    private void Ping_(string path)
+    {
+      ESStandUtility.SafeEditor.Quick_CreateFolderByFullPath(path);
+      ESStandUtility.SafeEditor.Quick_PingAssetByPath(path);
+    }
+
     #endregion
 
     #region SO管理支持
@@ -94,14 +105,14 @@ namespace ES
     [TabGroup("UnityPackage打包构建")]
     [LabelText("收集的路径ES"), FolderPath]
     public List<string> PackageCollectPath = new List<string>() { "Assets/Plugins/ES", "Assets/Scripts/ESLogic" };
-    
+
     [TabGroup("UnityPackage打包构建")]
     [LabelText("包含依赖项")]
     public bool IncludeDependencies = true;
-    
+
     [TabGroup("UnityPackage打包构建")]
     [LabelText("发布Editor位置"), FolderPath]
-    public string PackagePublishPath ="Assets\\Plugins\\ES\\Editor\\Installer" ;
+    public string PackagePublishPath = "Assets\\Plugins\\ES\\Editor\\Installer";
 
 
 
@@ -112,26 +123,26 @@ namespace ES
     [Serializable]
     public class UnityPackageConfig
     {
-        [LabelText("配置名称")]
-        public string ConfigName = "新配置";
+      [LabelText("配置名称")]
+      public string ConfigName = "新配置";
 
-        [LabelText("UnityPackage输出位置"), FolderPath]
-        public string OutputPath = "Assets/../ESOutput/UnityPackage";
+      [LabelText("UnityPackage输出位置"), FolderPath]
+      public string OutputPath = "Assets/../ESOutput/UnityPackage";
 
-        [LabelText("UnityPackage包名")]
-        public string PackageName = "ESPackage_Ext_";
+      [LabelText("UnityPackage包名")]
+      public string PackageName = "ESPackage_Ext_";
 
-        [LabelText("收集的路径列表"), FolderPath]
-        public List<string> CollectPaths = new List<string>() { "Assets/Plugins/ES" };
+      [LabelText("收集的路径列表"), FolderPath]
+      public List<string> CollectPaths = new List<string>() { "Assets/Plugins/ES" };
 
-        [LabelText("排除的文件夹列表"), FolderPath]
-        public List<string> ExcludeFolders = new List<string>();
+      [LabelText("排除的文件夹列表"), FolderPath]
+      public List<string> ExcludeFolders = new List<string>();
 
-        [LabelText("是否启用")]
-        public bool IsEnabled = true;
+      [LabelText("是否启用")]
+      public bool IsEnabled = true;
 
-        [LabelText("包含依赖项")]
-        public bool IncludeDependencies = true;
+      [LabelText("包含依赖项")]
+      public bool IncludeDependencies = true;
     }
 
     [TabGroup("UnityPackage扩展配置")]
@@ -144,18 +155,18 @@ namespace ES
     [GUIColor(0.5f, 0.8f, 1f)]
     public void AddNewPackageConfig()
     {
-        var newConfig = new UnityPackageConfig
-        {
-            ConfigName = $"配置 {ExtendedPackageConfigs.Count + 1}",
-            OutputPath = "Assets/../ESOutput/UnityPackage",
-            PackageName = $"ESPackage_Ext_{ExtendedPackageConfigs.Count + 1}_",
-            CollectPaths = new List<string>() { "Assets/Plugins/ES" },
-            ExcludeFolders = new List<string>(),
-            IsEnabled = true
-        };
-        ExtendedPackageConfigs.Add(newConfig);
+      var newConfig = new UnityPackageConfig
+      {
+        ConfigName = $"配置 {ExtendedPackageConfigs.Count + 1}",
+        OutputPath = "Assets/../ESOutput/UnityPackage",
+        PackageName = $"ESPackage_Ext_{ExtendedPackageConfigs.Count + 1}_",
+        CollectPaths = new List<string>() { "Assets/Plugins/ES" },
+        ExcludeFolders = new List<string>(),
+        IsEnabled = true
+      };
+      ExtendedPackageConfigs.Add(newConfig);
 #if UNITY_EDITOR
-        EditorUtility.SetDirty(this);
+      EditorUtility.SetDirty(this);
 #endif
     }
 
@@ -164,9 +175,9 @@ namespace ES
     [GUIColor(1f, 0.6f, 0.6f)]
     public void CleanDisabledConfigs()
     {
-        ExtendedPackageConfigs.RemoveAll(config => !config.IsEnabled);
+      ExtendedPackageConfigs.RemoveAll(config => !config.IsEnabled);
 #if UNITY_EDITOR
-        EditorUtility.SetDirty(this);
+      EditorUtility.SetDirty(this);
 #endif
     }
 

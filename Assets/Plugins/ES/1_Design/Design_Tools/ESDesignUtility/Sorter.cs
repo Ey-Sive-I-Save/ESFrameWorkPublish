@@ -31,9 +31,9 @@ namespace ES
                 {
                     case PathSort.NoneSort: return vectors;
                     case PathSort.StartFromNearToFar:
-                        return vectors.OrderBy((n) => Vector3.Distance(pos, n)).ToList();
+                        return vectors.OrderBy((n) => (pos - n).sqrMagnitude).ToList();
                     case PathSort.StartFromFarToNear:
-                        return vectors.OrderByDescending((n) => Vector3.Distance(pos, n)).ToList();
+                        return vectors.OrderByDescending((n) => (pos - n).sqrMagnitude).ToList();
                     case PathSort.Yup:
                         return vectors.OrderBy((n) => n.y).ToList();
                     case PathSort.Ydown:
@@ -55,11 +55,15 @@ namespace ES
                             return vectors.OrderByDescending((n) => transform.InverseTransformPoint(n).z).ToList();
                         else return vectors.OrderByDescending((n) => n.z).ToList();
                     case PathSort.Random:
-                        return vectors.OrderBy((n) => UnityEngine.Random.value).ToList();
+                        {
+                            var shuffled = new List<Vector3>(vectors);
+                            ShuffleInPlace(shuffled);
+                            return shuffled;
+                        }
                     case PathSort.AlwaysFirstNear:
                         return SortVectorPathForLast_Nearest(vectors, pos);
                     case PathSort.AlwaysFirstFar:
-                        return SortForLast(vectors, pos, (a, b) => -Vector3.Distance(a, b));
+                        return SortForLast(vectors, pos, (a, b) => -(a - b).sqrMagnitude);
                     case PathSort.AlwaysForwardZup:
                         return SortForLast_Three(vectors, pos, (a, b, c) =>
                         {
@@ -67,7 +71,7 @@ namespace ES
                             {
                                 return Vector3.Angle(a - b, b - c);
                             }
-                            return Vector3.Distance(a, b);
+                            return (a - b).sqrMagnitude;
 
                         });
                     case PathSort.AlwaysForwardZdown:
@@ -77,7 +81,7 @@ namespace ES
                             {
                                 return -Vector3.Angle(a - b, b - c);
                             }
-                            return -Vector3.Distance(a, b);
+                            return (a - b).sqrMagnitude;
 
                         });
                 }
@@ -97,14 +101,15 @@ namespace ES
             {
                 if (vectorUsers == null) return new List<T>();
                 if (vectorUsers.Count <= 1) return vectorUsers;
+                if (GetPos == null) return vectorUsers;
 
                 switch (sortType)
                 {
                     case PathSort.NoneSort: return vectorUsers;
                     case PathSort.StartFromNearToFar:
-                        return vectorUsers.OrderBy((n) => Vector3.Distance(pos, GetPos(n))).ToList();
+                        return vectorUsers.OrderBy((n) => (pos - GetPos(n)).sqrMagnitude).ToList();
                     case PathSort.StartFromFarToNear:
-                        return vectorUsers.OrderByDescending((n) => Vector3.Distance(pos, GetPos(n))).ToList();
+                        return vectorUsers.OrderByDescending((n) => (pos - GetPos(n)).sqrMagnitude).ToList();
                     case PathSort.Yup:
                         return vectorUsers.OrderBy((n) => GetPos(n).y).ToList();
                     case PathSort.Ydown:
@@ -126,10 +131,28 @@ namespace ES
                             return vectorUsers.OrderByDescending((n) => transform.InverseTransformPoint(GetPos(n)).z).ToList();
                         else return vectorUsers.OrderByDescending((n) => GetPos(n).z).ToList();
                     case PathSort.Random:
-                        return vectorUsers.OrderBy((n) => UnityEngine.Random.value).ToList();
+                        {
+                            var shuffled = new List<T>(vectorUsers);
+                            ShuffleInPlace(shuffled);
+                            return shuffled;
+                        }
 
                 }
                 return vectorUsers;
+            }
+
+            private static void ShuffleInPlace<T>(IList<T> list)
+            {
+                if (list == null || list.Count <= 1) return;
+
+                for (int i = list.Count - 1; i > 0; i--)
+                {
+                    int j = UnityEngine.Random.Range(0, i + 1);
+
+                    T tmp = list[i];
+                    list[i] = list[j];
+                    list[j] = tmp;
+                }
             }
             /// <summary>
             /// 排序路径点-每次找到离当前最近的点
@@ -145,12 +168,12 @@ namespace ES
                 {
                     Vector3 last = i == 0 ? pos : reSort[i - 1];
 
-                    float dis = 9999;
+                    float dis = float.PositiveInfinity;
                     int minIndex = i;
                     for (int j = i; j < vectors.Count; j++)
                     {
                         float disN;
-                        if ((disN = Vector3.Distance(reSort[j], last)) < dis)
+                        if ((disN = (reSort[j] - last).sqrMagnitude) < dis)
                         {
                             minIndex = j;
                             dis = disN;
@@ -178,7 +201,7 @@ namespace ES
                 {
                     T last = i == 0 ? start : reSort[i - 1];
 
-                    float dis = 9999;
+                    float dis = float.PositiveInfinity;
                     int minIndex = i;
                     for (int j = i; j < ts.Count; j++)
                     {
@@ -210,8 +233,8 @@ namespace ES
                 for (int i = 0; i < ts.Count; i++)
                 {
                     T last = i == 0 ? start : reSort[i - 1];
-                    T lastLast = i <= 2 ? start : reSort[i - 2];
-                    float dis = 9999;
+                    T lastLast = i < 2 ? start : reSort[i - 2];
+                    float dis = float.PositiveInfinity;
                     int minIndex = i;
                     for (int j = i; j < ts.Count; j++)
                     {

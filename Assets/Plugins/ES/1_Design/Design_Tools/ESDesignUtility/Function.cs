@@ -29,10 +29,10 @@ namespace ES
             /// <returns>运算结果（<see cref="float"/>）。</returns>
             /// <remarks>
             /// - 位运算（Mask_*）会将浮点数强制转换为 <see cref="int"/> 后执行位操作并再返回为 <see cref="float"/>（可能丢失精度）。
-            /// - 若希望严格的算术语义（尤其对整数位运算），请使用整型版本 <see cref="FunctionForHandleTwoInt(int,int,EnumCollect.HandleTwoNumber)"/>。
+            /// - 若希望严格的算术语义（尤其对整数位运算），请使用整型版本 <see cref="HandleTwoInt(int,int,EnumCollect.HandleTwoNumber)"/>。
             /// </remarks>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static float FunctionForHandleTwoFloat(float f1, float f2, EnumCollect.HandleTwoNumber twoFloatFunction)
+            public static float HandleTwoFloat(float f1, float f2, EnumCollect.HandleTwoNumber twoFloatFunction)
             {
                 switch (twoFloatFunction)
                 {
@@ -61,7 +61,7 @@ namespace ES
             /// - 部分比较（如 Reciprocal）使用了阈值 0.01f 来判断近似相等，这是折衷设计，视场景可调整。
             /// </remarks>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static bool FunctionForCompareTwoFloat(float left, float right, EnumCollect.CompareTwoNumber useFunction)
+            public static bool CompareTwoFloat(float left, float right, EnumCollect.CompareTwoNumber useFunction)
             {
                 switch (useFunction)
                 {
@@ -106,7 +106,7 @@ namespace ES
             /// - 除法/取模在右操作数为 0 时会将其替换为 1 以避免除以 0 的异常。
             /// </remarks>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static int FunctionForHandleTwoInt(int i1, int i2, EnumCollect.HandleTwoNumber twoIntFunction)
+            public static int HandleTwoInt(int i1, int i2, EnumCollect.HandleTwoNumber twoIntFunction)
             {
                 switch (twoIntFunction)
                 {
@@ -131,7 +131,7 @@ namespace ES
             /// <param name="twoBoolFunction">操作类型，来自 <see cref="EnumCollect.HandleTwoBool"/>。</param>
             /// <returns>操作结果（<see cref="bool"/>）。</returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static bool FunctionForHandleTwoBool(bool b1, bool b2, EnumCollect.HandleTwoBool twoBoolFunction)
+            public static bool HandleTwoBool(bool b1, bool b2, EnumCollect.HandleTwoBool twoBoolFunction)
             {
                 switch (twoBoolFunction)
                 {
@@ -164,7 +164,7 @@ namespace ES
             /// <remarks>
             /// - 使用扩展方法 `_FirstUpper` / `_FirstLower`（假定在项目中实现）处理首字母的大小写。
             /// - 对于需要文化敏感的字符串操作，请改用具体文化信息。</remarks>
-            public static string FunctionForStringAsIndentNameCase(string input, HandleIndentStringName handleType)
+            public static string HandleStringToIndentName(string input, HandleIndentStringName handleType)
             {
                 if (string.IsNullOrEmpty(input))
                     return input;
@@ -181,6 +181,23 @@ namespace ES
                     _ => input // 默认返回原字符串
                 };
             }
+
+            /// <summary>
+            /// 规范化字符串，移除前导和尾随空白字符，并根据指定规则调整大小写。
+            /// </summary>
+            /// <param name="input">待处理的字符串。</param>
+            /// <param name="trim">是否移除空白字符。</param>
+            /// <param name="handleType">大小写转换类型。</param>
+            /// <returns>处理后的字符串。</returns>
+            public static string NormalizeString(string input, bool trim = true, HandleIndentStringName handleType = HandleIndentStringName.StartToUpper)
+            {
+                if (string.IsNullOrEmpty(input))
+                    return input;
+
+                string result = trim ? input.Trim() : input;
+                return HandleStringToIndentName(result, handleType);
+            }
+
             #endregion
 
             #region 容器
@@ -301,15 +318,64 @@ namespace ES
                 }
                 return new List<T>();
             }
+
+            /// <summary>
+            /// 从数组中依据指定策略选择并返回一个元素。
+            /// </summary>
+            /// <typeparam name="T">元素类型。</typeparam>
+            /// <param name="values">源数组。</param>
+            /// <param name="selectOneType">选择策略。</param>
+            /// <param name="lastIndex">索引。</param>
+            /// <returns>选中的元素。</returns>
+            public static T GetOne<T>(T[] values, EnumCollect.SelectOne selectOneType, ref int lastIndex)
+            {
+                if (values != null && values.Length > 0)
+                {
+                    // 类似List版本的实现
+                    int lastP = lastIndex;
+                    lastIndex = 0;
+                    if (values.Length > 1)
+                    {
+                        switch (selectOneType)
+                        {
+                            case EnumCollect.SelectOne.NotNullFirst:
+                                for (int i = 0; i < values.Length; i++)
+                                {
+                                    if (values[i] != null)
+                                    {
+                                        lastIndex = i;
+                                        break;
+                                    }
+                                }
+                                break;
+                            case EnumCollect.SelectOne.RandomOnly:
+                                lastIndex = UnityEngine.Random.Range(0, values.Length);
+                                break;
+                            case EnumCollect.SelectOne.Next:
+                                lastIndex = lastP + 1;
+                                lastIndex %= values.Length;
+                                break;
+                            case EnumCollect.SelectOne.Last:
+                                lastIndex = lastP + values.Length - 1;
+                                lastIndex %= values.Length;
+                                break;
+                            default: break;
+                        }
+                    }
+                    if (lastIndex >= 0 && lastIndex < values.Length) return values[lastIndex];
+                }
+                return default;
+            }
+
             #endregion
 
             #region 集成Dotween
             /// <summary>
-            /// 获得CallBack
+            /// 获取Tween对象的指定回调委托。
             /// </summary>
-            /// <param name="use">Tween</param>
-            /// <param name="callBackType">类型</param>
-            /// <returns></returns>
+            /// <param name="use">Tween对象。</param>
+            /// <param name="callBackType">回调类型。</param>
+            /// <returns>回调委托；若Tween为null则返回null。</returns>
             public static Delegate GetCallBackFromTween(Tween use, EnumCollect.CallBackType callBackType)
             {
                 if (use != null)
@@ -337,11 +403,11 @@ namespace ES
                 return default;
             }
             /// <summary>
-            /// 设置CallBack
+            /// 为Tween对象设置指定类型的回调。
             /// </summary>
-            /// <param name="use">Tween</param>
-            /// <param name="callBackType">类型</param>
-            /// <param name="action">设置为</param>
+            /// <param name="use">Tween对象。</param>
+            /// <param name="callBackType">回调类型。</param>
+            /// <param name="action">要设置的回调动作。</param>
             public static void SetCallBackFromTween(Tween use, EnumCollect.CallBackType callBackType, TweenCallback action)
             {
                 if (use != null)
@@ -370,41 +436,13 @@ namespace ES
                             use.OnStepComplete(action);
                             break;
                         case EnumCollect.CallBackType.OnWayPointChange:
-                            //use_.OnWaypointChange(action);
+                            // Note: OnWaypointChange requires TweenCallback<int>, not TweenCallback
+                            // use.OnWaypointChange(action); // Uncomment if action is TweenCallback<int>
                             break;
                     }
                 }
                 return;
             }
-            //Function_OperationValue_InLine
-            /*   [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-               public static float OpearationFloat_Inline(float value, float Value, OperationOptionsForFloat settleType)
-               {
-                   switch (settleType)
-                   {
-                       case OperationOptionsForFloat.Add: return value + Value;
-                       case OperationOptionsForFloat.Sub: return value - Value;
-                       case OperationOptionsForFloat.PerUp: return value * (1 + Value);
-                       case OperationOptionsForFloat.Max: return Mathf.Clamp(value, value, Value);
-                       case OperationOptionsForFloat.Min: return Mathf.Clamp(value, Value, value);
-                       case OperationOptionsForFloat.Wave: return value + UnityEngine.Random.Range(-Value, Value);
-                       default: return value;
-                   }
-               }
-               [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-               public static float OpearationFloat_Cancel_Inline(float value, float Value, OperationOptionsForFloat settleType)
-               {
-                   switch (settleType)
-                   {
-                       case OperationOptionsForFloat.Add: return value - Value;
-                       case OperationOptionsForFloat.Sub: return value + Value;
-                       case OperationOptionsForFloat.PerUp: return value._SafeDivide(1 + Value);
-                       case OperationOptionsForFloat.Max: return Mathf.Clamp(value, value, Value);
-                       case OperationOptionsForFloat.Min: return Mathf.Clamp(value, Value, value);
-                       case OperationOptionsForFloat.Wave: return value + UnityEngine.Random.Range(-Value, Value);
-                       default: return value;
-                   }
-               }*/
             #endregion
         }
     }

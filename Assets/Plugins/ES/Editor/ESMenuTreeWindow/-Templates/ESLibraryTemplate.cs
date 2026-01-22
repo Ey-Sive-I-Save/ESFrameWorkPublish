@@ -50,7 +50,7 @@ namespace ES
             public override ESWindowPageBase ES_Refresh()
             {
                 LibName = GetLibTypeName_NewCreate();
-                FolderPath_ = ESGlobalResSetting.Instance.Path_AllLibraryFolder + "/" + typeof(TLib).Name;
+                FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_ + "/" + typeof(TLib).Name;
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
                 return base.ES_Refresh();
@@ -190,7 +190,7 @@ namespace ES
             }
             private void SetupBooksCallBack()
             {
-                Debug.Log("重建");
+                //Debug.Log("重建");
                 REForBooks.drawHeaderCallback = (Rect rect) =>
                 {
                     EditorGUI.LabelField(rect, "包含Book");

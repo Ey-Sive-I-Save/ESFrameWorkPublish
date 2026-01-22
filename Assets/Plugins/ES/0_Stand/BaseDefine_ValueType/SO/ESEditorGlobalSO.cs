@@ -194,7 +194,7 @@ namespace ES
                     path = path._KeepAfterByLast("Asset", true);
                     if (AssetDatabase.IsValidFolder(path))
                     {
-                        var first = ESStandUtility.SafeEditor.CreateSOAsset<This>(path, "全局数据" + typeof(This).Name);
+                        var first = ESStandUtility.SafeEditor.CreateSOAsset<This>(path, "全局数据" + typeof(This).Name, autoCreateFolder: true);
                         first.TryConfirmSwitchThis();
                         return _instance = first;
                     }

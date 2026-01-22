@@ -15,6 +15,16 @@ namespace ES
         {
             #region 深拷贝部分
             /// <summary>
+            /// 深度克隆实现提示：此方法适用于实现了IDeepClone接口的类型，确保在Unity主线程中调用以避免线程安全问题。
+            /// </summary>
+            public static T DeepCloneFrom<T>(T obj) where T : IDeepClone, new()
+            {
+                if (obj == null) return default;
+                T newObj = new T();
+                newObj.DeepCloneFrom(obj);
+                return newObj;
+            }
+            /// <summary>
             /// 深度克隆任意对象。
             /// 返回目标对象的独立副本；对于引用类型会递归克隆其字段与属性（基于反射）。
             /// </summary>
@@ -32,14 +42,14 @@ namespace ES
             /// </summary>
             /// <param name="obj">要克隆的源对象。</param>
             /// <param name="HardUnityObject">是否对 UnityEngine.Object 使用实例化拷贝（会调用 Instantiate）。注意：Instantiate 必须在主线程调用。</param>
-            /// <param name="seldeDefineCreater">可选的自定义创建器，若提供则用于创建目标对象的实例。</param>
+            /// <param name="selfDefineCreator">可选的自定义创建器，若提供则用于创建目标对象的实例。</param>
             /// <returns>克隆后的对象；若为不可克隆或输入为 <c>null</c> 则返回 <c>null</c> 或原始输入（视具体类型而定）。</returns>
             /// <remarks>
             /// - 方法使用反射实现，性能不如专用泛型实现；建议在性能敏感路径使用专用实现或预分配。
             /// - 当前实现基于递归反射，若对象图包含循环引用可能导致栈溢出或重复克隆（请在外部避免循环引用或扩展本方法以支持引用跟踪）。
             /// - 调用此方法应在 Unity 主线程中进行（若传入 Unity 对象且选择实例化）。
             /// </remarks>
-            public static object DeepCloneAnyObject(object obj, bool HardUnityObject = true, Func<object> seldeDefineCreater = null)
+            public static object DeepCloneAnyObject(object obj, bool HardUnityObject = true, Func<object> selfDefineCreator = null)
             {
                 //为NULL返回NULL
                 if (obj == null)
@@ -47,11 +57,11 @@ namespace ES
                     return null;
                 }
 
-               
+
                 Type type = obj.GetType();
-                // 如果是值类型或字符串，
+                // 如果是值类型（包括结构体）或字符串，
                 // 直接返回（值类型是不可变的，字符串是不可变引用类型）
-                if (obj is string || type.IsEnum || type.IsPrimitive)
+                if (type.IsValueType || obj is string)
                 {
                     return obj;
                 }
@@ -115,7 +125,7 @@ namespace ES
                 //如果是结构体("已经排除了原始类型--无法通过直接赋值来拷贝结构体，因为已经作为Struct装箱了
 
                 // 如果是普通引用类型或结构体--结合
-                var clonedObject = seldeDefineCreater != null ? seldeDefineCreater.Invoke() : Activator.CreateInstance(type);
+                var clonedObject = selfDefineCreator != null ? selfDefineCreator.Invoke() : Activator.CreateInstance(type);
                 if (clonedObject is IDeepClone deep)
                 {
                     deep.DeepCloneFrom(obj);
@@ -154,13 +164,11 @@ namespace ES
                     {
                         return DeepCloneGenericList(collection, collectionType);
                     }
-                    Debug.Log("BeforeDIc");
                     // 处理Dictionary<TKey, TValue>
                     if (genericDef == typeof(Dictionary<,>))
                     {
                         return DeepCloneGenericDictionary(collection, collectionType);
                     }
-                    Debug.Log("AfterDIc");
                     // 处理HashSet<T>
                     if (genericDef == typeof(HashSet<>))
                     {
@@ -200,7 +208,7 @@ namespace ES
             /// <param name="dictionary">源字典对象（可以为任意实现了 IDictionary 的实例）。</param>
             /// <param name="dictType">可选的字典类型；若为空将从实例推断。</param>
             /// <returns>返回克隆后的字典实例（类型与输入相同）。</returns>
-            public static object DeepCloneGenericDictionary(object dictionary, Type dictType=null)
+            public static object DeepCloneGenericDictionary(object dictionary, Type dictType = null)
             {
                 dictType ??= dictionary.GetType();
                 Type[] genericArgs = dictType.GetGenericArguments();
@@ -221,7 +229,7 @@ namespace ES
                 }
                 else
                 {
-
+                    Debug.LogWarning($"无法深拷贝字典类型: {dictType.Name}");
                 }
                 return newDict;
             }
@@ -232,7 +240,7 @@ namespace ES
             /// <param name="list">源列表实例。</param>
             /// <param name="listType">可选的列表类型；若为空将从实例推断。</param>
             /// <returns>返回克隆后的列表实例（元素为递归克隆结果）。</returns>
-            public static object DeepCloneGenericList(object list, Type listType=null)
+            public static object DeepCloneGenericList(object list, Type listType = null)
             {
                 listType ??= list.GetType();
                 Type elementType = listType.GetGenericArguments()[0];
@@ -244,10 +252,11 @@ namespace ES
                     new object[] { count }); // 指定初始容量
 
                 var addMethod = listType.GetMethod("Add");
-                
-                foreach(var one in list as IEnumerable)
+
+                foreach (var one in list as IEnumerable)
                 {
-                    addMethod.Invoke(newList, DeepCloneAnyObject(one,false)._AsArrayOnlySelf());
+                    var clonedItem = DeepCloneAnyObject(one, false);
+                    addMethod.Invoke(newList, new object[] { clonedItem });
                 }
                 return newList;
             }
@@ -257,7 +266,7 @@ namespace ES
             /// <param name="hashSet">源 HashSet 实例。</param>
             /// <param name="hashSetType">可选的 HashSet 类型；通常可为空以自动推断。</param>
             /// <returns>返回克隆后的 HashSet 实例。</returns>
-            public static object DeepCloneGenericHashSet(object hashSet, Type hashSetType=null)
+            public static object DeepCloneGenericHashSet(object hashSet, Type hashSetType = null)
             {
                 hashSetType ??= hashSet.GetType();
                 // 获取泛型参数类型
@@ -285,7 +294,7 @@ namespace ES
             /// <param name="stackType">可选的栈类型；若为空自动推断。</param>
             /// <param name="creator">元素的自定义创建器（可选）。</param>
             /// <returns>返回克隆后的栈实例。</returns>
-            public static object DeepCloneGenericStack(object stack, Type stackType=null, Func<object> creator = null)
+            public static object DeepCloneGenericStack(object stack, Type stackType = null, Func<object> creator = null)
             {
                 stackType ??= stack.GetType();
                 // 获取元素类型
@@ -315,7 +324,7 @@ namespace ES
                 // 将元素推入新栈（保持原始顺序）
                 foreach (var item in tempList)
                 {
-                    object clonedItem = DeepCloneAnyObject(item, false, seldeDefineCreater: creator);
+                    object clonedItem = DeepCloneAnyObject(item, false, selfDefineCreator: creator);
                     pushMethod.Invoke(newStack, new[] { clonedItem });
                 }
 
@@ -329,7 +338,7 @@ namespace ES
             /// <param name="linkedListType">可选链表类型；若为空将自动推断。</param>
             /// <param name="creator">节点元素的自定义创建器（可选）。</param>
             /// <returns>返回克隆后的链表实例。</returns>
-            public static object DeepCloneGenericLinkedList(object linkedList, Type linkedListType=null, Func<object> creator = null)
+            public static object DeepCloneGenericLinkedList(object linkedList, Type linkedListType = null, Func<object> creator = null)
             {
                 linkedListType ??= linkedList.GetType();
                 // 获取元素类型
@@ -353,7 +362,7 @@ namespace ES
                 // 遍历链表
                 Type nodeType = firstNode.GetType();
                 PropertyInfo nextProperty = nodeType.GetProperty("Next");
-                PropertyInfo valueProperty = nodeType.GetProperty("Value") ?? nodeType.GetProperty("Item") ;
+                PropertyInfo valueProperty = nodeType.GetProperty("Value") ?? nodeType.GetProperty("Item");
 
                 object currentNode = firstNode;
                 while (currentNode != null)
@@ -379,7 +388,8 @@ namespace ES
             /// <param name="queueType">可选队列类型；若为空自动推断。</param>
             /// <param name="creator">元素的自定义创建器（可选）。</param>
             /// <returns>返回克隆后的队列实例。</returns>
-            public static object DeepCloneGenericQueue(object queue, Type queueType=null, Func<object> creator = null)
+
+           public static object DeepCloneGenericQueue(object queue, Type queueType = null, Func<object> creator = null)
             {
                 queueType ??= queue.GetType();
                 // 1. 获取元素类型
@@ -444,16 +454,16 @@ namespace ES
             /// <param name="collectionType">集合类型；若为空将自动推断。</param>
             /// <param name="creator">元素的自定义创建器（可选）。</param>
             /// <returns>返回新集合实例或在无法复制时返回原集合并记录警告。</returns>
-            public static object DeepCloneCollectionByReflection_CantUSE(object collection, Type collectionType=null, Func<object> creator=null)
+            public static object DeepCloneCollectionByReflection_CantUSE(object collection, Type collectionType = null, Func<object> creator = null)
             {
                 collectionType ??= collection.GetType();
                 // 尝试创建实例
                 object newCollection = creator?.Invoke() ?? Activator.CreateInstance(collectionType);
 
-                
+
                 // 尝试查找Add方法
                 MethodInfo addMethod = null;
-                
+
                 foreach (var method in collectionType.GetMethods())
                 {
                     if (method.Name == "Add" && method.GetParameters().Length == 1)
@@ -474,20 +484,20 @@ namespace ES
                     return newCollection;
                 }
                 // 尝试使用ICollection接口
-              /*   if (collection is ICollection coll)
-                 {
-                     var newColl = (ICollection)Activator.CreateInstance(collectionType);
-                     
-                     // 不支持添加项的集合（如只读集合）
+                /*   if (collection is ICollection coll)
+                   {
+                       var newColl = (ICollection)Activator.CreateInstance(collectionType);
 
-                         foreach (var item in coll)
-                         {
-                             newColl.(DeepCloneObject(item));
-                         }
+                       // 不支持添加项的集合（如只读集合）
+
+                           foreach (var item in coll)
+                           {
+                               newColl.(DeepCloneObject(item));
+                           }
 
 
-                     return newColl;
-                 }*/
+                       return newColl;
+                   }*/
 
                 // 最终回退方案：无法复制，返回原始集合
                 Debug.LogWarning($"无法深拷贝集合类型: {collectionType.Name}");
@@ -503,13 +513,12 @@ namespace ES
             {
                 public override void Handle(ESCreatePathAttribute attribute, Type type)
                 {
-                    
-                    CreatePaths.AddOrSet(attribute.GroupName,attribute.MyName,type);
+
+                    CreatePaths.AddOrSet(attribute.GroupName, attribute.MyName, type);
                 }
             }
 
             #endregion
-
         }
 
 

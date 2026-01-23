@@ -8,8 +8,7 @@ using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEditor.PackageManager.Requests;
 using UnityEngine;
-using System.Threading;
-using Sirenix.OdinInspector;
+
 
 namespace ES.ESInstaller
 {
@@ -811,7 +810,8 @@ namespace ES.ESInstaller
             }
 
             // 确保在重新编译后窗口能正常工作
-
+            //Close();
+            Debug.Log("ES Installer 窗口已启用"); 
             InitializePaths();
             LoadConfiguration();
             ScanAndLoadAllPackages(); // 扫描并加载所有包
@@ -1089,7 +1089,7 @@ namespace ES.ESInstaller
                                 name = dep.name,
                                 version = dep.version,
                                 description = dep.description,
-                                packageId = dep.name,
+                                packageId = dep.packageId,
                                 isRequired = dep.isRequired,
                                 checkClass = dep.checkClass
                             });
@@ -1247,7 +1247,7 @@ namespace ES.ESInstaller
                         name = dep.name,
                         version = dep.version,
                         description = dep.description,
-                        packageId = dep.name,
+                        packageId = dep.packageId,
                         isRequired = dep.isRequired,
                         checkClass = dep.checkClass
                     });
@@ -1322,7 +1322,7 @@ namespace ES.ESInstaller
                         name = dep.name,
                         version = dep.version,
                         description = dep.description,
-                        packageId = dep.name,
+                        packageId = dep.packageId,
                         isRequired = dep.isRequired,
                         checkClass = dep.checkClass
                     });
@@ -1472,6 +1472,7 @@ namespace ES.ESInstaller
             public string description;
             public bool isRequired;
             public string checkClass; // 可选：用于验证安装状态的完整类名
+            public string packageId; // Unity Package Manager ID
         }
 
         [System.Serializable]
@@ -2962,11 +2963,6 @@ namespace ES.ESInstaller
             // 快速刷新按钮 - 更突出显示
             EditorGUILayout.BeginHorizontal();
             GUI.backgroundColor = new Color(0.3f, 0.6f, 1.0f); // 蓝色背景
-            if (GUILayout.Button("🚀 快速全部刷新状态", GUILayout.Height(35)))
-            {
-                RefreshAllStatuses();
-                ShowStatus("所有依赖状态已刷新", MessageType.Info);
-            }
             GUI.backgroundColor = Color.white;
             EditorGUILayout.EndHorizontal();
 
@@ -3616,9 +3612,33 @@ namespace ES.ESInstaller
                 return;
             }
 
-            await CheckAllUnityPackages();
-            await CheckAllGitPackages();
-            await CheckAllUserPackages();
+            ShowStatus("正在全面刷新所有状态...", MessageType.Info);
+
+            try
+            {
+                // 1. 重新加载配置文件
+                LoadSavedConfiguration();
+
+                // 2. 重新扫描并加载所有包
+                ScanAndLoadAllPackages();
+
+                // 3. 异步检查所有包的安装状态
+                await CheckAllPackagesInstallStateAsync();
+
+                // 4. 检查所有依赖状态
+                await CheckAllUnityPackages();
+                await CheckAllGitPackages();
+                await CheckAllUserPackages();
+
+                ShowStatus("所有状态刷新完成", MessageType.Info);
+            }
+            catch (Exception e)
+            {
+                ShowStatus($"刷新状态时出现错误: {e.Message}", MessageType.Error);
+                Debug.LogError($"RefreshAllStatuses error: {e}");
+            }
+
+            Repaint();
         }
 
         private void GenerateInstallationReport()

@@ -29,6 +29,7 @@ MonoBehaviour:
   Path_NormalParent: Assets/NormalResources/Data/Normal
   Path_ResourceParent: Assets/NormalResources
   Path_GlobalParent: 
+  Path_AllLibraryFolder_: Assets/NormalResources/Data/Library
   ExcludePackGroupInfo: 1
   ExcludeWindow: 1
   ExcludeNodeRunner: 1
@@ -38,8 +39,8 @@ MonoBehaviour:
   - ESTrackViewWindow
   - ESTreeMenuShower
   ExcludeHandle: ESTreeMenuShower
-  PackageOutputPath: Assets/../ESOutput/UnityPackage
-  PackageSelfPath: Assets/Plugins/ES/Editor/Installer/Downloads/Main
+  PackageOutputPathForPublish: Assets/../ESOutput/UnityPackage
+  PackageSelfPathForMain: Assets/Plugins/ES/Editor/Installer/Downloads/Main
   PackageName: ESPackage0.35_
   PackageCollectPath:
   - Assets/Plugins/ES
@@ -51,6 +52,7 @@ MonoBehaviour:
   - Assets/ES
   - Assets/Plugins/OUT
   - Assets/ScriptTemplates
+  - Assets/Packages
   IncludeDependencies: 1
   PackagePublishPath: Assets\Plugins\ES\Editor\Installer
   ExtendedPackageConfigs:
@@ -67,6 +69,22 @@ MonoBehaviour:
     PackageName: ESPackage_Ext_Only Sample
     CollectPaths:
     - Assets/ES/ETX/EXT_OnlySample
+    ExcludeFolders: []
+    IsEnabled: 1
+    IncludeDependencies: 1
+  - ConfigName: "\u914D\u7F6E 3"
+    OutputPath: Assets/Plugins/ES/Editor/Installer/Downloads/Main
+    PackageName: ESPackage_Ext_3_
+    CollectPaths:
+    - Assets/Plugins/ES
+    - Assets/Scripts/ESLogic
+    - Assets/NormalResources/Data/GlobalData
+    - Assets/NuGet
+    - Assets/Scripts/ESLogic
+    - Assets/Settings
+    - Assets/ES
+    - Assets/Plugins/OUT
+    - Assets/ScriptTemplates
     ExcludeFolders: []
     IsEnabled: 1
     IncludeDependencies: 1

@@ -44,7 +44,7 @@ namespace ES
             var newConfig = new ESGlobalEditorDefaultConfi.UnityPackageConfig
             {
                 ConfigName = $"配置 {globalConfigs.Count + 1}",
-                OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageOutputPath ?? "Assets/../ESOutput/UnityPackage",
+                OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage",
                 PackageName = $"ESPackage_Ext_{globalConfigs.Count + 1}_",
                 CollectPaths = new List<string>(ESGlobalEditorDefaultConfi.Instance?.PackageCollectPath ?? new List<string>() { "Assets/Plugins/ES" }),
                 ExcludeFolders = new List<string>(),
@@ -228,7 +228,7 @@ namespace ES
                 if (currentConfigIndex == -1)
                 {
                     // 使用默认配置
-                    return ESGlobalEditorDefaultConfi.Instance?.PackageOutputPath ?? "Assets/../ESOutput/UnityPackage";
+                    return ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage";
                 }
                 else
                 {
@@ -246,7 +246,7 @@ namespace ES
                     // 修改默认配置
                     if (ESGlobalEditorDefaultConfi.Instance != null)
                     {
-                        ESGlobalEditorDefaultConfi.Instance.PackageOutputPath = value;
+                        ESGlobalEditorDefaultConfi.Instance.PackageSelfPathForMain = value;
                         EditorUtility.SetDirty(ESGlobalEditorDefaultConfi.Instance);
                     }
                 }
@@ -275,14 +275,14 @@ namespace ES
                 if (currentConfigIndex == -1)
                 {
                     // 使用默认配置
-                    return ESGlobalEditorDefaultConfi.Instance?.IncludeDependencies ?? true;
+                    return ESGlobalEditorDefaultConfi.Instance?.IncludeDependencies_ ?? true;
                 }
                 else
                 {
                     // 使用扩展配置
                     var globalConfigs = GlobalPackageConfigs;
                     if (currentConfigIndex >= 0 && currentConfigIndex < globalConfigs.Count)
-                        return globalConfigs[currentConfigIndex].IncludeDependencies;
+                        return globalConfigs[currentConfigIndex].IncludeDependencies_;
                     return true;
                 }
             }
@@ -293,7 +293,7 @@ namespace ES
                     // 修改默认配置
                     if (ESGlobalEditorDefaultConfi.Instance != null)
                     {
-                        ESGlobalEditorDefaultConfi.Instance.IncludeDependencies = value;
+                        ESGlobalEditorDefaultConfi.Instance.IncludeDependencies_ = value;
                         EditorUtility.SetDirty(ESGlobalEditorDefaultConfi.Instance);
                     }
                 }
@@ -303,7 +303,7 @@ namespace ES
                     var globalConfigs = GlobalPackageConfigs;
                     if (currentConfigIndex >= 0 && currentConfigIndex < globalConfigs.Count)
                     {
-                        globalConfigs[currentConfigIndex].IncludeDependencies = value;
+                        globalConfigs[currentConfigIndex].IncludeDependencies_ = value;
                         // 标记全局配置为已修改
 #if UNITY_EDITOR
                         if (ESGlobalEditorDefaultConfi.Instance != null)
@@ -400,12 +400,12 @@ namespace ES
                 var defaultConfig = new ESGlobalEditorDefaultConfi.UnityPackageConfig
                 {
                     ConfigName = "默认配置",
-                    OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageOutputPath ?? "Assets/../ESOutput/UnityPackage",
+                    OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage",
                     PackageName = ESGlobalEditorDefaultConfi.Instance?.PackageName ?? "ESPackage0.35_",
                     CollectPaths = new List<string>(ESGlobalEditorDefaultConfi.Instance?.PackageCollectPath ?? new List<string>() { "Assets/Plugins/ES" }),
                     ExcludeFolders = new List<string>(),
                     IsEnabled = true,
-                    IncludeDependencies = ESGlobalEditorDefaultConfi.Instance?.IncludeDependencies ?? true
+                    IncludeDependencies_ = ESGlobalEditorDefaultConfi.Instance?.IncludeDependencies_ ?? true
                 };
                 globalConfigs.Add(defaultConfig);
                 currentConfigIndex = 0;
@@ -518,7 +518,7 @@ namespace ES
                 {
                     try
                     {
-                        currentConfig.OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageSelfPath ?? currentConfig.OutputPath;
+                        currentConfig.OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? currentConfig.OutputPath;
                     }
                     catch
                     {
@@ -612,8 +612,8 @@ namespace ES
                 return;
             }
             config.PackageName = currentConfig.PackageName;
-            config.PackageOutputPath = currentConfig.OutputPath;
-            config.IncludeDependencies = currentConfig.IncludeDependencies;
+            config.PackageSelfPathForMain = currentConfig.OutputPath;
+            config.IncludeDependencies_ = currentConfig.IncludeDependencies_;
             // 合并收集路径，去重
             var allPaths = new HashSet<string>(config.PackageCollectPath ?? new List<string>());
             foreach (var path in currentConfig.CollectPaths)
@@ -648,9 +648,9 @@ namespace ES
                 }
 
                 selectedAssets = globalConfig.PackageCollectPath;
-                outputPath = globalConfig.PackageOutputPath ?? "Assets/../ESOutput/UnityPackage";
+                outputPath = globalConfig.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage";
                 packageName = globalConfig.PackageName ?? "ESPackage0.35_";
-                includeDependencies = globalConfig.IncludeDependencies;
+                includeDependencies = globalConfig.IncludeDependencies_;
                 configName = "默认配置";
             }
             else
@@ -667,7 +667,7 @@ namespace ES
                 selectedAssets = currentConfig.CollectPaths;
                 outputPath = currentConfig.OutputPath;
                 packageName = currentConfig.PackageName;
-                includeDependencies = currentConfig.IncludeDependencies;
+                includeDependencies = currentConfig.IncludeDependencies_;
                 configName = currentConfig.ConfigName;
             }
 
@@ -688,15 +688,24 @@ namespace ES
                     foreach (var guid in guids)
                     {
                         var assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                        if (!expandedPaths.Contains(assetPath))
-                            expandedPaths.Add(assetPath);
+                        // 排除Assets/Plugins/ES/Editor/Installer下的文件
+                        if (!assetPath.StartsWith("Assets/Plugins/ES/Editor/Installer/", StringComparison.OrdinalIgnoreCase) &&
+                            !assetPath.Equals("Assets/Plugins/ES/Editor/Installer", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (!expandedPaths.Contains(assetPath))
+                                expandedPaths.Add(assetPath);
+                        }
                     }
                 }
                 else if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null)
                 {
-                    // 单个资源
-                    if (!expandedPaths.Contains(path))
-                        expandedPaths.Add(path);
+                    // 单个资源，排除Assets/Plugins/ES/Editor/Installer下的文件
+                    if (!path.StartsWith("Assets/Plugins/ES/Editor/Installer/", StringComparison.OrdinalIgnoreCase) &&
+                        !path.Equals("Assets/Plugins/ES/Editor/Installer", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!expandedPaths.Contains(path))
+                            expandedPaths.Add(path);
+                    }
                 }
             }
             var assetPaths = expandedPaths.ToArray();
@@ -761,7 +770,7 @@ namespace ES
             }
 
             // 使用PackageOutputPath作为输出目录
-            var outputDir = config.PackageOutputPath;
+            var outputDir = config.PackageOutputPathForPublish;
             if (string.IsNullOrEmpty(outputDir))
             {
                 outputDir = "Assets/../ESOutput/UnityPackage";

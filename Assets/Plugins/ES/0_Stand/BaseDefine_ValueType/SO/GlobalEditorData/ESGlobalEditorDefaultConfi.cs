@@ -90,12 +90,12 @@ namespace ES
 
     [TabGroup("UnityPackage打包构建")]
     [LabelText("UnityPackage发布打包输出到"), FolderPath]
-    public string PackageOutputPath = "Assets/../ESOutput/UnityPackage";
+    public string PackageOutputPathForPublish = "Assets/../ESOutput/UnityPackage";
 
 
     [TabGroup("UnityPackage打包构建")]
     [LabelText("UnityPackage本体汇总位置"), FolderPath]
-    public string PackageSelfPath = "Assets\\Plugins\\ES\\Editor\\Installer\\Downloads";
+    public string PackageSelfPathForMain = "Assets/Plugins/ES/Editor/Installer/Downloads/Main";
 
 
     [TabGroup("UnityPackage打包构建")]
@@ -108,10 +108,10 @@ namespace ES
 
     [TabGroup("UnityPackage打包构建")]
     [LabelText("包含依赖项")]
-    public bool IncludeDependencies = true;
+    public bool IncludeDependencies_ = false;
 
     [TabGroup("UnityPackage打包构建")]
-    [LabelText("发布Editor位置"), FolderPath]
+    [LabelText("发布Editor安装器位置"), FolderPath]
     public string PackagePublishPath = "Assets\\Plugins\\ES\\Editor\\Installer";
 
 
@@ -142,7 +142,7 @@ namespace ES
       public bool IsEnabled = true;
 
       [LabelText("包含依赖项")]
-      public bool IncludeDependencies = true;
+      public bool IncludeDependencies_ = false;
     }
 
     [TabGroup("UnityPackage扩展配置")]

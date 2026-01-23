@@ -29,7 +29,7 @@ namespace ES
             {
                 //如果没有会创建
                 BindingPool.SetIntDirect(it.Key, 0, EnableSendLinkIfCreateNew : true);
-                BindingPool.LinkRCL_Int.AddReceive(it.Key, this);//开始监听
+                BindingPool.LinkRCL_Int.AddReceiver(it.Key, this);//开始监听
             }
 
         }
@@ -39,7 +39,7 @@ namespace ES
             foreach (var it in Items)
             {
                 //可以移除参数--或者置空
-                BindingPool.LinkRCL_Int.RemoveReceive(it.Key, this);//开始监听
+                BindingPool.LinkRCL_Int.RemoveReceiver(it.Key, this);//开始监听
             }
         }
         //接受监听

@@ -5,72 +5,54 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
-
 namespace ES
 {
     /// <summary>
-    /// LinkReceiveChannelList
+    /// LinkReceiveListNoParam
     ///
-    /// 通道型 Link 接收者容器，为单一通道管理一组接收者。
-    /// 功能特性：
-    /// - 维护一个线程安全的接收者列表 (SafeNormalList)；
-    /// - 通过 SendLink 方法广播通道数据给所有有效接收者；
-    /// - 自动清理已销毁的 Unity 对象接收者；
-    /// - 支持接口和委托两种接收者类型；
-    /// - 适用于需要统一管理特定通道监听者的场景。
+    /// 针对无参数 Link 的专用接收列表：
+    /// - 专门为 IReceiveLinkNoParam 接口优化，无需传递参数；
+    /// - 内部使用 SafeNormalList 提供"延迟增删 + ApplyBuffers"机制，
+    ///   保证在派发过程中也可以安全地添加 / 移除监听；
+    /// - 适合用作简单通知事件，如心跳、状态同步等纯通知场景。
     /// </summary>
-    /// <typeparam name="Channel">通道标识的类型，通常为枚举或字符串。</typeparam>
-    /// <typeparam name="Link">传递的链接数据的类型。</typeparam>
-    public class LinkReceiveChannelList<Channel, Link>
+    public class LinkReceiveListNoParam
     {
         #region 字段 (Fields)
 
         /// <summary>
         /// 接收者列表，使用 SafeNormalList 确保线程安全。
         /// </summary>
-        private SafeNormalList<IReceiveChannelLink<Channel, Link>> _receivers = new SafeNormalList<IReceiveChannelLink<Channel, Link>>();
+        private SafeNormalList<IReceiveLinkNoParam> _receivers = new SafeNormalList<IReceiveLinkNoParam>();
 
         #endregion
 
         #region 核心功能 (Core Functionality)
 
         /// <summary>
-        /// 发送通道链接通知。
-        /// 通知所有有效的接收者指定的通道和链接数据。
+        /// 发送无参数链接通知。
+        /// 通知所有有效的接收者，无需传递数据。
         /// </summary>
-        /// <param name="channel">通道标识。</param>
-        /// <param name="link">链接数据。</param>
-        public void SendLink(Channel channel, Link link)
+        public void SendLink()
         {
             _receivers.ApplyBuffers();
 
             int count = _receivers.ValuesNow.Count;
             for (int i = 0; i < count; i++)
             {
-                IReceiveChannelLink<Channel, Link> currentReceiver = _receivers.ValuesNow[i];
+                IReceiveLinkNoParam currentReceiver = _receivers.ValuesNow[i];
                 if (currentReceiver is UnityEngine.Object ob)
                 {
-                    if (ob != null)
-                    {
-                        currentReceiver.OnLink(channel, link);
-                    }
-                    else
-                    {
-                        _receivers.Remove(currentReceiver);
-                    }
+                    if (ob != null) currentReceiver.OnLink();
+                    else _receivers.Remove(currentReceiver);
                 }
-                else if (currentReceiver != null)
-                {
-                    currentReceiver.OnLink(channel, link);
-                }
-                else
-                {
-                    _receivers.Remove(currentReceiver);
-                }
+                else if (currentReceiver != null) currentReceiver.OnLink();
+                else _receivers.Remove(currentReceiver);
             }
         }
 
         #endregion
+
         #region 接收者管理 (Receiver Management)
 
         /// <summary>
@@ -78,47 +60,47 @@ namespace ES
         /// </summary>
         /// <param name="receiver">要移除的接收者。</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Internal_TryRemove(IReceiveChannelLink<Channel, Link> receiver)
+        private void Internal_TryRemove(IReceiveLinkNoParam receiver)
         {
             _receivers.Remove(receiver);
         }
 
         /// <summary>
-        /// 添加通道接收者。
+        /// 添加无参数接收者。
         /// </summary>
         /// <param name="receiver">要添加的接收者。</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReceiver(IReceiveChannelLink<Channel, Link> receiver)
+        public void AddReceiver(IReceiveLinkNoParam receiver)
         {
             _receivers.Add(receiver);
         }
 
         /// <summary>
-        /// 移除通道接收者。
+        /// 移除无参数接收者。
         /// </summary>
         /// <param name="receiver">要移除的接收者。</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveReceiver(IReceiveChannelLink<Channel, Link> receiver)
+        public void RemoveReceiver(IReceiveLinkNoParam receiver)
         {
             _receivers.Remove(receiver);
         }
 
         /// <summary>
-        /// 添加基于 Action 的通道接收者。
+        /// 添加基于 Action 的无参数接收者。
         /// </summary>
         /// <param name="action">要添加的 Action 委托。</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReceiver(Action<Channel, Link> action)
+        public void AddReceiver(Action action)
         {
             _receivers.Add(action.MakeReceive());
         }
 
         /// <summary>
-        /// 移除基于 Action 的通道接收者。
+        /// 移除基于 Action 的无参数接收者。
         /// </summary>
         /// <param name="action">要移除的 Action 委托。</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveReceiver(Action<Channel, Link> action)
+        public void RemoveReceiver(Action action)
         {
             _receivers.Remove(action.MakeReceive());
         }

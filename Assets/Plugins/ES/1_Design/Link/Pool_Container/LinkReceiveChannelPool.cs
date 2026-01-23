@@ -9,57 +9,149 @@ using UnityEngine;
 #if UNITY_EDITOR
 #endif
 
-
 /*Channel 只是一个枚举或者静态类*/
+/// <summary>
+/// LinkReceiveChannelPool
+///
+/// 多通道 Link 接收者容器，按通道分组管理接收者集合。
+/// 功能特性：
+/// - 使用 SafeKeyGroup 按通道 (Channel) 分组存储接收者；
+/// - 支持多通道并发分发，每个通道独立管理接收者列表；
+/// - 自动清理已销毁的 Unity 对象接收者；
+/// - 提供通道级别的添加/移除接收者操作；
+/// - 适用于需要按通道分类管理事件监听的复杂系统。
+/// </summary>
+/// <typeparam name="Channel">通道标识的类型，通常为枚举。</typeparam>
+/// <typeparam name="Link">传递的链接数据的类型。</typeparam>
 [Serializable]
-public class LinkReceiveChannelPool<Channel,Link> 
+public class LinkReceiveChannelPool<Channel, Link>
 {
+    #region 字段 (Fields)
+
+    /// <summary>
+    /// 通道接收者分组，使用 SafeKeyGroup 按通道组织接收者列表，确保线程安全。
+    /// </summary>
     [HideLabel]
-    public SafeKeyGroup<Channel, IReceiveChannelLink<Channel,Link>> CIRS = new SafeKeyGroup<Channel, IReceiveChannelLink<Channel, Link>>();
-    public IReceiveChannelLink<Channel,Link> cache;
-    public void SendLink(Channel c,Link link)
+    private SafeKeyGroup<Channel, IReceiveChannelLink<Channel, Link>> _channelReceivers = new SafeKeyGroup<Channel, IReceiveChannelLink<Channel, Link>>();
+
+    #endregion
+
+    #region 核心功能 (Core Functionality)
+
+    /// <summary>
+    /// 发送指定通道的链接通知。
+    /// 通知该通道下所有有效的接收者。
+    /// </summary>
+    /// <param name="channel">目标通道。</param>
+    /// <param name="link">链接数据。</param>
+    public void SendLink(Channel channel, Link link)
     {
-        CIRS.ApplyBuffers();
-        if(CIRS.Groups.TryGetValue(c,out var irs))
+        _channelReceivers.ApplyBuffers();
+        if (_channelReceivers.Groups.TryGetValue(channel, out var receivers))
         {
-            int count = irs.ValuesNow.Count;
+            int count = receivers.ValuesNow.Count;
             for (int i = 0; i < count; i++)
             {
-                cache = irs.ValuesNow[i];
-                if (cache is UnityEngine.Object ob)
+                IReceiveChannelLink<Channel, Link> currentReceiver = receivers.ValuesNow[i];
+                if (currentReceiver is UnityEngine.Object ob)
                 {
-                    if (ob != null) cache.OnLink(c,link);
-                    else irs.Remove(cache);
+                    if (ob != null)
+                    {
+                        currentReceiver.OnLink(channel, link);
+                    }
+                    else
+                    {
+                        receivers.Remove(currentReceiver);
+                    }
                 }
-                else if (cache != null) cache.OnLink(c,link);
-                else irs.Remove(cache);
+                else if (currentReceiver != null)
+                {
+                    currentReceiver.OnLink(channel, link);
+                }
+                else
+                {
+                    receivers.Remove(currentReceiver);
+                }
             }
         }
     }
-    [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-    private void Internal_TryRemove(Channel channel, IReceiveChannelLink<Channel,Link> ir)
+
+    #endregion
+
+    #region 接收者管理 (Receiver Management)
+
+    /// <summary>
+    /// 尝试移除指定通道的接收者（内部使用）。
+    /// </summary>
+    /// <param name="channel">通道标识。</param>
+    /// <param name="receiver">要移除的接收者。</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void Internal_TryRemove(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
     {
-        CIRS.Remove(channel,ir);
-    }
-    [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-    public void AddReceive(Channel channel, IReceiveChannelLink<Channel,Link> e)
-    {
-        CIRS.Add(channel,e);
-    }
-    [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-    public void RemoveReceive(Channel channel, IReceiveChannelLink<Channel, Link> e)
-    {
-        CIRS.Remove(channel,e);
+        _channelReceivers.Remove(channel, receiver);
     }
 
-    [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-    public void AddReceive(Channel channel, Action<Channel, Link> e)
+    /// <summary>
+    /// 添加指定通道的接收者。
+    /// </summary>
+    /// <param name="channel">通道标识。</param>
+    /// <param name="receiver">要添加的接收者。</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void AddReceiver(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
     {
-        CIRS.Add(channel, e.MakeReceive());
+        _channelReceivers.Add(channel, receiver);
     }
-    [MethodImpl(methodImplOptions: MethodImplOptions.AggressiveInlining)]
-    public void RemoveReceive(Channel channel, Action<Channel, Link> e)
+
+    /// <summary>
+    /// 移除指定通道的接收者。
+    /// </summary>
+    /// <param name="channel">通道标识。</param>
+    /// <param name="receiver">要移除的接收者。</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void RemoveReceiver(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
     {
-        CIRS.Remove(channel,e.MakeReceive());
+        _channelReceivers.Remove(channel, receiver);
     }
+
+    /// <summary>
+    /// 添加基于 Action 的指定通道接收者。
+    /// </summary>
+    /// <param name="channel">通道标识。</param>
+    /// <param name="action">要添加的 Action 委托。</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void AddReceiver(Channel channel, Action<Channel, Link> action)
+    {
+        _channelReceivers.Add(channel, action.MakeReceive());
+    }
+
+    /// <summary>
+    /// 移除基于 Action 的指定通道接收者。
+    /// </summary>
+    /// <param name="channel">通道标识。</param>
+    /// <param name="action">要移除的 Action 委托。</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void RemoveReceiver(Channel channel, Action<Channel, Link> action)
+    {
+        _channelReceivers.Remove(channel, action.MakeReceive());
+    }
+
+    /// <summary>
+    /// 清除所有通道的接收者。
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Clear()
+    {
+        _channelReceivers.Clear();
+    }
+
+    /// <summary>
+    /// 手动应用缓冲区中的更改。
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void ApplyBuffers()
+    {
+        _channelReceivers.ApplyBuffers();
+    }
+
+    #endregion
 }

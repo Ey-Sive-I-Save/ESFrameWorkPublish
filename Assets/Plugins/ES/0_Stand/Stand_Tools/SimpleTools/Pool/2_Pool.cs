@@ -10,7 +10,7 @@ namespace ES
     /// 主线程优先：在主线程时尽量避免加锁；若从其他线程访问则用锁保护
     /// </summary>
     /// <typeparam name="T">池化对象类型</typeparam>
-    public abstract class Pool<T> : IPool<T> where T : IPoolable
+    public abstract class AbstractPool<T> : IPool<T> where T : IPoolable
     {
         /// <summary>
         /// 当前池中对象数量
@@ -115,7 +115,10 @@ namespace ES
             T use;
             if (mObjectStack.Count == 0)
             {
+                // 创建新对象，增加空值检查
                 use = mFactory.Create();
+                
+                // 添加到追踪集合
                 mCreatedObjects.Add(use);
 #if UNITY_EDITOR
                 mStatistics.TotalCreated++;

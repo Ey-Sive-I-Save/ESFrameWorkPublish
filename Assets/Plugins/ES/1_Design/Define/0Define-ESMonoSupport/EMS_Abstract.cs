@@ -33,13 +33,13 @@ namespace ES {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sealed override void AddRecieve(IReceiveChannelLink<Channel,Link> t) 
         {
-            Links.AddReceive(t);
+            Links.AddReceiver(t);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sealed override void RemoveRecieve(IReceiveChannelLink<Channel, Link> t)
         {
-            Links.RemoveReceive(t);
+            Links.RemoveReceiver(t);
         }
     }
     [HideMonoScript]

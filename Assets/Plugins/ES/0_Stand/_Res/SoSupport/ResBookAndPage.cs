@@ -2,11 +2,11 @@ using ES;
 using Sirenix.OdinInspector;
 #if UNITY_EDITOR
 using Sirenix.Utilities.Editor;
+using UnityEditor;
 #endif
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 namespace ES
 {
@@ -34,9 +34,8 @@ namespace ES
         private List<string> paths = new List<string>();
         public override bool Draw()
         {
-
-            bool dirty = false;
 #if UNITY_EDITOR
+            bool dirty = false;
             var pre = OB;
             OB = EditorGUILayout.ObjectField("文件夹或资源", OB, typeof(UnityEngine.Object), allowSceneObjects: false);
             if (OB != null)
@@ -87,9 +86,10 @@ namespace ES
 
 
             }
-#endif
             return dirty;
-
+#else
+            return false;
+#endif
         }
     }
     public enum NamedOption

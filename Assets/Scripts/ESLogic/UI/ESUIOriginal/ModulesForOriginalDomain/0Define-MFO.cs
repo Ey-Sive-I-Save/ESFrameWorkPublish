@@ -43,12 +43,12 @@ namespace ES {
         protected override void OnEnable()
         {
             base.OnEnable();
-            MyCore.MyPanel.ContextPool.LinkRCL_String.AddReceive(ContextKey,this);
+            MyCore.MyPanel.ContextPool.LinkRCL_String.AddReceiver(ContextKey,this);
         }
         protected override void OnDisable()
         {
             base.OnDisable();
-            MyCore.MyPanel.ContextPool.LinkRCL_String.RemoveReceive(ContextKey, this);
+            MyCore.MyPanel.ContextPool.LinkRCL_String.RemoveReceiver(ContextKey, this);
         }
 
 

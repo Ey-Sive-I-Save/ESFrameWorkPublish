@@ -24,12 +24,12 @@ namespace ES
         void OnLink(Link link);
 
     }
-    public interface IReceiveFlagLink<in LinkFlag> : IReceiveLink<LinkFlag>
+    public interface IReceiveStateLink<in LinkState> : IReceiveLink<LinkState>
     {
-        void OnLink(LinkFlag ago,LinkFlag now);
-        void IReceiveLink<LinkFlag>.OnLink(LinkFlag now)
+        void OnLink(LinkState ago,LinkState now);
+        void IReceiveLink<LinkState>.OnLink(LinkState now)
         {
-            OnLink(default, now);
+            OnLink(default(LinkState), now);
         }
     }
     public interface IReceiveChannelLink<in Channel, in Link> : IReceiveLink<Link>
@@ -37,7 +37,19 @@ namespace ES
         void OnLink(Channel channel, Link link);
         void IReceiveLink<Link>.OnLink(Link link)
         {
-            OnLink(default, link);
+            OnLink(default(Channel), link);
         }
+    }
+    /// <summary>
+    /// 🔔 无参数Link接收器 - 简单通知事件
+    /// 用于不需要传递数据的纯通知场景，如心跳、状态同步等
+    /// </summary>
+    public interface IReceiveLinkNoParam : IReceiveLink
+    {
+        /// <summary>
+        /// 📡 收到无参数Link消息
+        /// 触发简单的通知或状态更新逻辑
+        /// </summary>
+        void OnLink();
     }
 }

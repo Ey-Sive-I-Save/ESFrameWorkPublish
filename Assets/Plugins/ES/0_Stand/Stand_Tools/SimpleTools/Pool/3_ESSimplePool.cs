@@ -8,7 +8,7 @@ namespace ES
     /// 简单对象池实现（商业级）
     /// 支持自定义创建、重置、销毁回调
     /// </summary>
-    public class ESSimplePool<T> : Pool<T> where T : IPoolable
+    public class ESSimplePool<T> : AbstractPool<T> where T : IPoolable
     {
         protected readonly Action<T> mResetMethod;
         protected readonly Action<T> mOnCreate;
@@ -28,7 +28,7 @@ namespace ES
         public ESSimplePool(
             Func<T> factoryMethod,
             Action<T> resetMethod = null,
-            int initCount = 0,
+            int initCount = 5,
             int maxCount = 128,
             Action<T> onCreate = null,
             Action<T> onDestroy = null,
@@ -63,25 +63,35 @@ namespace ES
         }
 
         /// <summary>
-        /// 将对象放回池中（线程安全）
+        /// 将对象放回池中（高性能版本）
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool PushToPool(T obj)
         {
+            // 快速路径：最常见的情况
             if (obj == null)
             {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.LogWarning("[ESSimplePool] Trying to push null object to pool.");
+#endif
                 return false;
             }
-            // 检查对象是否已被回收
+            
+            // 检查对象是否已被回收（最常见的错误情况）
             if (obj.IsRecycled)
             {
-                Debug.LogWarning($"[ESSimplePool] Object {obj.GetType().Name} is already recycled. Duplicate push detected.");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.LogWarning($"[ESSimplePool] Object is already recycled. Type: {typeof(T).Name}");
+#endif
                 return false;
             }
-            // 检查对象是否属于此池
+            
+            // 检查对象是否属于此池（HashSet.Contains 是 O(1) 操作，性能优秀）
             if (!mCreatedObjects.Contains(obj))
             {
-                Debug.LogWarning($"[ESSimplePool] Object {obj.GetType().Name} does not belong to this pool.");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.LogWarning($"[ESSimplePool] Object does not belong to this pool. Type: {typeof(T).Name}");
+#endif
                 return false;
             }
             // 检查容量限制
@@ -119,24 +129,28 @@ namespace ES
         }
 
         /// <summary>
-        /// 从池中获取对象（重写以添加创建回调）
+        /// 从池中获取对象（高性能版本）
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override T GetInPool()
         {
-            // 主线程实现：调用基类（已为主线程实现）
             var obj = base.GetInPool();
-#if UNITY_EDITOR
-            if (mOnCreate != null && mStatistics.TotalCreated > 0)
-            {
-                // 如果是刚创建的对象，触发回调（注意：TotalCreated 自增较快，仅供指示）
-                try { mOnCreate(obj); } catch (Exception ex) { Debug.LogError($"[ESSimplePool] Error in onCreate callback: {ex.Message}"); }
-            }
-#else
+            
+            // 统一处理创建回调（避免重复代码）
             if (mOnCreate != null)
             {
-                try { mOnCreate(obj); } catch (Exception ex) { Debug.LogError($"[ESSimplePool] Error in onCreate callback: {ex.Message}"); }
-            }
+                try 
+                { 
+                    mOnCreate(obj); 
+                } 
+                catch (Exception ex) 
+                { 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.LogError($"[ESSimplePool] Error in onCreate callback for {typeof(T).Name}: {ex.Message}");
 #endif
+                }
+            }
+            
             return obj;
         }
 

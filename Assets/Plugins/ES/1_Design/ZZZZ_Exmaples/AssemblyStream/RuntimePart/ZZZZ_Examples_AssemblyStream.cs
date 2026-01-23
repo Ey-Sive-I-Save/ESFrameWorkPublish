@@ -26,7 +26,7 @@ public abstract class RuntimeGlobalLinker<Link> : RuntimeGlobalLinker, IReceiveL
     public override  void Level2_ApplyGlobalLinker()
     {
        
-        POOL.AddReceive(this);
+        POOL.AddReceiver(this);
     }
     public abstract void OnLink(Link link);
 }

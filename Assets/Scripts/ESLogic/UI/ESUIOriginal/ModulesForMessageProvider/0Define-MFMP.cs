@@ -36,11 +36,11 @@ namespace ES {
             {
                 if (UseSelfvalueEntry)
                 {
-                    MyDomain.LinkReceive.AddReceive(this);
+                    MyDomain.LinkReceive.AddReceiver(this);
                 }
                 else
                 {
-                    MyCore.MyPanel.MessagevalueEntryDomain.LinkReceive.AddReceive(this);
+                    MyCore.MyPanel.MessagevalueEntryDomain.LinkReceive.AddReceiver(this);
                 }
             }
             if (InitableCounter > 0)
@@ -71,11 +71,11 @@ namespace ES {
             {
                 if (UseSelfvalueEntry)
                 {
-                    MyDomain.LinkReceive.RemoveReceive(this);
+                    MyDomain.LinkReceive.RemoveReceiver(this);
                 }
                 else
                 {
-                    MyCore.MyPanel.MessagevalueEntryDomain.LinkReceive.RemoveReceive(this);
+                    MyCore.MyPanel.MessagevalueEntryDomain.LinkReceive.RemoveReceiver(this);
                 }
             }
             InitableCounter++;

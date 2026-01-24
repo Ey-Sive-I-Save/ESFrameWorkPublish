@@ -16,8 +16,8 @@ namespace ES
         void _Editor_RegisterAllButOnlyCreateRelationship(ICore core_);
         void _RegisterThisDomainToCore(ICore core);
         void TryRemoveNullModules(bool rightnow = false);
-        void TryAddModuleRunTimeWithoutTypeMatch(IModule module);
-        void TryRemoveModuleRunTimeWithoutTypeMatch(IModule Module);
+        void TryAddModuleRuntimeWithoutTypeMatch(IModule module);
+        void TryRemoveModuleRuntimeWithoutTypeMatch(IModule Module);
         void FixedUpdateExpand();
     }
     public interface IDomain<Core_> : IDomain
@@ -281,15 +281,15 @@ namespace ES
 
         //添加模块
 
-        public void TryAddModuleRunTimeWithoutTypeMatch(IModule Module)
+        public void TryAddModuleRuntimeWithoutTypeMatch(IModule Module)
         {
             if (Module is Module_ use)
             {
-                TryAddModuleRunTime(use);
+                TryAddModuleRuntime(use);
             }
         }
         [Button("添加实时模块"),HideInEditorMode]
-        public void TryAddModuleRunTime(Module_ use)
+        public void TryAddModuleRuntime(Module_ use)
         {
             if (use._TryRegisterToHost(this) == ESTryResult.Succeed)
             {
@@ -299,7 +299,7 @@ namespace ES
             };
         }
         //移除模块
-        public void TryRemoveModuleRunTimeWithoutTypeMatch(IModule Module)
+        public void TryRemoveModuleRuntimeWithoutTypeMatch(IModule Module)
         {
             if (Module is Module_ use)
             {

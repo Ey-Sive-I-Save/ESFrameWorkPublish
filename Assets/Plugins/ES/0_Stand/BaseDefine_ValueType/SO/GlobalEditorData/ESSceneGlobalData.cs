@@ -2,7 +2,9 @@ using ES;
 using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 
 namespace ES
@@ -19,8 +21,10 @@ namespace ES
         [LabelText("场景路径"), ReadOnly]
         public string ScenePath;
 
+#if UNITY_EDITOR
         [LabelText("场景资产"), AssetsOnly]
         public SceneAsset SceneAsset;
+#endif
 
         [LabelText("颜色标记")]
         public Color Color = Color.white;
@@ -37,6 +41,7 @@ namespace ES
 
         public SceneQuickAccessData() { }
 
+#if UNITY_EDITOR
         public SceneQuickAccessData(string scenePath)
         {
             ScenePath = scenePath;
@@ -46,6 +51,7 @@ namespace ES
             Group = "默认";
             Enabled = true;
         }
+#endif
     }
 
     /// <summary>
@@ -136,6 +142,7 @@ namespace ES
         /// <summary>
         /// 添加场景到自定义列表
         /// </summary>
+#if UNITY_EDITOR
         public void AddScene(string scenePath)
         {
             if (string.IsNullOrEmpty(scenePath))
@@ -161,10 +168,12 @@ namespace ES
             AssetDatabase.SaveAssets();
             Debug.Log($"已添加场景: {newScene.DisplayName}");
         }
+#endif
 
         /// <summary>
         /// 移除场景
         /// </summary>
+#if UNITY_EDITOR
         public void RemoveScene(string scenePath)
         {
             int index = CustomScenes.FindIndex(s => s.ScenePath == scenePath);
@@ -181,10 +190,12 @@ namespace ES
                 Debug.Log($"已移除场景: {name}");
             }
         }
+#endif
 
         /// <summary>
         /// 添加资产到快捷列表
         /// </summary>
+#if UNITY_EDITOR
         public void AddAsset(string displayName, UnityEngine.Object asset, string group = "默认")
         {
             if (asset == null)
@@ -210,10 +221,12 @@ namespace ES
             AssetDatabase.SaveAssets();
             Debug.Log($"已添加资产: {displayName}");
         }
+#endif
 
         /// <summary>
         /// 移除资产
         /// </summary>
+#if UNITY_EDITOR
         public void RemoveAsset(UnityEngine.Object asset)
         {
             int index = CustomAssets.FindIndex(a => a.Asset == asset);
@@ -230,14 +243,17 @@ namespace ES
                 Debug.Log($"已移除资产: {name}");
             }
         }
+#endif
 
         /// <summary>
         /// 获取所有启用的场景
         /// </summary>
+#if UNITY_EDITOR
         public List<SceneQuickAccessData> GetEnabledScenes()
         {
             return CustomScenes.FindAll(s => s.Enabled && s.SceneAsset != null);
         }
+#endif
 
         /// <summary>
         /// 获取所有启用的资产
@@ -250,10 +266,12 @@ namespace ES
         /// <summary>
         /// 按分组获取场景
         /// </summary>
+#if UNITY_EDITOR
         public List<SceneQuickAccessData> GetScenesByGroup(string group)
         {
             return CustomScenes.FindAll(s => s.Enabled && s.Group == group && s.SceneAsset != null);
         }
+#endif
 
         /// <summary>
         /// 按分组获取资产

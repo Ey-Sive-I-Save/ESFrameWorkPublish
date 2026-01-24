@@ -13,7 +13,7 @@ namespace ES
 {
     public class ESResWindow : ESMenuTreeWindowAB<ESResWindow> //OdinMenuEditorWindow
     {
-        [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "ES资源窗口", false, 4)]
+        [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【资源管理】窗口", false, -5)]
         public static void TryOpenWindow()
         {
             OpenWindow();
@@ -80,23 +80,23 @@ namespace ES
             [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据")]
             public string createText = "--构建流程--";
-            private ReorderableList REForLibs;
-            private List<ResLibrary> libs;
+            private ReorderableList reorderableListForLibraries;
+            private List<ResLibrary> libraries;
             [HorizontalGroup("总组/数据/分", Width = 355)]
             [OnInspectorGUI]
             public void DrawLibs()
             {
                 SirenixEditorGUI.BeginBox();
-                if (REForLibs != null) REForLibs.DoLayoutList();
+                if (reorderableListForLibraries != null) reorderableListForLibraries.DoLayoutList();
                 SirenixEditorGUI.EndBox();
 
             }
             public override ESWindowPageBase ES_Refresh()
             {
-                libs = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
-                if (libs != null)
+                libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+                if (libraries != null)
                 {
-                    REForLibs = new ReorderableList(libs, typeof(ResLibrary))
+                    reorderableListForLibraries = new ReorderableList(libraries, typeof(ResLibrary))
                     {
                         draggable = false,      // 允许拖拽排序
                         displayAdd = false, // 显示添加按钮
@@ -111,7 +111,7 @@ namespace ES
             private static Color colorBL = Color.blue._WithAlpha(0.05f);
             private void SetupCallBackLibs()
             {
-                REForLibs.drawHeaderCallback = (Rect rect) =>
+                reorderableListForLibraries.drawHeaderCallback = (Rect rect) =>
                 {
 
                     EditorGUI.LabelField(rect, "全部库");
@@ -119,10 +119,10 @@ namespace ES
                 };
 
 
-                REForLibs.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
+                reorderableListForLibraries.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
                 {
-                    if (libs == null) return;
-                    var lib = libs[index];
+                    if (libraries == null) return;
+                    var lib = libraries[index];
                     var color = isActive ? Color.yellow : (isFocused ? Color.white : Color.white);
 
                     GUIHelper.PushColor(color);
@@ -136,7 +136,7 @@ namespace ES
                     rightOFF.x -= 10;
                     SirenixEditorGUI.DrawBorders(rightOFF, (int)(rect.width * 0.45f), 0, (int)rect.height, 0, colorBL);
                     EditorGUI.LabelField(right, lib.Name._AddPreAndLast("【", "】"));
-
+                   
                     SirenixEditorGUI.DrawBorders(rect, 2);
 
                     EditorGUILayout.EndHorizontal();
@@ -146,7 +146,7 @@ namespace ES
 
             [HorizontalGroup("总组/数据/分", MinWidth = 100)]
             [OnInspectorGUI()]
-            public void Click_AssetPathingDetect()
+            public void AnalyzeAndAssignAssetPaths()
             {
                 if (GUILayout.Button("资源分析与去向生成", GUILayout.Height(50)))
                 {
@@ -154,8 +154,7 @@ namespace ES
                     {
                         if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-资源分析与去向生成", "开始分配资源去向，旧的手动地址可能失效！！", "直接来吧", "取消"))
                         {
-                            ESEditorRes.Build_PrepareAnalyzeAssetsBundles();
-
+                            ESEditorRes.Build_PrepareAnalyzeAssetsKeys();
                         }
                         else
                         {
@@ -169,54 +168,32 @@ namespace ES
 
             }
 
-            //代码生成--废案
-            /*[HorizontalGroup("总组/数据/分", MinWidth = 100)]
-            [OnInspectorGUI()]
-            public void Click_ABHelperCode()
-            {
-                if (GUILayout.Button("协助代码生成", GUILayout.Height(50)))
-                {
-                    ESEditorHandle.AddSimpleHanldeTask(() =>
-                    {
-                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-生成协助代码", "旧的协助代码可能失效！！这可能相当危险", "直接来吧", "取消"))
-                        {
-
-
-                        }
-                        else
-                        {
-                            Debug.LogWarning("放弃-<协助代码生成>");
-                        }
-
-
-                    });
-                };
-
-                SirenixEditorGUI.InfoMessageBox("手动输入代码过于麻烦，这里提供生成一个大型寻资源的代码生成协助，但是注意新的命名会导致的之前的错误");
-
-            }*/
-
             [HorizontalGroup("总组/数据/分", MinWidth = 100)]
             [OnInspectorGUI()]
-            public void Click_Build()
+            public void BuildAssetBundlesAndDependencies()
             {
                 if (GUILayout.Button("构建AB与依赖", GUILayout.Height(50)))
                 {
                     ESEditorHandle.AddSimpleHanldeTask(() =>
                     {
-                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-构建AB与依赖", "这是最重要的一步！！", "直接来吧", "取消"))
+                        try
                         {
+                            if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-构建AB与依赖", "这是最重要的一步！！", "直接来吧", "取消"))
+                            {
 
-                            ESEditorRes.Build_BuildAB();
+                                ESEditorRes.BuildABAndCreateABHashAndDependsJsonData();
 
-                            ESResMaster.JsonData_CreateHashAndDependence();
+                                Debug.Log("构建AB与依赖完成。");
+                            }
+                            else
+                            {
+                                Debug.LogWarning("放弃-<构建AB与依赖>");
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            Debug.LogWarning("放弃-<构建AB与依赖>");
+                            Debug.LogError($"构建AB与依赖失败: {ex.Message}");
                         }
-
-
                     });
                 };
 

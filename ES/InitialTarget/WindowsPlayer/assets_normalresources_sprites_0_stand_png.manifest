@@ -1,0 +1,20 @@
+ManifestFileVersion: 0
+CRC: 2141508509
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: edefc86dda736b43c29addedf6368863
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 2612ac43db082a73502ee80f2eceb73f
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: edefc86dda736b43c29addedf6368863
+HashAppended: 1
+ClassTypes:
+- Class: 28
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/NormalResources/Sprites/0_Stand.png
+Dependencies: []

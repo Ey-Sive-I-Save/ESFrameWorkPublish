@@ -16,7 +16,7 @@ namespace ES
     /// </summary>
     public partial class ESDevManagementWindow_V2 : ESMenuTreeWindowAB<ESDevManagementWindow_V2>
     {
-        [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "ES开发日志管理 ", false, 1)]
+        [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【日志】开发管理窗口 ", false, 1)]
         private static void OpenDevWindow()
         {
             OpenWindow();

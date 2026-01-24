@@ -1,5 +1,7 @@
 using ES;
 using Sirenix.OdinInspector;
+using Sirenix.Utilities;
+
 #if UNITY_EDITOR
 using Sirenix.Utilities.Editor;
 #endif
@@ -21,10 +23,26 @@ namespace ES
     /// </summary>
     public class ResLibrary : LibrarySoBase<ResBook>
     {
+        
         [LabelText("参与构建")]
         public bool ContainsBuild = true;
         [ESBoolOption("通过远程下载", "是本体库")]
         public bool IsNet = true;
+        public override void OnEditorApply()
+        {
+            base.OnEditorApply();
+            Refresh();
+        }
+        public override void Refresh()
+        {
+            if(LibFolderName.IsNullOrWhitespace())
+            {
+                LibFolderName = IESLibrary.DefaultLibFolderName;
+            }
+            //验证
+            ESResMaster.TrySetResLibFolderName(this, LibFolderName,0);
+            base.Refresh();
+        }
 
     }
 

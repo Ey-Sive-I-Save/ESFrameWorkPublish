@@ -10,6 +10,7 @@ using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
+using System.IO;
 
 
 namespace ES
@@ -19,6 +20,7 @@ namespace ES
     [CreateAssetMenu(fileName = "全局资源管理设置", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "全局资源管理设置")]
     public class ESGlobalResSetting : ESEditorGlobalSo<ESGlobalResSetting>
     {
+        public const string ResParentFolderName = "Res";
 
         [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
         public string createText = "--资源管理全局设置--";
@@ -46,7 +48,12 @@ namespace ES
         [VerticalGroup("总体/文件夹路径")]
         [LabelText("远程资源库构建文件夹"), ShowInInspector, InlineButton("OpenOutBuild", "打开远端构建文件夹")]
         public string Path_RemoteResOutBuildPath { get => _path_RemoteResOutPath; set { } }
-        private string _path_RemoteResOutPath = Application.dataPath._RemoveSubStrings("/Assets") + "/ES/Res";
+        private string _path_RemoteResOutPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "ES", ResParentFolderName);
+
+        [VerticalGroup("总体/文件夹路径")]
+        [LabelText("构建初始目标"), ShowInInspector, InlineButton("OpenInitialTarget", "打开初始目标文件夹")]
+        public string Path_BuildInitialTarget { get => _path_BuildInitialTarget; set { } }
+        private string _path_BuildInitialTarget = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "ES", "InitialTarget");
 
         [VerticalGroup("总体/文件夹路径")]
         [FolderPath, LabelText("默认资源库放置文件夹")]
@@ -62,7 +69,7 @@ namespace ES
         [VerticalGroup("总体/文件夹路径")]
         [FolderPath, LabelText("本地AB包资源父路径")]
         [InlineButton("Ping_", "<*>")]
-        public string Path_LocalABPath = "";
+        public string Path_LocalABPath_ = Path.Combine("Assets/StreamingAssets", ResParentFolderName);
 
         [VerticalGroup("总体/文件夹路径")]
         [LabelText("下载持久相对路径")]
@@ -87,6 +94,12 @@ namespace ES
             string log= ESStandUtility.SafeEditor.Quick_System_CreateDirectory(_path_RemoteResOutPath).Message;
             Debug.Log(log);
             ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(_path_RemoteResOutPath, false);
+        }
+        private void OpenInitialTarget()
+        {
+            string log = ESStandUtility.SafeEditor.Quick_System_CreateDirectory(_path_BuildInitialTarget).Message;
+            Debug.Log(log);
+            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(_path_BuildInitialTarget, false);
         }
         private void OpenPersist()
         {

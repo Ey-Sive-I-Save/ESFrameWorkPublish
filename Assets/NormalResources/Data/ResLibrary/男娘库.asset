@@ -22,12 +22,14 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   Name: "\u7537\u5A18\u5E93"
+  LibFolderName: nanniangku
   Books:
   - Name: book PreNameToABKeys
+    Desc: 
     pages:
-    - Name: "\u8D44\u6E90\u9875\u540D"
+    - Name: 0_Stand
       namedOption: 0
-      OB: {fileID: 0}
+      OB: {fileID: 2800000, guid: 17ec984bb532f85458d23ca13aaa6bce, type: 3}
     - Name: EditorInitAndUpdater
       namedOption: 0
       OB: {fileID: 11500000, guid: 9b711d233bc2a35488f86c11e47ff561, type: 3}
@@ -40,14 +42,12 @@ MonoBehaviour:
     - Name: BaseDefine_Law
       namedOption: 0
       OB: {fileID: 102900000, guid: 3e60cd3d64291c642ad8caf250a999a0, type: 3}
-    Desc: 
   - Name: book PreNameToABKeys
-    pages: []
     Desc: 
+    pages: []
   - Name: book PreNameToABKeys
-    pages: []
     Desc: 
-  ContainsBuild: 1
-  IsNet: 1
+    pages: []
   Desc: "\u63CF\u8FF0\uFF1A\u8FD9\u662F\u4E00\u4E2A\u505A\u5565\u7684\u5E93"
-  aaa: []
+  ContainsBuild: 1
+  IsNet: 0

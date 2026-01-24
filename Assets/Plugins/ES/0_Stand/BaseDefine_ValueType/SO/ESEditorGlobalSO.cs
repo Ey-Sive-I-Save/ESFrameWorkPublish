@@ -120,7 +120,7 @@ namespace ES
         /// 运行时唤醒（非编辑器），确保单例实例被设置。
         /// 在运行时应避免依赖 Editor-only API。
         /// </summary>
-        public void RunTimeAwake()
+        public void RuntimeAwake()
         {
             if (_instance != null && _instance != this)
             {

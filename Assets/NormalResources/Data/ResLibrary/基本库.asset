@@ -22,8 +22,14 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   Name: Library Name
-  Books: []
+  LibFolderName: haha11
+  Books:
+  - Name: book PreNameToABKeys
+    Desc: 
+    pages:
+    - Name: 0_Stand
+      namedOption: 0
+      OB: {fileID: 2800000, guid: e9f1b2a691cd0784fa0a1d6cf5b10830, type: 3}
+  Desc: 
   ContainsBuild: 1
   IsNet: 1
-  Desc: 
-  aaa: []

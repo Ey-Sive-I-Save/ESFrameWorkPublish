@@ -103,12 +103,12 @@ namespace ES
 #endif
             }
 
-            public static bool Wrap_IsValidFolder(string path, bool IfPlayerRunTime = false)
+            public static bool Wrap_IsValidFolder(string path, bool IfPlayerRuntime = false)
             {
 #if UNITY_EDITOR
                 return AssetDatabase.IsValidFolder(path);
 #else
-                return IfPlayerRunTime;
+                return IfPlayerRuntime;
 #endif
             }
 

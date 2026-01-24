@@ -1,0 +1,20 @@
+ManifestFileVersion: 0
+CRC: 1126204810
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: b52844f7e41411eefeb503bf6a4ecb4c
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 2612ac43db082a73502ee80f2eceb73f
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: b52844f7e41411eefeb503bf6a4ecb4c
+HashAppended: 1
+ClassTypes:
+- Class: 28
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/Gaskellgames/FolderSystem/Editor/Textures/Making/0_Stand.png
+Dependencies: []

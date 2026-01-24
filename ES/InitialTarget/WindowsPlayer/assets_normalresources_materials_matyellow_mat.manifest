@@ -1,0 +1,22 @@
+ManifestFileVersion: 0
+CRC: 2311561732
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: ae478a25f8091b99427214c24f01c50f
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 5e762ccb57c4caaabbb5a4199ac82c23
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: ae478a25f8091b99427214c24f01c50f
+HashAppended: 1
+ClassTypes:
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/NormalResources/Materials/MatYellow.mat
+Dependencies: []

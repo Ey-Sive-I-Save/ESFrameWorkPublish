@@ -25,7 +25,7 @@ namespace ES
     {
 
         [LabelText("分AB包命名方式")]
-        public NamedOption namedOption;
+        public ABNamedOption namedOption;
         [LabelText("绑定资源")]
         public UnityEngine.Object OB;
         private bool foldVisiable;
@@ -92,7 +92,7 @@ namespace ES
 #endif
         }
     }
-    public enum NamedOption
+    public enum ABNamedOption
     {
         [InspectorName("包名-使用自己的文件路径")] UseFilePath,
         [InspectorName("包名-使用自己的父文件夹路径")] UseParentPath,

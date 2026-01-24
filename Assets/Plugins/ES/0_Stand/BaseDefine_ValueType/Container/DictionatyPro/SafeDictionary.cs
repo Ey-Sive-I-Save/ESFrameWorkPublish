@@ -87,11 +87,6 @@ namespace ES
             base.Add(key, value);
             return true;
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public new void Add(TKey key, TValue value)
-        {
-            Add(key, value);
-        }
         /// <summary>
         /// 安全获取 - 永远不会抛异常
         /// </summary>

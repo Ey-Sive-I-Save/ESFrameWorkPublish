@@ -139,14 +139,14 @@ namespace ES
             /// 是有效的文件夹
             /// </summary>
             /// <param name="path">文件夹路径</param>
-            /// <param name="IfPlayerRunTime">如果在运行时(无法实际判断)，决定返回？？</param>
+            /// <param name="IfPlayerRuntime">如果在运行时(无法实际判断)，决定返回？？</param>
             /// <returns></returns>
-            public static bool Wrap_IsValidFolder(string path, bool IfPlayerRunTime = false)
+            public static bool Wrap_IsValidFolder(string path, bool IfPlayerRuntime = false)
             {
 #if UNITY_EDITOR
                 return AssetDatabase.IsValidFolder(path);
 #else
-                return IfPlayerRunTime;
+                return IfPlayerRuntime;
 #endif
             }
             /// <summary>

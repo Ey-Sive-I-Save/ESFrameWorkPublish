@@ -22,7 +22,7 @@ namespace ES
         //窗口总览
         public class ESSODataInfoWindow : ESMenuTreeWindowAB<ESSODataInfoWindow> //OdinMenuEditorWindow
         {
-            [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "ES[SO]数据窗口", false, 5)]
+            [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【SO】数据窗口", false, 5)]
             public static void TryOpenWindow()
             {
                 OpenWindow();

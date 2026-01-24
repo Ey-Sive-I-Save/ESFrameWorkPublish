@@ -31,7 +31,7 @@ namespace ES
                 
                 if (d != null&&d.GetType()==moduleNew.DomainType)
                 {
-                    d.TryAddModuleRunTimeWithoutTypeMatch(moduleNew);
+                    d.TryAddModuleRuntimeWithoutTypeMatch(moduleNew);
                 }
             }
             return moduleNew;
@@ -49,7 +49,7 @@ namespace ES
 
                 if (d != null && d.GetType() == moduleNew.DomainType)
                 {
-                    d.TryAddModuleRunTimeWithoutTypeMatch(moduleNew);
+                    d.TryAddModuleRuntimeWithoutTypeMatch(moduleNew);
                 }
             }
             return moduleNew;

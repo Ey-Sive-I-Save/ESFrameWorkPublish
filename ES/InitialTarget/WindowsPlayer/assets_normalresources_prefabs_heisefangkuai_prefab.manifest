@@ -1,0 +1,33 @@
+ManifestFileVersion: 0
+CRC: 2508099340
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 2378f837e47a0f4fc6c78c63ceb15049
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 48f9e47804cc6149eb45c38c55466448
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 2378f837e47a0f4fc6c78c63ceb15049
+HashAppended: 1
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 65
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- "Assets/NormalResources/Prefabs/\u9ED1\u8272\u65B9\u5757.prefab"
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/InitialTarget/WindowsPlayer/assets_normalresources_materials_caizhi1hei_mat_40afa05a736cc998a27108199570c75c

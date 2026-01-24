@@ -9,6 +9,7 @@ namespace ES
 {
     public interface IESLibrary : IString
     {
+        public const string DefaultLibFolderName = "LibraryFolder";
 
     }
 
@@ -18,9 +19,16 @@ namespace ES
     }
     public abstract class LibrarySoBase<Book> : ESSO, IESLibrary
     {
+
         [LabelText("Library名字")]
         public string Name = "Library PreNameToABKeys";
+        [LabelText("构建辅助专用的文件夹名(英文)")]
+        public string LibFolderName = "LibFolderName";
 
+        public virtual void Refresh()
+        {
+
+        }
         [LabelText("包含")]
         public List<Book> Books = new List<Book>();
 

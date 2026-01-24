@@ -6,7 +6,7 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
-    /// ESResMaster
+    /// ESResMaster脚本形式的资源总管。
     /// 
     /// 运行时资源总管：
     /// - 作为全局单例（SingletonMono），负责初始化 ESGlobalResSetting；
@@ -30,7 +30,7 @@ namespace ES
             base.DoAwake();
             if (Settings != null)
             {
-                Settings.RunTimeAwake();//装载
+                Settings.RuntimeAwake();//装载
             }
 
             StartResCompareAndDownload();

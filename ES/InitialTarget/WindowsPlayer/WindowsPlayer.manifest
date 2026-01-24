@@ -1,0 +1,57 @@
+ManifestFileVersion: 0
+CRC: 4014558040
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: assets_normalresources_materials_blue_mat_ac31858b98d5ad1d399f89461acaeae8
+      Dependencies: {}
+    Info_1:
+      Name: assets_normalresources_materials_mat_blue_mat_5219cc1c6b286dab29ebad84cdbb0756
+      Dependencies: {}
+    Info_2:
+      Name: assets_normalresources_materials_matyellow_mat_ae478a25f8091b99427214c24f01c50f
+      Dependencies: {}
+    Info_3:
+      Name: assets_normalresources_scenes_samplescene_1_unity_0b07f7bc50f72740366b9ffefc8e4a09
+      Dependencies:
+        Dependency_0: assets_normalresources_prefabs_lasefangkuai_prefab_da6df84dbbc22a9d2b67fe03014d2ec4
+    Info_4:
+      Name: assets_normalresources_scenes_samplescene_2_unity_135bd07d18f02314dd5dbb68cfdc2731
+      Dependencies:
+        Dependency_0: assets_normalresources_prefabs_lasefangkuai_prefab_da6df84dbbc22a9d2b67fe03014d2ec4
+    Info_5:
+      Name: assets_normalresources_scenes_samplescene_3_unity_8dfeaa920fbd2997238dd80e7f488188
+      Dependencies:
+        Dependency_0: assets_normalresources_prefabs_lasefangkuai_prefab_da6df84dbbc22a9d2b67fe03014d2ec4
+    Info_6:
+      Name: assets_normalresources_scenes_samplescene_unity_2b1257e71370b7b953540e1ee1740379
+      Dependencies:
+        Dependency_0: assets_normalresources_prefabs_lasefangkuai_prefab_da6df84dbbc22a9d2b67fe03014d2ec4
+    Info_7:
+      Name: assets_normalresources_materials_caizhi1hei_mat_40afa05a736cc998a27108199570c75c
+      Dependencies: {}
+    Info_8:
+      Name: assets_normalresources_materials_caizhimat2_1_mat_a829a90512d75594ca29c2c85b906d23
+      Dependencies: {}
+    Info_9:
+      Name: assets_normalresources_prefabs_lasefangkuai_1_prefab_75a0cd41d7b9b0cd41293eae228693cf
+      Dependencies:
+        Dependency_0: assets_normalresources_materials_caizhi1hei_mat_40afa05a736cc998a27108199570c75c
+    Info_10:
+      Name: assets_normalresources_prefabs_lasefangkuai_prefab_da6df84dbbc22a9d2b67fe03014d2ec4
+      Dependencies:
+        Dependency_0: assets_normalresources_materials_mat_blue_mat_5219cc1c6b286dab29ebad84cdbb0756
+    Info_11:
+      Name: assets_normalresources_prefabs_huangsefangkuai_prefab_1e9c39154628b59417799b88693be6a3
+      Dependencies:
+        Dependency_0: assets_normalresources_materials_matyellow_mat_ae478a25f8091b99427214c24f01c50f
+    Info_12:
+      Name: assets_normalresources_prefabs_heisefangkuai_prefab_2378f837e47a0f4fc6c78c63ceb15049
+      Dependencies:
+        Dependency_0: assets_normalresources_materials_caizhi1hei_mat_40afa05a736cc998a27108199570c75c
+    Info_13:
+      Name: assets_gaskellgames_foldersystem_editor_textures_making_0_stand_png_b52844f7e41411eefeb503bf6a4ecb4c
+      Dependencies: {}
+    Info_14:
+      Name: assets_normalresources_sprites_0_stand_png_edefc86dda736b43c29addedf6368863
+      Dependencies: {}

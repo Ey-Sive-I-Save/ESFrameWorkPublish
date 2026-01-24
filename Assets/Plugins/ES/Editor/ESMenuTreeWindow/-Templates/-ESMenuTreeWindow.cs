@@ -79,7 +79,7 @@ namespace ES {
             {
                 UsingWindow = this as This;
             }
-            GUI.DrawTexture(new Rect(0, 0, position.width, position.height), blackTexture);
+            if(blackTexture)GUI.DrawTexture(new Rect(0, 0, position.width, position.height), blackTexture);
             base.OnImGUI();
         }
         public static void ES_RefreshWindow()

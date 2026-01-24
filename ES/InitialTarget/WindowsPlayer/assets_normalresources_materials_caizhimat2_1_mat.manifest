@@ -1,0 +1,22 @@
+ManifestFileVersion: 0
+CRC: 1513306715
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: a829a90512d75594ca29c2c85b906d23
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 5e762ccb57c4caaabbb5a4199ac82c23
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: a829a90512d75594ca29c2c85b906d23
+HashAppended: 1
+ClassTypes:
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- "Assets/NormalResources/Materials/\u6750\u8D28mat2 1.mat"
+Dependencies: []

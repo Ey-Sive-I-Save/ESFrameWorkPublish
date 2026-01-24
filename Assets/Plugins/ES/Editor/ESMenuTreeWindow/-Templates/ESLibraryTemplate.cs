@@ -30,8 +30,13 @@ namespace ES
 
             [InfoBox("请修改一下文件名否则会分配随机数字后缀", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
             [VerticalGroup("总组/数据"), ESBackGround("yellow", 0.2f), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
-            [LabelText("新建资源库名")]
+            [LabelText("新建库名(展示用)")]
             public string LibName = "新建Library库";
+            [VerticalGroup("总组/数据"), ESBackGround("yellow", 0.2f), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
+            [LabelText("库文件夹名(文件夹用)")]
+            public string LibFolderName = IESLibrary.DefaultLibFolderName;
+            
+           
             [TextArea(3, 7)]
             [LabelText("描述")]
             public string LibDESC = "描述：这是一个做啥的库";
@@ -68,7 +73,9 @@ namespace ES
                     if (so is TLib lib)
                     {
                         lib.SetSTR(lib.name);
+                        lib.LibFolderName = LibFolderName;
                         lib.Desc = LibDESC;
+                        lib.Refresh();
                     }
                     else
                     {
@@ -118,6 +125,13 @@ namespace ES
             {
                 SirenixEditorGUI.BeginBox();
                 library.Name = EditorGUILayout.TextField("【库】命名", library.Name);
+                var preFolderName= library.LibFolderName;
+                library.LibFolderName = EditorGUILayout.TextField("库文件夹名", library.LibFolderName);
+                if(preFolderName!= library.LibFolderName)
+                {
+                    Debug.Log("尝试修改库文件夹名");
+                    library.Refresh();
+                }
                 EditorGUILayout.LabelField("↓库描述↓");
                 library.Desc = EditorGUILayout.TextArea(library.Desc, GUILayout.Height(50));
                 SirenixEditorGUI.EndBox();

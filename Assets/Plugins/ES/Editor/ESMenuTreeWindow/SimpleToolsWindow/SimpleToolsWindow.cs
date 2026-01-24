@@ -16,7 +16,7 @@ namespace ES
     //简单工具窗口
     public class SimpleToolsWindow : ESMenuTreeWindowAB<SimpleToolsWindow>
     {
-        [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "简单工具窗口", false, 6)]
+        [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "简单工具集成", false, 6)]
         public static void TryOpenWindow()
         {
             OpenWindow();

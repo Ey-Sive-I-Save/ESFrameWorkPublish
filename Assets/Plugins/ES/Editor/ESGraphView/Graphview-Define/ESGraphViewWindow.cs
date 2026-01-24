@@ -17,7 +17,7 @@ public class ESGraphViewWindow : EditorWindow
     public INodeContainer Container { get { return m_NodeContainer; } set { if (value != m_NodeContainer) { SContainer= m_NodeContainer = value; OnTargetContainerChanged();} } }
     private INodeContainer m_NodeContainer;
 
-    [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "图编辑器", false, 3)]
+    [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【图】编辑器", false, 3)]
     public static ESGraphViewWindow ShowWindow()
     {
         window = GetWindow<ESGraphViewWindow>();

@@ -61,7 +61,7 @@ namespace ES.Examples
             Debug.Log($"选择的路径: {selectedPath}");
 
             // 6. 验证文件夹是否有效（仅Editor模式）
-            bool isValid = ESDesignUtility.SafeEditor.Wrap_IsValidFolder("Assets", IfPlayerRunTime: false);
+            bool isValid = ESDesignUtility.SafeEditor.Wrap_IsValidFolder("Assets", IfPlayerRuntime: false);
             Debug.Log($"'Assets'文件夹有效: {isValid}");
 
             // ========== SetDirty 操作 ==========

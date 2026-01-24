@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
+using Newtonsoft.Json;
 using UnityEngine.SocialPlatforms;
 namespace ES
 {
@@ -53,22 +54,22 @@ namespace ES
         private IEnumerator DownLoadMainAndJsons()
         {
             var netpath = GetDownloadNetPathWithPlatform();
-            string netJson = netpath + "/" + PathParentFolder_ESResJsonData;
+            string netJson = netpath + "/" + JsonDataFileName.PathParentFolder_ESResJsonData;
             var local = GetDownloadLocalPath();
-            string localJson = local + "/" + PathParentFolder_ESResJsonData;
-            string netpathMain = netpath + "/" + GetPlatformName();
-            string netpathDependence = netJson + "/" + PathJsonFileName_ESDependences;
-            string netpathToHash = netJson + "/" + PathJsonFileName_ESABHashs;
-            string netpathAssetKeys = netJson + "/" + PathFileName_ESAssetkeys;
-            string netpathABKeys = netJson + "/" + PathFileName_ESABkeys;
+            string localJson = local + "/" + JsonDataFileName.PathParentFolder_ESResJsonData;
+            string netpathMain = netpath + "/" + GetRuntimePlatformName();
+            string netpathDependence = netJson + "/" + JsonDataFileName.PathJsonFileName_ESDependences;
+            string netpathToHash = netJson + "/" + JsonDataFileName.PathJsonFileName_ESABHashs;
+            string netpathAssetKeys = netJson + "/" + JsonDataFileName.PathFileName_ESAssetkeys;
+            string netpathABKeys = netJson + "/" + JsonDataFileName.PathFileName_ESABkeys;
 
 
 
-            string downloadAtMain = local + "/" + GetPlatformName();
-            string downloadAtDependence = localJson + "/" + PathJsonFileName_ESDependences;
-            string downloadAtToHash = localJson + "/" + PathJsonFileName_ESABHashs;
-            string downloadAssetKeys = localJson + "/" + PathFileName_ESAssetkeys;
-            string downloadABKeys = localJson + "/" + PathFileName_ESABkeys;
+            string downloadAtMain = local + "/" + GetRuntimePlatformName();
+            string downloadAtDependence = localJson + "/" + JsonDataFileName.PathJsonFileName_ESDependences;
+            string downloadAtToHash = localJson + "/" + JsonDataFileName.PathJsonFileName_ESABHashs;
+            string downloadAssetKeys = localJson + "/" + JsonDataFileName.PathFileName_ESAssetkeys;
+            string downloadABKeys = localJson + "/" + JsonDataFileName.PathFileName_ESABkeys;
 
             var unityWebRequestMain = UnityWebRequest.Get(netpathMain);
             var unityWebRequestDependence = UnityWebRequest.Get(netpathDependence);
@@ -111,17 +112,13 @@ namespace ES
 
 
 
-                    byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(jsonContentDepend);
-                    MainESResData_Dependences = SerializationUtility.DeserializeValue<ESResJsonData_Dependences>(jsonBytes, DataFormat.JSON);
+                    MainESResData_Dependences = JsonConvert.DeserializeObject<ESResJsonData_Dependences>(jsonContentDepend);
 
-                    byte[] jsonBytes2 = System.Text.Encoding.UTF8.GetBytes(jsonContentHash);
-                    MainESResData_WithHashes = SerializationUtility.DeserializeValue<ESResJsonData_Hashes>(jsonBytes2, DataFormat.JSON);
+                    MainESResData_WithHashes = JsonConvert.DeserializeObject<ESResJsonData_Hashes>(jsonContentHash);
 
-                    byte[] jsonBytes3 = System.Text.Encoding.UTF8.GetBytes(jsonContentAssetKeys);
-                    MainESResData_AssetKeys = SerializationUtility.DeserializeValue<ESResJsonData_AssetsKeys>(jsonBytes3, DataFormat.JSON);
+                    MainESResData_AssetKeys = JsonConvert.DeserializeObject<ESResJsonData_AssetsKeys>(jsonContentAssetKeys);
 
-                    byte[] jsonBytes4 = System.Text.Encoding.UTF8.GetBytes(jsonContentABKeys);
-                    MainESResData_ABKeys = SerializationUtility.DeserializeValue<ESResJsonData_ABKeys>(jsonBytes4, DataFormat.JSON);
+                    MainESResData_ABKeys = JsonConvert.DeserializeObject<ESResJsonData_ABKeys>(jsonContentABKeys);
 
 
                     MainBundle = AssetBundle.LoadFromFile(downloadAtMain);

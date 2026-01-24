@@ -160,11 +160,11 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     #endregion
 
-    [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "多轨编辑器", false, 2)]
+    [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【轨道】编辑器", false, 2)]
     public static void OpenWindow()
     {
         window = GetWindow<ESTrackViewWindow>();
-        window.titleContent = new GUIContent("轨道编辑器");
+        window.titleContent = new GUIContent("【轨道】编辑器");
     }
     public static void InitNewSequenceAndOpenWindow()
     {

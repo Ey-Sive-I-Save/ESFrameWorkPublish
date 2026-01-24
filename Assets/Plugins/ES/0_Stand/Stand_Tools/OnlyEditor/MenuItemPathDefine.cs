@@ -17,10 +17,10 @@ namespace ES {
         
         // ============ 二级菜单 ============
         public const string INSTALL_DEPENDENCY = "【安装与依赖】";
-        public const string EDITOR_TOOLS = "【编辑器工具】";
+        public const string EDITOR_TOOLS = "【窗口】";
         public const string VMCP_SYSTEM = "【VMCP系统】";
         public const string ASSET_CREATION = "【资产创建】";
-        public const string TEST_TOOLS = "【测试工具】";
+        public const string TEST_TOOLS = "测试工具";
         
         // ============ 三级菜单 ============
         // 编辑器工具

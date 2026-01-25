@@ -26,6 +26,9 @@ namespace ES
         
         [LabelText("参与构建")]
         public bool ContainsBuild = true;
+
+        
+
         [ESBoolOption("通过远程下载", "是本体库")]
         public bool IsNet = true;
         public override void OnEditorApply()

@@ -54,9 +54,9 @@ namespace ES
         private IEnumerator DownLoadMainAndJsons()
         {
             var netpath = GetDownloadNetPathWithPlatform();
-            string netJson = netpath + "/" + JsonDataFileName.PathParentFolder_ESResJsonData;
+            string netJson = netpath ;
             var local = GetDownloadLocalPath();
-            string localJson = local + "/" + JsonDataFileName.PathParentFolder_ESResJsonData;
+            string localJson = local ;
             string netpathMain = netpath + "/" + GetRuntimePlatformName();
             string netpathDependence = netJson + "/" + JsonDataFileName.PathJsonFileName_ESDependences;
             string netpathToHash = netJson + "/" + JsonDataFileName.PathJsonFileName_ESABHashs;

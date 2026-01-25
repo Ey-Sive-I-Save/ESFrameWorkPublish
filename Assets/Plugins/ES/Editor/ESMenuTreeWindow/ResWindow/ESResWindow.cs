@@ -22,10 +22,11 @@ namespace ES
 
         #region 数据缓存
         public const string MenuNameForLibraryRoot = "资源库";
-        
-        public ESLibraryWindowMenuTemplate<ResLibrary,ResBook,ResPage> menuTemplate=new ESLibraryWindowMenuTemplate<ResLibrary,ResBook,ResPage>();
+
+        public ESLibraryWindowMenuTemplate<ResLibConsumer, ResLibrary, ResBook, ResPage> menuTemplate = new ESLibraryWindowMenuTemplate<ResLibConsumer, ResLibrary, ResBook, ResPage>();
         public Page_Root_GlobalSetting page_root_GlobalSettings;
-       // public Page_Root_Build page_index_Build;
+
+        // public Page_Root_Build page_index_Build;
         #endregion
 
         public override void ES_SaveData()
@@ -44,7 +45,7 @@ namespace ES
         }
         void PartPage_Library(OdinMenuTree tree)
         {
-            menuTemplate.ApplyTemplateToMenuTree(this,tree,MenuNameForLibraryRoot);
+            menuTemplate.ApplyTemplateToMenuTree(this, tree, MenuNameForLibraryRoot);
         }
 
         void PartPage_Setting(OdinMenuTree tree)
@@ -54,7 +55,7 @@ namespace ES
 
         void PartPage_Build(OdinMenuTree tree)
         {
-          //  QuickBuildRootMenu(tree, "构建", ref page_index_Build, SdfIconType.Building);
+            //  QuickBuildRootMenu(tree, "构建", ref page_index_Build, SdfIconType.Building);
         }
 
         [Title("全局设置与构建", "配置整体资源路径与构建选项", bold: true, titleAlignment: TitleAlignments.Centered)]
@@ -65,7 +66,7 @@ namespace ES
              直接绘制本体了哈 ESGlobalResSetting
              */
             private OdinEditor editor;
-            [HorizontalGroup("设置"),PropertyOrder(-1)]
+            [HorizontalGroup("设置"), PropertyOrder(-1)]
             [OnInspectorGUI]
             public void Draw()
             {
@@ -75,7 +76,7 @@ namespace ES
                     editor.DrawDefaultInspector();
                 }
             }
-            [PropertySpace(20,30)]
+            [PropertySpace(20, 30)]
             [HorizontalGroup("总组")]
             [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据")]
@@ -86,7 +87,11 @@ namespace ES
             [OnInspectorGUI]
             public void DrawLibs()
             {
+                // 实时修改版本号
+                ESGlobalResSetting.Instance.Version = EditorGUILayout.TextField("版本号", ESGlobalResSetting.Instance.Version);
+
                 SirenixEditorGUI.BeginBox();
+
                 if (reorderableListForLibraries != null) reorderableListForLibraries.DoLayoutList();
                 SirenixEditorGUI.EndBox();
 
@@ -116,6 +121,7 @@ namespace ES
 
                     EditorGUI.LabelField(rect, "全部库");
 
+
                 };
 
 
@@ -127,16 +133,18 @@ namespace ES
 
                     GUIHelper.PushColor(color);
                     EditorGUILayout.BeginHorizontal();
-                    Rect left = new Rect(rect.x, rect.y, rect.width * 0.2f, rect.height);
+                    Rect left = new Rect(rect.x, rect.y, rect.width * 0.15f, rect.height);
                     lib.ContainsBuild = EditorGUI.ToggleLeft(left, "构建", lib.ContainsBuild);
-                    Rect left2 = new Rect(rect.x + 0.25f * rect.width, rect.y, rect.width * 0.2f, rect.height);
+                    Rect left2 = new Rect(rect.x + 0.15f * rect.width, rect.y, rect.width * 0.15f, rect.height);
                     lib.IsNet = EditorGUI.ToggleLeft(left2, "远端", lib.IsNet);
-                    Rect right = new Rect(rect.x + 0.5f * rect.width, rect.y, rect.width * 0.45f, rect.height);
+                    Rect left3 = new Rect(rect.x + 0.3f * rect.width, rect.y, rect.width * 0.15f, rect.height);
+                    lib.IsMainInClude = EditorGUI.ToggleLeft(left3, "主包", lib.IsMainInClude);
+                    Rect right = new Rect(rect.x + 0.45f * rect.width, rect.y, rect.width * 0.5f, rect.height);
                     Rect rightOFF = right;
                     rightOFF.x -= 10;
-                    SirenixEditorGUI.DrawBorders(rightOFF, (int)(rect.width * 0.45f), 0, (int)rect.height, 0, colorBL);
+                    SirenixEditorGUI.DrawBorders(rightOFF, (int)(rect.width * 0.5f), 0, (int)rect.height, 0, colorBL);
                     EditorGUI.LabelField(right, lib.Name._AddPreAndLast("【", "】"));
-                   
+
                     SirenixEditorGUI.DrawBorders(rect, 2);
 
                     EditorGUILayout.EndHorizontal();
@@ -163,7 +171,8 @@ namespace ES
 
 
                     });
-                };
+                }
+                ;
                 SirenixEditorGUI.InfoMessageBox("资源去向生成用于生成全部资源的去向，在这之后资源才能被保证正确加载,否则可能出现冲突问题等");
 
             }
@@ -195,7 +204,8 @@ namespace ES
                             Debug.LogError($"构建AB与依赖失败: {ex.Message}");
                         }
                     });
-                };
+                }
+                ;
 
 
                 SirenixEditorGUI.InfoMessageBox("开始构建AB包和依赖关系这是发布模式下必须进行的一步");
@@ -222,7 +232,8 @@ namespace ES
 
 
                     });
-                };
+                }
+                ;
 
 
                 SirenixEditorGUI.InfoMessageBox("经过配置后可用");
@@ -249,7 +260,8 @@ namespace ES
 
 
                     });
-                };
+                }
+                ;
 
 
                 SirenixEditorGUI.InfoMessageBox("前面的步骤一次性完成");
@@ -257,7 +269,5 @@ namespace ES
             }
 
         }
-
-  
     }
 }

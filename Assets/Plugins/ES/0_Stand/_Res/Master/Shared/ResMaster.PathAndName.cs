@@ -27,12 +27,6 @@ namespace ES
         public static class JsonDataFileName
         {
             /// <summary>
-            /// ESRes JSON数据父文件夹名称。
-            /// 此文件夹专门存放ESRes相关的JSON配置文件，每个Lib名下单独拥有一个子文件夹。
-            /// </summary>
-            public const string PathParentFolder_ESResJsonData = "ESResData";
-
-            /// <summary>
             /// AB包哈希JSON文件名。
             /// 存储AB包名到哈希值的映射（ABName -> Hash）。
             /// </summary>
@@ -61,6 +55,18 @@ namespace ES
             /// 存储AB包的哈希、依赖和键的合并信息。
             /// </summary>
             public const string PathJsonFileName_ESABMetadata = "ESABMetadata.json";
+
+            /// <summary>
+            /// 库身份JSON文件名。
+            /// 存储库的身份标识信息。
+            /// </summary>
+            public const string PathJsonFileName_ESLibIdentity = "LibIdentity.json";
+
+            /// <summary>
+            /// 游戏身份JSON文件名。
+            /// 存储游戏的构建时间戳、版本号和必须安装的库名列表。
+            /// </summary>
+            public const string PathJsonFileName_ESGameIdentity = "GameIdentity.json";
 
         }
         /// <summary>
@@ -318,7 +324,7 @@ namespace ES
         /// <returns>本地下载路径。</returns>
         public string GetDownloadLocalPath()
         {
-            return Application.persistentDataPath + "/" + Settings.Path_Sub_DownloadRelative;
+            return Application.persistentDataPath + "/" + Settings.Path_Sub_DownloadRelative_;
         }
         #endregion
 

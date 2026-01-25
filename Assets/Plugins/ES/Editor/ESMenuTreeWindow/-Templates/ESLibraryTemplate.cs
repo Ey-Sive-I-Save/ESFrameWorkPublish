@@ -12,31 +12,34 @@ using UnityEngine;
 
 namespace ES
 {
-    public class ESLibraryWindowMenuTemplate<TLib, TBook, TPage>
+    public class ESLibraryWindowMenuTemplate<TConsumer, TLib, TBook, TPage>
+    where TConsumer : LibConsumer<TLib>, new()
     where TPage : PageBase, new()
     where TBook : BookBase<TPage>
     where TLib : LibrarySoBase<TBook>
-    
+
     {
         public Page_Root_Library page_root_Library;
+        public Page_Root_Consumer page_root_Consumer;
 
         public class Page_Root_Library : ESWindowPageBase
         {
-            [Title("新建Lib库！", "每个库可以获得专属的资产", bold: true, titleAlignment: TitleAlignments.Centered, Title = "GetLibTypeName_NewCreate")]
-            [HorizontalGroup("总组")]
+            [Title("新建Lib库！", "每个库可以获得专属的资产", bold: true, titleAlignment: TitleAlignments.Centered, Title = "@GetLibTypeName_NewCreate()")]
             [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
-            [VerticalGroup("总组/数据")]
             public string createText = "--创建新的Library库--";
 
             [InfoBox("请修改一下文件名否则会分配随机数字后缀", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
-            [VerticalGroup("总组/数据"), ESBackGround("yellow", 0.2f), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
+            [ESBackGround("yellow", 0.2f), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
             [LabelText("新建库名(展示用)")]
             public string LibName = "新建Library库";
-            [VerticalGroup("总组/数据"), ESBackGround("yellow", 0.2f), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
+            [ESBackGround("yellow", 0.2f), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
             [LabelText("库文件夹名(文件夹用)")]
             public string LibFolderName = IESLibrary.DefaultLibFolderName;
-            
-           
+            [ESBackGround("yellow", 0.2f), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
+            [LabelText("是否包含在主包中")]
+            public bool IsMainInClude = true;
+
+
             [TextArea(3, 7)]
             [LabelText("描述")]
             public string LibDESC = "描述：这是一个做啥的库";
@@ -50,7 +53,7 @@ namespace ES
             #endregion
 
             [FolderPath]
-            [VerticalGroup("总组/数据"), LabelText("保存到文件夹"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            [LabelText("保存到文件夹"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
             public string FolderPath_ = "Assets/Resources/Data";
             public override ESWindowPageBase ES_Refresh()
             {
@@ -61,13 +64,16 @@ namespace ES
                 return base.ES_Refresh();
 
             }
-            [HorizontalGroup("总组", width: 100)]
-            [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
             [Button(ButtonHeight = 30, Name = "创建一个库", IconAlignment = IconAlignment.RightEdge), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void CreateNewLibrary()
             {
-                var create = ESDesignUtility.SafeEditor.CreateSOAsset(typeof(TLib), FolderPath_, LibName, true, hasChange, beforeSave);
+                string libFolder = FolderPath_ + "/" + LibName;
+                if (!AssetDatabase.IsValidFolder(libFolder))
+                {
+                    AssetDatabase.CreateFolder(FolderPath_, LibName);
+                }
+                var create = ESDesignUtility.SafeEditor.CreateSOAsset(typeof(TLib), libFolder, LibName, true, hasChange, beforeSave);
                 void beforeSave(ScriptableObject so)
                 {
                     if (so is TLib lib)
@@ -75,6 +81,7 @@ namespace ES
                         lib.SetSTR(lib.name);
                         lib.LibFolderName = LibFolderName;
                         lib.Desc = LibDESC;
+                        lib.IsMainInClude = IsMainInClude;
                         lib.Refresh();
                     }
                     else
@@ -107,9 +114,7 @@ namespace ES
         {
             [HideInInspector]
             public TLib library;
-            [HorizontalGroup("总组")]
             [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
-            [VerticalGroup("总组/数据")]
             public string createText = "--编辑库--";
 
             private ReorderableList REForBooks;
@@ -119,15 +124,14 @@ namespace ES
 
             private ESAreaSolver area = new ESAreaSolver();
             private ESDragAtSolver dragAt = new ESDragAtSolver();
-            [HorizontalGroup("总组/数据/本体与组", Width = 255)]
             [OnInspectorGUI]
             public void DrawSelfAndBooks()
             {
                 SirenixEditorGUI.BeginBox();
                 library.Name = EditorGUILayout.TextField("【库】命名", library.Name);
-                var preFolderName= library.LibFolderName;
+                var preFolderName = library.LibFolderName;
                 library.LibFolderName = EditorGUILayout.TextField("库文件夹名", library.LibFolderName);
-                if(preFolderName!= library.LibFolderName)
+                if (preFolderName != library.LibFolderName)
                 {
                     Debug.Log("尝试修改库文件夹名");
                     library.Refresh();
@@ -138,7 +142,6 @@ namespace ES
 
                 REForBooks.DoLayoutList();
             }
-            [HorizontalGroup("总组/数据/本体与组", Width = 255, MarginLeft = 25)]
             [OnInspectorGUI]
             public void DrawBookAndPages()
             {
@@ -175,7 +178,6 @@ namespace ES
                 }
                 area.UpdateAtLast();
             }
-            [HorizontalGroup("总组/数据/本体与组", MinWidth = 400, MaxWidth = 700, MarginLeft = 25)]
             [OnInspectorGUI]
             public void DrawPage()
             {
@@ -262,11 +264,115 @@ namespace ES
             }
         }
 
+        public class Page_Root_Consumer : ESWindowPageBase
+        {
+            [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            public string createText = "--创建新的Consumer--";
+
+            [LabelText("新建Consumer名")]
+            public string ConsumerName = "新建Consumer";
+
+            [LabelText("描述")]
+            [TextArea(3, 5)]
+            public string ConsumerDesc = "描述：这个Consumer包含哪些库";
+
+            [LabelText("选择包含的库")]
+            public List<TLib> selectedLibraries = new List<TLib>();
+
+            [Button(ButtonHeight = 30, Name = "创建Consumer")]
+            public void CreateNewConsumer()
+            {
+                var consumer = ScriptableObject.CreateInstance<TConsumer>();
+                consumer.Name = ConsumerName;
+                consumer.Desc = ConsumerDesc;
+                consumer.ConsumerLibFolders.AddRange(selectedLibraries);
+
+                string basePath = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_ + "/" + typeof(TLib).Name;
+                if (!AssetDatabase.IsValidFolder(basePath))
+                {
+                    AssetDatabase.CreateFolder(ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_, typeof(TLib).Name);
+                }
+                string consumerFolder = basePath + "/Consumer";
+                if (!AssetDatabase.IsValidFolder(consumerFolder))
+                {
+                    AssetDatabase.CreateFolder(basePath, "Consumer");
+                }
+                string path = consumerFolder + "/" + ConsumerName + ".asset";
+                AssetDatabase.CreateAsset(consumer, path);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                Debug.Log("Consumer created: " + path);
+            }
+        }
+
+        public class Page_Index_Consumer : ESWindowPageBase
+        {
+            [HideInInspector]
+            public TConsumer package;
+            [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            public string createText = "--编辑Consumer--";
+
+            [OnInspectorGUI]
+            public void DrawPackage()
+            {
+                SirenixEditorGUI.BeginBox();
+                package.Name = EditorGUILayout.TextField("Consumer名", package.Name);
+                package.Version = EditorGUILayout.TextField("版本号", package.Version);
+                package.Desc = EditorGUILayout.TextArea("描述", package.Desc, GUILayout.Height(50));
+                SirenixEditorGUI.EndBox();
+
+                // 绘制Libraries列表
+                EditorGUILayout.LabelField("包含的库:");
+                for (int i = 0; i < package.ConsumerLibFolders.Count; i++)
+                {
+                    var lib = package.ConsumerLibFolders[i];
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.ObjectField(lib, typeof(TLib), false);
+                    if (GUILayout.Button("移除", GUILayout.Width(50)))
+                    {
+                        package.ConsumerLibFolders.RemoveAt(i);
+                        EditorUtility.SetDirty(package);
+                        AssetDatabase.SaveAssets();
+                        i--;
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+
+                if (GUILayout.Button("添加库"))
+                {
+                    // 弹出选择库的窗口或列表
+                    var allLibs = ESEditorSO.SOS.GetNewGroupOfType<TLib>();
+                    var menu = new GenericMenu();
+                    foreach (var lib in allLibs)
+                    {
+                        if (!package.ConsumerLibFolders.Contains(lib))
+                        {
+                            menu.AddItem(new GUIContent(lib.Name), false, () =>
+                            {
+                                package.ConsumerLibFolders.Add(lib);
+                                EditorUtility.SetDirty(package);
+                                AssetDatabase.SaveAssets();
+                            });
+                        }
+                    }
+                    menu.ShowAsContext();
+                }
+            }
+
+            public override ESWindowPageBase ES_Refresh()
+            {
+                createText = $"--编辑Consumer【{package.Name}】--";
+                return base.ES_Refresh();
+            }
+        }
+
 
         public void ApplyTemplateToMenuTree<T>(ESMenuTreeWindowAB<T> from, OdinMenuTree tree, string menuName)
         where T : ESMenuTreeWindowAB<T>
         {
             from.QuickBuildRootMenu(tree, menuName, ref page_root_Library, Sirenix.OdinInspector.SdfIconType.KeyboardFill);
+            from.QuickBuildRootMenu(tree, "Consumer", ref page_root_Consumer, SdfIconType.Box);
 
             var libs = ESEditorSO.SOS.GetNewGroupOfType<TLib>();
             if (libs != null)
@@ -284,6 +390,26 @@ namespace ES
                         }
                         strings.Add(i.Name);
                         tree.Add(menuName + $"/库：{i.Name}", new Page_Index_Library() { library = i }.ES_Refresh(), SdfIconType.Cart);
+                    }
+                }
+            }
+
+            var consumers = ESEditorSO.SOS.GetNewGroupOfType<TConsumer>();
+            if (consumers != null)
+            {
+                List<string> strings = new List<string>(3);
+                foreach (var i in consumers)
+                {
+                    if (i != null)
+                    {
+                        while (strings.Contains(i.Name))
+                        {
+                            i.Name += "_re";
+                            EditorUtility.SetDirty(i);
+                            AssetDatabase.SaveAssets();
+                        }
+                        strings.Add(i.Name);
+                        tree.Add("Consumer" + $"/包：{i.Name}", new Page_Index_Consumer() { package = i }.ES_Refresh(), SdfIconType.Box);
                     }
                 }
             }

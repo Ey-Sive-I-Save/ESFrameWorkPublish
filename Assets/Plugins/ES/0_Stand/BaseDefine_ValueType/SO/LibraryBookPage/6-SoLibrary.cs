@@ -10,7 +10,7 @@ namespace ES
     public interface IESLibrary : IString
     {
         public const string DefaultLibFolderName = "LibraryFolder";
-
+        public const string DefaultTargetPackageName = "Main";
     }
 
     public interface IESPage : IString
@@ -24,7 +24,16 @@ namespace ES
         public string Name = "Library PreNameToABKeys";
         [LabelText("构建辅助专用的文件夹名(英文)")]
         public string LibFolderName = "LibFolderName";
+        [InlineButton("HandleAdd", "手动变更")]
+        public int ChangeCount = 0;
+        [LabelText("主包包含库")]
+        public bool IsMainInClude= true;
 
+        void HandleAdd()
+        {
+            ChangeCount++;
+            ESStandUtility.SafeEditor.Wrap_SetDirty(this);
+        }
         public virtual void Refresh()
         {
 

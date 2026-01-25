@@ -22,6 +22,8 @@ namespace ES
     {
         public const string ResParentFolderName = "Res";
 
+        public const string ResConsumersExpandParentFolderName = "_ExpandConsumers";
+
         [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
         public string createText = "--资源管理全局设置--";
         [HorizontalGroup("总体", Order = 5, MarginRight = 50)]
@@ -37,6 +39,10 @@ namespace ES
         [VerticalGroup("总体/构建与运行")]
         [LabelText("辅助代码生成模式")]
         public ESABCodegenMode CodegenMode = ESABCodegenMode.CodeAsOriginal;
+
+        [VerticalGroup("总体/构建与运行")]
+        [LabelText("游戏版本号")]
+        public string Version = "1.0.0";
 
         [HorizontalGroup("总体")]
         [Header("文件夹")]
@@ -74,7 +80,7 @@ namespace ES
         [VerticalGroup("总体/文件夹路径")]
         [LabelText("下载持久相对路径")]
         [InlineButton("OpenPersist", "打开持久下载文件夹")]
-        public string Path_Sub_DownloadRelative = "ABDownLoad";
+        public string Path_Sub_DownloadRelative_ = ResParentFolderName;
 
 
         private static Color color = new Color(0.05f, 0.05f, 0.05f, 1);
@@ -103,8 +109,8 @@ namespace ES
         }
         private void OpenPersist()
         {
-            ESStandUtility.SafeEditor.Quick_System_CreateDirectory(Application.persistentDataPath + "/" + Path_Sub_DownloadRelative);
-            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(Application.persistentDataPath + "/" + Path_Sub_DownloadRelative, false);
+            ESStandUtility.SafeEditor.Quick_System_CreateDirectory(Application.persistentDataPath + "/" + Path_Sub_DownloadRelative_);
+            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(Application.persistentDataPath + "/" + Path_Sub_DownloadRelative_, false);
         }
         private void Ping_(string path)
         {

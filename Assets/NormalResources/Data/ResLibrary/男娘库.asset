@@ -23,6 +23,8 @@ MonoBehaviour:
     SerializationNodes: []
   Name: "\u7537\u5A18\u5E93"
   LibFolderName: nanniangku
+  ChangeCount: 0
+  IsMainInClude: 1
   Books:
   - Name: book PreNameToABKeys
     Desc: 

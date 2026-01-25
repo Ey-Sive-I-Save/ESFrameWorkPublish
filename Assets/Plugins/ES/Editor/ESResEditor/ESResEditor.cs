@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -15,6 +14,7 @@ namespace ES
     public class ESEditorRes
     {
         public static ESResJsonData_ABMetadata MainESResData_ABMetadata = new ESResJsonData_ABMetadata();
+
         #region 库英文路径的唯一性验证
 
         public bool TrySetResLibFolderName(ResLibrary resLibrary, string preLibFolderName, int attemptCount = 0)
@@ -51,7 +51,7 @@ namespace ES
         //重复出现的资源
         private static HashSet<string> Caching_ReAsset = new HashSet<string>();
 
-        public static void Build_PrepareAnalyzeAssetsKeys(bool onlyIndentity=false)
+        public static void Build_PrepareAnalyzeAssetsKeys(bool onlyIndentity = false)
         {
             // 初始化总结信息收集
             System.Text.StringBuilder summary = new System.Text.StringBuilder();
@@ -369,11 +369,62 @@ namespace ES
             return result;
         }
 
+
+        private static Dictionary<string, HashSet<string>> GetLibraryActualABNames()
+        {
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            var result = new Dictionary<string, HashSet<string>>();
+            var globalSettings = ESGlobalResSetting.Instance;
+            string platformFolderName = ESResMaster.GetParentFolderNameByRuntimePlatform(globalSettings.applyPlatform);
+
+            foreach (var library in libraries)
+            {
+                if (library == null || !library.ContainsBuild)
+                    continue;
+
+                // 根据 IsNet 选择基础路径
+                string basePath = library.IsNet
+                    ? globalSettings.Path_RemoteResOutBuildPath
+                    : globalSettings.Path_LocalABPath_;
+
+                if (string.IsNullOrEmpty(basePath))
+                {
+                    Debug.LogError($"库 '{library.Name}' 的基础路径为空，跳过扫描");
+                    continue;
+                }
+
+                // 库数据路径：basePath/{Platform}/ESResData/{LibFolderName}
+                string libDataPath = Path.Combine(basePath, platformFolderName, library.LibFolderName);
+
+                if (!Directory.Exists(libDataPath))
+                {
+                    Debug.LogWarning($"库 '{library.Name}' 的数据路径不存在: {libDataPath}");
+                    result[library.Name] = new HashSet<string>();
+                    continue;
+                }
+
+                // 扫描文件夹获取实际存在的AB包文件名（带哈希）
+                string[] allFiles = Directory.GetFiles(libDataPath);
+                HashSet<string> actualABNames = new HashSet<string>();
+                foreach (var file in allFiles)
+                {
+                    string fileName = Path.GetFileName(file);
+                    // 假设AB包文件没有扩展名，且文件名是带哈希的AB名
+                    // 如果有特定扩展名或条件，可在此添加过滤
+                    actualABNames.Add(fileName);
+                }
+
+                result[library.Name] = actualABNames;
+            }
+
+            return result;
+        }
         #endregion
 
         #region  AssetKeys Json生成
         private static void CreateJsonData_AssetKeys(System.Text.StringBuilder summary)
         {
+
             foreach (var tempLib in ESResMaster.TempResLibrarys.Values)
             {
                 // 过滤：只处理需要构建的库
@@ -392,6 +443,9 @@ namespace ES
                     ? ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath
                     : ESGlobalResSetting.Instance.Path_LocalABPath_;
 
+                // 数据统计完成后，移动AB包从Init到对应构建文件夹
+
+
                 // 检查路径有效性
                 if (string.IsNullOrEmpty(basePath))
                 {
@@ -404,10 +458,13 @@ namespace ES
                 try
                 {
                     // 目标目录：basePath/{Platform}/ESResData
-                    string DataParentPath = basePath + "/" + ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform) + "/" + ESResMaster.JsonDataFileName.PathParentFolder_ESResJsonData;
+                    string DataParentPath = basePath + "/" + ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform);
 
                     // 库目录：DataParentPath/{LibFolderName}
                     string LibDataPath = DataParentPath + "/" + tempLib.LibFolderName;
+
+
+
                     // 创建库目录
                     var createResult = ESDesignUtility.SafeEditor.Quick_System_CreateDirectory(LibDataPath);
                     if (!createResult.Success)
@@ -437,6 +494,8 @@ namespace ES
             AssetDatabase.Refresh();
             AssetDatabase.SaveAssets();
 #endif
+
+
         }
 
 
@@ -448,7 +507,7 @@ namespace ES
             var buildTarget = ESResMaster.GetValidBuildTargetByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform);
 
             BuildABForTarget(BuildAssetBundleOptions.AppendHashToAssetBundleName, buildTarget);
-            CreateJsonData_ABHashAndDependence();
+            CreateJsonData_ABHashAndDependence_PlaceAB();
         }
 
         private static void BuildABForTarget(BuildAssetBundleOptions assetBundleOptions, BuildTarget buildTarget)
@@ -523,21 +582,30 @@ namespace ES
                 EditorUtility.DisplayDialog("错误", errorMsg, "确定");
             }
         }
-        
-        private static void CreateJsonData_ABHashAndDependence()
+
+        private static void CreateJsonData_ABHashAndDependence_PlaceAB()
         {
             // 为每个库生成AB键， AB Hash 和 依赖关系的 JSON 数据，通过重新检索 Library
             System.Text.StringBuilder summary = new System.Text.StringBuilder();
             summary.AppendLine("AB键， Hash 和依赖 JSON 生成总结：");
 
+            // 初始化变更计数
+            var changeCounts = new Dictionary<string, int>();
+            string plat = ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform);
+
             try
             {
                 var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
                 var libraryABNames = CollectLibraryABNames();
+                var actualLibraryABNames = GetLibraryActualABNames();
+
+
                 var ABNames = AssetDatabase.GetAllAssetBundleNames();
                 //先卸载加载
                 AssetBundle.UnloadAllAssetBundles(unloadAllObjects: false);
-                string plat = ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform);
+                string initPath = Path.Combine(ESGlobalResSetting.Instance.Path_BuildInitialTarget, plat);
+
+
                 AssetBundle MainBundle = AssetBundle.LoadFromFile(Path.Combine(ESGlobalResSetting.Instance.Path_BuildInitialTarget, plat, plat));
                 //FEST
                 AssetBundleManifest manifest = MainBundle.LoadAsset<AssetBundleManifest>("AssetBundleManifest");
@@ -552,10 +620,15 @@ namespace ES
                     preToHash[pre] = withHash;
                 }
 
+
+
                 foreach (var kvp in libraryABNames)
                 {
                     string libName = kvp.Key;
                     HashSet<string> libABNames = kvp.Value;
+                    HashSet<string> actualABNames = actualLibraryABNames.ContainsKey(libName) ? actualLibraryABNames[libName] : new HashSet<string>();
+
+                    changeCounts.TryAdd(libName, 0);
                     var library = libraries.FirstOrDefault(l => l.Name == libName);
                     if (library == null || !library.ContainsBuild)
                         continue;
@@ -565,6 +638,14 @@ namespace ES
                     abMetadata.PreToHashes.Clear();
                     abMetadata.Dependences.Clear();
                     abMetadata.ABKeys.Clear();
+
+                    // 保存该库的 ABMetadata JSON
+                    // 根据 IsNet 选择路径
+                    string basePath = library.IsNet
+                        ? ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath
+                        : ESGlobalResSetting.Instance.Path_LocalABPath_;
+                    // 目标目录：basePath/{Platform}/ESResData/{LibFolderName}
+                    string LibDataPath = basePath + "/" + ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform) + "/" + library.LibFolderName;
 
                     foreach (var abName in libABNames)
                     {
@@ -581,23 +662,80 @@ namespace ES
                             if (abDepend.Length > 0)
                                 abMetadata.Dependences.Add(abName, abDepend);
 
-                            ESResKey key = new ESResKey() { LibName = libName, ABName = abName, SourceLoadType = ESResSourceLoadType.AssetBundle, ResName = withHash, TargetType = typeof(AssetBundle) };
+                            ESResKey key = new ESResKey() { LibName = libName, LibFolderName = library.LibFolderName, ABName = abName, SourceLoadType = ESResSourceLoadType.AssetBundle, ResName = withHash, TargetType = typeof(AssetBundle) };
                             abMetadata.ABKeys.Add(key);
-                            
+
+
+                            // 检查Hash是否不同（文件名不同表示Hash不同）
+                            bool isHashDifferent = !actualABNames.Contains(withHash);
+                            if (isHashDifferent)
+                            {
+                                changeCounts[libName]++;
+
+                                // 移动前删除旧的AB包
+                                string oldWithHash = null;
+                                foreach (var actual in actualABNames)
+                                {
+                                    if (ESResMaster.PathAndNameTool_GetPreName(actual) == abName)
+                                    {
+                                        oldWithHash = actual;
+                                        break;
+                                    }
+                                }
+                                if (!string.IsNullOrEmpty(oldWithHash))
+                                {
+                                    string oldPath = Path.Combine(LibDataPath, oldWithHash);
+                                    if (File.Exists(oldPath))
+                                    {
+                                        File.Delete(oldPath);
+                                        summary.AppendLine($"删除旧AB包: {oldPath}");
+                                        Debug.Log($"删除旧AB包: {oldPath}");
+                                    }
+                                }
+
+                                // 移动新的AB包
+                                string sourcePath = Path.Combine(initPath, withHash);
+                                string targetPath = Path.Combine(LibDataPath, withHash);
+                                if (File.Exists(sourcePath))
+                                {
+                                    try
+                                    {
+                                        File.Move(sourcePath, targetPath);
+                                        summary.AppendLine($"移动AB包: {sourcePath} -> {targetPath}");
+                                        Debug.Log($"移动AB包: {sourcePath} -> {targetPath}");
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        string exMsg = $"移动AB包失败: {sourcePath} -> {targetPath}, 异常: {e.Message}";
+                                        summary.AppendLine($"异常: {exMsg}");
+                                        Debug.LogError(exMsg);
+                                    }
+                                }
+                                else
+                                {
+                                    summary.AppendLine($"警告: AB包文件不存在: {sourcePath}");
+                                }
+                            }
+                            else
+                            {
+                                // Hash未变，删除Init中的文件
+                                string sourcePath = Path.Combine(initPath, withHash);
+                                if (File.Exists(sourcePath))
+                                {
+                                    File.Delete(sourcePath);
+                                    summary.AppendLine($"Hash未变，删除Init文件: {sourcePath}");
+                                    Debug.Log($"Hash未变，删除Init文件: {sourcePath}");
+                                }
+                            }
                         }
                         else
                         {
                             summary.AppendLine($"警告: 库 '{libName}' 的 AB '{abName}' 未找到对应的带哈希版本");
                         }
-                    
-                    }
-                
 
-                    // 保存该库的 ABMetadata JSON
-                    // 根据 IsNet 选择路径
-                    string basePath = library.IsNet
-                        ? ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath
-                        : ESGlobalResSetting.Instance.Path_LocalABPath_;
+                    }
+
+
 
                     if (string.IsNullOrEmpty(basePath))
                     {
@@ -609,8 +747,7 @@ namespace ES
 
                     try
                     {
-                        // 目标目录：basePath/{Platform}/ESResData/{LibFolderName}
-                        string LibDataPath = basePath + "/" + ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform) + "/" + ESResMaster.JsonDataFileName.PathParentFolder_ESResJsonData + "/" + library.LibFolderName;
+
                         // 创建库目录
                         var createResult = ESDesignUtility.SafeEditor.Quick_System_CreateDirectory(LibDataPath);
                         if (!createResult.Success)
@@ -627,6 +764,27 @@ namespace ES
                         File.WriteAllText(metadata_Path, metadata_Json);
                         summary.AppendLine($"成功生成 ABMetadata JSON：{metadata_Path} (AB数: {abMetadata.ABKeys.Count})");
                         Debug.Log($"成功生成 ABMetadata JSON：{metadata_Path}");
+
+
+                        //把变更计数给Library累计上，并且生成验证文件LinIndentity
+                        library.ChangeCount += changeCounts[libName];
+
+                        var libIdentity = new ESResJsonData_LibIndentity()
+                        {
+                            LibraryDisplayName = library.Name,
+                            LibFolderName = library.LibFolderName,
+                            LibraryDescription = library.Desc,
+                            ChangeCount = library.ChangeCount
+                        };
+
+                        string libIdentity_Json = JsonConvert.SerializeObject(libIdentity);
+                        string libIdentity_Path = LibDataPath + "/" + ESResMaster.JsonDataFileName.PathJsonFileName_ESLibIdentity;
+                        File.WriteAllText(libIdentity_Path, libIdentity_Json);
+                        summary.AppendLine($"成功生成 LibIndentity JSON：{libIdentity_Path}");
+
+
+
+
                     }
                     catch (Exception e)
                     {
@@ -635,6 +793,132 @@ namespace ES
                         Debug.LogError(exMsg);
                     }
                 }
+
+                foreach (var kvp in libraryABNames)
+                {
+                    string libName = kvp.Key;
+                    HashSet<string> libABNames = kvp.Value;
+                    var library = libraries.FirstOrDefault(l => l.Name == libName);
+                    if (library == null || !library.ContainsBuild)
+                        continue;
+
+                    string basePath = library.IsNet
+                        ? ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath
+                        : ESGlobalResSetting.Instance.Path_LocalABPath_;
+
+                    if (string.IsNullOrEmpty(basePath))
+                        continue;
+
+                    string LibDataPath = Path.Combine(basePath, plat, library.LibFolderName);
+
+                    foreach (var abName in libABNames)
+                    {
+                        if (preToHash.TryGetValue(abName, out var withHash))
+                        {
+                            string sourcePath = Path.Combine(initPath, withHash);
+                            string targetPath = Path.Combine(LibDataPath, withHash);
+                            if (File.Exists(sourcePath))
+                            {
+                                try
+                                {
+                                    File.Move(sourcePath, targetPath);
+                                    summary.AppendLine($"移动AB包: {sourcePath} -> {targetPath}");
+                                    Debug.Log($"移动AB包: {sourcePath} -> {targetPath}");
+                                }
+                                catch (Exception e)
+                                {
+                                    string exMsg = $"移动AB包失败: {sourcePath} -> {targetPath}, 异常: {e.Message}";
+                                    summary.AppendLine($"异常: {exMsg}");
+                                    Debug.LogError(exMsg);
+                                }
+                            }
+                            else
+                            {
+                                summary.AppendLine($"警告: AB包文件不存在: {sourcePath}");
+                            }
+                        }
+                    }
+                }
+
+                // 移动Manifest到远端
+                string remoteManifestDir = Path.Combine(ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath, plat);
+                Directory.CreateDirectory(remoteManifestDir);
+                string remoteManifestPath = Path.Combine(remoteManifestDir, plat);
+                string manifestFilePath = Path.Combine(initPath, plat);
+                if (File.Exists(manifestFilePath))
+                {
+                    try
+                    {
+                        if (File.Exists(remoteManifestPath))
+                        {
+                            File.Delete(remoteManifestPath);
+                        }
+                        File.Move(manifestFilePath, remoteManifestPath);
+                        summary.AppendLine($"移动Manifest到远端: {manifestFilePath} -> {remoteManifestPath}");
+                        Debug.Log($"移动Manifest到远端: {manifestFilePath} -> {remoteManifestPath}");
+                    }
+                    catch (Exception e)
+                    {
+                        string exMsg = $"移动Manifest失败: {e.Message}";
+                        summary.AppendLine($"异常: {exMsg}");
+                        Debug.LogError(exMsg);
+                    }
+                }
+                else
+                {
+                    summary.AppendLine($"警告: Manifest文件不存在，无法移动: {manifestFilePath}");
+                }
+
+                //生成GameIdentity文件
+                {
+
+                    var gameIdentity = new ESResJsonData_GameIdentity
+                    {
+                        BuildTimestamp = DateTime.Now.ToString("o"), // ISO 8601格式
+                        Version = ESGlobalResSetting.Instance.Version,
+                        RequiredLibrariesFolders = libraries.Where(l => l.ContainsBuild && l.IsMainInClude).Select(l => l.LibFolderName).ToList()
+                    };
+
+                    // 在本地和远程都生成这个Indentity文件，顺便为全部的Conumsers生成单独的，并且放在ExpandConsumers文件夹下
+                    string[] basePaths = { ESGlobalResSetting.Instance.Path_LocalABPath_, ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath };
+                    var consumers = ESEditorSO.SOS.GetNewGroupOfType<ResLibConsumer>();
+
+                    foreach (var basePath in basePaths)
+                    {
+                        string gameIdentityPath = Path.Combine(basePath, plat, ESResMaster.JsonDataFileName.PathJsonFileName_ESGameIdentity);
+
+                        // 确保目录存在
+                        Directory.CreateDirectory(Path.GetDirectoryName(gameIdentityPath));
+
+                        // 序列化并写入GameIdentity
+                        string json = JsonConvert.SerializeObject(gameIdentity);
+                        File.WriteAllText(gameIdentityPath, json);
+                        summary.AppendLine($"成功生成 GameIdentity JSON：{gameIdentityPath}");
+                        Debug.Log($"成功生成 GameIdentity JSON：{gameIdentityPath}");
+
+                        // 生成Consumers的Identity文件
+                        string expandConsumersPath = Path.Combine(basePath, plat, ESGlobalResSetting.ResConsumersExpandParentFolderName);
+                        Directory.CreateDirectory(expandConsumersPath);
+
+                        foreach (var consumer in consumers)
+                        {
+                            var consumerIdentity = new ESResJsonData_ConsumerIdentity
+                            {
+                                ConsumerDisplayName = consumer.Name,
+                                Version = consumer.Version,
+                                ConsumerDescription = consumer.Desc,
+                                IncludedLibrariesFolders = consumer.ConsumerLibFolders.Select(lib => lib.LibFolderName).ToList()
+                            };
+
+                            string consumerJson = JsonConvert.SerializeObject(consumerIdentity);
+                            string consumerPath = Path.Combine(expandConsumersPath, consumer.Name + ".json");
+                            File.WriteAllText(consumerPath, consumerJson);
+                            summary.AppendLine($"成功生成 ConsumerIdentity JSON：{consumerPath}");
+                            Debug.Log($"成功生成 ConsumerIdentity JSON：{consumerPath}");
+                        }
+                    }
+                }
+
 
                 AssetDatabase.Refresh();
                 AssetDatabase.SaveAssets();
@@ -648,13 +932,31 @@ namespace ES
                 return;
             }
 
-            // 输出总结
+            // 输出总结并询问是否打开远程构建文件夹
             string finalSummary = summary.ToString();
             Debug.Log(finalSummary);
-            EditorUtility.DisplayDialog("AB 生成总结", finalSummary, "确定");
+            int result = EditorUtility.DisplayDialogComplex("AB 生成总结", finalSummary + "\n\n是否打开远程构建文件夹？", "打开远端构建文件夹", "否", "关闭");
+            if (result == 0) // 是
+            {
+                string remotePath = Path.Combine(ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath, plat);
+                if (Directory.Exists(remotePath))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo()
+                    {
+                        FileName = remotePath,
+                        UseShellExecute = true,
+                        Verb = "open"
+                    });
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("错误", $"远程构建文件夹不存在: {remotePath}", "确定");
+                }
+            }
         }
-       
-       
+
+
         #endregion
+
     }
 }

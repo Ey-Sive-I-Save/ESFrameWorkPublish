@@ -5,11 +5,11 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
-    /// 临时资源库数据结构,构建时和加载时 使用。
+    /// 构建时资源库数据结构，用于编辑器构建过程。
     /// </summary>
     
     [Serializable]
-    public class TempLibrary
+    public class ESBuildTempResLibrary
     {
         public string LibNameDisPlay = " ";
         public string LibFolderName = "DefaultLibFolderName";

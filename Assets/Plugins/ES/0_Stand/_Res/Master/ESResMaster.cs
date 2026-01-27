@@ -24,7 +24,7 @@ namespace ES
         [LabelText("全局设置")]
         public ESGlobalResSetting Settings;
         [LabelText("自动开始下载")]
-        public bool AutoDownload = true;
+        public bool AutoDownload = false;
         protected override void DoAwake()
         {
             base.DoAwake();
@@ -33,7 +33,14 @@ namespace ES
                 Settings.RuntimeAwake();//装载
             }
 
-            StartResCompareAndDownload();
+            // 初始化默认路径缓存
+            DefaultPaths.InitDefaultPaths();
+
+            if (Application.isPlaying && AutoDownload)
+            {
+                Debug.Log("ESResMaster: AutoDownload 启动");
+                GameInit_ResCompareAndDownload();
+            }
         }
 
         
@@ -53,8 +60,21 @@ namespace ES
         private bool isLoading = false;
         private void TryStartLoadTask()
         {
-            if (ResLoadTasks.Count == 0) return;
-            if (isLoading) return;
+            Debug.Log($"[ESResMaster.TryStartLoadTask] 尝试启动加载任务。任务队列长度: {ResLoadTasks.Count}, 正在加载: {isLoading}");
+
+            if (ResLoadTasks.Count == 0)
+            {
+                Debug.Log("[ESResMaster.TryStartLoadTask] 任务队列为空，无需启动。");
+                return;
+            }
+
+            if (isLoading)
+            {
+                Debug.Log("[ESResMaster.TryStartLoadTask] 正在加载中，跳过启动。");
+                return;
+            }
+
+            Debug.Log("[ESResMaster.TryStartLoadTask] 启动加载任务协程。");
             StartCoroutine(LoadResTask());
         }
         public void PushResLoadTask(IEnumeratorTask task)
@@ -72,14 +92,21 @@ namespace ES
         }
         private IEnumerator LoadResTask()
         {
+            Debug.Log("[ESResMaster.LoadResTask] 开始加载任务协程，设置isLoading为true。");
             isLoading = true;
+            int taskIndex = 0;
             while (ResLoadTasks.Count > 0)
             {
+                Debug.Log($"[ESResMaster.LoadResTask] 处理任务 {taskIndex + 1}，剩余任务数量: {ResLoadTasks.Count}");
                 var task = ResLoadTasks.First;
                 ResLoadTasks.RemoveFirst();
+                Debug.Log($"[ESResMaster.LoadResTask] 开始执行任务: {task.Value?.ToString() ?? "Unknown"}");
                 yield return StartCoroutine(task.Value.DoTaskAsync(OnLoadTaskOK));
+                Debug.Log($"[ESResMaster.LoadResTask] 任务 {taskIndex + 1} 执行完成。");
                 yield return null;
+                taskIndex++;
             }
+            Debug.Log("[ESResMaster.LoadResTask] 所有任务加载完成，设置isLoading为false。");
             isLoading = false;
             yield return null;
         }
@@ -131,21 +158,19 @@ namespace ES
         #endregion
 
         #region 资源源查询
-        public static ESResTable ResTable = new ESResTable();
-
-        public ESResSource CreateNewResSourceByKey(int keyIndex, ESResSourceLoadType loadType)
+        public ESResSource CreateNewResSourceByKey(object key, ESResSourceLoadType loadType)
         {
             ESResSource retRes = null;
 
             if (loadType == ESResSourceLoadType.AssetBundle)
             {
-                var key = MainESResData_ABKeys.ABKeys[keyIndex];
-                retRes = CreateResSource_AssetBundle(key);
+                var abKey = (ESResKey)key;
+                retRes = CreateResSource_AssetBundle(abKey);
             }
             else if (loadType == ESResSourceLoadType.ABAsset)
             {
-                var key = MainESResData_AssetKeys.AssetKeys[keyIndex];
-                retRes = CreateResSource_ABAsset(key);
+                var assetKey = (ESResKey)key;
+                retRes = CreateResSource_ABAsset(assetKey);
             }
             /*.Where(creator => creator.Match(resSearchKeys))
             .Select(creator => creator.Create(resSearchKeys))
@@ -153,35 +178,55 @@ namespace ES
 
             if (retRes == null)
             {
-                Debug.LogError("创建资源源失败了. 找不到这个查找键" + keyIndex);
+                Debug.LogError("创建资源源失败了. 找不到这个查找键" + key);
                 return null;
             }
 
             return retRes;
         }
 
-        public ESResSource GetResSourceByKey(int keyIndex, ESResSourceLoadType loadType, bool ifNullCreateNew = true)
+        public ESResSource GetResSourceByKey(object key, ESResSourceLoadType loadType, bool ifNullCreateNew = true)
         {
             ESResSource res = null;
-            if (loadType == ESResSourceLoadType.ABAsset) ResTable.GetAssetResByIndex(keyIndex);
-            else if (loadType == ESResSourceLoadType.ABAsset) ResTable.GetABResByIndex(keyIndex);
+            if (loadType == ESResSourceLoadType.ABAsset)
+            {
+                res = ResTable.GetAssetResByKey(key);
+            }
+            else if (loadType == ESResSourceLoadType.AssetBundle)
+            {
+                res = ResTable.GetABResByKey(key);
+            }
             if (res != null)
             {
+                AcquireResHandle(key, loadType);
                 return res;
             }
 
             if (!ifNullCreateNew)
             {
-                Debug.LogErrorFormat("没找到资源，并且这里也不允许创建:{0}", keyIndex);
+                Debug.LogErrorFormat("没找到资源，并且这里也不允许创建:{0}", key);
                 return null;
             }
 
-            res = CreateNewResSourceByKey(keyIndex, loadType);
+            res = CreateNewResSourceByKey(key, loadType);
 
             if (res != null)
             {
-                if (loadType == ESResSourceLoadType.ABAsset) ResTable.AssetsSources.TryAdd(keyIndex, res);
-                else if (loadType == ESResSourceLoadType.ABAsset) ResTable.ABSources.TryAdd(keyIndex, res);
+                bool registered = false;
+                if (loadType == ESResSourceLoadType.ABAsset)
+                {
+                    registered = ResTable.TryRegisterAssetRes(key, res);
+                }
+                else if (loadType == ESResSourceLoadType.AssetBundle)
+                {
+                    registered = ResTable.TryRegisterABRes(key, res);
+                }
+
+                if (!registered)
+                {
+                    Debug.LogWarning($"资源键重复注册: {key}");
+                }
+                AcquireResHandle(key, loadType);
             }
 
             return res;
@@ -190,11 +235,11 @@ namespace ES
         #endregion
 
         #region 资源源创建方式
-        internal ESResSource CreateResSource_AssetBundle(ESResKey key)
+        internal ESResSource CreateResSource_AssetBundle(ESResKey abKey)
         {
             var use = PoolForESABSource.GetInPool();
             use.IsNet = true;//还没实装
-            use.Set(key.ABName,key.ResName,ESResSourceLoadType.AssetBundle);
+            use.Set(abKey.ABName, abKey.ABName, ESResSourceLoadType.AssetBundle); // Assuming ABName is used for both
             use.TargetType = typeof(AssetBundle);
             return use;
         }
@@ -208,6 +253,36 @@ namespace ES
 
 
         #endregion
+
+        private void AcquireResHandle(object key, ESResSourceLoadType loadType)
+        {
+            switch (loadType)
+            {
+                case ESResSourceLoadType.ABAsset:
+                    ResTable.AcquireAssetRes(key);
+                    break;
+                case ESResSourceLoadType.AssetBundle:
+                    ResTable.AcquireABRes(key);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        internal void ReleaseResHandle(object key, ESResSourceLoadType loadType, bool unloadWhenZero)
+        {
+            switch (loadType)
+            {
+                case ESResSourceLoadType.ABAsset:
+                    ResTable.ReleaseAssetRes(key, unloadWhenZero);
+                    break;
+                case ESResSourceLoadType.AssetBundle:
+                    ResTable.ReleaseABRes(key, unloadWhenZero);
+                    break;
+                default:
+                    break;
+            }
+        }
 
     }
 }

@@ -96,7 +96,7 @@ namespace ES
                             // 如果同名库不存在，添加；如果存在，合并资源
                             if (!ESResMaster.TempResLibrarys.ContainsKey(library.Name))
                             {
-                                var newTempLib = new TempLibrary()
+                                var newTempLib = new ESBuildTempResLibrary()
                                 {
                                     LibNameDisPlay = library.Name,
                                     LibFolderName = library.LibFolderName,
@@ -183,7 +183,7 @@ namespace ES
                 EditorUtility.RevealInFinder(ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath);
             }
             // 无论选择什么，都Ping本地构建位置
-            var localPath = ESGlobalResSetting.Instance.Path_LocalABPath_;
+            var localPath = ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_;
             var obj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(localPath);
             if (obj != null)
             {
@@ -201,7 +201,7 @@ namespace ES
 
         #region  资源分析部分辅助
 
-        private static void HandleOnePage(TempLibrary tempLibrary, string libraryDisPlayName, string libraryFolderName, string assetPath, UnityEngine.Object assetObject, ResPage page, System.Text.StringBuilder summary)
+        private static void HandleOnePage(ESBuildTempResLibrary tempLibrary, string libraryDisPlayName, string libraryFolderName, string assetPath, UnityEngine.Object assetObject, ResPage page, System.Text.StringBuilder summary)
         {
             bool isFolder = ESDesignUtility.SafeEditor.Wrap_IsValidFolder(assetPath);
             if (isFolder)
@@ -217,7 +217,7 @@ namespace ES
                 HandleAsset(tempLibrary, libraryDisPlayName, libraryFolderName, assetPath, assetObject, page, false, null, summary);
             }
         }
-        private static void HandleAsset(TempLibrary tempLibrary, string libraryDisPlayName, string libraryFolderName, string assetPath, UnityEngine.Object assetObject, ResPage page, bool inFolder, string folderPath, System.Text.StringBuilder summary)
+        private static void HandleAsset(ESBuildTempResLibrary tempLibrary, string libraryDisPlayName, string libraryFolderName, string assetPath, UnityEngine.Object assetObject, ResPage page, bool inFolder, string folderPath, System.Text.StringBuilder summary)
         {
             // 排除不适用文件：.meta, .cs, .asmdef 等
             string extension = Path.GetExtension(assetPath).ToLowerInvariant();
@@ -231,11 +231,11 @@ namespace ES
                 return;
             }
 
-            if (tempLibrary.ESResData_AssetKeys.PathToAssetKeys.TryGetValue(assetPath, out int index))
+            // 检查重复资源
+            if (Caching_ReAsset.Contains(assetPath))
             {
                 //没必要重复，重复直接忽略
                 summary.AppendLine($"重复资源跳过: {assetPath}");
-                Caching_ReAsset.Add(assetPath);
                 return;
             }
 
@@ -264,26 +264,13 @@ namespace ES
                 ABName = safeABName,
                 SourceLoadType = ESResSourceLoadType.ABAsset,
                 ResName = assetObject.name,
+                GUID = AssetDatabase.AssetPathToGUID(assetPath),
+                Path = assetPath,
                 TargetType = assetObject.GetType()
             };
 
-            var assetKeyCount = tempLibrary.ESResData_AssetKeys.AssetKeys.Count;
+            
             tempLibrary.ESResData_AssetKeys.AssetKeys.Add(assetKey);
-
-            var assetGUID = AssetDatabase.AssetPathToGUID(assetPath);
-            if (!tempLibrary.ESResData_AssetKeys.PathToAssetKeys.TryAdd(assetPath, assetKeyCount))
-            {
-                string warnMsg = $"ES 预构建发现重复路径：{assetPath}";
-                summary.AppendLine($"警告: {warnMsg}");
-                Debug.LogWarning(warnMsg);
-            }
-
-            if (!tempLibrary.ESResData_AssetKeys.GUIDToAssetKeys.TryAdd(assetGUID, assetKeyCount))
-            {
-                string warnMsg = $"ES 预构建发现重复 GUID：{assetGUID}（路径：{assetPath}）";
-                summary.AppendLine($"警告: {warnMsg}");
-                Debug.LogWarning(warnMsg);
-            }
         }
         #endregion
 
@@ -385,7 +372,7 @@ namespace ES
                 // 根据 IsNet 选择基础路径
                 string basePath = library.IsNet
                     ? globalSettings.Path_RemoteResOutBuildPath
-                    : globalSettings.Path_LocalABPath_;
+                    : globalSettings.Path_LocalBuildOnEditorPath_;
 
                 if (string.IsNullOrEmpty(basePath))
                 {
@@ -441,7 +428,7 @@ namespace ES
                 // 根据 IsNet 选择路径：远程库用远端构建路径，本地库用本地AB路径
                 string basePath = tempLib.IsNet
                     ? ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath
-                    : ESGlobalResSetting.Instance.Path_LocalABPath_;
+                    : ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_;
 
                 // 数据统计完成后，移动AB包从Init到对应构建文件夹
 
@@ -552,28 +539,25 @@ namespace ES
                     Debug.Log("AB构建成功");
                 }
 
-                if (false)
-                {
-                    // 大规模文件迁移：将构建的AB文件移动到本地AB路径
-                    string localOutputPath = globalSettings.Path_LocalABPath_ + "/" + platformFolderName;
-                    try
-                    {
-                        // 如果本地路径已存在，先删除或处理
-                        if (Directory.Exists(localOutputPath))
-                        {
-                            Directory.Delete(localOutputPath, true);
-                        }
-                        // 移动整个目录
-                        Directory.Move(outputPath, localOutputPath);
-                        Debug.Log($"AB文件迁移完成：{outputPath} -> {localOutputPath}");
-                    }
-                    catch (Exception e)
-                    {
-                        string errorMsg = $"AB文件迁移失败：{e.Message}";
-                        Debug.LogError(errorMsg);
-                        EditorUtility.DisplayDialog("错误", errorMsg, "确定");
-                    }
-                }
+                // 大规模文件迁移：将构建的AB文件移动到本地AB路径（已禁用）
+                // string localOutputPath = globalSettings.Path_LocalABPath_ + "/" + platformFolderName;
+                // try
+                // {
+                //     // 如果本地路径已存在，先删除或处理
+                //     if (Directory.Exists(localOutputPath))
+                //     {
+                //         Directory.Delete(localOutputPath, true);
+                //     }
+                //     // 移动整个目录
+                //     Directory.Move(outputPath, localOutputPath);
+                //     Debug.Log($"AB文件迁移完成：{outputPath} -> {localOutputPath}");
+                // }
+                // catch (Exception e)
+                // {
+                //     string errorMsg = $"AB文件迁移失败：{e.Message}";
+                //     Debug.LogError(errorMsg);
+                //     EditorUtility.DisplayDialog("错误", errorMsg, "确定");
+                // }
             }
             else
             {
@@ -643,7 +627,7 @@ namespace ES
                     // 根据 IsNet 选择路径
                     string basePath = library.IsNet
                         ? ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath
-                        : ESGlobalResSetting.Instance.Path_LocalABPath_;
+                        : ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_;
                     // 目标目录：basePath/{Platform}/ESResData/{LibFolderName}
                     string LibDataPath = basePath + "/" + ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform) + "/" + library.LibFolderName;
 
@@ -804,7 +788,7 @@ namespace ES
 
                     string basePath = library.IsNet
                         ? ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath
-                        : ESGlobalResSetting.Instance.Path_LocalABPath_;
+                        : ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_;
 
                     if (string.IsNullOrEmpty(basePath))
                         continue;
@@ -876,11 +860,11 @@ namespace ES
                     {
                         BuildTimestamp = DateTime.Now.ToString("o"), // ISO 8601格式
                         Version = ESGlobalResSetting.Instance.Version,
-                        RequiredLibrariesFolders = libraries.Where(l => l.ContainsBuild && l.IsMainInClude).Select(l => l.LibFolderName).ToList()
+                        RequiredLibrariesFolders = libraries.Where(l => l.ContainsBuild && l.IsMainInClude).Select(l => new RequiredLibrary { FolderName = l.LibFolderName, IsRemote = l.IsNet }).ToList()
                     };
 
                     // 在本地和远程都生成这个Indentity文件，顺便为全部的Conumsers生成单独的，并且放在ExpandConsumers文件夹下
-                    string[] basePaths = { ESGlobalResSetting.Instance.Path_LocalABPath_, ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath };
+                    string[] basePaths = { ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_, ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath };
                     var consumers = ESEditorSO.SOS.GetNewGroupOfType<ResLibConsumer>();
 
                     foreach (var basePath in basePaths)
@@ -899,7 +883,14 @@ namespace ES
                         // 生成Consumers的Identity文件
                         string expandConsumersPath = Path.Combine(basePath, plat, ESGlobalResSetting.ResConsumersExpandParentFolderName);
                         Directory.CreateDirectory(expandConsumersPath);
+                        
 
+                        if(consumers == null || consumers.Count == 0)
+                        {
+                            summary.AppendLine($"警告: 未找到任何 ResLibConsumer，跳过生成 ConsumerIdentity JSON");
+                            Debug.LogWarning("未找到任何 ResLibConsumer，跳过生成 ConsumerIdentity JSON");
+                            continue;
+                        }
                         foreach (var consumer in consumers)
                         {
                             var consumerIdentity = new ESResJsonData_ConsumerIdentity
@@ -907,7 +898,7 @@ namespace ES
                                 ConsumerDisplayName = consumer.Name,
                                 Version = consumer.Version,
                                 ConsumerDescription = consumer.Desc,
-                                IncludedLibrariesFolders = consumer.ConsumerLibFolders.Select(lib => lib.LibFolderName).ToList()
+                                IncludedLibrariesFolders = consumer.ConsumerLibFolders.Select(lib => new RequiredLibrary { FolderName = lib.LibFolderName, IsRemote = lib.IsNet }).ToList()
                             };
 
                             string consumerJson = JsonConvert.SerializeObject(consumerIdentity);

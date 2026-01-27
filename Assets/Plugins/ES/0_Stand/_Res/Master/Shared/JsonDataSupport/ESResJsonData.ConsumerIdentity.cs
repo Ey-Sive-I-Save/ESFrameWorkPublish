@@ -11,6 +11,6 @@ namespace ES
         public string ConsumerDisplayName;
         public string Version;
         public string ConsumerDescription;
-        public List<string> IncludedLibrariesFolders;
+        public List<RequiredLibrary> IncludedLibrariesFolders;
     }
 }

@@ -318,8 +318,18 @@ namespace ES
         }
 
         /// <summary>
+        /// 获取本地构建路径。
+        /// 本地AB包资源父路径：Application.streamingAssetsPath + Res文件夹。
+        /// </summary>
+        /// <returns>本地构建路径。</returns>
+        public string GetLocalBuildPath()
+        {
+            return Application.streamingAssetsPath + "/" + ESGlobalResSetting.ResParentFolderName;
+        }
+
+        /// <summary>
         /// 获取本地下载路径。
-        /// 基于Application.persistentDataPath + 子路径。
+        /// 本地下载目标基础路径：Application.persistentDataPath + 下载持久相对路径。
         /// </summary>
         /// <returns>本地下载路径。</returns>
         public string GetDownloadLocalPath()
@@ -374,7 +384,7 @@ namespace ES
 
 
         #endregion
-        
+
 
         #region  验证器
         public static bool TrySetResLibFolderName(ResLibrary resLibrary, string preLibFolderName, int attemptCount = 0)
@@ -408,6 +418,194 @@ namespace ES
             return true;
         }
         #endregion
+
+        #region 默认路径缓存
+        /// <summary>
+        /// 默认路径缓存类，预计算常用路径避免重复字符串拼接。
+        /// </summary>
+        public static class DefaultPaths
+        {
+            // 基础路径
+            public static string NetBasePath { get; private set; }
+            public static string LocalBasePath { get; private set; } // 本地下载目标基础路径
+            public static string LocalBuildPath { get; private set; } // 本地构建路径
+
+            // GameIdentity路径
+            public static string NetGameIdentityPath { get; private set; }
+            public static string LocalGameIdentityPath { get; private set; }
+
+            // ConsumerIdentity路径
+            public static string NetConsumerBasePath { get; private set; }
+            public static string LocalConsumerBasePath { get; private set; }
+
+            // 库相关基础路径模板（需要配合库文件夹名使用）
+            public static string NetLibBaseTemplate { get; private set; }
+            public static string LocalLibBaseTemplate { get; private set; } // 本地下载库路径模板
+            public static string LocalBuildLibBaseTemplate { get; private set; } // 本地构建库路径模板
+
+            /// <summary>
+            /// 初始化所有默认路径。
+            /// 应在游戏启动时调用一次。
+            /// </summary>
+            public static void InitDefaultPaths()
+            {
+                // 获取网络基础路径、本地下载目标基础路径和本地构建路径
+                NetBasePath = Instance.GetDownloadNetPathWithPlatform();
+                LocalBasePath = Instance.GetDownloadLocalPath(); // 获取本地下载目标基础路径
+                LocalBuildPath = Instance.GetLocalBuildPath(); // 获取本地构建路径
+
+                // GameIdentity路径
+                NetGameIdentityPath = NetBasePath + "/" + JsonDataFileName.PathJsonFileName_ESGameIdentity;
+                LocalGameIdentityPath = LocalBasePath + "/" + JsonDataFileName.PathJsonFileName_ESGameIdentity;
+
+                // ConsumerIdentity路径
+                NetConsumerBasePath = NetBasePath + "/" + ESGlobalResSetting.ResConsumersExpandParentFolderName;
+                LocalConsumerBasePath = LocalBasePath + "/" + ESGlobalResSetting.ResConsumersExpandParentFolderName;
+
+                // 库基础路径模板
+                NetLibBaseTemplate = NetBasePath + "/{0}";
+                LocalLibBaseTemplate = LocalBasePath + "/{0}";
+                LocalBuildLibBaseTemplate = LocalBuildPath + "/{0}";
+            }
+
+            /// <summary>
+            /// 获取指定库的网络LibIdentity路径。
+            /// </summary>
+            public static string GetNetLibIdentityPath(string libFolderName)
+            {
+                return string.Format(NetLibBaseTemplate, libFolderName) + "/" + JsonDataFileName.PathJsonFileName_ESLibIdentity;
+            }
+
+            /// <summary>
+            /// 获取指定库的本地LibIdentity路径。
+            /// </summary>
+            public static string GetLocalLibIdentityPath(string libFolderName)
+            {
+                return string.Format(LocalLibBaseTemplate, libFolderName) + "/" + JsonDataFileName.PathJsonFileName_ESLibIdentity;
+            }
+
+            /// <summary>
+            /// 获取指定库的网络AssetKeys路径。
+            /// </summary>
+            public static string GetNetAssetKeysPath(string libFolderName)
+            {
+                return string.Format(NetLibBaseTemplate, libFolderName) + "/" + JsonDataFileName.PathFileName_ESAssetkeys;
+            }
+
+            /// <summary>
+            /// 获取指定库的本地AssetKeys路径。
+            /// </summary>
+            public static string GetLocalAssetKeysPath(string libFolderName)
+            {
+                return string.Format(LocalLibBaseTemplate, libFolderName) + "/" + JsonDataFileName.PathFileName_ESAssetkeys;
+            }
+
+            /// <summary>
+            /// 获取指定库的网络ABMetadata路径。
+            /// </summary>
+            public static string GetNetABMetadataPath(string libFolderName)
+            {
+                return string.Format(NetLibBaseTemplate, libFolderName) + "/" + JsonDataFileName.PathJsonFileName_ESABMetadata;
+            }
+
+            /// <summary>
+            /// 获取指定库的本地ABMetadata路径。
+            /// </summary>
+            public static string GetLocalABMetadataPath(string libFolderName)
+            {
+                return string.Format(LocalLibBaseTemplate, libFolderName) + "/" + JsonDataFileName.PathJsonFileName_ESABMetadata;
+            }
+
+            /// <summary>
+            /// 获取指定库的网络基础路径。
+            /// </summary>
+            public static string GetNetLibBasePath(string libFolderName)
+            {
+                return string.Format(NetLibBaseTemplate, libFolderName);
+            }
+
+            /// <summary>
+            /// 获取指定库的本地下载基础路径。
+            /// </summary>
+            public static string GetLocalLibBasePath(string libFolderName)
+            {
+                return string.Format(LocalLibBaseTemplate, libFolderName);
+            }
+
+            /// <summary>
+            /// 获取指定库的本地构建LibIdentity路径。
+            /// </summary>
+            public static string GetLocalBuildLibIdentityPath(string libFolderName)
+            {
+                return string.Format(LocalBuildLibBaseTemplate, libFolderName) + "/" + JsonDataFileName.PathJsonFileName_ESLibIdentity;
+            }
+
+            /// <summary>
+            /// 获取指定库的本地构建AssetKeys路径。
+            /// </summary>
+            public static string GetLocalBuildAssetKeysPath(string libFolderName)
+            {
+                return string.Format(LocalBuildLibBaseTemplate, libFolderName) + "/" + JsonDataFileName.PathFileName_ESAssetkeys;
+            }
+
+            /// <summary>
+            /// 获取指定库的本地构建ABMetadata路径。
+            /// </summary>
+            public static string GetLocalBuildABMetadataPath(string libFolderName)
+            {
+                return string.Format(LocalBuildLibBaseTemplate, libFolderName) + "/" + JsonDataFileName.PathJsonFileName_ESABMetadata;
+            }
+
+            /// <summary>
+            /// 获取指定库的本地构建基础路径。
+            /// AB包直接与JSON文件混放在此路径下。
+            /// </summary>
+            public static string GetLocalBuildLibBasePath(string libFolderName)
+            {
+                return string.Format(LocalBuildLibBaseTemplate, libFolderName);
+            }
+
+            /// <summary>
+            /// 获取AB包的本地构建路径。
+            /// </summary>
+            public static string GetLocalBuildABPath(string abName)
+            {
+                return LocalBuildPath + "/" + abName;
+            }
+
+            /// <summary>
+            /// 获取AB包的网络路径。
+            /// </summary>
+            public static string GetNetABPath(string abName)
+            {
+                return NetBasePath + "/" + abName;
+            }
+
+            /// <summary>
+            /// 获取AB包的本地下载路径。
+            /// </summary>
+            public static string GetLocalABPath(string abName)
+            {
+                return LocalBasePath + "/" + abName;
+            }
+
+            /// <summary>
+            /// 获取指定库的网络AB包基础路径。
+            /// </summary>
+            public static string GetNetABBasePath(string libFolderName)
+            {
+                return string.Format(NetLibBaseTemplate, libFolderName) + "/AB";
+            }
+
+            /// <summary>
+            /// 获取指定库的本地AB包基础路径。
+            /// </summary>
+            public static string GetLocalABBasePath(string libFolderName)
+            {
+                return string.Format(LocalLibBaseTemplate, libFolderName) + "/AB";
+            }
+        }
     }
 }
+        #endregion
 

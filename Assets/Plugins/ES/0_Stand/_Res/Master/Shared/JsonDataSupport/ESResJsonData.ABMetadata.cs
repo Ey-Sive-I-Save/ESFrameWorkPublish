@@ -19,5 +19,6 @@ namespace ES
 
         // 从Dependences类
         public Dictionary<string, string[]> Dependences = new Dictionary<string, string[]>();
+
     }
 }

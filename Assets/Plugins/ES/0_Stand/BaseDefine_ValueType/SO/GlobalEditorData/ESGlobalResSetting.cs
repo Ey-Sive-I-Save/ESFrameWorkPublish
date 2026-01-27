@@ -75,7 +75,7 @@ namespace ES
         [VerticalGroup("总体/文件夹路径")]
         [FolderPath, LabelText("本地AB包资源父路径")]
         [InlineButton("Ping_", "<*>")]
-        public string Path_LocalABPath_ = Path.Combine("Assets/StreamingAssets", ResParentFolderName);
+        public string Path_LocalBuildOnEditorPath_ => Path.Combine("Assets/StreamingAssets", ResParentFolderName);
 
         [VerticalGroup("总体/文件夹路径")]
         [LabelText("下载持久相对路径")]

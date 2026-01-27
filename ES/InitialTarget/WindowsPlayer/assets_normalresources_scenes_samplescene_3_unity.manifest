@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 658106628
+CRC: 3593759513
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: 8dfeaa920fbd2997238dd80e7f488188
+    Hash: 16ed32ac416c3af81885b3986f466fbd
   TypeTreeHash:
     serializedVersion: 2
-    Hash: 9ca4c05499108b2c39db6eb15e5f8856
+    Hash: 3ed4c98298b940074094be583f3a4147
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: 8dfeaa920fbd2997238dd80e7f488188
+    Hash: 16ed32ac416c3af81885b3986f466fbd
 HashAppended: 1
 ClassTypes:
 - Class: 1
@@ -20,13 +20,7 @@ ClassTypes:
   Script: {instanceID: 0}
 - Class: 21
   Script: {instanceID: 0}
-- Class: 23
-  Script: {instanceID: 0}
 - Class: 28
-  Script: {instanceID: 0}
-- Class: 33
-  Script: {instanceID: 0}
-- Class: 43
   Script: {instanceID: 0}
 - Class: 48
   Script: {instanceID: 0}
@@ -59,13 +53,19 @@ ClassTypes:
 - Class: 114
   Script: {fileID: 11500000, guid: 899c54efeace73346a0a16faa3afe726, type: 3}
 - Class: 114
+  Script: {fileID: 11500000, guid: 7443a3d373567e248a92b59138673ddf, type: 3}
+- Class: 114
   Script: {fileID: 11500000, guid: d7fd9488000d3734a9e00ee676215985, type: 3}
 - Class: 114
   Script: {fileID: 11500000, guid: 97c23e3b12dc18c42a140437e53d3951, type: 3}
 - Class: 114
+  Script: {fileID: 11500000, guid: 829f02ab7b5b12e489246de2cf8aad27, type: 3}
+- Class: 114
   Script: {fileID: 11500000, guid: 4f231c4fb786f3946a6b90b886c48677, type: 3}
 - Class: 114
   Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 5cb5dedc087a7d24c9a4bfd6772b5aaf, type: 3}
 - Class: 114
   Script: {fileID: 11500000, guid: e9b5eb84b2c2fc94eba2e90a564db28f, type: 3}
 - Class: 114
@@ -85,5 +85,4 @@ ClassTypes:
 SerializeReferenceClassIdentifiers: []
 Assets:
 - Assets/NormalResources/Scenes/SampleScene 3.unity
-Dependencies:
-- F:/aaProject/ESFrameWorkPublish/ES/InitialTarget/WindowsPlayer/assets_normalresources_prefabs_lasefangkuai_prefab_da6df84dbbc22a9d2b67fe03014d2ec4
+Dependencies: []

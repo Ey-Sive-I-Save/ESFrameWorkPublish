@@ -11,11 +11,6 @@ namespace ES
 {
     public partial class ESResMaster
     {
-        public static ESResJsonData_AssetsKeys MainESResData_AssetKeys = new ESResJsonData_AssetsKeys();
-        public static ESResJsonData_ABKeys MainESResData_ABKeys = new ESResJsonData_ABKeys();
-        public static ESResJsonData_Hashes MainESResData_WithHashes = new ESResJsonData_Hashes();
-        public static ESResJsonData_Dependences MainESResData_Dependences = new ESResJsonData_Dependences();
-
         public static string[] ABNames;
 
 
@@ -37,6 +32,8 @@ namespace ES
         public string LibFolderName;
         public string ABName;
         public string ResName;
+        public string GUID;
+        public string Path;
         public Type TargetType;
 
         public bool IsRecycled { get; set; }

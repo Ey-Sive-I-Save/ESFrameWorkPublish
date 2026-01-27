@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Sirenix.Serialization;
+using Sirenix.OdinInspector;
 
 namespace ES
 {
@@ -28,14 +29,14 @@ namespace ES
         /// 全局AssetKeys缓存：支持通过GUID或资源路径查询Asset对应的ESResKey
         /// 用于快速定位资源在哪个AB包中
         /// </summary>
-        [NonSerialized]
+        [NonSerialized,ShowInInspector]
         public static TwoKeyDictionary<ESResKey> GlobalAssetKeys = new TwoKeyDictionary<ESResKey>();
 
         /// <summary>
         /// 全局ABKeys缓存：AB包名 -> ESResKey
         /// 用于快速查找AB包的完整信息
         /// </summary>
-        [NonSerialized]
+        [NonSerialized,ShowInInspector]
         public static Dictionary<string, ESResKey> GlobalABKeys = new Dictionary<string, ESResKey>();
 
         /// <summary>
@@ -62,8 +63,8 @@ namespace ES
         /// 全局AB包依赖关系：AB包名 -> 依赖的AB包名数组
         /// 用于加载AB包时自动加载其依赖项
         /// </summary>
-        [NonSerialized]
-        public static Dictionary<string, string[]> GlobalDependences = new Dictionary<string, string[]>();
+        [NonSerialized,ShowInInspector]
+        public static Dictionary<string, string[]> GlobalDependencies = new Dictionary<string, string[]>();
         #endregion
 
         #region 加载部分

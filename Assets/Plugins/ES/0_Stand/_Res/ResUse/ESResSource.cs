@@ -353,10 +353,17 @@ namespace ES
     public class ESABSource : ESResSource
     {
         public bool IsNet = true;
+        public readonly string[] Nulldeps = new string[0];
         public override string[] GetDependResSourceAllAssetBundles(out bool withHash)
         {
-            withHash = true;//带hash
-            return ESResMaster.Instance.MainManifest.GetAllDependencies(m_ResName);
+            withHash = false;//Dependences是不带hash
+            if (!ESResMaster.GlobalDependencies.TryGetValue(ABName, out var deps))
+            {
+                return Nulldeps;
+                deps = ESResMaster.Instance.MainManifest.GetAllDependencies(ResName);
+                ESResMaster.GlobalDependencies[ABName] = deps;
+            }
+            return deps;
         }
 
         public override bool LoadSync()
@@ -412,31 +419,41 @@ namespace ES
 
         public override IEnumerator DoTaskAsync(Action finishCallback)
         {
+            Debug.Log($"[ESABSource.DoTaskAsync] 开始异步加载AssetBundle任务: {ResName}");
+
             if (State == ResSourceState.Ready)
             {
+                Debug.Log($"[ESABSource.DoTaskAsync] AssetBundle '{ResName}' 已就绪，直接调用完成回调。");
                 finishCallback?.Invoke();
                 yield break;
             }
 
+            Debug.Log($"[ESABSource.DoTaskAsync] 初始化加载状态: {ResName}");
             BeginLoad();
 
             var cached = ESResMaster.HasLoadedAB(m_ResName);
             if (cached != null)
             {
+                Debug.Log($"[ESABSource.DoTaskAsync] 使用缓存的AssetBundle: {ResName}");
                 CompleteWithAsset(cached);
                 finishCallback?.Invoke();
                 yield break;
             }
 
             var dependsAB = GetDependResSourceAllAssetBundles(out bool withHash);
+            Debug.Log($"[ESABSource.DoTaskAsync] 获取到 {dependsAB?.Length ?? 0} 个依赖AB，withHash: {withHash}");
+
             var dependencyResults = new Dictionary<ESResSource, bool?>();
             if (dependsAB != null && dependsAB.Length > 0)
             {
                 for (int i = 0; i < dependsAB.Length; i++)
                 {
                     string pre = withHash ? ESResMaster.PathAndNameTool_GetPreName(dependsAB[i]) : dependsAB[i];
+                    Debug.Log($"[ESABSource.DoTaskAsync] 处理依赖AB: {pre} (原始: {dependsAB[i]})");
+
                     if (!ESResMaster.GlobalABKeys.TryGetValue(pre, out var abKey))
                     {
+                        Debug.LogError($"[ESABSource.DoTaskAsync] 未找到依赖AssetBundle键: {pre}，加载失败。");
                         OnResLoadFaild($"未找到依赖AssetBundle键: {pre}");
                         finishCallback?.Invoke();
                         yield break;
@@ -445,6 +462,7 @@ namespace ES
                     var dependencyRes = ESResMaster.Instance.GetResSourceByKey(abKey, ESResSourceLoadType.AssetBundle);
                     if (dependencyRes == null)
                     {
+                        Debug.LogError($"[ESABSource.DoTaskAsync] 未找到依赖AssetBundle资源源: {pre}，加载失败。");
                         OnResLoadFaild($"未找到依赖AssetBundle: {pre}");
                         finishCallback?.Invoke();
                         yield break;
@@ -452,10 +470,12 @@ namespace ES
 
                     if (dependencyRes.State == ResSourceState.Ready)
                     {
+                        Debug.Log($"[ESABSource.DoTaskAsync] 依赖AB '{pre}' 已就绪。");
                         dependencyResults[dependencyRes] = true;
                     }
                     else
                     {
+                        Debug.Log($"[ESABSource.DoTaskAsync] 依赖AB '{pre}' 未就绪，添加到加载队列。");
                         dependencyResults[dependencyRes] = null;
                         var captured = dependencyRes;
                         captured.OnLoadOKAction_Submit((success, _) => dependencyResults[captured] = success);
@@ -465,6 +485,7 @@ namespace ES
 
                 if (dependencyResults.Values.Any(v => v == null))
                 {
+                    Debug.Log($"[ESABSource.DoTaskAsync] 开始异步加载所有依赖AB。");
                     ESResMaster.MainLoader.LoadAllAsync();
                     while (dependencyResults.Values.Any(v => v == null))
                     {
@@ -475,46 +496,69 @@ namespace ES
 
                 if (dependencyResults.Values.Any(v => v == false))
                 {
+                    Debug.LogError($"[ESABSource.DoTaskAsync] 依赖AssetBundle加载失败。");
                     OnResLoadFaild("依赖AssetBundle加载失败");
                     finishCallback?.Invoke();
                     yield break;
                 }
+
+                Debug.Log($"[ESABSource.DoTaskAsync] 所有依赖AB加载成功。");
+            }
+            else
+            {
+                Debug.Log($"[ESABSource.DoTaskAsync] AssetBundle '{ResName}' 无依赖。");
             }
 
+            Debug.Log($"[ESABSource.DoTaskAsync] 开始加载自身AssetBundle: {ResName}");
             yield return LoadSelf();
 
+            Debug.Log($"[ESABSource.DoTaskAsync] AssetBundle '{ResName}' 加载完成。");
             finishCallback?.Invoke();
         }
         private IEnumerator LoadSelf()
         {
+            Debug.Log($"[ESABSource.LoadSelf] 开始加载AssetBundle: {ResName}");
+
             if (m_Asset == null)
             {
                 string localBasePath = ESResMaster.Instance.GetDownloadLocalPath();
                 string bundlePath = Path.Combine(localBasePath, ResName);
+                Debug.Log($"[ESABSource.LoadSelf] 创建异步加载请求: {bundlePath}");
                 var request = AssetBundle.LoadFromFileAsync(bundlePath);
 
                 if (request == null)
                 {
+                    Debug.LogError($"[ESABSource.LoadSelf] 无法创建AssetBundle加载请求: {bundlePath}");
                     OnResLoadFaild("无法创建AssetBundle加载请求");
                     yield break;
                 }
 
+                Debug.Log($"[ESABSource.LoadSelf] 开始等待AssetBundle加载完成: {bundlePath}");
                 while (!request.isDone)
                 {
-                    ReportProgress(Mathf.Lerp(0.2f, 0.95f, request.progress));
+                    float progress = Mathf.Lerp(0.2f, 0.95f, request.progress);
+                    ReportProgress(progress);
+                    Debug.Log($"[ESABSource.LoadSelf] 加载进度: {progress:F2} for {bundlePath}");
                     yield return null;
                 }
 
                 if (!CompleteWithAsset(request.assetBundle))
                 {
-                    Debug.LogError($"异步加载AssetBundle失败: {bundlePath}");
+                    Debug.LogError($"[ESABSource.LoadSelf] 异步加载AssetBundle失败: {bundlePath}");
                     yield break;
+                }
+                else
+                {
+                    Debug.Log($"[ESABSource.LoadSelf] AssetBundle加载成功: {bundlePath}");
                 }
             }
             else
             {
+                Debug.Log($"[ESABSource.LoadSelf] 使用缓存的AssetBundle: {ResName}");
                 CompleteWithAsset(m_Asset);
             }
+
+            Debug.Log($"[ESABSource.LoadSelf] AssetBundle '{ResName}' 加载完成，设置进度为1。");
             ReportProgress(1f);
         }
         protected override float CalculateProgress()
@@ -577,70 +621,120 @@ namespace ES
             OnResLoadFaild($"AssetBundle未就绪: {ABName}");
             return false;
         }
+        /// <summary>
+        /// 异步执行资源加载任务。
+        /// 此方法是ESAssetSource的核心加载逻辑，负责从AssetBundle中异步加载指定的资源。
+        /// 流程包括：状态检查、依赖AssetBundle加载等待、自身资源加载。
+        /// </summary>
+        /// <param name="finishCallback">加载完成后的回调函数，参数为加载是否成功。</param>
+        /// <returns>协程枚举器，用于Unity的协程系统。</returns>
         public override IEnumerator DoTaskAsync(Action finishCallback)
         {
+            Debug.Log($"[ESAssetSource.DoTaskAsync] 开始异步加载任务: {ResName}");
+
+            // 如果资源已就绪，直接调用完成回调并退出协程
             if (State == ResSourceState.Ready)
             {
+                Debug.Log($"[ESAssetSource.DoTaskAsync] 资源 '{ResName}' 已就绪，直接调用完成回调。");
                 finishCallback?.Invoke();
                 yield break;
             }
 
+            // 初始化加载状态
+            Debug.Log($"[ESAssetSource.DoTaskAsync] 初始化加载状态: {ResName}");
             BeginLoad();
 
+            // 检查全局AB键字典中是否存在对应的AssetBundle键
             if (!ESResMaster.GlobalABKeys.TryGetValue(ABName, out var abKey))
             {
+                // 如果未找到键，记录错误并调用完成回调
+                Debug.LogError($"[ESAssetSource.DoTaskAsync] 未找到AB键: {ABName}，加载失败。");
                 OnResLoadFaild($"未找到AB键: {ABName}");
                 finishCallback?.Invoke();
                 yield break;
             }
 
+            Debug.Log($"[ESAssetSource.DoTaskAsync] 找到AB键: {ABName} -> {abKey}");
+
+            // 获取AssetBundle资源源
             var abResSou = ESResMaster.Instance.GetResSourceByKey(abKey, ESResSourceLoadType.AssetBundle);
             if (abResSou == null)
             {
+                // 如果未找到AssetBundle资源源，记录错误并调用完成回调
+                Debug.LogError($"[ESAssetSource.DoTaskAsync] 未找到AssetBundle资源源: {ABName}，加载失败。");
                 OnResLoadFaild($"未找到AssetBundle资源: {ABName}");
                 finishCallback?.Invoke();
                 yield break;
             }
 
+            Debug.Log($"[ESAssetSource.DoTaskAsync] 获取到AssetBundle资源源: {abResSou.ResName}，状态: {abResSou.State}");
+
+            // 如果AssetBundle未就绪，等待其加载完成
             if (abResSou.State != ResSourceState.Ready)
             {
+                Debug.Log($"[ESAssetSource.DoTaskAsync] AssetBundle '{ABName}' 未就绪，开始等待依赖加载。");
+
+                // 初始化依赖加载状态变量
                 bool dependencyCompleted = false;
                 bool dependencySuccess = false;
                 string dependencyError = null;
 
+                // 注册AssetBundle加载完成回调
                 abResSou.OnLoadOKAction_Submit((success, res) =>
                 {
                     dependencyCompleted = true;
                     dependencySuccess = success;
+                    // 如果加载失败，记录错误信息
                     if (!success && res is ESResSource resSource && resSource.HasError)
                     {
                         dependencyError = resSource.LastErrorMessage;
                     }
+                    Debug.Log($"[ESAssetSource.DoTaskAsync] 依赖AssetBundle '{ABName}' 加载完成，结果: {success}");
                 });
 
+                // 开始异步加载AssetBundle
+                Debug.Log($"[ESAssetSource.DoTaskAsync] 开始异步加载AssetBundle: {ABName}");
                 abResSou.LoadAsync();
 
+                // 等待AssetBundle加载完成
                 while (!dependencyCompleted)
                 {
+                    // 报告进度（依赖加载阶段）
                     ReportProgress(0.1f);
                     yield return null;
                 }
 
+                // 检查依赖加载结果
                 if (!dependencySuccess)
                 {
+                    // 如果依赖加载失败，记录错误并调用完成回调
+                    Debug.LogError($"[ESAssetSource.DoTaskAsync] 依赖AssetBundle '{ABName}' 加载失败: {dependencyError}");
                     OnResLoadFaild(string.IsNullOrEmpty(dependencyError) ? "依赖AssetBundle加载失败" : dependencyError);
                     finishCallback?.Invoke();
                     yield break;
                 }
+
+                Debug.Log($"[ESAssetSource.DoTaskAsync] 依赖AssetBundle '{ABName}' 加载成功。");
+            }
+            else
+            {
+                Debug.Log($"[ESAssetSource.DoTaskAsync] AssetBundle '{ABName}' 已就绪，跳过依赖加载。");
             }
 
+            // 如果AssetBundle已就绪且是AssetBundle类型，开始加载自身资源
             if (abResSou.Asset is AssetBundle ab)
             {
+                Debug.Log($"[ESAssetSource.DoTaskAsync] 开始加载自身资源: {ResName} 从AssetBundle: {ABName}");
+                // 调用子协程加载自身资源
                 yield return LoadSelf(ab);
+                // 加载完成后调用完成回调
+                Debug.Log($"[ESAssetSource.DoTaskAsync] 自身资源 '{ResName}' 加载完成。");
                 finishCallback?.Invoke();
                 yield break;
             }
 
+            // 如果AssetBundle未就绪，记录错误并调用完成回调
+            Debug.LogError($"[ESAssetSource.DoTaskAsync] AssetBundle '{ABName}' 未就绪，加载失败。");
             OnResLoadFaild($"AssetBundle未就绪: {ABName}");
             finishCallback?.Invoke();
         }

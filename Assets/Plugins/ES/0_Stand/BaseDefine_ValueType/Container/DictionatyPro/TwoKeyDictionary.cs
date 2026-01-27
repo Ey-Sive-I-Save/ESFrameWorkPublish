@@ -1,4 +1,5 @@
 using ES;
+using Sirenix.OdinInspector;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,9 +18,11 @@ namespace ES {
         private Dictionary<TValue, (string key1, string key2)> valueToKeys = new Dictionary<TValue, (string, string)>();
         
         // 键1到值的映射
+        [ShowInInspector]
         private Dictionary<string, TValue> key1ToValue = new Dictionary<string, TValue>();
         
         // 键2到值的映射
+        [ShowInInspector]
         private Dictionary<string, TValue> key2ToValue = new Dictionary<string, TValue>();
 
         /// <summary>

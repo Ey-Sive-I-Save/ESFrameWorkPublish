@@ -47,7 +47,7 @@ namespace ES
             GlobalABKeys.Clear();
             GlobalABPreToHashes.Clear();
             GlobalABHashToPres.Clear();
-            GlobalDependences.Clear();
+            GlobalDependencies.Clear();
 
             var callback = new ESCallback<string>();
             callback.OnSuccess = (message) => Debug.Log($"初始化下载完成: {message}");
@@ -918,9 +918,9 @@ namespace ES
                     // 合并依赖数据到GlobalDependences
                     foreach (var kvp in abMetadataData.Dependences)
                     {
-                        if (!GlobalDependences.ContainsKey(kvp.Key))
+                        if (!GlobalDependencies.ContainsKey(kvp.Key))
                         {
-                            GlobalDependences[kvp.Key] = kvp.Value;
+                            GlobalDependencies[kvp.Key] = kvp.Value;
                         }
                     }
 

@@ -646,7 +646,7 @@ namespace ES
                             if (abDepend.Length > 0)
                                 abMetadata.Dependences.Add(abName, abDepend);
 
-                            ESResKey key = new ESResKey() { LibName = libName, LibFolderName = library.LibFolderName, ABName = abName, SourceLoadType = ESResSourceLoadType.AssetBundle, ResName = withHash, TargetType = typeof(AssetBundle) };
+                            ESResKey key = new ESResKey() { LibName = libName, LibFolderName = library.LibFolderName, ABName = abName, SourceLoadType = ESResSourceLoadType.AssetBundle, ResName = abName, TargetType = typeof(AssetBundle) };
                             abMetadata.ABKeys.Add(key);
 
 

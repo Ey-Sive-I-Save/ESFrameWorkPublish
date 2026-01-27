@@ -92,23 +92,41 @@ namespace ES
         }
         private IEnumerator LoadResTask()
         {
-            Debug.Log("[ESResMaster.LoadResTask] 开始加载任务协程，设置isLoading为true。");
+            Debug.Log("[ESResMaster.LoadResTask] 开始加载任务协程，设置isLoading为true，支持并发处理。");
             isLoading = true;
+            int runningTasks = 0;
             int taskIndex = 0;
-            while (ResLoadTasks.Count > 0)
+
+            while (ResLoadTasks.Count > 0 || runningTasks > 0)
             {
-                Debug.Log($"[ESResMaster.LoadResTask] 处理任务 {taskIndex + 1}，剩余任务数量: {ResLoadTasks.Count}");
-                var task = ResLoadTasks.First;
-                ResLoadTasks.RemoveFirst();
-                Debug.Log($"[ESResMaster.LoadResTask] 开始执行任务: {task.Value?.ToString() ?? "Unknown"}");
-                yield return StartCoroutine(task.Value.DoTaskAsync(OnLoadTaskOK));
-                Debug.Log($"[ESResMaster.LoadResTask] 任务 {taskIndex + 1} 执行完成。");
+                // 启动新任务，如果有空闲槽且队列不空
+                while (ResLoadTasks.Count > 0 && runningTasks < mMaxCoroutineCount)
+                {
+                    Debug.Log($"[ESResMaster.LoadResTask] 启动并发任务 {taskIndex + 1}，当前运行任务数: {runningTasks + 1}/{mMaxCoroutineCount}");
+                    var task = ResLoadTasks.First;
+                    ResLoadTasks.RemoveFirst();
+                    runningTasks++;
+                    StartCoroutine(ExecuteTask(task.Value, taskIndex, () =>
+                    {
+                        runningTasks--;
+                        Debug.Log($"[ESResMaster.LoadResTask] 任务 {taskIndex + 1} 执行完成，剩余运行任务数: {runningTasks}");
+                    }));
+                    taskIndex++;
+                }
+
                 yield return null;
-                taskIndex++;
             }
+
             Debug.Log("[ESResMaster.LoadResTask] 所有任务加载完成，设置isLoading为false。");
             isLoading = false;
             yield return null;
+        }
+
+        private IEnumerator ExecuteTask(IEnumeratorTask task, int index, Action onComplete)
+        {
+            Debug.Log($"[ESResMaster.LoadResTask] 开始执行任务 {index + 1}: {task?.ToString() ?? "Unknown"}");
+            yield return StartCoroutine(task.DoTaskAsync(OnLoadTaskOK));
+            onComplete();
         }
         #endregion
 

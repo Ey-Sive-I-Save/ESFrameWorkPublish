@@ -36,6 +36,12 @@ namespace ES
         {
 #if UNITY_EDITOR
             bool dirty = false;
+            var preNamedOption = namedOption;
+            namedOption = (ABNamedOption)EditorGUILayout.EnumPopup("分AB包命名方式", namedOption);
+            if (preNamedOption != namedOption)
+            {
+                dirty = true;
+            }
             var pre = OB;
             OB = EditorGUILayout.ObjectField("文件夹或资源", OB, typeof(UnityEngine.Object), allowSceneObjects: false);
             if (OB != null)

@@ -46,7 +46,7 @@ namespace ES
             m_Loader.LoadAllAsync(() =>
             {
                 // 演示：在所有加载完成后，通过路径获取资源并实例化
-                if (ESResMaster.GlobalAssetKeys.TryGetByKey1(AssetPath, out var key))
+                if (ESResMaster.GlobalAssetKeys.TryGetESResKeyByPath(AssetPath, out var key))
                 {
                     if (m_Loader.TryGetLoadedAsset(key, out UnityEngine.Object asset) && asset is GameObject prefab)
                     {

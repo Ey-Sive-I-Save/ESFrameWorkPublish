@@ -3,27 +3,30 @@ using Sirenix.OdinInspector;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 
 namespace ES {
     /// <summary>
-    /// 双键字典：支持使用两种不同的string键中的任意一个查询同一个值
+    /// 多键字典：支持使用两种不同的键中的任意一个查询同一个值
     /// 用于资源加载系统中，可以通过资源名或资源ID等不同方式查询同一资源
     /// </summary>
+    /// <typeparam name="TKey1">第一个键类型</typeparam>
+    /// <typeparam name="TKey2">第二个键类型</typeparam>
     /// <typeparam name="TValue">存储的值类型</typeparam>
-    public class TwoKeyDictionary<TValue>
+    public class MultiKeyDictionary<TKey1, TKey2, TValue>
     {
         // 主存储：值 -> 两个键的元组
-        private Dictionary<TValue, (string key1, string key2)> valueToKeys = new Dictionary<TValue, (string, string)>();
+        private Dictionary<TValue, (TKey1 key1, TKey2 key2)> valueToKeys = new Dictionary<TValue, (TKey1, TKey2)>();
         
         // 键1到值的映射
         [ShowInInspector]
-        private Dictionary<string, TValue> key1ToValue = new Dictionary<string, TValue>();
+        private Dictionary<TKey1, TValue> key1ToValue = new Dictionary<TKey1, TValue>();
         
         // 键2到值的映射
         [ShowInInspector]
-        private Dictionary<string, TValue> key2ToValue = new Dictionary<string, TValue>();
+        private Dictionary<TKey2, TValue> key2ToValue = new Dictionary<TKey2, TValue>();
 
         /// <summary>
         /// 添加一个条目，为同一个值关联两个不同的键
@@ -31,13 +34,13 @@ namespace ES {
         /// <param name="key1">第一个键</param>
         /// <param name="key2">第二个键</param>
         /// <param name="value">值</param>
-        public void Add(string key1, string key2, TValue value)
+        public void Add(TKey1 key1, TKey2 key2, TValue value)
         {
-            if (string.IsNullOrEmpty(key1))
-                throw new ArgumentException("Key1 cannot be null or empty", nameof(key1));
+            if (key1 == null)
+                throw new ArgumentException("Key1 cannot be null", nameof(key1));
             
-            if (string.IsNullOrEmpty(key2))
-                throw new ArgumentException("Key2 cannot be null or empty", nameof(key2));
+            if (key2 == null)
+                throw new ArgumentException("Key2 cannot be null", nameof(key2));
 
             // 检查键是否已被使用
             if (key1ToValue.ContainsKey(key1))
@@ -57,24 +60,35 @@ namespace ES {
         }
 
         /// <summary>
-        /// 通过任意一个键获取值
+        /// 通过第一个键获取值
         /// </summary>
-        /// <param name="key">键（可以是key1或key2）</param>
+        /// <param name="key1">第一个键</param>
         /// <returns>对应的值</returns>
-        public TValue Get(string key)
+        public TValue GetByKey1(TKey1 key1)
         {
-            if (string.IsNullOrEmpty(key))
-                throw new ArgumentException("Key cannot be null or empty", nameof(key));
+            if (key1 == null)
+                throw new ArgumentException("Key1 cannot be null", nameof(key1));
 
-            // 先尝试key1
-            if (key1ToValue.TryGetValue(key, out TValue value))
+            if (key1ToValue.TryGetValue(key1, out TValue value))
                 return value;
             
-            // 再尝试key2
-            if (key2ToValue.TryGetValue(key, out value))
+            throw new KeyNotFoundException($"Key1 '{key1}' not found");
+        }
+
+        /// <summary>
+        /// 通过第二个键获取值
+        /// </summary>
+        /// <param name="key2">第二个键</param>
+        /// <returns>对应的值</returns>
+        public TValue GetByKey2(TKey2 key2)
+        {
+            if (key2 == null)
+                throw new ArgumentException("Key2 cannot be null", nameof(key2));
+
+            if (key2ToValue.TryGetValue(key2, out TValue value))
                 return value;
             
-            throw new KeyNotFoundException($"Key '{key}' not found");
+            throw new KeyNotFoundException($"Key2 '{key2}' not found");
         }
 
         /// <summary>
@@ -83,9 +97,10 @@ namespace ES {
         /// <param name="key1">第一个键</param>
         /// <param name="value">输出的值</param>
         /// <returns>是否找到</returns>
-        public bool TryGetByKey1(string key1, out TValue value)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGetByKey1(TKey1 key1, out TValue value)
         {
-            if (string.IsNullOrEmpty(key1))
+            if (key1 == null)
             {
                 value = default;
                 return false;
@@ -100,9 +115,10 @@ namespace ES {
         /// <param name="key2">第二个键</param>
         /// <param name="value">输出的值</param>
         /// <returns>是否找到</returns>
-        public bool TryGetByKey2(string key2, out TValue value)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGetByKey2(TKey2 key2, out TValue value)
         {
-            if (string.IsNullOrEmpty(key2))
+            if (key2 == null)
             {
                 value = default;
                 return false;
@@ -112,14 +128,25 @@ namespace ES {
         }
 
         /// <summary>
-        /// 检查是否包含指定的键
+        /// 检查是否包含指定的第一个键
         /// </summary>
-        /// <param name="key">键（可以是key1或key2）</param>
+        /// <param name="key1">第一个键</param>
         /// <returns>是否包含</returns>
-        public bool ContainsKey(string key)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsKey1(TKey1 key1)
         {
-            return !string.IsNullOrEmpty(key) && 
-                   (key1ToValue.ContainsKey(key) || key2ToValue.ContainsKey(key));
+            return key1 != null && key1ToValue.ContainsKey(key1);
+        }
+
+        /// <summary>
+        /// 检查是否包含指定的第二个键
+        /// </summary>
+        /// <param name="key2">第二个键</param>
+        /// <returns>是否包含</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsKey2(TKey2 key2)
+        {
+            return key2 != null && key2ToValue.ContainsKey(key2);
         }
 
         /// <summary>
@@ -141,17 +168,34 @@ namespace ES {
         }
 
         /// <summary>
-        /// 通过任意一个键移除条目
+        /// 通过第一个键移除条目
         /// </summary>
-        /// <param name="key">键（可以是key1或key2）</param>
+        /// <param name="key1">第一个键</param>
         /// <returns>是否成功移除</returns>
-        public bool RemoveByKey(string key)
+        public bool RemoveByKey1(TKey1 key1)
         {
-            if (string.IsNullOrEmpty(key))
+            if (key1 == null)
                 return false;
 
-            TValue value;
-            if (key1ToValue.TryGetValue(key, out value) || key2ToValue.TryGetValue(key, out value))
+            if (key1ToValue.TryGetValue(key1, out TValue value))
+            {
+                return Remove(value);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 通过第二个键移除条目
+        /// </summary>
+        /// <param name="key2">第二个键</param>
+        /// <returns>是否成功移除</returns>
+        public bool RemoveByKey2(TKey2 key2)
+        {
+            if (key2 == null)
+                return false;
+
+            if (key2ToValue.TryGetValue(key2, out TValue value))
             {
                 return Remove(value);
             }
@@ -166,7 +210,7 @@ namespace ES {
         /// <param name="key1">输出的key1</param>
         /// <param name="key2">输出的key2</param>
         /// <returns>是否找到</returns>
-        public bool TryGetKeys(TValue value, out string key1, out string key2)
+        public bool TryGetKeys(TValue value, out TKey1 key1, out TKey2 key2)
         {
             if (valueToKeys.TryGetValue(value, out var keys))
             {
@@ -175,8 +219,8 @@ namespace ES {
                 return true;
             }
 
-            key1 = null;
-            key2 = null;
+            key1 = default;
+            key2 = default;
             return false;
         }
 
@@ -193,21 +237,84 @@ namespace ES {
         /// <summary>
         /// 获取条目数量
         /// </summary>
-        public int Count => valueToKeys.Count;
+        public int Count
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => valueToKeys.Count;
+        }
 
         /// <summary>
         /// 获取所有值的集合
         /// </summary>
-        public Dictionary<TValue, (string key1, string key2)>.KeyCollection Values => valueToKeys.Keys;
+        public Dictionary<TValue, (TKey1 key1, TKey2 key2)>.KeyCollection Values => valueToKeys.Keys;
 
         /// <summary>
         /// 获取所有key1的集合
         /// </summary>
-        public Dictionary<string, TValue>.KeyCollection Key1s => key1ToValue.Keys;
+        public Dictionary<TKey1, TValue>.KeyCollection Key1s => key1ToValue.Keys;
 
         /// <summary>
         /// 获取所有key2的集合
         /// </summary>
-        public Dictionary<string, TValue>.KeyCollection Key2s => key2ToValue.Keys;
+        public Dictionary<TKey2, TValue>.KeyCollection Key2s => key2ToValue.Keys;
     }
-}
+
+    /// <summary>
+    /// 双键字典：支持使用两种不同的string键中的任意一个查询同一个值
+    /// 用于资源加载系统中，可以通过资源名或资源ID等不同方式查询同一资源
+    /// </summary>
+    /// <typeparam name="TValue">存储的值类型</typeparam>
+    public class TwoStringKeyDictionary<TValue> : MultiKeyDictionary<string, string, TValue>
+    {
+        /// <summary>
+        /// 通过任意一个键获取值
+        /// </summary>
+        /// <param name="key">键（可以是key1或key2）</param>
+        /// <returns>对应的值</returns>
+        public TValue Get(string key)
+        {
+            if (string.IsNullOrEmpty(key))
+                throw new ArgumentException("Key cannot be null or empty", nameof(key));
+
+            // 先尝试key1
+            if (TryGetByKey1(key, out TValue value))
+                return value;
+            
+            // 再尝试key2
+            if (TryGetByKey2(key, out value))
+                return value;
+            
+            throw new KeyNotFoundException($"Key '{key}' not found");
+        }
+
+        /// <summary>
+        /// 检查是否包含指定的键
+        /// </summary>
+        /// <param name="key">键（可以是key1或key2）</param>
+        /// <returns>是否包含</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsKey(string key)
+        {
+            return !string.IsNullOrEmpty(key) && 
+                   (ContainsKey1(key) || ContainsKey2(key));
+        }
+
+        /// <summary>
+        /// 通过任意一个键移除条目
+        /// </summary>
+        /// <param name="key">键（可以是key1或key2）</param>
+        /// <returns>是否成功移除</returns>
+        public bool RemoveByKey(string key)
+        {
+            if (string.IsNullOrEmpty(key))
+                return false;
+
+            if (RemoveByKey1(key) || RemoveByKey2(key))
+            {
+                return true;
+            }
+
+            return false;
+        }
+    }
+  }

@@ -16,14 +16,14 @@ using UnityEngine;
 namespace ES
 {
     [Serializable]
-    public abstract class ESResReferAB
+    public abstract class ESResReferABBase
     {
         public abstract void Draw();
         
         
     }
     [Serializable]
-    public class ESResRefer<T> : ESResReferAB where T : UnityEngine.Object
+    public class ESResRefer<T> : ESResReferABBase where T : UnityEngine.Object
     {
 #if UNITY_EDITOR
         private bool Refresh = true;
@@ -91,7 +91,7 @@ namespace ES
 
     }
 #if UNITY_EDITOR
-    public class ESResReferDrawer : OdinValueDrawer<ESResReferAB>
+    public class ESResReferDrawer : OdinValueDrawer<ESResReferABBase>
     {
         protected override void DrawPropertyLayout(GUIContent label)
         {

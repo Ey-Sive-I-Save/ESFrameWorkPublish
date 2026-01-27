@@ -105,7 +105,7 @@ namespace ES
 
         public void AddAsset2LoadByPathSourcer(string path, Action<bool, ESResSource> listener = null, bool AtLastOrFirst = true)
         {
-            if (ESResMaster.GlobalAssetKeys.TryGetByKey1(path, out var assetKey))
+            if (ESResMaster.GlobalAssetKeys.TryGetESResKeyByPath(path, out var assetKey))
             {
                 Add2LoadByKey(assetKey, ESResSourceLoadType.ABAsset, listener, AtLastOrFirst);
             }else
@@ -116,7 +116,7 @@ namespace ES
 
         public void AddAsset2LoadByGUIDSourcer(string guid, Action<bool, ESResSource> listener = null, bool AtLastOrFirst = true)
         {
-            if (ESResMaster.GlobalAssetKeys.TryGetByKey2(guid, out var assetKey))
+            if (ESResMaster.GlobalAssetKeys.TryGetESResKeyByGUID(guid, out var assetKey))
             {
                 Add2LoadByKey(assetKey, ESResSourceLoadType.ABAsset, listener, AtLastOrFirst);
             }

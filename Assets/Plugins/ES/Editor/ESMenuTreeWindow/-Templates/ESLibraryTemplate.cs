@@ -125,6 +125,7 @@ namespace ES
             private ESAreaSolver area = new ESAreaSolver();
             private ESDragAtSolver dragAt = new ESDragAtSolver();
             [OnInspectorGUI]
+            [HorizontalGroup("水平布局")]
             public void DrawSelfAndBooks()
             {
                 SirenixEditorGUI.BeginBox();
@@ -142,6 +143,7 @@ namespace ES
 
                 REForBooks.DoLayoutList();
             }
+            [HorizontalGroup("水平布局")]
             [OnInspectorGUI]
             public void DrawBookAndPages()
             {
@@ -179,6 +181,7 @@ namespace ES
                 area.UpdateAtLast();
             }
             [OnInspectorGUI]
+            [HorizontalGroup("水平布局")]
             public void DrawPage()
             {
                 if (book == null || page == null || !book.pages.Contains(page)) return;
@@ -196,7 +199,7 @@ namespace ES
             {
                 createText = $"--编辑库【{library.GetSTR()}】--";
                 REForBooks = new ReorderableList(library.Books, typeof(TBook))
-                {
+                { 
                     draggable = true,      // 允许拖拽排序
                     displayAdd = true, // 显示添加按钮
                     displayRemove = true, // 显示移除按钮

@@ -23,7 +23,7 @@ MonoBehaviour:
     SerializationNodes: []
   Name: "\u7537\u5A18\u5E93"
   LibFolderName: nanniangku
-  ChangeCount: 4
+  ChangeCount: 5
   IsMainInClude: 1
   Books:
   - Name: book PreNameToABKeys
@@ -33,7 +33,7 @@ MonoBehaviour:
       namedOption: 0
       OB: {fileID: 2800000, guid: 17ec984bb532f85458d23ca13aaa6bce, type: 3}
     - Name: EditorInitAndUpdater
-      namedOption: 0
+      namedOption: 2
       OB: {fileID: 11500000, guid: 9b711d233bc2a35488f86c11e47ff561, type: 3}
     - Name: EditorInitAndUpdater
       namedOption: 0
@@ -50,6 +50,15 @@ MonoBehaviour:
   - Name: book PreNameToABKeys
     Desc: 
     pages: []
+  - Name: "\u4F9D\u8D56\u6D4B\u8BD5"
+    Desc: 
+    pages:
+    - Name: GameObject (3)
+      namedOption: 0
+      OB: {fileID: 7055376591365242435, guid: 495b09c783492784e88277aa816dfdce, type: 3}
+    - Name: New Circle Denpendce Samples
+      namedOption: 0
+      OB: {fileID: 11400000, guid: 4d014869d6589ff45b23e49383b4e2b7, type: 2}
   Desc: "\u63CF\u8FF0\uFF1A\u8FD9\u662F\u4E00\u4E2A\u505A\u5565\u7684\u5E93"
   ContainsBuild: 1
   IsNet: 0

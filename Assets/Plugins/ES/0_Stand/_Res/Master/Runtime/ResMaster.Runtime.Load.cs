@@ -30,7 +30,7 @@ namespace ES
         /// 用于快速定位资源在哪个AB包中
         /// </summary>
         [NonSerialized,ShowInInspector]
-        public static TwoKeyDictionary<ESResKey> GlobalAssetKeys = new TwoKeyDictionary<ESResKey>();
+        public static PathOrGUIDToESResKey GlobalAssetKeys = new PathOrGUIDToESResKey();
 
         /// <summary>
         /// 全局ABKeys缓存：AB包名 -> ESResKey

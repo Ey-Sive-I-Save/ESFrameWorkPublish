@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 3593759513
+CRC: 693010936
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: 16ed32ac416c3af81885b3986f466fbd
+    Hash: 9b8aacb0ae136b1e39f7beab6305744d
   TypeTreeHash:
     serializedVersion: 2
-    Hash: 3ed4c98298b940074094be583f3a4147
+    Hash: 2aec3c87f60e0e18d68cbe688eee9428
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: 16ed32ac416c3af81885b3986f466fbd
+    Hash: 9b8aacb0ae136b1e39f7beab6305744d
 HashAppended: 1
 ClassTypes:
 - Class: 1
@@ -70,6 +70,10 @@ ClassTypes:
   Script: {fileID: 11500000, guid: e9b5eb84b2c2fc94eba2e90a564db28f, type: 3}
 - Class: 114
   Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: e4815b677e9fb2d4fb96a0343968a27a, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: a43b0f8f0c53eba4e8fb65148bafdd7a, type: 3}
 - Class: 115
   Script: {instanceID: 0}
 - Class: 157
@@ -85,4 +89,5 @@ ClassTypes:
 SerializeReferenceClassIdentifiers: []
 Assets:
 - Assets/NormalResources/Scenes/SampleScene 3.unity
-Dependencies: []
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/InitialTarget/WindowsPlayer/sharedab_cycle_0_9d8809aaed148e336b74e4dbc17515db

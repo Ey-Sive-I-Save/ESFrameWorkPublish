@@ -1,5 +1,5 @@
 ManifestFileVersion: 0
-CRC: 2695467624
+CRC: 481719552
 AssetBundleManifest:
   AssetBundleInfos:
     Info_0:
@@ -20,8 +20,9 @@ AssetBundleManifest:
       Dependencies:
         Dependency_0: assets_normalresources_prefabs_lasefangkuai_prefab_da6df84dbbc22a9d2b67fe03014d2ec4
     Info_5:
-      Name: assets_normalresources_scenes_samplescene_3_unity_16ed32ac416c3af81885b3986f466fbd
-      Dependencies: {}
+      Name: assets_normalresources_scenes_samplescene_3_unity_9b8aacb0ae136b1e39f7beab6305744d
+      Dependencies:
+        Dependency_0: sharedab_cycle_0_9d8809aaed148e336b74e4dbc17515db
     Info_6:
       Name: assets_normalresources_scenes_samplescene_unity_2b1257e71370b7b953540e1ee1740379
       Dependencies:
@@ -53,4 +54,7 @@ AssetBundleManifest:
       Dependencies: {}
     Info_14:
       Name: assets_normalresources_sprites_0_stand_png_edefc86dda736b43c29addedf6368863
+      Dependencies: {}
+    Info_15:
+      Name: sharedab_cycle_0_9d8809aaed148e336b74e4dbc17515db
       Dependencies: {}

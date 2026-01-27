@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 namespace ES
 {
@@ -24,6 +25,7 @@ namespace ES
         #region 私有保护
         protected string m_ResName;
         protected string m_ABName;
+        public string libFolderName;
         private ResSourceState m_ResSourceState = ResSourceState.Waiting;
         protected UnityEngine.Object m_Asset;
         protected float m_LastKnownProgress;
@@ -31,10 +33,11 @@ namespace ES
         private event Action<bool, ESResSource> m_OnLoadOKAction;
         public ESResSourceLoadType m_LoadType;
         private int m_ReferenceCount;
-        public void Set(string ABName, string ResName, ESResSourceLoadType loadType)
+        public void Set(string ABName, string _ResName, string libFolderName, ESResSourceLoadType loadType)
         {
             m_ABName = ABName;
-            m_ResName = ResName;
+            m_ResName = _ResName;
+            this.libFolderName = libFolderName;
             m_LoadType = loadType;
             IsRecycled = false;
             m_LastKnownProgress = 0f;
@@ -43,7 +46,8 @@ namespace ES
         }
         #endregion
         //路径
-        public string ResName => m_ResName;
+
+        public string ResName { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => m_ResName; }
         public ResSourceState State
         {
             get { return m_ResSourceState; }
@@ -360,8 +364,6 @@ namespace ES
             if (!ESResMaster.GlobalDependencies.TryGetValue(ABName, out var deps))
             {
                 return Nulldeps;
-                deps = ESResMaster.Instance.MainManifest.GetAllDependencies(ResName);
-                ESResMaster.GlobalDependencies[ABName] = deps;
             }
             return deps;
         }
@@ -521,17 +523,17 @@ namespace ES
 
             if (m_Asset == null)
             {
-                string localBasePath = ESResMaster.Instance.GetDownloadLocalPath();
-                string bundlePath = Path.Combine(localBasePath, ResName);
-                Debug.Log($"[ESABSource.LoadSelf] 创建异步加载请求: {bundlePath}");
+                var bundlePath = Path.Combine(ESResMaster.Instance.GetDownloadLocalPath(), libFolderName, "AB", ResName);
+                Debug.Log($"[ESABSource.LoadSelf] 创建异步加载请求（含Hash）: {ResName})");
                 var request = AssetBundle.LoadFromFileAsync(bundlePath);
-
                 if (request == null)
                 {
-                    Debug.LogError($"[ESABSource.LoadSelf] 无法创建AssetBundle加载请求: {bundlePath}");
+                    Debug.LogError($"[ESABSource.LoadSelf] 无法创建带Hash的AssetBundle加载请求: {ResName}");
                     OnResLoadFaild("无法创建AssetBundle加载请求");
                     yield break;
                 }
+
+                Debug.Log($"[ESABSource.LoadSelf] 开始等待带Hash的AssetBundle加载完成: {ResName}");
 
                 Debug.Log($"[ESABSource.LoadSelf] 开始等待AssetBundle加载完成: {bundlePath}");
                 while (!request.isDone)
@@ -551,15 +553,13 @@ namespace ES
                 {
                     Debug.Log($"[ESABSource.LoadSelf] AssetBundle加载成功: {bundlePath}");
                 }
+                Debug.Log($"[ESABSource.LoadSelf] AssetBundle '{ResName}' 加载完成，设置进度为1。");
+                ReportProgress(1f);
             }
             else
             {
-                Debug.Log($"[ESABSource.LoadSelf] 使用缓存的AssetBundle: {ResName}");
-                CompleteWithAsset(m_Asset);
+                Debug.Log($"[ESABSource.LoadSelf] AssetBundle '{ResName}' 已加载，跳过加载步骤。");
             }
-
-            Debug.Log($"[ESABSource.LoadSelf] AssetBundle '{ResName}' 加载完成，设置进度为1。");
-            ReportProgress(1f);
         }
         protected override float CalculateProgress()
         {

@@ -257,14 +257,14 @@ namespace ES
         {
             var use = PoolForESABSource.GetInPool();
             use.IsNet = true;//还没实装
-            use.Set(abKey.ABName, abKey.ABName, ESResSourceLoadType.AssetBundle); // Assuming ABName is used for both
+            use.Set(abKey.ABName, abKey.ResName, abKey.LibFolderName, ESResSourceLoadType.AssetBundle); // Assuming ABName is used for both
             use.TargetType = typeof(AssetBundle);
             return use;
         }
         internal ESResSource CreateResSource_ABAsset(ESResKey key)
         {
             var use = PoolForESAsset.GetInPool();
-            use.Set(key.ABName, key.ResName, ESResSourceLoadType.ABAsset);
+            use.Set(key.ABName, key.ResName, key.LibFolderName, ESResSourceLoadType.ABAsset);
             use.TargetType = key.TargetType;
             return use;
         }

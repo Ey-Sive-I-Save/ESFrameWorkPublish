@@ -380,8 +380,11 @@ namespace ES
                     continue;
                 }
 
-                // 库数据路径：basePath/{Platform}/ESResData/{LibFolderName}
-                string libDataPath = Path.Combine(basePath, platformFolderName, library.LibFolderName);
+                // 库数据路径：basePath/{Platform}/ESResData/{LibFolderName}/AB
+                string libDataPath = Path.Combine(basePath, platformFolderName, library.LibFolderName, "AB");
+
+                // 确保目录存在
+                Directory.CreateDirectory(libDataPath);
 
                 if (!Directory.Exists(libDataPath))
                 {
@@ -630,6 +633,7 @@ namespace ES
                         : ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_;
                     // 目标目录：basePath/{Platform}/ESResData/{LibFolderName}
                     string LibDataPath = basePath + "/" + ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform) + "/" + library.LibFolderName;
+                    string LibABPath = LibDataPath + "/AB";
 
                     foreach (var abName in libABNames)
                     {
@@ -646,7 +650,7 @@ namespace ES
                             if (abDepend.Length > 0)
                                 abMetadata.Dependences.Add(abName, abDepend);
 
-                            ESResKey key = new ESResKey() { LibName = libName, LibFolderName = library.LibFolderName, ABName = abName, SourceLoadType = ESResSourceLoadType.AssetBundle, ResName = abName, TargetType = typeof(AssetBundle) };
+                            ESResKey key = new ESResKey() { LibName = libName, LibFolderName = library.LibFolderName, ABName = abName, SourceLoadType = ESResSourceLoadType.AssetBundle, ResName = withHash, TargetType = typeof(AssetBundle) };
                             abMetadata.ABKeys.Add(key);
 
 
@@ -668,7 +672,7 @@ namespace ES
                                 }
                                 if (!string.IsNullOrEmpty(oldWithHash))
                                 {
-                                    string oldPath = Path.Combine(LibDataPath, oldWithHash);
+                                    string oldPath = Path.Combine(LibABPath, oldWithHash);
                                     if (File.Exists(oldPath))
                                     {
                                         File.Delete(oldPath);
@@ -679,7 +683,7 @@ namespace ES
 
                                 // 移动新的AB包
                                 string sourcePath = Path.Combine(initPath, withHash);
-                                string targetPath = Path.Combine(LibDataPath, withHash);
+                                string targetPath = Path.Combine(LibABPath, withHash);
                                 if (File.Exists(sourcePath))
                                 {
                                     try
@@ -733,10 +737,10 @@ namespace ES
                     {
 
                         // 创建库目录
-                        var createResult = ESDesignUtility.SafeEditor.Quick_System_CreateDirectory(LibDataPath);
+                        var createResult = ESDesignUtility.SafeEditor.Quick_System_CreateDirectory(LibABPath);
                         if (!createResult.Success)
                         {
-                            string errorMsg = $"创建目录失败：{LibDataPath}，消息：{createResult.Message}";
+                            string errorMsg = $"创建目录失败：{LibABPath}，消息：{createResult.Message}";
                             summary.AppendLine($"异常: {errorMsg}");
                             Debug.LogError(errorMsg);
                             continue;
@@ -794,13 +798,14 @@ namespace ES
                         continue;
 
                     string LibDataPath = Path.Combine(basePath, plat, library.LibFolderName);
+                    string LibABPath = LibDataPath + "/AB";
 
                     foreach (var abName in libABNames)
                     {
                         if (preToHash.TryGetValue(abName, out var withHash))
                         {
                             string sourcePath = Path.Combine(initPath, withHash);
-                            string targetPath = Path.Combine(LibDataPath, withHash);
+                            string targetPath = Path.Combine(LibABPath, withHash);
                             if (File.Exists(sourcePath))
                             {
                                 try

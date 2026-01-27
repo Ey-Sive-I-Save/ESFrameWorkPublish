@@ -397,7 +397,7 @@ namespace ES
                 bool abDownloadFailed = false;
                 string abLocalFilePath = Path.Combine(abLocalPath, hashedName);
                 yield return DownloadFileWithRetries(
-                    libNetPath + "/" + hashedName,
+                    DefaultPaths.GetNetABHashedPath(lib.FolderName, hashedName),
                     abLocalFilePath,
                     () =>
                     {

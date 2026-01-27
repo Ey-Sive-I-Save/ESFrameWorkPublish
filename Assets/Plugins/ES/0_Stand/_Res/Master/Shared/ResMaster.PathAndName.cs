@@ -565,13 +565,6 @@ namespace ES
                 return string.Format(LocalBuildLibBaseTemplate, libFolderName);
             }
 
-            /// <summary>
-            /// 获取AB包的本地构建路径。
-            /// </summary>
-            public static string GetLocalBuildABPath(string abName)
-            {
-                return LocalBuildPath + "/" + abName;
-            }
 
             /// <summary>
             /// 获取AB包的网络路径。
@@ -582,19 +575,19 @@ namespace ES
             }
 
             /// <summary>
-            /// 获取AB包的本地下载路径。
-            /// </summary>
-            public static string GetLocalABPath(string abName)
-            {
-                return LocalBasePath + "/" + abName;
-            }
-
-            /// <summary>
             /// 获取指定库的网络AB包基础路径。
             /// </summary>
             public static string GetNetABBasePath(string libFolderName)
             {
                 return string.Format(NetLibBaseTemplate, libFolderName) + "/AB";
+            }
+
+            /// <summary>
+            /// 获取指定库的网络AB包带哈希路径。
+            /// </summary>
+            public static string GetNetABHashedPath(string libFolderName, string hashedName)
+            {
+                return GetNetABBasePath(libFolderName) + "/" + hashedName;
             }
 
             /// <summary>

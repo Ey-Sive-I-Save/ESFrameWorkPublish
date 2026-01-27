@@ -435,6 +435,18 @@ namespace ES
 
         public void ReleaseAll(bool resumePooling = true)
         {
+            // 如果应用正在退出，跳过释放逻辑以避免在关闭时执行
+            if (!Application.isPlaying)
+            {
+                mLoadingCount = 0;
+                mListener_ForLoadAllOK = null;
+                LoaderResKeys.Clear();
+                LoaderKeyToRes.Clear();
+                LoaderResSources.Clear();
+                LoaderResRefCounts.Clear();
+                return;
+            }
+
             CancelPendingLoads(releaseResources: true);
 
             foreach (var res in LoaderResSources.ToArray())
@@ -585,8 +597,8 @@ namespace ES
                     LoaderResRefCounts[res] = count;
                 }
             }
-
-            ESResMaster.Instance.ReleaseResHandle(key, loadType, unloadWhenZero);
+            
+            if(!ESSystem.IsQuitting) ESResMaster.Instance.ReleaseResHandle(key, loadType, unloadWhenZero);
             return LoaderResRefCounts.TryGetValue(res, out var remain) ? remain : 0;
         }
 

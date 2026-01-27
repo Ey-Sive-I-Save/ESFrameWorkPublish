@@ -23,7 +23,7 @@ MonoBehaviour:
     SerializationNodes: []
   Name: Library Name
   LibFolderName: haha11
-  ChangeCount: 0
+  ChangeCount: 4
   IsMainInClude: 1
   Books:
   - Name: book PreNameToABKeys

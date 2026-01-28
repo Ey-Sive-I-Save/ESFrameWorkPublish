@@ -1,12 +1,57 @@
+#if !ES_LOG_DISABLED
+#define ES_LOG
+#endif
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using Debug = ES.ESLog;
 namespace ES
 {
+    internal static class ESLog
+    {
+        [Conditional("ES_LOG")]
+        public static void Log(object message)
+        {
+            UnityEngine.Debug.Log(message);
+        }
+
+        [Conditional("ES_LOG")]
+        public static void LogWarning(object message)
+        {
+            UnityEngine.Debug.LogWarning(message);
+        }
+
+        [Conditional("ES_LOG")]
+        public static void LogError(object message)
+        {
+            UnityEngine.Debug.LogError(message);
+        }
+
+        [Conditional("ES_LOG")]
+        public static void LogFormat(string format, params object[] args)
+        {
+            UnityEngine.Debug.LogFormat(format, args);
+        }
+
+        [Conditional("ES_LOG")]
+        public static void LogWarningFormat(string format, params object[] args)
+        {
+            UnityEngine.Debug.LogWarningFormat(format, args);
+        }
+
+        [Conditional("ES_LOG")]
+        public static void LogErrorFormat(string format, params object[] args)
+        {
+            UnityEngine.Debug.LogErrorFormat(format, args);
+        }
+    }
+
     /// <summary>
     /// ESResSource 抽象基类
     /// 
@@ -20,34 +65,35 @@ namespace ES
     /// - 同时实现 IPoolableAuto，便于通过对象池反复复用。
     /// 具体加载细节交给子类（如从本地 AB 或远程流加载）。
     /// </summary>
-    public abstract class ESResSource : IEnumeratorTask, IPoolableAuto
+    public abstract class ESResSourceBase : IEnumeratorTask, IPoolableAuto
     {
         #region 私有保护
-        protected string m_ResName;
-        protected string m_ABName;
-        public string libFolderName;
+        protected ESResKey m_ResKey;
         private ResSourceState m_ResSourceState = ResSourceState.Waiting;
         protected UnityEngine.Object m_Asset;
         protected float m_LastKnownProgress;
         protected string m_LastErrorMessage;
-        private event Action<bool, ESResSource> m_OnLoadOKAction;
+        private event Action<bool, ESResSourceBase> m_OnLoadOKAction;
         public ESResSourceLoadType m_LoadType;
         private int m_ReferenceCount;
-        public void Set(string ABName, string _ResName, string libFolderName, ESResSourceLoadType loadType)
+        public ESResKey ResKey => m_ResKey;
+        public string ResName { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => m_ResKey?.ResName; }
+        public string ABName { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => m_ResKey?.ABName; }
+        public string LibFolderName { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => m_ResKey?.LibFolderName; }
+
+        public void Set(ESResKey resKey, ESResSourceLoadType loadType)
         {
-            m_ABName = ABName;
-            m_ResName = _ResName;
-            this.libFolderName = libFolderName;
+            m_ResKey = resKey;
             m_LoadType = loadType;
+            TargetType = resKey?.TargetType;
             IsRecycled = false;
             m_LastKnownProgress = 0f;
             m_LastErrorMessage = null;
             m_ReferenceCount = 0;
+            Initilized();
         }
         #endregion
         //路径
-
-        public string ResName { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => m_ResName; }
         public ResSourceState State
         {
             get { return m_ResSourceState; }
@@ -63,8 +109,6 @@ namespace ES
                 }
             }
         }
-        public string ABName => m_ABName;
-
         public Type TargetType { get; set; }
 
         public UnityEngine.Object Asset => m_Asset;
@@ -99,6 +143,10 @@ namespace ES
             return 0;
         }
 
+        protected virtual void Initilized()
+        {
+        }
+
         protected void BeginLoad()
         {
             m_LastErrorMessage = null;
@@ -123,6 +171,81 @@ namespace ES
             m_LastKnownProgress = 1f;
             State = ResSourceState.Ready;
             return true;
+        }
+
+        protected bool TryGetLocalABLoadPath(out string localPath)
+        {
+            localPath = m_ResKey?.LocalABLoadPath;
+            return !string.IsNullOrEmpty(localPath);
+        }
+
+        protected bool TryLoadAssetFromLocalABSync(Func<AssetBundle, UnityEngine.Object> loader, out bool attempted)
+        {
+            attempted = TryGetLocalABLoadPath(out var localPath);
+            if (!attempted || loader == null)
+            {
+                return false;
+            }
+
+            var bundle = AssetBundle.LoadFromFile(localPath);
+            if (bundle == null)
+            {
+                Debug.LogWarning($"AB直载失败: {localPath}");
+                return false;
+            }
+
+            UnityEngine.Object asset = null;
+            try
+            {
+                asset = loader(bundle);
+            }
+            finally
+            {
+                bundle.Unload(false);
+            }
+
+            if (!CompleteWithAsset(asset))
+            {
+                Debug.LogError($"同步加载资源失败: {ResName}");
+                return false;
+            }
+
+            return true;
+        }
+
+        protected IEnumerator TryLoadAssetFromLocalABAsync(Func<AssetBundle, IEnumerator> loader, Action<bool> onFinished)
+        {
+            if (!TryGetLocalABLoadPath(out var localPath) || loader == null)
+            {
+                onFinished?.Invoke(false);
+                yield break;
+            }
+
+            var bundleRequest = AssetBundle.LoadFromFileAsync(localPath);
+            if (bundleRequest == null)
+            {
+                Debug.LogWarning($"AB直载请求失败: {localPath}");
+                onFinished?.Invoke(false);
+                yield break;
+            }
+
+            while (!bundleRequest.isDone)
+            {
+                ReportProgress(Mathf.Lerp(0.1f, 0.5f, bundleRequest.progress));
+                yield return null;
+            }
+
+            var bundle = bundleRequest.assetBundle;
+            if (bundle == null)
+            {
+                Debug.LogWarning($"AB直载失败: {localPath}");
+                onFinished?.Invoke(false);
+                yield break;
+            }
+
+            yield return loader(bundle);
+            bundle.Unload(false);
+            onFinished?.Invoke(State == ResSourceState.Ready);
         }
 
         internal int RetainReference()
@@ -158,7 +281,7 @@ namespace ES
             m_LastKnownProgress = 0f;
             m_LastErrorMessage = null;
         }
-        public void OnLoadOKAction_Submit(Action<bool, ESResSource> listener)
+        public void OnLoadOKAction_Submit(Action<bool, ESResSourceBase> listener)
         {
             if (listener == null)
             {
@@ -174,7 +297,7 @@ namespace ES
             m_OnLoadOKAction += listener;
         }
 
-        public void OnLoadOKAction_WithDraw(Action<bool, ESResSource> listener)
+        public void OnLoadOKAction_WithDraw(Action<bool, ESResSourceBase> listener)
         {
             if (listener == null)
             {
@@ -343,21 +466,25 @@ namespace ES
 
         public void OnResetAsPoolable()
         {
-            m_ResName = null;
+            m_ResKey = null;
             m_OnLoadOKAction = null;
-            m_ABName = null;
             m_Asset = null;
             m_LastKnownProgress = 0f;
             m_LastErrorMessage = null;
             m_ResSourceState = ResSourceState.Waiting;
             IsRecycled = false;
             m_ReferenceCount = 0;
+            TargetType = null;
         }
     }
-    public class ESABSource : ESResSource
+    public class ESABSource : ESResSourceBase
     {
         public bool IsNet = true;
         public readonly string[] Nulldeps = new string[0];
+
+        protected override void Initilized()
+        {
+        }
         public override string[] GetDependResSourceAllAssetBundles(out bool withHash)
         {
             withHash = false;//Dependences是不带hash
@@ -377,7 +504,14 @@ namespace ES
 
             BeginLoad();
 
-            var cached = ESResMaster.HasLoadedAB(m_ResName);
+            if (TryLoadAssetFromLocalABSync(
+                ab => TargetType != null ? ab.LoadAsset(ResName, TargetType) : ab.LoadAsset(ResName),
+                out var attemptedLocal) && attemptedLocal)
+            {
+                return true;
+            }
+
+            var cached = ESResMaster.HasLoadedAB(ResName);
             if (cached != null)
             {
                 return CompleteWithAsset(cached);
@@ -407,8 +541,8 @@ namespace ES
                 }
             }
 
-            string localBasePath = ESResMaster.Instance.GetDownloadLocalPath();
-            string bundlePath = Path.Combine(localBasePath, ResName);
+            
+            string bundlePath = m_ResKey?.LocalABLoadPath ?? Path.Combine(ESResMaster.Instance.GetDownloadLocalPath(), LibFolderName ?? string.Empty, "AB", ResName);
             var bundle = AssetBundle.LoadFromFile(bundlePath);
             if (!CompleteWithAsset(bundle))
             {
@@ -433,7 +567,7 @@ namespace ES
             Debug.Log($"[ESABSource.DoTaskAsync] 初始化加载状态: {ResName}");
             BeginLoad();
 
-            var cached = ESResMaster.HasLoadedAB(m_ResName);
+            var cached = ESResMaster.HasLoadedAB(ResName);
             if (cached != null)
             {
                 Debug.Log($"[ESABSource.DoTaskAsync] 使用缓存的AssetBundle: {ResName}");
@@ -445,7 +579,7 @@ namespace ES
             var dependsAB = GetDependResSourceAllAssetBundles(out bool withHash);
             Debug.Log($"[ESABSource.DoTaskAsync] 获取到 {dependsAB?.Length ?? 0} 个依赖AB，withHash: {withHash}");
 
-            var dependencyResults = new Dictionary<ESResSource, bool?>();
+            var dependencyResults = new Dictionary<ESResSourceBase, bool?>();
             if (dependsAB != null && dependsAB.Length > 0)
             {
                 for (int i = 0; i < dependsAB.Length; i++)
@@ -523,7 +657,7 @@ namespace ES
 
             if (m_Asset == null)
             {
-                var bundlePath = Path.Combine(ESResMaster.Instance.GetDownloadLocalPath(), libFolderName, "AB", ResName);
+                var bundlePath = m_ResKey?.LocalABLoadPath ?? Path.Combine(ESResMaster.Instance.GetDownloadLocalPath(), LibFolderName ?? string.Empty, "AB", ResName);
                 Debug.Log($"[ESABSource.LoadSelf] 创建异步加载请求（含Hash）: {ResName})");
                 var request = AssetBundle.LoadFromFileAsync(bundlePath);
                 if (request == null)
@@ -577,7 +711,7 @@ namespace ES
             instance?.PoolForESABSource.PushToPool(this);
         }
     }
-    public class ESAssetSource : ESResSource
+    public class ESAssetSource : ESResSourceBase
     {
         public override bool LoadSync()
         {
@@ -588,8 +722,24 @@ namespace ES
 
             BeginLoad();
 
+            // 检查全局AB键字典中是否存在对应的AssetBundle键
             if (!ESResMaster.GlobalABKeys.TryGetValue(ABName, out var abKey))
             {
+                var localPath = m_ResKey?.LocalABLoadPath;
+                if (!string.IsNullOrEmpty(localPath))
+                {
+                    var bundle = AssetBundle.LoadFromFile(localPath);
+                    if (bundle != null)
+                    {
+                        var asset = TargetType != null ? bundle.LoadAsset(ResName, TargetType) : bundle.LoadAsset(ResName);
+                        bundle.Unload(false);
+                        if (CompleteWithAsset(asset))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
                 OnResLoadFaild($"未找到AB键: {ABName}");
                 return false;
             }
@@ -647,6 +797,32 @@ namespace ES
             // 检查全局AB键字典中是否存在对应的AssetBundle键
             if (!ESResMaster.GlobalABKeys.TryGetValue(ABName, out var abKey))
             {
+                var localPath = m_ResKey?.LocalABLoadPath;
+                if (!string.IsNullOrEmpty(localPath))
+                {
+                    var bundleRequest = AssetBundle.LoadFromFileAsync(localPath);
+                    if (bundleRequest != null)
+                    {
+                        while (!bundleRequest.isDone)
+                        {
+                            ReportProgress(Mathf.Lerp(0.1f, 0.5f, bundleRequest.progress));
+                            yield return null;
+                        }
+
+                        var bundle = bundleRequest.assetBundle;
+                        if (bundle != null)
+                        {
+                            yield return LoadSelf(bundle);
+                            bundle.Unload(false);
+                            if (State == ResSourceState.Ready)
+                            {
+                                finishCallback?.Invoke();
+                                yield break;
+                            }
+                        }
+                    }
+                }
+
                 // 如果未找到键，记录错误并调用完成回调
                 Debug.LogError($"[ESAssetSource.DoTaskAsync] 未找到AB键: {ABName}，加载失败。");
                 OnResLoadFaild($"未找到AB键: {ABName}");
@@ -685,7 +861,7 @@ namespace ES
                     dependencyCompleted = true;
                     dependencySuccess = success;
                     // 如果加载失败，记录错误信息
-                    if (!success && res is ESResSource resSource && resSource.HasError)
+                    if (!success && res is ESResSourceBase resSource && resSource.HasError)
                     {
                         dependencyError = resSource.LastErrorMessage;
                     }
@@ -742,7 +918,7 @@ namespace ES
         {
             if (ab != null)
             {
-                AssetBundleRequest request = TargetType != null ? ab.LoadAssetAsync(m_ResName, TargetType) : ab.LoadAssetAsync(m_ResName);
+                AssetBundleRequest request = TargetType != null ? ab.LoadAssetAsync(ResName, TargetType) : ab.LoadAssetAsync(ResName);
                 if (request == null)
                 {
                     OnResLoadFaild("无法创建资源加载请求");

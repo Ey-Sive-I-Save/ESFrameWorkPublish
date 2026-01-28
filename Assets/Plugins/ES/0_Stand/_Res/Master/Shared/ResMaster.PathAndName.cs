@@ -324,7 +324,7 @@ namespace ES
         /// <returns>本地构建路径。</returns>
         public string GetLocalBuildPath()
         {
-            return Application.streamingAssetsPath + "/" + ESGlobalResSetting.ResParentFolderName;
+            return Application.streamingAssetsPath + "/" + ESGlobalResSetting.ResParentFolderName+"/"+ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform);
         }
 
         /// <summary>
@@ -557,12 +557,11 @@ namespace ES
             }
 
             /// <summary>
-            /// 获取指定库的本地构建基础路径。
-            /// AB包直接与JSON文件混放在此路径下。
+            /// 获取指定库的本地构建AB包基础路径。
             /// </summary>
             public static string GetLocalBuildLibBasePath(string libFolderName)
             {
-                return string.Format(LocalBuildLibBaseTemplate, libFolderName);
+                return string.Format(LocalBuildLibBaseTemplate, libFolderName) + "/AB";
             }
 
 

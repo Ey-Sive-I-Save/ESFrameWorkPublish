@@ -176,9 +176,9 @@ namespace ES
         #endregion
 
         #region 资源源查询
-        public ESResSource CreateNewResSourceByKey(object key, ESResSourceLoadType loadType)
+        public ESResSourceBase CreateNewResSourceByKey(object key, ESResSourceLoadType loadType)
         {
-            ESResSource retRes = null;
+            ESResSourceBase retRes = null;
 
             if (loadType == ESResSourceLoadType.AssetBundle)
             {
@@ -203,9 +203,9 @@ namespace ES
             return retRes;
         }
 
-        public ESResSource GetResSourceByKey(object key, ESResSourceLoadType loadType, bool ifNullCreateNew = true)
+        public ESResSourceBase GetResSourceByKey(object key, ESResSourceLoadType loadType, bool ifNullCreateNew = true)
         {
-            ESResSource res = null;
+            ESResSourceBase res = null;
             if (loadType == ESResSourceLoadType.ABAsset)
             {
                 res = ResTable.GetAssetResByKey(key);
@@ -253,18 +253,18 @@ namespace ES
         #endregion
 
         #region 资源源创建方式
-        internal ESResSource CreateResSource_AssetBundle(ESResKey abKey)
+        internal ESResSourceBase CreateResSource_AssetBundle(ESResKey abKey)
         {
             var use = PoolForESABSource.GetInPool();
             use.IsNet = true;//还没实装
-            use.Set(abKey.ABName, abKey.ResName, abKey.LibFolderName, ESResSourceLoadType.AssetBundle); // Assuming ABName is used for both
+            use.Set(abKey, ESResSourceLoadType.AssetBundle);
             use.TargetType = typeof(AssetBundle);
             return use;
         }
-        internal ESResSource CreateResSource_ABAsset(ESResKey key)
+        internal ESResSourceBase CreateResSource_ABAsset(ESResKey key)
         {
             var use = PoolForESAsset.GetInPool();
-            use.Set(key.ABName, key.ResName, key.LibFolderName, ESResSourceLoadType.ABAsset);
+            use.Set(key, ESResSourceLoadType.ABAsset);
             use.TargetType = key.TargetType;
             return use;
         }

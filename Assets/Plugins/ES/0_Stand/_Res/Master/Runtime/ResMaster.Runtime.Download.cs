@@ -112,7 +112,8 @@ namespace ES
                 // 即使不需要下载，也必须加载每个库的JSON信息
                 foreach (var lib in remoteGameIdentity.RequiredLibrariesFolders)
                 {
-                    EnsureLibraryMetadataLoaded(lib.FolderName, lib.IsRemote);
+                    Debug.Log("使用库 " + lib.FolderName + " 无需下载" + lib.IsRemote);
+                    EnsureLibraryMetadataLoaded(lib);
                 }
 
                 GlobalDownloadState = ESResGlobalDownloadState.AllReady;
@@ -221,17 +222,18 @@ namespace ES
                     {
                         if (TryRegisterLibraryFromLocal(lib.FolderName, localLibIdentityPath, true, remoteLibIdentity, out var registeredRemoteLib))
                         {
-                            EnsureLibraryMetadataLoaded(lib.FolderName, true);
+                            EnsureLibraryMetadataLoaded(lib);
                             DownloadedLibraries[lib.FolderName] = registeredRemoteLib;
                         }
                     }
                 }
                 else
                 {
+                    Debug.Log("使用本地库 " + lib.FolderName);
                     string libIdentityPath = DefaultPaths.GetLocalBuildLibIdentityPath(lib.FolderName);
                     if (TryRegisterLibraryFromLocal(lib.FolderName, libIdentityPath, false, null, out var registeredLocalLib))
                     {
-                        EnsureLibraryMetadataLoaded(lib.FolderName, false);
+                        EnsureLibraryMetadataLoaded(lib);
                         DownloadedLibraries[lib.FolderName] = registeredLocalLib;
                     }
                     else
@@ -314,7 +316,7 @@ namespace ES
                 assetKeysLocal,
                 () =>
                 {
-                    InjectAssetKeysData(lib.FolderName, assetKeysLocal);
+                    InjectAssetKeysData(lib, assetKeysLocal);
                     callback?.UpdateProgress(0.3f, "AssetKeys.json下载完成");
                 },
                 error =>
@@ -338,7 +340,7 @@ namespace ES
                 abMetadataLocal,
                 () =>
                 {
-                    abMetadata = InjectABMetadataData(lib.FolderName, abMetadataLocal);
+                    abMetadata = InjectABMetadataData(lib, abMetadataLocal);
                     callback?.UpdateProgress(0.6f, "ABMetadata.json下载完成");
                     if (abMetadata == null)
                     {
@@ -456,15 +458,20 @@ namespace ES
         #endregion
 
         #region 注入辅助
-        private void EnsureLibraryMetadataLoaded(string libFolderName, bool isRemote)
+        private void EnsureLibraryMetadataLoaded(RequiredLibrary lib)
         {
-            if (_injectedLibs.Contains(libFolderName))
+            if (lib == null || string.IsNullOrEmpty(lib.FolderName))
             {
                 return;
             }
 
-            string assetKeysLocal = isRemote ? DefaultPaths.GetLocalAssetKeysPath(libFolderName) : DefaultPaths.GetLocalBuildAssetKeysPath(libFolderName);
-            string abMetadataLocal = isRemote ? DefaultPaths.GetLocalABMetadataPath(libFolderName) : DefaultPaths.GetLocalBuildABMetadataPath(libFolderName);
+            if (_injectedLibs.Contains(lib.FolderName))
+            {
+                return;
+            }
+
+            string assetKeysLocal = lib.IsRemote ? DefaultPaths.GetLocalAssetKeysPath(lib.FolderName) : DefaultPaths.GetLocalBuildAssetKeysPath(lib.FolderName);
+            string abMetadataLocal = lib.IsRemote ? DefaultPaths.GetLocalABMetadataPath(lib.FolderName) : DefaultPaths.GetLocalBuildABMetadataPath(lib.FolderName);
 
             // 注意：这里使用 File.ReadAllText，这在 Android 上直接读取 StreamingAssets (jar:file://) 可能会失败
             // 如果 isRemote 为 false 且在 Android 上，可能需要改用 UnityWebRequest。
@@ -475,15 +482,23 @@ namespace ES
 
             if (File.Exists(assetKeysLocal))
             {
-                InjectAssetKeysData(libFolderName, assetKeysLocal);
+                InjectAssetKeysData(lib, assetKeysLocal);
             }
-            
-            if (File.Exists(abMetadataLocal))
+            else
             {
-                InjectABMetadataData(libFolderName, abMetadataLocal);
+                Debug.LogWarning($"AssetKeys文件不存在 {lib.FolderName}: {assetKeysLocal}");
             }
 
-            _injectedLibs.Add(libFolderName);
+            if (File.Exists(abMetadataLocal))
+            {
+                InjectABMetadataData(lib, abMetadataLocal);
+            }
+            else
+            {
+                Debug.LogWarning($"ABMetadata文件不存在 {lib.FolderName}: {abMetadataLocal}");
+            }
+
+            _injectedLibs.Add(lib.FolderName);
         }
         #endregion
 
@@ -818,9 +833,34 @@ namespace ES
         /// <summary>
         /// 注入AssetKeys数据到大型字典
         /// </summary>
-        /// <param name="libFolderName">库文件夹名</param>
+        /// <param name="lib">库信息</param>
         /// <param name="assetKeysFilePath">AssetKeys文件路径</param>
-        private void InjectAssetKeysData(string libFolderName, string assetKeysFilePath)
+        private static string BuildLocalABLoadPath(RequiredLibrary lib, ESResKey key)
+        {
+            if (lib == null || key == null)
+            {
+                return null;
+            }
+
+            var folderName = lib.FolderName;
+
+            string basePath = lib.IsRemote
+                ? DefaultPaths.GetLocalABBasePath(folderName)
+                : DefaultPaths.GetLocalBuildLibBasePath(folderName);
+
+            if (key.SourceLoadType == ESResSourceLoadType.AssetBundle)
+            {
+                return Path.Combine(basePath, key.ResName);
+            }
+            if (ESResMaster.GlobalABPreToHashes.TryGetValue(key.ResName, out var hashedName))
+            {
+                return Path.Combine(basePath, hashedName);
+            }
+            return "";
+        }
+
+
+        private void InjectAssetKeysData(RequiredLibrary lib, string assetKeysFilePath)
         {
             try
             {
@@ -833,8 +873,9 @@ namespace ES
                     foreach (var assetKey in assetKeysData.AssetKeys)
                     {
                         // 设置库信息
-                        assetKey.LibName = libFolderName;
-                        assetKey.LibFolderName = libFolderName;
+                        assetKey.LibName = lib.FolderName;
+                        assetKey.LibFolderName = lib.FolderName;
+                        assetKey.LocalABLoadPath = BuildLocalABLoadPath(lib, assetKey);
 
                         // 直接使用资源键中的GUID和Path
                         string pathKey = assetKey.Path ?? assetKey.ResName;
@@ -858,22 +899,22 @@ namespace ES
                         }
                     }
 
-                    Debug.Log($"成功注入AssetKeys数据到GlobalAssetKeys: {libFolderName}, 资产数量: {assetKeysData.AssetKeys.Count}");
+                    Debug.Log($"成功注入AssetKeys数据到GlobalAssetKeys: {lib.FolderName}, 资产数量: {assetKeysData.AssetKeys.Count}");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"注入AssetKeys数据失败 {libFolderName}: {ex.Message}");
+                Debug.LogError($"注入AssetKeys数据失败 {lib?.FolderName}: {ex.Message}");
             }
         }
 
         /// <summary>
         /// 注入ABMetadata数据到大型字典
         /// </summary>
-        /// <param name="libFolderName">库文件夹名</param>
+        /// <param name="lib">库信息</param>
         /// <param name="abMetadataFilePath">ABMetadata文件路径</param>
         /// <returns>反序列化的ABMetadata数据对象</returns>
-        private ESResJsonData_ABMetadata InjectABMetadataData(string libFolderName, string abMetadataFilePath)
+        private ESResJsonData_ABMetadata InjectABMetadataData(RequiredLibrary lib, string abMetadataFilePath)
         {
             try
             {
@@ -900,6 +941,9 @@ namespace ES
                     // 合并ABKeys数据到GlobalABKeys
                     foreach (var abKey in abMetadataData.ABKeys)
                     {
+                        abKey.LibName = lib.FolderName;
+                        abKey.LibFolderName = lib.FolderName;
+                        abKey.LocalABLoadPath = BuildLocalABLoadPath(lib, abKey);
                         // 检查现有值是否完整，不完整则替换
                         bool shouldReplace = true;
                         if (GlobalABKeys.TryGetValue(abKey.ABName, out var existingKey))
@@ -924,13 +968,13 @@ namespace ES
                         }
                     }
 
-                    Debug.Log($"成功注入ABMetadata数据到全局字典: {libFolderName}, AB包数量: {abMetadataData.PreToHashes.Count}");
+                    Debug.Log($"成功注入ABMetadata数据到全局字典: {lib.FolderName}, AB包数量: {abMetadataData.PreToHashes.Count}");
                     return abMetadataData;
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"注入ABMetadata数据失败 {libFolderName}: {ex.Message}");
+                Debug.LogError($"注入ABMetadata数据失败 {lib?.FolderName}: {ex.Message}");
             }
             return null;
         }
@@ -944,6 +988,7 @@ namespace ES
             {
                 if (!File.Exists(libIdentityPath))
                 {
+                    Debug.LogWarning($"LibIdentity文件不存在 {libFolderName}: {libIdentityPath}");
                     return false;
                 }
 

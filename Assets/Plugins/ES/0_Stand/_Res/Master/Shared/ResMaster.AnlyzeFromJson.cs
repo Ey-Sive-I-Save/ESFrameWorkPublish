@@ -35,6 +35,8 @@ namespace ES
         public string GUID;
         public string Path;
         public Type TargetType;
+        [NonSerialized]
+        public string LocalABLoadPath;
 
         public bool IsRecycled { get; set; }
 

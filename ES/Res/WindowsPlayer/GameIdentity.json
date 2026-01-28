@@ -1,1 +1,18 @@
-{"BuildTimestamp":"2026-01-27T17:43:45.9552693+08:00","Version":"1.0.0","RequiredLibrariesFolders":[{"FolderName":"haha11","IsRemote":true},{"FolderName":"ceshiku","IsRemote":true},{"FolderName":"nanniangku","IsRemote":false}]}
+{
+    "BuildTimestamp": "2026-01-28T09:10:17.2007742+08:00",
+    "Version": "1.0.0",
+    "RequiredLibrariesFolders": [
+        {
+            "FolderName": "haha11",
+            "IsRemote": true
+        },
+        {
+            "FolderName": "ceshiku",
+            "IsRemote": true
+        },
+        {
+            "FolderName": "nanniangku",
+            "IsRemote": false
+        }
+    ]
+}

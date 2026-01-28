@@ -67,7 +67,7 @@ namespace ES
             });
         }
 
-        private void OnResLoaded(bool success, ESResSource source)
+        private void OnResLoaded(bool success, ESResSourceBase source)
         {
             if (success && source.Asset != null)
             {

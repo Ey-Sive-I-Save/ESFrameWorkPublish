@@ -36,7 +36,7 @@ namespace ES
         #endregion
 
         #region ResSource相关
-        public ESResSource _LoadResSync(ESResKey resSearchKeys)
+        public ESResSourceBase _LoadResSync(ESResKey resSearchKeys)
         {
             return null;
         }
@@ -103,7 +103,7 @@ namespace ES
 
         #region 异步队列实现
 
-        public void AddAsset2LoadByPathSourcer(string path, Action<bool, ESResSource> listener = null, bool AtLastOrFirst = true)
+        public void AddAsset2LoadByPathSourcer(string path, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
         {
             if (ESResMaster.GlobalAssetKeys.TryGetESResKeyByPath(path, out var assetKey))
             {
@@ -114,7 +114,7 @@ namespace ES
             }
         }
 
-        public void AddAsset2LoadByGUIDSourcer(string guid, Action<bool, ESResSource> listener = null, bool AtLastOrFirst = true)
+        public void AddAsset2LoadByGUIDSourcer(string guid, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
         {
             if (ESResMaster.GlobalAssetKeys.TryGetESResKeyByGUID(guid, out var assetKey))
             {
@@ -122,7 +122,7 @@ namespace ES
             }
         }
 
-        public void AddAB2LoadByABPreNameSourcer(string abName, Action<bool, ESResSource> listener = null, bool AtLastOrFirst = true)
+        public void AddAB2LoadByABPreNameSourcer(string abName, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
         {
             if (ESResMaster.GlobalABKeys.TryGetValue(abName, out var abKey))
             {
@@ -130,7 +130,7 @@ namespace ES
             }
         }
 
-        public void Add2LoadByKey(object key, ESResSourceLoadType loadType, Action<bool, ESResSource> listener = null, bool AtLastOrFirst = true)
+        public void Add2LoadByKey(object key, ESResSourceLoadType loadType, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
         {
             ESResKey assetKey = null;
             ESResKey abKey = null;
@@ -216,7 +216,7 @@ namespace ES
                 Debug.LogWarning($"[ESResLoader] 无法创建资源源: {key}");
             }
         }
-        public ESResSource FindResInThisLoaderList(object key, ESResSourceLoadType loadType)
+        public ESResSourceBase FindResInThisLoaderList(object key, ESResSourceLoadType loadType)
         {
             if (key == null)
             {
@@ -230,7 +230,7 @@ namespace ES
 
             return null;
         }
-        public ESResSource FindResInThisLoaderList(ESResSource theRes)
+        public ESResSourceBase FindResInThisLoaderList(ESResSourceBase theRes)
         {
             if (theRes == null)
             {
@@ -239,10 +239,10 @@ namespace ES
 
             return LoaderResKeys.ContainsKey(theRes) ? theRes : null;
         }
-        private bool AddRes2ThisLoaderRes(ESResSource res, object key, ESResSourceLoadType loadType, bool addToLast)
+        private bool AddRes2ThisLoaderRes(ESResSourceBase res, object key, ESResSourceLoadType loadType, bool addToLast)
         {
             //本地是否已经加载
-            ESResSource thisLoaderRes = FindResInThisLoaderList(res);
+            ESResSourceBase thisLoaderRes = FindResInThisLoaderList(res);
 
             if (thisLoaderRes != null)//只要新的
             {
@@ -276,11 +276,11 @@ namespace ES
             return true;
         }
 
-        private readonly List<ESResSource> LoaderResSources = new List<ESResSource>();
-        private readonly LinkedList<ESResSource> ThisLoaderResSourcesWaitToLoad = new LinkedList<ESResSource>();
-        private readonly Dictionary<object, ESResSource> LoaderKeyToRes = new Dictionary<object, ESResSource>();
-        private readonly Dictionary<ESResSource, object> LoaderResKeys = new Dictionary<ESResSource, object>();
-        private readonly Dictionary<ESResSource, int> LoaderResRefCounts = new Dictionary<ESResSource, int>();
+        private readonly List<ESResSourceBase> LoaderResSources = new List<ESResSourceBase>();
+        private readonly LinkedList<ESResSourceBase> ThisLoaderResSourcesWaitToLoad = new LinkedList<ESResSourceBase>();
+        private readonly Dictionary<object, ESResSourceBase> LoaderKeyToRes = new Dictionary<object, ESResSourceBase>();
+        private readonly Dictionary<ESResSourceBase, object> LoaderResKeys = new Dictionary<ESResSourceBase, object>();
+        private readonly Dictionary<ESResSourceBase, int> LoaderResRefCounts = new Dictionary<ESResSourceBase, int>();
         #endregion
 
         public void LoadAllAsync(Action listener = null)
@@ -288,7 +288,7 @@ namespace ES
             mListener_ForLoadAllOK = listener;
             DoLoadAsync();
         }
-        private void OnOneResLoadFinished(bool result, ESResSource res)
+        private void OnOneResLoadFinished(bool result, ESResSourceBase res)
         {
             if (mLoadingCount > 0)
             {
@@ -313,7 +313,7 @@ namespace ES
 
             Debug.Log("[ESResLoader.DoLoadAsync] 开始处理等待队列中的资源。"+ThisLoaderResSourcesWaitToLoad.Count);
             var nextNode = ThisLoaderResSourcesWaitToLoad.First;
-            LinkedListNode<ESResSource> currentNode = null;
+            LinkedListNode<ESResSourceBase> currentNode = null;
             while (nextNode != null)
             {
                 currentNode = nextNode;
@@ -410,7 +410,7 @@ namespace ES
 
         public int PendingCount => mLoadingCount;
 
-        public IReadOnlyList<ESResSource> SnapshotQueuedSources()
+        public IReadOnlyList<ESResSourceBase> SnapshotQueuedSources()
         {
             return LoaderResSources.ToList();
         }
@@ -507,7 +507,7 @@ namespace ES
             }
         }
 
-        private void ReleaseEntry(ESResSource res, bool unloadWhenZero)
+        private void ReleaseEntry(ESResSourceBase res, bool unloadWhenZero)
         {
             if (res == null)
             {
@@ -536,7 +536,7 @@ namespace ES
             RemoveResFromLoader(res, key);
         }
 
-        private void RegisterLocalRes(ESResSource res, object key, ESResSourceLoadType loadType, bool skipGlobalRetain)
+        private void RegisterLocalRes(ESResSourceBase res, object key, ESResSourceLoadType loadType, bool skipGlobalRetain)
         {
             if (res == null)
             {
@@ -578,7 +578,7 @@ namespace ES
             }
         }
 
-        private int ReleaseReference(ESResSource res, object key, ESResSourceLoadType loadType, bool unloadWhenZero)
+        private int ReleaseReference(ESResSourceBase res, object key, ESResSourceLoadType loadType, bool unloadWhenZero)
         {
             if (res == null || key == null)
             {
@@ -602,7 +602,7 @@ namespace ES
             return LoaderResRefCounts.TryGetValue(res, out var remain) ? remain : 0;
         }
 
-        private void RemoveResFromLoader(ESResSource res, object key)
+        private void RemoveResFromLoader(ESResSourceBase res, object key)
         {
             if (key != null)
             {

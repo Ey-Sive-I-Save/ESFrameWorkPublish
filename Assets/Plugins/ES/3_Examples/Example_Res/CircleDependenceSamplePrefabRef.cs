@@ -9,5 +9,10 @@ namespace ES
 
         [TextArea]
         public string Note;
+
+        void Update()
+        {
+            Debug.Log("Circular Dependence Sample Prefab Ref Update");
+        }
     }
 }

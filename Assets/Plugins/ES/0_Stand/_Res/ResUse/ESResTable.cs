@@ -18,8 +18,8 @@ namespace ES {
     /// </summary>
     public class ESResTable 
     {
-        private readonly Dictionary<object, ESResSource> _assetSources = new Dictionary<object, ESResSource>();
-        private readonly Dictionary<object, ESResSource> _abSources = new Dictionary<object, ESResSource>();
+        private readonly Dictionary<object, ESResSourceBase> _assetSources = new Dictionary<object, ESResSourceBase>();
+        private readonly Dictionary<object, ESResSourceBase> _abSources = new Dictionary<object, ESResSourceBase>();
         private readonly Dictionary<object, int> _assetRefCounts = new Dictionary<object, int>();
         private readonly Dictionary<object, int> _abRefCounts = new Dictionary<object, int>();
 
@@ -48,7 +48,7 @@ namespace ES {
             }
         }
 
-        public ESResSource GetAssetResByKey(object key)
+        public ESResSourceBase GetAssetResByKey(object key)
         {
             if (key == null)
             {
@@ -61,7 +61,7 @@ namespace ES {
             }
         }
 
-        public ESResSource GetABResByKey(object key)
+        public ESResSourceBase GetABResByKey(object key)
         {
             if (key == null)
             {
@@ -74,7 +74,7 @@ namespace ES {
             }
         }
 
-        public bool TryRegisterAssetRes(object key, ESResSource res)
+        public bool TryRegisterAssetRes(object key, ESResSourceBase res)
         {
             if (key == null || res == null)
             {
@@ -87,7 +87,7 @@ namespace ES {
             }
         }
 
-        public bool TryRegisterABRes(object key, ESResSource res)
+        public bool TryRegisterABRes(object key, ESResSourceBase res)
         {
             if (key == null || res == null)
             {
@@ -193,23 +193,23 @@ namespace ES {
             }
         }
 
-        public List<KeyValuePair<object, ESResSource>> SnapshotAssetEntries()
+        public List<KeyValuePair<object, ESResSourceBase>> SnapshotAssetEntries()
         {
             lock (_assetLock)
             {
-                return new List<KeyValuePair<object, ESResSource>>(_assetSources);
+                return new List<KeyValuePair<object, ESResSourceBase>>(_assetSources);
             }
         }
 
-        public List<KeyValuePair<object, ESResSource>> SnapshotABEntries()
+        public List<KeyValuePair<object, ESResSourceBase>> SnapshotABEntries()
         {
             lock (_abLock)
             {
-                return new List<KeyValuePair<object, ESResSource>>(_abSources);
+                return new List<KeyValuePair<object, ESResSourceBase>>(_abSources);
             }
         }
 
-        private static ESResSource TryResolveEntry(Dictionary<object, ESResSource> map, object key)
+        private static ESResSourceBase TryResolveEntry(Dictionary<object, ESResSourceBase> map, object key)
         {
             if (!map.TryGetValue(key, out var res) || res == null)
             {
@@ -225,7 +225,7 @@ namespace ES {
             return res;
         }
 
-        private static bool TryRegisterEntry(Dictionary<object, ESResSource> map, Dictionary<object, int> refCounts, object key, ESResSource res)
+        private static bool TryRegisterEntry(Dictionary<object, ESResSourceBase> map, Dictionary<object, int> refCounts, object key, ESResSourceBase res)
         {
             if (map.TryGetValue(key, out var existing))
             {
@@ -251,7 +251,7 @@ namespace ES {
             return true;
         }
 
-        private static int InternalAcquire(Dictionary<object, ESResSource> map, Dictionary<object, int> refCounts, object key)
+        private static int InternalAcquire(Dictionary<object, ESResSourceBase> map, Dictionary<object, int> refCounts, object key)
         {
             if (!map.TryGetValue(key, out var res) || res == null)
             {
@@ -265,7 +265,7 @@ namespace ES {
             return count;
         }
 
-        private static int InternalRelease(Dictionary<object, ESResSource> map, Dictionary<object, int> refCounts, object key, bool unloadWhenZero)
+        private static int InternalRelease(Dictionary<object, ESResSourceBase> map, Dictionary<object, int> refCounts, object key, bool unloadWhenZero)
         {
             if (!refCounts.TryGetValue(key, out var count))
             {
@@ -274,7 +274,7 @@ namespace ES {
 
             count = Mathf.Max(0, count - 1);
 
-            ESResSource res = null;
+            ESResSourceBase res = null;
             map.TryGetValue(key, out res);
             res?.ReleaseReference();
 
@@ -294,7 +294,7 @@ namespace ES {
             return count;
         }
 
-        private static bool TryRemoveEntry(Dictionary<object, ESResSource> map, Dictionary<object, int> refCounts, object key, bool releaseResource)
+        private static bool TryRemoveEntry(Dictionary<object, ESResSourceBase> map, Dictionary<object, int> refCounts, object key, bool releaseResource)
         {
             if (!map.TryGetValue(key, out var res))
             {
@@ -326,7 +326,7 @@ namespace ES {
             return true;
         }
 
-        private static void InternalClear(Dictionary<object, ESResSource> map, Dictionary<object, int> refCounts, bool releaseResource)
+        private static void InternalClear(Dictionary<object, ESResSourceBase> map, Dictionary<object, int> refCounts, bool releaseResource)
         {
             if (!releaseResource)
             {

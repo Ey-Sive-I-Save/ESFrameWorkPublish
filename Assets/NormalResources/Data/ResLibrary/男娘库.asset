@@ -21,44 +21,196 @@ MonoBehaviour:
     PrefabModificationsReferencedUnityObjects: []
     PrefabModifications: []
     SerializationNodes: []
+  collectionConfig:
+    overallPriority: 1
   Name: "\u7537\u5A18\u5E93"
   LibFolderName: nanniangku
   ChangeCount: 5
   IsMainInClude: 1
   Books:
   - Name: book PreNameToABKeys
+    WritableDefaultMessageOnEditor: 1
+    PreferredAssetCategory: 12
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
     Desc: 
     pages:
-    - Name: 0_Stand
-      namedOption: 0
-      OB: {fileID: 2800000, guid: 17ec984bb532f85458d23ca13aaa6bce, type: 3}
-    - Name: EditorInitAndUpdater
-      namedOption: 2
-      OB: {fileID: 11500000, guid: 9b711d233bc2a35488f86c11e47ff561, type: 3}
-    - Name: EditorInitAndUpdater
-      namedOption: 0
-      OB: {fileID: 11500000, guid: 9b711d233bc2a35488f86c11e47ff561, type: 3}
-    - Name: SODataInfoWindow
-      namedOption: 0
-      OB: {fileID: 102900000, guid: 181bc873461614845a6eafc12154002f, type: 3}
     - Name: BaseDefine_Law
+      ColorTag: 0
       namedOption: 0
-      OB: {fileID: 102900000, guid: 3e60cd3d64291c642ad8caf250a999a0, type: 3}
+      OB: {fileID: 0}
+    - Name: EditorInitAndUpdater
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
+    - Name: 0_Stand
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
+    - Name: EditorInitAndUpdater
+      ColorTag: 0
+      namedOption: 2
+      OB: {fileID: 0}
+    - Name: SODataInfoWindow
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
+    - Name: ESDisplayToType
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
+    - Name: AA
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
   - Name: book PreNameToABKeys
+    WritableDefaultMessageOnEditor: 1
+    PreferredAssetCategory: 12
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
     Desc: 
     pages: []
   - Name: book PreNameToABKeys
+    WritableDefaultMessageOnEditor: 1
+    PreferredAssetCategory: 12
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
     Desc: 
     pages: []
-  - Name: "\u4F9D\u8D56\u6D4B\u8BD5"
+  - Name: book PreNameToABKeys
+    WritableDefaultMessageOnEditor: 1
+    PreferredAssetCategory: 12
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
     Desc: 
-    pages:
-    - Name: GameObject (3)
-      namedOption: 0
-      OB: {fileID: 7055376591365242435, guid: 495b09c783492784e88277aa816dfdce, type: 3}
-    - Name: New Circle Denpendce Samples
-      namedOption: 0
-      OB: {fileID: 11400000, guid: 4d014869d6589ff45b23e49383b4e2b7, type: 2}
+    pages: []
+  - Name: book PreNameToABKeys
+    WritableDefaultMessageOnEditor: 1
+    PreferredAssetCategory: 12
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: 
+    pages: []
   Desc: "\u63CF\u8FF0\uFF1A\u8FD9\u662F\u4E00\u4E2A\u505A\u5565\u7684\u5E93"
+  DefaultPrefabBook:
+    Name: "\u9ED8\u8BA4 \u9ED8\u8BA4\u9884\u5236\u4F53Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 1
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u9ED8\u8BA4\u9884\u5236\u4F53\u8D44\u6E90\u6240\u5728\u7684Book"
+    pages: []
+  DefaultSOBook:
+    Name: "\u9ED8\u8BA4 \u811A\u672C\u5BF9\u8C61SO Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 8
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u7528\u4E8E\u5B58\u50A8\u6E38\u620F\u903B\u8F91\u548C\u6570\u636E\u7684\u811A\u672C\u5316\u5BF9\u8C61\u8D44\u6E90"
+    pages:
+    - Name: ESDisplayToType
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
+    - Name: ESDisplayToType
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
+  DefaultSoundBook:
+    Name: "\u9ED8\u8BA4 \u97F3\u6548 Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 6
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u6E38\u620F\u4E2D\u7684\u58F0\u97F3\u6548\u679C\u8D44\u6E90\uFF0C\u5982\u97F3\u6548\u6587\u4EF6"
+    pages: []
+  DefaultTextureBook:
+    Name: "\u9ED8\u8BA4 \u7EB9\u7406 Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 4
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u56FE\u50CF\u7EB9\u7406\u8D44\u6E90\uFF0C\u7528\u4E8E\u6750\u8D28\u548CUI"
+    pages: []
+  DefaultAnimationBook:
+    Name: "\u9ED8\u8BA4 \u52A8\u753B Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 7
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u89D2\u8272\u6216\u5BF9\u8C61\u7684\u52A8\u753B\u8D44\u6E90"
+    pages: []
+  DefaultMaterialBook:
+    Name: "\u9ED8\u8BA4 \u6750\u8D28 Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 3
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u5B9A\u4E49\u7269\u4F53\u5916\u89C2\u7684\u6750\u8D28\u8D44\u6E90"
+    pages: []
+  DefaultSceneBook_:
+    Name: "\u9ED8\u8BA4 \u573A\u666F Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 2
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u6E38\u620F\u573A\u666F\u6587\u4EF6\u8D44\u6E90"
+    pages: []
+  DefaultSpriteBook:
+    Name: "\u9ED8\u8BA4 \u7CBE\u7075 Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 4
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "2D\u6E38\u620F\u4E2D\u7684\u7CBE\u7075\u56FE\u50CF\u8D44\u6E90"
+    pages: []
+  DefaultFontBook:
+    Name: "\u9ED8\u8BA4 \u5B57\u4F53 Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 10
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u6587\u672C\u663E\u793A\u7684\u5B57\u4F53\u8D44\u6E90"
+    pages: []
+  DefaultModelBook:
+    Name: "\u9ED8\u8BA4 \u6A21\u578B Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 5
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "3D\u6A21\u578B\u8D44\u6E90"
+    pages: []
+  DefaultShaderBook:
+    Name: "\u9ED8\u8BA4 \u7740\u8272\u5668 Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 9
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u7528\u4E8E\u6E32\u67D3\u7684\u7740\u8272\u5668\u8D44\u6E90"
+    pages: []
+  DefaultTextBook:
+    Name: "\u9ED8\u8BA4 \u6587\u672C Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 12
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u6587\u672C\u6587\u4EF6\u8D44\u6E90\uFF0C\u5982\u914D\u7F6E\u6587\u4EF6\u6216\u5BF9\u8BDD"
+    pages: []
+  DefaultDLLBook:
+    Name: "\u9ED8\u8BA4 DLL\u5B57\u8282 Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 8
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u52A8\u6001\u94FE\u63A5\u5E93\u7684\u5B57\u8282\u6570\u636E\u8D44\u6E90"
+    pages: []
+  DefaultOtherBook:
+    Name: "\u9ED8\u8BA4 \u5176\u4ED6 Book"
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 12
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: "\u5176\u4ED6\u7C7B\u578B\u7684\u8D44\u6E90"
+    pages: []
   ContainsBuild: 1
   IsNet: 0

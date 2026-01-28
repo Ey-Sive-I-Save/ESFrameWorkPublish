@@ -17,6 +17,20 @@ namespace ES {
         public static OdinMenuTree menuTree;
         private static Texture2D blackTexture;
         public static Dictionary<string, OdinMenuItem> MenuItems = new Dictionary<string, OdinMenuItem>();
+        
+        /// <summary>
+        /// 收集所有注册的页面，用于统一调用OnPageDisable
+        /// </summary>
+        private static List<ESWindowPageBase> registeredPages = new List<ESWindowPageBase>();
+        
+        /// <summary>
+        /// 获取当前注册的页面数量（用于调试）
+        /// </summary>
+        public static int GetRegisteredPageCount()
+        {
+            return registeredPages?.Count ?? 0;
+        }
+        
         public virtual GUIContent ESWindow_GetWindowGUIContent()
         {
             var content = new GUIContent("ES窗口", "使用ES工具完成快速开发");
@@ -62,16 +76,103 @@ namespace ES {
             // Odin 的 Add("父/子", obj) 会返回多个菜单项，最后一个才是真正绑定页面的叶子节点
             MenuItems[name] = tree.Add(name, (page ??= new P()), sdfIcon).Last();
             page.ES_Refresh();
+            
+            // 注册页面到列表，用于窗口关闭时统一调用OnPageDisable
+            if (page != null && !registeredPages.Contains(page))
+            {
+                registeredPages.Add(page);
+            }
         }
         public void QuickBuildRootMenu<P>(OdinMenuTree tree, string name, ref P page, Texture texture) where P : ESWindowPageBase, new()
         {
             MenuItems[name] = tree.Add(name, (page ??= new P()), texture).Last();
             page.ES_Refresh();
+            
+            // 注册页面到列表
+            if (page != null && !registeredPages.Contains(page))
+            {
+                registeredPages.Add(page);
+            }
         }
         public void QuickBuildRootMenu<P>(OdinMenuTree tree, string name, ref P page, EditorIcon icon) where P : ESWindowPageBase, new()
         {
             MenuItems[name] = tree.Add(name, (page ??= new P()), icon).Last();
             page.ES_Refresh();
+            
+            // 注册页面到列表
+            if (page != null && !registeredPages.Contains(page))
+            {
+                registeredPages.Add(page);
+            }
+        }
+        
+        /// <summary>
+        /// 注册并添加已创建的页面实例到菜单树（用于动态创建的页面）
+        /// </summary>
+        public OdinMenuItem RegisterAndAddPage(OdinMenuTree tree, string path, ESWindowPageBase page, SdfIconType icon)
+        {
+            if (page == null)
+            {
+                Debug.LogError("[ESMenuTreeWindow] RegisterAndAddPage: page is null");
+                return null;
+            }
+            
+            var menuItem = tree.Add(path, page, icon).Last();
+            
+            // 注册页面到列表，用于窗口关闭时统一调用OnPageDisable
+            if (!registeredPages.Contains(page))
+            {
+                registeredPages.Add(page);
+                // Debug.Log($"[ESMenuTreeWindow] 注册页面: {page.GetType().Name} - {path}");
+            }
+            
+            return menuItem;
+        }
+        
+        /// <summary>
+        /// 注册并添加已创建的页面实例到菜单树（Texture重载）
+        /// </summary>
+        public OdinMenuItem RegisterAndAddPage(OdinMenuTree tree, string path, ESWindowPageBase page, Texture icon)
+        {
+            if (page == null)
+            {
+                Debug.LogError("[ESMenuTreeWindow] RegisterAndAddPage: page is null");
+                return null;
+            }
+            
+            var menuItem = tree.Add(path, page, icon).Last();
+            
+            // 注册页面到列表
+            if (!registeredPages.Contains(page))
+            {
+                registeredPages.Add(page);
+                // Debug.Log($"[ESMenuTreeWindow] 注册页面: {page.GetType().Name} - {path}");
+            }
+            
+            return menuItem;
+        }
+        
+        /// <summary>
+        /// 注册并添加已创建的页面实例到菜单树（EditorIcon重载）
+        /// </summary>
+        public OdinMenuItem RegisterAndAddPage(OdinMenuTree tree, string path, ESWindowPageBase page, EditorIcon icon)
+        {
+            if (page == null)
+            {
+                Debug.LogError("[ESMenuTreeWindow] RegisterAndAddPage: page is null");
+                return null;
+            }
+            
+            var menuItem = tree.Add(path, page, icon).Last();
+            
+            // 注册页面到列表
+            if (!registeredPages.Contains(page))
+            {
+                registeredPages.Add(page);
+                // Debug.Log($"[ESMenuTreeWindow] 注册页面: {page.GetType().Name} - {path}");
+            }
+            
+            return menuItem;
         }
         protected override void OnImGUI()
         {
@@ -101,6 +202,36 @@ namespace ES {
         {
 
         }
+        
+        /// <summary>
+        /// 窗口销毁时统一调用所有注册页面的OnPageDisable
+        /// </summary>
+        protected override void OnDestroy()
+        {
+            // Debug.Log($"[ESMenuTreeWindow] 窗口销毁，开始调用 {registeredPages.Count} 个页面的OnPageDisable");
+            
+            int callCount = 0;
+            foreach (var page in registeredPages)
+            {
+                if (page != null)
+                {
+                    try
+                    {
+                        page.OnPageDisable();
+                        callCount++;
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogError($"[ESMenuTreeWindow] 页面 {page.GetType().Name} 的OnPageDisable调用失败: {e.Message}");
+                    }
+                }
+            }
+            
+            // Debug.Log($"[ESMenuTreeWindow] OnPageDisable调用完成，成功调用 {callCount}/{registeredPages.Count} 个页面");
+            
+            // 清理列表
+            registeredPages.Clear();
+        }
     }
 
     [Serializable]
@@ -109,6 +240,14 @@ namespace ES {
         public virtual ESWindowPageBase ES_Refresh()
         {
             return this;
+        }
+        
+        /// <summary>
+        /// 窗口关闭或页面销毁时调用，用于清理资源和保存数据
+        /// </summary>
+        public virtual void OnPageDisable()
+        {
+            // 子类可重写此方法进行清理工作
         }
     }
 

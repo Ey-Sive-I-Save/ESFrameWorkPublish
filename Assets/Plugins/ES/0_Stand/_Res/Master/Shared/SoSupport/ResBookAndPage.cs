@@ -13,6 +13,11 @@ namespace ES
     [Serializable]
     public class ResBook : BookBase<ResPage>
     {
+        [NonSerialized]
+        public EditorIconType _icon = EditorIconType.Folder;
+
+        public override EditorIconType Icon { get => _icon;  }
+
         public override ResPage CreateNewPage(UnityEngine.Object uo)
         {
             return new ResPage() { Name = uo.name, OB = uo };
@@ -21,13 +26,17 @@ namespace ES
 
     }
     [Serializable]
-    public class ResPage : PageBase, IString
+    public class ResPage : PageBase, IString, IAssetPage
     {
-
         [LabelText("分AB包命名方式")]
         public ABNamedOption namedOption;
-        [LabelText("绑定资源")]
+        
+        [LabelText("绑定资源"),AssetsOnly]
         public UnityEngine.Object OB;
+        
+        // 实现IAssetPage接口
+        UnityEngine.Object IAssetPage.OB => OB;
+        
         private bool foldVisiable;
         private bool refresh = true;
 

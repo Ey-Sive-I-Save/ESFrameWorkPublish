@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Networking;
 using static Unity.Burst.Intrinsics.X86.Avx;
 
 
@@ -25,7 +26,7 @@ namespace ES {
             {
                 init = false;
                 comp = Comparer<ESEditorInspectorUser>.Create((a,b)=>a.Order-b.Order);
-                Editor.finishedDefaultHeaderGUI += (ed) => {
+               UnityEditor.Editor.finishedDefaultHeaderGUI += (ed) => {
 
                     if (ed.targets.Length == 1)
                     {

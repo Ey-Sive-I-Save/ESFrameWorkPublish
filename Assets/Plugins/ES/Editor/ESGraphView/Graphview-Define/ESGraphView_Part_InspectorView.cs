@@ -11,8 +11,8 @@ namespace ES
     {
         public new class UxmlFactory : UxmlFactory<ESGraphView_Part_InspectorView, UxmlTraits> { }
 
-        Editor editorForNode;
-        Editor editorForContainer;
+        UnityEditor.Editor editorForNode;
+        UnityEditor.Editor editorForContainer;
         public DropdownField dropdown = new DropdownField();
         public VisualElement buttonsView = new VisualElement();
         public VisualElement ForNodePanel;

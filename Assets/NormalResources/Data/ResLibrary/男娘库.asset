@@ -116,6 +116,10 @@ MonoBehaviour:
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 0}
+    - Name: "\u65B0\u5EFA\u89D2\u8272\u6570\u636E\u7EC483227"
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11400000, guid: b7efbde1b85ac534f8df3ded09592512, type: 2}
   DefaultSoundBook:
     Name: "\u9ED8\u8BA4 \u97F3\u6548 Book"
     WritableDefaultMessageOnEditor: 0
@@ -123,7 +127,11 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "\u6E38\u620F\u4E2D\u7684\u58F0\u97F3\u6548\u679C\u8D44\u6E90\uFF0C\u5982\u97F3\u6548\u6587\u4EF6"
-    pages: []
+    pages:
+    - Name: "\u65B0\u5EFA\u89D2\u8272\u6570\u636E\u7EC483227"
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11400000, guid: b7efbde1b85ac534f8df3ded09592512, type: 2}
   DefaultTextureBook:
     Name: "\u9ED8\u8BA4 \u7EB9\u7406 Book"
     WritableDefaultMessageOnEditor: 0

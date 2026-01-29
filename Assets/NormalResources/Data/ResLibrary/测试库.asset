@@ -39,13 +39,13 @@ MonoBehaviour:
     WritableDefaultMessageOnEditor: 1
     PreferredAssetCategory: 12
     CustomIcon: {fileID: 0}
-    ColorTag: 0
+    ColorTag: 1
     Desc: 
     pages:
-    - Name: "\u84DD\u8272\u65B9\u5757 1"
+    - Name: MetalMaterial 10
       ColorTag: 0
       namedOption: 0
-      OB: {fileID: 0}
+      OB: {fileID: 2100000, guid: 3890bf180a9f2aa4a9e845d873d56547, type: 2}
     - Name: "\u84DD\u8272\u65B9\u5757"
       ColorTag: 0
       namedOption: 0
@@ -62,17 +62,32 @@ MonoBehaviour:
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 11500000, guid: ef7c98344bad5a74bb6ea31e423bac35, type: 3}
-  - Name: "\u6750\u8D28"
+    - Name: "\u8D44\u6E90\u9875\u540D"
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
+  - Name: "\u573A\u666F"
     WritableDefaultMessageOnEditor: 1
     PreferredAssetCategory: 12
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: 
+    pages: []
+  - Name: "\u6750\u8D28"
+    WritableDefaultMessageOnEditor: 1
+    PreferredAssetCategory: 12
+    CustomIcon: {fileID: 0}
+    ColorTag: 5
+    Desc: 
     pages:
     - Name: MatYellow
-      ColorTag: 0
+      ColorTag: 8
       namedOption: 0
       OB: {fileID: 0}
+    - Name: AA 2
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11400000, guid: 0a45407b845bf9347b7b974aaca979de, type: 2}
     - Name: SampleScene
       ColorTag: 4
       namedOption: 0
@@ -105,21 +120,6 @@ MonoBehaviour:
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 0}
-  - Name: "\u573A\u666F"
-    WritableDefaultMessageOnEditor: 1
-    PreferredAssetCategory: 12
-    CustomIcon: {fileID: 0}
-    ColorTag: 0
-    Desc: 
-    pages:
-    - Name: AA 2
-      ColorTag: 0
-      namedOption: 0
-      OB: {fileID: 11400000, guid: 0a45407b845bf9347b7b974aaca979de, type: 2}
-    - Name: AA 1
-      ColorTag: 0
-      namedOption: 0
-      OB: {fileID: 11400000, guid: 3db87459e9ff54d4395a96462c91be33, type: 2}
   - Name: book PreNameToABKeys
     WritableDefaultMessageOnEditor: 1
     PreferredAssetCategory: 12
@@ -135,7 +135,11 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "\u9ED8\u8BA4\u9884\u5236\u4F53\u8D44\u6E90\u6240\u5728\u7684Book"
-    pages: []
+    pages:
+    - Name: GameObject (3)
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 7055376591365242435, guid: 495b09c783492784e88277aa816dfdce, type: 3}
   DefaultSOBook:
     Name: "\u9ED8\u8BA4 \u811A\u672C\u5BF9\u8C61SO Book"
     WritableDefaultMessageOnEditor: 0
@@ -151,7 +155,11 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "\u6E38\u620F\u4E2D\u7684\u58F0\u97F3\u6548\u679C\u8D44\u6E90\uFF0C\u5982\u97F3\u6548\u6587\u4EF6"
-    pages: []
+    pages:
+    - Name: New Circle Denpendce Samples
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11400000, guid: 4d014869d6589ff45b23e49383b4e2b7, type: 2}
   DefaultTextureBook:
     Name: "\u9ED8\u8BA4 \u7EB9\u7406 Book"
     WritableDefaultMessageOnEditor: 0
@@ -167,7 +175,23 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "\u89D2\u8272\u6216\u5BF9\u8C61\u7684\u52A8\u753B\u8D44\u6E90"
-    pages: []
+    pages:
+    - Name: "\u8D44\u6E90\u9875\u540D"
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
+    - Name: GameObject (3)
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 7055376591365242435, guid: 495b09c783492784e88277aa816dfdce, type: 3}
+    - Name: CircleDependenceSamplePrefabRef
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11500000, guid: a43b0f8f0c53eba4e8fb65148bafdd7a, type: 3}
+    - Name: CircleDenpendceSamples
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11500000, guid: e4815b677e9fb2d4fb96a0343968a27a, type: 3}
   DefaultMaterialBook:
     Name: "\u9ED8\u8BA4 \u6750\u8D28 Book"
     WritableDefaultMessageOnEditor: 0
@@ -175,7 +199,11 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "\u5B9A\u4E49\u7269\u4F53\u5916\u89C2\u7684\u6750\u8D28\u8D44\u6E90"
-    pages: []
+    pages:
+    - Name: "\u8D44\u6E90\u9875\u540D"
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 0}
   DefaultSceneBook_:
     Name: "\u9ED8\u8BA4 \u573A\u666F Book"
     WritableDefaultMessageOnEditor: 0
@@ -191,7 +219,11 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "2D\u6E38\u620F\u4E2D\u7684\u7CBE\u7075\u56FE\u50CF\u8D44\u6E90"
-    pages: []
+    pages:
+    - Name: AA 1
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11400000, guid: 3db87459e9ff54d4395a96462c91be33, type: 2}
   DefaultFontBook:
     Name: "\u9ED8\u8BA4 \u5B57\u4F53 Book"
     WritableDefaultMessageOnEditor: 0
@@ -232,6 +264,10 @@ MonoBehaviour:
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 11500000, guid: ef7c98344bad5a74bb6ea31e423bac35, type: 3}
+    - Name: CircleDependenceSamplePrefabRef
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11500000, guid: a43b0f8f0c53eba4e8fb65148bafdd7a, type: 3}
   DefaultDLLBook:
     Name: "\u9ED8\u8BA4 DLL\u5B57\u8282 Book"
     WritableDefaultMessageOnEditor: 0

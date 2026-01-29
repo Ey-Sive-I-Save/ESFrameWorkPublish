@@ -7,6 +7,8 @@ namespace ES
         [Header("Circular Dependency Test")]
         public CircleDenpendceSamples SampleSO;
 
+        public ESResRefer refer;
+
         [TextArea]
         public string Note;
 

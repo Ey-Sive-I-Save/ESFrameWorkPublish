@@ -36,7 +36,13 @@ namespace ES
 
         private static HashSet<string> _injectedLibs = new HashSet<string>();
         #endregion
-        public void GameInit_ResCompareAndDownload()
+
+        /// <summary>
+        /// 游戏初始化资源对比和下载
+        /// </summary>
+        /// <param name="forceRedownload">是否强制重新下载所有资源（忽略本地缓存）</param>
+        /// <param name="verifyIntegrity">是否验证文件完整性</param>
+        public void GameInit_ResCompareAndDownload(bool forceRedownload = false, bool verifyIntegrity = true)
         {
             // 路径已在Awake中初始化，这里直接开始下载流程
 
@@ -53,13 +59,21 @@ namespace ES
             callback.OnSuccess = (message) => Debug.Log($"初始化下载完成: {message}");
             callback.OnError = (error) => Debug.LogError($"初始化下载失败: {error}");
 
-            StartCoroutine(InitTryDownload(callback));
+            StartCoroutine(InitTryDownload(callback, forceRedownload, verifyIntegrity));
         }
 
         #region 游戏初始化下载
-        private IEnumerator InitTryDownload(ESCallback<string> callback)
+        /// <summary>
+        /// 初始化下载流程（支持强制重新下载）
+        /// </summary>
+        private IEnumerator InitTryDownload(ESCallback<string> callback, bool forceRedownload = false, bool verifyIntegrity = true)
         {
-            callback?.UpdateProgress(0f, "开始初始化下载流程");
+            callback?.UpdateProgress(0f, $"开始初始化下载流程 (强制下载: {forceRedownload}, 完整性验证: {verifyIntegrity})");
+
+            if (forceRedownload)
+            {
+                Debug.LogWarning("[ESResMaster] ⚠️ 强制重新下载模式已启用，将忽略所有本地缓存");
+            }
 
             #region 下载并解析GameIdentity
             // 首先检查本地是否已有GameIdentity
@@ -288,6 +302,12 @@ namespace ES
             GlobalDownloadState = ESResGlobalDownloadState.AllReady;
             callback?.UpdateProgress(1.0f, "初始化下载流程完成");
             callback?.Success($"成功初始化 {libsToDownload.Count} 个库的下载流程");
+            
+            // 🔥 自动预热Shader（在所有Key注入完成后）
+            StartCoroutine(ESShaderPreloader.AutoWarmUpAllShaders(() =>
+            {
+                Debug.Log("[ESResMaster] Shader自动预热已完成");
+            }));
         }
         #endregion
 
@@ -946,16 +966,16 @@ namespace ES
                         abKey.LocalABLoadPath = BuildLocalABLoadPath(lib, abKey);
                         // 检查现有值是否完整，不完整则替换
                         bool shouldReplace = true;
-                        if (GlobalABKeys.TryGetValue(abKey.ABName, out var existingKey))
+                        if (GlobalABKeys.TryGetValue(abKey.ABPreName, out var existingKey))
                         {
                             // 检查关键字段是否完整
                             shouldReplace = string.IsNullOrEmpty(existingKey.LibName) ||
-                                           string.IsNullOrEmpty(existingKey.ABName);
+                                           string.IsNullOrEmpty(existingKey.ABPreName);
                         }
 
                         if (shouldReplace)
                         {
-                            GlobalABKeys[abKey.ABName] = abKey;
+                            GlobalABKeys[abKey.ABPreName] = abKey;
                         }
                     }
 

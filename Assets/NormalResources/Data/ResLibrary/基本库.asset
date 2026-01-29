@@ -44,7 +44,11 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "\u7528\u4E8E\u5B58\u50A8\u6E38\u620F\u903B\u8F91\u548C\u6570\u636E\u7684\u811A\u672C\u5316\u5BF9\u8C61\u8D44\u6E90"
-    pages: []
+    pages:
+    - Name: New Circle Denpendce Samples
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11400000, guid: 4d014869d6589ff45b23e49383b4e2b7, type: 2}
   DefaultSoundBook:
     Name: "\u9ED8\u8BA4 \u97F3\u6548 Book"
     WritableDefaultMessageOnEditor: 0
@@ -124,7 +128,15 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "\u6587\u672C\u6587\u4EF6\u8D44\u6E90\uFF0C\u5982\u914D\u7F6E\u6587\u4EF6\u6216\u5BF9\u8BDD"
-    pages: []
+    pages:
+    - Name: ResSamples
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11500000, guid: 7443a3d373567e248a92b59138673ddf, type: 3}
+    - Name: tempCodeRunnerFile
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11500000, guid: dccdaf424ccc2a2408d2c1c3d03a3747, type: 3}
   DefaultDLLBook:
     Name: "\u9ED8\u8BA4 DLL\u5B57\u8282 Book"
     WritableDefaultMessageOnEditor: 0

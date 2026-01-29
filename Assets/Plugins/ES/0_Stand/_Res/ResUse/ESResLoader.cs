@@ -9,42 +9,78 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
-    /// ESResLoader
+    /// ESResLoader - 资源加载器
     /// 
-    /// 负责围绕 ESResMaster 提供“单个 Loader 实例”的加载能力：
-    /// - 对外暴露同步加载接口（按 KeyIndex 取资源）；
-    /// - 提供按路径 / GUID / AB 名称 添加到异步加载队列的便捷方法；
-    /// - 自身可池化复用，通过 ESResMaster.Instance.PoolForESLoader 管理生命周期。
+    /// 【核心职责】
+    /// 1. 作为资源加载的"会话管理器"，管理一组相关资源的生命周期
+    /// 2. 维护本地引用计数，确保资源不被提前卸载
+    /// 3. 协调依赖资源的加载顺序，保证依赖关系正确
+    /// 4. 提供同步/异步加载接口，简化资源获取流程
+    /// 5. 支持对象池复用，减少 GC 压力
     /// 
-    /// 注意：此类不直接持有全局配置，仅通过 ESResMaster 访问 JsonData 和 Key 表。
+    /// 【设计原则】
+    /// - 单一职责：只负责加载和引用管理，不处理资源创建
+    /// - 防御性编程：所有公开接口都进行空值和状态检查
+    /// - 容错设计：单个资源失败不影响其他资源，回调异常不影响流程
+    /// - 性能优先：避免重复查找、减少临时分配、优化集合操作
+    /// 
+    /// 【引用计数机制】
+    /// - 本地计数(LoaderResRefCounts)：记录 Loader 对资源的持有次数
+    /// - 全局计数(ESResMaster)：记录所有 Loader 对资源的总持有次数
+    /// - 释放规则：本地计数归零时从 Loader 移除，全局计数归零时卸载资源
+    /// 
+    /// 【线程安全】
+    /// ⚠️ 此类设计为单线程使用（Unity 主线程），不保证线程安全
     /// </summary>
-    public class ESResLoader : IPoolableAuto
+    public sealed class ESResLoader : IPoolableAuto
     {
-        #region 池化
+        #region 池化接口实现 - IPoolableAuto
+
+        /// <summary>
+        /// 标记对象是否已回收到池中
+        /// </summary>
         public bool IsRecycled { get; set; }
 
+        /// <summary>
+        /// 池化重置回调 - 清理状态，准备复用
+        /// ⚠️ 注意：此方法由对象池调用，不要手动调用
+        /// </summary>
         public void OnResetAsPoolable()
         {
-
+            mIsLoadingInProgress = false;
+            // 注意：不清理集合，因为 ReleaseAll 会在回池前调用
         }
 
+        /// <summary>
+        /// 自动回池 - 释放所有资源并返回对象池
+        /// 📌 使用场景：资源加载完成后不再需要 Loader 时调用
+        /// </summary>
         public void TryAutoPushedToPool()
         {
+            if (ESResMaster.Instance?.PoolForESLoader == null)
+            {
+                Debug.LogWarning("[ESResLoader.TryAutoPushedToPool] 对象池未初始化，无法回池");
+                return;
+            }
+
             ReleaseAll(resumePooling: false);
             ESResMaster.Instance.PoolForESLoader.PushToPool(this);
         }
+
         #endregion
 
-        #region ResSource相关
-        public ESResSourceBase _LoadResSync(ESResKey resSearchKeys)
-        {
-            return null;
-        }
-        #endregion
+        #region 同步加载 - 立即返回资源
 
-        #region 同步加载
-        // TODO: Update LoadAssetSync to use object key instead of int keyIndex, as GetResSourceByKey API has changed.
-        public UnityEngine.Object LoadAssetSync(object key)
+        /// <summary>
+        /// 同步加载资产 - 阻塞直到资源加载完成
+        /// </summary>
+        /// <param name="key">资源键（强类型）</param>
+        /// <returns>加载的资源对象，失败返回 null</returns>
+        /// <remarks>
+        /// ⚠️ 性能警告：会阻塞主线程，建议仅在必要时使用
+        /// 📌 引用管理：此方法不增加 Loader 本地引用计数
+        /// </remarks>
+        public UnityEngine.Object LoadAssetSync(ESResKey key)
         {
             if (key == null)
             {
@@ -71,12 +107,28 @@ namespace ES
             return res.Asset;
         }
 
-        public T LoadAssetSync<T>(object key) where T : UnityEngine.Object
+        /// <summary>
+        /// 同步加载资产（泛型版本） - 自动类型转换
+        /// </summary>
+        /// <typeparam name="T">资源类型（Texture、Sprite、GameObject等）</typeparam>
+        /// <param name="key">资源键</param>
+        /// <returns>指定类型的资源对象，类型不匹配或失败返回 null</returns>
+        public T LoadAssetSync<T>(ESResKey key) where T : UnityEngine.Object
         {
             return LoadAssetSync(key) as T;
         }
 
-        public bool TryGetLoadedAsset(object key, out UnityEngine.Object asset)
+        /// <summary>
+        /// 尝试获取已加载的资产 - 非阻塞查询
+        /// </summary>
+        /// <param name="key">资源键</param>
+        /// <param name="asset">输出参数：资源对象</param>
+        /// <returns>true=资源已就绪并获取成功，false=资源未加载或未就绪</returns>
+        /// <remarks>
+        /// ✅ 性能友好：不会触发加载，仅查询已加载资源
+        /// ⚠️ 引用管理：成功时会增加全局引用计数（需要手动释放）
+        /// </remarks>
+        public bool TryGetLoadedAsset(ESResKey key, out UnityEngine.Object asset)
         {
             asset = null;
             if (key == null)
@@ -99,21 +151,42 @@ namespace ES
 
             return false;
         }
+
         #endregion
 
-        #region 异步队列实现
+        #region 异步加载 - 队列管理
 
+        /// <summary>
+        /// 通过资源路径添加异步加载任务
+        /// </summary>
+        /// <param name="path">资源路径（如 "Assets/Prefabs/Player.prefab"）</param>
+        /// <param name="listener">加载完成回调（参数1=成功/失败，参数2=资源源对象）</param>
+        /// <param name="AtLastOrFirst">true=添加到队列末尾，false=添加到队列开头（优先加载）</param>
+        /// <remarks>
+        /// 内部会通过 GlobalAssetKeys 将路径转换为 ESResKey
+        /// ⭐ 最常用的加载方式之一，推荐使用
+        /// </remarks>
         public void AddAsset2LoadByPathSourcer(string path, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
         {
             if (ESResMaster.GlobalAssetKeys.TryGetESResKeyByPath(path, out var assetKey))
             {
                 Add2LoadByKey(assetKey, ESResSourceLoadType.ABAsset, listener, AtLastOrFirst);
-            }else
+            }
+            else
             {
                 Debug.LogError($"通过路径添加异步加载任务失败，未找到资源键: {path}");
             }
         }
 
+        /// <summary>
+        /// 通过资源 GUID 添加异步加载任务
+        /// </summary>
+        /// <param name="guid">资源 GUID（Unity 内部唯一标识符）</param>
+        /// <param name="listener">加载完成回调</param>
+        /// <param name="AtLastOrFirst">true=队列末尾，false=队列开头</param>
+        /// <remarks>
+        /// ⭐ 最常用的加载方式之一，推荐使用
+        /// </remarks>
         public void AddAsset2LoadByGUIDSourcer(string guid, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
         {
             if (ESResMaster.GlobalAssetKeys.TryGetESResKeyByGUID(guid, out var assetKey))
@@ -122,6 +195,16 @@ namespace ES
             }
         }
 
+        /// <summary>
+        /// 通过 AssetBundle PreName 添加异步加载任务
+        /// </summary>
+        /// <param name="abName">AB包的PreName（不带Hash后缀，如 "ui_mainmenu"）</param>
+        /// <param name="listener">加载完成回调</param>
+        /// <param name="AtLastOrFirst">true=队列末尾，false=队列开头</param>
+        /// <remarks>
+        /// ⚠️ 注意：abName 必须是 PreName（不带Hash），而非完整文件名
+        /// 🔒 访问修饰符：public - 通常由依赖加载内部调用，但保留为 public 以支持手动加载 AB 包
+        /// </remarks>
         public void AddAB2LoadByABPreNameSourcer(string abName, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
         {
             if (ESResMaster.GlobalABKeys.TryGetValue(abName, out var abKey))
@@ -130,18 +213,151 @@ namespace ES
             }
         }
 
-        public void Add2LoadByKey(object key, ESResSourceLoadType loadType, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
+        /// <summary>
+        /// 添加RawFile原始文件异步加载任务
+        /// </summary>
+        /// <param name="filePath">文件路径（可以是相对路径或绝对路径）</param>
+        /// <param name="listener">加载完成回调</param>
+        /// <param name="AtLastOrFirst">true=队列末尾，false=队列开头</param>
+        /// <remarks>
+        /// ⭐ 适用场景：
+        /// - Lua脚本文件（.lua.txt）
+        /// - JSON配置文件（.json）
+        /// - Protobuf二进制数据（.bytes）
+        /// - 加密文件等
+        /// 
+        /// 📌 使用方式：
+        /// <code>
+        /// loader.AddRawFile2Load("Config/game_settings.json", (success, source) => {
+        ///     if (success) {
+        ///         var rawFileSource = source as ESRawFileSource;
+        ///         string jsonText = rawFileSource.GetTextContent();
+        ///         // 解析JSON...
+        ///     }
+        /// });
+        /// </code>
+        /// 
+        /// ⚠️ 注意：RawFile不使用GUID，直接用文件路径作为标识
+        /// </remarks>
+        public void AddRawFile2Load(string filePath, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
         {
-            ESResKey assetKey = null;
-            ESResKey abKey = null;
-            if (loadType == ESResSourceLoadType.AssetBundle)
+            // 创建RawFile专用的ESResKey
+            var key = ESResMaster.Instance.PoolForESResKey.GetInPool();
+            key.SourceLoadType = ESResSourceLoadType.RawFile;
+            key.ResName = filePath;
+            key.LocalABLoadPath = filePath; // 直接使用路径
+
+            Add2LoadByKey(key, ESResSourceLoadType.RawFile, listener, AtLastOrFirst);
+        }
+
+        /// <summary>
+        /// 添加InternalResource（Resources文件夹资源）异步加载任务
+        /// </summary>
+        /// <param name="resourcePath">Resources相对路径（不包含扩展名）</param>
+        /// <param name="listener">加载完成回调</param>
+        /// <param name="AtLastOrFirst">true=队列末尾，false=队列开头</param>
+        /// <remarks>
+        /// ⭐ 适用场景：
+        /// - 默认配置、UI图标等小型固定资源
+        /// - 快速原型开发，无需AB打包
+        /// 
+        /// 📌 使用方式：
+        /// <code>
+        /// loader.AddInternalResource2Load("UI/Icons/default_icon", (success, source) => {
+        ///     if (success) {
+        ///         var sprite = source.Asset as Sprite;
+        ///         // 使用Sprite...
+        ///     }
+        /// });
+        /// </code>
+        /// 
+        /// ⚠️ 注意：
+        /// - InternalResource不使用GUID，直接用Resources路径作为标识
+        /// - Resources资源会增加包体大小，不建议大量使用
+        /// - 不支持热更新
+        /// </remarks>
+        public void AddInternalResource2Load(string resourcePath, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
+        {
+            // 创建InternalResource专用的ESResKey
+            var key = ESResMaster.Instance.PoolForESResKey.GetInPool();
+            key.SourceLoadType = ESResSourceLoadType.InternalResource;
+            key.ResName = resourcePath;
+
+            Add2LoadByKey(key, ESResSourceLoadType.InternalResource, listener, AtLastOrFirst);
+        }
+
+        /// <summary>
+        /// 添加NetImage（网络图片）异步加载任务
+        /// </summary>
+        /// <param name="url">完整URL地址（支持HTTP/HTTPS）</param>
+        /// <param name="listener">加载完成回调</param>
+        /// <param name="AtLastOrFirst">true=队列末尾，false=队列开头</param>
+        /// <remarks>
+        /// ⭐ 适用场景：
+        /// - 动态头像、远程图片
+        /// - CDN资源
+        /// 
+        /// 📌 使用方式：
+        /// <code>
+        /// loader.AddNetImage2Load("https://example.com/avatar.jpg", (success, source) => {
+        ///     if (success) {
+        ///         var netImageSource = source as ESNetImageSource;
+        ///         Texture2D texture = netImageSource.Texture;
+        ///         // 使用Texture...
+        ///     }
+        /// });
+        /// </code>
+        /// 
+        /// ⚠️ 注意：
+        /// - NetImage不使用GUID，直接用URL作为标识
+        /// - 仅支持异步加载（网络请求）
+        /// - 自动缓存到本地，支持离线使用
+        /// - 支持自动重试（最多3次）
+        /// - 超时时间：30秒
+        /// </remarks>
+        public void AddNetImage2Load(string url, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
+        {
+            // 验证URL
+            if (string.IsNullOrEmpty(url) || (!url.StartsWith("http://") && !url.StartsWith("https://")))
             {
-                abKey = (ESResKey)key;
+                Debug.LogError($"[ESResLoader.AddNetImage2Load] 无效的URL: {url}");
+                listener?.Invoke(false, null);
+                return;
             }
-            else if (loadType == ESResSourceLoadType.ABAsset)
-            {
-                assetKey = (ESResKey)key;
-            }
+
+            // 创建NetImage专用的ESResKey
+            var key = ESResMaster.Instance.PoolForESResKey.GetInPool();
+            key.SourceLoadType = ESResSourceLoadType.NetImageRes;
+            key.ResName = url;
+
+            Add2LoadByKey(key, ESResSourceLoadType.NetImageRes, listener, AtLastOrFirst);
+        }
+
+        /// <summary>
+        /// 通过资源键添加异步加载任务 - 核心方法
+        /// </summary>
+        /// <param name="key">资源键（强类型）</param>
+        /// <param name="loadType">加载类型（AssetBundle/ABAsset/RawFile等）</param>
+        /// <param name="listener">加载完成回调</param>
+        /// <param name="AtLastOrFirst">true=队列末尾，false=队列开头（优先级）</param>
+        /// <remarks>
+        /// 【逻辑流程】
+        /// 1. 检查资源是否已在本 Loader 的队列中（去重）
+        /// 2. 从 ESResMaster 获取或创建资源源对象
+        /// 3. 自动解析并添加依赖 AB 包到加载队列
+        /// 4. 将资源加入 Loader 本地队列并增加引用计数
+        /// 5. 触发异步加载流程
+        /// 
+        /// 【去重机制】
+        /// - 同一个 Key 多次添加到同一个 Loader，只有第一次生效
+        /// - 后续调用仅注册回调（如有），不增加引用计数
+        /// - 这避免了重复加载同一资源的开销
+        /// 
+        /// 🔒 访问修饰符：internal - 外部应通过 AddAsset2LoadByPathSourcer/AddAsset2LoadByGUIDSourcer 等便利方法调用
+        /// </remarks>
+        internal void Add2LoadByKey(ESResKey key, ESResSourceLoadType loadType, Action<bool, ESResSourceBase> listener = null, bool AtLastOrFirst = true)
+        {
+            // 检查是否已在本 Loader 中
             var res = FindResInThisLoaderList(key, loadType);
             if (res != null)
             {
@@ -150,6 +366,8 @@ namespace ES
                 if (listener != null) res.OnLoadOKAction_Submit(listener);
                 return;
             }
+
+            // 从全局管理器获取或创建资源源
             res = ESResMaster.Instance.GetResSourceByKey(key, loadType);
             if (res != null)
             {
@@ -165,14 +383,14 @@ namespace ES
                         foreach (var depend in dependsAssetBundles)
                         {
                             string abName = withHash ? ESResMaster.PathAndNameTool_GetPreName(depend) : depend;
-                             Debug.Log($"[ESResLoader] -> 添加依赖AB任务: {abName}");
+                            Debug.Log($"[ESResLoader] -> 添加依赖AB任务: {abName}");
                             AddAB2LoadByABPreNameSourcer(abName);
                         }
                     }
                 }
-                
+
                 bool isNew = AddRes2ThisLoaderRes(res, key, loadType, AtLastOrFirst);
-                 Debug.Log($"[ESResLoader] 尝试添加 '{res.ResName}' 到加载列表, 结果: {(isNew ? "成功(新任务)" : "已存在(复用)")}");
+                Debug.Log($"[ESResLoader] 尝试添加 '{res.ResName}' 到加载列表, 结果: {(isNew ? "成功(新任务)" : "已存在(复用)")}");
 
                 if (isNew)
                 {
@@ -193,21 +411,21 @@ namespace ES
                     // 之前的逻辑：AddRes2ThisLoaderRes 返回 false -> 释放这次 Get 带来的全局引用。
                     // 这样会导致：同一个 Loader 对同一个资源调用多次 Add，只有第一次算数。后续调用只会注册 listener (如果有)。
                     // 这样是符合设计预期的（一个 Loader 不应该重复加载同一个资源多次，或者说重复排队）。
-                    
+
                     ESResMaster.Instance.ReleaseResHandle(key, loadType, unloadWhenZero: false);
                     RegisterLocalRes(res, key, loadType, skipGlobalRetain: false); // 确保重复添加时也能增加本地计数？不需要，现在的逻辑看起来是不支持重复排队。
-                    // 原代码逻辑：AddRes2ThisLoaderRes 失败（已存在） -> ReleaseResHandle（抵消 Get 的+1） -> 结束。
-                    // 这意味着多次 Add 同一个 Key 到同一个 Loader，Loader 内部只持有一个引用计数？
-                    // 如果外部调用了两次 Add，然后 Release 一次，会导致资源被卸载吗？
-                    // 查看 ReleaseAsset -> ReleaseReference -> 减本地计数 -> 减全局。
-                    // 如果 Add 时没有增加本地计数，Release 时减本地计数可能归零 -> 导致 RemoveFromLoader。
-                    // 这里的关键是：AddRes2ThisLoaderRes 返回 false 时，我们是否应该增加 LocalRef？
-                    
+                                                                                   // 原代码逻辑：AddRes2ThisLoaderRes 失败（已存在） -> ReleaseResHandle（抵消 Get 的+1） -> 结束。
+                                                                                   // 这意味着多次 Add 同一个 Key 到同一个 Loader，Loader 内部只持有一个引用计数？
+                                                                                   // 如果外部调用了两次 Add，然后 Release 一次，会导致资源被卸载吗？
+                                                                                   // 查看 ReleaseAsset -> ReleaseReference -> 减本地计数 -> 减全局。
+                                                                                   // 如果 Add 时没有增加本地计数，Release 时减本地计数可能归零 -> 导致 RemoveFromLoader。
+                                                                                   // 这里的关键是：AddRes2ThisLoaderRes 返回 false 时，我们是否应该增加 LocalRef？
+
                     // 修正：如果资源已在 Loader 中，AddRes2ThisLoaderRes 返回 false，但作为 Loader 的使用者，我可能期望它引用计数+1。
                     // 但看 AddRes2ThisLoaderRes 的实现，它只是检查是否存在。
                     // 原来的代码直接 dispose 掉了，这可能意味着 Loader 设计为“对同一个资源去重”。
                     // 这里添加一个 Debug 提示即可，保持原有逻辑。
-                    
+
                     Debug.LogWarning($"[ESResLoader] 资源 '{res.ResName}' 已在加载队列中，本次仅注册回调(如有)。");
                 }
             }
@@ -216,7 +434,16 @@ namespace ES
                 Debug.LogWarning($"[ESResLoader] 无法创建资源源: {key}");
             }
         }
-        public ESResSourceBase FindResInThisLoaderList(object key, ESResSourceLoadType loadType)
+        /// <summary>
+        /// 在本 Loader 的队列中查找资源 - 通过 Key 查找
+        /// </summary>
+        /// <param name="key">资源键</param>
+        /// <param name="loadType">加载类型（当前未使用）</param>
+        /// <returns>找到的资源源，未找到返回 null</returns>
+        /// <remarks>
+        /// 🔒 访问修饰符：private - 仅用于 Add2LoadByKey 内部去重检查，外部不应直接调用
+        /// </remarks>
+        private ESResSourceBase FindResInThisLoaderList(ESResKey key, ESResSourceLoadType loadType)
         {
             if (key == null)
             {
@@ -230,7 +457,16 @@ namespace ES
 
             return null;
         }
-        public ESResSourceBase FindResInThisLoaderList(ESResSourceBase theRes)
+
+        /// <summary>
+        /// 在本 Loader 的队列中查找资源 - 通过资源实例查找
+        /// </summary>
+        /// <param name="theRes">资源源实例</param>
+        /// <returns>如果在队列中返回该实例，否则返回 null</returns>
+        /// <remarks>
+        /// 🔒 访问修饰符：private - 仅用于 AddRes2ThisLoaderRes 内部检查，外部不应直接调用
+        /// </remarks>
+        private ESResSourceBase FindResInThisLoaderList(ESResSourceBase theRes)
         {
             if (theRes == null)
             {
@@ -239,7 +475,23 @@ namespace ES
 
             return LoaderResKeys.ContainsKey(theRes) ? theRes : null;
         }
-        private bool AddRes2ThisLoaderRes(ESResSourceBase res, object key, ESResSourceLoadType loadType, bool addToLast)
+        /// <summary>
+        /// 将资源加入 Loader 内部队列 - 核心数据结构维护
+        /// </summary>
+        /// <param name="res">资源源对象</param>
+        /// <param name="key">资源键</param>
+        /// <param name="loadType">加载类型</param>
+        /// <param name="addToLast">true=添加到队列末尾，false=添加到队列开头</param>
+        /// <returns>true=成功添加新资源，false=资源已存在</returns>
+        /// <remarks>
+        /// 【数据结构维护】
+        /// - LoaderResSources: 所有资源的总列表
+        /// - LoaderResKeys: 资源源 -> Key 的映射
+        /// - LoaderKeyToRes: Key -> 资源源的映射
+        /// - ThisLoaderResSourcesWaitToLoad: 等待加载的资源队列（LinkedList）
+        /// - mLoadingCount: 当前正在加载的资源数量
+        /// </remarks>
+        private bool AddRes2ThisLoaderRes(ESResSourceBase res, ESResKey key, ESResSourceLoadType loadType, bool addToLast)
         {
             //本地是否已经加载
             ESResSourceBase thisLoaderRes = FindResInThisLoaderList(res);
@@ -275,19 +527,96 @@ namespace ES
             }
             return true;
         }
-
-        private readonly List<ESResSourceBase> LoaderResSources = new List<ESResSourceBase>();
-        private readonly LinkedList<ESResSourceBase> ThisLoaderResSourcesWaitToLoad = new LinkedList<ESResSourceBase>();
-        private readonly Dictionary<object, ESResSourceBase> LoaderKeyToRes = new Dictionary<object, ESResSourceBase>();
-        private readonly Dictionary<ESResSourceBase, object> LoaderResKeys = new Dictionary<ESResSourceBase, object>();
-        private readonly Dictionary<ESResSourceBase, int> LoaderResRefCounts = new Dictionary<ESResSourceBase, int>();
         #endregion
 
+        #region 数据结构 - 资源管理
+
+        /// <summary>
+        /// 所有资源的总列表（已加载 + 等待加载）
+        /// </summary>
+        private readonly List<ESResSourceBase> LoaderResSources = new List<ESResSourceBase>();
+
+        /// <summary>
+        /// 等待加载的资源队列（依赖未就绪或未开始加载）
+        /// 📌 使用 LinkedList 以支持高效的中间节点移除
+        /// </summary>
+        private readonly LinkedList<ESResSourceBase> ThisLoaderResSourcesWaitToLoad = new LinkedList<ESResSourceBase>();
+
+        /// <summary>
+        /// Key -> 资源源的映射（用于快速查找）
+        /// </summary>
+        private readonly Dictionary<ESResKey, ESResSourceBase> LoaderKeyToRes = new Dictionary<ESResKey, ESResSourceBase>();
+
+        /// <summary>
+        /// 资源源 -> Key 的反向映射（用于释放时查询 Key）
+        /// </summary>
+        private readonly Dictionary<ESResSourceBase, ESResKey> LoaderResKeys = new Dictionary<ESResSourceBase, ESResKey>();
+
+        /// <summary>
+        /// 资源源的本地引用计数（Loader 对资源的持有次数）
+        /// ⚠️ 注意：这是本地计数，与全局引用计数（ESResMaster）分开管理
+        /// </summary>
+        private readonly Dictionary<ESResSourceBase, int> LoaderResRefCounts = new Dictionary<ESResSourceBase, int>();
+
+        #endregion
+
+        #region 异步加载执行 - 流程控制
+
+        /// <summary>
+        /// 异步加载所有已添加的资源
+        /// </summary>
+        /// <param name="listener">加载完成回调（所有资源加载完毕时触发）</param>
+        /// <remarks>
+        /// 【重要特性】
+        /// 1. 支持重复调用：多次调用会收集所有回调，加载完成时一起触发
+        /// 2. 防重复加载：已在加载进程中时，仅注册回调，不重新启动流程
+        /// 3. 线程安全：通过 mIsLoadingInProgress 标志位防止并发问题
+        /// 
+        /// 【使用场景】
+        /// - 一次性加载多个资源：loader.AddAsset(...); loader.AddAsset(...); loader.LoadAllAsync()
+        /// - 动态追加回调：loader.LoadAllAsync(callback1); loader.LoadAllAsync(callback2)
+        /// </remarks>
         public void LoadAllAsync(Action listener = null)
         {
-            mListener_ForLoadAllOK = listener;
-            DoLoadAsync();
+            // 添加回调到列表
+            if (listener != null)
+            {
+                if (mListeners_ForLoadAllOK == null)
+                {
+                    mListeners_ForLoadAllOK = new List<Action>();
+                }
+
+                if (!mListeners_ForLoadAllOK.Contains(listener))
+                {
+                    mListeners_ForLoadAllOK.Add(listener);
+                    Debug.Log($"[ESResLoader.LoadAllAsync] 添加完成回调，当前回调数量: {mListeners_ForLoadAllOK.Count}");
+                }
+            }
+
+            // 只有在没有加载进行时才触发新的加载流程
+            // 这样避免重复调用导致的重复加载
+            if (!mIsLoadingInProgress)
+            {
+                mIsLoadingInProgress = true;
+                Debug.Log("[ESResLoader.LoadAllAsync] 开始新的加载流程");
+                DoLoadAsync();
+            }
+            else
+            {
+                Debug.Log("[ESResLoader.LoadAllAsync] 加载已在进行中，仅注册回调");
+            }
         }
+        /// <summary>
+        /// 单个资源加载完成回调 - 内部使用
+        /// </summary>
+        /// <param name="result">加载是否成功</param>
+        /// <param name="res">资源源对象</param>
+        /// <remarks>
+        /// 此方法会被注册到每个资源的加载回调中，加载完成后：
+        /// 1. 减少 mLoadingCount 计数器
+        /// 2. 注销自身回调（防止重复触发）
+        /// 3. 继续调度后续加载任务
+        /// </remarks>
         private void OnOneResLoadFinished(bool result, ESResSourceBase res)
         {
             if (mLoadingCount > 0)
@@ -298,6 +627,26 @@ namespace ES
 
             DoLoadAsync();
         }
+        /// <summary>
+        /// 异步加载调度器 - 核心逻辑
+        /// </summary>
+        /// <remarks>
+        /// 【调度逻辑】
+        /// 1. 检查是否所有资源已加载完毕（mLoadingCount=0 && 队列为空）
+        /// 2. 逐个检查等待队列中的资源，判断依赖是否就绪
+        /// 3. 依赖就绪的资源从队列移除并启动加载
+        /// 4. 如果资源已经 Ready，直接减少 mLoadingCount
+        /// 5. 循环结束后再次检查是否全部完成
+        /// 
+        /// 【依赖处理】
+        /// - 通过 IsDependResLoadFinish() 判断依赖是否就绪
+        /// - 仅当依赖全部就绪时才开始加载本资源
+        /// - 这保证了 AB 包的加载顺序正确性
+        /// 
+        /// 【性能优化】
+        /// - 使用 LinkedList 支持 O(1) 节点移除
+        /// - 循环中提前保存 nextNode 防止迭代器失效
+        /// </remarks>
         private void DoLoadAsync()
         {
             Debug.Log($"[ESResLoader.DoLoadAsync] 进入异步加载调度。当前加载计数: {mLoadingCount}, 等待队列长度: {ThisLoaderResSourcesWaitToLoad.Count}");
@@ -305,13 +654,12 @@ namespace ES
             if (mLoadingCount == 0 && ThisLoaderResSourcesWaitToLoad.Count == 0)
             {
                 Debug.Log("[ESResLoader.DoLoadAsync] 所有资源已加载完成，触发完成回调。");
-                var listener = mListener_ForLoadAllOK;
-                mListener_ForLoadAllOK = null;
-                listener?.Invoke();
+                // 触发所有回调
+                InvokeAllLoadCompleteCallbacks();
                 return;
             }
 
-            Debug.Log("[ESResLoader.DoLoadAsync] 开始处理等待队列中的资源。"+ThisLoaderResSourcesWaitToLoad.Count);
+            Debug.Log("[ESResLoader.DoLoadAsync] 开始处理等待队列中的资源。" + ThisLoaderResSourcesWaitToLoad.Count);
             var nextNode = ThisLoaderResSourcesWaitToLoad.First;
             LinkedListNode<ESResSourceBase> currentNode = null;
             while (nextNode != null)
@@ -345,13 +693,12 @@ namespace ES
                     Debug.Log($"[ESResLoader.DoLoadAsync] 资源 '{res?.ResName ?? "Unknown"}' 依赖未完成，跳过。");
                 }
             }
-            
+
             if (mLoadingCount == 0 && ThisLoaderResSourcesWaitToLoad.Count == 0)
             {
                 Debug.Log("[ESResLoader.DoLoadAsync] 循环后检查：所有资源加载完成，触发完成回调。");
-                var listener = mListener_ForLoadAllOK;
-                mListener_ForLoadAllOK = null;
-                listener?.Invoke();
+                // 触发所有回调
+                InvokeAllLoadCompleteCallbacks();
             }
             else
             {
@@ -359,6 +706,50 @@ namespace ES
             }
         }
 
+        /// <summary>
+        /// 触发所有加载完成回调 - 安全执行
+        /// </summary>
+        /// <remarks>
+        /// 【安全特性】
+        /// 1. 复制回调列表：防止回调中修改列表导致的问题
+        /// 2. 异常捕获：单个回调异常不影响其他回调执行
+        /// 3. 重置标志位：允许下一轮加载
+        /// 4. 清空回调列表：防止重复触发
+        /// </remarks>
+        private void InvokeAllLoadCompleteCallbacks()
+        {
+            // 重置加载标记，允许下一轮加载
+            mIsLoadingInProgress = false;
+
+            if (mListeners_ForLoadAllOK != null && mListeners_ForLoadAllOK.Count > 0)
+            {
+                Debug.Log($"[ESResLoader] 触发 {mListeners_ForLoadAllOK.Count} 个加载完成回调");
+
+                // 复制列表以避免回调中修改列表导致的问题
+                var callbacks = new List<Action>(mListeners_ForLoadAllOK);
+                mListeners_ForLoadAllOK.Clear();
+
+                foreach (var callback in callbacks)
+                {
+                    try
+                    {
+                        callback?.Invoke();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[ESResLoader] 加载完成回调执行异常: {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 同步加载所有等待队列中的资源
+        /// </summary>
+        /// <remarks>
+        /// ⚠️ 性能警告：会阻塞主线程直到所有资源加载完毕
+        /// 📌 使用场景：仅在必要时使用（如启动界面、关键资源）
+        /// </remarks>
         public void LoadAll_Sync()
         {
             while (ThisLoaderResSourcesWaitToLoad.Count > 0)
@@ -378,12 +769,37 @@ namespace ES
                 }
             }
         }
+        #endregion
 
-        private System.Action mListener_ForLoadAllOK;
+        #region 状态字段 - 内部状态跟踪
 
+        /// <summary>
+        /// 加载完成回调列表（支持多个监听者）
+        /// </summary>
+        private List<Action> mListeners_ForLoadAllOK;
+
+        /// <summary>
+        /// 标记是否正在进行加载，防止重复触发加载流程
+        /// </summary>
+        private bool mIsLoadingInProgress;
+
+        /// <summary>
+        /// 当前正在加载的资源数量（不包括等待依赖的资源）
+        /// </summary>
         private int mLoadingCount;
 
+        #endregion
 
+
+        #region 公开属性 - 状态查询
+
+        /// <summary>
+        /// 获取加载进度 (0.0 ~ 1.0)
+        /// </summary>
+        /// <remarks>
+        /// 计算方式：（已加载资源数 + 正在加载资源的进度和） / 总资源数
+        /// ⚠️ 性能注意：每次访问都会遍历等待队列，频繁调用可能影响性能
+        /// </remarks>
         public float Progress
         {
             get
@@ -408,13 +824,39 @@ namespace ES
             }
         }
 
+        /// <summary>
+        /// 获取当前正在加载的资源数量
+        /// </summary>
         public int PendingCount => mLoadingCount;
 
-        public IReadOnlyList<ESResSourceBase> SnapshotQueuedSources()
+        /// <summary>
+        /// 获取所有已添加资源的快照（只读列表）
+        /// </summary>
+        /// <returns>资源列表的副本（避免外部修改）</returns>
+        /// <remarks>
+        /// 🔒 访问修饰符：internal - 用于框架内部调试和监控，外部用户不应依赖此方法
+        /// </remarks>
+        internal IReadOnlyList<ESResSourceBase> SnapshotQueuedSources()
         {
             return LoaderResSources.ToList();
         }
 
+        #endregion
+
+
+
+
+        #region 资源释放 - 引用管理
+
+        /// <summary>
+        /// 取消所有等待中的加载任务
+        /// </summary>
+        /// <param name="releaseResources">true=同时释放资源引用，false=仅取消加载</param>
+        /// <remarks>
+        /// 【使用场景】
+        /// - 切换场景时取消未完成的加载
+        /// - 用户取消操作时中断加载流程
+        /// </remarks>
         public void CancelPendingLoads(bool releaseResources = false)
         {
             var pending = ThisLoaderResSourcesWaitToLoad.ToList();
@@ -433,13 +875,28 @@ namespace ES
             mLoadingCount = 0;
         }
 
+        /// <summary>
+        /// 释放所有资源并清空 Loader 状态
+        /// </summary>
+        /// <param name="resumePooling">true=保留回池逻辑，false=禁用回池（用于 TryAutoPushedToPool）</param>
+        /// <remarks>
+        /// 【执行步骤】
+        /// 1. 取消所有等待中的加载任务
+        /// 2. 释放所有已添加资源的引用计数
+        /// 3. 清空所有内部数据结构
+        /// 4. 重置加载状态标志
+        /// 
+        /// ⚠️ 注意：应用退出时会跳过释放逻辑，避免错误
+        /// </remarks>
         public void ReleaseAll(bool resumePooling = true)
         {
             // 如果应用正在退出，跳过释放逻辑以避免在关闭时执行
             if (!Application.isPlaying)
             {
                 mLoadingCount = 0;
-                mListener_ForLoadAllOK = null;
+                mListeners_ForLoadAllOK?.Clear();
+                mListeners_ForLoadAllOK = null;
+                mIsLoadingInProgress = false;  // 重置加载标记
                 LoaderResKeys.Clear();
                 LoaderKeyToRes.Clear();
                 LoaderResSources.Clear();
@@ -455,7 +912,9 @@ namespace ES
             }
 
             mLoadingCount = 0;
-            mListener_ForLoadAllOK = null;
+            mListeners_ForLoadAllOK?.Clear();
+            mListeners_ForLoadAllOK = null;
+            mIsLoadingInProgress = false;  // 重置加载标记
             LoaderResKeys.Clear();
             LoaderKeyToRes.Clear();
             LoaderResSources.Clear();
@@ -467,7 +926,19 @@ namespace ES
             }
         }
 
-        public void ReleaseAsset(object key, bool unloadWhenZero = false)
+        /// <summary>
+        /// 释放指定资产的引用
+        /// </summary>
+        /// <param name="key">资源键</param>
+        /// <param name="unloadWhenZero">true=引用计数归零时卸载资源，false=仅减少引用计数</param>
+        /// <remarks>
+        /// 【释放逻辑】
+        /// 1. 本地引用计数 -1
+        /// 2. 全局引用计数 -1
+        /// 3. 本地计数归零时从 Loader 移除资源
+        /// 4. 全局计数归零且 unloadWhenZero=true 时卸载资源
+        /// </remarks>
+        public void ReleaseAsset(ESResKey key, bool unloadWhenZero = false)
         {
             if (key == null)
             {
@@ -487,7 +958,12 @@ namespace ES
             }
         }
 
-        public void ReleaseAssetBundle(object key, bool unloadWhenZero = false)
+        /// <summary>
+        /// 释放指定 AssetBundle 的引用
+        /// </summary>
+        /// <param name="key">资源键</param>
+        /// <param name="unloadWhenZero">true=引用计数归零时卸载资源，false=仅减少引用计数</param>
+        public void ReleaseAssetBundle(ESResKey key, bool unloadWhenZero = false)
         {
             if (key == null)
             {
@@ -507,6 +983,14 @@ namespace ES
             }
         }
 
+        /// <summary>
+        /// 释放资源项 - 内部方法
+        /// </summary>
+        /// <param name="res">资源源对象</param>
+        /// <param name="unloadWhenZero">true=最后一次释放时卸载资源</param>
+        /// <remarks>
+        /// 此方法会释放本 Loader 对资源的所有引用计数（循环调用 ReleaseReference）
+        /// </remarks>
         private void ReleaseEntry(ESResSourceBase res, bool unloadWhenZero)
         {
             if (res == null)
@@ -536,7 +1020,19 @@ namespace ES
             RemoveResFromLoader(res, key);
         }
 
-        private void RegisterLocalRes(ESResSourceBase res, object key, ESResSourceLoadType loadType, bool skipGlobalRetain)
+        /// <summary>
+        /// 注册本地资源引用 - 增加引用计数
+        /// </summary>
+        /// <param name="res">资源源对象</param>
+        /// <param name="key">资源键</param>
+        /// <param name="loadType">加载类型</param>
+        /// <param name="skipGlobalRetain">true=跳过全局引用计数+1（用于 GetResSourceByKey 已经 +1 的场景）</param>
+        /// <remarks>
+        /// 此方法同时维护本地和全局引用计数：
+        /// - 本地计数：无条件 +1
+        /// - 全局计数：根据 skipGlobalRetain 决定是否 +1
+        /// </remarks>
+        private void RegisterLocalRes(ESResSourceBase res, ESResKey key, ESResSourceLoadType loadType, bool skipGlobalRetain)
         {
             if (res == null)
             {
@@ -558,7 +1054,18 @@ namespace ES
             LoaderResRefCounts[res] = count;
         }
 
-        private static void RetainGlobalHandle(object key, ESResSourceLoadType loadType)
+        /// <summary>
+        /// 增加全局引用计数 - 静态方法
+        /// </summary>
+        /// <param name="key">资源键</param>
+        /// <param name="loadType">加载类型（决定调用哪个 Acquire 方法）</param>
+        /// <remarks>
+        /// 此方法会调用 ESResMaster.ResTable 的相应 Acquire 方法：
+        /// - ABAsset -> AcquireAssetRes
+        /// - AssetBundle -> AcquireABRes
+        /// - RawFile -> AcquireRawFileRes
+        /// </remarks>
+        private static void RetainGlobalHandle(ESResKey key, ESResSourceLoadType loadType)
         {
             if (key == null)
             {
@@ -573,18 +1080,33 @@ namespace ES
                 case ESResSourceLoadType.AssetBundle:
                     ESResMaster.ResTable.AcquireABRes(key);
                     break;
+                case ESResSourceLoadType.RawFile:
+                    ESResMaster.ResTable.AcquireRawFileRes(key);
+                    break;
                 default:
                     break;
             }
         }
 
-        private int ReleaseReference(ESResSourceBase res, object key, ESResSourceLoadType loadType, bool unloadWhenZero)
+        /// <summary>
+        /// 减少引用计数 - 本地和全局同时减少
+        /// </summary>
+        /// <param name="res">资源源对象</param>
+        /// <param name="key">资源键</param>
+        /// <param name="loadType">加载类型</param>
+        /// <param name="unloadWhenZero">true=全局计数归零时卸载资源</param>
+        /// <returns>本地剩余引用计数</returns>
+        /// <remarks>
+        /// ⚠️ 应用退出检查：退出时跳过全局释放，防止错误
+        /// </remarks>
+        private int ReleaseReference(ESResSourceBase res, ESResKey key, ESResSourceLoadType loadType, bool unloadWhenZero)
         {
             if (res == null || key == null)
             {
                 return 0;
             }
 
+            // 减少本地引用计数
             if (LoaderResRefCounts.TryGetValue(res, out var count))
             {
                 count = Mathf.Max(0, count - 1);
@@ -597,12 +1119,28 @@ namespace ES
                     LoaderResRefCounts[res] = count;
                 }
             }
-            
-            if(!ESSystem.IsQuitting) ESResMaster.Instance.ReleaseResHandle(key, loadType, unloadWhenZero);
+
+            // 减少全局引用计数（退出时跳过）
+            if (!ESSystem.IsQuitting) ESResMaster.Instance.ReleaseResHandle(key, loadType, unloadWhenZero);
+
             return LoaderResRefCounts.TryGetValue(res, out var remain) ? remain : 0;
         }
 
-        private void RemoveResFromLoader(ESResSourceBase res, object key)
+        /// <summary>
+        /// 从 Loader 移除资源 - 清理所有关联数据结构
+        /// </summary>
+        /// <param name="res">资源源对象</param>
+        /// <param name="key">资源键</param>
+        /// <remarks>
+        /// 此方法会：
+        /// 1. 从 LoaderKeyToRes 移除 Key -> Res 映射
+        /// 2. 从 LoaderResKeys 移除 Res -> Key 映射
+        /// 3. 从 LoaderResSources 移除资源
+        /// 4. 从 LoaderResRefCounts 移除引用计数
+        /// 5. 从 ThisLoaderResSourcesWaitToLoad 移除等待队列
+        /// 6. 注销加载完成回调
+        /// </remarks>
+        private void RemoveResFromLoader(ESResSourceBase res, ESResKey key)
         {
             if (key != null)
             {
@@ -619,5 +1157,7 @@ namespace ES
 
             res.OnLoadOKAction_WithDraw(OnOneResLoadFinished);
         }
+
+        #endregion
     }
 }

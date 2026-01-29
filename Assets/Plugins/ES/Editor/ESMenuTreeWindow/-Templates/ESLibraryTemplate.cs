@@ -131,7 +131,7 @@ namespace ES
             private static readonly Color SELECTION_BORDER_COLOR = new Color(0.3f, 0.6f, 1f, 1f);
             private const int MAX_THUMBNAIL_CACHE_SIZE = 100;  // 缩略图缓存上限
             #endregion
-            
+
             #region 字段
             [HideInInspector]
             public TLib library;
@@ -140,22 +140,29 @@ namespace ES
 
             private static GUIStyle buttonStyle;
             private static Texture2D buttonBackground;
-            
+
             // 静态样式缓存，避免频繁修改GUI.skin
             private static GUIStyle _smallLabelStyle;
             private static GUIStyle SmallLabelStyle => _smallLabelStyle ?? (_smallLabelStyle = new GUIStyle(GUI.skin.label) { fontSize = 11 });
             private static GUIStyle _smallButtonStyle;
             private static GUIStyle SmallButtonStyle => _smallButtonStyle ?? (_smallButtonStyle = new GUIStyle(GUI.skin.button) { fontSize = 10 });
-            
+
             // 视图模式
             private static ViewMode currentViewMode = ViewMode.CompactList;
-            
+
             // 缩略图缓存（带LRU）
             private Dictionary<UnityEngine.Object, Texture2D> thumbnailCache = new Dictionary<UnityEngine.Object, Texture2D>();
             private LinkedList<UnityEngine.Object> thumbnailCacheOrder = new LinkedList<UnityEngine.Object>();
-            
+
             // 延迟保存
             private bool pendingSave = false;
+
+            // 动态对齐 - 记录选中Book和Page的窗口位置
+            private static float selectedBookWindowY = 0f;
+            private static float selectedPageWindowY = 0f;
+            private static float bookListScrollY = 0f;
+            private const float ALIGNMENT_THRESHOLD = 150f;  // 超过150px才开始偏移
+            private const float MAX_OFFSET = 400f;  // 最大偏移400px
 
             // 剪切功能的静态存储
             private static TBook cutBook;
@@ -173,17 +180,17 @@ namespace ES
             private ESDragAtSolver dragAtForBooks = new ESDragAtSolver();
             private ESDragAtSolver dragAtForPages = new ESDragAtSolver();
             #endregion
-            
+
             /// <summary>
             /// 重写OnPageDisable，在窗口关闭时执行延迟保存
             /// </summary>
             public override void OnPageDisable()
             {
                 base.OnPageDisable();
-                
+
                 string libName = library?.Name ?? "null";
                 Debug.Log($"[Page_Index_Library] OnPageDisable调用 - Library: {libName}, pendingSave: {pendingSave}");
-                
+
                 // 窗口关闭时执行延迟保存
                 if (pendingSave && library != null)
                 {
@@ -200,7 +207,7 @@ namespace ES
                     Debug.LogWarning("[Page_Index_Library] Library为null，无法保存");
                 }
             }
-            
+
             #region UI绘制
             [OnInspectorGUI]
             [HorizontalGroup("水平布局")]
@@ -214,7 +221,7 @@ namespace ES
                     library.Name = newName;
                     MarkDirtyDeferred();
                 }
-                
+
                 var preFolderName = library.LibFolderName;
                 library.LibFolderName = EditorGUILayout.TextField("库文件夹名", library.LibFolderName);
                 if (preFolderName != library.LibFolderName)
@@ -231,20 +238,25 @@ namespace ES
                     library.Desc = newDesc;
                     MarkDirtyDeferred();
                 }
-                
+
                 // 收集配置按钮
                 if (GUILayout.Button("收集配置", GUILayout.Height(25)))
                 {
                     ShowCollectionConfigMenu();
                 }
-                
+
                 bookAreaWidth = EditorGUILayout.GetControlRect().width;
                 SirenixEditorGUI.EndBox();
 
                 // Books拖拽区域
                 area.UpdateAtFisrt();
+
+                // 绘制自定义Books
                 REForBooks_SelfDefine.DoLayoutList();
-                
+
+                // 绘制默认Books（合并到同一个竖直列表）
+                DrawDefaultBooksInline();
+
                 // 在Books列表下方添加拖拽区域提示
                 GUILayout.Label("↓ 拖入资产到此处自动分配到合适的DefaultBook ↓", EditorStyles.centeredGreyMiniLabel);
                 dragAtForBooks.normalColor.a = 0.02f;
@@ -264,7 +276,14 @@ namespace ES
             public void DrawBookAndPages()
             {
                 if (book == null) return;
-                
+
+                // 动态对齐：根据选中Book的位置添加顶部空白
+                float dynamicOffset = CalculateDynamicOffset(selectedBookWindowY);
+                if (dynamicOffset > 0)
+                {
+                    GUILayout.Space(dynamicOffset);
+                }
+
                 // 优化：仅在book变化或REForPages为null时重建
                 if (REForPages == null || REForPages.list != book.pages)
                 {
@@ -276,7 +295,7 @@ namespace ES
                     };
                     SetupPagesCallBack();
                 }
-                
+
                 REForPages.list = book.pages;
                 SirenixEditorGUI.BeginBox();
                 if (book.WritableDefaultMessageOnEditor)
@@ -327,8 +346,31 @@ namespace ES
             [HorizontalGroup("水平布局")]
             public void DrawPage()
             {
-                if (book == null || page == null || !book.pages.Contains(page)) return;
+                // Debug: 检查DrawPage是否被调用
+                Debug.Log($"[DrawPage] Called - book: {book?.Name ?? "null"}, page: {page?.Name ?? "null"}");
+
+                if (book == null || page == null || !book.pages.Contains(page))
+                {
+                    Debug.Log($"[DrawPage] Early return - book null: {book == null}, page null: {page == null}, contains: {book?.pages.Contains(page) ?? false}");
+                    return;
+                }
+                // 动态对齐：根据选中Book的位置添加顶部空白
+                float dynamicOffset = CalculateDynamicOffset(selectedBookWindowY);
+                if (dynamicOffset > 0)
+                {
+                    GUILayout.Space(dynamicOffset);
+                }
+                // 动态对齐：根据选中Page的位置添加顶部空白
+                //  float dynamicOffset = CalculateDynamicOffset(selectedPageWindowY);
+
                 SirenixEditorGUI.BeginBox();
+
+
+                // 始终创建Space以避免Layout/Repaint控件数量不匹配
+                Debug.Log($"[DrawPage] Dynamic Offset: {dynamicOffset}");
+
+
+
                 var newName = EditorGUILayout.TextField("Page命名", page.Name);
                 if (newName != page.Name)
                 {
@@ -342,14 +384,14 @@ namespace ES
                 {
                     MarkDirtyDeferred();
                 }
-                
+
                 // 在Draw之后显示缩略图预览
                 if (page is ResPage resPage && resPage.OB != null)
                 {
                     EditorGUILayout.Space(10);
                     SirenixEditorGUI.BeginBox();
                     EditorGUILayout.LabelField("资源预览", EditorStyles.boldLabel);
-                    
+
                     // 使用缓存获取缩略图
                     var thumbnail = GetThumbnailFromCache(resPage.OB);
                     if (thumbnail != null)
@@ -367,143 +409,144 @@ namespace ES
                             GUI.DrawTexture(rect, icon, ScaleMode.ScaleToFit);
                         }
                     }
-                    
+
                     SirenixEditorGUI.EndBox();
                 }
             }
-            [OnInspectorGUI]
-            [HorizontalGroup("水平布局之默认Books")]
-            public void DrawDefaultBooks()
+
+            /// <summary>
+            /// 内联绘制默认Books（不使用独立的HorizontalGroup）
+            /// </summary>
+            private void DrawDefaultBooksInline()
             {
-                SirenixEditorGUI.BeginBox(GUILayout.Width(bookAreaWidth));
-                EditorGUILayout.LabelField("默认Books【自动收集，不可删改】");
                 if (library.DefaultBooks == null || library.DefaultBooks.Count() == 0)
                 {
-                    EditorGUILayout.LabelField("【！】无默认Books");
-                    SirenixEditorGUI.EndBox();
-                    EditorGUILayout.EndVertical();
                     return;
                 }
-                else
-                {
-                    foreach (var b in library.DefaultBooks)
-                    {
-                        if (b == null)
-                        {
-                            continue;
-                        }
-                        if (buttonStyle == null)
-                        {
-                            buttonStyle = new GUIStyle(GUI.skin.button);
-                            buttonStyle.alignment = TextAnchor.MiddleLeft;
-                            buttonStyle.normal.textColor = new Color(0.7f, 0.7f, 0.7f); // 稍暗的浅灰色
-                            if (buttonBackground == null)
-                            {
-                                buttonBackground = new Texture2D(1, 1);
-                                buttonBackground.SetPixel(0, 0, Color.black);
-                                buttonBackground.Apply();
-                            }
-                            buttonStyle.normal.background = buttonBackground;
-                        }
-                        var color = book == b ? Color.yellow : GetColorFromLabel(b.ColorTag);
-                        GUIHelper.PushColor(color);
-                        // Debug.Log($"绘制默认Book按钮：{b.Name}{b.pages.Count}{bookAreaWidth}");
 
-                        var buttonRect = EditorGUILayout.GetControlRect(GUILayout.Height(20));
-                        
-                        // 获取图标内容
-                        GUIContent buttonContent;
-                        if (b.CustomIcon != null)
+                // 绘制分隔线和标题
+                GUILayout.Space(5);
+                EditorGUILayout.LabelField("默认Books【自动收集，不可删改】", EditorStyles.boldLabel);
+
+                foreach (var b in library.DefaultBooks)
+                {
+                    if (b == null)
+                    {
+                        continue;
+                    }
+                    if (buttonStyle == null)
+                    {
+                        buttonStyle = new GUIStyle(GUI.skin.button);
+                        buttonStyle.alignment = TextAnchor.MiddleLeft;
+                        buttonStyle.normal.textColor = new Color(0.7f, 0.7f, 0.7f); // 稍暗的浅灰色
+                        if (buttonBackground == null)
                         {
-                            buttonContent = new GUIContent($"- 【{b.Name}】 ({b.pages.Count} 页)", b.CustomIcon);
+                            buttonBackground = new Texture2D(1, 1);
+                            buttonBackground.SetPixel(0, 0, Color.black);
+                            buttonBackground.Apply();
+                        }
+                        buttonStyle.normal.background = buttonBackground;
+                    }
+                    var color = book == b ? Color.yellow : GetColorFromLabel(b.ColorTag);
+                    GUIHelper.PushColor(color);
+                    // Debug.Log($"绘制默认Book按钮：{b.Name}{b.pages.Count}{bookAreaWidth}");
+
+                    var buttonRect = EditorGUILayout.GetControlRect(GUILayout.Height(20));
+
+                    // 获取图标内容
+                    GUIContent buttonContent;
+                    if (b.CustomIcon != null)
+                    {
+                        buttonContent = new GUIContent($"- 【{b.Name}】 ({b.pages.Count} 页)", b.CustomIcon);
+                    }
+                    else
+                    {
+                        buttonContent = EditorIconSupport.CreateContent($"- 【{b.Name}】 ({b.pages.Count} 页)", b.Icon);
+                    }
+
+                    // 添加警告前缀（如果Book为空）
+                    if (b.pages == null || b.pages.Count == 0)
+                    {
+                        buttonContent.text = "⚠ " + buttonContent.text;
+                    }
+
+                    // 先处理右键菜单，避免与Button冲突
+                    bool isRightClick = Event.current.type == EventType.MouseDown && Event.current.button == 1 && buttonRect.Contains(Event.current.mousePosition);
+
+                    if (isRightClick)
+                    {
+                        GenericMenu menu = new GenericMenu();
+
+                        // 默认Book不能被剪切，但可以接受粘贴
+                        menu.AddDisabledItem(new GUIContent("剪切（默认Book不可剪切）"));
+
+                        if (cutBook != null)
+                        {
+                            menu.AddItem(new GUIContent("粘贴Book到Library此位置"), false, () =>
+                            {
+                                PasteBookToLibrary(library, library.Books.Count);
+                            });
                         }
                         else
                         {
-                            buttonContent = EditorIconSupport.CreateContent($"- 【{b.Name}】 ({b.pages.Count} 页)", b.Icon);
-                        }
-                        
-                        // 添加警告前缀（如果Book为空）
-                        if (b.pages == null || b.pages.Count == 0)
-                        {
-                            buttonContent.text = "⚠ " + buttonContent.text;
+                            menu.AddDisabledItem(new GUIContent("粘贴Book到Library此位置"));
                         }
 
-                        // 先处理右键菜单，避免与Button冲突
-                        bool isRightClick = Event.current.type == EventType.MouseDown && Event.current.button == 1 && buttonRect.Contains(Event.current.mousePosition);
-
-                        if (isRightClick)
+                        // 添加"全部Pages移动到"子菜单
+                        var allTargetBooks = new List<TBook>();
+                        // 收集自定义Books
+                        if (library.Books != null)
                         {
-                            GenericMenu menu = new GenericMenu();
-
-                            // 默认Book不能被剪切，但可以接受粘贴
-                            menu.AddDisabledItem(new GUIContent("剪切（默认Book不可剪切）"));
-
-                            if (cutBook != null)
+                            foreach (var targetBook in library.Books)
                             {
-                                menu.AddItem(new GUIContent("粘贴Book到Library此位置"), false, () =>
+                                if (targetBook != null && targetBook != b)
                                 {
-                                    PasteBookToLibrary(library, library.Books.Count);
+                                    allTargetBooks.Add(targetBook);
+                                }
+                            }
+                        }
+                        // 收集其他默认Books
+                        if (library.DefaultBooks != null)
+                        {
+                            foreach (var targetBook in library.DefaultBooks)
+                            {
+                                if (targetBook != null && targetBook != b)
+                                {
+                                    allTargetBooks.Add(targetBook);
+                                }
+                            }
+                        }
+
+                        if (allTargetBooks.Count > 0 && b.pages != null && b.pages.Count > 0)
+                        {
+                            for (int i = 0; i < allTargetBooks.Count; i++)
+                            {
+                                var targetBook = allTargetBooks[i];
+                                menu.AddItem(new GUIContent($"全部Pages移动到/{i + 1}. {targetBook.Name}"), false, () =>
+                                {
+                                    MoveAllPagesToBook(b, targetBook);
                                 });
                             }
-                            else
-                            {
-                                menu.AddDisabledItem(new GUIContent("粘贴Book到Library此位置"));
-                            }
-
-                            // 添加"全部Pages移动到"子菜单
-                            var allTargetBooks = new List<TBook>();
-                            // 收集自定义Books
-                            if (library.Books != null)
-                            {
-                                foreach (var targetBook in library.Books)
-                                {
-                                    if (targetBook != null && targetBook != b)
-                                    {
-                                        allTargetBooks.Add(targetBook);
-                                    }
-                                }
-                            }
-                            // 收集其他默认Books
-                            if (library.DefaultBooks != null)
-                            {
-                                foreach (var targetBook in library.DefaultBooks)
-                                {
-                                    if (targetBook != null && targetBook != b)
-                                    {
-                                        allTargetBooks.Add(targetBook);
-                                    }
-                                }
-                            }
-
-                            if (allTargetBooks.Count > 0 && b.pages != null && b.pages.Count > 0)
-                            {
-                                for (int i = 0; i < allTargetBooks.Count; i++)
-                                {
-                                    var targetBook = allTargetBooks[i];
-                                    menu.AddItem(new GUIContent($"全部Pages移动到/{i + 1}. {targetBook.Name}"), false, () =>
-                                    {
-                                        MoveAllPagesToBook(b, targetBook);
-                                    });
-                                }
-                            }
-                            else
-                            {
-                                menu.AddDisabledItem(new GUIContent("全部Pages移动到/（无可用目标或无Pages）"));
-                            }
-
-                            menu.ShowAsContext();
-                            Event.current.Use();
                         }
-                        else if (GUI.Button(buttonRect, buttonContent, buttonStyle))
+                        else
                         {
-                            book = b;
+                            menu.AddDisabledItem(new GUIContent("全部Pages移动到/（无可用目标或无Pages）"));
                         }
 
-                        GUIHelper.PopColor();
+                        menu.ShowAsContext();
+                        Event.current.Use();
                     }
-                    SirenixEditorGUI.EndBox();
+                    else if (GUI.Button(buttonRect, buttonContent, buttonStyle))
+                    {
+                        book = b;
+                        // 记录选中Book的窗口位置
+                        selectedBookWindowY = buttonRect.y;
+                    }
+
+                    GUIHelper.PopColor();
                 }
             }
+
             public override ESWindowPageBase ES_Refresh()
             {
                 createText = $"--编辑库【{library.GetSTR()}】--";
@@ -557,6 +600,9 @@ namespace ES
                     if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
                     {
                         book = library.Books[index];
+
+                        // 记录选中Book的窗口位置（用于动态对齐）
+                        selectedBookWindowY = rect.y;
 
                         // 右键菜单
                         if (Event.current.button == 1)
@@ -622,9 +668,9 @@ namespace ES
                             {
                                 menu.AddDisabledItem(new GUIContent("全部Pages移动到/（无可用目标）"));
                             }
-                            
+
                             menu.AddSeparator("");
-                            
+
                             // 颜色标记子菜单
                             AddColorTagMenu(menu, "设置颜色标签", (colorTag) =>
                             {
@@ -632,7 +678,7 @@ namespace ES
                                 book_.ColorTag = colorTag;
                                 MarkDirtyDeferred();
                             });
-                            
+
                             // 自定义图标
                             menu.AddItem(new GUIContent("自定义图标"), false, () =>
                             {
@@ -646,22 +692,22 @@ namespace ES
 
                     // 应用颜色标记
                     var displayColor = book == book_ ? Color.yellow : GetColorFromLabel(book_.ColorTag);
-                    
+
                     // 绘制选中边框
                     if (book == book_)
                     {
                         DrawSelectionBorder(rect);
                     }
-                    
+
                     GUIHelper.PushColor(displayColor);
-                    
+
                     // 显示警告图标（如果Book为空）
                     var bookContent = book_.Name;
                     if (book_.pages == null || book_.pages.Count == 0)
                     {
                         bookContent = "⚠ " + bookContent;
                     }
-                    
+
                     EditorGUI.LabelField(rect, bookContent);
                     GUIHelper.PopColor();
                 };
@@ -672,14 +718,14 @@ namespace ES
             {
                 // 动态设置行高
                 REForPages.elementHeight = currentViewMode == ViewMode.ThumbnailView ? GRID_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
-                
+
                 REForPages.drawHeaderCallback = (Rect rect) =>
                 {
                     var labelRect = new Rect(rect.x, rect.y, rect.width - 120, rect.height);
-                    
+
                     // 使用静态样式避免频繁修改GUI.skin
                     EditorGUI.LabelField(labelRect, "包含Page", SmallLabelStyle);
-                    
+
                     // 视图模式切换按钮
                     var buttonRect = new Rect(rect.x + rect.width - 115, rect.y, 55, rect.height - 2);
                     if (GUI.Button(buttonRect, currentViewMode == ViewMode.CompactList ? "缩略图" : "列表", SmallButtonStyle))
@@ -687,7 +733,7 @@ namespace ES
                         currentViewMode = currentViewMode == ViewMode.CompactList ? ViewMode.ThumbnailView : ViewMode.CompactList;
                         REForPages.elementHeight = currentViewMode == ViewMode.ThumbnailView ? GRID_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
                     }
-                    
+
                     // 检测重复按钮
                     var detectButtonRect = new Rect(rect.x + rect.width - 55, rect.y, 55, rect.height - 2);
                     if (GUI.Button(detectButtonRect, "检测重复", SmallButtonStyle))
@@ -710,15 +756,15 @@ namespace ES
                         {
                             menu.AddDisabledItem(new GUIContent("粘贴到末尾"));
                         }
-                        
+
                         menu.AddSeparator("");
-                        
+
                         // 批量操作
                         menu.AddItem(new GUIContent("清除所有空Pages"), false, () =>
                         {
                             RemoveEmptyPages(book);
                         });
-                        
+
                         menu.ShowAsContext();
                         Event.current.Use();
                     }
@@ -728,12 +774,15 @@ namespace ES
                 {
                     if (book == null) return;
                     var page_ = book.pages[index];
-                    
+
                     // 应用颜色标记
                     var color = isActive ? Color.yellow : GetColorFromLabel(page_.ColorTag);
                     if (isActive)
                     {
                         page = book.pages[index];
+                        // 记录选中Page的窗口位置（用于动态对齐）
+                        selectedPageWindowY = rect.y;
+                        Debug.Log($"[Pages] Selected page: {page.Name}, Y position: {rect.y}");
                     }
 
                     // 获取Page关联的资源对象
@@ -747,7 +796,7 @@ namespace ES
                     if (Event.current.type == EventType.MouseDown && Event.current.button == 1 && rect.Contains(Event.current.mousePosition))
                     {
                         GenericMenu menu = new GenericMenu();
-                        
+
                         // 基础操作
                         menu.AddItem(new GUIContent("剪切"), false, () =>
                         {
@@ -769,7 +818,7 @@ namespace ES
                         {
                             menu.AddDisabledItem(new GUIContent("粘贴到此处"));
                         }
-                        
+
                         menu.AddSeparator("");
 
                         // 在Project中定位
@@ -780,13 +829,13 @@ namespace ES
                                 EditorGUIUtility.PingObject(pageAsset);
                                 Selection.activeObject = pageAsset;
                             });
-                            
+
                             // 显示引用此资源的所有Pages
                             menu.AddItem(new GUIContent("显示所有引用"), false, () =>
                             {
                                 ShowAssetReferences(pageAsset, library);
                             });
-                            
+
                             // 检测重复资源
                             var duplicates = FindDuplicatePages(pageAsset, library);
                             if (duplicates.Count > 1)
@@ -806,9 +855,9 @@ namespace ES
                             menu.AddDisabledItem(new GUIContent("在Project中定位（无资源）"));
                             menu.AddDisabledItem(new GUIContent("显示所有引用（无资源）"));
                         }
-                        
+
                         menu.AddSeparator("");
-                        
+
                         // 颜色标记子菜单
                         AddColorTagMenu(menu, "设置颜色标签", (colorTag) =>
                         {
@@ -865,15 +914,15 @@ namespace ES
                     }
 
                     // 绘制带颜色标记、警告图标和选中边框的列表项
-                    
+
                     // 1. 绘制选中边框
                     if (isActive)
                     {
                         DrawSelectionBorder(rect);
                     }
-                    
+
                     GUIHelper.PushColor(color);
-                    
+
                     // 2. 显示警告图标（如果Page为空）
                     if (pageAsset == null)
                     {
@@ -882,7 +931,7 @@ namespace ES
                         rect.x += 18;
                         rect.width -= 18;
                     }
-                    
+
                     // 3. 根据视图模式绘制
                     if (currentViewMode == ViewMode.ThumbnailView && pageAsset != null)
                     {
@@ -892,7 +941,7 @@ namespace ES
                     {
                         EditorGUI.LabelField(rect, page_.Name);
                     }
-                    
+
                     GUIHelper.PopColor();
                 };
 
@@ -911,7 +960,7 @@ namespace ES
                     Debug.LogWarning("[PasteBook] 无效的粘贴操作：剪切板或目标为空");
                     return;
                 }
-                
+
                 Undo.RecordObject(targetLibrary, "Paste Book");
                 if (cutBookSourceLibrary != targetLibrary)
                 {
@@ -938,7 +987,7 @@ namespace ES
                     Debug.LogWarning("[PastePage] 无效的粘贴操作：剪切板或目标为空");
                     return;
                 }
-                
+
                 Undo.RecordObject(library, "Paste Page");
                 if (cutPageSourceLibrary != null && cutPageSourceLibrary != library)
                 {
@@ -966,13 +1015,13 @@ namespace ES
                     Debug.LogWarning("[MoveAllPages] 无效的移动操作：源或目标为空");
                     return;
                 }
-                
+
                 if (sourceBook.pages.Count == 0)
                 {
                     Debug.Log("[MoveAllPages] 源Book为空，无需移动");
                     return;
                 }
-                
+
                 Undo.RecordObject(library, "Move All Pages");
 
                 // 复制所有Pages到目标Book
@@ -1000,7 +1049,7 @@ namespace ES
                     Debug.LogWarning("[MovePage] 无效的移动操作：页面或Book为空");
                     return;
                 }
-                
+
                 Undo.RecordObject(library, "Move Page");
 
                 // 从源Book移除
@@ -1011,7 +1060,7 @@ namespace ES
                 MarkDirtyDeferred();  // 单个Page移动使用延迟保存
                 Debug.Log($"已将Page [{page.Name}] 从 [{sourceBook.Name}] 移动到 [{targetBook.Name}]");
             }
-            
+
             /// <summary>
             /// 显示收集配置菜单
             /// </summary>
@@ -1022,27 +1071,27 @@ namespace ES
                     Debug.LogError("[CollectionConfig] Library为null，无法显示配置菜单");
                     return;
                 }
-                
+
                 var menu = new GenericMenu();
-                
+
                 // 获取所有资产类别（除了All）
                 var categories = System.Enum.GetValues(typeof(ESAssetCategory)).Cast<ESAssetCategory>().Where(c => c != ESAssetCategory.All).ToArray();
-                
+
                 // "总体优先级"菜单项
                 AddPriorityMenuItems(menu, "总体优先级", ESAssetCategory.All);
-                
+
                 menu.AddSeparator("");
-                
+
                 // 为每个资产类别添加菜单项
                 foreach (var category in categories)
                 {
                     string categoryName = GetCategoryDisplayName(category);
                     AddPriorityMenuItems(menu, categoryName, category);
                 }
-                
+
                 menu.ShowAsContext();
             }
-            
+
             /// <summary>
             /// 为指定类别添加优先级菜单项
             /// </summary>
@@ -1050,13 +1099,13 @@ namespace ES
             {
                 var priorities = System.Enum.GetValues(typeof(ESAssetCollectionPriority)).Cast<ESAssetCollectionPriority>().ToArray();
                 var currentPriority = library.collectionConfig.GetPriority(category);
-                
+
                 foreach (var priority in priorities)
                 {
                     string priorityName = GetPriorityDisplayName(priority);
                     string menuPath = $"{categoryName}/{priorityName}";
                     bool isSelected = (priority == currentPriority);
-                    
+
                     menu.AddItem(new GUIContent(menuPath), isSelected, () =>
                     {
                         Undo.RecordObject(library, $"Set Collection Priority: {library.Name} - {category} - {priority}");
@@ -1066,10 +1115,10 @@ namespace ES
                         Debug.Log($"[CollectionConfig] 设置 [{library.Name}] 的 [{categoryName}] 优先级为 [{priorityName}]");
                     });
                 }
-                
+
                 menu.AddSeparator($"{categoryName}/");
             }
-            
+
             /// <summary>
             /// 获取资产类别显示名称
             /// </summary>
@@ -1093,7 +1142,7 @@ namespace ES
                     default: return category.ToString();
                 }
             }
-            
+
             /// <summary>
             /// 获取优先级显示名称
             /// </summary>
@@ -1110,11 +1159,11 @@ namespace ES
                     default: return priority.ToString();
                 }
             }
-            
+
             #endregion
-            
+
             #region 延迟保存和缓存管理
-            
+
             /// <summary>
             /// 标记为脏数据，延迟保存
             /// </summary>
@@ -1127,7 +1176,7 @@ namespace ES
                     Debug.Log($"[Page_Index_Library] MarkDirtyDeferred - 标记为待保存状态，Library: {library.Name}");
                 }
             }
-            
+
             /// <summary>
             /// 立即保存（用于关键操作）
             /// </summary>
@@ -1143,14 +1192,14 @@ namespace ES
                 pendingSave = false;
                 Debug.Log("[Page_Index_Library] SaveAssetsImmediate - 保存完成，pendingSave已重置为false");
             }
-            
+
             /// <summary>
             /// 带LRU缓存的缩略图获取
             /// </summary>
             private Texture2D GetThumbnailFromCache(UnityEngine.Object asset)
             {
                 if (asset == null) return null;
-                
+
                 // 检查缓存
                 if (thumbnailCache.TryGetValue(asset, out var cachedThumbnail) && cachedThumbnail != null)
                 {
@@ -1159,7 +1208,7 @@ namespace ES
                     thumbnailCacheOrder.AddLast(asset);
                     return cachedThumbnail;
                 }
-                
+
                 // 获取新缩略图
                 var thumbnail = AssetPreview.GetAssetPreview(asset);
                 if (thumbnail != null)
@@ -1175,18 +1224,37 @@ namespace ES
                             thumbnailCacheOrder.RemoveFirst();
                         }
                     }
-                    
+
                     thumbnailCache[asset] = thumbnail;
                     thumbnailCacheOrder.AddLast(asset);
                 }
-                
+
                 return thumbnail;
             }
-            
+
             #endregion
-            
+
+            #region 动态对齐
+
+            /// <summary>
+            /// 计算动态偏移量：当选中Book在下方时，右侧面板向上偏移
+            /// </summary>
+            private float CalculateDynamicOffset(float bookY)
+            {
+                // 如果Book在阈值以上，开始计算偏移
+                if (bookY > ALIGNMENT_THRESHOLD)
+                {
+                    // 线性插值，但限制最大值
+                    float offset = Mathf.Min(bookY - ALIGNMENT_THRESHOLD, MAX_OFFSET);
+                    return offset;
+                }
+                return 0f;
+            }
+
+            #endregion
+
             #region 颜色和样式
-            
+
             /// <summary>
             /// 根据颜色标签获取颜色
             /// </summary>
@@ -1205,7 +1273,7 @@ namespace ES
                     default: return Color.white;
                 }
             }
-            
+
             /// <summary>
             /// 添加颜色标签菜单
             /// </summary>
@@ -1221,11 +1289,11 @@ namespace ES
                 menu.AddItem(new GUIContent($"{menuPath}/粉色"), false, () => onSelected(ColorLabel.Pink));
                 menu.AddItem(new GUIContent($"{menuPath}/灰色"), false, () => onSelected(ColorLabel.Gray));
             }
-            
+
             #endregion
-            
+
             #region 资源引用追踪
-            
+
             /// <summary>
             /// 显示资源引用
             /// </summary>
@@ -1233,54 +1301,31 @@ namespace ES
             {
                 var assetPath = AssetDatabase.GetAssetPath(asset);
                 var references = new List<string>();
-                
-                // 遍历所有Books和Pages
-                if (lib.Books != null)
+
+                // 统一遍历所有Books（包含自定义和默认）
+                foreach (var book in lib.GetAllUseableBooks())
                 {
-                    foreach (var book in lib.Books)
+                    if (book?.pages == null) continue;
+                    foreach (var page in book.pages)
                     {
-                        if (book?.pages == null) continue;
-                        foreach (var page in book.pages)
+                        if (page is ResPage resPage && resPage.OB != null)
                         {
-                            if (page is ResPage resPage && resPage.OB != null)
+                            var pagePath = AssetDatabase.GetAssetPath(resPage.OB);
+                            if (pagePath == assetPath)
                             {
-                                var pagePath = AssetDatabase.GetAssetPath(resPage.OB);
-                                if (pagePath == assetPath)
-                                {
-                                    references.Add($"Book: {book.Name} > Page: {page.Name}");
-                                }
+                                references.Add($"Book: {book.Name} > Page: {page.Name}");
                             }
                         }
                     }
                 }
-                
-                // 检查默认Books
-                if (lib.DefaultBooks != null)
-                {
-                    foreach (var book in lib.DefaultBooks)
-                    {
-                        if (book?.pages == null) continue;
-                        foreach (var page in book.pages)
-                        {
-                            if (page is ResPage resPage && resPage.OB != null)
-                            {
-                                var pagePath = AssetDatabase.GetAssetPath(resPage.OB);
-                                if (pagePath == assetPath)
-                                {
-                                    references.Add($"默认Book: {book.Name} > Page: {page.Name}");
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                var message = references.Count > 0 
+
+                var message = references.Count > 0
                     ? $"资源 '{asset.name}' 被以下 {references.Count} 个位置引用：\n\n" + string.Join("\n", references)
                     : $"资源 '{asset.name}' 没有被任何Page引用。";
-                    
+
                 EditorUtility.DisplayDialog("资源引用追踪", message, "确定");
             }
-            
+
             /// <summary>
             /// 查找重复的Pages
             /// </summary>
@@ -1288,50 +1333,27 @@ namespace ES
             {
                 var duplicates = new List<(TBook, TPage)>();
                 var assetPath = AssetDatabase.GetAssetPath(asset);
-                
-                // 遍历所有Books
-                if (lib.Books != null)
+
+                // 统一遍历所有Books（包含自定义和默认）
+                foreach (var book in lib.GetAllUseableBooks())
                 {
-                    foreach (var book in lib.Books)
+                    if (book?.pages == null) continue;
+                    foreach (var page in book.pages)
                     {
-                        if (book?.pages == null) continue;
-                        foreach (var page in book.pages)
+                        if (page is ResPage resPage && resPage.OB != null)
                         {
-                            if (page is ResPage resPage && resPage.OB != null)
+                            var pagePath = AssetDatabase.GetAssetPath(resPage.OB);
+                            if (pagePath == assetPath)
                             {
-                                var pagePath = AssetDatabase.GetAssetPath(resPage.OB);
-                                if (pagePath == assetPath)
-                                {
-                                    duplicates.Add((book, page));
-                                }
+                                duplicates.Add((book, page));
                             }
                         }
                     }
                 }
-                
-                // 检查默认Books
-                if (lib.DefaultBooks != null)
-                {
-                    foreach (var book in lib.DefaultBooks)
-                    {
-                        if (book?.pages == null) continue;
-                        foreach (var page in book.pages)
-                        {
-                            if (page is ResPage resPage && resPage.OB != null)
-                            {
-                                var pagePath = AssetDatabase.GetAssetPath(resPage.OB);
-                                if (pagePath == assetPath)
-                                {
-                                    duplicates.Add((book, page));
-                                }
-                            }
-                        }
-                    }
-                }
-                
+
                 return duplicates;
             }
-            
+
             /// <summary>
             /// 显示重复资源对话框
             /// </summary>
@@ -1339,20 +1361,20 @@ namespace ES
             {
                 var locations = duplicates.Select(d => $"  • {d.book.Name} > {d.page.Name}").ToArray();
                 var message = $"资源 '{asset.name}' 在以下 {duplicates.Count} 个位置重复：\n\n" + string.Join("\n", locations) + "\n\n是否合并为一个Page？";
-                
+
                 if (EditorUtility.DisplayDialog("检测到重复资源", message, "合并", "取消"))
                 {
                     MergeDuplicatePages(duplicates, lib);
                 }
             }
-            
+
             /// <summary>
             /// 合并重复的Pages
             /// </summary>
             private void MergeDuplicatePages(List<(TBook book, TPage page)> duplicates, TLib lib)
             {
                 if (duplicates.Count <= 1) return;
-                
+
                 // 保留第一个，删除其他
                 var keepPage = duplicates[0];
                 for (int i = 1; i < duplicates.Count; i++)
@@ -1360,66 +1382,60 @@ namespace ES
                     var (book, page) = duplicates[i];
                     book.pages.Remove(page);
                 }
-                
+
                 EditorUtility.SetDirty(lib);
                 AssetDatabase.SaveAssets();
-                
+
                 EditorUtility.DisplayDialog("合并完成", $"已合并 {duplicates.Count - 1} 个重复Page，保留在 {keepPage.book.Name}", "确定");
             }
-            
+
             #endregion
-            
+
             #region 资源管理功能
-            
+
             /// <summary>
             /// 检测所有重复资源（全项目范围）
             /// </summary>
             private void DetectAllDuplicates(TLib currentLib)
             {
                 var assetToPages = new Dictionary<string, List<(string libName, string bookName, string pageName)>>();
-                
+
                 // 获取所有同类型Library
                 var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<TLib>();
-                
-                // 收集所有Library中的资源引用
-                System.Action<IEnumerable<TBook>, string> collectFromBooks = (books, libName) =>
-                {
-                    if (books == null) return;
-                    foreach (var book in books)
-                    {
-                        if (book?.pages == null) continue;
-                        foreach (var page in book.pages)
-                        {
-                            if (page is ResPage resPage && resPage.OB != null)
-                            {
-                                var path = AssetDatabase.GetAssetPath(resPage.OB);
-                                if (!string.IsNullOrEmpty(path))
-                                {
-                                    if (!assetToPages.ContainsKey(path))
-                                    {
-                                        assetToPages[path] = new List<(string, string, string)>();
-                                    }
-                                    assetToPages[path].Add((libName, book.Name, page.Name));
-                                }
-                            }
-                        }
-                    }
-                };
-                
-                // 遍历所有Library
+
+                // 遍历所有Library收集资源引用
                 if (allLibraries != null)
                 {
                     foreach (var lib in allLibraries)
                     {
                         if (lib == null) continue;
-                        collectFromBooks(lib.Books, lib.Name);
-                        collectFromBooks(lib.DefaultBooks, lib.Name);
+
+                        // 统一遍历所有Books（包含自定义和默认）
+                        foreach (var book in lib.GetAllUseableBooks())
+                        {
+                            if (book?.pages == null) continue;
+                            foreach (var page in book.pages)
+                            {
+                                if (page is ResPage resPage && resPage.OB != null)
+                                {
+                                    var path = AssetDatabase.GetAssetPath(resPage.OB);
+                                    if (!string.IsNullOrEmpty(path))
+                                    {
+                                        if (!assetToPages.ContainsKey(path))
+                                        {
+                                            assetToPages[path] = new List<(string, string, string)>();
+                                        }
+                                        assetToPages[path].Add((lib.Name, book.Name, page.Name));
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                
+
                 // 找出重复项
                 var duplicates = assetToPages.Where(kvp => kvp.Value.Count > 1).ToList();
-                
+
                 if (duplicates.Count == 0)
                 {
                     EditorUtility.DisplayDialog("全项目检测完成", "未发现重复资源引用。", "确定");
@@ -1431,7 +1447,7 @@ namespace ES
                     {
                         var assetName = System.IO.Path.GetFileName(dup.Key);
                         message += $"• {assetName} ({dup.Value.Count}次引用)\n";
-                        
+
                         // 显示前3个引用位置
                         foreach (var loc in dup.Value.Take(3))
                         {
@@ -1447,21 +1463,21 @@ namespace ES
                     {
                         message += $"...还有 {duplicates.Count - 10} 个重复资源";
                     }
-                    
+
                     message += "\n\n提示：请手动清理跨Library的重复引用";
                     EditorUtility.DisplayDialog("全项目重复检测结果", message, "确定");
                 }
             }
-            
+
             /// <summary>
             /// 清除空Pages
             /// </summary>
             private void RemoveEmptyPages(TBook book)
             {
                 if (book?.pages == null) return;
-                
+
                 Undo.RecordObject(library, "Remove Empty Pages");
-                
+
                 int removedCount = 0;
                 for (int i = book.pages.Count - 1; i >= 0; i--)
                 {
@@ -1472,7 +1488,7 @@ namespace ES
                         removedCount++;
                     }
                 }
-                
+
                 if (removedCount > 0)
                 {
                     SaveAssetsImmediate();  // 清理操作需立即保存
@@ -1483,11 +1499,11 @@ namespace ES
                     EditorUtility.DisplayDialog("清理完成", "没有发现空Page", "确定");
                 }
             }
-            
+
             #endregion
-            
+
             #region 工具方法
-            
+
             /// <summary>
             /// 显示自定义图标选择器
             /// </summary>
@@ -1510,7 +1526,7 @@ namespace ES
                     }
                 }
             }
-            
+
             /// <summary>
             /// 绘制选中项的边框
             /// </summary>
@@ -1522,7 +1538,7 @@ namespace ES
                 EditorGUI.DrawRect(new Rect(borderRect.x, borderRect.y, SELECTION_BORDER_WIDTH, borderRect.height), SELECTION_BORDER_COLOR);
                 EditorGUI.DrawRect(new Rect(borderRect.xMax - SELECTION_BORDER_WIDTH, borderRect.y, SELECTION_BORDER_WIDTH, borderRect.height), SELECTION_BORDER_COLOR);
             }
-            
+
             /// <summary>
             /// 在缩略图模式下绘制Page（缩略图+名称）
             /// </summary>
@@ -1537,12 +1553,12 @@ namespace ES
                         thumbnailCache[asset] = thumbnail;
                     }
                 }
-                
+
                 // 布局：左侧缩略图（垂直居中），右侧名称
                 float yOffset = (rect.height - THUMBNAIL_SIZE) * 0.5f;  // 垂直居中
                 var thumbRect = new Rect(rect.x + 6, rect.y + yOffset, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
                 var nameRect = new Rect(rect.x + THUMBNAIL_SIZE + 12, rect.y, rect.width - THUMBNAIL_SIZE - 16, rect.height);
-                
+
                 // 绘制缩略图
                 if (thumbnail != null)
                 {
@@ -1557,13 +1573,13 @@ namespace ES
                         GUI.DrawTexture(thumbRect, icon, ScaleMode.ScaleToFit);
                     }
                 }
-                
+
                 // 显示名称，垂直居中
                 EditorGUI.LabelField(nameRect, page.Name);
             }
-            
+
             #endregion
-            
+
         }
 
         public class Page_Root_Consumer : ESWindowPageBase
@@ -1725,7 +1741,7 @@ namespace ES
                         from.RegisterAndAddPage(tree, "Consumer" + $"/包：{i.Name}", new Page_Index_Consumer() { package = i }.ES_Refresh(), SdfIconType.Box);
                     }
                 }
-                
+
                 // 批量修改后保存
                 if (strings.Count > 0)
                 {

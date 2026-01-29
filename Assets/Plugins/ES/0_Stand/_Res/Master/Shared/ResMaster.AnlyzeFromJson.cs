@@ -7,56 +7,18 @@ using System.IO;
 using UnityEditor;
 #endif
 using UnityEngine;
+
 namespace ES
 {
+    /// <summary>
+    /// ES资源系统主控类 - JSON配置解析部分
+    /// 
+    /// 【注意】
+    /// ESResKey已移动到独立文件：Assets/Plugins/ES/0_Stand/_Res/ResUse/ESResKey.cs
+    /// 如需查看或修改ESResKey，请访问新的文件位置。
+    /// </summary>
     public partial class ESResMaster
     {
         public static string[] ABNames;
-
-
-    
-     
-
-
     }
-
-        /// <summary>
-    /// 查询特定资源的最终标识
-    /// </summary>
-    [Serializable]
-    public class ESResKey : IPoolableAuto
-    {
-
-        public ESResSourceLoadType SourceLoadType = ESResSourceLoadType.ABAsset;
-        public string LibName;
-        public string LibFolderName;
-        public string ABName;
-        public string ResName;
-        public string GUID;
-        public string Path;
-        public Type TargetType;
-        [NonSerialized]
-        public string LocalABLoadPath;
-
-        public bool IsRecycled { get; set; }
-
-        public void OnResetAsPoolable()
-        {
-
-        }
-
-        public override string ToString()
-        {
-            return string.Format("资源查询键, 库名:{0} AB包名:{1} 类型:{2},资源名{3}", LibName, ABName,
-                ResName, TargetType);
-        }
-
-        public void TryAutoPushedToPool()
-        {
-            ESResMaster.Instance.PoolForESResKey.PushToPool(this);
-        }
-    }
-   
-  
-
 }

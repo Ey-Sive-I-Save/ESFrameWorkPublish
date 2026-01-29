@@ -26,6 +26,15 @@ namespace ES
     {
         UnityEngine.Object OB { get; }
     }
+    
+    /// <summary>
+    /// Book接口 - 提供页面数量查询（避免反射）
+    /// </summary>
+    public interface IBook
+    {
+        /// <summary>获取Book中的页面数量</summary>
+        int PageCount { get; }
+    }
     public abstract class LibrarySoBase<Book> : ESSO, IESLibrary
     {
         [Title("资产收集配置")]
@@ -117,11 +126,15 @@ namespace ES
             return book.ToString();
         }
         
-        [LabelText("包含")]
+        [LabelText("自定义Books")]
         public List<Book> Books = new List<Book>();
+        
         [NonSerialized]
         private bool _defaultBooksInitialized = false;
         
+        /// <summary>
+        /// 获取默认Books - 首次访问时自动初始化
+        /// </summary>
         public IEnumerable<Book> DefaultBooks
         {
             get
@@ -136,127 +149,65 @@ namespace ES
         }
         
         /// <summary>
-        /// 初始化默认Books，设置图标和编辑权限
+        /// 初始化默认Books，设置图标和编辑权限（子类重写）
         /// </summary>
         protected virtual void InitializeDefaultBooks()
         {
-           
+            // 子类重写此方法设置默认Books的属性
         }
         
         /// <summary>
-        /// 获取默认Books，子类重写此方法提供默认Books
+        /// 获取默认Books的内部实现，子类重写此方法
         /// </summary>
         protected virtual IEnumerable<Book> GetDefaultBooks() => null;
         
         /// <summary>
-        /// 高性能检查资产是否存在于Library中（使用缓存）
+        /// 实时检查资产是否存在于Library中（无缓存，适合高频删改场景）
         /// </summary>
         public bool ContainsAsset(UnityEngine.Object asset)
         {
             if (asset == null) return false;
             
-            // 每次查询前都重建缓存，确保数据准确
-            RebuildAssetCache();
-            
 #if UNITY_EDITOR
             var assetPath = UnityEditor.AssetDatabase.GetAssetPath(asset);
-            return !string.IsNullOrEmpty(assetPath) && _assetPathCache != null && _assetPathCache.Contains(assetPath);
+            if (string.IsNullOrEmpty(assetPath)) return false;
+            
+            // 实时遍历所有Books（自定义+默认）
+            foreach (var book in GetAllUseableBooks())
+            {
+                if (book == null) continue;
+                
+                // 使用反射获取pages字段（兼容泛型约束）
+                var pagesField = book.GetType().GetField("pages");
+                if (pagesField == null) continue;
+                
+                var pages = pagesField.GetValue(book) as System.Collections.IEnumerable;
+                if (pages == null) continue;
+                
+                foreach (var page in pages)
+                {
+                    if (page is IAssetPage assetPage && assetPage.OB != null)
+                    {
+                        var pagePath = UnityEditor.AssetDatabase.GetAssetPath(assetPage.OB);
+                        if (pagePath == assetPath)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            
+            return false;
 #else
             return false;
 #endif
         }
         
-        /// <summary>
-        /// 增量添加资产到缓存（用于批量操作优化）
-        /// </summary>
-        public void AddAssetToCache(UnityEngine.Object asset)
-        {
-#if UNITY_EDITOR
-            if (asset == null) return;
-            
-            if (_assetPathCache == null)
-            {
-                _assetPathCache = new HashSet<string>();
-            }
-            
-            var assetPath = UnityEditor.AssetDatabase.GetAssetPath(asset);
-            if (!string.IsNullOrEmpty(assetPath))
-            {
-                _assetPathCache.Add(assetPath);
-            }
-#endif
-        }
-        
-        /// <summary>
-        /// 重建资产缓存（每次查询前调用）
-        /// </summary>
-        public void RebuildAssetCache()
-        {
-            if (_assetPathCache == null)
-            {
-                _assetPathCache = new HashSet<string>();
-            }
-            else
-            {
-                _assetPathCache.Clear();
-            }
-            
-            // 遍历所有Books收集资产
-            if (Books != null)
-            {
-                foreach (var book in Books)
-                {
-                    if (book != null)
-                    {
-                        AddBookAssetsToCache(book);
-                    }
-                }
-            }
-            
-            // 遍历DefaultBooks收集资产
-            if (DefaultBooks != null)
-            {
-                foreach (var book in DefaultBooks)
-                {
-                    if (book != null)
-                    {
-                        AddBookAssetsToCache(book);
-                    }
-                }
-            }
-        }
-        
-        /// <summary>
-        /// 将Book中的所有资产添加到缓存
-        /// </summary>
-        private void AddBookAssetsToCache(Book book)
-        {
-#if UNITY_EDITOR
-            // 使用反射获取pages字段
-            var pagesField = book.GetType().GetField("pages");
-            if (pagesField != null)
-            {
-                var pages = pagesField.GetValue(book) as System.Collections.IList;
-                if (pages != null)
-                {
-                    foreach (var page in pages)
-                    {
-                        if (page == null) continue;
-                        
-                        // 直接使用类型检查，无反射开销
-                        if (page is IAssetPage assetPage && assetPage.OB != null)
-                        {
-                            var assetPath = UnityEditor.AssetDatabase.GetAssetPath(assetPage.OB);
-                            if (!string.IsNullOrEmpty(assetPath))
-                            {
-                                _assetPathCache.Add(assetPath);
-                            }
-                        }
-                    }
-                }
-            }
-#endif
-        }
+        // ==================== 已废弃的缓存方法 ====================
+        // 注意：以下缓存方法已废弃，因为在高频删改场景下缓存可能导致数据不一致
+        // 现在所有检测都使用实时遍历，确保数据准确性
+        // _assetPathCache 字段保留是为了向后兼容，但不再使用
+        // ==========================================================
         
         /// <summary>
         /// 根据资产类别获取推荐的DefaultBook
@@ -281,6 +232,37 @@ namespace ES
             }
             
             return default;
+        }
+        
+        /// <summary>
+        /// 获取所有可用的Books（包含普通Books和DefaultBooks，自动过滤空Book）
+        /// 用于构建和编辑器工具链中的统一遍历
+        /// </summary>
+        public IEnumerable<Book> GetAllUseableBooks()
+        {
+            // 遍历普通Books
+            if (Books != null && Books.Count > 0)
+            {
+                foreach (var book in Books)
+                {
+                    if (book != null && book is IBook iBook && iBook.PageCount > 0)
+                    {
+                        yield return book;
+                    }
+                }
+            }
+            
+            // 遍历DefaultBooks
+            if (DefaultBooks != null)
+            {
+                foreach (var book in DefaultBooks)
+                {
+                    if (book != null && book is IBook iBook && iBook.PageCount > 0)
+                    {
+                        yield return book;
+                    }
+                }
+            }
         }
         
         [LabelText("描述")]
@@ -349,7 +331,7 @@ namespace ES
     /// </summary>
     /// <typeparam name="TPage">Page类型，必须继承自PageBase</typeparam>
     [Serializable]
-    public abstract class BookBase<TPage> : IString where TPage : PageBase, IString, new()
+    public abstract class BookBase<TPage> : IString, IBook where TPage : PageBase, IString, new()
     {
         [LabelText("Book名字")]
         public string Name = "book PreNameToABKeys";
@@ -396,6 +378,11 @@ namespace ES
         [LabelText("收容页面")]
         [SerializeField]
         public List<TPage> pages = new List<TPage>();
+        
+        /// <summary>
+        /// 实现IBook接口 - 获取页面数量（高性能，无反射）
+        /// </summary>
+        public int PageCount => pages?.Count ?? 0;
 
         public string GetSTR()
         {
@@ -409,25 +396,232 @@ namespace ES
 
         public virtual void EditorOnly_DragAtArea(UnityEngine.Object[] gs)
         {
-            foreach (var i in gs)
+#if UNITY_EDITOR
+            if (gs == null || gs.Length == 0) return;
+            
+            var assetsToProcess = new List<UnityEngine.Object>();
+            
+            // 第一步：展开文件夹，收集所有实际资源
+            foreach (var obj in gs)
             {
-                if (i != null)
+                if (obj == null) continue;
+                
+                var assetPath = UnityEditor.AssetDatabase.GetAssetPath(obj);
+                if (string.IsNullOrEmpty(assetPath)) continue;
+                
+                // 检查是否为文件夹
+                if (UnityEditor.AssetDatabase.IsValidFolder(assetPath))
                 {
-                    // 检查是否已存在相同资源
-                    if (!IsDuplicateAsset(i))
+                    // 递归遍历文件夹中的所有资源
+                    var folderAssets = ExpandFolder(assetPath);
+                    assetsToProcess.AddRange(folderAssets);
+                    UnityEngine.Debug.Log($"[BookBase] 文件夹 [{obj.name}] 展开为 {folderAssets.Count} 个资源");
+                }
+                else
+                {
+                    assetsToProcess.Add(obj);
+                }
+            }
+            
+            if (assetsToProcess.Count == 0)
+            {
+                UnityEngine.Debug.LogWarning($"[BookBase] 没有有效的资源可添加到Book [{Name}]");
+                return;
+            }
+            
+            // 第二步：处理每个资源
+            int addedCount = 0;
+            int skippedCount = 0;
+            int rejectedCount = 0;
+            
+            foreach (var obj in assetsToProcess)
+            {
+                if (obj == null) continue;
+                
+                var assetPath = UnityEditor.AssetDatabase.GetAssetPath(obj);
+                
+                // 拒绝.cs文件
+                if (assetPath.EndsWith(".cs", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    UnityEngine.Debug.LogWarning($"[BookBase] 拒绝添加C#脚本文件: {obj.name}", obj);
+                    rejectedCount++;
+                    continue;
+                }
+                
+                UnityEngine.Object assetToAdd = obj;
+                
+                // 检测是否为子资产
+                if (ESGlobalResToolsSupportConfig.IsSubAsset(obj, out var mainAsset))
+                {
+                    UnityEngine.Debug.LogWarning(
+                        $"[BookBase] 检测到子资产 [{obj.name}]，自动退化为主资产 [{mainAsset.name}]",
+                        obj
+                    );
+                    assetToAdd = mainAsset;
+                    
+                    // 再次检查主资产是否为.cs文件
+                    var mainAssetPath = UnityEditor.AssetDatabase.GetAssetPath(mainAsset);
+                    if (mainAssetPath.EndsWith(".cs", System.StringComparison.OrdinalIgnoreCase))
                     {
-                        pages.Add(CreateNewPage(i));
+                        UnityEngine.Debug.LogWarning($"[BookBase] 拒绝添加C#脚本文件: {mainAsset.name}", mainAsset);
+                        rejectedCount++;
+                        continue;
+                    }
+                }
+                
+                // 检查当前Book是否已存在
+                if (IsDuplicateAsset(assetToAdd))
+                {
+                    UnityEngine.Debug.LogWarning($"[BookBase] 资源 [{assetToAdd.name}] 已存在于当前Book [{Name}] 中，跳过添加");
+                    skippedCount++;
+                    continue;
+                }
+                
+                // 全项目查重检查（DragAtPages的特权）
+                var duplicateLocation = FindAssetInProject(assetToAdd);
+                if (duplicateLocation.library != null)
+                {
+                    // 弹窗询问用户
+                    string bookName = duplicateLocation.bookName ?? "未知Book";
+                    string message = $"资源 '{assetToAdd.name}' 已存在于其他位置：\n\n"
+                        + $"Library: {duplicateLocation.library.Name}\n"
+                        + $"Book: {bookName}\n\n"
+                        + "是否强制重复收集到当前Book？\n\n"
+                        + "• 强制收集：资源将同时存在于多个位置\n"
+                        + "• 取消：跳过此资源";
+                    
+                    bool forceAdd = UnityEditor.EditorUtility.DisplayDialog(
+                        "⚠️ 检测到重复资源",
+                        message,
+                        "强制收集",
+                        "取消"
+                    );
+                    
+                    if (!forceAdd)
+                    {
+                        UnityEngine.Debug.Log($"[BookBase] 用户取消添加重复资源: {assetToAdd.name}");
+                        skippedCount++;
+                        continue;
                     }
                     else
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.LogWarning($"[BookBase] 资源 [{i.name}] 已存在于Book [{Name}] 中，跳过添加");
+                        UnityEngine.Debug.LogWarning($"[BookBase] 用户强制添加重复资源: {assetToAdd.name}", assetToAdd);
+                    }
+                }
+                
+                // 添加资源
+                pages.Add(CreateNewPage(assetToAdd));
+                addedCount++;
+            }
+            
+            // 汇总报告
+            string summary = $"[BookBase] Book [{Name}] 资源添加完成：\n"
+                + $"  • 成功添加: {addedCount}\n"
+                + $"  • 跳过重复: {skippedCount}\n"
+                + $"  • 拒绝文件: {rejectedCount}";
+            UnityEngine.Debug.Log(summary);
+            
+            if (addedCount > 0)
+            {
+                UnityEditor.EditorUtility.SetDirty(this as UnityEngine.Object);
+            }
 #endif
+        }
+        
+#if UNITY_EDITOR
+        /// <summary>
+        /// 递归展开文件夹，获取所有子资源（排除文件夹本身）
+        /// </summary>
+        private List<UnityEngine.Object> ExpandFolder(string folderPath)
+        {
+            var result = new List<UnityEngine.Object>();
+            
+            // 获取文件夹中所有GUID
+            var guids = UnityEditor.AssetDatabase.FindAssets("", new[] { folderPath });
+            
+            foreach (var guid in guids)
+            {
+                var assetPath = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                
+                // 跳过文件夹本身
+                if (UnityEditor.AssetDatabase.IsValidFolder(assetPath))
+                    continue;
+                
+                // 跳过.cs文件
+                if (assetPath.EndsWith(".cs", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+                
+                var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+                if (asset != null)
+                {
+                    result.Add(asset);
+                }
+            }
+            
+            return result;
+        }
+        
+        /// <summary>
+        /// 在整个项目中查找资产是否已存在（包括文件夹包含检测）
+        /// </summary>
+        private (LibrarySoBase<BookBase<TPage>> library, string bookName) FindAssetInProject(UnityEngine.Object asset)
+        {
+            if (asset == null)
+                return (null, null);
+            
+            var assetPath = UnityEditor.AssetDatabase.GetAssetPath(asset);
+            if (string.IsNullOrEmpty(assetPath))
+                return (null, null);
+            
+            // 获取所有同类型Library
+            var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<LibrarySoBase<BookBase<TPage>>>();
+            if (allLibraries == null)
+                return (null, null);
+            
+            foreach (var lib in allLibraries)
+            {
+                if (lib == null) continue;
+                
+                // 遍历所有Books（包括自定义和默认）
+                foreach (var book in lib.GetAllUseableBooks())
+                {
+                    if (book?.pages == null) continue;
+                    
+                    foreach (var page in book.pages)
+                    {
+                        if (!(page is IAssetPage assetPage) || assetPage.OB == null)
+                            continue;
+                        
+                        var pageAssetPath = UnityEditor.AssetDatabase.GetAssetPath(assetPage.OB);
+                        
+                        // 情况1：完全相同的资产
+                        if (assetPage.OB == asset)
+                        {
+                            UnityEngine.Debug.Log($"[FindAsset] 发现完全相同的资产引用: {asset.name}");
+                            return (lib, book.Name);
+                        }
+                        
+                        // 情况2：Page的OB是文件夹，检查资产是否在该文件夹内
+                        if (UnityEditor.AssetDatabase.IsValidFolder(pageAssetPath))
+                        {
+                            // 检查资产路径是否以文件夹路径开头（即资产在文件夹内）
+                            if (assetPath.StartsWith(pageAssetPath + "/", System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                UnityEngine.Debug.LogWarning(
+                                    $"[FindAsset] 发现文件夹包含关系: 资产 [{asset.name}] 已被文件夹Page [{assetPage.OB.name}] 包含\n"
+                                    + $"  资产路径: {assetPath}\n"
+                                    + $"  文件夹路径: {pageAssetPath}"
+                                );
+                                return (lib, book.Name);
+                            }
+                        }
                     }
                 }
             }
-
+            
+            return (null, null);
         }
+#endif
         
         /// <summary>
         /// 检查资源是否已存在于Book中

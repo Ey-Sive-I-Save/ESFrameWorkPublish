@@ -100,7 +100,7 @@ namespace ES
                         libraryIndex++;
                         EditorUtility.DisplayProgressBar("构建准备", $"处理库: {library.Name} ({libraryIndex}/{totalLibraries})", (float)libraryIndex / totalLibraries);
 
-                        if (library != null && library.Books != null)
+                        if (library != null)
                         {
                             // 如果同名库不存在，添加；如果存在，合并资源
                             if (!ESResMaster.TempResLibrarys.ContainsKey(library.Name))
@@ -118,9 +118,8 @@ namespace ES
 
                             var tempLib = ESResMaster.TempResLibrarys[library.Name];
 
-
-
-                            foreach (var book in library.Books)
+                            // 使用GetAllUseableBooks统一获取普通Books和DefaultBooks
+                            foreach (var book in library.GetAllUseableBooks())
                             {
                                 if (book != null && book.pages != null)
                                 {
@@ -290,7 +289,7 @@ namespace ES
             {
                 LibName = tempLibrary.LibNameDisPlay,
                 LibFolderName = libraryFolderName,
-                ABName = safeABName,
+                ABPreName = safeABName,
                 SourceLoadType = ESResSourceLoadType.ABAsset,
                 ResName = assetPath,
                 GUID = guid,
@@ -359,9 +358,10 @@ namespace ES
                 if (library == null || !library.ContainsBuild)
                     continue;
                 var abNames = new HashSet<string>();
-                if (library.Books != null)
+                var useableBooks = library.GetAllUseableBooks();
+                if (useableBooks != null)
                 {
-                    foreach (var book in library.Books.OrderBy(b => b?.Name, StringComparer.Ordinal))
+                    foreach (var book in useableBooks.OrderBy(b => b?.Name, StringComparer.Ordinal))
                     {
                         if (book != null && book.pages != null)
                         {
@@ -463,10 +463,11 @@ namespace ES
                 }
 
                 var tempLib = ESResMaster.TempResLibrarys[library.Name];
-                if (library.Books == null)
+                var useableBooks = library.GetAllUseableBooks();
+                if (useableBooks == null)
                     continue;
 
-                foreach (var book in library.Books.OrderBy(b => b?.Name, StringComparer.Ordinal))
+                foreach (var book in useableBooks.OrderBy(b => b?.Name, StringComparer.Ordinal))
                 {
                     if (book?.pages == null)
                         continue;
@@ -819,7 +820,7 @@ namespace ES
                             if (abDepend.Length > 0)
                                 abMetadata.Dependences.Add(abName, abDepend);
 
-                            ESResKey key = new ESResKey() { LibName = libName, LibFolderName = library.LibFolderName, ABName = abName, SourceLoadType = ESResSourceLoadType.AssetBundle, ResName = withHash, TargetType = typeof(AssetBundle) };
+                            ESResKey key = new ESResKey() { LibName = libName, LibFolderName = library.LibFolderName, ABPreName = abName, SourceLoadType = ESResSourceLoadType.AssetBundle, ResName = withHash, TargetType = typeof(AssetBundle) };
                             abMetadata.ABKeys.Add(key);
 
 
@@ -1210,9 +1211,9 @@ namespace ES
                     if (string.IsNullOrEmpty(key?.Path))
                         continue;
 
-                    if (AssetToABName.TryGetValue(key.Path, out var newABName))
+                    if (AssetToABName.TryGetValue(key.Path, out var newABPreName))
                     {
-                        key.ABName = newABName;
+                        key.ABPreName = newABPreName;
                     }
                 }
             }

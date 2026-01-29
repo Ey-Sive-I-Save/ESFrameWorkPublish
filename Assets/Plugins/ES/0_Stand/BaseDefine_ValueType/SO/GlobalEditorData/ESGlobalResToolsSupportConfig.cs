@@ -162,6 +162,32 @@ namespace ES
             return ESAssetCategory.Other;
         }
 
+#if UNITY_EDITOR
+        /// <summary>
+        /// 检测是否为子资产
+        /// </summary>
+        /// <param name="asset">要检测的资产</param>
+        /// <param name="mainAsset">输出主资产（如果是子资产）</param>
+        /// <returns>true=子资产, false=主资产</returns>
+        public static bool IsSubAsset(UnityEngine.Object asset, out UnityEngine.Object mainAsset)
+        {
+            mainAsset = null;
+            
+            if (asset == null)
+                return false;
+            
+            string assetPath = AssetDatabase.GetAssetPath(asset);
+            if (string.IsNullOrEmpty(assetPath))
+                return false;
+            
+            // 获取该路径下的主资产
+            mainAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            
+            // 如果主资产与asset不同，则asset是子资产
+            return mainAsset != null && mainAsset != asset;
+        }
+#endif
+
         /// <summary>
         /// 高性能查找资产在所有Library中的位置
         /// </summary>
@@ -198,22 +224,11 @@ namespace ES
             if (library == null || asset == null)
                 return null;
 
-            // 检查自定义Books
-            if (library.Books != null)
+            // 使用 GetAllUseableBooks() 统一遍历（高性能，自动过滤空 Book）
+            var useableBooks = library.GetAllUseableBooks();
+            if (useableBooks != null)
             {
-                foreach (var book in library.Books)
-                {
-                    if (book != null && ContainsAsset(book, asset))
-                    {
-                        return book;
-                    }
-                }
-            }
-
-            // 检查DefaultBooks
-            if (library.DefaultBooks != null)
-            {
-                foreach (var book in library.DefaultBooks)
+                foreach (var book in useableBooks)
                 {
                     if (book != null && ContainsAsset(book, asset))
                     {
@@ -265,6 +280,37 @@ namespace ES
             if (asset == null)
             {
                 if (!silent) Debug.LogError("[资产收集] 资产为null");
+                return null;
+            }
+
+            // 检测是否为子资产
+            if (IsSubAsset(asset, out var mainAsset))
+            {
+                string assetPath = AssetDatabase.GetAssetPath(asset);
+                
+                // 弹窗告知用户
+                EditorUtility.DisplayDialog(
+                    "⚠️ 禁止收集子资产",
+                    $"资产 '{asset.name}' 是子资产，不能直接使用 ESResRefer！\n\n"
+                    + $"主资产: {mainAsset?.name}\n"
+                    + $"路径: {assetPath}\n\n"
+                    + "请使用以下方式：\n"
+                    + "1. 引用主资产，运行时动态获取子资产\n"
+                    + "2. 将子资产导出为独立文件\n\n"
+                    + "后续将提供专门工具处理子资产场景。",
+                    "确定"
+                );
+                
+                if (!silent)
+                {
+                    Debug.LogWarning(
+                        $"[资产收集] 拒绝收集子资产: {asset.name}\n"
+                        + $"主资产: {mainAsset?.name}\n"
+                        + $"路径: {assetPath}",
+                        asset
+                    );
+                }
+                
                 return null;
             }
 
@@ -433,19 +479,9 @@ namespace ES
                 return 0;
             }
 
-            // 批量模式优化：先重建所有Library的缓存（仅一次）
-            if (config.autoDeduplication)
-            {
-                Debug.Log("[批量收集] 正在重建资产缓存...");
-                foreach (var lib in libraries)
-                {
-                    if (lib != null)
-                    {
-                        lib.RebuildAssetCache();
-                    }
-                }
-            }
-
+            // 批量模式：使用实时检测，无需缓存
+            // 每次检测都是实时遍历，确保数据准确性
+            
             // 批量收集时显示进度条
             int successCount = 0;
             int failedCount = 0;
@@ -467,18 +503,12 @@ namespace ES
                     // 批量模式下，只在第一个资产显示确认对话框
                     bool shouldConfirm = (showConfirmDialog ?? config.showConfirmDialog) && (i == 0);
                     
-                    // 使用内部方法，跳过缓存重建
+                    // 使用内部方法
                     var result = CollectAssetToRecommendedLibraryInternal(asset, libraries, shouldConfirm, silent: true, rebuildCache: false);
                     if (result.success)
                     {
                         successCount++;
                         Debug.Log($"[批量收集 {i + 1}/{assets.Length}] 成功: {asset.name} → {result.library.Name}");
-                        
-                        // 增量添加到缓存
-                        if (config.autoDeduplication && result.library != null)
-                        {
-                            result.library.AddAssetToCache(asset);
-                        }
                     }
                     else if (result.skipped)
                     {
@@ -637,7 +667,7 @@ namespace ES
         }
 
         /// <summary>
-        /// 查找资产但不重建缓存（用于批量操作）
+        /// 实时查找资产（用于批量操作，无缓存依赖）
         /// </summary>
         private static (ResLibrary library, ResBook book) FindAssetInLibrariesWithoutRebuild(UnityEngine.Object asset, List<ResLibrary> libraries)
         {
@@ -645,14 +675,10 @@ namespace ES
             if (asset == null || libraries == null) 
                 return (null, null);
 
-            var assetPath = AssetDatabase.GetAssetPath(asset);
-            if (string.IsNullOrEmpty(assetPath))
-                return (null, null);
-
-            // 使用已有缓存查找
+            // 实时遍历所有Library，不依赖缓存
             foreach (var library in libraries)
             {
-                if (library?._assetPathCache != null && library._assetPathCache.Contains(assetPath))
+                if (library != null && library.ContainsAsset(asset))
                 {
                     var book = FindBookContainingAsset(library, asset);
                     return (library, book);

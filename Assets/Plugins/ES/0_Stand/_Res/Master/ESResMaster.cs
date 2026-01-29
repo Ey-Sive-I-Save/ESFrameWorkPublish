@@ -17,7 +17,60 @@ namespace ES
     [DefaultExecutionOrder(-10)]
     public partial class ESResMaster : SingletonMono<ESResMaster>
     {
+        #region 全局资源加载器
+        /// <summary>
+        /// 全局默认资源加载器 - 用于 ESResRefer 等辅助工具
+        /// </summary>
+        private static ESResLoader _globalResLoader;
+        public static ESResLoader GlobalResLoader
+        {
+            get
+            {
+                if (_globalResLoader == null)
+                {
+                    _globalResLoader = new ESResLoader();
+                }
+                return _globalResLoader;
+            }
+        }
+        #endregion
 
+        #region 对象池
+        public ESSimplePool<ESABSource> PoolForESABSource = new ESSimplePool<ESABSource>(
+            () => new ESABSource(),
+            (source) => source.OnResetAsPoolable()
+        );
+        
+        public ESSimplePool<ESAssetSource> PoolForESAsset = new ESSimplePool<ESAssetSource>(
+            () => new ESAssetSource(),
+            (source) => source.OnResetAsPoolable()
+        );
+        
+        public ESSimplePool<ESABSceneSource> PoolForESABScene = new ESSimplePool<ESABSceneSource>(
+            () => new ESABSceneSource(),
+            (source) => source.OnResetAsPoolable()
+        );
+        
+        public ESSimplePool<ESShaderVariantSource> PoolForESShaderVariant = new ESSimplePool<ESShaderVariantSource>(
+            () => new ESShaderVariantSource(),
+            (source) => source.OnResetAsPoolable()
+        );
+        
+        public ESSimplePool<ESRawFileSource> PoolForESRawFile = new ESSimplePool<ESRawFileSource>(
+            () => new ESRawFileSource(),
+            (source) => source.OnResetAsPoolable()
+        );
+        
+        public ESSimplePool<ESInternalResourceSource> PoolForESInternalResource = new ESSimplePool<ESInternalResourceSource>(
+            () => new ESInternalResourceSource(),
+            (source) => source.OnResetAsPoolable()
+        );
+        
+        public ESSimplePool<ESNetImageSource> PoolForESNetImage = new ESSimplePool<ESNetImageSource>(
+            () => new ESNetImageSource(),
+            (source) => source.OnResetAsPoolable()
+        );
+        #endregion
 
         #region 全局设置和初始化
         [Required]
@@ -144,26 +197,13 @@ namespace ES
 
        }
        , 30);
-
-        public ESSimplePool<ESABSource> PoolForESABSource = new ESSimplePool<ESABSource>(() => new ESABSource(),
-(f) =>
-{
-
-}
-, 30);
-
-        public ESSimplePool<ESAssetSource> PoolForESAsset = new ESSimplePool<ESAssetSource>(() => new ESAssetSource(),
-(f) =>
-{
-
-}
-, 30);
+        
         #region 池操作在这里
         public ESResKey GetInPool_ResKey(string resName, string ownerBundleName = null, Type assetType = null)
         {
             var resSearchRule = ESResMaster.Instance.PoolForESResKey.GetInPool();
             resSearchRule.ResName = resName;
-            resSearchRule.ABName = ownerBundleName == null ? null : ownerBundleName;
+            resSearchRule.ABPreName = ownerBundleName == null ? null : ownerBundleName;
             resSearchRule.TargetType = assetType;
             return resSearchRule;
         }
@@ -176,35 +216,41 @@ namespace ES
         #endregion
 
         #region 资源源查询
-        public ESResSourceBase CreateNewResSourceByKey(object key, ESResSourceLoadType loadType)
+        /// <summary>
+        /// 使用工厂模式创建资源源（商业级重构 - 强类型版本）
+        /// 扩展性：添加新类型只需在ESResSourceFactory注册，无需修改此方法
+        /// </summary>
+        public ESResSourceBase CreateNewResSourceByKey(ESResKey resKey, ESResSourceLoadType loadType)
         {
-            ESResSourceBase retRes = null;
-
-            if (loadType == ESResSourceLoadType.AssetBundle)
+            if (resKey == null)
             {
-                var abKey = (ESResKey)key;
-                retRes = CreateResSource_AssetBundle(abKey);
-            }
-            else if (loadType == ESResSourceLoadType.ABAsset)
-            {
-                var assetKey = (ESResKey)key;
-                retRes = CreateResSource_ABAsset(assetKey);
-            }
-            /*.Where(creator => creator.Match(resSearchKeys))
-            .Select(creator => creator.Create(resSearchKeys))
-            .FirstOrDefault();*/
-
-            if (retRes == null)
-            {
-                Debug.LogError("创建资源源失败了. 找不到这个查找键" + key);
+                Debug.LogError("资源键不能为null");
                 return null;
             }
 
-            return retRes;
+            try
+            {
+                // ✅ 使用工厂创建，完全解耦，符合开闭原则
+                return ESResSourceFactory.CreateResSource(resKey, loadType);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"创建资源源失败 [Type: {loadType}, Key: {resKey}]\n{ex.Message}");
+                return null;
+            }
         }
 
-        public ESResSourceBase GetResSourceByKey(object key, ESResSourceLoadType loadType, bool ifNullCreateNew = true)
+        /// <summary>
+        /// 通过ESResKey获取资源源（强类型版本）
+        /// </summary>
+        public ESResSourceBase GetResSourceByKey(ESResKey key, ESResSourceLoadType loadType, bool ifNullCreateNew = true)
         {
+            if (key == null)
+            {
+                Debug.LogError("资源键不能为null");
+                return null;
+            }
+
             ESResSourceBase res = null;
             if (loadType == ESResSourceLoadType.ABAsset)
             {
@@ -214,6 +260,19 @@ namespace ES
             {
                 res = ResTable.GetABResByKey(key);
             }
+            else if (loadType == ESResSourceLoadType.RawFile)
+            {
+                res = ResTable.GetRawFileResByKey(key);
+            }
+            else if (loadType == ESResSourceLoadType.InternalResource)
+            {
+                res = ResTable.GetInternalResourceResByKey(key);
+            }
+            else if (loadType == ESResSourceLoadType.NetImageRes)
+            {
+                res = ResTable.GetNetImageResByKey(key);
+            }
+
             if (res != null)
             {
                 AcquireResHandle(key, loadType);
@@ -239,6 +298,18 @@ namespace ES
                 {
                     registered = ResTable.TryRegisterABRes(key, res);
                 }
+                else if (loadType == ESResSourceLoadType.RawFile)
+                {
+                    registered = ResTable.TryRegisterRawFileRes(key, res);
+                }
+                else if (loadType == ESResSourceLoadType.InternalResource)
+                {
+                    registered = ResTable.TryRegisterInternalResourceRes(key, res);
+                }
+                else if (loadType == ESResSourceLoadType.NetImageRes)
+                {
+                    registered = ResTable.TryRegisterNetImageRes(key, res);
+                }
 
                 if (!registered)
                 {
@@ -252,7 +323,11 @@ namespace ES
 
         #endregion
 
-        #region 资源源创建方式
+        #region 遗留工厂方法（已弃用，保留兼容性）
+        /// <summary>
+        /// [已弃用] 使用 ESResSourceFactory.CreateResSource() 代替
+        /// </summary>
+        [Obsolete("请使用 ESResSourceFactory.CreateResSource()")]
         internal ESResSourceBase CreateResSource_AssetBundle(ESResKey abKey)
         {
             var use = PoolForESABSource.GetInPool();
@@ -261,6 +336,10 @@ namespace ES
             use.TargetType = typeof(AssetBundle);
             return use;
         }
+        /// <summary>
+        /// [已弃用] 使用 ESResSourceFactory.CreateResSource() 代替
+        /// </summary>
+        [Obsolete("请使用 ESResSourceFactory.CreateResSource()")]
         internal ESResSourceBase CreateResSource_ABAsset(ESResKey key)
         {
             var use = PoolForESAsset.GetInPool();
@@ -272,7 +351,11 @@ namespace ES
 
         #endregion
 
-        private void AcquireResHandle(object key, ESResSourceLoadType loadType)
+        #region 资源源管理（引用计数）
+        /// <summary>
+        /// 获取资源句柄（引用计数+1）- 强类型版本
+        /// </summary>
+        private void AcquireResHandle(ESResKey key, ESResSourceLoadType loadType)
         {
             switch (loadType)
             {
@@ -282,12 +365,28 @@ namespace ES
                 case ESResSourceLoadType.AssetBundle:
                     ResTable.AcquireABRes(key);
                     break;
+                case ESResSourceLoadType.ShaderVariant:
+                    // Shader资源不需要引用计数
+                    break;
+                case ESResSourceLoadType.RawFile:
+                    ResTable.AcquireRawFileRes(key);
+                    break;
+                case ESResSourceLoadType.InternalResource:
+                    ResTable.AcquireInternalResourceRes(key);
+                    break;
+                case ESResSourceLoadType.NetImageRes:
+                    ResTable.AcquireNetImageRes(key);
+                    break;
                 default:
+                    Debug.LogWarning($"未处理的资源类型引用计数: {loadType}");
                     break;
             }
         }
 
-        internal void ReleaseResHandle(object key, ESResSourceLoadType loadType, bool unloadWhenZero)
+        /// <summary>
+        /// 释放资源句柄（引用计数-1）- 强类型版本
+        /// </summary>
+        internal void ReleaseResHandle(ESResKey key, ESResSourceLoadType loadType, bool unloadWhenZero)
         {
             switch (loadType)
             {
@@ -297,10 +396,60 @@ namespace ES
                 case ESResSourceLoadType.AssetBundle:
                     ResTable.ReleaseABRes(key, unloadWhenZero);
                     break;
+                case ESResSourceLoadType.ShaderVariant:
+                    // Shader资源永不卸载
+                    Debug.LogWarning($"Shader资源不应被释放: {key}");
+                    break;
+                case ESResSourceLoadType.RawFile:
+                    ResTable.ReleaseRawFileRes(key, unloadWhenZero);
+                    break;
+                case ESResSourceLoadType.InternalResource:
+                    ResTable.ReleaseInternalResourceRes(key, unloadWhenZero);
+                    break;
+                case ESResSourceLoadType.NetImageRes:
+                    ResTable.ReleaseNetImageRes(key, unloadWhenZero);
+                    break;
                 default:
                     break;
             }
         }
+
+        #endregion
+
+        #region Shader自动预热API
+        
+        /// <summary>
+        /// 手动触发Shader预热（通常不需要，系统会自动预热）
+        /// </summary>
+        public static void WarmUpAllShaders(Action onComplete = null)
+        {
+            if (Instance == null)
+            {
+                Debug.LogError("[ESResMaster.WarmUpAllShaders] ESResMaster实例不存在");
+                onComplete?.Invoke();
+                return;
+            }
+
+            Instance.StartCoroutine(ESShaderPreloader.AutoWarmUpAllShaders(onComplete));
+        }
+
+        /// <summary>
+        /// 检查Shader是否已预热完成
+        /// </summary>
+        public static bool IsShadersWarmedUp()
+        {
+            return ESShaderPreloader.IsWarmedUp;
+        }
+
+        /// <summary>
+        /// 获取Shader预热统计信息
+        /// </summary>
+        public static string GetShaderStatistics()
+        {
+            return ESShaderPreloader.GetStatistics();
+        }
+
+        #endregion
 
     }
 }

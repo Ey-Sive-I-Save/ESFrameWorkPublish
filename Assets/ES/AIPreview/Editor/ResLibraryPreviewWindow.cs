@@ -83,16 +83,17 @@ public class ResLibraryPreviewWindow : EditorWindow
                 EditorGUILayout.LabelField("参与构建", lib.ContainsBuild ? "是" : "否");
                 EditorGUILayout.LabelField("是否远程库", lib.IsNet ? "远程" : "本体");
 
-                // 展示 Book / Page 层级
-                if (lib.Books != null)
+                // 展示 Book / Page 层级（包含自定义Books和DefaultBooks）
+                var useableBooks = lib.GetAllUseableBooks();
+                if (useableBooks != null)
                 {
                     EditorGUI.indentLevel++;
-                    for (int b = 0; b < lib.Books.Count; b++)
+                    int bookIndex = 0;
+                    foreach (var book in useableBooks)
                     {
-                        var book = lib.Books[b];
                         if (book == null) continue;
 
-                        EditorGUILayout.LabelField($"Book[{b}] - {book.Name}");
+                        EditorGUILayout.LabelField($"Book[{bookIndex}] - {book.Name}");
                         EditorGUI.indentLevel++;
                         EditorGUILayout.LabelField("描述", book.Desc);
 
@@ -117,6 +118,7 @@ public class ResLibraryPreviewWindow : EditorWindow
                         }
 
                         EditorGUI.indentLevel--;
+                        bookIndex++;
                     }
                     EditorGUI.indentLevel--;
                 }

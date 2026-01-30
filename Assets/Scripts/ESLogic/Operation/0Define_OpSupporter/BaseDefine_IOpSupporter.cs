@@ -90,6 +90,35 @@ namespace ES
     }
     #endregion
 
+    #region 专用实现
+    /// <summary>
+    /// 技能操作支持者
+    /// 专为技能系统设计的OpSupporter实现
+    /// </summary>
+    public class SkillOpSupporter : OpSupport_Examples
+    {
+        // 可以添加技能特定的逻辑
+    }
+
+    /// <summary>
+    /// Buff操作支持者
+    /// 专为高级Buff系统设计的OpSupporter实现
+    /// </summary>
+    public class BuffOpSupporter : OpSupport_Examples
+    {
+        // 可以添加Buff特定的逻辑
+    }
+
+    /// <summary>
+    /// 飞行物操作支持者
+    /// 专为飞行物系统设计的OpSupporter实现
+    /// </summary>
+    public class ProjectileOpSupporter : OpSupport_Examples
+    {
+        // 可以添加飞行物特定的逻辑
+    }
+    #endregion
+
     #region 标准Provider
     /// <summary>
     /// 操作支持标准提供者
@@ -111,6 +140,17 @@ namespace ES
     /// </summary>
     public class OpSupportProvider : IOpSupporter
     {
+        #region 构造函数
+        /// <summary>
+        /// 默认构造函数，初始化所有数据池
+        /// </summary>
+        public OpSupportProvider()
+        {
+            contextPool = new ContextPool();
+            cacherPool = new CacherPool();
+        }
+        #endregion
+
         #region 核心数据池
         /// <summary>上下文池 - 提供运行时上下文环境支持</summary>
         public ContextPool contextPool;
@@ -133,7 +173,7 @@ namespace ES
         /// </summary>
         /// <param name="flag">委托操作标志位（当前实现忽略标志位）</param>
         /// <returns>委托任务的安全字典存储</returns>
-        public SafeDictionary<IOperation, DeleAndCount> GetFromOpStore(OutputOpeationDelegateFlag flag = null)
+        public SafeDictionary<IOperation, DeleAndCount> GetFromOpStore(OutputOpeationDelegateFlag flag = OutputOpeationDelegateFlag.Default)
         {
             return storeFordele;
         }
@@ -143,7 +183,7 @@ namespace ES
         /// </summary>
         /// <param name="flag">缓冲操作标志位（当前实现忽略标志位）</param>
         /// <returns>缓冲任务的安全键组存储</returns>
-        public SafeKeyGroup<OutputOperationBufferFloat_TargetAndDirectInput<ESRuntimeTarget, IOpSupporter, ESRuntimeOpSupport_ValueEntryFloatOperation>, BufferOperationFloat> GetFromOpStore(OutputOpeationBufferFlag flag = null)
+        public SafeKeyGroup<OutputOperationBufferFloat_TargetAndDirectInput<ESRuntimeTarget, IOpSupporter, ESRuntimeOpSupport_ValueEntryFloatOperation>, BufferOperationFloat> GetFromOpStore(OutputOpeationBufferFlag flag = OutputOpeationBufferFlag.Default)
         {
             return storeForbufer;
         }
@@ -164,7 +204,28 @@ namespace ES
     #endregion
 
     #region 重写标志位定义
-    // TODO: 在此区域定义Operation相关的标志位枚举
-    // 例如：委托操作标志位、缓冲操作标志位等
+    /// <summary>
+    /// 委托操作标志位枚举
+    /// 用于区分不同类型的委托任务存储
+    /// </summary>
+    public enum OutputOpeationDelegateFlag
+    {
+        Default,    // 默认委托
+        Skill,      // 技能相关
+        Buff,       // Buff相关
+        Projectile  // 飞行物相关
+    }
+
+    /// <summary>
+    /// 缓冲操作标志位枚举
+    /// 用于区分不同类型的缓冲任务存储
+    /// </summary>
+    public enum OutputOpeationBufferFlag
+    {
+        Default,    // 默认缓冲
+        Skill,      // 技能相关
+        Buff,       // Buff相关
+        Projectile  // 飞行物相关
+    }
     #endregion
 }

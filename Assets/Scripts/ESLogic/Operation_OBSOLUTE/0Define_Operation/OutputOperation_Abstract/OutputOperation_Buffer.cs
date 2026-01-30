@@ -9,10 +9,6 @@ using static UnityEngine.GraphicsBuffer;
 
 namespace ES
 {
-    public class OutputOpeationBufferFlag : OverLoadFlag<OutputOpeationBufferFlag>
-    {
-
-    }
     public abstract class OutputOperationBuffer<Target,Logic, ValueType, Buffer, BufferSource, This> : IOutputOperation<Target,Logic>
         where Logic : IOpStoreKeyGroup<This, Buffer, OutputOpeationBufferFlag>
         where Buffer : BufferOperationAbstract, new()
@@ -24,12 +20,12 @@ namespace ES
         public Buffer GetBufferOnEnableExpand(Target target,Logic logic)
         {
             var use = MakeTheOpeation(target, logic);
-            logic.GetFromOpStore(OutputOpeationBufferFlag.flag).Add(this as This, use);
+            logic.GetFromOpStore(OutputOpeationBufferFlag.Default).Add(this as This, use);
             return use;
         }
         public Buffer GetBufferOnDisableExpand(Target target,Logic logic)
         {
-            var cacher = logic.GetFromOpStore(OutputOpeationBufferFlag.flag);
+            var cacher = logic.GetFromOpStore(OutputOpeationBufferFlag.Default);
             if (cacher.Groups.TryGetValue(this as This, out var use))
             {
                 cacher.Groups.Remove(this as This);
@@ -81,7 +77,7 @@ namespace ES
         }
         public override void TryStopTheBuffer(Target target,Logic logic, Buffer buffer)
         {
-            var cacher = logic.GetFromOpStore(OutputOpeationBufferFlag.flag);
+            var cacher = logic.GetFromOpStore(OutputOpeationBufferFlag.Default);
             if (cacher.Groups.TryGetValue(this as This, out var use))
             {
                 if (valueEntryOp != null)

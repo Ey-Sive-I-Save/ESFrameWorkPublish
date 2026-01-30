@@ -9,10 +9,6 @@ using static UnityEngine.UIElements.UxmlAttributeDescription;
 
 namespace ES
 {
-    public class OutputOpeationDelegateFlag : OverLoadFlag<OutputOpeationDelegateFlag>
-    {
-
-    }
     
     public class DeleAndCount
     {
@@ -33,7 +29,7 @@ namespace ES
         public MakeAction GetActionOnEnableExpand(Target target,Logic logic)
         {
             MakeAction make = null;
-            var cache = logic.GetFromOpStore(OutputOpeationDelegateFlag.flag);
+            var cache = logic.GetFromOpStore(OutputOpeationDelegateFlag.Default);
             if(cache.TryGetValue(this, out var value))
             {
                 make = value.dele as MakeAction;
@@ -48,7 +44,7 @@ namespace ES
         }
         public MakeAction GetActionOnDisableExpand(Target target,Logic logic)
         {
-            var cacher = logic.GetFromOpStore(OutputOpeationDelegateFlag.flag);
+            var cacher = logic.GetFromOpStore(OutputOpeationDelegateFlag.Default);
             if (cacher.TryGetValue(this, out var use))
             {
                 cacher.Remove(this);
@@ -58,7 +54,7 @@ namespace ES
         }
         public void SetWhenActionHappenCountChange(Target target,Logic logic)
         {
-            var cacher = logic.GetFromOpStore(OutputOpeationDelegateFlag.flag);
+            var cacher = logic.GetFromOpStore(OutputOpeationDelegateFlag.Default);
             if (cacher.TryGetValue(this, out var use))
             {
                 Debug.Log("COUNT2     "+ use.count);

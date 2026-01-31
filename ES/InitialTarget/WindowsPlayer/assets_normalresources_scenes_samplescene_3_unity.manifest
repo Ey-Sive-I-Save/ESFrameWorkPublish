@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 693010936
+CRC: 1916016344
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: 9b8aacb0ae136b1e39f7beab6305744d
+    Hash: aab354251d5eabd2347964da308a1082
   TypeTreeHash:
     serializedVersion: 2
-    Hash: 8880343ca120cbdc3a1e6cb68c484043
+    Hash: 28beebcc4c8e86619d015e5ab23a2a31
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: 9b8aacb0ae136b1e39f7beab6305744d
+    Hash: aab354251d5eabd2347964da308a1082
 HashAppended: 1
 ClassTypes:
 - Class: 1
@@ -49,8 +49,6 @@ ClassTypes:
 - Class: 114
   Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
 - Class: 114
-  Script: {fileID: 11500000, guid: a43b0f8f0c53eba4e8fb65148bafdd7a, type: 3}
-- Class: 114
   Script: {fileID: 11500000, guid: 0b2db86121404754db890f4c8dfe81b2, type: 3}
 - Class: 114
   Script: {fileID: 11500000, guid: 899c54efeace73346a0a16faa3afe726, type: 3}
@@ -62,8 +60,6 @@ ClassTypes:
   Script: {fileID: 11500000, guid: 97c23e3b12dc18c42a140437e53d3951, type: 3}
 - Class: 114
   Script: {fileID: 11500000, guid: 829f02ab7b5b12e489246de2cf8aad27, type: 3}
-- Class: 114
-  Script: {fileID: 11500000, guid: e4815b677e9fb2d4fb96a0343968a27a, type: 3}
 - Class: 114
   Script: {fileID: 11500000, guid: 4f231c4fb786f3946a6b90b886c48677, type: 3}
 - Class: 114
@@ -89,5 +85,4 @@ ClassTypes:
 SerializeReferenceClassIdentifiers: []
 Assets:
 - Assets/NormalResources/Scenes/SampleScene 3.unity
-Dependencies:
-- F:/aaProject/ESFrameWorkPublish/ES/InitialTarget/WindowsPlayer/sharedab_cycle_0_9d8809aaed148e336b74e4dbc17515db
+Dependencies: []

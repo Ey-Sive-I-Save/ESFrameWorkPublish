@@ -270,67 +270,67 @@ namespace ES
             return false;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool GetBool(string key)
+        public bool GetBool(string key, bool defaultValue = false)
         {
             if (_ContextValues.TryGetValue(key, out var use))
             {
                 return use.GetBool();
             }
-            return false;
+            return defaultValue;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float GetFloat(string key)
+        public float GetFloat(string key, float defaultValue = 0f)
         {
             if (_ContextValues.TryGetValue(key, out var use))
             {
                 return use.GetFloat();
             }
-            return 0;
+            return defaultValue;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Vector3 GetVector(string key)
+        public Vector3 GetVector(string key, Vector3 defaultValue = default)
         {
             if (_ContextValues.TryGetValue(key, out var use))
             {
                 return use.GetVector();
             }
-            return default;
+            return defaultValue;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float GetInt(string key)
+        public int GetInt(string key, int defaultValue = 0)
         {
             if (_ContextValues.TryGetValue(key, out var use))
             {
                 return use.GetInt();
             }
-            return 0;
+            return defaultValue;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public string GetString(string key)
+        public string GetString(string key, string defaultValue = "")
         {
             if (_ContextValues.TryGetValue(key, out var use))
             {
                 return use.GetString();
             }
-            return "NULL";
+            return defaultValue;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool GetTagIsUseable(string key)
+        public bool GetTagIsUseable(string key, bool defaultValue = false)
         {
             if (_ContextValues.TryGetValue(key, out var use))
             {
                 return use.GetBool();
             }
-            return false;
+            return defaultValue;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float GetTagRemain(string key)
+        public float GetTagRemain(string key, float defaultValue = 0f)
         {
             if (_ContextValues.TryGetValue(key, out var use))
             {
                 return use.GetFloat();
             }
-            return 0;
+            return defaultValue;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public object GetValue(string key)

@@ -160,7 +160,9 @@ namespace ES
             // 动态对齐 - 记录选中Book和Page的窗口位置
             private static float selectedBookWindowY = 0f;
             private static float selectedPageWindowY = 0f;
+#pragma warning disable CS0414
             private static float bookListScrollY = 0f;
+#pragma warning restore CS0414
             private const float ALIGNMENT_THRESHOLD = 150f;  // 超过150px才开始偏移
             private const float MAX_OFFSET = 400f;  // 最大偏移400px
 

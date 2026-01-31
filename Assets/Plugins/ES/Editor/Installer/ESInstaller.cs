@@ -811,7 +811,7 @@ namespace ES.ESInstaller
 
             // 确保在重新编译后窗口能正常工作
             //Close();
-            Debug.Log("ES Installer 窗口已启用"); 
+          //  Debug.Log("ES Installer 窗口已启用"); 
             InitializePaths();
             LoadConfiguration();
             ScanAndLoadAllPackages(); // 扫描并加载所有包

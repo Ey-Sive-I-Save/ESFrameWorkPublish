@@ -25,7 +25,7 @@ MonoBehaviour:
     overallPriority: 1
   Name: "\u7537\u5A18\u5E93"
   LibFolderName: nanniangku
-  ChangeCount: 5
+  ChangeCount: 7
   IsMainInClude: 1
   Books:
   - Name: book PreNameToABKeys
@@ -99,7 +99,11 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "\u9ED8\u8BA4\u9884\u5236\u4F53\u8D44\u6E90\u6240\u5728\u7684Book"
-    pages: []
+    pages:
+    - Name: GameObject (3)
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 7055376591365242435, guid: 495b09c783492784e88277aa816dfdce, type: 3}
   DefaultSOBook:
     Name: "\u9ED8\u8BA4 \u811A\u672C\u5BF9\u8C61SO Book"
     WritableDefaultMessageOnEditor: 0

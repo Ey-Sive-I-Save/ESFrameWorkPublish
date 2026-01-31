@@ -98,6 +98,15 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("引用统计")]
         [DisplayAsString]
         private string ReferenceStats => $"直接引用: {selectedAssetReferences.Count(r => !r.IsIndirect)}, 间接引用: {selectedAssetReferences.Count(r => r.IsIndirect)}";
+
+        [TabGroup("分析结果", "依赖分析")]
+        [HideInInspector]
+        public List<AssetReferenceInfo> selectedAssetDependencies = new List<AssetReferenceInfo>();
+
+        [TabGroup("分析结果", "依赖分析")]
+        [ShowInInspector, ReadOnly, LabelText("依赖统计")]
+        [DisplayAsString]
+        private string DependencyStats => $"直接依赖: {selectedAssetDependencies.Count(r => !r.IsIndirect)}, 间接依赖: {selectedAssetDependencies.Count(r => r.IsIndirect)}";
         #endregion
 
         #region 数据结构
@@ -252,42 +261,56 @@ namespace ES
             foldoutReferences = EditorGUILayout.Foldout(foldoutReferences, $"选中资源的引用 ({selectedAssetReferences.Count})");
             if (foldoutReferences)
             {
-                EditorGUI.indentLevel++;
-                if (selectedAssetReferences.Count == 0)
-                {
-                    EditorGUILayout.LabelField("没有引用信息。");
-                }
-                else
-                {
-                    // 分页
-                    int totalPages = Mathf.CeilToInt((float)selectedAssetReferences.Count / pageSize);
-                    if (totalPages > 1)
-                    {
-                        EditorGUILayout.BeginHorizontal();
-                        if (GUILayout.Button("上一页", GUILayout.Width(60)) && currentPageReferences > 0) currentPageReferences--;
-                        GUILayout.FlexibleSpace();
-                        GUILayout.Label($"页 {currentPageReferences + 1} / {totalPages}", GUILayout.Width(80));
-                        GUILayout.FlexibleSpace();
-                        if (GUILayout.Button("下一页", GUILayout.Width(60)) && currentPageReferences < totalPages - 1) currentPageReferences++;
-                        EditorGUILayout.EndHorizontal();
-                    }
-
-                    int start = currentPageReferences * pageSize;
-                    int end = Mathf.Min(start + pageSize, selectedAssetReferences.Count);
-                    for (int i = start; i < end; i++)
-                    {
-                        var asset = selectedAssetReferences[i];
-                        EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField(asset.ToString());
-                        if (GUILayout.Button("跳转", GUILayout.Width(50)))
-                        {
-                            asset.JumpToAsset();
-                        }
-                        EditorGUILayout.EndHorizontal();
-                    }
-                }
-                EditorGUI.indentLevel--;
+                DrawAssetList(selectedAssetReferences, ref currentPageReferences);
             }
+
+            EditorGUILayout.Space();
+
+            // 绘制依赖分析
+            foldoutDependencies = EditorGUILayout.Foldout(foldoutDependencies, $"选中资源的依赖 ({selectedAssetDependencies.Count})");
+            if (foldoutDependencies)
+            {
+                DrawAssetList(selectedAssetDependencies, ref currentPageDependencies);
+            }
+        }
+
+        private void DrawAssetList(List<AssetReferenceInfo> assetList, ref int currentPage)
+        {
+            EditorGUI.indentLevel++;
+            if (assetList.Count == 0)
+            {
+                EditorGUILayout.LabelField("没有分析结果。");
+            }
+            else
+            {
+                // 分页
+                int totalPages = Mathf.CeilToInt((float)assetList.Count / pageSize);
+                if (totalPages > 1)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button("上一页", GUILayout.Width(60)) && currentPage > 0) currentPage--;
+                    GUILayout.FlexibleSpace();
+                    GUILayout.Label($"页 {currentPage + 1} / {totalPages}", GUILayout.Width(80));
+                    GUILayout.FlexibleSpace();
+                    if (GUILayout.Button("下一页", GUILayout.Width(60)) && currentPage < totalPages - 1) currentPage++;
+                    EditorGUILayout.EndHorizontal();
+                }
+
+                int start = currentPage * pageSize;
+                int end = Mathf.Min(start + pageSize, assetList.Count);
+                for (int i = start; i < end; i++)
+                {
+                    var asset = assetList[i];
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField(asset.ToString());
+                    if (GUILayout.Button("跳转", GUILayout.Width(50)))
+                    {
+                        asset.JumpToAsset();
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+            }
+            EditorGUI.indentLevel--;
         }
         #endregion
 
@@ -297,9 +320,11 @@ namespace ES
         private HashSet<string> processedAssets = new HashSet<string>();
         private bool foldoutUnused = true;
         private bool foldoutReferences = true;
+        private bool foldoutDependencies = true;
         private int pageSize = 10;
         private int currentPageUnused = 0;
         private int currentPageReferences = 0;
+        private int currentPageDependencies = 0;
         #endregion
 
         #region 商业级核心方法
@@ -361,81 +386,141 @@ namespace ES
 
         [TabGroup("操作", "查找功能")]
         [Button("🎯 查找选中资源的引用", ButtonHeight = 45), GUIColor("@ESDesignUtility.ColorSelector.Color_05")]
-        [InfoBox("分析当前选中资源的所有引用关系。")]
+        [InfoBox("找出哪些资源引用了当前选中的资源。")]
         public void FindReferencesToSelected()
         {
             var selectedAsset = Selection.activeObject;
             if (selectedAsset == null)
             {
-                EditorUtility.DisplayDialog("错误", "请先在Project窗口中选择一个资源文件！", "确定");
+                ShowErrorDialog("请先在Project窗口中选择一个资源文件！");
                 return;
             }
 
             selectedAssetReferences.Clear();
             var assetPath = AssetDatabase.GetAssetPath(selectedAsset);
-
+            
             if (string.IsNullOrEmpty(assetPath) || !File.Exists(assetPath))
             {
-                EditorUtility.DisplayDialog("错误", "选中的对象不是有效的资源文件！", "确定");
+                Debug.LogError($"选中的对象路径无效或文件不存在: {assetPath}");
+                ShowErrorDialog("选中的对象不是有效的资源文件！");
                 return;
             }
 
-            try
+            ExecuteWithProgress("查找引用", "正在分析引用关系...", () =>
             {
-                EditorUtility.DisplayProgressBar("查找引用", "正在分析引用关系...", 0f);
-
+                // 获取所有资源路径，包括可能引用目标资源的任何文件
                 var allAssetPaths = AssetDatabase.GetAllAssetPaths();
-                var filteredPaths = FilterAssetPaths(allAssetPaths);
+                var filteredPaths = FilterAssetPathsForReferenceCheck(allAssetPaths);
 
                 for (int i = 0; i < filteredPaths.Count; i++)
                 {
                     var currentPath = filteredPaths[i];
-                    EditorUtility.DisplayProgressBar("查找引用",
-                        $"检查: {Path.GetFileName(currentPath)}",
-                        (float)i / filteredPaths.Count);
 
-                    // 检查直接引用
-                    var dependencies = AssetDatabase.GetDependencies(currentPath, false);
-                    if (Array.IndexOf(dependencies, assetPath) >= 0)
+                    // 检查用户是否取消操作
+                    if (EditorUtility.DisplayCancelableProgressBar("查找引用",
+                        $"检查: {Path.GetFileName(currentPath)} ({i + 1}/{filteredPaths.Count})",
+                        (float)i / filteredPaths.Count))
                     {
-                        selectedAssetReferences.Add(new AssetReferenceInfo(currentPath, false));
+                        break; // 用户取消
                     }
-                    // 检查间接引用（如果启用了深度分析）
-                    else if (deepAnalysis)
+
+                    try
                     {
-                        var allDeps = AssetDatabase.GetDependencies(currentPath, true);
-                        if (Array.IndexOf(allDeps, assetPath) >= 0)
+                        // 检查直接引用
+                        var dependencies = AssetDatabase.GetDependencies(currentPath, false);
+                        if (Array.IndexOf(dependencies, assetPath) >= 0)
                         {
-                            selectedAssetReferences.Add(new AssetReferenceInfo(currentPath, true));
+                            selectedAssetReferences.Add(new AssetReferenceInfo(currentPath, false));
+                        }
+                        // 检查间接引用（如果启用了深度分析）
+                        else if (deepAnalysis)
+                        {
+                            var allDeps = AssetDatabase.GetDependencies(currentPath, true);
+                            if (Array.IndexOf(allDeps, assetPath) >= 0)
+                            {
+                                selectedAssetReferences.Add(new AssetReferenceInfo(currentPath, true));
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"分析文件 {currentPath} 时出错: {ex.Message}");
+                    }
+                }
+
+                RefreshUI();
+
+                ShowCompletionDialog("引用分析完成",
+                    $"找到 {selectedAssetReferences.Count} 个引用文件！\n" +
+                    $"直接引用: {selectedAssetReferences.Count(r => !r.IsIndirect)}\n" +
+                    $"间接引用: {selectedAssetReferences.Count(r => r.IsIndirect)}");
+            });
+        }
+
+        [TabGroup("操作", "查找功能")]
+        [Button("🔗 查找选中资源的依赖", ButtonHeight = 45), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+        [InfoBox("分析当前选中资源依赖的所有其他资源。")]
+        public void FindDependenciesOfSelected()
+        {
+            var selectedAsset = Selection.activeObject;
+            if (selectedAsset == null)
+            {
+                ShowErrorDialog("请先在Project窗口中选择一个资源文件！");
+                return;
+            }
+
+            selectedAssetDependencies.Clear();
+            var assetPath = AssetDatabase.GetAssetPath(selectedAsset);
+
+            if (string.IsNullOrEmpty(assetPath) || !File.Exists(assetPath))
+            {
+                ShowErrorDialog("选中的对象不是有效的资源文件！");
+                return;
+            }
+
+            ExecuteWithProgress("查找依赖", "正在分析依赖关系...", () =>
+            {
+                // 获取直接依赖
+                var directDependencies = AssetDatabase.GetDependencies(assetPath, false);
+                foreach (var dep in directDependencies)
+                {
+                    if (dep != assetPath) // 排除自身
+                    {
+                        selectedAssetDependencies.Add(new AssetReferenceInfo(dep, false));
+                    }
+                }
+
+                // 如果启用了深度分析，获取所有依赖
+                if (deepAnalysis)
+                {
+                    var allDependencies = AssetDatabase.GetDependencies(assetPath, true);
+                    var indirectDeps = allDependencies.Except(directDependencies).ToArray();
+                    foreach (var dep in indirectDeps)
+                    {
+                        if (dep != assetPath) // 排除自身
+                        {
+                            selectedAssetDependencies.Add(new AssetReferenceInfo(dep, true));
                         }
                     }
                 }
 
-                EditorUtility.ClearProgressBar();
+                RefreshUI();
 
-                // 强制刷新UI
-                UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
-
-                EditorUtility.DisplayDialog("完成",
-                    $"找到 {selectedAssetReferences.Count} 个引用文件！\n" +
-                    $"直接引用: {selectedAssetReferences.Count(r => !r.IsIndirect)}\n" +
-                    $"间接引用: {selectedAssetReferences.Count(r => r.IsIndirect)}", "确定");
-            }
-            catch (Exception ex)
-            {
-                EditorUtility.ClearProgressBar();
-                EditorUtility.DisplayDialog("错误", $"查找过程中发生错误：{ex.Message}", "确定");
-            }
+                ShowCompletionDialog("依赖分析完成",
+                    $"找到 {selectedAssetDependencies.Count} 个依赖文件！\n" +
+                    $"直接依赖: {selectedAssetDependencies.Count(r => !r.IsIndirect)}\n" +
+                    $"间接依赖: {selectedAssetDependencies.Count(r => r.IsIndirect)}");
+            });
         }
 
         [TabGroup("操作", "批量操作")]
-        [Button("📂 选中未使用资源", ButtonHeight = 40), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+        [Button("📂 选中未使用资源", ButtonHeight = 45), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
         [EnableIf("@unusedAssets.Count > 0")]
         public void SelectUnusedAssets()
         {
             if (unusedAssets.Count == 0)
             {
-                EditorUtility.DisplayDialog("提示", "没有未使用的资源可以选中！", "确定");
+                ShowInfoDialog("没有未使用的资源可以选中！");
                 return;
             }
 
@@ -448,19 +533,19 @@ namespace ES
             if (objects.Length > 0)
             {
                 EditorGUIUtility.PingObject(objects[0]);
-                EditorUtility.DisplayDialog("完成", $"已选中 {objects.Length} 个未使用的资源！", "确定");
+                ShowCompletionDialog("操作完成", $"已选中 {objects.Length} 个未使用的资源！");
             }
         }
 
         [TabGroup("操作", "批量操作")]
-        [Button("🗑️ 删除未使用资源", ButtonHeight = 40), GUIColor(0.9f, 0.4f, 0.4f)]
+        [Button("🗑️ 删除未使用资源", ButtonHeight = 45), GUIColor(0.9f, 0.4f, 0.4f)]
         [EnableIf("@unusedAssets.Count > 0")]
         [InfoBox("⚠️ 危险操作：这将永久删除选中的未使用资源！建议先备份项目。")]
         public void DeleteUnusedAssets()
         {
             if (unusedAssets.Count == 0)
             {
-                EditorUtility.DisplayDialog("提示", "没有未使用的资源可以删除！", "确定");
+                ShowInfoDialog("没有未使用的资源可以删除！");
                 return;
             }
 
@@ -469,7 +554,7 @@ namespace ES
                 "确认删除", "取消"))
                 return;
 
-            try
+            ExecuteWithProgress("删除资源", "正在删除未使用资源...", () =>
             {
                 AssetDatabase.StartAssetEditing();
 
@@ -484,18 +569,13 @@ namespace ES
                 AssetDatabase.Refresh();
 
                 unusedAssets.Clear();
-                EditorUtility.DisplayDialog("完成", $"成功删除 {deletedCount} 个资源文件！", "确定");
-            }
-            catch (Exception ex)
-            {
-                AssetDatabase.StopAssetEditing();
-                EditorUtility.DisplayDialog("错误", $"删除过程中发生错误：{ex.Message}", "确定");
-            }
+                ShowCompletionDialog("删除完成", $"成功删除 {deletedCount} 个资源文件！");
+            });
         }
 
         [TabGroup("操作", "批量操作")]
-        [Button("📊 导出分析报告", ButtonHeight = 40), GUIColor("@ESDesignUtility.ColorSelector.Color_06")]
-        [EnableIf("@unusedAssets.Count > 0 || selectedAssetReferences.Count > 0")]
+        [Button("📊 导出分析报告", ButtonHeight = 45), GUIColor("@ESDesignUtility.ColorSelector.Color_06")]
+        [EnableIf("@unusedAssets.Count > 0 || selectedAssetReferences.Count > 0 || selectedAssetDependencies.Count > 0")]
         public void ExportAnalysisReport()
         {
             var reportPath = EditorUtility.SaveFilePanel("导出分析报告",
@@ -531,29 +611,41 @@ namespace ES
                         {
                             writer.WriteLine($"{(reference.IsIndirect ? "[间接]" : "[直接]")}\t{reference.FileSize}\t{reference.LastModified}\t{reference.AssetPath}");
                         }
+                        writer.WriteLine();
+                    }
+
+                    if (selectedAssetDependencies.Count > 0)
+                    {
+                        writer.WriteLine($"=== 依赖分析 ({selectedAssetDependencies.Count} 个) ===");
+                        foreach (var dependency in selectedAssetDependencies)
+                        {
+                            writer.WriteLine($"{(dependency.IsIndirect ? "[间接]" : "[直接]")}\t{dependency.FileSize}\t{dependency.LastModified}\t{dependency.AssetPath}");
+                        }
                     }
                 }
 
-                EditorUtility.DisplayDialog("完成", $"分析报告已导出到：\n{reportPath}", "确定");
                 EditorUtility.RevealInFinder(reportPath);
+                ShowCompletionDialog("导出完成", $"分析报告已导出到：\n{reportPath}");
             }
             catch (Exception ex)
             {
-                EditorUtility.DisplayDialog("错误", $"导出报告时发生错误：{ex.Message}", "确定");
+                ShowErrorDialog($"导出报告时发生错误：{ex.Message}");
             }
         }
 
         [TabGroup("操作", "工具")]
-        [Button("🧹 清除结果", ButtonHeight = 35), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
+        [Button("🧹 清除结果", ButtonHeight = 45), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
         public void ClearResults()
         {
             unusedAssets.Clear();
             selectedAssetReferences.Clear();
+            selectedAssetDependencies.Clear();
             referenceCache.Clear();
             processedAssets.Clear();
             totalFilesChecked = 0;
             currentPageUnused = 0;
             currentPageReferences = 0;
+            currentPageDependencies = 0;
         }
 
         [TabGroup("操作", "工具")]
@@ -585,13 +677,13 @@ namespace ES
         }
 
         [TabGroup("操作", "工具")]
-        [Button("�🔄 刷新缓存", ButtonHeight = 35), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
+        [Button("🔄 刷新缓存", ButtonHeight = 45), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
         public void RefreshCache()
         {
             referenceCache.Clear();
             processedAssets.Clear();
             AssetDatabase.Refresh();
-            EditorUtility.DisplayDialog("完成", "缓存已刷新！", "确定");
+            ShowCompletionDialog("操作完成", "缓存已刷新！");
         }
         #endregion
 
@@ -600,7 +692,7 @@ namespace ES
         {
             if (!AssetDatabase.IsValidFolder(checkFolder))
             {
-                EditorUtility.DisplayDialog("错误", $"文件夹 '{checkFolder}' 不存在或无效！", "确定");
+                ShowErrorDialog($"文件夹 '{checkFolder}' 不存在或无效！");
                 return false;
             }
             return true;
@@ -641,6 +733,36 @@ namespace ES
                     continue;
 
                 if (includeExtensions.Count > 0 && !includeExtensions.Contains(extension))
+                    continue;
+
+                // 跳过文件夹
+                if (AssetDatabase.IsValidFolder(path))
+                    continue;
+
+                filteredPaths.Add(path);
+            }
+
+            return filteredPaths;
+        }
+
+        private List<string> FilterAssetPathsForReferenceCheck(string[] allPaths)
+        {
+            var filteredPaths = new List<string>();
+
+            foreach (var path in allPaths)
+            {
+                // 检查是否在检查范围内
+                if (!path.StartsWith(checkFolder))
+                    continue;
+
+                // 检查是否在排除文件夹中
+                if (excludeFolders.Any(exclude => path.StartsWith(exclude)))
+                    continue;
+
+                // 对于引用检查，我们需要包含更多文件类型，因为任何文件都可能引用资源
+                // 只排除.meta文件和文件夹
+                var extension = Path.GetExtension(path).ToLower();
+                if (extension == ".meta")
                     continue;
 
                 // 跳过文件夹
@@ -728,6 +850,51 @@ namespace ES
 
             EditorUtility.DisplayDialog("分析完成", message, "确定");
         }
+
+        #region 统一UI辅助方法
+        private void ShowErrorDialog(string message)
+        {
+            EditorUtility.DisplayDialog("错误", message, "确定");
+        }
+
+        private void ShowInfoDialog(string message)
+        {
+            EditorUtility.DisplayDialog("提示", message, "确定");
+        }
+
+        private void ShowCompletionDialog(string title, string message)
+        {
+            EditorUtility.DisplayDialog(title, message, "确定");
+        }
+
+        private void ExecuteWithProgress(string title, string initialMessage, Action action)
+        {
+            try
+            {
+                EditorUtility.DisplayProgressBar(title, initialMessage, 0f);
+                action();
+            }
+            catch (Exception ex)
+            {
+                ShowErrorDialog($"{title}过程中发生错误：{ex.Message}");
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
+        }
+
+        private void UpdateProgress(string message, float progress)
+        {
+            EditorUtility.DisplayProgressBar("处理中", message, progress);
+        }
+
+        private void RefreshUI()
+        {
+            UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+        }
+        #endregion
+
         #endregion
     }
     #endregion

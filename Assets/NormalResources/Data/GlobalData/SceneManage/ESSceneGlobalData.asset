@@ -28,7 +28,7 @@ MonoBehaviour:
     SceneAsset: {fileID: 102900000, guid: 99c9720ab356a0642a771bea13969a05, type: 3}
     Color: {r: 1, g: 1, b: 1, a: 1}
     Description: 
-    Group: "\u9ED8\u8BA4"
+    Group: "UI\u573A\u666F"
     Enabled: 1
   - DisplayName: 2 - Microphone
     ScenePath: Assets/ES/AIPreview/Special/Wispwer_Voice/Samples/2 - Microphone/2
@@ -43,11 +43,18 @@ MonoBehaviour:
     SceneAsset: {fileID: 102900000, guid: a56d4590da976e043ad16449b33b45fa, type: 3}
     Color: {r: 1, g: 1, b: 1, a: 1}
     Description: 
-    Group: "\u9ED8\u8BA4"
+    Group: "\u6D4B\u8BD5\u573A\u666F"
     Enabled: 1
   - DisplayName: NullScene
     ScenePath: Assets/Scenes/NullScene.unity
     SceneAsset: {fileID: 102900000, guid: abe9eb92e1fa8cb4a9ae52b3a515e684, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u6838\u5FC3\u573A\u666F"
+    Enabled: 1
+  - DisplayName: New Scene 1
+    ScenePath: Assets/Plugins/ES/3_Examples/Example_SimpleTools/New Scene 1.unity
+    SceneAsset: {fileID: 102900000, guid: b4b75588872fe9740ab90f542b86ce3e, type: 3}
     Color: {r: 1, g: 1, b: 1, a: 1}
     Description: 
     Group: "\u9ED8\u8BA4"
@@ -65,6 +72,10 @@ MonoBehaviour:
   - DisplayName: "\U0001F4C1 OBSOLUTE"
     Asset: {fileID: 102900000, guid: 63b50f818d503904fa3c39903080c36b, type: 3}
     Group: "\u6587\u4EF6\u5939"
+    Enabled: 1
+  - DisplayName: AutodeskInteractiveTransparent
+    Asset: {fileID: -876546973899608171, guid: 5c81372d981403744adbdda4433c9c11, type: 3}
+    Group: "\u811A\u672C"
     Enabled: 1
   AssetGroups:
   - "\u9ED8\u8BA4"

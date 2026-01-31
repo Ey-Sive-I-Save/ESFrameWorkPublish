@@ -1,0 +1,22 @@
+ManifestFileVersion: 0
+CRC: 1227940597
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 5e9f3b00986ee651e3bacfefd7b3ae95
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: aa6657b8ea614d243b50d3653b6d98ca
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 5e9f3b00986ee651e3bacfefd7b3ae95
+HashAppended: 1
+ClassTypes:
+- Class: 114
+  Script: {fileID: 11500000, guid: f3169d9a79228a346bfa2cc3b0c61965, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/Plugins/ES/0_Stand/TESTING/AA 1.asset
+Dependencies: []

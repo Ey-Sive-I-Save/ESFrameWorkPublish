@@ -204,7 +204,11 @@ namespace ES
             }
         }
         [ShowInInspector, NonSerialized]
+#pragma warning disable IDE0051 // 添加只读修饰符
+#pragma warning disable CS0414 // 字段被赋值但从未使用
         private bool ShowDefaultPrefabBook = false;
+#pragma warning restore CS0414 // 字段被赋值但从未使用
+#pragma warning restore IDE0051 // 添加只读修饰符
         [ShowIf("ShowDefaultPrefabBook")]
         public ResBook DefaultPrefabBook = new ResBook() { Name = "默认 默认预制体Book", Desc = "默认预制体资源所在的Book" };
         [ShowIf("ShowDefaultPrefabBook")]

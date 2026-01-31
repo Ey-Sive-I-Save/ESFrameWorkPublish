@@ -871,7 +871,10 @@ namespace ES
                                 }
                                 else
                                 {
-                                    summary.AppendLine($"警告: AB包文件不存在: {sourcePath}");
+                                    if (!File.Exists(targetPath))
+                                    {
+                                        summary.AppendLine($"警告: AB包文件不存在: {sourcePath}，目的是{targetPath}");
+                                    }
                                 }
                             }
                             else
@@ -993,7 +996,10 @@ namespace ES
                             }
                             else
                             {
-                                summary.AppendLine($"警告: AB包文件不存在: {sourcePath}");
+                                if (!File.Exists(targetPath))
+                                {
+                                    summary.AppendLine($"警告: AB包文件不存在: {sourcePath}，目的是{targetPath}");
+                                }
                             }
                         }
                     }

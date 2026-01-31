@@ -1,7 +1,6 @@
 using ES;
 using Sirenix.OdinInspector;
 using Sirenix.Serialization;
-using Sirenix.Utilities.Editor;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -523,7 +522,11 @@ namespace ES
             
             if (addedCount > 0)
             {
-                UnityEditor.EditorUtility.SetDirty(this as UnityEngine.Object);
+                if(this is UnityEngine.Object uou)
+                {
+                    UnityEditor.EditorUtility.SetDirty(uou);
+                }
+                
             }
 #endif
         }

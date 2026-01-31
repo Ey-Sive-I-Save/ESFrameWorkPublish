@@ -1,0 +1,28 @@
+ManifestFileVersion: 0
+CRC: 2875513379
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: fd2bb2cff91c577936ee55a59faca143
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 4000aefe5a0ac34bb296bd4ef42e10d2
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: fd2bb2cff91c577936ee55a59faca143
+HashAppended: 1
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 114
+  Script: {fileID: 11500000, guid: a43b0f8f0c53eba4e8fb65148bafdd7a, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers:
+- AssemblyName: ES_Stand
+  ClassName: ES.ESResRefer
+Assets:
+- Assets/Plugins/ES/3_Examples/Example_Res/GameObject (3).prefab
+Dependencies: []

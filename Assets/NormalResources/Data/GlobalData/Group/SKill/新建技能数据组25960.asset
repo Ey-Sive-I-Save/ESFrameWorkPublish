@@ -32,6 +32,8 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
     - rid: 5686404864374210566
       type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
       data:
@@ -111,7 +113,13 @@ MonoBehaviour:
       type: {class: SkillTrackItem_Operation, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
-        clips: []
+        clips:
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 3.237066
+          durationTime: 2.3812869
+          OperationDescription: 
+          op:
+            rid: -2
         displayName: 
     - rid: 5686404864374210607
       type: {class: SkillTrackItem_GameObject, ns: ES, asm: ES_Logic}

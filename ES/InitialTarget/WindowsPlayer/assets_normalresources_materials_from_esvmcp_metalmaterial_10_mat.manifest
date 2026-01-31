@@ -1,0 +1,22 @@
+ManifestFileVersion: 0
+CRC: 4276079210
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 8de44fbd8131331fc29417cbf08b50ed
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 5e762ccb57c4caaabbb5a4199ac82c23
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 8de44fbd8131331fc29417cbf08b50ed
+HashAppended: 1
+ClassTypes:
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/NormalResources/Materials/From_ESVMCP/MetalMaterial 10.mat
+Dependencies: []

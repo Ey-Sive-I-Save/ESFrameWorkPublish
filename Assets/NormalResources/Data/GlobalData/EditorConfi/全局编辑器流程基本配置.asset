@@ -53,7 +53,7 @@ MonoBehaviour:
   - Assets/Plugins/OUT
   - Assets/ScriptTemplates
   - Assets/Packages
-  IncludeDependencies: 1
+  IncludeDependencies_: 0
   PackagePublishPath: Assets\Plugins\ES\Editor\Installer
   ExtendedPackageConfigs:
   - ConfigName: "Whisper\u652F\u6301"
@@ -63,7 +63,7 @@ MonoBehaviour:
     - Assets/StreamingAssets/OUT/Whisper
     ExcludeFolders: []
     IsEnabled: 1
-    IncludeDependencies: 1
+    IncludeDependencies_: 0
   - ConfigName: ES ETX Only Sample
     OutputPath: Assets/Plugins/ES/Editor/Installer/Downloads/OnlySamples
     PackageName: ESPackage_Ext_Only Sample
@@ -71,7 +71,7 @@ MonoBehaviour:
     - Assets/ES/ETX/EXT_OnlySample
     ExcludeFolders: []
     IsEnabled: 1
-    IncludeDependencies: 1
+    IncludeDependencies_: 0
   - ConfigName: "\u914D\u7F6E 3"
     OutputPath: Assets/Plugins/ES/Editor/Installer/Downloads/Main
     PackageName: ESPackage_Ext_3_
@@ -87,4 +87,15 @@ MonoBehaviour:
     - Assets/ScriptTemplates
     ExcludeFolders: []
     IsEnabled: 1
-    IncludeDependencies: 1
+    IncludeDependencies_: 0
+  - ConfigName: "\u914D\u7F6E 4"
+    OutputPath: Assets/ES/AIPreview
+    PackageName: ESPackage_Ext_4_
+    CollectPaths:
+    - Assets/ES/AIPreview
+    - Assets/Gaskellgames/GgCore/Editor/Scripts
+    - 
+    - 
+    ExcludeFolders: []
+    IsEnabled: 1
+    IncludeDependencies_: 0

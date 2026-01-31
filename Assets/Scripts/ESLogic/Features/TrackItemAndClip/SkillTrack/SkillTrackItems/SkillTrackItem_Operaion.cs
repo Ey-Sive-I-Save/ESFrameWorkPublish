@@ -14,5 +14,8 @@ namespace ES
     {
           [LabelText("操作描述")]
           public string OperationDescription;
+
+          [SerializeReference,HideLabel,BoxGroup("操作内容")]
+          public ESOutputOp op;
     }
 }

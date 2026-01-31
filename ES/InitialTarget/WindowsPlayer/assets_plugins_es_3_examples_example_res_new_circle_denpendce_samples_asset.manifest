@@ -1,0 +1,25 @@
+ManifestFileVersion: 0
+CRC: 34762680
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 5c740e3b2e2c4d99ccc12dfcabf875b0
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 3545eb5b88631e75d8e576edfebbb3e4
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 5c740e3b2e2c4d99ccc12dfcabf875b0
+HashAppended: 1
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 114
+  Script: {fileID: 11500000, guid: e4815b677e9fb2d4fb96a0343968a27a, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/Plugins/ES/3_Examples/Example_Res/New Circle Denpendce Samples.asset
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/InitialTarget/WindowsPlayer/assets_plugins_es_3_examples_example_res_gameobject_3_prefab_fd2bb2cff91c577936ee55a59faca143

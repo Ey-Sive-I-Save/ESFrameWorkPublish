@@ -25,7 +25,7 @@ MonoBehaviour:
     overallPriority: 1
   Name: "\u6D4B\u8BD5\u5E93"
   LibFolderName: ceshiku
-  ChangeCount: 55
+  ChangeCount: 64
   IsMainInClude: 1
   Books:
   - Name: "\u9884\u5236\u4EF6"
@@ -155,11 +155,7 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: "\u6E38\u620F\u4E2D\u7684\u58F0\u97F3\u6548\u679C\u8D44\u6E90\uFF0C\u5982\u97F3\u6548\u6587\u4EF6"
-    pages:
-    - Name: New Circle Denpendce Samples
-      ColorTag: 0
-      namedOption: 0
-      OB: {fileID: 11400000, guid: 4d014869d6589ff45b23e49383b4e2b7, type: 2}
+    pages: []
   DefaultTextureBook:
     Name: "\u9ED8\u8BA4 \u7EB9\u7406 Book"
     WritableDefaultMessageOnEditor: 0
@@ -184,14 +180,14 @@ MonoBehaviour:
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 7055376591365242435, guid: 495b09c783492784e88277aa816dfdce, type: 3}
-    - Name: CircleDependenceSamplePrefabRef
-      ColorTag: 0
-      namedOption: 0
-      OB: {fileID: 11500000, guid: a43b0f8f0c53eba4e8fb65148bafdd7a, type: 3}
     - Name: CircleDenpendceSamples
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 11500000, guid: e4815b677e9fb2d4fb96a0343968a27a, type: 3}
+    - Name: CircleDependenceSamplePrefabRef
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11500000, guid: a43b0f8f0c53eba4e8fb65148bafdd7a, type: 3}
   DefaultMaterialBook:
     Name: "\u9ED8\u8BA4 \u6750\u8D28 Book"
     WritableDefaultMessageOnEditor: 0

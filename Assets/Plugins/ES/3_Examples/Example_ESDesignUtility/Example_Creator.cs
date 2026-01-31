@@ -11,17 +11,25 @@ namespace ES.Examples
     public class Example_Creator : MonoBehaviour
     {
         [System.Serializable]
-        public class TestData
+        public class TestData : IDeepClone<TestData>
         {
             public string name;
             public int value;
             public List<int> numbers;
+
 
             public TestData(string name, int value)
             {
                 this.name = name;
                 this.value = value;
                 this.numbers = new List<int> { 1, 2, 3 };
+            }
+
+            public void DeepCloneFrom(TestData t)
+            {
+                this.name = t.name;
+                this.value = t.value;
+                this.numbers = ESDesignUtility.Creator.DeepClone(t.numbers);
             }
         }
 

@@ -1,0 +1,26 @@
+ManifestFileVersion: 0
+CRC: 3598833895
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 99c529862c6f0f6e12e889c0b90976c0
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 92f3b440e6ef06c81533a9f835cc8152
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 99c529862c6f0f6e12e889c0b90976c0
+HashAppended: 1
+ClassTypes:
+- Class: 114
+  Script: {fileID: 11500000, guid: 6564680c81fcf5a4397f4b92e3ebb0f4, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 9cac72d466e1b7b4bb1dc4ce51ff08ee, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers:
+- AssemblyName: Sirenix.Serialization
+  ClassName: Sirenix.Serialization.SerializationData
+Assets:
+- "Assets/NormalResources/Data/GlobalData/Group/Actor/\u65B0\u5EFA\u89D2\u8272\u6570\u636E\u7EC483227.asset"
+Dependencies: []

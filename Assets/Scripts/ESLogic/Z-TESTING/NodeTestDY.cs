@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace ES
 {
-    public interface IOOP_GGGloat : IOutputOperation<GameObject, float>
+    public interface IOOP_GGGloat 
     {
         public string Name { get; }
     }
@@ -34,12 +34,12 @@ namespace ES
         public bool bbb;
         public string Name => "GGF_活动设置";
 
-        public void TryCancel(GameObject on, float with)
+        public void StopOperation(GameObject on, float with)
         {
             on.SetActive(false);
         }
 
-        public void TryOperation(GameObject on, float with)
+        public void StartOperation(GameObject on, float with)
         {
             on.SetActive(true);
         }

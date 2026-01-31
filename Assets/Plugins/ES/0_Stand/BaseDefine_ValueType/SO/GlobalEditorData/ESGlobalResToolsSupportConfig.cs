@@ -127,6 +127,7 @@ namespace ES
         /// <summary>
         /// 判断资产类型
         /// </summary>
+#if UNITY_EDITOR
         public static ESAssetCategory DetermineAssetCategory(UnityEngine.Object asset)
         {
             if (asset is GameObject)
@@ -149,7 +150,7 @@ namespace ES
             else if (asset is AnimationClip || asset is RuntimeAnimatorController)
                 return ESAssetCategory.Animation;
             else if (asset is MonoScript)
-                return ESAssetCategory.Other; // .cs脚本文件不支持收集
+                return ESAssetCategory.Other; // .cs脚本文件不支持收集预编译掉
             else if (asset is ScriptableObject)
                 return ESAssetCategory.Script; // ScriptableObject归类为SO
             else if (asset is Shader)
@@ -161,6 +162,8 @@ namespace ES
 
             return ESAssetCategory.Other;
         }
+#endif
+
 
 #if UNITY_EDITOR
         /// <summary>

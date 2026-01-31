@@ -23,112 +23,8 @@ namespace ES
 
     #region Core Data Implementations
 
-    [Serializable]
-    public class SimpleStateSharedData : IStateSharedData
-    {
-        // 基本排序用于优先级判断（越小越优先）
-        [ShowInInspector]
-        public int Order { get; set; } = 0;
-
-        // 是否能被命中（例如：硬性被动/不可中断）
-        [ShowInInspector]
-        public bool CanBeHit { get; set; } = true;
-
-        // 是否能主动命中其他（例如：攻击状态）
-        [ShowInInspector]
-        public bool CanHit { get; set; } = true;
-
-        // 在不满足条件时仍可被视为通过的标签
-        [ShowInInspector]
-        public string[] BeHitWithoutCondition { get; set; } = new string[0];
-
-        // 通道用于决定哪些状态互斥（可枚举或自定义 enum）
-        [ShowInInspector]
-        public Enum Channel { get; set; } = null;
-
-        [Serializable]
-        public class SimpleStateVariableData : IStateVariableData
-        {
-            // 运行时上下文参数容器（触发器、引用、标记）——按用户要求移除数值型容器
-            [SerializeField]
-            private HashSet<string> triggers = new HashSet<string>();
-            [SerializeField]
-            private Dictionary<string, UnityEngine.Object> refs = new Dictionary<string, UnityEngine.Object>();
-            [SerializeField]
-            private HashSet<string> tags = new HashSet<string>();
-
-            // 触发器接口
-            public bool GetTrigger(string key)
-            {
-                return triggers.Contains(key);
-            }
-
-            public void SetTrigger(string key)
-            {
-                triggers.Add(key);
-            }
-
-            public void ResetTrigger(string key)
-            {
-                triggers.Remove(key);
-            }
-
-            // 引用接口
-            public UnityEngine.Object GetRef(string key)
-            {
-                refs.TryGetValue(key, out var o);
-                return o;
-            }
-
-            public void SetRef(string key, UnityEngine.Object obj)
-            {
-                refs[key] = obj;
-            }
-
-            // 标记接口
-            public bool HasTag(string tag)
-            {
-                return tags.Contains(tag);
-            }
-
-            public void AddTag(string tag)
-            {
-                tags.Add(tag);
-            }
-
-            public void RemoveTag(string tag)
-            {
-                tags.Remove(tag);
-            }
-
-            // 深拷贝接口
-            public IStateVariableData DeepClone()
-            {
-                var clone = new SimpleStateVariableData();
-                clone.triggers = new HashSet<string>(triggers);
-                clone.refs = new Dictionary<string, UnityEngine.Object>(refs);
-                clone.tags = new HashSet<string>(tags);
-                return clone;
-            }
-
-            public void DeepCloneFrom(IStateVariableData t)
-            {
-                throw new NotImplementedException();
-            }
-        }
-        // 深拷贝接口
-        public IStateVariableData DeepClone()
-        {
-            var clone = new SimpleStateVariableData();
-            
-            return clone;
-        }
-
-        public void DeepCloneFrom(IStateVariableData t)
-        {
-            throw new NotImplementedException();
-        }
-    }
+   
+    
 
     #endregion
 
@@ -255,7 +151,7 @@ namespace ES
     /// BaseStateExtended: 在 `BaseState` 之上加入代价与备忘支持的基础实现，
     /// 提供一个轻量级的 Hook API 方便继承者实现进入/后摇/退化逻辑。
     /// </summary>
-    public abstract class BaseStateExtended : BaseState
+    public abstract class BaseStateExtended : StateBase
     {
         // 代价标记 ID，用于 CostBank 的持有者识别
 
@@ -334,16 +230,16 @@ namespace ES
     /// BaseStateMachine: 轻量的单路径状态机实现，管理三条主要线路（Base/Main/Buff），
     /// 并提供 Attempt/Memo 的生命周期钩子。
     /// </summary>
-    public class BaseStateMachine : MonoBehaviour, IStateMachine
+    public class StateMachineBase
     {
         // IState 接口实现（此状态机也可作为一个状态嵌套）
         public bool IsRunning { get; set; }
 
-        public IState SelfRunningMainState { get; set; }
+        public StateBase SelfRunningMainState { get; set; }
 
-        public IEnumerable<IState> SelfRunningStates => new IState[] { SelfRunningMainState };
+        public IEnumerable<StateBase> SelfRunningStates => new StateBase[] { SelfRunningMainState };
 
-        public HashSet<IState> RootAllRunningStates { get; } = new HashSet<IState>();
+        public HashSet<StateBase> RootAllRunningStates { get; } = new HashSet<StateBase>();
 
         // 三条线路分离管理
         public BaseStateExtended BaseLineState { get; private set; }
@@ -556,10 +452,9 @@ namespace ES
 
         public void SetKey(string key) { /* not used */ }
         public string GetKey() { return "BaseStateMachine"; }
-        public IState AsThis { get => this; set => throw new NotSupportedException(); }
+        public StateBase AsThis ;
         public bool CheckThisStateCanUpdating => true;
-        IStateSharedData IState.SharedData { get => null; set => throw new NotSupportedException(); }
-        IStateVariableData IState.VariableData { get => null; set => throw new NotSupportedException(); }
+        
         public EnumStateRunningStatus RunningStatus => EnumStateRunningStatus.StateUpdate;
         #endregion
     }

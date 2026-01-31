@@ -10,8 +10,8 @@ using UnityEngine;
 namespace ES
 {
     //写一个纳米的
-    [Serializable, TypeRegistryItem("抽象泛型元-原始状态_纳米")]
-    public abstract class BaseState : IState
+    [Serializable, TypeRegistryItem("状态基类")]
+    public abstract class StateBase 
     {
         #region  SV
 
@@ -61,12 +61,9 @@ namespace ES
 
         #region 键
 
-        public IState AsThis { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public StateBase AsThis { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         public bool CheckThisStateCanUpdating => throw new NotImplementedException();
-
-        IStateSharedData IState.SharedData { get => SharedData; set => throw new NotImplementedException(); }
-        IStateVariableData IState.VariableData { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         public EnumStateRunningStatus RunningStatus => throw new NotImplementedException();
 

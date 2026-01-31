@@ -11,11 +11,11 @@ namespace ES {
 
     #region 标准级别 : ESStandard
     [Serializable, TypeRegistryItem("标准状态共享数据")]
-    public class StateSharedData : IStateSharedData
+    public class StateSharedData 
     {
          [LabelText("状态开始时间")] public float hasEnterTime;
 
-        public void DeepCloneFrom(IStateVariableData t)
+        public void DeepCloneFrom(StateVariableData t)
         {
             
         }

@@ -28,7 +28,7 @@ namespace ES.Examples
         public AnimationClip sadClip;
         
         [Header("共享配置(享元)")]
-        public BlendTree1DCalculator sharedSpeedBlend;
+        public StateAnimationMixCalculatorForBlendTree1D sharedSpeedBlend;
         
         private PlayableGraph _graph;
         private AnimationPlayableOutput _output;
@@ -65,11 +65,11 @@ namespace ES.Examples
         private void Example1_SingleCharacter()
         {
             // 创建配置(可序列化,可共享)
-            var calculator = new BlendTree1DCalculator
+            var calculator = new StateAnimationMixCalculatorForBlendTree1D
             {
                 parameterName = "Speed",
                 smoothTime = 0.15f,
-                samples = new BlendTree1DCalculator.ClipSampleForBlend1D[]
+                samples = new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D[]
                 {
                     new() { clip = idleClip, threshold = 0f },
                     new() { clip = walkClip, threshold = 2f },
@@ -101,11 +101,11 @@ namespace ES.Examples
         private void Example2_FlyweightPattern()
         {
             // 1个配置对象(享元)
-            var sharedCalculator = new BlendTree1DCalculator
+            var sharedCalculator = new StateAnimationMixCalculatorForBlendTree1D
             {
                 parameterName = "Speed",
                 smoothTime = 0.15f,
-                samples = new BlendTree1DCalculator.ClipSampleForBlend1D[]
+                samples = new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D[]
                 {
                     new() { clip = idleClip, threshold = 0f },
                     new() { clip = walkClip, threshold = 2f },
@@ -150,7 +150,7 @@ namespace ES.Examples
             UpdateInputParameters();
             
             // 使用配置对象更新运行时数据
-            var calculator = new BlendTree1DCalculator
+            var calculator = new StateAnimationMixCalculatorForBlendTree1D
             {
                 parameterName = "Speed",
                 smoothTime = 0.15f
@@ -194,12 +194,12 @@ namespace ES.Examples
             Debug.Log("========== 内存占用对比 ==========");
             
             // 配置数据大小估算
-            var sampleConfig = new BlendTree1DCalculator
+            var sampleConfig = new StateAnimationMixCalculatorForBlendTree1D
             {
-                samples = new BlendTree1DCalculator.ClipSampleForBlend1D[4]
+                samples = new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D[4]
             };
             
-            int configSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(BlendTree1DCalculator));
+            int configSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(StateAnimationMixCalculatorForBlendTree1D));
             Debug.Log($"单个配置对象: ~{configSize} bytes");
             
             Debug.Log("");

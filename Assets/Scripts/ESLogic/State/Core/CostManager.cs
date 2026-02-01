@@ -11,84 +11,40 @@ namespace ES
     [Serializable]
     public class CostManager
     {
-        // 每个通道的当前代价值 (0=完全空闲, 1=完全占用)
-        private Dictionary<StateChannelMask, float> _channelCostValues;
-        
-        // 记录当前占用各通道的状态信息
-        private Dictionary<StateChannelMask, HashSet<int>> _channelOccupiers;
-        
-        // 代价返还队列 - 用于逐步释放代价
-        private List<CostReturnSchedule> _returnSchedules;
+        // 三大资源的当前使用值，范围 0..100
+        private float _motionUsage = 0f;
+        private float _agilityUsage = 0f;
+        private float _targetUsage = 0f;
+
+        // 记录当前占用各资源的状态集合（用于简单查询和回收）
+        private HashSet<int> _motionOccupiers = new HashSet<int>();
+        private HashSet<int> _agilityOccupiers = new HashSet<int>();
+        private HashSet<int> _targetOccupiers = new HashSet<int>();
+
+        // 代价返还队列 - 用于逐步释放代价（按资源）
+        private List<CostReturnSchedule> _returnSchedules = new List<CostReturnSchedule>();
 
         public CostManager()
         {
-            _channelCostValues = new Dictionary<StateChannelMask, float>();
-            _channelOccupiers = new Dictionary<StateChannelMask, HashSet<int>>();
-            _returnSchedules = new List<CostReturnSchedule>();
-            
-            InitializeChannels();
-        }
-
-        private void InitializeChannels()
-        {
-            // 初始化所有定义的通道
-            foreach (StateChannelMask channel in Enum.GetValues(typeof(StateChannelMask)))
-            {
-                if (channel != StateChannelMask.None && IsSingleBit(channel))
-                {
-                    _channelCostValues[channel] = 0f;
-                    _channelOccupiers[channel] = new HashSet<int>();
-                }
-            }
+            // 初始使用为0
+            _motionUsage = _agilityUsage = _targetUsage = 0f;
         }
 
         /// <summary>
-        /// 检查某个代价需求是否可以满足
+        /// 检查某个代价需求是否可以满足（简化版）
         /// </summary>
         public bool CanAffordCost(StateCostData cost, int stateId, bool allowInterrupt = false)
         {
             if (cost == null) return true;
-            
-            // 检查主代价
-            if (!CanAffordCostPart(cost.mainCostPart, stateId, allowInterrupt))
-                return false;
-            
-            // 检查分部代价
-            if (cost.EnableCostPartList && cost.costPartList != null)
-            {
-                foreach (var part in cost.costPartList)
-                {
-                    if (!CanAffordCostPart(part, stateId, allowInterrupt))
-                        return false;
-                }
-            }
-            
-            return true;
-        }
 
-        private bool CanAffordCostPart(StateChannelCostPart part, int stateId, bool allowInterrupt)
-        {
-            if (part == null) return true;
-            
-            var channels = ExpandChannelMask(part.channelMask);
-            foreach (var channel in channels)
-            {
-                float currentCost = GetChannelCost(channel);
-                float availableCost = 1f - currentCost;
-                
-                // 如果当前通道可用代价不足
-                if (availableCost < part.EnterCostValue)
-                {
-                    // 检查是否允许打断
-                    if (!allowInterrupt) return false;
-                    
-                    // 检查当前占用者是否可被打断（这里需要结合状态优先级系统）
-                    // 简化处理：如果不是自己占用的，且代价不足，则失败
-                    if (!_channelOccupiers[channel].Contains(stateId))
-                        return false;
-                }
-            }
-            
+            float reqMotion = cost.GetWeightedMotion();
+            float reqAgility = cost.GetWeightedAgility();
+            float reqTarget = cost.GetWeightedTarget();
+
+            if (reqMotion > 0f && (100f - _motionUsage) < reqMotion && !allowInterrupt) return false;
+            if (reqAgility > 0f && (100f - _agilityUsage) < reqAgility && !allowInterrupt) return false;
+            if (reqTarget > 0f && (100f - _targetUsage) < reqTarget && !allowInterrupt) return false;
+
             return true;
         }
 
@@ -98,48 +54,26 @@ namespace ES
         public void ConsumeCost(StateCostData cost, int stateId)
         {
             if (cost == null) return;
-            
-            ConsumeCostPart(cost.mainCostPart, stateId);
-            
-            if (cost.EnableCostPartList && cost.costPartList != null)
-            {
-                foreach (var part in cost.costPartList)
-                {
-                    ConsumeCostPart(part, stateId);
-                }
-            }
-        }
 
-        private void ConsumeCostPart(StateChannelCostPart part, int stateId)
-        {
-            if (part == null) return;
-            
-            var channels = ExpandChannelMask(part.channelMask);
-            foreach (var channel in channels)
-            {
-                float current = GetChannelCost(channel);
-                _channelCostValues[channel] = Mathf.Clamp01(current + part.EnterCostValue);
-                _channelOccupiers[channel].Add(stateId);
-            }
-        }
+            float reqMotion = cost.GetWeightedMotion();
+            float reqAgility = cost.GetWeightedAgility();
+            float reqTarget = cost.GetWeightedTarget();
 
-        /// <summary>
-        /// 安排代价返还 - 在后摇阶段或退出时调用
-        /// </summary>
-        public void ScheduleCostReturn(StateCostData cost, int stateId, float startTime, float duration)
-        {
-            if (cost == null) return;
-            
-            var schedule = new CostReturnSchedule
+            if (reqMotion > 0f)
             {
-                stateId = stateId,
-                cost = cost,
-                startTime = startTime,
-                duration = duration,
-                returnedAmount = 0f
-            };
-            
-            _returnSchedules.Add(schedule);
+                _motionUsage = Mathf.Clamp(_motionUsage + reqMotion, 0f, 100f);
+                _motionOccupiers.Add(stateId);
+            }
+            if (reqAgility > 0f)
+            {
+                _agilityUsage = Mathf.Clamp(_agilityUsage + reqAgility, 0f, 100f);
+                _agilityOccupiers.Add(stateId);
+            }
+            if (reqTarget > 0f)
+            {
+                _targetUsage = Mathf.Clamp(_targetUsage + reqTarget, 0f, 100f);
+                _targetOccupiers.Add(stateId);
+            }
         }
 
         /// <summary>
@@ -148,45 +82,45 @@ namespace ES
         public void ReturnCostImmediately(StateCostData cost, int stateId)
         {
             if (cost == null) return;
-            
-            ReturnCostPart(cost.mainCostPart, stateId, 1f);
-            
-            if (cost.EnableCostPartList && cost.costPartList != null)
+
+            float reqMotion = cost.GetWeightedMotion();
+            float reqAgility = cost.GetWeightedAgility();
+            float reqTarget = cost.GetWeightedTarget();
+
+            if (reqMotion > 0f)
             {
-                foreach (var part in cost.costPartList)
-                {
-                    ReturnCostPart(part, stateId, 1f);
-                }
+                _motionUsage = Mathf.Clamp(_motionUsage - reqMotion, 0f, 100f);
+                _motionOccupiers.Remove(stateId);
             }
-            
-            // 清除相关的返还计划
-            _returnSchedules.RemoveAll(s => s.stateId == stateId);
+            if (reqAgility > 0f)
+            {
+                _agilityUsage = Mathf.Clamp(_agilityUsage - reqAgility, 0f, 100f);
+                _agilityOccupiers.Remove(stateId);
+            }
+            if (reqTarget > 0f)
+            {
+                _targetUsage = Mathf.Clamp(_targetUsage - reqTarget, 0f, 100f);
+                _targetOccupiers.Remove(stateId);
+            }
         }
 
-        private void ReturnCostPart(StateChannelCostPart part, int stateId, float fraction)
+        /// <summary>
+        /// 安排代价返还 - 在后摇阶段或退出时调用（简化：按比例在 duration 内返回）
+        /// </summary>
+        public void ScheduleCostReturn(StateCostData cost, int stateId, float startTime, float duration)
         {
-            if (part == null) return;
-            
-            var returnMask = part.ReturnMask != StateChannelMask.None ? part.ReturnMask : part.channelMask;
-            var channels = ExpandChannelMask(returnMask);
-            
-            float returnAmount = part.EnterCostValue * fraction;
-            if (part.EnableReturnProgress)
+            if (cost == null) return;
+            var schedule = new CostReturnSchedule
             {
-                returnAmount *= part.ReturnFraction;
-            }
-            
-            foreach (var channel in channels)
-            {
-                float current = GetChannelCost(channel);
-                _channelCostValues[channel] = Mathf.Clamp01(current - returnAmount);
-                
-                // 如果代价完全返还，移除占用者
-                if (_channelCostValues[channel] <= 0.01f)
-                {
-                    _channelOccupiers[channel].Remove(stateId);
-                }
-            }
+                stateId = stateId,
+                motionAmount = cost.GetWeightedMotion(),
+                agilityAmount = cost.GetWeightedAgility(),
+                targetAmount = cost.GetWeightedTarget(),
+                startTime = startTime,
+                duration = duration,
+                returnedProgress = 0f
+            };
+            _returnSchedules.Add(schedule);
         }
 
         /// <summary>
@@ -196,100 +130,56 @@ namespace ES
         {
             for (int i = _returnSchedules.Count - 1; i >= 0; i--)
             {
-                var schedule = _returnSchedules[i];
-                float elapsed = currentTime - schedule.startTime;
-                
-                if (elapsed >= schedule.duration)
+                var s = _returnSchedules[i];
+                float elapsed = currentTime - s.startTime;
+                if (elapsed >= s.duration)
                 {
                     // 完成返还
-                    ReturnScheduleRemaining(schedule);
+                    ReturnPartial(s.motionAmount * (1f - s.returnedProgress), s.agilityAmount * (1f - s.returnedProgress), s.targetAmount * (1f - s.returnedProgress), s.stateId);
                     _returnSchedules.RemoveAt(i);
                 }
                 else
                 {
-                    // 渐进返还
-                    float progress = elapsed / schedule.duration;
-                    float targetAmount = progress;
-                    float deltaAmount = targetAmount - schedule.returnedAmount;
-                    
-                    if (deltaAmount > 0.001f)
+                    float progress = s.duration > 0f ? Mathf.Clamp01(elapsed / s.duration) : 1f;
+                    float delta = progress - s.returnedProgress;
+                    if (delta > 0f)
                     {
-                        ProgressiveReturn(schedule, deltaAmount);
-                        schedule.returnedAmount = targetAmount;
+                        ReturnPartial(s.motionAmount * delta, s.agilityAmount * delta, s.targetAmount * delta, s.stateId);
+                        s.returnedProgress = progress;
                     }
                 }
             }
         }
 
-        private void ReturnScheduleRemaining(CostReturnSchedule schedule)
+        private void ReturnPartial(float motionDelta, float agilityDelta, float targetDelta, int stateId)
         {
-            float remaining = 1f - schedule.returnedAmount;
-            if (remaining > 0.001f)
+            if (motionDelta > 0f)
             {
-                ProgressiveReturn(schedule, remaining);
+                _motionUsage = Mathf.Clamp(_motionUsage - motionDelta, 0f, 100f);
+                if (_motionUsage <= 0.001f) _motionOccupiers.Remove(stateId);
+            }
+            if (agilityDelta > 0f)
+            {
+                _agilityUsage = Mathf.Clamp(_agilityUsage - agilityDelta, 0f, 100f);
+                if (_agilityUsage <= 0.001f) _agilityOccupiers.Remove(stateId);
+            }
+            if (targetDelta > 0f)
+            {
+                _targetUsage = Mathf.Clamp(_targetUsage - targetDelta, 0f, 100f);
+                if (_targetUsage <= 0.001f) _targetOccupiers.Remove(stateId);
             }
         }
 
-        private void ProgressiveReturn(CostReturnSchedule schedule, float fraction)
-        {
-            ReturnCostPart(schedule.cost.mainCostPart, schedule.stateId, fraction);
-            
-            if (schedule.cost.EnableCostPartList && schedule.cost.costPartList != null)
-            {
-                foreach (var part in schedule.cost.costPartList)
-                {
-                    ReturnCostPart(part, schedule.stateId, fraction);
-                }
-            }
-        }
-
-        public float GetChannelCost(StateChannelMask channel)
-        {
-            return _channelCostValues.TryGetValue(channel, out float value) ? value : 0f;
-        }
-
-        /// <summary>
-        /// 获取组合通道的最大代价值
-        /// </summary>
-        public float GetMaxCostInMask(StateChannelMask mask)
-        {
-            var channels = ExpandChannelMask(mask);
-            float maxCost = 0f;
-            foreach (var channel in channels)
-            {
-                maxCost = Mathf.Max(maxCost, GetChannelCost(channel));
-            }
-            return maxCost;
-        }
-
-        // 将组合掩码拆分为单个通道
-        private List<StateChannelMask> ExpandChannelMask(StateChannelMask mask)
-        {
-            var result = new List<StateChannelMask>();
-            foreach (StateChannelMask channel in Enum.GetValues(typeof(StateChannelMask)))
-            {
-                if (channel != StateChannelMask.None && IsSingleBit(channel) && (mask & channel) != 0)
-                {
-                    result.Add(channel);
-                }
-            }
-            return result;
-        }
-
-        private bool IsSingleBit(StateChannelMask mask)
-        {
-            uint value = (uint)mask;
-            return value != 0 && (value & (value - 1)) == 0;
-        }
-
-        // 代价返还计划
+        // 代价返还计划（简化）
         private class CostReturnSchedule
         {
             public int stateId;
-            public StateCostData cost;
+            public float motionAmount;
+            public float agilityAmount;
+            public float targetAmount;
             public float startTime;
             public float duration;
-            public float returnedAmount; // 0~1
+            public float returnedProgress; // 0~1
         }
     }
 }

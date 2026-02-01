@@ -22,15 +22,33 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: "\u72B6\u60011"
+  sharedData:
+    MergePart_:
+      BeCombinedWithoutCondition: []
+      CombinedWithoutCondition: []
+      BeHitWithoutCondition: []
+      HitWithoutCondition: []
+      CanBeHit: 0
+      CanHit: 0
+      logicLayer: 1
+      channel: 63
+      BeHitOrder: 0
+      HitOrder: 0
+    playAnimationAtAddition: 0
+    AnimationName: 
+    crossFade: 0.2
   basicConfig:
     stateId: 0
     stateName: "\u65B0\u72B6\u6001"
     priority: 40
     pipelineType: 0
     description: 
-    duration: 0
-    recoveryStartTime: 0.7
-    recoveryDuration: 0.3
+    durationMode: 1
+    timedDuration: 1
+    phaseConfig:
+      returnStartTime: 0.7
+      releaseStartTime: 0.9
+      returnCostFraction: 0.5
   animationConfig:
     mode: 0
     singleClip: {fileID: 0}

@@ -8,45 +8,7 @@ namespace ES
 {
     #region 核心数据模块定义
     
-    /// <summary>
-    /// 状态基础配置 - 标识与生命周期
-    /// </summary>
-    [Serializable]
-    public class StateBasicConfig
-    {
-        [HorizontalGroup("Identity", Width = 0.4f)]
-        [VerticalGroup("Identity/Left")]
-        [LabelText("状态ID")]
-        public int stateId;
-        
-        [VerticalGroup("Identity/Left")]
-        [LabelText("状态名称")]
-        public string stateName = "新状态";
-        
-        [VerticalGroup("Identity/Right")]
-        [LabelText("优先级"), Range(0, 100)]
-        public int priority = 50;
-        
-        [VerticalGroup("Identity/Right")]
-        [LabelText("所属流水线")]
-        public StatePipelineType pipelineType = StatePipelineType.Basic;
-        
-        [LabelText("状态描述"), TextArea(2, 3)]
-        public string description = "";
-        
-        [HorizontalGroup("Lifecycle")]
-        [LabelText("持续时间(秒)"), MinValue(0)]
-        public float duration = 0f;
-        
-        [HorizontalGroup("Lifecycle")]
-        [LabelText("后摇开始(归一化)"), Range(0, 1)]
-        public float recoveryStartTime = 0.7f;
-        
-        [HorizontalGroup("Lifecycle")]
-        [LabelText("后摇时长(秒)"), MinValue(0)]
-        public float recoveryDuration = 0.3f;
-    }
-    
+      
     /// <summary>
     /// 动画配置 - Clip与BlendTree
     /// </summary>
@@ -69,6 +31,7 @@ namespace ES
         
         [HorizontalGroup("Playback")]
         [LabelText("循环播放")]
+        [Tooltip("Loop动画：结束后自动循环 | 非Loop动画：播放一次后进入释放阶段")]
         public bool loopClip = false;
         
         [LabelText("BlendTree样本"), ShowIf("@mode == StateAnimationMode.BlendTree")]
@@ -82,6 +45,49 @@ namespace ES
         [HorizontalGroup("Advanced")]
         [LabelText("脏标记阈值"), Range(0.001f, 0.1f)]
         public float dirtyThreshold = 0.01f;
+        
+        // 运行时预计算数据（缓存，避免GC）
+        [NonSerialized] private float _cachedClipLength;
+        [NonSerialized] private int _cachedClipFrameCount;
+        [NonSerialized] private bool _isInitialized;
+        
+        /// <summary>
+        /// 重置为默认值
+        /// </summary>
+        public void ResetToDefault()
+        {
+            mode = StateAnimationMode.SingleClip;
+            singleClip = null;
+            clipKey = string.Empty;
+            playbackSpeed = 1f;
+            loopClip = false;
+            smoothTime = 0.1f;
+            dirtyThreshold = 0.01f;
+            if (blendTreeSamples == null)
+                blendTreeSamples = new List<BlendTreeSample>();
+            else
+                blendTreeSamples.Clear();
+        }
+        
+        /// <summary>
+        /// 初始化预计算数据（运行时调用，避免每帧计算）
+        /// </summary>
+        public void Initialize()
+        {
+            if (_isInitialized) return;
+            
+            // 预计算动画长度（避免运行时频繁访问clip.length）
+            if (mode == StateAnimationMode.SingleClip && singleClip != null)
+            {
+                _cachedClipLength = singleClip.length;
+                _cachedClipFrameCount = Mathf.RoundToInt(singleClip.length * singleClip.frameRate);
+            }
+            
+            _isInitialized = true;
+        }
+        
+        public float GetClipLength() => _cachedClipLength;
+        public int GetClipFrameCount() => _cachedClipFrameCount;
     }
     
     /// <summary>
@@ -103,6 +109,82 @@ namespace ES
         
         [LabelText("监听参数变化")]
         public List<StateParameter> watchedParameters = new List<StateParameter>();
+        
+        // 运行时预计算数据（缓存参数名，避免装箱和字符串分配）
+        [NonSerialized] private string[] _cachedFloatKeys;
+        [NonSerialized] private float[] _cachedFloatValues;
+        [NonSerialized] private string[] _cachedBoolKeys;
+        [NonSerialized] private bool[] _cachedBoolValues;
+        [NonSerialized] private bool _isInitialized;
+        
+        /// <summary>
+        /// 重置为默认值
+        /// </summary>
+        public void ResetToDefault()
+        {
+            if (enterFloats == null)
+                enterFloats = new Dictionary<string, float>();
+            else
+                enterFloats.Clear();
+                
+            if (enterBools == null)
+                enterBools = new Dictionary<string, bool>();
+            else
+                enterBools.Clear();
+                
+            if (enterTriggers == null)
+                enterTriggers = new List<string>();
+            else
+                enterTriggers.Clear();
+                
+            if (watchedParameters == null)
+                watchedParameters = new List<StateParameter>();
+            else
+                watchedParameters.Clear();
+        }
+        
+        /// <summary>
+        /// 初始化预计算数据（运行时调用，避免Dictionary迭代GC）
+        /// </summary>
+        public void Initialize()
+        {
+            if (_isInitialized) return;
+            
+            // 预缓存Float参数（避免运行时Dictionary查找和装箱）
+            int floatCount = enterFloats.Count;
+            _cachedFloatKeys = new string[floatCount];
+            _cachedFloatValues = new float[floatCount];
+            int index = 0;
+            foreach (var kvp in enterFloats)
+            {
+                _cachedFloatKeys[index] = kvp.Key;
+                _cachedFloatValues[index] = kvp.Value;
+                index++;
+            }
+            
+            // 预缓存Bool参数
+            int boolCount = enterBools.Count;
+            _cachedBoolKeys = new string[boolCount];
+            _cachedBoolValues = new bool[boolCount];
+            index = 0;
+            foreach (var kvp in enterBools)
+            {
+                _cachedBoolKeys[index] = kvp.Key;
+                _cachedBoolValues[index] = kvp.Value;
+                index++;
+            }
+            
+            _isInitialized = true;
+        }
+        
+        public void ApplyEnterParameters(StateContext context)
+        {
+            // 零GC应用参数
+            for (int i = 0; i < _cachedFloatKeys.Length; i++)
+                context.SetFloat(_cachedFloatKeys[i], _cachedFloatValues[i]);
+            for (int i = 0; i < _cachedBoolKeys.Length; i++)
+                context.SetBool(_cachedBoolKeys[i], _cachedBoolValues[i]);
+        }
     }
     
     /// <summary>
@@ -125,6 +207,54 @@ namespace ES
         [LabelText("自动转换规则")]
         [ListDrawerSettings(ShowIndexLabels = true, ShowFoldout = false)]
         public List<StateTransition> autoTransitions = new List<StateTransition>();
+        
+        // 运行时预计算数据（缓存曲线采样，避免每帧Evaluate）
+        [NonSerialized] private float[] _cachedCurveSamples;
+        [NonSerialized] private const int CURVE_SAMPLE_COUNT = 32;
+        [NonSerialized] private bool _isInitialized;
+        
+        /// <summary>
+        /// 重置为默认值
+        /// </summary>
+        public void ResetToDefault()
+        {
+            transitionDuration = 0.3f;
+            transitionMode = TransitionMode.Blend;
+            transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+            if (autoTransitions == null)
+                autoTransitions = new List<StateTransition>();
+            else
+                autoTransitions.Clear();
+        }
+        
+        /// <summary>
+        /// 初始化预计算数据（运行时调用，避免每帧曲线采样）
+        /// </summary>
+        public void Initialize()
+        {
+            if (_isInitialized) return;
+            
+            // 预采样过渡曲线（避免运行时Evaluate开销）
+            _cachedCurveSamples = new float[CURVE_SAMPLE_COUNT];
+            for (int i = 0; i < CURVE_SAMPLE_COUNT; i++)
+            {
+                float t = i / (float)(CURVE_SAMPLE_COUNT - 1);
+                _cachedCurveSamples[i] = transitionCurve.Evaluate(t);
+            }
+            
+            _isInitialized = true;
+        }
+        
+        public float SampleTransitionCurve(float normalizedTime)
+        {
+            if (_cachedCurveSamples == null) return normalizedTime;
+            
+            float index = normalizedTime * (CURVE_SAMPLE_COUNT - 1);
+            int i0 = Mathf.FloorToInt(index);
+            int i1 = Mathf.Min(i0 + 1, CURVE_SAMPLE_COUNT - 1);
+            float t = index - i0;
+            return Mathf.Lerp(_cachedCurveSamples[i0], _cachedCurveSamples[i1], t);
+        }
     }
     
     /// <summary>
@@ -147,6 +277,51 @@ namespace ES
         [ListDrawerSettings(ShowIndexLabels = true, ShowFoldout = false)]
         [SerializeReference]
         public List<StateCondition> exitConditions = new List<StateCondition>();
+        
+        // 运行时预计算数据（缓存条件数量，避免Count访问）
+        [NonSerialized] private int _enterConditionCount;
+        [NonSerialized] private int _keepConditionCount;
+        [NonSerialized] private int _exitConditionCount;
+        [NonSerialized] private bool _isInitialized;
+        
+        /// <summary>
+        /// 重置为默认值
+        /// </summary>
+        public void ResetToDefault()
+        {
+            if (enterConditions == null)
+                enterConditions = new List<StateCondition>();
+            else
+                enterConditions.Clear();
+                
+            if (keepConditions == null)
+                keepConditions = new List<StateCondition>();
+            else
+                keepConditions.Clear();
+                
+            if (exitConditions == null)
+                exitConditions = new List<StateCondition>();
+            else
+                exitConditions.Clear();
+        }
+        
+        /// <summary>
+        /// 初始化预计算数据（运行时调用）
+        /// </summary>
+        public void Initialize()
+        {
+            if (_isInitialized) return;
+            
+            _enterConditionCount = enterConditions?.Count ?? 0;
+            _keepConditionCount = keepConditions?.Count ?? 0;
+            _exitConditionCount = exitConditions?.Count ?? 0;
+            
+            _isInitialized = true;
+        }
+        
+        public bool HasEnterConditions() => _enterConditionCount > 0;
+        public bool HasKeepConditions() => _keepConditionCount > 0;
+        public bool HasExitConditions() => _exitConditionCount > 0;
     }
     
     /// <summary>
@@ -175,6 +350,42 @@ namespace ES
         
         [LabelText("日志颜色"), ShowIf("enableDebugLog")]
         public Color debugLogColor = Color.cyan;
+        
+        // 运行时预计算数据（缓存HTML颜色字符串，避免每帧ToHtmlStringRGB）
+        [NonSerialized] private string _cachedLogColorHtml;
+        [NonSerialized] private bool _isInitialized;
+        
+        /// <summary>
+        /// 重置为默认值
+        /// </summary>
+        public void ResetToDefault()
+        {
+            allowWeakInterrupt = false;
+            samePathType = SamePathType.None;
+            degradeTargetId = -1;
+            enableMemoization = true;
+            memoizationTimeout = 0.5f;
+            enableDebugLog = false;
+            debugLogColor = Color.cyan;
+        }
+        
+        /// <summary>
+        /// 初始化预计算数据（运行时调用）
+        /// </summary>
+        public void Initialize()
+        {
+            if (_isInitialized) return;
+            
+            // 预计算HTML颜色字符串（避免运行时ColorUtility调用）
+            if (enableDebugLog)
+            {
+                _cachedLogColorHtml = ColorUtility.ToHtmlStringRGB(debugLogColor);
+            }
+            
+            _isInitialized = true;
+        }
+        
+        public string GetLogColorHtml() => _cachedLogColorHtml;
     }
     
     #endregion
@@ -188,6 +399,10 @@ namespace ES
     {
         #region 核心数据模块
         
+        [HideLabel,InlineProperty]
+        public StateSharedData sharedData = new StateSharedData();
+        
+
         [TabGroup("核心", "基础配置")]
         [InlineProperty, HideLabel]
         public StateBasicConfig basicConfig = new StateBasicConfig();
@@ -212,11 +427,11 @@ namespace ES
         [InlineProperty, HideLabel]
         public StateConditionConfig conditionConfig = new StateConditionConfig();
         
-        [TabGroup("行为", "代价配置")]
+        [TabGroup("行为", "冲突与合并(代价)")]
         [ToggleLeft, LabelText("忽略代价计算")]
         public bool ignoreInCostCalculation = false;
         
-        [TabGroup("行为", "代价配置")]
+        [TabGroup("行为", "冲突与合并(代价)")]
         [InlineProperty, HideLabel, ShowIf("@!ignoreInCostCalculation")]
         public StateCostData costData = new StateCostData();
         
@@ -230,46 +445,83 @@ namespace ES
         
         #endregion
         
-        #region 统一初始化接口
+        #region 数据管理接口
         
         /// <summary>
-        /// 统一初始化入口 - 商业级初始化方法
+        /// 重置为默认值 - 编辑器使用
         /// </summary>
-        public void Initialize(int id, string name, StatePipelineType pipeline = StatePipelineType.Basic)
+        public void ResetToDefault(int id, string name, StatePipelineType pipeline = StatePipelineType.Basic)
         {
             // 基础配置
             basicConfig.stateId = id;
             basicConfig.stateName = name;
             basicConfig.pipelineType = pipeline;
             basicConfig.priority = 50;
-            basicConfig.duration = 1f;
-            basicConfig.recoveryStartTime = 0.7f;
-            basicConfig.recoveryDuration = 0.3f;
+            basicConfig.durationMode = StateDurationMode.UntilAnimationEnd;
+            basicConfig.timedDuration = 1f;
+            if (basicConfig.phaseConfig == null)
+                basicConfig.phaseConfig = new StatePhaseConfig();
+            basicConfig.phaseConfig.returnStartTime = 0.7f;
+            basicConfig.phaseConfig.releaseStartTime = 0.9f;
+            basicConfig.phaseConfig.returnCostFraction = 0.5f;
             
-            // 动画配置
-            animationConfig.mode = StateAnimationMode.SingleClip;
-            animationConfig.playbackSpeed = 1f;
-            animationConfig.loopClip = false;
-            animationConfig.smoothTime = 0.1f;
-            animationConfig.dirtyThreshold = 0.01f;
+            // 动画配置 - 重置
+            if (animationConfig == null)
+                animationConfig = new StateAnimationConfig();
+            animationConfig.ResetToDefault();
             
-            // 过渡配置
-            transitionConfig.transitionDuration = 0.3f;
-            transitionConfig.transitionMode = TransitionMode.Blend;
-            transitionConfig.transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+            // 参数配置 - 重置
+            if (parameterConfig == null)
+                parameterConfig = new StateParameterConfig();
+            parameterConfig.ResetToDefault();
+            
+            // 过渡配置 - 重置
+            if (transitionConfig == null)
+                transitionConfig = new StateTransitionConfig();
+            transitionConfig.ResetToDefault();
+            
+            // 条件配置 - 重置
+            if (conditionConfig == null)
+                conditionConfig = new StateConditionConfig();
+            conditionConfig.ResetToDefault();
             
             // 代价配置
             ignoreInCostCalculation = false;
             if (costData == null)
                 costData = new StateCostData();
             
-            // 高级配置
-            advancedConfig.enableMemoization = true;
-            advancedConfig.memoizationTimeout = 0.5f;
-            advancedConfig.enableDebugLog = false;
+            // 高级配置 - 重置
+            if (advancedConfig == null)
+                advancedConfig = new StateAdvancedConfig();
+            advancedConfig.ResetToDefault();
             
-            Debug.Log($"<color=green>状态 [{name}] 初始化完成</color>");
+            Debug.Log($"状态 [{name}] 已重置为默认值");
         }
+        
+        /// <summary>
+        /// 初始化预计算数据 - 运行时使用（避免每帧计算）
+        /// </summary>
+        public void InitializeRuntimeCache()
+        {
+            // 动画配置预计算
+            animationConfig?.Initialize();
+            
+            // 参数配置预计算
+            parameterConfig?.Initialize();
+            
+            // 过渡配置预计算
+            transitionConfig?.Initialize();
+            
+            // 条件配置预计算
+            conditionConfig?.Initialize();
+            
+            // 高级配置预计算
+            advancedConfig?.Initialize();
+        }
+        
+        #endregion
+        
+        #region 数据验证
         
         /// <summary>
         /// 验证数据完整性
@@ -283,8 +535,14 @@ namespace ES
             if (string.IsNullOrEmpty(basicConfig.stateName))
                 errors.Add("状态名称不能为空");
             
-            if (basicConfig.duration < 0)
-                errors.Add("持续时间不能为负数");
+            if (basicConfig.durationMode == StateDurationMode.Timed && basicConfig.timedDuration < 0)
+                errors.Add("定时持续时间不能为负数");
+            
+            if (basicConfig.phaseConfig != null)
+            {
+                if (basicConfig.phaseConfig.returnStartTime > basicConfig.phaseConfig.releaseStartTime)
+                    errors.Add("返还阶段开始时间不能晚于释放阶段开始时间");
+            }
             
             // 动画验证
             if (animationConfig.mode == StateAnimationMode.SingleClip && animationConfig.singleClip == null)
@@ -297,12 +555,7 @@ namespace ES
                 (animationConfig.blendTreeSamples == null || animationConfig.blendTreeSamples.Count == 0))
                 errors.Add("启用了BlendTree但未配置样本");
             
-            // 代价验证
-            if (!ignoreInCostCalculation && costData != null)
-            {
-                if (costData.mainCostPart.EnterCostValue < 0 || costData.mainCostPart.EnterCostValue > 1)
-                    errors.Add("主代价值必须在[0,1]范围内");
-            }
+         
             
             // 过渡验证
             if (transitionConfig.transitionDuration < 0)
@@ -315,12 +568,12 @@ namespace ES
         
         #region 编辑器工具
         
-        [Button("初始化状态", ButtonSizes.Large)]
+        [Button("重置状态数据", ButtonSizes.Large)]
         [PropertySpace(10)]
         [GUIColor(0.3f, 0.8f, 1f)]
-        private void EditorInitialize()
+        private void EditorReset()
         {
-            Initialize(basicConfig.stateId, $"新状态_{basicConfig.stateId}");
+            ResetToDefault(basicConfig.stateId, $"新状态_{basicConfig.stateId}");
         }
         
         [Button("验证数据", ButtonSizes.Large)]

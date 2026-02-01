@@ -77,6 +77,11 @@ MonoBehaviour:
     Asset: {fileID: -876546973899608171, guid: 5c81372d981403744adbdda4433c9c11, type: 3}
     Group: "\u811A\u672C"
     Enabled: 1
+  - DisplayName: "\u4FE1\u606F\u72B6\u60011"
+    Asset: {fileID: -4032791083603288687, guid: 3bbbfb0eae070104295366fdaf88f52a,
+      type: 2}
+    Group: "\u914D\u7F6E"
+    Enabled: 1
   AssetGroups:
   - "\u9ED8\u8BA4"
   - "\u811A\u672C"

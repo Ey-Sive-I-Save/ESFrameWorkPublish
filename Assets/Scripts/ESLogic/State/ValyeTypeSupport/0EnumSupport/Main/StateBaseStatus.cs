@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace ES
 {
-   public enum StateRunningState
+   public enum StateBaseStatus
     {
         [InspectorName("从未启动")]
         Never = 0,
@@ -12,4 +12,6 @@ namespace ES
         [InspectorName("退出")]
         Exited = 2,
     }
+
+    
 }

@@ -9,15 +9,6 @@ namespace ES
     // 注意：StateDefaultParameter枚举已移至 0EnumSupport/StateDefaultParameter.cs
     // 注意：StateParameter结构体已移至 1NormalFeatureSupportData/StateParameter.cs
     
-    /// <summary>
-    /// 动画Mixer计算器集合
-    /// 包含所有基于Mixer的动画混合计算器
-    /// </summary>
-    public static class AnimationMixerCalculators
-    {
-        // 此文件包含StateAnimationConfigData的所有Calculator实现
-
-    }
     
     /// <summary>
     /// 动画Clip计算器基类 - 零GC高性能抽象
@@ -30,7 +21,7 @@ namespace ES
     /// 5. 参数获取通过StateContext，支持枚举+字符串方式
     /// </summary>
     [Serializable]
-    public abstract class AnimationClipPlayableCalculator
+    public abstract class StateAnimationMixCalculator
     {
         /// <summary>
         /// 创建运行时数据
@@ -92,7 +83,7 @@ namespace ES
         /// 支持运行时Clip覆盖，可接入任意Mixer
         /// </summary>
         [Serializable]
-        public class SimpleClipCalculator : AnimationClipPlayableCalculator
+        public class StateAnimationMixCalculatorForSimpleClip : StateAnimationMixCalculator
         {
             public AnimationClip clip;
 
@@ -179,7 +170,7 @@ namespace ES
         /// 支持多层级嵌套，Mixer可连接到父Mixer
         /// </summary>
         [Serializable]
-        public class BlendTree1DCalculator : AnimationClipPlayableCalculator
+        public class StateAnimationMixCalculatorForBlendTree1D : StateAnimationMixCalculator
         {
             [Serializable]
             public struct ClipSampleForBlend1D
@@ -389,7 +380,7 @@ namespace ES
         /// 支持多层级嵌套，Mixer可连接到父Mixer
         /// </summary>
         [Serializable]
-        public abstract class BlendTree2DCalculator : AnimationClipPlayableCalculator
+        public abstract class StateAnimationMixCalculatorForBlendTree2D : StateAnimationMixCalculator
         {
             [Serializable]
             public struct ClipSample2D
@@ -558,7 +549,7 @@ namespace ES
         /// 性能: O(n)三角形查找 + O(1)重心坐标
         /// </summary>
         [Serializable]
-        public class BlendTree2DFreeformDirectionalCalculator : BlendTree2DCalculator
+        public class StateAnimationMixCalculatorForBlendTree2DFreeformDirectional : StateAnimationMixCalculatorForBlendTree2D
         {
             protected override void ComputeDelaunayTriangulation()
             {
@@ -710,7 +701,7 @@ namespace ES
         /// 性能: O(1)查找最近4个点 + O(1)双线性插值
         /// </summary>
         [Serializable]
-        public class BlendTree2DFreeformCartesianCalculator : BlendTree2DCalculator
+        public class StateAnimationMixCalculatorForBlendTree2DFreeformCartesian : StateAnimationMixCalculatorForBlendTree2D
         {
             protected override void ComputeDelaunayTriangulation()
             {
@@ -844,7 +835,7 @@ namespace ES
         /// 支持多层级嵌套，Mixer可连接到父Mixer
         /// </summary>
         [Serializable]
-        public class DirectBlendCalculator : AnimationClipPlayableCalculator
+        public class StateAnimationMixCalculatorForDirectBlend : StateAnimationMixCalculator
         {
             [Serializable]
             public struct DirectClip

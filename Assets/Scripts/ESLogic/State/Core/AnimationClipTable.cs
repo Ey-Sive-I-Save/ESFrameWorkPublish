@@ -325,7 +325,7 @@ namespace ES
 
             var clip = clips[_currentIndex % clips.Count];
             _currentIndex = (_currentIndex + 1) % clips.Count;
-            
+
             return (clip, 0f);
         }
     }
@@ -341,9 +341,23 @@ namespace ES
 
         public override (AnimationClip clip, float normalizedTime) GetClipAndTime(StateContext context)
         {
-            // 这里需要访问StateContext,暂时返回默认
             if (mappings != null && mappings.Count > 0)
             {
+                // 尝试根据 context 中的参数选择映射（示例：使用 parameterName 作为 float/int/key）
+                if (context != null)
+                {
+                    // 优先尝试 float
+                    float f = context.GetFloat(parameterName, float.NaN);
+                    if (!float.IsNaN(f))
+                    {
+                        // 简单匹配：找到第一个 mapping 参数值等于 (int)f
+                        foreach (var m in mappings)
+                        {
+                            if (Mathf.Approximately(m.parameterValue, (int)f) && m.clip != null) return (m.clip, 0f);
+                        }
+                    }
+                }
+
                 return (mappings[0].clip, 0f);
             }
             return (null, 0f);

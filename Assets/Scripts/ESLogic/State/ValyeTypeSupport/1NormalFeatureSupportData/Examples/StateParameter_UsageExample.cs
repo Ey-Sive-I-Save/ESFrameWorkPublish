@@ -13,23 +13,23 @@ namespace ES
         
         public void Example1_UsingEnumParameter()
         {
-            var calculator = new BlendTree1DCalculator
+            var calculator = new StateAnimationMixCalculatorForBlendTree1D
             {
                 // 直接使用枚举 - 高性能，类型安全，支持重构
                 parameterName = StateDefaultFloatParameter.Speed,
                 samples = new[]
                 {
-                    new BlendTree1DCalculator.ClipSampleForBlend1D
+                    new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                     {
                         clip = Resources.Load<AnimationClip>("Idle"),
                         threshold = 0f
                     },
-                    new BlendTree1DCalculator.ClipSampleForBlend1D
+                    new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                     {
                         clip = Resources.Load<AnimationClip>("Walk"),
                         threshold = 2f
                     },
-                    new BlendTree1DCalculator.ClipSampleForBlend1D
+                    new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                     {
                         clip = Resources.Load<AnimationClip>("Run"),
                         threshold = 5f
@@ -55,18 +55,18 @@ namespace ES
         
         public void Example2_UsingStringParameter()
         {
-            var calculator = new BlendTree1DCalculator
+            var calculator = new StateAnimationMixCalculatorForBlendTree1D
             {
                 // 使用字符串 - 适用于动态生成的参数名
                 parameterName = "DynamicParameter_" + Random.Range(0, 100),
                 samples = new[]
                 {
-                    new BlendTree1DCalculator.ClipSampleForBlend1D
+                    new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                     {
                         clip = Resources.Load<AnimationClip>("Idle"),
                         threshold = 0f
                     },
-                    new BlendTree1DCalculator.ClipSampleForBlend1D
+                    new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                     {
                         clip = Resources.Load<AnimationClip>("Run"),
                         threshold = 5f
@@ -84,29 +84,29 @@ namespace ES
         
         public void Example3_2DBlendWithEnum()
         {
-            var calculator = new BlendTree2DFreeformDirectionalCalculator
+            var calculator = new StateAnimationMixCalculatorForBlendTree2DFreeformDirectional
             {
                 // 2D参数使用字符串
                 parameterX = "DirectionX",
                 parameterY = "DirectionY",
                 samples = new[]
                 {
-                    new BlendTree2DCalculator.ClipSample2D
+                    new StateAnimationMixCalculatorForBlendTree2D.ClipSample2D
                     {
                         clip = Resources.Load<AnimationClip>("Walk_Forward"),
                         position = new Vector2(0, 1)
                     },
-                    new BlendTree2DCalculator.ClipSample2D
+                    new StateAnimationMixCalculatorForBlendTree2D.ClipSample2D
                     {
                         clip = Resources.Load<AnimationClip>("Walk_Back"),
                         position = new Vector2(0, -1)
                     },
-                    new BlendTree2DCalculator.ClipSample2D
+                    new StateAnimationMixCalculatorForBlendTree2D.ClipSample2D
                     {
                         clip = Resources.Load<AnimationClip>("Walk_Left"),
                         position = new Vector2(-1, 0)
                     },
-                    new BlendTree2DCalculator.ClipSample2D
+                    new StateAnimationMixCalculatorForBlendTree2D.ClipSample2D
                     {
                         clip = Resources.Load<AnimationClip>("Walk_Right"),
                         position = new Vector2(1, 0)
@@ -126,17 +126,17 @@ namespace ES
         public void Example4_MixedParameters()
         {
             // 第一个Mixer使用枚举
-            var upperBodyCalculator = new DirectBlendCalculator
+            var upperBodyCalculator = new StateAnimationMixCalculatorForDirectBlend
             {
                 clips = new[]
                 {
-                    new DirectBlendCalculator.DirectClip
+                    new StateAnimationMixCalculatorForDirectBlend.DirectClip
                     {
                         clip = Resources.Load<AnimationClip>("Attack"),
                         weightParameter = "AttackWeight", // 字符串参数
                         defaultWeight = 0f
                     },
-                    new DirectBlendCalculator.DirectClip
+                    new StateAnimationMixCalculatorForDirectBlend.DirectClip
                     {
                         clip = Resources.Load<AnimationClip>("Block"),
                         weightParameter = "BlockWeight", // 字符串参数
@@ -146,17 +146,17 @@ namespace ES
             };
             
             // 第二个Mixer使用自定义字符串
-            var lowerBodyCalculator = new BlendTree1DCalculator
+            var lowerBodyCalculator = new StateAnimationMixCalculatorForBlendTree1D
             {
                 parameterName = "CustomMoveSpeed", // 自定义参数名
                 samples = new[]
                 {
-                    new BlendTree1DCalculator.ClipSampleForBlend1D
+                    new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                     {
                         clip = Resources.Load<AnimationClip>("Idle"),
                         threshold = 0f
                     },
-                    new BlendTree1DCalculator.ClipSampleForBlend1D
+                    new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                     {
                         clip = Resources.Load<AnimationClip>("Run"),
                         threshold = 5f
@@ -231,7 +231,7 @@ namespace ES
         {
             private PlayableGraph _graph;
             private StateContext _context;
-            private BlendTree1DCalculator _moveCalculator;
+            private StateAnimationMixCalculatorForBlendTree1D _moveCalculator;
             private AnimationCalculatorRuntime _moveRuntime;
             
             public void Initialize()
@@ -240,28 +240,28 @@ namespace ES
                 _context = new StateContext();
                 
                 // 使用枚举配置移动动画
-                _moveCalculator = new BlendTree1DCalculator
+                _moveCalculator = new StateAnimationMixCalculatorForBlendTree1D
                 {
                     parameterName = StateDefaultFloatParameter.Speed, // 使用枚举
                     smoothTime = 0.15f,
                     samples = new[]
                     {
-                        new BlendTree1DCalculator.ClipSampleForBlend1D
+                        new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                         {
                             clip = Resources.Load<AnimationClip>("Idle"),
                             threshold = 0f
                         },
-                        new BlendTree1DCalculator.ClipSampleForBlend1D
+                        new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                         {
                             clip = Resources.Load<AnimationClip>("Walk"),
                             threshold = 2f
                         },
-                        new BlendTree1DCalculator.ClipSampleForBlend1D
+                        new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                         {
                             clip = Resources.Load<AnimationClip>("Run"),
                             threshold = 5f
                         },
-                        new BlendTree1DCalculator.ClipSampleForBlend1D
+                        new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
                         {
                             clip = Resources.Load<AnimationClip>("Sprint"),
                             threshold = 8f

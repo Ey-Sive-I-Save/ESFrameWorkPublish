@@ -102,10 +102,15 @@ namespace ES.Examples
             ESDesignUtility.SafeEditor.Quick_OpenInSystemFolder(assetsPath);
             Debug.Log($"尝试打开系统文件夹: {assetsPath}（仅Editor有效）");
 
-            // 12. 创建文件夹（仅Editor模式）
-            string newFolderPath = "Assets/TestFolder";
-            ESDesignUtility.SafeEditor.Quick_CreateFolderByFullPath(newFolderPath, refresh: false);
-            Debug.Log($"尝试创建文件夹: {newFolderPath}（仅Editor有效）");
+            // 12. 创建Unity资产文件夹（仅Editor模式）
+            string newAssetFolderPath = "Assets/TestFolder";
+            ESDesignUtility.SafeEditor.Quick_CreateAssetFolder(newAssetFolderPath, refresh: false);
+            Debug.Log($"尝试创建Unity资产文件夹: {newAssetFolderPath}（仅Editor有效）");
+            
+            // 13. 创建系统完整路径文件夹（仅Editor模式）
+            string systemFolderPath = Application.persistentDataPath + "/MyData";
+            var result = ESDesignUtility.SafeEditor.Quick_System_CreateDirectory(systemFolderPath);
+            Debug.Log($"尝试创建系统文件夹: {systemFolderPath}, 结果: {result.Message}");
 
             // ========== 实用提示 ==========
             Debug.Log("\n=== 使用提示 ===");
@@ -113,6 +118,8 @@ namespace ES.Examples
             Debug.Log("• 运行时调用会安全返回，不会报错");
             Debug.Log("• 大部分功能主要用于Editor工具脚本");
             Debug.Log("• 资产创建、查找等功能仅在Editor模式下有效");
+            Debug.Log("• Quick_CreateAssetFolder: Unity资产路径（Assets/...）");
+            Debug.Log("• Quick_System_CreateDirectory: 系统完整路径（F:/...或C:\\...）");
         }
     }
 }

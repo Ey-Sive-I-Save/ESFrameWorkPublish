@@ -536,13 +536,13 @@ namespace ES
                     {
                         if (!autoCreateFolder)
                         {
-                            UnityEngine.Debug.LogWarning($"CreateSOAsset 失败：目标文件夹不存在：{saveFolderPath}");
+                            UnityEngine.Debug.LogWarning($"CreateSOAsset 失败：目标Unity资产文件夹不存在：{saveFolderPath}");
                             return null;
                         }
 
-                        if (!Quick_CreateFolderByFullPath(saveFolderPath, refresh: false))
+                        if (!Quick_CreateAssetFolder(saveFolderPath, refresh: false))
                         {
-                            UnityEngine.Debug.LogWarning($"CreateSOAsset 失败：无法创建文件夹路径：{saveFolderPath}");
+                            UnityEngine.Debug.LogWarning($"CreateSOAsset 失败：无法创建Unity资产文件夹：{saveFolderPath}");
                             return null;
                         }
                     }
@@ -574,13 +574,13 @@ namespace ES
 
                 if (!AssetDatabase.IsValidFolder(folderPath))
                 {
-                    if (Quick_CreateFolderByFullPath(folderPath, refresh: false))
+                    if (Quick_CreateAssetFolder(folderPath, refresh: false))
                     {
-                        UnityEngine.Debug.Log($"自动创建了文件夹: {folderPath}");
+                        UnityEngine.Debug.Log($"自动创建了Unity资产文件夹: {folderPath}");
                     }
                     else
                     {
-                        UnityEngine.Debug.LogWarning($"无法创建文件夹路径: {folderPath}");
+                        UnityEngine.Debug.LogWarning($"无法创建Unity资产文件夹: {folderPath}");
                         return null;
                     }
                 }
@@ -611,17 +611,17 @@ namespace ES
             {
 #if UNITY_EDITOR
                 if (type == null) return null;
-
+                Debug.LogWarning("folderPath: " + folderPath);
                 folderPath = _NormalizeAssetPath(folderPath);
                 if (!AssetDatabase.IsValidFolder(folderPath))
                 {
-                    if (Quick_CreateFolderByFullPath(folderPath, refresh: false))
+                    if (Quick_CreateAssetFolder(folderPath, refresh: false))
                     {
-                        UnityEngine.Debug.Log($"自动创建了文件夹: {folderPath}");
+                        UnityEngine.Debug.Log($"自动创建了Unity资产文件夹: {folderPath}");
                     }
                     else
                     {
-                        UnityEngine.Debug.LogWarning($"无法创建文件夹路径: {folderPath}");
+                        UnityEngine.Debug.LogWarning($"无法创建Unity资产文件夹: {folderPath}");
                         return null;
                     }
                 }
@@ -753,12 +753,32 @@ namespace ES
 #endif
             }
 
+            /// <summary>
+            /// 创建操作系统完整路径文件夹（递归创建）
+            /// </summary>
+            /// <param name="fullPath">操作系统完整绝对路径（如"F:/Project/Output"或"C:\\Temp\\Data"）</param>
+            /// <returns>元组(Success: 是否成功, Message: 结果消息)</returns>
+            /// <remarks>
+            /// 路径类型说明：
+            /// - SystemFullPath: 操作系统绝对路径（本方法使用此类型）
+            /// - AssetPath: Unity资产相对路径，需使用Quick_CreateAssetFolder
+            /// </remarks>
+            /// <summary>
+            /// 创建操作系统完整路径文件夹（递归创建）
+            /// </summary>
+            /// <param name="fullPath">操作系统完整绝对路径（如"F:/Project/Output"或"C:\\Temp\\Data"）</param>
+            /// <returns>元组(Success: 是否成功, Message: 结果消息)</returns>
+            /// <remarks>
+            /// 路径类型说明：
+            /// - SystemFullPath: 操作系统绝对路径（本方法使用此类型）
+            /// - AssetPath: Unity资产相对路径，需使用Quick_CreateAssetFolder
+            /// </remarks>
             public static (bool Success, string Message) Quick_System_CreateDirectory(string fullPath)
             {
                 // 参数校验
                 if (string.IsNullOrWhiteSpace(fullPath))
                 {
-                    return (false, "提供的路径为空或无效。");
+                    return (false, "提供的系统完整路径为空或无效。");
                 }
 
                 try
@@ -793,35 +813,47 @@ namespace ES
                 }
             }
 
-            public static bool Quick_CreateFolderByFullPath(string fullPath, bool refresh = true)
+            /// <summary>
+            /// 创建Unity资产文件夹（递归创建）
+            /// </summary>
+            /// <param name="assetPath">Unity资产路径，必须以"Assets"开头（如"Assets/Scripts/MyFolder"）</param>
+            /// <param name="refresh">是否立即刷新资产数据库</param>
+            /// <returns>创建成功返回true</returns>
+            /// <remarks>
+            /// 路径类型说明：
+            /// - AssetPath: Unity资产相对路径，以"Assets/"开头（如"Assets/Scripts"）
+            /// - SystemFullPath: 操作系统绝对路径（如"F:/Project/Assets/Scripts"）
+            /// 本方法接收AssetPath，若需创建SystemFullPath请使用Quick_System_CreateDirectory
+            /// </remarks>
+            public static bool Quick_CreateAssetFolder(string assetPath, bool refresh = true)
             {
 #if UNITY_EDITOR
                 // 参数检查
-                fullPath = _NormalizeAssetPath(fullPath);
-                if (string.IsNullOrEmpty(fullPath) || !fullPath.StartsWith("Assets", StringComparison.Ordinal))
+                assetPath = _NormalizeAssetPath(assetPath);
+                if (string.IsNullOrEmpty(assetPath) || !assetPath.StartsWith("Assets", StringComparison.Ordinal))
                 {
-                    UnityEngine.Debug.LogError("路径无效！必须是以 'Assets' 开头的有效路径。");
+                    UnityEngine.Debug.LogError($"路径无效！必须是以 'Assets' 开头的Unity资产路径。当前路径：{assetPath}");
                     return false;
                 }
 
-                if (string.Equals(fullPath, "Assets", StringComparison.Ordinal))
+                if (string.Equals(assetPath, "Assets", StringComparison.Ordinal))
                 {
                     return true;
                 }
 
                 // 检查文件夹是否已存在
-                if (AssetDatabase.IsValidFolder(fullPath))
+                if (AssetDatabase.IsValidFolder(assetPath))
                 {
-
                     return true;
                 }
-                // 从完整路径中提取父文件夹路径和要创建的新文件夹名称
-                string parentFolder = _NormalizeAssetPath(Path.GetDirectoryName(fullPath));
-                string newFolderName = Path.GetFileName(fullPath);
+                
+                // 从资产路径中提取父文件夹路径和要创建的新文件夹名称
+                string parentFolder = _NormalizeAssetPath(Path.GetDirectoryName(assetPath));
+                string newFolderName = Path.GetFileName(assetPath);
 
                 if (string.IsNullOrEmpty(parentFolder) || string.IsNullOrEmpty(newFolderName))
                 {
-                    UnityEngine.Debug.LogError($"路径解析失败：{fullPath}");
+                    UnityEngine.Debug.LogError($"Unity资产路径解析失败：{assetPath}");
                     return false;
                 }
 
@@ -829,7 +861,7 @@ namespace ES
                 if (!AssetDatabase.IsValidFolder(parentFolder))
                 {
                     // 递归调用自身来创建父目录
-                    if (!Quick_CreateFolderByFullPath(parentFolder, refresh: false))
+                    if (!Quick_CreateAssetFolder(parentFolder, refresh: false))
                     {
                         return false; // 如果父目录创建失败，则直接返回
                     }
@@ -840,12 +872,12 @@ namespace ES
                 if (!string.IsNullOrEmpty(resultGuid))
                 {
                     if (refresh) AssetDatabase.Refresh(); // 需要立即可见时才刷新（批量创建建议外层统一 Refresh）
-                    UnityEngine.Debug.Log($"文件夹创建成功：{fullPath}");
+                    UnityEngine.Debug.Log($"Unity资产文件夹创建成功：{assetPath}");
                     return true;
                 }
                 else
                 {
-                    UnityEngine.Debug.LogError($"文件夹创建失败：{fullPath}");
+                    UnityEngine.Debug.LogError($"Unity资产文件夹创建失败：{assetPath}");
                     return false;
                 }
 #else
@@ -853,6 +885,61 @@ namespace ES
 #endif
             }
 
+            #endregion
+            
+            #region 路径转换工具
+            
+            /// <summary>
+            /// 将系统完整路径转换为Unity资产路径
+            /// </summary>
+            /// <param name="systemFullPath">系统完整路径（如"F:/Project/Assets/Scripts"）</param>
+            /// <returns>Unity资产路径（如"Assets/Scripts"），转换失败返回null</returns>
+            public static string ConvertSystemPathToAssetPath(string systemFullPath)
+            {
+                if (string.IsNullOrEmpty(systemFullPath))
+                    return null;
+
+                systemFullPath = _NormalizeAssetPath(systemFullPath);
+                string dataPath = UnityEngine.Application.dataPath.Replace('\\', '/');
+                
+                if (systemFullPath.StartsWith(dataPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    // 移除dataPath部分，保留"Assets"后的内容
+                    return "Assets" + systemFullPath.Substring(dataPath.Length);
+                }
+                
+                return null;
+            }
+            
+            /// <summary>
+            /// 将Unity资产路径转换为系统完整路径
+            /// </summary>
+            /// <param name="assetPath">Unity资产路径（如"Assets/Scripts"）</param>
+            /// <returns>系统完整路径（如"F:/Project/Assets/Scripts"）</returns>
+            public static string ConvertAssetPathToSystemPath(string assetPath)
+            {
+                if (string.IsNullOrEmpty(assetPath))
+                    return null;
+                    
+                assetPath = _NormalizeAssetPath(assetPath);
+                if (!assetPath.StartsWith("Assets", StringComparison.Ordinal))
+                    return null;
+                
+                string dataPath = UnityEngine.Application.dataPath.Replace('\\', '/');
+                return dataPath + assetPath.Substring("Assets".Length);
+            }
+
+            #endregion
+
+            #region 向后兼容（已废弃）
+            /// <summary>
+            /// [已废弃] 使用Quick_CreateAssetFolder代替
+            /// </summary>
+            [Obsolete("方法名具有误导性。请使用Quick_CreateAssetFolder（Unity资产路径）或Quick_System_CreateDirectory（系统完整路径）")]
+            public static bool Quick_CreateFolderByFullPath(string assetPath, bool refresh = true)
+            {
+                return Quick_CreateAssetFolder(assetPath, refresh);
+            }
             #endregion
         }
 

@@ -429,6 +429,17 @@ namespace ES
             {
                 Type targetType = ESSODataWindowHelper.GetPackType(createPackType_);
                 string path = FolderPath_;
+                
+                // 先确保父文件夹存在
+                if (!AssetDatabase.IsValidFolder(path))
+                {
+                    if (!ESDesignUtility.SafeEditor.Quick_CreateAssetFolder(path, refresh: false))
+                    {
+                        Debug.LogError($"无法创建Unity资产父文件夹：{path}");
+                        return;
+                    }
+                }
+                
                 Debug.Log(path + targetType.Name + targetType.Name._RemoveSubStrings("Data", "Pack"));
                 if (AutoParentFolder) ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(FolderPath_, targetType.Name._RemoveSubStrings("Data", "Pack"), out path);
                 Debug.Log(path);
@@ -631,7 +642,18 @@ namespace ES
             {
                 Type targetType = ESSODataWindowHelper.GetGroupType(createGroup_);
                 string path = FolderPath_;
-                Debug.Log(path + targetType.Name + targetType.Name._RemoveSubStrings("Data", "Group"));
+                
+                // 先确保父文件夹存在
+                if (!AssetDatabase.IsValidFolder(path))
+                {
+                    if (!ESDesignUtility.SafeEditor.Quick_CreateAssetFolder(path, refresh: false))
+                    {
+                        Debug.LogError($"无法创建Unity资产父文件夹：{path}");
+                        return;
+                    }
+                }
+                
+                Debug.Log(path +"TYPE"+ targetType.Name +"NAME"+ targetType.Name._RemoveSubStrings("Data", "Group"));
                 if (AutoParentFolder) ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(FolderPath_, targetType.Name._RemoveSubStrings("Data", "Group"), out path);
                 Debug.Log(path);
                 var create = ESDesignUtility.SafeEditor.CreateSOAsset(targetType, path, createName_, true, hasChange, beforeSave);

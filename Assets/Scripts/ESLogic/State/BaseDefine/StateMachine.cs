@@ -496,6 +496,12 @@ namespace ES
         [NonSerialized]
         protected bool ownsPlayableGraph = false;
 
+        public bool IsPlayableGraphValid => playableGraph.IsValid();
+
+        public bool IsPlayableGraphPlaying => playableGraph.IsValid() && playableGraph.IsPlaying();
+
+        public Animator BoundAnimator => boundAnimator;
+
         #endregion
 
         #region 性能优化相关

@@ -595,7 +595,13 @@ namespace ES
                 Debug.Log($"<color=green>[{basicConfig.stateName}] 数据验证通过！</color>");
             }
         }
-        
+
+        internal void Initialize()
+        {
+           
+        }
+
+
         #endregion
     }
     

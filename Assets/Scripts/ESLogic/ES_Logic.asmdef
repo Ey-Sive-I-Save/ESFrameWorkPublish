@@ -6,7 +6,8 @@
         "ES_Design",
         "Unity.TextMeshPro",
         "DOTween.Modules",
-        "KCC"
+        "KCC",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

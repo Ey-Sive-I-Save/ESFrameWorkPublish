@@ -35,10 +35,10 @@ namespace ES
     //    - Core 对域的声明是统一的，且按案例注册（RegisterDomain）。
     //    - 只注册需要参与当前 Core 的域。
     //
-    // 5) Domain 里不推荐 public 模块字段：
-    //    - 即使需要公开，也必须“禁止序列化”（不要 SerializeField / SerializeReference）。
-    //    - 只有“超高频访问”的模块才建议 public（非序列化）以减少 GetModule 成本。
-    //    - 若需求是“超高频且稳定”，可以直接写在 Domain 内部，不必拆成 Module。
+    // 5) Domain 内拒绝随意 public 模块字段：
+    //    - 默认不允许声明 public 模块字段（避免耦合/误用）。
+    //    - 如必须公开，也只能用于“极端高频”且必须禁止序列化，并且需要审查。
+    //    - 更推荐：超高频逻辑直接写在 Domain 内部，不拆成 Module。
     //    - Module 的最大价值是“可选存在”：没有它也能正常运行，用于灵活扩展。
     //
     // 6) 域与模块需要注册中文名：
@@ -133,9 +133,7 @@ namespace ES
     [Serializable]
     public class SampleDomainType1 : Domain<SamplesCore, SampleModuleType1Base>
     {
-        // 示例：不推荐在 Domain 中 public 暴露模块。
-        // 如需暴露，仅允许非序列化 public 字段，并且仅限超高频访问场景。
-        // public SampleModuleType1_1 veryHotModule; // 禁止序列化
+        // 规则重申：默认不在 Domain 中 public 暴露模块。
     }
 
     [Serializable]

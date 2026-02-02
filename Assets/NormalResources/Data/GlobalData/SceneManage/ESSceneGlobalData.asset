@@ -59,6 +59,13 @@ MonoBehaviour:
     Description: 
     Group: "\u9ED8\u8BA4"
     Enabled: 1
+  - DisplayName: AimingRig
+    ScenePath: Assets/Samples/Cinemachine/2.10.5/Cinemachine Example Scenes/Scenes/AimingRig/AimingRig.unity
+    SceneAsset: {fileID: 102900000, guid: 8ad62c20b502850419e9fbe043d2d6f8, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
   SceneGroups:
   - "\u9ED8\u8BA4"
   - "\u6838\u5FC3\u573A\u666F"

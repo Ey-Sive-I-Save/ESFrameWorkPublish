@@ -80,6 +80,51 @@ namespace ES
             kcc.ResetInputs();
         }
 
+        public void RequestJump()
+        {
+            kcc.RequestJump();
+        }
+
+        public void SetCrouch(bool enable)
+        {
+            kcc.SetCrouch(enable);
+        }
+
+        public void SetRootMotionVelocity(Vector3 velocity)
+        {
+            kcc.SetRootMotionVelocity(velocity);
+        }
+
+        public void ClearRootMotionVelocity()
+        {
+            kcc.ClearRootMotionVelocity();
+        }
+
+        public void SetSpeedMultiplier(float multiplier)
+        {
+            kcc.SetSpeedMultiplier(multiplier);
+        }
+
+        public void SetSpeedLimit(float limit)
+        {
+            kcc.SetSpeedLimit(limit);
+        }
+
+        public void ResetSpeedModifiers()
+        {
+            kcc.ResetSpeedModifiers();
+        }
+
+        public void SetLocomotionMode(LocomotionMode mode)
+        {
+            kcc.SetLocomotionMode(mode);
+        }
+
+        public void SetVerticalInput(float input)
+        {
+            kcc.SetVerticalInput(input);
+        }
+
         #endregion
 
         #region ICharacterController
@@ -154,21 +199,59 @@ namespace ES
         public float airAccelerationSpeed = 5f;
         public float drag = 0.1f;
 
+        [Title("飞行")]
+        public float flyMaxSpeed = 10f;
+        public float flyAcceleration = 12f;
+        public float flyDrag = 0.2f;
+
+        [Title("游泳")]
+        public float swimMaxSpeed = 6f;
+        public float swimAcceleration = 8f;
+        public float swimDrag = 0.5f;
+        public float swimBuoyancy = 6f;
+
+        [Title("速度倍率/限速")]
+        public float speedMultiplier = 1f;
+        [Tooltip("<=0 表示不限制")]
+        public float speedLimit = 0f;
+
+        [Title("跳跃")]
+        public float jumpSpeed = 8f;
+
+        [Title("下蹲")]
+        public float standingCapsuleHeight = 2f;
+        public float crouchedCapsuleHeight = 1f;
+
         [Title("旋转")]
         public float orientationSharpness = 10f;
 
         [Title("重力")]
         public Vector3 gravity = new Vector3(0f, -30f, 0f);
 
+        [Title("根运动")]
+        public bool useRootMotion = true;
+        public float rootMotionScale = 1f;
+        public bool rootMotionGroundOnly = true;
+
         [Title("输入（世界空间）")]
         public Vector3 moveInput;
         public Vector3 lookInput = Vector3.forward;
+
+        [LabelText("垂直输入")]
+        public float verticalInput;
+
+        [LabelText("移动模式")]
+        public LocomotionMode locomotionMode = LocomotionMode.Grounded;
 
         [Title("Monitor（运行监视）")]
         [InlineProperty, HideLabel]
         public EntityKCCMonitor monitor = new EntityKCCMonitor();
 
         private Vector3 _lastVelocity;
+        private Vector3 _rootMotionVelocity;
+        private bool _jumpRequested;
+        private bool _crouchRequested;
+        private bool _isCrouched;
 
         public void Initialize(Entity owner)
         {
@@ -180,12 +263,25 @@ namespace ES
             if (motor != null)
             {
                 motor.CharacterController = owner;
+                if (motor.Capsule != null && standingCapsuleHeight <= 0f)
+                {
+                    standingCapsuleHeight = motor.Capsule.height;
+                }
+                if (crouchedCapsuleHeight <= 0f)
+                {
+                    crouchedCapsuleHeight = Mathf.Max(0.5f, standingCapsuleHeight * 0.5f);
+                }
             }
         }
 
         public void SetMoveInput(Vector3 input)
         {
             moveInput = Vector3.ClampMagnitude(input, 1f);
+        }
+
+        public void SetVerticalInput(float input)
+        {
+            verticalInput = Mathf.Clamp(input, -1f, 1f);
         }
 
         public void SetLookInput(Vector3 input)
@@ -200,11 +296,54 @@ namespace ES
         {
             moveInput = Vector3.zero;
             lookInput = Vector3.forward;
+            verticalInput = 0f;
+        }
+
+        public void SetLocomotionMode(LocomotionMode mode)
+        {
+            locomotionMode = mode;
+        }
+
+        public void RequestJump()
+        {
+            _jumpRequested = true;
+        }
+
+        public void SetCrouch(bool enable)
+        {
+            _crouchRequested = enable;
+        }
+
+        public void SetRootMotionVelocity(Vector3 velocity)
+        {
+            _rootMotionVelocity = velocity;
+        }
+
+        public void ClearRootMotionVelocity()
+        {
+            _rootMotionVelocity = Vector3.zero;
+        }
+
+        public void SetSpeedMultiplier(float multiplier)
+        {
+            speedMultiplier = Mathf.Max(0f, multiplier);
+        }
+
+        public void SetSpeedLimit(float limit)
+        {
+            speedLimit = limit;
+        }
+
+        public void ResetSpeedModifiers()
+        {
+            speedMultiplier = 1f;
+            speedLimit = 0f;
         }
 
         public void BeforeCharacterUpdate(Entity owner, float deltaTime)
         {
-            // 预留扩展
+            if (motor == null) return;
+            ApplyCrouch();
         }
 
         public void UpdateRotation(Entity owner, ref Quaternion currentRotation, float deltaTime)
@@ -218,22 +357,61 @@ namespace ES
         {
             if (motor == null) return;
 
+            float multiplier = Mathf.Max(0f, speedMultiplier);
+            float stableMaxSpeed = maxStableMoveSpeed * multiplier;
+            float airMaxSpeed = maxAirMoveSpeed * multiplier;
+            if (speedLimit > 0f)
+            {
+                stableMaxSpeed = Mathf.Min(stableMaxSpeed, speedLimit);
+                airMaxSpeed = Mathf.Min(airMaxSpeed, speedLimit);
+            }
+
             Vector3 targetMovementVelocity = Vector3.zero;
-            if (motor.GroundingStatus.IsStableOnGround)
+            if (locomotionMode == LocomotionMode.Flying)
+            {
+                Vector3 up = motor.CharacterUp;
+                Vector3 input = moveInput + up * verticalInput;
+                input = Vector3.ClampMagnitude(input, 1f);
+                targetMovementVelocity = input * flyMaxSpeed;
+
+                Vector3 velocityDiff = targetMovementVelocity - currentVelocity;
+                currentVelocity += velocityDiff * flyAcceleration * deltaTime;
+                currentVelocity *= (1f / (1f + (flyDrag * deltaTime)));
+            }
+            else if (locomotionMode == LocomotionMode.Swimming)
+            {
+                Vector3 up = motor.CharacterUp;
+                Vector3 input = moveInput + up * verticalInput;
+                input = Vector3.ClampMagnitude(input, 1f);
+                targetMovementVelocity = input * swimMaxSpeed;
+
+                Vector3 velocityDiff = targetMovementVelocity - currentVelocity;
+                currentVelocity += velocityDiff * swimAcceleration * deltaTime;
+                currentVelocity += up * swimBuoyancy * deltaTime;
+                currentVelocity *= (1f / (1f + (swimDrag * deltaTime)));
+            }
+            else if (motor.GroundingStatus.IsStableOnGround)
             {
                 currentVelocity = motor.GetDirectionTangentToSurface(currentVelocity, motor.GroundingStatus.GroundNormal) * currentVelocity.magnitude;
 
                 Vector3 inputRight = Vector3.Cross(moveInput, motor.CharacterUp);
                 Vector3 reorientedInput = Vector3.Cross(motor.GroundingStatus.GroundNormal, inputRight).normalized * moveInput.magnitude;
-                targetMovementVelocity = reorientedInput * maxStableMoveSpeed;
+                targetMovementVelocity = reorientedInput * stableMaxSpeed;
 
                 currentVelocity = Vector3.Lerp(currentVelocity, targetMovementVelocity, 1f - Mathf.Exp(-stableMovementSharpness * deltaTime));
+
+                if (_jumpRequested)
+                {
+                    _jumpRequested = false;
+                    motor.ForceUnground(0.1f);
+                    currentVelocity = Vector3.ProjectOnPlane(currentVelocity, motor.CharacterUp) + (motor.CharacterUp * jumpSpeed);
+                }
             }
             else
             {
                 if (moveInput.sqrMagnitude > 0f)
                 {
-                    targetMovementVelocity = moveInput * maxAirMoveSpeed;
+                    targetMovementVelocity = moveInput * airMaxSpeed;
 
                     if (motor.GroundingStatus.FoundAnyGround)
                     {
@@ -249,7 +427,45 @@ namespace ES
                 currentVelocity *= (1f / (1f + (drag * deltaTime)));
             }
 
+            if (useRootMotion)
+            {
+                bool canApply = !rootMotionGroundOnly || motor.GroundingStatus.IsStableOnGround;
+                if (canApply)
+                {
+                    currentVelocity += _rootMotionVelocity * rootMotionScale;
+                }
+            }
+
+            if (speedLimit > 0f)
+            {
+                Vector3 up = motor.CharacterUp;
+                Vector3 planar = Vector3.ProjectOnPlane(currentVelocity, up);
+                float planarMag = planar.magnitude;
+                if (planarMag > speedLimit)
+                {
+                    Vector3 vertical = Vector3.Project(currentVelocity, up);
+                    currentVelocity = planar.normalized * speedLimit + vertical;
+                }
+            }
+
             _lastVelocity = currentVelocity;
+        }
+
+        private void ApplyCrouch()
+        {
+            if (motor == null || motor.Capsule == null) return;
+            if (_crouchRequested == _isCrouched) return;
+
+            _isCrouched = _crouchRequested;
+            float radius = motor.Capsule.radius;
+            if (_isCrouched)
+            {
+                motor.SetCapsuleDimensions(radius, crouchedCapsuleHeight, crouchedCapsuleHeight * 0.5f);
+            }
+            else
+            {
+                motor.SetCapsuleDimensions(radius, standingCapsuleHeight, standingCapsuleHeight * 0.5f);
+            }
         }
 
         public void PostGroundingUpdate(Entity owner, float deltaTime)
@@ -286,6 +502,13 @@ namespace ES
         {
             // 预留扩展
         }
+    }
+
+    public enum LocomotionMode
+    {
+        Grounded,
+        Swimming,
+        Flying
     }
 
     [Serializable]

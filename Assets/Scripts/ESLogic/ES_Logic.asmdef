@@ -5,7 +5,8 @@
         "ES_Stand",
         "ES_Design",
         "Unity.TextMeshPro",
-        "DOTween.Modules"
+        "DOTween.Modules",
+        "KCC"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

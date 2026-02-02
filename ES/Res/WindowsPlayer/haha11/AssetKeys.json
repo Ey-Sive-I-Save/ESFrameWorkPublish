@@ -1,1 +1,26 @@
-{"AssetKeys":[{"SourceLoadType":1,"LibName":"Library Name","LibFolderName":"haha11","ABPreName":"assets_plugins_es_3_examples_example_res_gameobject_3_prefab","ResName":"Assets/Plugins/ES/3_Examples/Example_Res/GameObject (3).prefab","GUID":"495b09c783492784e88277aa816dfdce","Path":"Assets/Plugins/ES/3_Examples/Example_Res/GameObject (3).prefab","TargetType":"UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null","IsRecycled":false},{"SourceLoadType":1,"LibName":"Library Name","LibFolderName":"haha11","ABPreName":"assets_plugins_es_3_examples_example_res_new_circle_denpendce_samples_asset","ResName":"Assets/Plugins/ES/3_Examples/Example_Res/New Circle Denpendce Samples.asset","GUID":"4d014869d6589ff45b23e49383b4e2b7","Path":"Assets/Plugins/ES/3_Examples/Example_Res/New Circle Denpendce Samples.asset","TargetType":"ES.CircleDenpendceSamples, Assembly-CSharp-firstpass, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null","IsRecycled":false}]}
+{
+    "AssetKeys": [
+        {
+            "SourceLoadType": 1,
+            "LibName": "Library Name",
+            "LibFolderName": "haha11",
+            "ABPreName": "assets_plugins_es_3_examples_example_res_gameobject_3_prefab",
+            "ResName": "Assets/Plugins/ES/3_Examples/Example_Res/GameObject (3).prefab",
+            "GUID": "495b09c783492784e88277aa816dfdce",
+            "Path": "Assets/Plugins/ES/3_Examples/Example_Res/GameObject (3).prefab",
+            "TargetType": "UnityEngine.GameObject, UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null",
+            "IsRecycled": false
+        },
+        {
+            "SourceLoadType": 1,
+            "LibName": "Library Name",
+            "LibFolderName": "haha11",
+            "ABPreName": "assets_plugins_es_3_examples_example_res_new_circle_denpendce_samples_asset",
+            "ResName": "Assets/Plugins/ES/3_Examples/Example_Res/New Circle Denpendce Samples.asset",
+            "GUID": "4d014869d6589ff45b23e49383b4e2b7",
+            "Path": "Assets/Plugins/ES/3_Examples/Example_Res/New Circle Denpendce Samples.asset",
+            "TargetType": "ES.CircleDenpendceSamples, Assembly-CSharp-firstpass, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null",
+            "IsRecycled": false
+        }
+    ]
+}

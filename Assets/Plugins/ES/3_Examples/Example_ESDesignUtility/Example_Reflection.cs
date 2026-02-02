@@ -97,7 +97,7 @@ namespace ES.Examples
             string propValue = ESDesignUtility.Reflection.GetProperty<string>(obj, "PublicProperty");
             Debug.Log($"泛型获取属性: {propValue}");
 
-            ESDesignUtility.Reflection.SetProperty<string>(obj, "PrivateProperty", "泛型设置私有属性");
+            ESDesignUtility.Reflection.SetProperty(obj, "PrivateProperty", "泛型设置私有属性");
             string newPropValue = ESDesignUtility.Reflection.GetProperty<string>(obj, "PrivateProperty");
             Debug.Log($"泛型设置私有属性后: {newPropValue}");
 

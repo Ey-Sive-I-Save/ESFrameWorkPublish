@@ -11,10 +11,7 @@ namespace ES.SkillSample {
     {
           
     }*/
-    public class Entity
-    {
 
-    }
     public class Entity_SKill
     {
 

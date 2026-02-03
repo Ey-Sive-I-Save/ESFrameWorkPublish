@@ -46,7 +46,7 @@ namespace ES
         private StatePipeline _buffPipeline;
 
         // 核心系统
-        private StateContext _context;
+        private StateMachineContext _context;
         private CostManager _costManager;
         private MemoizationSystem _memoSystem;
 
@@ -118,7 +118,7 @@ namespace ES
 
         private void InitializeCoreSystems()
         {
-            _context = new StateContext();
+            _context = new StateMachineContext();
             _costManager = new CostManager();
             _memoSystem = new MemoizationSystem();
             _currentTime = 0f;
@@ -142,16 +142,19 @@ namespace ES
         {
             // 创建基本线
             _basicPipeline = new StatePipeline(StatePipelineType.Basic, _graph);
+            _basicPipeline.FallbackStateId = stateMachineData.basicFallbackStateId >= 0 ? stateMachineData.basicFallbackStateId : null;
             _graph.Connect(_basicPipeline.GetMixer(), 0, _rootMixer, 0);
             _rootMixer.SetInputWeight(0, stateMachineData.basicPipelineWeight);
 
             // 创建主线
             _mainPipeline = new StatePipeline(StatePipelineType.Main, _graph);
+            _mainPipeline.FallbackStateId = stateMachineData.mainFallbackStateId >= 0 ? stateMachineData.mainFallbackStateId : null;
             _graph.Connect(_mainPipeline.GetMixer(), 0, _rootMixer, 1);
             _rootMixer.SetInputWeight(1, stateMachineData.mainPipelineWeight);
 
             // 创建Buff线
             _buffPipeline = new StatePipeline(StatePipelineType.Buff, _graph);
+            _buffPipeline.FallbackStateId = stateMachineData.buffFallbackStateId >= 0 ? stateMachineData.buffFallbackStateId : null;
             _graph.Connect(_buffPipeline.GetMixer(), 0, _rootMixer, 2);
             _rootMixer.SetInputWeight(2, stateMachineData.buffPipelineWeight);
         }
@@ -268,10 +271,24 @@ namespace ES
             // 更新代价返还
             _costManager.UpdateCostReturns(_currentTime);
 
-            // 更新三条流水线
-            _basicPipeline?.Update(deltaTime, _currentTime);
-            _mainPipeline?.Update(deltaTime, _currentTime);
-            _buffPipeline?.Update(deltaTime, _currentTime);
+            // 更新三条流水线并检测空转
+            bool basicNeedsFallback = _basicPipeline?.Update(deltaTime, _currentTime) ?? false;
+            bool mainNeedsFallback = _mainPipeline?.Update(deltaTime, _currentTime) ?? false;
+            bool buffNeedsFallback = _buffPipeline?.Update(deltaTime, _currentTime) ?? false;
+            
+            // 处理Fallback状态激活
+            if (basicNeedsFallback && _basicPipeline.FallbackStateId.HasValue)
+            {
+                TryEnterState(_basicPipeline.FallbackStateId.Value, StatePipelineType.Basic, true);
+            }
+            if (mainNeedsFallback && _mainPipeline.FallbackStateId.HasValue)
+            {
+                TryEnterState(_mainPipeline.FallbackStateId.Value, StatePipelineType.Main, true);
+            }
+            if (buffNeedsFallback && _buffPipeline.FallbackStateId.HasValue)
+            {
+                TryEnterState(_buffPipeline.FallbackStateId.Value, StatePipelineType.Buff, true);
+            }
 
             // 检查备忘状态是否需要刷新
             if (_memoSystem.IsDirty)

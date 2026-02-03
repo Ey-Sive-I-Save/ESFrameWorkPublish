@@ -11,7 +11,7 @@ namespace ES.Examples
     {
         [Header("状态机配置")]
         public PlayableStateMachineController stateMachine;
-        public StateContext context;
+        public StateMachineContext context;
         
         [Header("测试Clip")]
         public AnimationClip idleClip;

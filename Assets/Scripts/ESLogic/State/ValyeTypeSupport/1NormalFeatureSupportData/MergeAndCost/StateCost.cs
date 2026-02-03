@@ -6,8 +6,11 @@ using UnityEngine;
 namespace ES
 {
     [Serializable]
-    public class StateCostData
+    public class StateCostData : IRuntimeInitializable
     {
+        [NonSerialized] private bool _isRuntimeInitialized;
+        public bool IsRuntimeInitialized => _isRuntimeInitialized;
+
         [LabelText("动向代价")]
         [Tooltip("包含身体的基本运动意愿，0-100")]
         [Range(0f, 100f)]
@@ -26,12 +29,17 @@ namespace ES
         [LabelText("启用代价计算")]
         public bool enableCostCalculation = true;
 
-        [LabelText("代价权重"), ShowIf("enableCostCalculation")]
-        public Vector3 costWeights = Vector3.one;
+        /// <summary>
+        /// 获取总代价（直接相加，不使用权重）
+        /// </summary>
+        public float GetTotalCost() => motionCost + agilityCost + targetCost;
 
-        public float GetWeightedMotion() => motionCost * costWeights.x;
-        public float GetWeightedAgility() => agilityCost * costWeights.y;
-        public float GetWeightedTarget() => targetCost * costWeights.z;
+        /// <summary>
+        /// 为保留兼容性保留的方法
+        /// </summary>
+        public float GetWeightedMotion() => motionCost;
+        public float GetWeightedAgility() => agilityCost;
+        public float GetWeightedTarget() => targetCost;
 
         [HorizontalGroup("Actions")]
         [Button("验证配置合理性", ButtonSizes.Medium)]
@@ -47,6 +55,17 @@ namespace ES
             {
                 foreach (var s in issues) Debug.LogWarning("StateCostData 配置警告: " + s);
             }
+        }
+
+        /// <summary>
+        /// 运行时初始化
+        /// </summary>
+        public void InitializeRuntime()
+        {
+            if (_isRuntimeInitialized) return;
+            
+            // StateCostData目前无预计算需求，但保留接口以便未来扩展
+            _isRuntimeInitialized = true;
         }
     }
 }

@@ -43,8 +43,11 @@ namespace ES
 
     }
     [Serializable, TypeRegistryItem("冲突时操作机制")]
-    public class StateMergeData
+    public class StateMergeData : IRuntimeInitializable
     {
+        [NonSerialized] private bool _isRuntimeInitialized;
+        public bool IsRuntimeInitialized => _isRuntimeInitialized;
+
         [LabelText("状态占据通道")]
         public StateChannelMask stateChannelMask = StateChannelMask.AllBodyActive;
         public StateStayLevel stayLevel = StateStayLevel.Low;
@@ -59,11 +62,16 @@ namespace ES
         [HideLabel, InlineProperty]
         public NormalMergeRule asRightRule;
 
-
-
-
-
-
+        /// <summary>
+        /// 运行时初始化
+        /// </summary>
+        public void InitializeRuntime()
+        {
+            if (_isRuntimeInitialized) return;
+            
+            // StateMergeData目前无预计算需求，但保留接口以便未来扩展
+            _isRuntimeInitialized = true;
+        }
     }
 
 }

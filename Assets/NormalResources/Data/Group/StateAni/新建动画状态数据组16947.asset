@@ -23,26 +23,63 @@ MonoBehaviour:
     SerializationNodes: []
   KeyName: "\u72B6\u60011"
   sharedData:
-    MergePart_:
-      BeCombinedWithoutCondition: []
-      CombinedWithoutCondition: []
-      BeHitWithoutCondition: []
-      HitWithoutCondition: []
-      CanBeHit: 0
-      CanHit: 0
-      logicLayer: 1
-      channel: 63
-      BeHitOrder: 0
-      HitOrder: 0
-    playAnimationAtAddition: 0
-    AnimationName: 
-    crossFade: 0.2
+    basicConfig:
+      stateId: 1
+      stateName: "\u7AD9\u7ACB\u79FB\u52A8"
+      priority: 50
+      pipelineType: 0
+      canBeFeedback: 1
+      fallbackChannelIndex: 0
+      description: 
+      useDirectBlend: 0
+      mainStateCriterion: 0
+      directMainWeight: 1
+      preparedMainCriterionValue: 1
+      durationMode: 0
+      timedDuration: 1
+      phaseConfig:
+        returnStartTime: 0.7
+        releaseStartTime: 0.9
+        returnCostFraction: 0.5
+    animationConfig:
+      calculator:
+        rid: 3128555966166990854
+    hasAnimation: 1
+    mergeData:
+      stateChannelMask: 63
+      stayLevel: 1
+      asLeftRule:
+        enableUnconditionalRule: 0
+        unconditionalRule:
+        - matchBackType: 0
+          stateName: "\u72B6\u6001\u540D"
+          stateID: -1
+        hitByLayerOption: 0
+        EffectialPripority: 0
+        EqualIsEffectial: 0
+      asRightRule:
+        enableUnconditionalRule: 0
+        unconditionalRule: []
+        hitByLayerOption: 0
+        EffectialPripority: 0
+        EqualIsEffectial: 0
+    costData:
+      motionCost: 0
+      agilityCost: 0
+      targetCost: 0
+      enableCostCalculation: 1
   basicConfig:
     stateId: 0
     stateName: "\u65B0\u72B6\u6001"
     priority: 40
     pipelineType: 0
+    canBeFeedback: 0
+    fallbackChannelIndex: 0
     description: 
+    useDirectBlend: 0
+    mainStateCriterion: 0
+    directMainWeight: 1
+    preparedMainCriterionValue: 0
     durationMode: 1
     timedDuration: 1
     phaseConfig:
@@ -95,17 +132,10 @@ MonoBehaviour:
     exitConditions: []
   ignoreInCostCalculation: 0
   costData:
-    DynamicCost: 0
-    mainCostPart:
-      channelMask: 63
-      EnterCostValue: 0.8
-      ReturnMask: 0
-      EnableReturnProgress: 0
-      ReturnFraction: 1
-    EnableReturnProgress: 0
-    ValidationMessagePlaceholder: 
-    EnableCostPartList: 0
-    costPartList: []
+    motionCost: 0
+    agilityCost: 0
+    targetCost: 0
+    enableCostCalculation: 1
   advancedConfig:
     allowWeakInterrupt: 0
     samePathType: 0
@@ -116,7 +146,53 @@ MonoBehaviour:
     debugLogColor: {r: 0, g: 1, b: 1, a: 1}
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 3128555966166990854
+      type: {class: StateAnimationMixCalculatorForBlendTree2DFreeformDirectional,
+        ns: ES, asm: ES_Logic}
+      data:
+        parameterX:
+          EnumValue: 1
+          StringValue: DirectionX
+        parameterY:
+          EnumValue: 3
+          StringValue: DirectionY
+        samples:
+        - clip: {fileID: 7400002, guid: 080945c46afd34f3ebc364c1696e6678, type: 3}
+          position: {x: 0, y: 0}
+        - clip: {fileID: 7400000, guid: de9e84aea2809fd4dab56481e7796f02, type: 3}
+          position: {x: 1, y: 0}
+        - clip: {fileID: 7400000, guid: 5c3fee8971d524740b0b15d98d755f7c, type: 3}
+          position: {x: 0.70710677, y: 0.70710677}
+        - clip: {fileID: 7400000, guid: 2052e59abeb75e741848e7102f47a677, type: 3}
+          position: {x: 0, y: 1}
+        - clip: {fileID: 7400000, guid: 9e484751ff08e214f8b9441bdc72d9eb, type: 3}
+          position: {x: -0.70710677, y: 0.70710677}
+        - clip: {fileID: 7400000, guid: e983ef2aee5563f43b1f7a200572d0c7, type: 3}
+          position: {x: -1, y: -0.00000008742278}
+        - clip: {fileID: 7400000, guid: 10af6be2bc3611e4b880950d2afa62cb, type: 3}
+          position: {x: -0.7071068, y: -0.7071067}
+        - clip: {fileID: 7400000, guid: b0d68a4a5a96d154f946969c11790dab, type: 3}
+          position: {x: 0.000000011924881, y: -1}
+        - clip: {fileID: 7400000, guid: 3a22c86a391a75e49aab7cdb5fae3780, type: 3}
+          position: {x: 0.70710665, y: -0.7071069}
+        - clip: {fileID: 7400000, guid: 23fe2c799289f0b4c87e5184114d35d8, type: 3}
+          position: {x: 0.5, y: 0}
+        - clip: {fileID: 7400000, guid: ae36db0ec29790b4d909645412d2094f, type: 3}
+          position: {x: 0.35355338, y: 0.35355338}
+        - clip: {fileID: 7400000, guid: 3a3075913643e7f43b61bc7ccbc070e2, type: 3}
+          position: {x: -0.000000021855694, y: 0.5}
+        - clip: {fileID: 7400000, guid: d68905673cd2ab94888b03851ded7e4d, type: 3}
+          position: {x: -0.35355338, y: 0.35355338}
+        - clip: {fileID: 7400000, guid: 8963a7997f2bbdd43998a822733ac81e, type: 3}
+          position: {x: -0.5, y: -0.00000004371139}
+        - clip: {fileID: 7400000, guid: 9b7e4ef7c6efe6d41b0daa23baf117e8, type: 3}
+          position: {x: -0.3535534, y: -0.35355335}
+        - clip: {fileID: 7400000, guid: f2f0f7b1c134a3442a8f6570b63ed097, type: 3}
+          position: {x: 0.0000000059624403, y: -0.5}
+        - clip: {fileID: 7400000, guid: 4bef3980ac3ba994daf7f1c7e07d85ec, type: 3}
+          position: {x: 0.35355332, y: -0.35355344}
+        smoothTime: 0.173
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

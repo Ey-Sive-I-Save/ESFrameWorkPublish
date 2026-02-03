@@ -258,7 +258,7 @@ namespace ES
         
         #region 权重计算
         
-        private void CalculateTargetWeights(StateContext context, float inputX, float inputY)
+        private void CalculateTargetWeights(StateMachineContext context, float inputX, float inputY)
         {
             // TODO: BlendSpacePlayableManager API不匹配，需要重新实现
             /*
@@ -281,7 +281,7 @@ namespace ES
             CalculateDirectWeights(context);
         }
         
-        private void CalculateDirectWeights(StateContext context)
+        private void CalculateDirectWeights(StateMachineContext context)
         {
             for (int i = 0; i < clips.Count; i++)
             {

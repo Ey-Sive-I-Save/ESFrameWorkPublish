@@ -10,7 +10,7 @@ namespace ES
     [Serializable]
     public abstract class StateCondition
     {
-        public abstract bool Evaluate(StateContext context);
+        public abstract bool Evaluate(StateMachineContext context);
     }
 
     /// <summary>
@@ -33,7 +33,7 @@ namespace ES
         public CompareMode mode;
         public float threshold;
 
-        public override bool Evaluate(StateContext context)
+        public override bool Evaluate(StateMachineContext context)
         {
             float value = context.GetFloat(parameterName);
             return mode switch
@@ -69,7 +69,7 @@ namespace ES
         public CompareMode mode;
         public int threshold;
 
-        public override bool Evaluate(StateContext context)
+        public override bool Evaluate(StateMachineContext context)
         {
             int value = context.GetInt(parameterName);
             return mode switch
@@ -94,7 +94,7 @@ namespace ES
         public string parameterName;
         public bool expectedValue = true;
 
-        public override bool Evaluate(StateContext context)
+        public override bool Evaluate(StateMachineContext context)
         {
             return context.GetBool(parameterName) == expectedValue;
         }
@@ -108,7 +108,7 @@ namespace ES
     {
         public string triggerName;
 
-        public override bool Evaluate(StateContext context)
+        public override bool Evaluate(StateMachineContext context)
         {
             return context.GetTrigger(triggerName);
         }
@@ -130,7 +130,7 @@ namespace ES
             _costManager = costManager;
         }
 
-        public override bool Evaluate(StateContext context)
+        public override bool Evaluate(StateMachineContext context)
         {
             if (_costManager == null || requiredCost == null)
                 return true;
@@ -156,7 +156,7 @@ namespace ES
         public LogicMode mode = LogicMode.And;
         public List<StateCondition> conditions = new List<StateCondition>();
 
-        public override bool Evaluate(StateContext context)
+        public override bool Evaluate(StateMachineContext context)
         {
             if (conditions == null || conditions.Count == 0)
                 return true;

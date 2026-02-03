@@ -48,14 +48,42 @@ namespace ES
     /// 状态机上下文 - 管理所有可变参数
     /// 
     /// 设计原则：
-    /// 1. 整个状态机共享一个StateContext
-    /// 2. 枚举参数使用显式字段，零开销直接访问
+    /// 1. 整个状态机共享一个StateMachineContext
+    /// 2. 枚举参数使用数组索引，零开销直接访问（史上最强性能）
     /// 3. 字符串参数使用字典，支持退化到ContextPool
     /// 4. 统一的Get/Set方法，支持枚举和字符串
     /// </summary>
-    public class StateContext
+    public class StateMachineContext
     {
-        // ==================== 枚举参数 - 显式字段（零开销） ====================
+        // ==================== 状态机元数据 ====================
+        /// <summary>
+        /// 上下文唯一标识
+        /// </summary>
+        public string contextID;
+        
+        /// <summary>
+        /// 创建时间
+        /// </summary>
+        public float creationTime;
+        
+        /// <summary>
+        /// 最后更新时间
+        /// </summary>
+        public float lastUpdateTime;
+        
+        /// <summary>
+        /// 共享数据 - 用于存储任意类型的运行时数据
+        /// </summary>
+        private Dictionary<string, object> _sharedData;
+        
+        /// <summary>
+        /// 运行时标记 - 用于状态机逻辑判断
+        /// </summary>
+        private HashSet<string> _runtimeFlags;
+        
+        // ==================== 枚举参数 - 直接字段（性能最优：无数组边界检查，CPU缓存友好）====================
+        
+        // ===== 核心运动参数 (1-7) =====
         public float SpeedX;
         public float SpeedY;
         public float SpeedZ;
@@ -63,6 +91,21 @@ namespace ES
         public float AimPitch;
         public float Speed;
         public float IsGrounded;
+        
+        // ===== 运动阈值 (8-10) =====
+        public float WalkSpeedThreshold = 0.65f;  // 默认走路速度上限
+        public float RunSpeedThreshold = 1.0f;    // 默认跑步速度上限
+        public float SprintSpeedThreshold = 1.5f; // 默认冲刺速度上限
+        
+        // ===== 运动状态标记 (11-15) =====
+        public float IsWalking;
+        public float IsRunning;
+        public float IsSprinting;
+        public float IsCrouching;
+        public float IsSliding;
+        
+        // ===== 运动控制按键 =====
+        public float IsSprintKeyPressed; // 是否按住冲刺键（1=按下，0=松开）
         
         // ==================== 字符串参数 - 字典存储（支持退化） ====================
         private Dictionary<string, float> _floatParams;
@@ -83,8 +126,16 @@ namespace ES
         public event Action<string, bool> OnBoolChanged;
         public event Action<string> OnTriggerFired;
 
-        public StateContext(ContextPool fallbackPool = null)
+        public StateMachineContext(ContextPool fallbackPool = null)
         {
+            // 初始化元数据
+            contextID = Guid.NewGuid().ToString();
+            creationTime = Time.time;
+            lastUpdateTime = Time.time;
+            _sharedData = new Dictionary<string, object>();
+            _runtimeFlags = new HashSet<string>();
+            
+            // 初始化参数字典
             _floatParams = new Dictionary<string, float>();
             _intParams = new Dictionary<string, int>();
             _boolParams = new Dictionary<string, bool>();
@@ -107,7 +158,7 @@ namespace ES
         #region Float Parameters
         
         /// <summary>
-        /// 设置默认枚举参数（零开销，直接字段访问，硬编码映射）
+        /// 设置默认枚举参数（直接字段访问，性能最优）
         /// </summary>
         public void SetDefaultFloat(StateDefaultFloatParameter param, float value)
         {
@@ -120,11 +171,19 @@ namespace ES
                 case StateDefaultFloatParameter.AimPitch: AimPitch = value; break;
                 case StateDefaultFloatParameter.Speed: Speed = value; break;
                 case StateDefaultFloatParameter.IsGrounded: IsGrounded = value; break;
+                case StateDefaultFloatParameter.WalkSpeedThreshold: WalkSpeedThreshold = value; break;
+                case StateDefaultFloatParameter.RunSpeedThreshold: RunSpeedThreshold = value; break;
+                case StateDefaultFloatParameter.SprintSpeedThreshold: SprintSpeedThreshold = value; break;
+                case StateDefaultFloatParameter.IsWalking: IsWalking = value; break;
+                case StateDefaultFloatParameter.IsRunning: IsRunning = value; break;
+                case StateDefaultFloatParameter.IsSprinting: IsSprinting = value; break;
+                case StateDefaultFloatParameter.IsCrouching: IsCrouching = value; break;
+                case StateDefaultFloatParameter.IsSliding: IsSliding = value; break;
             }
         }
         
         /// <summary>
-        /// 获取默认枚举参数（零开销，直接字段访问，无退化）
+        /// 获取默认枚举参数（直接字段访问，性能最优）
         /// </summary>
         public float GetDefaultFloat(StateDefaultFloatParameter param, float defaultValue = 0f)
         {
@@ -137,6 +196,14 @@ namespace ES
                 case StateDefaultFloatParameter.AimPitch: return AimPitch;
                 case StateDefaultFloatParameter.Speed: return Speed;
                 case StateDefaultFloatParameter.IsGrounded: return IsGrounded;
+                case StateDefaultFloatParameter.WalkSpeedThreshold: return WalkSpeedThreshold;
+                case StateDefaultFloatParameter.RunSpeedThreshold: return RunSpeedThreshold;
+                case StateDefaultFloatParameter.SprintSpeedThreshold: return SprintSpeedThreshold;
+                case StateDefaultFloatParameter.IsWalking: return IsWalking;
+                case StateDefaultFloatParameter.IsRunning: return IsRunning;
+                case StateDefaultFloatParameter.IsSprinting: return IsSprinting;
+                case StateDefaultFloatParameter.IsCrouching: return IsCrouching;
+                case StateDefaultFloatParameter.IsSliding: return IsSliding;
                 default: return defaultValue;
             }
         }
@@ -379,19 +446,89 @@ namespace ES
         }
 
         /// <summary>
-        /// 每帧更新 - 重置触发器等
+        /// 每帧更新 - 重置触发器、速度限制、运动状态更新
         /// </summary>
         public void Update()
         {
             // 触发器在下一帧自动重置
             _activeTriggers.Clear();
+            
+            // ===== 速度限制和运动状态更新 =====
+            // 计算水平速度（SpeedX/Z由移动系统控制，这里只处理速度限制）
+            float horizontalSpeed = Mathf.Sqrt(SpeedX * SpeedX + SpeedZ * SpeedZ);
+            
+            // 根据是否按下冲刺键来限制速度
+            float maxSpeed = IsSprintKeyPressed > 0.5f ? SprintSpeedThreshold : WalkSpeedThreshold;
+            
+            // 如果超过最大速度，进行限制
+            if (horizontalSpeed > maxSpeed)
+            {
+                float scale = maxSpeed / horizontalSpeed;
+                SpeedX *= scale;
+                SpeedZ *= scale;
+                horizontalSpeed = maxSpeed;
+            }
+            
+            // 更新综合速度
+            Speed = horizontalSpeed;
+            
+            // 更新运动状态标记（用于动画混合）
+            if (horizontalSpeed > 0.01f)
+            {
+                if (IsSprintKeyPressed > 0.5f)
+                {
+                    IsSprinting = 1f;
+                    IsRunning = 0f;
+                    IsWalking = 0f;
+                }
+                else if (horizontalSpeed > RunSpeedThreshold * 0.8f)
+                {
+                    IsSprinting = 0f;
+                    IsRunning = 1f;
+                    IsWalking = 0f;
+                }
+                else
+                {
+                    IsSprinting = 0f;
+                    IsRunning = 0f;
+                    IsWalking = 1f;
+                }
+            }
+            else
+            {
+                // 速度接近0时，清除所有运动状态
+                IsWalking = 0f;
+                IsRunning = 0f;
+                IsSprinting = 0f;
+            }
+            
+            // 更新时间戳
+            lastUpdateTime = Time.time;
         }
 
         /// <summary>
         /// 拷贝参数到另一个上下文
         /// </summary>
-        public void CopyTo(StateContext target)
+        public void CopyTo(StateMachineContext target)
         {
+            // 拷贝枚举参数字段
+            target.SpeedX = SpeedX;
+            target.SpeedY = SpeedY;
+            target.SpeedZ = SpeedZ;
+            target.AimYaw = AimYaw;
+            target.AimPitch = AimPitch;
+            target.Speed = Speed;
+            target.IsGrounded = IsGrounded;
+            target.WalkSpeedThreshold = WalkSpeedThreshold;
+            target.RunSpeedThreshold = RunSpeedThreshold;
+            target.SprintSpeedThreshold = SprintSpeedThreshold;
+            target.IsWalking = IsWalking;
+            target.IsRunning = IsRunning;
+            target.IsSprinting = IsSprinting;
+            target.IsCrouching = IsCrouching;
+            target.IsSliding = IsSliding;
+            target.IsSprintKeyPressed = IsSprintKeyPressed;
+            
             foreach (var kv in _floatParams) target.SetFloat(kv.Key, kv.Value);
             foreach (var kv in _intParams) target.SetInt(kv.Key, kv.Value);
             foreach (var kv in _boolParams) target.SetBool(kv.Key, kv.Value);
@@ -401,5 +538,79 @@ namespace ES
             foreach (var trigger in _activeTriggers) target.SetTrigger(trigger);
             foreach (var kv in _tempCosts) target.SetTempCost(kv.Key, kv.Value);
         }
+        
+        #region 共享数据管理（原StateMachineContext功能）
+        
+        /// <summary>
+        /// 设置共享数据
+        /// </summary>
+        public void SetData<T>(string key, T value)
+        {
+            _sharedData[key] = value;
+        }
+
+        /// <summary>
+        /// 获取共享数据
+        /// </summary>
+        public T GetData<T>(string key, T defaultValue = default)
+        {
+            if (_sharedData.TryGetValue(key, out var value) && value is T typedValue)
+            {
+                return typedValue;
+            }
+            return defaultValue;
+        }
+        
+        /// <summary>
+        /// 检查共享数据是否存在
+        /// </summary>
+        public bool HasData(string key)
+        {
+            return _sharedData.ContainsKey(key);
+        }
+        
+        /// <summary>
+        /// 移除共享数据
+        /// </summary>
+        public bool RemoveData(string key)
+        {
+            return _sharedData.Remove(key);
+        }
+
+        /// <summary>
+        /// 添加运行时标记
+        /// </summary>
+        public void AddFlag(string flag)
+        {
+            _runtimeFlags.Add(flag);
+        }
+
+        /// <summary>
+        /// 移除运行时标记
+        /// </summary>
+        public void RemoveFlag(string flag)
+        {
+            _runtimeFlags.Remove(flag);
+        }
+
+        /// <summary>
+        /// 检查运行时标记
+        /// </summary>
+        public bool HasFlag(string flag)
+        {
+            return _runtimeFlags.Contains(flag);
+        }
+        
+        /// <summary>
+        /// 清空所有运行时标记
+        /// </summary>
+        public void ClearFlags()
+        {
+            _runtimeFlags.Clear();
+        }
+
+       
+        
+        #endregion
     }
 }

@@ -14,6 +14,9 @@ namespace ES
     {
         public StatePipelineType Type { get; private set; }
         
+        // Fallback状态ID（管线空转时激活）
+        public int? FallbackStateId { get; set; }
+        
         // 当前激活的状态
         private StateInstance _currentState;
         
@@ -46,7 +49,7 @@ namespace ES
         /// <summary>
         /// 进入新状态
         /// </summary>
-        public void EnterState(StateDefinition stateDef, StateContext context, PlayableGraph graph, float currentTime)
+        public void EnterState(StateDefinition stateDef, StateMachineContext context, PlayableGraph graph, float currentTime)
         {
             // 保存上一个状态用于过渡
             if (_currentState != null)
@@ -83,8 +86,17 @@ namespace ES
         /// <summary>
         /// 更新流水线
         /// </summary>
-        public void Update(float deltaTime, float currentTime)
+        /// <returns>返回是否需要激活Fallback状态</returns>
+        public bool Update(float deltaTime, float currentTime)
         {
+            bool needsFallback = false;
+            
+            // 检测空转：当前无状态且有Fallback配置
+            if (_currentState == null && FallbackStateId.HasValue)
+            {
+                needsFallback = true;
+            }
+            
             // 更新过渡
             if (_isTransitioning && _previousState != null)
             {
@@ -115,6 +127,8 @@ namespace ES
             {
                 _previousState.Update(deltaTime, currentTime);
             }
+            
+            return needsFallback;
         }
 
         private void UpdateTransitionWeights()
@@ -233,7 +247,7 @@ namespace ES
         private float _stateTime;
         private bool _isInRecovery;
 
-        public StateInstance(StateDefinition definition, StateContext context, PlayableGraph graph, float currentTime)
+        public StateInstance(StateDefinition definition, StateMachineContext context, PlayableGraph graph, float currentTime)
         {
             Definition = definition;
             Runtime = new StateRuntime(graph, context);

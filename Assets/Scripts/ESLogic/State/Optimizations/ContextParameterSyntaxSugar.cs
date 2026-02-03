@@ -4,10 +4,10 @@ using UnityEngine;
 namespace ES.Optimizations
 {
     /// <summary>
-    /// 共享StateContext的语法糖扩展
+    /// 共享StateMachineContext的语法糖扩展
     /// 
     /// 设计原则：
-    /// - StateContext是整个状态机的全局共享容器，不属于任何单个State
+    /// - StateMachineContext是整个状态机的全局共享容器，不属于任何单个State
     /// - 这些扩展方法是对共享Context的便捷操作
     /// - State通过StateRuntime.Context访问共享Context
     /// </summary>
@@ -18,7 +18,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 获取共享Float参数(带默认值)
         /// </summary>
-        public static float Get(this StateContext sharedCtx, string name, float defaultValue = 0f)
+        public static float Get(this StateMachineContext sharedCtx, string name, float defaultValue = 0f)
         {
             return sharedCtx.GetFloat(name, defaultValue);
         }
@@ -26,7 +26,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 设置共享Float参数(Fluent API)
         /// </summary>
-        public static StateContext Set(this StateContext sharedCtx, string name, float value)
+        public static StateMachineContext Set(this StateMachineContext sharedCtx, string name, float value)
         {
             sharedCtx.SetFloat(name, value);
             return sharedCtx;
@@ -35,7 +35,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 递增共享Float参数
         /// </summary>
-        public static StateContext Increment(this StateContext sharedCtx, string name, float delta = 1f)
+        public static StateMachineContext Increment(this StateMachineContext sharedCtx, string name, float delta = 1f)
         {
             float current = sharedCtx.GetFloat(name, 0f);
             sharedCtx.SetFloat(name, current + delta);
@@ -45,7 +45,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 递减共享Float参数
         /// </summary>
-        public static StateContext Decrement(this StateContext sharedCtx, string name, float delta = 1f)
+        public static StateMachineContext Decrement(this StateMachineContext sharedCtx, string name, float delta = 1f)
         {
             float current = sharedCtx.GetFloat(name, 0f);
             sharedCtx.SetFloat(name, current - delta);
@@ -55,7 +55,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 限制共享Float参数范围
         /// </summary>
-        public static StateContext Clamp(this StateContext sharedCtx, string name, float min, float max)
+        public static StateMachineContext Clamp(this StateMachineContext sharedCtx, string name, float min, float max)
         {
             float current = sharedCtx.GetFloat(name, 0f);
             sharedCtx.SetFloat(name, Mathf.Clamp(current, min, max));
@@ -69,7 +69,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 获取共享Int参数(带默认值)
         /// </summary>
-        public static int GetInt(this StateContext sharedCtx, string name, int defaultValue = 0)
+        public static int GetInt(this StateMachineContext sharedCtx, string name, int defaultValue = 0)
         {
             return sharedCtx.GetInt(name, defaultValue);
         }
@@ -77,7 +77,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 设置共享Int参数(Fluent API)
         /// </summary>
-        public static StateContext SetInt(this StateContext sharedCtx, string name, int value)
+        public static StateMachineContext SetInt(this StateMachineContext sharedCtx, string name, int value)
         {
             sharedCtx.SetInt(name, value);
             return sharedCtx;
@@ -86,7 +86,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 递增共享Int参数
         /// </summary>
-        public static StateContext IncrementInt(this StateContext sharedCtx, string name, int delta = 1)
+        public static StateMachineContext IncrementInt(this StateMachineContext sharedCtx, string name, int delta = 1)
         {
             int current = sharedCtx.GetInt(name, 0);
             sharedCtx.SetInt(name, current + delta);
@@ -100,7 +100,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 切换共享Bool参数
         /// </summary>
-        public static StateContext Toggle(this StateContext sharedCtx, string name)
+        public static StateMachineContext Toggle(this StateMachineContext sharedCtx, string name)
         {
             bool current = sharedCtx.GetBool(name, false);
             sharedCtx.SetBool(name, !current);
@@ -110,7 +110,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 多个Bool参数AND运算
         /// </summary>
-        public static bool AllTrue(this StateContext sharedCtx, params string[] names)
+        public static bool AllTrue(this StateMachineContext sharedCtx, params string[] names)
         {
             foreach (var name in names)
             {
@@ -123,7 +123,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 多个Bool参数OR运算
         /// </summary>
-        public static bool AnyTrue(this StateContext sharedCtx, params string[] names)
+        public static bool AnyTrue(this StateMachineContext sharedCtx, params string[] names)
         {
             foreach (var name in names)
             {
@@ -140,7 +140,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 激活共享Trigger(简写)
         /// </summary>
-        public static StateContext Fire(this StateContext sharedCtx, string triggerName)
+        public static StateMachineContext Fire(this StateMachineContext sharedCtx, string triggerName)
         {
             sharedCtx.SetTrigger(triggerName);
             return sharedCtx;
@@ -149,7 +149,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 批量激活共享Trigger
         /// </summary>
-        public static StateContext FireAll(this StateContext sharedCtx, params string[] triggers)
+        public static StateMachineContext FireAll(this StateMachineContext sharedCtx, params string[] triggers)
         {
             foreach (var trigger in triggers)
                 sharedCtx.SetTrigger(trigger);
@@ -159,7 +159,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 检查多个Trigger是否全部激活
         /// </summary>
-        public static bool AllTriggered(this StateContext sharedCtx, params string[] triggers)
+        public static bool AllTriggered(this StateMachineContext sharedCtx, params string[] triggers)
         {
             foreach (var trigger in triggers)
             {
@@ -176,7 +176,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 设置共享曲线并采样
         /// </summary>
-        public static StateContext SetCurveValue(this StateContext sharedCtx, string curveName, AnimationCurve curve, float time)
+        public static StateMachineContext SetCurveValue(this StateMachineContext sharedCtx, string curveName, AnimationCurve curve, float time)
         {
             sharedCtx.SetCurve(curveName, curve);
             float value = curve.Evaluate(time);
@@ -187,7 +187,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 获取共享曲线采样值
         /// </summary>
-        public static float EvaluateCurve(this StateContext sharedCtx, string curveName, float time)
+        public static float EvaluateCurve(this StateMachineContext sharedCtx, string curveName, float time)
         {
             var curve = sharedCtx.GetCurve(curveName);
             return curve?.Evaluate(time) ?? 0f;
@@ -200,7 +200,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 检查共享Entity是否存在
         /// </summary>
-        public static bool HasEntity(this StateContext sharedCtx, string name)
+        public static bool HasEntity(this StateMachineContext sharedCtx, string name)
         {
             return sharedCtx.GetEntity(name) != null;
         }
@@ -208,7 +208,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 安全获取共享Entity组件
         /// </summary>
-        public static T GetEntityComponent<T>(this StateContext sharedCtx, string entityName) where T : Component
+        public static T GetEntityComponent<T>(this StateMachineContext sharedCtx, string entityName) where T : Component
         {
             var obj = sharedCtx.GetEntity(entityName);
             if (obj is GameObject go)
@@ -225,7 +225,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 快速配置共享参数
         /// </summary>
-        public static StateContext Configure(this StateContext sharedCtx, Action<StateContext> config)
+        public static StateMachineContext Configure(this StateMachineContext sharedCtx, Action<StateMachineContext> config)
         {
             config?.Invoke(sharedCtx);
             return sharedCtx;
@@ -234,7 +234,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 条件性设置共享参数
         /// </summary>
-        public static StateContext SetIf(this StateContext sharedCtx, bool condition, string name, float value)
+        public static StateMachineContext SetIf(this StateMachineContext sharedCtx, bool condition, string name, float value)
         {
             if (condition)
                 sharedCtx.SetFloat(name, value);
@@ -244,7 +244,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 批量设置共享Float参数
         /// </summary>
-        public static StateContext SetMultiple(this StateContext sharedCtx, params (string name, float value)[] pairs)
+        public static StateMachineContext SetMultiple(this StateMachineContext sharedCtx, params (string name, float value)[] pairs)
         {
             foreach (var pair in pairs)
                 sharedCtx.SetFloat(pair.name, pair.value);
@@ -258,7 +258,7 @@ namespace ES.Optimizations
         /// <summary>
         /// 打印共享参数值
         /// </summary>
-        public static StateContext DebugLog(this StateContext sharedCtx, string name)
+        public static StateMachineContext DebugLog(this StateMachineContext sharedCtx, string name)
         {
             float f = sharedCtx.GetFloat(name, float.NaN);
             if (!float.IsNaN(f))
@@ -338,7 +338,7 @@ namespace ES.Optimizations
         public void ExampleInStateComponent(StateRuntime runtime)
         {
             // 从StateRuntime获取共享Context
-            StateContext sharedCtx = runtime.Context;
+            StateMachineContext sharedCtx = runtime.Context;
             
             // 传统写法
             sharedCtx.SetFloat("Speed", 5.0f);

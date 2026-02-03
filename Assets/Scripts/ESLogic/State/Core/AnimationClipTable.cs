@@ -250,7 +250,7 @@ namespace ES
     {
         public AnimationClip clip;
 
-        public override (AnimationClip clip, float normalizedTime) GetClipAndTime(StateContext context)
+        public override (AnimationClip clip, float normalizedTime) GetClipAndTime(StateMachineContext context)
         {
             return (clip, 0f);
         }
@@ -268,7 +268,7 @@ namespace ES
         [NonSerialized]
         private AnimationClip _selectedClip;
 
-        public override (AnimationClip clip, float normalizedTime) GetClipAndTime(StateContext context)
+        public override (AnimationClip clip, float normalizedTime) GetClipAndTime(StateMachineContext context)
         {
             if (_selectedClip == null)
             {
@@ -318,7 +318,7 @@ namespace ES
         [NonSerialized]
         private int _currentIndex = 0;
 
-        public override (AnimationClip clip, float normalizedTime) GetClipAndTime(StateContext context)
+        public override (AnimationClip clip, float normalizedTime) GetClipAndTime(StateMachineContext context)
         {
             if (clips == null || clips.Count == 0)
                 return (null, 0f);
@@ -339,7 +339,7 @@ namespace ES
         public string parameterName;
         public List<ClipParameterMapping> mappings = new List<ClipParameterMapping>();
 
-        public override (AnimationClip clip, float normalizedTime) GetClipAndTime(StateContext context)
+        public override (AnimationClip clip, float normalizedTime) GetClipAndTime(StateMachineContext context)
         {
             if (mappings != null && mappings.Count > 0)
             {

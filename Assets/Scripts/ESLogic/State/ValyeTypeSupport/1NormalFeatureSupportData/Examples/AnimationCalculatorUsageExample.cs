@@ -32,7 +32,7 @@ namespace ES.Examples
         
         private PlayableGraph _graph;
         private AnimationPlayableOutput _output;
-        private StateContext _context;
+        private StateMachineContext _context;
         
         // 运行时数据 - 每个实例独立
         private AnimationCalculatorRuntime _runtime;
@@ -43,7 +43,7 @@ namespace ES.Examples
         
         private void Start()
         {
-            _context = new StateContext();
+            _context = new StateMachineContext();
             CreateGraph();
             
             // 示例1: 单个角色使用
@@ -67,7 +67,7 @@ namespace ES.Examples
             // 创建配置(可序列化,可共享)
             var calculator = new StateAnimationMixCalculatorForBlendTree1D
             {
-                parameterName = "Speed",
+                parameterFloat = "Speed",
                 smoothTime = 0.15f,
                 samples = new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D[]
                 {
@@ -103,7 +103,7 @@ namespace ES.Examples
             // 1个配置对象(享元)
             var sharedCalculator = new StateAnimationMixCalculatorForBlendTree1D
             {
-                parameterName = "Speed",
+                parameterFloat = "Speed",
                 smoothTime = 0.15f,
                 samples = new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D[]
                 {
@@ -152,7 +152,7 @@ namespace ES.Examples
             // 使用配置对象更新运行时数据
             var calculator = new StateAnimationMixCalculatorForBlendTree1D
             {
-                parameterName = "Speed",
+                parameterFloat = "Speed",
                 smoothTime = 0.15f
             };
             

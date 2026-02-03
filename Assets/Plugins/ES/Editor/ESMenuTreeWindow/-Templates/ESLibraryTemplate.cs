@@ -349,11 +349,11 @@ namespace ES
             public void DrawPage()
             {
                 // Debug: 检查DrawPage是否被调用
-                Debug.Log($"[DrawPage] Called - book: {book?.Name ?? "null"}, page: {page?.Name ?? "null"}");
+              //  Debug.Log($"[DrawPage] Called - book: {book?.Name ?? "null"}, page: {page?.Name ?? "null"}");
 
                 if (book == null || page == null || !book.pages.Contains(page))
                 {
-                    Debug.Log($"[DrawPage] Early return - book null: {book == null}, page null: {page == null}, contains: {book?.pages.Contains(page) ?? false}");
+                  //  Debug.Log($"[DrawPage] Early return - book null: {book == null}, page null: {page == null}, contains: {book?.pages.Contains(page) ?? false}");
                     return;
                 }
                 // 动态对齐：根据选中Book的位置添加顶部空白

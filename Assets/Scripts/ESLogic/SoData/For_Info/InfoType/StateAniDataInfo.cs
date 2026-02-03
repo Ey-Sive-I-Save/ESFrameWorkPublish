@@ -177,7 +177,7 @@ namespace ES
             _isInitialized = true;
         }
         
-        public void ApplyEnterParameters(StateContext context)
+        public void ApplyEnterParameters(StateMachineContext context)
         {
             // 零GC应用参数
             for (int i = 0; i < _cachedFloatKeys.Length; i++)
@@ -598,7 +598,27 @@ namespace ES
 
         internal void Initialize()
         {
-           
+            InitializeRuntime();
+        }
+
+        /// <summary>
+        /// 运行时初始化 - 递归初始化所有子成员（统一入口）
+        /// </summary>
+        public void InitializeRuntime()
+        {
+            // 递归初始化StateSharedData（会递归初始化所有子成员）
+            sharedData?.InitializeRuntime();
+            return;
+            // 初始化其他配置模块
+            basicConfig?.InitializeRuntime();
+            animationConfig?.Initialize();
+            parameterConfig?.Initialize();
+            transitionConfig?.Initialize();
+            conditionConfig?.Initialize();
+            advancedConfig?.Initialize();
+            
+            // 预备主状态判据值（依赖costData）
+            basicConfig?.PrepareMainCriterionValue(costData);
         }
 
 

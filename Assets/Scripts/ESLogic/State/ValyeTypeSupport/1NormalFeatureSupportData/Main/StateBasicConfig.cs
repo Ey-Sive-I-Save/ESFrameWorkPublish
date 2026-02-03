@@ -10,8 +10,10 @@ namespace ES
     /// 状态基础配置 - 标识与生命周期
     /// </summary>
     [Serializable]
-    public class StateBasicConfig
+    public class StateBasicConfig : IRuntimeInitializable
     {
+        [NonSerialized] private bool _isRuntimeInitialized;
+        public bool IsRuntimeInitialized => _isRuntimeInitialized;
         [HorizontalGroup("Identity", Width = 0.4f)]
         [VerticalGroup("Identity/Left")]
         [LabelText("状态ID(重复时会被运行时Hash值顶掉)")]
@@ -32,8 +34,41 @@ namespace ES
         [LabelText("所属流水线(重要！)")]
         public StatePipelineType pipelineType = StatePipelineType.Basic;
 
+        [VerticalGroup("Identity/Right")]
+        [LabelText("可作为Fallback状态")]
+        [Tooltip("勾选后该状态可被用作Fallback状态（如资源无匹配或失效时的兜底流转）。")]
+        public bool canBeFeedback = false;
+
+        [VerticalGroup("Identity/Right")]
+        [LabelText("Fallback通道索引")]
+        [Tooltip("当canBeFeedback=true时，指定该Fallback状态对应的通道索引（0-4），注册时会自动设置到StateMachineContext中")]
+        [Range(0, 4)]
+        [ShowIf("canBeFeedback")]
+        public int fallbackChannelIndex = 0;
+
         [LabelText("状态描述"), TextArea(2, 3)]
         public string description = "";
+
+        [BoxGroup("动画混合配置")]
+        [LabelText("使用直接混合（无淡入淡出）")]
+        [Tooltip("启用后动画立即切换到目标权重，不进行平滑过渡。适用于表情、UI反馈等需要即时响应的动画")]
+        public bool useDirectBlend = false;
+
+        [BoxGroup("主状态判据")]
+        [LabelText("主状态判据类型")]
+        [Tooltip("主状态判据：直接权重优先 / 依赖代价计算 / 动态运行时评估。")]
+        public MainStateCriterionType mainStateCriterion = MainStateCriterionType.DirectWeight;
+
+        [BoxGroup("主状态判据")]
+        [LabelText("直接权重(推荐1,范围0-5)")]
+        [Tooltip("主状态判据为“直接权重”时使用；用于初始化阶段预备主状态判据计算与保留。")]
+        [Range(0, 5)]
+        public byte directMainWeight = 1;
+
+        [BoxGroup("主状态判据")]
+        [LabelText("预备主状态判据值(只读)"), ReadOnly]
+        [Tooltip("初始化阶段基于主状态判据类型计算出的预备值（用于享元缓存）。")]
+        public float preparedMainCriterionValue = 0f;
 
         [BoxGroup("生命周期配置")]
         [HorizontalGroup("生命周期配置/Duration")]
@@ -66,6 +101,9 @@ namespace ES
             if (priority < 0) priority = 0;
             if (priority > 255) priority = 255;
 
+            // clamp direct main weight
+            if (directMainWeight > 5) directMainWeight = 5;
+
             // ensure phase ordering
             if (phaseConfig != null)
             {
@@ -83,6 +121,52 @@ namespace ES
                 if (phaseConfig.returnCostFraction < 0f) phaseConfig.returnCostFraction = 0f;
                 if (phaseConfig.returnCostFraction > 1f) phaseConfig.returnCostFraction = 1f;
             }
+
+            // ensure prepared value is non-negative
+            if (preparedMainCriterionValue < 0f) preparedMainCriterionValue = 0f;
+        }
+
+        /// <summary>
+        /// 依据主状态判据类型预备主判据值（用于享元缓存）。
+        /// </summary>
+        /// <param name="costData">状态代价数据（仅 CostBased 使用）</param>
+        public void PrepareMainCriterionValue(StateCostData costData)
+        {
+            switch (mainStateCriterion)
+            {
+                case MainStateCriterionType.DirectWeight:
+                    preparedMainCriterionValue = directMainWeight;
+                    break;
+                case MainStateCriterionType.CostBased:
+                    if (costData != null && costData.enableCostCalculation)
+                    {
+                        preparedMainCriterionValue = costData.GetTotalCost();
+                    }
+                    else
+                    {
+                        preparedMainCriterionValue = 0f;
+                    }
+                    break;
+                case MainStateCriterionType.Dynamic:
+                default:
+                    preparedMainCriterionValue = 0f;
+                    break;
+            }
+
+            if (preparedMainCriterionValue < 0f) preparedMainCriterionValue = 0f;
+        }
+
+        /// <summary>
+        /// 运行时初始化 - 执行验证和预备计算
+        /// </summary>
+        public void InitializeRuntime()
+        {
+            if (_isRuntimeInitialized) return;
+            
+            ValidateAndFix();
+            phaseConfig?.InitializeRuntime();
+            
+            _isRuntimeInitialized = true;
         }
     }
 
@@ -91,8 +175,10 @@ namespace ES
     /// 状态阶段配置
     /// </summary>
     [Serializable]
-    public class StatePhaseConfig
+    public class StatePhaseConfig : IRuntimeInitializable
     {
+        [NonSerialized] private bool _isRuntimeInitialized;
+        public bool IsRuntimeInitialized => _isRuntimeInitialized;
         [LabelText("返还阶段开始时间(归一化)"), Range(0, 1)]
         [Tooltip("达到此时间点进入返还阶段，可以开始额外容纳其他动作")]
         public float returnStartTime = 0.7f;
@@ -104,6 +190,39 @@ namespace ES
         [LabelText("返还代价比例"), Range(0, 1)]
         [Tooltip("返还阶段返还多少比例的代价")]
         public float returnCostFraction = 0.5f;
+
+        /// <summary>
+        /// 运行时初始化
+        /// </summary>
+        public void InitializeRuntime()
+        {
+            if (_isRuntimeInitialized) return;
+            _isRuntimeInitialized = true;
+        }
+    }
+
+    /// <summary>
+    /// 主状态判据类型
+    /// </summary>
+    public enum MainStateCriterionType
+    {
+        /// <summary>
+        /// 直接设置权重（推荐，0-5）
+        /// </summary>
+        [InspectorName("直接权重")]
+        DirectWeight = 0,
+
+        /// <summary>
+        /// 依赖代价计算（静态/可预估）
+        /// </summary>
+        [InspectorName("依赖代价计算")]
+        CostBased = 1,
+
+        /// <summary>
+        /// 动态运行时评估
+        /// </summary>
+        [InspectorName("动态评估")]
+        Dynamic = 2
     }
 
 }

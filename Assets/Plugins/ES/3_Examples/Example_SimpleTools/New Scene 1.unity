@@ -1679,13 +1679,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2040373635}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.67, y: 0.41, z: -4.5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_LocalRotation: {x: 0.32185823, y: 0.11788465, z: 0.007625133, w: 0.93938947}
+  m_LocalPosition: {x: 2.67, y: -0.49, z: -7.19}
+  m_LocalScale: {x: 2.99, y: 2.99, z: 2.99}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 37.078, y: 16.485, z: 6.492}
 --- !u!1001 &2081736436
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1857,6 +1857,8 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
     - rid: 3128555941174181889
       type: {class: EntityBasicDomain, ns: ES, asm: ES_Logic}
       data:
@@ -2379,10 +2381,17 @@ MonoBehaviour:
           ValuesNow:
           - rid: 3128555942915604491
           MayHasAddingElement: 1
-        stateAniDataPack: {fileID: 0}
+        stateAniDataPack: {fileID: 11400000, guid: 4ab68be0f05295f48bcd61332872d9b5,
+          type: 2}
         stateMachine:
           stateMachineKey: 
           defaultStateKey: 
+          basicPipeline:
+            rid: -2
+          mainPipeline:
+            rid: -2
+          buffPipeline:
+            rid: -2
         defaultStateKey: 
     - rid: 3128555942915604490
       type: {class: EntityBasicCameraModule, ns: ES, asm: ES_Logic}

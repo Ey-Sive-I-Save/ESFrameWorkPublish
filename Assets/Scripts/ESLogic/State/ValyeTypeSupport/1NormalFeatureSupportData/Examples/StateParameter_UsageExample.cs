@@ -16,7 +16,7 @@ namespace ES
             var calculator = new StateAnimationMixCalculatorForBlendTree1D
             {
                 // 直接使用枚举 - 高性能，类型安全，支持重构
-                parameterName = StateDefaultFloatParameter.Speed,
+                parameterFloat = StateDefaultFloatParameter.Speed,
                 samples = new[]
                 {
                     new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
@@ -38,7 +38,7 @@ namespace ES
             };
             
             // 在Context中设置参数
-            var context = new StateContext();
+            var context = new StateMachineContext();
             context.SetFloat(StateDefaultFloatParameter.Speed, 3.5f);
             
             // Calculator内部会自动通过枚举获取参数
@@ -58,7 +58,7 @@ namespace ES
             var calculator = new StateAnimationMixCalculatorForBlendTree1D
             {
                 // 使用字符串 - 适用于动态生成的参数名
-                parameterName = "DynamicParameter_" + Random.Range(0, 100),
+                parameterFloat = "DynamicParameter_" + Random.Range(0, 100),
                 samples = new[]
                 {
                     new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
@@ -74,7 +74,7 @@ namespace ES
                 }
             };
             
-            var context = new StateContext();
+            var context = new StateMachineContext();
             context.SetFloat("DynamicParameter_42", 2.5f);
             
             Debug.Log("✓ 示例2: 字符串参数 - 灵活，适用于动态场景");
@@ -114,7 +114,7 @@ namespace ES
                 }
             };
             
-            var context = new StateContext();
+            var context = new StateMachineContext();
             context.SetFloat("DirectionX", 0.5f);
             context.SetFloat("DirectionY", 0.8f);
             
@@ -148,7 +148,7 @@ namespace ES
             // 第二个Mixer使用自定义字符串
             var lowerBodyCalculator = new StateAnimationMixCalculatorForBlendTree1D
             {
-                parameterName = "CustomMoveSpeed", // 自定义参数名
+                parameterFloat = "CustomMoveSpeed", // 自定义参数名
                 samples = new[]
                 {
                     new StateAnimationMixCalculatorForBlendTree1D.ClipSampleForBlend1D
@@ -164,7 +164,7 @@ namespace ES
                 }
             };
             
-            var context = new StateContext();
+            var context = new StateMachineContext();
             context.SetFloat("AttackWeight", 0.7f);
             context.SetFloat("BlockWeight", 0.3f);
             context.SetFloat("CustomMoveSpeed", 2.5f);
@@ -176,7 +176,7 @@ namespace ES
         
         public void Example5_PerformanceComparison()
         {
-            var context = new StateContext();
+            var context = new StateMachineContext();
             
             // === 方式1: 旧方式 - 字符串硬编码 ===
             // 缺点：拼写错误、不支持重构、无智能提示
@@ -216,7 +216,7 @@ namespace ES
             // }
             
             // 然后就可以直接使用
-            var context = new StateContext();
+            var context = new StateMachineContext();
             
             // 假设已添加
             // context.SetFloat(StateDefaultParameter.JumpHeight, 2.5f);
@@ -230,19 +230,19 @@ namespace ES
         public class CharacterAnimationSystem : MonoBehaviour
         {
             private PlayableGraph _graph;
-            private StateContext _context;
+            private StateMachineContext _context;
             private StateAnimationMixCalculatorForBlendTree1D _moveCalculator;
             private AnimationCalculatorRuntime _moveRuntime;
             
             public void Initialize()
             {
                 _graph = PlayableGraph.Create("Character");
-                _context = new StateContext();
+                _context = new StateMachineContext();
                 
                 // 使用枚举配置移动动画
                 _moveCalculator = new StateAnimationMixCalculatorForBlendTree1D
                 {
-                    parameterName = StateDefaultFloatParameter.Speed, // 使用枚举
+                    parameterFloat = StateDefaultFloatParameter.Speed, // 使用枚举
                     smoothTime = 0.15f,
                     samples = new[]
                     {
@@ -310,7 +310,7 @@ namespace ES
         [ContextMenu("性能对比测试")]
         public void PerformanceTest()
         {
-            var context = new StateContext();
+            var context = new StateMachineContext();
             int iterations = 100000;
             
             // 测试1: 枚举参数

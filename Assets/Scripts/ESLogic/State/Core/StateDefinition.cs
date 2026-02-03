@@ -143,7 +143,7 @@ namespace ES
         /// <summary>
         /// 检查进入条件是否满足
         /// </summary>
-        public bool CheckEnterConditions(StateContext context)
+        public bool CheckEnterConditions(StateMachineContext context)
         {
             if (enterConditions == null || enterConditions.Count == 0)
                 return true;
@@ -159,7 +159,7 @@ namespace ES
         /// <summary>
         /// 检查保持条件是否满足
         /// </summary>
-        public bool CheckKeepConditions(StateContext context)
+        public bool CheckKeepConditions(StateMachineContext context)
         {
             if (keepConditions == null || keepConditions.Count == 0)
                 return true;
@@ -175,7 +175,7 @@ namespace ES
         /// <summary>
         /// 检查退出条件是否满足
         /// </summary>
-        public bool CheckExitConditions(StateContext context)
+        public bool CheckExitConditions(StateMachineContext context)
         {
             if (exitConditions == null || exitConditions.Count == 0)
                 return false;
@@ -241,7 +241,7 @@ namespace ES
         /// <summary>
         /// 检查转换条件是否满足
         /// </summary>
-        public bool CheckConditions(StateContext context, float normalizedTime)
+        public bool CheckConditions(StateMachineContext context, float normalizedTime)
         {
             // 检查时间条件
             if (transitionTime >= 0f && normalizedTime < transitionTime)

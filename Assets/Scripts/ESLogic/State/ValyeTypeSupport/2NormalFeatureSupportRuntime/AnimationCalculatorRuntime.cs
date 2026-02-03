@@ -59,7 +59,13 @@ namespace ES
         // ==================== Direct混合数据 ====================
         public float[] currentWeights;                        // 当前权重
         public float[] targetWeights;                         // 目标权重
-        public float[] weightVelocities;                      // 权重变化速度
+    public float[] weightVelocities;                      // 权重变化速度（用于SmoothDamp）
+    
+    // ==================== 权重缓存（所有计算器通用） ====================
+    public float[] weightCache;                           // 权重缓存（避免每帧查询Mixer）
+    public float[] weightTargetCache;                     // 目标权重缓存
+    public float[] weightVelocityCache;                   // 权重速度缓存（用于平滑）
+    public bool useSmoothing = true;                      // 是否启用权重平滑
         
         // ==================== 三角形结构体 ====================
         public struct Triangle
@@ -97,6 +103,9 @@ namespace ES
             currentWeights = null;
             targetWeights = null;
             weightVelocities = null;
+            weightCache = null;
+            weightTargetCache = null;
+            weightVelocityCache = null;
             
             IsInitialized = false;
         }
@@ -126,6 +135,12 @@ namespace ES
                 size += targetWeights.Length * 4;
             if (weightVelocities != null)
                 size += weightVelocities.Length * 4;
+            if (weightCache != null)
+                size += weightCache.Length * 4;
+            if (weightTargetCache != null)
+                size += weightTargetCache.Length * 4;
+            if (weightVelocityCache != null)
+                size += weightVelocityCache.Length * 4;
             
             // Triangle数组
             if (triangles != null)

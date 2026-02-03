@@ -378,7 +378,7 @@ namespace ES
     public class StateRuntime
     {
         public PlayableGraph Graph { get; set; }
-        public StateContext Context { get; set; }
+        public StateMachineContext Context { get; set; }
         public float CurrentTime { get; set; }
         public float StateTime { get; set; }
         public float NormalizedTime { get; set; }
@@ -387,7 +387,7 @@ namespace ES
         private Dictionary<string, AnimationClip> _clipTable;
         private Dictionary<string, float> _ikWeights;
 
-        public StateRuntime(PlayableGraph graph, StateContext context)
+        public StateRuntime(PlayableGraph graph, StateMachineContext context)
         {
             Graph = graph;
             Context = context;

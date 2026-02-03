@@ -59,6 +59,21 @@ namespace ES
                 jumpRequested = false;
             }
             MyCore.SetCrouch(crouchHold);
+            
+            // ★ 自动更新StateMachine的SpeedX和SpeedZ参数（移动模块的核心职责）
+            // 通过Entity的stateDomain访问stateMachine，实现Basic域与State域的联动
+            if (applyMove && MyCore.stateDomain != null && MyCore.stateDomain.stateMachine != null)
+            {
+                var context = MyCore.stateDomain.stateMachine.stateContext;
+                if (context != null)
+                {
+                    // 将世界空间的移动向量转换为角色局部空间（相对于角色朝向）
+                    Vector3 moveLocal = MyCore.transform.InverseTransformDirection(moveWorld);
+                    // 使用局部坐标系设置SpeedX（右）和SpeedZ（前）
+                    context.SpeedX = moveLocal.x;
+                    context.SpeedZ = moveLocal.z;
+                }
+            }
         }
     }
 

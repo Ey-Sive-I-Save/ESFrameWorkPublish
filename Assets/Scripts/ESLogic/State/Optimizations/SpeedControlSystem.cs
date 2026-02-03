@@ -35,7 +35,7 @@ namespace ES.Optimizations
             _playable = AnimationClipPlayable.Create(graph, clip);
         }
         
-        public void UpdateSpeed(StateContext context, float normalizedTime)
+        public void UpdateSpeed(StateMachineContext context, float normalizedTime)
         {
             if (!_playable.IsValid() || !enableSpeedControl)
                 return;
@@ -44,7 +44,7 @@ namespace ES.Optimizations
             _playable.SetSpeed(speed);
         }
         
-        private float CalculateSpeed(StateContext context, float normalizedTime)
+        private float CalculateSpeed(StateMachineContext context, float normalizedTime)
         {
             float speed = 1f;
             

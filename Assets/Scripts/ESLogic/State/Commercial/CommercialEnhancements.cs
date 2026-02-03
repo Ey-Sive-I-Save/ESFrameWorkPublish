@@ -53,7 +53,7 @@ namespace ES.Commercial
             Debug.Log($"Setting up {type} IK Layer");
         }
         
-        public void Update(StateContext context, float deltaTime)
+        public void Update(StateMachineContext context, float deltaTime)
         {
             float weight = context.GetFloat(weightParameterName, 0f);
             var target = context.GetEntity(targetParameterName) as Transform;
@@ -141,7 +141,7 @@ namespace ES.Commercial
             [NonSerialized]
             private float _velocity;
             
-            public void Update(SkinnedMeshRenderer renderer, StateContext context, float deltaTime)
+            public void Update(SkinnedMeshRenderer renderer, StateMachineContext context, float deltaTime)
             {
                 float targetValue = context.GetFloat(parameterName, 0f) * multiplier * 100f;
                 
@@ -169,7 +169,7 @@ namespace ES.Commercial
         [ShowIf("enableLipSync")]
         public string lipSyncParameter = "Viseme";
         
-        public void Update(StateContext context, float deltaTime)
+        public void Update(StateMachineContext context, float deltaTime)
         {
             if (facialMesh == null)
                 return;
@@ -185,7 +185,7 @@ namespace ES.Commercial
             }
         }
         
-        private void UpdateLipSync(StateContext context)
+        private void UpdateLipSync(StateMachineContext context)
         {
             int viseme = context.GetInt(lipSyncParameter, 0);
             
@@ -255,7 +255,7 @@ namespace ES.Commercial
             }
         }
         
-        public void Update(StateContext context)
+        public void Update(StateMachineContext context)
         {
             bool shouldActivate = context.GetBool(activeParameterName, false);
             

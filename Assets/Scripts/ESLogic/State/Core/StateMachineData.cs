@@ -14,6 +14,28 @@ namespace ES
     {
         [InfoBox("基于Playable的多流水线动画状态机配置")]
         
+        /// <summary>
+        /// 初始化ScriptableObject（用于享元数据预备计算）
+        /// </summary>
+        public void InitializeForRuntime()
+        {
+            // 初始化所有状态的共享数据
+            InitializeStates(basicStates);
+            InitializeStates(mainStates);
+            InitializeStates(buffStates);
+        }
+        
+        private void InitializeStates(System.Collections.Generic.List<StateDefinition> states)
+        {
+            if (states == null) return;
+            
+            foreach (var stateDef in states)
+            {
+                // TODO: 这里需要根据实际的StateDefinition结构调用对应初始化
+                // 如果StateDefinition有stateSharedData，则调用其InitializeForFlyweight
+            }
+        }
+        
         [TabGroup("基础")]
         [LabelText("状态机名称")]
         public string machineName;
@@ -99,11 +121,26 @@ namespace ES
         [LabelText("基本线初始状态ID")]
         [Tooltip("状态机启动时基本线的默认状态")]
         public int basicInitialStateId = 0;
+        
+        [TabGroup("初始化")]
+        [LabelText("基本线Fallback状态ID")]
+        [Tooltip("管线空转时自动激活的兰底状态，-1表示不启用")]
+        public int basicFallbackStateId = -1;
 
         [TabGroup("初始化")]
         [LabelText("主线初始状态ID")]
-        [Tooltip("状态机启动时主线的默认状态(-1表示无初始状态)")]
+        [Tooltip("状态机启动时主线的默认状态")]
         public int mainInitialStateId = -1;
+        
+        [TabGroup("初始化")]
+        [LabelText("主线Fallback状态ID")]
+        [Tooltip("管线空转时自动激活的兰底状态，-1表示不启用")]
+        public int mainFallbackStateId = -1;
+        
+        [TabGroup("初始化")]
+        [LabelText("Buff线Fallback状态ID")]
+        [Tooltip("管线空转时自动激活的兰底状态，-1表示不启用")]
+        public int buffFallbackStateId = -1;
 
         [TabGroup("初始化")]
         [LabelText("自动启动")]

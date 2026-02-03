@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Playables;
 using UnityEngine.Animations;
@@ -70,7 +71,7 @@ namespace ES
         public virtual bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)
         {
             // 默认实现：不支持覆盖
-            Debug.LogWarning($"[{GetType().Name}] 不支持Clip覆盖");
+            StateMachineDebugSettings.Global.LogWarning($"[{GetType().Name}] 不支持Clip覆盖");
             return false;
         }
     }
@@ -95,7 +96,7 @@ namespace ES
             {
                 if (clip == null)
                 {
-                    Debug.LogError("[SimpleClip] Clip未设置");
+                    StateMachineDebugSettings.Global.LogError("[SimpleClip] Clip未设置");
                     return false;
                 }
 
@@ -132,19 +133,19 @@ namespace ES
             {
                 if (clipIndex != 0)
                 {
-                    Debug.LogError($"[SimpleClip] 索引无效: {clipIndex}，仅支持索引0");
+                    StateMachineDebugSettings.Global.LogError($"[SimpleClip] 索引无效: {clipIndex}，仅支持索引0");
                     return false;
                 }
                 
                 if (!runtime.singlePlayable.IsValid())
                 {
-                    Debug.LogError("[SimpleClip] Runtime未初始化");
+                    StateMachineDebugSettings.Global.LogError("[SimpleClip] Runtime未初始化");
                     return false;
                 }
                 
                 if (newClip == null)
                 {
-                    Debug.LogError("[SimpleClip] 新Clip为null");
+                    StateMachineDebugSettings.Global.LogError("[SimpleClip] 新Clip为null");
                     return false;
                 }
                 
@@ -214,7 +215,7 @@ namespace ES
                 };
                 
                 
-                Debug.Log("[BlendTree1D] 已初始化3个标准采样点");
+                StateMachineDebugSettings.Global.LogRuntimeInit("[BlendTree1D] 已初始化3个标准采样点");
             }
 #endif
 
@@ -238,7 +239,7 @@ namespace ES
 
                 if (samples == null || samples.Length == 0)
                 {
-                    Debug.LogError("[BlendTree1D] 采样点为空");
+                    StateMachineDebugSettings.Global.LogError("[BlendTree1D] 采样点为空");
                     return false;
                 }
 
@@ -345,6 +346,7 @@ namespace ES
                 }
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private int BinarySearchRight(float value)
             {
                 int left = 0;
@@ -391,19 +393,19 @@ namespace ES
             {
                 if (clipIndex < 0 || clipIndex >= samples.Length)
                 {
-                    Debug.LogError($"[BlendTree1D] 索引越界: {clipIndex} (有效范围: 0-{samples.Length - 1})");
+                    StateMachineDebugSettings.Global.LogError($"[BlendTree1D] 索引越界: {clipIndex} (有效范围: 0-{samples.Length - 1})");
                     return false;
                 }
                 
                 if (runtime.playables == null || !runtime.playables[clipIndex].IsValid())
                 {
-                    Debug.LogError($"[BlendTree1D] Playable[{clipIndex}]无效");
+                    StateMachineDebugSettings.Global.LogError($"[BlendTree1D] Playable[{clipIndex}]无效");
                     return false;
                 }
                 
                 if (newClip == null)
                 {
-                    Debug.LogError("[BlendTree1D] 新Clip为null");
+                    StateMachineDebugSettings.Global.LogError("[BlendTree1D] 新Clip为null");
                     return false;
                 }
                 
@@ -451,6 +453,12 @@ namespace ES
 
             protected bool _isCalculatorInitialized;
             protected AnimationCalculatorRuntime.Triangle[] _sharedTriangles;  // 享元三角形数据
+            
+            /// <summary>
+            /// Debug设置（可独立配置，默认使用全局设置）
+            /// </summary>
+            [NonSerialized]
+            protected StateMachineDebugSettings debugSettings = StateMachineDebugSettings.Global;
 
 #if UNITY_EDITOR
             /// <summary>
@@ -501,7 +509,7 @@ namespace ES
                 _isCalculatorInitialized = false; // 重置初始化标记
                 
 
-                Debug.Log($"[BlendTree2D] 已初始化{samples.Length}个标准采样点（8方向外圈+8方向内圈+中心）");
+                debugSettings.LogRuntimeInit($"[BlendTree2D] 已初始化{samples.Length}个标准采样点（8方向外圈+8方向内圈+中心）");
             }
 #endif
 
@@ -525,7 +533,7 @@ namespace ES
 
                 if (samples == null || samples.Length < 3)
                 {
-                    Debug.LogError("[BlendTree2D] 至少需要3个采样点");
+                    debugSettings.LogError("[BlendTree2D] 至少需要3个采样点");
                     return false;
                 }
 
@@ -576,7 +584,7 @@ namespace ES
                 output = runtime.mixer;
                 runtime.IsInitialized = true;
                 
-                Debug.Log($"[BlendTree2D] Runtime初始化完成: {samples.Length}个采样点, 中心点索引={centerIndex}, 三角形数量={_sharedTriangles?.Length ?? 0}");
+                debugSettings.LogRuntimeInit($"[BlendTree2D] Runtime初始化完成: {samples.Length}个采样点, 中心点索引={centerIndex}, 三角形数量={_sharedTriangles?.Length ?? 0}");
                 return true;
             }
 
@@ -637,19 +645,19 @@ namespace ES
             {
                 if (clipIndex < 0 || clipIndex >= samples.Length)
                 {
-                    Debug.LogError($"[BlendTree2D] 索引越界: {clipIndex} (有效范围: 0-{samples.Length - 1})");
+                    debugSettings.LogError($"[BlendTree2D] 索引越界: {clipIndex} (有效范围: 0-{samples.Length - 1})");
                     return false;
                 }
                 
                 if (runtime.playables == null || !runtime.playables[clipIndex].IsValid())
                 {
-                    Debug.LogError($"[BlendTree2D] Playable[{clipIndex}]无效");
+                    debugSettings.LogError($"[BlendTree2D] Playable[{clipIndex}]无效");
                     return false;
                 }
                 
                 if (newClip == null)
                 {
-                    Debug.LogError("[BlendTree2D] 新Clip为null");
+                    debugSettings.LogError("[BlendTree2D] 新Clip为null");
                     return false;
                 }
                 
@@ -754,14 +762,14 @@ namespace ES
                 }
 
                 _sharedTriangles = triangleList.ToArray();
-                Debug.Log($"[BlendTree2D-Directional] 三角化完成: {_sharedTriangles.Length}个三角形，中心点索引={centerIndex}");
+                debugSettings.LogTriangulation($"[BlendTree2D-Directional] 三角化完成: {_sharedTriangles.Length}个三角形，中心点索引={centerIndex}");
             }
 
             protected override void CalculateWeights2D(AnimationCalculatorRuntime runtime, Vector2 input, float deltaTime)
             {
                 if (samples == null || samples.Length == 0)
                 {
-                    Debug.LogWarning("[BlendTree2D-Directional] samples为空，无法计算权重");
+                    debugSettings.LogWarning("[BlendTree2D-Directional] samples为空，无法计算权重");
                     return;
                 }
 
@@ -784,7 +792,7 @@ namespace ES
                 }
                 else
                 {
-                    Debug.LogWarning($"[BlendTree2D-Directional] 三角形数据为空！samples.Length={samples.Length}");
+                    debugSettings.LogWarning($"[BlendTree2D-Directional] 三角形数据为空！samples.Length={samples.Length}");
                 }
 
                 if (containingTriangle.HasValue)
@@ -802,14 +810,14 @@ namespace ES
                         runtime.weightTargetCache[tri.i1] = Mathf.Max(0f, bary.y);
                         runtime.weightTargetCache[tri.i2] = Mathf.Max(0f, bary.z);
                         
-                        // Debug.Log($"[BlendTree2D-Directional] 输入({input.x:F2}, {input.y:F2}) → 三角形[{tri.i0},{tri.i1},{tri.i2}] 权重[{bary.x:F2},{bary.y:F2},{bary.z:F2}]");
+                        debugSettings.LogWeightDetail($"[BlendTree2D-Directional] 输入({input.x:F2}, {input.y:F2}) → 三角形[{tri.i0},{tri.i1},{tri.i2}] 权重[{bary.x:F2},{bary.y:F2},{bary.z:F2}]");
                     }
                     else
                     {
                         // 重心坐标计算失败，回退到最近点
                         int nearest = FindNearestSample(input);
                         runtime.weightTargetCache[nearest] = 1f;
-                        Debug.LogWarning($"[BlendTree2D-Directional] 重心坐标无效，使用最近点 #{nearest}");
+                        debugSettings.LogWarning($"[BlendTree2D-Directional] 重心坐标无效，使用最近点 #{nearest}");
                     }
                 }
                 else
@@ -817,7 +825,7 @@ namespace ES
                     // 未找到包含三角形，使用最近点
                     int nearest = FindNearestSample(input);
                     runtime.weightTargetCache[nearest] = 1f;
-                    Debug.Log($"[BlendTree2D-Directional] 输入({input.x:F2}, {input.y:F2}) 不在任何三角形内，使用最近点 #{nearest}");
+                    debugSettings.LogAnimationBlend($"[BlendTree2D-Directional] 输入({input.x:F2}, {input.y:F2}) 不在任何三角形内，使用最近点 #{nearest}");
                 }
 
                 // 平滑过渡到目标权重
@@ -843,6 +851,7 @@ namespace ES
                 }
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private bool IsPointInTriangle(Vector2 p, AnimationCalculatorRuntime.Triangle triangle)
             {
                 // 使用重心坐标法判断点是否在三角形内
@@ -852,6 +861,7 @@ namespace ES
                 return bary.x >= -0.001f && bary.y >= -0.001f && bary.z >= -0.001f;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private Vector3 CalculateBarycentricCoordinates(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
             {
                 // 使用叉积法计算重心坐标（更稳定）
@@ -1104,7 +1114,7 @@ namespace ES
                 };
                 
 
-                Debug.Log("[DirectBlend] 已初始化4个标准插槽");
+                StateMachineDebugSettings.Global.LogRuntimeInit("[DirectBlend] 已初始化4个标准插槽");
             }
 #endif
 
@@ -1112,7 +1122,7 @@ namespace ES
             {
                 if (clips == null || clips.Length == 0)
                 {
-                    Debug.LogError("[DirectBlend] Clip列表为空");
+                    StateMachineDebugSettings.Global.LogError("[DirectBlend] Clip列表为空");
                     return false;
                 }
 
@@ -1221,19 +1231,19 @@ namespace ES
             {
                 if (clipIndex < 0 || clipIndex >= clips.Length)
                 {
-                    Debug.LogError($"[DirectBlend] 索引越界: {clipIndex} (有效范围: 0-{clips.Length - 1})");
+                    StateMachineDebugSettings.Global.LogError($"[DirectBlend] 索引越界: {clipIndex} (有效范围: 0-{clips.Length - 1})");
                     return false;
                 }
                 
                 if (runtime.playables == null || !runtime.playables[clipIndex].IsValid())
                 {
-                    Debug.LogError($"[DirectBlend] Playable[{clipIndex}]无效");
+                    StateMachineDebugSettings.Global.LogError($"[DirectBlend] Playable[{clipIndex}]无效");
                     return false;
                 }
                 
                 if (newClip == null)
                 {
-                    Debug.LogError("[DirectBlend] 新Clip为null");
+                    StateMachineDebugSettings.Global.LogError("[DirectBlend] 新Clip为null");
                     return false;
                 }
                 

@@ -54,6 +54,11 @@ namespace ES
         [Tooltip("启用后动画立即切换到目标权重，不进行平滑过渡。适用于表情、UI反馈等需要即时响应的动画")]
         public bool useDirectBlend = false;
 
+        [BoxGroup("动画混合配置")]
+        [LabelText("Avatar Mask（可选）"), AssetsOnly]
+        [Tooltip("指定Avatar Mask来控制动画影响的骨骼范围。\n常用场景：\n- 上半身动作：攻击/换弹仅影响上半身\n- 下半身动作：移动/跳跃仅影响下半身\n- 左手/右手分离控制")]
+        public AvatarMask avatarMask = null;
+
         [BoxGroup("主状态判据")]
         [LabelText("主状态判据类型")]
         [Tooltip("主状态判据：直接权重优先 / 依赖代价计算 / 动态运行时评估。")]

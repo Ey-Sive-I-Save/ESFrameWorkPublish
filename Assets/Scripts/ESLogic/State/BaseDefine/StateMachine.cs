@@ -885,6 +885,14 @@ namespace ES
         protected StatePipelineRuntime buffPipeline;
 
         /// <summary>
+        /// 流水线混合模式 - 控制Main线和Basic线如何混合
+        /// </summary>
+        [TitleGroup("流水线混合设置", Order = 1)]
+        [LabelText("混合模式"), InfoBox("Override: Main覆盖Basic（推荐）\nAdditive: 权重叠加\nMultiplicative: Main调制Basic")]
+        [EnumToggleButtons]
+        public PipelineBlendMode pipelineBlendMode = PipelineBlendMode.Override;
+
+        /// <summary>
         /// 通过枚举获取对应的流水线
         /// </summary>
         private StatePipelineRuntime GetPipelineByType(StatePipelineType pipelineType)
@@ -1515,6 +1523,9 @@ namespace ES
             ProcessDirtyTasks(basicPipeline, StatePipelineType.Basic);
             ProcessDirtyTasks(mainPipeline, StatePipelineType.Main);
             ProcessDirtyTasks(buffPipeline, StatePipelineType.Buff);
+
+            // ★ 应用流水线混合模式（Main与Basic的混合策略）
+            ApplyPipelineBlendMode();
            
             // ★ 关键：手动推进PlayableGraph，将动画输出到Animator
             // PlayableGraph.SetTimeUpdateMode设置为GameTime时，Evaluate会自动使用deltaTime
@@ -1528,6 +1539,57 @@ namespace ES
             if (enableContinuousStats)
             {
                 OutputContinuousStats();
+            }
+        }
+
+        /// <summary>
+        /// 应用流水线混合模式 - 控制Main线和Basic线的混合权重
+        /// </summary>
+        private void ApplyPipelineBlendMode()
+        {
+            if (!rootMixer.IsValid() || basicPipeline == null || mainPipeline == null)
+                return;
+
+            float basicWeight = basicPipeline.weight;
+            float mainWeight = mainPipeline.weight;
+            
+            // 计算Main线的实际激活度（有运行状态则视为激活）
+            float mainActivation = (mainPipeline.runningStates.Count > 0) ? mainWeight : 0f;
+
+            switch (pipelineBlendMode)
+            {
+                case PipelineBlendMode.Override:
+                    // 覆盖模式：Main激活时完全覆盖Basic
+                    if (mainActivation > 0.001f)
+                    {
+                        rootMixer.SetInputWeight(basicPipeline.rootInputIndex, 0f);
+                        rootMixer.SetInputWeight(mainPipeline.rootInputIndex, 1f);
+                    }
+                    else
+                    {
+                        rootMixer.SetInputWeight(basicPipeline.rootInputIndex, 1f);
+                        rootMixer.SetInputWeight(mainPipeline.rootInputIndex, 0f);
+                    }
+                    break;
+
+                case PipelineBlendMode.Additive:
+                    // 叠加模式：直接使用各自的权重（默认行为）
+                    rootMixer.SetInputWeight(basicPipeline.rootInputIndex, basicWeight);
+                    rootMixer.SetInputWeight(mainPipeline.rootInputIndex, mainWeight);
+                    break;
+
+                case PipelineBlendMode.Multiplicative:
+                    // 乘法模式：Basic权重被Main激活度调制
+                    float modulatedBasicWeight = basicWeight * (1f - mainActivation);
+                    rootMixer.SetInputWeight(basicPipeline.rootInputIndex, modulatedBasicWeight);
+                    rootMixer.SetInputWeight(mainPipeline.rootInputIndex, mainWeight);
+                    break;
+            }
+
+            // Buff线始终使用自身权重（不受混合模式影响）
+            if (buffPipeline != null && buffPipeline.mixer.IsValid())
+            {
+                rootMixer.SetInputWeight(buffPipeline.rootInputIndex, buffPipeline.weight);
             }
         }
 
@@ -2202,6 +2264,10 @@ namespace ES
         [FoldoutGroup("临时动画测试")]
         [LabelText("播放速度"), Range(0.1f, 3f)]
         public float testSpeed = 1.0f;
+        
+        [FoldoutGroup("临时动画测试")]
+        [LabelText("循环播放"), Tooltip("勾选后动画循环播放，不勾选则播放一次后自动退出")]
+        public bool testLoopable = false;
 
         [FoldoutGroup("临时动画测试")]
         [Button("添加临时动画", ButtonSizes.Medium), GUIColor(0.4f, 0.8f, 1f)]
@@ -2219,7 +2285,7 @@ namespace ES
                 return;
             }
 
-            AddTemporaryAnimation(testTempKey, testClip, testPipeline, testSpeed);
+            AddTemporaryAnimation(testTempKey, testClip, testPipeline, testSpeed, testLoopable);
         }
 
         [FoldoutGroup("临时动画测试")]
@@ -2243,8 +2309,9 @@ namespace ES
         /// <param name="clip">动画Clip</param>
         /// <param name="pipeline">目标流水线</param>
         /// <param name="speed">播放速度</param>
+        /// <param name="loopable">是否循环播放（false=播放一次后自动退出，true=持续循环）</param>
         /// <returns>是否添加成功</returns>
-        public bool AddTemporaryAnimation(string tempKey, AnimationClip clip, StatePipelineType pipeline = StatePipelineType.Main, float speed = 1.0f)
+        public bool AddTemporaryAnimation(string tempKey, AnimationClip clip, StatePipelineType pipeline = StatePipelineType.Main, float speed = 1.0f, bool loopable = false)
         {
             if (string.IsNullOrEmpty(tempKey))
             {
@@ -2273,10 +2340,12 @@ namespace ES
             tempState.stateSharedData = new StateSharedData();
             tempState.stateSharedData.hasAnimation = true;
             
-            // 创建BasicConfig（配置为播放完自动退出）
+            // 创建BasicConfig（根据loopable配置播放模式）
             tempState.stateSharedData.basicConfig = new StateBasicConfig();
             tempState.stateSharedData.basicConfig.stateName = tempKey;
-            tempState.stateSharedData.basicConfig.durationMode = StateDurationMode.UntilAnimationEnd; // 播放完自动退出
+            tempState.stateSharedData.basicConfig.durationMode = loopable 
+                ? StateDurationMode.Infinite  // 循环播放
+                : StateDurationMode.UntilAnimationEnd; // 播放一次后自动退出
             tempState.stateSharedData.basicConfig.pipelineType = pipeline;
             
             // 创建AnimationConfig

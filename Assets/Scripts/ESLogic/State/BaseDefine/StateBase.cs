@@ -41,6 +41,12 @@ namespace ES
         [NonSerialized]
         private AnimationCalculatorRuntime _animationRuntime;
 
+        /// <summary>
+        /// 动画控制的自动退出标志（AnimationClip反向控制）
+        /// </summary>
+        [NonSerialized]
+        private bool _shouldAutoExitFromAnimation = false;
+
         #endregion
 
         #region 键
@@ -59,6 +65,7 @@ namespace ES
             baseStatus = StateBaseStatus.Running;
             stateRuntimePhase = StateRuntimePhase.Running;
             activationTime = Time.time; // 记录激活时间
+            _shouldAutoExitFromAnimation = false; // 重置动画完毕标志
             OnStateEnterLogic();
         }
 
@@ -145,7 +152,94 @@ namespace ES
             if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
             {
                 stateSharedData.animationConfig.calculator.UpdateWeights(_animationRuntime, context, deltaTime);
+                
+                // ★ AnimationClip反向控制：检测动画是否播放完毕（仅针对UntilAnimationEnd模式）
+                if (stateSharedData.basicConfig.durationMode == StateDurationMode.UntilAnimationEnd)
+                {
+                    CheckAnimationCompletion();
+                }
             }
+        }
+
+        /// <summary>
+        /// 检测动画播放完毕状态（AnimationClip反向控制）
+        /// 当动画播放进度>=1.0且为非循环模式时，标记应该退出
+        /// </summary>
+        private void CheckAnimationCompletion()
+        {
+            if (_animationRuntime == null || !_animationRuntime.IsInitialized)
+                return;
+
+            // 检查单个Playable（SimpleClip）
+            if (_animationRuntime.singlePlayable.IsValid())
+            {
+                Playable playable = _animationRuntime.singlePlayable;
+                if (playable.GetPlayableType() == typeof(AnimationClipPlayable))
+                {
+                    var clipPlayable = (AnimationClipPlayable)playable;
+                    var animationClip = GetAnimationClipFromPlayable(clipPlayable);
+                    
+                    if (animationClip != null && !animationClip.isLooping)
+                    {
+                        double currentTime = playable.GetTime();
+                        double duration = playable.GetDuration();
+                        
+                        // 播放进度>=1.0，标记为应该退出
+                        if (duration > 0.001 && currentTime >= duration - 0.016) // 0.016 = 1帧容错（60fps）
+                        {
+                            _shouldAutoExitFromAnimation = true;
+                        }
+                    }
+                }
+            }
+            // 检查Mixer中的Playables（BlendTree/DirectBlend）
+            else if (_animationRuntime.playables != null)
+            {
+                // 多动画混合的情况：只有当所有非循环动画都播放完毕才退出
+                bool hasNonLoopingClip = false;
+                bool allNonLoopingCompleted = true;
+
+                for (int i = 0; i < _animationRuntime.playables.Length; i++)
+                {
+                    Playable playable = _animationRuntime.playables[i];
+                    if (!playable.IsValid()) continue;
+
+                    if (playable.GetPlayableType() == typeof(AnimationClipPlayable))
+                    {
+                        var clipPlayable = (AnimationClipPlayable)playable;
+                        var animationClip = GetAnimationClipFromPlayable(clipPlayable);
+                        
+                        if (animationClip != null && !animationClip.isLooping)
+                        {
+                            hasNonLoopingClip = true;
+                            
+                            double currentTime = playable.GetTime();
+                            double duration = playable.GetDuration();
+                            
+                            if (duration > 0.001 && currentTime < duration - 0.016)
+                            {
+                                allNonLoopingCompleted = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (hasNonLoopingClip && allNonLoopingCompleted)
+                {
+                    _shouldAutoExitFromAnimation = true;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 从AnimationClipPlayable获取AnimationClip
+        /// TODO: 当前使用简单实现，后续可优化为缓存或更高效的方式
+        /// </summary>
+        private AnimationClip GetAnimationClipFromPlayable(AnimationClipPlayable clipPlayable)
+        {
+            // 当前简单实现：直接调用GetAnimationClip()
+            return clipPlayable.GetAnimationClip();
         }
 
         /// <summary>
@@ -194,7 +288,11 @@ namespace ES
                     return elapsedTime >= config.timedDuration;
 
                 case StateDurationMode.UntilAnimationEnd:
-                    // 检查动画是否播放完毕
+                    // 检查动画是否播放完毕（优先使用AnimationClip反向控制的标志）
+                    if (_shouldAutoExitFromAnimation)
+                        return true;
+                    
+                    // 备用逻辑：通过Clip长度计算
                     if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
                     {
                         var clip = stateSharedData.animationConfig.calculator.GetCurrentClip(_animationRuntime);

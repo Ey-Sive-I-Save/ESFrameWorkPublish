@@ -211,6 +211,18 @@ namespace ES
         public Dictionary<StateBase, int> stateToSlotMap = new Dictionary<StateBase, int>(64);
 
         /// <summary>
+        /// 正在淡入的状态字典 - 用于淡入效果更新
+        /// </summary>
+        [NonSerialized]
+        public Dictionary<StateBase, FadeData> fadeInStates = new Dictionary<StateBase, FadeData>();
+
+        /// <summary>
+        /// 正在淡出的状态字典 - 用于淡出效果更新
+        /// </summary>
+        [NonSerialized]
+        public Dictionary<StateBase, FadeData> fadeOutStates = new Dictionary<StateBase, FadeData>();
+
+        /// <summary>
         /// 最大预分配槽位数 - 避免无限增长
         /// </summary>
         [LabelText("最大Playable槽位")]
@@ -685,6 +697,32 @@ namespace ES
         {
             return new StateExitResult { canExit = false, failureReason = reason, pipeline = pipelineType };
         }
+    }
+
+    /// <summary>
+    /// 淡入淡出数据 - 用于动画权重淡入淡出效果
+    /// </summary>
+    public class FadeData
+    {
+        /// <summary>
+        /// 已经过的时间
+        /// </summary>
+        public float elapsedTime;
+
+        /// <summary>
+        /// 淡入淡出持续时间
+        /// </summary>
+        public float duration;
+
+        /// <summary>
+        /// Playable槽位索引
+        /// </summary>
+        public int slotIndex;
+
+        /// <summary>
+        /// 起始权重（用于淡出）
+        /// </summary>
+        public float startWeight = 1f;
     }
 
     #endregion
@@ -1509,6 +1547,9 @@ namespace ES
                 }
             }
 
+            // ★ 更新淡入淡出效果
+            UpdateFades(deltaTime);
+
             // 更新三个流水线的MainState
             UpdatePipelineMainState(basicPipeline);
             UpdatePipelineMainState(mainPipeline);
@@ -1592,6 +1633,147 @@ namespace ES
                 rootMixer.SetInputWeight(buffPipeline.rootInputIndex, buffPipeline.weight);
             }
         }
+
+        #region 淡入淡出系统
+
+        /// <summary>
+        /// 应用淡入效果到新激活的状态
+        /// </summary>
+        private void ApplyFadeIn(StateBase state, StatePipelineRuntime pipeline)
+        {
+            if (state?.stateSharedData == null || !state.stateSharedData.enableFadeInOut)
+                return;
+
+            float fadeInDuration = state.stateSharedData.fadeInDuration;
+            if (fadeInDuration <= 0f || !pipeline.stateToSlotMap.ContainsKey(state))
+                return;
+
+            // 初始化淡入：权重从0开始
+            int slotIndex = pipeline.stateToSlotMap[state];
+            pipeline.mixer.SetInputWeight(slotIndex, 0f);
+
+            // 记录淡入数据（需要在StatePipelineRuntime中添加字段）
+            if (!pipeline.fadeInStates.ContainsKey(state))
+            {
+                pipeline.fadeInStates[state] = new FadeData
+                {
+                    elapsedTime = 0f,
+                    duration = fadeInDuration,
+                    slotIndex = slotIndex
+                };
+
+                StateMachineDebugSettings.Global.LogFade(
+                    $"[淡入] 状态 {state.strKey} 开始淡入，时长 {fadeInDuration:F2}秒");
+            }
+        }
+
+        /// <summary>
+        /// 应用淡出效果到即将停用的状态
+        /// </summary>
+        private void ApplyFadeOut(StateBase state, StatePipelineRuntime pipeline)
+        {
+            if (state?.stateSharedData == null || !state.stateSharedData.enableFadeInOut)
+                return;
+
+            float fadeOutDuration = state.stateSharedData.fadeOutDuration;
+            if (fadeOutDuration <= 0f || !pipeline.stateToSlotMap.ContainsKey(state))
+                return;
+
+            // 记录淡出数据
+            int slotIndex = pipeline.stateToSlotMap[state];
+            float currentWeight = pipeline.mixer.GetInputWeight(slotIndex);
+            
+            if (!pipeline.fadeOutStates.ContainsKey(state))
+            {
+                pipeline.fadeOutStates[state] = new FadeData
+                {
+                    elapsedTime = 0f,
+                    duration = fadeOutDuration,
+                    slotIndex = slotIndex,
+                    startWeight = currentWeight
+                };
+
+                state.OnFadeOutStarted();
+                StateMachineDebugSettings.Global.LogFade(
+                    $"[淡出] 状态 {state.strKey} 开始淡出，时长 {fadeOutDuration:F2}秒，起始权重 {currentWeight:F2}");
+            }
+        }
+
+        /// <summary>
+        /// 更新所有流水线的淡入淡出效果
+        /// </summary>
+        private void UpdateFades(float deltaTime)
+        {
+            UpdatePipelineFades(basicPipeline, deltaTime);
+            UpdatePipelineFades(mainPipeline, deltaTime);
+            UpdatePipelineFades(buffPipeline, deltaTime);
+        }
+
+        /// <summary>
+        /// 更新单个流水线的淡入淡出效果
+        /// </summary>
+        private void UpdatePipelineFades(StatePipelineRuntime pipeline, float deltaTime)
+        {
+            if (pipeline == null || !pipeline.mixer.IsValid())
+                return;
+
+            // 更新淡入状态
+            var fadeInToRemove = new List<StateBase>();
+            foreach (var kvp in pipeline.fadeInStates)
+            {
+                var state = kvp.Key;
+                var fadeData = kvp.Value;
+
+                fadeData.elapsedTime += deltaTime;
+                float t = Mathf.Clamp01(fadeData.elapsedTime / fadeData.duration);
+                float weight = Mathf.Lerp(0f, 1f, t);
+
+                pipeline.mixer.SetInputWeight(fadeData.slotIndex, weight);
+
+                if (t >= 1f)
+                {
+                    fadeInToRemove.Add(state);
+                    state.OnFadeInComplete();
+                    StateMachineDebugSettings.Global.LogFade(
+                        $"[淡入完成] 状态 {state.strKey}");
+                }
+            }
+
+            // 移除已完成的淡入状态
+            foreach (var state in fadeInToRemove)
+            {
+                pipeline.fadeInStates.Remove(state);
+            }
+
+            // 更新淡出状态
+            var fadeOutToRemove = new List<StateBase>();
+            foreach (var kvp in pipeline.fadeOutStates)
+            {
+                var state = kvp.Key;
+                var fadeData = kvp.Value;
+
+                fadeData.elapsedTime += deltaTime;
+                float t = Mathf.Clamp01(fadeData.elapsedTime / fadeData.duration);
+                float weight = Mathf.Lerp(fadeData.startWeight, 0f, t);
+
+                pipeline.mixer.SetInputWeight(fadeData.slotIndex, weight);
+
+                if (t >= 1f)
+                {
+                    fadeOutToRemove.Add(state);
+                    StateMachineDebugSettings.Global.LogFade(
+                        $"[淡出完成] 状态 {state.strKey}");
+                }
+            }
+
+            // 移除已完成的淡出状态
+            foreach (var state in fadeOutToRemove)
+            {
+                pipeline.fadeOutStates.Remove(state);
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// 输出持续统计信息 - 简洁版，不干扰游戏运行
@@ -2770,6 +2952,9 @@ namespace ES
             // 如果状态有动画，热插拔到Playable图
             HotPlugStateToPlayable(targetState, pipeline);
 
+            // ★ 应用淡入逻辑（如果启用）
+            ApplyFadeIn(targetState, pipeline);
+
             // 重新评估MainState
             UpdatePipelineMainState(pipeline);
 
@@ -2843,8 +3028,14 @@ namespace ES
         {
             if (state == null) return;
 
-            // 从Playable图中卸载状态动画
+            // ★ 应用淡出逻辑（如果启用）
             var pipelineData = GetPipelineByType(pipeline);
+            if (pipelineData != null)
+            {
+                ApplyFadeOut(state, pipelineData);
+            }
+
+            // 从Playable图中卸载状态动画
             if (pipelineData != null)
             {
                 HotUnplugStateFromPlayable(state, pipelineData);

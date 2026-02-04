@@ -66,6 +66,29 @@ namespace ES
     public float[] weightTargetCache;                     // 目标权重缓存
     public float[] weightVelocityCache;                   // 权重速度缓存（用于平滑）
     public bool useSmoothing = true;                      // 是否启用权重平滑
+    
+    // ==================== 嵌套支持 ====================
+    /// <summary>
+    /// 子Calculator的Runtime（用于MixerCalculator嵌套）
+    /// 支持一层嵌套，推荐深度≤2层
+    /// </summary>
+    public AnimationCalculatorRuntime childRuntime;
+
+    // ==================== 序列混合器数据 ====================
+    /// <summary>
+    /// 当前序列阶段：0=Entry, 1=Main, 2=Exit
+    /// </summary>
+    public int sequencePhase;
+
+    /// <summary>
+    /// 当前阶段的已运行时间
+    /// </summary>
+    public float phaseStartTime;
+
+    /// <summary>
+    /// 整个序列是否已完成
+    /// </summary>
+    public bool sequenceCompleted;
         
         // ==================== 三角形结构体 ====================
         public struct Triangle

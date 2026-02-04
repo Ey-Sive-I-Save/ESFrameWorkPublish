@@ -46,6 +46,11 @@ namespace ES
 
         [ShowIf("enableDebug")]
         [BoxGroup("调试开关/详细控制")]
+        [LabelText("淡入淡出日志"), Tooltip("记录动画淡入淡出过程")]
+        public bool logFadeEffects = true;
+
+        [ShowIf("enableDebug")]
+        [BoxGroup("调试开关/详细控制")]
         [LabelText("错误和警告"), Tooltip("始终输出错误和警告（即使enableDebug=false）")]
         public bool alwaysLogErrors = true;
 
@@ -127,6 +132,15 @@ namespace ES
         {
             if (enableDebug && logDirtySystem)
                 Debug.Log($"[Dirty] {message}");
+        }
+
+        /// <summary>
+        /// 条件日志 - 淡入淡出效果
+        /// </summary>
+        public void LogFade(string message)
+        {
+            if (enableDebug && logFadeEffects)
+                Debug.Log($"[Fade] {message}");
         }
 
         /// <summary>

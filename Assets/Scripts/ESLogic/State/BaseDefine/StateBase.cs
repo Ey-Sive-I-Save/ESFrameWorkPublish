@@ -32,6 +32,34 @@ namespace ES
         [NonSerialized]
         public float activationTime = 0f;
 
+        #region 运行时数据（保证可用）
+        
+        /// <summary>
+        /// 已经进入时间（从进入状态过去的时间）
+        /// </summary>
+        [NonSerialized]
+        public float hasEnterTime = 0f;
+
+        /// <summary>
+        /// 归一化进度（适用于循环动画）[0-1]
+        /// </summary>
+        [NonSerialized]
+        public float normalizedProgress = 0f;
+
+        /// <summary>
+        /// 总体进度（比如05.5代表已经循环了5次）
+        /// </summary>
+        [NonSerialized]
+        public float totalProgress = 0f;
+
+        /// <summary>
+        /// 循环次数（完成的循环次数）
+        /// </summary>
+        [NonSerialized]
+        public int loopCount = 0;
+
+        #endregion
+
         [LabelText("共享数据", SdfIconType.Calendar2Date), FoldoutGroup("基础属性"), NonSerialized/*不让自动序列化*/] public StateSharedData stateSharedData = null;
         [LabelText("自变化数据", SdfIconType.Calendar3Range), FoldoutGroup("基础属性")] public StateVariableData stateVariableData;
 
@@ -46,6 +74,46 @@ namespace ES
         /// </summary>
         [NonSerialized]
         private bool _shouldAutoExitFromAnimation = false;
+
+        #endregion
+
+        #region 增强回调系统
+
+        /// <summary>
+        /// 状态进度回调（每帧调用）
+        /// 子类可重写实现基于进度的逻辑
+        /// </summary>
+        protected virtual void OnProgressUpdate(float normalizedProgress, float totalProgress)
+        {
+            // 默认不实现，子类重写
+        }
+
+        /// <summary>
+        /// 循环完成回调
+        /// 子类可重写实现循环触发逻辑
+        /// </summary>
+        protected virtual void OnLoopCompleted(int loopCount)
+        {
+            // 默认不实现，子类重写
+        }
+
+        /// <summary>
+        /// 淡入完成回调
+        /// 由StateMachine调用
+        /// </summary>
+        public virtual void OnFadeInComplete()
+        {
+            // 默认不实现，子类重写
+        }
+
+        /// <summary>
+        /// 淡出开始回调
+        /// 由StateMachine调用
+        /// </summary>
+        public virtual void OnFadeOutStarted()
+        {
+            // 默认不实现，子类重写
+        }
 
         #endregion
 
@@ -65,7 +133,14 @@ namespace ES
             baseStatus = StateBaseStatus.Running;
             stateRuntimePhase = StateRuntimePhase.Running;
             activationTime = Time.time; // 记录激活时间
+            
+            // 重置运行时数据
+            hasEnterTime = 0f;
+            normalizedProgress = 0f;
+            totalProgress = 0f;
+            loopCount = 0;
             _shouldAutoExitFromAnimation = false; // 重置动画完毕标志
+            
             OnStateEnterLogic();
         }
 
@@ -149,6 +224,10 @@ namespace ES
         /// <param name="deltaTime">帧时间</param>
         public virtual void UpdateAnimationWeights(StateMachineContext context, float deltaTime)
         {
+            // 更新运行时数据
+            hasEnterTime += deltaTime;
+            UpdateRuntimeProgress(deltaTime);
+            
             if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
             {
                 stateSharedData.animationConfig.calculator.UpdateWeights(_animationRuntime, context, deltaTime);
@@ -159,6 +238,56 @@ namespace ES
                     CheckAnimationCompletion();
                 }
             }
+        }
+
+        /// <summary>
+        /// 更新运行时进度数据
+        /// </summary>
+        private void UpdateRuntimeProgress(float deltaTime)
+        {
+            // 获取标准动画时长（不经历外部缩放速度）
+            float standardDuration = GetStandardAnimationDuration();
+            
+            int previousLoopCount = loopCount;  // 记录上一次的循环次数
+            
+            if (standardDuration > 0.001f)
+            {
+                // 计算总体进度
+                totalProgress = hasEnterTime / standardDuration;
+                
+                // 计算归一化进度 [0-1]
+                normalizedProgress = totalProgress % 1.0f;
+                
+                // 计算循环次数
+                loopCount = Mathf.FloorToInt(totalProgress);
+            }
+            else
+            {
+                // 无法获取时长，使用简单递增
+                normalizedProgress = Mathf.Repeat(hasEnterTime, 1.0f);
+                totalProgress = hasEnterTime;
+            }
+            
+            // 调用进度回调
+            OnProgressUpdate(normalizedProgress, totalProgress);
+            
+            // 检测循环完成
+            if (loopCount > previousLoopCount)
+            {
+                OnLoopCompleted(loopCount);
+            }
+        }
+
+        /// <summary>
+        /// 获取标准动画时长（不经历外部缩放速度）
+        /// </summary>
+        public float GetStandardAnimationDuration()
+        {
+            if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
+            {
+                return stateSharedData.animationConfig.calculator.GetStandardDuration(_animationRuntime);
+            }
+            return 0f;
         }
 
         /// <summary>

@@ -74,20 +74,30 @@ namespace ES
             StateMachineDebugSettings.Global.LogWarning($"[{GetType().Name}] 不支持Clip覆盖");
             return false;
         }
-    }
-    // ==================== 扩展StateAnimationConfigData ====================
-
-
-        // ==================== 单Clip计算器 ====================
 
         /// <summary>
-        /// 简单Clip - 直接播放单个AnimationClip
-        /// 支持运行时Clip覆盖，可接入任意Mixer
+        /// 获取标准动画时长（不经历外部缩放速度）
+        /// 用于计算归一化进度和循环次数
         /// </summary>
-        [Serializable, TypeRegistryItem("单一Clip播放器")]
-        public class StateAnimationMixCalculatorForSimpleClip : StateAnimationMixCalculator
+        /// <param name="runtime">运行时数据</param>
+        /// <returns>标准动画时长（秒），0表示无法获取</returns>
+        public virtual float GetStandardDuration(AnimationCalculatorRuntime runtime)
         {
-            public AnimationClip clip;
+            // 默认实现：返回0（子类需要override）
+            return 1f;
+        }
+    }
+
+    // ==================== 单Clip计算器 ====================
+
+    /// <summary>
+    /// 简单Clip - 直接播放单个AnimationClip
+    /// 支持运行时Clip覆盖，可接入任意Mixer
+    /// </summary>
+    [Serializable, TypeRegistryItem("单一Clip播放器")]
+    public class StateAnimationMixCalculatorForSimpleClip : StateAnimationMixCalculator
+    {
+        public AnimationClip clip;
 
             [Range(0f, 3f)]
             public float speed = 1f;
@@ -160,6 +170,13 @@ namespace ES
                 runtime.singlePlayable.SetTime(oldTime);
                 
                 return true;
+            }
+
+            public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
+            {
+                // SimpleClip: 返回Clip原始长度（不考虑speed缩放）
+                var currentClip = GetCurrentClip(runtime);
+                return currentClip != null ? currentClip.length : 1f;  // 默认1秒
             }
         }
 
@@ -424,7 +441,32 @@ namespace ES
                 runtime.playables[clipIndex].SetTime(oldTime);
                 graph.Connect(runtime.playables[clipIndex], 0, runtime.mixer, clipIndex);
                 
+                samples[clipIndex].clip = newClip;
                 return true;
+            }
+
+            public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
+            {
+                // BlendTree1D: 返回当前权重最大的Clip的长度
+                if (runtime.weightCache == null || runtime.weightCache.Length == 0)
+                    return 1f;  // 默认1秒
+
+                int maxWeightIndex = 0;
+                float maxWeight = 0f;
+                for (int i = 0; i < runtime.weightCache.Length; i++)
+                {
+                    if (runtime.weightCache[i] > maxWeight)
+                    {
+                        maxWeight = runtime.weightCache[i];
+                        maxWeightIndex = i;
+                    }
+                }
+
+                if (maxWeightIndex < samples.Length && samples[maxWeightIndex].clip != null)
+                {
+                    return samples[maxWeightIndex].clip.length;
+                }
+                return 1f;  // 默认1秒
             }
         }
 
@@ -1264,8 +1306,424 @@ namespace ES
                 graph.Connect(runtime.playables[clipIndex], 0, runtime.mixer, clipIndex);
                 runtime.mixer.SetInputWeight(clipIndex, currentWeight);
                 
+                clips[clipIndex].clip = newClip;
                 return true;
             }
+
+            public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
+            {
+                // DirectBlend: 返回当前权重最大的Clip的长度
+                if (runtime.currentWeights == null || runtime.currentWeights.Length == 0)
+                    return 1f;  // 默认1秒
+
+                int maxWeightIndex = 0;
+                float maxWeight = 0f;
+                for (int i = 0; i < runtime.currentWeights.Length; i++)
+                {
+                    if (runtime.currentWeights[i] > maxWeight)
+                    {
+                        maxWeight = runtime.currentWeights[i];
+                        maxWeightIndex = i;
+                    }
+                }
+
+                if (maxWeightIndex < clips.Length && clips[maxWeightIndex].clip != null)
+                {
+                    return clips[maxWeightIndex].clip.length;
+                }
+                return 1f;  // 默认1秒
+            }
         }
-    
+
+        // ==================== 序列混合器（前中后三段式） ====================
+
+        /// <summary>
+        /// 序列混合器 - 在主动画前后自动插入过渡Clip
+        /// 典型应用场景：
+        /// 1. 攻击动画：预备(准备姿态) → 主体(挥砍) → 收尾(收刀)
+        /// 2. 技能释放：前摇(读条) → 施法(特效) → 后摇(硬直)
+        /// 3. 开门动画：推门(Entry) → 穿过(Main) → 关门(Exit)
+        /// 4. 换弹动画：拆卸(Entry) → 装填(Main) → 上膛(Exit)
+        /// 
+        /// 优势：
+        /// - 自动管理三段式时间轴，无需手动计算时间点
+        /// - 支持独立速度缩放（前摇1x，主体2x，后摇0.5x）
+        /// - 支持可选前后Clip（Entry/Exit可为null）
+        /// - 零GC实现，运行时无分配
+        /// </summary>
+        [Serializable, TypeRegistryItem("序列混合器(前-主-后)")]
+        public class SequentialClipMixer : StateAnimationMixCalculator
+        {
+            [BoxGroup("前置动画(Entry)")]
+            [LabelText("前置Clip"), Tooltip("可选，在主动画前播放（如攻击预备、技能前摇）")]
+            public AnimationClip entryClip;
+
+            [BoxGroup("前置动画(Entry)")]
+            [LabelText("前置速度"), Range(0.1f, 5f), ShowIf("@entryClip != null")]
+            public float entrySpeed = 1f;
+
+            [BoxGroup("主动画(Main)"), HideLabel]
+            [InlineProperty]
+            public MainClipConfig mainConfig = new MainClipConfig();
+
+            [BoxGroup("后置动画(Exit)")]
+            [LabelText("后置Clip"), Tooltip("可选，在主动画后播放（如攻击收尾、技能后摇）")]
+            public AnimationClip exitClip;
+
+            [BoxGroup("后置动画(Exit)")]
+            [LabelText("后置速度"), Range(0.1f, 5f), ShowIf("@exitClip != null")]
+            public float exitSpeed = 1f;
+
+            [BoxGroup("高级选项")]
+            [LabelText("循环主动画"), Tooltip("是否循环播放主动画（前后Clip只播放一次）")]
+            public bool loopMainClip = false;
+
+            [BoxGroup("高级选项")]
+            [LabelText("允许提前退出"), Tooltip("是否允许在主动画阶段提前退出（跳过后置Clip）")]
+            public bool allowEarlyExit = true;
+
+            [Serializable]
+            public struct MainClipConfig
+            {
+                [LabelText("主Clip"), Tooltip("必须，核心动画")]
+                public AnimationClip clip;
+
+                [LabelText("主速度"), Range(0.1f, 5f)]
+                public float speed;
+
+                public MainClipConfig(AnimationClip clip = null, float speed = 1f)
+                {
+                    this.clip = clip;
+                    this.speed = speed;
+                }
+            }
+
+            public override AnimationCalculatorRuntime CreateRuntimeData()
+            {
+                var runtime = base.CreateRuntimeData();
+                runtime.sequencePhase = 0; // 0=Entry, 1=Main, 2=Exit
+                runtime.phaseStartTime = 0f;
+                return runtime;
+            }
+
+            public override bool InitializeRuntime(AnimationCalculatorRuntime runtime, PlayableGraph graph, ref Playable output)
+            {
+                if (mainConfig.clip == null)
+                {
+                    StateMachineDebugSettings.Global.LogError("[SequentialMixer] 主Clip不能为null");
+                    return false;
+                }
+
+                // 创建Mixer（3个输入：Entry、Main、Exit）
+                runtime.mixer = AnimationMixerPlayable.Create(graph, 3);
+                runtime.playables = new AnimationClipPlayable[3];
+
+                // 创建Entry Playable（可选）
+                if (entryClip != null)
+                {
+                    runtime.playables[0] = AnimationClipPlayable.Create(graph, entryClip);
+                    runtime.playables[0].SetSpeed(entrySpeed);
+                    runtime.playables[0].SetDuration(entryClip.length / entrySpeed);
+                    graph.Connect(runtime.playables[0], 0, runtime.mixer, 0);
+                }
+
+                // 创建Main Playable（必须）
+                runtime.playables[1] = AnimationClipPlayable.Create(graph, mainConfig.clip);
+                runtime.playables[1].SetSpeed(mainConfig.speed);
+                if (loopMainClip)
+                {
+                    runtime.playables[1].SetDuration(double.PositiveInfinity); // 无限循环
+                }
+                graph.Connect(runtime.playables[1], 0, runtime.mixer, 1);
+
+                // 创建Exit Playable（可选）
+                if (exitClip != null)
+                {
+                    runtime.playables[2] = AnimationClipPlayable.Create(graph, exitClip);
+                    runtime.playables[2].SetSpeed(exitSpeed);
+                    runtime.playables[2].SetDuration(exitClip.length / exitSpeed);
+                    graph.Connect(runtime.playables[2], 0, runtime.mixer, 2);
+                }
+
+                // 初始化：播放Entry或Main
+                runtime.sequencePhase = (entryClip != null) ? 0 : 1;
+                runtime.phaseStartTime = 0f;
+                UpdatePhaseWeights(runtime);
+
+                output = runtime.mixer;
+                runtime.IsInitialized = true;
+
+                StateMachineDebugSettings.Global.LogRuntimeInit(
+                    $"[SequentialMixer] 初始化完成: Entry={entryClip?.name ?? "None"}, Main={mainConfig.clip.name}, Exit={exitClip?.name ?? "None"}");
+                return true;
+            }
+
+            public override void UpdateWeights(AnimationCalculatorRuntime runtime, in StateMachineContext context, float deltaTime)
+            {
+                if (!runtime.mixer.IsValid())
+                    return;
+
+                runtime.phaseStartTime += deltaTime;
+
+                // 检查当前阶段是否完成，自动切换到下一阶段
+                bool phaseCompleted = false;
+                switch (runtime.sequencePhase)
+                {
+                    case 0: // Entry阶段
+                        if (entryClip != null && runtime.playables[0].IsValid())
+                        {
+                            double duration = entryClip.length / entrySpeed;
+                            if (runtime.phaseStartTime >= duration)
+                            {
+                                phaseCompleted = true;
+                            }
+                        }
+                        else
+                        {
+                            phaseCompleted = true; // Entry不存在，立即进入Main
+                        }
+                        break;
+
+                    case 1: // Main阶段
+                        if (!loopMainClip && mainConfig.clip != null)
+                        {
+                            double duration = mainConfig.clip.length / mainConfig.speed;
+                            if (runtime.phaseStartTime >= duration)
+                            {
+                                phaseCompleted = true;
+                            }
+                        }
+                        // 循环模式下Main永不完成（除非外部强制退出）
+                        break;
+
+                    case 2: // Exit阶段
+                        if (exitClip != null && runtime.playables[2].IsValid())
+                        {
+                            double duration = exitClip.length / exitSpeed;
+                            if (runtime.phaseStartTime >= duration)
+                            {
+                                // Exit完成，整个序列结束
+                                runtime.sequenceCompleted = true;
+                            }
+                        }
+                        else
+                        {
+                            runtime.sequenceCompleted = true; // Exit不存在，序列结束
+                        }
+                        break;
+                }
+
+                // 阶段切换
+                if (phaseCompleted)
+                {
+                    runtime.sequencePhase++;
+                    runtime.phaseStartTime = 0f;
+
+                    // 重置即将播放的阶段的Playable时间
+                    if (runtime.sequencePhase < 3 && runtime.playables[runtime.sequencePhase].IsValid())
+                    {
+                        runtime.playables[runtime.sequencePhase].SetTime(0);
+                    }
+
+                    UpdatePhaseWeights(runtime);
+
+                    StateMachineDebugSettings.Global.LogAnimationBlend(
+                        $"[SequentialMixer] 阶段切换: Phase {runtime.sequencePhase - 1} → {runtime.sequencePhase}");
+                }
+            }
+
+            /// <summary>
+            /// 更新三个阶段的权重（只有当前阶段权重为1）
+            /// </summary>
+            private void UpdatePhaseWeights(AnimationCalculatorRuntime runtime)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    float weight = (i == runtime.sequencePhase) ? 1f : 0f;
+                    runtime.mixer.SetInputWeight(i, weight);
+                }
+            }
+
+            public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
+            {
+                switch (runtime.sequencePhase)
+                {
+                    case 0: return entryClip;
+                    case 1: return mainConfig.clip;
+                    case 2: return exitClip;
+                    default: return null;
+                }
+            }
+
+            public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
+            {
+                float totalDuration = 0f;
+
+                // Entry时长
+                if (entryClip != null)
+                    totalDuration += entryClip.length / entrySpeed;
+
+                // Main时长（循环模式返回无限）
+                if (loopMainClip)
+                    return float.PositiveInfinity;
+                if (mainConfig.clip != null)
+                    totalDuration += mainConfig.clip.length / mainConfig.speed;
+
+                // Exit时长
+                if (exitClip != null)
+                    totalDuration += exitClip.length / exitSpeed;
+
+                return totalDuration > 0f ? totalDuration : 1f;
+            }
+
+            public override bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)
+            {
+                if (clipIndex < 0 || clipIndex >= 3)
+                {
+                    StateMachineDebugSettings.Global.LogError($"[SequentialMixer] 索引越界: {clipIndex} (0=Entry, 1=Main, 2=Exit)");
+                    return false;
+                }
+
+                if (clipIndex == 1 && newClip == null)
+                {
+                    StateMachineDebugSettings.Global.LogError("[SequentialMixer] Main Clip不能为null");
+                    return false;
+                }
+
+                if (!runtime.playables[clipIndex].IsValid())
+                {
+                    StateMachineDebugSettings.Global.LogWarning($"[SequentialMixer] Playable[{clipIndex}]无效，可能该阶段原本为空");
+                    return false;
+                }
+
+                // 替换Playable
+                var graph = runtime.playables[clipIndex].GetGraph();
+                var oldSpeed = runtime.playables[clipIndex].GetSpeed();
+                var oldTime = runtime.playables[clipIndex].GetTime();
+
+                runtime.mixer.DisconnectInput(clipIndex);
+                runtime.playables[clipIndex].Destroy();
+
+                if (newClip != null)
+                {
+                    runtime.playables[clipIndex] = AnimationClipPlayable.Create(graph, newClip);
+                    runtime.playables[clipIndex].SetSpeed(oldSpeed);
+                    runtime.playables[clipIndex].SetTime(oldTime);
+                    graph.Connect(runtime.playables[clipIndex], 0, runtime.mixer, clipIndex);
+                }
+
+                // 更新配置
+                switch (clipIndex)
+                {
+                    case 0: entryClip = newClip; break;
+                    case 1: mainConfig.clip = newClip; break;
+                    case 2: exitClip = newClip; break;
+                }
+
+                return true;
+            }
+
+            /// <summary>
+            /// 强制进入Exit阶段（提前退出）
+            /// </summary>
+            public void ForceExit(AnimationCalculatorRuntime runtime)
+            {
+                if (!allowEarlyExit || runtime.sequencePhase >= 2)
+                    return;
+
+                runtime.sequencePhase = 2;
+                runtime.phaseStartTime = 0f;
+                if (runtime.playables[2].IsValid())
+                {
+                    runtime.playables[2].SetTime(0);
+                }
+                UpdatePhaseWeights(runtime);
+
+                StateMachineDebugSettings.Global.LogAnimationBlend("[SequentialMixer] 强制提前退出到Exit阶段");
+            }
+        }
+
+        // ==================== 混合器包装器（支持嵌套） ====================
+
+        /// <summary>
+        /// 混合器包装器 - 支持Calculator嵌套
+        /// 用于实现上下半身分离、多层混合等高级功能
+        /// 性能: 一层嵌套几乎无影响，推荐深度≤2层
+        /// </summary>
+        [Serializable, TypeRegistryItem("混合器包装器")]
+        public class MixerCalculator : StateAnimationMixCalculator
+        {
+            [SerializeReference, LabelText("子计算器")]
+            public StateAnimationMixCalculator childCalculator;
+
+            [LabelText("权重缩放"), Range(0f, 1f), Tooltip("对子Calculator的输出权重进行缩放")]
+            public float weightScale = 1f;
+
+            public override AnimationCalculatorRuntime CreateRuntimeData()
+            {
+                // 创建运行时数据，包含子Calculator的Runtime
+                var runtime = new AnimationCalculatorRuntime();
+                if (childCalculator != null)
+                {
+                    runtime.childRuntime = childCalculator.CreateRuntimeData();
+                }
+                return runtime;
+            }
+
+            public override bool InitializeRuntime(AnimationCalculatorRuntime runtime, PlayableGraph graph, ref Playable output)
+            {
+                if (childCalculator == null)
+                {
+                    StateMachineDebugSettings.Global.LogError("[MixerCalculator] 子计算器为null");
+                    return false;
+                }
+
+                // 初始化子Calculator，将其输出作为我们的输出
+                bool success = childCalculator.InitializeRuntime(runtime.childRuntime, graph, ref output);
+                
+                if (success)
+                {
+                    runtime.IsInitialized = true;
+                    StateMachineDebugSettings.Global.LogRuntimeInit($"[MixerCalculator] 嵌套初始化成功: {childCalculator.GetType().Name}");
+                }
+                
+                return success;
+            }
+
+            public override void UpdateWeights(AnimationCalculatorRuntime runtime, in StateMachineContext context, float deltaTime)
+            {
+                if (childCalculator != null && runtime.childRuntime != null)
+                {
+                    // 递归更新子Calculator
+                    childCalculator.UpdateWeights(runtime.childRuntime, context, deltaTime);
+                }
+            }
+
+            public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
+            {
+                if (childCalculator != null && runtime.childRuntime != null)
+                {
+                    return childCalculator.GetCurrentClip(runtime.childRuntime);
+                }
+                return null;
+            }
+
+            public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
+            {
+                if (childCalculator != null && runtime.childRuntime != null)
+                {
+                    return childCalculator.GetStandardDuration(runtime.childRuntime);
+                }
+                return 1f;  // 默认1秒
+            }
+
+            public override bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)
+            {
+                if (childCalculator != null && runtime.childRuntime != null)
+                {
+                    return childCalculator.OverrideClip(runtime.childRuntime, clipIndex, newClip);
+                }
+                return false;
+            }
+        }
 }

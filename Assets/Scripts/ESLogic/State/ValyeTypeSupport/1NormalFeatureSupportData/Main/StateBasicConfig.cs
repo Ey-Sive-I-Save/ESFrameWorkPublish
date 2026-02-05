@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
+using UnityEngine.Serialization;
 namespace ES
 {
 
@@ -40,14 +41,34 @@ namespace ES
         public bool canBeFeedback = false;
 
         [VerticalGroup("Identity/Right")]
-        [LabelText("Fallback通道索引")]
-        [Tooltip("当canBeFeedback=true时，指定该Fallback状态对应的通道索引（0-4），注册时会自动设置到StateMachineContext中")]
-        [Range(0, 4)]
+        [LabelText("Fallback支持标记")]
+        [Tooltip("当canBeFeedback=true时，指定该Fallback状态对应的支持标记。")]
         [ShowIf("canBeFeedback")]
-        public int fallbackChannelIndex = 0;
+        [FormerlySerializedAs("fallbackChannelIndex")]
+        public StateSupportFlags fallbackSupportFlag = StateSupportFlags.Grounded;
 
         [LabelText("状态描述"), TextArea(2, 3)]
         public string description = "";
+
+        [BoxGroup("支持标记")]
+        [LabelText("忽略SupportFlags")]
+        [Tooltip("启用后该状态不会受SupportFlags限制（如Buff/特效状态）。")]
+        public bool ignoreSupportFlags = false;
+
+        [BoxGroup("支持标记")]
+        [LabelText("进入前必须满足")]
+        [Tooltip("进入该状态前必须满足的支持标记（位标记）。")]
+        public StateSupportFlags requiredSupportFlags = StateSupportFlags.None;
+
+        [BoxGroup("支持标记")]
+        [LabelText("进入后自动设置")]
+        [Tooltip("进入该状态后自动设置的支持标记（位标记）。当前不会自动应用，供外部系统使用。")]
+        public StateSupportFlags setSupportFlagsOnEnter = StateSupportFlags.None;
+
+        [BoxGroup("支持标记")]
+        [LabelText("进入后自动清除")]
+        [Tooltip("进入该状态后自动清除的支持标记（位标记）。当前不会自动应用，供外部系统使用。")]
+        public StateSupportFlags clearSupportFlagsOnEnter = StateSupportFlags.None;
 
         [BoxGroup("动画混合配置")]
         [LabelText("使用直接混合（无淡入淡出）")]

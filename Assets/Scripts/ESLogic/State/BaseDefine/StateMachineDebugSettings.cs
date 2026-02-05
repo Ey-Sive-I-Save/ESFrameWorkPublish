@@ -6,9 +6,10 @@ namespace ES
 {
     /// <summary>
     /// 状态机全局调试设置 - 一键控制所有Debug日志输出
+    /// 支持编辑器配置：在Project面板右键 Create → ES → StateMachine Debug Settings
     /// </summary>
-    [Serializable]
-    public class StateMachineDebugSettings
+    [CreateAssetMenu(fileName = "StateMachineDebugSettings", menuName = "ES/StateMachine Debug Settings", order = 100)]
+    public class StateMachineDebugSettings : ESEditorGlobalSo<StateMachineDebugSettings>
     {
         [TitleGroup("调试开关", "控制状态机各模块的Debug日志输出", BoldTitle = true, Indent = false)]
         [LabelText("启用全局Debug"), Tooltip("总开关，关闭后所有Debug日志都不输出")]
@@ -64,21 +65,6 @@ namespace ES
         [LabelText("权重详细信息"), Tooltip("输出每个动画的详细权重值")]
         public bool logWeightDetails = false;
 
-        /// <summary>
-        /// 全局单例（可选，也可以每个StateMachine持有自己的Settings）
-        /// </summary>
-        private static StateMachineDebugSettings _globalInstance;
-        public static StateMachineDebugSettings Global
-        {
-            get
-            {
-                if (_globalInstance == null)
-                {
-                    _globalInstance = new StateMachineDebugSettings();
-                }
-                return _globalInstance;
-            }
-        }
 
         /// <summary>
         /// 条件日志 - 状态切换

@@ -28,6 +28,19 @@ namespace ES
     [Serializable, TypeRegistryItem("序列状态播放器")]
     public class StateAnimationMixCalculatorForSequentialStates : StateAnimationMixCalculator
     {
+        public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.SequentialStates;
+
+        protected override string GetUsageHelp()
+        {
+             return "适用：固定顺序多阶段动作（跳跃/连招/翻滚）。\n" +
+                 "必填：phases(phaseName+primaryClip)。\n" +
+                 "可选：secondaryClip/触发参数/自动切换/过渡时长。";
+        }
+
+        protected override string GetCalculatorDisplayName()
+        {
+            return "序列状态播放器";
+        }
         /// <summary>
         /// 顺序阶段定义
         /// </summary>
@@ -228,7 +241,7 @@ namespace ES
         /// <summary>
         /// 计算器初始化
         /// </summary>
-        public void InitializeCalculator()
+        public override void InitializeCalculator()
         {
             if (_isCalculatorInitialized || phases == null || phases.Length == 0)
                 return;
@@ -250,7 +263,7 @@ namespace ES
             _isCalculatorInitialized = true;
         }
 
-        public override bool InitializeRuntime(AnimationCalculatorRuntime runtime, PlayableGraph graph, ref Playable output)
+        protected override bool InitializeRuntimeInternal(AnimationCalculatorRuntime runtime, PlayableGraph graph, ref Playable output)
         {
             InitializeCalculator();
 
@@ -303,7 +316,6 @@ namespace ES
             runtime.useSmoothing = blendSmoothTime > 0.001f;
 
             output = runtime.mixer;
-            runtime.IsInitialized = true;
             return true;
         }
 

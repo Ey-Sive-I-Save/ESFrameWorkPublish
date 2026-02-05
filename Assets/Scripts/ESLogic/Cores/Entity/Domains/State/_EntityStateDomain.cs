@@ -77,62 +77,58 @@ namespace ES
             stateAniDataPack.Check();
             _cachedInfos.Clear();
             
-            foreach (var info in stateAniDataPack.Infos.Values)
-            {
-                if (info == null) continue;
-                
-                // 1. 确保Runtime初始化（不重复）
-                if (!info.sharedData.IsRuntimeInitialized)
-                {
-                    info.InitializeRuntime();
-                }
-                
-                // 2. 缓存info
-                _cachedInfos.Add(info);
-                
-                // 3. 创建StateBase实例并注册到状态机
-                if (stateMachine != null)
-                {
-                    var state = CreateStateFromInfo(info);
-                    if (state != null)
-                    {
-                        // 获取管线类型
-                        var pipelineType = info.sharedData.basicConfig.pipelineType;
-                        
-                        // 获取状态名称（优先使用配置）
-                        string stateName = string.IsNullOrEmpty(info.sharedData.basicConfig.stateName) 
-                            ? null  // 传null让StateMachine自动生成
-                            : info.sharedData.basicConfig.stateName;
-                        
-                        // 注册到状态机（仅使用string键，StateMachine自动生成intKey和处理fallback）
-                        bool registered = stateMachine.RegisterState(stateName ?? "AutoState", state, pipelineType);
-                        
-                        if (!registered)
-                        {
-                            Debug.LogWarning($"[StateDomain] 注册状态失败: {stateName}");
-                        }
-                    }
-                }
-            }
+            // 批量注册所有状态
+            RegisterStatesFromInfos(stateAniDataPack.Infos.Values, allowOverride: false);
 
             _packDirty = false;
         }
         
         /// <summary>
-        /// 从StateAniDataInfo创建StateBase实例
+        /// 批量注册状态（从Info列表）
         /// </summary>
-        private StateBase CreateStateFromInfo(StateAniDataInfo info)
+        /// <param name="infos">状态Info集合</param>
+        /// <param name="allowOverride">是否允许覆盖已存在的状态键</param>
+        /// <returns>成功注册的状态数量</returns>
+        public int RegisterStatesFromInfos(IEnumerable<StateAniDataInfo> infos, bool allowOverride = false)
         {
-            // 创建基础状态实例
-            var state = new StateBase();
+            if (infos == null) return 0;
             
-            // 绑定SharedData
-            state.stateSharedData = info.sharedData;
+            int successCount = 0;
+            foreach (var info in infos)
+            {
+                if (RegisterStateFromInfo(info, allowOverride))
+                {
+                    successCount++;
+                }
+            }
             
-            // 绑定VariableData（运行时独立数据）
-            state.stateVariableData = new StateVariableData();
+            return successCount;
+        }
+        
+        /// <summary>
+        /// 注册单个状态（从Info）- 纯粹委托给StateMachine
+        /// </summary>
+        /// <param name="info">状态Info</param>
+        /// <param name="allowOverride">是否允许覆盖已存在的状态键</param>
+        /// <returns>是否注册成功</returns>
+        public bool RegisterStateFromInfo(StateAniDataInfo info, bool allowOverride = false)
+        {
+            if (stateMachine == null)
+            {
+                Debug.LogError("[StateDomain] 状态机未初始化，无法注册状态");
+                return false;
+            }
             
-            return state;
+            // 直接委托给StateMachine处理所有逻辑（初始化、键冲突、注册）
+            bool registered = stateMachine.RegisterStateFromInfo(info, allowOverride);
+            
+            // 注册成功后缓存Info（用于Domain层管理）
+            if (registered && info != null)
+            {
+                _cachedInfos.Add(info);
+            }
+            
+            return registered;
         }
         
         private void InitializeStateMachine()
@@ -170,6 +166,35 @@ namespace ES
         }
 
         #region 测试方法
+
+        [Button("动态注册单个状态"), FoldoutGroup("状态注册")]
+        public void TestRegisterSingleState(StateAniDataInfo info, bool allowOverride = false)
+        {
+            if (info == null)
+            {
+                Debug.LogWarning("[StateDomain] 请提供有效的StateAniDataInfo");
+                return;
+            }
+            
+            bool success = RegisterStateFromInfo(info, allowOverride);
+            if (success)
+            {
+                Debug.Log($"[StateDomain] 动态注册成功: {info.sharedData.basicConfig.stateName}");
+            }
+        }
+
+        [Button("重新注册所有状态（覆盖）"), FoldoutGroup("状态注册")]
+        public void TestReregisterAllStates()
+        {
+            if (stateAniDataPack == null)
+            {
+                Debug.LogWarning("[StateDomain] 状态数据包为空");
+                return;
+            }
+            
+            int count = RegisterStatesFromInfos(stateAniDataPack.Infos.Values, allowOverride: true);
+            Debug.Log($"[StateDomain] 重新注册完成，共 {count} 个状态");
+        }
 
         [Button("测试激活状态(String)"), FoldoutGroup("测试功能")]
         public void TestActivateStateByString(string stateKey)

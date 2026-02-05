@@ -15,6 +15,10 @@ namespace ES
         Main = 1,     // 主线 - 技能、表情、交互等互相排斥的动作
         [InspectorName("Buff线")]
         Buff = 2,     // Buff线 - 特效、状态效果
-        Count
+        Count,
+
+
+
+        NotClear=99,  // 不清除标记 - 用于某些特殊情况，表示不清除当前流水线的动画状态
     }
 }

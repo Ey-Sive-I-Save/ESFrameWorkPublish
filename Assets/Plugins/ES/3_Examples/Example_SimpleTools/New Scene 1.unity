@@ -989,6 +989,83 @@ Transform:
   - {fileID: 915158774}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &837284910
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 837284912}
+  - component: {fileID: 837284911}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &837284911
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 837284910}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ab733f30950a9f94396b121fd6fff9a5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  stringMap:
+    baseKeys:
+    - AAA
+    - CCC
+    - DD
+    - 
+    relations:
+    - key: AAA
+      relatedKeys:
+      - AAA
+      - CCC
+    - key: CCC
+      relatedKeys:
+      - AAA
+      - DD
+    - key: DD
+      relatedKeys:
+      - AAA
+  intMap:
+    baseKeys: 00000000000000000000000000000000
+    relations: []
+  enumMap:
+    baseKeys: 01000000030000000400000005000000
+    relations:
+    - key: 1
+      relatedKeys: 01000000
+    - key: 3
+      relatedKeys: 03000000
+    - key: 4
+      relatedKeys: 01000000
+    - key: 5
+      relatedKeys: 0100000003000000
+  runOnStart: 1
+--- !u!4 &837284912
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 837284910}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.7164879, y: -2.6965032, z: -11.430472}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &915158773
 GameObject:
   m_ObjectHideFlags: 0
@@ -1790,7 +1867,7 @@ Animator:
   m_GameObject: {fileID: 2081736437}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: a166f20cb1bba8b4780ce3e897fcc411, type: 3}
-  m_Controller: {fileID: 9100000, guid: 5dd8b41e30f29fc47a069cca42b499c4, type: 2}
+  m_Controller: {fileID: 0}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -1847,7 +1924,7 @@ MonoBehaviour:
     moveInput: {x: 0, y: 0, z: 0}
     lookInput: {x: 0, y: 0, z: 1}
     verticalInput: 0
-    locomotionMode: 0
+    locomotionSupportFlags: 1
     monitor:
       hasMotor: 0
       isStableOnGround: 0
@@ -1857,8 +1934,6 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: -2
-      type: {class: , ns: , asm: }
     - rid: 3128555941174181889
       type: {class: EntityBasicDomain, ns: ES, asm: ES_Logic}
       data:
@@ -2386,13 +2461,14 @@ MonoBehaviour:
         stateMachine:
           stateMachineKey: 
           defaultStateKey: 
-          basicPipeline:
-            rid: -2
-          mainPipeline:
-            rid: -2
-          buffPipeline:
-            rid: -2
+          pipelineBlendMode: 1
+          testTempKey: TestAnim
+          testClip: {fileID: 0}
+          testPipeline: 1
+          testSpeed: 1
+          testLoopable: 0
         defaultStateKey: 
+        initialStateName: 
     - rid: 3128555942915604490
       type: {class: EntityBasicCameraModule, ns: ES, asm: ES_Logic}
       data:
@@ -2525,3 +2601,4 @@ SceneRoots:
   - {fileID: 1580964203}
   - {fileID: 672649523}
   - {fileID: 354340708}
+  - {fileID: 837284912}

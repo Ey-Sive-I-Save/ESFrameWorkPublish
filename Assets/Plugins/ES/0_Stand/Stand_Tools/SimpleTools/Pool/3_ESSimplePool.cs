@@ -42,7 +42,16 @@ namespace ES
             mResetMethod = resetMethod;
             mOnCreate = onCreate;
             mOnDestroy = onDestroy;
-            mMaxCount = maxCount;
+            if (maxCount <= 0)
+            {
+                mMaxCount = 0;
+                mEnableMaxLimit = false;
+            }
+            else
+            {
+                mMaxCount = maxCount;
+                mEnableMaxLimit = true;
+            }
 
             // 预热对象池
             if (initCount > 0)

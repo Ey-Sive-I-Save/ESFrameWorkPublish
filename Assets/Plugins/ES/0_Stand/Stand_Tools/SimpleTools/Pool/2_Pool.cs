@@ -95,7 +95,11 @@ namespace ES
         public void SetMaxCount(int maxCount, bool enableLimit = true)
         {
             if (maxCount <= 0)
-                throw new ArgumentException("Max count must be greater than 0", nameof(maxCount));
+            {
+                mMaxCount = 0;
+                mEnableMaxLimit = false;
+                return;
+            }
             mMaxCount = maxCount;
             mEnableMaxLimit = enableLimit;
             // 如果当前数量超过新的最大值，清理多余对象

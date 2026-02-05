@@ -2,740 +2,22 @@ using ES;
 using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
 
 namespace ES
 {
-    #region 辅助结构定义
-
     /// <summary>
-    /// 状态激活测试结果 - 描述状态能否激活以及需要执行的操作
+    /// 状态机基类 - 专为Entity提供的高性能并行状态管理系统。
+    /// 设计思路参考UE状态机，支持流水线、并行状态、动画混合等高级特性。
+    /// 核心逻辑默认稳定可用，扩展点通过回调/配置开放，避免子类侵入式重写。
     /// </summary>
-    [Serializable]
-    public struct StateActivationResult
-    {
-        /// <summary>
-        /// 是否可以激活
-        /// </summary>
-        public bool canActivate;
-
-        /// <summary>
-        /// 是否需要打断当前状态
-        /// </summary>
-        public bool requiresInterruption;
-
-        /// <summary>
-        /// 需要打断的状态列表
-        /// </summary>
-        public List<StateBase> statesToInterrupt;
-
-        /// <summary>
-        /// 是否可以直接合并（多个状态并行）
-        /// </summary>
-        public bool canMerge;
-
-        /// <summary>
-        /// 是否可以直接合并（无需打断）
-        /// </summary>
-        public bool mergeDirectly;
-
-        /// <summary>
-        /// 可以合并的状态列表
-        /// </summary>
-        public List<StateBase> statesToMergeWith;
-
-        /// <summary>
-        /// 打断数量（便于快速判断）
-        /// </summary>
-        public int interruptCount;
-
-        /// <summary>
-        /// 合并数量（便于快速判断）
-        /// </summary>
-        public int mergeCount;
-
-        /// <summary>
-        /// 失败原因
-        /// </summary>
-        public string failureReason;
-
-        /// <summary>
-        /// 目标流水线
-        /// </summary>
-        public StatePipelineType targetPipeline;
-
-        /// <summary>
-        /// 注意：statesToInterrupt / statesToMergeWith 为内部复用列表引用，不建议外部长期持有。
-        /// </summary>
-
-        /// <summary>
-        /// 创建成功结果
-        /// </summary>
-        public static StateActivationResult Success(StatePipelineType pipeline, bool merge = false)
-        {
-            return new StateActivationResult
-            {
-                canActivate = true,
-                requiresInterruption = false,
-                canMerge = merge,
-                mergeDirectly = merge,
-                statesToInterrupt = new List<StateBase>(),
-                statesToMergeWith = new List<StateBase>(),
-                interruptCount = 0,
-                mergeCount = 0,
-                failureReason = string.Empty,
-                targetPipeline = pipeline
-            };
-        }
-
-        /// <summary>
-        /// 创建打断结果
-        /// </summary>
-        public static StateActivationResult Interrupt(StatePipelineType pipeline, List<StateBase> toInterrupt)
-        {
-            return new StateActivationResult
-            {
-                canActivate = true,
-                requiresInterruption = true,
-                canMerge = false,
-                mergeDirectly = false,
-                statesToInterrupt = toInterrupt,
-                statesToMergeWith = new List<StateBase>(),
-                interruptCount = toInterrupt?.Count ?? 0,
-                mergeCount = 0,
-                failureReason = string.Empty,
-                targetPipeline = pipeline
-            };
-        }
-
-        /// <summary>
-        /// 创建合并结果
-        /// </summary>
-        public static StateActivationResult Merge(StatePipelineType pipeline, List<StateBase> mergeWith)
-        {
-            return new StateActivationResult
-            {
-                canActivate = true,
-                requiresInterruption = false,
-                canMerge = true,
-                mergeDirectly = true,
-                statesToInterrupt = new List<StateBase>(),
-                statesToMergeWith = mergeWith,
-                interruptCount = 0,
-                mergeCount = mergeWith?.Count ?? 0,
-                failureReason = string.Empty,
-                targetPipeline = pipeline
-            };
-        }
-
-        /// <summary>
-        /// 创建失败结果
-        /// </summary>
-        public static StateActivationResult Failure(string reason)
-        {
-            return new StateActivationResult
-            {
-                canActivate = false,
-                requiresInterruption = false,
-                canMerge = false,
-                mergeDirectly = false,
-                statesToInterrupt = new List<StateBase>(),
-                statesToMergeWith = new List<StateBase>(),
-                interruptCount = 0,
-                mergeCount = 0,
-                failureReason = reason,
-                targetPipeline = StatePipelineType.Basic
-            };
-        }
-    }
-
-    /// <summary>
-    /// 流水线数据 - 管理单个流水线中的状态
-    /// </summary>
-    public class StatePipelineRuntime
-    {
-        /// <summary>
-        /// 所属状态机引用
-        /// </summary>
-        [NonSerialized]
-        public StateMachine stateMachine;
-
-        [LabelText("流水线类型")]
-        public StatePipelineType pipelineType;
-
-        [LabelText("主状态"), ShowInInspector, ReadOnly]
-
-        public StateBase mainState;
-
-        [LabelText("空转反馈状态"), ShowInInspector]
-        public StateBase feedbackState;
-
-        [LabelText("当前运行状态集合"), ShowInInspector, ReadOnly]
-        [NonSerialized]
-        public HashSet<StateBase> runningStates = new HashSet<StateBase>();
-
-        [LabelText("流水线权重"), Range(0f, 1f)]
-        public float weight = 1f;
-
-        [LabelText("是否启用")]
-        public bool isEnabled = true;
-
-        [LabelText("优先级"), Tooltip("数值越大优先级越高")]
-        public int priority = 0;
-
-        /// <summary>
-        /// Playable混合器 - 该流水线的动画混合器
-        /// </summary>
-        [NonSerialized]
-        public AnimationMixerPlayable mixer;
-
-        /// <summary>
-        /// 该流水线在RootMixer中的输入索引
-        /// </summary>
-        [NonSerialized]
-        public int rootInputIndex = -1;
-
-        /// <summary>
-        /// Playable槽位池 - 记录空闲的输入索引（用于复用）
-        /// </summary>
-        [NonSerialized]
-        public Stack<int> freeSlots = new Stack<int>(64);
-
-        /// <summary>
-        /// 状态到输入索引的映射 - 用于快速查找和卸载
-        /// </summary>
-        [NonSerialized,ShowInInspector]
-        public Dictionary<StateBase, int> stateToSlotMap = new Dictionary<StateBase, int>(64);
-
-        /// <summary>
-        /// 正在淡入的状态字典 - 用于淡入效果更新
-        /// </summary>
-        [NonSerialized]
-        public Dictionary<StateBase, FadeData> fadeInStates = new Dictionary<StateBase, FadeData>();
-
-        /// <summary>
-        /// 正在淡出的状态字典 - 用于淡出效果更新
-        /// </summary>
-        [NonSerialized]
-        public Dictionary<StateBase, FadeData> fadeOutStates = new Dictionary<StateBase, FadeData>();
-
-        /// <summary>
-        /// 最大预分配槽位数 - 避免无限增长
-        /// </summary>
-        [LabelText("最大Playable槽位")]
-        public int maxPlayableSlots = 32;
-
-        // ===== FallBack多通道系统（每个流水线独立配置）=====
-        // 当流水线运行状态为空时，使用FallBack作为默认回退状态
-        // 使用int映射到具体的状态ID，每个Channel对应不同流水线的FallBack
-        // 玩家可自定义：Channel0=地面Idle，Channel1=空中Idle，Channel2=水下Idle，Channel3=载具Idle，Channel4=特殊Idle
-        // 默认使用Channel0，最多支持5个独立流水线的FallBack配置
-        [LabelText("默认FallBack通道")]
-        public int DefaultFallBackChannel = 0; // 默认FallBack通道索引
-        [LabelText("Channel0 FallBack")]
-        public int FallBackForChannel0 = -1; // 默认通道FallBack状态ID（-1表示无FallBack）
-        [LabelText("Channel1 FallBack")]
-        public int FallBackForChannel1 = -1; // 扩展通道1 FallBack状态ID
-        [LabelText("Channel2 FallBack")]
-        public int FallBackForChannel2 = -1; // 扩展通道2 FallBack状态ID
-        [LabelText("Channel3 FallBack")]
-        public int FallBackForChannel3 = -1; // 扩展通道3 FallBack状态ID
-        [LabelText("Channel4 FallBack")]
-        public int FallBackForChannel4 = -1; // 扩展通道4 FallBack状态ID
-
-        // ===== Dirty机制（流水线级别的脏标记）=====
-        /// <summary>
-        /// Dirty等级（用于标记流水线需要更新，Update时根据此等级执行不同任务）
-        /// 使用 MarkDirty(level) 来标记：
-        ///   level > 0: 标记为Dirty，取当前值和新值的较大值
-        ///   level <= 0: 清除Dirty（0=清除，-1=Apply后清除）
-        /// 
-        /// 建议的等级划分（可自定义）：
-        ///   3 = 重要状态变更（如状态激活/停用）
-        ///   2 = 中等变更（如热插拔操作）
-        ///   1 = 轻度变更（如自动衰减）
-        /// 
-        /// Update时根据等级执行任务：
-        ///   if (dirtyLevel >= 3) { 执行高优先级任务... }
-        ///   if (dirtyLevel >= 1) { 执行FallBack自动激活等任务... }
-        /// </summary>
-        [LabelText("Dirty等级"), ShowInInspector, ReadOnly]
-        [NonSerialized]
-        public int dirtyLevel = 0;
-
-        /// <summary>
-        /// 上次Dirty时间（用于自动衰减）
-        /// </summary>
-        [NonSerialized]
-        private float lastDirtyTime = 0f;
-        
-        /// <summary>
-        /// 是否为Dirty状态
-        /// </summary>
-        public bool IsDirty => dirtyLevel > 0;
-
-        /// <summary>
-        /// 流水线是否有活动状态
-        /// </summary>
-        public bool HasActiveStates => runningStates.Count > 0;
-
-        public StatePipelineRuntime(StatePipelineType type, StateMachine machine)
-        {
-            pipelineType = type;
-            stateMachine = machine;
-            runningStates = new HashSet<StateBase>();
-        }
-
-        /// <summary>
-        /// 更新流水线权重到根部Mixer
-        /// </summary>
-        public void UpdatePipelineMixer()
-        {
-            if (stateMachine == null || !stateMachine.IsPlayableGraphValid) return;
-
-            var rootMixer = stateMachine.rootMixer;
-            if (!rootMixer.IsValid()) return;
-
-            if (rootInputIndex >= 0 && rootInputIndex < rootMixer.GetInputCount())
-            {
-                rootMixer.SetInputWeight(rootInputIndex, weight);
-            }
-        }
-
-        /// <summary>
-        /// 激活状态并加载到Mixer
-        /// </summary>
-        public bool ActivateState(StateBase state)
-        {
-            if (state == null || stateMachine == null) return false;
-
-            if (runningStates.Contains(state)) return false;
-
-            // 激活状态
-            runningStates.Add(state);
-            stateMachine.runningStates.Add(state);
-
-            // 热插拔到Playable图
-            if (stateMachine.IsPlayableGraphValid && mixer.IsValid())
-            {
-                stateMachine.HotPlugStateToPlayable(state, this);
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// 停用状态并从 Mixer卸载
-        /// </summary>
-        public bool DeactivateState(StateBase state)
-        {
-            if (state == null || stateMachine == null) return false;
-
-            if (!runningStates.Contains(state)) return false;
-
-            // 热拔插从Pla<b图
-            if (stateMachine.IsPlayableGraphValid && mixer.IsValid())
-            {
-                stateMachine.HotUnplugStateFromPlayable(state, this);
-            }
-
-            // 停用状态
-            runningStates.Remove(state);
-            stateMachine.runningStates.Remove(state);
-
-            return true;
-        }
-
-        /// <summary>
-        /// 获取指定通道的FallBack状态ID
-        /// 当流水线运行状态为空时，返回此状态ID作为默认回退状态
-        /// </summary>
-        /// <param name="channel">通道索引（0-4），传入-1使用DefaultFallBackChannel</param>
-        /// <returns>FallBack状态ID，-1表示无FallBack</returns>
-        public int GetFallBack(int channel = -1)
-        {
-            // 如果传入-1，使用默认通道
-            int originalChannel = channel;
-            if (channel < 0)
-                channel = DefaultFallBackChannel;
-            
-            int result;
-            switch (channel)
-            {
-                case 0: result = FallBackForChannel0; break;
-                case 1: result = FallBackForChannel1; break;
-                case 2: result = FallBackForChannel2; break;
-                case 3: result = FallBackForChannel3; break;
-                case 4: result = FallBackForChannel4; break;
-                default: 
-                    Debug.LogWarning($"[FallBack-Get] ⚠ [{pipelineType}] 通道索引超出范围({channel})，回退到Channel0");
-                    result = FallBackForChannel0;
-                    break;
-            }
-            
-            Debug.Log($"[FallBack-Get] [{pipelineType}] GetFallBack(原始Channel={originalChannel}, 实际Channel={channel}) -> StateID={result}");
-            return result;
-        }
-        
-        /// <summary>
-        /// 设置指定通道的FallBack状态ID
-        /// </summary>
-        /// <param name="stateID">状态ID，-1表示无FallBack</param>
-        /// <param name="channel">通道索引（0-4），传入-1使用DefaultFallBackChannel</param>
-        public void SetFallBack(int stateID, int channel = -1)
-        {
-            // 如果传入-1，使用默认通道
-            int originalChannel = channel;
-            if (channel < 0)
-                channel = DefaultFallBackChannel;
-            
-            Debug.Log($"[FallBack-Set] [{pipelineType}] SetFallBack(StateID={stateID}, 原始Channel={originalChannel}, 实际Channel={channel})");
-            
-            switch (channel)
-            {
-                case 0: 
-                    FallBackForChannel0 = stateID;
-                    Debug.Log($"[FallBack-Set]   Ch0: {stateID}");
-                    break;
-                case 1: 
-                    FallBackForChannel1 = stateID;
-                    Debug.Log($"[FallBack-Set]   Ch1: {stateID}");
-                    break;
-                case 2: 
-                    FallBackForChannel2 = stateID;
-                    Debug.Log($"[FallBack-Set]   Ch2: {stateID}");
-                    break;
-                case 3: 
-                    FallBackForChannel3 = stateID;
-                    Debug.Log($"[FallBack-Set]   Ch3: {stateID}");
-                    break;
-                case 4: 
-                    FallBackForChannel4 = stateID;
-                    Debug.Log($"[FallBack-Set]   Ch4: {stateID}");
-                    break;
-                default:
-                    Debug.LogError($"[FallBack-Set] ✗ [{pipelineType}] 无效的通道索引: {channel}");
-                    break;
-            }
-        }
-        
-        /// <summary>
-        /// 设置默认FallBack通道索引
-        /// </summary>
-        /// <param name="channel">通道索引（0-4）</param>
-        public void SetFallBackChannel(int channel)
-        {
-            if (channel >= 0 && channel <= 4)
-                DefaultFallBackChannel = channel;
-        }
-        
-        /// <summary>
-        /// 获取当前默认FallBack通道索引
-        /// </summary>
-        public int GetFallBackChannel()
-        {
-            return DefaultFallBackChannel;
-        }
-        
-        /// <summary>
-        /// 检查指定通道是否配置了FallBack状态
-        /// </summary>
-        /// <param name="channel">通道索引（0-4），传入-1使用DefaultFallBackChannel</param>
-        public bool HasFallBack(int channel = -1)
-        {
-            return GetFallBack(channel) >= 0;
-        }
-
-        /// <summary>
-        /// 标记Dirty状态（通用方法，可在任何需要标记流水线变更的地方调用）
-        /// level > 0: 标记为Dirty，取当前值和新值的较大值（高优先级不被低优先级覆盖）
-        /// level <= 0: 清除Dirty（0=清除，-1=Apply后清除）
-        /// 
-        /// 使用示例：
-        ///   MarkDirty(3);  // 标记为等级3的Dirty
-        ///   MarkDirty(1);  // 如果当前已经是3，则保持3；如果是0，则变为1
-        ///   MarkDirty(0);  // 清除Dirty
-        /// </summary>
-        public void MarkDirty(int level)
-        {
-            if (level > 0)
-            {
-                // 取最大值
-                if (level > dirtyLevel)
-                {
-                    dirtyLevel = level;
-                    lastDirtyTime = Time.time;
-                    Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty等级: {dirtyLevel}");
-                }
-            }
-            else
-            {
-                // 关闭/应用Dirty
-                Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty已应用/关闭 (旧等级={dirtyLevel})");
-                dirtyLevel = 0;
-            }
-        }
-
-        /// <summary>
-        /// 更新Dirty自动标记（每秒自动Dirty=1，用于持续触发低优先级任务检查）
-        /// 在StateMachine的Update中调用，确保流水线定期检查FallBack等低优先级任务
-        /// 
-        /// 工作原理：
-        /// - 如果 dirtyLevel > 1（2或3），经过1秒后降级到1
-        /// - 如果 dirtyLevel = 1，保持不变
-        /// - 如果 dirtyLevel = 0，不会自动变为1（需要手动MarkDirty）
-        /// 
-        /// 用途：保持最低Dirty等级1，确保FallBack等任务能够持续检查
-        /// </summary>
-        public void UpdateDirtyDecay()
-        {
-            if (dirtyLevel > 1)
-            {
-                float elapsed = Time.time - lastDirtyTime;
-                if (elapsed >= 1.0f)
-                {
-                    // 降级到等级1（保持最低Dirty等级）
-                    MarkDirty(1);
-                }
-            }
-        }
-
-        /// <summary>
-        /// 获取Mixer连接详细信息
-        /// </summary>
-        public string GetMixerConnectionInfo()
-        {
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"╔═══════════════════════════════════════════════════════════════╗");
-            sb.AppendLine($"║  [{pipelineType}] 流水线连接信息");
-            sb.AppendLine($"╚═══════════════════════════════════════════════════════════════╝");
-            sb.AppendLine();
-
-            // 基本信息
-            sb.AppendLine($"┌─ 基本配置 ────────────────────────────────────────────────┐");
-            sb.AppendLine($"│  流水线类型: {pipelineType}");
-            sb.AppendLine($"│  权重: {weight:F3} | 启用: {(isEnabled ? "✓" : "✗")} | 优先级: {priority}");
-            sb.AppendLine($"│  FallBack通道: Ch{DefaultFallBackChannel} | Ch0={FallBackForChannel0}, Ch1={FallBackForChannel1}, Ch2={FallBackForChannel2}, Ch3={FallBackForChannel3}, Ch4={FallBackForChannel4}");
-            sb.AppendLine($"│  主状态: {(mainState != null ? $"{mainState.strKey} (ID:{mainState.intKey})" : "无")}");
-            sb.AppendLine($"└───────────────────────────────────────────────────────────┘");
-            sb.AppendLine();
-
-            // RootMixer连接状态
-            sb.AppendLine($"┌─ RootMixer连接 ───────────────────────────────────────────┐");
-            if (stateMachine != null && stateMachine.rootMixer.IsValid())
-            {
-                var rootMixer = stateMachine.rootMixer;
-                bool isConnected = rootInputIndex >= 0 && rootInputIndex < rootMixer.GetInputCount();
-                sb.AppendLine($"│  状态: {(isConnected ? "✓ 已连接" : "✗ 未连接")}");
-                sb.AppendLine($"│  索引: {rootInputIndex}");
-                if (isConnected)
-                {
-                    float actualWeight = rootMixer.GetInputWeight(rootInputIndex);
-                    sb.AppendLine($"│  实际权重: {actualWeight:F3} {(Mathf.Approximately(actualWeight, weight) ? "" : $"(配置: {weight:F3})")}");
-                    var input = rootMixer.GetInput(rootInputIndex);
-                    sb.AppendLine($"│  输入Playable: {(input.IsValid() ? $"有效 ({input.GetPlayableType().Name})" : "无效")}");
-                }
-            }
-            else
-            {
-                sb.AppendLine($"│  状态: ✗ StateMachine或RootMixer无效");
-            }
-            sb.AppendLine($"└───────────────────────────────────────────────────────────┘");
-            sb.AppendLine();
-
-            // Mixer自身信息
-            sb.AppendLine($"┌─ 流水线Mixer ─────────────────────────────────────────────┐");
-            if (mixer.IsValid())
-            {
-                sb.AppendLine($"│  状态: ✓ 有效");
-                sb.AppendLine($"│  输入槽位数: {mixer.GetInputCount()} / {maxPlayableSlots} (最大)");
-                sb.AppendLine($"│  已使用槽位: {stateToSlotMap.Count}");
-                sb.AppendLine($"│  空闲槽位数: {freeSlots.Count}");
-            }
-            else
-            {
-                sb.AppendLine($"│  状态: ✗ 无效");
-            }
-            sb.AppendLine($"└───────────────────────────────────────────────────────────┘");
-            sb.AppendLine();
-
-            // 运行状态列表
-            sb.AppendLine($"┌─ 运行状态 ({runningStates.Count}) ─────────────────────────────────────────┐");
-            if (runningStates.Count > 0)
-            {
-                int index = 0;
-                foreach (var state in runningStates)
-                {
-                    string prefix = index == runningStates.Count - 1 ? "└─" : "├─";
-                    string stateInfo = $"{state.strKey} (ID:{state.intKey})";
-                    
-                    // 检查是否有动画连接
-                    bool hasAnimation = state.stateSharedData?.hasAnimation ?? false;
-                    string animStatus = hasAnimation ? "有动画" : "无动画";
-                    
-                    // 检查槽位映射
-                    string slotInfo = "";
-                    if (hasAnimation && stateToSlotMap.TryGetValue(state, out int slot))
-                    {
-                        if (mixer.IsValid() && slot < mixer.GetInputCount())
-                        {
-                            float slotWeight = mixer.GetInputWeight(slot);
-                            var slotInput = mixer.GetInput(slot);
-                            slotInfo = $"→ Slot[{slot}] 权重:{slotWeight:F3} {(slotInput.IsValid() ? "✓" : "✗")}";
-                        }
-                        else
-                        {
-                            slotInfo = $"→ Slot[{slot}] ⚠无效";
-                        }
-                    }
-                    else if (hasAnimation)
-                    {
-                        slotInfo = "→ ⚠未映射";
-                    }
-
-                    sb.AppendLine($"│ {prefix} {stateInfo} [{animStatus}] {slotInfo}");
-                    index++;
-                }
-            }
-            else
-            {
-                sb.AppendLine($"│  (空闲)");
-            }
-            sb.AppendLine($"└───────────────────────────────────────────────────────────┘");
-            sb.AppendLine();
-
-            // 槽位详细映射
-            if (stateToSlotMap.Count > 0)
-            {
-                sb.AppendLine($"┌─ 槽位映射详情 ({stateToSlotMap.Count}) ──────────────────────────────────┐");
-                var sortedSlots = stateToSlotMap.OrderBy(kvp => kvp.Value);
-                foreach (var kvp in sortedSlots)
-                {
-                    var state = kvp.Key;
-                    var slot = kvp.Value;
-                    string slotStatus = "✓";
-                    string weightInfo = "";
-                    
-                    if (mixer.IsValid() && slot < mixer.GetInputCount())
-                    {
-                        var input = mixer.GetInput(slot);
-                        if (!input.IsValid())
-                        {
-                            slotStatus = "✗ 断开";
-                        }
-                        else
-                        {
-                            float w = mixer.GetInputWeight(slot);
-                            weightInfo = $"权重:{w:F3}";
-                        }
-                    }
-                    else
-                    {
-                        slotStatus = "⚠ 越界";
-                    }
-                    
-                    sb.AppendLine($"│  Slot[{slot,2}] {slotStatus} ← {state.strKey,-20} {weightInfo}");
-                }
-                sb.AppendLine($"└───────────────────────────────────────────────────────────┘");
-                sb.AppendLine();
-            }
-
-            // 空闲槽位池
-            if (freeSlots.Count > 0)
-            {
-                sb.AppendLine($"┌─ 空闲槽位池 ({freeSlots.Count}) ──────────────────────────────────────┐");
-                var freeArray = freeSlots.ToArray();
-                sb.Append($"│  ");
-                for (int i = 0; i < freeArray.Length; i++)
-                {
-                    sb.Append($"[{freeArray[i]}]");
-                    if ((i + 1) % 10 == 0 && i < freeArray.Length - 1)
-                    {
-                        sb.AppendLine();
-                        sb.Append($"│  ");
-                    }
-                    else if (i < freeArray.Length - 1)
-                    {
-                        sb.Append(" ");
-                    }
-                }
-                sb.AppendLine();
-                sb.AppendLine($"└───────────────────────────────────────────────────────────┘");
-            }
-
-            return sb.ToString();
-        }
-
-#if UNITY_EDITOR
-        [Button("输出Mixer连接信息", ButtonSizes.Medium), PropertyOrder(-1)]
-        private void DebugPrintMixerConnection()
-        {
-            UnityEngine.Debug.Log(GetMixerConnectionInfo());
-        }
-#endif
-    }
-
-    /// <summary>
-    /// 状态退出测试结果
-    /// </summary>
-    [Serializable]
-    public struct StateExitResult
-    {
-        public bool canExit;
-        public string failureReason;
-        public StatePipelineType pipeline;
-
-        public static StateExitResult Success(StatePipelineType pipelineType)
-        {
-            return new StateExitResult { canExit = true, failureReason = string.Empty, pipeline = pipelineType };
-        }
-
-        public static StateExitResult Failure(string reason, StatePipelineType pipelineType)
-        {
-            return new StateExitResult { canExit = false, failureReason = reason, pipeline = pipelineType };
-        }
-    }
-
-    /// <summary>
-    /// 淡入淡出数据 - 用于动画权重淡入淡出效果
-    /// </summary>
-    public class FadeData
-    {
-        /// <summary>
-        /// 已经过的时间
-        /// </summary>
-        public float elapsedTime;
-
-        /// <summary>
-        /// 淡入淡出持续时间
-        /// </summary>
-        public float duration;
-
-        /// <summary>
-        /// Playable槽位索引
-        /// </summary>
-        public int slotIndex;
-
-        /// <summary>
-        /// 起始权重（用于淡出）
-        /// </summary>
-        public float startWeight = 1f;
-    }
-
-    #endregion
-
-    /// <summary>
-    /// 状态机基类 - 专为Entity提供的高性能并行状态管理系统
-    /// 设计思路参考UE的状态机，支持流水线、并行状态、动画混合等高级特性
-    /// 功能完备，无需子类重写核心逻辑
-    /// </summary>
-    [Serializable]
+    [Serializable, TypeRegistryItem("ES状态机")]
     public class StateMachine
     {
-        #region 核心引用与宿主
+        #region 核心引用与宿主（核心/不建议改）
 
         /// <summary>
         /// 宿主Entity - 状态机所属的实体对象
@@ -748,6 +30,12 @@ namespace ES
         /// </summary>
         [LabelText("状态机键"), ShowInInspector]
         public string stateMachineKey;
+
+        /// <summary>
+        /// 状态机配置（可拖入，编辑器下空则使用全局Instance）
+        /// </summary>
+        [LabelText("状态机配置")]
+        public StateMachineConfig config;
 
         /// <summary>
         /// 状态上下文 - 统一管理运行时数据、参数、标记等（整合了原StateMachineContext）
@@ -763,9 +51,20 @@ namespace ES
         [NonSerialized]
         public bool enableContinuousStats = false;
 
+#if UNITY_EDITOR
+        [OnInspectorInit]
+        private void EditorInitConfig()
+        {
+            if (config == null)
+            {
+                config = StateMachineConfig.Instance;
+            }
+        }
+#endif
+
         #endregion
 
-        #region 扩展回调与策略
+        #region 扩展回调与策略（可修改）
 
         /// <summary>
         /// 自定义激活测试（若返回非默认值将覆盖内置逻辑）
@@ -798,6 +97,11 @@ namespace ES
         public Func<StateBase, StatePipelineType, StateExitResult> CustomExitTest;
 
         /// <summary>
+        /// 动画事件回调（当状态触发动画事件时）
+        /// </summary>
+        public Action<StateBase, string, string> OnAnimationEvent;
+
+        /// <summary>
         /// 自定义通道占用计算
         /// </summary>
         public Func<IEnumerable<StateBase>, StateChannelMask> CustomChannelMaskEvaluator;
@@ -807,9 +111,14 @@ namespace ES
         /// </summary>
         public Func<IEnumerable<StateBase>, StateCostSummary> CustomCostEvaluator;
 
+        /// <summary>
+        /// 自定义主状态评分（用于 Dynamic 判据）
+        /// </summary>
+        public Func<StateBase, float> CustomMainStateScore;
+
         #endregion
 
-        #region 生命周期状态
+        #region 生命周期状态（核心/不建议改）
 
         /// <summary>
         /// 状态机是否正在运行
@@ -825,7 +134,7 @@ namespace ES
 
         #endregion
 
-        #region 流水线与并行状态管理
+        #region 流水线与并行状态管理（核心/谨慎改）
 
         /// <summary>
         /// 所有运行中的状态集合 - 支持多状态并行
@@ -833,6 +142,48 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("当前运行状态")]
         [NonSerialized]
         public HashSet<StateBase> runningStates = new HashSet<StateBase>();
+
+        /// <summary>
+        /// 当前实体支持标记（与实体KCC一致）
+        /// </summary>
+        [ShowInInspector, ReadOnly, LabelText("SupportFlags")]
+        [NonSerialized]
+        public StateSupportFlags currentSupportFlags = StateSupportFlags.Grounded;
+
+        private const StateSupportFlags LocomotionMask = StateSupportFlags.Grounded | StateSupportFlags.Swimming | StateSupportFlags.Flying;
+
+        public void SetSupportFlags(StateSupportFlags flags)
+        {
+            var beforeFlags = currentSupportFlags;
+            currentSupportFlags = flags;
+            if (beforeFlags != currentSupportFlags)
+            {
+                MarkSupportFlagsDirty();
+            }
+        }
+
+        public void SetLocomotionSupportFlags(StateSupportFlags locomotionFlags)
+        {
+            var beforeFlags = currentSupportFlags;
+            currentSupportFlags = (currentSupportFlags & ~LocomotionMask) | (locomotionFlags & LocomotionMask);
+            if (beforeFlags != currentSupportFlags)
+            {
+                MarkSupportFlagsDirty();
+            }
+        }
+
+        private void MarkSupportFlagsDirty()
+        {
+            basicPipeline.MarkDirty(PipelineDirtyFlags.FallbackCheck);
+            mainPipeline.MarkDirty(PipelineDirtyFlags.FallbackCheck);
+            buffPipeline.MarkDirty(PipelineDirtyFlags.FallbackCheck);
+        }
+
+        [NonSerialized]
+        private int[] _supportFlagToRelationIndex;
+
+        [NonSerialized]
+        private ulong[] _disableTransitionMasks;
 
         /// <summary>
         /// String键到状态的映射
@@ -865,7 +216,25 @@ namespace ES
         private readonly List<StateBase> _tmpMergeStates = new List<StateBase>(8);
 
         [NonSerialized]
+        private readonly List<StateBase> _statesToDeactivateCache = new List<StateBase>(16);
+
+        [NonSerialized]
         private readonly Dictionary<StateBase, StateActivationCache> _activationCache = new Dictionary<StateBase, StateActivationCache>(64);
+
+        [NonSerialized]
+        private readonly List<StateBase> _registeredStatesList = new List<StateBase>(256);
+
+        [NonSerialized]
+        private readonly List<StateBase> _cachedRunningStatesList = new List<StateBase>(32);
+
+        [NonSerialized]
+        private readonly List<string> _temporaryKeysCache = new List<string>(16);
+
+        [NonSerialized]
+        private readonly System.Text.StringBuilder _continuousStatsBuilder = new System.Text.StringBuilder(256);
+
+        [NonSerialized]
+        private int _cachedRunningStatesVersion = -1;
 
         [NonSerialized]
         private int _dirtyVersion = 0;
@@ -902,7 +271,7 @@ namespace ES
 
         #endregion
 
-        #region 流水线直接声明与管理
+        #region 流水线声明与管理（核心/谨慎改）
 
         /// <summary>
         /// 基础流水线 - 基础状态层
@@ -975,18 +344,18 @@ namespace ES
         {
             yield return basicPipeline;
             yield return mainPipeline;
-            if (buffPipeline != null) yield return buffPipeline;
+            yield return buffPipeline;
         }
 
         #endregion
 
-        #region Playable动画系统
+        #region Playable动画系统（核心/谨慎改）
 
         /// <summary>
         /// PlayableGraph引用 - 用于动画播放
         /// </summary>
         [NonSerialized]
-        protected PlayableGraph playableGraph;
+        public PlayableGraph playableGraph;
 
         /// <summary>
         /// 绑定的Animator
@@ -1020,7 +389,7 @@ namespace ES
 
         #endregion
 
-        #region 性能优化相关
+        #region 性能优化相关（核心/谨慎改）
 
         /// <summary>
         /// 状态转换缓存 - 避免频繁的字典查找
@@ -1077,7 +446,7 @@ namespace ES
 
         #endregion
 
-        #region 初始化与销毁
+        #region 初始化与销毁（核心/谨慎改）
 
         /// <summary>
         /// 初始化状态机
@@ -1092,16 +461,16 @@ namespace ES
             hostEntity = entity;
 
             // 初始化StateContext（整合了原StateMachineContext和动画参数）
-            if (stateContext == null)
-            {
-                stateContext = new StateMachineContext();
-                stateContext.contextID = Guid.NewGuid().ToString();
-                stateContext.creationTime = Time.time;
-                stateContext.lastUpdateTime = Time.time;
-            }
+            stateContext = new StateMachineContext();
+            stateContext.contextID = Guid.NewGuid().ToString();
+            stateContext.creationTime = Time.time;
+            stateContext.lastUpdateTime = Time.time;
 
             // 初始化流水线
             InitializePipelines(graph, root);
+
+            // 初始化SupportFlags禁用跳转缓存（超高频查询用）
+            InitializeSupportFlagsTransitionCache();
 
             // 初始化所有状态（注意：状态初始化依赖流水线已创建，所以必须在InitializePipelines之后）
             foreach (var kvp in stringToStateMap)
@@ -1109,12 +478,129 @@ namespace ES
                 InitializeState(kvp.Value);
             }
 
-            // 标记所有流水线Dirty=2，表示初始化完成，触发首次FallBack检查
-            basicPipeline?.MarkDirty(2);
-            mainPipeline?.MarkDirty(2);
-            buffPipeline?.MarkDirty(2);
+            // 标记所有流水线需要FallBack检查
+            basicPipeline.MarkDirty(PipelineDirtyFlags.FallbackCheck);
+            mainPipeline.MarkDirty(PipelineDirtyFlags.FallbackCheck);
+            buffPipeline.MarkDirty(PipelineDirtyFlags.FallbackCheck);
 
             isInitialized = true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsTransitionDisabledFast(StateSupportFlags fromFlag, StateSupportFlags toFlag)
+        {
+            if (_disableTransitionMasks == null || _supportFlagToRelationIndex == null) return false;
+            fromFlag = NormalizeSingleSupportFlag(fromFlag);
+            toFlag = NormalizeSingleSupportFlag(toFlag);
+            if (fromFlag == StateSupportFlags.None || toFlag == StateSupportFlags.None) return false;
+
+            int fromBit = GetFlagBitIndex(fromFlag);
+            int toBit = GetFlagBitIndex(toFlag);
+            if ((uint)fromBit >= 8 || (uint)toBit >= 8) return false;
+
+            int fromIndex = _supportFlagToRelationIndex[fromBit];
+            int toIndex = _supportFlagToRelationIndex[toBit];
+            if (fromIndex < 0 || toIndex < 0) return false;
+
+            return ((_disableTransitionMasks[fromBit] >> toIndex) & 1UL) != 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsTransitionDisabledMaskFast(StateSupportFlags fromFlag, ulong targetMask)
+        {
+            if (_disableTransitionMasks == null) return false;
+            fromFlag = NormalizeSingleSupportFlag(fromFlag);
+            if (fromFlag == StateSupportFlags.None) return false;
+            int fromBit = GetFlagBitIndex(fromFlag);
+            if ((uint)fromBit >= 8) return false;
+            return (_disableTransitionMasks[fromBit] & targetMask) != 0UL;
+        }
+
+        public ulong BuildTransitionMask(params StateSupportFlags[] flags)
+        {
+            if (_supportFlagToRelationIndex == null || flags == null || flags.Length == 0) return 0UL;
+            ulong mask = 0UL;
+            for (int i = 0; i < flags.Length; i++)
+            {
+                var flag = NormalizeSingleSupportFlag(flags[i]);
+                if (flag == StateSupportFlags.None) continue;
+                int bit = GetFlagBitIndex(flag);
+                if ((uint)bit >= 8) continue;
+                int index = _supportFlagToRelationIndex[bit];
+                if (index >= 0 && index < 64)
+                {
+                    mask |= 1UL << index;
+                }
+            }
+
+            return mask;
+        }
+
+        private void InitializeSupportFlagsTransitionCache()
+        {
+            if (config == null)
+            {
+                config = StateMachineConfig.Instance;
+            }
+
+            var map = config != null ? config.disableTransitionPermissionMap : null;
+            if (map == null)
+            {
+                _supportFlagToRelationIndex = null;
+                _disableTransitionMasks = null;
+                return;
+            }
+
+            _supportFlagToRelationIndex = new int[8];
+            for (int i = 0; i < _supportFlagToRelationIndex.Length; i++)
+            {
+                _supportFlagToRelationIndex[i] = -1;
+            }
+
+            _disableTransitionMasks = new ulong[8];
+            Array.Clear(_disableTransitionMasks, 0, _disableTransitionMasks.Length);
+
+            var values = (StateSupportFlags[])Enum.GetValues(typeof(StateSupportFlags));
+            for (int i = 0; i < values.Length; i++)
+            {
+                var flag = values[i];
+                if (flag == StateSupportFlags.None) continue;
+                int bitIndex = GetFlagBitIndex(flag);
+                if ((uint)bitIndex >= 8) continue;
+
+                if (map.TryGetIndex(flag, out var relationIndex))
+                {
+                    _supportFlagToRelationIndex[bitIndex] = relationIndex;
+                }
+
+                if (map.TryGetMaskFast(flag, out var mask))
+                {
+                    _disableTransitionMasks[bitIndex] = mask;
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int GetFlagBitIndex(StateSupportFlags flag)
+        {
+            byte value = (byte)flag;
+            if (value == 0) return -1;
+            int index = 0;
+            while ((value & 1) == 0)
+            {
+                value >>= 1;
+                index++;
+            }
+            return index;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static StateSupportFlags NormalizeSingleSupportFlag(StateSupportFlags flag)
+        {
+            if (flag == StateSupportFlags.None) return StateSupportFlags.None;
+            byte value = (byte)flag;
+            byte lowest = (byte)(value & (byte)(-(sbyte)value));
+            return (StateSupportFlags)lowest;
         }
 
         /// <summary>
@@ -1124,23 +610,26 @@ namespace ES
         {
             Initialize(entity, graph, root);
             BindToAnimator(animator);
+            playableGraph.Stop();
+            playableGraph.Play();
         }
 
         /// <summary>
         /// 初始化流水线系统
         /// </summary>
-        private void InitializePipelines(PlayableGraph graph, AnimationMixerPlayable root)
+        private void InitializePipelines(PlayableGraph hanldegraph, AnimationMixerPlayable root)
         {
             // Playable初始化
-            if (graph.IsValid())
+            if (hanldegraph.IsValid())
             {
-                playableGraph = graph;
+                playableGraph = hanldegraph;
+                playableGraph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
                 ownsPlayableGraph = false;
             }
             else
             {
                 playableGraph = PlayableGraph.Create($"StateMachine_{stateMachineKey}");
-                playableGraph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+                playableGraph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
                 ownsPlayableGraph = true;
             }
 
@@ -1165,6 +654,7 @@ namespace ES
 
             // 使用封装方法直接装填所有流水线
             InitializeAllPipelines();
+            InitializePipelineWeights();
         }
 
         /// <summary>
@@ -1210,7 +700,6 @@ namespace ES
         /// </summary>
         public void InitializeState(StateBase state)
         {
-            if (state == null) return;
             state.host = this;
             state.Initialize(this);
         }
@@ -1220,17 +709,15 @@ namespace ES
         /// </summary>
         public bool BindToAnimator(Animator animator)
         {
-            if (animator == null)
-            {
-                Debug.LogError("绑定Animator失败：Animator为空");
-                return false;
-            }
-
             if (!playableGraph.IsValid())
             {
                 playableGraph = PlayableGraph.Create($"StateMachine_{stateMachineKey}");
-                playableGraph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+                playableGraph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
                 ownsPlayableGraph = true;
+            }
+            else
+            {
+                playableGraph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
             }
 
             if (!rootMixer.IsValid())
@@ -1253,7 +740,9 @@ namespace ES
             animationOutput.SetSourcePlayable(rootMixer);
             // ★ 确保Output权重为1.0，否则动画不会输出
             animationOutput.SetWeight(1.0f);
-            
+
+            InitializePipelineWeights();
+
             Debug.Log($"[StateMachine] Animator绑定成功: {animator.gameObject.name}");
             return true;
         }
@@ -1276,10 +765,75 @@ namespace ES
             isDirty = false;
         }
 
+        private List<StateBase> GetCachedRunningStates()
+        {
+            if (_cachedRunningStatesVersion == _dirtyVersion)
+            {
+                return _cachedRunningStatesList;
+            }
+
+            _cachedRunningStatesList.Clear();
+            for (int i = 0; i < _registeredStatesList.Count; i++)
+            {
+                var state = _registeredStatesList[i];
+                if (runningStates.Contains(state))
+                {
+                    _cachedRunningStatesList.Add(state);
+                }
+            }
+            _cachedRunningStatesVersion = _dirtyVersion;
+            return _cachedRunningStatesList;
+        }
+
+        private StateBase GetFirstRunningState(StatePipelineRuntime pipeline)
+        {
+            var runningStates = GetCachedRunningStates();
+            for (int i = 0; i < runningStates.Count; i++)
+            {
+                var state = runningStates[i];
+                if (pipeline.runningStates.Contains(state))
+                {
+                    return state;
+                }
+            }
+
+            return null;
+        }
+
+        private static int CompareStateDeterministic(StateBase a, StateBase b)
+        {
+            if (ReferenceEquals(a, b)) return 0;
+
+            int aId = a.stateSharedData.basicConfig.stateId;
+            int bId = b.stateSharedData.basicConfig.stateId;
+            int idCompare = aId.CompareTo(bId);
+            if (idCompare != 0) return idCompare;
+
+            string aKey = a.strKey ?? string.Empty;
+            string bKey = b.strKey ?? string.Empty;
+            int keyCompare = string.CompareOrdinal(aKey, bKey);
+            if (keyCompare != 0) return keyCompare;
+
+            return 0;
+        }
+
+        private StatePipelineType ResolvePipelineForState(StateBase targetState, StatePipelineType pipeline)
+        {
+            if (pipeline != StatePipelineType.NotClear)
+            {
+                return pipeline;
+            }
+
+            if (statePipelineMap.TryGetValue(targetState, out var mappedPipeline))
+            {
+                return mappedPipeline;
+            }
+
+            return targetState.stateSharedData.basicConfig.pipelineType;
+        }
+
         private StateActivationCache GetOrCreateActivationCache(StateBase targetState)
         {
-            if (targetState == null) return null;
-
             if (!_activationCache.TryGetValue(targetState, out var cache) || cache == null)
             {
                 cache = new StateActivationCache();
@@ -1337,11 +891,8 @@ namespace ES
             StateChannelMask mask = StateChannelMask.None;
             foreach (var state in runningStates)
             {
-                var mergeData = state?.stateSharedData?.mergeData;
-                if (mergeData != null)
-                {
-                    mask |= mergeData.stateChannelMask;
-                }
+                var mergeData = state.stateSharedData.mergeData;
+                mask |= mergeData.stateChannelMask;
             }
 
             return mask;
@@ -1357,11 +908,7 @@ namespace ES
             StateCostSummary sum = new StateCostSummary();
             foreach (var state in runningStates)
             {
-                var costData = state?.stateSharedData?.costData;
-                if (costData == null || !costData.enableCostCalculation)
-                {
-                    continue;
-                }
+                var costData = state.stateSharedData.costData;
 
                 sum.motionCost += costData.motionCost;
                 sum.agilityCost += costData.agilityCost;
@@ -1373,6 +920,32 @@ namespace ES
 
             sum.totalWeighted = sum.weightedMotion + sum.weightedAgility + sum.weightedTarget;
             return sum;
+        }
+
+        private float GetMainStateScore(StateBase state)
+        {
+            var sharedData = state.stateSharedData;
+            var basic = sharedData.basicConfig;
+
+            switch (basic.mainStateCriterion)
+            {
+                case MainStateCriterionType.DirectWeight:
+                    return basic.directMainWeight;
+                case MainStateCriterionType.CostBased:
+                    {
+                        var cost = sharedData.costData;
+                        return cost.GetTotalCost();
+                    }
+                case MainStateCriterionType.Dynamic:
+                default:
+                    {
+                        if (CustomMainStateScore != null)
+                            return CustomMainStateScore(state);
+
+                        var cost = sharedData.costData;
+                        return cost.GetTotalCost();
+                    }
+            }
         }
 
         /// <summary>
@@ -1402,15 +975,12 @@ namespace ES
             foreach (var pipeline in GetAllPipelines())
             {
                 pipeline.runningStates.Clear();
-                
+
                 // 清理Playable槽位映射
-                pipeline.stateToSlotMap?.Clear();
-                pipeline.freeSlots?.Clear();
-                
-                if (pipeline.mixer.IsValid())
-                {
-                    pipeline.mixer.Destroy();
-                }
+                pipeline.stateToSlotMap.Clear();
+                pipeline.freeSlots.Clear();
+
+                pipeline.mixer.Destroy();
             }
 
             basicPipeline = null;
@@ -1434,7 +1004,7 @@ namespace ES
             _activationCache.Clear();
 
             // 清理上下文
-            stateContext?.Clear();
+            stateContext.Clear();
 
             isRunning = false;
             isInitialized = false;
@@ -1442,7 +1012,7 @@ namespace ES
 
         #endregion
 
-        #region 状态机生命周期
+        #region 状态机生命周期（核心/谨慎改）
 
         /// <summary>
         /// 启动状态机
@@ -1511,20 +1081,23 @@ namespace ES
 
             float deltaTime = Time.deltaTime;
 
+            // SupportFlags由StateMachine统一维护，无需同步
+
             // 更新上下文时间
             stateContext.lastUpdateTime = Time.time;
 
             // 更新所有运行中的状态
-            var statesToDeactivate = new List<StateBase>(); // 收集需要自动退出的状态
+            var statesToDeactivate = _statesToDeactivateCache; // 收集需要自动退出的状态
+            statesToDeactivate.Clear();
             foreach (var state in runningStates)
             {
-                if (state != null && state.baseStatus == StateBaseStatus.Running)
+                if (state.baseStatus == StateBaseStatus.Running)
                 {
                     state.OnStateUpdate();
-                    
+
                     // ★ 更新动画权重 - 2D混合树等需要通过StateContext获取参数
                     state.UpdateAnimationWeights(stateContext, deltaTime);
-                    
+
                     // ★ 检查是否应该自动退出（按持续时间模式）
                     if (state.ShouldAutoExit(Time.time))
                     {
@@ -1554,12 +1127,12 @@ namespace ES
             UpdatePipelineMainState(basicPipeline);
             UpdatePipelineMainState(mainPipeline);
             UpdatePipelineMainState(buffPipeline);
-            
+
             // 更新流水线Dirty自动标记（高等级降级到1，保持最低Dirty用于持续检查FallBack）
-            basicPipeline?.UpdateDirtyDecay();
-            mainPipeline?.UpdateDirtyDecay();
-            buffPipeline?.UpdateDirtyDecay();
-            
+            basicPipeline.UpdateDirtyDecay();
+            mainPipeline.UpdateDirtyDecay();
+            buffPipeline.UpdateDirtyDecay();
+
             // 根据Dirty等级处理不同任务（包括FallBack自动激活）
             ProcessDirtyTasks(basicPipeline, StatePipelineType.Basic);
             ProcessDirtyTasks(mainPipeline, StatePipelineType.Main);
@@ -1567,12 +1140,19 @@ namespace ES
 
             // ★ 应用流水线混合模式（Main与Basic的混合策略）
             ApplyPipelineBlendMode();
-           
-            // ★ 关键：手动推进PlayableGraph，将动画输出到Animator
-            // PlayableGraph.SetTimeUpdateMode设置为GameTime时，Evaluate会自动使用deltaTime
-            // 这确保动画持续更新并应用到Animator
+
+            // Manual模式下需要手动Evaluate推进图
             if (playableGraph.IsValid())
             {
+                if (!playableGraph.IsPlaying())
+                {
+                    playableGraph.Play();
+                }
+                StateMachineDebugSettings.Instance.LogPerformance(
+                    $"[StateMachine] 手动评估PlayableGraph，DeltaTime: {deltaTime:F4}" +
+                    playableGraph.GetTimeUpdateMode() +
+                    playableGraph.IsPlaying() +
+                    playableGraph.IsValid());
                 playableGraph.Evaluate(deltaTime);
             }
 
@@ -1581,19 +1161,19 @@ namespace ES
             {
                 OutputContinuousStats();
             }
+
         }
+
+
 
         /// <summary>
         /// 应用流水线混合模式 - 控制Main线和Basic线的混合权重
         /// </summary>
         private void ApplyPipelineBlendMode()
         {
-            if (!rootMixer.IsValid() || basicPipeline == null || mainPipeline == null)
-                return;
-
             float basicWeight = basicPipeline.weight;
             float mainWeight = mainPipeline.weight;
-            
+
             // 计算Main线的实际激活度（有运行状态则视为激活）
             float mainActivation = (mainPipeline.runningStates.Count > 0) ? mainWeight : 0f;
 
@@ -1628,23 +1208,32 @@ namespace ES
             }
 
             // Buff线始终使用自身权重（不受混合模式影响）
-            if (buffPipeline != null && buffPipeline.mixer.IsValid())
-            {
-                rootMixer.SetInputWeight(buffPipeline.rootInputIndex, buffPipeline.weight);
-            }
+            rootMixer.SetInputWeight(buffPipeline.rootInputIndex, buffPipeline.weight);
         }
 
-        #region 淡入淡出系统
+        /// <summary>
+        /// 初始化所有流水线权重到RootMixer
+        /// </summary>
+        private void InitializePipelineWeights()
+        {
+            if (!rootMixer.IsValid()) return;
+
+            basicPipeline.UpdatePipelineMixer();
+            mainPipeline.UpdatePipelineMixer();
+            buffPipeline.UpdatePipelineMixer();
+        }
+
+        #region 淡入淡出系统（核心/谨慎改）
 
         /// <summary>
         /// 应用淡入效果到新激活的状态
         /// </summary>
         private void ApplyFadeIn(StateBase state, StatePipelineRuntime pipeline)
         {
-            if (state?.stateSharedData == null || !state.stateSharedData.enableFadeInOut)
-                return;
+            if (!state.stateSharedData.enableFadeInOut) return;
+            if (state.stateSharedData.basicConfig.useDirectBlend) return;
 
-            float fadeInDuration = state.stateSharedData.fadeInDuration;
+            float fadeInDuration = GetScaledFadeDuration(state.stateSharedData.fadeInDuration, state.stateSharedData);
             if (fadeInDuration <= 0f || !pipeline.stateToSlotMap.ContainsKey(state))
                 return;
 
@@ -1653,16 +1242,16 @@ namespace ES
             pipeline.mixer.SetInputWeight(slotIndex, 0f);
 
             // 记录淡入数据（需要在StatePipelineRuntime中添加字段）
-            if (!pipeline.fadeInStates.ContainsKey(state))
+            if (!pipeline.fadeInStates.TryGetValue(state, out var fadeData))
             {
-                pipeline.fadeInStates[state] = new FadeData
-                {
-                    elapsedTime = 0f,
-                    duration = fadeInDuration,
-                    slotIndex = slotIndex
-                };
+                fadeData = StateFadeData.Pool.GetInPool();
+                fadeData.elapsedTime = 0f;
+                fadeData.duration = fadeInDuration;
+                fadeData.slotIndex = slotIndex;
+                fadeData.startWeight = 1f;
+                pipeline.fadeInStates[state] = fadeData;
 
-                StateMachineDebugSettings.Global.LogFade(
+                StateMachineDebugSettings.Instance.LogFade(
                     $"[淡入] 状态 {state.strKey} 开始淡入，时长 {fadeInDuration:F2}秒");
             }
         }
@@ -1672,29 +1261,28 @@ namespace ES
         /// </summary>
         private void ApplyFadeOut(StateBase state, StatePipelineRuntime pipeline)
         {
-            if (state?.stateSharedData == null || !state.stateSharedData.enableFadeInOut)
-                return;
+            if (!state.stateSharedData.enableFadeInOut) return;
+            if (state.stateSharedData.basicConfig.useDirectBlend) return;
 
-            float fadeOutDuration = state.stateSharedData.fadeOutDuration;
+            float fadeOutDuration = GetScaledFadeDuration(state.stateSharedData.fadeOutDuration, state.stateSharedData);
             if (fadeOutDuration <= 0f || !pipeline.stateToSlotMap.ContainsKey(state))
                 return;
 
             // 记录淡出数据
             int slotIndex = pipeline.stateToSlotMap[state];
             float currentWeight = pipeline.mixer.GetInputWeight(slotIndex);
-            
-            if (!pipeline.fadeOutStates.ContainsKey(state))
+
+            if (!pipeline.fadeOutStates.TryGetValue(state, out var fadeData))
             {
-                pipeline.fadeOutStates[state] = new FadeData
-                {
-                    elapsedTime = 0f,
-                    duration = fadeOutDuration,
-                    slotIndex = slotIndex,
-                    startWeight = currentWeight
-                };
+                fadeData = StateFadeData.Pool.GetInPool();
+                fadeData.elapsedTime = 0f;
+                fadeData.duration = fadeOutDuration;
+                fadeData.slotIndex = slotIndex;
+                fadeData.startWeight = currentWeight;
+                pipeline.fadeOutStates[state] = fadeData;
 
                 state.OnFadeOutStarted();
-                StateMachineDebugSettings.Global.LogFade(
+                StateMachineDebugSettings.Instance.LogFade(
                     $"[淡出] 状态 {state.strKey} 开始淡出，时长 {fadeOutDuration:F2}秒，起始权重 {currentWeight:F2}");
             }
         }
@@ -1714,11 +1302,9 @@ namespace ES
         /// </summary>
         private void UpdatePipelineFades(StatePipelineRuntime pipeline, float deltaTime)
         {
-            if (pipeline == null || !pipeline.mixer.IsValid())
-                return;
-
             // 更新淡入状态
-            var fadeInToRemove = new List<StateBase>();
+            var fadeInToRemove = pipeline.fadeInToRemoveCache;
+            fadeInToRemove.Clear();
             foreach (var kvp in pipeline.fadeInStates)
             {
                 var state = kvp.Key;
@@ -1726,7 +1312,8 @@ namespace ES
 
                 fadeData.elapsedTime += deltaTime;
                 float t = Mathf.Clamp01(fadeData.elapsedTime / fadeData.duration);
-                float weight = Mathf.Lerp(0f, 1f, t);
+                float eased = EvaluateFadeCurve(state, t, isFadeIn: true);
+                float weight = Mathf.Lerp(0f, 1f, eased);
 
                 pipeline.mixer.SetInputWeight(fadeData.slotIndex, weight);
 
@@ -1734,7 +1321,7 @@ namespace ES
                 {
                     fadeInToRemove.Add(state);
                     state.OnFadeInComplete();
-                    StateMachineDebugSettings.Global.LogFade(
+                    StateMachineDebugSettings.Instance.LogFade(
                         $"[淡入完成] 状态 {state.strKey}");
                 }
             }
@@ -1742,11 +1329,16 @@ namespace ES
             // 移除已完成的淡入状态
             foreach (var state in fadeInToRemove)
             {
+                if (pipeline.fadeInStates.TryGetValue(state, out var fadeData))
+                {
+                    fadeData.TryAutoPushedToPool();
+                }
                 pipeline.fadeInStates.Remove(state);
             }
 
             // 更新淡出状态
-            var fadeOutToRemove = new List<StateBase>();
+            var fadeOutToRemove = pipeline.fadeOutToRemoveCache;
+            fadeOutToRemove.Clear();
             foreach (var kvp in pipeline.fadeOutStates)
             {
                 var state = kvp.Key;
@@ -1754,14 +1346,16 @@ namespace ES
 
                 fadeData.elapsedTime += deltaTime;
                 float t = Mathf.Clamp01(fadeData.elapsedTime / fadeData.duration);
-                float weight = Mathf.Lerp(fadeData.startWeight, 0f, t);
+                float eased = EvaluateFadeCurve(state, t, isFadeIn: false);
+                float weight = Mathf.Lerp(fadeData.startWeight, 0f, eased);
 
                 pipeline.mixer.SetInputWeight(fadeData.slotIndex, weight);
 
                 if (t >= 1f)
                 {
                     fadeOutToRemove.Add(state);
-                    StateMachineDebugSettings.Global.LogFade(
+                    HotUnplugStateFromPlayable(state, pipeline);
+                    StateMachineDebugSettings.Instance.LogFade(
                         $"[淡出完成] 状态 {state.strKey}");
                 }
             }
@@ -1769,8 +1363,35 @@ namespace ES
             // 移除已完成的淡出状态
             foreach (var state in fadeOutToRemove)
             {
+                if (pipeline.fadeOutStates.TryGetValue(state, out var fadeData))
+                {
+                    fadeData.TryAutoPushedToPool();
+                }
                 pipeline.fadeOutStates.Remove(state);
             }
+        }
+
+        private float GetScaledFadeDuration(float baseDuration, StateSharedData sharedData)
+        {
+            if (baseDuration <= 0f) return baseDuration;
+
+            float scale = Mathf.Max(0.01f, sharedData.fadeSpeedMultiplier);
+            if (sharedData.fadeFollowTimeScale)
+                scale *= Mathf.Max(0.01f, Time.timeScale);
+
+            return baseDuration / scale;
+        }
+
+        private float EvaluateFadeCurve(StateBase state, float t, bool isFadeIn)
+        {
+            if (!state.stateSharedData.useAdvancedFadeCurve) return t;
+
+            var curve = isFadeIn ? state.stateSharedData.fadeInCurve : state.stateSharedData.fadeOutCurve;
+            if (curve == null || curve.length == 0)
+            {
+                return t;
+            }
+            return Mathf.Clamp01(curve.Evaluate(t));
         }
 
         #endregion
@@ -1780,9 +1401,10 @@ namespace ES
         /// </summary>
         private void OutputContinuousStats()
         {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            var sb = _continuousStatsBuilder;
+            sb.Clear();
             sb.Append($"[Stats] 运行:{runningStates.Count} |");
-            
+
             foreach (var pipeline in GetAllPipelines())
             {
                 if (pipeline.runningStates.Count > 0)
@@ -1790,330 +1412,304 @@ namespace ES
                     sb.Append($" {pipeline.pipelineType}:{pipeline.runningStates.Count}");
                 }
             }
-            
+
             if (runningStates.Count > 0)
             {
                 sb.Append(" | 状态:");
                 foreach (var state in runningStates)
                 {
-                    if (state != null)
-                    {
-                        sb.Append($" [{state.strKey}]");
-                    }
+                    sb.Append($" [{state.strKey}]");
                 }
             }
-            
+
             Debug.Log(sb.ToString());
         }
-        
+
         /// <summary>
-        /// 根据流水线的Dirty等级处理不同的任务
+        /// 根据流水线的Dirty标记处理不同任务
         /// </summary>
         private void ProcessDirtyTasks(StatePipelineRuntime pipelineData, StatePipelineType pipeline)
         {
-            if (pipelineData == null || !pipelineData.IsDirty) return;
+            if (!pipelineData.IsDirty) return;
 
-            // Dirty >= 3: 高优先级任务（预留）
-            if (pipelineData.dirtyLevel >= 3)
+            if (pipelineData.HasDirtyFlag(PipelineDirtyFlags.HighPriority))
             {
                 // 可在此添加高优先级任务
             }
 
-            // Dirty >= 2: 中等优先级任务（预留）
-            if (pipelineData.dirtyLevel >= 2)
+            if (pipelineData.HasDirtyFlag(PipelineDirtyFlags.MediumPriority))
             {
                 // 可在此添加中等优先级任务
             }
 
-            // Dirty >= 1: FallBack自动激活检查
-            if (pipelineData.dirtyLevel >= 1)
+            if (pipelineData.HasDirtyFlag(PipelineDirtyFlags.HotPlug))
+            {
+                // 热插拔相关任务（预留）
+                pipelineData.ClearDirty(PipelineDirtyFlags.HotPlug);
+            }
+
+            if (pipelineData.HasDirtyFlag(PipelineDirtyFlags.FallbackCheck))
             {
                 // 如果流水线空闲，尝试激活FallBack状态
                 if (pipelineData.runningStates.Count == 0)
                 {
-                    Debug.Log($"[FallBack-Activate] ⚠ [{pipeline}] 流水线已空，检查FallBack配置...");
-                    Debug.Log($"[FallBack-Activate]   DefaultChannel={pipelineData.DefaultFallBackChannel}");
-                    
-                    // 使用多通道FallBack系统
-                    int fallbackStateId = pipelineData.GetFallBack(); // 使用默认通道（内部会打印日志）
-                    
+                    // Debug.Log($"[FallBack-Activate] ⚠ [{pipeline}] 流水线已空，检查FallBack配置...");
+                    // Debug.Log($"[FallBack-Activate]   DefaultSupportFlag={pipelineData.DefaultSupportFlag}");
+
+                    // 使用支持标记FallBack系统
+                    int fallbackStateId = pipelineData.GetFallBack(currentSupportFlags); // 使用当前SupportFlags
+
                     if (fallbackStateId >= 0)
                     {
-                        Debug.Log($"[FallBack-Activate] 🔍 查找FallBack状态: StateID={fallbackStateId}");
+                        // Debug.Log($"[FallBack-Activate] 🔍 查找FallBack状态: StateID={fallbackStateId}");
                         var fallbackState = GetStateByInt(fallbackStateId);
-                        
-                        if (fallbackState != null)
+
+                        bool activated = TryActivateState(fallbackState, pipeline);
+                        if (activated)
                         {
-                            Debug.Log($"[FallBack-Activate] ✓ 找到FallBack状态: {fallbackState.strKey}, 尝试激活...");
-                            bool activated = TryActivateState(fallbackState, pipeline);
-                            Debug.Log($"[FallBack-Activate] {(activated ? "✓" : "✗")} FallBack激活{(activated ? "成功" : "失败")}");
-                            
-                            if (activated)
-                            {
-                                // 激活成功后清除Dirty
-                                pipelineData.MarkDirty(0);
-                            }
+                            pipelineData.ClearDirty(PipelineDirtyFlags.FallbackCheck);
                         }
                         else
                         {
-                            Debug.LogWarning($"[FallBack-Activate] ✗ 未找到FallBack状态(ID={fallbackStateId})，流水线将保持空闲");
+                            //Debug.LogWarning($"[FallBack-Activate] ✗ 未找到FallBack状态(ID={fallbackStateId})，流水线将保持空闲");
                         }
                     }
                     else
                     {
-                        Debug.Log($"[FallBack-Activate] ⊘ [{pipeline}] 未配置FallBack状态(StateID={fallbackStateId})，流水线保持空闲");
+                        // Debug.Log($"[FallBack-Activate] ⊘ [{pipeline}] 未配置FallBack状态(StateID={fallbackStateId})，流水线保持空闲");
                     }
                 }
                 else
                 {
-                    Debug.Log($"[FallBack-Activate] [{pipeline}] 流水线仍有{pipelineData.runningStates.Count}个运行状态，无需FallBack");
-                    // 流水线非空时也清除Dirty
-                    pipelineData.MarkDirty(0);
+                    // Debug.Log($"[FallBack-Activate] [{pipeline}] 流水线仍有{pipelineData.runningStates.Count}个运行状态，无需FallBack");
+                    // 流水线非空时也清除FallBack标记
+                    pipelineData.ClearDirty(PipelineDirtyFlags.FallbackCheck);
                 }
             }
-        }
-
-        /// <summary>
-        /// 诊断模式更新 - 打印详细日志帮助排查问题
-        /// 使用方法：临时替换UpdateStateMachine()调用为UpdateStateMachineWithDiagnostics()
-        /// </summary>
-        public void UpdateStateMachineWithDiagnostics()
-        {
-            Debug.Log("==================== [状态机诊断] 开始 ====================");
-            
-            if (!isRunning)
-            {
-                Debug.LogError("[Diagnostics] ✗ 状态机未运行！请先调用StartStateMachine()");
-                return;
-            }
-
-            float deltaTime = Time.deltaTime;
-            stateContext.lastUpdateTime = Time.time;
-
-            // === 1. 检查PlayableGraph ===
-            Debug.Log($"[1. PlayableGraph]");
-            if (!playableGraph.IsValid())
-            {
-                Debug.LogError("  ✗ PlayableGraph无效！");
-                return;
-            }
-            Debug.Log($"  ✓ PlayableGraph有效: True");
-            
-            bool isPlaying = playableGraph.IsPlaying();
-            if (isPlaying)
-            {
-                Debug.Log($"  ✓ PlayableGraph播放中: True");
-            }
-            else
-            {
-                Debug.LogWarning("  ⚠ PlayableGraph未播放，尝试启动...");
-                playableGraph.Play();
-            }
-            Debug.Log($"  - Graph名称: {playableGraph.GetEditorName()}");
-
-            // === 2. 检查Animator绑定 ===
-            Debug.Log($"\n[2. Animator绑定]");
-            if (boundAnimator == null)
-            {
-                Debug.LogError("  ✗ 未绑定Animator！请调用BindToAnimator()或Initialize(entity, animator)");
-            }
-            else
-            {
-                Debug.Log($"  ✓ Animator已绑定: {boundAnimator.gameObject.name}");
-                Debug.Log($"  - Animator.enabled: {boundAnimator.enabled}");
-                Debug.Log($"  - Animator.isActiveAndEnabled: {boundAnimator.isActiveAndEnabled}");
-                Debug.Log($"  - Has Avatar: {boundAnimator.avatar != null}");
-                Debug.Log($"  - Avatar IsValid: {(boundAnimator.avatar != null ? boundAnimator.avatar.isValid : false)}");
-                Debug.Log($"  - Avatar IsHuman: {(boundAnimator.avatar != null ? boundAnimator.avatar.isHuman : false)}");
-                
-                if (!boundAnimator.enabled)
-                {
-                    Debug.LogWarning("  ⚠ Animator已禁用！动画不会播放");
-                }
-            }
-
-            // === 3. 检查AnimationOutput ===
-            Debug.Log($"\n[3. AnimationOutput]");
-            if (!animationOutput.IsOutputValid())
-            {
-                Debug.LogError("  ✗ AnimationOutput无效！");
-            }
-            else
-            {
-                Debug.Log($"  ✓ AnimationOutput有效: True");
-                float weight = animationOutput.GetWeight();
-                Debug.Log($"  - Output权重: {weight:F3}");
-                
-                if (weight < 0.99f)
-                {
-                    Debug.LogWarning($"  ⚠ Output权重过低({weight:F3})，自动设置为1.0");
-                    animationOutput.SetWeight(1.0f);
-                }
-                else
-                {
-                    Debug.Log("  ✓ Output权重正常: 1.0");
-                }
-                
-                var sourcePlayable = animationOutput.GetSourcePlayable();
-                Debug.Log($"  - 源Playable有效: {sourcePlayable.IsValid()}");
-            }
-
-            // === 4. 检查RootMixer连接状态 ===
-            Debug.Log($"\n[4. RootMixer连接]");
-            if (!rootMixer.IsValid())
-            {
-                Debug.LogError("  ✗ RootMixer无效！");
-            }
-            else
-            {
-                Debug.Log($"  ✓ RootMixer有效: True");
-                int inputCount = rootMixer.GetInputCount();
-                Debug.Log($"  - 输入槽位数: {inputCount}");
-                
-                for (int i = 0; i < inputCount; i++)
-                {
-                    var input = rootMixer.GetInput(i);
-                    float weight = rootMixer.GetInputWeight(i);
-                    StatePipelineType pipelineType = (StatePipelineType)i;
-                    
-                    Debug.Log($"  [槽位{i} - {pipelineType}]");
-                    Debug.Log($"    - 输入有效: {input.IsValid()}");
-                    Debug.Log($"    - 权重: {weight:F3}");
-                    
-                    if (input.IsValid() && input.IsPlayableOfType<AnimationMixerPlayable>())
-                    {
-                        var mixer = (AnimationMixerPlayable)input;
-                        int subCount = mixer.GetInputCount();
-                        Debug.Log($"    - 子Mixer输入数: {subCount}");
-                        
-                        var pipeline = GetPipelineByType(pipelineType);
-                        if (pipeline != null)
-                        {
-                            Debug.Log($"    - 运行状态数: {pipeline.runningStates.Count}");
-                            Debug.Log($"    - 槽位映射数: {pipeline.stateToSlotMap.Count}");
-                        }
-                    }
-                }
-            }
-
-            // === 5. 检查当前运行状态及动画配置 ===
-            Debug.Log($"\n[5. 运行状态 & 动画配置]");
-            Debug.Log($"  - 总运行状态数: {runningStates.Count}");
-            
-            if (runningStates.Count == 0)
-            {
-                Debug.LogWarning("  ⚠ 没有运行中的状态！");
-            }
-            else
-            {
-                int index = 0;
-                foreach (var state in runningStates)
-                {
-                    if (state != null)
-                    {
-                        index++;
-                        Debug.Log($"  [状态{index}] {state.strKey} (ID:{state.intKey})");
-                        Debug.Log($"    - 状态: {state.baseStatus}");
-                        Debug.Log($"    - 有动画: {state.stateSharedData?.hasAnimation}");
-                        
-                        if (state.stateSharedData?.hasAnimation == true)
-                        {
-                            var animConfig = state.stateSharedData.animationConfig;
-                            if (animConfig != null)
-                            {
-                                var calculator = animConfig.calculator;
-                                Debug.Log($"    - Calculator类型: {calculator?.GetType().Name ?? "null"}");
-                                
-                                if (calculator is StateAnimationMixCalculatorForSimpleClip simpleClip)
-                                {
-                                    Debug.Log($"    - Clip: {simpleClip.clip?.name ?? "null"}");
-                                    Debug.Log($"    - Clip长度: {(simpleClip.clip != null ? simpleClip.clip.length : 0):F2}秒");
-                                    Debug.Log($"    - 播放速度: {simpleClip.speed}");
-                                }
-                            }
-                            else
-                            {
-                                Debug.LogWarning($"    ⚠ animationConfig为null");
-                            }
-                            
-                            // 检查状态是否在Pipeline映射中
-                            if (statePipelineMap.TryGetValue(state, out var pipeline))
-                            {
-                                Debug.Log($"    - 所属管线: {pipeline}");
-                                var pipelineRuntime = GetPipelineByType(pipeline);
-                                if (pipelineRuntime != null)
-                                {
-                                    bool inSlotMap = pipelineRuntime.stateToSlotMap.ContainsKey(state);
-                                    Debug.Log($"    - 在槽位映射中: {inSlotMap}");
-                                    if (inSlotMap)
-                                    {
-                                        int slotIndex = pipelineRuntime.stateToSlotMap[state];
-                                        Debug.Log($"    - 槽位索引: {slotIndex}");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // === 6. 正常更新流程 ===
-            Debug.Log($"\n[6. 执行更新]");
-            foreach (var state in runningStates)
-            {
-                if (state != null && state.baseStatus == StateBaseStatus.Running)
-                {
-                    state.OnStateUpdate();
-                    state.UpdateAnimationWeights(stateContext, deltaTime);
-                }
-            }
-
-            UpdatePipelineMainState(basicPipeline);
-            UpdatePipelineMainState(mainPipeline);
-            UpdatePipelineMainState(buffPipeline);
-
-            playableGraph.Evaluate(deltaTime);
-            Debug.Log($"  ✓ PlayableGraph.Evaluate完成 (deltaTime={deltaTime:F4}秒)");
-            
-            Debug.Log("==================== [状态机诊断] 完成 ====================\n");
         }
 
         #endregion
 
-        #region 状态注册与管理
+        #region 状态注册与管理（核心/谨慎改）
 
         /// <summary>
-        /// 注册新状态（String键）
+        /// 从StateAniDataInfo注册状态 - 完整封装创建和注册流程
+        /// </summary>
+        /// <param name="info">状态数据Info</param>
+        /// <param name="allowOverride">是否允许覆盖已存在的状态</param>
+        /// <returns>是否注册成功</returns>
+        public bool RegisterStateFromInfo(StateAniDataInfo info, bool allowOverride = false)
+        {
+            return RegisterStateFromInfo(info, null, allowOverride);
+        }
+
+        /// <summary>
+        /// 从StateAniDataInfo注册状态 - 支持自定义String键
+        /// </summary>
+        /// <param name="info">状态数据Info</param>
+        /// <param name="customStringKey">自定义String键（null则使用info中的stateName）</param>
+        /// <param name="allowOverride">是否允许覆盖已存在的状态</param>
+        /// <returns>是否注册成功</returns>
+        public bool RegisterStateFromInfo(StateAniDataInfo info, string customStringKey, bool allowOverride = false)
+        {
+            return RegisterStateFromInfo(info, customStringKey, null, allowOverride);
+        }
+
+        /// <summary>
+        /// 从StateAniDataInfo注册状态 - 支持自定义String和Int键
+        /// </summary>
+        /// <param name="info">状态数据Info</param>
+        /// <param name="customStringKey">自定义String键（null则使用info中的stateName）</param>
+        /// <param name="customIntKey">自定义Int键（null则使用info中的stateId）</param>
+        /// <param name="allowOverride">是否允许覆盖已存在的状态</param>
+        /// <returns>是否注册成功</returns>
+        public bool RegisterStateFromInfo(StateAniDataInfo info, string customStringKey, int? customIntKey, bool allowOverride = false)
+        {
+            try
+            {
+                // 1. 确保Runtime初始化（不重复）
+                info.InitializeRuntime();
+                StateMachineDebugSettings.Instance.LogRuntimeInit($"✓ Info初始化完成: {info.sharedData.basicConfig.stateName}");
+
+                // 2. 创建StateBase实例
+                var state = CreateStateFromInfo(info);
+                // 3. 应用自定义键（如果提供）
+                string finalStringKey = customStringKey ?? info.sharedData.basicConfig.stateName;
+                int finalIntKey = customIntKey ?? info.sharedData.basicConfig.stateId;
+
+                // 4. 获取流水线类型
+                var pipelineType = info.sharedData.basicConfig.pipelineType;
+
+                // 5. 注册状态（使用自定义键或原始键）
+                bool registered;
+                if (customStringKey != null || customIntKey.HasValue)
+                {
+                    // 使用了自定义键，直接注册
+                    registered = RegisterStateCore(finalStringKey, finalIntKey, state, pipelineType);
+                    if (!registered && !allowOverride)
+                    {
+                        // 键冲突时自动处理
+                        registered = RegisterState(state, pipelineType, allowOverride);
+                    }
+                }
+                else
+                {
+                    // 使用原始键，自动处理冲突
+                    registered = RegisterState(state, pipelineType, allowOverride);
+                }
+
+                if (registered)
+                {
+                    StateMachineDebugSettings.Instance.LogStateTransition(
+                        $"✓ 注册状态: [{pipelineType}] {state.strKey} (ID:{state.intKey})");
+                }
+                else
+                {
+                    if (StateMachineDebugSettings.Instance.alwaysLogErrors)
+                        Debug.LogWarning($"[StateMachine] 注册状态失败: {info.sharedData.basicConfig.stateName}");
+                }
+
+                return registered;
+            }
+            catch (Exception e)
+            {
+                if (StateMachineDebugSettings.Instance.alwaysLogErrors)
+                    Debug.LogError($"[StateMachine] 注册状态异常: {info.sharedData.basicConfig.stateName}\n{e}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 从StateAniDataInfo创建StateBase实例
+        /// </summary>
+        private StateBase CreateStateFromInfo(StateAniDataInfo info)
+        {
+            var state = StateBase.Pool.GetInPool();
+            state.stateSharedData = info.sharedData;
+            state.stateVariableData = new StateVariableData();
+            return state;
+        }
+
+        /// <summary>
+        /// 注册状态（自动从SharedData获取配置）- 智能处理键冲突
+        /// </summary>
+        private bool RegisterState(StateBase state, StatePipelineType pipeline, bool allowOverride = false)
+        {
+            var config = state.stateSharedData.basicConfig;
+            string originalName = string.IsNullOrEmpty(config.stateName) ? "AutoState" : config.stateName;
+            int originalId = config.stateId;
+
+            // 处理String键冲突
+            string finalName = originalName;
+            if (!allowOverride)
+            {
+                int attempt = 0;
+                while (stringToStateMap.ContainsKey(finalName))
+                {
+                    finalName = $"{originalName}_r{++attempt}";
+                    if (StateMachineDebugSettings.Instance.alwaysLogErrors)
+                        Debug.LogError($"[StateMachine] ⚠️ String键冲突! '{originalName}' → '{finalName}'");
+                }
+            }
+
+            // 处理Int键冲突（传-1触发自动分配）
+            if (!allowOverride && originalId > 0 && intToStateMap.ContainsKey(originalId))
+            {
+                config.stateId = -1; // 触发自动分配
+                StateMachineDebugSettings.Instance.LogStateTransition(
+                    $"⚠️ Int键冲突! ID={originalId} 已占用，自动重新分配");
+            }
+
+            // 自动分配IntKey
+            int finalId = GenerateUniqueIntKey(state);
+
+            // 执行注册
+            return RegisterStateCore(finalName, finalId, state, pipeline);
+        }
+
+        /// <summary>
+        /// 注册新状态（String键）- 智能处理键冲突
         /// </summary>
         public bool RegisterState(string stateKey, StateBase state, StatePipelineType pipeline = StatePipelineType.Basic)
         {
             if (string.IsNullOrEmpty(stateKey))
             {
-                Debug.LogError("状态键不能为空");
+                Debug.LogError("[StateMachine] 状态键不能为空");
                 return false;
             }
 
-            if (state == null)
+            // String键重复时自动添加后缀（_r1, _r2...）
+            string finalStateKey = stateKey;
+            int renameAttempt = 0;
+            while (stringToStateMap.ContainsKey(finalStateKey))
             {
-                Debug.LogError($"状态实例不能为空: {stateKey}");
-                return false;
-            }
-
-            if (stringToStateMap.ContainsKey(stateKey))
-            {
-                Debug.LogWarning($"状态 {stateKey} 已存在，跳过注册");
-                return false;
+                renameAttempt++;
+                finalStateKey = $"{stateKey}_r{renameAttempt}";
+                Debug.LogError($"[StateMachine] ⚠️ String键冲突! '{stateKey}'已存在，自动重命名为'{finalStateKey}'");
             }
 
             // 自动分配IntKey（从SharedData获取或自动生成）
             int autoIntKey = GenerateUniqueIntKey(state);
-            if (intToStateMap.ContainsKey(autoIntKey))
+            // Int键冲突时会自动跳过到下一个可用ID（GenerateUniqueIntKey内部已处理）
+
+            return RegisterStateCore(finalStateKey, autoIntKey, state, pipeline);
+        }
+
+        /// <summary>
+        /// 注册StateSharedData - 快速注册接口（支持自定义键）
+        /// </summary>
+        /// <param name="sharedData">状态共享数据</param>
+        /// <param name="customStringKey">自定义String键（null则使用sharedData中的stateName）</param>
+        /// <param name="customIntKey">自定义Int键（null则使用sharedData中的stateId）</param>
+        /// <param name="allowOverride">是否允许覆盖</param>
+        /// <returns>是否注册成功</returns>
+        public bool RegisterStateFromSharedData(StateSharedData sharedData, string customStringKey = null, int? customIntKey = null, bool allowOverride = false)
+        {
+            if (sharedData == null)
             {
-                Debug.LogWarning($"自动生成的IntKey {autoIntKey} 已存在，跳过注册");
+                if (StateMachineDebugSettings.Instance.alwaysLogErrors)
+                    Debug.LogError("[StateMachine] StateSharedData为空");
                 return false;
             }
 
-            return RegisterStateCore(stateKey, autoIntKey, state, pipeline);
+            // 确保初始化
+            if (!sharedData.IsRuntimeInitialized)
+            {
+                sharedData.InitializeRuntime();
+            }
+
+            // 创建StateBase（对象池）
+            var state = StateBase.Pool.GetInPool();
+            state.stateSharedData = sharedData;
+            state.stateVariableData = new StateVariableData();
+
+            // 应用自定义键或使用默认键
+            string finalStringKey = customStringKey ?? sharedData.basicConfig.stateName;
+            int finalIntKey = customIntKey ?? sharedData.basicConfig.stateId;
+            var pipelineType = sharedData.basicConfig.pipelineType;
+
+            // 注册
+            bool registered;
+            if (customStringKey != null || customIntKey.HasValue)
+            {
+                registered = RegisterStateCore(finalStringKey, finalIntKey, state, pipelineType);
+                if (!registered && !allowOverride)
+                {
+                    registered = RegisterState(state, pipelineType, allowOverride);
+                }
+            }
+            else
+            {
+                registered = RegisterState(state, pipelineType, allowOverride);
+            }
+
+            if (registered)
+            {
+                StateMachineDebugSettings.Instance.LogStateTransition(
+                    $"✓ 注册SharedData状态: [{pipelineType}] {state.strKey} (ID:{state.intKey})");
+            }
+
+            return registered;
         }
 
         /// <summary>
@@ -2126,7 +1722,6 @@ namespace ES
                 Debug.LogError($"状态实例不能为空: {stateKey}");
                 return false;
             }
-
             if (intToStateMap.ContainsKey(stateKey))
             {
                 Debug.LogWarning($"状态ID {stateKey} 已存在，跳过注册");
@@ -2190,7 +1785,7 @@ namespace ES
         }
 
         /// <summary>
-        /// 生成唯一的IntKey
+        /// 生成唯一的IntKey - 智能处理冲突
         /// </summary>
         private int GenerateUniqueIntKey(StateBase state)
         {
@@ -2198,18 +1793,32 @@ namespace ES
             if (state?.stateSharedData?.basicConfig != null)
             {
                 int configId = state.stateSharedData.basicConfig.stateId;
-                if (configId > 0 && !intToStateMap.ContainsKey(configId))
+
+                // 如果配置ID为-1，表示需要自动分配
+                if (configId == -1)
+                {
+                    StateMachineDebugSettings.Instance.LogStateTransition(
+                        $"状态'{state.stateSharedData.basicConfig.stateName}' ID=-1，触发自动分配");
+                }
+                else if (configId > 0 && !intToStateMap.ContainsKey(configId))
                 {
                     return configId;
                 }
+                else if (configId > 0 && intToStateMap.ContainsKey(configId))
+                {
+                    if (StateMachineDebugSettings.Instance.alwaysLogErrors)
+                        Debug.LogWarning($"[StateMachine] ⚠️ IntKey冲突! ID={configId} 已被'{intToStateMap[configId].strKey}'占用");
+                }
             }
 
-            // 自动分配
+            // 自动分配新ID（从10000开始避免冲突）
             while (intToStateMap.ContainsKey(_nextAutoIntId))
             {
                 _nextAutoIntId++;
             }
-            return _nextAutoIntId++;
+            int newId = _nextAutoIntId++;
+            StateMachineDebugSettings.Instance.LogStateTransition($"✓ 自动分配IntKey: {newId}");
+            return newId;
         }
 
         /// <summary>
@@ -2235,7 +1844,7 @@ namespace ES
                 candidateName = $"{baseName}_{_nextAutoStringIdSuffix++}";
             }
             while (stringToStateMap.ContainsKey(candidateName));
-            
+
             return candidateName;
         }
 
@@ -2249,21 +1858,15 @@ namespace ES
             // 检查是否可以作为Fallback状态
             if (state.stateSharedData.basicConfig.canBeFeedback)
             {
-                // 获取Fallback通道索引（默认0）
-                int fallbackChannel = state.stateSharedData.basicConfig.fallbackChannelIndex;
-                
+                // 获取Fallback支持标记
+                var fallbackFlag = state.stateSharedData.basicConfig.fallbackSupportFlag;
+
                 // 获取目标流水线运行时
                 var pipelineRuntime = GetPipelineByType(pipeline);
                 if (pipelineRuntime != null)
                 {
-                    // 设置到流水线的对应通道
-                    pipelineRuntime.SetFallBack(state.intKey, fallbackChannel);
-                    Debug.Log($"[FallBack-Register] ✓ [{pipeline}] Channel{fallbackChannel} <- State '{state.strKey}' (ID:{state.intKey})");
-                    Debug.Log($"[FallBack-Register]   当前通道配置: Ch0={pipelineRuntime.FallBackForChannel0}, Ch1={pipelineRuntime.FallBackForChannel1}, Ch2={pipelineRuntime.FallBackForChannel2}, Ch3={pipelineRuntime.FallBackForChannel3}, Ch4={pipelineRuntime.FallBackForChannel4}");
-                }
-                else
-                {
-                    Debug.LogError($"[FallBack-Register] ✗ 无法获取流水线运行时: {pipeline}");
+                    pipelineRuntime.SetFallBack(state.intKey, fallbackFlag);
+                    Debug.Log($"[FallBack-Register] ✓ [{pipeline}] Flag={fallbackFlag} <- State '{state.strKey}' (ID:{state.intKey})");
                 }
             }
         }
@@ -2280,9 +1883,28 @@ namespace ES
             state.intKey = intKey;
             state.host = this;
             statePipelineMap[state] = pipeline;
+            if (!_registeredStatesList.Contains(state))
+            {
+                _registeredStatesList.Add(state);
+            }
 
             // 检查并设置Fallback状态
             CheckAndSetFallbackState(state, pipeline);
+
+            // 如果状态有动画，初始化Calculator（享元数据预计算）
+            if (state.stateSharedData.hasAnimation && state.stateSharedData.animationConfig?.calculator != null)
+            {
+                try
+                {
+                    state.stateSharedData.animationConfig.calculator.InitializeCalculator();
+                    StateMachineDebugSettings.Instance.LogRuntimeInit(
+                        $"✓ Calculator初始化: {stringKey} - {state.stateSharedData.animationConfig.calculator.GetType().Name}");
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[StateMachine] Calculator初始化失败: {stringKey}\n{e}");
+                }
+            }
 
             MarkDirty(StateDirtyReason.RuntimeChanged);
 
@@ -2301,7 +1923,6 @@ namespace ES
         private bool UnregisterStateCore(StateBase state)
         {
             if (state == null) return false;
-
             // 如果状态正在运行，先停用
             if (runningStates.Contains(state))
             {
@@ -2317,11 +1938,13 @@ namespace ES
             {
                 intToStateMap.Remove(state.intKey);
             }
-            
+
             transitionCache.Remove(state.strKey);
             statePipelineMap.Remove(state);
             _activationCache.Remove(state);
+            _registeredStatesList.Remove(state);
             MarkDirty(StateDirtyReason.Release);
+            state.TryAutoPushedToPool();
             return true;
         }
 
@@ -2386,14 +2009,14 @@ namespace ES
         }
 
         /// <summary>
-        /// 设置Fallback状态
+        /// 设置Fallback状态（按支持标记）
         /// </summary>
-        public void SetFallbackState(StatePipelineType pipelineType, int stateId, int channel = 0)
+        public void SetFallbackState(StatePipelineType pipelineType, int stateId, StateSupportFlags supportFlag = StateSupportFlags.None)
         {
             var pipeline = GetPipelineByType(pipelineType);
             if (pipeline != null)
             {
-                pipeline.SetFallBack(stateId, channel);
+                pipeline.SetFallBack(stateId, supportFlag);
             }
         }
 
@@ -2421,7 +2044,7 @@ namespace ES
 
         #endregion
 
-        #region 临时动画热拔插
+        #region 临时动画热拔插（可修改）
 
         /// <summary>
         /// 临时动画状态跟踪
@@ -2434,19 +2057,19 @@ namespace ES
         [FoldoutGroup("临时动画测试", expanded: false)]
         [LabelText("测试键"), Tooltip("临时状态的唯一标识")]
         public string testTempKey = "TestAnim";
-        
+
         [FoldoutGroup("临时动画测试")]
         [LabelText("测试Clip"), AssetsOnly]
         public AnimationClip testClip;
-        
+
         [FoldoutGroup("临时动画测试")]
         [LabelText("目标管线")]
         public StatePipelineType testPipeline = StatePipelineType.Main;
-        
+
         [FoldoutGroup("临时动画测试")]
         [LabelText("播放速度"), Range(0.1f, 3f)]
         public float testSpeed = 1.0f;
-        
+
         [FoldoutGroup("临时动画测试")]
         [LabelText("循环播放"), Tooltip("勾选后动画循环播放，不勾选则播放一次后自动退出")]
         public bool testLoopable = false;
@@ -2515,21 +2138,22 @@ namespace ES
             }
 
             // 创建临时StateBase
-            var tempState = new StateBase();
+            var tempState = StateBase.Pool.GetInPool();
             tempState.strKey = $"__temp_{tempKey}";
-            
+            tempState.intKey = -1;
+
             // 创建SharedData
             tempState.stateSharedData = new StateSharedData();
             tempState.stateSharedData.hasAnimation = true;
-            
+
             // 创建BasicConfig（根据loopable配置播放模式）
             tempState.stateSharedData.basicConfig = new StateBasicConfig();
             tempState.stateSharedData.basicConfig.stateName = tempKey;
-            tempState.stateSharedData.basicConfig.durationMode = loopable 
+            tempState.stateSharedData.basicConfig.durationMode = loopable
                 ? StateDurationMode.Infinite  // 循环播放
                 : StateDurationMode.UntilAnimationEnd; // 播放一次后自动退出
             tempState.stateSharedData.basicConfig.pipelineType = pipeline;
-            
+
             // 创建AnimationConfig
             tempState.stateSharedData.animationConfig = new StateAnimationConfigData();
             var calculator = new StateAnimationMixCalculatorForSimpleClip
@@ -2538,7 +2162,7 @@ namespace ES
                 speed = speed
             };
             tempState.stateSharedData.animationConfig.calculator = calculator;
-            
+
             // 初始化SharedData
             tempState.stateSharedData.InitializeRuntime();
 
@@ -2601,12 +2225,17 @@ namespace ES
             }
 
             Debug.Log($"[TempAnim] 开始清除 {_temporaryStates.Count} 个临时动画");
-            
+
             // 复制键列表避免迭代时修改字典
-            var keys = new List<string>(_temporaryStates.Keys);
-            foreach (var key in keys)
+            var keys = _temporaryKeysCache;
+            keys.Clear();
+            foreach (var key in _temporaryStates.Keys)
             {
-                RemoveTemporaryAnimation(key);
+                keys.Add(key);
+            }
+            for (int i = 0; i < keys.Count; i++)
+            {
+                RemoveTemporaryAnimation(keys[i]);
             }
 
             _temporaryStates.Clear();
@@ -2629,23 +2258,63 @@ namespace ES
             return _temporaryStates.Count;
         }
 
+        /// <summary>
+        /// 广播动画事件
+        /// 由StateBase调用，通知外部监听者
+        /// </summary>
+        /// <param name="state">触发事件的状态</param>
+        /// <param name="eventName">事件名称</param>
+        /// <param name="eventParam">事件参数</param>
+        public void BroadcastAnimationEvent(StateBase state, string eventName, string eventParam)
+        {
+            // 调用回调
+            OnAnimationEvent?.Invoke(state, eventName, eventParam);
+
+            // 也可以通过Entity广播
+            if (hostEntity != null)
+            {
+                // 假设Entity有事件系统
+                // hostEntity.BroadcastEvent(eventName, eventParam);
+            }
+
+            StateMachineDebugSettings.Instance.LogStateTransition(
+                $"[StateMachine] 广播动画事件: {eventName} | State: {state?.strKey} | Param: {eventParam}");
+        }
+
         #endregion
 
-        #region 状态激活测试与执行
+        #region 状态激活测试与执行（核心/谨慎改）
 
         /// <summary>
         /// 测试状态能否激活（不执行）
         /// </summary>
-        public StateActivationResult TestStateActivation(StateBase targetState, StatePipelineType pipeline = StatePipelineType.Basic)
+        // TODO: [用户修改] 合并测试核心方法 - 需要优化合并判断逻辑
+        // 修改点：
+        // 1. 完善 CheckStateMergeCompatibility 的判断规则
+        // 2. 考虑优先级、代价、通道占用等因素
+        // 3. 添加自定义合并策略支持
+        public StateActivationResult TestStateActivation(StateBase targetState, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             if (targetState == null)
             {
-                return StateActivationResult.Failure("目标状态为空");
+                return StateActivationResult.Failure(StateFailureReasons.StateIsNull);
             }
+
+            pipeline = ResolvePipelineForState(targetState, pipeline);
 
             if (!isRunning)
             {
-                return StateActivationResult.Failure("状态机未运行");
+                return StateActivationResult.Failure(StateFailureReasons.MachineNotRunning);
+            }
+
+            var basicConfig = targetState.stateSharedData?.basicConfig;
+            if (basicConfig != null && !basicConfig.ignoreSupportFlags)
+            {
+                var requiredFlags = basicConfig.requiredSupportFlags;
+                if ((currentSupportFlags & requiredFlags) != requiredFlags)
+                {
+                    return StateActivationResult.Failure(StateFailureReasons.SupportFlagsNotSatisfied);
+                }
             }
 
             if (CustomActivationTest != null)
@@ -2657,7 +2326,7 @@ namespace ES
             int pipelineIndex = (int)pipeline;
             if (pipelineIndex < 0 || pipelineIndex >= pipelineCount)
             {
-                return StateActivationResult.Failure($"流水线索引非法: {pipeline}");
+                return StateActivationResult.Failure(StateFailureReasons.InvalidPipelineIndex);
             }
 
             var cache = GetOrCreateActivationCache(targetState);
@@ -2669,7 +2338,7 @@ namespace ES
             // 检查该状态是否已在运行
             if (runningStates.Contains(targetState))
             {
-                var failure = StateActivationResult.Failure("状态已在运行中");
+                var failure = StateActivationResult.Failure(StateFailureReasons.StateAlreadyRunning);
                 if (cache != null)
                 {
                     cache.results[pipelineIndex] = failure;
@@ -2682,7 +2351,7 @@ namespace ES
             var targetPipeline = GetPipelineByType(pipeline);
             if (targetPipeline == null)
             {
-                var failure = StateActivationResult.Failure($"流水线 {pipeline} 不存在");
+                var failure = StateActivationResult.Failure(StateFailureReasons.PipelineNotFound);
                 if (cache != null)
                 {
                     cache.results[pipelineIndex] = failure;
@@ -2693,7 +2362,7 @@ namespace ES
 
             if (!targetPipeline.isEnabled)
             {
-                var failure = StateActivationResult.Failure($"流水线 {pipeline} 未启用");
+                var failure = StateActivationResult.Failure(StateFailureReasons.PipelineDisabled);
                 if (cache != null)
                 {
                     cache.results[pipelineIndex] = failure;
@@ -2705,8 +2374,8 @@ namespace ES
             // 获取该流水线中当前运行的状态
             var pipelineStates = targetPipeline.runningStates;
 
-            // 如果流水线为空，直接成功
-            if (pipelineStates.Count == 0)
+            var allRunningStates = GetCachedRunningStates();
+            if (allRunningStates.Count == 0)
             {
                 var success = StateActivationResult.Success(pipeline, false);
                 if (cache != null)
@@ -2723,27 +2392,51 @@ namespace ES
             interruptList.Clear();
             mergeList.Clear();
 
-            foreach (var existingState in pipelineStates)
+            foreach (var existingState in allRunningStates)
             {
-                // 这里可以添加自定义的冲突/合并逻辑
-                // 示例：检查StateSharedData的mergeData
-                if (existingState.stateSharedData != null && targetState.stateSharedData != null)
+                if (existingState == null || targetState == null)
                 {
-                    // 简化的合并判断逻辑
-                    bool canMerge = CheckStateMergeCompatibility(existingState, targetState);
-                    if (canMerge)
-                    {
-                        mergeList.Add(existingState);
-                    }
-                    else
-                    {
-                        interruptList.Add(existingState);
-                    }
+                    continue;
                 }
-                else
+
+                var mergeResult = CheckStateMergeCompatibility(existingState, targetState);
+                bool isInTargetPipeline = pipelineStates.Contains(existingState);
+                if (!isInTargetPipeline)
                 {
-                    // 默认：打断
-                    interruptList.Add(existingState);
+                    if (mergeResult == StateMergeResult.MergeComplete)
+                    {
+                        continue;
+                    }
+
+                    var failure = StateActivationResult.Failure($"跨流水线冲突：{targetState.strKey} 与 {existingState.strKey} 不可并行");
+                    if (cache != null)
+                    {
+                        cache.results[pipelineIndex] = failure;
+                        cache.versions[pipelineIndex] = _dirtyVersion;
+                    }
+                    return failure;
+                }
+
+                switch (mergeResult)
+                {
+                    case StateMergeResult.MergeComplete:
+                        mergeList.Add(existingState);
+                        break;
+                    case StateMergeResult.HitAndReplace:
+                    case StateMergeResult.TryWeakInterrupt:
+                        interruptList.Add(existingState);
+                        break;
+                    case StateMergeResult.MergeFail:
+                    default:
+                        {
+                            var failure = StateActivationResult.Failure($"合并失败：{targetState.strKey} 与 {existingState.strKey} 冲突");
+                            if (cache != null)
+                            {
+                                cache.results[pipelineIndex] = failure;
+                                cache.versions[pipelineIndex] = _dirtyVersion;
+                            }
+                            return failure;
+                        }
                 }
             }
 
@@ -2827,47 +2520,175 @@ namespace ES
                 return;
             }
 
-            StateBase maxCostState = null;
-            float maxTotalCost = float.MinValue;
+            StateBase bestState = null;
+            float bestScore = float.MinValue;
+            byte bestPriority = 0;
 
             foreach (var state in pipeline.runningStates)
             {
-                if (state?.stateSharedData?.costData == null || !state.stateSharedData.costData.enableCostCalculation)
+                var basic = state?.stateSharedData?.basicConfig;
+                if (basic == null) continue;
+
+                float score = GetMainStateScore(state);
+                byte priority = basic.priority;
+
+                if (bestState == null)
                 {
+                    bestState = state;
+                    bestScore = score;
+                    bestPriority = priority;
                     continue;
                 }
 
-                float totalCost = state.stateSharedData.costData.GetTotalCost();
-
-                if (totalCost > maxTotalCost)
+                if (score > bestScore)
                 {
-                    maxTotalCost = totalCost;
-                    maxCostState = state;
+                    bestState = state;
+                    bestScore = score;
+                    bestPriority = priority;
+                    continue;
+                }
+
+                if (Mathf.Approximately(score, bestScore))
+                {
+                    if (priority > bestPriority)
+                    {
+                        bestState = state;
+                        bestScore = score;
+                        bestPriority = priority;
+                        continue;
+                    }
+
+                    if (priority == bestPriority && CompareStateDeterministic(state, bestState) < 0)
+                    {
+                        bestState = state;
+                        bestScore = score;
+                        bestPriority = priority;
+                    }
                 }
             }
 
-            // 如果没有有效代价的状态，选择第一个
-            pipeline.mainState = maxCostState ?? pipeline.runningStates.FirstOrDefault();
+            // 如果没有有效评分的状态，选择确定性的第一个
+            pipeline.mainState = bestState ?? GetFirstRunningState(pipeline);
         }
 
         /// <summary>
         /// 检查两个状态是否可以合并
         /// </summary>
-        private bool CheckStateMergeCompatibility(StateBase existing, StateBase incoming)
+        /// TODO: [用户修改] 合并兼容性检查 - 需要实现详细的合并规则
+        /// 修改点：
+        /// 1. 检查 StateMergeData.stateChannelMask 是否冲突
+        /// 2. 检查 exclusiveTags 是否互斥
+        /// 3. 检查优先级和代价是否允许合并
+        /// 4. 考虑自定义合并策略（CanMergeEvaluator）
+        private StateMergeResult CheckStateMergeCompatibility(StateBase existing, StateBase incoming)
         {
             if (CanMergeEvaluator != null)
             {
-                return CanMergeEvaluator(existing, incoming);
+                return CanMergeEvaluator(existing, incoming) ? StateMergeResult.MergeComplete : StateMergeResult.HitAndReplace;
             }
 
-            // 默认简单实现：不同状态可以合并
-            return existing != incoming;
+            if (existing == null || incoming == null || existing == incoming)
+                return StateMergeResult.MergeFail;
+
+            var leftShared = existing.stateSharedData;
+            var rightShared = incoming.stateSharedData;
+            var leftMerge = leftShared?.mergeData;
+            var rightMerge = rightShared?.mergeData;
+
+            // 无条件规则优先
+            var unconditional = ResolveUnconditionalRule(leftShared?.basicConfig, leftMerge?.asLeftRule, incoming)
+                              ?? ResolveUnconditionalRule(rightShared?.basicConfig, rightMerge?.asRightRule, existing);
+            if (unconditional.HasValue)
+                return unconditional.Value;
+
+            // 若缺少合并配置，默认允许合并
+            if (leftMerge == null || rightMerge == null)
+                return StateMergeResult.MergeComplete;
+
+            // 通道冲突检查
+            bool channelOverlap = (leftMerge.stateChannelMask & rightMerge.stateChannelMask) != StateChannelMask.None;
+            if (channelOverlap)
+            {
+                // 若通道总代价允许共存，优先合并
+                if (CanMergeByChannelOverlap(GetPipelineByType(rightShared?.basicConfig?.pipelineType ?? StatePipelineType.Basic), incoming))
+                    return StateMergeResult.MergeComplete;
+
+                // 层级规则
+                var leftLevel = GetStayLevelValue(leftMerge.stayLevel);
+                var rightLevel = GetStayLevelValue(rightMerge.stayLevel);
+
+                if (rightMerge.asRightRule != null && rightMerge.asRightRule.hitByLayerOption == StateHitByLayerOption.Never)
+                    return StateMergeResult.MergeFail;
+
+                if (rightMerge.asRightRule != null && rightMerge.asRightRule.hitByLayerOption == StateHitByLayerOption.OnlyLayerCrush)
+                {
+                    return rightLevel > leftLevel ? StateMergeResult.HitAndReplace : StateMergeResult.MergeFail;
+                }
+
+                // SameLevelTest: 层级优先，层级相同则走优先级规则
+                if (rightLevel > leftLevel)
+                    return StateMergeResult.HitAndReplace;
+
+                if (Mathf.Approximately(rightLevel, leftLevel))
+                {
+                    byte rightPriority = rightShared?.basicConfig?.priority ?? (byte)0;
+                    byte leftPriority = leftShared?.basicConfig?.priority ?? (byte)0;
+                    bool equalEffective = rightMerge.asRightRule != null && rightMerge.asRightRule.EqualIsEffectial;
+
+                    if (rightPriority > leftPriority || (equalEffective && rightPriority == leftPriority))
+                        return StateMergeResult.HitAndReplace;
+                }
+
+                return StateMergeResult.MergeFail;
+            }
+
+            // 无通道冲突，允许合并
+            return StateMergeResult.MergeComplete;
+        }
+
+        private StateMergeResult? ResolveUnconditionalRule(StateBasicConfig selfBasic, NormalMergeRule rule, StateBase other)
+        {
+            if (rule == null || !rule.enableUnconditionalRule || rule.unconditionalRule == null || other == null)
+                return null;
+
+            foreach (var item in rule.unconditionalRule)
+            {
+                if (item == null) continue;
+
+                bool nameMatch = !string.IsNullOrEmpty(item.stateName) && item.stateName == other.strKey;
+                bool idMatch = item.stateID >= 0 && other.intKey == item.stateID;
+
+                if (!nameMatch && !idMatch)
+                    continue;
+
+                switch (item.matchBackType)
+                {
+                    case UnconditionalMatchBackType.Accept:
+                        return StateMergeResult.MergeComplete;
+                    case UnconditionalMatchBackType.Reject:
+                        return StateMergeResult.MergeFail;
+                    case UnconditionalMatchBackType.Replace:
+                        return StateMergeResult.HitAndReplace;
+                }
+            }
+
+            return null;
+        }
+
+        private static float GetStayLevelValue(StateStayLevel level)
+        {
+            return (float)level;
         }
 
         /// <summary>
         /// 检查流水线中的状态是否可以与新状态合并
         /// 基于Channel重合度：如果总代价不超过1，则可以合并
         /// </summary>
+        /// TODO: [用户修改] 基于通道的合并检查 - 需要调整代价阈值和合并规则
+        /// 修改点：
+        /// 1. totalOverlapCost <= 1.0f 的阈值是否合理？
+        /// 2. 是否需要考虑不同通道的权重？
+        /// 3. 是否需要支持动态调整阈值？
         private bool CanMergeByChannelOverlap(StatePipelineRuntime pipeline, StateBase incomingState)
         {
             if (pipeline == null || incomingState?.stateSharedData == null) return false;
@@ -2912,12 +2733,20 @@ namespace ES
         /// <summary>
         /// 执行状态激活（根据测试结果）
         /// </summary>
+        /// TODO: [用户修改] 执行激活逻辑 - 需要验证合并执行流程
+        /// 修改点：
+        /// 1. 验证 result.canMerge 和 result.mergeDirectly 的处理逻辑
+        /// 2. 确认合并时的权重分配和动画混合
+        /// 3. 确认打断和合并的执行顺序
+        /// 4. 添加合并失败的回滚机制
         public bool ExecuteStateActivation(StateBase targetState, StateActivationResult result)
         {
             Debug.Log($"[StateMachine] === 开始执行状态激活 ===");
             Debug.Log($"[StateMachine]   状态: {targetState?.strKey} (ID:{targetState?.intKey})");
             Debug.Log($"[StateMachine]   目标管线: {result.targetPipeline}");
-            
+
+            var basicConfig = targetState?.stateSharedData?.basicConfig;
+
             if (!result.canActivate)
             {
                 Debug.LogWarning($"[StateMachine] ✗ 状态激活失败: {result.failureReason}");
@@ -2958,6 +2787,7 @@ namespace ES
             // 重新评估MainState
             UpdatePipelineMainState(pipeline);
 
+
             OnStateEntered?.Invoke(targetState, result.targetPipeline);
             MarkDirty(StateDirtyReason.Enter);
 
@@ -2968,7 +2798,7 @@ namespace ES
         /// <summary>
         /// 尝试激活状态（通过键）
         /// </summary>
-        public bool TryActivateState(string stateKey, StatePipelineType pipeline = StatePipelineType.Basic)
+        public bool TryActivateState(string stateKey, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             var state = GetStateByString(stateKey);
             if (state == null)
@@ -2983,7 +2813,7 @@ namespace ES
         /// <summary>
         /// 尝试激活状态（通过Int键）
         /// </summary>
-        public bool TryActivateState(int stateKey, StatePipelineType pipeline = StatePipelineType.Basic)
+        public bool TryActivateState(int stateKey, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             var state = GetStateByInt(stateKey);
             if (state == null)
@@ -2998,10 +2828,11 @@ namespace ES
         /// <summary>
         /// 尝试激活状态（通过实例 + 指定流水线）
         /// </summary>
-        public bool TryActivateState(StateBase targetState, StatePipelineType pipeline = StatePipelineType.Basic)
+        public bool TryActivateState(StateBase targetState, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             if (targetState == null) return false;
 
+            pipeline = ResolvePipelineForState(targetState, pipeline);
             var result = TestStateActivation(targetState, pipeline);
             return ExecuteStateActivation(targetState, result);
         }
@@ -3013,12 +2844,7 @@ namespace ES
         {
             if (targetState == null) return false;
 
-            if (statePipelineMap.TryGetValue(targetState, out var pipeline))
-            {
-                return TryActivateState(targetState, pipeline);
-            }
-
-            return TryActivateState(targetState, StatePipelineType.Basic);
+            return TryActivateState(targetState, StatePipelineType.NotClear);
         }
 
         /// <summary>
@@ -3035,8 +2861,9 @@ namespace ES
                 ApplyFadeOut(state, pipelineData);
             }
 
-            // 从Playable图中卸载状态动画
-            if (pipelineData != null)
+            // 若启用淡出，则由淡出完成时统一卸载
+            bool useDirectBlend = state.stateSharedData.basicConfig?.useDirectBlend == true;
+            if (pipelineData != null && (!state.stateSharedData.enableFadeInOut || state.stateSharedData.fadeOutDuration <= 0f || useDirectBlend))
             {
                 HotUnplugStateFromPlayable(state, pipelineData);
             }
@@ -3047,12 +2874,12 @@ namespace ES
             if (pipelineData != null)
             {
                 pipelineData.runningStates.Remove(state);
-                
+
                 // 重新评估MainState
                 UpdatePipelineMainState(pipelineData);
-                
-                // 标记Dirty=1，让Update中检查FallBack
-                pipelineData.MarkDirty(1);
+
+                // 标记FallBack检查
+                pipelineData.MarkDirty(PipelineDirtyFlags.FallbackCheck);
             }
 
             OnStateExited?.Invoke(state, pipeline);
@@ -3110,7 +2937,7 @@ namespace ES
         /// <summary>
         /// 进入验证测试（不执行）
         /// </summary>
-        public StateActivationResult TestEnterState(StateBase targetState, StatePipelineType pipeline = StatePipelineType.Basic)
+        public StateActivationResult TestEnterState(StateBase targetState, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             return TestStateActivation(targetState, pipeline);
         }
@@ -3118,7 +2945,7 @@ namespace ES
         /// <summary>
         /// 测试进入（验证后执行进入）
         /// </summary>
-        public bool TryEnterState(StateBase targetState, StatePipelineType pipeline = StatePipelineType.Basic)
+        public bool TryEnterState(StateBase targetState, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             return TryActivateState(targetState, pipeline);
         }
@@ -3126,10 +2953,11 @@ namespace ES
         /// <summary>
         /// 强制进入（不做验证）
         /// </summary>
-        public bool ForceEnterState(StateBase targetState, StatePipelineType pipeline = StatePipelineType.Basic)
+        public bool ForceEnterState(StateBase targetState, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             if (targetState == null) return false;
 
+            pipeline = ResolvePipelineForState(targetState, pipeline);
             var pipelineData = GetPipelineByType(pipeline);
             if (pipelineData == null)
             {
@@ -3146,7 +2974,7 @@ namespace ES
             targetState.OnStateEnter();
             runningStates.Add(targetState);
             pipelineData.runningStates.Add(targetState);
-            
+
             // 重新评估MainState
             UpdatePipelineMainState(pipelineData);
 
@@ -3242,7 +3070,7 @@ namespace ES
 
         #endregion
 
-        #region Playable动画管理
+        #region Playable动画管理（核心/谨慎改）
 
         /// <summary>
         /// 热插拔状态到Playable图（运行时动态添加）- 高性能版本
@@ -3251,13 +3079,13 @@ namespace ES
         {
             Debug.Log($"[HotPlug] === 开始热插拔状态到Playable ===");
             Debug.Log($"[HotPlug]   状态: {state?.strKey} | 流水线: {pipeline?.pipelineType}");
-            
+
             if (state == null || pipeline == null)
             {
                 Debug.LogWarning($"[HotPlug] ✗ 状态或流水线为空 - State:{state != null}, Pipeline:{pipeline != null}");
                 return;
             }
-            
+
             // 检查状态是否有动画
             if (state.stateSharedData?.hasAnimation != true)
             {
@@ -3276,7 +3104,7 @@ namespace ES
             Debug.Log($"[HotPlug]   检查Playable有效性:");
             Debug.Log($"[HotPlug]     PlayableGraph有效: {playableGraph.IsValid()}");
             Debug.Log($"[HotPlug]     Pipeline.mixer有效: {pipeline.mixer.IsValid()}");
-            
+
             if (!playableGraph.IsValid() || !pipeline.mixer.IsValid())
             {
                 Debug.LogError($"[HotPlug] ✗✗✗ 无法插入状态动画：PlayableGraph({playableGraph.IsValid()})或Mixer({pipeline.mixer.IsValid()})无效 ✗✗✗");
@@ -3308,7 +3136,7 @@ namespace ES
             if (pipeline.freeSlots.Count > 0)
             {
                 inputIndex = pipeline.freeSlots.Pop();
-                
+
                 // 断开旧连接（如果有）
                 if (pipeline.mixer.GetInput(inputIndex).IsValid())
                 {
@@ -3338,9 +3166,9 @@ namespace ES
             // 记录映射
             pipeline.stateToSlotMap[state] = inputIndex;
             Debug.Log($"[HotPlug]   状态 {state.strKey} 映射到槽位 {inputIndex}");
-            
-            // 标记Dirty（热插拔 = Dirty2）
-            pipeline.MarkDirty(2);
+
+            // 标记Dirty（热插拔）
+            pipeline.MarkDirty(PipelineDirtyFlags.HotPlug);
         }
 
         /// <summary>
@@ -3383,9 +3211,9 @@ namespace ES
 
             // 将槽位回收到池中
             pipeline.freeSlots.Push(slotIndex);
-            
-            // 标记Dirty（热拔插 = Dirty2）
-            pipeline.MarkDirty(2);
+
+            // 标记Dirty（热拔插）
+            pipeline.MarkDirty(PipelineDirtyFlags.HotPlug);
 
             // 让StateBase销毁自己的Playable资源（包括嵌套的Mixer等）
             state.DestroyPlayable();
@@ -3402,6 +3230,16 @@ namespace ES
             // 委托给StateBase创建Playable
             if (state.CreatePlayable(playableGraph, out Playable output))
             {
+                var mask = state.stateSharedData?.basicConfig?.avatarMask;
+                if (mask != null && output.IsValid())
+                {
+                    var layerMixer = AnimationLayerMixerPlayable.Create(playableGraph, 1);
+                    playableGraph.Connect(output, 0, layerMixer, 0);
+                    layerMixer.SetInputWeight(0, 1f);
+                    layerMixer.SetLayerMaskFromAvatarMask(0, mask);
+                    output = layerMixer;
+                }
+
                 Debug.Log($"[StateMachine] ✓ 状态 {state.strKey} Playable创建成功 | Valid:{output.IsValid()}");
                 return output;
             }
@@ -3438,7 +3276,7 @@ namespace ES
 
         #endregion
 
-        #region 工具方法
+        #region 工具方法（可修改）
 
         /// <summary>
         /// 获取所有状态键（用于编辑器下拉框）
@@ -3483,13 +3321,45 @@ namespace ES
         }
 
         /// <summary>
+        /// 获取状态当前权重（用于IK/外部系统）
+        /// </summary>
+        public float GetStateWeight(StateBase state)
+        {
+            if (state == null) return 0f;
+            if (statePipelineMap.TryGetValue(state, out var pipelineType))
+            {
+                var pipeline = GetPipelineByType(pipelineType);
+                return pipeline != null ? pipeline.GetStateWeight(state) : 0f;
+            }
+            return 0f;
+        }
+
+        /// <summary>
+        /// 获取状态权重（String键）
+        /// </summary>
+        public float GetStateWeight(string stateKey)
+        {
+            var state = GetStateByString(stateKey);
+            return GetStateWeight(state);
+        }
+
+        /// <summary>
+        /// 获取状态权重（Int键）
+        /// </summary>
+        public float GetStateWeight(int stateId)
+        {
+            var state = GetStateByInt(stateId);
+            return GetStateWeight(state);
+        }
+
+        /// <summary>
         /// 获取RootMixer的测试输出信息 - 用于调试动画输出链路
         /// </summary>
         public string GetRootMixerDebugInfo()
         {
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
             sb.AppendLine("========== RootMixer调试信息 ==========");
-            
+
             // PlayableGraph状态
             sb.AppendLine($"PlayableGraph有效: {playableGraph.IsValid()}");
             if (playableGraph.IsValid())
@@ -3497,25 +3367,25 @@ namespace ES
                 sb.AppendLine($"PlayableGraph运行中: {playableGraph.IsPlaying()}");
                 sb.AppendLine($"PlayableGraph名称: {playableGraph.GetEditorName()}");
             }
-            
+
             // RootMixer状态
             sb.AppendLine($"\nRootMixer有效: {rootMixer.IsValid()}");
             if (rootMixer.IsValid())
             {
                 int inputCount = rootMixer.GetInputCount();
                 sb.AppendLine($"RootMixer输入数: {inputCount}");
-                
+
                 // 遍历所有输入槽位
                 for (int i = 0; i < inputCount; i++)
                 {
                     var input = rootMixer.GetInput(i);
                     float weight = rootMixer.GetInputWeight(i);
                     StatePipelineType pipelineType = (StatePipelineType)i;
-                    
+
                     sb.AppendLine($"\n  槽位[{i}] - {pipelineType}:");
                     sb.AppendLine($"    输入有效: {input.IsValid()}");
                     sb.AppendLine($"    权重: {weight:F3}");
-                    
+
                     if (input.IsValid())
                     {
                         // 如果是Mixer，显示其子输入
@@ -3524,7 +3394,7 @@ namespace ES
                             var mixer = (AnimationMixerPlayable)input;
                             int subInputCount = mixer.GetInputCount();
                             sb.AppendLine($"    子输入数: {subInputCount}");
-                            
+
                             var pipeline = GetPipelineByType(pipelineType);
                             if (pipeline != null)
                             {
@@ -3534,7 +3404,7 @@ namespace ES
                     }
                 }
             }
-            
+
             // Animator输出
             sb.AppendLine($"\nAnimator绑定: {boundAnimator != null}");
             if (boundAnimator != null)
@@ -3542,7 +3412,7 @@ namespace ES
                 sb.AppendLine($"Animator启用: {boundAnimator.enabled}");
                 sb.AppendLine($"Animator路径: {boundAnimator.gameObject.name}");
             }
-            
+
             sb.AppendLine($"\nOutput有效: {animationOutput.IsOutputValid()}");
             if (animationOutput.IsOutputValid())
             {
@@ -3550,14 +3420,14 @@ namespace ES
                 sb.AppendLine($"Output源Playable有效: {sourcePlayable.IsValid()}");
                 sb.AppendLine($"Output权重: {animationOutput.GetWeight():F3}");
             }
-            
+
             sb.AppendLine("========================================");
             return sb.ToString();
         }
 
         #endregion
 
-        #region 调试支持
+        #region 调试支持（可修改）
 
 #if UNITY_EDITOR
         /// <summary>
@@ -3655,7 +3525,7 @@ namespace ES
 
         #endregion
 
-        #region StateContext便捷访问
+        #region StateContext便捷访问（可修改）
 
         /// <summary>
         /// 设置Float参数 - 用于动画混合（如2D混合的X/Y输入）
@@ -3692,1085 +3562,3 @@ namespace ES
         #endregion
     }
 }
-//     #region 最原始定义
-//     //原始定义
-//     public abstract class BaseOriginalStateMachine : IESHosting<BaseOriginalStateMachine>, IStateMachine, IESModule,IESOriginalModule<BaseOriginalStateMachine>
-//     {
-//         #region 杂货
-//         public static IState NullState = new ESNanoStateMachine_StringKey() { key_ = "空状态" };
-//         public static IState NullState_Micro = new BaseESMicroStateOverrideRunTimeLogic_StringKey() { key = "空状态" };
-//         [DisplayAsString(FontSize = 25), HideLabel, PropertyOrder(-1)]
-//         public string Des_ => "我是一个状态机噢耶";//随便描述一下而已
-//         public bool CheckThisStateCanUpdating
-//         {
-//             get
-//             {
-//                 if (AsThis != null && AsThis != this)
-//                 {
-//                     if (!AsThis.CheckThisStateCanUpdating) return false;
-//                 }
-//                 if (GetHost != null)
-//                 {
-//                     if (GetHost is IStateMachine machine)
-//                     {
-//                         if (!machine.CheckThisStateCanUpdating)
-//                         {
-//                             return false;
-//                         }
-//                         else if (machine is ESMicroStateMachine_StringKey mS && (mS.SelfRunningStates?.Contains(this) ?? false)) return true;
-//                         return false;
-//                     }
-//                 }
-//                 return true;
-//             }
-//         }
-
-//         //默认进入状态
-//         [NonSerialized] public IState StartWithState;
-//         [LabelText("设置默认状态的键(这里设置没用)"),ShowInInspector] public object defaultStateKey = null;
-//         //Host获取哈
-//         protected bool OnSubmitHostingAsNormal(BaseOriginalStateMachine hosting)
-//         {
-//             host = hosting;
-//             return true;
-//         }
-//         //获取初始状态
-//         protected IState GetStartWith()
-//         {
-//             if (StartWithState != null && StartWithState != NullState)
-//             {
-//                 return StartWithState;
-//             }
-//             else
-//             {
-//                 return GetDefaultState();
-//             }
-//         }
-//         public IState GetDefaultState()
-//         {
-//             if (defaultStateKey == null) return null;
-//             return GetStateByKey(defaultStateKey);
-//         }
-//         public bool IsIdle()
-//         {
-//             return !IsStateNotNull(_SelfRunningState);
-//         }
-//         public IState AsThis
-//         {
-//             get => thisState;
-//             set { /*Debug.LogWarning("修改状态机自状态是危险的，但是允许");*/ thisState = value; }
-//         }
-
-//         [LabelText("状态机自基准状态"), SerializeReference, FoldoutGroup("子状态")] public IState thisState = NullState_Micro;//基准状态不准是纳米的，起码是微型的罢
-
-//         #endregion
-
-//         #region 父子关系与保持的运行
-//         //基准状态
-//         //获得根状态机--非常好的东西
-//         public BaseOriginalStateMachine Root { get { if (GetHost is BaseOriginalStateMachine machine) return machine.Root; else return this; } }
-
-//         public IState SelfRunningMainState { get => _SelfRunningState; set => _SelfRunningState = value; }
-//         [SerializeReference, LabelText("当前运行状态"), FoldoutGroup("子状态")] public IState _SelfRunningState = null;
-//         //总状态机(冲突合并需要的)--只有标准状态机需要
-//         /*[SerializeReference, LabelText("总状态机运行中状态")]
-//         public HashSet<IESNanoState> MainRunningStates;*/
-
-//         //自己掌控运行--至少是微型状态机才有
-//         /**/
-//         #endregion
-
-//         #region 生命周期_状态专属的
-//         [ShowInInspector, ReadOnly, LabelText("状态进入 是/否"), FoldoutGroup("是否状况收集")]
-//         public bool IsRunning { get; set; }
-//         public void OnStateEnter()
-//         {
-//             if (IsRunning) return;
-//             IsRunning = true;//状态更新
-//             /*MainRunningStates = Root.MainRunningStates;//使用统一的根处引用*/
-//             AsThis?.OnStateEnter();//自基准状态
-//             _Expand_PreparedHappenDesign();//扩展Prepare时间
-//             /*_SelfRunningStates?.Update();//自己层级下的运行中状态--子状态机也是状态哈--这个更新就是删除多余的的加入新的
-//              */
-//             if (host is ESMicroStateMachine_StringKey parent)//您是微型状态机
-//             {
-//                 parent._SelfRunningState = this;
-//                 parent._SelfRunningStates.TryAdd(this);//如果自己是子，那么也要加入到父级的运行状态中
-//             }
-//             OnStateEnter();//状态机没啥好额外准备的罢
-//         }
-//         //进入时--都不是必要功能
-//         protected virtual void OnStateEnter()
-//         {
-//             IState state = GetStartWith();
-//             if (state != null)
-//             {
-//                 bool b = TryActiveState(state);
-//                 if (b == false) OnStateExit();
-//                 StartWithState = null;
-//             }
-//         }
-
-//         //退出时,状态退出
-//         public virtual void OnStateExit()
-//         {
-//             if (!IsRunning) return;
-//             IsRunning = false;//状态更新
-
-//             AsThis?.OnStateExit();//自基准状态
-
-
-//             _Expand_ExitHappenDesign();//扩展Exit时机
-
-//             if (host is ESMicroStateMachine_StringKey parent)
-//             {
-//                 if (parent._SelfRunningState == this)
-//                 {
-//                     parent._SelfRunningState = null;
-//                 }
-//                 parent._SelfRunningStates.TryRemove(this);//如果自己是子，那么也要从父级的运行状态中移除
-//             }
-//             _SelfRunningState = NullState;
-//         }
-//         //更新时--状态更新
-//         public void OnStateUpdate()
-//         {
-//             AsThis?.OnStateUpdate();
-//             _Expand_UpdateHappenDesign();//扩展更新Update的时机
-//             /* _SelfRunningStates?.Update();
-//              if (_SelfRunningStates != null)
-//              {
-//                  foreach (var i in _SelfRunningStates.valuesNow_)
-//                  {
-//                      if (i != null)
-//                      {
-//                          if(i is IESMicroState ESMicro)
-//                          {
-//                              if (ESMicro.RunningStatus != EnumStateRunningStatus.StateUpdate) continue;
-//                          }
-//                          else if(!i.HasPrepared)
-//                          {
-//                              continue;
-//                          }
-//                          i.OnStateUpdate();
-//                      }
-//                  }
-//              }*/
-//         }
-//         #endregion
-
-//         #region 生命周期_作为模块的
-//         protected override void OnEnable()
-//         {
-//             base.OnEnable();
-//             if (GetHost is BaseOriginalStateMachine machine) { }//如果有父状态机--》受父级更新控制
-//             else OnStateEnter();//如果没有父级或者父级不是状态机--》自己就完成控制了
-//         }
-
-//         protected override void OnDisable()
-//         {
-//             base.OnDisable();
-//             if (GetHost is BaseOriginalStateMachine machine) { }//如果有父状态机--》受父级更新控制
-//             else OnStateExit();//如果没有父级或者父级不是状态机--》自己就完成控制了
-//         }
-//         protected override void Update()
-//         {
-//             base.Update();
-//             if (GetHost is BaseOriginalStateMachine machine) { Debug.Log(2); }//如果有父状态机--》受父级更新控制
-//             else OnStateUpdate();//如果没有父级或者父级不是状态机--》自己就完成控制了
-//         }
-//         #endregion
-
-//         #region 对基准状态的包装
-//         public object key_;
-//         public void SetKey(object key)
-//         {
-//             AsThis?.SetKey(key);
-//             key_ = key;
-//         }
-//         public object GetKey()
-//         {
-//             if (!IsStateNotNull(AsThis)) return key_;
-//             return AsThis.GetKey();
-//         }
-//         public bool IsStateNotNull(IState state)
-//         {
-//             if (state == null || state == NullState || state == NullState_Micro) return false;
-//             return true;
-//         }
-
-//         public EnumStateRunningStatus RunningStatus => AsThis?.RunningStatus??(IsRunning?EnumStateRunningStatus.StateUpdate:EnumStateRunningStatus.StateExit);
-//         IStateSharedData IState.SharedData
-//         {
-//             get => AsThis?.SharedData; set { if (AsThis != null) AsThis.SharedData = value; }
-//         }
-//         IStateVariableData IState.VariableData
-//         {
-//             get => AsThis?.VariableData; set { if (AsThis != null) AsThis.VariableData = value; }
-//         }
-//         #endregion
-
-//         #region 状态切换支持
-//         public abstract bool TryActiveState(IState use);//通用
-//         public abstract bool TryInActiveState(IState use);//通用
-//         public abstract bool TryActiveStateByKey(object key_);//通用
-//         public abstract string[] KeysWithLayer(string atFirst="");
-//         public abstract void RegisterNewState_Original(object key, IState aState);
-//         public abstract bool TryInActiveState(object key_);
-//         public abstract bool TryInActiveStateByKey(string key_);
-//         public abstract IState GetStateByKey(object o);
-//         public abstract IState GetStateByKey(string o);
-//         #endregion
-
-//         #region 设计层扩展重写状态机逻辑
-//         protected virtual void _Expand_PreparedHappenDesign()
-//         {
-//             host._SelfRunningState = this;
-//         }
-//         protected virtual void _Expand_UpdateHappenDesign()
-//         {
-//             if (_SelfRunningState != null)
-//             {
-//                 _SelfRunningState.OnStateUpdate();
-//             }
-//             else
-//             {
-//                 if (IsIdle())
-//                 {
-//                     var default_ = GetDefaultState();
-//                     if (default_ != null)
-//                     {
-//                        bool b= TryActiveState(default_);
-//                         if (b == false) OnStateExit();
-//                     }
-//                 }
-//             }
-//         }
-//         protected virtual void _Expand_ExitHappenDesign()
-//         {
-
-//             if (_SelfRunningState != null)
-//             {
-//                 _RightlyExitTheState(_SelfRunningState);
-//             }
-//         }
-//         #endregion
-
-//         #region 测试方法
-//         [Button("初始化"), FoldoutGroup("状态机测试按钮"), Tooltip("定义初始化的状态")]
-//         public void WithEnterState(IState state)
-//         {
-//             if (state != null)
-//                 StartWithState = state;
-//         }
-
-
-//         #endregion
-
-//         #region 注册状态
-
-
-//         #endregion
-
-//         #region 状态切换辅助等
-//         protected void _RightlyPreparedTheState(IState use)
-//         {
-//             if (use != null)
-//             {
-//                 use.OnStateEnter();
-//                 _SelfRunningState = use;
-//             }
-//         }
-//         protected void _RightlyExitTheState(IState use)
-//         {
-//             if (use != null)
-//             {
-//                 if (_SelfRunningState == use) { _SelfRunningState = null; };
-//                 use.OnStateExit();
-//             }
-//         }
-
-//         bool IESOriginalModule<BaseOriginalStateMachine>.OnSubmitHosting(BaseOriginalStateMachine host)
-//         {
-//             this.host = host;
-//             return true;
-//         }
-//         #endregion
-//     }
-//     #endregion
-
-//     #region 纳米级别状态机--空的-泛型键-状态机-只能是纳米了--给键哈
-//     public abstract class BaseESNanoStateMachine<Key_> : BaseOriginalStateMachine
-//     {
-//         #region 杂货与基准定义
-//         #endregion
-
-//         #region 字典表
-//         public override string[] KeysWithLayer(string atFirst)
-//         {
-//             List<string> all = new List<string>();
-
-//             //加键
-//             foreach (var i in allStates.Keys)
-//             {
-//                 all.Add(atFirst + i);
-//             };
-//             //遍历
-//             foreach (var i in allStates.Values)
-//             {
-//                 if (i is BaseOriginalStateMachine machine)
-//                 {
-//                     all.AddRange(machine.KeysWithLayer(atFirst + i.GetKey()));
-//                 }
-//             }
-//             return all.ToArray();
-//         }
-//         [SerializeReference, LabelText("全部状态字典")]
-//         public Dictionary<Key_, IState> allStates = new Dictionary<Key_, IState>();
-//         public Dictionary<Key_, IState> AllStates => allStates;
-//         public override IState GetStateByKey(object o)
-//         {
-//             if(o is Key_ thekey&&allStates.ContainsKey(thekey))
-//             {
-//                 return allStates[thekey];
-//             }
-//             return null;
-//         }
-//         public override IState GetStateByKey(string s)
-//         {
-//             if (s is Key_ thekey && allStates.ContainsKey(thekey))
-//             {
-//                 return allStates[thekey];
-//             }
-//             var use = ESDesignUtility.Matcher.SystemObjectToT<Key_>(s);
-//             if (use != null && allStates.ContainsKey(use))
-//             {
-//                 return allStates[use];
-//             }
-//             return null;
-//         }
-//         #endregion
-
-//         #region 定义
-
-//         #endregion
-//         /* [GUIColor("@OLDESDesignUtilityOLD.ColorSelector.Color_03"),LabelText("当前状态")]*/
-//         /* public IESMicroState CurrentState =>currentFirstState?? NullState;*/
-
-
-//         [Button("测试切换状态"), Tooltip("该方法建议用于运行时，不然得话会立刻调用状态的Enter，请切换使用WithEnterState")]
-//         public void TryActiveStateByKey(Key_ key, IState ifNULL = null)
-//         {
-//             if (allStates == null)
-//             {
-//                 allStates = new Dictionary<Key_, IState>();
-//                 if (ifNULL != null)
-//                 {
-//                     RegisterNewState_Original(key, ifNULL);
-//                     OnlyESNanoPrivate_SwitchStateToFromByKey(key);
-//                     //新建 没啥
-//                 }
-//                 return;
-//             }
-//             if (allStates.ContainsKey(key))
-//             {
-//                 TryActiveState(allStates[key]);
-//             }
-//             else
-//             {
-//                 if (ifNULL != null)
-//                 {
-//                     RegisterNewState_Original(key, ifNULL);
-//                     TryActiveState(ifNULL);
-//                 }
-//             }
-//         }
-//         public override bool TryActiveStateByKey(object key_)
-//         {
-//             if(key_ is Key_ key_1)
-//             {
-//                 return TryActiveStateByKey(key_1);
-//             }
-//             return false;
-//         }
-//         protected void OnlyESNanoPrivate_SwitchStateToFromByKey(Key_ to, Key_ from = default)
-//         {
-//             if (allStates.ContainsKey(to))
-//             {
-//                 OnlyESNanoPrivate_SwitchStateToFrom(allStates[to]);
-//             }
-//         }
-//         protected void OnlyESNanoPrivate_SwitchStateToFrom(IState to, IState from = default)
-//         {
-//             if (allStates.Values.Contains(to))
-//             {
-//                 IState willUse = to;
-//                 if (SelfRunningMainState == willUse) return;//同一个？无意义
-
-//                 _RightlyExitTheState(SelfRunningMainState);//过去的真退了
-
-//                 _RightlyPreparedTheState(to);//我真来了
-
-//                 if (SelfRunningMainState == null)
-//                 {
-//                     Debug.LogError("状态为空！键是" + to.GetKey());
-//                 }
-//             }
-//         }
-
-//         public bool TryActiveStateByKeyWithLayer(string layerKey)
-//         {
-//             if (layerKey.Contains('/')||layerKey.Contains('?')||layerKey.Contains(".."))
-//             {
-//                 string[] layers = layerKey.Split('/');
-//                 BaseOriginalStateMachine TheMachine = this;
-//                 IState TheState=null;
-//                 Queue<IState> TheStates=null;
-//                 bool endBack = true;
-
-//                 for(int index = 0; index < layers.Length; index++)
-//                 {
-//                     string i = layers[index];
-//                     Debug.Log("by" + i+index);
-//                     if (i == "..")//回退一级
-//                     {
-//                         Debug.Log("回退");
-//                         var parent = TheMachine.GetHost as BaseOriginalStateMachine;
-//                         if (parent != null)
-//                         {
-//                             TheMachine = parent;
-//                             continue;
-//                         }
-//                     }
-//                     var aState = i;
-//                     TheStates = null;
-//                     if (i.Contains('?'))
-//                     {
-//                         TheStates = new Queue<IState>();
-//                         string[] Addstates = i.Split('?');
-//                         foreach (var a in Addstates)
-//                         {
-//                             var state = TheMachine.GetStateByKey(a);
-//                             if (state != null)
-//                                 TheStates.Enqueue(state);
-//                         }
-//                         aState = Addstates[0];
-//                     }
-
-//                     TheState = TheMachine.GetStateByKey(aState);
-
-//                     if (TheState != null)
-//                     {
-//                         if (index == layers.Length - 1) { Debug.Log("last" + index+ TheState.GetKey()); break; }
-//                         if (TheState is BaseOriginalStateMachine nextMachine)
-//                         {
-//                             TheMachine = nextMachine;
-//                             Debug.Log("next"+index);
-//                             continue;
-//                         }
-//                         else
-//                         {
-//                             Debug.Log("state" + index);
-//                             break;
-//                         }
-//                     }
-//                     else
-//                     {
-//                         Debug.Log("null" + index);
-//                         endBack = false;
-//                         break;
-//                     }
-//                 }
-//                /* foreach(var i in layers)
-//                 {
-
-//                 }*/
-//                 if (TheStates != null&&TheStates.Count>0)
-//                 {
-//                     while (TheStates.Count > 0)
-//                     {
-//                         var use = TheStates.Dequeue();
-//                         if (TheMachine.TryActiveState(use)) return true;
-//                     }
-//                 }
-//                 else if (TheState != null)
-//                 {
-//                    return TheMachine.TryActiveState(TheState);
-//                 }
-//                 return endBack;
-//             }
-//             else
-//             {
-//                return TryActiveStateByKey(layerKey);
-//             }
-//         }
-//         public bool TryInActiveStateByKeyWithLayer(string layerKey)
-//         {
-//             if (layerKey.Contains('/') || layerKey.Contains('?') || layerKey.Contains(".."))
-//             {
-//                 string[] layers = layerKey.Split('/');
-//                 BaseOriginalStateMachine TheMachine = this;
-//                 IState TheState = null;
-//                 Queue<IState> TheStates = null;
-//                 bool endBack = true;
-
-//                 for (int index = 0; index < layers.Length; index++)
-//                 {
-//                     string i = layers[index];
-//                     Debug.Log("by" + i + index);
-//                     if (i == "..")//回退一级
-//                     {
-//                         Debug.Log("回退");
-//                         var parent = TheMachine.GetHost as BaseOriginalStateMachine;
-//                         if (parent != null)
-//                         {
-//                             TheMachine = parent;
-//                             continue;
-//                         }
-//                     }
-//                     var aState = i;
-//                     TheStates = null;
-//                     if (i.Contains('?'))
-//                     {
-//                         TheStates = new Queue<IState>();
-//                         string[] Addstates = i.Split('?');
-//                         foreach (var a in Addstates)
-//                         {
-//                             var state = TheMachine.GetStateByKey(a);
-//                             if (state != null)
-//                                 TheStates.Enqueue(state);
-//                         }
-//                         aState = Addstates[0];
-//                     }
-
-//                     TheState = TheMachine.GetStateByKey(aState);
-
-//                     if (TheState != null)
-//                     {
-//                         if (index == layers.Length - 1) break;
-//                         if (TheState is BaseOriginalStateMachine nextMachine)
-//                         {
-//                             TheMachine = nextMachine;
-//                             Debug.Log("next" + index);
-//                             continue;
-//                         }
-//                         else
-//                         {
-//                             Debug.Log("state" + index);
-//                             break;
-//                         }
-//                     }
-//                     else
-//                     {
-//                         Debug.Log("null" + index);
-//                         endBack = false;
-//                         break;
-//                     }
-//                 }
-//                 /* foreach(var i in layers)
-//                  {
-
-//                  }*/
-//                 if (TheStates != null && TheStates.Count > 0)
-//                 {
-//                     while (TheStates.Count > 0)
-//                     {
-//                         var use = TheStates.Dequeue();
-//                         if (TheMachine.TryInActiveState(use)) return true;
-//                     }
-//                 }
-//                 else if (TheState != null)
-//                 {
-//                     return TheMachine.TryInActiveState(TheState);
-//                 }
-//                 return endBack;
-//             }
-//             else
-//             {
-//                 return TryInActiveStateByKey(layerKey);
-//             }
-//         }
-//         public override bool TryInActiveState(IState use)
-//         {
-//             if (allStates.ContainsValue(use))
-//             {
-//                 _RightlyExitTheState(use);
-//             }
-//             return false;
-//         }
-//         public bool TryActiveStateByKey(string key_)
-//         {
-//             if (allStates.ContainsKey(key_))
-//             {
-
-//                 return TryActiveState(allStates[key_]);
-//             }
-//             return false;
-//         }
-
-//         public override bool TryActiveStateByKey(object key_)
-//         {
-//             return TryActiveStateByKey(key_.ToString());
-//         }
-
-//         public override bool TryActiveState(IState use)
-//         {
-//             if (use.IsRunning) return true;
-//             if (!this.IsRunning && host is BaseOriginalStateMachine originalStateMachine)
-//             { 
-//                 this.WithEnterState(use);
-//                 return originalStateMachine.TryActiveState(this);
-//             }
-//             if (allStates.Values.Contains(use))
-//             {
-//                 OnlyESNanoPrivate_SwitchStateToFrom(use);
-//                 return true;
-//             }
-//             else
-//             {
-//                 if (use.GetKey().ToString() == "玩家格挡")
-//                 {
-//                     Debug.Log("RESIST-SI");
-//                 }
-//                 Debug.LogError("暂时不支持活动为注册的状态");
-//                 return false;
-//             }
-//         }
-//         #endregion
-
-//         #region 注册注销
-//         public override void RegisterNewState_Original(object key, IState aState)
-//         {
-//             RegisterNewState(key.ToString(), aState);
-//         }
-//         public void RegisterNewState(string key, IState logic)
-//         {
-//             if (allStates.ContainsKey(key))
-//             {
-//                // Debug.LogError("重复注册状态?键是" + key);
-//             }
-//             else
-//             {
-//                 allStates.Add(key, logic);
-//                 logic.SetKey(key);
-//                 if (StartWithState == null || StartWithState == NullState)
-//                 {
-//                     //新的
-//                     StartWithState = logic;
-//                 }
-//                 if (logic is IESOriginalModule<BaseOriginalStateMachine> logic1)
-//                 {
-//                     logic1.OnSubmitHosting(this);
-//                     //Debug.Log("注册成功？" + logic.GetKey());
-//                 }
-//                 else if (logic is BaseOriginalStateMachine machine)
-//                 {
-//                     machine.TrySubmitHosting(this, false);
-//                     //Debug.Log("注册状态机成功？" + logic.GetKey());
-//                 }
-//                 else
-//                 {
-//                     Debug.Log("啥也不是？");
-//                 }
-
-//             }
-//         }
-
-
-//         #endregion
-
-//         #region 设计层
-//         protected override void _Expand_PreparedHappenDesign()
-//         {
-//             base._Expand_PreparedHappenDesign();
-//         }
-
-//         public override bool TryInActiveState(object key_)
-//         {
-//            return TryInActiveStateByKey(key_.ToString());
-//         }
-
-//         public override bool TryInActiveStateByKey(string key_)
-//         {
-//             Debug.Log("尝试关闭" + key_);
-//             var it = GetStateByKey(key_);
-//             if (it == null) return false;
-//             TryInActiveState(it);
-//             return false;
-//         }
-
-//         #endregion
-//     }
-//     //微型状态机定义
-//     [Serializable, TypeRegistryItem("微型状态机(String)")]
-//     public class ESMicroStateMachine_StringKey : ESNanoStateMachine_StringKey, IStateMachine
-//     {
-//         #region 当前并行
-//         [LabelText("自己的运行中状态"),FoldoutGroup("子状态")]
-//         public SafeUpdateList_EasyQueue_SeriNot_Dirty<IState> _SelfRunningStates = new SafeUpdateList_EasyQueue_SeriNot_Dirty<IState>();
-//         public IEnumerable<IState> SelfRunningStates => _SelfRunningStates.valuesNow_;
-//         #endregion
-
-//         #region 设计层
-//         protected override void _Expand_PreparedHappenDesign()
-//         {
-//             _SelfRunningStates?.Update();
-//             // base._Expand_PreparedHappenDesign();
-//         }
-//         protected override void _Expand_UpdateHappenDesign()
-//         {
-//             if (_SelfRunningStates != null)
-//             {
-//                 _SelfRunningStates.Update();
-//                 int count = _SelfRunningStates.valuesNow_.Count;
-//                 if (count == 0)
-//                 {
-//                     if (IsIdle())
-//                     {
-//                         var default_ = GetDefaultState();
-//                         if (default_ != null)
-//                         {
-//                             bool b = TryActiveState(default_);
-//                             if (b == false)
-//                             {
-//                                 if (GetHost is not BaseOriginalStateMachine machine) return;//最高级您
-//                                 OnStateExit();
-//                             }
-//                         }
-//                         else
-//                         {
-//                             if (GetHost is not BaseOriginalStateMachine machine) return;//最高级您
-//                             OnStateExit();
-//                         }
-//                     }
-//                 }
-//                 else
-//                 {
-
-//                     for (int iq = 0; iq < count; iq++)
-//                     {
-//                         var i = _SelfRunningStates.valuesNow_[iq];
-//                         /*                    if (i is IESMicroState ESMicro)
-//                                             {
-//                                                 if (ESMicro.RunningStatus != EnumStateRunningStatus.StateUpdate) continue;
-//                                             }
-//                                             else if (!i.HasPrepared)
-//                                             {
-//                                                 continue;
-//                                             }*/
-//                         if (i.RunningStatus == EnumStateRunningStatus.StateUpdate)
-//                             i.OnStateUpdate();
-//                     }
-//                 }
-
-//             }
-
-
-
-
-
-//             //base._Expand_UpdateHappenDesign();不需要您
-//         }
-//         protected override void _Expand_ExitHappenDesign()
-//         {
-//             _SelfRunningStates?.Update();
-//             if (_SelfRunningStates != null)
-//             {
-//                 foreach (var i in _SelfRunningStates.valuesNow_)
-//                 {
-//                     if (i != null)
-//                     {
-//                         _RightlyExitTheState(i);
-//                     }
-//                 }
-//             }
-//             //base._Expand_ExitHappenDesign();
-//         }
-//         #endregion
-
-//         #region Active重写
-//         public override bool TryActiveState(IState use)
-//         {
-//             if (use is IState ESMicro)
-//             {
-//                 //空状态：直接使用
-//                 if (SelfRunningStates.Count() == 0) return base.TryActiveState(ESMicro);
-//                 //已经包含-就取消
-//                 if (SelfRunningStates.Contains(ESMicro))
-//                 {
-//                     return ESMicro.IsRunning;
-//                 }
-
-//                 Debug.Log("-----------《《《《合并测试开始------来自" + ESMicro.GetKey().ToString());
-//                 //单状态，简易判断
-//                 if (SelfRunningStates.Count() == 1)
-//                 {
-//                     IState state = SelfRunningStates.First();
-//                     {
-//                         //state的共享数据有的不是标准的哈/
-//                         //标准情形
-//                       //  Debug.Log("单-合并--测试");
-//                         if (state.SharedData is IStateSharedData left && ESMicro.SharedData is IStateSharedData right)
-//                         {
-//                             string leftKey = state.GetKey().ToString();
-//                             string rightKey = ESMicro.GetKey().ToString();
-//                             var back = StateSharedData.HandleMerge(left.MergePart_, right.MergePart_, leftKey, rightKey);
-//                             if (back == HandleMergeBack.HitAndReplace)
-//                             {
-//                                 state.OnStateExit();
-//                                 ESMicro.OnStateEnter();
-//                                 _SelfRunningState = ESMicro;
-//                                 Debug.Log("单-合并--打断  原有的  " + leftKey + " 被 新的  " + rightKey + "  打断!");
-//                                 return true;
-//                             }
-//                             else if (back == HandleMergeBack.MergeComplete)
-//                             {
-//                                 ESMicro.OnStateEnter();
-//                                 Debug.Log("单-合并--成功  原有的  " + leftKey + " 和  新的  " + rightKey + "  合并!");
-//                                 return true;
-//                             }
-//                             else //合并失败
-//                             {
-//                                 Debug.Log("单-合并--失败  原有的  " + leftKey + " 阻止了  新的  " + rightKey + "  !");
-//                                 return false;
-//                             }
-//                         }
-//                         else //有的不是标准状态
-//                         {
-//                             base.TryActiveState(ESMicro);
-//                             Debug.Log("不具有");
-//                         }
-//                     }
-//                 }
-//                 else  //多项目
-//                 {
-//                     if (ESMicro.SharedData is IStateSharedData right)
-//                     {
-//                         string rightKey = ESMicro.GetKey().ToString();
-//                         List<IState> hit = new List<IState>();
-//                         List<string> merge = new List<string>();
-//                         foreach (var i in SelfRunningStates)
-//                         {
-//                             if (i.SharedData is IStateSharedData left)
-//                             {
-//                                 string leftKey = i.GetKey().ToString();
-//                                 var back = StateSharedData.HandleMerge(left, right, leftKey, rightKey);
-//                                 if (back == HandleMergeBack.HitAndReplace)
-//                                 {
-//                                     hit.Add(i);
-
-//                                     //打断一个捏
-//                                 }
-//                                 else if (back == HandleMergeBack.MergeComplete)
-//                                 {
-//                                     //正常的
-//                                     merge.Add(leftKey);
-
-//                                 }
-//                                 else //合并失败
-//                                 {
-//                                    // Debug.LogWarning("多-合并--失败" + leftKey + " 阻止了 " + rightKey + "的本次合并测，无事发生试!");
-//                                     return false;
-//                                 }
-//                             }
-//                         }
-//                         //成功合并了
-//                       //  Debug.Log("---√多-合并--完全成功！来自" + rightKey + "以下是细则：");
-//                         ESMicro.OnStateEnter();
-//                         foreach (var i in merge)
-//                         {
-//                           //  Debug.Log("     --合并细则  本次合并-合并了了" + i);
-//                         }
-//                         foreach (var i in hit)
-//                         {
-//                         //    Debug.Log("     --合并细则  本次合并-打断了" + i.GetKey());
-//                             i.OnStateExit();
-//                         }
-//                         return true;
-//                     }
-//                     else //不是标准状态滚
-//                     {
-//                         base.TryActiveState(ESMicro);
-//                     }
-//                 }
-//                 return false;
-//             }
-//             return base.TryActiveState(use);
-//         }
-
-//         #endregion
-//     }
-
-//     //标准状态机
-//     [Serializable, TypeRegistryItem("标准状态机(String)")]
-//     public class ESStandardStateMachine_StringKey : ESMicroStateMachine_StringKey, IStateMachine
-//     {
-//         #region 总状态机
-//         [OdinSerialize, LabelText("总状态机运行中状态"),ShowInInspector, FoldoutGroup("子状态")]
-//         public HashSet<IState> MainRunningStates=new HashSet<IState>();
-//         public HashSet<IState> RootAllRunningStates => MainRunningStates;
-//         #endregion
-
-//         #region 设计层
-//         protected override void _Expand_PreparedHappenDesign()
-//         {
-//             if (MainRunningStates ==null&&Root == this)
-//             {
-//                 MainRunningStates = new HashSet<IState>();
-//             }
-//             if (Root is ESStandardStateMachine_StringKey standMachine)
-//             {
-//                 MainRunningStates = standMachine.MainRunningStates;
-//             }
-//             base._Expand_PreparedHappenDesign();
-//         }
-//         protected override void OnEnable()
-//         {
-//             base.OnEnable();
-//             if (Root is ESStandardStateMachine_StringKey standMachine)
-//             {
-//                 MainRunningStates = standMachine.MainRunningStates;
-//             }
-//         }
-//       /*  protected override void _Expand_UpdateHappenDesign()
-//         {
-//             base._Expand_UpdateHappenDesign();//照常更新
-//         }*/
-//         protected override void _Expand_ExitHappenDesign()
-//         {
-//             _SelfRunningStates?.Update();
-//             base._Expand_ExitHappenDesign();//照常更新
-//         }
-//         #endregion
-
-//         #region Active重写
-//         public override bool TryActiveState(IState use)
-//         {
-
-//             if (use is IState stand)
-//             {
-//                 //空状态：直接使用
-//                 if (RootAllRunningStates.Count == 0) { return base.TryActiveState(stand); }
-//                 //已经包含-就取消
-//                 if (RootAllRunningStates.Contains(stand)||SelfRunningStates.Contains(stand))
-//                 {
-//                     return stand.IsRunning;
-//                 }
-
-//                 //Debug.Log("-----------《《《《合并测试开始------来自" + stand.GetKey().ToString());
-//                 //单状态，简易判断
-//                 if (RootAllRunningStates.Count == 1)
-//                 {
-//                     IState state = RootAllRunningStates.First();
-//                     {
-//                         //state的共享数据有的不是标准的哈/
-//                         //标准情形
-//                       //  Debug.Log("单-合并--测试");
-//                         if (state.SharedData is IStateSharedData left && stand.SharedData is IStateSharedData right)
-//                         {
-//                             string leftKey = state.GetKey().ToString();
-//                             string rightKey = stand.GetKey().ToString();
-//                             var back = StateSharedData.HandleMerge(left.MergePart_, right.MergePart_, leftKey, rightKey);
-//                             if (back == HandleMergeBack.HitAndReplace)
-//                             {
-//                                 state.OnStateExit();
-//                                 stand.OnStateEnter();
-//                                 _SelfRunningState = stand;
-//                                 Debug.Log("单-合并--打断  原有的  " + leftKey + " 被 新的  " + rightKey + "  打断!");
-//                                 return true;
-//                             }
-//                             else if (back == HandleMergeBack.MergeComplete)
-//                             {
-//                                 stand.OnStateEnter();
-//                                 Debug.Log("单-合并--成功  原有的  " + leftKey + " 和  新的  " + rightKey + "  合并!");
-//                                 return true;
-//                             }
-//                             else //合并失败
-//                             {
-//                                 Debug.Log("单-合并--失败  原有的  " + leftKey + " 阻止了  新的  " + rightKey + "  !");
-//                                 return false;
-//                             }
-//                         }
-//                         else //有的不是标准状态
-//                         {
-//                             base.TryActiveState(stand);
-//                         }
-//                     }
-//                 }
-//                 else  //多项目
-//                 {
-//                     if (stand.SharedData is IStateSharedData right)
-//                     {
-//                         string rightKey = stand.GetKey().ToString();
-//                         List<IState> hit = new List<IState>();
-//                         List<string> merge = new List<string>();
-//                         foreach (var i in RootAllRunningStates)
-//                         {
-//                             if (i.SharedData is IStateSharedData left)
-//                             {
-//                                 string leftKey = i.GetKey().ToString();
-//                                 var back = StateSharedData.HandleMerge(left, right, leftKey, rightKey);
-//                                 if (back == HandleMergeBack.HitAndReplace)
-//                                 {
-//                                     hit.Add(i);
-
-//                                     //打断一个捏
-//                                 }
-//                                 else if (back == HandleMergeBack.MergeComplete)
-//                                 {
-//                                     //正常的
-//                                     merge.Add(leftKey);
-
-//                                 }
-//                                 else //合并失败
-//                                 {
-//                                    // Debug.LogWarning("多-合并--失败" + leftKey + " 阻止了 " + rightKey + "的本次合并测，无事发生试!");
-//                                     return false;
-//                                 }
-//                             }
-//                         }
-//                         //成功合并了
-//                       //  Debug.Log("---√多-合并--完全成功！来自" + rightKey + "以下是细则：");
-//                         stand.OnStateEnter();
-//                         foreach (var i in merge)
-//                         {
-//                           //  Debug.Log("     --合并细则  本次合并-合并了了" + i);
-//                         }
-//                         foreach (var i in hit)
-//                         {
-//                         //    Debug.Log("     --合并细则  本次合并-打断了" + i.GetKey());
-//                             i.OnStateExit();
-//                         }
-//                         return true;
-//                     }
-//                     else //不是标准状态滚
-//                     {
-//                         base.TryActiveState(stand);
-//                     }
-//                 }
-//                 return false;
-//             }
-//             return base.TryActiveState(use);
-//         }
-
-//         #endregion
-
-//         #region 测试方法
-
-//         [Button("输出全部状态"), FoldoutGroup("状态机测试按钮")]
-//         public void Test_OutPutAllStateRunning(string befo = "状态机：")
-//         {
-//             string all = befo + "现在运行的有：";
-//             foreach (var i in MainRunningStates)
-//             {
-//                 all += i.GetKey() + " , ";
-//             }
-//             /*Debug.LogWarning(all);*/
-//         }
-//         #endregion
-//     }
-
-//     #endregion
-
-
-// }

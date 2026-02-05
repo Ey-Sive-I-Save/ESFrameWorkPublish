@@ -13,8 +13,65 @@ namespace ES
 {
 
     [Serializable, TypeRegistryItem("状态基类")]
-    public class StateBase
+    public class StateBase : IPoolableAuto
     {
+        #region 对象池支持
+
+        /// <summary>
+        /// StateBase 对象池
+        /// 容量: 500个对象
+        /// 预热: 10个初始对象
+        /// </summary>
+        public static readonly ESSimplePool<StateBase> Pool = new ESSimplePool<StateBase>(
+            factoryMethod: () => new StateBase(),
+            resetMethod: (obj) => obj.OnResetAsPoolable(),
+            initCount: 10,
+            maxCount: -1,
+            poolDisplayName: "StateBase Pool"
+        );
+
+        /// <summary>
+        /// 对象回收标记
+        /// </summary>
+        public bool IsRecycled { get; set; }
+
+        /// <summary>
+        /// 重置对象状态
+        /// </summary>
+        public void OnResetAsPoolable()
+        {
+            host = null;
+            activationTime = 0f;
+            hasEnterTime = 0f;
+            normalizedProgress = 0f;
+            totalProgress = 0f;
+            loopCount = 0;
+            _lastNormalizedProgress = 0f;
+            baseStatus = StateBaseStatus.Never;
+            stateRuntimePhase = StateRuntimePhase.Running;
+            strKey = null;
+            intKey = -1;
+            stateSharedData = null;
+            stateVariableData = null;
+            _shouldAutoExitFromAnimation = false;
+            DestroyPlayable();
+            // 其他字段在此重置
+        }
+
+        /// <summary>
+        /// 尝试回收到对象池
+        /// </summary>
+        public void TryAutoPushedToPool()
+        {
+            if (!IsRecycled)
+            {
+                IsRecycled = true;
+                Pool.PushToPool(this);
+            }
+        }
+
+        #endregion
+
         #region  基础属性
 
         [NonSerialized]
@@ -57,7 +114,11 @@ namespace ES
         /// </summary>
         [NonSerialized]
         public int loopCount = 0;
-
+        /// <summary>
+        /// 上一帧的归一化进度（用于事件触发检测）
+        /// </summary>
+        [NonSerialized]
+        private float _lastNormalizedProgress = 0f;
         #endregion
 
         [LabelText("共享数据", SdfIconType.Calendar2Date), FoldoutGroup("基础属性"), NonSerialized/*不让自动序列化*/] public StateSharedData stateSharedData = null;
@@ -95,6 +156,21 @@ namespace ES
         protected virtual void OnLoopCompleted(int loopCount)
         {
             // 默认不实现，子类重写
+        }
+
+        /// <summary>
+        /// 动画事件回调
+        /// 当动画播放到指定时间点时触发
+        /// </summary>
+        /// <param name="eventName">事件名称</param>
+        /// <param name="eventParam">事件参数</param>
+        protected virtual void OnAnimationEvent(string eventName, string eventParam)
+        {
+            StateMachineDebugSettings.Instance.LogStateTransition(
+                $"[AnimEvent] State:{stateSharedData?.basicConfig.stateName} | Event:{eventName} | Param:{eventParam}");
+            
+            // 可以通知StateMachine广播事件
+            host?.BroadcastAnimationEvent(this, eventName, eventParam);
         }
 
         /// <summary>
@@ -139,9 +215,20 @@ namespace ES
             normalizedProgress = 0f;
             totalProgress = 0f;
             loopCount = 0;
+            _lastNormalizedProgress = 0f; // 重置事件检测
             _shouldAutoExitFromAnimation = false; // 重置动画完毕标志
             
+            // 重置动画事件触发标记
+            ResetAnimationEventTriggers();
+            
             OnStateEnterLogic();
+        }
+
+        private void MarkAutoExitFromAnimation(string reason)
+        {
+            if (_shouldAutoExitFromAnimation) return;
+            _shouldAutoExitFromAnimation = true;
+            Debug.Log($"[StateBase] AutoExitFlag=TRUE | State={stateSharedData?.basicConfig?.stateName} | Reason={reason}\n{Environment.StackTrace}");
         }
 
         public void OnStateUpdate()
@@ -176,6 +263,12 @@ namespace ES
         #endregion
 
         #region Playable创建与管理
+
+        /// <summary>
+        /// 当前动画计算器类型（用于扩展能力判断）
+        /// </summary>
+        public StateAnimationMixerKind CurrentCalculatorKind
+            => stateSharedData?.animationConfig?.calculator?.CalculatorKind ?? StateAnimationMixerKind.Unknown;
 
         /// <summary>
         /// 创建状态的Playable节点 - 零GC高性能实现
@@ -230,6 +323,7 @@ namespace ES
             
             if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
             {
+                Debug.Log($"[StateBase] 更新动画权重: State={stateSharedData.basicConfig.stateName}");
                 stateSharedData.animationConfig.calculator.UpdateWeights(_animationRuntime, context, deltaTime);
                 
                 // ★ AnimationClip反向控制：检测动画是否播放完毕（仅针对UntilAnimationEnd模式）
@@ -276,6 +370,84 @@ namespace ES
             {
                 OnLoopCompleted(loopCount);
             }
+            
+            // 检测动画事件触发
+            CheckAnimationEventTriggers();
+        }
+
+        /// <summary>
+        /// 检测并触发动画事件
+        /// </summary>
+        private void CheckAnimationEventTriggers()
+        {
+            // 获取动画配置中的事件列表
+            var triggerEvents = GetAnimationTriggerEvents();
+            if (triggerEvents == null || triggerEvents.Count == 0)
+                return;
+
+            foreach (var evt in triggerEvents)
+            {
+                // 检测是否穿过触发点
+                bool crossedTriggerPoint = false;
+                
+                // 情况1：正常前进，穿过触发点
+                if (_lastNormalizedProgress < evt.normalizedTime && 
+                    normalizedProgress >= evt.normalizedTime)
+                {
+                    crossedTriggerPoint = true;
+                }
+                
+                // 情况2：循环回绕（从1回到0）
+                if (_lastNormalizedProgress > normalizedProgress)
+                {
+                    // 新循环开始，重置触发标记
+                    evt.ResetTrigger();
+                    
+                    // 检查是否在新循环中穿过触发点
+                    if (evt.normalizedTime < normalizedProgress)
+                    {
+                        crossedTriggerPoint = true;
+                    }
+                }
+                
+                // 触发事件
+                if (crossedTriggerPoint)
+                {
+                    if (!evt.triggerOnce || !evt.hasTriggered)
+                    {
+                        OnAnimationEvent(evt.eventName, evt.eventParam);
+                        evt.hasTriggered = true;
+                    }
+                }
+            }
+            
+            _lastNormalizedProgress = normalizedProgress;
+        }
+
+        /// <summary>
+        /// 获取动画触发事件列表
+        /// </summary>
+        private List<TriggerEventAt> GetAnimationTriggerEvents()
+        {
+            // 暂时返回null，后续集成AnimationClipConfig时实现
+            // TODO: 从animationConfig.calculator中获取triggerEvents
+            return null;
+        }
+
+        /// <summary>
+        /// 重置动画事件触发标记
+        /// </summary>
+        private void ResetAnimationEventTriggers()
+        {
+            var triggerEvents = GetAnimationTriggerEvents();
+            if (triggerEvents != null)
+            {
+                foreach (var evt in triggerEvents)
+                {
+                    evt.ResetTrigger();
+                }
+            }
+            _lastNormalizedProgress = 0f;
         }
 
         /// <summary>
@@ -296,6 +468,13 @@ namespace ES
         /// </summary>
         private void CheckAnimationCompletion()
         {
+            if (stateSharedData?.basicConfig == null)
+            {
+                Debug.LogWarning("[StateBase] 检测动画完毕失败：stateSharedData或basicConfig为空");
+                return;
+            }
+
+            Debug.Log($"[StateBase] 检测动画完毕: State={stateSharedData.basicConfig.stateName} | RuntimeInit={_animationRuntime != null && _animationRuntime.IsInitialized}");
             if (_animationRuntime == null || !_animationRuntime.IsInitialized)
                 return;
 
@@ -303,6 +482,7 @@ namespace ES
             if (_animationRuntime.singlePlayable.IsValid())
             {
                 Playable playable = _animationRuntime.singlePlayable;
+                Debug.Log($"[StateBase] 单Playable检测: Type={playable.GetPlayableType().Name} | Time={playable.GetTime():F3} | Duration={playable.GetDuration():F3}");
                 if (playable.GetPlayableType() == typeof(AnimationClipPlayable))
                 {
                     var clipPlayable = (AnimationClipPlayable)playable;
@@ -310,20 +490,36 @@ namespace ES
                     
                     if (animationClip != null && !animationClip.isLooping)
                     {
+                        Debug.Log($"[StateBase] 单Clip: {animationClip.name} | Loop={animationClip.isLooping}");
                         double currentTime = playable.GetTime();
                         double duration = playable.GetDuration();
+                        if (double.IsInfinity(duration) || duration <= 0.001)
+                        {
+                            Debug.LogWarning($"[StateBase] 单Clip时长异常: {duration}");
+                            return;
+                        }
                         
                         // 播放进度>=1.0，标记为应该退出
                         if (duration > 0.001 && currentTime >= duration - 0.016) // 0.016 = 1帧容错（60fps）
                         {
-                            _shouldAutoExitFromAnimation = true;
+                            MarkAutoExitFromAnimation("SingleClipComplete");
+                            Debug.Log($"[StateBase] 单Clip播放完毕 -> 标记退出");
                         }
                     }
+                    else
+                    {
+                        Debug.Log($"[StateBase] 单Clip为空或循环播放，跳过完成检测");
+                    }
+                }
+                else
+                {
+                    Debug.Log($"[StateBase] 单Playable非AnimationClipPlayable，跳过完成检测");
                 }
             }
             // 检查Mixer中的Playables（BlendTree/DirectBlend）
             else if (_animationRuntime.playables != null)
             {
+                Debug.Log($"[StateBase] 多Playable检测: Count={_animationRuntime.playables.Length}");
                 // 多动画混合的情况：只有当所有非循环动画都播放完毕才退出
                 bool hasNonLoopingClip = false;
                 bool allNonLoopingCompleted = true;
@@ -344,6 +540,12 @@ namespace ES
                             
                             double currentTime = playable.GetTime();
                             double duration = playable.GetDuration();
+                            Debug.Log($"[StateBase] 子Clip[{i}]: {animationClip.name} | Time={currentTime:F3} | Duration={duration:F3} | Loop={animationClip.isLooping}");
+                            if (double.IsInfinity(duration) || duration <= 0.001)
+                            {
+                                Debug.LogWarning($"[StateBase] 子Clip时长异常: {duration}");
+                                continue;
+                            }
                             
                             if (duration > 0.001 && currentTime < duration - 0.016)
                             {
@@ -351,13 +553,26 @@ namespace ES
                                 break;
                             }
                         }
+                        else
+                        {
+                            Debug.Log($"[StateBase] 子Clip[{i}]为空或循环播放，跳过完成检测");
+                        }
+                    }
+                    else
+                    {
+                        Debug.Log($"[StateBase] 子Playable[{i}]非AnimationClipPlayable: {playable.GetPlayableType().Name}");
                     }
                 }
 
                 if (hasNonLoopingClip && allNonLoopingCompleted)
                 {
-                    _shouldAutoExitFromAnimation = true;
+                    MarkAutoExitFromAnimation("AllNonLoopingClipsComplete");
+                    Debug.Log($"[StateBase] 多Clip全部播放完毕 -> 标记退出");
                 }
+            }
+            else
+            {
+                Debug.LogWarning("[StateBase] 无可检测Playable（singlePlayable无效且playables为空）");
             }
         }
 
@@ -414,12 +629,20 @@ namespace ES
                     return false; // 无限持续，不自动退出
 
                 case StateDurationMode.Timed:
-                    return elapsedTime >= config.timedDuration;
+                    if (elapsedTime >= config.timedDuration)
+                    {
+                        Debug.Log($"[StateBase] ShouldAutoExit=TRUE (Timed) | State={stateSharedData.basicConfig.stateName} | Elapsed={elapsedTime:F3} | Duration={config.timedDuration:F3}");
+                        return true;
+                    }
+                    return false;
 
                 case StateDurationMode.UntilAnimationEnd:
                     // 检查动画是否播放完毕（优先使用AnimationClip反向控制的标志）
                     if (_shouldAutoExitFromAnimation)
+                    {
+                        Debug.Log($"[StateBase] ShouldAutoExit=TRUE (AnimFlag) | State={stateSharedData.basicConfig.stateName}");
                         return true;
+                    }
                     
                     // 备用逻辑：通过Clip长度计算
                     if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
@@ -435,7 +658,12 @@ namespace ES
                             }
                             
                             float animDuration = clip.length / Mathf.Max(0.01f, speed);
-                            return elapsedTime >= animDuration;
+                            if (elapsedTime >= animDuration)
+                            {
+                                Debug.Log($"[StateBase] ShouldAutoExit=TRUE (ClipLength) | State={stateSharedData.basicConfig.stateName} | Clip={clip.name} | Elapsed={elapsedTime:F3} | AnimDuration={animDuration:F3} | Speed={speed:F3}");
+                                return true;
+                            }
+                            return false;
                         }
                     }
                     return false;

@@ -204,7 +204,7 @@ namespace ES
         {
             if (MyCore == null || !enableFly) return;
 
-            MyCore.SetLocomotionMode(LocomotionMode.Flying);
+            MyCore.SetLocomotionSupportFlags(StateSupportFlags.Flying);
             MyCore.SetVerticalInput(verticalInput);
 
             if (applyEveryFrame)
@@ -263,7 +263,7 @@ namespace ES
         {
             if (MyCore == null || !enableSwim) return;
 
-            MyCore.SetLocomotionMode(LocomotionMode.Swimming);
+            MyCore.SetLocomotionSupportFlags(StateSupportFlags.Swimming);
             MyCore.SetVerticalInput(verticalInput);
 
             if (applyEveryFrame)

@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ddf7428a32f160f4286dce9392bf8895, type: 3}
+  m_Name: "\u9ED8\u8BA4\u52A8\u753B\u5668\u914D\u7F6E"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  HasConfirm: 1
+  disableTransitionPermissionMap:
+    baseKeys: 000102040810204080
+    relations:
+    - key: 0
+      relatedKeys: 
+    - key: 1
+      relatedKeys: 
+    - key: 2
+      relatedKeys: 0810
+    - key: 4
+      relatedKeys: 1020
+    - key: 8
+      relatedKeys: 100402
+    - key: 16
+      relatedKeys: 08200402
+    - key: 32
+      relatedKeys: 08100402
+    - key: 64
+      relatedKeys: 01020408102080
+    - key: 128
+      relatedKeys: 081020

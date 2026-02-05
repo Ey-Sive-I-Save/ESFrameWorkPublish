@@ -10,6 +10,7 @@ namespace ES
     public class Entity : Core, ICharacterController
     {
         public Animator animator;
+
         #region Domains
 
         [TabGroup("域", "基础域"), InlineProperty, HideLabel, SerializeReference]
@@ -115,9 +116,9 @@ namespace ES
             kcc.ResetSpeedModifiers();
         }
 
-        public void SetLocomotionMode(LocomotionMode mode)
+        public void SetLocomotionSupportFlags(StateSupportFlags flags)
         {
-            kcc.SetLocomotionMode(mode);
+            stateDomain.stateMachine.SetLocomotionSupportFlags(flags);
         }
 
         public void SetVerticalInput(float input)
@@ -240,9 +241,6 @@ namespace ES
         [LabelText("垂直输入")]
         public float verticalInput;
 
-        [LabelText("移动模式")]
-        public LocomotionMode locomotionMode = LocomotionMode.Grounded;
-
         [Title("Monitor（运行监视）")]
         [InlineProperty, HideLabel]
         public EntityKCCMonitor monitor = new EntityKCCMonitor();
@@ -299,11 +297,6 @@ namespace ES
             verticalInput = 0f;
         }
 
-        public void SetLocomotionMode(LocomotionMode mode)
-        {
-            locomotionMode = mode;
-        }
-
         public void RequestJump()
         {
             _jumpRequested = true;
@@ -342,7 +335,6 @@ namespace ES
 
         public void BeforeCharacterUpdate(Entity owner, float deltaTime)
         {
-            if (motor == null) return;
             ApplyCrouch();
         }
 
@@ -355,8 +347,6 @@ namespace ES
 
         public void UpdateVelocity(Entity owner, ref Vector3 currentVelocity, float deltaTime)
         {
-            if (motor == null) return;
-
             float multiplier = Mathf.Max(0f, speedMultiplier);
             float stableMaxSpeed = maxStableMoveSpeed * multiplier;
             float airMaxSpeed = maxAirMoveSpeed * multiplier;
@@ -367,7 +357,8 @@ namespace ES
             }
 
             Vector3 targetMovementVelocity = Vector3.zero;
-            if (locomotionMode == LocomotionMode.Flying)
+            var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
+            if ((supportFlags & StateSupportFlags.Flying) != 0)
             {
                 Vector3 up = motor.CharacterUp;
                 Vector3 input = moveInput + up * verticalInput;
@@ -378,7 +369,7 @@ namespace ES
                 currentVelocity += velocityDiff * flyAcceleration * deltaTime;
                 currentVelocity *= (1f / (1f + (flyDrag * deltaTime)));
             }
-            else if (locomotionMode == LocomotionMode.Swimming)
+            else if ((supportFlags & StateSupportFlags.Swimming) != 0)
             {
                 Vector3 up = motor.CharacterUp;
                 Vector3 input = moveInput + up * verticalInput;
@@ -453,7 +444,6 @@ namespace ES
 
         private void ApplyCrouch()
         {
-            if (motor == null || motor.Capsule == null) return;
             if (_crouchRequested == _isCrouched) return;
 
             _isCrouched = _crouchRequested;
@@ -475,7 +465,7 @@ namespace ES
 
         public void AfterCharacterUpdate(Entity owner, float deltaTime)
         {
-            monitor?.UpdateFromMotor(motor, _lastVelocity);
+            monitor.UpdateFromMotor(motor, _lastVelocity);
         }
 
         public bool IsColliderValidForCollisions(Entity owner, Collider coll)
@@ -502,13 +492,8 @@ namespace ES
         {
             // 预留扩展
         }
-    }
 
-    public enum LocomotionMode
-    {
-        Grounded,
-        Swimming,
-        Flying
+        
     }
 
     [Serializable]
@@ -532,7 +517,6 @@ namespace ES
         public void UpdateFromMotor(KinematicCharacterMotor motor, Vector3 currentVelocity)
         {
             hasMotor = motor != null;
-            if (motor == null) return;
             isStableOnGround = motor.GroundingStatus.IsStableOnGround;
             velocity = currentVelocity;
             position = motor.TransientPosition;

@@ -71,8 +71,10 @@ namespace ES
         /// </summary>
         public void LogStateTransition(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug && logStateTransitions)
                 Debug.Log($"[StateMachine] {message}");
+#endif
         }
 
         /// <summary>
@@ -80,8 +82,10 @@ namespace ES
         /// </summary>
         public void LogAnimationBlend(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug && logAnimationBlending)
                 Debug.Log($"[Animation] {message}");
+#endif
         }
 
         /// <summary>
@@ -89,8 +93,10 @@ namespace ES
         /// </summary>
         public void LogTriangulation(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug && logTriangulation)
                 Debug.Log($"[Triangulation] {message}");
+#endif
         }
 
         /// <summary>
@@ -98,8 +104,10 @@ namespace ES
         /// </summary>
         public void LogRuntimeInit(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug && logRuntimeInit)
                 Debug.Log($"[Runtime] {message}");
+#endif
         }
 
         /// <summary>
@@ -107,8 +115,10 @@ namespace ES
         /// </summary>
         public void LogFallback(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug && logFallback)
                 Debug.Log($"[FallBack] {message}");
+#endif
         }
 
         /// <summary>
@@ -116,8 +126,10 @@ namespace ES
         /// </summary>
         public void LogDirty(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug && logDirtySystem)
                 Debug.Log($"[Dirty] {message}");
+#endif
         }
 
         /// <summary>
@@ -125,8 +137,10 @@ namespace ES
         /// </summary>
         public void LogFade(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug && logFadeEffects)
                 Debug.Log($"[Fade] {message}");
+#endif
         }
 
         /// <summary>
@@ -134,8 +148,10 @@ namespace ES
         /// </summary>
         public void LogPerformance(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug && logPerformanceStats)
                 Debug.Log($"[Performance] {message}");
+#endif
         }
 
         /// <summary>
@@ -143,8 +159,10 @@ namespace ES
         /// </summary>
         public void LogWeightDetail(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug && logWeightDetails)
                 Debug.Log($"[Weight] {message}");
+#endif
         }
 
         /// <summary>
@@ -152,8 +170,10 @@ namespace ES
         /// </summary>
         public void LogWarning(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug || alwaysLogErrors)
                 Debug.LogWarning($"[StateMachine Warning] {message}");
+#endif
         }
 
         /// <summary>
@@ -161,8 +181,10 @@ namespace ES
         /// </summary>
         public void LogError(string message)
         {
+#if STATEMACHINEDEBUG
             if (enableDebug || alwaysLogErrors)
                 Debug.LogError($"[StateMachine Error] {message}");
+#endif
         }
     }
 }

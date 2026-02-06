@@ -81,7 +81,7 @@ namespace ES.Examples
                 },
                 costData = new StateCostData
                 {
-                    motionCost = 0.8f
+                    
                 },
                 hasAnimation = true,
                 fadeInDuration = 0.05f,

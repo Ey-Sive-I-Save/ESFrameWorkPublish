@@ -5,12 +5,12 @@ namespace ES
 {
     /// <summary>
     /// 实体/状态支持标记（位标记）。
-    /// 由StateMachine统一维护，KCC与状态系统共同读取：Grounded/Swimming/Flying。
+    /// 由StateMachine统一维护，KCC与状态系统共同读取：Grounded/Swimming/Flying/Climbing。
     /// </summary>
     [Flags]
-    public enum StateSupportFlags : byte
+    public enum StateSupportFlags : ushort
     {
-        [InspectorName("站立/地面(默认)")]
+        [InspectorName("站立于地面(默认)")]
         Grounded = 1 << 0,
 
         [InspectorName("无")]
@@ -35,6 +35,15 @@ namespace ES
         Dead = 1 << 6,
 
         [InspectorName("过场")]
-        Transition = 1 << 7
+        Transition = 1 << 7,
+
+        [InspectorName("攀爬")]
+        Climbing = 1 << 8,
+
+        [InspectorName("特殊交互")]
+        SpecialInteraction = 1 << 9,
+
+        [InspectorName("观察者")]
+        Observer = 1 << 10
     }
 }

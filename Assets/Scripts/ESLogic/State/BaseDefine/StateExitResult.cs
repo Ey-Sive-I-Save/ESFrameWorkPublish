@@ -60,16 +60,16 @@ namespace ES
         public static void AnalyzeCommonExitCases()
         {
             // 1) 目标状态为空
-            var caseNull = StateExitResult.Failure("目标状态为空", StatePipelineType.Basic);
+            var caseNull = StateExitResult.Failure("目标状态为空", StatePipelineType.NotClear);
 
             // 2) 状态未在运行中
-            var caseNotRunning = StateExitResult.Failure("状态未在运行中", StatePipelineType.Basic);
+            var caseNotRunning = StateExitResult.Failure("状态未在运行中", StatePipelineType.NotClear);
 
             // 3) 自定义退出测试拒绝
             var caseCustomDenied = StateExitResult.Failure("自定义退出测试未通过", StatePipelineType.Main);
 
             // 4) 正常允许退出
-            var caseAllowed = StateExitResult.Success(StatePipelineType.Basic);
+            var caseAllowed = StateExitResult.Success(StatePipelineType.NotClear);
 
             // 这里仅为示例，避免运行时输出；如需查看可在编辑器调用并自行打印。
             _ = caseNull;

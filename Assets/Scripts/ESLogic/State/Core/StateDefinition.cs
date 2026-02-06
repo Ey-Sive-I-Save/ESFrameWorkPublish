@@ -47,23 +47,6 @@ namespace ES
         [Tooltip("负数表示无限循环")]
         public float duration = -1f;
 
-        // ============ 代价系统 ============
-        [TabGroup("代价")]
-        [LabelText("状态代价配置")]
-        [InlineProperty]
-        public StateCostData cost = new StateCostData();
-
-        [TabGroup("代价")]
-        [LabelText("后摇开始时间(归一化)")]
-        [Tooltip("到达此时间后开始返还代价")]
-        [Range(0f, 1f)]
-        public float recoveryStartTime = 0.7f;
-
-        [TabGroup("代价")]
-        [LabelText("后摇持续时间(秒)")]
-        [Tooltip("代价返还所需的时间")]
-        public float recoveryDuration = 0.3f;
-
         // ============ 同路退化 ============
         [TabGroup("同路")]
         [LabelText("同路类型")]
@@ -134,11 +117,6 @@ namespace ES
         [LabelText("状态标签")]
         [Tooltip("用于快速分类和查询")]
         public List<string> tags = new List<string>();
-
-        [TabGroup("标签")]
-        [LabelText("不参与代价计算")]
-        [Tooltip("此状态不影响代价系统和备忘状态")]
-        public bool ignoreInCostCalculation = false;
 
         /// <summary>
         /// 检查进入条件是否满足

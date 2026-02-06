@@ -13,7 +13,7 @@ namespace ES
     [Serializable]
     public sealed class RelationMaskStringMap : ISerializationCallbackReceiver
     {
-        public const int MaxKeys = 64;
+        public const int MaxKeys = 32;
 
         [Serializable]
         public struct RelationEntry
@@ -28,11 +28,11 @@ namespace ES
         private List<RelationEntry> relations = new List<RelationEntry>(8);
 
         [NonSerialized] private Dictionary<string, int> _index;
-        [NonSerialized] private ulong[] _masks;
+        [NonSerialized] private uint[] _masks;
         [NonSerialized] private bool _cacheReady;
 
 #if UNITY_EDITOR
-        [TableMatrix(SquareCells = true, Labels = "GetMatrixLabel")]
+        [TableMatrix(SquareCells = true,Transpose = true, Labels = "GetMatrixLabel")]
         [OnValueChanged("EditorApplyMatrix")]
         [ShowInInspector, PropertyOrder(100)]
         private bool[,] editorMatrix;
@@ -83,24 +83,24 @@ namespace ES
             if (fromKey == null || toKey == null) return false;
             if (!_index.TryGetValue(fromKey, out var fromIndex)) return false;
             if (!_index.TryGetValue(toKey, out var toIndex)) return false;
-            return ((_masks[fromIndex] >> toIndex) & 1UL) != 0;
+            return ((_masks[fromIndex] >> toIndex) & 1u) != 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsRelatedMaskFast(string fromKey, ulong targetMask)
+        public bool IsRelatedMaskFast(string fromKey, uint targetMask)
         {
             if (!_cacheReady || _index == null || _masks == null) return false;
             if (fromKey == null) return false;
             if (!_index.TryGetValue(fromKey, out var fromIndex)) return false;
-            return (_masks[fromIndex] & targetMask) != 0UL;
+            return (_masks[fromIndex] & targetMask) != 0u;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetMaskFast(string key, out ulong mask)
+        public bool TryGetMaskFast(string key, out uint mask)
         {
             if (!_cacheReady || _index == null || _masks == null || key == null)
             {
-                mask = 0UL;
+                mask = 0u;
                 return false;
             }
 
@@ -110,7 +110,7 @@ namespace ES
                 return true;
             }
 
-            mask = 0UL;
+            mask = 0u;
             return false;
         }
 
@@ -140,15 +140,15 @@ namespace ES
             if (_masks == null) return false;
             if ((uint)fromIndex >= (uint)_masks.Length) return false;
             if ((uint)toIndex >= (uint)_masks.Length) return false;
-            return ((_masks[fromIndex] >> toIndex) & 1UL) != 0;
+            return ((_masks[fromIndex] >> toIndex) & 1u) != 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong GetMaskByIndex(int index)
+        public uint GetMaskByIndex(int index)
         {
             EnsureCache();
-            if (_masks == null) return 0UL;
-            if ((uint)index >= (uint)_masks.Length) return 0UL;
+            if (_masks == null) return 0u;
+            if ((uint)index >= (uint)_masks.Length) return 0u;
             return _masks[index];
         }
 
@@ -165,7 +165,7 @@ namespace ES
             if (count > MaxKeys) count = MaxKeys;
 
             _index = count > 0 ? new Dictionary<string, int>(count) : null;
-            _masks = count > 0 ? new ulong[count] : null;
+            _masks = count > 0 ? new uint[count] : null;
 
             for (int i = 0; i < count; i++)
             {
@@ -181,7 +181,7 @@ namespace ES
                 if (!_index.TryGetValue(entry.key ?? string.Empty, out var fromIndex))
                     continue;
 
-                ulong mask = 0UL;
+                uint mask = 0u;
                 var related = entry.relatedKeys;
                 if (related != null)
                 {
@@ -191,7 +191,7 @@ namespace ES
                         if (_index.TryGetValue(rk, out var toIndex))
                         {
                             if ((uint)toIndex < MaxKeys)
-                                mask |= 1UL << toIndex;
+                                mask |= 1u << toIndex;
                         }
                     }
                 }
@@ -294,7 +294,7 @@ namespace ES
     [Serializable]
     public sealed class RelationMaskIntMap : ISerializationCallbackReceiver
     {
-        public const int MaxKeys = 64;
+        public const int MaxKeys = 32;
 
         [Serializable]
         public struct RelationEntry
@@ -309,11 +309,11 @@ namespace ES
         private List<RelationEntry> relations = new List<RelationEntry>(8);
 
         [NonSerialized] private Dictionary<int, int> _index;
-        [NonSerialized] private ulong[] _masks;
+        [NonSerialized] private uint[] _masks;
         [NonSerialized] private bool _cacheReady;
 
 #if UNITY_EDITOR
-        [TableMatrix(SquareCells = true, Labels = "GetMatrixLabel")]
+        [TableMatrix(SquareCells = true, Transpose = true, Labels = "GetMatrixLabel")]
         [OnValueChanged("EditorApplyMatrix")]
         [ShowInInspector, PropertyOrder(100)]
         private bool[,] editorMatrix;
@@ -375,19 +375,19 @@ namespace ES
             if (!_cacheReady || _index == null || _masks == null) return false;
             if (!_index.TryGetValue(fromKey, out var fromIndex)) return false;
             if (!_index.TryGetValue(toKey, out var toIndex)) return false;
-            return ((_masks[fromIndex] >> toIndex) & 1UL) != 0;
+            return ((_masks[fromIndex] >> toIndex) & 1u) != 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsRelatedMaskFast(int fromKey, ulong targetMask)
+        public bool IsRelatedMaskFast(int fromKey, uint targetMask)
         {
             if (!_cacheReady || _index == null || _masks == null) return false;
             if (!_index.TryGetValue(fromKey, out var fromIndex)) return false;
-            return (_masks[fromIndex] & targetMask) != 0UL;
+            return (_masks[fromIndex] & targetMask) != 0u;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsRelatedMaskFast<TEnum>(TEnum fromKey, ulong targetMask) where TEnum : struct, Enum
+        public bool IsRelatedMaskFast<TEnum>(TEnum fromKey, uint targetMask) where TEnum : struct, Enum
         {
             return IsRelatedMaskFast(Convert.ToInt32(fromKey), targetMask);
         }
@@ -399,11 +399,11 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetMaskFast(int key, out ulong mask)
+        public bool TryGetMaskFast(int key, out uint mask)
         {
             if (!_cacheReady || _index == null || _masks == null)
             {
-                mask = 0UL;
+                mask = 0u;
                 return false;
             }
 
@@ -413,12 +413,12 @@ namespace ES
                 return true;
             }
 
-            mask = 0UL;
+            mask = 0u;
             return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetMaskFast<TEnum>(TEnum key, out ulong mask) where TEnum : struct, Enum
+        public bool TryGetMaskFast<TEnum>(TEnum key, out uint mask) where TEnum : struct, Enum
         {
             return TryGetMaskFast(Convert.ToInt32(key), out mask);
         }
@@ -455,9 +455,9 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong GetMask<TEnum>(TEnum key) where TEnum : struct, Enum
+        public uint GetMask<TEnum>(TEnum key) where TEnum : struct, Enum
         {
-            return TryGetIndex(Convert.ToInt32(key), out var index) ? GetMaskByIndex(index) : 0UL;
+            return TryGetIndex(Convert.ToInt32(key), out var index) ? GetMaskByIndex(index) : 0u;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -473,15 +473,15 @@ namespace ES
             if (_masks == null) return false;
             if ((uint)fromIndex >= (uint)_masks.Length) return false;
             if ((uint)toIndex >= (uint)_masks.Length) return false;
-            return ((_masks[fromIndex] >> toIndex) & 1UL) != 0;
+            return ((_masks[fromIndex] >> toIndex) & 1u) != 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong GetMaskByIndex(int index)
+        public uint GetMaskByIndex(int index)
         {
             EnsureCache();
-            if (_masks == null) return 0UL;
-            if ((uint)index >= (uint)_masks.Length) return 0UL;
+            if (_masks == null) return 0u;
+            if ((uint)index >= (uint)_masks.Length) return 0u;
             return _masks[index];
         }
 
@@ -498,7 +498,7 @@ namespace ES
             if (count > MaxKeys) count = MaxKeys;
 
             _index = count > 0 ? new Dictionary<int, int>(count) : null;
-            _masks = count > 0 ? new ulong[count] : null;
+            _masks = count > 0 ? new uint[count] : null;
 
             for (int i = 0; i < count; i++)
             {
@@ -513,7 +513,7 @@ namespace ES
                 if (!_index.TryGetValue(entry.key, out var fromIndex))
                     continue;
 
-                ulong mask = 0UL;
+                uint mask = 0u;
                 var related = entry.relatedKeys;
                 if (related != null)
                 {
@@ -522,7 +522,7 @@ namespace ES
                         if (_index.TryGetValue(related[r], out var toIndex))
                         {
                             if ((uint)toIndex < MaxKeys)
-                                mask |= 1UL << toIndex;
+                                mask |= 1u << toIndex;
                         }
                     }
                 }
@@ -645,7 +645,7 @@ namespace ES
     [Serializable]
     public class RelationMaskEnumMap<TEnum> : ISerializationCallbackReceiver where TEnum : struct, Enum
     {
-        public const int MaxKeys = 64;
+        public const int MaxKeys = 32;
 
         [Serializable]
         public struct RelationEntry
@@ -660,11 +660,11 @@ namespace ES
         private List<RelationEntry> relations = new List<RelationEntry>(8);
 
         [NonSerialized] private Dictionary<TEnum, int> _index;
-        [NonSerialized] private ulong[] _masks;
+        [NonSerialized] private uint[] _masks;
         [NonSerialized] private bool _cacheReady;
 
 #if UNITY_EDITOR
-        [TableMatrix(SquareCells = true, Labels = "GetMatrixLabel")]
+        [TableMatrix(SquareCells = true, Transpose = true, Labels = "GetMatrixLabel")]
         [OnValueChanged("EditorApplyMatrix")]
         [ShowInInspector, PropertyOrder(100)]
         private bool[,] editorMatrix;
@@ -832,23 +832,23 @@ namespace ES
             if (!_cacheReady || _index == null || _masks == null) return false;
             if (!_index.TryGetValue(fromKey, out var fromIndex)) return false;
             if (!_index.TryGetValue(toKey, out var toIndex)) return false;
-            return ((_masks[fromIndex] >> toIndex) & 1UL) != 0;
+            return ((_masks[fromIndex] >> toIndex) & 1u) != 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsRelatedMaskFast(TEnum fromKey, ulong targetMask)
+        public bool IsRelatedMaskFast(TEnum fromKey, uint targetMask)
         {
             if (!_cacheReady || _index == null || _masks == null) return false;
             if (!_index.TryGetValue(fromKey, out var fromIndex)) return false;
-            return (_masks[fromIndex] & targetMask) != 0UL;
+            return (_masks[fromIndex] & targetMask) != 0u;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetMaskFast(TEnum key, out ulong mask)
+        public bool TryGetMaskFast(TEnum key, out uint mask)
         {
             if (!_cacheReady || _index == null || _masks == null)
             {
-                mask = 0UL;
+                mask = 0u;
                 return false;
             }
 
@@ -858,7 +858,7 @@ namespace ES
                 return true;
             }
 
-            mask = 0UL;
+            mask = 0u;
             return false;
         }
 
@@ -888,21 +888,21 @@ namespace ES
             if (_masks == null) return false;
             if ((uint)fromIndex >= (uint)_masks.Length) return false;
             if ((uint)toIndex >= (uint)_masks.Length) return false;
-            return ((_masks[fromIndex] >> toIndex) & 1UL) != 0;
+            return ((_masks[fromIndex] >> toIndex) & 1u) != 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong GetMask(TEnum key)
+        public uint GetMask(TEnum key)
         {
-            return TryGetIndex(key, out var index) ? GetMaskByIndex(index) : 0UL;
+            return TryGetIndex(key, out var index) ? GetMaskByIndex(index) : 0u;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ulong GetMaskByIndex(int index)
+        public uint GetMaskByIndex(int index)
         {
             EnsureCache();
-            if (_masks == null) return 0UL;
-            if ((uint)index >= (uint)_masks.Length) return 0UL;
+            if (_masks == null) return 0u;
+            if ((uint)index >= (uint)_masks.Length) return 0u;
             return _masks[index];
         }
 
@@ -919,7 +919,7 @@ namespace ES
             if (count > MaxKeys) count = MaxKeys;
 
             _index = count > 0 ? new Dictionary<TEnum, int>(count, EqualityComparer<TEnum>.Default) : null;
-            _masks = count > 0 ? new ulong[count] : null;
+            _masks = count > 0 ? new uint[count] : null;
 
             for (int i = 0; i < count; i++)
             {
@@ -934,7 +934,7 @@ namespace ES
                 if (!_index.TryGetValue(entry.key, out var fromIndex))
                     continue;
 
-                ulong mask = 0UL;
+                uint mask = 0u;
                 var related = entry.relatedKeys;
                 if (related != null)
                 {
@@ -943,7 +943,7 @@ namespace ES
                         if (_index.TryGetValue(related[r], out var toIndex))
                         {
                             if ((uint)toIndex < MaxKeys)
-                                mask |= 1UL << toIndex;
+                                mask |= 1u << toIndex;
                         }
                     }
                 }
@@ -1054,7 +1054,7 @@ namespace ES
                 return ValueTuple.Create(string.Empty, LabelDirection.LeftToRight);
             }
 
-            string label = baseKeys[index].ToString();
+            string label = baseKeys[index]._GetInspectorName().ToString();
             return ValueTuple.Create(label, LabelDirection.LeftToRight);
         }
 #endif

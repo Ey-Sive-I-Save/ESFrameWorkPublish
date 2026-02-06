@@ -96,7 +96,7 @@ namespace ES
             int successCount = 0;
             foreach (var info in infos)
             {
-                if (RegisterStateFromInfo(info, allowOverride))
+                if (RegisterStateFromInfo(info, allowOverride) != null)
                 {
                     successCount++;
                 }
@@ -110,25 +110,25 @@ namespace ES
         /// </summary>
         /// <param name="info">状态Info</param>
         /// <param name="allowOverride">是否允许覆盖已存在的状态键</param>
-        /// <returns>是否注册成功</returns>
-        public bool RegisterStateFromInfo(StateAniDataInfo info, bool allowOverride = false)
+        /// <returns>成功返回 StateBase，失败返回 null</returns>
+        public StateBase RegisterStateFromInfo(StateAniDataInfo info, bool allowOverride = false)
         {
             if (stateMachine == null)
             {
                 Debug.LogError("[StateDomain] 状态机未初始化，无法注册状态");
-                return false;
+                return null;
             }
             
             // 直接委托给StateMachine处理所有逻辑（初始化、键冲突、注册）
-            bool registered = stateMachine.RegisterStateFromInfo(info, allowOverride);
+            var state = stateMachine.RegisterStateFromInfo(info, allowOverride);
             
             // 注册成功后缓存Info（用于Domain层管理）
-            if (registered && info != null)
+            if (state != null && info != null)
             {
                 _cachedInfos.Add(info);
             }
             
-            return registered;
+            return state;
         }
         
         private void InitializeStateMachine()
@@ -176,8 +176,8 @@ namespace ES
                 return;
             }
             
-            bool success = RegisterStateFromInfo(info, allowOverride);
-            if (success)
+            var state = RegisterStateFromInfo(info, allowOverride);
+            if (state != null)
             {
                 Debug.Log($"[StateDomain] 动态注册成功: {info.sharedData.basicConfig.stateName}");
             }

@@ -88,6 +88,9 @@ namespace ES
 
         public void SetCrouch(bool enable)
         {
+            if(enable){
+                stateDomain.stateMachine.SetLocomotionSupportFlags(StateSupportFlags.Crouched);
+            }
             kcc.SetCrouch(enable);
         }
 
@@ -204,6 +207,14 @@ namespace ES
         public float flyMaxSpeed = 10f;
         public float flyAcceleration = 12f;
         public float flyDrag = 0.2f;
+        [Tooltip("飞行重力倍率(0=无重力, 1=全重力)")]
+        public float flyGravityScale = 0.1f;
+        [Tooltip("飞行上升倍率(>1 更快上升)")]
+        public float flyAscendMultiplier = 1.5f;
+        [Tooltip("飞行下降倍率(>1 更快下降)")]
+        public float flyDescendMultiplier = 1f;
+        [Tooltip("飞行时强制离地时长")]
+        public float flyUngroundTime = 0.1f;
 
         [Title("游泳")]
         public float swimMaxSpeed = 6f;
@@ -218,10 +229,14 @@ namespace ES
 
         [Title("跳跃")]
         public float jumpSpeed = 8f;
+        [Tooltip("跳跃速度倍率（降低跳跃高度）")]
+        public float jumpSpeedMultiplier = 0.8f;
 
         [Title("下蹲")]
         public float standingCapsuleHeight = 2f;
         public float crouchedCapsuleHeight = 1f;
+        [Tooltip("下蹲移动速度倍率")]
+        public float crouchSpeedMultiplier = 0.5f;
 
         [Title("旋转")]
         public float orientationSharpness = 10f;
@@ -335,11 +350,27 @@ namespace ES
 
         public void BeforeCharacterUpdate(Entity owner, float deltaTime)
         {
+            if (owner != null && owner.stateDomain != null && owner.stateDomain.stateMachine != null)
+            {
+                var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
+                if ((supportFlags & StateSupportFlags.Flying) != 0 && motor != null && flyUngroundTime > 0f)
+                {
+                    motor.ForceUnground(flyUngroundTime);
+                }
+            }
             ApplyCrouch();
         }
 
         public void UpdateRotation(Entity owner, ref Quaternion currentRotation, float deltaTime)
         {
+            if (owner != null && owner.stateDomain != null && owner.stateDomain.stateMachine != null)
+            {
+                var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
+                if ((supportFlags & StateSupportFlags.Mounted) != 0)
+                {
+                    return;
+                }
+            }
             if (lookInput.sqrMagnitude <= 0f || orientationSharpness <= 0f) return;
             Vector3 smoothedLookInputDirection = Vector3.Slerp(motor.CharacterForward, lookInput, 1f - Mathf.Exp(-orientationSharpness * deltaTime)).normalized;
             currentRotation = Quaternion.LookRotation(smoothedLookInputDirection, motor.CharacterUp);
@@ -350,6 +381,10 @@ namespace ES
             float multiplier = Mathf.Max(0f, speedMultiplier);
             float stableMaxSpeed = maxStableMoveSpeed * multiplier;
             float airMaxSpeed = maxAirMoveSpeed * multiplier;
+            if (_isCrouched)
+            {
+                stableMaxSpeed *= Mathf.Clamp01(crouchSpeedMultiplier);
+            }
             if (speedLimit > 0f)
             {
                 stableMaxSpeed = Mathf.Min(stableMaxSpeed, speedLimit);
@@ -358,15 +393,34 @@ namespace ES
 
             Vector3 targetMovementVelocity = Vector3.zero;
             var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
+            if ((supportFlags & StateSupportFlags.Mounted) != 0)
+            {
+                currentVelocity = Vector3.zero;
+                _lastVelocity = currentVelocity;
+                return;
+            }
             if ((supportFlags & StateSupportFlags.Flying) != 0)
             {
                 Vector3 up = motor.CharacterUp;
-                Vector3 input = moveInput + up * verticalInput;
+                float vertical = verticalInput;
+                if (vertical > 0f)
+                {
+                    vertical *= Mathf.Max(0f, flyAscendMultiplier);
+                }
+                else if (vertical < 0f)
+                {
+                    vertical *= Mathf.Max(0f, flyDescendMultiplier);
+                }
+                Vector3 input = moveInput + up * vertical;
                 input = Vector3.ClampMagnitude(input, 1f);
                 targetMovementVelocity = input * flyMaxSpeed;
 
                 Vector3 velocityDiff = targetMovementVelocity - currentVelocity;
                 currentVelocity += velocityDiff * flyAcceleration * deltaTime;
+                if (flyGravityScale > 0f)
+                {
+                    currentVelocity += gravity * (flyGravityScale * deltaTime);
+                }
                 currentVelocity *= (1f / (1f + (flyDrag * deltaTime)));
             }
             else if ((supportFlags & StateSupportFlags.Swimming) != 0)
@@ -395,7 +449,8 @@ namespace ES
                 {
                     _jumpRequested = false;
                     motor.ForceUnground(0.1f);
-                    currentVelocity = Vector3.ProjectOnPlane(currentVelocity, motor.CharacterUp) + (motor.CharacterUp * jumpSpeed);
+                    float finalJumpSpeed = jumpSpeed * Mathf.Max(0f, jumpSpeedMultiplier);
+                    currentVelocity = Vector3.ProjectOnPlane(currentVelocity, motor.CharacterUp) + (motor.CharacterUp * finalJumpSpeed);
                 }
             }
             else

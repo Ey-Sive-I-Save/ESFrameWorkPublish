@@ -1,10 +1,7 @@
 using ES;
 using Sirenix.OdinInspector;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Playables;
 using UnityEngine.Animations;
@@ -166,8 +163,12 @@ namespace ES
         /// <param name="eventParam">事件参数</param>
         protected virtual void OnAnimationEvent(string eventName, string eventParam)
         {
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
             StateMachineDebugSettings.Instance.LogStateTransition(
                 $"[AnimEvent] State:{stateSharedData?.basicConfig.stateName} | Event:{eventName} | Param:{eventParam}");
+#endif
+#endif
             
             // 可以通知StateMachine广播事件
             host?.BroadcastAnimationEvent(this, eventName, eventParam);
@@ -201,7 +202,7 @@ namespace ES
         #endregion
 
         #region 状态生命周期
-        public StateBaseStatus baseStatus = StateBaseStatus.Never;
+        public StateBaseStatus baseStatus { get; private set; } = StateBaseStatus.Never;
         public StateRuntimePhase stateRuntimePhase = StateRuntimePhase.Running;
         public void OnStateEnter()
         {
@@ -228,7 +229,11 @@ namespace ES
         {
             if (_shouldAutoExitFromAnimation) return;
             _shouldAutoExitFromAnimation = true;
+    #if STATEMACHINEDEBUG
+    #if UNITY_EDITOR
             Debug.Log($"[StateBase] AutoExitFlag=TRUE | State={stateSharedData?.basicConfig?.stateName} | Reason={reason}\n{Environment.StackTrace}");
+    #endif
+    #endif
         }
 
         public void OnStateUpdate()
@@ -239,7 +244,7 @@ namespace ES
         public void OnStateExit()
         {
             if (baseStatus != StateBaseStatus.Running) return;
-            baseStatus = StateBaseStatus.Never;
+            baseStatus = StateBaseStatus.Exited;
             //这里需要编写释放逻辑
             OnStateExitLogic();
         }
@@ -323,7 +328,12 @@ namespace ES
             
             if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
             {
-                Debug.Log($"[StateBase] 更新动画权重: State={stateSharedData.basicConfig.stateName}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                StateMachineDebugSettings.Instance.LogAnimationBlend(
+                    $"State={stateSharedData.basicConfig.stateName} 进行权重更新");
+#endif
+#endif
                 stateSharedData.animationConfig.calculator.UpdateWeights(_animationRuntime, context, deltaTime);
                 
                 // ★ AnimationClip反向控制：检测动画是否播放完毕（仅针对UntilAnimationEnd模式）
@@ -470,11 +480,20 @@ namespace ES
         {
             if (stateSharedData?.basicConfig == null)
             {
-                Debug.LogWarning("[StateBase] 检测动画完毕失败：stateSharedData或basicConfig为空");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                StateMachineDebugSettings.Instance.LogWarning("[StateBase] 检测动画完毕失败：stateSharedData或basicConfig为空");
+#endif
+#endif
                 return;
             }
 
-            Debug.Log($"[StateBase] 检测动画完毕: State={stateSharedData.basicConfig.stateName} | RuntimeInit={_animationRuntime != null && _animationRuntime.IsInitialized}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+            StateMachineDebugSettings.Instance.LogAnimationBlend(
+                $"检测动画完毕: State={stateSharedData.basicConfig.stateName} | RuntimeInit={_animationRuntime != null && _animationRuntime.IsInitialized}");
+#endif
+#endif
             if (_animationRuntime == null || !_animationRuntime.IsInitialized)
                 return;
 
@@ -482,7 +501,12 @@ namespace ES
             if (_animationRuntime.singlePlayable.IsValid())
             {
                 Playable playable = _animationRuntime.singlePlayable;
-                Debug.Log($"[StateBase] 单Playable检测: Type={playable.GetPlayableType().Name} | Time={playable.GetTime():F3} | Duration={playable.GetDuration():F3}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                StateMachineDebugSettings.Instance.LogAnimationBlend(
+                    $"单Playable检测: Type={playable.GetPlayableType().Name} | Time={playable.GetTime():F3} | Duration={playable.GetDuration():F3}");
+#endif
+#endif
                 if (playable.GetPlayableType() == typeof(AnimationClipPlayable))
                 {
                     var clipPlayable = (AnimationClipPlayable)playable;
@@ -490,12 +514,21 @@ namespace ES
                     
                     if (animationClip != null && !animationClip.isLooping)
                     {
-                        Debug.Log($"[StateBase] 单Clip: {animationClip.name} | Loop={animationClip.isLooping}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                        StateMachineDebugSettings.Instance.LogAnimationBlend(
+                            $"单Clip: {animationClip.name} | Loop={animationClip.isLooping}");
+#endif
+#endif
                         double currentTime = playable.GetTime();
                         double duration = playable.GetDuration();
                         if (double.IsInfinity(duration) || duration <= 0.001)
                         {
-                            Debug.LogWarning($"[StateBase] 单Clip时长异常: {duration}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                            StateMachineDebugSettings.Instance.LogWarning($"[StateBase] 单Clip时长异常: {duration}");
+#endif
+#endif
                             return;
                         }
                         
@@ -503,23 +536,40 @@ namespace ES
                         if (duration > 0.001 && currentTime >= duration - 0.016) // 0.016 = 1帧容错（60fps）
                         {
                             MarkAutoExitFromAnimation("SingleClipComplete");
-                            Debug.Log($"[StateBase] 单Clip播放完毕 -> 标记退出");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                            StateMachineDebugSettings.Instance.LogAnimationBlend("单Clip播放完毕 -> 标记退出");
+#endif
+#endif
                         }
                     }
                     else
                     {
-                        Debug.Log($"[StateBase] 单Clip为空或循环播放，跳过完成检测");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                        StateMachineDebugSettings.Instance.LogAnimationBlend("单Clip为空或循环播放，跳过完成检测");
+#endif
+#endif
                     }
                 }
                 else
                 {
-                    Debug.Log($"[StateBase] 单Playable非AnimationClipPlayable，跳过完成检测");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                    StateMachineDebugSettings.Instance.LogAnimationBlend("单Playable非AnimationClipPlayable，跳过完成检测");
+#endif
+#endif
                 }
             }
             // 检查Mixer中的Playables（BlendTree/DirectBlend）
             else if (_animationRuntime.playables != null)
             {
-                Debug.Log($"[StateBase] 多Playable检测: Count={_animationRuntime.playables.Length}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                StateMachineDebugSettings.Instance.LogAnimationBlend(
+                    $"多Playable检测: Count={_animationRuntime.playables.Length}");
+#endif
+#endif
                 // 多动画混合的情况：只有当所有非循环动画都播放完毕才退出
                 bool hasNonLoopingClip = false;
                 bool allNonLoopingCompleted = true;
@@ -540,10 +590,19 @@ namespace ES
                             
                             double currentTime = playable.GetTime();
                             double duration = playable.GetDuration();
-                            Debug.Log($"[StateBase] 子Clip[{i}]: {animationClip.name} | Time={currentTime:F3} | Duration={duration:F3} | Loop={animationClip.isLooping}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                            StateMachineDebugSettings.Instance.LogAnimationBlend(
+                                $"子Clip[{i}]: {animationClip.name} | Time={currentTime:F3} | Duration={duration:F3} | Loop={animationClip.isLooping}");
+#endif
+#endif
                             if (double.IsInfinity(duration) || duration <= 0.001)
                             {
-                                Debug.LogWarning($"[StateBase] 子Clip时长异常: {duration}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                                StateMachineDebugSettings.Instance.LogWarning($"[StateBase] 子Clip时长异常: {duration}");
+#endif
+#endif
                                 continue;
                             }
                             
@@ -555,24 +614,42 @@ namespace ES
                         }
                         else
                         {
-                            Debug.Log($"[StateBase] 子Clip[{i}]为空或循环播放，跳过完成检测");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                            StateMachineDebugSettings.Instance.LogAnimationBlend(
+                                $"子Clip[{i}]为空或循环播放，跳过完成检测");
+#endif
+#endif
                         }
                     }
                     else
                     {
-                        Debug.Log($"[StateBase] 子Playable[{i}]非AnimationClipPlayable: {playable.GetPlayableType().Name}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                        StateMachineDebugSettings.Instance.LogAnimationBlend(
+                            $"子Playable[{i}]非AnimationClipPlayable: {playable.GetPlayableType().Name}");
+#endif
+#endif
                     }
                 }
 
                 if (hasNonLoopingClip && allNonLoopingCompleted)
                 {
                     MarkAutoExitFromAnimation("AllNonLoopingClipsComplete");
-                    Debug.Log($"[StateBase] 多Clip全部播放完毕 -> 标记退出");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                    StateMachineDebugSettings.Instance.LogAnimationBlend("多Clip全部播放完毕 -> 标记退出");
+#endif
+#endif
                 }
             }
             else
             {
-                Debug.LogWarning("[StateBase] 无可检测Playable（singlePlayable无效且playables为空）");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                StateMachineDebugSettings.Instance.LogWarning("[StateBase] 无可检测Playable（singlePlayable无效且playables为空）");
+#endif
+#endif
             }
         }
 
@@ -631,7 +708,12 @@ namespace ES
                 case StateDurationMode.Timed:
                     if (elapsedTime >= config.timedDuration)
                     {
-                        Debug.Log($"[StateBase] ShouldAutoExit=TRUE (Timed) | State={stateSharedData.basicConfig.stateName} | Elapsed={elapsedTime:F3} | Duration={config.timedDuration:F3}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                        StateMachineDebugSettings.Instance.LogStateTransition(
+                            $"[StateBase] ShouldAutoExit=TRUE (Timed) | State={stateSharedData.basicConfig.stateName} | Elapsed={elapsedTime:F3} | Duration={config.timedDuration:F3}");
+#endif
+#endif
                         return true;
                     }
                     return false;
@@ -640,7 +722,12 @@ namespace ES
                     // 检查动画是否播放完毕（优先使用AnimationClip反向控制的标志）
                     if (_shouldAutoExitFromAnimation)
                     {
-                        Debug.Log($"[StateBase] ShouldAutoExit=TRUE (AnimFlag) | State={stateSharedData.basicConfig.stateName}");
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                        StateMachineDebugSettings.Instance.LogStateTransition(
+                            $"[StateBase] ShouldAutoExit=TRUE (AnimFlag) | State={stateSharedData.basicConfig.stateName}");
+#endif
+#endif
                         return true;
                     }
                     
@@ -660,7 +747,10 @@ namespace ES
                             float animDuration = clip.length / Mathf.Max(0.01f, speed);
                             if (elapsedTime >= animDuration)
                             {
-                                Debug.Log($"[StateBase] ShouldAutoExit=TRUE (ClipLength) | State={stateSharedData.basicConfig.stateName} | Clip={clip.name} | Elapsed={elapsedTime:F3} | AnimDuration={animDuration:F3} | Speed={speed:F3}");
+#if UNITY_EDITOR
+                                StateMachineDebugSettings.Instance.LogStateTransition(
+                                    $"[StateBase] ShouldAutoExit=TRUE (ClipLength) | State={stateSharedData.basicConfig.stateName} | Clip={clip.name} | Elapsed={elapsedTime:F3} | AnimDuration={animDuration:F3} | Speed={speed:F3}");
+#endif
                                 return true;
                             }
                             return false;
@@ -675,6 +765,27 @@ namespace ES
 
         #endregion
 
+    }
+
+    public static class StateMachineAnimationEventExtensions
+    {
+        public static void BroadcastAnimationEvent(this StateMachine host, StateBase state, string eventName, string eventParam)
+        {
+            if (host == null)
+            {
+                return;
+            }
+
+            host.OnAnimationEvent?.Invoke(state, eventName, eventParam);
+
+            if (host.hostEntity != null)
+            {
+                // 预留：实体广播
+            }
+
+            StateMachineDebugSettings.Instance.LogStateTransition(
+                $"[StateMachine] 广播动画事件: {eventName} | State: {state?.strKey} | Param: {eventParam}");
+        }
     }
 }
 

@@ -15,7 +15,7 @@ namespace ES
         Main = 1,     // 主线 - 技能、表情、交互等互相排斥的动作
         [InspectorName("Buff线")]
         Buff = 2,     // Buff线 - 特效、状态效果
-        Count,
+        Count,        // 哨兵：用于表示流水线数量（数组长度/Mixer输入数）
 
 
 

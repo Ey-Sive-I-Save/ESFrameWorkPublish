@@ -782,15 +782,22 @@ namespace ES
                 Type type = group.GetSOInfoType();
                 if (group.NotContainsInfoKey(DataKey))
                 {
+                    var groupAssetPath = AssetDatabase.GetAssetPath(group as ScriptableObject);
+                    if (!EnsureAssetWritable(groupAssetPath, "新建单元信息"))
+                    {
+                        return;
+                    }
+
                     ScriptableObject @object = ScriptableObject.CreateInstance(type);
                     @object.name = DataFileName + DataKey + (hasChange ? "" : UnityEngine.Random.Range(0, 99999));
                     if (@object is ISoDataInfo info)
                     {
                         info.SetKey(DataKey);
                         group._TryAddInfoToDic(DataKey, @object);
-                        AssetDatabase.AddObjectToAsset(@object, AssetDatabase.GetAssetPath(group as ScriptableObject));
+                        AssetDatabase.AddObjectToAsset(@object, groupAssetPath);
+                        EditorUtility.SetDirty(group as ScriptableObject);
                         AssetDatabase.SaveAssets();
-                        AssetDatabase.Refresh();
+                        AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
                     }
                     else
                     {
@@ -814,6 +821,12 @@ namespace ES
                 }
                 if (group.NotContainsInfoKey(DataKey))
                 {
+                    var groupAssetPath = AssetDatabase.GetAssetPath(group as ScriptableObject);
+                    if (!EnsureAssetWritable(groupAssetPath, "拷贝选定信息"))
+                    {
+                        return;
+                    }
+
                     ScriptableObject copy = ScriptableObject.Instantiate(from);
                     copy.name = DataFileName + DataKey + (hasChange ? "" : UnityEngine.Random.Range(0, 99999));
                     if (copy is ISoDataInfo ifno)
@@ -821,9 +834,10 @@ namespace ES
                         ifno.SetKey(DataKey);
 
                         group._TryAddInfoToDic(DataKey, copy);
-                        AssetDatabase.AddObjectToAsset(copy, AssetDatabase.GetAssetPath(group as ScriptableObject));
+                        AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
+                        EditorUtility.SetDirty(group as ScriptableObject);
                         AssetDatabase.SaveAssets();
-                        AssetDatabase.Refresh();
+                        AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
                     }
                     else
                     {
@@ -864,21 +878,65 @@ namespace ES
                     }
                     if (group.NotContainsInfoKey(DataKey))
                     {
+                        var groupAssetPath = AssetDatabase.GetAssetPath(group as ScriptableObject);
+                        if (!EnsureAssetWritable(groupAssetPath, "持久粘贴"))
+                        {
+                            return;
+                        }
+
                         ScriptableObject copy = ScriptableObject.Instantiate(from);
                         copy.name = DataFileName + DataKey + (hasChange ? "" : UnityEngine.Random.Range(0, 99999));
                         if (copy is ISoDataInfo info)
                         {
                             info.SetKey(DataKey);
                             group._TryAddInfoToDic(DataKey, copy);
-                            AssetDatabase.AddObjectToAsset(copy, AssetDatabase.GetAssetPath(group as ScriptableObject));
+                            AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
+                            EditorUtility.SetDirty(group as ScriptableObject);
                             AssetDatabase.SaveAssets();
-                            AssetDatabase.Refresh();
+                            AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
                         }
                         else
                         {
                             Debug.LogError("不合理的值或者重复键");
                         }
                     }
+                }
+            }
+
+            private static bool EnsureAssetWritable(string assetPath, string actionName)
+            {
+                if (string.IsNullOrEmpty(assetPath))
+                {
+                    Debug.LogError($"[{actionName}] 资源路径为空，无法写入。请先保存数据组资产。");
+                    return false;
+                }
+
+                if (!AssetDatabase.IsOpenForEdit(assetPath, StatusQueryOptions.UseCachedIfPossible))
+                {
+                    var madeEditable = AssetDatabase.MakeEditable(new[] { assetPath }, $"{actionName} 需要写入资源");
+                    if (!madeEditable && !AssetDatabase.IsOpenForEdit(assetPath, StatusQueryOptions.UseCachedIfPossible))
+                    {
+                        EditorUtility.DisplayDialog("资源不可写", $"无法写入资源：{assetPath}\n请检查只读/版本控制锁定/权限问题。", "知道了");
+                        return false;
+                    }
+                }
+
+                TryRemoveReadOnly(assetPath);
+                return true;
+            }
+
+            private static void TryRemoveReadOnly(string assetPath)
+            {
+                var projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+                if (string.IsNullOrEmpty(projectRoot)) return;
+
+                var fullPath = Path.GetFullPath(Path.Combine(projectRoot, assetPath));
+                if (!File.Exists(fullPath)) return;
+
+                var attrs = File.GetAttributes(fullPath);
+                if ((attrs & FileAttributes.ReadOnly) != 0)
+                {
+                    File.SetAttributes(fullPath, attrs & ~FileAttributes.ReadOnly);
                 }
             }
             public void RefreshInfos()

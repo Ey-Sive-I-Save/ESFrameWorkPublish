@@ -6,6 +6,10 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 
 namespace ES
 {
@@ -217,10 +221,9 @@ namespace ES
             basicConfig?.InitializeRuntime();
             animationConfig?.InitializeRuntime();
             mergeData?.InitializeRuntime();
-            costData?.InitializeRuntime();
-            
-            // 计算主状态优先级（需要costData）
-            basicConfig?.PrepareMainCriterionValue(costData);
+
+            // 计算主状态优先级
+            basicConfig?.PrepareMainCriterionValue();
             
             _isRuntimeInitialized = true;
         }
@@ -262,50 +265,28 @@ namespace ES
             Fly
         }
 
-        [ContextMenu("StateSharedData/预设/通用默认")]
-        private void CM_DefaultPreset() => ApplyCommonPreset(CommonStatePreset.Default);
-
-        [ContextMenu("StateSharedData/预设/待机")]
-        private void CM_IdlePreset() => ApplyCommonPreset(CommonStatePreset.Idle);
-
-        [ContextMenu("StateSharedData/预设/行走")]
-        private void CM_WalkPreset() => ApplyCommonPreset(CommonStatePreset.Walk);
-
-        [ContextMenu("StateSharedData/预设/奔跑")]
-        private void CM_RunPreset() => ApplyCommonPreset(CommonStatePreset.Run);
-
-        [ContextMenu("StateSharedData/预设/冲刺")]
-        private void CM_SprintPreset() => ApplyCommonPreset(CommonStatePreset.Sprint);
-
-        [ContextMenu("StateSharedData/预设/跳跃")]
-        private void CM_JumpPreset() => ApplyCommonPreset(CommonStatePreset.Jump);
-
-        [ContextMenu("StateSharedData/预设/下落")]
-        private void CM_FallPreset() => ApplyCommonPreset(CommonStatePreset.Fall);
-
-        [ContextMenu("StateSharedData/预设/落地")]
-        private void CM_LandPreset() => ApplyCommonPreset(CommonStatePreset.Land);
-
-        [ContextMenu("StateSharedData/预设/攻击")]
-        private void CM_AttackPreset() => ApplyCommonPreset(CommonStatePreset.Attack);
-
-        [ContextMenu("StateSharedData/预设/技能")]
-        private void CM_SkillPreset() => ApplyCommonPreset(CommonStatePreset.Skill);
-
-        [ContextMenu("StateSharedData/预设/受击")]
-        private void CM_HitPreset() => ApplyCommonPreset(CommonStatePreset.Hit);
-
-        [ContextMenu("StateSharedData/预设/死亡")]
-        private void CM_DiePreset() => ApplyCommonPreset(CommonStatePreset.Die);
-
-        [ContextMenu("StateSharedData/预设/复活")]
-        private void CM_RevivePreset() => ApplyCommonPreset(CommonStatePreset.Revive);
-
-        [ContextMenu("StateSharedData/预设/游泳")]
-        private void CM_SwimPreset() => ApplyCommonPreset(CommonStatePreset.Swim);
-
-        [ContextMenu("StateSharedData/预设/飞行")]
-        private void CM_FlyPreset() => ApplyCommonPreset(CommonStatePreset.Fly);
+        [Button("预设菜单", ButtonSizes.Medium), PropertyOrder(-1)]
+        [GUIColor(0.7f, 0.85f, 1f)]
+        private void OpenPresetMenu()
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("通用默认"), false, () => ApplyCommonPreset(CommonStatePreset.Default));
+            menu.AddItem(new GUIContent("待机"), false, () => ApplyCommonPreset(CommonStatePreset.Idle));
+            menu.AddItem(new GUIContent("行走"), false, () => ApplyCommonPreset(CommonStatePreset.Walk));
+            menu.AddItem(new GUIContent("奔跑"), false, () => ApplyCommonPreset(CommonStatePreset.Run));
+            menu.AddItem(new GUIContent("冲刺"), false, () => ApplyCommonPreset(CommonStatePreset.Sprint));
+            menu.AddItem(new GUIContent("跳跃"), false, () => ApplyCommonPreset(CommonStatePreset.Jump));
+            menu.AddItem(new GUIContent("下落"), false, () => ApplyCommonPreset(CommonStatePreset.Fall));
+            menu.AddItem(new GUIContent("落地"), false, () => ApplyCommonPreset(CommonStatePreset.Land));
+            menu.AddItem(new GUIContent("攻击"), false, () => ApplyCommonPreset(CommonStatePreset.Attack));
+            menu.AddItem(new GUIContent("技能"), false, () => ApplyCommonPreset(CommonStatePreset.Skill));
+            menu.AddItem(new GUIContent("受击"), false, () => ApplyCommonPreset(CommonStatePreset.Hit));
+            menu.AddItem(new GUIContent("死亡"), false, () => ApplyCommonPreset(CommonStatePreset.Die));
+            menu.AddItem(new GUIContent("复活"), false, () => ApplyCommonPreset(CommonStatePreset.Revive));
+            menu.AddItem(new GUIContent("游泳"), false, () => ApplyCommonPreset(CommonStatePreset.Swim));
+            menu.AddItem(new GUIContent("飞行"), false, () => ApplyCommonPreset(CommonStatePreset.Fly));
+            menu.ShowAsContext();
+        }
 
         [Button("应用攻击预设", ButtonSizes.Medium), PropertyOrder(-1)]
         [GUIColor(1f, 0.6f, 0.6f)]
@@ -548,10 +529,8 @@ namespace ES
                 timedDuration = originalBasic.timedDuration,
                 phaseConfig = originalBasic.phaseConfig, // 阶段配置可共享
                 canBeFeedback = originalBasic.canBeFeedback,
-                fallbackSupportFlag = originalBasic.fallbackSupportFlag,
-                requiredSupportFlags = originalBasic.requiredSupportFlags,
-                setSupportFlagsOnEnter = originalBasic.setSupportFlagsOnEnter,
-                clearSupportFlagsOnEnter = originalBasic.clearSupportFlagsOnEnter
+                stateSupportFlag = originalBasic.stateSupportFlag,
+               
             };
             
             // 替换动画

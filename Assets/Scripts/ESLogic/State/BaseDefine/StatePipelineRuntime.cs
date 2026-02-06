@@ -113,6 +113,12 @@ namespace ES
         public int FallBackForFlying = -1;
         [LabelText("Mounted FallBack")]
         public int FallBackForMounted = -1;
+        [LabelText("Climbing FallBack")]
+        public int FallBackForClimbing = -1;
+        [LabelText("SpecialInteraction FallBack")]
+        public int FallBackForSpecialInteraction = -1;
+        [LabelText("Observer FallBack")]
+        public int FallBackForObserver = -1;
         [LabelText("Dead FallBack")]
         public int FallBackForDead = -1;
         [LabelText("Transition FallBack")]
@@ -243,15 +249,22 @@ namespace ES
                 case StateSupportFlags.Swimming: result = FallBackForSwimming; break;
                 case StateSupportFlags.Flying: result = FallBackForFlying; break;
                 case StateSupportFlags.Mounted: result = FallBackForMounted; break;
+                case StateSupportFlags.Climbing: result = FallBackForClimbing; break;
+                case StateSupportFlags.SpecialInteraction: result = FallBackForSpecialInteraction; break;
+                case StateSupportFlags.Observer: result = FallBackForObserver; break;
                 case StateSupportFlags.Dead: result = FallBackForDead; break;
                 case StateSupportFlags.Transition: result = FallBackForTransition; break;
                 default:
+#if STATEMACHINEDEBUG
                         Debug.LogWarning($"[FallBack-Get] ⚠ [{pipelineType}] SupportFlag无效({supportFlag})，回退到Grounded");
+#endif
                         result = ResolveFallBackByFlag(StateSupportFlags.Grounded);
                     break;
             }
 
+#if STATEMACHINEDEBUG
             Debug.Log($"[FallBack-Get] [{pipelineType}] GetFallBack(原始Flag={originalFlag}, 实际Flag={supportFlag}) -> StateID={result}");
+#endif
             return result;
         }
 
@@ -268,7 +281,9 @@ namespace ES
 
             supportFlag = NormalizeSingleFlag(supportFlag);
 
+#if STATEMACHINEDEBUG
             Debug.Log($"[FallBack-Set] [{pipelineType}] SetFallBack(StateID={stateID}, 原始Flag={originalFlag}, 实际Flag={supportFlag})");
+#endif
 
             switch (supportFlag)
             {
@@ -278,10 +293,15 @@ namespace ES
                 case StateSupportFlags.Swimming: FallBackForSwimming = stateID; break;
                 case StateSupportFlags.Flying: FallBackForFlying = stateID; break;
                 case StateSupportFlags.Mounted: FallBackForMounted = stateID; break;
+                case StateSupportFlags.Climbing: FallBackForClimbing = stateID; break;
+                case StateSupportFlags.SpecialInteraction: FallBackForSpecialInteraction = stateID; break;
+                case StateSupportFlags.Observer: FallBackForObserver = stateID; break;
                 case StateSupportFlags.Dead: FallBackForDead = stateID; break;
                 case StateSupportFlags.Transition: FallBackForTransition = stateID; break;
                 default:
+#if STATEMACHINEDEBUG
                     Debug.LogError($"[FallBack-Set] ✗ [{pipelineType}] 无效的SupportFlag: {supportFlag}");
+#endif
                     break;
             }
         }
@@ -298,8 +318,8 @@ namespace ES
         {
             if (flag == StateSupportFlags.None) return StateSupportFlags.None;
 
-            byte value = (byte)flag;
-            byte lowest = (byte)(value & (byte)(-(sbyte)value));
+            ushort value = (ushort)flag;
+            ushort lowest = (ushort)(value & (ushort)(-(short)value));
             return (StateSupportFlags)lowest;
         }
 
@@ -313,6 +333,9 @@ namespace ES
                 case StateSupportFlags.Swimming: return FallBackForSwimming;
                 case StateSupportFlags.Flying: return FallBackForFlying;
                 case StateSupportFlags.Mounted: return FallBackForMounted;
+                case StateSupportFlags.Climbing: return FallBackForClimbing;
+                case StateSupportFlags.SpecialInteraction: return FallBackForSpecialInteraction;
+                case StateSupportFlags.Observer: return FallBackForObserver;
                 case StateSupportFlags.Dead: return FallBackForDead;
                 case StateSupportFlags.Transition: return FallBackForTransition;
                 default: return FallBackForGrounded;
@@ -328,7 +351,9 @@ namespace ES
 
             dirtyFlags |= flags;
             lastDirtyTime = Time.time;
+#if STATEMACHINEDEBUG
             Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty添加: {flags} -> {dirtyFlags}");
+#endif
         }
 
         /// <summary>
@@ -339,7 +364,9 @@ namespace ES
             if (flags == PipelineDirtyFlags.None)
             {
                 if (dirtyFlags == PipelineDirtyFlags.None) return;
+#if STATEMACHINEDEBUG
                 Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty已清空 (旧={dirtyFlags})");
+#endif
                 dirtyFlags = PipelineDirtyFlags.None;
                 return;
             }
@@ -347,7 +374,9 @@ namespace ES
             if ((dirtyFlags & flags) != 0)
             {
                 dirtyFlags &= ~flags;
+#if STATEMACHINEDEBUG
                 Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty移除: {flags} -> {dirtyFlags}");
+#endif
             }
         }
 
@@ -374,7 +403,9 @@ namespace ES
             {
                 dirtyFlags &= ~decayFlags;
                 dirtyFlags |= PipelineDirtyFlags.FallbackCheck;
+#if STATEMACHINEDEBUG
                 Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty衰减 -> {dirtyFlags}");
+#endif
             }
         }
 
@@ -393,7 +424,7 @@ namespace ES
             sb.AppendLine($"┌─ 基本配置 ────────────────────────────────────────────────┐");
             sb.AppendLine($"│  流水线类型: {pipelineType}");
             sb.AppendLine($"│  权重: {weight:F3} | 启用: {(isEnabled ? "✓" : "✗")} | 优先级: {priority}");
-            sb.AppendLine($"│  SupportFlag: Grounded={FallBackForGrounded}, Crouched={FallBackForCrouched}, Prone={FallBackForProne}, Swimming={FallBackForSwimming}, Flying={FallBackForFlying}, Mounted={FallBackForMounted}, Dead={FallBackForDead}, Transition={FallBackForTransition}");
+            sb.AppendLine($"│  SupportFlag: Grounded={FallBackForGrounded}, Crouched={FallBackForCrouched}, Prone={FallBackForProne}, Swimming={FallBackForSwimming}, Flying={FallBackForFlying}, Mounted={FallBackForMounted}, Climbing={FallBackForClimbing}, SpecialInteraction={FallBackForSpecialInteraction}, Observer={FallBackForObserver}, Dead={FallBackForDead}, Transition={FallBackForTransition}");
             sb.AppendLine($"│  主状态: {(mainState != null ? $"{mainState.strKey} (ID:{mainState.intKey})" : "无")}");
             sb.AppendLine($"└───────────────────────────────────────────────────────────┘");
             sb.AppendLine();
@@ -555,7 +586,9 @@ namespace ES
         [Button("输出Mixer连接信息", ButtonSizes.Medium), PropertyOrder(-1)]
         private void DebugPrintMixerConnection()
         {
+#if STATEMACHINEDEBUG
             UnityEngine.Debug.Log(GetMixerConnectionInfo());
+#endif
         }
 #endif
     }

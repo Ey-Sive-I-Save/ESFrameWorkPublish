@@ -67,6 +67,15 @@ namespace ES
         [LabelText("下蹲")]
         public InputActionProperty crouchAction;
 
+        [LabelText("飞行切换")]
+        public InputActionProperty flyAction;
+
+        [LabelText("飞行垂直")]
+        public InputActionProperty flyVerticalAction;
+
+        [LabelText("骑乘切换")]
+        public InputActionProperty mountAction;
+
         [LabelText("小眼睛(视角附加)")]
         public InputActionProperty eyeAction;
 
@@ -96,6 +105,9 @@ namespace ES
             skill3Action = default;
             jumpAction = default;
             crouchAction = default;
+            flyAction = default;
+            mountAction = default;
+            flyVerticalAction = default;
         }
 
         [Button("一键内置默认输入"), GUIColor(0.3f, 0.8f, 0.3f)]
@@ -132,9 +144,12 @@ namespace ES
         public bool ConsumeSkill2() => snapshot.ConsumeSkill2();
         public bool ConsumeSkill3() => snapshot.ConsumeSkill3();
         public bool ConsumeJump() => snapshot.ConsumeJump();
+        public bool ConsumeCrouchToggle() => snapshot.ConsumeCrouchToggle();
+        public bool ConsumeFlyToggle() => snapshot.ConsumeFlyToggle();
+        public bool ConsumeMountToggle() => snapshot.ConsumeMountToggle();
         public void ClearOneShot() => snapshot.ClearOneShot();
-        public bool CrouchHold => snapshot.crouchHold;
         public bool EyeHold => snapshot.eyeHold;
+        public float FlyVertical => snapshot.flyVertical;
 
 #if ENABLE_INPUT_SYSTEM
         private InputAction _move;
@@ -150,6 +165,9 @@ namespace ES
         private InputAction _skill3;
         private InputAction _jump;
         private InputAction _crouch;
+        private InputAction _fly;
+        private InputAction _flyVertical;
+        private InputAction _mount;
         private InputAction _eye;
 #endif
 
@@ -187,6 +205,9 @@ namespace ES
             _skill3 = skill3Action.action;
             _jump = jumpAction.action;
             _crouch = crouchAction.action;
+            _fly = flyAction.action;
+            _flyVertical = flyVerticalAction.action;
+            _mount = mountAction.action;
             _eye = eyeAction.action;
 
             RegisterAxis(_move, OnMove);
@@ -202,7 +223,10 @@ namespace ES
             RegisterButton(_skill2, OnSkill2);
             RegisterButton(_skill3, OnSkill3);
             RegisterButton(_jump, OnJump);
-            RegisterAxis(_crouch, OnCrouch);
+            RegisterButton(_crouch, OnCrouch);
+            RegisterButton(_fly, OnFly);
+            RegisterAxis(_flyVertical, OnFlyVertical);
+            RegisterButton(_mount, OnMount);
             RegisterAxis(_eye, OnEye);
 #endif
         }
@@ -223,7 +247,10 @@ namespace ES
             UnregisterButton(_skill2, OnSkill2);
             UnregisterButton(_skill3, OnSkill3);
             UnregisterButton(_jump, OnJump);
-            UnregisterAxis(_crouch, OnCrouch);
+            UnregisterButton(_crouch, OnCrouch);
+            UnregisterButton(_fly, OnFly);
+            UnregisterAxis(_flyVertical, OnFlyVertical);
+            UnregisterButton(_mount, OnMount);
             UnregisterAxis(_eye, OnEye);
 #endif
         }
@@ -319,7 +346,31 @@ namespace ES
 
         private void OnCrouch(InputAction.CallbackContext ctx)
         {
-            snapshot.crouchHold = ctx.ReadValue<float>() > 0.5f;
+            if (ctx.performed)
+            {
+                snapshot.crouchToggle = true;
+            }
+        }
+
+        private void OnFly(InputAction.CallbackContext ctx)
+        {
+            if (ctx.performed)
+            {
+                snapshot.flyToggle = true;
+            }
+        }
+
+        private void OnFlyVertical(InputAction.CallbackContext ctx)
+        {
+            snapshot.flyVertical = ctx.ReadValue<float>();
+        }
+
+        private void OnMount(InputAction.CallbackContext ctx)
+        {
+            if (ctx.performed)
+            {
+                snapshot.mountToggle = true;
+            }
         }
 
         private void OnEye(InputAction.CallbackContext ctx)
@@ -407,6 +458,9 @@ namespace ES
         [LabelText("相机调试")]
         public bool debugCamera;
 
+        [LabelText("骑乘调试")]
+        public bool debugMount;
+
         private Vector3 _lastLookWorld = Vector3.forward;
         private Vector3 _smoothedMoveWorld;
         private float _freeLookYaw;
@@ -459,17 +513,40 @@ namespace ES
             {
                 Vector3 moveWorld = GetMoveWorld(input.Move, cam, _lastLookWorld) * moveScale;
                 _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
-                moveModule.SetMoveWorld(_smoothedMoveWorld);
+                MyCore.SetMoveInput(_smoothedMoveWorld);
 
                 if (!input.EyeHold)
                 {
                     Vector3 targetLook = GetLookWorld(input.Look, cam, _smoothedMoveWorld, turnMode);
                     _lastLookWorld = SmoothLook(_lastLookWorld, targetLook, lookSmooth);
-                    moveModule.SetLookWorld(_lastLookWorld);
+                    MyCore.SetLookInput(_lastLookWorld);
                 }
 
                 if (input.ConsumeJump()) moveModule.RequestJump();
-                moveModule.SetCrouch(input.CrouchHold);
+                if (input.ConsumeCrouchToggle()) moveModule.ToggleCrouch();
+            }
+
+            if (TryGetModule(out EntityBasicFlyModule flyModule))
+            {
+                if (input.ConsumeFlyToggle()) flyModule.ToggleFly();
+                flyModule.SetVerticalInput(input.FlyVertical);
+            }
+
+            if (TryGetModule(out global::ES.EntityBasicMountModule mountModule))
+            {
+                mountModule.SetMountInput(input.Move, _lastLookWorld, cam);
+                if (input.ConsumeMountToggle())
+                {
+                    if (debugMount)
+                    {
+                        Debug.Log($"[EntityAIInputDispatch] MountToggle consumed | module={(mountModule != null ? mountModule.GetType().Name : "null")}");
+                    }
+                    mountModule.ToggleMount();
+                }
+                else if (debugMount)
+                {
+                    Debug.Log("[EntityAIInputDispatch] MountToggle not triggered");
+                }
             }
 
             UpdateMoveStats(_smoothedMoveWorld);
@@ -494,7 +571,7 @@ namespace ES
             input.ClearOneShot();
         }
 
-        private bool TryGetModule<T>(out T module) where T : class, IModule
+        private bool TryGetModule<T>(out T module) where T : class
         {
             if (MyCore.ModuleTables.TryGetValue(typeof(T), out var m))
             {
@@ -932,8 +1009,17 @@ namespace ES
         [LabelText("跳跃")]
         public bool jump;
 
-        [LabelText("下蹲(按住)")]
-        public bool crouchHold;
+        [LabelText("下蹲(切换指令)")]
+        public bool crouchToggle;
+
+        [LabelText("飞行(切换指令)")]
+        public bool flyToggle;
+
+        [LabelText("飞行垂直")]
+        public float flyVertical;
+
+        [LabelText("骑乘(切换指令)")]
+        public bool mountToggle;
 
         [LabelText("小眼睛(按住)")]
         public bool eyeHold;
@@ -950,6 +1036,9 @@ namespace ES
             skill2 = false;
             skill3 = false;
             jump = false;
+            crouchToggle = false;
+            flyToggle = false;
+            mountToggle = false;
         }
 
         public bool ConsumeAttack() => Consume(ref attack);
@@ -963,8 +1052,10 @@ namespace ES
         public bool ConsumeSkill3() => Consume(ref skill3);
         public bool ConsumeJump() => Consume(ref jump);
 
-        public bool CrouchHold => crouchHold;
         public bool EyeHold => eyeHold;
+        public bool ConsumeCrouchToggle() => Consume(ref crouchToggle);
+        public bool ConsumeFlyToggle() => Consume(ref flyToggle);
+        public bool ConsumeMountToggle() => Consume(ref mountToggle);
 
         private static bool Consume(ref bool value)
         {
@@ -1014,7 +1105,10 @@ namespace ES
         Skill2,
         Skill3,
         Jump,
-        Crouch
+        Crouch,
+        Fly,
+            Mount,
+            FlyVertical
     }
 
 #if ENABLE_INPUT_SYSTEM
@@ -1043,6 +1137,9 @@ namespace ES
             ApplySingle(module, InputActionKey.Skill3, schemeKey);
             ApplySingle(module, InputActionKey.Jump, schemeKey);
             ApplySingle(module, InputActionKey.Crouch, schemeKey);
+            ApplySingle(module, InputActionKey.Fly, schemeKey);
+            ApplySingle(module, InputActionKey.Mount, schemeKey);
+            ApplySingle(module, InputActionKey.FlyVertical, schemeKey);
         }
 
         public static void ApplySingle(EntityAIInputSystemModule module, InputActionKey key, InputSchemeKey schemeKey)
@@ -1090,7 +1187,37 @@ namespace ES
                 case InputActionKey.Crouch:
                     module.crouchAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
                     break;
+                case InputActionKey.Fly:
+                    module.flyAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.Mount:
+                    module.mountAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.FlyVertical:
+                    module.flyVerticalAction = CreateAxisAction(key.ToString(), schemeKey);
+                    break;
             }
+        }
+
+        private static InputActionProperty CreateAxisAction(string name, InputSchemeKey schemeKey)
+        {
+            var action = new InputAction(name, InputActionType.Value) { expectedControlType = "Axis" };
+
+            if (schemeKey == InputSchemeKey.KeyboardMouse || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default)
+            {
+                action.AddCompositeBinding("1DAxis")
+                    .With("Negative", "<Keyboard>/q")
+                    .With("Positive", "<Keyboard>/e");
+            }
+
+            if (schemeKey == InputSchemeKey.Gamepad || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default)
+            {
+                action.AddCompositeBinding("1DAxis")
+                    .With("Negative", "<Gamepad>/leftTrigger")
+                    .With("Positive", "<Gamepad>/rightTrigger");
+            }
+
+            return new InputActionProperty(action);
         }
 
         private static InputActionProperty CreateMoveAction(string name, InputSchemeKey schemeKey)
@@ -1153,6 +1280,8 @@ namespace ES
                     case InputActionKey.Skill3: list.Add("<Keyboard>/3"); break;
                     case InputActionKey.Jump: list.Add("<Keyboard>/space"); break;
                     case InputActionKey.Crouch: list.Add("<Keyboard>/c"); break;
+                    case InputActionKey.Fly: list.Add("<Keyboard>/f"); break;
+                    case InputActionKey.Mount: list.Add("<Keyboard>/r"); break;
                 }
             }
 
@@ -1171,6 +1300,8 @@ namespace ES
                     case InputActionKey.Skill3: list.Add("<Gamepad>/dpad/down"); break;
                     case InputActionKey.Jump: list.Add("<Gamepad>/buttonSouth"); break;
                     case InputActionKey.Crouch: list.Add("<Gamepad>/rightStickPress"); break;
+                    case InputActionKey.Fly: list.Add("<Gamepad>/buttonNorth"); break;
+                    case InputActionKey.Mount: list.Add("<Gamepad>/buttonWest"); break;
                 }
             }
 

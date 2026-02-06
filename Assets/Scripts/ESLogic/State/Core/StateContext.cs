@@ -16,7 +16,6 @@ namespace ES
         StateValue,     // 状态枚举值
         Entity,         // 实体对象引用
         String,         // 字符串标记
-        TempCost,       // 临时代价值
         Curve           // 曲线参数(用于IK等)
     }
 
@@ -115,7 +114,6 @@ namespace ES
         private Dictionary<string, UnityEngine.Object> _entityParams;
         private Dictionary<string, AnimationCurve> _curveParams;
         private HashSet<string> _activeTriggers;
-        private Dictionary<string, float> _tempCosts;
 
         // 退化到Entity的ContextPool（仅字符串参数）
         private ContextPool _fallbackContextPool;
@@ -143,7 +141,6 @@ namespace ES
             _entityParams = new Dictionary<string, UnityEngine.Object>();
             _curveParams = new Dictionary<string, AnimationCurve>();
             _activeTriggers = new HashSet<string>();
-            _tempCosts = new Dictionary<string, float>();
             _fallbackContextPool = fallbackPool;
         }
 
@@ -393,43 +390,6 @@ namespace ES
         public bool HasCurve(string name) => _curveParams.ContainsKey(name);
         #endregion
 
-        #region Temp Cost Parameters
-        public void SetTempCost(string name, float cost)
-        {
-            _tempCosts[name] = Mathf.Clamp01(cost);
-        }
-
-        public float GetTempCost(string name, float defaultValue = 0f)
-        {
-            return _tempCosts.TryGetValue(name, out float value) ? value : defaultValue;
-        }
-
-        public void ConsumeTempCost(string name, float amount)
-        {
-            if (_tempCosts.TryGetValue(name, out float current))
-            {
-                _tempCosts[name] = Mathf.Clamp01(current + amount);
-            }
-            else
-            {
-                _tempCosts[name] = Mathf.Clamp01(amount);
-            }
-        }
-
-        public void ReturnTempCost(string name, float amount)
-        {
-            if (_tempCosts.TryGetValue(name, out float current))
-            {
-                _tempCosts[name] = Mathf.Clamp01(current - amount);
-            }
-        }
-
-        public void ClearTempCost(string name)
-        {
-            _tempCosts.Remove(name);
-        }
-        #endregion
-
         /// <summary>
         /// 清空所有参数
         /// </summary>
@@ -442,7 +402,6 @@ namespace ES
             _entityParams.Clear();
             _curveParams.Clear();
             _activeTriggers.Clear();
-            _tempCosts.Clear();
         }
 
         /// <summary>
@@ -536,7 +495,6 @@ namespace ES
             foreach (var kv in _entityParams) target.SetEntity(kv.Key, kv.Value);
             foreach (var kv in _curveParams) target.SetCurve(kv.Key, kv.Value);
             foreach (var trigger in _activeTriggers) target.SetTrigger(trigger);
-            foreach (var kv in _tempCosts) target.SetTempCost(kv.Key, kv.Value);
         }
         
         #region 共享数据管理（原StateMachineContext功能）

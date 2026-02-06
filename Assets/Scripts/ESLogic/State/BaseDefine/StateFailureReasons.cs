@@ -12,5 +12,7 @@ namespace ES
         public const string PipelineDisabled = "流水线未启用";
         public const string InvalidPipelineIndex = "流水线索引非法";
         public const string SupportFlagsNotSatisfied = "支持标记条件未满足";
+        public const string CrossPipelineConflict = "跨流水线冲突";
+        public const string MergeConflict = "合并冲突";
     }
 }

@@ -12,7 +12,7 @@ namespace ES
     public enum StateStayLevel
     {
         [InspectorName("低等级")] Low = 1,
-        [InspectorName("垃圾层")] Rubbish = 0,
+        [InspectorName("垃圾层()")] Rubbish = 0,
         [InspectorName("中等级")] Middle = 2,
         [InspectorName("高等级")] High = 4,
         [InspectorName("超等级")] Super = 8,
@@ -32,16 +32,4 @@ namespace ES
         TryWeakInterrupt     // 尝试弱打断（新增：保留左状态但降级）
     }
 
-    public enum UnconditionalMatchBackType
-    {
-        [InspectorName("强制接受")]
-        Accept,
-
-        [InspectorName("强制排除")]
-        Reject,
-
-        [InspectorName("强制替换")]
-        Replace,
-
-    }
 }

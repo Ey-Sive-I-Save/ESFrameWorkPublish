@@ -10,12 +10,15 @@ namespace ES
         public sealed override Type TableKeyType => GetType();
     }
 
-    [Serializable, TypeRegistryItem("基础移动旋转模块")]
+    [Serializable, TypeRegistryItem("基础移动模块")]
     public class EntityBasicMoveRotateModule : EntityBasicModuleBase
     {
         [Title("输入（世界空间）")]
-        public Vector3 moveWorld;
-        public Vector3 lookWorld = Vector3.forward;
+        [ShowInInspector, ReadOnly]
+        public Vector3 moveWorld => MyCore != null ? MyCore.kcc.moveInput : Vector3.zero;
+
+        [ShowInInspector, ReadOnly]
+        public Vector3 lookWorld => MyCore != null ? MyCore.kcc.lookInput : Vector3.forward;
 
         [Title("应用开关")]
         public bool applyMove = true;
@@ -25,41 +28,83 @@ namespace ES
         [ReadOnly] public bool crouchHold;
         [ReadOnly] public bool jumpRequested;
 
-        public void SetMoveWorld(Vector3 move)
+        public string JUMP_StateName = "跳跃";
+        public string Crouch_StateName = "下蹲";
+        private StateBase _jumpState;
+        private StateBase _crouchState;
+        private StateMachine sm;
+        public override void Start()
         {
-            moveWorld = move;
-        }
-
-        public void SetLookWorld(Vector3 look)
-        {
-            if (look.sqrMagnitude > 0f)
+            base.Start();
+            if (MyCore != null && MyCore.stateDomain != null && MyCore.stateDomain.stateMachine != null)
             {
-                lookWorld = look.normalized;
+                sm = MyCore.stateDomain.stateMachine;
+                _jumpState = sm.GetStateByString(JUMP_StateName);
+                _crouchState = sm.GetStateByString(Crouch_StateName);
             }
         }
-
         public void RequestJump()
         {
-            jumpRequested = true;
+          
+            if (sm.TryActivateState(_jumpState))
+            {
+
+                jumpRequested = true;
+            }
         }
 
         public void SetCrouch(bool enable)
         {
-            crouchHold = enable;
+            if (enable)
+            {
+                if (_crouchState.baseStatus != StateBaseStatus.Running)
+                {
+                    sm.TryActivateState(_crouchState);
+                }
+            }
+            else
+            {
+                if (_crouchState.baseStatus == StateBaseStatus.Running)
+                {
+                    sm.TryDeactivateState(Crouch_StateName);
+                }
+            }
+
+            crouchHold = _crouchState.baseStatus == StateBaseStatus.Running;
+        }
+
+        public void ToggleCrouch()
+        {
+            if (_crouchState == null) return;
+
+            if (_crouchState.baseStatus == StateBaseStatus.Running)
+            {
+                sm.TryDeactivateState(Crouch_StateName);
+            }
+            else
+            {
+                sm.TryActivateState(_crouchState);
+            }
+
+            crouchHold = _crouchState.baseStatus == StateBaseStatus.Running;
         }
 
         protected override void Update()
         {
             if (MyCore == null) return;
-            if (applyMove) MyCore.SetMoveInput(moveWorld);
-            if (applyLook) MyCore.SetLookInput(lookWorld);
+            var moveWorld = MyCore.kcc.moveInput;
             if (jumpRequested)
             {
                 MyCore.RequestJump();
                 jumpRequested = false;
             }
+            else if (MyCore.kcc.monitor.isStableOnGround&&_jumpState.hasEnterTime>0.1f)
+            {
+                sm?.TryDeactivateState(JUMP_StateName);
+            }
+            crouchHold = _crouchState != null && _crouchState.baseStatus == StateBaseStatus.Running;
             MyCore.SetCrouch(crouchHold);
-            
+
             // ★ 自动更新StateMachine的SpeedX和SpeedZ参数（移动模块的核心职责）
             // 通过Entity的stateDomain访问stateMachine，实现Basic域与State域的联动
             if (applyMove && MyCore.stateDomain != null && MyCore.stateDomain.stateMachine != null)
@@ -121,6 +166,8 @@ namespace ES
         }
     }
 
+
+
     [Serializable]
     public struct FlyParams
     {
@@ -133,11 +180,27 @@ namespace ES
         [LabelText("飞行阻力")]
         public float flyDrag;
 
+        [LabelText("飞行重力倍率(0=无重力,1=全重力)")]
+        public float flyGravityScale;
+
+        [LabelText("飞行上升倍率")]
+        public float flyAscendMultiplier;
+
+        [LabelText("飞行下降倍率")]
+        public float flyDescendMultiplier;
+
+        [LabelText("飞行强制离地时长")]
+        public float flyUngroundTime;
+
         public static FlyParams Default => new FlyParams
         {
             flyMaxSpeed = 10f,
             flyAcceleration = 12f,
-            flyDrag = 0.2f
+            flyDrag = 0.2f,
+            flyGravityScale = 0.1f,
+            flyAscendMultiplier = 1.5f,
+            flyDescendMultiplier = 1f,
+            flyUngroundTime = 0.1f
         };
     }
 
@@ -171,6 +234,15 @@ namespace ES
         [Title("开关")]
         public bool enableFly = true;
 
+        [Title("状态")]
+        [ReadOnly] public bool flyHold;
+
+        [LabelText("飞行状态名")]
+        public string Fly_StateName = "飞行";
+
+        private StateBase _flyState;
+        private StateMachine sm;
+
         [Title("应用策略")]
         [LabelText("启用时应用参数")]
         public bool applyOnEnable = true;
@@ -191,6 +263,78 @@ namespace ES
             verticalInput = Mathf.Clamp(input, -1f, 1f);
         }
 
+        public void SetFly(bool enable)
+        {
+            if (!enableFly || _flyState == null) return;
+
+            if (enable)
+            {
+                if (_flyState.baseStatus != StateBaseStatus.Running)
+                {
+                    if (sm.TryActivateState(_flyState))
+                    {
+                        ApplyParams();
+                    }
+                }
+            }
+            else
+            {
+                ExitFly();
+            }
+
+            flyHold = _flyState.baseStatus == StateBaseStatus.Running;
+        }
+
+        public void ToggleFly()
+        {
+            if (!enableFly || _flyState == null) return;
+
+            if (_flyState.baseStatus == StateBaseStatus.Running)
+            {
+                ExitFly();
+            }
+            else
+            {
+                if (sm.TryActivateState(_flyState))
+                {
+                    ApplyParams();
+                }
+            }
+
+            flyHold = _flyState.baseStatus == StateBaseStatus.Running;
+        }
+
+        private void ExitFly()
+        {
+            if (_flyState == null) return;
+
+            if (_flyState.baseStatus == StateBaseStatus.Running)
+            {
+                sm.TryDeactivateState(Fly_StateName);
+                if (_flyState.baseStatus == StateBaseStatus.Running)
+                {
+                    sm.ForceExitState(_flyState);
+                }
+            }
+
+            flyHold = _flyState.baseStatus == StateBaseStatus.Running;
+            if (!flyHold && MyCore != null)
+            {
+                MyCore.SetLocomotionSupportFlags(StateSupportFlags.Grounded);
+                MyCore.SetVerticalInput(0f);
+            }
+        }
+
+        public override void Start()
+        {
+            base.Start();
+            if (MyCore != null && MyCore.stateDomain != null && MyCore.stateDomain.stateMachine != null)
+            {
+                sm = MyCore.stateDomain.stateMachine;
+                _flyState = sm.GetStateByString(Fly_StateName);
+            }
+        }
+
         protected override void OnEnable()
         {
             base.OnEnable();
@@ -203,6 +347,9 @@ namespace ES
         protected override void Update()
         {
             if (MyCore == null || !enableFly) return;
+
+            flyHold = _flyState != null && _flyState.baseStatus == StateBaseStatus.Running;
+            if (!flyHold) return;
 
             MyCore.SetLocomotionSupportFlags(StateSupportFlags.Flying);
             MyCore.SetVerticalInput(verticalInput);
@@ -221,7 +368,280 @@ namespace ES
             kcc.flyMaxSpeed = fly.flyMaxSpeed;
             kcc.flyAcceleration = fly.flyAcceleration;
             kcc.flyDrag = fly.flyDrag;
+            kcc.flyGravityScale = fly.flyGravityScale;
+            kcc.flyAscendMultiplier = fly.flyAscendMultiplier;
+            kcc.flyDescendMultiplier = fly.flyDescendMultiplier;
+            kcc.flyUngroundTime = fly.flyUngroundTime;
         }
+    }
+
+    [Serializable, TypeRegistryItem("基础骑乘模块")]
+    public class EntityBasicMountModule : EntityBasicModuleBase
+    {
+        [Title("开关")]
+        public bool enableMount = true;
+
+        [Title("调试")]
+        public bool debugMount;
+
+        [Title("输入")]
+        [LabelText("强制骑乘输入")]
+        public bool forceMountInput = true;
+
+        [LabelText("移动参考")]
+        public MountMoveReference moveReference = MountMoveReference.Camera;
+
+        [LabelText("触发缓冲(秒)")]
+        public float mountRequestWindow = 0.2f;
+
+        [Title("状态")]
+        [ReadOnly] public bool mountHold;
+
+        [Title("检测")]
+        [LabelText("射线起点(可选)")]
+        public Transform rayOrigin;
+
+        [LabelText("检测距离")]
+        public float mountDistance = 2f;
+
+        [LabelText("检测层")]
+        public LayerMask mountLayerMask = ~0;
+
+        [LabelText("触发器命中")]
+        public QueryTriggerInteraction mountQuery = QueryTriggerInteraction.Ignore;
+
+        [Title("骑乘目标")]
+        [ReadOnly] public EntityMountable currentMount;
+
+        [LabelText("骑乘状态名")]
+        public string Mount_StateName = "骑乘";
+
+        private StateBase _mountState;
+        private StateMachine sm;
+        private bool _cachedAllowInput;
+        private float _mountRequestExpiry;
+        private Vector2 _mountMoveAxis;
+        private Vector3 _mountLookWorld = Vector3.forward;
+        private Transform _mountCamera;
+
+        public override void Start()
+        {
+            base.Start();
+            if (MyCore != null && MyCore.stateDomain != null && MyCore.stateDomain.stateMachine != null)
+            {
+                sm = MyCore.stateDomain.stateMachine;
+                _mountState = sm.GetStateByString(Mount_StateName);
+            }
+        }
+
+        public void SetMount(bool enable)
+        {
+            if (debugMount) DebugLog($"SetMount enable={enable}");
+            if (!enableMount || _mountState == null) return;
+
+            if (enable)
+            {
+                RequestEnterMount();
+            }
+            else
+            {
+                ExitMount();
+            }
+        }
+
+        public void ToggleMount()
+        {
+            if (debugMount) DebugLog("ToggleMount");
+            if (!enableMount || _mountState == null) return;
+
+            if (_mountState.baseStatus == StateBaseStatus.Running)
+            {
+                ExitMount();
+            }
+            else
+            {
+                RequestEnterMount();
+            }
+        }
+
+        private void RequestEnterMount()
+        {
+            if (mountRequestWindow > 0f)
+            {
+                _mountRequestExpiry = Time.time + mountRequestWindow;
+            }
+            else
+            {
+                _mountRequestExpiry = 0f;
+            }
+
+            TryEnterMount();
+        }
+
+        public void SetMountInput(Vector2 moveAxis, Vector3 lookWorld, Transform cameraTransform)
+        {
+            _mountMoveAxis = moveAxis;
+            if (lookWorld.sqrMagnitude > 0.0001f)
+            {
+                _mountLookWorld = lookWorld;
+            }
+            _mountCamera = cameraTransform;
+        }
+
+        private void TryEnterMount()
+        {
+            if (debugMount) DebugLog("TryEnterMount");
+            if (currentMount != null) return;
+
+            var mountable = FindMountable();
+            if (mountable == null) return;
+
+            if (sm.TryActivateState(_mountState))
+            {
+                currentMount = mountable;
+                _cachedAllowInput = currentMount.allowInput;
+                if (forceMountInput)
+                {
+                    currentMount.allowInput = true;
+                }
+                currentMount.Mount(MyCore);
+                mountHold = true;
+                if (debugMount) DebugLog("Mounted: state activated and mountable assigned");
+            }
+            else if (debugMount)
+            {
+                DebugLog("TryEnterMount failed: state activation rejected");
+            }
+        }
+
+        private void ExitMount()
+        {
+            if (debugMount) DebugLog("ExitMount");
+            if (currentMount != null)
+            {
+                if (forceMountInput)
+                {
+                    currentMount.allowInput = _cachedAllowInput;
+                }
+                currentMount.Unmount();
+                currentMount = null;
+            }
+
+            if (_mountState != null && _mountState.baseStatus == StateBaseStatus.Running)
+            {
+                sm.TryDeactivateState(Mount_StateName);
+            }
+
+            mountHold = false;
+            if (MyCore != null)
+            {
+                MyCore.SetLocomotionSupportFlags(StateSupportFlags.Grounded);
+                MyCore.SetVerticalInput(0f);
+            }
+        }
+
+        private EntityMountable FindMountable()
+        {
+            if (MyCore == null) return null;
+
+            Transform origin = rayOrigin != null ? rayOrigin : MyCore.transform;
+            Vector3 dir = origin.forward;
+            if (Physics.Raycast(origin.position, dir, out RaycastHit hit, mountDistance, mountLayerMask, mountQuery))
+            {
+                return hit.collider.GetComponentInParent<EntityMountable>();
+            }
+
+            return null;
+        }
+
+        protected override void Update()
+        {
+            if (MyCore == null || !enableMount) return;
+
+            if (currentMount == null && _mountRequestExpiry > 0f)
+            {
+                if (Time.time <= _mountRequestExpiry)
+                {
+                    TryEnterMount();
+                }
+                else
+                {
+                    _mountRequestExpiry = 0f;
+                }
+            }
+
+            if (currentMount == null)
+            {
+                mountHold = false;
+                if (debugMount) DebugLog("Update: currentMount null");
+                return;
+            }
+
+            if (_mountState == null || _mountState.baseStatus != StateBaseStatus.Running)
+            {
+                if (debugMount) DebugLog("Update: mount state not running, forcing exit");
+                ExitMount();
+                return;
+            }
+
+            mountHold = true;
+            MyCore.SetLocomotionSupportFlags(StateSupportFlags.Mounted);
+            Vector3 moveWorld = ResolveMountMoveWorld();
+            currentMount.TickMounted(MyCore, moveWorld, _mountLookWorld, Time.deltaTime);
+        }
+
+        private Vector3 ResolveMountMoveWorld()
+        {
+            Transform reference = null;
+            switch (moveReference)
+            {
+                case MountMoveReference.Camera:
+                    reference = _mountCamera;
+                    break;
+                case MountMoveReference.Rider:
+                    reference = MyCore != null ? MyCore.transform : null;
+                    break;
+                case MountMoveReference.LookWorld:
+                    reference = null;
+                    break;
+            }
+
+            Vector3 forward;
+            Vector3 right;
+            if (moveReference == MountMoveReference.LookWorld)
+            {
+                Vector3 lookPlanar = Vector3.ProjectOnPlane(_mountLookWorld, Vector3.up);
+                forward = lookPlanar.sqrMagnitude > 0.0001f ? lookPlanar.normalized : Vector3.forward;
+                right = Vector3.Cross(Vector3.up, forward).normalized;
+            }
+            else if (reference != null)
+            {
+                Vector3 refForward = Vector3.ProjectOnPlane(reference.forward, Vector3.up);
+                Vector3 refRight = Vector3.ProjectOnPlane(reference.right, Vector3.up);
+                forward = refForward.sqrMagnitude > 0.0001f ? refForward.normalized : Vector3.forward;
+                right = refRight.sqrMagnitude > 0.0001f ? refRight.normalized : Vector3.right;
+            }
+            else
+            {
+                forward = Vector3.forward;
+                right = Vector3.right;
+            }
+
+            Vector3 moveWorld = forward * _mountMoveAxis.y + right * _mountMoveAxis.x;
+            return moveWorld;
+        }
+
+        private void DebugLog(string message)
+        {
+            Debug.Log($"[Mount] {message} | enable={enableMount} state={( _mountState != null ? _mountState.baseStatus.ToString() : "null")} currentMount={(currentMount != null ? currentMount.name : "null")}");
+        }
+    }
+
+    public enum MountMoveReference
+    {
+        Camera,
+        Rider,
+        LookWorld
     }
 
     [Serializable, TypeRegistryItem("基础游泳模块")]

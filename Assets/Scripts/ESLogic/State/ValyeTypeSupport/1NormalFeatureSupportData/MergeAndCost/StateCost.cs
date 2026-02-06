@@ -13,18 +13,18 @@ namespace ES
 
         [LabelText("动向代价")]
         [Tooltip("包含身体的基本运动意愿，0-100")]
-        [Range(0f, 100f)]
-        public float motionCost = 0f;
+        [Range(0, 100)]
+        public byte costForMotion = 60;
 
         [LabelText("灵活度代价")]
         [Tooltip("控制身体灵活度的代价，0-100")]
-        [Range(0f, 100f)]
-        public float agilityCost = 0f;
+        [Range(0, 100)]
+        public byte costForAgility = 60;
 
         [LabelText("目标代价")]
         [Tooltip("目标锁定相关代价，0-100")]
-        [Range(0f, 100f)]
-        public float targetCost = 0f;
+        [Range(0, 100)]
+        public byte costForTarget = 60;
 
         [LabelText("启用代价计算")]
         public bool enableCostCalculation = true;
@@ -32,23 +32,19 @@ namespace ES
         /// <summary>
         /// 获取总代价（直接相加，不使用权重）
         /// </summary>
-        public float GetTotalCost() => motionCost + agilityCost + targetCost;
+        public float GetTotalCost() => costForMotion + costForAgility + costForTarget;
 
         /// <summary>
         /// 为保留兼容性保留的方法
         /// </summary>
-        public float GetWeightedMotion() => motionCost;
-        public float GetWeightedAgility() => agilityCost;
-        public float GetWeightedTarget() => targetCost;
-
         [HorizontalGroup("Actions")]
         [Button("验证配置合理性", ButtonSizes.Medium)]
         public void ValidateConfig()
         {
             var issues = new List<string>();
-            if (motionCost < 0f || motionCost > 100f) issues.Add("motionCost 必须在 [0,100] 范围内。");
-            if (agilityCost < 0f || agilityCost > 100f) issues.Add("agilityCost 必须在 [0,100] 范围内。");
-            if (targetCost < 0f || targetCost > 100f) issues.Add("targetCost 必须在 [0,100] 范围内。");
+            if (costForMotion > 100) issues.Add("motionCost 必须在 [0,100] 范围内。");
+            if (costForAgility > 100) issues.Add("agilityCost 必须在 [0,100] 范围内。");
+            if (costForTarget > 100) issues.Add("targetCost 必须在 [0,100] 范围内。");
 
             if (issues.Count == 0) Debug.Log("StateCostData: 配置检查通过。");
             else

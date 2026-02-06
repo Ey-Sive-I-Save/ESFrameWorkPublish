@@ -67,7 +67,6 @@ namespace ES
         {
             if (!IsRecycled)
             {
-                IsRecycled = true;
                 Pool.PushToPool(this);
             }
         }

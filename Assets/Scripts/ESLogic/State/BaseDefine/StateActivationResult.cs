@@ -1,56 +1,34 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace ES
 {
+    [Flags]
+    public enum StateActivationCode : byte
+    {
+        [InspectorName("失败")]
+        Fail = 0,
+        [InspectorName("成功")]
+        Success = 1 << 0,
+        [InspectorName("有打断")]
+        HasInterrupt = 1 << 1,
+        [InspectorName("有合并")]
+        HasMerge = 1 << 2,
+        [InspectorName("重启")]
+        Restart = 1 << 3
+    }
+
     /// <summary>
     /// 状态激活测试结果 - 描述状态能否激活以及需要执行的操作
     /// </summary>
     [Serializable]
     public struct StateActivationResult
     {
-        // 共享空List，避免重复分配(零GC优化)
-        private static readonly List<StateBase> _sharedEmptyList = new List<StateBase>(0);
-
         /// <summary>
-        /// 是否可以激活
+        /// 激活码
         /// </summary>
-        public bool canActivate;
-
-        /// <summary>
-        /// 是否需要打断当前状态
-        /// </summary>
-        public bool requiresInterruption;
-
-        /// <summary>
-        /// 需要打断的状态列表
-        /// </summary>
-        public List<StateBase> statesToInterrupt;
-
-        /// <summary>
-        /// 是否可以直接合并（多个状态并行）
-        /// </summary>
-        public bool canMerge;
-
-        /// <summary>
-        /// 是否可以直接合并（无需打断）
-        /// </summary>
-        public bool mergeDirectly;
-
-        /// <summary>
-        /// 可以合并的状态列表
-        /// </summary>
-        public List<StateBase> statesToMergeWith;
-
-        /// <summary>
-        /// 打断数量（便于快速判断）
-        /// </summary>
-        public int interruptCount;
-
-        /// <summary>
-        /// 合并数量（便于快速判断）
-        /// </summary>
-        public int mergeCount;
+        public StateActivationCode code;
 
         /// <summary>
         /// 失败原因
@@ -58,92 +36,196 @@ namespace ES
         public string failureReason;
 
         /// <summary>
-        /// 目标流水线
+        /// 运行时打断列表（仅当code包含HasInterrupt时有效）
         /// </summary>
-        public StatePipelineType targetPipeline;
+        public List<StateBase> statesToInterrupt;
 
         /// <summary>
-        /// 注意：statesToInterrupt / statesToMergeWith 为内部复用列表引用，不建议外部长期持有。
+        /// 运行时打断数量
         /// </summary>
+        public int interruptCount;
+
+        public bool CanActivate => (code & StateActivationCode.Success) != 0;
+
+        public bool RequiresInterruption => (code & StateActivationCode.HasInterrupt) != 0;
+
+        public bool CanMerge => (code & StateActivationCode.HasMerge) != 0;
+
+        public bool IsRestart => (code & StateActivationCode.Restart) != 0;
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// 编辑器调试用：合并状态列表
+        /// </summary>
+        public List<StateBase> debugMergeStates;
 
         /// <summary>
-        /// 创建成功结果 (零GC优化：使用共享空List)
+        /// 编辑器调试用：合并数量
         /// </summary>
-        public static StateActivationResult Success(StatePipelineType pipeline, bool merge = false)
+        public int debugMergeCount;
+#endif
+        /// <summary>
+        /// 注意：调试列表为内部复用引用，仅用于编辑器观察。
+        /// </summary>
+
+        // 共享空List，避免重复分配(零GC优化)
+        private static readonly List<StateBase> _sharedEmptyList = new List<StateBase>(0);
+
+        // 共享结果（零GC优化，适用于不可变结果）
+        public static readonly StateActivationResult SuccessNoMerge = new StateActivationResult
         {
-            return new StateActivationResult
-            {
-                canActivate = true,
-                requiresInterruption = false,
-                canMerge = merge,
-                mergeDirectly = merge,
-                statesToInterrupt = _sharedEmptyList,
-                statesToMergeWith = _sharedEmptyList,
-                interruptCount = 0,
-                mergeCount = 0,
-                failureReason = string.Empty,
-                targetPipeline = pipeline
-            };
-        }
+            code = StateActivationCode.Success,
+            failureReason = string.Empty,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
 
-        /// <summary>
-        /// 创建打断结果 (零GC优化)
-        /// </summary>
-        public static StateActivationResult Interrupt(StatePipelineType pipeline, List<StateBase> toInterrupt)
+        public static readonly StateActivationResult SuccessMerge = new StateActivationResult
         {
-            return new StateActivationResult
-            {
-                canActivate = true,
-                requiresInterruption = true,
-                canMerge = false,
-                mergeDirectly = false,
-                statesToInterrupt = toInterrupt,
-                statesToMergeWith = _sharedEmptyList,
-                interruptCount = toInterrupt?.Count ?? 0,
-                mergeCount = 0,
-                failureReason = string.Empty,
-                targetPipeline = pipeline
-            };
-        }
+            code = StateActivationCode.Success | StateActivationCode.HasMerge,
+            failureReason = string.Empty,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
 
-        /// <summary>
-        /// 创建合并结果 (零GC优化)
-        /// </summary>
-        public static StateActivationResult Merge(StatePipelineType pipeline, List<StateBase> mergeWith)
+        public static readonly StateActivationResult SuccessInterrupt = new StateActivationResult
         {
-            return new StateActivationResult
-            {
-                canActivate = true,
-                requiresInterruption = false,
-                canMerge = true,
-                mergeDirectly = true,
-                statesToInterrupt = _sharedEmptyList,
-                statesToMergeWith = mergeWith,
-                interruptCount = 0,
-                mergeCount = mergeWith?.Count ?? 0,
-                failureReason = string.Empty,
-                targetPipeline = pipeline
-            };
-        }
+            code = StateActivationCode.Success | StateActivationCode.HasInterrupt,
+            failureReason = string.Empty,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
 
-        /// <summary>
-        /// 创建失败结果 (零GC优化)
-        /// </summary>
-        public static StateActivationResult Failure(string reason)
+        public static readonly StateActivationResult SuccessRestart = new StateActivationResult
         {
-            return new StateActivationResult
-            {
-                canActivate = false,
-                requiresInterruption = false,
-                canMerge = false,
-                mergeDirectly = false,
-                statesToInterrupt = _sharedEmptyList,
-                statesToMergeWith = _sharedEmptyList,
-                interruptCount = 0,
-                mergeCount = 0,
-                failureReason = reason,
-                targetPipeline = StatePipelineType.Basic
-            };
-        }
+            code = StateActivationCode.Success | StateActivationCode.Restart,
+            failureReason = string.Empty,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+    #if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+    #endif
+        };
+
+        public static readonly StateActivationResult FailureStateIsNull = new StateActivationResult
+        {
+            code = StateActivationCode.Fail,
+            failureReason = StateFailureReasons.StateIsNull,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
+
+        public static readonly StateActivationResult FailureMachineNotRunning = new StateActivationResult
+        {
+            code = StateActivationCode.Fail,
+            failureReason = StateFailureReasons.MachineNotRunning,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
+
+        public static readonly StateActivationResult FailureStateAlreadyRunning = new StateActivationResult
+        {
+            code = StateActivationCode.Fail,
+            failureReason = StateFailureReasons.StateAlreadyRunning,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
+
+        public static readonly StateActivationResult FailurePipelineNotFound = new StateActivationResult
+        {
+            code = StateActivationCode.Fail,
+            failureReason = StateFailureReasons.PipelineNotFound,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
+
+        public static readonly StateActivationResult FailurePipelineDisabled = new StateActivationResult
+        {
+            code = StateActivationCode.Fail,
+            failureReason = StateFailureReasons.PipelineDisabled,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
+
+        public static readonly StateActivationResult FailureInvalidPipelineIndex = new StateActivationResult
+        {
+            code = StateActivationCode.Fail,
+            failureReason = StateFailureReasons.InvalidPipelineIndex,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
+
+        public static readonly StateActivationResult FailureSupportFlagsNotSatisfied = new StateActivationResult
+        {
+            code = StateActivationCode.Fail,
+            failureReason = StateFailureReasons.SupportFlagsNotSatisfied,
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
+
+        public static readonly StateActivationResult FailureCrossPipelineConflict = new StateActivationResult
+        {
+            code = StateActivationCode.Fail,
+            failureReason = "跨流水线冲突",
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
+
+        public static readonly StateActivationResult FailureMergeConflict = new StateActivationResult
+        {
+            code = StateActivationCode.Fail,
+            failureReason = "合并冲突",
+            statesToInterrupt = _sharedEmptyList,
+            interruptCount = 0
+#if UNITY_EDITOR
+            , debugMergeStates = _sharedEmptyList,
+            debugMergeCount = 0
+#endif
+        };
     }
 }

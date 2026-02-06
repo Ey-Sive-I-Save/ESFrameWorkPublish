@@ -171,7 +171,7 @@ namespace ES
         /// <summary>
         /// 检查是否可以进入新状态
         /// </summary>
-        public bool CanEnterState(StateDefinition stateDef, CostManager costManager)
+        public bool CanEnterState(StateDefinition stateDef)
         {
             // 如果当前无状态,可以直接进入
             if (_currentState == null)
@@ -180,13 +180,6 @@ namespace ES
             // 检查优先级
             if (stateDef.priority <= _currentState.Definition.priority)
                 return false;
-
-            // 检查代价
-            if (!stateDef.ignoreInCostCalculation)
-            {
-                if (!costManager.CanAffordCost(stateDef.cost, stateDef.stateId, true))
-                    return false;
-            }
 
             return true;
         }
@@ -245,7 +238,6 @@ namespace ES
         
         private float _enterTime;
         private float _stateTime;
-        private bool _isInRecovery;
 
         public StateInstance(StateDefinition definition, StateMachineContext context, PlayableGraph graph, float currentTime)
         {
@@ -253,7 +245,6 @@ namespace ES
             Runtime = new StateRuntime(graph, context);
             _enterTime = currentTime;
             _stateTime = 0f;
-            _isInRecovery = false;
         }
 
         public void SetMixer(AnimationMixerPlayable mixer)
@@ -297,13 +288,6 @@ namespace ES
                 Runtime.NormalizedTime = 0f; // 无限循环状态
             }
 
-            // 检查是否进入后摇阶段
-            if (!_isInRecovery && Runtime.NormalizedTime >= Definition.recoveryStartTime)
-            {
-                _isInRecovery = true;
-                OnEnterRecovery();
-            }
-
             // 调用所有组件的OnUpdate
             foreach (var component in Definition.GetAllComponents())
             {
@@ -329,12 +313,6 @@ namespace ES
 
             // 检查自动转换
             CheckAutoTransitions();
-        }
-
-        private void OnEnterRecovery()
-        {
-            // 通知代价管理器开始返还代价
-            // 这里需要访问外部的CostManager
         }
 
         private void CheckAutoTransitions()
@@ -369,6 +347,6 @@ namespace ES
 
         public float GetNormalizedTime() => Runtime.NormalizedTime;
         public float GetStateTime() => _stateTime;
-        public bool IsInRecovery() => _isInRecovery;
+        public bool IsInRecovery() => false;
     }
 }

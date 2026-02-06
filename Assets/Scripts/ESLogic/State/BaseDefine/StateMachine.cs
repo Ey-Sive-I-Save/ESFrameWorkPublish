@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
+using Debug = UnityEngine.Debug;
 
 namespace ES
 {
@@ -17,8 +18,6 @@ namespace ES
     [Serializable, TypeRegistryItem("ES状态机")]
     public class StateMachine
     {
-        #region 核心引用与宿主（核心/不建议改）
-
         /// <summary>
         /// 宿主Entity - 状态机所属的实体对象
         /// </summary>
@@ -48,8 +47,10 @@ namespace ES
         /// 是否持续输出统计信息（用于调试）
         /// </summary>
         [LabelText("持续输出统计"), Tooltip("每帧在Console输出状态机统计信息")]
+#if UNITY_EDITOR
         [NonSerialized]
         public bool enableContinuousStats = false;
+#endif
 
 #if UNITY_EDITOR
         [OnInspectorInit]
@@ -62,19 +63,10 @@ namespace ES
         }
 #endif
 
-        #endregion
+
+
 
         #region 扩展回调与策略（可修改）
-
-        /// <summary>
-        /// 自定义激活测试（若返回非默认值将覆盖内置逻辑）
-        /// </summary>
-        public Func<StateBase, StatePipelineType, StateActivationResult> CustomActivationTest;
-
-        /// <summary>
-        /// 自定义合并判定
-        /// </summary>
-        public Func<StateBase, StateBase, bool> CanMergeEvaluator;
 
         /// <summary>
         /// 状态进入回调
@@ -106,10 +98,6 @@ namespace ES
         /// </summary>
         public Func<IEnumerable<StateBase>, StateChannelMask> CustomChannelMaskEvaluator;
 
-        /// <summary>
-        /// 自定义代价计算
-        /// </summary>
-        public Func<IEnumerable<StateBase>, StateCostSummary> CustomCostEvaluator;
 
         /// <summary>
         /// 自定义主状态评分（用于 Dynamic 判据）
@@ -134,28 +122,24 @@ namespace ES
 
         #endregion
 
-        #region 流水线与并行状态管理（核心/谨慎改）
 
-        /// <summary>
-        /// 所有运行中的状态集合 - 支持多状态并行
-        /// </summary>
         [ShowInInspector, ReadOnly, LabelText("当前运行状态")]
         [NonSerialized]
         public HashSet<StateBase> runningStates = new HashSet<StateBase>();
 
-        /// <summary>
-        /// 当前实体支持标记（与实体KCC一致）
-        /// </summary>
+
+
+
         [ShowInInspector, ReadOnly, LabelText("SupportFlags")]
         [NonSerialized]
         public StateSupportFlags currentSupportFlags = StateSupportFlags.Grounded;
 
-        private const StateSupportFlags LocomotionMask = StateSupportFlags.Grounded | StateSupportFlags.Swimming | StateSupportFlags.Flying;
+        private const StateSupportFlags LocomotionMask = StateSupportFlags.Grounded | StateSupportFlags.Swimming | StateSupportFlags.Flying | StateSupportFlags.Mounted | StateSupportFlags.Climbing;
 
         public void SetSupportFlags(StateSupportFlags flags)
         {
             var beforeFlags = currentSupportFlags;
-            currentSupportFlags = flags;
+            currentSupportFlags = NormalizeSingleSupportFlag(flags);
             if (beforeFlags != currentSupportFlags)
             {
                 MarkSupportFlagsDirty();
@@ -165,7 +149,7 @@ namespace ES
         public void SetLocomotionSupportFlags(StateSupportFlags locomotionFlags)
         {
             var beforeFlags = currentSupportFlags;
-            currentSupportFlags = (currentSupportFlags & ~LocomotionMask) | (locomotionFlags & LocomotionMask);
+            currentSupportFlags = NormalizeSingleSupportFlag(locomotionFlags & LocomotionMask);
             if (beforeFlags != currentSupportFlags)
             {
                 MarkSupportFlagsDirty();
@@ -177,14 +161,13 @@ namespace ES
             basicPipeline.MarkDirty(PipelineDirtyFlags.FallbackCheck);
             mainPipeline.MarkDirty(PipelineDirtyFlags.FallbackCheck);
             buffPipeline.MarkDirty(PipelineDirtyFlags.FallbackCheck);
+            MarkDirty(StateDirtyReason.RuntimeChanged);
         }
 
         [NonSerialized]
-        private int[] _supportFlagToRelationIndex;
+        private Dictionary<StateSupportFlags, uint> _disableTransitionMasks;
 
-        [NonSerialized]
-        private ulong[] _disableTransitionMasks;
-
+        #region 存储容器（核心/谨慎改）
         /// <summary>
         /// String键到状态的映射
         /// </summary>
@@ -257,19 +240,14 @@ namespace ES
         [NonSerialized]
         private int _cachedChannelMaskVersion = -1;
 
-        [NonSerialized]
-        private StateCostSummary _cachedCostSummary;
-
-        [NonSerialized]
-        private int _cachedCostVersion = -1;
 
         /// <summary>
         /// 默认状态键 - 状态机启动时进入的状态
         /// </summary>
         [LabelText("默认状态键"), ValueDropdown("GetAllStateKeys")]
         public string defaultStateKey;
-
         #endregion
+
 
         #region 流水线声明与管理（核心/谨慎改）
 
@@ -313,7 +291,7 @@ namespace ES
                 case StatePipelineType.Buff:
                     return buffPipeline;
                 default:
-                    return null;
+                    return basicPipeline;
             }
         }
 
@@ -408,7 +386,9 @@ namespace ES
             public int[] versions;
             public StateActivationResult[] results;
             public List<StateBase>[] interruptLists;
+#if UNITY_EDITOR
             public List<StateBase>[] mergeLists;
+#endif
         }
 
         public enum StateDirtyReason
@@ -417,31 +397,7 @@ namespace ES
             Enter = 1,
             Exit = 2,
             Release = 3,
-            CostChanged = 4,
             RuntimeChanged = 5
-        }
-
-        [Serializable]
-        public struct StateCostSummary
-        {
-            public float motionCost;
-            public float agilityCost;
-            public float targetCost;
-            public float weightedMotion;
-            public float weightedAgility;
-            public float weightedTarget;
-            public float totalWeighted;
-
-            public void Clear()
-            {
-                motionCost = 0f;
-                agilityCost = 0f;
-                targetCost = 0f;
-                weightedMotion = 0f;
-                weightedAgility = 0f;
-                weightedTarget = 0f;
-                totalWeighted = 0f;
-            }
         }
 
         #endregion
@@ -486,55 +442,18 @@ namespace ES
             isInitialized = true;
         }
 
+        //是否直接禁用跳转
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsTransitionDisabledFast(StateSupportFlags fromFlag, StateSupportFlags toFlag)
         {
-            if (_disableTransitionMasks == null || _supportFlagToRelationIndex == null) return false;
-            fromFlag = NormalizeSingleSupportFlag(fromFlag);
-            toFlag = NormalizeSingleSupportFlag(toFlag);
+            // fromFlag 是当前支持标记（通常单一）
+            // toFlag 作为“目标层级掩码”直接按位判断
+
             if (fromFlag == StateSupportFlags.None || toFlag == StateSupportFlags.None) return false;
-
-            int fromBit = GetFlagBitIndex(fromFlag);
-            int toBit = GetFlagBitIndex(toFlag);
-            if ((uint)fromBit >= 8 || (uint)toBit >= 8) return false;
-
-            int fromIndex = _supportFlagToRelationIndex[fromBit];
-            int toIndex = _supportFlagToRelationIndex[toBit];
-            if (fromIndex < 0 || toIndex < 0) return false;
-
-            return ((_disableTransitionMasks[fromBit] >> toIndex) & 1UL) != 0;
+            return _disableTransitionMasks.TryGetValue(fromFlag, out var mask)
+                && (mask & (uint)toFlag) != 0u;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsTransitionDisabledMaskFast(StateSupportFlags fromFlag, ulong targetMask)
-        {
-            if (_disableTransitionMasks == null) return false;
-            fromFlag = NormalizeSingleSupportFlag(fromFlag);
-            if (fromFlag == StateSupportFlags.None) return false;
-            int fromBit = GetFlagBitIndex(fromFlag);
-            if ((uint)fromBit >= 8) return false;
-            return (_disableTransitionMasks[fromBit] & targetMask) != 0UL;
-        }
-
-        public ulong BuildTransitionMask(params StateSupportFlags[] flags)
-        {
-            if (_supportFlagToRelationIndex == null || flags == null || flags.Length == 0) return 0UL;
-            ulong mask = 0UL;
-            for (int i = 0; i < flags.Length; i++)
-            {
-                var flag = NormalizeSingleSupportFlag(flags[i]);
-                if (flag == StateSupportFlags.None) continue;
-                int bit = GetFlagBitIndex(flag);
-                if ((uint)bit >= 8) continue;
-                int index = _supportFlagToRelationIndex[bit];
-                if (index >= 0 && index < 64)
-                {
-                    mask |= 1UL << index;
-                }
-            }
-
-            return mask;
-        }
 
         private void InitializeSupportFlagsTransitionCache()
         {
@@ -546,61 +465,54 @@ namespace ES
             var map = config != null ? config.disableTransitionPermissionMap : null;
             if (map == null)
             {
-                _supportFlagToRelationIndex = null;
                 _disableTransitionMasks = null;
                 return;
             }
 
-            _supportFlagToRelationIndex = new int[8];
-            for (int i = 0; i < _supportFlagToRelationIndex.Length; i++)
+            if (_disableTransitionMasks == null)
             {
-                _supportFlagToRelationIndex[i] = -1;
+                _disableTransitionMasks = new Dictionary<StateSupportFlags, uint>(8);
+            }
+            else
+            {
+                _disableTransitionMasks.Clear();
             }
 
-            _disableTransitionMasks = new ulong[8];
-            Array.Clear(_disableTransitionMasks, 0, _disableTransitionMasks.Length);
-
-            var values = (StateSupportFlags[])Enum.GetValues(typeof(StateSupportFlags));
-            for (int i = 0; i < values.Length; i++)
+            var relations = map.Relations;
+            if (relations == null)
             {
-                var flag = values[i];
-                if (flag == StateSupportFlags.None) continue;
-                int bitIndex = GetFlagBitIndex(flag);
-                if ((uint)bitIndex >= 8) continue;
+                return;
+            }
 
-                if (map.TryGetIndex(flag, out var relationIndex))
+            for (int i = 0; i < relations.Count; i++)
+            {
+                var entry = relations[i];
+                var fromFlag = entry.key;
+                if (fromFlag == StateSupportFlags.None) continue;
+
+                uint mask = 0u;
+                var related = entry.relatedKeys;
+                if (related != null)
                 {
-                    _supportFlagToRelationIndex[bitIndex] = relationIndex;
+                    for (int r = 0; r < related.Count; r++)
+                    {
+                        var relatedFlag = related[r];
+                        if (relatedFlag == StateSupportFlags.None) continue;
+                        mask |= (uint)relatedFlag;
+                    }
                 }
 
-                if (map.TryGetMaskFast(flag, out var mask))
-                {
-                    _disableTransitionMasks[bitIndex] = mask;
-                }
+                _disableTransitionMasks[fromFlag] = mask;
             }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int GetFlagBitIndex(StateSupportFlags flag)
-        {
-            byte value = (byte)flag;
-            if (value == 0) return -1;
-            int index = 0;
-            while ((value & 1) == 0)
-            {
-                value >>= 1;
-                index++;
-            }
-            return index;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static StateSupportFlags NormalizeSingleSupportFlag(StateSupportFlags flag)
         {
             if (flag == StateSupportFlags.None) return StateSupportFlags.None;
-            byte value = (byte)flag;
-            byte lowest = (byte)(value & (byte)(-(sbyte)value));
-            return (StateSupportFlags)lowest;
+            uint value = (ushort)flag;
+            uint lowest = value & (~value + 1u);
+            return (StateSupportFlags)(ushort)lowest;
         }
 
         /// <summary>
@@ -776,7 +688,7 @@ namespace ES
             for (int i = 0; i < _registeredStatesList.Count; i++)
             {
                 var state = _registeredStatesList[i];
-                if (runningStates.Contains(state))
+                if (state.baseStatus == StateBaseStatus.Running)
                 {
                     _cachedRunningStatesList.Add(state);
                 }
@@ -791,7 +703,7 @@ namespace ES
             for (int i = 0; i < runningStates.Count; i++)
             {
                 var state = runningStates[i];
-                if (pipeline.runningStates.Contains(state))
+                if (statePipelineMap.TryGetValue(state, out var pipelineType) && pipelineType == pipeline.pipelineType)
                 {
                     return state;
                 }
@@ -824,11 +736,6 @@ namespace ES
                 return pipeline;
             }
 
-            if (statePipelineMap.TryGetValue(targetState, out var mappedPipeline))
-            {
-                return mappedPipeline;
-            }
-
             return targetState.stateSharedData.basicConfig.pipelineType;
         }
 
@@ -846,13 +753,17 @@ namespace ES
                 cache.versions = new int[pipelineCount];
                 cache.results = new StateActivationResult[pipelineCount];
                 cache.interruptLists = new List<StateBase>[pipelineCount];
+#if UNITY_EDITOR
                 cache.mergeLists = new List<StateBase>[pipelineCount];
+#endif
 
                 for (int i = 0; i < pipelineCount; i++)
                 {
                     cache.versions[i] = -1;
                     cache.interruptLists[i] = new List<StateBase>(4);
+#if UNITY_EDITOR
                     cache.mergeLists[i] = new List<StateBase>(4);
+#endif
                 }
             }
 
@@ -868,17 +779,6 @@ namespace ES
             }
 
             return _cachedChannelMask;
-        }
-
-        public StateCostSummary GetTotalCostSummary()
-        {
-            if (_cachedCostVersion != _dirtyVersion || isDirty)
-            {
-                _cachedCostSummary = EvaluateCostSummary();
-                _cachedCostVersion = _dirtyVersion;
-            }
-
-            return _cachedCostSummary;
         }
 
         private StateChannelMask EvaluateChannelMask()
@@ -898,29 +798,6 @@ namespace ES
             return mask;
         }
 
-        private StateCostSummary EvaluateCostSummary()
-        {
-            if (CustomCostEvaluator != null)
-            {
-                return CustomCostEvaluator(runningStates);
-            }
-
-            StateCostSummary sum = new StateCostSummary();
-            foreach (var state in runningStates)
-            {
-                var costData = state.stateSharedData.costData;
-
-                sum.motionCost += costData.motionCost;
-                sum.agilityCost += costData.agilityCost;
-                sum.targetCost += costData.targetCost;
-                sum.weightedMotion += costData.GetWeightedMotion();
-                sum.weightedAgility += costData.GetWeightedAgility();
-                sum.weightedTarget += costData.GetWeightedTarget();
-            }
-
-            sum.totalWeighted = sum.weightedMotion + sum.weightedAgility + sum.weightedTarget;
-            return sum;
-        }
 
         private float GetMainStateScore(StateBase state)
         {
@@ -931,29 +808,13 @@ namespace ES
             {
                 case MainStateCriterionType.DirectWeight:
                     return basic.directMainWeight;
-                case MainStateCriterionType.CostBased:
-                    {
-                        var cost = sharedData.costData;
-                        return cost.GetTotalCost();
-                    }
                 case MainStateCriterionType.Dynamic:
+                    if (CustomMainStateScore != null)
+                        return CustomMainStateScore(state);
+                    return 0f;
                 default:
-                    {
-                        if (CustomMainStateScore != null)
-                            return CustomMainStateScore(state);
-
-                        var cost = sharedData.costData;
-                        return cost.GetTotalCost();
-                    }
+                    return 0f;
             }
-        }
-
-        /// <summary>
-        /// 通知代价层变化
-        /// </summary>
-        public void NotifyCostChanged()
-        {
-            MarkDirty(StateDirtyReason.CostChanged);
         }
 
         /// <summary>
@@ -1037,7 +898,7 @@ namespace ES
             // 进入默认状态
             if (!string.IsNullOrEmpty(defaultStateKey))
             {
-                TryActivateState(defaultStateKey, StatePipelineType.Basic);
+                TryActivateState(defaultStateKey, StatePipelineType.NotClear);
             }
         }
 
@@ -1109,14 +970,10 @@ namespace ES
             // 自动退出已完成的状态
             foreach (var state in statesToDeactivate)
             {
-                // 查找状态所在流水线并停用
-                foreach (var pipeline in GetAllPipelines())
+                // 使用缓存的流水线映射直接停用
+                if (statePipelineMap.TryGetValue(state, out var pipelineType))
                 {
-                    if (pipeline.runningStates.Contains(state))
-                    {
-                        TryDeactivateState(state.strKey);
-                        break;
-                    }
+                    TruelyDeactivateState(state, pipelineType);
                 }
             }
 
@@ -1148,19 +1005,25 @@ namespace ES
                 {
                     playableGraph.Play();
                 }
+#if STATEMACHINEDEBUG
                 StateMachineDebugSettings.Instance.LogPerformance(
                     $"[StateMachine] 手动评估PlayableGraph，DeltaTime: {deltaTime:F4}" +
                     playableGraph.GetTimeUpdateMode() +
                     playableGraph.IsPlaying() +
                     playableGraph.IsValid());
+#endif
                 playableGraph.Evaluate(deltaTime);
             }
 
+#if UNITY_EDITOR
+#if STATEMACHINEDEBUG
             // 持续输出统计信息（可选）
             if (enableContinuousStats)
             {
                 OutputContinuousStats();
             }
+#endif
+#endif
 
         }
 
@@ -1321,8 +1184,10 @@ namespace ES
                 {
                     fadeInToRemove.Add(state);
                     state.OnFadeInComplete();
+#if STATEMACHINEDEBUG
                     StateMachineDebugSettings.Instance.LogFade(
                         $"[淡入完成] 状态 {state.strKey}");
+#endif
                 }
             }
 
@@ -1355,8 +1220,10 @@ namespace ES
                 {
                     fadeOutToRemove.Add(state);
                     HotUnplugStateFromPlayable(state, pipeline);
+#if STATEMACHINEDEBUG
                     StateMachineDebugSettings.Instance.LogFade(
                         $"[淡出完成] 状态 {state.strKey}");
+#endif
                 }
             }
 
@@ -1497,8 +1364,8 @@ namespace ES
         /// </summary>
         /// <param name="info">状态数据Info</param>
         /// <param name="allowOverride">是否允许覆盖已存在的状态</param>
-        /// <returns>是否注册成功</returns>
-        public bool RegisterStateFromInfo(StateAniDataInfo info, bool allowOverride = false)
+        /// <returns>成功返回 StateBase，失败返回 null</returns>
+        public StateBase RegisterStateFromInfo(StateAniDataInfo info, bool allowOverride = false)
         {
             return RegisterStateFromInfo(info, null, allowOverride);
         }
@@ -1509,8 +1376,8 @@ namespace ES
         /// <param name="info">状态数据Info</param>
         /// <param name="customStringKey">自定义String键（null则使用info中的stateName）</param>
         /// <param name="allowOverride">是否允许覆盖已存在的状态</param>
-        /// <returns>是否注册成功</returns>
-        public bool RegisterStateFromInfo(StateAniDataInfo info, string customStringKey, bool allowOverride = false)
+        /// <returns>成功返回 StateBase，失败返回 null</returns>
+        public StateBase RegisterStateFromInfo(StateAniDataInfo info, string customStringKey, bool allowOverride = false)
         {
             return RegisterStateFromInfo(info, customStringKey, null, allowOverride);
         }
@@ -1522,8 +1389,8 @@ namespace ES
         /// <param name="customStringKey">自定义String键（null则使用info中的stateName）</param>
         /// <param name="customIntKey">自定义Int键（null则使用info中的stateId）</param>
         /// <param name="allowOverride">是否允许覆盖已存在的状态</param>
-        /// <returns>是否注册成功</returns>
-        public bool RegisterStateFromInfo(StateAniDataInfo info, string customStringKey, int? customIntKey, bool allowOverride = false)
+        /// <returns>成功返回 StateBase，失败返回 null</returns>
+        public StateBase RegisterStateFromInfo(StateAniDataInfo info, string customStringKey, int? customIntKey, bool allowOverride = false)
         {
             try
             {
@@ -1562,20 +1429,20 @@ namespace ES
                 {
                     StateMachineDebugSettings.Instance.LogStateTransition(
                         $"✓ 注册状态: [{pipelineType}] {state.strKey} (ID:{state.intKey})");
+                    return state;
                 }
                 else
                 {
                     if (StateMachineDebugSettings.Instance.alwaysLogErrors)
                         Debug.LogWarning($"[StateMachine] 注册状态失败: {info.sharedData.basicConfig.stateName}");
                 }
-
-                return registered;
+                return null;
             }
             catch (Exception e)
             {
                 if (StateMachineDebugSettings.Instance.alwaysLogErrors)
                     Debug.LogError($"[StateMachine] 注册状态异常: {info.sharedData.basicConfig.stateName}\n{e}");
-                return false;
+                return null;
             }
         }
 
@@ -1630,13 +1497,20 @@ namespace ES
         /// <summary>
         /// 注册新状态（String键）- 智能处理键冲突
         /// </summary>
-        public bool RegisterState(string stateKey, StateBase state, StatePipelineType pipeline = StatePipelineType.Basic)
+        public bool RegisterState(string stateKey, StateBase state, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             if (string.IsNullOrEmpty(stateKey))
             {
                 Debug.LogError("[StateMachine] 状态键不能为空");
                 return false;
             }
+            if (state == null)
+            {
+                Debug.LogError("[StateMachine] 状态实例不能为空");
+                return false;
+            }
+
+            pipeline = ResolvePipelineForState(state, pipeline);
 
             // String键重复时自动添加后缀（_r1, _r2...）
             string finalStateKey = stateKey;
@@ -1715,13 +1589,15 @@ namespace ES
         /// <summary>
         /// 注册新状态（Int键）
         /// </summary>
-        public bool RegisterState(int stateKey, StateBase state, StatePipelineType pipeline = StatePipelineType.Basic)
+        public bool RegisterState(int stateKey, StateBase state, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             if (state == null)
             {
                 Debug.LogError($"状态实例不能为空: {stateKey}");
                 return false;
             }
+
+            pipeline = ResolvePipelineForState(state, pipeline);
             if (intToStateMap.ContainsKey(stateKey))
             {
                 Debug.LogWarning($"状态ID {stateKey} 已存在，跳过注册");
@@ -1742,7 +1618,7 @@ namespace ES
         /// <summary>
         /// 同时注册String和Int键
         /// </summary>
-        public bool RegisterState(string stringKey, int intKey, StateBase state, StatePipelineType pipeline = StatePipelineType.Basic)
+        public bool RegisterState(string stringKey, int intKey, StateBase state, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
             if (string.IsNullOrEmpty(stringKey))
             {
@@ -1755,6 +1631,8 @@ namespace ES
                 Debug.LogError($"状态实例不能为空: {stringKey}");
                 return false;
             }
+
+            pipeline = ResolvePipelineForState(state, pipeline);
 
             if (stringToStateMap.ContainsKey(stringKey))
             {
@@ -1851,7 +1729,7 @@ namespace ES
         /// <summary>
         /// 检查并设置Fallback状态
         /// </summary>
-        private void CheckAndSetFallbackState(StateBase state, StatePipelineType pipeline)
+        private void CheckAndSetFallbackState(StateBase state, StatePipelineType pipelineType)
         {
             if (state?.stateSharedData?.basicConfig == null) return;
 
@@ -1859,14 +1737,14 @@ namespace ES
             if (state.stateSharedData.basicConfig.canBeFeedback)
             {
                 // 获取Fallback支持标记
-                var fallbackFlag = state.stateSharedData.basicConfig.fallbackSupportFlag;
+                var fallbackFlag = state.stateSharedData.basicConfig.stateSupportFlag;
 
                 // 获取目标流水线运行时
-                var pipelineRuntime = GetPipelineByType(pipeline);
+                var pipelineRuntime = GetPipelineByType(pipelineType);
                 if (pipelineRuntime != null)
                 {
                     pipelineRuntime.SetFallBack(state.intKey, fallbackFlag);
-                    Debug.Log($"[FallBack-Register] ✓ [{pipeline}] Flag={fallbackFlag} <- State '{state.strKey}' (ID:{state.intKey})");
+                    Debug.Log($"[FallBack-Register] ✓ [{pipelineType}] Flag={fallbackFlag} <- State '{state.strKey}' (ID:{state.intKey})");
                 }
             }
         }
@@ -1924,7 +1802,7 @@ namespace ES
         {
             if (state == null) return false;
             // 如果状态正在运行，先停用
-            if (runningStates.Contains(state))
+            if (state.baseStatus == StateBaseStatus.Running)
             {
                 TryDeactivateState(state.strKey);
             }
@@ -2201,7 +2079,7 @@ namespace ES
             }
 
             // 停用并注销状态
-            if (runningStates.Contains(tempState))
+            if (tempState.baseStatus == StateBaseStatus.Running)
             {
                 TryDeactivateState(tempState.strKey);
             }
@@ -2288,57 +2166,78 @@ namespace ES
         /// <summary>
         /// 测试状态能否激活（不执行）
         /// </summary>
-        // TODO: [用户修改] 合并测试核心方法 - 需要优化合并判断逻辑
         // 修改点：
         // 1. 完善 CheckStateMergeCompatibility 的判断规则
         // 2. 考虑优先级、代价、通道占用等因素
         // 3. 添加自定义合并策略支持
         public StateActivationResult TestStateActivation(StateBase targetState, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
+#if UNITY_EDITOR
+            UnityEngine.Debug.Log($"[TestStateActivation] Begin | State={(targetState != null ? targetState.strKey : "<null>")} | Pipeline={pipeline} | Running={isRunning} | DirtyVersion={_dirtyVersion}");
+#endif
+
+            //状态为空，直接失败
             if (targetState == null)
             {
-                return StateActivationResult.Failure(StateFailureReasons.StateIsNull);
+#if UNITY_EDITOR
+                UnityEngine.Debug.LogWarning("[TestStateActivation] Fail: targetState is null");
+#endif
+                return StateActivationResult.FailureStateIsNull;
             }
 
-            pipeline = ResolvePipelineForState(targetState, pipeline);
-
-            if (!isRunning)
+            var basicConfig = targetState.stateSharedData.basicConfig;
+            //不清晰就是用默认配置的流水线
+            if (pipeline == StatePipelineType.NotClear)
             {
-                return StateActivationResult.Failure(StateFailureReasons.MachineNotRunning);
+                pipeline = basicConfig.pipelineType;
             }
-
-            var basicConfig = targetState.stateSharedData?.basicConfig;
-            if (basicConfig != null && !basicConfig.ignoreSupportFlags)
+#if UNITY_EDITOR
+            UnityEngine.Debug.Log($"[TestStateActivation] ResolvePipeline -> {pipeline}");
+#endif
+            //忽略Ignore则跳过支持标记检查
+            if (!basicConfig.ignoreSupportFlag)
             {
-                var requiredFlags = basicConfig.requiredSupportFlags;
-                if ((currentSupportFlags & requiredFlags) != requiredFlags)
+                var targetFlag = basicConfig.stateSupportFlag;
+                //为NULL则通用支持，跳过即可
+                if (targetFlag != StateSupportFlags.None)
                 {
-                    return StateActivationResult.Failure(StateFailureReasons.SupportFlagsNotSatisfied);
+                    var supportFlags = currentSupportFlags;
+                    if ((supportFlags & targetFlag) == StateSupportFlags.None)
+                    {
+                        //如果禁用在切换时激活则直接失败了，如果不禁用去看一下是否在禁用切换中
+                        if (basicConfig.disableActiveOnSupportFlagSwitching || IsTransitionDisabledFast(supportFlags, targetFlag))
+                        {
+#if UNITY_EDITOR
+                            UnityEngine.Debug.LogWarning($"[TestStateActivation] Fail: SupportFlags not satisfied | Current={supportFlags} Target={targetFlag} DisableOnSwitch={basicConfig.disableActiveOnSupportFlagSwitching}");
+#endif
+                            return StateActivationResult.FailureSupportFlagsNotSatisfied;
+                        }
+#if UNITY_EDITOR
+                        UnityEngine.Debug.Log($"[TestStateActivation] SupportFlags mismatch but not blocked | Current={supportFlags} Target={targetFlag}");
+#endif
+                    }
                 }
             }
-
-            if (CustomActivationTest != null)
-            {
-                return CustomActivationTest(targetState, pipeline);
-            }
-
-            int pipelineCount = (int)StatePipelineType.Count;
+            #region 缓存与已激活查询
             int pipelineIndex = (int)pipeline;
-            if (pipelineIndex < 0 || pipelineIndex >= pipelineCount)
-            {
-                return StateActivationResult.Failure(StateFailureReasons.InvalidPipelineIndex);
-            }
-
             var cache = GetOrCreateActivationCache(targetState);
             if (cache != null && cache.versions[pipelineIndex] == _dirtyVersion)
             {
+#if UNITY_EDITOR
+                UnityEngine.Debug.Log($"[TestStateActivation] Cache hit | PipelineIndex={pipelineIndex}");
+#endif
                 return cache.results[pipelineIndex];
             }
 
             // 检查该状态是否已在运行
-            if (runningStates.Contains(targetState))
+            if (targetState.baseStatus == StateBaseStatus.Running)
             {
-                var failure = StateActivationResult.Failure(StateFailureReasons.StateAlreadyRunning);
+                var failure = basicConfig.supportReStart
+                    ? StateActivationResult.SuccessRestart
+                    : StateActivationResult.FailureStateAlreadyRunning;
+#if UNITY_EDITOR
+                UnityEngine.Debug.Log($"[TestStateActivation] State already running | Restart={basicConfig.supportReStart}");
+#endif
                 if (cache != null)
                 {
                     cache.results[pipelineIndex] = failure;
@@ -2351,7 +2250,10 @@ namespace ES
             var targetPipeline = GetPipelineByType(pipeline);
             if (targetPipeline == null)
             {
-                var failure = StateActivationResult.Failure(StateFailureReasons.PipelineNotFound);
+                var failure = StateActivationResult.FailurePipelineNotFound;
+#if UNITY_EDITOR
+                UnityEngine.Debug.LogWarning($"[TestStateActivation] Fail: Pipeline not found | {pipeline}");
+#endif
                 if (cache != null)
                 {
                     cache.results[pipelineIndex] = failure;
@@ -2362,7 +2264,10 @@ namespace ES
 
             if (!targetPipeline.isEnabled)
             {
-                var failure = StateActivationResult.Failure(StateFailureReasons.PipelineDisabled);
+                var failure = StateActivationResult.FailurePipelineDisabled;
+#if UNITY_EDITOR
+                UnityEngine.Debug.LogWarning($"[TestStateActivation] Fail: Pipeline disabled | {pipeline}");
+#endif
                 if (cache != null)
                 {
                     cache.results[pipelineIndex] = failure;
@@ -2370,14 +2275,16 @@ namespace ES
                 }
                 return failure;
             }
-
-            // 获取该流水线中当前运行的状态
-            var pipelineStates = targetPipeline.runningStates;
+            #endregion
 
             var allRunningStates = GetCachedRunningStates();
+            //空状态机直接激活即可
             if (allRunningStates.Count == 0)
             {
-                var success = StateActivationResult.Success(pipeline, false);
+#if UNITY_EDITOR
+                UnityEngine.Debug.Log("[TestStateActivation] No running states -> SuccessNoMerge");
+#endif
+                var success = StateActivationResult.SuccessNoMerge;
                 if (cache != null)
                 {
                     cache.results[pipelineIndex] = success;
@@ -2386,121 +2293,109 @@ namespace ES
                 return success;
             }
 
-            // 检查合并和冲突（复用列表，减少GC）
-            var interruptList = cache != null ? cache.interruptLists[pipelineIndex] : _tmpInterruptStates;
-            var mergeList = cache != null ? cache.mergeLists[pipelineIndex] : _tmpMergeStates;
-            interruptList.Clear();
-            mergeList.Clear();
+            int totalMotionCost = 0;
+            int totalAgilityCost = 0;
+            int totalTargetCost = 0;
 
+            var incomingCost = targetState.stateSharedData.costData;
+            if (incomingCost.enableCostCalculation)
+            {
+                totalMotionCost += incomingCost.costForMotion;
+                totalAgilityCost += incomingCost.costForAgility;
+                totalTargetCost += incomingCost.costForTarget;
+#if UNITY_EDITOR
+                UnityEngine.Debug.Log(
+                    $"[TestStateActivation] IncomingCost | M/A/T={incomingCost.costForMotion}/{incomingCost.costForAgility}/{incomingCost.costForTarget} " +
+                    $"TotalNow M/A/T={totalMotionCost}/{totalAgilityCost}/{totalTargetCost}");
+#endif
+            }
+
+            bool needsInterrupt = false;
+            bool canMerge = false;
+            // 检查合并和冲突（运行时复用列表）
+            var interruptList = cache.interruptLists[pipelineIndex];
+            interruptList.Clear();
+#if UNITY_EDITOR
+            var mergeList = cache.mergeLists[pipelineIndex];
+            mergeList.Clear();
+#endif       
+            #region 遍历合并测试
             foreach (var existingState in allRunningStates)
             {
-                if (existingState == null || targetState == null)
-                {
-                    continue;
-                }
-
-                var mergeResult = CheckStateMergeCompatibility(existingState, targetState);
-                bool isInTargetPipeline = pipelineStates.Contains(existingState);
-                if (!isInTargetPipeline)
-                {
-                    if (mergeResult == StateMergeResult.MergeComplete)
-                    {
-                        continue;
-                    }
-
-                    var failure = StateActivationResult.Failure($"跨流水线冲突：{targetState.strKey} 与 {existingState.strKey} 不可并行");
-                    if (cache != null)
-                    {
-                        cache.results[pipelineIndex] = failure;
-                        cache.versions[pipelineIndex] = _dirtyVersion;
-                    }
-                    return failure;
-                }
+#if UNITY_EDITOR
+                UnityEngine.Debug.Log($"[TestStateActivation] MergeCheck: {existingState?.strKey} vs {targetState.strKey}");
+#endif
+                var mergeResult = CheckStateMergeCompatibility(existingState, targetState,
+                    ref totalMotionCost, ref totalAgilityCost, ref totalTargetCost);
 
                 switch (mergeResult)
                 {
+                    //已经失败则直接返回
+                    case StateMergeResult.MergeFail:
+                        var failure = StateActivationResult.FailureMergeConflict;
+#if UNITY_EDITOR
+                        Debug.LogWarning($"[TestStateActivation] Fail: MergeConflict with {existingState?.strKey}");
+#endif
+                        if (cache != null)
+                        {
+                            cache.results[pipelineIndex] = failure;
+                            cache.versions[pipelineIndex] = _dirtyVersion;
+                        }
+                        return failure;
                     case StateMergeResult.MergeComplete:
+                        canMerge = true;
+#if UNITY_EDITOR
                         mergeList.Add(existingState);
+#endif
                         break;
                     case StateMergeResult.HitAndReplace:
                     case StateMergeResult.TryWeakInterrupt:
+                        needsInterrupt = true;
                         interruptList.Add(existingState);
                         break;
-                    case StateMergeResult.MergeFail:
+
                     default:
                         {
-                            var failure = StateActivationResult.Failure($"合并失败：{targetState.strKey} 与 {existingState.strKey} 冲突");
+                            var failureDefault = StateActivationResult.FailureMergeConflict;
+#if UNITY_EDITOR
+                            UnityEngine.Debug.LogWarning($"[TestStateActivation] Fail: Unexpected merge result with {existingState?.strKey}");
+#endif
                             if (cache != null)
                             {
-                                cache.results[pipelineIndex] = failure;
+                                cache.results[pipelineIndex] = failureDefault;
                                 cache.versions[pipelineIndex] = _dirtyVersion;
                             }
-                            return failure;
+                            return failureDefault;
                         }
                 }
             }
 
-            // 如果可以合并
-            if (mergeList.Count > 0 && interruptList.Count == 0)
+            StateActivationCode code = StateActivationCode.Success;
+            if (needsInterrupt)
             {
-                var success = new StateActivationResult
-                {
-                    canActivate = true,
-                    requiresInterruption = false,
-                    canMerge = true,
-                    mergeDirectly = true,
-                    statesToInterrupt = interruptList,
-                    statesToMergeWith = mergeList,
-                    interruptCount = 0,
-                    mergeCount = mergeList.Count,
-                    failureReason = string.Empty,
-                    targetPipeline = pipeline
-                };
-                if (cache != null)
-                {
-                    cache.results[pipelineIndex] = success;
-                    cache.versions[pipelineIndex] = _dirtyVersion;
-                }
-                return success;
+                code |= StateActivationCode.HasInterrupt;
             }
-
-            // 如果需要打断
-            if (interruptList.Count > 0)
+            if (canMerge)
             {
-                var success = new StateActivationResult
-                {
-                    canActivate = true,
-                    requiresInterruption = true,
-                    canMerge = false,
-                    mergeDirectly = false,
-                    statesToInterrupt = interruptList,
-                    statesToMergeWith = mergeList,
-                    interruptCount = interruptList.Count,
-                    mergeCount = 0,
-                    failureReason = string.Empty,
-                    targetPipeline = pipeline
-                };
-                if (cache != null)
-                {
-                    cache.results[pipelineIndex] = success;
-                    cache.versions[pipelineIndex] = _dirtyVersion;
-                }
-                return success;
+                code |= StateActivationCode.HasMerge;
             }
+            #endregion
 
             var defaultSuccess = new StateActivationResult
             {
-                canActivate = true,
-                requiresInterruption = false,
-                canMerge = false,
-                mergeDirectly = false,
-                statesToInterrupt = interruptList,
-                statesToMergeWith = mergeList,
-                interruptCount = 0,
-                mergeCount = 0,
+                code = code,
                 failureReason = string.Empty,
-                targetPipeline = pipeline
+                statesToInterrupt = interruptList,
+                interruptCount = interruptList.Count
+#if UNITY_EDITOR
+                ,
+                debugMergeStates = mergeList,
+                debugMergeCount = mergeList.Count
+#endif
             };
+#if UNITY_EDITOR
+            Debug.Log($"[TestStateActivation] Success | Code={code} | Interrupts={interruptList.Count} | Merges={(canMerge ? mergeList.Count : 0)}");
+#endif
             if (cache != null)
             {
                 cache.results[pipelineIndex] = defaultSuccess;
@@ -2580,70 +2475,242 @@ namespace ES
         /// 2. 检查 exclusiveTags 是否互斥
         /// 3. 检查优先级和代价是否允许合并
         /// 4. 考虑自定义合并策略（CanMergeEvaluator）
-        private StateMergeResult CheckStateMergeCompatibility(StateBase existing, StateBase incoming)
+        private StateMergeResult CheckStateMergeCompatibility(StateBase existing, StateBase incoming,
+            ref int totalMotionCost, ref int totalAgilityCost, ref int totalTargetCost)
         {
-            if (CanMergeEvaluator != null)
+#if UNITY_EDITOR
+            UnityEngine.Debug.Log(
+                $"[MergeCheck] Begin | Existing={existing?.strKey} (ID:{existing?.intKey}) " +
+                $"Incoming={incoming?.strKey} (ID:{incoming?.intKey}) | " +
+                $"CostsBefore: M{totalMotionCost}/A{totalAgilityCost}/T{totalTargetCost}");
+#endif
+            if (existing == incoming)
             {
-                return CanMergeEvaluator(existing, incoming) ? StateMergeResult.MergeComplete : StateMergeResult.HitAndReplace;
-            }
-
-            if (existing == null || incoming == null || existing == incoming)
+#if UNITY_EDITOR
+                UnityEngine.Debug.LogWarning("[MergeCheck] Fail: existing == incoming");
+#endif
                 return StateMergeResult.MergeFail;
+            }
 
             var leftShared = existing.stateSharedData;
             var rightShared = incoming.stateSharedData;
-            var leftMerge = leftShared?.mergeData;
-            var rightMerge = rightShared?.mergeData;
 
-            // 无条件规则优先
-            var unconditional = ResolveUnconditionalRule(leftShared?.basicConfig, leftMerge?.asLeftRule, incoming)
-                              ?? ResolveUnconditionalRule(rightShared?.basicConfig, rightMerge?.asRightRule, existing);
-            if (unconditional.HasValue)
-                return unconditional.Value;
+            var leftMerge = leftShared.mergeData;
+            var rightMerge = rightShared.mergeData;
+            NormalMergeRule leftRule = leftMerge.asLeftRule;
+            NormalMergeRule rightRule = rightMerge.asRightRule;
+            var existingCost = existing.stateSharedData.costData;
 
-            // 若缺少合并配置，默认允许合并
-            if (leftMerge == null || rightMerge == null)
-                return StateMergeResult.MergeComplete;
+#if UNITY_EDITOR
+            UnityEngine.Debug.Log(
+                $"[MergeCheck] ChannelMask L={leftMerge.stateChannelMask} R={rightMerge.stateChannelMask} | " +
+                $"StayLevel L={leftMerge.stayLevel} R={rightMerge.stayLevel} | " +
+                $"CostEnabled={existingCost.enableCostCalculation} " +
+                $"Cost(M/A/T)={existingCost.costForMotion}/{existingCost.costForAgility}/{existingCost.costForTarget}");
+            UnityEngine.Debug.Log(
+                $"[MergeCheck] LeftRule: Unconditional={leftRule.enableUnconditionalRule} " +
+                $"HitByLayer={leftRule.hitByLayerOption} Priority={leftRule.EffectialPripority} EqualIsEffectial={leftRule.EqualIsEffectial_}"
+            );
+            UnityEngine.Debug.Log(
+                $"[MergeCheck] RightRule: Unconditional={rightRule.enableUnconditionalRule} " +
+                $"HitByLayer={rightRule.hitByLayerOption} Priority={rightRule.EffectialPripority} EqualIsEffectial={rightRule.EqualIsEffectial_}"
+            );
+#endif
 
+            #region 优先检查无条件规则
+            //左边承接右边的无条件规则
+
+            int leftRuleCount = leftRule.unconditionalRule.Count;
+            if (leftRuleCount > 0 && leftRule.enableUnconditionalRule)
+            {
+                var list = leftRule.unconditionalRule;
+                for (int i = 0; i < leftRuleCount; i++)
+                {
+                    var item = list[i];
+                    if (item.stateName != null && item.stateName.Length > 0 && item.stateName == incoming.strKey)
+                    {
+#if UNITY_EDITOR
+                        UnityEngine.Debug.Log($"[MergeCheck] Unconditional(L->R) Hit by Name: {item.stateName} => {item.matchBackType}");
+#endif
+                        return item.matchBackType;
+                    }
+
+                    if (item.stateID >= 0 && incoming.intKey == item.stateID)
+                    {
+#if UNITY_EDITOR
+                        UnityEngine.Debug.Log($"[MergeCheck] Unconditional(L->R) Hit by ID: {item.stateID} => {item.matchBackType}");
+#endif
+                        return item.matchBackType;
+                    }
+                }
+            }
+            //右边抓取左边的无条件规则
+
+            int rightRuleCount = rightRule.unconditionalRule.Count;
+            if (rightRuleCount > 0 && rightRule.enableUnconditionalRule)
+            {
+                var list = rightRule.unconditionalRule;
+                for (int i = 0; i < rightRuleCount; i++)
+                {
+                    var item = list[i];
+                    if (item.stateName != null && item.stateName.Length > 0 && item.stateName == existing.strKey)
+                    {
+#if UNITY_EDITOR
+                        UnityEngine.Debug.Log($"[MergeCheck] Unconditional(R->L) Hit by Name: {item.stateName} => {item.matchBackType}");
+#endif
+                        return item.matchBackType;
+                    }
+
+                    if (item.stateID >= 0 && existing.intKey == item.stateID)
+                    {
+#if UNITY_EDITOR
+                        UnityEngine.Debug.Log($"[MergeCheck] Unconditional(R->L) Hit by ID: {item.stateID} => {item.matchBackType}");
+#endif
+                        return item.matchBackType;
+                    }
+                }
+            }
+            #endregion
+
+            bool onlyInterruptTest = false;
             // 通道冲突检查
             bool channelOverlap = (leftMerge.stateChannelMask & rightMerge.stateChannelMask) != StateChannelMask.None;
+
+
+            //发生通道重叠
             if (channelOverlap)
             {
-                // 若通道总代价允许共存，优先合并
-                if (CanMergeByChannelOverlap(GetPipelineByType(rightShared?.basicConfig?.pipelineType ?? StatePipelineType.Basic), incoming))
-                    return StateMergeResult.MergeComplete;
-
-                // 层级规则
-                var leftLevel = GetStayLevelValue(leftMerge.stayLevel);
-                var rightLevel = GetStayLevelValue(rightMerge.stayLevel);
-
-                if (rightMerge.asRightRule != null && rightMerge.asRightRule.hitByLayerOption == StateHitByLayerOption.Never)
-                    return StateMergeResult.MergeFail;
-
-                if (rightMerge.asRightRule != null && rightMerge.asRightRule.hitByLayerOption == StateHitByLayerOption.OnlyLayerCrush)
+#if UNITY_EDITOR
+                UnityEngine.Debug.Log("[MergeCheck] Channel overlap detected");
+#endif
+                if (!existingCost.enableCostCalculation)
                 {
-                    return rightLevel > leftLevel ? StateMergeResult.HitAndReplace : StateMergeResult.MergeFail;
+                    onlyInterruptTest = true;
+                }
+                else
+                {
+                    const int costLimit = 100;
+                    int nextMotionCost = totalMotionCost + existingCost.costForMotion;
+                    int nextAgilityCost = totalAgilityCost + existingCost.costForAgility;
+                    int nextTargetCost = totalTargetCost + existingCost.costForTarget;
+
+                    bool overMotion = nextMotionCost > costLimit;
+                    bool overAgility = nextAgilityCost > costLimit;
+                    bool overTarget = nextTargetCost > costLimit;
+
+                    onlyInterruptTest = overMotion || overAgility || overTarget;
+#if UNITY_EDITOR
+                    UnityEngine.Debug.Log(
+                        $"[MergeCheck] CostCalc | Limit={costLimit} " +
+                        $"Next(M/A/T)={nextMotionCost}/{nextAgilityCost}/{nextTargetCost} " +
+                        $"Over(M/A/T)={overMotion}/{overAgility}/{overTarget} " +
+                        $"OnlyInterrupt={onlyInterruptTest}");
+#endif
                 }
 
-                // SameLevelTest: 层级优先，层级相同则走优先级规则
-                if (rightLevel > leftLevel)
-                    return StateMergeResult.HitAndReplace;
-
-                if (Mathf.Approximately(rightLevel, leftLevel))
+                if (onlyInterruptTest)
                 {
-                    byte rightPriority = rightShared?.basicConfig?.priority ?? (byte)0;
-                    byte leftPriority = leftShared?.basicConfig?.priority ?? (byte)0;
-                    bool equalEffective = rightMerge.asRightRule != null && rightMerge.asRightRule.EqualIsEffectial;
+#if UNITY_EDITOR
+                    UnityEngine.Debug.Log(
+                        $"[MergeCheck] Only interrupt test | CurrentCosts M{totalMotionCost}/A{totalAgilityCost}/T{totalTargetCost}");
+#endif
+                    // 仅打断测试逻辑
+                    //右边不允许打断，左边不允许被打断，都会提前终止
+                    if (rightRule.hitByLayerOption == StateHitByLayerOption.Never)
+                    {
+#if UNITY_EDITOR
+                        UnityEngine.Debug.LogWarning("[MergeCheck] Fail: Right hitByLayer=Never");
+#endif
+                        return StateMergeResult.MergeFail;
+                    }
+                    if (leftRule.hitByLayerOption == StateHitByLayerOption.Never)
+                    {
+#if UNITY_EDITOR
+                        UnityEngine.Debug.LogWarning("[MergeCheck] Fail: Left hitByLayer=Never");
+#endif
+                        return StateMergeResult.MergeFail;
+                    }
+                    var levelOverlap = leftMerge.stayLevel & rightMerge.stayLevel;
+                    if (levelOverlap == StateStayLevel.Rubbish)
+                    {
+                        if (leftRule.hitByLayerOption == StateHitByLayerOption.SameLevelTest
+                            && rightRule.hitByLayerOption == StateHitByLayerOption.SameLevelTest)
+                        {
+#if UNITY_EDITOR
+                            UnityEngine.Debug.LogWarning("[MergeCheck] Fail: SameLevelTest + Rubbish overlap");
+#endif
+                            return StateMergeResult.MergeFail;
+                        }
+                        else if (rightMerge.stayLevel > leftMerge.stayLevel)
+                        {
+#if UNITY_EDITOR
+                            UnityEngine.Debug.Log("[MergeCheck] HitAndReplace: Right stayLevel higher");
+#endif
+                            return StateMergeResult.HitAndReplace;
+                        }
+                    }
 
-                    if (rightPriority > leftPriority || (equalEffective && rightPriority == leftPriority))
+
+                    byte rightPriority = rightRule.EffectialPripority;
+                    byte leftPriority = leftRule.EffectialPripority;
+
+                    if (rightRule.EqualIsEffectial_ && leftRule.EqualIsEffectial_)
+                    {
+                        if (rightPriority < leftPriority)
+                        {
+#if UNITY_EDITOR
+                            UnityEngine.Debug.Log("[MergeCheck] Fail: Right priority lower (EqualIsEffectial)");
+#endif
+                            return StateMergeResult.MergeFail;
+                        }
+                        else return StateMergeResult.HitAndReplace;
+                    }
+                    else if (rightPriority < leftPriority)
+                    {
+#if UNITY_EDITOR
+                        UnityEngine.Debug.Log("[MergeCheck] Fail: Right priority lower");
+#endif
+                        return StateMergeResult.MergeFail;
+                    }
+                    else if (rightPriority > leftPriority)
+                    {
+#if UNITY_EDITOR
+                        UnityEngine.Debug.Log("[MergeCheck] HitAndReplace: Right priority higher");
+#endif
                         return StateMergeResult.HitAndReplace;
+                    }
+                    // 无法决定打断方向，合并失败
+#if UNITY_EDITOR
+                    UnityEngine.Debug.LogWarning("[MergeCheck] Fail: Unable to decide interrupt direction");
+#endif
+                    return StateMergeResult.MergeFail;
                 }
 
-                return StateMergeResult.MergeFail;
+                // 代价符合合并要求，允许合并
+                if (existingCost.enableCostCalculation)
+                {
+                    // 代价加上
+                    totalMotionCost += existingCost.costForMotion;
+                    totalAgilityCost += existingCost.costForAgility;
+                    totalTargetCost += existingCost.costForTarget;
+#if UNITY_EDITOR
+                    UnityEngine.Debug.Log(
+                        $"[MergeCheck] MergeComplete by cost | CostsAfter M{totalMotionCost}/A{totalAgilityCost}/T{totalTargetCost}");
+#endif
+                }
+#if UNITY_EDITOR
+                UnityEngine.Debug.Log("[MergeCheck] MergeComplete (channel overlap allowed)");
+#endif
+                return StateMergeResult.MergeComplete;
             }
-
-            // 无通道冲突，允许合并
-            return StateMergeResult.MergeComplete;
+            else
+            {
+                // 无通道冲突，允许直接合并
+#if UNITY_EDITOR
+                UnityEngine.Debug.Log("[MergeCheck] MergeComplete (no channel overlap)");
+#endif
+                return StateMergeResult.MergeComplete;
+            }
         }
 
         private StateMergeResult? ResolveUnconditionalRule(StateBasicConfig selfBasic, NormalMergeRule rule, StateBase other)
@@ -2663,11 +2730,11 @@ namespace ES
 
                 switch (item.matchBackType)
                 {
-                    case UnconditionalMatchBackType.Accept:
+                    case StateMergeResult.MergeComplete:
                         return StateMergeResult.MergeComplete;
-                    case UnconditionalMatchBackType.Reject:
+                    case StateMergeResult.MergeFail:
                         return StateMergeResult.MergeFail;
-                    case UnconditionalMatchBackType.Replace:
+                    case StateMergeResult.HitAndReplace:
                         return StateMergeResult.HitAndReplace;
                 }
             }
@@ -2681,117 +2748,91 @@ namespace ES
         }
 
         /// <summary>
-        /// 检查流水线中的状态是否可以与新状态合并
-        /// 基于Channel重合度：如果总代价不超过1，则可以合并
-        /// </summary>
-        /// TODO: [用户修改] 基于通道的合并检查 - 需要调整代价阈值和合并规则
-        /// 修改点：
-        /// 1. totalOverlapCost <= 1.0f 的阈值是否合理？
-        /// 2. 是否需要考虑不同通道的权重？
-        /// 3. 是否需要支持动态调整阈值？
-        private bool CanMergeByChannelOverlap(StatePipelineRuntime pipeline, StateBase incomingState)
-        {
-            if (pipeline == null || incomingState?.stateSharedData == null) return false;
-
-            var incomingMergeData = incomingState.stateSharedData.mergeData;
-            var incomingCostData = incomingState.stateSharedData.costData;
-            if (incomingMergeData == null || incomingCostData == null) return false;
-
-            float totalOverlapCost = 0f;
-
-            // 遍历流水线中的所有状态
-            foreach (var existingState in pipeline.runningStates)
-            {
-                if (existingState?.stateSharedData == null) continue;
-
-                var existingMergeData = existingState.stateSharedData.mergeData;
-                var existingCostData = existingState.stateSharedData.costData;
-                if (existingMergeData == null || existingCostData == null) continue;
-
-                // 检查Channel是否有重合
-                StateChannelMask overlap = existingMergeData.stateChannelMask & incomingMergeData.stateChannelMask;
-                if (overlap != StateChannelMask.None)
-                {
-                    // 有重合，累加代价
-                    if (existingCostData.enableCostCalculation)
-                    {
-                        totalOverlapCost += existingCostData.GetTotalCost();
-                    }
-                }
-            }
-
-            // 加上新状态的代价
-            if (incomingCostData.enableCostCalculation)
-            {
-                totalOverlapCost += incomingCostData.GetTotalCost();
-            }
-
-            // 如果总代价不超过1，则可以合并
-            return totalOverlapCost <= 1.0f;
-        }
-
-        /// <summary>
         /// 执行状态激活（根据测试结果）
         /// </summary>
         /// TODO: [用户修改] 执行激活逻辑 - 需要验证合并执行流程
         /// 修改点：
-        /// 1. 验证 result.canMerge 和 result.mergeDirectly 的处理逻辑
+        /// 1. 验证 result.decision 的处理逻辑
         /// 2. 确认合并时的权重分配和动画混合
         /// 3. 确认打断和合并的执行顺序
         /// 4. 添加合并失败的回滚机制
-        public bool ExecuteStateActivation(StateBase targetState, StateActivationResult result)
+        public bool ExecuteStateActivation(StateBase targetState, StatePipelineType pipeline, in StateActivationResult result)
         {
+#if UNITY_EDITOR
             Debug.Log($"[StateMachine] === 开始执行状态激活 ===");
             Debug.Log($"[StateMachine]   状态: {targetState?.strKey} (ID:{targetState?.intKey})");
-            Debug.Log($"[StateMachine]   目标管线: {result.targetPipeline}");
+            Debug.Log($"[StateMachine]   目标管线: {pipeline}");
+#endif
 
             var basicConfig = targetState?.stateSharedData?.basicConfig;
 
-            if (!result.canActivate)
+            if ((result.code & StateActivationCode.Success) == 0)
             {
+#if UNITY_EDITOR
                 Debug.LogWarning($"[StateMachine] ✗ 状态激活失败: {result.failureReason}");
+#endif
                 return false;
             }
 
-            var pipeline = GetPipelineByType(result.targetPipeline);
-            if (pipeline == null)
+            var pipelineRuntime = GetPipelineByType(pipeline);
+            if (pipelineRuntime == null)
             {
-                Debug.LogError($"[StateMachine] ✗ 获取流水线失败: {result.targetPipeline}");
+#if UNITY_EDITOR
+                Debug.LogError($"[StateMachine] ✗ 获取流水线失败: {pipeline}");
+#endif
                 return false;
             }
 
-            Debug.Log($"[StateMachine]   流水线状态: Mixer有效={pipeline.mixer.IsValid()}, 运行状态数={pipeline.runningStates.Count}");
+            // Restart：若目标状态已运行，先停用再重新进入
+            if ((result.code & StateActivationCode.Restart) != 0 && targetState.baseStatus == StateBaseStatus.Running)
+            {
+                TruelyDeactivateState(targetState, pipeline);
+            }
+
+#if UNITY_EDITOR
+            Debug.Log($"[StateMachine]   流水线状态: Mixer有效={pipelineRuntime.mixer.IsValid()}, 运行状态数={pipelineRuntime.runningStates.Count}");
+#endif
 
             // 执行打断
-            if (result.requiresInterruption && result.statesToInterrupt != null)
+            if ((result.code & StateActivationCode.HasInterrupt) != 0)
             {
-                Debug.Log($"[StateMachine]   打断 {result.statesToInterrupt.Count} 个状态");
-                foreach (var stateToInterrupt in result.statesToInterrupt)
+                var interruptStates = result.statesToInterrupt;
+                if (interruptStates != null && result.interruptCount > 0)
                 {
-                    TruelyDeactivateState(stateToInterrupt, result.targetPipeline);
+#if UNITY_EDITOR
+                    Debug.Log($"[StateMachine]   打断 {interruptStates.Count} 个状态");
+#endif
+                    for (int i = 0; i < interruptStates.Count; i++)
+                    {
+                        TruelyDeactivateState(interruptStates[i], pipeline);
+                    }
                 }
             }
 
             // 激活目标状态
             targetState.OnStateEnter();
             runningStates.Add(targetState);
-            pipeline.runningStates.Add(targetState);
+            pipelineRuntime.runningStates.Add(targetState);
+#if UNITY_EDITOR
             Debug.Log($"[StateMachine]   ✓ 状态已添加到运行集合");
+#endif
 
             // 如果状态有动画，热插拔到Playable图
-            HotPlugStateToPlayable(targetState, pipeline);
+            HotPlugStateToPlayable(targetState, pipelineRuntime);
 
             // ★ 应用淡入逻辑（如果启用）
-            ApplyFadeIn(targetState, pipeline);
+            ApplyFadeIn(targetState, pipelineRuntime);
 
             // 重新评估MainState
-            UpdatePipelineMainState(pipeline);
+            UpdatePipelineMainState(pipelineRuntime);
 
 
-            OnStateEntered?.Invoke(targetState, result.targetPipeline);
+            OnStateEntered?.Invoke(targetState, pipeline);
             MarkDirty(StateDirtyReason.Enter);
 
+#if UNITY_EDITOR
             Debug.Log($"[StateMachine] === 状态激活完成 ===");
+#endif
             return true;
         }
 
@@ -2830,11 +2871,11 @@ namespace ES
         /// </summary>
         public bool TryActivateState(StateBase targetState, StatePipelineType pipeline = StatePipelineType.NotClear)
         {
+            UnityEngine.Debug.Log($"[StateMachine] 尝试激活状态: {targetState?.strKey} | Pipeline: {pipeline}");
             if (targetState == null) return false;
-
             pipeline = ResolvePipelineForState(targetState, pipeline);
             var result = TestStateActivation(targetState, pipeline);
-            return ExecuteStateActivation(targetState, result);
+            return ExecuteStateActivation(targetState, pipeline, result);
         }
 
         /// <summary>
@@ -2842,8 +2883,6 @@ namespace ES
         /// </summary>
         public bool TryActivateState(StateBase targetState)
         {
-            if (targetState == null) return false;
-
             return TryActivateState(targetState, StatePipelineType.NotClear);
         }
 
@@ -2892,19 +2931,15 @@ namespace ES
         public bool TryDeactivateState(string stateKey)
         {
             var state = GetStateByString(stateKey);
-            if (state == null || !runningStates.Contains(state))
+            if (state == null || state.baseStatus != StateBaseStatus.Running)
             {
                 return false;
             }
 
-            // 查找该状态所在的流水线 - 零GC优化
-            foreach (var pipeline in GetAllPipelines())
+            if (statePipelineMap.TryGetValue(state, out var pipelineType))
             {
-                if (pipeline.runningStates.Contains(state))
-                {
-                    TruelyDeactivateState(state, pipeline.pipelineType);
-                    return true;
-                }
+                TruelyDeactivateState(state, pipelineType);
+                return true;
             }
 
             return false;
@@ -2916,19 +2951,15 @@ namespace ES
         public bool TryDeactivateState(int stateKey)
         {
             var state = GetStateByInt(stateKey);
-            if (state == null || !runningStates.Contains(state))
+            if (state == null || state.baseStatus != StateBaseStatus.Running)
             {
                 return false;
             }
 
-            // 查找该状态所在的流水线 - 零GC优化
-            foreach (var pipeline in GetAllPipelines())
+            if (statePipelineMap.TryGetValue(state, out var pipelineType))
             {
-                if (pipeline.runningStates.Contains(state))
-                {
-                    TruelyDeactivateState(state, pipeline.pipelineType);
-                    return true;
-                }
+                TruelyDeactivateState(state, pipelineType);
+                return true;
             }
 
             return false;
@@ -2989,18 +3020,20 @@ namespace ES
         {
             if (targetState == null)
             {
-                return StateExitResult.Failure("目标状态为空", StatePipelineType.Basic);
+                return StateExitResult.Failure("目标状态为空", StatePipelineType.NotClear);
             }
 
-            if (!runningStates.Contains(targetState))
+            if (targetState.baseStatus != StateBaseStatus.Running)
             {
-                return StateExitResult.Failure("状态未在运行中", StatePipelineType.Basic);
+                return StateExitResult.Failure("状态未在运行中", StatePipelineType.NotClear);
             }
 
             if (!statePipelineMap.TryGetValue(targetState, out var pipeline))
             {
-                pipeline = StatePipelineType.Basic;
+                pipeline = StatePipelineType.NotClear;
             }
+
+            pipeline = ResolvePipelineForState(targetState, pipeline);
 
             if (CustomExitTest != null)
             {
@@ -3035,17 +3068,6 @@ namespace ES
             if (statePipelineMap.TryGetValue(targetState, out var pipeline))
             {
                 TruelyDeactivateState(targetState, pipeline);
-                return;
-            }
-
-            // 查找该状态所在的流水线 - 零GC优化
-            foreach (var pipelineRuntime in GetAllPipelines())
-            {
-                if (pipelineRuntime.runningStates.Contains(targetState))
-                {
-                    TruelyDeactivateState(targetState, pipelineRuntime.pipelineType);
-                    return;
-                }
             }
         }
 
@@ -3475,7 +3497,7 @@ namespace ES
             sb.AppendLine("========== 所有注册状态 ==========");
             foreach (var kvp in stringToStateMap)
             {
-                sb.AppendLine($"[{kvp.Key}] -> {kvp.Value.GetType().Name} (运行:{runningStates.Contains(kvp.Value)})");
+                sb.AppendLine($"[{kvp.Key}] -> {kvp.Value.GetType().Name} (运行:{kvp.Value.baseStatus == StateBaseStatus.Running})");
             }
             Debug.Log(sb.ToString());
         }
@@ -3508,7 +3530,7 @@ namespace ES
             foreach (var kvp in _temporaryStates)
             {
                 var state = kvp.Value;
-                bool isRunning = runningStates.Contains(state);
+                bool isRunning = state.baseStatus == StateBaseStatus.Running;
                 var clip = state.stateSharedData?.animationConfig?.calculator as StateAnimationMixCalculatorForSimpleClip;
                 string clipName = clip?.clip?.name ?? "未知";
                 sb.AppendLine($"[{kvp.Key}] Clip:{clipName} | 运行:{isRunning}");
@@ -3561,4 +3583,40 @@ namespace ES
 
         #endregion
     }
+
+
+#if UNITY_EDITOR
+    public static class StateMachineDebug
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Log(string message)
+        {
+            StateMachineDebugSettings.Instance.LogStateTransition(message);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void LogWarning(string message)
+        {
+            StateMachineDebugSettings.Instance.LogWarning(message);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void LogError(string message)
+        {
+            StateMachineDebugSettings.Instance.LogError(message);
+        }
+    }
+#else
+    public static class StateMachineDebug
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Log(string message) { }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void LogWarning(string message) { }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void LogError(string message) { }
+    }
+#endif
 }

@@ -23,23 +23,29 @@ MonoBehaviour:
     SerializationNodes: []
   HasConfirm: 1
   disableTransitionPermissionMap:
-    baseKeys: 000102040810204080
+    baseKeys: 000001000200040008001000200040008000000100020004
     relations:
     - key: 0
       relatedKeys: 
     - key: 1
       relatedKeys: 
     - key: 2
-      relatedKeys: 0810
+      relatedKeys: 0800100020000001
     - key: 4
-      relatedKeys: 1020
+      relatedKeys: 0800100020000001
     - key: 8
-      relatedKeys: 100402
+      relatedKeys: 10002000040002000001
     - key: 16
-      relatedKeys: 08200402
+      relatedKeys: 08002000040002000001
     - key: 32
-      relatedKeys: 08100402
+      relatedKeys: 08001000040002000001
     - key: 64
-      relatedKeys: 01020408102080
+      relatedKeys: 0100020004000800100020008000000100020004
     - key: 128
-      relatedKeys: 081020
+      relatedKeys: 020004000800100020004000000100020004
+    - key: 256
+      relatedKeys: 08001000200004000200
+    - key: 512
+      relatedKeys: 080010002000040002000001
+    - key: 1024
+      relatedKeys: 08001000200004000200000100028000

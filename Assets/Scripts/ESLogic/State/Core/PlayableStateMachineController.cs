@@ -47,7 +47,6 @@ namespace ES
 
         // 核心系统
         private StateMachineContext _context;
-        private CostManager _costManager;
         private MemoizationSystem _memoSystem;
 
         // Clip表
@@ -119,7 +118,6 @@ namespace ES
         private void InitializeCoreSystems()
         {
             _context = new StateMachineContext();
-            _costManager = new CostManager();
             _memoSystem = new MemoizationSystem();
             _currentTime = 0f;
         }
@@ -268,9 +266,6 @@ namespace ES
             // 更新上下文
             _context.Update();
 
-            // 更新代价返还
-            _costManager.UpdateCostReturns(_currentTime);
-
             // 更新三条流水线并检测空转
             bool basicNeedsFallback = _basicPipeline?.Update(deltaTime, _currentTime) ?? false;
             bool mainNeedsFallback = _mainPipeline?.Update(deltaTime, _currentTime) ?? false;
@@ -333,21 +328,6 @@ namespace ES
                 return false;
             }
 
-            // 检查代价
-            if (!forceEnter && !stateDef.ignoreInCostCalculation)
-            {
-                if (!_costManager.CanAffordCost(stateDef.cost, stateId, false))
-                {
-                    // 尝试打断测试
-                    if (!TestAndInterrupt(stateDef, pipeline))
-                    {
-                        _memoSystem.RecordDenial(stateId, DenialReason.CostNotEnough, _currentTime);
-                        LogVerbose($"State {stateId} cost not affordable and cannot interrupt");
-                        return false;
-                    }
-                }
-            }
-
             // 可以进入,执行进入逻辑
             EnterState(stateDef, pipeline);
             return true;
@@ -364,7 +344,7 @@ namespace ES
                 return false;
 
             // 检查是否可以打断当前状态
-            if (!pipeline.CanEnterState(newState, _costManager))
+            if (!pipeline.CanEnterState(newState))
                 return false;
 
             // 检查同路退化
@@ -404,22 +384,8 @@ namespace ES
             var previousState = pipeline.GetCurrentState();
             int previousStateId = previousState?.Definition.stateId ?? -1;
 
-            // 消耗代价
-            if (!stateDef.ignoreInCostCalculation && stateDef.cost != null)
-            {
-                _costManager.ConsumeCost(stateDef.cost, stateDef.stateId);
-            }
-
             // 进入新状态
             pipeline.EnterState(stateDef, _context, _graph, _currentTime);
-
-            // 安排代价返还
-            if (!stateDef.ignoreInCostCalculation && stateDef.cost != null && stateDef.duration > 0f)
-            {
-                float recoveryStart = _currentTime + stateDef.duration * stateDef.recoveryStartTime;
-                _costManager.ScheduleCostReturn(stateDef.cost, stateDef.stateId, 
-                    recoveryStart, stateDef.recoveryDuration);
-            }
 
             // 标记备忘系统为脏
             _memoSystem.MarkDirty();

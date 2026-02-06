@@ -1097,6 +1097,111 @@ Transform:
   m_Children: []
   m_Father: {fileID: 677318751}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &951405575
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 951405576}
+  - component: {fileID: 951405579}
+  - component: {fileID: 951405578}
+  - component: {fileID: 951405577}
+  m_Layer: 0
+  m_Name: Cube
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &951405576
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 951405575}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.04, z: -0.089}
+  m_LocalScale: {x: 1, y: 1, z: 0.22}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 992245613}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &951405577
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 951405575}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &951405578
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 951405575}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &951405579
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 951405575}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1 &986044682
 GameObject:
   m_ObjectHideFlags: 3
@@ -1194,6 +1299,137 @@ MonoBehaviour:
   m_BiasX: 0
   m_BiasY: 0
   m_CenterOnActivate: 1
+--- !u!1 &992245608
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 992245613}
+  - component: {fileID: 992245612}
+  - component: {fileID: 992245611}
+  - component: {fileID: 992245610}
+  - component: {fileID: 992245609}
+  m_Layer: 0
+  m_Name: "\u8F66"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &992245609
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992245608}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0fd1e3359ba60de4e871ecc8916a1ce7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  matchPoint: {fileID: 951405576}
+  weaponMountPoint: {fileID: 951405576}
+  allowWeapon: 1
+  moveSpeed: 5
+  acceleration: 10
+  turnSpeed: 180
+  useGravity: 0
+  gravity: {x: 0, y: -9.81, z: 0}
+  alignRiderPosition: 1
+  alignRiderRotation: 1
+  allowInput: 1
+  rider: {fileID: 0}
+--- !u!65 &992245610
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992245608}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!23 &992245611
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992245608}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 61fe05610bde9e843bc06ffd3a6b7e8e, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &992245612
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992245608}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &992245613
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992245608}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -1.9300001, y: 0.72000015, z: 3.53}
+  m_LocalScale: {x: 1.38, y: 0.5, z: 3.21}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 951405576}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1037905665
 GameObject:
   m_ObjectHideFlags: 0
@@ -1907,6 +2143,7 @@ MonoBehaviour:
     flyMaxSpeed: 10
     flyAcceleration: 12
     flyDrag: 0.2
+    flyGravityScale: 0.1
     swimMaxSpeed: 6
     swimAcceleration: 8
     swimDrag: 0.5
@@ -1914,8 +2151,10 @@ MonoBehaviour:
     speedMultiplier: 1
     speedLimit: 0
     jumpSpeed: 8
+    jumpSpeedMultiplier: 0.8
     standingCapsuleHeight: 2
     crouchedCapsuleHeight: 1
+    crouchSpeedMultiplier: 0.5
     orientationSharpness: 10
     gravity: {x: 0, y: -30, z: 0}
     useRootMotion: 1
@@ -1924,7 +2163,6 @@ MonoBehaviour:
     moveInput: {x: 0, y: 0, z: 0}
     lookInput: {x: 0, y: 0, z: 1}
     verticalInput: 0
-    locomotionSupportFlags: 1
     monitor:
       hasMotor: 0
       isStableOnGround: 0
@@ -1944,6 +2182,8 @@ MonoBehaviour:
           - rid: 3128555942915604485
           - rid: 3128555942915604486
           - rid: 3128555942915604490
+          - rid: 3128556031534694441
+          - rid: 3128556031534694442
           MayHasAddingElement: 1
         applyGroundDefaults: 1
         groundedDefaults:
@@ -1964,12 +2204,12 @@ MonoBehaviour:
       type: {class: EntityBasicMoveRotateModule, ns: ES, asm: ES_Logic}
       data:
         _enableSelf: 1
-        moveWorld: {x: 0, y: 0, z: 0}
-        lookWorld: {x: 0, y: 0, z: 1}
         applyMove: 1
         applyLook: 1
         crouchHold: 0
         jumpRequested: 0
+        JUMP_StateName: "\u8DF3\u8DC3"
+        Crouch_StateName: "\u4E0B\u8E72"
     - rid: 3128555942915604485
       type: {class: EntityBasicSkillModule, ns: ES, asm: ES_Logic}
       data:
@@ -2027,12 +2267,12 @@ MonoBehaviour:
             m_Name: Move
             m_Type: 0
             m_ExpectedControlType: Vector2
-            m_Id: 36e201b9-e0c9-4d44-9ef7-597c1d7aee4a
+            m_Id: 123aae2f-96fd-43b6-9068-abc94d1df7d3
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 2DVector
-              m_Id: e4a64970-cb87-485b-803d-1f55ee4a8940
+              m_Id: 055a6fa5-a483-4e93-a4b9-7f124a34312f
               m_Path: 2DVector
               m_Interactions: 
               m_Processors: 
@@ -2040,7 +2280,7 @@ MonoBehaviour:
               m_Action: Move
               m_Flags: 4
             - m_Name: Up
-              m_Id: 5787de08-01ca-4bc4-a948-be4d0ea43366
+              m_Id: d1ebf8df-7dd0-4453-b99b-462e82eba777
               m_Path: <Keyboard>/w
               m_Interactions: 
               m_Processors: 
@@ -2048,7 +2288,7 @@ MonoBehaviour:
               m_Action: Move
               m_Flags: 8
             - m_Name: Down
-              m_Id: 218226fc-9677-481d-8f32-8181f960f9e0
+              m_Id: efeef62d-72ed-412c-93e4-c23c2d95c5eb
               m_Path: <Keyboard>/s
               m_Interactions: 
               m_Processors: 
@@ -2056,7 +2296,7 @@ MonoBehaviour:
               m_Action: Move
               m_Flags: 8
             - m_Name: Left
-              m_Id: 9b2d93a9-c7e1-4318-a0f1-ba6508c973e1
+              m_Id: 73ec60c6-dee6-477a-b6d2-fff44b136985
               m_Path: <Keyboard>/a
               m_Interactions: 
               m_Processors: 
@@ -2064,7 +2304,7 @@ MonoBehaviour:
               m_Action: Move
               m_Flags: 8
             - m_Name: Right
-              m_Id: cf5a7ef2-f93c-403a-bcb7-9526142d7195
+              m_Id: 987a4e6e-8a57-4af7-a1e4-c694a87f3c43
               m_Path: <Keyboard>/d
               m_Interactions: 
               m_Processors: 
@@ -2072,7 +2312,7 @@ MonoBehaviour:
               m_Action: Move
               m_Flags: 8
             - m_Name: 
-              m_Id: 92fb3b81-69e4-4d78-8f5e-4e510f49b671
+              m_Id: 44443cef-4bf6-4997-83d7-c541c217a7e1
               m_Path: <Gamepad>/leftStick
               m_Interactions: 
               m_Processors: 
@@ -2087,12 +2327,12 @@ MonoBehaviour:
             m_Name: Look
             m_Type: 0
             m_ExpectedControlType: Vector2
-            m_Id: 7b7d5132-cb1c-45cd-921e-49914ecbe911
+            m_Id: b308b1c8-6a5d-47ec-81b0-54df817e8318
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: 08c620f7-98f1-4bb8-8d3c-5a776282d309
+              m_Id: b8f4b682-e624-49a2-9449-44a5ea17d37a
               m_Path: <Mouse>/delta
               m_Interactions: 
               m_Processors: 
@@ -2100,7 +2340,7 @@ MonoBehaviour:
               m_Action: Look
               m_Flags: 0
             - m_Name: 
-              m_Id: 0a1a862a-6c77-4b55-af94-dd489996d352
+              m_Id: 3ce1d1ba-e689-43e5-9328-33d17e4f00ca
               m_Path: <Gamepad>/rightStick
               m_Interactions: 
               m_Processors: 
@@ -2115,12 +2355,12 @@ MonoBehaviour:
             m_Name: Attack
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: ae7ed859-f191-4fc4-8fb2-7cfafdd71142
+            m_Id: 73116cb6-229a-40fa-89d7-29222a51cfea
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: d60b0325-0f77-4be2-8f8c-dace1bd54da7
+              m_Id: b0c1ff67-fe82-462f-b5c1-f7ca72729b18
               m_Path: <Mouse>/leftButton
               m_Interactions: 
               m_Processors: 
@@ -2128,7 +2368,7 @@ MonoBehaviour:
               m_Action: Attack
               m_Flags: 0
             - m_Name: 
-              m_Id: 6ef4d210-615a-4a10-94dd-4f302912ed4e
+              m_Id: 0d2ec60d-8f5b-4bd6-a0b5-041ba4efdf32
               m_Path: <Gamepad>/rightTrigger
               m_Interactions: 
               m_Processors: 
@@ -2143,12 +2383,12 @@ MonoBehaviour:
             m_Name: HeavyAttack
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: 205abf88-8cd2-4263-93eb-2266a87f874e
+            m_Id: d2415977-4bca-4c8e-987c-8af9c65e591c
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: 2ae490b0-e408-4cc7-ab4c-2dcc470c63c3
+              m_Id: f41cb7de-d614-44a3-8c31-bc4f6b855a60
               m_Path: <Mouse>/rightButton
               m_Interactions: 
               m_Processors: 
@@ -2156,7 +2396,7 @@ MonoBehaviour:
               m_Action: HeavyAttack
               m_Flags: 0
             - m_Name: 
-              m_Id: 66803b80-8e79-4b28-b87b-00c52bff8fb9
+              m_Id: ad1cdfa9-93e6-40fd-833e-ab27956dcc6c
               m_Path: <Gamepad>/leftTrigger
               m_Interactions: 
               m_Processors: 
@@ -2171,12 +2411,12 @@ MonoBehaviour:
             m_Name: Block
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: 235fd2c9-0284-42c0-8a32-e87cb17a8577
+            m_Id: d5fdfae1-77d4-4a15-9b70-32a431bc4409
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: 29489186-8ea6-44cc-96f6-d52fc38d7e01
+              m_Id: 7eb1deb9-3ce4-4078-ba08-141bd2be67f6
               m_Path: <Keyboard>/leftShift
               m_Interactions: 
               m_Processors: 
@@ -2184,7 +2424,7 @@ MonoBehaviour:
               m_Action: Block
               m_Flags: 0
             - m_Name: 
-              m_Id: d3571123-c9b7-44fb-844c-4073008fa42e
+              m_Id: 27b29bac-45ff-4cc7-90ce-32a9ab2702cc
               m_Path: <Gamepad>/leftShoulder
               m_Interactions: 
               m_Processors: 
@@ -2199,12 +2439,12 @@ MonoBehaviour:
             m_Name: Slide
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: e89142bc-dc8d-4354-ae60-4f09ae3946c1
+            m_Id: af4efd30-d8d7-4bb8-a84c-d5fc5bcabe0a
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: 7276d5ed-b7fe-4a31-b51c-7359ed6bf1c2
+              m_Id: c0acb764-c034-4aa9-b757-f46f8b1a3826
               m_Path: <Keyboard>/leftCtrl
               m_Interactions: 
               m_Processors: 
@@ -2212,7 +2452,7 @@ MonoBehaviour:
               m_Action: Slide
               m_Flags: 0
             - m_Name: 
-              m_Id: 65b5a30e-ec2c-42fe-a652-1cdec8c4270e
+              m_Id: cd1f9857-6eac-49c4-a302-8553aca1089b
               m_Path: <Gamepad>/rightShoulder
               m_Interactions: 
               m_Processors: 
@@ -2227,12 +2467,12 @@ MonoBehaviour:
             m_Name: SwitchWeapon
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: e902ae60-27ff-468c-94b0-afbbf17830df
+            m_Id: eac8b427-2609-4c0c-a85d-6b02d263d11d
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: f368dc26-69a9-4927-879b-0c84830becd9
+              m_Id: bfb54c8a-defa-4a65-85c3-7eccdf8db1cd
               m_Path: <Keyboard>/tab
               m_Interactions: 
               m_Processors: 
@@ -2240,7 +2480,7 @@ MonoBehaviour:
               m_Action: SwitchWeapon
               m_Flags: 0
             - m_Name: 
-              m_Id: a54007b3-fdff-41ef-bab7-e8a3a4001c60
+              m_Id: c08e3081-93e7-4995-a7c3-200681fbe3db
               m_Path: <Gamepad>/dpad/right
               m_Interactions: 
               m_Processors: 
@@ -2255,12 +2495,12 @@ MonoBehaviour:
             m_Name: Aim
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: 814d4797-701c-403d-b1ef-4c2475757b07
+            m_Id: 6b3c8977-b524-48f3-83d6-fdec079e1ec9
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: 8ac4e25e-76ea-4bd8-9b36-d60c124937c4
+              m_Id: 449e70bd-4f9c-47f6-a583-8534d37cc752
               m_Path: <Mouse>/rightButton
               m_Interactions: 
               m_Processors: 
@@ -2268,7 +2508,7 @@ MonoBehaviour:
               m_Action: Aim
               m_Flags: 0
             - m_Name: 
-              m_Id: cb6bd7a5-d02a-4528-a1ca-84b314d29c36
+              m_Id: 1cb30122-c7c8-423e-a3ad-45ce4d3dcefd
               m_Path: <Gamepad>/leftTrigger
               m_Interactions: 
               m_Processors: 
@@ -2283,12 +2523,12 @@ MonoBehaviour:
             m_Name: Skill1
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: fd6024a8-eeaf-4fde-b1b8-25686ad4cf3e
+            m_Id: da4b0c10-1f14-4c0d-aa64-a213b73c2d59
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: 562f339f-3c69-4793-8ba5-c2147e8b515c
+              m_Id: db99f872-d4d2-4cad-95f3-9da9fc9da72b
               m_Path: <Keyboard>/1
               m_Interactions: 
               m_Processors: 
@@ -2296,7 +2536,7 @@ MonoBehaviour:
               m_Action: Skill1
               m_Flags: 0
             - m_Name: 
-              m_Id: b749ec7a-aefe-40da-a87e-68ae32a056d4
+              m_Id: 9bfffaab-d233-4ae9-adc3-ece0b02f8224
               m_Path: <Gamepad>/dpad/up
               m_Interactions: 
               m_Processors: 
@@ -2311,12 +2551,12 @@ MonoBehaviour:
             m_Name: Skill2
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: a926ec9f-584d-4f03-b45e-d62077d879e8
+            m_Id: 1ffa4eeb-04d1-4d2b-985c-f859a1108964
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: cc51ecad-c945-479f-9dae-100f95db8271
+              m_Id: c5a9b513-2dc1-4d3c-8cb0-53e18ed102d1
               m_Path: <Keyboard>/2
               m_Interactions: 
               m_Processors: 
@@ -2324,7 +2564,7 @@ MonoBehaviour:
               m_Action: Skill2
               m_Flags: 0
             - m_Name: 
-              m_Id: e531939e-1f86-434a-b6df-bb03f25d24bd
+              m_Id: da93a888-c433-45b1-8278-1d5e51befd7e
               m_Path: <Gamepad>/dpad/left
               m_Interactions: 
               m_Processors: 
@@ -2339,12 +2579,12 @@ MonoBehaviour:
             m_Name: Skill3
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: 88a7689b-9a29-4467-a1d9-51e743149227
+            m_Id: 541e477e-8ba1-4c76-9763-31a0b293044f
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: af7f9a78-795c-485f-91d8-a07bbcbed83f
+              m_Id: 04f97957-3ed5-46ef-a04f-fe2912d8b557
               m_Path: <Keyboard>/3
               m_Interactions: 
               m_Processors: 
@@ -2352,7 +2592,7 @@ MonoBehaviour:
               m_Action: Skill3
               m_Flags: 0
             - m_Name: 
-              m_Id: 78525d31-574d-4497-bc71-d3336044013e
+              m_Id: 26dbbee6-dc93-4707-9d96-ece2f700d578
               m_Path: <Gamepad>/dpad/down
               m_Interactions: 
               m_Processors: 
@@ -2367,12 +2607,12 @@ MonoBehaviour:
             m_Name: Jump
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: ad55a2a9-fcb4-417f-8e3a-1490f99d4054
+            m_Id: 259c3e87-1c7a-4031-8a74-b764bc83a60f
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: b8862818-e7b5-40db-88a1-f325926a4a67
+              m_Id: f84e478b-d59a-46e3-93bc-844c51bd4647
               m_Path: <Keyboard>/space
               m_Interactions: 
               m_Processors: 
@@ -2380,7 +2620,7 @@ MonoBehaviour:
               m_Action: Jump
               m_Flags: 0
             - m_Name: 
-              m_Id: a4553711-045e-4996-b5a5-3570e363abf9
+              m_Id: d20e9ce2-5dc5-4a26-82b1-b72d9142cb7e
               m_Path: <Gamepad>/buttonSouth
               m_Interactions: 
               m_Processors: 
@@ -2395,12 +2635,12 @@ MonoBehaviour:
             m_Name: Crouch
             m_Type: 1
             m_ExpectedControlType: 
-            m_Id: 7c7abcf3-8604-4e0e-9aba-98e947aa58ca
+            m_Id: a2dfedb7-066e-45c5-8056-8762c30de85e
             m_Processors: 
             m_Interactions: 
             m_SingletonActionBindings:
             - m_Name: 
-              m_Id: 49e837d6-6faf-48be-893c-a6f7a878913c
+              m_Id: 0662fdaa-c9a2-4e5e-a0be-bc78c1937ff6
               m_Path: <Keyboard>/c
               m_Interactions: 
               m_Processors: 
@@ -2408,12 +2648,128 @@ MonoBehaviour:
               m_Action: Crouch
               m_Flags: 0
             - m_Name: 
-              m_Id: f525081e-0ba4-476b-a119-b241c7219973
+              m_Id: 1274497e-cfee-4080-aa8e-272da53e1392
               m_Path: <Gamepad>/rightStickPress
               m_Interactions: 
               m_Processors: 
               m_Groups: 
               m_Action: Crouch
+              m_Flags: 0
+            m_Flags: 0
+          m_Reference: {fileID: 0}
+        flyAction:
+          m_UseReference: 0
+          m_Action:
+            m_Name: Fly
+            m_Type: 1
+            m_ExpectedControlType: 
+            m_Id: 708ff78c-84ba-49e6-ab13-4a24e594a3f0
+            m_Processors: 
+            m_Interactions: 
+            m_SingletonActionBindings:
+            - m_Name: 
+              m_Id: 7e7f8d53-d4e8-43ea-853f-8e40000a1b61
+              m_Path: <Keyboard>/f
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: Fly
+              m_Flags: 0
+            - m_Name: 
+              m_Id: 5e9f6834-1eb6-428b-aa43-49b970818bb4
+              m_Path: <Gamepad>/buttonNorth
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: Fly
+              m_Flags: 0
+            m_Flags: 0
+          m_Reference: {fileID: 0}
+        flyVerticalAction:
+          m_UseReference: 0
+          m_Action:
+            m_Name: FlyVertical
+            m_Type: 0
+            m_ExpectedControlType: Axis
+            m_Id: b6965059-8376-4127-b1bc-c43a93782022
+            m_Processors: 
+            m_Interactions: 
+            m_SingletonActionBindings:
+            - m_Name: 1DAxis
+              m_Id: dbc12cac-4a8e-4bf5-836a-a3a34ec8eb3c
+              m_Path: 1DAxis
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: FlyVertical
+              m_Flags: 4
+            - m_Name: Negative
+              m_Id: d17d0fa8-0bde-4716-b875-9dfc17f0827b
+              m_Path: <Keyboard>/q
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: FlyVertical
+              m_Flags: 8
+            - m_Name: Positive
+              m_Id: aecf260c-6d04-4065-b8d0-7f54a42c05f7
+              m_Path: <Keyboard>/e
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: FlyVertical
+              m_Flags: 8
+            - m_Name: 1DAxis
+              m_Id: 02a08b32-6966-4d1f-b91e-55f63721435d
+              m_Path: 1DAxis
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: FlyVertical
+              m_Flags: 4
+            - m_Name: Negative
+              m_Id: e6240824-53a1-4380-94af-6609da982bc8
+              m_Path: <Gamepad>/leftTrigger
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: FlyVertical
+              m_Flags: 8
+            - m_Name: Positive
+              m_Id: bd4936d4-55e6-4cbe-8f9a-043496acf873
+              m_Path: <Gamepad>/rightTrigger
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: FlyVertical
+              m_Flags: 8
+            m_Flags: 0
+          m_Reference: {fileID: 0}
+        mountAction:
+          m_UseReference: 0
+          m_Action:
+            m_Name: Mount
+            m_Type: 1
+            m_ExpectedControlType: 
+            m_Id: 8f10dd77-fbfa-4b75-887a-db69892e9b3b
+            m_Processors: 
+            m_Interactions: 
+            m_SingletonActionBindings:
+            - m_Name: 
+              m_Id: 833e983b-e556-4aff-9f2a-5bd2e4176aa8
+              m_Path: <Keyboard>/r
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: Mount
+              m_Flags: 0
+            - m_Name: 
+              m_Id: fbeda288-b6f4-4522-bf44-5c4eece7f7ac
+              m_Path: <Gamepad>/buttonWest
+              m_Interactions: 
+              m_Processors: 
+              m_Groups: 
+              m_Action: Mount
               m_Flags: 0
             m_Flags: 0
           m_Reference: {fileID: 0}
@@ -2446,7 +2802,10 @@ MonoBehaviour:
           skill2: 0
           skill3: 0
           jump: 0
-          crouchHold: 0
+          crouchToggle: 0
+          flyToggle: 0
+          flyVertical: 0
+          mountToggle: 0
           eyeHold: 0
     - rid: 3128555942915604489
       type: {class: EntityStateDomain, ns: ES, asm: ES_Logic}
@@ -2460,6 +2819,7 @@ MonoBehaviour:
           type: 2}
         stateMachine:
           stateMachineKey: 
+          config: {fileID: 11400000, guid: b449f64f05658744a948c6bf1e40c76b, type: 2}
           defaultStateKey: 
           pipelineBlendMode: 1
           testTempKey: TestAnim
@@ -2514,6 +2874,35 @@ MonoBehaviour:
         positionOffset: {x: 0, y: 0, z: 0}
         rotationOffsetEuler: {x: 0, y: 0, z: 0}
         logStatus: 0
+    - rid: 3128556031534694441
+      type: {class: EntityBasicFlyModule, ns: ES, asm: ES_Logic}
+      data:
+        _enableSelf: 1
+        enableFly: 1
+        flyHold: 0
+        Fly_StateName: "\u98DE\u884C"
+        applyOnEnable: 1
+        applyEveryFrame: 0
+        fly:
+          flyMaxSpeed: 10
+          flyAcceleration: 12
+          flyDrag: 0.2
+          flyGravityScale: 0.1
+        verticalInput: 0
+    - rid: 3128556031534694442
+      type: {class: EntityBasicMountModule, ns: ES, asm: ES_Logic}
+      data:
+        _enableSelf: 1
+        enableMount: 1
+        mountHold: 0
+        rayOrigin: {fileID: 346436310}
+        mountDistance: 2
+        mountLayerMask:
+          serializedVersion: 2
+          m_Bits: 887
+        mountQuery: 1
+        currentMount: {fileID: 0}
+        Mount_StateName: "\u9A91\u4E58"
 --- !u!114 &2081736440
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2602,3 +2991,4 @@ SceneRoots:
   - {fileID: 672649523}
   - {fileID: 354340708}
   - {fileID: 837284912}
+  - {fileID: 992245613}

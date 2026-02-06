@@ -123,7 +123,6 @@ namespace ES
     {
         None,                   // 无拒绝
         ConditionNotMet,        // 条件不满足
-        CostNotEnough,          // 代价不足
         PriorityTooLow,         // 优先级太低
         SamePathDegrading,      // 同路退化中
         InTransition,           // 正在过渡中

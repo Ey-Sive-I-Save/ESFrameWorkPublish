@@ -34,41 +34,32 @@ namespace ES
         [VerticalGroup("Identity/Right")]
         [LabelText("所属流水线(重要！)")]
         public StatePipelineType pipelineType = StatePipelineType.Basic;
+        [VerticalGroup("Identity/Right")]
+        [LabelText("是否必须不允许激活于状态支持标记切换")]
+        public bool disableActiveOnSupportFlagSwitching = false;
+
+        [VerticalGroup("Identity/Right")]
+        [LabelText("状态所处于的支持标记(无代表通用)")]
+        public StateSupportFlags stateSupportFlag = StateSupportFlags.Grounded;
+
+        [VerticalGroup("Identity/Right")]
+        [LabelText("支持ReStart")]
+        public bool supportReStart = false;
+
+
+        [VerticalGroup("Identity/Right")]
+        [LabelText("忽略进入支持标记")]
+        public bool ignoreSupportFlag = false;
 
         [VerticalGroup("Identity/Right")]
         [LabelText("可作为Fallback状态")]
         [Tooltip("勾选后该状态可被用作Fallback状态（如资源无匹配或失效时的兜底流转）。")]
         public bool canBeFeedback = false;
 
-        [VerticalGroup("Identity/Right")]
-        [LabelText("Fallback支持标记")]
-        [Tooltip("当canBeFeedback=true时，指定该Fallback状态对应的支持标记。")]
-        [ShowIf("canBeFeedback")]
-        [FormerlySerializedAs("fallbackChannelIndex")]
-        public StateSupportFlags fallbackSupportFlag = StateSupportFlags.Grounded;
-
         [LabelText("状态描述"), TextArea(2, 3)]
         public string description = "";
 
-        [BoxGroup("支持标记")]
-        [LabelText("忽略SupportFlags")]
-        [Tooltip("启用后该状态不会受SupportFlags限制（如Buff/特效状态）。")]
-        public bool ignoreSupportFlags = false;
 
-        [BoxGroup("支持标记")]
-        [LabelText("进入前必须满足")]
-        [Tooltip("进入该状态前必须满足的支持标记（位标记）。")]
-        public StateSupportFlags requiredSupportFlags = StateSupportFlags.None;
-
-        [BoxGroup("支持标记")]
-        [LabelText("进入后自动设置")]
-        [Tooltip("进入该状态后自动设置的支持标记（位标记）。当前不会自动应用，供外部系统使用。")]
-        public StateSupportFlags setSupportFlagsOnEnter = StateSupportFlags.None;
-
-        [BoxGroup("支持标记")]
-        [LabelText("进入后自动清除")]
-        [Tooltip("进入该状态后自动清除的支持标记（位标记）。当前不会自动应用，供外部系统使用。")]
-        public StateSupportFlags clearSupportFlagsOnEnter = StateSupportFlags.None;
 
         [BoxGroup("动画混合配置")]
         [LabelText("使用直接混合（无淡入淡出）")]
@@ -144,8 +135,6 @@ namespace ES
                     phaseConfig.releaseStartTime = phaseConfig.returnStartTime;
                 }
 
-                if (phaseConfig.returnCostFraction < 0f) phaseConfig.returnCostFraction = 0f;
-                if (phaseConfig.returnCostFraction > 1f) phaseConfig.returnCostFraction = 1f;
             }
 
             // ensure prepared value is non-negative
@@ -155,23 +144,12 @@ namespace ES
         /// <summary>
         /// 依据主状态判据类型预备主判据值（用于享元缓存）。
         /// </summary>
-        /// <param name="costData">状态代价数据（仅 CostBased 使用）</param>
-        public void PrepareMainCriterionValue(StateCostData costData)
+        public void PrepareMainCriterionValue()
         {
             switch (mainStateCriterion)
             {
                 case MainStateCriterionType.DirectWeight:
                     preparedMainCriterionValue = directMainWeight;
-                    break;
-                case MainStateCriterionType.CostBased:
-                    if (costData != null && costData.enableCostCalculation)
-                    {
-                        preparedMainCriterionValue = costData.GetTotalCost();
-                    }
-                    else
-                    {
-                        preparedMainCriterionValue = 0f;
-                    }
                     break;
                 case MainStateCriterionType.Dynamic:
                 default:
@@ -188,10 +166,10 @@ namespace ES
         public void InitializeRuntime()
         {
             if (_isRuntimeInitialized) return;
-            
+
             ValidateAndFix();
             phaseConfig?.InitializeRuntime();
-            
+
             _isRuntimeInitialized = true;
         }
     }
@@ -213,9 +191,7 @@ namespace ES
         [Tooltip("达到此时间点进入释放阶段，状态不再占据但动画可能未完")]
         public float releaseStartTime = 0.9f;
 
-        [LabelText("返还代价比例"), Range(0, 1)]
-        [Tooltip("返还阶段返还多少比例的代价")]
-        public float returnCostFraction = 0.5f;
+        // 代价相关参数已移除
 
         /// <summary>
         /// 运行时初始化
@@ -239,16 +215,10 @@ namespace ES
         DirectWeight = 0,
 
         /// <summary>
-        /// 依赖代价计算（静态/可预估）
-        /// </summary>
-        [InspectorName("依赖代价计算")]
-        CostBased = 1,
-
-        /// <summary>
         /// 动态运行时评估
         /// </summary>
         [InspectorName("动态评估")]
-        Dynamic = 2
+        Dynamic = 1
     }
 
 }

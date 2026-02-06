@@ -156,10 +156,6 @@ namespace ES
         [LabelText("显示状态转换")]
         public bool logStateTransitions = true;
 
-        [TabGroup("调试")]
-        [LabelText("显示代价变化")]
-        public bool logCostChanges = false;
-
         /// <summary>
         /// 根据ID查找状态定义
         /// </summary>

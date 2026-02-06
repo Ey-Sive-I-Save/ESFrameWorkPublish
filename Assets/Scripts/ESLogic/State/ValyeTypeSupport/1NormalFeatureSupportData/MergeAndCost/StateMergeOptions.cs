@@ -25,14 +25,14 @@ namespace ES
         [LabelText("生效优先级(打断者＞(=)承接者可打断)")]
         public byte EffectialPripority = 0;
         [LabelText("相等是否生效")]
-        public bool EqualIsEffectial = false;
+        public bool EqualIsEffectial_ = true;
 
     }
     //无条件单情况条目
     [Serializable]
     public class UnconditionalMatchRule
     {
-        public UnconditionalMatchBackType matchBackType = UnconditionalMatchBackType.Accept;
+        public StateMergeResult matchBackType = StateMergeResult.MergeComplete;
         [LabelText("状态名匹配")]
         public string stateName = "状态名";
         [LabelText("状态ID匹配(仅初始定义有效)")]

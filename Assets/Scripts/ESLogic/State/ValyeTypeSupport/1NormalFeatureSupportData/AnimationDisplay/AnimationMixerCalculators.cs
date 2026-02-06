@@ -2142,8 +2142,10 @@ namespace ES
 
                     UpdatePhaseWeights(runtime);
 
+#if STATEMACHINEDEBUG
                     StateMachineDebugSettings.Instance.LogAnimationBlend(
                         $"[SequentialMixer] 阶段切换: Phase {runtime.sequencePhase - 1} → {runtime.sequencePhase}");
+#endif
                 }
             }
 
@@ -2254,7 +2256,9 @@ namespace ES
                 }
                 UpdatePhaseWeights(runtime);
 
+#if STATEMACHINEDEBUG
                 StateMachineDebugSettings.Instance.LogAnimationBlend("[SequentialMixer] 强制提前退出到Exit阶段");
+#endif
             }
         }
 

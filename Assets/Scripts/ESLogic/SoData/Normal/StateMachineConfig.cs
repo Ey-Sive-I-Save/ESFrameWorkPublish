@@ -31,7 +31,10 @@ namespace ES
                 StateSupportFlags.Swimming,
                 StateSupportFlags.Flying,
                 StateSupportFlags.Mounted,
-                StateSupportFlags.Transition
+                StateSupportFlags.Transition,
+                StateSupportFlags.Climbing,
+                StateSupportFlags.SpecialInteraction,
+                StateSupportFlags.Observer
             });
 
             // Transition：禁止切换到战斗/机动/载具类
@@ -42,7 +45,10 @@ namespace ES
                 StateSupportFlags.Swimming,
                 StateSupportFlags.Flying,
                 StateSupportFlags.Mounted,
-                StateSupportFlags.Dead
+                StateSupportFlags.Dead,
+                StateSupportFlags.Climbing,
+                StateSupportFlags.SpecialInteraction,
+                StateSupportFlags.Observer
             });
 
             // Swimming：禁止切换到飞行/骑乘/趴伏/下蹲
@@ -51,7 +57,8 @@ namespace ES
                 StateSupportFlags.Flying,
                 StateSupportFlags.Mounted,
                 StateSupportFlags.Prone,
-                StateSupportFlags.Crouched
+                StateSupportFlags.Crouched,
+                StateSupportFlags.Climbing
             });
 
             // Flying：禁止切换到游泳/骑乘/趴伏/下蹲
@@ -60,7 +67,8 @@ namespace ES
                 StateSupportFlags.Swimming,
                 StateSupportFlags.Mounted,
                 StateSupportFlags.Prone,
-                StateSupportFlags.Crouched
+                StateSupportFlags.Crouched,
+                StateSupportFlags.Climbing
             });
 
             // Mounted：禁止切换到游泳/飞行/趴伏/下蹲
@@ -69,7 +77,8 @@ namespace ES
                 StateSupportFlags.Swimming,
                 StateSupportFlags.Flying,
                 StateSupportFlags.Prone,
-                StateSupportFlags.Crouched
+                StateSupportFlags.Crouched,
+                StateSupportFlags.Climbing
             });
 
             // Prone：禁止切换到游泳/飞行/骑乘
@@ -77,7 +86,8 @@ namespace ES
             {
                 StateSupportFlags.Swimming,
                 StateSupportFlags.Flying,
-                StateSupportFlags.Mounted
+                StateSupportFlags.Mounted,
+                StateSupportFlags.Climbing
             });
 
             // Crouched：禁止切换到游泳/飞行/骑乘
@@ -85,7 +95,42 @@ namespace ES
             {
                 StateSupportFlags.Swimming,
                 StateSupportFlags.Flying,
-                StateSupportFlags.Mounted
+                StateSupportFlags.Mounted,
+                StateSupportFlags.Climbing
+            });
+
+            // Climbing：禁止切换到游泳/飞行/骑乘/趴伏/下蹲
+            AddRelations(StateSupportFlags.Climbing, new[]
+            {
+                StateSupportFlags.Swimming,
+                StateSupportFlags.Flying,
+                StateSupportFlags.Mounted,
+                StateSupportFlags.Prone,
+                StateSupportFlags.Crouched
+            });
+
+            // SpecialInteraction：禁止切换到游泳/飞行/骑乘/趴伏/下蹲/攀爬
+            AddRelations(StateSupportFlags.SpecialInteraction, new[]
+            {
+                StateSupportFlags.Swimming,
+                StateSupportFlags.Flying,
+                StateSupportFlags.Mounted,
+                StateSupportFlags.Prone,
+                StateSupportFlags.Crouched,
+                StateSupportFlags.Climbing
+            });
+
+            // Observer：禁止切换到游泳/飞行/骑乘/趴伏/下蹲/攀爬/特殊交互/过场
+            AddRelations(StateSupportFlags.Observer, new[]
+            {
+                StateSupportFlags.Swimming,
+                StateSupportFlags.Flying,
+                StateSupportFlags.Mounted,
+                StateSupportFlags.Prone,
+                StateSupportFlags.Crouched,
+                StateSupportFlags.Climbing,
+                StateSupportFlags.SpecialInteraction,
+                StateSupportFlags.Transition
             });
         }
     }

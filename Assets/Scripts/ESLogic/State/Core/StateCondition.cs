@@ -115,32 +115,6 @@ namespace ES
     }
 
     /// <summary>
-    /// 代价条件 - 检查是否有足够代价
-    /// </summary>
-    [Serializable]
-    public class CostCondition : StateCondition
-    {
-        public StateCostData requiredCost;
-
-        [NonSerialized]
-        private CostManager _costManager;
-
-        public void Initialize(CostManager costManager)
-        {
-            _costManager = costManager;
-        }
-
-        public override bool Evaluate(StateMachineContext context)
-        {
-            if (_costManager == null || requiredCost == null)
-                return true;
-            
-            // 这里需要状态ID,简化处理
-            return _costManager.CanAffordCost(requiredCost, -1, false);
-        }
-    }
-
-    /// <summary>
     /// 组合条件 - 支持AND/OR逻辑
     /// </summary>
     [Serializable]

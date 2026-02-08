@@ -180,8 +180,8 @@ maxPlayableSlots = 同时运行最大状态数 × 1.5 (冗余)
 **实际配置：**
 ```csharp
 // 在初始化时设置
-basicPipeline.maxPlayableSlots = 16;   // 基础流水线较简单
-mainPipeline.maxPlayableSlots = 32;    // 主流水线标准配置
+basicPipeline.maxPlayableSlots = 16;   // 基础层级较简单
+mainPipeline.maxPlayableSlots = 32;    // 主层级标准配置
 buffPipeline.maxPlayableSlots = 64;    // Buff可能很多
 ```
 
@@ -228,7 +228,7 @@ private void CleanupFragmentedSlots()
 
 ```csharp
 /// <summary>
-/// 预热流水线 - 预分配槽位避免运行时扩展
+/// 预热层级 - 预分配槽位避免运行时扩展
 /// </summary>
 public void WarmupPipeline(StatePipelineType pipelineType, int count = 8)
 {

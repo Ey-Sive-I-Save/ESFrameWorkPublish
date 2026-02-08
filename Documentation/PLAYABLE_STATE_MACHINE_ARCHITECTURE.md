@@ -219,7 +219,7 @@
   channelCost -= returnAmount
 ```
 
-## 三条流水线Mix输出
+## 三条层级Mix输出
 
 ```
                    Playable Graph 架构

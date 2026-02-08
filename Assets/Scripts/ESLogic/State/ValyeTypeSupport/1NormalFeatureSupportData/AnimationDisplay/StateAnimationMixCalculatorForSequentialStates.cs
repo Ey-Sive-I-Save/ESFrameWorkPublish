@@ -25,7 +25,7 @@ namespace ES
     /// - Attack: 前摇(0.15s) → 攻击(0.3s) → 后摇(0.25s)
     /// - Dodge: 启动(0.05s) → 无敌(0.4s) → 恢复(0.15s)
     /// </summary>
-    [Serializable, TypeRegistryItem("序列状态播放器")]
+    [Serializable, TypeRegistryItem("高级·序列状态播放器")]
     public class StateAnimationMixCalculatorForSequentialStates : StateAnimationMixCalculator
     {
         public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.SequentialStates;
@@ -33,13 +33,13 @@ namespace ES
         protected override string GetUsageHelp()
         {
              return "适用：固定顺序多阶段动作（跳跃/连招/翻滚）。\n" +
-                 "必填：phases(phaseName+primaryClip)。\n" +
+                 "必填：phases(phaseName+primaryClip 或 phaseCalculator)。\n" +
                  "可选：secondaryClip/触发参数/自动切换/过渡时长。";
         }
 
         protected override string GetCalculatorDisplayName()
         {
-            return "序列状态播放器";
+            return "高级·序列状态播放器";
         }
         /// <summary>
         /// 顺序阶段定义
@@ -49,6 +49,9 @@ namespace ES
         {
             [LabelText("阶段名称")]
             public string phaseName;
+
+            [SerializeReference, LabelText("阶段计算器"), Tooltip("可选：使用完整计算器作为该阶段输出")]
+            public StateAnimationMixCalculator phaseCalculator;
             
             [LabelText("主Clip")]
             [Tooltip("该阶段的主要动画")]
@@ -249,9 +252,13 @@ namespace ES
             // 验证配置
             for (int i = 0; i < phases.Length; i++)
             {
-                if (phases[i].primaryClip == null)
+                if (phases[i].phaseCalculator == null && phases[i].primaryClip == null)
                 {
                     Debug.LogWarning($"[SequentialStates] 阶段{i} ({phases[i].phaseName}) 缺少主Clip");
+                }
+                if (phases[i].phaseCalculator != null)
+                {
+                    phases[i].phaseCalculator.InitializeCalculator();
                 }
                 if (phases[i].minDuration < 0f)
                 {
@@ -273,45 +280,79 @@ namespace ES
                 return false;
             }
 
-            // 创建Mixer（每个阶段占2个输入：主Clip + 次Clip）
-            int totalInputs = phases.Length * 2;
-            runtime.mixer = AnimationMixerPlayable.Create(graph, totalInputs);
+            runtime.mixer = AnimationMixerPlayable.Create(graph, phases.Length);
 
-            // 创建所有Playables
-            runtime.playables = new AnimationClipPlayable[totalInputs];
-            runtime.weightCache = new float[totalInputs];
-            runtime.weightTargetCache = new float[totalInputs];
-            runtime.weightVelocityCache = new float[totalInputs];
+            // 初始化阶段数据
+            runtime.phaseRuntimes = new AnimationCalculatorRuntime[phases.Length];
+            runtime.phaseOutputs = new Playable[phases.Length];
+            runtime.phaseMixers = new AnimationMixerPlayable[phases.Length];
+            runtime.phasePrimaryPlayables = new AnimationClipPlayable[phases.Length];
+            runtime.phaseSecondaryPlayables = new AnimationClipPlayable[phases.Length];
+            runtime.phaseUsesCalculator = new bool[phases.Length];
+            runtime.phaseBlendWeights = new float[phases.Length];
+            runtime.phaseBlendVelocities = new float[phases.Length];
 
             for (int i = 0; i < phases.Length; i++)
             {
-                int primaryIndex = i * 2;
-                int secondaryIndex = i * 2 + 1;
+                var phase = phases[i];
 
-                // 主Clip
-                if (phases[i].primaryClip != null)
+                if (phase.phaseCalculator != null)
                 {
-                    runtime.playables[primaryIndex] = AnimationClipPlayable.Create(graph, phases[i].primaryClip);
-                    graph.Connect(runtime.playables[primaryIndex], 0, runtime.mixer, primaryIndex);
+                    runtime.phaseUsesCalculator[i] = true;
+                    runtime.phaseRuntimes[i] = phase.phaseCalculator.CreateRuntimeData();
+
+                    Playable phaseOutput = Playable.Null;
+                    bool ok = phase.phaseCalculator.InitializeRuntime(runtime.phaseRuntimes[i], graph, ref phaseOutput);
+                    if (ok && phaseOutput.IsValid())
+                    {
+                        runtime.phaseOutputs[i] = phaseOutput;
+                        graph.Connect(phaseOutput, 0, runtime.mixer, i);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[SequentialStates] 阶段{i} ({phase.phaseName}) 子计算器初始化失败");
+                    }
+                }
+                else
+                {
+                    runtime.phaseUsesCalculator[i] = false;
+                    if (phase.secondaryClip != null)
+                    {
+                        runtime.phaseMixers[i] = AnimationMixerPlayable.Create(graph, 2);
+
+                        if (phase.primaryClip != null)
+                        {
+                            runtime.phasePrimaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.primaryClip);
+                            graph.Connect(runtime.phasePrimaryPlayables[i], 0, runtime.phaseMixers[i], 0);
+                        }
+
+                        runtime.phaseSecondaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.secondaryClip);
+                        graph.Connect(runtime.phaseSecondaryPlayables[i], 0, runtime.phaseMixers[i], 1);
+
+                        runtime.phaseMixers[i].SetInputWeight(0, 1f);
+                        runtime.phaseMixers[i].SetInputWeight(1, 0f);
+
+                        graph.Connect(runtime.phaseMixers[i], 0, runtime.mixer, i);
+                    }
+                    else if (phase.primaryClip != null)
+                    {
+                        runtime.phasePrimaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.primaryClip);
+                        graph.Connect(runtime.phasePrimaryPlayables[i], 0, runtime.mixer, i);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[SequentialStates] 阶段{i} ({phase.phaseName}) 无可用输出");
+                    }
                 }
 
-                // 次Clip（可选）
-                if (phases[i].secondaryClip != null)
-                {
-                    runtime.playables[secondaryIndex] = AnimationClipPlayable.Create(graph, phases[i].secondaryClip);
-                    graph.Connect(runtime.playables[secondaryIndex], 0, runtime.mixer, secondaryIndex);
-                }
-
-                // 初始权重全为0
-                runtime.mixer.SetInputWeight(primaryIndex, 0f);
-                runtime.mixer.SetInputWeight(secondaryIndex, 0f);
+                runtime.mixer.SetInputWeight(i, 0f);
             }
 
-            // 初始化顺序状态机状态
-            runtime.currentWeights = new float[3];  // [0]=当前阶段索引, [1]=阶段时间, [2]=总时间
-            runtime.currentWeights[0] = 0f;  // 从第一个阶段开始
-            runtime.currentWeights[1] = 0f;
-            runtime.currentWeights[2] = 0f;
+            // ★ 修复：使用专用字段代替currentWeights hack（之前currentWeights[0-2]
+            //   存储阶段数据与DirectBlend冲突）
+            runtime.sequencePhaseIndex = 0;  // 从第一个阶段开始
+            runtime.sequencePhaseTime = 0f;
+            runtime.sequenceTotalTime = 0f;
 
             runtime.useSmoothing = blendSmoothTime > 0.001f;
 
@@ -324,15 +365,16 @@ namespace ES
             if (!runtime.mixer.IsValid() || phases.Length == 0)
                 return;
 
-            int currentPhase = (int)runtime.currentWeights[0];
-            float phaseTime = runtime.currentWeights[1];
-            float totalTime = runtime.currentWeights[2];
+            // ★ 修复：使用专用字段代替currentWeights hack
+            int currentPhase = runtime.sequencePhaseIndex;
+            float phaseTime = runtime.sequencePhaseTime;
+            float totalTime = runtime.sequenceTotalTime;
 
             // 更新时间
             phaseTime += deltaTime;
             totalTime += deltaTime;
-            runtime.currentWeights[1] = phaseTime;
-            runtime.currentWeights[2] = totalTime;
+            runtime.sequencePhaseTime = phaseTime;
+            runtime.sequenceTotalTime = totalTime;
 
             // 检查是否需要切换阶段
             bool shouldTransition = false;
@@ -351,8 +393,7 @@ namespace ES
                     shouldTransition = true;
                 }
                 // 检查手动触发
-                else if (phaseTime >= phase.minDuration && 
-                         phase.transitionTrigger.EnumValue != StateDefaultFloatParameter.None)
+                else if (phaseTime >= phase.minDuration && HasTransitionTrigger(phase))
                 {
                     float triggerValue = context.GetFloat(phase.transitionTrigger, 0f);
                     if (triggerValue > 0.5f)  // 触发阈值
@@ -365,6 +406,7 @@ namespace ES
             // 执行阶段切换
             if (shouldTransition)
             {
+                int prevPhase = currentPhase;
                 currentPhase++;
                 if (currentPhase >= phases.Length)
                 {
@@ -377,74 +419,76 @@ namespace ES
                         currentPhase = phases.Length - 1;  // 停留在最后一个阶段
                     }
                 }
-                runtime.currentWeights[0] = currentPhase;
-                runtime.currentWeights[1] = 0f;  // 重置阶段时间
+                if (currentPhase != prevPhase)
+                {
+                    runtime.sequencePrevPhase = prevPhase;
+                    runtime.sequenceInTransition = transitionDuration > 0.001f;
+                    runtime.sequenceTransitionTime = 0f;
+                }
+                runtime.sequencePhaseIndex = currentPhase;
+                runtime.sequencePhaseTime = 0f;  // 重置阶段时间
             }
 
-            // 更新当前阶段的权重
-            if (currentPhase < phases.Length)
+            // 更新阶段内部输出（当前与过渡中的上一个阶段）
+            UpdatePhaseOutput(runtime, currentPhase, context, deltaTime);
+            if (runtime.sequenceInTransition && runtime.sequencePrevPhase >= 0)
             {
-                var phase = phases[currentPhase];
-                int primaryIndex = currentPhase * 2;
-                int secondaryIndex = currentPhase * 2 + 1;
+                UpdatePhaseOutput(runtime, runtime.sequencePrevPhase, context, deltaTime);
+            }
 
-                // 获取混合参数
-                float blendValue = context.GetFloat(phase.blendParameter, 0f);
-                blendValue = Mathf.Clamp01(blendValue);
+            // 计算阶段权重（支持过渡）
+            float currentWeight = 1f;
+            float prevWeight = 0f;
+            int prevPhaseIndex = -1;
 
-                // 计算主次Clip权重
-                float primaryWeight = 1f - blendValue;
-                float secondaryWeight = blendValue;
+            if (runtime.sequenceInTransition)
+            {
+                runtime.sequenceTransitionTime += deltaTime;
+                float t = transitionDuration > 0.001f
+                    ? Mathf.Clamp01(runtime.sequenceTransitionTime / transitionDuration)
+                    : 1f;
 
-                // 计算阶段淡入淡出（基于transitionDuration）
-                float phaseFade = 1f;
-                if (transitionDuration > 0.001f && phaseTime < transitionDuration)
+                currentWeight = t;
+                prevWeight = 1f - t;
+                prevPhaseIndex = runtime.sequencePrevPhase;
+
+                if (t >= 1f)
                 {
-                    phaseFade = phaseTime / transitionDuration;
+                    runtime.sequenceInTransition = false;
+                    runtime.sequencePrevPhase = -1;
+                    prevPhaseIndex = -1;
+                    currentWeight = 1f;
+                    prevWeight = 0f;
                 }
+            }
 
-                // 设置目标权重
-                for (int i = 0; i < runtime.weightTargetCache.Length; i++)
-                    runtime.weightTargetCache[i] = 0f;
+            for (int i = 0; i < phases.Length; i++)
+            {
+                float weight = 0f;
+                if (i == currentPhase)
+                    weight = currentWeight;
+                else if (i == prevPhaseIndex)
+                    weight = prevWeight;
 
-                runtime.weightTargetCache[primaryIndex] = primaryWeight * phaseFade;
-                if (phase.secondaryClip != null)
-                {
-                    runtime.weightTargetCache[secondaryIndex] = secondaryWeight * phaseFade;
-                }
-
-                // 平滑过渡
-                float smoothSpeed = blendSmoothTime > 0.001f ? blendSmoothTime : 0.001f;
-                for (int i = 0; i < runtime.weightTargetCache.Length; i++)
-                {
-                    if (runtime.useSmoothing)
-                    {
-                        runtime.weightCache[i] = Mathf.SmoothDamp(
-                            runtime.weightCache[i],
-                            runtime.weightTargetCache[i],
-                            ref runtime.weightVelocityCache[i],
-                            smoothSpeed,
-                            float.MaxValue,
-                            deltaTime
-                        );
-                    }
-                    else
-                    {
-                        runtime.weightCache[i] = runtime.weightTargetCache[i];
-                    }
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
-                }
+                runtime.mixer.SetInputWeight(i, weight * runtime.totalWeight);
             }
         }
 
         public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
         {
-            if (phases.Length == 0 || runtime.currentWeights == null)
+            if (phases.Length == 0)
                 return null;
 
-            int currentPhase = (int)runtime.currentWeights[0];
+            // ★ 修复：使用专用字段
+            int currentPhase = runtime.sequencePhaseIndex;
             if (currentPhase >= 0 && currentPhase < phases.Length)
             {
+                if (phases[currentPhase].phaseCalculator != null && runtime.phaseRuntimes != null)
+                {
+                    var phaseRuntime = runtime.phaseRuntimes[currentPhase];
+                    if (phaseRuntime != null)
+                        return phases[currentPhase].phaseCalculator.GetCurrentClip(phaseRuntime);
+                }
                 return phases[currentPhase].primaryClip;
             }
 
@@ -453,59 +497,179 @@ namespace ES
 
         public override bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)
         {
-            if (clipIndex < 0 || clipIndex >= runtime.playables.Length)
+            if (phases == null || phases.Length == 0)
+                return false;
+
+            int phaseIndex = clipIndex / 2;
+            int localIndex = clipIndex % 2;
+
+            if (phaseIndex < 0 || phaseIndex >= phases.Length)
             {
                 Debug.LogError($"[SequentialStates] 索引越界: {clipIndex}");
                 return false;
             }
 
-            if (!runtime.playables[clipIndex].IsValid() || newClip == null)
+            if (runtime.phaseUsesCalculator != null && runtime.phaseUsesCalculator[phaseIndex])
             {
-                Debug.LogError($"[SequentialStates] Playable[{clipIndex}]无效或新Clip为null");
+                Debug.LogWarning($"[SequentialStates] 阶段{phaseIndex}使用子计算器，无法通过索引覆盖Clip");
                 return false;
             }
 
-            // 零GC替换
-            var graph = runtime.playables[clipIndex].GetGraph();
-            var oldSpeed = runtime.playables[clipIndex].GetSpeed();
-            var oldTime = runtime.playables[clipIndex].GetTime();
-            var currentWeight = runtime.mixer.GetInputWeight(clipIndex);
+            if (newClip == null)
+            {
+                Debug.LogError("[SequentialStates] 新Clip为null");
+                return false;
+            }
 
-            runtime.mixer.DisconnectInput(clipIndex);
-            runtime.playables[clipIndex].Destroy();
+            if (localIndex == 0)
+            {
+                if (runtime.phasePrimaryPlayables == null || !runtime.phasePrimaryPlayables[phaseIndex].IsValid())
+                {
+                    Debug.LogError($"[SequentialStates] 主Clip Playable无效: phase={phaseIndex}");
+                    return false;
+                }
 
-            runtime.playables[clipIndex] = AnimationClipPlayable.Create(graph, newClip);
-            runtime.playables[clipIndex].SetSpeed(oldSpeed);
-            runtime.playables[clipIndex].SetTime(oldTime);
-            graph.Connect(runtime.playables[clipIndex], 0, runtime.mixer, clipIndex);
-            runtime.mixer.SetInputWeight(clipIndex, currentWeight);
+                var graph = runtime.phasePrimaryPlayables[phaseIndex].GetGraph();
+                var oldSpeed = runtime.phasePrimaryPlayables[phaseIndex].GetSpeed();
+                var oldTime = runtime.phasePrimaryPlayables[phaseIndex].GetTime();
+
+                if (runtime.phaseMixers != null && runtime.phaseMixers[phaseIndex].IsValid())
+                {
+                    runtime.phaseMixers[phaseIndex].DisconnectInput(0);
+                    runtime.phasePrimaryPlayables[phaseIndex].Destroy();
+
+                    runtime.phasePrimaryPlayables[phaseIndex] = AnimationClipPlayable.Create(graph, newClip);
+                    runtime.phasePrimaryPlayables[phaseIndex].SetSpeed(oldSpeed);
+                    runtime.phasePrimaryPlayables[phaseIndex].SetTime(oldTime);
+                    graph.Connect(runtime.phasePrimaryPlayables[phaseIndex], 0, runtime.phaseMixers[phaseIndex], 0);
+                }
+                else
+                {
+                    runtime.mixer.DisconnectInput(phaseIndex);
+                    runtime.phasePrimaryPlayables[phaseIndex].Destroy();
+
+                    runtime.phasePrimaryPlayables[phaseIndex] = AnimationClipPlayable.Create(graph, newClip);
+                    runtime.phasePrimaryPlayables[phaseIndex].SetSpeed(oldSpeed);
+                    runtime.phasePrimaryPlayables[phaseIndex].SetTime(oldTime);
+                    graph.Connect(runtime.phasePrimaryPlayables[phaseIndex], 0, runtime.mixer, phaseIndex);
+                }
+            }
+            else
+            {
+                if (runtime.phaseSecondaryPlayables == null || !runtime.phaseSecondaryPlayables[phaseIndex].IsValid())
+                {
+                    Debug.LogError($"[SequentialStates] 次Clip Playable无效: phase={phaseIndex}");
+                    return false;
+                }
+
+                if (runtime.phaseMixers == null || !runtime.phaseMixers[phaseIndex].IsValid())
+                {
+                    Debug.LogError($"[SequentialStates] 阶段{phaseIndex}不存在次Clip Mixer");
+                    return false;
+                }
+
+                var graph = runtime.phaseSecondaryPlayables[phaseIndex].GetGraph();
+                var oldSpeed = runtime.phaseSecondaryPlayables[phaseIndex].GetSpeed();
+                var oldTime = runtime.phaseSecondaryPlayables[phaseIndex].GetTime();
+
+                runtime.phaseMixers[phaseIndex].DisconnectInput(1);
+                runtime.phaseSecondaryPlayables[phaseIndex].Destroy();
+
+                runtime.phaseSecondaryPlayables[phaseIndex] = AnimationClipPlayable.Create(graph, newClip);
+                runtime.phaseSecondaryPlayables[phaseIndex].SetSpeed(oldSpeed);
+                runtime.phaseSecondaryPlayables[phaseIndex].SetTime(oldTime);
+                graph.Connect(runtime.phaseSecondaryPlayables[phaseIndex], 0, runtime.phaseMixers[phaseIndex], 1);
+            }
 
             return true;
         }
 
         /// <summary>
         /// 重置到第一个阶段（外部调用）
+        /// ★ 修复：使用专用字段
         /// </summary>
         public void ResetSequence(AnimationCalculatorRuntime runtime)
         {
-            if (runtime.currentWeights != null && runtime.currentWeights.Length >= 3)
-            {
-                runtime.currentWeights[0] = 0f;  // 阶段索引
-                runtime.currentWeights[1] = 0f;  // 阶段时间
-                runtime.currentWeights[2] = 0f;  // 总时间
-            }
+            runtime.sequencePhaseIndex = 0;
+            runtime.sequencePhaseTime = 0f;
+            runtime.sequenceTotalTime = 0f;
+            runtime.sequencePrevPhase = -1;
+            runtime.sequenceTransitionTime = 0f;
+            runtime.sequenceInTransition = false;
         }
 
         /// <summary>
         /// 强制跳转到指定阶段（外部调用）
+        /// ★ 修复：使用专用字段
         /// </summary>
         public void JumpToPhase(AnimationCalculatorRuntime runtime, int phaseIndex)
         {
-            if (phaseIndex >= 0 && phaseIndex < phases.Length && runtime.currentWeights != null)
+            if (phaseIndex >= 0 && phaseIndex < phases.Length)
             {
-                runtime.currentWeights[0] = phaseIndex;
-                runtime.currentWeights[1] = 0f;  // 重置阶段时间
+                runtime.sequencePhaseIndex = phaseIndex;
+                runtime.sequencePhaseTime = 0f;
             }
+            runtime.sequencePrevPhase = -1;
+            runtime.sequenceTransitionTime = 0f;
+            runtime.sequenceInTransition = false;
+        }
+
+        private bool HasTransitionTrigger(SequentialPhase phase)
+        {
+            return phase.transitionTrigger.EnumValue != StateDefaultFloatParameter.None ||
+                   !string.IsNullOrEmpty(phase.transitionTrigger.StringValue);
+        }
+
+        private void UpdatePhaseOutput(AnimationCalculatorRuntime runtime, int phaseIndex, in StateMachineContext context, float deltaTime)
+        {
+            if (phaseIndex < 0 || phaseIndex >= phases.Length)
+                return;
+
+            var phase = phases[phaseIndex];
+
+            if (runtime.phaseUsesCalculator != null && runtime.phaseUsesCalculator[phaseIndex])
+            {
+                var phaseRuntime = runtime.phaseRuntimes[phaseIndex];
+                if (phase.phaseCalculator != null && phaseRuntime != null)
+                {
+                    phase.phaseCalculator.UpdateWeights(phaseRuntime, context, deltaTime);
+                }
+                return;
+            }
+
+            if (phase.secondaryClip == null)
+                return;
+
+            if (runtime.phaseMixers == null || !runtime.phaseMixers[phaseIndex].IsValid())
+                return;
+
+            float targetBlend = Mathf.Clamp01(context.GetFloat(phase.blendParameter, 0f));
+
+            if (runtime.phaseBlendWeights == null || runtime.phaseBlendVelocities == null)
+                return;
+
+            if (runtime.useSmoothing)
+            {
+                float smoothSpeed = blendSmoothTime > 0.001f ? blendSmoothTime : 0.001f;
+                runtime.phaseBlendWeights[phaseIndex] = Mathf.SmoothDamp(
+                    runtime.phaseBlendWeights[phaseIndex],
+                    targetBlend,
+                    ref runtime.phaseBlendVelocities[phaseIndex],
+                    smoothSpeed,
+                    float.MaxValue,
+                    deltaTime
+                );
+            }
+            else
+            {
+                runtime.phaseBlendWeights[phaseIndex] = targetBlend;
+            }
+
+            float primaryWeight = 1f - runtime.phaseBlendWeights[phaseIndex];
+            float secondaryWeight = runtime.phaseBlendWeights[phaseIndex];
+
+            runtime.phaseMixers[phaseIndex].SetInputWeight(0, primaryWeight);
+            runtime.phaseMixers[phaseIndex].SetInputWeight(1, secondaryWeight);
         }
     }
 }

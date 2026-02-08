@@ -1,12 +1,12 @@
-# 🎬 基于Playable的多流水线动画状态机系统
+# 🎬 基于Playable的多层级动画状态机系统
 
 ## ✨ 项目概述
 
-这是一个**设计精巧、功能强大**的Unity动画状态机系统,完全基于**Playable API**开发,采用创新的**多流水线架构**和**代价系统**,实现了史上最灵活的动画控制方案。
+这是一个**设计精巧、功能强大**的Unity动画状态机系统,完全基于**Playable API**开发,采用创新的**多层级架构**和**代价系统**,实现了史上最灵活的动画控制方案。
 
 ### 🎯 核心创新
 
-1. **三流水线架构** - 基本线/主线/Buff线独立运行并混合输出
+1. **三层级架构** - 基本线/主线/Buff线独立运行并混合输出
 2. **代价参数化** - 四肢和意愿量化为浮点数,实现精确的动画冲突管理
 3. **备忘状态** - 智能缓存拒绝记录,大幅提升性能
 4. **同路退化** - 优雅的状态降级机制,避免生硬打断
@@ -25,7 +25,7 @@
 - ✅ **MemoizationSystem.cs** - 备忘状态系统,性能优化核心
 - ✅ **StateComponents.cs** - 多态组件系统(Display/Transition/Execution/IK)
 - ✅ **StateDefinition.cs** - 状态定义,完整的状态配置
-- ✅ **StatePipeline.cs** - 流水线管理和状态实例
+- ✅ **StatePipeline.cs** - 层级管理和状态实例
 - ✅ **AnimationClipTable.cs** - Clip配置表ScriptableObject
 - ✅ **StateMachineData.cs** - 状态机数据ScriptableObject
 - ✅ **PlayableStateMachineController.cs** - 主控制器组件
@@ -52,7 +52,7 @@
 
 ## 🚀 核心特性详解
 
-### 1️⃣ 三条流水线 (Three Pipelines)
+### 1️⃣ 三条层级 (Three Pipelines)
 
 ```
 基本线 (Basic) → 跑跳下蹲等基础动作,硬性过渡
@@ -356,7 +356,7 @@ controller.OnStateEntered += (id, pipeline) => {
 
 **创新突破**:
 - 🚀 代价参数化 (量化人体动作)
-- 🚀 三流水线架构 (分类管理)
+- 🚀 三层级架构 (分类管理)
 - 🚀 备忘状态系统 (性能优化)
 - 🚀 同路退化机制 (优雅降级)
 

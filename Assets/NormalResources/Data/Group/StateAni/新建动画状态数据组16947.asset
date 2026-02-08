@@ -24,30 +24,85 @@ MonoBehaviour:
   KeyName: "\u98DE\u884C"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u98DE\u884C"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 16
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
       canBeFeedback: 1
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128556031534694419
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -130,10 +185,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -179,30 +234,85 @@ MonoBehaviour:
   KeyName: "\u7AD9\u7ACB\u79FB\u52A8"
   sharedData:
     basicConfig:
-      stateId: 1
       stateName: "\u7AD9\u7ACB\u79FB\u52A8"
+      stateId: 1
+      layerType: 0
       priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 1
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 0
       canBeFeedback: 1
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128555966166990854
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -285,10 +395,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -366,30 +476,85 @@ MonoBehaviour:
   KeyName: "\u653B\u51FB\u6D4B\u8BD5"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u7AD9\u7ACB\u79FB\u52A8"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 1
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 0
       canBeFeedback: 1
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128555966166990854
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -472,10 +637,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -737,30 +902,85 @@ MonoBehaviour:
   KeyName: "\u8DF3\u8DC3"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u8DF3\u8DC3"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 1
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 0
       canBeFeedback: 0
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128556031534694417
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -843,10 +1063,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -893,30 +1113,85 @@ MonoBehaviour:
   KeyName: "\u9A91\u4E58"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u9A91\u4E58"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 32
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
       canBeFeedback: 1
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128556031534694424
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -999,10 +1274,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -1046,30 +1321,85 @@ MonoBehaviour:
   KeyName: "\u6E38\u6CF3"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u7AD9\u7ACB\u79FB\u52A8"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 1
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
       canBeFeedback: 1
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128555966166990854
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -1152,10 +1482,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -1233,30 +1563,85 @@ MonoBehaviour:
   KeyName: "\u8868\u60C5"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u8868\u60C5"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 1
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 1
-      supportReStart: 1
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 1
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
       canBeFeedback: 0
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 1
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128556031534694427
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -1339,10 +1724,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -1380,30 +1765,85 @@ MonoBehaviour:
   KeyName: "\u6500\u722C"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u6500\u722C"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 16
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
       canBeFeedback: 1
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128556031534694419
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -1486,10 +1926,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -1533,30 +1973,85 @@ MonoBehaviour:
   KeyName: "\u8DB4"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u7AD9\u7ACB\u79FB\u52A8"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 1
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
       canBeFeedback: 1
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128556031534694423
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -1639,10 +2134,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -1688,35 +2183,90 @@ MonoBehaviour:
   KeyName: "\u4E0B\u8E72"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u4E0B\u8E72"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 2
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
       canBeFeedback: 1
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 1
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128555966166990854
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
-    fadeInDuration: 0.2
-    fadeOutDuration: 0.15
+    fadeInDuration: 0.05
+    fadeOutDuration: 0.1
     useAdvancedFadeCurve: 0
     fadeInCurve:
       serializedVersion: 2
@@ -1766,10 +2316,11 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
-    tags: []
-    group: Default
-    displayName: 
-    description: 
+    tags:
+    - Skill
+    group: Skills
+    displayName: "\u6280\u80FD"
+    description: "\u4E34\u65F6\u6280\u80FD"
     icon: {fileID: 0}
     mergeData:
       stateChannelMask: 63
@@ -1794,10 +2345,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -1855,30 +2406,85 @@ MonoBehaviour:
   KeyName: "\u6B7B\u4EA1"
   sharedData:
     basicConfig:
-      stateId: -1
       stateName: "\u6B7B\u4EA1"
+      stateId: -1
+      layerType: 0
       priority: 50
-      pipelineType: 1
-      disableActiveOnSupportFlagSwitching: 0
       stateSupportFlag: 64
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
       canBeFeedback: 1
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 1
       durationMode: 0
       timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
       phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
     hasAnimation: 1
     animationConfig:
       calculator:
         rid: 3128556031534694426
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -1961,10 +2567,10 @@ MonoBehaviour:
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0

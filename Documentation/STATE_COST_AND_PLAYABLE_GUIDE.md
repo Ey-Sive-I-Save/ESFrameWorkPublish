@@ -29,13 +29,13 @@ public float GetTotalCost() => motionCost + agilityCost + targetCost;
 
 ```csharp
 /// <summary>
-/// 检查流水线中的状态是否可以与新状态合并
+/// 检查层级中的状态是否可以与新状态合并
 /// </summary>
 private bool CanMergeByChannelOverlap(StatePipelineRuntime pipeline, StateBase incomingState)
 {
     float totalOverlapCost = 0f;
 
-    // 遍历流水线中的所有状态
+    // 遍历层级中的所有状态
     foreach (var existingState in pipeline.runningStates)
     {
         // 检查Channel是否有重合
@@ -179,15 +179,15 @@ if (targetState.stateSharedData?.hasAnimation == true)
 
 ```
 StateMachine (PlayableGraph)
-    └─ RootMixer (流水线总混合器)
-        ├─ BasicPipeline.mixer (基础流水线混合器)
+    └─ RootMixer (层级总混合器)
+        ├─ BasicPipeline.mixer (基础层级混合器)
         │   ├─ State1.playable (动态插入)
         │   ├─ State2.playable (动态插入)
         │   └─ ...
-        ├─ MainPipeline.mixer (主流水线混合器)
+        ├─ MainPipeline.mixer (主层级混合器)
         │   ├─ State3.playable (动态插入)
         │   └─ ...
-        └─ BuffPipeline.mixer (Buff流水线混合器)
+        └─ BuffPipeline.mixer (Buff层级混合器)
             └─ State4.playable (动态插入)
 ```
 
@@ -211,7 +211,7 @@ private void HotPlugStateToPlayable(StateBase state, StatePipelineRuntime pipeli
         return;
     }
 
-    // 3. 连接到流水线Mixer
+    // 3. 连接到层级Mixer
     int inputIndex = pipeline.mixer.GetInputCount();
     pipeline.mixer.SetInputCount(inputIndex + 1);  // 动态扩展输入
     playableGraph.Connect(statePlayable, 0, pipeline.mixer, inputIndex);

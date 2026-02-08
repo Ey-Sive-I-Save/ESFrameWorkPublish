@@ -3,7 +3,7 @@ using System;
 namespace ES
 {
     /// <summary>
-    /// 流水线Dirty标记（独立运作，位标记组合，低开销）。
+    /// 层级Dirty标记（独立运作，位标记组合，低开销）。
     /// </summary>
     [Flags]
     public enum PipelineDirtyFlags : byte

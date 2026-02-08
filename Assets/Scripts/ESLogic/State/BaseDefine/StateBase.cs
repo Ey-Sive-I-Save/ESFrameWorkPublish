@@ -2,6 +2,7 @@ using ES;
 using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Playables;
 using UnityEngine.Animations;
@@ -33,11 +34,13 @@ namespace ES
         public bool IsRecycled { get; set; }
 
         /// <summary>
-        /// 重置对象状态
+        /// 重置对象状态 —— 彻底清理所有运行时数据
         /// </summary>
         public void OnResetAsPoolable()
         {
             host = null;
+            _layerRuntime = null;
+            _pipelineSlotIndex = -1;
             activationTime = 0f;
             hasEnterTime = 0f;
             normalizedProgress = 0f;
@@ -45,14 +48,21 @@ namespace ES
             loopCount = 0;
             _lastNormalizedProgress = 0f;
             baseStatus = StateBaseStatus.Never;
-            stateRuntimePhase = StateRuntimePhase.Running;
+            stateRuntimePhase = StateRuntimePhase.Pre;
+            _runtimePhaseManual = false;
             strKey = null;
             intKey = -1;
             stateSharedData = null;
             stateVariableData = null;
             _shouldAutoExitFromAnimation = false;
+            _playableWeight = 1f;
+            OnRuntimePhaseChanged = null; // ★ 清理委托引用防止内存泄漏
+
+            // IK/MatchTarget状态
+            _ikActive = false;
+            _matchTargetActive = false;
+
             DestroyPlayable();
-            // 其他字段在此重置
         }
 
         /// <summary>
@@ -62,7 +72,9 @@ namespace ES
         {
             if (!IsRecycled)
             {
-                IsRecycled = true;
+                // ★ 不在这里设置 IsRecycled = true
+                // PushToPool 内部流程：检查IsRecycled → resetMethod → 设置IsRecycled=true → 入栈
+                // 如果提前设置，PushToPool会误判为"已回收"而拒绝入池
                 Pool.PushToPool(this);
             }
         }
@@ -74,7 +86,15 @@ namespace ES
         [NonSerialized]
         public StateMachine host;
 
-        // 建议：添加初始化方法
+        [NonSerialized]
+        private StateLayerRuntime _layerRuntime;
+
+        [NonSerialized]
+        private int _pipelineSlotIndex = -1;
+
+        /// <summary>
+        /// 初始化状态（绑定宿主StateMachine）
+        /// </summary>
         public virtual void Initialize(StateMachine machine)
         {
             host = machine;
@@ -101,7 +121,7 @@ namespace ES
         public float normalizedProgress = 0f;
 
         /// <summary>
-        /// 总体进度（比如05.5代表已经循环了5次）
+        /// 总体进度（比如5.5代表已经循环了5次半）
         /// </summary>
         [NonSerialized]
         public float totalProgress = 0f;
@@ -111,6 +131,7 @@ namespace ES
         /// </summary>
         [NonSerialized]
         public int loopCount = 0;
+
         /// <summary>
         /// 上一帧的归一化进度（用于事件触发检测）
         /// </summary>
@@ -128,10 +149,27 @@ namespace ES
         private AnimationCalculatorRuntime _animationRuntime;
 
         /// <summary>
+        /// 获取动画Runtime（只读访问，用于外部IK/MatchTarget等高级操作）
+        /// </summary>
+        public AnimationCalculatorRuntime AnimationRuntime => _animationRuntime;
+
+        /// <summary>
         /// 动画控制的自动退出标志（AnimationClip反向控制）
         /// </summary>
         [NonSerialized]
         private bool _shouldAutoExitFromAnimation = false;
+
+        /// <summary>
+        /// IK是否已激活（避免重复设置）
+        /// </summary>
+        [NonSerialized]
+        private bool _ikActive = false;
+
+        /// <summary>
+        /// MatchTarget是否已激活
+        /// </summary>
+        [NonSerialized]
+        private bool _matchTargetActive = false;
 
         #endregion
 
@@ -201,15 +239,140 @@ namespace ES
         public int intKey;
         #endregion
 
+        #region 权重
+
+        [NonSerialized]
+        private float _playableWeight = 1f;
+
+        public float PlayableWeight => _playableWeight;
+
+        internal void SetPlayableWeight(float weight)
+        {
+            _playableWeight = Mathf.Clamp01(weight);
+            if (_animationRuntime != null)
+            {
+                _animationRuntime.totalWeight = _playableWeight;
+                ApplyTotalWeightToRuntime(_animationRuntime);
+                ApplyExternalWeightToPipeline();
+            }
+        }
+
+        internal void BindLayerSlot(StateLayerRuntime layer, int slotIndex)
+        {
+            _layerRuntime = layer;
+            _pipelineSlotIndex = slotIndex;
+            ApplyExternalWeightToPipeline();
+        }
+
+        internal void ClearLayerSlot()
+        {
+            _layerRuntime = null;
+            _pipelineSlotIndex = -1;
+        }
+
+        private bool UsesExternalWeight()
+        {
+            return _animationRuntime != null && !_animationRuntime.HasInternalWeightMixer();
+        }
+
+        internal bool ShouldUseExternalPipelineWeight()
+        {
+            return UsesExternalWeight();
+        }
+
+        private void ApplyExternalWeightToPipeline()
+        {
+            if (!UsesExternalWeight()) return;
+            if (_layerRuntime == null || !_layerRuntime.mixer.IsValid()) return;
+            if (_pipelineSlotIndex < 0 || _pipelineSlotIndex >= _layerRuntime.mixer.GetInputCount()) return;
+
+            _layerRuntime.mixer.SetInputWeight(_pipelineSlotIndex, _playableWeight);
+        }
+
+        private static void ApplyTotalWeightToRuntime(AnimationCalculatorRuntime runtime)
+        {
+            if (runtime == null || !runtime.mixer.IsValid()) return;
+
+            int inputCount = runtime.mixer.GetInputCount();
+            if (inputCount <= 0) return;
+
+            float totalWeight = runtime.totalWeight;
+
+            if (runtime.weightCache != null && runtime.weightCache.Length >= inputCount)
+            {
+                for (int i = 0; i < inputCount; i++)
+                {
+                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i] * totalWeight);
+                }
+            }
+            else if (runtime.currentWeights != null && runtime.currentWeights.Length >= inputCount)
+            {
+                for (int i = 0; i < inputCount; i++)
+                {
+                    runtime.mixer.SetInputWeight(i, runtime.currentWeights[i] * totalWeight);
+                }
+            }
+            else
+            {
+                float scale = runtime.lastAppliedTotalWeight > 0f
+                    ? totalWeight / runtime.lastAppliedTotalWeight
+                    : totalWeight;
+
+                for (int i = 0; i < inputCount; i++)
+                {
+                    float currentWeight = runtime.mixer.GetInputWeight(i);
+                    runtime.mixer.SetInputWeight(i, currentWeight * scale);
+                }
+            }
+
+            runtime.lastAppliedTotalWeight = totalWeight;
+        }
+
+        #endregion
+
         #region 状态生命周期
         public StateBaseStatus baseStatus { get; private set; } = StateBaseStatus.Never;
-        public StateRuntimePhase stateRuntimePhase = StateRuntimePhase.Running;
+        public StateRuntimePhase stateRuntimePhase = StateRuntimePhase.Pre;
+        [NonSerialized]
+        private bool _runtimePhaseManual = false;
+
+        public Action<StateBase, StateRuntimePhase, StateRuntimePhase> OnRuntimePhaseChanged;
+
+      
+        public void SetRuntimePhase(StateRuntimePhase phase, bool lockPhase = true)
+        {
+            if (phase != stateRuntimePhase)
+            {
+                var previous = stateRuntimePhase;
+                stateRuntimePhase = phase;
+                OnRuntimePhaseChanged?.Invoke(this, previous, phase);
+            }
+            _runtimePhaseManual = lockPhase;
+        }
+
+        public void SetRuntimePhaseFromCalculator(StateRuntimePhase phase, bool lockPhase = true)
+        {
+            SetRuntimePhase(phase, lockPhase);
+        }
+
+        public void ClearRuntimePhaseOverride()
+        {
+            _runtimePhaseManual = false;
+        }
         public void OnStateEnter()
         {
             if (baseStatus == StateBaseStatus.Running) return;
             baseStatus = StateBaseStatus.Running;
-            stateRuntimePhase = StateRuntimePhase.Running;
+            if (stateRuntimePhase != StateRuntimePhase.Pre)
+            {
+                var previous = stateRuntimePhase;
+                stateRuntimePhase = StateRuntimePhase.Pre;
+                OnRuntimePhaseChanged?.Invoke(this, previous, stateRuntimePhase);
+            }
+            _runtimePhaseManual = false;
             activationTime = Time.time; // 记录激活时间
+
+            SetPlayableWeight(1f);
             
             // 重置运行时数据
             hasEnterTime = 0f;
@@ -221,6 +384,11 @@ namespace ES
             
             // 重置动画事件触发标记
             ResetAnimationEventTriggers();
+
+            // ★ 自动应用IK配置（从Inspector配置到Runtime）
+            ApplyIKConfigOnEnter();
+            // ★ 自动应用MatchTarget配置
+            ApplyMatchTargetConfigOnEnter();
             
             OnStateEnterLogic();
         }
@@ -245,6 +413,24 @@ namespace ES
         {
             if (baseStatus != StateBaseStatus.Running) return;
             baseStatus = StateBaseStatus.Exited;
+            if (stateRuntimePhase != StateRuntimePhase.Released)
+            {
+                var previous = stateRuntimePhase;
+                stateRuntimePhase = StateRuntimePhase.Released;
+                OnRuntimePhaseChanged?.Invoke(this, previous, stateRuntimePhase);
+            }
+
+            // ★ 状态退出时自动清理IK
+            if (stateSharedData?.animationConfig != null && stateSharedData.animationConfig.disableIKOnExit)
+            {
+                DisableIK();
+            }
+            // ★ 状态退出时自动清理MatchTarget
+            if (_matchTargetActive)
+            {
+                CancelMatchTarget();
+            }
+
             //这里需要编写释放逻辑
             OnStateExitLogic();
         }
@@ -273,7 +459,7 @@ namespace ES
         /// 当前动画计算器类型（用于扩展能力判断）
         /// </summary>
         public StateAnimationMixerKind CurrentCalculatorKind
-            => stateSharedData?.animationConfig?.calculator?.CalculatorKind ?? StateAnimationMixerKind.Unknown;
+            => stateSharedData.animationConfig.calculator.CalculatorKind;
 
         /// <summary>
         /// 创建状态的Playable节点 - 零GC高性能实现
@@ -287,20 +473,19 @@ namespace ES
             output = Playable.Null;
 
             // 验证数据有效性
-            if (stateSharedData?.animationConfig?.calculator == null)
-            {
+            var calculator = stateSharedData.animationConfig.calculator;
+            if (calculator == null)
                 return false;
-            }
 
             // 创建运行时数据（仅创建一次）
             if (_animationRuntime == null)
             {
-                _animationRuntime = stateSharedData.animationConfig.calculator.CreateRuntimeData();
+                _animationRuntime = calculator.CreateRuntimeData();
             }
 
             // 委托给Calculator初始化Playable
             Playable tempOutput = Playable.Null;
-            bool success = stateSharedData.animationConfig.calculator.InitializeRuntime(
+            bool success = calculator.InitializeRuntime(
                 _animationRuntime,
                 graph,
                 ref tempOutput
@@ -317,29 +502,82 @@ namespace ES
 
         /// <summary>
         /// 更新动画权重 - 每帧调用（可选）
+        /// ★ 修复：移除了重复的UpdateRuntimeProgress调用（这是导致计算器失效的关键Bug）
         /// </summary>
         /// <param name="context">状态上下文</param>
         /// <param name="deltaTime">帧时间</param>
         public virtual void UpdateAnimationWeights(StateMachineContext context, float deltaTime)
         {
             // 更新运行时数据
+            var shared = stateSharedData;
+            bool hasAnimation = shared.hasAnimation;
+            if (!hasAnimation)
+                return;
+
+            // ★ 累加进入时间（无论是否需要进度追踪都要累加）
             hasEnterTime += deltaTime;
-            UpdateRuntimeProgress(deltaTime);
-            
-            if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
+
+            var basic = shared.basicConfig;
+            bool needsProgress = basic.enableProgressTracking;
+            var phaseConfig = basic.phaseConfig;
+            if (phaseConfig.enablePhase && phaseConfig.enableAutoPhaseByTime)
+                needsProgress = true;
+
+            // ★ 修复：进度更新只调用一次（之前被调用了两次导致2x速度推进！）
+            if (needsProgress)
             {
+                UpdateRuntimeProgress(deltaTime);
+            }
+
+            var runtime = _animationRuntime;
+            var calculator = shared.animationConfig.calculator;
+            if (runtime != null && runtime.IsInitialized && calculator != null)
+            {
+                runtime.totalWeight = _playableWeight;
 #if STATEMACHINEDEBUG
 #if UNITY_EDITOR
                 StateMachineDebugSettings.Instance.LogAnimationBlend(
-                    $"State={stateSharedData.basicConfig.stateName} 进行权重更新");
+                    $"State={shared.basicConfig.stateName} 进行权重更新");
 #endif
 #endif
-                stateSharedData.animationConfig.calculator.UpdateWeights(_animationRuntime, context, deltaTime);
+                calculator.UpdateWeights(runtime, context, deltaTime);
                 
                 // ★ AnimationClip反向控制：检测动画是否播放完毕（仅针对UntilAnimationEnd模式）
-                if (stateSharedData.basicConfig.durationMode == StateDurationMode.UntilAnimationEnd)
+                if (shared.basicConfig.durationMode == StateDurationMode.UntilAnimationEnd)
                 {
-                    CheckAnimationCompletion();
+                    // ★ 关键修复：SequentialClipMixer有自己的完成标志，优先桥接
+                    // CheckAnimationCompletion对SequentialClipMixer无效（所有Playable的Duration=infinity）
+                    if (runtime.sequenceCompleted)
+                    {
+                        MarkAutoExitFromAnimation("SequenceComplete");
+                    }
+                    else
+                    {
+                        CheckAnimationCompletion();
+                    }
+                }
+
+                // ★ 更新IK权重平滑过渡
+                if (runtime.ik.enabled)
+                {
+                    float ikSmooth = shared.animationConfig.ikSmoothTime;
+                    runtime.UpdateIKWeight(ikSmooth, deltaTime);
+
+                    // ★ 动态IK目标追踪：如果配置了Transform引用，每帧同步位置
+                    if (shared.animationConfig.HasDynamicIKTargets())
+                    {
+                        shared.animationConfig.UpdateIKTargetsFromConfig(runtime);
+                    }
+                }
+
+                // ★ 更新MatchTarget进度检查
+                if (runtime.matchTarget.active && !runtime.matchTarget.completed)
+                {
+                    if (normalizedProgress > runtime.matchTarget.endTime)
+                    {
+                        runtime.CompleteMatchTarget();
+                        OnMatchTargetCompleted();
+                    }
                 }
             }
         }
@@ -374,6 +612,9 @@ namespace ES
             
             // 调用进度回调
             OnProgressUpdate(normalizedProgress, totalProgress);
+
+            // 自动阶段评估（无手动锁定时）
+            UpdateAutoRuntimePhase();
             
             // 检测循环完成
             if (loopCount > previousLoopCount)
@@ -383,6 +624,28 @@ namespace ES
             
             // 检测动画事件触发
             CheckAnimationEventTriggers();
+        }
+
+        private void UpdateAutoRuntimePhase()
+        {
+            if (_runtimePhaseManual)
+                return;
+
+            var shared = stateSharedData;
+            if (!shared.hasAnimation)
+                return;
+
+            var phaseConfig = shared.basicConfig.phaseConfig;
+            if (!phaseConfig.enablePhase || !phaseConfig.enableAutoPhaseByTime)
+                return;
+
+            var nextPhase = phaseConfig.EvaluatePhase(normalizedProgress);
+            if (nextPhase != stateRuntimePhase)
+            {
+                var previous = stateRuntimePhase;
+                stateRuntimePhase = nextPhase;
+                OnRuntimePhaseChanged?.Invoke(this, previous, nextPhase);
+            }
         }
 
         /// <summary>
@@ -478,16 +741,6 @@ namespace ES
         /// </summary>
         private void CheckAnimationCompletion()
         {
-            if (stateSharedData?.basicConfig == null)
-            {
-#if STATEMACHINEDEBUG
-#if UNITY_EDITOR
-                StateMachineDebugSettings.Instance.LogWarning("[StateBase] 检测动画完毕失败：stateSharedData或basicConfig为空");
-#endif
-#endif
-                return;
-            }
-
 #if STATEMACHINEDEBUG
 #if UNITY_EDITOR
             StateMachineDebugSettings.Instance.LogAnimationBlend(
@@ -665,6 +918,7 @@ namespace ES
 
         /// <summary>
         /// 销毁Playable - 状态退出时调用（零GC）
+        /// ★ 改进：支持Runtime回收到对象池
         /// </summary>
         public virtual void DestroyPlayable()
         {
@@ -672,8 +926,12 @@ namespace ES
             {
                 // 使用Runtime的Cleanup方法统一清理所有Playable资源
                 _animationRuntime.Cleanup();
+                // ★ 回收到对象池而非丢弃
+                _animationRuntime.TryAutoPushedToPool();
                 _animationRuntime = null;
             }
+            _ikActive = false;
+            _matchTargetActive = false;
         }
 
         /// <summary>
@@ -681,7 +939,7 @@ namespace ES
         /// </summary>
         public virtual AnimationClip GetCurrentClip()
         {
-            if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
+            if (_animationRuntime != null && _animationRuntime.IsInitialized && stateSharedData.animationConfig.calculator != null)
             {
                 return stateSharedData.animationConfig.calculator.GetCurrentClip(_animationRuntime);
             }
@@ -690,13 +948,12 @@ namespace ES
 
         /// <summary>
         /// 检查状态是否应该自动退出（根据持续时间模式）
+        /// ★ 优化：减少冗余的属性访问和类型转换
         /// </summary>
         /// <param name="currentTime">当前时间</param>
         /// <returns>是否应该退出</returns>
         public virtual bool ShouldAutoExit(float currentTime)
         {
-            if (stateSharedData?.basicConfig == null) return false;
-
             var config = stateSharedData.basicConfig;
             float elapsedTime = currentTime - activationTime;
 
@@ -719,7 +976,7 @@ namespace ES
                     return false;
 
                 case StateDurationMode.UntilAnimationEnd:
-                    // 检查动画是否播放完毕（优先使用AnimationClip反向控制的标志）
+                    // ★ 检查动画是否播放完毕（优先使用AnimationClip反向控制的标志）
                     if (_shouldAutoExitFromAnimation)
                     {
 #if STATEMACHINEDEBUG
@@ -731,37 +988,366 @@ namespace ES
                         return true;
                     }
                     
+                    if (!config.enableClipLengthFallback)
+                        return false;
+
                     // 备用逻辑：通过Clip长度计算
-                    if (_animationRuntime?.IsInitialized == true && stateSharedData?.animationConfig?.calculator != null)
-                    {
-                        var clip = stateSharedData.animationConfig.calculator.GetCurrentClip(_animationRuntime);
-                        if (clip != null)
-                        {
-                            // 获取动画速度
-                            float speed = 1.0f;
-                            if (stateSharedData.animationConfig.calculator is StateAnimationMixCalculatorForSimpleClip simpleCalc)
-                            {
-                                speed = simpleCalc.speed;
-                            }
-                            
-                            float animDuration = clip.length / Mathf.Max(0.01f, speed);
-                            if (elapsedTime >= animDuration)
-                            {
-#if UNITY_EDITOR
-                                StateMachineDebugSettings.Instance.LogStateTransition(
-                                    $"[StateBase] ShouldAutoExit=TRUE (ClipLength) | State={stateSharedData.basicConfig.stateName} | Clip={clip.name} | Elapsed={elapsedTime:F3} | AnimDuration={animDuration:F3} | Speed={speed:F3}");
-#endif
-                                return true;
-                            }
-                            return false;
-                        }
-                    }
-                    return false;
+                    return CheckClipLengthFallbackExit(elapsedTime);
 
                 default:
                     return false;
             }
         }
+
+        /// <summary>
+        /// ★ 抽取的Clip长度回退退出逻辑（降低ShouldAutoExit复杂度）
+        /// ★ 修复：SequentialClipMixer使用GetStandardDuration（总时长），而非当前阶段Clip长度
+        ///   之前GetCurrentClip返回当前阶段的Clip，导致用总逝去时间 vs 单阶段时长比较 → 提前退出
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool CheckClipLengthFallbackExit(float elapsedTime)
+        {
+            if (_animationRuntime == null || !_animationRuntime.IsInitialized)
+                return false;
+
+            var calculator = stateSharedData.animationConfig.calculator;
+            if (calculator == null)
+                return false;
+
+            // ★ 优先使用GetStandardDuration（对SequentialClipMixer返回Entry+Main+Exit总时长）
+            float standardDuration = calculator.GetStandardDuration(_animationRuntime);
+            if (standardDuration > 0.001f && !float.IsInfinity(standardDuration) && !float.IsPositiveInfinity(standardDuration))
+            {
+                if (elapsedTime >= standardDuration)
+                {
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                    StateMachineDebugSettings.Instance.LogStateTransition(
+                        $"[StateBase] ShouldAutoExit=TRUE (StandardDuration) | State={stateSharedData.basicConfig.stateName} | Elapsed={elapsedTime:F3} | Duration={standardDuration:F3}");
+#endif
+#endif
+                    return true;
+                }
+                return false;
+            }
+
+            // 回退：单Clip模式
+            var clip = calculator.GetCurrentClip(_animationRuntime);
+            if (clip == null)
+                return false;
+
+            // 获取动画速度
+            float speed = 1.0f;
+            if (calculator is StateAnimationMixCalculatorForSimpleClip simpleCalc)
+            {
+                speed = simpleCalc.speed;
+            }
+
+            float animDuration = clip.length / Mathf.Max(0.01f, speed);
+            if (elapsedTime >= animDuration)
+            {
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                StateMachineDebugSettings.Instance.LogStateTransition(
+                    $"[StateBase] ShouldAutoExit=TRUE (ClipLength) | State={stateSharedData.basicConfig.stateName} | Clip={clip.name} | Elapsed={elapsedTime:F3} | AnimDuration={animDuration:F3} | Speed={speed:F3}");
+#endif
+#endif
+                return true;
+            }
+            return false;
+        }
+
+        #endregion
+
+        #region IK/MatchTarget 配置自动应用
+
+        /// <summary>
+        /// 状态进入时自动从 StateAnimationConfigData 应用IK配置到Runtime
+        /// 仅在 enableIK=true 且 ikSourceMode != CodeOnly 时生效
+        /// </summary>
+        private void ApplyIKConfigOnEnter()
+        {
+            if (_animationRuntime == null || stateSharedData?.animationConfig == null) return;
+            var animConfig = stateSharedData.animationConfig;
+            if (!animConfig.enableIK) return;
+            if (animConfig.ikSourceMode == IKSourceMode.CodeOnly) return;
+
+            // 从Inspector配置数据写入Runtime
+            Transform rootTransform = host?.BoundAnimator?.transform;
+            animConfig.ApplyIKConfigToRuntime(_animationRuntime, rootTransform);
+            _ikActive = true;
+        }
+
+        /// <summary>
+        /// 状态进入时自动从 StateAnimationConfigData 应用MatchTarget配置到Runtime
+        /// 仅在 enableMatchTarget=true 且 autoActivateMatchTarget=true 时生效
+        /// </summary>
+        private void ApplyMatchTargetConfigOnEnter()
+        {
+            if (_animationRuntime == null || stateSharedData?.animationConfig == null) return;
+            var animConfig = stateSharedData.animationConfig;
+            if (!animConfig.enableMatchTarget || !animConfig.autoActivateMatchTarget) return;
+
+            animConfig.ApplyMatchTargetConfigToRuntime(_animationRuntime);
+            _matchTargetActive = true;
+        }
+
+        #endregion
+
+        #region IK支持（商业级特性）
+
+        /// <summary>
+        /// 启用IK并设置目标（由外部系统调用）
+        /// </summary>
+        /// <param name="goal">IK目标（左/右手/脚）</param>
+        /// <param name="position">目标位置</param>
+        /// <param name="rotation">目标旋转</param>
+        /// <param name="weight">权重 [0-1]</param>
+        public void SetIKGoal(AvatarIKGoal goal, Vector3 position, Quaternion rotation, float weight)
+        {
+            if (_animationRuntime == null) return;
+            _ikActive = true;
+            _animationRuntime.SetIKGoal(goal, position, rotation, weight);
+        }
+
+        /// <summary>
+        /// 设置IK提示位置（肘/膝方向引导）
+        /// </summary>
+        public void SetIKHintPosition(AvatarIKHint hint, Vector3 position)
+        {
+            if (_animationRuntime == null) return;
+            _animationRuntime.SetIKHintPosition(hint, position);
+        }
+
+        /// <summary>
+        /// 设置注视目标
+        /// </summary>
+        public void SetLookAtTarget(Vector3 position, float weight)
+        {
+            if (_animationRuntime == null) return;
+            _ikActive = true;
+            _animationRuntime.SetLookAtTarget(position, weight);
+        }
+
+        /// <summary>
+        /// 设置IK总目标权重（平滑过渡）
+        /// </summary>
+        public void SetIKTargetWeight(float weight)
+        {
+            if (_animationRuntime == null) return;
+            _animationRuntime.ik.targetWeight = Mathf.Clamp01(weight);
+        }
+
+        /// <summary>
+        /// 禁用IK
+        /// </summary>
+        public void DisableIK()
+        {
+            _ikActive = false;
+            if (_animationRuntime != null)
+            {
+                _animationRuntime.ik.targetWeight = 0f;
+                // IK权重会在UpdateAnimationWeights中平滑过渡到0
+            }
+        }
+
+        /// <summary>
+        /// IK是否处于活跃状态
+        /// </summary>
+        public bool IsIKActive => _ikActive && _animationRuntime != null && _animationRuntime.ik.enabled;
+
+        /// <summary>
+        /// IK处理回调（子类可重写实现自定义IK逻辑）
+        /// 在OnAnimatorIK中由StateMachine转发调用
+        /// </summary>
+        /// <param name="animator">Animator组件</param>
+        /// <param name="layerIndex">动画层索引</param>
+        protected virtual void OnStateAnimatorIK(Animator animator, int layerIndex)
+        {
+            if (_animationRuntime == null || !_animationRuntime.ik.enabled) return;
+            if (_animationRuntime.ik.weight < 0.001f) return;
+
+            ref var ik = ref _animationRuntime.ik;
+
+            // 注视IK（支持高级权重配置）
+            if (ik.lookAtWeight > 0.001f)
+            {
+                animator.SetLookAtPosition(ik.lookAtPosition);
+
+                var animConfig = stateSharedData?.animationConfig;
+                if (animConfig != null && animConfig.enableIK && animConfig.ikLookAt.enabled)
+                {
+                    // 使用配置的细分权重
+                    var lookCfg = animConfig.ikLookAt;
+                    animator.SetLookAtWeight(
+                        ik.lookAtWeight * ik.weight,
+                        lookCfg.bodyWeight,
+                        lookCfg.headWeight,
+                        lookCfg.eyesWeight,
+                        lookCfg.clampWeight
+                    );
+                }
+                else
+                {
+                    animator.SetLookAtWeight(ik.lookAtWeight * ik.weight);
+                }
+            }
+
+            // 四肢IK
+            ApplyLimbIK(animator, AvatarIKGoal.LeftHand, ik.leftHandPosition, ik.leftHandRotation,
+                ik.leftHandWeight * ik.weight, ik.leftHandHintPosition, AvatarIKHint.LeftElbow);
+            ApplyLimbIK(animator, AvatarIKGoal.RightHand, ik.rightHandPosition, ik.rightHandRotation,
+                ik.rightHandWeight * ik.weight, ik.rightHandHintPosition, AvatarIKHint.RightElbow);
+            ApplyLimbIK(animator, AvatarIKGoal.LeftFoot, ik.leftFootPosition, ik.leftFootRotation,
+                ik.leftFootWeight * ik.weight, ik.leftFootHintPosition, AvatarIKHint.LeftKnee);
+            ApplyLimbIK(animator, AvatarIKGoal.RightFoot, ik.rightFootPosition, ik.rightFootRotation,
+                ik.rightFootWeight * ik.weight, ik.rightFootHintPosition, AvatarIKHint.RightKnee);
+        }
+
+        /// <summary>
+        /// 应用单个肢体IK
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ApplyLimbIK(Animator animator, AvatarIKGoal goal, Vector3 pos, Quaternion rot,
+            float weight, Vector3 hintPos, AvatarIKHint hint)
+        {
+            if (weight < 0.001f) return;
+            animator.SetIKPositionWeight(goal, weight);
+            animator.SetIKRotationWeight(goal, weight);
+            animator.SetIKPosition(goal, pos);
+            animator.SetIKRotation(goal, rot);
+            if (hintPos != Vector3.zero)
+            {
+                animator.SetIKHintPositionWeight(hint, weight);
+                animator.SetIKHintPosition(hint, hintPos);
+            }
+        }
+
+        /// <summary>
+        /// 由StateMachine在OnAnimatorIK时调用（内部接口）
+        /// </summary>
+        internal void ProcessAnimatorIK(Animator animator, int layerIndex)
+        {
+            OnStateAnimatorIK(animator, layerIndex);
+        }
+
+        #endregion
+
+        #region MatchTarget支持（商业级特性）
+
+        /// <summary>
+        /// 启动MatchTarget（根动作对齐到目标位置）
+        /// 用于攀爬、跳跃落地等需要精确对齐的场景
+        /// </summary>
+        /// <param name="targetPos">目标位置</param>
+        /// <param name="targetRot">目标旋转</param>
+        /// <param name="bodyPart">身体部位</param>
+        /// <param name="startNormTime">开始归一化时间 [0-1]</param>
+        /// <param name="endNormTime">结束归一化时间 [0-1]</param>
+        /// <param name="posWeight">位置权重 (XYZ分量)</param>
+        /// <param name="rotWeight">旋转权重 [0-1]</param>
+        public void StartMatchTarget(Vector3 targetPos, Quaternion targetRot, AvatarTarget bodyPart,
+            float startNormTime, float endNormTime, Vector3 posWeight, float rotWeight = 1f)
+        {
+            if (_animationRuntime == null)
+            {
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+                Debug.LogWarning($"[StateBase] StartMatchTarget failed: runtime is null | State={stateSharedData?.basicConfig?.stateName}");
+#endif
+#endif
+                return;
+            }
+
+            _matchTargetActive = true;
+            _animationRuntime.StartMatchTarget(targetPos, targetRot, bodyPart, startNormTime, endNormTime, posWeight, rotWeight);
+        }
+
+        /// <summary>
+        /// 取消MatchTarget
+        /// </summary>
+        public void CancelMatchTarget()
+        {
+            _matchTargetActive = false;
+            if (_animationRuntime != null)
+            {
+                _animationRuntime.ResetMatchTargetData();
+            }
+        }
+
+        /// <summary>
+        /// MatchTarget是否处于活跃状态
+        /// </summary>
+        public bool IsMatchTargetActive => _matchTargetActive && _animationRuntime != null && _animationRuntime.matchTarget.active;
+
+        /// <summary>
+        /// MatchTarget完成回调（子类可重写）
+        /// </summary>
+        protected virtual void OnMatchTargetCompleted()
+        {
+            _matchTargetActive = false;
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
+            StateMachineDebugSettings.Instance.LogStateTransition(
+                $"[StateBase] MatchTarget完成 | State={stateSharedData?.basicConfig?.stateName}");
+#endif
+#endif
+        }
+
+        /// <summary>
+        /// 由StateMachine在Update中调用处理MatchTarget（内部接口）
+        /// </summary>
+        internal void ProcessMatchTarget(Animator animator)
+        {
+            if (_animationRuntime == null || !_animationRuntime.matchTarget.active || _animationRuntime.matchTarget.completed)
+                return;
+
+            if (!_animationRuntime.IsMatchTargetInRange(normalizedProgress))
+                return;
+
+            ref var mt = ref _animationRuntime.matchTarget;
+
+            // ★ 使用Animator.MatchTarget进行实际的根动作对齐
+            if (animator != null && !animator.isMatchingTarget)
+            {
+                var matchRange = new MatchTargetWeightMask(mt.positionWeight, mt.rotationWeight);
+                animator.MatchTarget(
+                    mt.position,
+                    mt.rotation,
+                    mt.bodyPart,
+                    matchRange,
+                    mt.startTime,
+                    mt.endTime
+                );
+            }
+        }
+
+        #endregion
+
+        #region 调试与诊断
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// 获取状态的调试摘要（Editor Only）
+        /// </summary>
+        public string GetDebugSummary()
+        {
+            var sb = new System.Text.StringBuilder(256);
+            sb.Append($"[State] {stateSharedData?.basicConfig?.stateName ?? "NULL"}");
+            sb.Append($" | Status={baseStatus} Phase={stateRuntimePhase}");
+            sb.Append($" | Weight={_playableWeight:F2}");
+            sb.Append($" | Time={hasEnterTime:F2}s Progress={normalizedProgress:F2} Loop={loopCount}");
+            if (_ikActive && _animationRuntime != null)
+                sb.Append($" | IK={_animationRuntime.ik.weight:F2}");
+            if (_matchTargetActive)
+                sb.Append(" | MT=Active");
+            if (_shouldAutoExitFromAnimation)
+                sb.Append(" | AutoExit=Pending");
+            if (_animationRuntime != null)
+                sb.Append($" | Mem={_animationRuntime.GetMemoryFootprint()}B");
+            return sb.ToString();
+        }
+#endif
 
         #endregion
 
@@ -783,8 +1369,12 @@ namespace ES
                 // 预留：实体广播
             }
 
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
             StateMachineDebugSettings.Instance.LogStateTransition(
                 $"[StateMachine] 广播动画事件: {eventName} | State: {state?.strKey} | Param: {eventParam}");
+#endif
+#endif
         }
     }
 }

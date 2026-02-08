@@ -29,7 +29,7 @@ stateMachine.TryActivateState("Idle");           // String键
 stateMachine.TryActivateState(100);              // Int键
 stateMachine.TryActivateState(idleState);        // State对象
 
-// ✅ 流水线明确
+// ✅ 层级明确
 stateMachine.TryActivateState("Attack", StatePipelineType.Main);
 ```
 
@@ -39,7 +39,7 @@ stateMachine.TryActivateState("Attack", StatePipelineType.Main);
 stateMachine.AddTemporaryAnimation(
     "Jump",                    // 键
     jumpClip,                  // Clip
-    StatePipelineType.Main,    // 流水线
+    StatePipelineType.Main,    // 层级
     1.0f,                      // 速度
     false                      // 循环
 );
@@ -72,7 +72,7 @@ bool hasState = stateMachine.HasState("Idle");
 
 #### **问题2：缺少状态查询API**
 ```csharp
-// ❌ 当前：无法便捷查询流水线状态
+// ❌ 当前：无法便捷查询层级状态
 // 需要手动遍历 runningStates
 
 // ✅ 建议：添加查询方法
@@ -105,7 +105,7 @@ if (!result.success) {
 #### ✅ **已支持的基础能力**
 | 功能 | 支持情况 | 说明 |
 |------|---------|------|
-| **多流水线并行** | ✅ 完美支持 | Basic(移动) + Main(攀爬动作) 可并行 |
+| **多层级并行** | ✅ 完美支持 | Basic(移动) + Main(攀爬动作) 可并行 |
 | **状态合并** | ✅ 部分支持 | 通过`StateMergeData`配置通道占用 |
 | **代价计算** | ✅ 完美支持 | 可配置运动/灵活/目标代价 |
 | **动画混合** | ✅ 完美支持 | Playable Graph + 淡入淡出 |
@@ -423,7 +423,7 @@ public bool TryActivateState(StateBase targetState, StatePipelineType pipeline) 
     // 3. 重复检查
     if (runningStates.Contains(targetState)) return false;
     
-    // 4. 流水线检查
+    // 4. 层级检查
     var targetPipeline = GetPipelineByType(pipeline);
     if (targetPipeline == null || !targetPipeline.isEnabled) return false;
     
@@ -448,7 +448,7 @@ if (!success) {
     // 可能原因：
     // - 状态不存在？
     // - 状态机未运行？
-    // - 流水线已满？
+    // - 层级已满？
     // - 通道冲突？
     // - 权限不足？
     // 完全不知道！
@@ -631,7 +631,7 @@ EntityStateDomain (领域层)
 StateMachine (状态机层)
   ├─ 管理状态注册/注销
   ├─ 管理状态激活/停用
-  ├─ 管理3条流水线
+  ├─ 管理3条层级
   ├─ 管理Playable Graph
   ├─ 处理动画混合
   ├─ 处理Fallback逻辑
@@ -658,7 +658,7 @@ StateBase (状态层)
 StateMachine (核心调度)
   ├─ StateRegistryManager (注册管理)
   ├─ StateActivationManager (激活管理)
-  ├─ PipelineManager (流水线管理)
+  ├─ PipelineManager (层级管理)
   ├─ PlayableManager (Playable管理)
   ├─ FallbackManager (Fallback管理)
   └─ TemporaryStateManager (临时状态管理)
@@ -712,7 +712,7 @@ public class StatePlayableAdapter {
 │ Registry     │ Activation   │ Pipeline     │
 │ Manager      │ Manager      │ Manager      │
 ├──────────────┼──────────────┼──────────────┤
-│状态注册/注销  │状态激活/停用  │流水线管理    │
+│状态注册/注销  │状态激活/停用  │层级管理    │
 └──────────────┴──────────────┴──────────────┘
 ┌──────────────┬──────────────┬──────────────┐
 │ Playable     │ Fallback     │ Temporary    │
@@ -819,7 +819,7 @@ public class StateGroup {
 
 #### **4. 状态层混合 (State Layering)**
 ```csharp
-// ❌ 当前：3条固定流水线（Basic/Main/Buff），不够灵活
+// ❌ 当前：3条固定层级（Basic/Main/Buff），不够灵活
 
 // ✅ 大型状态机需要：动态层系统
 // 类似Animator的Layer，支持任意多层
@@ -992,7 +992,7 @@ public bool CanActivateState(string stateKey, out string reason);
 /// 尝试激活状态（扩展版本，返回详细结果）
 /// </summary>
 /// <param name="stateKey">状态键（String或Int）</param>
-/// <param name="pipeline">目标流水线（默认Basic）</param>
+/// <param name="pipeline">目标层级（默认Basic）</param>
 /// <returns>激活结果，包含成功/失败原因/冲突状态等信息</returns>
 /// <example>
 /// var result = stateMachine.TryActivateStateEx("Attack");
@@ -1064,7 +1064,7 @@ public class StateGraphEditorWindow : EditorWindow {
 | 功能模块 | 完成度 | 评分 | 说明 |
 |---------|--------|------|------|
 | **核心状态管理** | 95% | ⭐⭐⭐⭐⭐ | 注册/激活/停用完善 |
-| **多流水线并行** | 100% | ⭐⭐⭐⭐⭐ | 3条流水线支持完美 |
+| **多层级并行** | 100% | ⭐⭐⭐⭐⭐ | 3条层级支持完美 |
 | **动画混合** | 90% | ⭐⭐⭐⭐⭐ | Playable + 淡入淡出 |
 | **Fallback机制** | 100% | ⭐⭐⭐⭐⭐ | 5通道Fallback |
 | **临时动画** | 100% | ⭐⭐⭐⭐⭐ | 热插拔完美 |

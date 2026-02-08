@@ -509,7 +509,8 @@ namespace ES
                 ApplyCameraLook(input.Look, input.EyeHold ? eyeLookScale : 1f, cam, input.EyeHold);
             }
 
-            if (TryGetModule(out EntityBasicMoveRotateModule moveModule))
+            bool hasMoveModule = TryGetModule(out EntityBasicMoveRotateModule moveModule);
+            if (hasMoveModule)
             {
                 Vector3 moveWorld = GetMoveWorld(input.Move, cam, _lastLookWorld) * moveScale;
                 _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
@@ -534,7 +535,19 @@ namespace ES
 
             if (TryGetModule(out global::ES.EntityBasicMountModule mountModule))
             {
-                mountModule.SetMountInput(input.Move, _lastLookWorld, cam);
+                if (!hasMoveModule)
+                {
+                    Vector3 moveWorld = GetMoveWorld(input.Move, cam, _lastLookWorld) * moveScale;
+                    _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
+                    MyCore.SetMoveInput(_smoothedMoveWorld);
+
+                    if (!input.EyeHold)
+                    {
+                        Vector3 targetLook = GetLookWorld(input.Look, cam, _smoothedMoveWorld, turnMode);
+                        _lastLookWorld = SmoothLook(_lastLookWorld, targetLook, lookSmooth);
+                        MyCore.SetLookInput(_lastLookWorld);
+                    }
+                }
                 if (input.ConsumeMountToggle())
                 {
                     if (debugMount)

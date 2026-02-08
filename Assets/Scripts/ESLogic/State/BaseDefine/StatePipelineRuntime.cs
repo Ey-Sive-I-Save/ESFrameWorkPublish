@@ -8,9 +8,9 @@ using UnityEngine.Playables;
 namespace ES
 {
     /// <summary>
-    /// 流水线数据 - 管理单个流水线中的状态
+    /// 层级运行时数据 - 管理单个层级中的状态
     /// </summary>
-    public class StatePipelineRuntime
+    public class StateLayerRuntime
     {
         /// <summary>
         /// 所属状态机引用
@@ -18,11 +18,18 @@ namespace ES
         [NonSerialized]
         public StateMachine stateMachine;
 
-        [LabelText("流水线类型")]
-        public StatePipelineType pipelineType;
+        [LabelText("层级类型")]
+        public StateLayerType layerType;
 
-        [LabelText("主状态"), ShowInInspector, ReadOnly]
-        public StateBase mainState;
+        [LabelText("AvatarMask")]
+        public AvatarMask avatarMask;
+
+        [LabelText("混合模式")]
+        public StateLayerBlendMode blendMode = StateLayerBlendMode.Override;
+
+        [LabelText("允许状态Mask覆盖")]
+        public bool allowStateMaskOverride = false;
+
 
         [LabelText("空转反馈状态"), ShowInInspector]
         public StateBase feedbackState;
@@ -31,7 +38,7 @@ namespace ES
         [NonSerialized]
         public HashSet<StateBase> runningStates = new HashSet<StateBase>();
 
-        [LabelText("流水线权重"), Range(0f, 1f)]
+        [LabelText("层级权重"), Range(0f, 1f)]
         public float weight = 1f;
 
         [LabelText("是否启用")]
@@ -41,13 +48,13 @@ namespace ES
         public byte priority = 0;
 
         /// <summary>
-        /// Playable混合器 - 该流水线的动画混合器
+        /// Playable混合器 - 该层级的动画混合器
         /// </summary>
         [NonSerialized]
         public AnimationMixerPlayable mixer;
 
         /// <summary>
-        /// 该流水线在RootMixer中的输入索引
+        /// 该层级在RootMixer中的输入索引
         /// </summary>
         [NonSerialized]
         public int rootInputIndex = -1;
@@ -100,7 +107,7 @@ namespace ES
         [LabelText("最大Playable槽位")]
         public int maxPlayableSlots = 32;
 
-        // ===== FallBack支持标记系统（每个流水线独立配置）=====
+        // ===== FallBack支持标记系统（每个层级独立配置）=====
         [LabelText("Grounded FallBack")]
         public int FallBackForGrounded = -1;
         [LabelText("Crouched FallBack")]
@@ -124,9 +131,9 @@ namespace ES
         [LabelText("Transition FallBack")]
         public int FallBackForTransition = -1;
 
-        // ===== Dirty机制（流水线级别的脏标记）=====
+        // ===== Dirty机制（层级级别的脏标记）=====
         /// <summary>
-        /// 流水线Dirty标记（独立运作，不再使用等级制）
+        /// 层级Dirty标记（独立运作，不再使用等级制）
         /// </summary>
         [LabelText("Dirty标记"), ShowInInspector, ReadOnly]
         [NonSerialized]
@@ -144,21 +151,21 @@ namespace ES
         public bool IsDirty => dirtyFlags != PipelineDirtyFlags.None;
 
         /// <summary>
-        /// 流水线是否有活动状态
+        /// 层级是否有活动状态
         /// </summary>
         public bool HasActiveStates => runningStates.Count > 0;
 
-        public StatePipelineRuntime(StatePipelineType type, StateMachine machine)
+        public StateLayerRuntime(StateLayerType type, StateMachine machine)
         {
-            pipelineType = type;
+            layerType = type;
             stateMachine = machine;
             runningStates = new HashSet<StateBase>();
         }
 
         /// <summary>
-        /// 更新流水线权重到根部Mixer
+        /// 更新层级权重到根部Mixer
         /// </summary>
-        public void UpdatePipelineMixer()
+        public void UpdateLayerMixer()
         {
             if (stateMachine == null || !stateMachine.IsPlayableGraphValid) return;
 
@@ -172,14 +179,12 @@ namespace ES
         }
 
         /// <summary>
-        /// 获取指定状态在本流水线Mixer中的当前权重
+        /// 获取指定状态在本层级Mixer中的当前权重
         /// </summary>
         public float GetStateWeight(StateBase state)
         {
-            if (state == null || !mixer.IsValid()) return 0f;
-            if (!stateToSlotMap.TryGetValue(state, out int slot)) return 0f;
-            if (slot < 0 || slot >= mixer.GetInputCount()) return 0f;
-            return mixer.GetInputWeight(slot);
+            if (state == null) return 0f;
+            return state.PlayableWeight;
         }
 
         /// <summary>
@@ -228,7 +233,7 @@ namespace ES
 
         /// <summary>
         /// 获取指定支持标记的FallBack状态ID
-        /// 当流水线运行状态为空时，返回此状态ID作为默认回退状态
+        /// 当层级运行状态为空时，返回此状态ID作为默认回退状态
         /// </summary>
         /// <param name="supportFlag">支持标记（传 None 使用 StateMachine 当前SupportFlags）</param>
         /// <returns>FallBack状态ID，-1表示无FallBack</returns>
@@ -256,14 +261,14 @@ namespace ES
                 case StateSupportFlags.Transition: result = FallBackForTransition; break;
                 default:
 #if STATEMACHINEDEBUG
-                        Debug.LogWarning($"[FallBack-Get] ⚠ [{pipelineType}] SupportFlag无效({supportFlag})，回退到Grounded");
+                        Debug.LogWarning($"[FallBack-Get] ⚠ [{layerType}] SupportFlag无效({supportFlag})，回退到Grounded");
 #endif
                         result = ResolveFallBackByFlag(StateSupportFlags.Grounded);
                     break;
             }
 
 #if STATEMACHINEDEBUG
-            Debug.Log($"[FallBack-Get] [{pipelineType}] GetFallBack(原始Flag={originalFlag}, 实际Flag={supportFlag}) -> StateID={result}");
+            Debug.Log($"[FallBack-Get] [{layerType}] GetFallBack(原始Flag={originalFlag}, 实际Flag={supportFlag}) -> StateID={result}");
 #endif
             return result;
         }
@@ -282,7 +287,7 @@ namespace ES
             supportFlag = NormalizeSingleFlag(supportFlag);
 
 #if STATEMACHINEDEBUG
-            Debug.Log($"[FallBack-Set] [{pipelineType}] SetFallBack(StateID={stateID}, 原始Flag={originalFlag}, 实际Flag={supportFlag})");
+            Debug.Log($"[FallBack-Set] [{layerType}] SetFallBack(StateID={stateID}, 原始Flag={originalFlag}, 实际Flag={supportFlag})");
 #endif
 
             switch (supportFlag)
@@ -300,7 +305,7 @@ namespace ES
                 case StateSupportFlags.Transition: FallBackForTransition = stateID; break;
                 default:
 #if STATEMACHINEDEBUG
-                    Debug.LogError($"[FallBack-Set] ✗ [{pipelineType}] 无效的SupportFlag: {supportFlag}");
+                    Debug.LogError($"[FallBack-Set] ✗ [{layerType}] 无效的SupportFlag: {supportFlag}");
 #endif
                     break;
             }
@@ -352,7 +357,7 @@ namespace ES
             dirtyFlags |= flags;
             lastDirtyTime = Time.time;
 #if STATEMACHINEDEBUG
-            Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty添加: {flags} -> {dirtyFlags}");
+            Debug.Log($"[Layer-Dirty] [{layerType}] Dirty添加: {flags} -> {dirtyFlags}");
 #endif
         }
 
@@ -365,7 +370,7 @@ namespace ES
             {
                 if (dirtyFlags == PipelineDirtyFlags.None) return;
 #if STATEMACHINEDEBUG
-                Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty已清空 (旧={dirtyFlags})");
+                Debug.Log($"[Layer-Dirty] [{layerType}] Dirty已清空 (旧={dirtyFlags})");
 #endif
                 dirtyFlags = PipelineDirtyFlags.None;
                 return;
@@ -375,7 +380,7 @@ namespace ES
             {
                 dirtyFlags &= ~flags;
 #if STATEMACHINEDEBUG
-                Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty移除: {flags} -> {dirtyFlags}");
+                Debug.Log($"[Layer-Dirty] [{layerType}] Dirty移除: {flags} -> {dirtyFlags}");
 #endif
             }
         }
@@ -404,7 +409,7 @@ namespace ES
                 dirtyFlags &= ~decayFlags;
                 dirtyFlags |= PipelineDirtyFlags.FallbackCheck;
 #if STATEMACHINEDEBUG
-                Debug.Log($"[Pipeline-Dirty] [{pipelineType}] Dirty衰减 -> {dirtyFlags}");
+                Debug.Log($"[Layer-Dirty] [{layerType}] Dirty衰减 -> {dirtyFlags}");
 #endif
             }
         }
@@ -416,16 +421,15 @@ namespace ES
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"╔═══════════════════════════════════════════════════════════════╗");
-            sb.AppendLine($"║  [{pipelineType}] 流水线连接信息");
+            sb.AppendLine($"║  [{layerType}] 层级连接信息");
             sb.AppendLine($"╚═══════════════════════════════════════════════════════════════╝");
             sb.AppendLine();
 
             // 基本信息
             sb.AppendLine($"┌─ 基本配置 ────────────────────────────────────────────────┐");
-            sb.AppendLine($"│  流水线类型: {pipelineType}");
+            sb.AppendLine($"│  层级类型: {layerType}");
             sb.AppendLine($"│  权重: {weight:F3} | 启用: {(isEnabled ? "✓" : "✗")} | 优先级: {priority}");
             sb.AppendLine($"│  SupportFlag: Grounded={FallBackForGrounded}, Crouched={FallBackForCrouched}, Prone={FallBackForProne}, Swimming={FallBackForSwimming}, Flying={FallBackForFlying}, Mounted={FallBackForMounted}, Climbing={FallBackForClimbing}, SpecialInteraction={FallBackForSpecialInteraction}, Observer={FallBackForObserver}, Dead={FallBackForDead}, Transition={FallBackForTransition}");
-            sb.AppendLine($"│  主状态: {(mainState != null ? $"{mainState.strKey} (ID:{mainState.intKey})" : "无")}");
             sb.AppendLine($"└───────────────────────────────────────────────────────────┘");
             sb.AppendLine();
 
@@ -453,7 +457,7 @@ namespace ES
             sb.AppendLine();
 
             // Mixer自身信息
-            sb.AppendLine($"┌─ 流水线Mixer ─────────────────────────────────────────────┐");
+            sb.AppendLine($"┌─ 层级Mixer ─────────────────────────────────────────────┐");
             if (mixer.IsValid())
             {
                 sb.AppendLine($"│  状态: ✓ 有效");

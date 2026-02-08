@@ -2144,6 +2144,9 @@ MonoBehaviour:
     flyAcceleration: 12
     flyDrag: 0.2
     flyGravityScale: 0.1
+    flyAscendMultiplier: 1.5
+    flyDescendMultiplier: 1
+    flyUngroundTime: 0.1
     swimMaxSpeed: 6
     swimAcceleration: 8
     swimDrag: 0.5
@@ -2254,6 +2257,7 @@ MonoBehaviour:
         eyeLookScale: 1
         eyeReturnSpeed: 10
         debugCamera: 0
+        debugMount: 0
         totalMoveTime: 0
         avgSpeedLast1s: 0
     - rid: 3128555942915604488
@@ -2821,10 +2825,11 @@ MonoBehaviour:
           stateMachineKey: 
           config: {fileID: 11400000, guid: b449f64f05658744a948c6bf1e40c76b, type: 2}
           defaultStateKey: 
-          pipelineBlendMode: 1
+          upperBodyMask: {fileID: 0}
+          lowerBodyMask: {fileID: 0}
           testTempKey: TestAnim
           testClip: {fileID: 0}
-          testPipeline: 1
+          testLayer: 1
           testSpeed: 1
           testLoopable: 0
         defaultStateKey: 

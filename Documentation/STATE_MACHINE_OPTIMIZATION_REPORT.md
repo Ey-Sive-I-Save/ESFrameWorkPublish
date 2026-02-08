@@ -104,7 +104,7 @@ public enum PipelineBlendMode
     Multiplicative
 }
 
-[BoxGroup("流水线管理/混合模式")]
+[BoxGroup("层级管理/混合模式")]
 [LabelText("混合模式"), EnumToggleButtons]
 [InfoBox("Override模式：Main激活时完全覆盖Basic，避免动画过曝")]
 public PipelineBlendMode blendMode = PipelineBlendMode.Override;
@@ -140,7 +140,7 @@ private void ApplyPipelineBlendMode()
 
 #### E. Odin Inspector美化排版
 在StateMachine.cs添加布局标记:
-- [ ] TitleGroup分组：基本信息/流水线管理/性能优化/调试工具
+- [ ] TitleGroup分组：基本信息/层级管理/性能优化/调试工具
 - [ ] BoxGroup细分：权重/混合模式/Dirty设置
 - [ ] InfoBox添加说明
 - [ ] 按钮美化（颜色/大小/图标）
@@ -213,7 +213,7 @@ private void ApplyPipelineBlendMode()
 - [ ] 临时动画测试
   - [ ] 非循环模式：动画播完自动退出
   - [ ] 循环模式：动画持续循环播放
-  - [ ] 切换不同流水线正常工作
+  - [ ] 切换不同层级正常工作
 
 - [ ] 性能测试
   - [ ] 测量优化前后CPU时间

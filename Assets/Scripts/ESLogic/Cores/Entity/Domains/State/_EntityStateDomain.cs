@@ -33,7 +33,7 @@ namespace ES
         public override void _AwakeRegisterAllModules()
         {
             base._AwakeRegisterAllModules();
-            // 必须先初始化StateMachine（创建流水线等基础设施），再初始化StateAniDataPack（注册状态）
+            // 必须先初始化StateMachine（创建层级等基础设施），再初始化StateAniDataPack（注册状态）
             InitializeStateMachine();
             InitializeStateAniDataPack();
         } 
@@ -79,6 +79,16 @@ namespace ES
             
             // 批量注册所有状态
             RegisterStatesFromInfos(stateAniDataPack.Infos.Values, allowOverride: false);
+
+            // 确保默认状态在注册完成后可被激活
+            if (!string.IsNullOrEmpty(defaultStateKey))
+            {
+                var defaultState = stateMachine.GetStateByString(defaultStateKey);
+                if (defaultState != null && defaultState.baseStatus != StateBaseStatus.Running)
+                {
+                    stateMachine.TryActivateState(defaultStateKey);
+                }
+            }
 
             _packDirty = false;
         }
@@ -315,13 +325,13 @@ namespace ES
             foreach (var kvp in stateMachine.stringToStateMap)
             {
                 var state = kvp.Value;
-                var pipelineType = stateMachine.statePipelineMap.ContainsKey(state) 
-                    ? stateMachine.statePipelineMap[state].ToString() 
+                var layerType = stateMachine.stateLayerMap.ContainsKey(state) 
+                    ? stateMachine.stateLayerMap[state].ToString() 
                     : "Unknown";
                 var isRunning = stateMachine.runningStates.Contains(state);
                 var isFallback = state.stateSharedData?.basicConfig?.canBeFeedback ?? false;
                 
-                Debug.Log($"  [{pipelineType}] {kvp.Key} (IntKey:{state.intKey}) - " +
+                Debug.Log($"  [{layerType}] {kvp.Key} (IntKey:{state.intKey}) - " +
                           $"运行:{isRunning}, Fallback:{isFallback}");
             }
         }

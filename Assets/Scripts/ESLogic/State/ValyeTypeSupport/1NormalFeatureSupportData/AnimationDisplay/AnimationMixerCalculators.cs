@@ -21,21 +21,21 @@ namespace ES
     {
         [InspectorName("未知")]
         Unknown = 0,
-        [InspectorName("单一Clip")]
+        [InspectorName("简易·单Clip播放")]
         SimpleClip = 1,
-        [InspectorName("1D混合树")]
+        [InspectorName("简易·1D混合树")]
         BlendTree1D = 2,
-        [InspectorName("2D混合树-方向型")]
+        [InspectorName("2D混合树(方向型)")]
         BlendTree2D_Directional = 3,
-        [InspectorName("2D混合树-笛卡尔型")]
+        [InspectorName("2D混合树(笛卡尔型)")]
         BlendTree2D_Cartesian = 4,
-        [InspectorName("直接混合")]
+        [InspectorName("直接权重混合")]
         DirectBlend = 5,
-        [InspectorName("序列混合器(前-主-后)")]
+        [InspectorName("简易·序列Clip(前-主-后)")]
         SequentialClipMixer = 6,
         [InspectorName("混合器包装器")]
         MixerWrapper = 7,
-        [InspectorName("序列状态播放器")]
+        [InspectorName("高级·序列状态播放器")]
         SequentialStates = 8
     }
     
@@ -72,16 +72,19 @@ namespace ES
         /// <summary>
         /// 创建运行时数据
         /// Runtime与Calculator绑定后不变，保证索引稳定性
+        /// ★ 优化：使用对象池回收，避免GC
         /// </summary>
         public virtual AnimationCalculatorRuntime CreateRuntimeData()
         {
-            return new AnimationCalculatorRuntime();
+            var runtime = AnimationCalculatorRuntime.Pool.GetInPool();
+            runtime.BoundCalculatorKind = CalculatorKind;
+            return runtime;
         }
 
         /// <summary>
         /// 初始化运行时Playable - 连接到PlayableGraph或父Mixer（带统一防重复保护）
         /// 支持多层级：可以连接到主Graph或父级Mixer
-        /// 注意：每个Runtime独立调用，不共享Playable实例
+        /// ★ 优化：设置BoundCalculatorKind和outputPlayable跟踪
         /// </summary>
         /// <param name="runtime">运行时数据(绑定后不变)</param>
         /// <param name="graph">PlayableGraph引用</param>
@@ -97,6 +100,9 @@ namespace ES
                 return true; // 已初始化视为成功
             }
             
+            // ★ 绑定计算器类型标识
+            runtime.BoundCalculatorKind = CalculatorKind;
+            
             // 调用子类具体实现
             bool success = InitializeRuntimeInternal(runtime, graph, ref output);
             
@@ -104,13 +110,17 @@ namespace ES
             if (success)
             {
                 runtime.IsInitialized = true;
+                // ★ 记录输出Playable引用（用于外部查询和IK连接）
+                if (output.IsValid())
+                    runtime.outputPlayable = output;
+                    
                 if (StateMachineDebugSettings.Instance.logRuntimeInit)
-                    StateMachineDebugSettings.Instance.LogRuntimeInit($"✓ [{GetType().Name}] Runtime初始化完成");
+                    StateMachineDebugSettings.Instance.LogRuntimeInit($"[{GetType().Name}] Runtime初始化完成 | Kind={CalculatorKind}");
             }
             else
             {
                 if (StateMachineDebugSettings.Instance.alwaysLogErrors)
-                    StateMachineDebugSettings.Instance.LogError($"✗ [{GetType().Name}] Runtime初始化失败");
+                    StateMachineDebugSettings.Instance.LogError($"[{GetType().Name}] Runtime初始化失败");
             }
             
             return success;
@@ -203,7 +213,7 @@ namespace ES
     /// 简单Clip - 直接播放单个AnimationClip
     /// 支持运行时Clip覆盖，可接入任意Mixer
     /// </summary>
-    [Serializable, TypeRegistryItem("单一Clip播放器")]
+    [Serializable, TypeRegistryItem("简易·单Clip播放")]
     public class StateAnimationMixCalculatorForSimpleClip : StateAnimationMixCalculator
     {
         public AnimationClip clip;
@@ -220,7 +230,7 @@ namespace ES
 
         protected override string GetCalculatorDisplayName()
         {
-            return "单一Clip播放器";
+            return "简易·单Clip播放";
         }
 
             [Range(0f, 3f)]
@@ -258,7 +268,7 @@ namespace ES
                 runtime.singlePlayable = AnimationClipPlayable.Create(graph, clip);
                 runtime.singlePlayable.SetSpeed(speed);
 
-                // 输出Playable供父级连接(支持多层级)
+                // 单Clip直连输出，避免额外Mixer
                 output = runtime.singlePlayable;
                 return true;
             }
@@ -267,6 +277,7 @@ namespace ES
             {
                 // 单Clip无需更新权重，但可通过context支持动态速度
                 // 示例: runtime.singlePlayable.SetSpeed(context.GetFloat("Speed", speed));
+                // 单Clip权重由外部State权重控制
             }
 
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
@@ -331,7 +342,7 @@ namespace ES
         /// 性能: O(log n)查找 + O(1)插值
         /// 支持多层级嵌套，Mixer可连接到父Mixer
         /// </summary>
-        [Serializable, TypeRegistryItem("1D混合树")]
+        [Serializable, TypeRegistryItem("简易·1D混合树")]
         public class StateAnimationMixCalculatorForBlendTree1D : StateAnimationMixCalculator
         {
             [Serializable]
@@ -372,7 +383,7 @@ namespace ES
 
             protected override string GetCalculatorDisplayName()
             {
-                return "1D混合树";
+                return "简易·1D混合树";
             }
 
             [Range(0f, 1f)]
@@ -426,6 +437,13 @@ namespace ES
                 {
                     StateMachineDebugSettings.Instance.LogError("[BlendTree1D] 采样点为空");
                     return false;
+                }
+
+                if (samples.Length == 1 && samples[0].clip != null)
+                {
+                    runtime.singlePlayable = AnimationClipPlayable.Create(graph, samples[0].clip);
+                    output = runtime.singlePlayable;
+                    return true;
                 }
 
                 // 创建Mixer(可被父Mixer连接)
@@ -531,7 +549,7 @@ namespace ES
                     {
                         runtime.weightCache[i] = runtime.weightTargetCache[i];
                     }
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
+                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i] * runtime.totalWeight);
                 }
             }
 
@@ -571,6 +589,11 @@ namespace ES
 
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
             {
+                if (runtime.singlePlayable.IsValid())
+                {
+                    return runtime.singlePlayable.GetAnimationClip();
+                }
+
                 // 返回权重最大的Clip
                 if (samples.Length == 0 || runtime.playables == null)
                     return null;
@@ -596,6 +619,21 @@ namespace ES
             /// </summary>
             public override bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)
             {
+                if (samples.Length == 1 && clipIndex == 0 && runtime.singlePlayable.IsValid())
+                {
+                    var singleGraph = runtime.singlePlayable.GetGraph();
+                    var singleOldSpeed = runtime.singlePlayable.GetSpeed();
+                    var singleOldTime = runtime.singlePlayable.GetTime();
+
+                    runtime.singlePlayable.Destroy();
+                    runtime.singlePlayable = AnimationClipPlayable.Create(singleGraph, newClip);
+                    runtime.singlePlayable.SetSpeed(singleOldSpeed);
+                    runtime.singlePlayable.SetTime(singleOldTime);
+
+                    samples[0].clip = newClip;
+                    return true;
+                }
+
                 if (clipIndex < 0 || clipIndex >= samples.Length)
                 {
                     StateMachineDebugSettings.Instance.LogError($"[BlendTree1D] 索引越界: {clipIndex} (有效范围: 0-{samples.Length - 1})");
@@ -635,6 +673,12 @@ namespace ES
 
             public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
             {
+                if (runtime.singlePlayable.IsValid())
+                {
+                    var clip = runtime.singlePlayable.GetAnimationClip();
+                    return clip != null ? clip.length : 1f;
+                }
+
                 // BlendTree1D: 返回当前权重最大的Clip的长度
                 if (runtime.weightCache == null || runtime.weightCache.Length == 0)
                     return 1f;  // 默认1秒
@@ -750,7 +794,20 @@ namespace ES
 
             protected override bool InitializeRuntimeInternal(AnimationCalculatorRuntime runtime, PlayableGraph graph, ref Playable output)
             {
-                if (samples == null || samples.Length < 3)
+                if (samples == null || samples.Length == 0)
+                {
+                    debugSettings.LogError("[BlendTree2D] 采样点为空");
+                    return false;
+                }
+
+                if (samples.Length == 1 && samples[0].clip != null)
+                {
+                    runtime.singlePlayable = AnimationClipPlayable.Create(graph, samples[0].clip);
+                    output = runtime.singlePlayable;
+                    return true;
+                }
+
+                if (samples.Length < 3)
                 {
                     debugSettings.LogError("[BlendTree2D] 至少需要3个采样点");
                     return false;
@@ -790,7 +847,7 @@ namespace ES
                         
                         // 初始化时给中心点100%权重（默认播放Idle）
                         float initialWeight = (i == centerIndex) ? 1f : 0f;
-                        runtime.mixer.SetInputWeight(i, initialWeight);
+                        runtime.mixer.SetInputWeight(i, initialWeight * runtime.totalWeight);
                         runtime.weightCache[i] = initialWeight;
                         runtime.weightTargetCache[i] = initialWeight;
                     }
@@ -839,6 +896,11 @@ namespace ES
 
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
             {
+                if (runtime.singlePlayable.IsValid())
+                {
+                    return runtime.singlePlayable.GetAnimationClip();
+                }
+
                 // 返回权重最大的Clip
                 if (samples.Length == 0 || runtime.playables == null)
                     return null;
@@ -864,6 +926,21 @@ namespace ES
             /// </summary>
             public override bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)
             {
+                if (samples.Length == 1 && clipIndex == 0 && runtime.singlePlayable.IsValid())
+                {
+                    var singleGraph = runtime.singlePlayable.GetGraph();
+                    var singleOldSpeed = runtime.singlePlayable.GetSpeed();
+                    var singleOldTime = runtime.singlePlayable.GetTime();
+
+                    runtime.singlePlayable.Destroy();
+                    runtime.singlePlayable = AnimationClipPlayable.Create(singleGraph, newClip);
+                    runtime.singlePlayable.SetSpeed(singleOldSpeed);
+                    runtime.singlePlayable.SetTime(singleOldTime);
+
+                    samples[0].clip = newClip;
+                    return true;
+                }
+
                 if (clipIndex < 0 || clipIndex >= samples.Length)
                 {
                     debugSettings.LogError($"[BlendTree2D] 索引越界: {clipIndex} (有效范围: 0-{samples.Length - 1})");
@@ -934,7 +1011,7 @@ namespace ES
         /// 典型应用: 8方向移动(前后左右+4个斜向)
         /// 性能: O(n)三角形查找 + O(1)重心坐标
         /// </summary>
-        [Serializable, TypeRegistryItem("2D混合树-方向型")]
+        [Serializable, TypeRegistryItem("2D混合树(方向型)")]
         public class StateAnimationMixCalculatorForBlendTree2DFreeformDirectional : StateAnimationMixCalculatorForBlendTree2D
         {
             public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.BlendTree2D_Directional;
@@ -948,7 +1025,7 @@ namespace ES
 
             protected override string GetCalculatorDisplayName()
             {
-                return "2D混合树-方向型";
+                return "2D混合树(方向型)";
             }
             // 8方向 Walk + 8方向 Run + 中心Idle 的环形缓存
             [NonSerialized] private bool _ringsPrepared;
@@ -1334,7 +1411,7 @@ namespace ES
                     {
                         runtime.weightCache[i] = runtime.weightTargetCache[i];
                     }
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
+                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i] * runtime.totalWeight);
                 }
             }
         }
@@ -1346,7 +1423,7 @@ namespace ES
         /// 典型应用: Aim Offset (Yaw/Pitch独立混合)
         /// 性能: O(1)查找最近4个点 + O(1)双线性插值
         /// </summary>
-        [Serializable, TypeRegistryItem("2D混合树-笛卡尔型")]
+        [Serializable, TypeRegistryItem("2D混合树(笛卡尔型)")]
         public class StateAnimationMixCalculatorForBlendTree2DFreeformCartesian : StateAnimationMixCalculatorForBlendTree2D
         {
             public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.BlendTree2D_Cartesian;
@@ -1365,7 +1442,7 @@ namespace ES
 
             protected override string GetCalculatorDisplayName()
             {
-                return "2D混合树-笛卡尔型";
+                return "2D混合树(笛卡尔型)";
             }
 
             public override void InitializeCalculator()
@@ -1441,7 +1518,7 @@ namespace ES
                     {
                         runtime.weightCache[i] = runtime.weightTargetCache[i];
                     }
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
+                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i] * runtime.totalWeight);
                 }
             }
 
@@ -1594,7 +1671,7 @@ namespace ES
         /// 性能: O(n)权重更新
         /// 支持多层级嵌套，Mixer可连接到父Mixer
         /// </summary>
-        [Serializable, TypeRegistryItem("直接混合器")]
+        [Serializable, TypeRegistryItem("直接权重混合")]
         public class StateAnimationMixCalculatorForDirectBlend : StateAnimationMixCalculator
         {
             [Serializable]
@@ -1646,7 +1723,7 @@ namespace ES
 
             protected override string GetCalculatorDisplayName()
             {
-                return "直接混合器";
+                return "直接权重混合";
             }
 
             [Range(0f, 1f)]
@@ -1727,7 +1804,7 @@ namespace ES
                     {
                         runtime.playables[i] = AnimationClipPlayable.Create(graph, clips[i].clip);
                         graph.Connect(runtime.playables[i], 0, runtime.mixer, i);
-                        runtime.mixer.SetInputWeight(i, clips[i].defaultWeight);
+                        runtime.mixer.SetInputWeight(i, clips[i].defaultWeight * runtime.totalWeight);
                         runtime.currentWeights[i] = clips[i].defaultWeight;
                         runtime.weightTargetCache[i] = clips[i].defaultWeight;
                     }
@@ -1792,7 +1869,7 @@ namespace ES
                         runtime.currentWeights[i] = runtime.targetWeights[i];
                     }
 
-                    runtime.mixer.SetInputWeight(i, runtime.currentWeights[i]);
+                    runtime.mixer.SetInputWeight(i, runtime.currentWeights[i] * runtime.totalWeight);
                 }
 
                 // 触发权重事件（基于上/下穿越阈值）
@@ -1930,7 +2007,7 @@ namespace ES
         /// - 支持可选前后Clip（Entry/Exit可为null）
         /// - 零GC实现，运行时无分配
         /// </summary>
-        [Serializable, TypeRegistryItem("序列混合器(前-主-后)")]
+        [Serializable, TypeRegistryItem("简易·序列Clip(前-主-后)")]
         public class SequentialClipMixer : StateAnimationMixCalculator
         {
             [BoxGroup("前置动画(Entry)")]
@@ -1972,7 +2049,7 @@ namespace ES
 
             protected override string GetCalculatorDisplayName()
             {
-                return "序列混合器(前-主-后)";
+                return "简易·序列Clip(前-主-后)";
             }
             
             private bool _isCalculatorInitialized;  // 标记Calculator是否已初始化（享元数据）
@@ -2033,23 +2110,33 @@ namespace ES
                 // 创建Mixer（3个输入：Entry、Main、Exit）
                 runtime.mixer = AnimationMixerPlayable.Create(graph, 3);
                 runtime.playables = new AnimationClipPlayable[3];
+                
+                // ★ 关键修复：分配weightCache，使ApplyTotalWeightToRuntime能正确缩放权重
+                // 没有weightCache时，外部fade会通过else分支把权重乘以0，导致再也无法恢复！
+                runtime.weightCache = new float[3];
+
+                // 初始化阶段：Entry或Main
+                runtime.sequencePhase = (entryClip != null) ? 0 : 1;
+                runtime.phaseStartTime = 0f;
 
                 // 创建Entry Playable（可选）
                 if (entryClip != null)
                 {
                     runtime.playables[0] = AnimationClipPlayable.Create(graph, entryClip);
                     runtime.playables[0].SetSpeed(entrySpeed);
-                    runtime.playables[0].SetDuration(entryClip.length / entrySpeed);
+                    // ★ 不使用SetDuration，避免PlayableGraph将Playable标记为Done导致冻结
+                    // ★ 非当前阶段暂停（speed=0），防止时间提前推进
+                    if (runtime.sequencePhase != 0)
+                        runtime.playables[0].Pause();
                     graph.Connect(runtime.playables[0], 0, runtime.mixer, 0);
                 }
 
                 // 创建Main Playable（必须）
                 runtime.playables[1] = AnimationClipPlayable.Create(graph, mainConfig.clip);
                 runtime.playables[1].SetSpeed(mainConfig.speed);
-                if (loopMainClip)
-                {
-                    runtime.playables[1].SetDuration(double.PositiveInfinity); // 无限循环
-                }
+                // ★ 非当前阶段暂停
+                if (runtime.sequencePhase != 1)
+                    runtime.playables[1].Pause();
                 graph.Connect(runtime.playables[1], 0, runtime.mixer, 1);
 
                 // 创建Exit Playable（可选）
@@ -2057,19 +2144,17 @@ namespace ES
                 {
                     runtime.playables[2] = AnimationClipPlayable.Create(graph, exitClip);
                     runtime.playables[2].SetSpeed(exitSpeed);
-                    runtime.playables[2].SetDuration(exitClip.length / exitSpeed);
+                    // ★ Exit始终先暂停（稍后激活时恢复）
+                    runtime.playables[2].Pause();
                     graph.Connect(runtime.playables[2], 0, runtime.mixer, 2);
                 }
 
-                // 初始化：播放Entry或Main
-                runtime.sequencePhase = (entryClip != null) ? 0 : 1;
-                runtime.phaseStartTime = 0f;
                 UpdatePhaseWeights(runtime);
 
                 output = runtime.mixer;
 
                 StateMachineDebugSettings.Instance.LogRuntimeInit(
-                    $"[SequentialMixer] 初始化完成: Entry={entryClip?.name ?? "None"}, Main={mainConfig.clip.name}, Exit={exitClip?.name ?? "None"}");
+                    $"[SequentialMixer] 初始化完成: Entry={entryClip?.name ?? "None"}, Main={mainConfig.clip.name}, Exit={exitClip?.name ?? "None"}, StartPhase={runtime.sequencePhase}");
                 return true;
             }
 
@@ -2131,33 +2216,46 @@ namespace ES
                 // 阶段切换
                 if (phaseCompleted)
                 {
+                    // ★ 暂停当前阶段的Playable（停止时间推进）
+                    if (runtime.sequencePhase < 3 && runtime.playables[runtime.sequencePhase].IsValid())
+                    {
+                        runtime.playables[runtime.sequencePhase].Pause();
+                    }
+
                     runtime.sequencePhase++;
                     runtime.phaseStartTime = 0f;
 
-                    // 重置即将播放的阶段的Playable时间
+                    // ★ 恢复新阶段的Playable：重置时间 → 恢复播放
                     if (runtime.sequencePhase < 3 && runtime.playables[runtime.sequencePhase].IsValid())
                     {
                         runtime.playables[runtime.sequencePhase].SetTime(0);
+                        runtime.playables[runtime.sequencePhase].Play();
                     }
-
-                    UpdatePhaseWeights(runtime);
 
 #if STATEMACHINEDEBUG
                     StateMachineDebugSettings.Instance.LogAnimationBlend(
                         $"[SequentialMixer] 阶段切换: Phase {runtime.sequencePhase - 1} → {runtime.sequencePhase}");
 #endif
                 }
+
+                // ★ 关键修复：每帧都更新阶段权重（不仅仅是切换时）
+                // 外部fade/ApplyTotalWeightToRuntime可能随时修改mixer权重
+                // 必须每帧重新写入正确的 weightCache * totalWeight
+                UpdatePhaseWeights(runtime);
             }
 
             /// <summary>
             /// 更新三个阶段的权重（只有当前阶段权重为1）
+            /// ★ 关键修复：将内部权重(0/1)写入weightCache，使ApplyTotalWeightToRuntime能正确工作
+            /// 之前直接写mixer且不维护weightCache，导致fade-in时权重被清零后永远无法恢复
             /// </summary>
             private void UpdatePhaseWeights(AnimationCalculatorRuntime runtime)
             {
                 for (int i = 0; i < 3; i++)
                 {
-                    float weight = (i == runtime.sequencePhase) ? 1f : 0f;
-                    runtime.mixer.SetInputWeight(i, weight);
+                    float internalWeight = (i == runtime.sequencePhase) ? 1f : 0f;
+                    runtime.weightCache[i] = internalWeight;
+                    runtime.mixer.SetInputWeight(i, internalWeight * runtime.totalWeight);
                 }
             }
 
@@ -2248,11 +2346,20 @@ namespace ES
                 if (!allowEarlyExit || runtime.sequencePhase >= 2)
                     return;
 
+                // ★ 暂停当前阶段
+                if (runtime.playables[runtime.sequencePhase].IsValid())
+                {
+                    runtime.playables[runtime.sequencePhase].Pause();
+                }
+
                 runtime.sequencePhase = 2;
                 runtime.phaseStartTime = 0f;
+
+                // ★ 恢复Exit阶段：重置时间 → 恢复播放
                 if (runtime.playables[2].IsValid())
                 {
                     runtime.playables[2].SetTime(0);
+                    runtime.playables[2].Play();
                 }
                 UpdatePhaseWeights(runtime);
 

@@ -207,7 +207,7 @@ namespace ES
         public static readonly StateActivationResult FailureCrossPipelineConflict = new StateActivationResult
         {
             code = StateActivationCode.Fail,
-            failureReason = "跨流水线冲突",
+            failureReason = "跨层级冲突",
             statesToInterrupt = _sharedEmptyList,
             interruptCount = 0
 #if UNITY_EDITOR

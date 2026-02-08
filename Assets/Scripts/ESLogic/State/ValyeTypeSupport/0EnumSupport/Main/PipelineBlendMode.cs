@@ -5,7 +5,7 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
-    /// 流水线混合模式 - 定义Main线和Basic线如何混合
+    /// 层级混合模式 - 定义Main线和Basic线如何混合
     /// </summary>
     public enum PipelineBlendMode
     {

@@ -1,4 +1,4 @@
-# 基于Playable的多流水线动画状态机系统
+# 基于Playable的多层级动画状态机系统
 
 ## 概述
 
@@ -6,7 +6,7 @@
 
 ### 🎯 核心特性
 
-1. **三条流水线架构**
+1. **三条层级架构**
    - **基本线** (Basic Pipeline): 控制跑跳下蹲等基础动作的硬性过渡支撑动画
    - **主线** (Main Pipeline): 控制技能、表情、交互等互相排斥的动画和执行
    - **Buff线** (Buff Pipeline): 控制Buff效果,可能不输出动作只执行效果
@@ -77,14 +77,14 @@ Core/
 ├── MemoizationSystem.cs              # 备忘状态系统
 ├── StateComponents.cs                # 多态组件系统
 ├── StateDefinition.cs                # 状态定义
-├── StatePipeline.cs                  # 流水线和状态实例
+├── StatePipeline.cs                  # 层级和状态实例
 ├── AnimationClipTable.cs             # Clip配置表
 ├── StateMachineData.cs               # 状态机ScriptableObject
 └── PlayableStateMachineController.cs # 主控制器
 
 ValyeTypeSupport/
 ├── 0EnumSupport/
-│   ├── StatePipelineType.cs         # 流水线类型枚举
+│   ├── StatePipelineType.cs         # 层级类型枚举
 │   └── StateChannelMask.cs          # 通道掩码枚举
 └── 1NormalFeatureSupport/
     ├── StateAnimationClip.cs         # Clip配置基类
@@ -205,12 +205,12 @@ var cost = new StateCost
 3. 在返还持续时间 (recoveryDuration) 内逐步释放
 4. 退出时必须完全返还
 
-### 流水线混合
+### 层级混合
 
-三条流水线独立运行,最终混合输出:
+三条层级独立运行,最终混合输出:
 
 ```csharp
-// 设置流水线权重
+// 设置层级权重
 stateMachineData.basicPipelineWeight = 1.0f;  // 基本线 100%
 stateMachineData.mainPipelineWeight = 1.0f;   // 主线 100%
 stateMachineData.buffPipelineWeight = 0.5f;   // Buff线 50%
@@ -397,7 +397,7 @@ bool success = controller.TryEnterState(stateId: 10);
 // 强制进入状态 (忽略条件和代价)
 controller.TryEnterState(stateId: 10, forceEnter: true);
 
-// 指定流水线
+// 指定层级
 controller.TryEnterState(stateId: 10, StatePipelineType.Main);
 
 // 获取当前状态
@@ -425,7 +425,7 @@ controller.OnStateTransitioned += (from, to, pipeline) =>
 1. **性能优化**
    - 备忘状态系统避免重复测试
    - 按需刷新,减少CPU开销
-   - 流水线独立更新,支持多线程扩展
+   - 层级独立更新,支持多线程扩展
 
 2. **高度复用**
    - Clip表独立管理,可跨项目复用
@@ -446,7 +446,7 @@ controller.OnStateTransitioned += (from, to, pipeline) =>
 5. **精巧架构**
    - 代价系统创新性地解决动画冲突
    - 同路退化机制优雅处理状态降级
-   - 多流水线混合满足复杂动画需求
+   - 多层级混合满足复杂动画需求
    - 组件化设计达到极致解耦
 
 ---

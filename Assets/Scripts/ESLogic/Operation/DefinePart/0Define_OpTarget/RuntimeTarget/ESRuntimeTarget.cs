@@ -73,7 +73,9 @@ namespace ES
         {
             if (!IsRecycled)
             {
-                IsRecycled = true;
+                // ★ 不在这里设置 IsRecycled = true
+                // PushToPool 内部流程：检查IsRecycled → resetMethod → 设置IsRecycled=true → 入栈
+                // 如果提前设置，PushToPool会误判为"已回收"而拒绝入池
                 Pool.PushToPool(this);
             }
         }

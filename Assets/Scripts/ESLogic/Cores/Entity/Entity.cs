@@ -89,7 +89,7 @@ namespace ES
         public void SetCrouch(bool enable)
         {
             if(enable){
-                stateDomain.stateMachine.SetLocomotionSupportFlags(StateSupportFlags.Crouched);
+                stateDomain.stateMachine.SetSupportFlags(StateSupportFlags.Crouched);
             }
             kcc.SetCrouch(enable);
         }
@@ -121,7 +121,7 @@ namespace ES
 
         public void SetLocomotionSupportFlags(StateSupportFlags flags)
         {
-            stateDomain.stateMachine.SetLocomotionSupportFlags(flags);
+            stateDomain.stateMachine.SetSupportFlags(flags);
         }
 
         public void SetVerticalInput(float input)

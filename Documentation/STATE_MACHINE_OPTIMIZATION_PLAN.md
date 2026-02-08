@@ -59,15 +59,15 @@ public string stateMachineKey;
 [LabelText("Debug设置"), InlineProperty, HideLabel]
 public StateMachineDebugSettings debugSettings;
 
-[TitleGroup("流水线管理", "Basic/Main/Buff流水线配置", BoldTitle = true)]
-[BoxGroup("流水线管理/流水线权重")]
+[TitleGroup("层级管理", "Basic/Main/Buff层级配置", BoldTitle = true)]
+[BoxGroup("层级管理/层级权重")]
 [LabelText("Basic权重"), Range(0f, 2f)]
-[InfoBox("Basic流水线通常用于基础循环动画（Idle/Walk/Run）")]
+[InfoBox("Basic层级通常用于基础循环动画（Idle/Walk/Run）")]
 public float basicPipelineWeight = 1.0f;
 
-[BoxGroup("流水线管理/流水线权重")]
+[BoxGroup("层级管理/层级权重")]
 [LabelText("Main权重"), Range(0f, 2f)]
-[InfoBox("Main流水线用于主要动作（攻击/技能/交互）")]
+[InfoBox("Main层级用于主要动作（攻击/技能/交互）")]
 public float mainPipelineWeight = 1.0f;
 
 [TitleGroup("性能优化", "运行时性能参数", BoldTitle = true)]
@@ -203,7 +203,7 @@ public StateMachinePerformanceStats GetPerformanceStats()
 - **预期提升**: ~25% 查找时间减少
 
 ### Dirty检查优化
-- **优化前**: 每帧检查所有流水线
+- **优化前**: 每帧检查所有层级
 - **优化后**: 间隔检查 (0.1秒)
 - **预期提升**: ~60% Dirty相关CPU减少
 

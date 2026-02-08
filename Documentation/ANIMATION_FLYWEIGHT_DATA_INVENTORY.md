@@ -16,7 +16,7 @@ public class StateBasicConfig
     public int stateId;                      // 状态ID（运行时可能被Hash值覆盖）
     public string stateName;                 // 状态标识名称
     public int priority;                     // 默认优先级（0-100，仅作最后判据）
-    public StatePipelineType pipelineType;   // 所属流水线（Basic/Main/Buff）
+    public StatePipelineType pipelineType;   // 所属层级（Basic/Main/Buff）
     public string description;               // 状态描述
     
     // 生命周期配置

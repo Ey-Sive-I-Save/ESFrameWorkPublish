@@ -2,14 +2,14 @@
 
 ## 核心改进
 
-### 1. 零GC流水线管理
+### 1. 零GC层级管理
 - ✅ **移除字典依赖**：完全移除`pipelines`字典，使用直接字段访问
 - ✅ **零GC遍历**：`GetAllPipelines()`使用yield return直接返回字段，无枚举器开销
-- ✅ **崩溃优先**：前两个流水线（Basic/Main）不判空，为空直接崩溃，确保核心流水线正确初始化
+- ✅ **崩溃优先**：前两个层级（Basic/Main）不判空，为空直接崩溃，确保核心层级正确初始化
 
-### 2. 流水线索引管理
+### 2. 层级索引管理
 ```csharp
-// 每个流水线的input索引唯一且不变
+// 每个层级的input索引唯一且不变
 basicPipeline.rootInputIndex = (int)StatePipelineType.Basic;  // 0
 mainPipeline.rootInputIndex = (int)StatePipelineType.Main;    // 1
 buffPipeline.rootInputIndex = (int)StatePipelineType.Buff;    // 2
@@ -17,10 +17,10 @@ buffPipeline.rootInputIndex = (int)StatePipelineType.Buff;    // 2
 
 ### 3. FeedbackState空转机制
 ```csharp
-// 流水线现在支持空转反馈状态
+// 层级现在支持空转反馈状态
 pipeline.feedbackState = someIdleState;
 
-// 当流水线所有状态退出时，自动尝试激活feedbackState
+// 当层级所有状态退出时，自动尝试激活feedbackState
 if (pipelineData.runningStates.Count == 0 && pipelineData.feedbackState != null)
 {
     TryActivateState(pipelineData.feedbackState, pipeline);
@@ -29,14 +29,14 @@ if (pipelineData.runningStates.Count == 0 && pipelineData.feedbackState != null)
 
 **使用示例：**
 ```csharp
-// 设置流水线的空转状态
+// 设置层级的空转状态
 var idleState = new IdleState();
 stateMachine.RegisterState("idle", idleState, StatePipelineType.Main);
 
 var mainPipeline = stateMachine.GetPipeline(StatePipelineType.Main);
 mainPipeline.feedbackState = idleState;
 
-// 现在当主流水线空闲时，会自动激活idle状态
+// 现在当主层级空闲时，会自动激活idle状态
 ```
 
 ### 4. MainState智能选择
@@ -143,7 +143,7 @@ public class MyStateSharedData : StateSharedData
 
 | 项目 | 优化前 | 优化后 |
 |------|--------|--------|
-| 流水线遍历GC | 72B/次 | 0B |
+| 层级遍历GC | 72B/次 | 0B |
 | 字典查找 | O(log n) | O(1) |
 | MainState选择 | 简单逻辑 | 基于代价权重 |
 | 空转处理 | 无 | FeedbackState自动激活 |
@@ -164,17 +164,17 @@ stateMachine.UnregisterState("attack");
 
 ## 最佳实践
 
-1. **必须初始化前两个流水线**
+1. **必须初始化前两个层级**
 ```csharp
-// ✅ 正确：确保基础和主流水线初始化
+// ✅ 正确：确保基础和主层级初始化
 stateMachine.Initialize(entity);
 
 // ❌ 错误：不初始化会崩溃
 ```
 
-2. **为核心流水线设置FeedbackState**
+2. **为核心层级设置FeedbackState**
 ```csharp
-// 推荐为主流水线设置默认空闲状态
+// 推荐为主层级设置默认空闲状态
 mainPipeline.feedbackState = idleState;
 ```
 
@@ -195,7 +195,7 @@ defendState.SetTags("战斗", "防御", "不可打断");
 ## API变更
 
 ### 新增方法
-- `UpdatePipelineMainState(pipeline)` - 更新流水线主状态
+- `UpdatePipelineMainState(pipeline)` - 更新层级主状态
 - `StateSharedData.InitializeExtensions()` - 初始化扩展
 - `StateSharedData.SetExtensionProperty<T>()` - 设置扩展属性
 - `StateSharedData.GetExtensionProperty<T>()` - 获取扩展属性
@@ -206,6 +206,6 @@ defendState.SetTags("战斗", "防御", "不可打断");
 - ❌ `Dictionary<StatePipelineType, StatePipelineRuntime> pipelines` - 已完全移除
 
 ### 修改行为
-- `GetAllPipelines()` - 不再判空前两个流水线
+- `GetAllPipelines()` - 不再判空前两个层级
 - `ExecuteStateActivation()` - 使用代价权重选择MainState
 - `DeactivateState()` - 自动触发FeedbackState

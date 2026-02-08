@@ -15,99 +15,99 @@ namespace ES
     {
         [NonSerialized] private bool _isRuntimeInitialized;
         public bool IsRuntimeInitialized => _isRuntimeInitialized;
-        [HorizontalGroup("Identity", Width = 0.4f)]
-        [VerticalGroup("Identity/Left")]
+        [BoxGroup("标识", ShowLabel = true), PropertyOrder(0)]
+        [LabelText("状态名称")]
+        [InfoBox("优先配置：名称、层级、优先级", InfoMessageType.Info)]
+        public string stateName = "新状态";
+
+        [BoxGroup("标识", ShowLabel = true), PropertyOrder(0)]
         [LabelText("状态ID(重复时会被运行时Hash值顶掉)")]
         [Tooltip("用于唯一标识状态；重复ID会被运行时Hash覆盖。建议由资源导出或工具保证唯一性。")]
         public int stateId;
 
-        [VerticalGroup("Identity/Left")]
-        [LabelText("状态标识名称")]
-        public string stateName = "新状态";
+        [BoxGroup("标识", ShowLabel = true), PropertyOrder(0)]
+        [LabelText("所属层级(重要！)")]
+        public StateLayerType layerType = StateLayerType.Base;
 
-        [VerticalGroup("Identity/Right")]
+        [BoxGroup("标识", ShowLabel = true), PropertyOrder(0)]
         [LabelText("默认优先级(仅作为最后判据)")]
         [Tooltip("优先级仅在所有其它判定无法决断时作为最终比较依据；建议范围0-255。")]
         [Range(0, 255)]
         public byte priority = 50;
 
-        [VerticalGroup("Identity/Right")]
-        [LabelText("所属流水线(重要！)")]
-        public StatePipelineType pipelineType = StatePipelineType.Basic;
-        [VerticalGroup("Identity/Right")]
-        [LabelText("是否必须不允许激活于状态支持标记切换")]
-        public bool disableActiveOnSupportFlagSwitching = false;
-
-        [VerticalGroup("Identity/Right")]
+        [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
         [LabelText("状态所处于的支持标记(无代表通用)")]
         public StateSupportFlags stateSupportFlag = StateSupportFlags.Grounded;
 
-        [VerticalGroup("Identity/Right")]
-        [LabelText("支持ReStart")]
-        public bool supportReStart = false;
-
-
-        [VerticalGroup("Identity/Right")]
+        [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
         [LabelText("忽略进入支持标记")]
         public bool ignoreSupportFlag = false;
 
-        [VerticalGroup("Identity/Right")]
+        [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
+        [LabelText("是否必须不允许激活于状态支持标记切换")]
+        public bool disableActiveOnSupportFlagSwitching = false;
+
+        [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
+        [LabelText("支持ReStart")]
+        public bool supportReStart = false;
+
+        [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
+        [LabelText("进入时重设支持标记")]
+        public bool resetSupportFlagOnEnter = true;
+
+        [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
+        [LabelText("退出时移除支持标记")]
+        public bool removeSupportFlagOnExit = false;
+
+        [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
         [LabelText("可作为Fallback状态")]
         [Tooltip("勾选后该状态可被用作Fallback状态（如资源无匹配或失效时的兜底流转）。")]
         public bool canBeFeedback = false;
 
-        [LabelText("状态描述"), TextArea(2, 3)]
-        public string description = "";
-
-
-
-        [BoxGroup("动画混合配置")]
-        [LabelText("使用直接混合（无淡入淡出）")]
-        [Tooltip("启用后动画立即切换到目标权重，不进行平滑过渡。适用于表情、UI反馈等需要即时响应的动画")]
-        public bool useDirectBlend = false;
-
-        [BoxGroup("动画混合配置")]
-        [LabelText("Avatar Mask（可选）"), AssetsOnly]
-        [Tooltip("指定Avatar Mask来控制动画影响的骨骼范围。\n常用场景：\n- 上半身动作：攻击/换弹仅影响上半身\n- 下半身动作：移动/跳跃仅影响下半身\n- 左手/右手分离控制")]
-        public AvatarMask avatarMask = null;
-
-        [BoxGroup("主状态判据")]
-        [LabelText("主状态判据类型")]
-        [Tooltip("主状态判据：直接权重优先 / 依赖代价计算 / 动态运行时评估。")]
-        public MainStateCriterionType mainStateCriterion = MainStateCriterionType.DirectWeight;
-
-        [BoxGroup("主状态判据")]
-        [LabelText("直接权重(推荐1,范围0-5)")]
-        [Tooltip("主状态判据为“直接权重”时使用；用于初始化阶段预备主状态判据计算与保留。")]
-        [Range(0, 5)]
-        public byte directMainWeight = 1;
-
-        [BoxGroup("主状态判据")]
-        [LabelText("预备主状态判据值(只读)"), ReadOnly]
-        [Tooltip("初始化阶段基于主状态判据类型计算出的预备值（用于享元缓存）。")]
-        public float preparedMainCriterionValue = 0f;
-
-        [BoxGroup("生命周期配置")]
-        [HorizontalGroup("生命周期配置/Duration")]
+        [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
         [LabelText("持续时间模式")]
         [Tooltip("无限：永久持续 | 按动画结束：跟随动画长度 | 定时：指定固定时长")]
         public StateDurationMode durationMode = StateDurationMode.UntilAnimationEnd;
 
-        [HorizontalGroup("生命周期配置/Duration")]
+        [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
         [LabelText("定时时长(秒)"), MinValue(0)]
         [ShowIf("@durationMode == StateDurationMode.Timed")]
         public float timedDuration = 1f;
 
-        [BoxGroup("生命周期配置")]
+        [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
+        [LabelText("启用进度追踪")]
+        [Tooltip("仅在需要阶段/事件/进度时开启，默认关闭以降低开销")]
+        public bool enableProgressTracking = false;
+
+        [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
+        [LabelText("启用Clip时长兜底")]
+        [Tooltip("仅用于UntilAnimationEnd模式的兜底计算，默认关闭")]
+        public bool enableClipLengthFallback = false;
+
+        [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
         [LabelText("运行时阶段配置")]
         [InlineProperty, HideLabel]
         public StatePhaseConfig phaseConfig = new StatePhaseConfig();
+
+        [BoxGroup("混合", ShowLabel = true), PropertyOrder(3)]
+        [LabelText("使用直接混合（无淡入淡出）")]
+        [Tooltip("启用后动画立即切换到目标权重，不进行平滑过渡。适用于表情、UI反馈等需要即时响应的动画")]
+        public bool useDirectBlend = false;
+
+        [BoxGroup("混合", ShowLabel = true), PropertyOrder(3)]
+        [LabelText("Avatar Mask（可选）"), AssetsOnly]
+        [Tooltip("指定Avatar Mask来控制动画影响的骨骼范围。\n常用场景：\n- 上半身动作：攻击/换弹仅影响上半身\n- 下半身动作：移动/跳跃仅影响下半身\n- 左手/右手分离控制")]
+        public AvatarMask avatarMask = null;
+
+        [BoxGroup("说明", ShowLabel = true), PropertyOrder(4)]
+        [LabelText("状态描述"), TextArea(2, 3)]
+        public string description = "";
 
         /// <summary>
         /// 验证并修正配置（编辑器与运行时可调用）。
         /// 会：
         /// - 确保 <see cref="timedDuration"/> 非负
-        /// - 保证 <see cref="phaseConfig.returnStartTime"/> <= <see cref="phaseConfig.releaseStartTime"/>
+        /// - 保证 <see cref="phaseConfig.mainStartTime"/> <= <see cref="phaseConfig.waitStartTime"/>
         /// - 将 <see cref="priority"/> 限制在 [0,255]
         /// </summary>
         public void ValidateAndFix()
@@ -118,46 +118,21 @@ namespace ES
             if (priority < 0) priority = 0;
             if (priority > 255) priority = 255;
 
-            // clamp direct main weight
-            if (directMainWeight > 5) directMainWeight = 5;
-
             // ensure phase ordering
             if (phaseConfig != null)
             {
-                if (phaseConfig.returnStartTime < 0f) phaseConfig.returnStartTime = 0f;
-                if (phaseConfig.returnStartTime > 1f) phaseConfig.returnStartTime = 1f;
-                if (phaseConfig.releaseStartTime < 0f) phaseConfig.releaseStartTime = 0f;
-                if (phaseConfig.releaseStartTime > 1f) phaseConfig.releaseStartTime = 1f;
+                if (phaseConfig.mainStartTime < 0f) phaseConfig.mainStartTime = 0f;
+                if (phaseConfig.mainStartTime > 1f) phaseConfig.mainStartTime = 1f;
+                if (phaseConfig.waitStartTime < 0f) phaseConfig.waitStartTime = 0f;
+                if (phaseConfig.waitStartTime > 1f) phaseConfig.waitStartTime = 1f;
 
-                if (phaseConfig.releaseStartTime < phaseConfig.returnStartTime)
+                if (phaseConfig.waitStartTime < phaseConfig.mainStartTime)
                 {
                     // 保持 release >= return，若不满足则将 release 调整为 return
-                    phaseConfig.releaseStartTime = phaseConfig.returnStartTime;
+                    phaseConfig.waitStartTime = phaseConfig.mainStartTime;
                 }
 
             }
-
-            // ensure prepared value is non-negative
-            if (preparedMainCriterionValue < 0f) preparedMainCriterionValue = 0f;
-        }
-
-        /// <summary>
-        /// 依据主状态判据类型预备主判据值（用于享元缓存）。
-        /// </summary>
-        public void PrepareMainCriterionValue()
-        {
-            switch (mainStateCriterion)
-            {
-                case MainStateCriterionType.DirectWeight:
-                    preparedMainCriterionValue = directMainWeight;
-                    break;
-                case MainStateCriterionType.Dynamic:
-                default:
-                    preparedMainCriterionValue = 0f;
-                    break;
-            }
-
-            if (preparedMainCriterionValue < 0f) preparedMainCriterionValue = 0f;
         }
 
         /// <summary>
@@ -183,13 +158,21 @@ namespace ES
     {
         [NonSerialized] private bool _isRuntimeInitialized;
         public bool IsRuntimeInitialized => _isRuntimeInitialized;
-        [LabelText("返还阶段开始时间(归一化)"), Range(0, 1)]
-        [Tooltip("达到此时间点进入返还阶段，可以开始额外容纳其他动作")]
-        public float returnStartTime = 0.7f;
+        [LabelText("启用阶段")]
+        public bool enablePhase = false;
 
-        [LabelText("释放阶段开始时间(归一化)"), Range(0, 1)]
-        [Tooltip("达到此时间点进入释放阶段，状态不再占据但动画可能未完")]
-        public float releaseStartTime = 0.9f;
+        [LabelText("启用按时间自动切换")]
+        public bool enableAutoPhaseByTime = false;
+
+        [LabelText("Main阶段开始时间(归一化)"), Range(0, 1)]
+        [Tooltip("达到此时间点进入Main阶段")]
+        [FormerlySerializedAs("returnStartTime")]
+        public float mainStartTime = 0.7f;
+
+        [LabelText("Wait阶段开始时间(归一化)"), Range(0, 1)]
+        [Tooltip("达到此时间点进入Wait阶段（回收/衔接）")]
+        [FormerlySerializedAs("releaseStartTime")]
+        public float waitStartTime = 0.9f;
 
         // 代价相关参数已移除
 
@@ -201,24 +184,14 @@ namespace ES
             if (_isRuntimeInitialized) return;
             _isRuntimeInitialized = true;
         }
+
+        public StateRuntimePhase EvaluatePhase(float normalizedProgress)
+        {
+            if (normalizedProgress < mainStartTime)
+                return StateRuntimePhase.Pre;
+            if (normalizedProgress < waitStartTime)
+                return StateRuntimePhase.Main;
+            return StateRuntimePhase.Wait;
+        }
     }
-
-    /// <summary>
-    /// 主状态判据类型
-    /// </summary>
-    public enum MainStateCriterionType
-    {
-        /// <summary>
-        /// 直接设置权重（推荐，0-5）
-        /// </summary>
-        [InspectorName("直接权重")]
-        DirectWeight = 0,
-
-        /// <summary>
-        /// 动态运行时评估
-        /// </summary>
-        [InspectorName("动态评估")]
-        Dynamic = 1
-    }
-
 }

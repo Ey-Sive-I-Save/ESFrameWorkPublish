@@ -54,6 +54,8 @@ namespace ES
     /// </summary>
     public class StateMachineContext
     {
+        public bool enableChangeEvents = true;
+        public bool enableDefaultParamEvents = true;
         // ==================== 状态机元数据 ====================
         /// <summary>
         /// 上下文唯一标识
@@ -123,6 +125,9 @@ namespace ES
         public event Action<string, int> OnIntChanged;
         public event Action<string, bool> OnBoolChanged;
         public event Action<string> OnTriggerFired;
+        public event Action<string, string> OnStringChanged;
+        public event Action<string, UnityEngine.Object> OnEntityChanged;
+        public event Action<string, AnimationCurve> OnCurveChanged;
 
         public StateMachineContext(ContextPool fallbackPool = null)
         {
@@ -159,23 +164,43 @@ namespace ES
         /// </summary>
         public void SetDefaultFloat(StateDefaultFloatParameter param, float value)
         {
+            bool changed = false;
             switch (param)
             {
-                case StateDefaultFloatParameter.SpeedX: SpeedX = value; break;
-                case StateDefaultFloatParameter.SpeedY: SpeedY = value; break;
-                case StateDefaultFloatParameter.SpeedZ: SpeedZ = value; break;
-                case StateDefaultFloatParameter.AimYaw: AimYaw = value; break;
-                case StateDefaultFloatParameter.AimPitch: AimPitch = value; break;
-                case StateDefaultFloatParameter.Speed: Speed = value; break;
-                case StateDefaultFloatParameter.IsGrounded: IsGrounded = value; break;
-                case StateDefaultFloatParameter.WalkSpeedThreshold: WalkSpeedThreshold = value; break;
-                case StateDefaultFloatParameter.RunSpeedThreshold: RunSpeedThreshold = value; break;
-                case StateDefaultFloatParameter.SprintSpeedThreshold: SprintSpeedThreshold = value; break;
-                case StateDefaultFloatParameter.IsWalking: IsWalking = value; break;
-                case StateDefaultFloatParameter.IsRunning: IsRunning = value; break;
-                case StateDefaultFloatParameter.IsSprinting: IsSprinting = value; break;
-                case StateDefaultFloatParameter.IsCrouching: IsCrouching = value; break;
-                case StateDefaultFloatParameter.IsSliding: IsSliding = value; break;
+                case StateDefaultFloatParameter.SpeedX: changed = !Mathf.Approximately(SpeedX, value); SpeedX = value; break;
+                case StateDefaultFloatParameter.SpeedY: changed = !Mathf.Approximately(SpeedY, value); SpeedY = value; break;
+                case StateDefaultFloatParameter.SpeedZ: changed = !Mathf.Approximately(SpeedZ, value); SpeedZ = value; break;
+                case StateDefaultFloatParameter.AimYaw: changed = !Mathf.Approximately(AimYaw, value); AimYaw = value; break;
+                case StateDefaultFloatParameter.AimPitch: changed = !Mathf.Approximately(AimPitch, value); AimPitch = value; break;
+                case StateDefaultFloatParameter.Speed: changed = !Mathf.Approximately(Speed, value); Speed = value; break;
+                case StateDefaultFloatParameter.IsGrounded: changed = !Mathf.Approximately(IsGrounded, value); IsGrounded = value; break;
+                case StateDefaultFloatParameter.WalkSpeedThreshold: changed = !Mathf.Approximately(WalkSpeedThreshold, value); WalkSpeedThreshold = value; break;
+                case StateDefaultFloatParameter.RunSpeedThreshold: changed = !Mathf.Approximately(RunSpeedThreshold, value); RunSpeedThreshold = value; break;
+                case StateDefaultFloatParameter.SprintSpeedThreshold: changed = !Mathf.Approximately(SprintSpeedThreshold, value); SprintSpeedThreshold = value; break;
+                case StateDefaultFloatParameter.IsWalking: changed = !Mathf.Approximately(IsWalking, value); IsWalking = value; break;
+                case StateDefaultFloatParameter.IsRunning: changed = !Mathf.Approximately(IsRunning, value); IsRunning = value; break;
+                case StateDefaultFloatParameter.IsSprinting: changed = !Mathf.Approximately(IsSprinting, value); IsSprinting = value; break;
+                case StateDefaultFloatParameter.IsCrouching: changed = !Mathf.Approximately(IsCrouching, value); IsCrouching = value; break;
+                case StateDefaultFloatParameter.IsSliding: changed = !Mathf.Approximately(IsSliding, value); IsSliding = value; break;
+            }
+
+            if (changed && enableChangeEvents && enableDefaultParamEvents)
+            {
+                if (TryGetDefaultFloatName(param, out string name))
+                {
+                    OnFloatChanged?.Invoke(name, value);
+                }
+            }
+        }
+
+        public void NotifyDefaultFloatChanged(StateDefaultFloatParameter param)
+        {
+            if (!enableChangeEvents || !enableDefaultParamEvents)
+                return;
+
+            if (TryGetDefaultFloatName(param, out string name))
+            {
+                OnFloatChanged?.Invoke(name, GetDefaultFloat(param));
             }
         }
         
@@ -228,7 +253,7 @@ namespace ES
         {
             bool changed = !_floatParams.TryGetValue(name, out float oldValue) || !Mathf.Approximately(oldValue, value);
             _floatParams[name] = value;
-            if (changed)
+            if (changed && enableChangeEvents)
                 OnFloatChanged?.Invoke(name, value);
         }
 
@@ -284,7 +309,7 @@ namespace ES
         {
             bool changed = !_intParams.TryGetValue(name, out int oldValue) || oldValue != value;
             _intParams[name] = value;
-            if (changed)
+            if (changed && enableChangeEvents)
                 OnIntChanged?.Invoke(name, value);
         }
 
@@ -301,7 +326,7 @@ namespace ES
         {
             bool changed = !_boolParams.TryGetValue(name, out bool oldValue) || oldValue != value;
             _boolParams[name] = value;
-            if (changed)
+            if (changed && enableChangeEvents)
                 OnBoolChanged?.Invoke(name, value);
         }
 
@@ -317,7 +342,10 @@ namespace ES
         public void SetTrigger(string name)
         {
             _activeTriggers.Add(name);
-            OnTriggerFired?.Invoke(name);
+            if (enableChangeEvents)
+            {
+                OnTriggerFired?.Invoke(name);
+            }
         }
 
         public bool GetTrigger(string name)
@@ -339,7 +367,10 @@ namespace ES
         #region String Parameters
         public void SetString(string name, string value)
         {
+            bool changed = !_stringParams.TryGetValue(name, out string oldValue) || oldValue != value;
             _stringParams[name] = value;
+            if (changed && enableChangeEvents)
+                OnStringChanged?.Invoke(name, value);
         }
 
         public string GetString(string name, string defaultValue = "")
@@ -353,7 +384,10 @@ namespace ES
         #region Entity Parameters
         public void SetEntity(string name, UnityEngine.Object entity)
         {
+            bool changed = !_entityParams.TryGetValue(name, out var oldValue) || oldValue != entity;
             _entityParams[name] = entity;
+            if (changed && enableChangeEvents)
+                OnEntityChanged?.Invoke(name, entity);
         }
 
         public T GetEntity<T>(string name) where T : UnityEngine.Object
@@ -372,7 +406,10 @@ namespace ES
         #region Curve Parameters (for IK)
         public void SetCurve(string name, AnimationCurve curve)
         {
+            bool changed = !_curveParams.TryGetValue(name, out var oldValue) || oldValue != curve;
             _curveParams[name] = curve;
+            if (changed && enableChangeEvents)
+                OnCurveChanged?.Invoke(name, curve);
         }
 
         public AnimationCurve GetCurve(string name)
@@ -488,6 +525,8 @@ namespace ES
             target.IsSliding = IsSliding;
             target.IsSprintKeyPressed = IsSprintKeyPressed;
             
+            bool originalEvents = target.enableChangeEvents;
+            target.enableChangeEvents = false;
             foreach (var kv in _floatParams) target.SetFloat(kv.Key, kv.Value);
             foreach (var kv in _intParams) target.SetInt(kv.Key, kv.Value);
             foreach (var kv in _boolParams) target.SetBool(kv.Key, kv.Value);
@@ -495,6 +534,30 @@ namespace ES
             foreach (var kv in _entityParams) target.SetEntity(kv.Key, kv.Value);
             foreach (var kv in _curveParams) target.SetCurve(kv.Key, kv.Value);
             foreach (var trigger in _activeTriggers) target.SetTrigger(trigger);
+            target.enableChangeEvents = originalEvents;
+        }
+
+        private static bool TryGetDefaultFloatName(StateDefaultFloatParameter param, out string name)
+        {
+            switch (param)
+            {
+                case StateDefaultFloatParameter.SpeedX: name = "SpeedX"; return true;
+                case StateDefaultFloatParameter.SpeedY: name = "SpeedY"; return true;
+                case StateDefaultFloatParameter.SpeedZ: name = "SpeedZ"; return true;
+                case StateDefaultFloatParameter.AimYaw: name = "AimYaw"; return true;
+                case StateDefaultFloatParameter.AimPitch: name = "AimPitch"; return true;
+                case StateDefaultFloatParameter.Speed: name = "Speed"; return true;
+                case StateDefaultFloatParameter.IsGrounded: name = "IsGrounded"; return true;
+                case StateDefaultFloatParameter.WalkSpeedThreshold: name = "WalkSpeedThreshold"; return true;
+                case StateDefaultFloatParameter.RunSpeedThreshold: name = "RunSpeedThreshold"; return true;
+                case StateDefaultFloatParameter.SprintSpeedThreshold: name = "SprintSpeedThreshold"; return true;
+                case StateDefaultFloatParameter.IsWalking: name = "IsWalking"; return true;
+                case StateDefaultFloatParameter.IsRunning: name = "IsRunning"; return true;
+                case StateDefaultFloatParameter.IsSprinting: name = "IsSprinting"; return true;
+                case StateDefaultFloatParameter.IsCrouching: name = "IsCrouching"; return true;
+                case StateDefaultFloatParameter.IsSliding: name = "IsSliding"; return true;
+                default: name = null; return false;
+            }
         }
         
         #region 共享数据管理（原StateMachineContext功能）

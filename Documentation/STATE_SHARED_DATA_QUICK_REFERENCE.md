@@ -9,7 +9,7 @@
 
 | 字段名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `basicConfig` | StateBasicConfig | 必填 | 状态名称、ID、流水线、优先级 |
+| `basicConfig` | StateBasicConfig | 必填 | 状态名称、ID、层级、优先级 |
 | `hasAnimation` | bool | false | 是否启用动画 |
 | `enableFadeInOut` | bool | true | 是否启用平滑过渡 |
 | `fadeInDuration` | float | 0.2f | 淡入时长（秒） |

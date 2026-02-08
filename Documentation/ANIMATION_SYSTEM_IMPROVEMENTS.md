@@ -528,7 +528,7 @@ lowerBodyLayer.Play(walkClip);
 
 **ES对应：**
 ```csharp
-// ES的流水线系统
+// ES的层级系统
 StatePipelineType.Basic   // ≈ Layer 0
 StatePipelineType.Main     // ≈ Layer 1
 StatePipelineType.Buff     // ≈ Layer 2
@@ -659,7 +659,7 @@ stateMachine.Play("Walk");
 6. ✅ **可扩展** - 自定义State和Mixer
 
 ### ES的优势
-1. ✅ **多流水线** - 3条独立流水线并行
+1. ✅ **多层级** - 3条独立层级并行
 2. ✅ **Fallback机制** - 5通道Fallback
 3. ✅ **详细配置** - 更细粒度的控制
 4. ✅ **状态合并** - 通道占用和冲突处理
@@ -667,6 +667,6 @@ stateMachine.Play("Walk");
 
 ### 建议整合
 - 引入Animancer的简单API和声明式转换
-- 保留ES的多流水线和Fallback机制
+- 保留ES的多层级和Fallback机制
 - 完善事件系统，参考Animancer设计
 - 简化使用方式，降低学习曲线

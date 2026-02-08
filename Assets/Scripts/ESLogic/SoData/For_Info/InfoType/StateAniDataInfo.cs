@@ -204,10 +204,6 @@ namespace ES
         [LabelText("过渡曲线")]
         public AnimationCurve transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
         
-        [LabelText("自动转换规则")]
-        [ListDrawerSettings(ShowIndexLabels = true, ShowFoldout = false)]
-        public List<StateTransition> autoTransitions = new List<StateTransition>();
-        
         // 运行时预计算数据（缓存曲线采样，避免每帧Evaluate）
         [NonSerialized] private float[] _cachedCurveSamples;
         [NonSerialized] private const int CURVE_SAMPLE_COUNT = 32;
@@ -221,10 +217,6 @@ namespace ES
             transitionDuration = 0.3f;
             transitionMode = TransitionMode.Blend;
             transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
-            if (autoTransitions == null)
-                autoTransitions = new List<StateTransition>();
-            else
-                autoTransitions.Clear();
         }
         
         /// <summary>
@@ -258,73 +250,6 @@ namespace ES
     }
     
     /// <summary>
-    /// 条件配置 - 进入/保持/退出条件
-    /// </summary>
-    [Serializable]
-    public class StateConditionConfig
-    {
-        [LabelText("进入条件")]
-        [ListDrawerSettings(ShowIndexLabels = true, ShowFoldout = false)]
-        [SerializeReference]
-        public List<StateCondition> enterConditions = new List<StateCondition>();
-        
-        [LabelText("保持条件")]
-        [ListDrawerSettings(ShowIndexLabels = true, ShowFoldout = false)]
-        [SerializeReference]
-        public List<StateCondition> keepConditions = new List<StateCondition>();
-        
-        [LabelText("退出条件")]
-        [ListDrawerSettings(ShowIndexLabels = true, ShowFoldout = false)]
-        [SerializeReference]
-        public List<StateCondition> exitConditions = new List<StateCondition>();
-        
-        // 运行时预计算数据（缓存条件数量，避免Count访问）
-        [NonSerialized] private int _enterConditionCount;
-        [NonSerialized] private int _keepConditionCount;
-        [NonSerialized] private int _exitConditionCount;
-        [NonSerialized] private bool _isInitialized;
-        
-        /// <summary>
-        /// 重置为默认值
-        /// </summary>
-        public void ResetToDefault()
-        {
-            if (enterConditions == null)
-                enterConditions = new List<StateCondition>();
-            else
-                enterConditions.Clear();
-                
-            if (keepConditions == null)
-                keepConditions = new List<StateCondition>();
-            else
-                keepConditions.Clear();
-                
-            if (exitConditions == null)
-                exitConditions = new List<StateCondition>();
-            else
-                exitConditions.Clear();
-        }
-        
-        /// <summary>
-        /// 初始化预计算数据（运行时调用）
-        /// </summary>
-        public void Initialize()
-        {
-            if (_isInitialized) return;
-            
-            _enterConditionCount = enterConditions?.Count ?? 0;
-            _keepConditionCount = keepConditions?.Count ?? 0;
-            _exitConditionCount = exitConditions?.Count ?? 0;
-            
-            _isInitialized = true;
-        }
-        
-        public bool HasEnterConditions() => _enterConditionCount > 0;
-        public bool HasKeepConditions() => _keepConditionCount > 0;
-        public bool HasExitConditions() => _exitConditionCount > 0;
-    }
-    
-    /// <summary>
     /// 高级配置 - 打断、退化、备忘
     /// </summary>
     [Serializable]
@@ -332,9 +257,6 @@ namespace ES
     {
         [ToggleLeft, LabelText("允许弱打断")]
         public bool allowWeakInterrupt = false;
-        
-        [LabelText("同路类型"), ShowIf("allowWeakInterrupt")]
-        public SamePathType samePathType = SamePathType.None;
         
         [LabelText("退化目标ID"), ShowIf("allowWeakInterrupt")]
         public int degradeTargetId = -1;
@@ -361,7 +283,6 @@ namespace ES
         public void ResetToDefault()
         {
             allowWeakInterrupt = false;
-            samePathType = SamePathType.None;
             degradeTargetId = -1;
             enableMemoization = true;
             memoizationTimeout = 0.5f;

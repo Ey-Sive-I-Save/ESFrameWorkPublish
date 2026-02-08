@@ -259,7 +259,7 @@ state.Events.OnEnd = () => ReturnToIdle();
 | **事件系统** | ✅ 完善 | ✅ **本次已添加** | **现在相当** |
 | 分层系统 | Layers | Pipelines | 功能相似 |
 | 零GC | ✅ | ✅ | 相当 |
-| 多流水线 | ❌ | ✅ | **ES胜** |
+| 多层级 | ❌ | ✅ | **ES胜** |
 | Fallback | ❌ | ✅ | **ES胜** |
 
 ---

@@ -34,7 +34,7 @@ namespace ES.Examples
                 {
                     stateName = "Walk_Base",
                     stateId = 100,
-                    pipelineType = StatePipelineType.Main,
+                    layerType = StateLayerType.Main,
                     priority = 50
                 },
                 mergeData = new StateMergeData
@@ -70,7 +70,7 @@ namespace ES.Examples
             {
                 basicConfig = new StateBasicConfig
                 {
-                    pipelineType = StatePipelineType.Main,
+                    layerType = StateLayerType.Main,
                     priority = 80,
                     durationMode = StateDurationMode.UntilAnimationEnd
                 },
@@ -121,7 +121,7 @@ namespace ES.Examples
                 {
                     stateName = "Dash_Default", // 默认名（会被覆盖）
                     stateId = -1, // 自动分配（会被覆盖）
-                    pipelineType = StatePipelineType.Main
+                    layerType = StateLayerType.Main
                 },
                 hasAnimation = true
             };
@@ -158,7 +158,7 @@ namespace ES.Examples
                 {
                     stateName = "FireBall",
                     stateId = 8001,
-                    pipelineType = StatePipelineType.Buff
+                    layerType = StateLayerType.Buff
                 },
                 hasAnimation = true
             };
@@ -223,7 +223,7 @@ namespace ES.Examples
                 {
                     stateName = "Jump",
                     stateId = 3001,
-                    pipelineType = StatePipelineType.Main
+                    layerType = StateLayerType.Main
                 }
             };
             return info;

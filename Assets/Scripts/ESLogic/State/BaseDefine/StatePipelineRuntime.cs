@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.Animations;
@@ -36,10 +37,13 @@ namespace ES
 
         [LabelText("当前运行状态集合"), ShowInInspector, ReadOnly]
         [NonSerialized]
-        public HashSet<StateBase> runningStates = new HashSet<StateBase>();
+        public SwapBackSet<StateBase> runningStates = new SwapBackSet<StateBase>(16);
 
         [LabelText("层级权重"), Range(0f, 1f)]
         public float weight = 1f;
+
+        [NonSerialized]
+        internal float lastAppliedRootMixerWeight = float.NaN;
 
         [LabelText("是否启用")]
         public bool isEnabled = true;
@@ -52,6 +56,27 @@ namespace ES
         /// </summary>
         [NonSerialized]
         public AnimationMixerPlayable mixer;
+
+        /// <summary>
+        /// ★ 参考姿态Playable - 防止bind pose导致角色下陷
+        /// 始终占据mixer的slot 0，权重自动填充空缺
+        /// </summary>
+        [NonSerialized]
+        public AnimationClipPlayable referencePosePlayable;
+
+        /// <summary>
+        /// 参考姿态是否已初始化
+        /// </summary>
+        [NonSerialized]
+        public bool hasReferencePose;
+
+        /// <summary>
+        /// 参考姿态权重归一化标记。
+        /// 当上一轮因为 intendedWeightSum &gt; 1 而对状态权重做了归一化缩放时，置为 true。
+        /// 用于在 intendedWeightSum 回落到 &lt;= 1 时，仅在必要时恢复原始权重，避免每帧重复写回所有 state 权重。
+        /// </summary>
+        [NonSerialized]
+        public bool referencePoseWeightsNormalized;
 
         /// <summary>
         /// 该层级在RootMixer中的输入索引
@@ -70,6 +95,60 @@ namespace ES
         /// </summary>
         [NonSerialized, ShowInInspector]
         public Dictionary<StateBase, int> stateToSlotMap = new Dictionary<StateBase, int>(64);
+
+        // ===== 连接状态缓存（性能关键：替代每次 dirty 的 Dictionary 枚举） =====
+        // 维护时机：HotPlug/HotUnplug/强制清理（低频），读取时机：UpdateMixerInputWeights（可能每帧/每 dirty）。
+        [NonSerialized]
+        internal readonly List<StateBase> connectedStates = new List<StateBase>(64);
+
+        [NonSerialized]
+        internal readonly List<int> connectedSlots = new List<int>(64);
+
+        [NonSerialized]
+        private readonly Dictionary<StateBase, int> _connectedIndexMap = new Dictionary<StateBase, int>(64);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void InternalOnStateConnected(StateBase state, int slotIndex)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (_connectedIndexMap.ContainsKey(state)) throw new InvalidOperationException($"State 已在 connectedStates 中: {state.strKey}");
+#endif
+            int idx = connectedStates.Count;
+            connectedStates.Add(state);
+            connectedSlots.Add(slotIndex);
+            _connectedIndexMap[state] = idx;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void InternalOnStateDisconnected(StateBase state)
+        {
+            if (state == null) return;
+            if (!_connectedIndexMap.TryGetValue(state, out int idx)) return;
+
+            int last = connectedStates.Count - 1;
+            var lastState = connectedStates[last];
+            var lastSlot = connectedSlots[last];
+
+            connectedStates[idx] = lastState;
+            connectedSlots[idx] = lastSlot;
+            connectedStates.RemoveAt(last);
+            connectedSlots.RemoveAt(last);
+
+            _connectedIndexMap.Remove(state);
+            if (idx != last)
+            {
+                _connectedIndexMap[lastState] = idx;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void InternalClearConnectedStates()
+        {
+            connectedStates.Clear();
+            connectedSlots.Clear();
+            _connectedIndexMap.Clear();
+        }
 
         /// <summary>
         /// 正在淡入的状态字典 - 用于淡入效果更新
@@ -155,11 +234,268 @@ namespace ES
         /// </summary>
         public bool HasActiveStates => runningStates.Count > 0;
 
+        // ===== Odin Inspector 实时调试显示 =====
+
+    #if UNITY_EDITOR
+        [NonSerialized]
+        private bool _debugEnableMixerSlotWeights;
+
+        [NonSerialized]
+        private bool _debugMixerSlotWeightsDirty = true;
+
+        [ShowInInspector, FoldoutGroup("Mixer权重调试"), LabelText("启用槽位权重列表(耗时)")]
+        private bool DebugEnableMixerSlotWeights
+        {
+            get => _debugEnableMixerSlotWeights;
+            set
+            {
+                if (_debugEnableMixerSlotWeights == value) return;
+                _debugEnableMixerSlotWeights = value;
+                _debugMixerSlotWeightsDirty = true;
+            }
+        }
+
+        [NonSerialized]
+        private readonly List<string> _debugMixerSlotWeightsCache = new List<string>(64);
+
+        [NonSerialized]
+        private StateBase[] _debugSlotToState;
+
+        [NonSerialized]
+        private bool[] _debugSlotFadingIn;
+
+        [NonSerialized]
+        private bool[] _debugSlotFadingOut;
+    #endif
+
+        /// <summary>
+        /// 实时显示Mixer内所有槽位的权重，用于调试动画混合
+        /// 显示格式：期望权重 → 实际Mixer权重，便于观察归一化效果
+        /// </summary>
+        [ShowInInspector, ReadOnly, FoldoutGroup("Mixer权重调试")]
+        [LabelText("槽位权重列表")]
+        private List<string> DebugMixerSlotWeights
+        {
+            get
+            {
+#if UNITY_EDITOR
+                if (!_debugEnableMixerSlotWeights)
+                {
+                    _debugMixerSlotWeightsCache.Clear();
+                    _debugMixerSlotWeightsCache.Add("(未启用) 勾选“启用槽位权重列表(耗时)”以显示");
+                    return _debugMixerSlotWeightsCache;
+                }
+
+                if (!mixer.IsValid())
+                {
+                    _debugMixerSlotWeightsCache.Clear();
+                    _debugMixerSlotWeightsCache.Add("Mixer无效");
+                    _debugMixerSlotWeightsDirty = false;
+                    return _debugMixerSlotWeightsCache;
+                }
+
+                int inputCount = mixer.GetInputCount();
+                if (inputCount <= 0)
+                {
+                    _debugMixerSlotWeightsCache.Clear();
+                    _debugMixerSlotWeightsCache.Add("(无输入槽位)");
+                    _debugMixerSlotWeightsDirty = false;
+                    return _debugMixerSlotWeightsCache;
+                }
+
+                // Inspector 重绘频率很高：仅在权重/槽位可能变化时重建字符串列表，避免每次重绘都产生 GC。
+                bool hasActiveFades = fadeInStates.Count > 0 || fadeOutStates.Count > 0;
+                bool hasRelevantDirty = (dirtyFlags & (PipelineDirtyFlags.MixerWeights | PipelineDirtyFlags.HotPlug)) != 0;
+                if (!_debugMixerSlotWeightsDirty && !hasActiveFades && !hasRelevantDirty)
+                {
+                    return _debugMixerSlotWeightsCache;
+                }
+
+                _debugMixerSlotWeightsCache.Clear();
+
+                if (_debugSlotToState == null || _debugSlotToState.Length < inputCount)
+                {
+                    _debugSlotToState = new StateBase[inputCount];
+                    _debugSlotFadingIn = new bool[inputCount];
+                    _debugSlotFadingOut = new bool[inputCount];
+                }
+
+                for (int i = 0; i < inputCount; i++)
+                {
+                    _debugSlotToState[i] = null;
+                    _debugSlotFadingIn[i] = false;
+                    _debugSlotFadingOut[i] = false;
+                }
+
+                foreach (var kvp in stateToSlotMap)
+                {
+                    int slotIndex = kvp.Value;
+                    if ((uint)slotIndex >= (uint)inputCount) continue;
+
+                    var state = kvp.Key;
+                    _debugSlotToState[slotIndex] = state;
+                    _debugSlotFadingIn[slotIndex] = state != null && fadeInStates.ContainsKey(state);
+                    _debugSlotFadingOut[slotIndex] = state != null && fadeOutStates.ContainsKey(state);
+                }
+
+                for (int slot = 0; slot < inputCount; slot++)
+                {
+                    float mixerW = mixer.GetInputWeight(slot);
+                    var state = _debugSlotToState[slot];
+
+                    if (slot > 0 && state == null && mixerW <= 0f)
+                    {
+                        continue;
+                    }
+
+                    string stateName;
+                    float intendedW;
+
+                    if (slot == 0 && hasReferencePose)
+                    {
+                        stateName = "[参考姿态]";
+                        intendedW = mixerW;
+                    }
+                    else if (state != null)
+                    {
+                        stateName = state.strKey;
+                        intendedW = state.PlayableWeight;
+                    }
+                    else
+                    {
+                        stateName = "(空)";
+                        intendedW = 0f;
+                    }
+
+                    string fadeTag = _debugSlotFadingIn[slot] ? " [淡入中]" : _debugSlotFadingOut[slot] ? " [淡出中]" : "";
+
+                    bool isNormalized = slot > 0 && state != null && !Mathf.Approximately(intendedW, mixerW);
+                    string weightStr = isNormalized ? $"{intendedW:F4}→{mixerW:F4}" : $"{mixerW:F4}";
+                    string normTag = isNormalized ? " [已归一化]" : "";
+                    _debugMixerSlotWeightsCache.Add($"Slot[{slot}] {weightStr} ← {stateName}{fadeTag}{normTag}");
+                }
+
+                _debugMixerSlotWeightsDirty = false;
+                return _debugMixerSlotWeightsCache;
+#else
+                return null;
+#endif
+            }
+        }
+
+        /// <summary>
+        /// 期望权重总和（从状态对象读取，不受归一化影响）
+        /// </summary>
+        [ShowInInspector, ReadOnly, FoldoutGroup("Mixer权重调试")]
+        [ShowIf("DebugEnableMixerSlotWeights")]
+        [LabelText("期望权重总和"), PropertyOrder(1)]
+        private float DebugIntendedWeightSum
+        {
+            get
+            {
+                // Inspector 重绘频繁：未启用时不做遍历。
+#if UNITY_EDITOR
+                if (!_debugEnableMixerSlotWeights) return 0f;
+#endif
+                float sum = 0f;
+                foreach (var kvp in stateToSlotMap)
+                    sum += kvp.Key.PlayableWeight;
+                return sum;
+            }
+        }
+
+        /// <summary>
+        /// Mixer实际权重总和（不含参考姿态）
+        /// </summary>
+        [ShowInInspector, ReadOnly, FoldoutGroup("Mixer权重调试")]
+        [ShowIf("DebugEnableMixerSlotWeights")]
+        [LabelText("Mixer实际权重总和"), PropertyOrder(2)]
+        private float DebugMixerActiveWeightSum
+        {
+            get
+            {
+#if UNITY_EDITOR
+                if (!_debugEnableMixerSlotWeights) return 0f;
+#endif
+                if (!mixer.IsValid()) return 0f;
+                int count = mixer.GetInputCount();
+                float sum = 0f;
+                int start = hasReferencePose ? 1 : 0;
+                for (int i = start; i < count; i++)
+                    sum += mixer.GetInputWeight(i);
+                return sum;
+            }
+        }
+
+        /// <summary>
+        /// 参考姿态当前权重
+        /// </summary>
+        [ShowInInspector, ReadOnly, FoldoutGroup("Mixer权重调试")]
+        [ShowIf("DebugEnableMixerSlotWeights")]
+        [LabelText("参考姿态权重"), PropertyOrder(3)]
+        private float DebugReferencePoseWeight
+        {
+            get
+            {
+#if UNITY_EDITOR
+                if (!_debugEnableMixerSlotWeights) return -1f;
+#endif
+                if (!mixer.IsValid() || !hasReferencePose) return -1f;
+                return mixer.GetInputWeight(0);
+            }
+        }
+
+        /// <summary>
+        /// Mixer所有输入的权重总和（含参考姿态），应始终≈1.0
+        /// </summary>
+        [ShowInInspector, ReadOnly, FoldoutGroup("Mixer权重调试")]
+        [ShowIf("DebugEnableMixerSlotWeights")]
+        [LabelText("总权重(含参考姿态)"), PropertyOrder(4)]
+        private float DebugTotalWeight
+        {
+            get
+            {
+#if UNITY_EDITOR
+                if (!_debugEnableMixerSlotWeights) return 0f;
+#endif
+                if (!mixer.IsValid()) return 0f;
+                int count = mixer.GetInputCount();
+                float sum = 0f;
+                for (int i = 0; i < count; i++)
+                    sum += mixer.GetInputWeight(i);
+                return sum;
+            }
+        }
+
+        /// <summary>
+        /// 正在淡入/淡出的状态数量
+        /// </summary>
+        [ShowInInspector, ReadOnly, FoldoutGroup("Mixer权重调试")]
+        [ShowIf("DebugEnableMixerSlotWeights")]
+        [LabelText("淡入/淡出状态数"), PropertyOrder(5)]
+        private string DebugFadeCount
+        {
+            get => $"淡入:{fadeInStates.Count}  淡出:{fadeOutStates.Count}";
+        }
+
         public StateLayerRuntime(StateLayerType type, StateMachine machine)
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (machine == null) throw new ArgumentNullException(nameof(machine));
+#endif
             layerType = type;
             stateMachine = machine;
-            runningStates = new HashSet<StateBase>();
+            runningStates = new SwapBackSet<StateBase>(16);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private StateMachine GetStateMachineOrNull()
+        {
+            var machine = stateMachine;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (machine == null) throw new InvalidOperationException("StateLayerRuntime.stateMachine 不能为空（应由构造函数注入）");
+#endif
+            return machine;
         }
 
         /// <summary>
@@ -167,14 +503,19 @@ namespace ES
         /// </summary>
         public void UpdateLayerMixer()
         {
-            if (stateMachine == null || !stateMachine.IsPlayableGraphValid) return;
+            var machine = GetStateMachineOrNull();
+            if (machine == null || !machine.IsPlayableGraphValid) return;
 
-            var rootMixer = stateMachine.rootMixer;
+            var rootMixer = machine.rootMixer;
             if (!rootMixer.IsValid()) return;
 
             if (rootInputIndex >= 0 && rootInputIndex < rootMixer.GetInputCount())
             {
-                rootMixer.SetInputWeight(rootInputIndex, weight);
+                if (Mathf.Abs(lastAppliedRootMixerWeight - weight) > 0.0001f)
+                {
+                    rootMixer.SetInputWeight(rootInputIndex, weight);
+                    lastAppliedRootMixerWeight = weight;
+                }
             }
         }
 
@@ -192,18 +533,20 @@ namespace ES
         /// </summary>
         public bool ActivateState(StateBase state)
         {
-            if (state == null || stateMachine == null) return false;
+            if (state == null) return false;
+            var machine = GetStateMachineOrNull();
+            if (machine == null) return false;
 
             if (runningStates.Contains(state)) return false;
 
             // 激活状态
             runningStates.Add(state);
-            stateMachine.runningStates.Add(state);
+            machine.InternalAddRunningState(state);
 
             // 热插拔到Playable图
-            if (stateMachine.IsPlayableGraphValid && mixer.IsValid())
+            if (machine.IsPlayableGraphValid && mixer.IsValid())
             {
-                stateMachine.HotPlugStateToPlayable(state, this);
+                machine.HotPlugStateToPlayable(state, this);
             }
 
             return true;
@@ -214,19 +557,21 @@ namespace ES
         /// </summary>
         public bool DeactivateState(StateBase state)
         {
-            if (state == null || stateMachine == null) return false;
+            if (state == null) return false;
+            var machine = GetStateMachineOrNull();
+            if (machine == null) return false;
 
             if (!runningStates.Contains(state)) return false;
 
             // 热拔插从Playable图
-            if (stateMachine.IsPlayableGraphValid && mixer.IsValid())
+            if (machine.IsPlayableGraphValid && mixer.IsValid())
             {
-                stateMachine.HotUnplugStateFromPlayable(state, this);
+                machine.HotUnplugStateFromPlayable(state, this);
             }
 
             // 停用状态
             runningStates.Remove(state);
-            stateMachine.runningStates.Remove(state);
+            machine.InternalRemoveRunningState(state);
 
             return true;
         }
@@ -241,7 +586,10 @@ namespace ES
         {
             var originalFlag = supportFlag;
             if (supportFlag == StateSupportFlags.None)
-            supportFlag = stateMachine != null ? stateMachine.currentSupportFlags : StateSupportFlags.Grounded;
+            {
+                var machine = GetStateMachineOrNull();
+                supportFlag = machine != null ? machine.currentSupportFlags : StateSupportFlags.Grounded;
+            }
 
             supportFlag = NormalizeSingleFlag(supportFlag);
 
@@ -261,14 +609,26 @@ namespace ES
                 case StateSupportFlags.Transition: result = FallBackForTransition; break;
                 default:
 #if STATEMACHINEDEBUG
-                        Debug.LogWarning($"[FallBack-Get] ⚠ [{layerType}] SupportFlag无效({supportFlag})，回退到Grounded");
+                        {
+                            var dbg = StateMachineDebugSettings.Instance;
+                            if (dbg != null && dbg.IsFallbackEnabled)
+                            {
+                                dbg.LogFallback($"[FallBack-Get] ⚠ [{layerType}] SupportFlag无效({supportFlag})，回退到Grounded");
+                            }
+                        }
 #endif
                         result = ResolveFallBackByFlag(StateSupportFlags.Grounded);
                     break;
             }
 
 #if STATEMACHINEDEBUG
-            Debug.Log($"[FallBack-Get] [{layerType}] GetFallBack(原始Flag={originalFlag}, 实际Flag={supportFlag}) -> StateID={result}");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsFallbackEnabled)
+                {
+                    dbg.LogFallback($"[FallBack-Get] [{layerType}] GetFallBack(原始Flag={originalFlag}, 实际Flag={supportFlag}) -> StateID={result}");
+                }
+            }
 #endif
             return result;
         }
@@ -282,12 +642,21 @@ namespace ES
         {
             var originalFlag = supportFlag;
             if (supportFlag == StateSupportFlags.None)
-            supportFlag = stateMachine != null ? stateMachine.currentSupportFlags : StateSupportFlags.Grounded;
+            {
+                var machine = GetStateMachineOrNull();
+                supportFlag = machine != null ? machine.currentSupportFlags : StateSupportFlags.Grounded;
+            }
 
             supportFlag = NormalizeSingleFlag(supportFlag);
 
 #if STATEMACHINEDEBUG
-            Debug.Log($"[FallBack-Set] [{layerType}] SetFallBack(StateID={stateID}, 原始Flag={originalFlag}, 实际Flag={supportFlag})");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsFallbackEnabled)
+                {
+                    dbg.LogFallback($"[FallBack-Set] [{layerType}] SetFallBack(StateID={stateID}, 原始Flag={originalFlag}, 实际Flag={supportFlag})");
+                }
+            }
 #endif
 
             switch (supportFlag)
@@ -305,7 +674,13 @@ namespace ES
                 case StateSupportFlags.Transition: FallBackForTransition = stateID; break;
                 default:
 #if STATEMACHINEDEBUG
-                    Debug.LogError($"[FallBack-Set] ✗ [{layerType}] 无效的SupportFlag: {supportFlag}");
+                    {
+                        var dbg = StateMachineDebugSettings.Instance;
+                        if (dbg != null)
+                        {
+                            dbg.LogError($"[FallBack-Set] ✗ [{layerType}] 无效的SupportFlag: {supportFlag}");
+                        }
+                    }
 #endif
                     break;
             }
@@ -354,10 +729,38 @@ namespace ES
         {
             if (flags == PipelineDirtyFlags.None) return;
 
-            dirtyFlags |= flags;
-            lastDirtyTime = Time.time;
+            // 性能：MixerWeights 在同一帧内可能被多个 State 反复标记。
+            // 该标记不参与 Dirty 衰减计时（仅 Medium/High 需要 lastDirtyTime），
+            // 因此当目标位已存在时可以直接返回，避免重复读取 Time.time。
+            var decayFlags = PipelineDirtyFlags.MediumPriority | PipelineDirtyFlags.HighPriority;
+            bool touchesDecayTimer = (flags & decayFlags) != 0;
+
+            var merged = dirtyFlags | flags;
+            if (merged == dirtyFlags && !touchesDecayTimer)
+            {
+                return;
+            }
+
+            dirtyFlags = merged;
+            if (touchesDecayTimer)
+            {
+                lastDirtyTime = Time.time;
+            }
+
+#if UNITY_EDITOR
+            if ((flags & (PipelineDirtyFlags.MixerWeights | PipelineDirtyFlags.HotPlug)) != 0)
+            {
+                _debugMixerSlotWeightsDirty = true;
+            }
+#endif
 #if STATEMACHINEDEBUG
-            Debug.Log($"[Layer-Dirty] [{layerType}] Dirty添加: {flags} -> {dirtyFlags}");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsDirtyEnabled)
+                {
+                    dbg.LogDirty($"[Layer-Dirty] [{layerType}] Dirty添加: {flags} -> {dirtyFlags}");
+                }
+            }
 #endif
         }
 
@@ -370,7 +773,13 @@ namespace ES
             {
                 if (dirtyFlags == PipelineDirtyFlags.None) return;
 #if STATEMACHINEDEBUG
-                Debug.Log($"[Layer-Dirty] [{layerType}] Dirty已清空 (旧={dirtyFlags})");
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsDirtyEnabled)
+                    {
+                        dbg.LogDirty($"[Layer-Dirty] [{layerType}] Dirty已清空 (旧={dirtyFlags})");
+                    }
+                }
 #endif
                 dirtyFlags = PipelineDirtyFlags.None;
                 return;
@@ -380,7 +789,13 @@ namespace ES
             {
                 dirtyFlags &= ~flags;
 #if STATEMACHINEDEBUG
-                Debug.Log($"[Layer-Dirty] [{layerType}] Dirty移除: {flags} -> {dirtyFlags}");
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsDirtyEnabled)
+                    {
+                        dbg.LogDirty($"[Layer-Dirty] [{layerType}] Dirty移除: {flags} -> {dirtyFlags}");
+                    }
+                }
 #endif
             }
         }
@@ -409,7 +824,11 @@ namespace ES
                 dirtyFlags &= ~decayFlags;
                 dirtyFlags |= PipelineDirtyFlags.FallbackCheck;
 #if STATEMACHINEDEBUG
-                Debug.Log($"[Layer-Dirty] [{layerType}] Dirty衰减 -> {dirtyFlags}");
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsDirtyEnabled)
+                {
+                    dbg.LogDirty($"[Layer-Dirty] [{layerType}] Dirty衰减 -> {dirtyFlags}");
+                }
 #endif
             }
         }
@@ -483,7 +902,21 @@ namespace ES
                     string stateInfo = $"{state.strKey} (ID:{state.intKey})";
 
                     // 检查是否有动画连接
-                    bool hasAnimation = state.stateSharedData?.hasAnimation ?? false;
+                    bool hasAnimation;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    if (state == null) throw new InvalidOperationException($"[{layerType}] runningStates 包含 null StateBase（不允许）");
+                    if (state.stateSharedData == null) throw new InvalidOperationException($"[{layerType}] State '{state.strKey}' 的 stateSharedData 为空（不允许）");
+                    hasAnimation = state.stateSharedData.hasAnimation;
+#else
+                    if (state == null || state.stateSharedData == null)
+                    {
+                        hasAnimation = false;
+                    }
+                    else
+                    {
+                        hasAnimation = state.stateSharedData.hasAnimation;
+                    }
+#endif
                     string animStatus = hasAnimation ? "有动画" : "无动画";
 
                     // 检查槽位映射

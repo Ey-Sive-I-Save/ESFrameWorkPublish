@@ -108,6 +108,18 @@ namespace ES
         // ===== 运动控制按键 =====
         public float IsSprintKeyPressed; // 是否按住冲刺键（1=按下，0=松开）
         
+        // ===== 历史平均速度 (16-17) =====
+        /// <summary>前0.5秒局部空间横向平均速度（急停时动画方向保持用）</summary>
+        public float AvgSpeedX;
+        /// <summary>前0.5秒局部空间前后平均速度（急停时动画方向保持用）</summary>
+        public float AvgSpeedZ;
+        
+        // ===== 攀爬参数 (18-19) =====
+        /// <summary>攀爬时沿墙面的水平输入（-1=左, 0=静止, 1=右）</summary>
+        public float ClimbHorizontal;
+        /// <summary>攀爬时沿墙面的垂直输入（-1=下, 0=静止, 1=上）</summary>
+        public float ClimbVertical;
+        
         // ==================== 字符串参数 - 字典存储（支持退化） ====================
         private Dictionary<string, float> _floatParams;
         private Dictionary<string, int> _intParams;
@@ -182,6 +194,10 @@ namespace ES
                 case StateDefaultFloatParameter.IsSprinting: changed = !Mathf.Approximately(IsSprinting, value); IsSprinting = value; break;
                 case StateDefaultFloatParameter.IsCrouching: changed = !Mathf.Approximately(IsCrouching, value); IsCrouching = value; break;
                 case StateDefaultFloatParameter.IsSliding: changed = !Mathf.Approximately(IsSliding, value); IsSliding = value; break;
+                case StateDefaultFloatParameter.AvgSpeedX: changed = !Mathf.Approximately(AvgSpeedX, value); AvgSpeedX = value; break;
+                case StateDefaultFloatParameter.AvgSpeedZ: changed = !Mathf.Approximately(AvgSpeedZ, value); AvgSpeedZ = value; break;
+                case StateDefaultFloatParameter.ClimbHorizontal: changed = !Mathf.Approximately(ClimbHorizontal, value); ClimbHorizontal = value; break;
+                case StateDefaultFloatParameter.ClimbVertical: changed = !Mathf.Approximately(ClimbVertical, value); ClimbVertical = value; break;
             }
 
             if (changed && enableChangeEvents && enableDefaultParamEvents)
@@ -226,6 +242,10 @@ namespace ES
                 case StateDefaultFloatParameter.IsSprinting: return IsSprinting;
                 case StateDefaultFloatParameter.IsCrouching: return IsCrouching;
                 case StateDefaultFloatParameter.IsSliding: return IsSliding;
+                case StateDefaultFloatParameter.AvgSpeedX: return AvgSpeedX;
+                case StateDefaultFloatParameter.AvgSpeedZ: return AvgSpeedZ;
+                case StateDefaultFloatParameter.ClimbHorizontal: return ClimbHorizontal;
+                case StateDefaultFloatParameter.ClimbVertical: return ClimbVertical;
                 default: return defaultValue;
             }
         }
@@ -524,6 +544,10 @@ namespace ES
             target.IsCrouching = IsCrouching;
             target.IsSliding = IsSliding;
             target.IsSprintKeyPressed = IsSprintKeyPressed;
+            target.AvgSpeedX = AvgSpeedX;
+            target.AvgSpeedZ = AvgSpeedZ;
+            target.ClimbHorizontal = ClimbHorizontal;
+            target.ClimbVertical = ClimbVertical;
             
             bool originalEvents = target.enableChangeEvents;
             target.enableChangeEvents = false;
@@ -556,6 +580,10 @@ namespace ES
                 case StateDefaultFloatParameter.IsSprinting: name = "IsSprinting"; return true;
                 case StateDefaultFloatParameter.IsCrouching: name = "IsCrouching"; return true;
                 case StateDefaultFloatParameter.IsSliding: name = "IsSliding"; return true;
+                case StateDefaultFloatParameter.AvgSpeedX: name = "AvgSpeedX"; return true;
+                case StateDefaultFloatParameter.AvgSpeedZ: name = "AvgSpeedZ"; return true;
+                case StateDefaultFloatParameter.ClimbHorizontal: name = "ClimbHorizontal"; return true;
+                case StateDefaultFloatParameter.ClimbVertical: name = "ClimbVertical"; return true;
                 default: name = null; return false;
             }
         }

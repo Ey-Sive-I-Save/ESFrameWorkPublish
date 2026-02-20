@@ -321,14 +321,14 @@ namespace ES
                 return;
             }
 
-            Debug.Log($"=== 状态机所有状态 ({stateMachine.stringToStateMap.Count}) ===");
-            foreach (var kvp in stateMachine.stringToStateMap)
+            Debug.Log($"=== 状态机所有状态 ({stateMachine.RegisteredStateCount}) ===");
+            foreach (var kvp in stateMachine.EnumerateRegisteredStatesByKey())
             {
                 var state = kvp.Value;
-                var layerType = stateMachine.stateLayerMap.ContainsKey(state) 
-                    ? stateMachine.stateLayerMap[state].ToString() 
+                var layerType = stateMachine.TryGetStateLayerType(state, out var layer)
+                    ? layer.ToString()
                     : "Unknown";
-                var isRunning = stateMachine.runningStates.Contains(state);
+                var isRunning = stateMachine.IsStateRunning(state);
                 var isFallback = state.stateSharedData?.basicConfig?.canBeFeedback ?? false;
                 
                 Debug.Log($"  [{layerType}] {kvp.Key} (IntKey:{state.intKey}) - " +

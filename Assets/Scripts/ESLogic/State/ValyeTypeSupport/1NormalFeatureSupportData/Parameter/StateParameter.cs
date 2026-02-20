@@ -51,6 +51,14 @@ namespace ES
                         case StateDefaultFloatParameter.IsCrouching: return "IsCrouching";
                         case StateDefaultFloatParameter.IsSliding: return "IsSliding";
                         
+                        // 历史平均速度 (16-17)
+                        case StateDefaultFloatParameter.AvgSpeedX: return "AvgSpeedX";
+                        case StateDefaultFloatParameter.AvgSpeedZ: return "AvgSpeedZ";
+                        
+                        // 攀爬参数 (18-19)
+                        case StateDefaultFloatParameter.ClimbHorizontal: return "ClimbHorizontal";
+                        case StateDefaultFloatParameter.ClimbVertical: return "ClimbVertical";
+                        
                         default: return "None";
                     }
                 }

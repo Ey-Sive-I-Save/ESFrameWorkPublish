@@ -164,6 +164,10 @@ namespace ES
         [LabelText("启用按时间自动切换")]
         public bool enableAutoPhaseByTime = false;
 
+        [LabelText("静默阶段覆盖")]
+        [Tooltip("启用后忽略Pre/Wait/Released覆盖，仅使用Main(默认)配置")]
+        public bool mutePhaseOverride = false;
+
         [LabelText("Main阶段开始时间(归一化)"), Range(0, 1)]
         [Tooltip("达到此时间点进入Main阶段")]
         [FormerlySerializedAs("returnStartTime")]
@@ -174,6 +178,25 @@ namespace ES
         [FormerlySerializedAs("releaseStartTime")]
         public float waitStartTime = 0.9f;
 
+        [Title("Main阶段IK")]
+        [LabelText("覆盖Main阶段IK目标权重")]
+        [Tooltip("启用后：当状态运行时阶段进入 Main 时，强制把IK总目标权重设置为 mainIKTargetWeight（0=不影响/关闭IK，1=完全启用IK）。\n不启用时：Main阶段沿用默认IK目标权重，或由Pre/Wait/Released阶段覆盖决定。")]
+        public bool overrideMainIK = false;
+
+        [ShowIf("overrideMainIK"), Range(0f, 1f)]
+        [Tooltip("Main阶段的IK总目标权重（会被平滑过渡到该值）。")]
+        public float mainIKTargetWeight = 1f;
+
+        [Title("阶段覆盖")]
+        [LabelText("Pre阶段覆盖")]
+        public StatePhaseOverrideConfig preOverride = new StatePhaseOverrideConfig();
+
+        [LabelText("Wait阶段覆盖")]
+        public StatePhaseOverrideConfig waitOverride = new StatePhaseOverrideConfig();
+
+        [LabelText("Released阶段覆盖")]
+        public StatePhaseOverrideConfig releasedOverride = new StatePhaseOverrideConfig();
+
         // 代价相关参数已移除
 
         /// <summary>
@@ -182,6 +205,9 @@ namespace ES
         public void InitializeRuntime()
         {
             if (_isRuntimeInitialized) return;
+            preOverride?.InitializeRuntime();
+            waitOverride?.InitializeRuntime();
+            releasedOverride?.InitializeRuntime();
             _isRuntimeInitialized = true;
         }
 
@@ -192,6 +218,50 @@ namespace ES
             if (normalizedProgress < waitStartTime)
                 return StateRuntimePhase.Main;
             return StateRuntimePhase.Wait;
+        }
+    }
+
+    [Serializable]
+    public class StatePhaseOverrideConfig : IRuntimeInitializable
+    {
+        [NonSerialized] private bool _isRuntimeInitialized;
+        public bool IsRuntimeInitialized => _isRuntimeInitialized;
+
+        [LabelText("启用覆盖")]
+        public bool enable = false;
+
+        [LabelText("覆盖代价")]
+        public bool overrideCost = false;
+
+        [ShowIf("overrideCost")]
+        [InlineProperty, HideLabel]
+        public StateCostData costData = new StateCostData();
+
+        [LabelText("覆盖冲突规则")]
+        public bool overrideMerge = false;
+
+        [ShowIf("overrideMerge")]
+        [InlineProperty, HideLabel]
+        public StateMergeData mergeData = new StateMergeData();
+
+        [LabelText("覆盖优先级")]
+        public bool overridePriority = false;
+
+        [ShowIf("overridePriority"), Range(0, 255)]
+        public byte priority = 50;
+
+        [LabelText("覆盖IK目标权重")]
+        public bool overrideIK = false;
+
+        [ShowIf("overrideIK"), Range(0f, 1f)]
+        public float ikTargetWeight = 1f;
+
+        public void InitializeRuntime()
+        {
+            if (_isRuntimeInitialized) return;
+            costData?.InitializeRuntime();
+            mergeData?.InitializeRuntime();
+            _isRuntimeInitialized = true;
         }
     }
 }

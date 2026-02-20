@@ -76,6 +76,12 @@ namespace ES
         [LabelText("骑乘切换")]
         public InputActionProperty mountAction;
 
+        [LabelText("攀爬切换")]
+        public InputActionProperty climbAction;
+
+        [LabelText("交互")]
+        public InputActionProperty interactAction;
+
         [LabelText("小眼睛(视角附加)")]
         public InputActionProperty eyeAction;
 
@@ -107,7 +113,9 @@ namespace ES
             crouchAction = default;
             flyAction = default;
             mountAction = default;
+            climbAction = default;
             flyVerticalAction = default;
+            interactAction = default;
         }
 
         [Button("一键内置默认输入"), GUIColor(0.3f, 0.8f, 0.3f)]
@@ -147,6 +155,8 @@ namespace ES
         public bool ConsumeCrouchToggle() => snapshot.ConsumeCrouchToggle();
         public bool ConsumeFlyToggle() => snapshot.ConsumeFlyToggle();
         public bool ConsumeMountToggle() => snapshot.ConsumeMountToggle();
+        public bool ConsumeClimbToggle() => snapshot.ConsumeClimbToggle();
+        public bool ConsumeInteract() => snapshot.ConsumeInteract();
         public void ClearOneShot() => snapshot.ClearOneShot();
         public bool EyeHold => snapshot.eyeHold;
         public float FlyVertical => snapshot.flyVertical;
@@ -168,7 +178,9 @@ namespace ES
         private InputAction _fly;
         private InputAction _flyVertical;
         private InputAction _mount;
+        private InputAction _climb;
         private InputAction _eye;
+        private InputAction _interact;
 #endif
 
         protected override void OnEnable()
@@ -180,13 +192,23 @@ namespace ES
         protected override void OnDisable()
         {
             UnbindActions();
+            ClearSnapshot();
             base.OnDisable();
         }
 
         protected override void Update()
         {
-            if (!enableInput) return;
+            if (!enableInput)
+            {
+                ClearSnapshot();
+                return;
+            }
             snapshot.frameIndex = Time.frameCount;
+        }
+
+        private void ClearSnapshot()
+        {
+            snapshot = default;
         }
 
         private void BindActions()
@@ -208,7 +230,9 @@ namespace ES
             _fly = flyAction.action;
             _flyVertical = flyVerticalAction.action;
             _mount = mountAction.action;
+            _climb = climbAction.action;
             _eye = eyeAction.action;
+            _interact = interactAction.action;
 
             RegisterAxis(_move, OnMove);
             RegisterAxis(_look, OnLook);
@@ -227,7 +251,9 @@ namespace ES
             RegisterButton(_fly, OnFly);
             RegisterAxis(_flyVertical, OnFlyVertical);
             RegisterButton(_mount, OnMount);
+            RegisterButton(_climb, OnClimb);
             RegisterAxis(_eye, OnEye);
+            RegisterButton(_interact, OnInteract);
 #endif
         }
 
@@ -251,7 +277,9 @@ namespace ES
             UnregisterButton(_fly, OnFly);
             UnregisterAxis(_flyVertical, OnFlyVertical);
             UnregisterButton(_mount, OnMount);
+            UnregisterButton(_climb, OnClimb);
             UnregisterAxis(_eye, OnEye);
+            UnregisterButton(_interact, OnInteract);
 #endif
         }
 
@@ -373,9 +401,25 @@ namespace ES
             }
         }
 
+        private void OnClimb(InputAction.CallbackContext ctx)
+        {
+            if (ctx.performed)
+            {
+                snapshot.climbToggle = true;
+            }
+        }
+
         private void OnEye(InputAction.CallbackContext ctx)
         {
             snapshot.eyeHold = ctx.ReadValue<float>() > 0.5f;
+        }
+
+        private void OnInteract(InputAction.CallbackContext ctx)
+        {
+            if (ctx.performed)
+            {
+                snapshot.interact = true;
+            }
         }
 #endif
     }
@@ -410,6 +454,15 @@ namespace ES
         [Title("移动平滑")]
         [LabelText("移动平滑")]
         public float moveSmooth = 12f;
+
+        [LabelText("无输入时立即停下")]
+        public bool stopMoveWhenNoInput = true;
+
+        [LabelText("移动死区")]
+        public float moveDeadZone = 0.05f;
+
+        [LabelText("攀爬时禁用移动平滑")]
+        public bool disableMoveSmoothWhileClimbing = true;
 
         [Title("相机控制")]
         [LabelText("启用相机上下视角")]
@@ -485,6 +538,8 @@ namespace ES
 
         private float _eyePitchVel;
 
+        private bool _wasClimbing;
+
         private float _totalMoveTime;
         private float _last1sSpeedSum;
         private readonly Queue<SpeedSample> _speedSamples = new Queue<SpeedSample>(64);
@@ -504,6 +559,14 @@ namespace ES
 
             var cam = ResolveCameraTransform();
 
+            bool hasClimbModule = TryGetModule(out EntityBasicClimbModule climbModule);
+            bool isClimbing = hasClimbModule && climbModule.subState != ClimbSubState.None;
+            if (isClimbing && !_wasClimbing)
+            {
+                _smoothedMoveWorld = Vector3.zero;
+                MyCore.SetMoveInput(Vector3.zero);
+            }
+
             if (enableCameraLook)
             {
                 ApplyCameraLook(input.Look, input.EyeHold ? eyeLookScale : 1f, cam, input.EyeHold);
@@ -513,8 +576,21 @@ namespace ES
             if (hasMoveModule)
             {
                 Vector3 moveWorld = GetMoveWorld(input.Move, cam, _lastLookWorld) * moveScale;
-                _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
-                MyCore.SetMoveInput(_smoothedMoveWorld);
+                if (stopMoveWhenNoInput && input.Move.sqrMagnitude <= moveDeadZone * moveDeadZone)
+                {
+                    _smoothedMoveWorld = Vector3.zero;
+                    moveWorld = Vector3.zero;
+                }
+                if (disableMoveSmoothWhileClimbing && isClimbing)
+                {
+                    _smoothedMoveWorld = moveWorld;
+                    MyCore.SetMoveInput(moveWorld);
+                }
+                else
+                {
+                    _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
+                    MyCore.SetMoveInput(_smoothedMoveWorld);
+                }
 
                 if (!input.EyeHold)
                 {
@@ -538,8 +614,21 @@ namespace ES
                 if (!hasMoveModule)
                 {
                     Vector3 moveWorld = GetMoveWorld(input.Move, cam, _lastLookWorld) * moveScale;
-                    _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
-                    MyCore.SetMoveInput(_smoothedMoveWorld);
+                    if (stopMoveWhenNoInput && input.Move.sqrMagnitude <= moveDeadZone * moveDeadZone)
+                    {
+                        _smoothedMoveWorld = Vector3.zero;
+                        moveWorld = Vector3.zero;
+                    }
+                    if (disableMoveSmoothWhileClimbing && isClimbing)
+                    {
+                        _smoothedMoveWorld = moveWorld;
+                        MyCore.SetMoveInput(moveWorld);
+                    }
+                    else
+                    {
+                        _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
+                        MyCore.SetMoveInput(_smoothedMoveWorld);
+                    }
 
                     if (!input.EyeHold)
                     {
@@ -564,6 +653,23 @@ namespace ES
 
             UpdateMoveStats(_smoothedMoveWorld);
 
+            // ===== 攀爬 =====
+            if (hasClimbModule)
+            {
+                if (input.ConsumeClimbToggle())
+                {
+                    climbModule.ToggleClimb();
+                }
+            }
+
+            if (TryGetModule(out EntityBasicInteractionModule interactionModule))
+            {
+                if (input.ConsumeInteract())
+                {
+                    interactionModule.RequestInteract();
+                }
+            }
+
             if (TryGetModule(out EntityBasicCombatModule combatModule))
             {
                 if (input.ConsumeAttack()) combatModule.TriggerAttack();
@@ -582,6 +688,7 @@ namespace ES
             }
 
             input.ClearOneShot();
+            _wasClimbing = isClimbing;
         }
 
         private bool TryGetModule<T>(out T module) where T : class
@@ -1034,6 +1141,12 @@ namespace ES
         [LabelText("骑乘(切换指令)")]
         public bool mountToggle;
 
+        [LabelText("攀爬(切换指令)")]
+        public bool climbToggle;
+
+        [LabelText("交互")]
+        public bool interact;
+
         [LabelText("小眼睛(按住)")]
         public bool eyeHold;
 
@@ -1052,6 +1165,8 @@ namespace ES
             crouchToggle = false;
             flyToggle = false;
             mountToggle = false;
+            climbToggle = false;
+            interact = false;
         }
 
         public bool ConsumeAttack() => Consume(ref attack);
@@ -1069,6 +1184,8 @@ namespace ES
         public bool ConsumeCrouchToggle() => Consume(ref crouchToggle);
         public bool ConsumeFlyToggle() => Consume(ref flyToggle);
         public bool ConsumeMountToggle() => Consume(ref mountToggle);
+        public bool ConsumeClimbToggle() => Consume(ref climbToggle);
+        public bool ConsumeInteract() => Consume(ref interact);
 
         private static bool Consume(ref bool value)
         {
@@ -1120,8 +1237,10 @@ namespace ES
         Jump,
         Crouch,
         Fly,
-            Mount,
-            FlyVertical
+        Mount,
+        FlyVertical,
+        Climb,
+        Interact
     }
 
 #if ENABLE_INPUT_SYSTEM
@@ -1153,6 +1272,8 @@ namespace ES
             ApplySingle(module, InputActionKey.Fly, schemeKey);
             ApplySingle(module, InputActionKey.Mount, schemeKey);
             ApplySingle(module, InputActionKey.FlyVertical, schemeKey);
+            ApplySingle(module, InputActionKey.Climb, schemeKey);
+            ApplySingle(module, InputActionKey.Interact, schemeKey);
         }
 
         public static void ApplySingle(EntityAIInputSystemModule module, InputActionKey key, InputSchemeKey schemeKey)
@@ -1205,6 +1326,12 @@ namespace ES
                     break;
                 case InputActionKey.Mount:
                     module.mountAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.Climb:
+                    module.climbAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.Interact:
+                    module.interactAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
                     break;
                 case InputActionKey.FlyVertical:
                     module.flyVerticalAction = CreateAxisAction(key.ToString(), schemeKey);
@@ -1295,6 +1422,8 @@ namespace ES
                     case InputActionKey.Crouch: list.Add("<Keyboard>/c"); break;
                     case InputActionKey.Fly: list.Add("<Keyboard>/f"); break;
                     case InputActionKey.Mount: list.Add("<Keyboard>/r"); break;
+                    case InputActionKey.Climb: list.Add("<Keyboard>/g"); break;
+                    case InputActionKey.Interact: list.Add("<Keyboard>/e"); break;
                 }
             }
 
@@ -1315,6 +1444,8 @@ namespace ES
                     case InputActionKey.Crouch: list.Add("<Gamepad>/rightStickPress"); break;
                     case InputActionKey.Fly: list.Add("<Gamepad>/buttonNorth"); break;
                     case InputActionKey.Mount: list.Add("<Gamepad>/buttonWest"); break;
+                    case InputActionKey.Climb: list.Add("<Gamepad>/leftStickPress"); break;
+                    case InputActionKey.Interact: list.Add("<Gamepad>/buttonEast"); break;
                 }
             }
 

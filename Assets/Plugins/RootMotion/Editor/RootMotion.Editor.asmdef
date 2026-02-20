@@ -1,0 +1,10 @@
+{
+    "name": "RootMotionEditor",
+    "references": [
+        "RootMotion"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": []
+}

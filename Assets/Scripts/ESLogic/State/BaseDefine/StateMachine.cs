@@ -8,6 +8,87 @@ using UnityEngine.Animations;
 using UnityEngine.Playables;
 using Debug = UnityEngine.Debug;
 
+// ============================================================================
+// 文件：StateMachine.cs
+// 作用：状态机主实现（注册/运行/更新/切换/层级管理/PlayableGraph 驱动/临时动画等）。
+//
+// Public（本文件对外可直接使用的成员；按模块分组，“先功能、后成员”，便于扫读）：
+//
+// 【基础信息】
+// - 宿主实体：public Entity HostEntity { get; }
+// - 唯一标识：public string stateMachineKey
+// - 配置访问：public StateMachineConfig Config
+// - 运行状态：public bool isRunning { get; protected set; }
+// - 查询某状态是否运行：public bool IsStateRunning(StateBase state)
+//
+// 【IK 汇总输出】
+// - 最终 IK 姿态：public StateIKPose finalIKPose
+// - IK 后处理扩展点：public delegate FinalIKPosePostProcessDelegate(...) / public event OnFinalIKPosePostProcess
+//
+// 【运行时约束】
+// - 支持标记：public StateSupportFlags currentSupportFlags
+// - 设置支持标记：public void SetSupportFlags(StateSupportFlags flags)
+//
+// 【注册与查询】
+// - 注册数量：public int RegisteredStateCount { get; }
+// - 枚举注册状态：public IEnumerable<KeyValuePair<string, StateBase>> EnumerateRegisteredStatesByKey()
+// - 查询状态所属层级：public bool TryGetStateLayerType(StateBase state, out StateLayerType layerType)
+// - 按键获取/判断：public GetStateByString/GetStateByInt/HasState(...)
+//
+// 【默认/层级资源】
+// - 默认状态键：public string defaultStateKey
+// - 上/下半身遮罩：public AvatarMask upperBodyMask / public AvatarMask lowerBodyMask
+// - 参考姿态动画：public AnimationClip referencePoseClip
+//
+// 【PlayableGraph】
+// - 图对象：public PlayableGraph playableGraph
+// - 图状态：public bool IsPlayableGraphValid / public bool IsPlayableGraphPlaying
+// - 绑定 Animator：public Animator BoundAnimator { get; }
+//
+// 【初始化/生命周期】
+// - 初始化：public void Initialize(...)
+// - 初始化并绑定 Animator：public void Initialize(..., Animator animator, ...)
+// - 释放：public void Dispose()
+// - 启动/停止：public void StartStateMachine() / public void StopStateMachine()
+// - 每帧更新：public void UpdateStateMachine()
+//
+// 【注册接口】
+// - 从 Info 注册：public StateBase RegisterStateFromInfo(...)
+// - 注册/反注册：public bool RegisterState(...)
+// - 从 SharedData 注册：public bool RegisterStateFromSharedData(...)
+// - 反注册：public bool UnregisterState(...)
+//
+// 【回退与层级控制】
+// - 设置回退状态：public void SetFallbackState(...)
+// - 获取层级运行时：public StateLayerRuntime GetLayer(StateLayerType layerType)
+// - 设置层级权重：public void SetLayerWeight(StateLayerType layerType, float weight)
+// - 层级空闲/统计：public IsIdle/IsLayerIdle/GetRunningStateCount/GetLayerStateCount
+//
+// 【临时动画（运行时插拔）】
+// - 添加/移除/清空：public AddTemporaryAnimation/RemoveTemporaryAnimation/ClearAllTemporaryAnimations
+// - 查询：public HasTemporaryAnimation/GetTemporaryAnimationCount
+//
+// 【事件广播】
+// - 动画事件广播：public void BroadcastAnimationEvent(StateBase state, string eventName, string eventParam)
+//
+// 【状态切换】
+// - 评估：public TestStateActivation/TestEnterState/TestExitState
+// - 执行：public ExecuteStateActivation/TryActivateState/TryDeactivateState/TryEnterState/TryExitState
+// - 强制：public ForceEnterState/ForceExitState
+// - 关闭层级：public void DeactivateLayer(StateLayerType layer)
+//
+// 【权重/调试/阶段】
+// - 权重查询：public float GetStateWeight(...)
+// - RootMixer 调试信息：public string GetRootMixerDebugInfo()
+// - 外部控制状态阶段：public void SetStateRuntimePhase(...) / public void ClearStateRuntimePhaseOverride(...)
+//
+// 【上下文参数】
+// - 速度/攀爬输入：public void SetMotionSpeedXZ/SetAvgSpeedXZ/SetClimbInput
+// - 参数读写：public void SetFloat(...) / public float GetFloat(...)
+//
+// Private/Internal：各类缓存、热路径更新、字典/层级运行时、混合/打断/合并规则、Dirty 降级流程等。
+// ============================================================================
+
 namespace ES
 {
     /// <summary>
@@ -16,13 +97,18 @@ namespace ES
     /// 核心逻辑默认稳定可用，扩展点通过回调/配置开放，避免子类侵入式重写。
     /// </summary>
     [Serializable, TypeRegistryItem("ES状态机")]
-    public class StateMachine
+    public partial class StateMachine
     {
+        
+        #region 基础字段（序列化/上下文）
+
         /// <summary>
         /// 宿主Entity - 状态机所属的实体对象
         /// </summary>
         [NonSerialized]
-        public Entity hostEntity;
+        private Entity hostEntity;
+
+        public Entity HostEntity => hostEntity;
 
         /// <summary>
         /// 状态机唯一标识键
@@ -32,79 +118,31 @@ namespace ES
         [LabelText("状态机键"), ShowInInspector]
         public string stateMachineKey;
 
-        /// <summary>
-        /// 状态机配置（可拖入，编辑器下空则使用全局Instance）
-        /// </summary>
+
+
+        [TitleGroup("状态机设置", Order = 0)]
         [BoxGroup("状态机设置/基础", ShowLabel = false)]
-        [LabelText("状态机配置")]
-        public StateMachineConfig config;
+        [LabelText("状态机配置"), ShowInInspector]
+        [SerializeField]
+        private StateMachineConfig config;
+
+        public StateMachineConfig Config
+        {
+            get => config;
+            set => config = value;
+        }
 
         /// <summary>
         /// 状态上下文 - 统一管理运行时数据、参数、标记等（整合了原StateMachineContext）
         /// </summary>
-        [LabelText("状态上下文"), ShowInInspector]
+        [LabelText("状态实时上下文"), ShowInInspector]
+        [ReadOnly]
         [NonSerialized]
-        public StateMachineContext stateContext;
-
-        /// <summary>
-        /// 是否持续输出统计信息（用于调试）
-        /// </summary>
-        [LabelText("持续输出统计"), Tooltip("每帧在Console输出状态机统计信息")]
-#if UNITY_EDITOR
-        [NonSerialized]
-        public bool enableContinuousStats = false;
-#endif
-
-#if UNITY_EDITOR
-        [OnInspectorInit]
-        private void EditorInitConfig()
-        {
-            if (config == null)
-            {
-                config = StateMachineConfig.Instance;
-            }
-        }
-#endif
-
-
-
-
-        #region 扩展回调与策略（可修改）
-
-        /// <summary>
-        /// 状态进入回调
-        /// </summary>
-        public Action<StateBase, StateLayerType> OnStateEntered;
-
-        /// <summary>
-        /// 状态退出回调
-        /// </summary>
-        public Action<StateBase, StateLayerType> OnStateExited;
-
-        /// <summary>
-        /// 层级初始化回调
-        /// </summary>
-        public Action<StateLayerRuntime> OnLayerInitialized;
-
-        /// <summary>
-        /// 自定义退出测试
-        /// </summary>
-        public Func<StateBase, StateLayerType, StateExitResult> CustomExitTest;
-
-        /// <summary>
-        /// 动画事件回调（当状态触发动画事件时）
-        /// </summary>
-        public Action<StateBase, string, string> OnAnimationEvent;
-
-        /// <summary>
-        /// 自定义通道占用计算
-        /// </summary>
-        public Func<IEnumerable<StateBase>, StateChannelMask> CustomChannelMaskEvaluator;
-
+        private StateMachineContext stateContext;
 
 
         #endregion
-
+        
         #region 生命周期状态（核心/不建议改）
 
         /// <summary>
@@ -122,14 +160,59 @@ namespace ES
         #endregion
 
 
+        #region 运行时状态（核心/不建议改）
+
+
         [ShowInInspector, ReadOnly, LabelText("当前运行状态")]
         [NonSerialized]
-        public HashSet<StateBase> runningStates = new HashSet<StateBase>();
+        private SwapBackSet<StateBase> runningStates = new SwapBackSet<StateBase>(32);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void InternalAddRunningState(StateBase state)
+        {
+            if (state == null) return;
+            runningStates.Add(state);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void InternalRemoveRunningState(StateBase state)
+        {
+            if (state == null) return;
+            runningStates.Remove(state);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool IsStateRunning(StateBase state)
+        {
+            return state != null && runningStates.Contains(state);
+        }
+
+        #region FinalIK 输出（BipedIK）
+
+        /// <summary>
+        /// 由 StateMachine 每帧聚合得到的最终 IK Pose（供 LateUpdate 驱动 FinalIK 使用）。
+        /// </summary>
+        [NonSerialized]
+        public StateIKPose finalIKPose;
+
+        /// <summary>
+        /// FinalIK Pose 后处理回调：允许外部模块在不侵入状态系统的前提下，
+        /// 对 finalIKPose 做“最后一公里”的增量修正（例如：走台阶脚贴合、轻量LookAt等）。
+        /// 不订阅时完全不影响原有逻辑与性能。
+        /// </summary>
+        public delegate void FinalIKPosePostProcessDelegate(StateMachine machine, ref StateIKPose pose, float deltaTime);
+
+        public event FinalIKPosePostProcessDelegate OnFinalIKPosePostProcess;
+
+        #endregion
+
+
+        #region SupportFlags（运行时约束）
 
 
 
 
-        [ShowInInspector, ReadOnly, LabelText("SupportFlags")]
+        [ShowInInspector, ReadOnly, LabelText("支持标记")]
         [NonSerialized]
         public StateSupportFlags currentSupportFlags = StateSupportFlags.Grounded;
 
@@ -137,16 +220,23 @@ namespace ES
 
         public void SetSupportFlags(StateSupportFlags flags)
         {
-            Debug.Log($"[StateMachine] 设置SupportFlags: {flags}");
+#if STATEMACHINEDEBUG
+            var dbg = StateMachineDebugSettings.Instance;
+            if (dbg != null && dbg.IsStateTransitionEnabled)
+            {
+                dbg.LogStateTransition($"设置支持标记: {flags}");
+            }
+#endif
             var beforeFlags = currentSupportFlags;
             currentSupportFlags = NormalizeSingleSupportFlag(flags);
             if (beforeFlags != currentSupportFlags)
             {
+                RemoveUnsupportedRunningStates(currentSupportFlags);
                 MarkSupportFlagsDirty();
             }
         }
 
-       
+
 
         private void MarkSupportFlagsDirty()
         {
@@ -157,33 +247,97 @@ namespace ES
             MarkDirty(StateDirtyReason.RuntimeChanged);
         }
 
+        private void RemoveUnsupportedRunningStates(StateSupportFlags newFlag)
+        {
+            if (newFlag == StateSupportFlags.None)
+            {
+                return;
+            }
+
+            var allRunningStates = GetRunningStatesSnapshot();
+            for (int i = 0; i < allRunningStates.Count; i++)
+            {
+                var state = allRunningStates[i];
+                if (state == null) continue;
+
+                var sharedData = state.stateSharedData;
+                if (sharedData == null) continue;
+
+                var basicConfig = sharedData.basicConfig;
+                if (basicConfig == null) continue;
+
+                if (basicConfig.ignoreSupportFlag)
+                {
+                    continue;
+                }
+
+                var stateFlag = basicConfig.stateSupportFlag;
+                if (stateFlag == StateSupportFlags.None)
+                {
+                    continue;
+                }
+
+                if ((stateFlag & newFlag) == 0)
+                {
+                    if (stateLayerMap.TryGetValue(state, out var layerType))
+                    {
+                        TruelyDeactivateState(state, layerType);
+                    }
+                }
+            }
+        }
+
         [NonSerialized]
         private Dictionary<StateSupportFlags, uint> _disableTransitionMasks;
+
+        #endregion
+
+        #endregion
 
         #region 存储容器（核心/谨慎改）
         /// <summary>
         /// String键到状态的映射
         /// </summary>
         [ShowInInspector, FoldoutGroup("状态字典"), LabelText("String映射")]
-        [SerializeReference]
-        public Dictionary<string, StateBase> stringToStateMap = new Dictionary<string, StateBase>();
+        [SerializeField, SerializeReference]
+        private Dictionary<string, StateBase> stringToStateMap = new Dictionary<string, StateBase>();
 
         /// <summary>
         /// Int键到状态的映射
         /// </summary>
         [ShowInInspector, FoldoutGroup("状态字典"), LabelText("Int映射")]
-        [SerializeReference]
-        public Dictionary<int, StateBase> intToStateMap = new Dictionary<int, StateBase>();
+        [SerializeField, SerializeReference]
+        private Dictionary<int, StateBase> intToStateMap = new Dictionary<int, StateBase>();
 
         /// <summary>
         /// 状态归属层级映射
         /// </summary>
         [ShowInInspector, FoldoutGroup("状态字典"), LabelText("状态层级映射")]
         [NonSerialized]
-        public Dictionary<StateBase, StateLayerType> stateLayerMap = new Dictionary<StateBase, StateLayerType>();
+        private Dictionary<StateBase, StateLayerType> stateLayerMap = new Dictionary<StateBase, StateLayerType>();
 
-        [NonSerialized]
-        private readonly List<StateBase> _tmpStateBuffer = new List<StateBase>(16);
+        public int RegisteredStateCount => stringToStateMap != null ? stringToStateMap.Count : 0;
+
+        public IEnumerable<KeyValuePair<string, StateBase>> EnumerateRegisteredStatesByKey()
+        {
+            if (stringToStateMap == null) yield break;
+            foreach (var kvp in stringToStateMap)
+            {
+                yield return kvp;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGetStateLayerType(StateBase state, out StateLayerType layerType)
+        {
+            if (state == null)
+            {
+                layerType = default;
+                return false;
+            }
+
+            return stateLayerMap.TryGetValue(state, out layerType);
+        }
 
         [NonSerialized]
         private readonly List<StateBase> _tmpInterruptStates = new List<StateBase>(8);
@@ -201,16 +355,13 @@ namespace ES
         private readonly List<StateBase> _registeredStatesList = new List<StateBase>(256);
 
         [NonSerialized]
-        private readonly List<StateBase> _cachedRunningStatesList = new List<StateBase>(32);
+        private readonly List<StateBase> _runningStatesSnapshot = new List<StateBase>(32);
 
         [NonSerialized]
         private readonly List<string> _temporaryKeysCache = new List<string>(16);
 
         [NonSerialized]
         private readonly System.Text.StringBuilder _continuousStatsBuilder = new System.Text.StringBuilder(256);
-
-        [NonSerialized]
-        private int _cachedRunningStatesVersion = -1;
 
         [NonSerialized]
         private int _dirtyVersion = 0;
@@ -249,13 +400,24 @@ namespace ES
         /// 固定层级遮罩配置（按规范使用）
         /// </summary>
         [TitleGroup("层级设置", Order = 1)]
-        [BoxGroup("层级设置/AvatarMask", ShowLabel = false)]
-        [LabelText("上半身Mask"), AssetsOnly]
+        [BoxGroup("层级设置/动作遮罩", ShowLabel = false)]
+        [LabelText("上半身遮罩"), AssetsOnly]
         public AvatarMask upperBodyMask;
 
-        [BoxGroup("层级设置/AvatarMask", ShowLabel = false)]
-        [LabelText("下半身Mask"), AssetsOnly]
+        [BoxGroup("层级设置/动作遮罩", ShowLabel = false)]
+        [LabelText("下半身遮罩"), AssetsOnly]
         public AvatarMask lowerBodyMask;
+
+        /// <summary>
+        /// ★ 参考姿态Clip - 防止bind pose导致角色下陷。
+        /// 当无活跃状态或状态权重之和 < 1.0时，此Clip会自动填充剩余权重，
+        /// 保证 AnimationMixerPlayable 的输入权重总和始终=1.0。
+        /// 建议使用1帧的站立idle动画。
+        /// </summary>
+        [BoxGroup("层级设置/动作遮罩", ShowLabel = false)]
+        [LabelText("参考姿态动画剪辑(防下陷)"), AssetsOnly]
+        [Tooltip("防止空状态时角色下陷到地面以下。建议设置为 1 帧的站立待机动画剪辑。")]
+        public AnimationClip referencePoseClip;
 
         /// <summary>
         /// 层级运行时数据
@@ -538,7 +700,15 @@ namespace ES
         /// </summary>
         private StateLayerRuntime InitializeSingleLayer(StateLayerType layerType)
         {
-            Debug.Log($"[StateMachine] 开始初始化层级: {layerType}");
+#if STATEMACHINEDEBUG
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsRuntimeInitEnabled)
+                {
+                    dbg.LogRuntimeInit($"开始初始化层级: {layerType}");
+                }
+            }
+#endif
             var layer = new StateLayerRuntime(layerType, this);
 
             layer.avatarMask = ResolveLayerMask(layerType);
@@ -550,10 +720,34 @@ namespace ES
             // 如果有PlayableGraph,为层级创建Mixer并接入Root
             if (playableGraph.IsValid())
             {
-                layer.mixer = AnimationMixerPlayable.Create(playableGraph, 0);
+                // ★ 仅Base层使用参考姿态Clip，slot 0 预留给参考姿态
+                bool useReferencePose = (referencePoseClip != null && layerType == StateLayerType.Base);
+                int initialSlotCount = useReferencePose ? 1 : 0;
+                layer.mixer = AnimationMixerPlayable.Create(playableGraph, initialSlotCount);
                 layer.rootInputIndex = (int)layerType;
                 playableGraph.Connect(layer.mixer, 0, rootMixer, layer.rootInputIndex);
                 rootMixer.SetInputWeight(layer.rootInputIndex, layer.weight);
+                layer.lastAppliedRootMixerWeight = layer.weight;
+
+                // ★ 创建参考姿态Playable（防止bind pose下陷）—— 仅Base层
+                if (useReferencePose)
+                {
+                    layer.referencePosePlayable = AnimationClipPlayable.Create(playableGraph, referencePoseClip);
+                    layer.referencePosePlayable.SetSpeed(0); // 不需要播放，只需要第0帧姿态
+                    layer.referencePosePlayable.SetTime(0);
+                    playableGraph.Connect(layer.referencePosePlayable, 0, layer.mixer, 0);
+                    layer.mixer.SetInputWeight(0, 1f); // 初始权重=1（无其他状态时全部用参考姿态）
+                    layer.hasReferencePose = true;
+#if STATEMACHINEDEBUG
+                    {
+                        var dbg = StateMachineDebugSettings.Instance;
+                        if (dbg != null && dbg.IsRuntimeInitEnabled)
+                        {
+                            dbg.LogRuntimeInit($"✓ Base层参考姿态已创建 | Clip={referencePoseClip.name}");
+                        }
+                    }
+#endif
+                }
 
                 if (layer.avatarMask != null)
                 {
@@ -562,14 +756,29 @@ namespace ES
 
                 rootMixer.SetLayerAdditive((uint)layer.rootInputIndex, layer.blendMode == StateLayerBlendMode.Additive);
 
-                Debug.Log($"[StateMachine] ✓ {layerType}层级Mixer创建成功 | Valid:{layer.mixer.IsValid()} | RootIndex:{layer.rootInputIndex}");
+#if STATEMACHINEDEBUG
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsRuntimeInitEnabled)
+                    {
+                        dbg.LogRuntimeInit($"✓ {layerType}层级Mixer创建成功 | Valid:{layer.mixer.IsValid()} | RootIndex:{layer.rootInputIndex}");
+                    }
+                }
+#endif
             }
             else
             {
-                Debug.LogWarning($"[StateMachine] ✗ {layerType}层级Mixer创建失败 - PlayableGraph无效");
+#if STATEMACHINEDEBUG
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null)
+                    {
+                        dbg.LogWarning($"✗ {layerType}层级Mixer创建失败 - PlayableGraph无效");
+                    }
+                }
+#endif
             }
 
-            OnLayerInitialized?.Invoke(layer);
             return layer;
         }
 
@@ -626,7 +835,7 @@ namespace ES
         public void InitializeState(StateBase state)
         {
             state.host = this;
-            state.Initialize(this);
+            state.BindHostMachine(this);
         }
 
         /// <summary>
@@ -634,6 +843,18 @@ namespace ES
         /// </summary>
         public bool BindToAnimator(Animator animator)
         {
+            if (animator == null)
+            {
+#if STATEMACHINEDEBUG
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null)
+                {
+                    dbg.LogWarning($"BindToAnimator 失败：Animator 为 null | StateMachineKey={stateMachineKey}");
+                }
+#endif
+                return false;
+            }
+
             if (!playableGraph.IsValid())
             {
                 playableGraph = PlayableGraph.Create($"StateMachine_{stateMachineKey}");
@@ -653,6 +874,14 @@ namespace ES
 
             boundAnimator = animator;
 
+            // ★ 深度集成：自动挂载 FinalIK 驱动（如果用户有添加 BipedIK 组件则会被驱动；没有则零成本跳过）
+            var driver = animator.GetComponent<StateFinalIKDriver>();
+            if (driver == null)
+            {
+                driver = animator.gameObject.AddComponent<StateFinalIKDriver>();
+            }
+            driver.Bind(this, animator);
+
             if (!animationOutput.IsOutputValid())
             {
                 animationOutput = AnimationPlayableOutput.Create(playableGraph, "StateMachine", animator);
@@ -668,7 +897,15 @@ namespace ES
 
             InitializeLayerWeights();
 
-            Debug.Log($"[StateMachine] Animator绑定成功: {animator.gameObject.name}");
+#if STATEMACHINEDEBUG
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsRuntimeInitEnabled)
+                {
+                    dbg.LogRuntimeInit($"Animator绑定成功: {animator.gameObject.name}");
+                }
+            }
+#endif
             return true;
         }
 
@@ -690,29 +927,36 @@ namespace ES
             isDirty = false;
         }
 
-        private List<StateBase> GetCachedRunningStates()
+        private List<StateBase> GetRunningStatesList()
         {
-            if (_cachedRunningStatesVersion == _dirtyVersion)
-            {
-                return _cachedRunningStatesList;
-            }
+            return runningStates.Items;
+        }
 
-            _cachedRunningStatesList.Clear();
-            for (int i = 0; i < _registeredStatesList.Count; i++)
+        /// <summary>
+        /// 获取 RunningStates 的稳定快照（复用缓存，零GC）。
+        /// 当遍历过程中可能触发状态切换（Enter/Exit）导致 runningStates 变更时，必须使用快照。
+        /// </summary>
+        private List<StateBase> GetRunningStatesSnapshot()
+        {
+            var src = runningStates.Items;
+            var dst = _runningStatesSnapshot;
+            dst.Clear();
+
+            for (int i = 0; i < src.Count; i++)
             {
-                var state = _registeredStatesList[i];
-                if (state.baseStatus == StateBaseStatus.Running)
+                var state = src[i];
+                if (state != null)
                 {
-                    _cachedRunningStatesList.Add(state);
+                    dst.Add(state);
                 }
             }
-            _cachedRunningStatesVersion = _dirtyVersion;
-            return _cachedRunningStatesList;
+
+            return dst;
         }
 
         private StateBase GetFirstRunningState(StateLayerRuntime layer)
         {
-            var runningStates = GetCachedRunningStates();
+            var runningStates = GetRunningStatesList();
             for (int i = 0; i < runningStates.Count; i++)
             {
                 var state = runningStates[i];
@@ -796,19 +1040,12 @@ namespace ES
 
         private StateChannelMask EvaluateChannelMask()
         {
-            if (CustomChannelMaskEvaluator != null)
-            {
-                return CustomChannelMaskEvaluator(runningStates);
-            }
-
             StateChannelMask mask = StateChannelMask.None;
-            // ★ 修复：使用_tmpStateBuffer代替foreach on HashSet，避免GC分配
-            _tmpStateBuffer.Clear();
-            _tmpStateBuffer.AddRange(runningStates);
-            for (int i = 0; i < _tmpStateBuffer.Count; i++)
+            var allRunningStates = GetRunningStatesList();
+            for (int i = 0; i < allRunningStates.Count; i++)
             {
-                var mergeData = _tmpStateBuffer[i].stateSharedData.mergeData;
-                mask |= mergeData.stateChannelMask;
+                var resolved = allRunningStates[i].ResolvedConfig;
+                mask |= resolved.channelMask;
             }
 
             return mask;
@@ -822,11 +1059,22 @@ namespace ES
         /// </summary>
         public void Dispose()
         {
-            // 停用所有运行中的状态
-            _tmpStateBuffer.Clear();
-            _tmpStateBuffer.AddRange(runningStates);
-            foreach (var state in _tmpStateBuffer)
+            // 解绑 FinalIK 驱动：避免 driver 继续引用已 Dispose 的 StateMachine
+            if (boundAnimator != null)
             {
+                var driver = boundAnimator.GetComponent<StateFinalIKDriver>();
+                if (driver != null)
+                {
+                    driver.Unbind();
+                }
+            }
+
+            // 停用所有运行中的状态
+            var allRunningStates = GetRunningStatesSnapshot();
+            for (int i = 0; i < allRunningStates.Count; i++)
+            {
+                var state = allRunningStates[i];
+                if (state == null) continue;
                 state.OnStateExit();
                 // ★ 修复：销毁每个状态的Playable资源（之前漏掉导致Playable泄漏）
                 state.DestroyPlayable();
@@ -861,25 +1109,21 @@ namespace ES
 
                 // 清理Playable槽位映射
                 layer.stateToSlotMap.Clear();
+                layer.InternalClearConnectedStates();
                 layer.freeSlots.Clear();
 
                 // ★ 清理淡出状态池
-                if (layer.fadeOutStates != null)
+                foreach (var kvp in layer.fadeOutStates)
                 {
-                    foreach (var kvp in layer.fadeOutStates)
-                    {
-                        kvp.Value?.TryAutoPushedToPool();
-                    }
-                    layer.fadeOutStates.Clear();
+                    kvp.Value?.TryAutoPushedToPool();
                 }
-                if (layer.fadeInStates != null)
+                layer.fadeOutStates.Clear();
+
+                foreach (var kvp in layer.fadeInStates)
                 {
-                    foreach (var kvp in layer.fadeInStates)
-                    {
-                        kvp.Value?.TryAutoPushedToPool();
-                    }
-                    layer.fadeInStates.Clear();
+                    kvp.Value?.TryAutoPushedToPool();
                 }
+                layer.fadeInStates.Clear();
 
                 if (layer.mixer.IsValid())
                     layer.mixer.Destroy();
@@ -905,7 +1149,10 @@ namespace ES
             _activationCache.Clear();
 
             // 清理上下文
-            stateContext.Clear();
+            if (stateContext != null)
+            {
+                stateContext.Clear();
+            }
 
             isRunning = false;
             isInitialized = false;
@@ -923,7 +1170,24 @@ namespace ES
             if (isRunning) return;
             if (!isInitialized)
             {
-                Debug.LogWarning($"状态机 {stateMachineKey} 未初始化，无法启动");
+#if STATEMACHINEDEBUG
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    dbg?.LogWarning($"状态机 {stateMachineKey} 未初始化，无法启动");
+                }
+#endif
+                return;
+            }
+
+            if (boundAnimator == null)
+            {
+#if STATEMACHINEDEBUG
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null)
+                {
+                    dbg.LogWarning($"状态机 {stateMachineKey} 未绑定Animator，无法启动（请先调用 BindToAnimator）");
+                }
+#endif
                 return;
             }
 
@@ -953,6 +1217,10 @@ namespace ES
             foreach (var layer in GetAllLayers())
             {
                 DeactivateLayer(layer.layerType);
+
+                // ★ 可靠性收口：Stop 之后不会再 UpdateFades，因此必须强制清理残留 fade 数据并卸载仍连接的 Playable。
+                // 否则：fadeOut 未完成的状态会一直残留在 stateToSlotMap 上，导致重启后 HotPlug 跳过/槽位耗尽等隐性问题。
+                ForceClearLayerFadesAndResidualPlayables(layer);
             }
 
             // 停止PlayableGraph
@@ -962,6 +1230,55 @@ namespace ES
             }
 
             isRunning = false;
+        }
+
+        /// <summary>
+        /// ★ Stop/强制清理用：
+        /// - 清空该层的 fadeIn/fadeOut 数据（回收池对象）
+        /// - 卸载仍连接在 mixer 上的残留状态 Playable（通常来自未完成的 fadeOut）
+        ///
+        /// 注意：不触发 OnStateExit / 事件回调；逻辑退出应由上层调用 TruelyDeactivateState 处理。
+        /// </summary>
+        private void ForceClearLayerFadesAndResidualPlayables(StateLayerRuntime layer)
+        {
+            if (layer == null) return;
+
+            // 1) 清理 fade 数据（回收对象池）
+            if (layer.fadeInStates.Count > 0)
+            {
+                foreach (var kvp in layer.fadeInStates)
+                {
+                    kvp.Value?.TryAutoPushedToPool();
+                }
+                layer.fadeInStates.Clear();
+            }
+
+            if (layer.fadeOutStates.Count > 0)
+            {
+                foreach (var kvp in layer.fadeOutStates)
+                {
+                    kvp.Value?.TryAutoPushedToPool();
+                }
+                layer.fadeOutStates.Clear();
+            }
+
+            // 2) 卸载仍连接的残留状态（只要还在 stateToSlotMap，就说明 playable 还挂在 mixer 上）
+            if (layer.stateToSlotMap.Count > 0)
+            {
+                var buffer = _statesToDeactivateCache;
+                buffer.Clear();
+                foreach (var kvp in layer.stateToSlotMap)
+                {
+                    if (kvp.Key != null) buffer.Add(kvp.Key);
+                }
+
+                for (int i = 0; i < buffer.Count; i++)
+                {
+                    HotUnplugStateFromPlayable(buffer[i], layer);
+                }
+
+                buffer.Clear();
+            }
         }
 
         /// <summary>
@@ -980,6 +1297,18 @@ namespace ES
         {
             if (!isRunning) return;
 
+            if (stateContext == null)
+            {
+#if STATEMACHINEDEBUG
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null)
+                {
+                    dbg.LogWarning($"UpdateStateMachine 被调用但 stateContext 为 null | StateMachineKey={stateMachineKey}");
+                }
+#endif
+                return;
+            }
+
             float deltaTime = Time.deltaTime;
 
             // SupportFlags由StateMachine统一维护，无需同步
@@ -990,27 +1319,31 @@ namespace ES
             // 更新所有运行中的状态
             var statesToDeactivate = _statesToDeactivateCache; // 收集需要自动退出的状态
             statesToDeactivate.Clear();
-            // ★ 修复：使用_tmpStateBuffer迭代代替foreach on HashSet，避免每帧GC分配Enumerator
-            _tmpStateBuffer.Clear();
-            _tmpStateBuffer.AddRange(runningStates);
-            for (int i = 0; i < _tmpStateBuffer.Count; i++)
+            var allRunningStates = GetRunningStatesSnapshot();
+            for (int i = 0; i < allRunningStates.Count; i++)
             {
-                var state = _tmpStateBuffer[i];
-                if (state.baseStatus == StateBaseStatus.Running)
+                var state = allRunningStates[i];
+                if (state == null) continue;
+                if (state.baseStatus != StateBaseStatus.Running) continue;
+
+                state.OnStateUpdate();
+
+                // 统一推进进入时长：不应依赖动画更新函数是否被调用。
+                state.hasEnterTime += deltaTime;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (state.stateSharedData == null) throw new InvalidOperationException("RunningState 的 stateSharedData 不能为空（应在注册/初始化期保证）");
+#endif
+                if (state._hasAnimationCached)
                 {
-                    state.OnStateUpdate();
+                    state.UpdateAnimationRuntime(stateContext, deltaTime);
+                    state.ProcessMatchTarget(boundAnimator);
+                }
 
-                    // ★ 更新动画权重 - 仅动画状态需要
-                    if (state.stateSharedData.hasAnimation)
-                    {
-                        state.UpdateAnimationWeights(stateContext, deltaTime);
-                    }
-
-                    // ★ 检查是否应该自动退出（按持续时间模式）
-                    if (state.ShouldAutoExit(Time.time))
-                    {
-                        statesToDeactivate.Add(state);
-                    }
+                // ★ 检查是否应该自动退出（按持续时间模式）
+                if (state.ShouldAutoExit(Time.time))
+                {
+                    statesToDeactivate.Add(state);
                 }
             }
 
@@ -1026,6 +1359,9 @@ namespace ES
 
             // ★ 更新淡入淡出效果
             UpdateFades(deltaTime);
+
+            // ★ 统一批处理写入 Mixer 输入权重（含参考姿态填充/归一化）
+            UpdateMixerInputWeights();
 
 
             // 更新层级Dirty自动标记（高等级降级到1，保持最低Dirty用于持续检查FallBack）
@@ -1043,6 +1379,9 @@ namespace ES
             // 同步层级权重到RootMixer
             UpdateLayerWeights();
 
+            // ★ FinalIK Pose 聚合：每帧从所有 Running State 的 runtime.ik 生成最终 Pose（LateUpdate 驱动输出）
+            UpdateFinalIKPoseCache(deltaTime);
+
             // Manual模式下需要手动Evaluate推进图
             if (playableGraph.IsValid())
             {
@@ -1051,11 +1390,17 @@ namespace ES
                     playableGraph.Play();
                 }
 #if STATEMACHINEDEBUG
-                StateMachineDebugSettings.Instance.LogPerformance(
-                    $"[StateMachine] 手动评估PlayableGraph，DeltaTime: {deltaTime:F4}" +
-                    playableGraph.GetTimeUpdateMode() +
-                    playableGraph.IsPlaying() +
-                    playableGraph.IsValid());
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsPerformanceEnabled)
+                    {
+                        dbg.LogPerformance(
+                            $"[StateMachine] 手动评估PlayableGraph，DeltaTime: {deltaTime:F4}" +
+                            playableGraph.GetTimeUpdateMode() +
+                            playableGraph.IsPlaying() +
+                            playableGraph.IsValid());
+                    }
+                }
 #endif
                 playableGraph.Evaluate(deltaTime);
             }
@@ -1070,6 +1415,187 @@ namespace ES
 #endif
 #endif
 
+        }
+
+        private void UpdateFinalIKPoseCache(float deltaTime)
+        {
+            finalIKPose.Reset();
+
+            // 临时容器：按层级做 override（上层优先），同层多状态做权重混合
+            StateIKPose upper = default;
+            StateIKPose lower = default;
+            StateIKPose buff = default;
+            StateIKPose main = default;
+            StateIKPose @base = default;
+            upper.Reset();
+            lower.Reset();
+            buff.Reset();
+            main.Reset();
+            @base.Reset();
+
+            var allRunningStates = GetRunningStatesList();
+            for (int i = 0; i < allRunningStates.Count; i++)
+            {
+                var state = allRunningStates[i];
+                if (state == null || state.baseStatus != StateBaseStatus.Running) continue;
+
+                var runtime = state.AnimationRuntime;
+                if (runtime == null || !runtime.ik.enabled) continue;
+                if (runtime.ik.weight < 0.001f) continue;
+
+                float master = runtime.ik.weight * state.PlayableWeight;
+                if (master < 0.001f) continue;
+
+                if (!stateLayerMap.TryGetValue(state, out var layerType))
+                {
+                    layerType = state.stateSharedData != null ? state.stateSharedData.basicConfig.layerType : StateLayerType.Main;
+                }
+
+                ref var target = ref GetLayerPoseRef(layerType, ref upper, ref lower, ref buff, ref main, ref @base);
+                AccumulateFromRuntime(ref target, state, master);
+            }
+
+            // 按层级 override 合成：UpperBody > LowerBody > Buff > Main > Base
+            ComposeOverride(ref finalIKPose, ref upper);
+            ComposeOverride(ref finalIKPose, ref lower);
+            ComposeOverride(ref finalIKPose, ref buff);
+            ComposeOverride(ref finalIKPose, ref main);
+            ComposeOverride(ref finalIKPose, ref @base);
+
+            // 输出权重 clamp
+            ClampPoseWeights(ref finalIKPose);
+
+            // 外部后处理（可选）：例如脚贴合台阶等
+            var cb = OnFinalIKPosePostProcess;
+            if (cb != null)
+            {
+                cb(this, ref finalIKPose, deltaTime);
+                ClampPoseWeights(ref finalIKPose);
+            }
+        }
+
+        private static ref StateIKPose GetLayerPoseRef(
+            StateLayerType layerType,
+            ref StateIKPose upper,
+            ref StateIKPose lower,
+            ref StateIKPose buff,
+            ref StateIKPose main,
+            ref StateIKPose @base)
+        {
+            switch (layerType)
+            {
+                case StateLayerType.UpperBody: return ref upper;
+                case StateLayerType.LowerBody: return ref lower;
+                case StateLayerType.Buff: return ref buff;
+                case StateLayerType.Base: return ref @base;
+                case StateLayerType.Main:
+                default: return ref main;
+            }
+        }
+
+        private static void AccumulateFromRuntime(ref StateIKPose pose, StateBase state, float master)
+        {
+            ref var ik = ref state.AnimationRuntime.ik;
+
+            AccumulateGoal(ref pose.leftHand, ik.leftHandWeight * master, ik.leftHandPosition, ik.leftHandRotation, ik.leftHandHintPosition);
+            AccumulateGoal(ref pose.rightHand, ik.rightHandWeight * master, ik.rightHandPosition, ik.rightHandRotation, ik.rightHandHintPosition);
+            AccumulateGoal(ref pose.leftFoot, ik.leftFootWeight * master, ik.leftFootPosition, ik.leftFootRotation, ik.leftFootHintPosition);
+            AccumulateGoal(ref pose.rightFoot, ik.rightFootWeight * master, ik.rightFootPosition, ik.rightFootRotation, ik.rightFootHintPosition);
+
+            float lookW = ik.lookAtWeight * master;
+            if (lookW > 0.001f)
+            {
+                AccumulateLookAt(ref pose, lookW, ik.lookAtPosition, state);
+            }
+        }
+
+        private static void AccumulateGoal(ref IKGoalPose goal, float w, Vector3 pos, Quaternion rot, Vector3 hintPos)
+        {
+            if (w <= 0.001f) return;
+
+            if (goal.weight <= 0.001f)
+            {
+                goal.weight = w;
+                goal.position = pos;
+                goal.rotation = rot;
+                goal.hintPosition = hintPos;
+                return;
+            }
+
+            float newW = goal.weight + w;
+            float t = w / newW;
+            goal.position = Vector3.Lerp(goal.position, pos, t);
+            goal.rotation = Quaternion.Slerp(goal.rotation, rot, t);
+
+            if (hintPos != Vector3.zero)
+            {
+                goal.hintPosition = (goal.hintPosition == Vector3.zero) ? hintPos : Vector3.Lerp(goal.hintPosition, hintPos, t);
+            }
+
+            goal.weight = newW;
+        }
+
+        private static void AccumulateLookAt(ref StateIKPose pose, float w, Vector3 lookAtPos, StateBase state)
+        {
+            if (pose.lookAtWeight <= 0.001f)
+            {
+                pose.lookAtWeight = w;
+                pose.lookAtPosition = lookAtPos;
+                ApplyLookAtConfig(ref pose, state);
+                return;
+            }
+
+            float newW = pose.lookAtWeight + w;
+            float t = w / newW;
+            pose.lookAtPosition = Vector3.Lerp(pose.lookAtPosition, lookAtPos, t);
+            pose.lookAtWeight = newW;
+        }
+
+        private static void ApplyLookAtConfig(ref StateIKPose pose, StateBase state)
+        {
+            var animConfig = state.stateSharedData != null ? state.stateSharedData.animationConfig : null;
+            if (animConfig != null && animConfig.enableIK && animConfig.ikLookAt.enabled)
+            {
+                var cfg = animConfig.ikLookAt;
+                pose.lookAtBodyWeight = cfg.bodyWeight;
+                pose.lookAtHeadWeight = cfg.headWeight;
+                pose.lookAtEyesWeight = cfg.eyesWeight;
+                pose.lookAtClampWeight = cfg.clampWeight;
+            }
+            else
+            {
+                pose.lookAtBodyWeight = 0.5f;
+                pose.lookAtHeadWeight = 1f;
+                pose.lookAtEyesWeight = 1f;
+                pose.lookAtClampWeight = 0.5f;
+            }
+        }
+
+        private static void ComposeOverride(ref StateIKPose dst, ref StateIKPose src)
+        {
+            if (dst.leftHand.weight <= 0.001f && src.leftHand.weight > 0.001f) dst.leftHand = src.leftHand;
+            if (dst.rightHand.weight <= 0.001f && src.rightHand.weight > 0.001f) dst.rightHand = src.rightHand;
+            if (dst.leftFoot.weight <= 0.001f && src.leftFoot.weight > 0.001f) dst.leftFoot = src.leftFoot;
+            if (dst.rightFoot.weight <= 0.001f && src.rightFoot.weight > 0.001f) dst.rightFoot = src.rightFoot;
+
+            if (dst.lookAtWeight <= 0.001f && src.lookAtWeight > 0.001f)
+            {
+                dst.lookAtWeight = src.lookAtWeight;
+                dst.lookAtPosition = src.lookAtPosition;
+                dst.lookAtBodyWeight = src.lookAtBodyWeight;
+                dst.lookAtHeadWeight = src.lookAtHeadWeight;
+                dst.lookAtEyesWeight = src.lookAtEyesWeight;
+                dst.lookAtClampWeight = src.lookAtClampWeight;
+            }
+        }
+
+        private static void ClampPoseWeights(ref StateIKPose pose)
+        {
+            pose.leftHand.weight = Mathf.Clamp01(pose.leftHand.weight);
+            pose.rightHand.weight = Mathf.Clamp01(pose.rightHand.weight);
+            pose.leftFoot.weight = Mathf.Clamp01(pose.leftFoot.weight);
+            pose.rightFoot.weight = Mathf.Clamp01(pose.rightFoot.weight);
+            pose.lookAtWeight = Mathf.Clamp01(pose.lookAtWeight);
         }
 
 
@@ -1088,7 +1614,11 @@ namespace ES
                 int index = layer.rootInputIndex;
                 if (index >= 0)
                 {
-                    mixer.SetInputWeight(index, layer.weight);
+                    if (Mathf.Abs(layer.lastAppliedRootMixerWeight - layer.weight) > 0.0001f)
+                    {
+                        mixer.SetInputWeight(index, layer.weight);
+                        layer.lastAppliedRootMixerWeight = layer.weight;
+                    }
                 }
             }
         }
@@ -1117,7 +1647,7 @@ namespace ES
 
             // 初始化淡入：权重从0开始
             int slotIndex = layer.stateToSlotMap[state];
-            state.SetPlayableWeight(0f);
+            state.SetPlayableWeightAssumeBound(0f);
 
             // 记录淡入数据（需要在StateLayerRuntime中添加字段）
             if (!layer.fadeInStates.TryGetValue(state, out var fadeData))
@@ -1160,7 +1690,6 @@ namespace ES
                 fadeData.startWeight = currentWeight;
                 layer.fadeOutStates[state] = fadeData;
 
-                state.OnFadeOutStarted();
                 StateMachineDebugSettings.Instance.LogFade(
                     $"[淡出] 状态 {state.strKey} 开始淡出，时长 {fadeOutDuration:F2}秒，起始权重 {currentWeight:F2}");
             }
@@ -1174,6 +1703,106 @@ namespace ES
             foreach (var layer in layerRuntimes)
             {
                 UpdateLayerFades(layer, deltaTime);
+            }
+        }
+
+        /// <summary>
+        /// ★ 批处理写入每层 Mixer 的输入权重（零GC）。
+        /// - 所有状态的外部权重写入统一集中在这里，避免 StateBase 每次 SetPlayableWeight 都调用 SetInputWeight。
+        /// - Base 层含参考姿态：额外做“参考姿态填充/归一化”，确保输入权重和≈1，避免 bind pose 混入下陷。
+        /// </summary>
+        private void UpdateMixerInputWeights()
+        {
+            for (int layerIdx = 0; layerIdx < layerRuntimes.Count; layerIdx++)
+            {
+                var layer = layerRuntimes[layerIdx];
+                if (!layer.mixer.IsValid()) continue;
+                if (!layer.HasDirtyFlag(PipelineDirtyFlags.MixerWeights)) continue;
+
+                // 非参考姿态层：只需要把 state.PlayableWeight 写回 mixer 一次即可
+                if (!layer.hasReferencePose)
+                {
+                    var states = layer.connectedStates;
+                    var slots = layer.connectedSlots;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    if (states.Count != slots.Count) throw new InvalidOperationException($"connectedStates/connectedSlots 计数不一致: {layer.layerType}");
+#endif
+                    for (int i = 0; i < states.Count; i++)
+                    {
+                        var state = states[i];
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                        if (state == null) throw new InvalidOperationException($"connectedStates 存在 null: {layer.layerType}");
+#endif
+                        layer.mixer.SetInputWeight(slots[i], state.PlayableWeight);
+                    }
+
+                    layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
+                    continue;
+                }
+
+                int inputCount = layer.mixer.GetInputCount();
+                if (inputCount <= 1)
+                {
+                    // 只有参考姿态自己，权重=1
+                    layer.mixer.SetInputWeight(0, 1f);
+                    layer.referencePoseWeightsNormalized = false;
+                    layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
+                    continue;
+                }
+
+                // ★ 核心：从状态对象读取"期望权重"（state.PlayableWeight），
+                //   而非从mixer读取——这样不受上帧归一化的污染
+                float intendedWeightSum = 0f;
+                {
+                    var states = layer.connectedStates;
+                    for (int i = 0; i < states.Count; i++)
+                    {
+                        intendedWeightSum += states[i].PlayableWeight;
+                    }
+                }
+
+                if (intendedWeightSum <= 1f)
+                {
+                    // ★ 权重不足1.0：参考姿态自动填充剩余，防止bind pose下陷
+                    // 注意：外部权重写入已延后到这里，因此每次 dirty 都需要把状态权重写回 mixer。
+                    {
+                        var states = layer.connectedStates;
+                        var slots = layer.connectedSlots;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                        if (states.Count != slots.Count) throw new InvalidOperationException($"connectedStates/connectedSlots 计数不一致: {layer.layerType}");
+#endif
+                        for (int i = 0; i < states.Count; i++)
+                        {
+                            layer.mixer.SetInputWeight(slots[i], states[i].PlayableWeight);
+                        }
+                    }
+                    layer.mixer.SetInputWeight(0, 1f - intendedWeightSum);
+                    layer.referencePoseWeightsNormalized = false;
+                }
+                else
+                {
+                    // ★ 权重超过1.0：归一化所有状态权重，防止角色浮起
+                    // 参考姿态权重=0（活跃状态已完全覆盖）
+                    // 因为每帧都从state.PlayableWeight重新读取，不会永久破坏权重
+                    // 当其他状态淡出后sum回落<=1.0，权重自动恢复为原始值
+                    layer.mixer.SetInputWeight(0, 0f);
+                    float invSum = 1f / intendedWeightSum;
+                    {
+                        var states = layer.connectedStates;
+                        var slots = layer.connectedSlots;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                        if (states.Count != slots.Count) throw new InvalidOperationException($"connectedStates/connectedSlots 计数不一致: {layer.layerType}");
+#endif
+                        for (int i = 0; i < states.Count; i++)
+                        {
+                            layer.mixer.SetInputWeight(slots[i], states[i].PlayableWeight * invSum);
+                        }
+                    }
+
+                    layer.referencePoseWeightsNormalized = true;
+                }
+
+                layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
             }
         }
 
@@ -1197,12 +1826,11 @@ namespace ES
                 float t = Mathf.Clamp01(fadeData.elapsedTime / fadeData.duration);
                 float eased = EvaluateFadeCurve(state, t, isFadeIn: true);
                 float weight = Mathf.Lerp(0f, 1f, eased);
-                state.SetPlayableWeight(weight);
+                state.SetPlayableWeightAssumeBound(weight);
 
                 if (t >= 1f)
                 {
                     fadeInToRemove.Add(state);
-                    state.OnFadeInComplete();
 #if STATEMACHINEDEBUG
                     StateMachineDebugSettings.Instance.LogFade(
                         $"[淡入完成] 状态 {state.strKey}");
@@ -1232,7 +1860,7 @@ namespace ES
                 float t = Mathf.Clamp01(fadeData.elapsedTime / fadeData.duration);
                 float eased = EvaluateFadeCurve(state, t, isFadeIn: false);
                 float weight = Mathf.Lerp(fadeData.startWeight, 0f, eased);
-                state.SetPlayableWeight(weight);
+                state.SetPlayableWeightAssumeBound(weight);
 
                 if (t >= 1f)
                 {
@@ -1289,7 +1917,9 @@ namespace ES
         /// </summary>
         private void CancelStaleFadeData(StateBase state, StateLayerRuntime layer)
         {
-            if (layer == null) return;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (layer == null) throw new ArgumentNullException(nameof(layer));
+#endif
 
             // 清理残留的fadeOut（最关键！）
             // fadeOut期间：状态的旧Playable仍然连接在mixer上，stateToSlotMap映射也还在
@@ -1298,7 +1928,7 @@ namespace ES
             {
                 // 卸载旧的Playable连接（这会清理stateToSlotMap和销毁旧Playable）
                 HotUnplugStateFromPlayable(state, layer);
-                
+
                 fadeOutData.TryAutoPushedToPool();
                 layer.fadeOutStates.Remove(state);
 #if STATEMACHINEDEBUG
@@ -1320,35 +1950,6 @@ namespace ES
         }
 
         #endregion
-
-        /// <summary>
-        /// 输出持续统计信息 - 简洁版，不干扰游戏运行
-        /// </summary>
-        private void OutputContinuousStats()
-        {
-            var sb = _continuousStatsBuilder;
-            sb.Clear();
-            sb.Append($"[Stats] 运行:{runningStates.Count} |");
-
-            foreach (var layer in GetAllLayers())
-            {
-                if (layer.runningStates.Count > 0)
-                {
-                    sb.Append($" {layer.layerType}:{layer.runningStates.Count}");
-                }
-            }
-
-            if (runningStates.Count > 0)
-            {
-                sb.Append(" | 状态:");
-                foreach (var state in runningStates)
-                {
-                    sb.Append($" [{state.strKey}]");
-                }
-            }
-
-            Debug.Log(sb.ToString());
-        }
 
         /// <summary>
         /// 根据层级的Dirty标记处理不同任务
@@ -1491,15 +2092,13 @@ namespace ES
                 }
                 else
                 {
-                    if (StateMachineDebugSettings.Instance.alwaysLogErrors)
-                        Debug.LogWarning($"[StateMachine] 注册状态失败: {info.sharedData.basicConfig.stateName}");
+                    StateMachineDebugSettings.Instance.LogWarning($"注册状态失败: {info.sharedData.basicConfig.stateName}");
                 }
                 return null;
             }
             catch (Exception e)
             {
-                if (StateMachineDebugSettings.Instance.alwaysLogErrors)
-                    Debug.LogError($"[StateMachine] 注册状态异常: {info.sharedData.basicConfig.stateName}\n{e}");
+                StateMachineDebugSettings.Instance.LogError($"注册状态异常: {info.sharedData.basicConfig.stateName}\n{e}");
                 return null;
             }
         }
@@ -1532,8 +2131,8 @@ namespace ES
                 while (stringToStateMap.ContainsKey(finalName))
                 {
                     finalName = $"{originalName}_r{++attempt}";
-                    if (StateMachineDebugSettings.Instance.alwaysLogErrors)
-                        Debug.LogError($"[StateMachine] ⚠️ String键冲突! '{originalName}' → '{finalName}'");
+                    StateMachineDebugSettings.Instance.LogStateTransition(
+                        $"⚠️ String键冲突: '{originalName}' → '{finalName}'");
                 }
             }
 
@@ -1559,12 +2158,12 @@ namespace ES
         {
             if (string.IsNullOrEmpty(stateKey))
             {
-                Debug.LogError("[StateMachine] 状态键不能为空");
+                StateMachineDebugSettings.Instance.LogError("状态键不能为空");
                 return false;
             }
             if (state == null)
             {
-                Debug.LogError("[StateMachine] 状态实例不能为空");
+                StateMachineDebugSettings.Instance.LogError("状态实例不能为空");
                 return false;
             }
 
@@ -1577,7 +2176,8 @@ namespace ES
             {
                 renameAttempt++;
                 finalStateKey = $"{stateKey}_r{renameAttempt}";
-                Debug.LogError($"[StateMachine] ⚠️ String键冲突! '{stateKey}'已存在，自动重命名为'{finalStateKey}'");
+                StateMachineDebugSettings.Instance.LogStateTransition(
+                    $"⚠️ String键冲突: '{stateKey}'已存在，自动重命名为'{finalStateKey}'");
             }
 
             // 自动分配IntKey（从SharedData获取或自动生成）
@@ -1599,8 +2199,7 @@ namespace ES
         {
             if (sharedData == null)
             {
-                if (StateMachineDebugSettings.Instance.alwaysLogErrors)
-                    Debug.LogError("[StateMachine] StateSharedData为空");
+                StateMachineDebugSettings.Instance.LogError("StateSharedData为空");
                 return false;
             }
 
@@ -1651,14 +2250,14 @@ namespace ES
         {
             if (state == null)
             {
-                Debug.LogError($"状态实例不能为空: {stateKey}");
+                StateMachineDebugSettings.Instance.LogError($"状态实例不能为空: {stateKey}");
                 return false;
             }
 
             layer = ResolveLayerForState(state, layer);
             if (intToStateMap.ContainsKey(stateKey))
             {
-                Debug.LogWarning($"状态ID {stateKey} 已存在，跳过注册");
+                StateMachineDebugSettings.Instance.LogWarning($"状态ID {stateKey} 已存在，跳过注册");
                 return false;
             }
 
@@ -1666,7 +2265,7 @@ namespace ES
             string autoStrKey = GenerateUniqueStringKey(state);
             if (stringToStateMap.ContainsKey(autoStrKey))
             {
-                Debug.LogWarning($"自动生成的StringKey {autoStrKey} 已存在，跳过注册");
+                StateMachineDebugSettings.Instance.LogWarning($"自动生成的StringKey {autoStrKey} 已存在，跳过注册");
                 return false;
             }
 
@@ -1680,13 +2279,13 @@ namespace ES
         {
             if (string.IsNullOrEmpty(stringKey))
             {
-                Debug.LogError("状态键不能为空");
+                StateMachineDebugSettings.Instance.LogError("状态键不能为空");
                 return false;
             }
 
             if (state == null)
             {
-                Debug.LogError($"状态实例不能为空: {stringKey}");
+                StateMachineDebugSettings.Instance.LogError($"状态实例不能为空: {stringKey}");
                 return false;
             }
 
@@ -1694,13 +2293,13 @@ namespace ES
 
             if (stringToStateMap.ContainsKey(stringKey))
             {
-                Debug.LogWarning($"状态 {stringKey} 已存在，跳过注册");
+                StateMachineDebugSettings.Instance.LogWarning($"状态 {stringKey} 已存在，跳过注册");
                 return false;
             }
 
             if (intToStateMap.ContainsKey(intKey))
             {
-                Debug.LogWarning($"状态ID {intKey} 已存在，跳过注册");
+                StateMachineDebugSettings.Instance.LogWarning($"状态ID {intKey} 已存在，跳过注册");
                 return false;
             }
 
@@ -1725,26 +2324,33 @@ namespace ES
         /// </summary>
         private int GenerateUniqueIntKey(StateBase state)
         {
-            // 优先从SharedData.basicConfig.stateId获取
-            if (state?.stateSharedData?.basicConfig != null)
-            {
-                int configId = state.stateSharedData.basicConfig.stateId;
+            // 约定：注册期传入的 state 必须具备完整 sharedData/basicConfig
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (state.stateSharedData == null) throw new InvalidOperationException("State.stateSharedData 不能为空（注册期不应出现空共享数据）");
+            if (state.stateSharedData.basicConfig == null) throw new InvalidOperationException("State.stateSharedData.basicConfig 不能为空（注册期不应出现空基础配置）");
+#endif
 
-                // 如果配置ID为-1，表示需要自动分配
-                if (configId == -1)
-                {
-                    StateMachineDebugSettings.Instance.LogStateTransition(
-                        $"状态'{state.stateSharedData.basicConfig.stateName}' ID=-1，触发自动分配");
-                }
-                else if (configId > 0 && !intToStateMap.ContainsKey(configId))
-                {
-                    return configId;
-                }
-                else if (configId > 0 && intToStateMap.ContainsKey(configId))
-                {
-                    if (StateMachineDebugSettings.Instance.alwaysLogErrors)
-                        Debug.LogWarning($"[StateMachine] ⚠️ IntKey冲突! ID={configId} 已被'{intToStateMap[configId].strKey}'占用");
-                }
+            var sharedData = state.stateSharedData;
+            var basicConfig = sharedData.basicConfig;
+
+            // 优先从SharedData.basicConfig.stateId获取
+            int configId = basicConfig.stateId;
+
+            // 如果配置ID为-1，表示需要自动分配
+            if (configId == -1)
+            {
+                StateMachineDebugSettings.Instance.LogStateTransition(
+                    $"状态'{basicConfig.stateName}' ID=-1，触发自动分配");
+            }
+            else if (configId > 0 && !intToStateMap.ContainsKey(configId))
+            {
+                return configId;
+            }
+            else if (configId > 0 && intToStateMap.ContainsKey(configId))
+            {
+                StateMachineDebugSettings.Instance.LogWarning(
+                    $"⚠️ IntKey冲突! ID={configId} 已被'{intToStateMap[configId].strKey}'占用");
             }
 
             // 自动分配新ID（从10000开始避免冲突）
@@ -1762,14 +2368,17 @@ namespace ES
         /// </summary>
         private string GenerateUniqueStringKey(StateBase state)
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (state.stateSharedData == null) throw new InvalidOperationException("State.stateSharedData 不能为空（注册期不应出现空共享数据）");
+            if (state.stateSharedData.basicConfig == null) throw new InvalidOperationException("State.stateSharedData.basicConfig 不能为空（注册期不应出现空基础配置）");
+#endif
+
             // 优先从SharedData.basicConfig.stateName获取
-            if (state?.stateSharedData?.basicConfig != null)
+            string configName = state.stateSharedData.basicConfig.stateName;
+            if (!string.IsNullOrEmpty(configName) && !stringToStateMap.ContainsKey(configName))
             {
-                string configName = state.stateSharedData.basicConfig.stateName;
-                if (!string.IsNullOrEmpty(configName) && !stringToStateMap.ContainsKey(configName))
-                {
-                    return configName;
-                }
+                return configName;
             }
 
             // 自动分配
@@ -1789,20 +2398,23 @@ namespace ES
         /// </summary>
         private void CheckAndSetFallbackState(StateBase state, StateLayerType layerType)
         {
-            if (state?.stateSharedData?.basicConfig == null) return;
+            // 约定：调用方（RegisterStateCore）已保证 state/sharedData/basicConfig 非空
+            var sharedData = state.stateSharedData;
+            var basicConfig = sharedData.basicConfig;
 
             // 检查是否可以作为Fallback状态
-            if (state.stateSharedData.basicConfig.canBeFeedback)
+            if (basicConfig.canBeFeedback)
             {
                 // 获取Fallback支持标记
-                var fallbackFlag = state.stateSharedData.basicConfig.stateSupportFlag;
+                var fallbackFlag = basicConfig.stateSupportFlag;
 
                 // 获取目标层级运行时
                 var layerRuntime = GetLayerByType(layerType);
                 if (layerRuntime != null)
                 {
                     layerRuntime.SetFallBack(state.intKey, fallbackFlag);
-                    Debug.Log($"[FallBack-Register] ✓ [{layerType}] Flag={fallbackFlag} <- State '{state.strKey}' (ID:{state.intKey})");
+                    StateMachineDebugSettings.Instance.LogFallback(
+                        $"[FallBack-Register] ✓ [{layerType}] Flag={fallbackFlag} <- State '{state.strKey}' (ID:{state.intKey})");
                 }
             }
         }
@@ -1812,6 +2424,16 @@ namespace ES
         /// </summary>
         private bool RegisterStateCore(string stringKey, int intKey, StateBase state, StateLayerType layer)
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (state.stateSharedData == null) throw new InvalidOperationException("RegisterStateCore: stateSharedData 不能为空");
+            if (state.stateSharedData.basicConfig == null) throw new InvalidOperationException("RegisterStateCore: basicConfig 不能为空");
+#else
+            if (state == null || state.stateSharedData == null || state.stateSharedData.basicConfig == null) return false;
+#endif
+
+            var sharedData = state.stateSharedData;
+
             // 同时注册到两个字典
             stringToStateMap[stringKey] = state;
             intToStateMap[intKey] = state;
@@ -1819,6 +2441,9 @@ namespace ES
             state.intKey = intKey;
             state.host = this;
             stateLayerMap[state] = layer;
+
+            // ★ 低频路径缓存：Initialize/Update 热路径依赖这些缓存字段（减少每帧判空与链式取值）
+            state.InternalRefreshSharedDataCache();
             if (!_registeredStatesList.Contains(state))
             {
                 _registeredStatesList.Add(state);
@@ -1828,17 +2453,31 @@ namespace ES
             CheckAndSetFallbackState(state, layer);
 
             // 如果状态有动画，初始化Calculator（享元数据预计算）
-            if (state.stateSharedData.hasAnimation && state.stateSharedData.animationConfig?.calculator != null)
+            if (sharedData.hasAnimation)
             {
-                try
+                var animationConfig = sharedData.animationConfig;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (animationConfig == null) throw new InvalidOperationException($"RegisterStateCore: hasAnimation=true 但 animationConfig 为空 | State={stringKey}");
+#endif
+                // ★ 优先使用 State 缓存的“已解析 Calculator”（支持外部覆盖，不污染 sharedData）
+                var calculator = state._calculatorCached;
+                if (calculator == null && animationConfig != null)
                 {
-                    state.stateSharedData.animationConfig.calculator.InitializeCalculator();
-                    StateMachineDebugSettings.Instance.LogRuntimeInit(
-                        $"✓ Calculator初始化: {stringKey} - {state.stateSharedData.animationConfig.calculator.GetType().Name}");
+                    calculator = animationConfig.calculator;
                 }
-                catch (System.Exception e)
+
+                if (calculator != null)
                 {
-                    Debug.LogError($"[StateMachine] Calculator初始化失败: {stringKey}\n{e}");
+                    try
+                    {
+                        calculator.InitializeCalculator();
+                        StateMachineDebugSettings.Instance.LogRuntimeInit(
+                            $"✓ Calculator初始化: {stringKey} - {calculator.GetType().Name}");
+                    }
+                    catch (System.Exception e)
+                    {
+                        StateMachineDebugSettings.Instance.LogError($"Calculator初始化失败: {stringKey}\n{e}");
+                    }
                 }
             }
 
@@ -1849,7 +2488,15 @@ namespace ES
                 InitializeState(state);
             }
 
-            Debug.Log($"[StateMachine] 注册状态: {stringKey} (IntKey:{intKey}, Layer:{layer})");
+#if STATEMACHINEDEBUG
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsRuntimeInitEnabled)
+                {
+                    dbg.LogRuntimeInit($"注册状态: {stringKey} (IntKey:{intKey}, Layer:{layer})");
+                }
+            }
+#endif
             return true;
         }
 
@@ -1988,61 +2635,6 @@ namespace ES
         [NonSerialized]
         private Dictionary<string, StateBase> _temporaryStates = new Dictionary<string, StateBase>();
 
-#if UNITY_EDITOR
-        // === 编辑器测试字段 ===
-        [FoldoutGroup("临时动画测试", expanded: false)]
-        [LabelText("测试键"), Tooltip("临时状态的唯一标识")]
-        public string testTempKey = "TestAnim";
-
-        [FoldoutGroup("临时动画测试")]
-        [LabelText("测试Clip"), AssetsOnly]
-        public AnimationClip testClip;
-
-        [FoldoutGroup("临时动画测试")]
-        [LabelText("目标层级")]
-        public StateLayerType testLayer = StateLayerType.Main;
-
-        [FoldoutGroup("临时动画测试")]
-        [LabelText("播放速度"), Range(0.1f, 3f)]
-        public float testSpeed = 1.0f;
-
-        [FoldoutGroup("临时动画测试")]
-        [LabelText("循环播放"), Tooltip("勾选后动画循环播放，不勾选则播放一次后自动退出")]
-        public bool testLoopable = false;
-
-        [FoldoutGroup("临时动画测试")]
-        [Button("添加临时动画", ButtonSizes.Medium), GUIColor(0.4f, 0.8f, 1f)]
-        private void EditorAddTemporaryAnimation()
-        {
-            if (!Application.isPlaying)
-            {
-                Debug.LogWarning("请在运行时测试！");
-                return;
-            }
-
-            if (testClip == null)
-            {
-                Debug.LogError("请先指定Clip！");
-                return;
-            }
-
-            AddTemporaryAnimation(testTempKey, testClip, testLayer, testSpeed, testLoopable);
-        }
-
-        [FoldoutGroup("临时动画测试")]
-        [Button("移除临时动画", ButtonSizes.Medium), GUIColor(1f, 0.7f, 0.4f)]
-        private void EditorRemoveTemporaryAnimation()
-        {
-            if (!Application.isPlaying)
-            {
-                Debug.LogWarning("请在运行时测试！");
-                return;
-            }
-
-            RemoveTemporaryAnimation(testTempKey);
-        }
-#endif
-
         /// <summary>
         /// 添加临时动画 - 快速热拔插（自动注册+激活）
         /// </summary>
@@ -2056,20 +2648,20 @@ namespace ES
         {
             if (string.IsNullOrEmpty(tempKey))
             {
-                Debug.LogError("[TempAnim] 临时状态键不能为空");
+                StateMachineDebugSettings.Instance.LogError("[TempAnim] 临时状态键不能为空");
                 return false;
             }
 
             if (clip == null)
             {
-                Debug.LogError("[TempAnim] AnimationClip不能为空");
+                StateMachineDebugSettings.Instance.LogError("[TempAnim] AnimationClip不能为空");
                 return false;
             }
 
             // 检查是否已存在
             if (_temporaryStates.ContainsKey(tempKey))
             {
-                Debug.LogWarning($"[TempAnim] 临时状态 {tempKey} 已存在，先移除旧的");
+                StateMachineDebugSettings.Instance.LogWarning($"[TempAnim] 临时状态 {tempKey} 已存在，先移除旧的");
                 RemoveTemporaryAnimation(tempKey);
             }
 
@@ -2105,21 +2697,22 @@ namespace ES
             // 注册状态
             if (!RegisterState(tempState.strKey, tempState, layer))
             {
-                Debug.LogError($"[TempAnim] 注册临时状态失败: {tempKey}");
+                StateMachineDebugSettings.Instance.LogError($"[TempAnim] 注册临时状态失败: {tempKey}");
                 return false;
             }
 
             // 激活状态
             if (!TryActivateState(tempState, layer))
             {
-                Debug.LogError($"[TempAnim] 激活临时状态失败: {tempKey}");
+                StateMachineDebugSettings.Instance.LogError($"[TempAnim] 激活临时状态失败: {tempKey}");
                 UnregisterState(tempState.strKey);
                 return false;
             }
 
             // 记录到临时状态集合
             _temporaryStates[tempKey] = tempState;
-            Debug.Log($"[TempAnim] ✓ 添加临时动画: {tempKey} | Clip:{clip.name} | Layer:{layer}");
+            StateMachineDebugSettings.Instance.LogStateTransition(
+                $"[TempAnim] ✓ 添加临时动画: {tempKey} | Clip:{clip.name} | Layer:{layer}");
             return true;
         }
 
@@ -2132,7 +2725,7 @@ namespace ES
         {
             if (!_temporaryStates.TryGetValue(tempKey, out var tempState))
             {
-                Debug.LogWarning($"[TempAnim] 临时状态 {tempKey} 不存在");
+                StateMachineDebugSettings.Instance.LogWarning($"[TempAnim] 临时状态 {tempKey} 不存在");
                 return false;
             }
 
@@ -2145,7 +2738,7 @@ namespace ES
 
             // 从临时集合移除
             _temporaryStates.Remove(tempKey);
-            Debug.Log($"[TempAnim] ✓ 移除临时动画: {tempKey}");
+            StateMachineDebugSettings.Instance.LogStateTransition($"[TempAnim] ✓ 移除临时动画: {tempKey}");
             return true;
         }
 
@@ -2156,11 +2749,11 @@ namespace ES
         {
             if (_temporaryStates.Count == 0)
             {
-                Debug.Log("[TempAnim] 没有临时动画需要清除");
+                StateMachineDebugSettings.Instance.LogStateTransition("[TempAnim] 没有临时动画需要清除");
                 return;
             }
 
-            Debug.Log($"[TempAnim] 开始清除 {_temporaryStates.Count} 个临时动画");
+            StateMachineDebugSettings.Instance.LogStateTransition($"[TempAnim] 开始清除 {_temporaryStates.Count} 个临时动画");
 
             // 复制键列表避免迭代时修改字典
             var keys = _temporaryKeysCache;
@@ -2175,7 +2768,7 @@ namespace ES
             }
 
             _temporaryStates.Clear();
-            Debug.Log("[TempAnim] ✓ 所有临时动画已清除");
+            StateMachineDebugSettings.Instance.LogStateTransition("[TempAnim] ✓ 所有临时动画已清除");
         }
 
         /// <summary>
@@ -2203,18 +2796,19 @@ namespace ES
         /// <param name="eventParam">事件参数</param>
         public void BroadcastAnimationEvent(StateBase state, string eventName, string eventParam)
         {
-            // 调用回调
-            OnAnimationEvent?.Invoke(state, eventName, eventParam);
-
-            // 也可以通过Entity广播
+            // 预留：通过Entity广播
             if (hostEntity != null)
             {
                 // 假设Entity有事件系统
                 // hostEntity.BroadcastEvent(eventName, eventParam);
             }
 
+#if STATEMACHINEDEBUG
+#if UNITY_EDITOR
             StateMachineDebugSettings.Instance.LogStateTransition(
                 $"[StateMachine] 广播动画事件: {eventName} | State: {state?.strKey} | Param: {eventParam}");
+#endif
+#endif
         }
 
         #endregion
@@ -2230,15 +2824,21 @@ namespace ES
         // 3. 添加自定义合并策略支持
         public StateActivationResult TestStateActivation(StateBase targetState, StateLayerType layer = StateLayerType.NotClear)
         {
-#if UNITY_EDITOR
-            UnityEngine.Debug.Log($"[TestStateActivation] Begin | State={(targetState != null ? targetState.strKey : "<null>")} | Layer={layer} | Running={isRunning} | DirtyVersion={_dirtyVersion}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition($"[TestStateActivation] Begin | State={(targetState != null ? targetState.strKey : "<null>")} | Layer={layer} | Running={isRunning} | DirtyVersion={_dirtyVersion}");
+                }
+            }
 #endif
 
             //状态为空，直接失败
             if (targetState == null)
             {
-#if UNITY_EDITOR
-                UnityEngine.Debug.LogWarning("[TestStateActivation] Fail: targetState is null");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                StateMachineDebugSettings.Instance?.LogWarning("[TestStateActivation] Fail: targetState is null");
 #endif
                 return StateActivationResult.FailureStateIsNull;
             }
@@ -2249,8 +2849,14 @@ namespace ES
             {
                 layer = basicConfig.layerType;
             }
-#if UNITY_EDITOR
-            UnityEngine.Debug.Log($"[TestStateActivation] ResolveLayer -> {layer}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition($"[TestStateActivation] ResolveLayer -> {layer}");
+                }
+            }
 #endif
             //忽略Ignore则跳过支持标记检查
             if (!basicConfig.ignoreSupportFlag)
@@ -2265,13 +2871,20 @@ namespace ES
                         //如果禁用在切换时激活则直接失败了，如果不禁用去看一下是否在禁用切换中
                         if (basicConfig.disableActiveOnSupportFlagSwitching || IsTransitionDisabledFast(supportFlags, targetFlag))
                         {
-#if UNITY_EDITOR
-                            UnityEngine.Debug.LogWarning($"[TestStateActivation] Fail: SupportFlags not satisfied | Current={supportFlags} Target={targetFlag} DisableOnSwitch={basicConfig.disableActiveOnSupportFlagSwitching}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                            StateMachineDebugSettings.Instance?.LogWarning(
+                                $"[TestStateActivation] Fail: SupportFlags not satisfied | Current={supportFlags} Target={targetFlag} DisableOnSwitch={basicConfig.disableActiveOnSupportFlagSwitching}");
 #endif
                             return StateActivationResult.FailureSupportFlagsNotSatisfied;
                         }
-#if UNITY_EDITOR
-                        UnityEngine.Debug.Log($"[TestStateActivation] SupportFlags mismatch but not blocked | Current={supportFlags} Target={targetFlag}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        {
+                            var dbg = StateMachineDebugSettings.Instance;
+                            if (dbg != null && dbg.IsStateTransitionEnabled)
+                            {
+                                dbg.LogStateTransition($"[TestStateActivation] SupportFlags mismatch but not blocked | Current={supportFlags} Target={targetFlag}");
+                            }
+                        }
 #endif
                     }
                 }
@@ -2281,8 +2894,14 @@ namespace ES
             var cache = GetOrCreateActivationCache(targetState);
             if (cache != null && cache.versions[layerIndex] == _dirtyVersion)
             {
-#if UNITY_EDITOR
-                UnityEngine.Debug.Log($"[TestStateActivation] Cache hit | LayerIndex={layerIndex}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsStateTransitionEnabled)
+                    {
+                        dbg.LogStateTransition($"[TestStateActivation] Cache hit | LayerIndex={layerIndex}");
+                    }
+                }
 #endif
                 return cache.results[layerIndex];
             }
@@ -2293,8 +2912,14 @@ namespace ES
                 var failure = basicConfig.supportReStart
                     ? StateActivationResult.SuccessRestart
                     : StateActivationResult.FailureStateAlreadyRunning;
-#if UNITY_EDITOR
-                UnityEngine.Debug.Log($"[TestStateActivation] State already running | Restart={basicConfig.supportReStart}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsStateTransitionEnabled)
+                    {
+                        dbg.LogStateTransition($"[TestStateActivation] State already running | Restart={basicConfig.supportReStart}");
+                    }
+                }
 #endif
                 if (cache != null)
                 {
@@ -2309,8 +2934,8 @@ namespace ES
             if (targetLayer == null)
             {
                 var failure = StateActivationResult.FailurePipelineNotFound;
-#if UNITY_EDITOR
-                UnityEngine.Debug.LogWarning($"[TestStateActivation] Fail: Layer not found | {layer}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                StateMachineDebugSettings.Instance?.LogWarning($"[TestStateActivation] Fail: Layer not found | {layer}");
 #endif
                 if (cache != null)
                 {
@@ -2323,8 +2948,8 @@ namespace ES
             if (!targetLayer.isEnabled)
             {
                 var failure = StateActivationResult.FailurePipelineDisabled;
-#if UNITY_EDITOR
-                UnityEngine.Debug.LogWarning($"[TestStateActivation] Fail: Layer disabled | {layer}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                StateMachineDebugSettings.Instance?.LogWarning($"[TestStateActivation] Fail: Layer disabled | {layer}");
 #endif
                 if (cache != null)
                 {
@@ -2335,12 +2960,18 @@ namespace ES
             }
             #endregion
 
-            var allRunningStates = GetCachedRunningStates();
+            var allRunningStates = GetRunningStatesList();
             //空状态机直接激活即可
             if (allRunningStates.Count == 0)
             {
-#if UNITY_EDITOR
-                UnityEngine.Debug.Log("[TestStateActivation] No running states -> SuccessNoMerge");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsStateTransitionEnabled)
+                    {
+                        dbg.LogStateTransition("[TestStateActivation] No running states -> SuccessNoMerge");
+                    }
+                }
 #endif
                 var success = StateActivationResult.SuccessNoMerge;
                 if (cache != null)
@@ -2355,16 +2986,23 @@ namespace ES
             int totalAgilityCost = 0;
             int totalTargetCost = 0;
 
-            var incomingCost = targetState.stateSharedData.costData;
-            if (incomingCost.enableCostCalculation)
+            targetState.EnsureResolvedRuntimeConfig();
+            var incomingResolved = targetState.ResolvedConfig;
+            if (incomingResolved.enableCostCalculation)
             {
-                totalMotionCost += incomingCost.costForMotion;
-                totalAgilityCost += incomingCost.costForAgility;
-                totalTargetCost += incomingCost.costForTarget;
-#if UNITY_EDITOR
-                UnityEngine.Debug.Log(
-                    $"[TestStateActivation] IncomingCost | M/A/T={incomingCost.costForMotion}/{incomingCost.costForAgility}/{incomingCost.costForTarget} " +
-                    $"TotalNow M/A/T={totalMotionCost}/{totalAgilityCost}/{totalTargetCost}");
+                totalMotionCost += incomingResolved.costForMotion;
+                totalAgilityCost += incomingResolved.costForAgility;
+                totalTargetCost += incomingResolved.costForTarget;
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsStateTransitionEnabled)
+                    {
+                        dbg.LogStateTransition(
+                            $"[TestStateActivation] IncomingCost | M/A/T={incomingResolved.costForMotion}/{incomingResolved.costForAgility}/{incomingResolved.costForTarget} " +
+                            $"TotalNow M/A/T={totalMotionCost}/{totalAgilityCost}/{totalTargetCost}");
+                    }
+                }
 #endif
             }
 
@@ -2380,8 +3018,14 @@ namespace ES
             #region 遍历合并测试
             foreach (var existingState in allRunningStates)
             {
-#if UNITY_EDITOR
-                UnityEngine.Debug.Log($"[TestStateActivation] MergeCheck: {existingState?.strKey} vs {targetState.strKey}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsStateTransitionEnabled)
+                    {
+                        dbg.LogStateTransition($"[TestStateActivation] MergeCheck: {existingState?.strKey} vs {targetState.strKey}");
+                    }
+                }
 #endif
                 var mergeResult = CheckStateMergeCompatibility(existingState, targetState,
                     ref totalMotionCost, ref totalAgilityCost, ref totalTargetCost);
@@ -2391,8 +3035,8 @@ namespace ES
                     //已经失败则直接返回
                     case StateMergeResult.MergeFail:
                         var failure = StateActivationResult.FailureMergeConflict;
-#if UNITY_EDITOR
-                        Debug.LogWarning($"[TestStateActivation] Fail: MergeConflict with {existingState?.strKey}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        StateMachineDebugSettings.Instance?.LogWarning($"[TestStateActivation] Fail: MergeConflict with {existingState?.strKey}");
 #endif
                         if (cache != null)
                         {
@@ -2415,8 +3059,8 @@ namespace ES
                     default:
                         {
                             var failureDefault = StateActivationResult.FailureMergeConflict;
-#if UNITY_EDITOR
-                            UnityEngine.Debug.LogWarning($"[TestStateActivation] Fail: Unexpected merge result with {existingState?.strKey}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                            StateMachineDebugSettings.Instance?.LogWarning($"[TestStateActivation] Fail: Unexpected merge result with {existingState?.strKey}");
 #endif
                             if (cache != null)
                             {
@@ -2451,8 +3095,14 @@ namespace ES
                 debugMergeCount = mergeList.Count
 #endif
             };
-#if UNITY_EDITOR
-            Debug.Log($"[TestStateActivation] Success | Code={code} | Interrupts={interruptList.Count} | Merges={(canMerge ? mergeList.Count : 0)}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition($"[TestStateActivation] Success | Code={code} | Interrupts={interruptList.Count} | Merges={(canMerge ? mergeList.Count : 0)}");
+                }
+            }
 #endif
             if (cache != null)
             {
@@ -2475,43 +3125,53 @@ namespace ES
         private StateMergeResult CheckStateMergeCompatibility(StateBase existing, StateBase incoming,
             ref int totalMotionCost, ref int totalAgilityCost, ref int totalTargetCost)
         {
-#if UNITY_EDITOR
-            UnityEngine.Debug.Log(
-                $"[MergeCheck] Begin | Existing={existing?.strKey} (ID:{existing?.intKey}) " +
-                $"Incoming={incoming?.strKey} (ID:{incoming?.intKey}) | " +
-                $"CostsBefore: M{totalMotionCost}/A{totalAgilityCost}/T{totalTargetCost}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition(
+                        $"[MergeCheck] Begin | Existing={existing?.strKey} (ID:{existing?.intKey}) " +
+                        $"Incoming={incoming?.strKey} (ID:{incoming?.intKey}) | " +
+                        $"CostsBefore: M{totalMotionCost}/A{totalAgilityCost}/T{totalTargetCost}");
+                }
+            }
 #endif
             if (existing == incoming)
             {
-#if UNITY_EDITOR
-                UnityEngine.Debug.LogWarning("[MergeCheck] Fail: existing == incoming");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                StateMachineDebugSettings.Instance?.LogWarning("[MergeCheck] Fail: existing == incoming");
 #endif
                 return StateMergeResult.MergeFail;
             }
 
-            var leftShared = existing.stateSharedData;
-            var rightShared = incoming.stateSharedData;
+            existing.EnsureResolvedRuntimeConfig();
+            incoming.EnsureResolvedRuntimeConfig();
 
-            var leftMerge = leftShared.mergeData;
-            var rightMerge = rightShared.mergeData;
-            NormalMergeRule leftRule = leftMerge.asLeftRule;
-            NormalMergeRule rightRule = rightMerge.asRightRule;
-            var existingCost = existing.stateSharedData.costData;
+            var leftResolved = existing.ResolvedConfig;
+            var rightResolved = incoming.ResolvedConfig;
 
-#if UNITY_EDITOR
-            UnityEngine.Debug.Log(
-                $"[MergeCheck] ChannelMask L={leftMerge.stateChannelMask} R={rightMerge.stateChannelMask} | " +
-                $"StayLevel L={leftMerge.stayLevel} R={rightMerge.stayLevel} | " +
-                $"CostEnabled={existingCost.enableCostCalculation} " +
-                $"Cost(M/A/T)={existingCost.costForMotion}/{existingCost.costForAgility}/{existingCost.costForTarget}");
-            UnityEngine.Debug.Log(
-                $"[MergeCheck] LeftRule: Unconditional={leftRule.enableUnconditionalRule} " +
-                $"HitByLayer={leftRule.hitByLayerOption} Priority={leftRule.EffectialPripority} EqualIsEffectial={leftRule.EqualIsEffectial_}"
-            );
-            UnityEngine.Debug.Log(
-                $"[MergeCheck] RightRule: Unconditional={rightRule.enableUnconditionalRule} " +
-                $"HitByLayer={rightRule.hitByLayerOption} Priority={rightRule.EffectialPripority} EqualIsEffectial={rightRule.EqualIsEffectial_}"
-            );
+            NormalMergeRule leftRule = leftResolved.asLeftRule ?? existing.stateSharedData?.mergeData?.asLeftRule;
+            NormalMergeRule rightRule = rightResolved.asRightRule ?? incoming.stateSharedData?.mergeData?.asRightRule;
+
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition(
+                        $"[MergeCheck] ChannelMask L={leftResolved.channelMask} R={rightResolved.channelMask} | " +
+                        $"StayLevel L={leftResolved.stayLevel} R={rightResolved.stayLevel} | " +
+                        $"CostEnabled={leftResolved.enableCostCalculation} " +
+                        $"Cost(M/A/T)={leftResolved.costForMotion}/{leftResolved.costForAgility}/{leftResolved.costForTarget}");
+                    dbg.LogStateTransition(
+                        $"[MergeCheck] LeftRule: Unconditional={leftRule.enableUnconditionalRule} " +
+                        $"HitByLayer={leftRule.hitByLayerOption} Priority={leftRule.EffectialPripority} EqualIsEffectial={leftRule.EqualIsEffectial_}");
+                    dbg.LogStateTransition(
+                        $"[MergeCheck] RightRule: Unconditional={rightRule.enableUnconditionalRule} " +
+                        $"HitByLayer={rightRule.hitByLayerOption} Priority={rightRule.EffectialPripority} EqualIsEffectial={rightRule.EqualIsEffectial_}");
+                }
+            }
 #endif
 
             #region 优先检查无条件规则
@@ -2526,16 +3186,28 @@ namespace ES
                     var item = list[i];
                     if (item.stateName != null && item.stateName.Length > 0 && item.stateName == incoming.strKey)
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.Log($"[MergeCheck] Unconditional(L->R) Hit by Name: {item.stateName} => {item.matchBackType}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        {
+                            var dbg = StateMachineDebugSettings.Instance;
+                            if (dbg != null && dbg.IsStateTransitionEnabled)
+                            {
+                                dbg.LogStateTransition($"[MergeCheck] Unconditional(L->R) Hit by Name: {item.stateName} => {item.matchBackType}");
+                            }
+                        }
 #endif
                         return item.matchBackType;
                     }
 
                     if (item.stateID >= 0 && incoming.intKey == item.stateID)
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.Log($"[MergeCheck] Unconditional(L->R) Hit by ID: {item.stateID} => {item.matchBackType}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        {
+                            var dbg = StateMachineDebugSettings.Instance;
+                            if (dbg != null && dbg.IsStateTransitionEnabled)
+                            {
+                                dbg.LogStateTransition($"[MergeCheck] Unconditional(L->R) Hit by ID: {item.stateID} => {item.matchBackType}");
+                            }
+                        }
 #endif
                         return item.matchBackType;
                     }
@@ -2552,16 +3224,28 @@ namespace ES
                     var item = list[i];
                     if (item.stateName != null && item.stateName.Length > 0 && item.stateName == existing.strKey)
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.Log($"[MergeCheck] Unconditional(R->L) Hit by Name: {item.stateName} => {item.matchBackType}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        {
+                            var dbg = StateMachineDebugSettings.Instance;
+                            if (dbg != null && dbg.IsStateTransitionEnabled)
+                            {
+                                dbg.LogStateTransition($"[MergeCheck] Unconditional(R->L) Hit by Name: {item.stateName} => {item.matchBackType}");
+                            }
+                        }
 #endif
                         return item.matchBackType;
                     }
 
                     if (item.stateID >= 0 && existing.intKey == item.stateID)
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.Log($"[MergeCheck] Unconditional(R->L) Hit by ID: {item.stateID} => {item.matchBackType}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        {
+                            var dbg = StateMachineDebugSettings.Instance;
+                            if (dbg != null && dbg.IsStateTransitionEnabled)
+                            {
+                                dbg.LogStateTransition($"[MergeCheck] Unconditional(R->L) Hit by ID: {item.stateID} => {item.matchBackType}");
+                            }
+                        }
 #endif
                         return item.matchBackType;
                     }
@@ -2571,77 +3255,101 @@ namespace ES
 
             bool onlyInterruptTest = false;
             // 通道冲突检查
-            bool channelOverlap = (leftMerge.stateChannelMask & rightMerge.stateChannelMask) != StateChannelMask.None;
+            bool channelOverlap = (leftResolved.channelMask & rightResolved.channelMask) != StateChannelMask.None;
 
 
             //发生通道重叠
             if (channelOverlap)
             {
-#if UNITY_EDITOR
-                UnityEngine.Debug.Log("[MergeCheck] Channel overlap detected");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsStateTransitionEnabled)
+                    {
+                        dbg.LogStateTransition("[MergeCheck] Channel overlap detected");
+                    }
+                }
 #endif
-                if (!existingCost.enableCostCalculation)
+                if (!leftResolved.enableCostCalculation)
                 {
                     onlyInterruptTest = true;
                 }
                 else
                 {
                     const int costLimit = 100;
-                    int nextMotionCost = totalMotionCost + existingCost.costForMotion;
-                    int nextAgilityCost = totalAgilityCost + existingCost.costForAgility;
-                    int nextTargetCost = totalTargetCost + existingCost.costForTarget;
+                    int nextMotionCost = totalMotionCost + leftResolved.costForMotion;
+                    int nextAgilityCost = totalAgilityCost + leftResolved.costForAgility;
+                    int nextTargetCost = totalTargetCost + leftResolved.costForTarget;
 
                     bool overMotion = nextMotionCost > costLimit;
                     bool overAgility = nextAgilityCost > costLimit;
                     bool overTarget = nextTargetCost > costLimit;
 
                     onlyInterruptTest = overMotion || overAgility || overTarget;
-#if UNITY_EDITOR
-                    UnityEngine.Debug.Log(
-                        $"[MergeCheck] CostCalc | Limit={costLimit} " +
-                        $"Next(M/A/T)={nextMotionCost}/{nextAgilityCost}/{nextTargetCost} " +
-                        $"Over(M/A/T)={overMotion}/{overAgility}/{overTarget} " +
-                        $"OnlyInterrupt={onlyInterruptTest}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                    {
+                        var dbg = StateMachineDebugSettings.Instance;
+                        if (dbg != null && dbg.IsStateTransitionEnabled)
+                        {
+                            dbg.LogStateTransition(
+                                $"[MergeCheck] CostCalc | Limit={costLimit} " +
+                                $"Next(M/A/T)={nextMotionCost}/{nextAgilityCost}/{nextTargetCost} " +
+                                $"Over(M/A/T)={overMotion}/{overAgility}/{overTarget} " +
+                                $"OnlyInterrupt={onlyInterruptTest}");
+                        }
+                    }
 #endif
                 }
 
                 if (onlyInterruptTest)
                 {
-#if UNITY_EDITOR
-                    UnityEngine.Debug.Log(
-                        $"[MergeCheck] Only interrupt test | CurrentCosts M{totalMotionCost}/A{totalAgilityCost}/T{totalTargetCost}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                    {
+                        var dbg = StateMachineDebugSettings.Instance;
+                        if (dbg != null && dbg.IsStateTransitionEnabled)
+                        {
+                            dbg.LogStateTransition(
+                                $"[MergeCheck] Only interrupt test | CurrentCosts M{totalMotionCost}/A{totalAgilityCost}/T{totalTargetCost}");
+                        }
+                    }
 #endif
                     // 仅打断测试逻辑
                     //右边不允许打断，左边不允许被打断，都会提前终止
                     if (rightRule.hitByLayerOption == StateHitByLayerOption.Never)
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.LogWarning("[MergeCheck] Fail: Right hitByLayer=Never");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        StateMachineDebugSettings.Instance?.LogWarning("[MergeCheck] Fail: Right hitByLayer=Never");
 #endif
                         return StateMergeResult.MergeFail;
                     }
                     if (leftRule.hitByLayerOption == StateHitByLayerOption.Never)
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.LogWarning("[MergeCheck] Fail: Left hitByLayer=Never");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        StateMachineDebugSettings.Instance?.LogWarning("[MergeCheck] Fail: Left hitByLayer=Never");
 #endif
                         return StateMergeResult.MergeFail;
                     }
-                    var levelOverlap = leftMerge.stayLevel & rightMerge.stayLevel;
+                    var levelOverlap = leftResolved.stayLevel & rightResolved.stayLevel;
                     if (levelOverlap == StateStayLevel.Rubbish)
                     {
                         if (leftRule.hitByLayerOption == StateHitByLayerOption.SameLevelTest
                             && rightRule.hitByLayerOption == StateHitByLayerOption.SameLevelTest)
                         {
-#if UNITY_EDITOR
-                            UnityEngine.Debug.LogWarning("[MergeCheck] Fail: SameLevelTest + Rubbish overlap");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                            StateMachineDebugSettings.Instance?.LogWarning("[MergeCheck] Fail: SameLevelTest + Rubbish overlap");
 #endif
                             return StateMergeResult.MergeFail;
                         }
-                        else if (rightMerge.stayLevel > leftMerge.stayLevel)
+                        else if (rightResolved.stayLevel > leftResolved.stayLevel)
                         {
-#if UNITY_EDITOR
-                            UnityEngine.Debug.Log("[MergeCheck] HitAndReplace: Right stayLevel higher");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                            {
+                                var dbg = StateMachineDebugSettings.Instance;
+                                if (dbg != null && dbg.IsStateTransitionEnabled)
+                                {
+                                    dbg.LogStateTransition("[MergeCheck] HitAndReplace: Right stayLevel higher");
+                                }
+                            }
 #endif
                             return StateMergeResult.HitAndReplace;
                         }
@@ -2655,8 +3363,14 @@ namespace ES
                     {
                         if (rightPriority < leftPriority)
                         {
-#if UNITY_EDITOR
-                            UnityEngine.Debug.Log("[MergeCheck] Fail: Right priority lower (EqualIsEffectial)");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                            {
+                                var dbg = StateMachineDebugSettings.Instance;
+                                if (dbg != null && dbg.IsStateTransitionEnabled)
+                                {
+                                    dbg.LogStateTransition("[MergeCheck] Fail: Right priority lower (EqualIsEffectial)");
+                                }
+                            }
 #endif
                             return StateMergeResult.MergeFail;
                         }
@@ -2664,47 +3378,77 @@ namespace ES
                     }
                     else if (rightPriority < leftPriority)
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.Log("[MergeCheck] Fail: Right priority lower");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        {
+                            var dbg = StateMachineDebugSettings.Instance;
+                            if (dbg != null && dbg.IsStateTransitionEnabled)
+                            {
+                                dbg.LogStateTransition("[MergeCheck] Fail: Right priority lower");
+                            }
+                        }
 #endif
                         return StateMergeResult.MergeFail;
                     }
                     else if (rightPriority > leftPriority)
                     {
-#if UNITY_EDITOR
-                        UnityEngine.Debug.Log("[MergeCheck] HitAndReplace: Right priority higher");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        {
+                            var dbg = StateMachineDebugSettings.Instance;
+                            if (dbg != null && dbg.IsStateTransitionEnabled)
+                            {
+                                dbg.LogStateTransition("[MergeCheck] HitAndReplace: Right priority higher");
+                            }
+                        }
 #endif
                         return StateMergeResult.HitAndReplace;
                     }
                     // 无法决定打断方向，合并失败
-#if UNITY_EDITOR
-                    UnityEngine.Debug.LogWarning("[MergeCheck] Fail: Unable to decide interrupt direction");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                    StateMachineDebugSettings.Instance?.LogWarning("[MergeCheck] Fail: Unable to decide interrupt direction");
 #endif
                     return StateMergeResult.MergeFail;
                 }
 
                 // 代价符合合并要求，允许合并
-                if (existingCost.enableCostCalculation)
+                if (leftResolved.enableCostCalculation)
                 {
                     // 代价加上
-                    totalMotionCost += existingCost.costForMotion;
-                    totalAgilityCost += existingCost.costForAgility;
-                    totalTargetCost += existingCost.costForTarget;
-#if UNITY_EDITOR
-                    UnityEngine.Debug.Log(
-                        $"[MergeCheck] MergeComplete by cost | CostsAfter M{totalMotionCost}/A{totalAgilityCost}/T{totalTargetCost}");
+                    totalMotionCost += leftResolved.costForMotion;
+                    totalAgilityCost += leftResolved.costForAgility;
+                    totalTargetCost += leftResolved.costForTarget;
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                    {
+                        var dbg = StateMachineDebugSettings.Instance;
+                        if (dbg != null && dbg.IsStateTransitionEnabled)
+                        {
+                            dbg.LogStateTransition(
+                                $"[MergeCheck] MergeComplete by cost | CostsAfter M{totalMotionCost}/A{totalAgilityCost}/T{totalTargetCost}");
+                        }
+                    }
 #endif
                 }
-#if UNITY_EDITOR
-                UnityEngine.Debug.Log("[MergeCheck] MergeComplete (channel overlap allowed)");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsStateTransitionEnabled)
+                    {
+                        dbg.LogStateTransition("[MergeCheck] MergeComplete (channel overlap allowed)");
+                    }
+                }
 #endif
                 return StateMergeResult.MergeComplete;
             }
             else
             {
                 // 无通道冲突，允许直接合并
-#if UNITY_EDITOR
-                UnityEngine.Debug.Log("[MergeCheck] MergeComplete (no channel overlap)");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsStateTransitionEnabled)
+                    {
+                        dbg.LogStateTransition("[MergeCheck] MergeComplete (no channel overlap)");
+                    }
+                }
 #endif
                 return StateMergeResult.MergeComplete;
             }
@@ -2755,21 +3499,39 @@ namespace ES
         /// 4. 添加合并失败的回滚机制
         public bool ExecuteStateActivation(StateBase targetState, StateLayerType layer, in StateActivationResult result)
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (targetState == null) throw new ArgumentNullException(nameof(targetState));
+            if (targetState.stateSharedData == null) throw new InvalidOperationException("ExecuteStateActivation: targetState.stateSharedData 不能为空（状态必须先完成注册/初始化）");
+            if (targetState.stateSharedData.basicConfig == null) throw new InvalidOperationException("ExecuteStateActivation: targetState.stateSharedData.basicConfig 不能为空（状态必须先完成注册/初始化）");
+#else
+            if (targetState == null || targetState.stateSharedData == null || targetState.stateSharedData.basicConfig == null) return false;
+#endif
+
 #if STATEMACHINEDEBUG
 #if UNITY_EDITOR
-            Debug.Log($"[StateMachine] === 开始执行状态激活 ===");
-            Debug.Log($"[StateMachine]   状态: {targetState?.strKey} (ID:{targetState?.intKey})");
-            Debug.Log($"[StateMachine]   目标层级: {layer}");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition("=== 开始执行状态激活 ===");
+                    dbg.LogStateTransition($"状态: {targetState.strKey} (ID:{targetState.intKey})");
+                    dbg.LogStateTransition($"目标层级: {layer}");
+                }
+            }
 #endif
 #endif
 
-            var basicConfig = targetState?.stateSharedData?.basicConfig;
+            var sharedData = targetState.stateSharedData;
+            var basicConfig = sharedData.basicConfig;
 
             if ((result.code & StateActivationCode.Success) == 0)
             {
 #if STATEMACHINEDEBUG
 #if UNITY_EDITOR
-                Debug.LogWarning($"[StateMachine] ✗ 状态激活失败: {result.failureReason}");
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    dbg?.LogWarning($"状态激活失败: {result.failureReason}");
+                }
 #endif
 #endif
                 return false;
@@ -2778,7 +3540,7 @@ namespace ES
             var layerRuntime = GetLayerByType(layer);
             if (layerRuntime == null)
             {
-                Debug.LogError($"[StateMachine] 获取层级失败: {layer}");
+                StateMachineDebugSettings.Instance.LogError($"获取层级失败: {layer}");
                 return false;
             }
 
@@ -2790,7 +3552,13 @@ namespace ES
 
 #if STATEMACHINEDEBUG
 #if UNITY_EDITOR
-            Debug.Log($"[StateMachine]   层级状态: Mixer有效={layerRuntime.mixer.IsValid()}, 运行状态数={layerRuntime.runningStates.Count}");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition($"层级状态: Mixer有效={layerRuntime.mixer.IsValid()}, 运行状态数={layerRuntime.runningStates.Count}");
+                }
+            }
 #endif
 #endif
 
@@ -2802,7 +3570,13 @@ namespace ES
                 {
 #if STATEMACHINEDEBUG
 #if UNITY_EDITOR
-                    Debug.Log($"[StateMachine]   打断 {interruptStates.Count} 个状态");
+                    {
+                        var dbg = StateMachineDebugSettings.Instance;
+                        if (dbg != null && dbg.IsStateTransitionEnabled)
+                        {
+                            dbg.LogStateTransition($"打断 {interruptStates.Count} 个状态");
+                        }
+                    }
 #endif
 #endif
                     for (int i = 0; i < interruptStates.Count; i++)
@@ -2813,10 +3587,9 @@ namespace ES
             }
 
             // 激活目标状态
-            var enterBasicConfig = targetState.stateSharedData?.basicConfig;
-            if (enterBasicConfig != null && enterBasicConfig.resetSupportFlagOnEnter)
+            if (basicConfig.resetSupportFlagOnEnter)
             {
-                var enterFlag = enterBasicConfig.stateSupportFlag;
+                var enterFlag = basicConfig.stateSupportFlag;
                 if (enterFlag != StateSupportFlags.None)
                 {
                     SetSupportFlags(enterFlag);
@@ -2827,7 +3600,13 @@ namespace ES
             layerRuntime.runningStates.Add(targetState);
 #if STATEMACHINEDEBUG
 #if UNITY_EDITOR
-            Debug.Log($"[StateMachine]   状态已添加到运行集合");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition("状态已添加到运行集合");
+                }
+            }
 #endif
 #endif
 
@@ -2842,14 +3621,24 @@ namespace ES
             // ★ 应用淡入逻辑（如果启用）
             ApplyFadeIn(targetState, layerRuntime);
 
+            // ★ 首帧立即更新：计算器内部权重直接到位（跳过平滑），外部淡入不受影响
+            // 解决状态进入后第一帧计算器内部权重全为 0 导致的视觉跳变
+            if (targetState.stateSharedData.hasAnimation)
+            {
+                targetState.ImmediateUpdateAnimationRuntime(stateContext);
+            }
 
-
-            OnStateEntered?.Invoke(targetState, layer);
             MarkDirty(StateDirtyReason.Enter);
 
 #if STATEMACHINEDEBUG
 #if UNITY_EDITOR
-            Debug.Log($"[StateMachine] === 状态激活完成 ===");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition("=== 状态激活完成 ===");
+                }
+            }
 #endif
 #endif
             return true;
@@ -2863,7 +3652,7 @@ namespace ES
             var state = GetStateByString(stateKey);
             if (state == null)
             {
-                Debug.LogWarning($"状态 {stateKey} 不存在");
+                StateMachineDebugSettings.Instance.LogWarning($"状态 {stateKey} 不存在");
                 return false;
             }
 
@@ -2878,7 +3667,7 @@ namespace ES
             var state = GetStateByInt(stateKey);
             if (state == null)
             {
-                Debug.LogWarning($"状态ID {stateKey} 不存在");
+                StateMachineDebugSettings.Instance.LogWarning($"状态ID {stateKey} 不存在");
                 return false;
             }
 
@@ -2890,7 +3679,15 @@ namespace ES
         /// </summary>
         public bool TryActivateState(StateBase targetState, StateLayerType layer = StateLayerType.NotClear)
         {
-            UnityEngine.Debug.Log($"[StateMachine] 尝试激活状态: {targetState?.strKey} | Layer: {layer}");
+#if STATEMACHINEDEBUG
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsStateTransitionEnabled)
+                {
+                    dbg.LogStateTransition($"尝试激活状态: {targetState?.strKey} | Layer: {layer}");
+                }
+            }
+#endif
             if (targetState == null) return false;
             layer = ResolveLayerForState(targetState, layer);
             var result = TestStateActivation(targetState, layer);
@@ -2916,6 +3713,13 @@ namespace ES
             var layerRuntime = GetLayerByType(layer);
             if (layerRuntime != null)
             {
+                // ★ 可靠性收口：退出时取消未完成的淡入，避免 OnFadeInComplete 在已退出状态上触发。
+                if (layerRuntime.fadeInStates != null && layerRuntime.fadeInStates.TryGetValue(state, out var fadeInData))
+                {
+                    fadeInData.TryAutoPushedToPool();
+                    layerRuntime.fadeInStates.Remove(state);
+                }
+
                 // 仅触发一次淡出时长判断，后续不做持续判断。
                 ApplyFadeOut(state, layerRuntime);
             }
@@ -2957,7 +3761,6 @@ namespace ES
                 layerRuntime.MarkDirty(PipelineDirtyFlags.FallbackCheck);
             }
 
-            OnStateExited?.Invoke(state, layer);
             MarkDirty(StateDirtyReason.Exit);
         }
 
@@ -3032,10 +3835,9 @@ namespace ES
                 return false;
             }
 
-            _tmpStateBuffer.Clear();
-            _tmpStateBuffer.AddRange(layerData.runningStates);
-            foreach (var state in _tmpStateBuffer)
+            while (layerData.runningStates.Count > 0)
             {
+                var state = layerData.runningStates.Items[0];
                 TruelyDeactivateState(state, layer);
             }
 
@@ -3052,7 +3854,12 @@ namespace ES
             // ★ 修复：应用淡入逻辑（之前漏掉导致无淡入效果）
             ApplyFadeIn(targetState, layerData);
 
-            OnStateEntered?.Invoke(targetState, layer);
+            // ★ 首帧立即更新：计算器内部权重直接到位（跳过平滑），外部淡入不受影响
+            if (targetState.stateSharedData.hasAnimation)
+            {
+                targetState.ImmediateUpdateAnimationRuntime(stateContext);
+            }
+
             MarkDirty(StateDirtyReason.Enter);
             return true;
         }
@@ -3078,11 +3885,6 @@ namespace ES
             }
 
             layer = ResolveLayerForState(targetState, layer);
-
-            if (CustomExitTest != null)
-            {
-                return CustomExitTest(targetState, layer);
-            }
 
             return StateExitResult.Success(layer);
         }
@@ -3126,10 +3928,9 @@ namespace ES
                 return;
             }
 
-            _tmpStateBuffer.Clear();
-            _tmpStateBuffer.AddRange(layerData.runningStates);
-            foreach (var state in _tmpStateBuffer)
+            while (layerData.runningStates.Count > 0)
             {
+                var state = layerData.runningStates.Items[0];
                 TruelyDeactivateState(state, layer);
             }
         }
@@ -3144,32 +3945,55 @@ namespace ES
         internal void HotPlugStateToPlayable(StateBase state, StateLayerRuntime layer)
         {
 #if STATEMACHINEDEBUG
-            Debug.Log($"[HotPlug] === 开始热插拔状态到Playable ===");
-            Debug.Log($"[HotPlug]   状态: {state?.strKey} | 层级: {layer?.layerType}");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsAnimationBlendEnabled)
+                {
+                    dbg.LogAnimationBlend("[HotPlug] === 开始热插拔状态到Playable ===");
+                    dbg.LogAnimationBlend($"[HotPlug] 状态: {state?.strKey} | 层级: {layer?.layerType}");
+                }
+            }
 #endif
 
-            if (state == null || layer == null)
-            {
-#if STATEMACHINEDEBUG
-                Debug.LogWarning($"[HotPlug] ✗ 状态或层级为空 - State:{state != null}, Layer:{layer != null}");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (layer == null) throw new ArgumentNullException(nameof(layer));
+            if (state.stateSharedData == null) throw new InvalidOperationException("HotPlugStateToPlayable: state.stateSharedData 不能为空");
+#else
+            if (state == null || layer == null || state.stateSharedData == null) return;
 #endif
-                return;
-            }
+
+            var sharedData = state.stateSharedData;
 
             // 检查状态是否有动画
-            if (state.stateSharedData?.hasAnimation != true)
+            if (!sharedData.hasAnimation)
             {
 #if STATEMACHINEDEBUG
-                Debug.Log($"[HotPlug]   状态无动画，跳过热插拔");
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsAnimationBlendEnabled)
+                    {
+                        dbg.LogAnimationBlend("[HotPlug] 状态无动画，跳过热插拔");
+                    }
+                }
 #endif
                 return;
             }
+
+            // 连接/槽位映射变化，需要下一帧更新参考姿态填充与归一化
+            layer.MarkDirty(PipelineDirtyFlags.MixerWeights);
 
             // 检查是否已经插入过
             if (layer.stateToSlotMap.ContainsKey(state))
             {
 #if STATEMACHINEDEBUG
-                Debug.Log($"[HotPlug]   状态已在槽位映射中，跳过");
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsAnimationBlendEnabled)
+                    {
+                        dbg.LogAnimationBlend("[HotPlug] 状态已在槽位映射中，跳过");
+                    }
+                }
 #endif
                 return; // 已存在，跳过
             }
@@ -3177,23 +4001,28 @@ namespace ES
             // 确保PlayableGraph和层级Mixer有效
             if (!playableGraph.IsValid() || !layer.mixer.IsValid())
             {
-                Debug.LogError($"[HotPlug] 无法插入状态动画：PlayableGraph({playableGraph.IsValid()})或Mixer({layer.mixer.IsValid()})无效 | 层级:{layer.layerType} | 初始化:{isInitialized} | 运行:{isRunning}");
+                StateMachineDebugSettings.Instance.LogError(
+                    $"[HotPlug] 无法插入状态动画：PlayableGraph({playableGraph.IsValid()})或Mixer({layer.mixer.IsValid()})无效 | 层级:{layer.layerType} | 初始化:{isInitialized} | 运行:{isRunning}");
                 return;
             }
 
             // 获取状态的动画配置
-            var animConfig = state.stateSharedData.animationConfig;
+            var animConfig = sharedData.animationConfig;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (animConfig == null) throw new InvalidOperationException($"HotPlugStateToPlayable: hasAnimation=true 但 animationConfig 为空 | State={state.strKey}");
+#else
             if (animConfig == null)
             {
-                Debug.LogWarning($"状态 {state.strKey} 标记了hasAnimation=true，但没有animationConfig");
+                StateMachineDebugSettings.Instance.LogWarning($"状态 {state.strKey} 标记了hasAnimation=true，但没有animationConfig");
                 return;
             }
+#endif
 
             // 创建Playable节点
             var statePlayable = CreateStatePlayable(state, animConfig, layer);
             if (!statePlayable.IsValid())
             {
-                Debug.LogWarning($"无法为状态 {state.strKey} 创建有效的Playable节点");
+                StateMachineDebugSettings.Instance.LogWarning($"无法为状态 {state.strKey} 创建有效的Playable节点");
                 return;
             }
 
@@ -3204,8 +4033,16 @@ namespace ES
             {
                 inputIndex = layer.freeSlots.Pop();
 
+                // ★ 保护：slot 0 是参考姿态保留位，不可分配给状态
+                if (inputIndex == 0 && layer.hasReferencePose)
+                {
+                    // 放弃slot 0，重新分配
+                    int currentCount = layer.mixer.GetInputCount();
+                    inputIndex = currentCount;
+                    layer.mixer.SetInputCount(inputIndex + 1);
+                }
                 // 断开旧连接（如果有）
-                if (layer.mixer.GetInput(inputIndex).IsValid())
+                else if (layer.mixer.GetInput(inputIndex).IsValid())
                 {
                     playableGraph.Disconnect(layer.mixer, inputIndex);
                 }
@@ -3216,7 +4053,7 @@ namespace ES
                 int currentCount = layer.mixer.GetInputCount();
                 if (currentCount >= layer.maxPlayableSlots)
                 {
-                    Debug.LogWarning($"层级 {layer.layerType} 已达到最大Playable槽位限制 {layer.maxPlayableSlots}，无法添加新状态");
+                    StateMachineDebugSettings.Instance.LogWarning($"层级 {layer.layerType} 已达到最大Playable槽位限制 {layer.maxPlayableSlots}，无法添加新状态");
                     statePlayable.Destroy();
                     return;
                 }
@@ -3226,17 +4063,29 @@ namespace ES
                 layer.mixer.SetInputCount(inputIndex + 1);
             }
 #if STATEMACHINEDEBUG
-            Debug.Log($"[HotPlug]   插入状态Playable到Mixer槽位 {inputIndex}");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsAnimationBlendEnabled)
+                {
+                    dbg.LogAnimationBlend($"[HotPlug] 插入状态Playable到Mixer槽位 {inputIndex}");
+                }
+            }
 #endif
             // 连接到层级Mixer
             playableGraph.Connect(statePlayable, 0, layer.mixer, inputIndex);
-            layer.mixer.SetInputWeight(inputIndex, state.ShouldUseExternalPipelineWeight() ? state.PlayableWeight : 1.0f);
 
             // 记录映射
             layer.stateToSlotMap[state] = inputIndex;
             state.BindLayerSlot(layer, inputIndex);
+            layer.InternalOnStateConnected(state, inputIndex);
 #if STATEMACHINEDEBUG
-            Debug.Log($"[HotPlug]   状态 {state.strKey} 映射到槽位 {inputIndex}");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsAnimationBlendEnabled)
+                {
+                    dbg.LogAnimationBlend($"[HotPlug] 状态 {state.strKey} 映射到槽位 {inputIndex}");
+                }
+            }
 #endif
 
             // 标记Dirty（热插拔）
@@ -3248,10 +4097,22 @@ namespace ES
         /// </summary>
         internal void HotUnplugStateFromPlayable(StateBase state, StateLayerRuntime layer)
         {
-            if (state == null || layer == null) return;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (layer == null) throw new ArgumentNullException(nameof(layer));
+            if (state.stateSharedData == null) throw new InvalidOperationException("HotUnplugStateFromPlayable: state.stateSharedData 不能为空");
+#else
+            if (state == null || layer == null || state.stateSharedData == null) return;
+#endif
+
+            // 卸载连接/槽位变化，需要更新参考姿态填充与归一化
+            layer.MarkDirty(PipelineDirtyFlags.MixerWeights);
+
+            var sharedData = state.stateSharedData;
 
             // 只有有动画的状态才需要卸载
-            if (state.stateSharedData?.hasAnimation != true)
+            if (!sharedData.hasAnimation)
             {
                 return;
             }
@@ -3280,10 +4141,14 @@ namespace ES
 
             // 移除映射
             layer.stateToSlotMap.Remove(state);
+            layer.InternalOnStateDisconnected(state);
             state.ClearLayerSlot();
 
-            // 将槽位回收到池中
-            layer.freeSlots.Push(slotIndex);
+            // 将槽位回收到池中（★ slot 0 是参考姿态保留位，不回收）
+            if (!(slotIndex == 0 && layer.hasReferencePose))
+            {
+                layer.freeSlots.Push(slotIndex);
+            }
 
             // 标记Dirty（热拔插）
             layer.MarkDirty(PipelineDirtyFlags.HotPlug);
@@ -3315,13 +4180,22 @@ namespace ES
                 }
 
 #if STATEMACHINEDEBUG
-                Debug.Log($"[StateMachine] 状态 {state.strKey} Playable创建成功 | Valid:{output.IsValid()}");
+                {
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsAnimationBlendEnabled)
+                    {
+                        dbg.LogAnimationBlend($"状态 {state.strKey} Playable创建成功 | Valid:{output.IsValid()}");
+                    }
+                }
 #endif
                 return output;
             }
 
 #if STATEMACHINEDEBUG
-            Debug.LogWarning($"[StateMachine] 状态 {state.strKey} Playable创建失败");
+            {
+                var dbg = StateMachineDebugSettings.Instance;
+                dbg?.LogWarning($"状态 {state.strKey} Playable创建失败");
+            }
 #endif
             return Playable.Null;
         }
@@ -3505,104 +4379,6 @@ namespace ES
 
         #endregion
 
-        #region 调试支持（可修改）
-
-#if UNITY_EDITOR
-        /// <summary>
-        /// 获取状态机调试信息
-        /// </summary>
-        public string GetDebugInfo()
-        {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            sb.AppendLine($"========== 状态机调试信息 ==========");
-            sb.AppendLine($"状态机ID: {stateMachineKey}");
-            sb.AppendLine($"运行状态: {(isRunning ? "运行中" : "已停止")}");
-            sb.AppendLine($"宿主Entity: 无");
-            sb.AppendLine($"\n========== 上下文信息 ==========");
-            sb.AppendLine($"上下文ID: {stateContext?.contextID}");
-            sb.AppendLine($"创建时间: {stateContext?.creationTime}");
-            sb.AppendLine($"最后更新: {stateContext?.lastUpdateTime}");
-            sb.AppendLine($"\n========== 状态统计 ==========");
-            sb.AppendLine($"注册状态数(String): {stringToStateMap.Count}");
-            sb.AppendLine($"注册状态数(Int): {intToStateMap.Count}");
-            sb.AppendLine($"运行中状态总数: {runningStates.Count}");
-
-            sb.AppendLine($"\n========== 层级状态 ==========");
-            foreach (var layer in GetAllLayers())
-            {
-                sb.AppendLine($"- {layer.layerType}: {layer.runningStates.Count}个状态 | 权重:{layer.weight:F2} | {(layer.isEnabled ? "启用" : "禁用")}");
-                foreach (var state in layer.runningStates)
-                {
-                    sb.AppendLine($"  └─ {state.strKey}");
-                }
-            }
-
-            return sb.ToString();
-        }
-
-        [Button("输出调试信息", ButtonSizes.Large), PropertyOrder(-1)]
-        private void DebugPrint()
-        {
-            Debug.Log(GetDebugInfo());
-        }
-
-        [Button("输出所有状态", ButtonSizes.Medium), PropertyOrder(-1)]
-        private void DebugPrintAllStates()
-        {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            sb.AppendLine("========== 所有注册状态 ==========");
-            foreach (var kvp in stringToStateMap)
-            {
-                sb.AppendLine($"[{kvp.Key}] -> {kvp.Value.GetType().Name} (运行:{kvp.Value.baseStatus == StateBaseStatus.Running})");
-            }
-            Debug.Log(sb.ToString());
-        }
-
-        [Button("测试RootMixer输出", ButtonSizes.Medium), PropertyOrder(-1)]
-        private void DebugPrintRootMixer()
-        {
-            Debug.Log(GetRootMixerDebugInfo());
-        }
-
-        [Button("切换持续统计输出", ButtonSizes.Medium), PropertyOrder(-1)]
-        [GUIColor("@enableContinuousStats ? new Color(0.4f, 1f, 0.4f) : new Color(0.7f, 0.7f, 0.7f)")]
-        private void ToggleContinuousStats()
-        {
-            enableContinuousStats = !enableContinuousStats;
-            Debug.Log($"[StateMachine] 持续统计输出: {(enableContinuousStats ? "开启" : "关闭")}");
-        }
-
-        [Button("打印临时动画列表", ButtonSizes.Medium), PropertyOrder(-1)]
-        private void DebugPrintTemporaryAnimations()
-        {
-            if (_temporaryStates.Count == 0)
-            {
-                Debug.Log("[TempAnim] 无临时动画");
-                return;
-            }
-
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            sb.AppendLine($"========== 临时动画列表 ({_temporaryStates.Count}个) ==========");
-            foreach (var kvp in _temporaryStates)
-            {
-                var state = kvp.Value;
-                bool isRunning = state.baseStatus == StateBaseStatus.Running;
-                var clip = state.stateSharedData?.animationConfig?.calculator as StateAnimationMixCalculatorForSimpleClip;
-                string clipName = clip?.clip?.name ?? "未知";
-                sb.AppendLine($"[{kvp.Key}] Clip:{clipName} | 运行:{isRunning}");
-            }
-            Debug.Log(sb.ToString());
-        }
-
-        [Button("一键清除临时动画", ButtonSizes.Medium), PropertyOrder(-1)]
-        private void DebugClearTemporaryAnimations()
-        {
-            ClearAllTemporaryAnimations();
-        }
-#endif
-
-        #endregion
-
         #region RuntimePhase控制（可修改）
 
         public void SetStateRuntimePhase(StateBase state, StateRuntimePhase phase, bool lockPhase = true)
@@ -3619,9 +4395,55 @@ namespace ES
 
         #region StateContext便捷访问（可修改）
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetMotionSpeedXZ(float localSpeedX, float localSpeedZ)
+        {
+            var ctx = stateContext;
+            if (ctx == null) return;
+            ctx.SpeedX = localSpeedX;
+            ctx.SpeedZ = localSpeedZ;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetAvgSpeedXZ(float avgSpeedX, float avgSpeedZ)
+        {
+            var ctx = stateContext;
+            if (ctx == null) return;
+            ctx.AvgSpeedX = avgSpeedX;
+            ctx.AvgSpeedZ = avgSpeedZ;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetClimbInput(float horizontal, float vertical)
+        {
+            var ctx = stateContext;
+            if (ctx == null) return;
+            ctx.ClimbHorizontal = horizontal;
+            ctx.ClimbVertical = vertical;
+        }
+
+        /// <summary>
+        /// 设置默认枚举Float参数（直接字段路径）
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetFloat(StateDefaultFloatParameter parameter, float value)
+        {
+            stateContext?.SetDefaultFloat(parameter, value);
+        }
+
+        /// <summary>
+        /// 获取默认枚举Float参数（直接字段路径）
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public float GetFloat(StateDefaultFloatParameter parameter, float defaultValue = 0f)
+        {
+            return stateContext?.GetDefaultFloat(parameter, defaultValue) ?? defaultValue;
+        }
+
         /// <summary>
         /// 设置Float参数 - 用于动画混合（如2D混合的X/Y输入）
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetFloat(StateParameter parameter, float value)
         {
             stateContext?.SetFloat(parameter, value);
@@ -3630,6 +4452,7 @@ namespace ES
         /// <summary>
         /// 设置Float参数 - 字符串重载
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetFloat(string paramName, float value)
         {
             stateContext?.SetFloat(paramName, value);
@@ -3638,6 +4461,7 @@ namespace ES
         /// <summary>
         /// 获取Float参数
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float GetFloat(StateParameter parameter, float defaultValue = 0f)
         {
             return stateContext?.GetFloat(parameter, defaultValue) ?? defaultValue;
@@ -3646,6 +4470,7 @@ namespace ES
         /// <summary>
         /// 获取Float参数 - 字符串重载
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float GetFloat(string paramName, float defaultValue = 0f)
         {
             return stateContext?.GetFloat(paramName, defaultValue) ?? defaultValue;
@@ -3653,40 +4478,4 @@ namespace ES
 
         #endregion
     }
-
-
-#if UNITY_EDITOR
-    public static class StateMachineDebug
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Log(string message)
-        {
-            StateMachineDebugSettings.Instance.LogStateTransition(message);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void LogWarning(string message)
-        {
-            StateMachineDebugSettings.Instance.LogWarning(message);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void LogError(string message)
-        {
-            StateMachineDebugSettings.Instance.LogError(message);
-        }
-    }
-#else
-    public static class StateMachineDebug
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Log(string message) { }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void LogWarning(string message) { }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void LogError(string message) { }
-    }
-#endif
 }

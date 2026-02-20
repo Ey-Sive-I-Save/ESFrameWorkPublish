@@ -10,6 +10,29 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
+// ============================================================================
+// 文件：StateSharedData.cs
+// 作用：状态配置数据（共享数据 + 运行时可变数据）。
+//
+// Public（本文件对外可直接使用的成员；按模块分组，“先功能、后成员”，便于扫读）：
+//
+// 【共享数据（StateSharedData）】
+// - 运行时初始化标记：public bool IsRuntimeInitialized { get; }
+// - 基础配置（必填）：public StateBasicConfig basicConfig
+// - 动画开关与配置：public bool hasAnimation / public StateAnimationConfigData animationConfig
+// - 淡入淡出：public bool enableFadeInOut / public float fadeInDuration / public float fadeOutDuration / public AnimationCurve fadeInCurve / fadeOutCurve
+// - 标签与显示：public List<string> tags / public string group / public string displayName / public string description / public Sprite icon
+// - 切换与代价：public StateMergeData mergeData / public StateCostData costData
+// - 运行时扩展：public bool canBeTemporary / public bool autoRemoveWhenDone / public bool canReplaceAtRuntime / public bool allowOverride ...
+// - 调试显示：public bool showDebugInfo / public Color debugGizmoColor
+// - 初始化运行数据：public void InitializeRuntime()
+//
+// 【可变数据（StateVariableData）】
+// - 说明：本文件同时包含 StateVariableData（用于运行时参数/临时数据的承载与克隆）。
+//
+// Private/Internal：编辑器工具、Odin Inspector 组织、初始化细节与辅助方法。
+// ============================================================================
+
 
 namespace ES
 {

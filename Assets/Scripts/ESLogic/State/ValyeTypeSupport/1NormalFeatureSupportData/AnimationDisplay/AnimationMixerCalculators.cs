@@ -36,7 +36,9 @@ namespace ES
         [InspectorName("混合器包装器")]
         MixerWrapper = 7,
         [InspectorName("高级·序列状态播放器")]
-        SequentialStates = 8
+        SequentialStates = 8,
+        [InspectorName("高级·阶段播放器(四阶段)")]
+        Phase4 = 9
     }
     
     /// <summary>
@@ -144,6 +146,31 @@ namespace ES
         public abstract void UpdateWeights(AnimationCalculatorRuntime runtime, in StateMachineContext context, float deltaTime);
 
         /// <summary>
+        /// 状态首帧立即更新 — 内部混合权重直接到位（无平滑过渡）。
+        /// 外部管线权重(FadeIn/FadeOut)由状态机独立管理，不受此影响。
+        /// 
+        /// 原理：临时关闭 useSmoothing 并传入极大 deltaTime，
+        /// 使所有 SmoothDamp 在一次调用内完全收敛到目标值，
+        /// 随后恢复平滑设置供后续帧正常过渡。
+        /// </summary>
+        public virtual void ImmediateUpdate(AnimationCalculatorRuntime runtime, in StateMachineContext context)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (runtime == null) throw new ArgumentNullException(nameof(runtime), $"[{GetType().Name}] ImmediateUpdate: runtime 不能为空");
+#endif
+
+            // 保存 & 关闭内部权重平滑
+            bool prevSmoothing = runtime.useSmoothing;
+            runtime.useSmoothing = false;
+
+            // 极大 deltaTime → 所有 SmoothDamp（输入平滑 / Direct权重平滑）一帧收敛
+            UpdateWeights(runtime, context, 99f);
+
+            // 恢复平滑设置
+            runtime.useSmoothing = prevSmoothing;
+        }
+
+        /// <summary>
         /// 获取当前播放的主Clip(用于调试)
         /// </summary>
         public abstract AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime);
@@ -172,7 +199,7 @@ namespace ES
         public virtual float GetStandardDuration(AnimationCalculatorRuntime runtime)
         {
             // 默认实现：返回0（子类需要override）
-            return 1f;
+            return 0f;
         }
 
 #if UNITY_EDITOR
@@ -223,9 +250,9 @@ namespace ES
         protected override string GetUsageHelp()
         {
              return "适用：单段动作（待机/受击/起跳/落地）。\n" +
-                 "必填：Clip。\n" +
-                 "可选：speed（播放速度）。\n" +
-                 "特点：性能最优，逻辑最简单。";
+                    "必填：动画片段。\n" +
+                    "可选：播放速度。\n" +
+                    "特点：性能最优，逻辑最简单。";
         }
 
         protected override string GetCalculatorDisplayName()
@@ -280,6 +307,14 @@ namespace ES
                 // 单Clip权重由外部State权重控制
             }
 
+            /// <summary>
+            /// SimpleClip 首帧立即更新 — 单Clip无内部混合，无需操作。
+            /// </summary>
+            public override void ImmediateUpdate(AnimationCalculatorRuntime runtime, in StateMachineContext context)
+            {
+                // 单Clip权重完全由外部管线(FadeIn)控制，无内部混合需要对齐
+            }
+
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
             {
                 // 如果Clip被覆盖，返回运行时的Clip
@@ -330,7 +365,7 @@ namespace ES
             {
                 // SimpleClip: 返回Clip原始长度（不考虑speed缩放）
                 var currentClip = GetCurrentClip(runtime);
-                return currentClip != null ? currentClip.length : 1f;  // 默认1秒
+                return currentClip != null ? currentClip.length : 0f;
             }
         }
 
@@ -376,9 +411,9 @@ namespace ES
             protected override string GetUsageHelp()
             {
                  return "适用：速度驱动的线性混合（Idle→Walk→Run→Sprint）。\n" +
-                     "必填：samples(Clip+threshold)，parameterFloat。\n" +
-                     "可选：smoothTime、曲线阈值(输入映射)。\n" +
-                     "建议：阈值严格递增。";
+                        "必填：若干采样点（动画片段 + 阈值），以及 1 个用于驱动的 float 参数。\n" +
+                        "可选：输入平滑、输入映射曲线。\n" +
+                        "建议：阈值严格递增。";
             }
 
             protected override string GetCalculatorDisplayName()
@@ -549,7 +584,7 @@ namespace ES
                     {
                         runtime.weightCache[i] = runtime.weightTargetCache[i];
                     }
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i] * runtime.totalWeight);
+                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
                 }
             }
 
@@ -585,6 +620,56 @@ namespace ES
                 }
 
                 return right;
+            }
+
+            /// <summary>
+            /// BlendTree1D 首帧立即更新 — 跳过输入SmoothDamp和权重SmoothDamp，
+            /// 直接根据 Context 参数计算并应用最终权重。
+            /// 同时重置 inputVelocity 和 weightVelocityCache 避免残留速度影响后续帧。
+            /// </summary>
+            public override void ImmediateUpdate(AnimationCalculatorRuntime runtime, in StateMachineContext context)
+            {
+                if (runtime == null || !runtime.mixer.IsValid() || samples.Length == 0) return;
+
+                // 直接读取参数，跳过输入平滑
+                float rawInput = context.GetFloat(parameterFloat, 0f);
+                float mappedInput = useCustomThresholdCurve ? MapInputByCurve(rawInput) : rawInput;
+
+                // 立即设置 lastInput（后续帧从此值开始平滑）
+                runtime.lastInput = mappedInput;
+                runtime.inputVelocity = 0f;
+
+                // 直接计算目标权重
+                int count = samples.Length;
+                for (int i = 0; i < count; i++)
+                    runtime.weightTargetCache[i] = 0f;
+
+                if (mappedInput <= samples[0].threshold)
+                {
+                    runtime.weightTargetCache[0] = 1f;
+                }
+                else if (mappedInput >= samples[count - 1].threshold)
+                {
+                    runtime.weightTargetCache[count - 1] = 1f;
+                }
+                else
+                {
+                    int rightIndex = BinarySearchRight(mappedInput);
+                    int leftIndex = rightIndex - 1;
+                    float leftThreshold = samples[leftIndex].threshold;
+                    float rightThreshold = samples[rightIndex].threshold;
+                    float t = (mappedInput - leftThreshold) / (rightThreshold - leftThreshold);
+                    runtime.weightTargetCache[leftIndex] = 1f - t;
+                    runtime.weightTargetCache[rightIndex] = t;
+                }
+
+                // 权重直接到位，跳过SmoothDamp
+                for (int i = 0; i < count; i++)
+                {
+                    runtime.weightCache[i] = runtime.weightTargetCache[i];
+                    runtime.weightVelocityCache[i] = 0f;
+                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
+                }
             }
 
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
@@ -676,12 +761,12 @@ namespace ES
                 if (runtime.singlePlayable.IsValid())
                 {
                     var clip = runtime.singlePlayable.GetAnimationClip();
-                    return clip != null ? clip.length : 1f;
+                    return clip != null ? clip.length : 0f;
                 }
 
                 // BlendTree1D: 返回当前权重最大的Clip的长度
                 if (runtime.weightCache == null || runtime.weightCache.Length == 0)
-                    return 1f;  // 默认1秒
+                    return 0f;
 
                 int maxWeightIndex = 0;
                 float maxWeight = 0f;
@@ -698,7 +783,7 @@ namespace ES
                 {
                     return samples[maxWeightIndex].clip.length;
                 }
-                return 1f;  // 默认1秒
+                return 0f;
             }
         }
 
@@ -847,7 +932,7 @@ namespace ES
                         
                         // 初始化时给中心点100%权重（默认播放Idle）
                         float initialWeight = (i == centerIndex) ? 1f : 0f;
-                        runtime.mixer.SetInputWeight(i, initialWeight * runtime.totalWeight);
+                        runtime.mixer.SetInputWeight(i, initialWeight);
                         runtime.weightCache[i] = initialWeight;
                         runtime.weightTargetCache[i] = initialWeight;
                     }
@@ -893,6 +978,38 @@ namespace ES
             /// 预计算Delaunay三角化 - 一次性计算，享元数据
             /// </summary>
             protected abstract void ComputeDelaunayTriangulation();
+
+            /// <summary>
+            /// BlendTree2D 首帧立即更新 — 跳过输入SmoothDamp，
+            /// 关闭 useSmoothing 后调用 CalculateWeights2D 使内部权重直接到位，
+            /// 同时重置 inputVelocity2D 避免残留速度影响后续帧。
+            /// </summary>
+            public override void ImmediateUpdate(AnimationCalculatorRuntime runtime, in StateMachineContext context)
+            {
+                if (runtime == null || !runtime.mixer.IsValid() || samples.Length == 0) return;
+
+                // 直接读取参数，跳过输入平滑
+                float paramX = context.GetFloat(parameterX, 0f);
+                float paramY = context.GetFloat(parameterY, 0f);
+                Vector2 rawInput = new Vector2(paramX, paramY);
+
+                // 立即设置 lastInput2D（后续帧从此值开始平滑）
+                runtime.lastInput2D = rawInput;
+                runtime.inputVelocity2D = Vector2.zero;
+
+                // 关闭权重平滑，直接计算到位
+                bool prevSmoothing = runtime.useSmoothing;
+                runtime.useSmoothing = false;
+                CalculateWeights2D(runtime, rawInput, 0f);
+                runtime.useSmoothing = prevSmoothing;
+
+                // 重置权重速度缓存
+                if (runtime.weightVelocityCache != null)
+                {
+                    for (int i = 0; i < runtime.weightVelocityCache.Length; i++)
+                        runtime.weightVelocityCache[i] = 0f;
+                }
+            }
 
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
             {
@@ -982,7 +1099,7 @@ namespace ES
         public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
         {
             if (samples == null || samples.Length == 0)
-                return 1f;
+                return 0f;
 
             int maxWeightIndex = 0;
             float maxWeight = 0f;
@@ -1000,7 +1117,7 @@ namespace ES
             }
 
             var clip = samples[maxWeightIndex].clip;
-            return clip != null ? clip.length : 1f;
+            return clip != null ? clip.length : 0f;
         }
         }
 
@@ -1019,8 +1136,8 @@ namespace ES
             protected override string GetUsageHelp()
             {
                  return "适用：方向移动（8向/多向）。\n" +
-                     "必填：samples(位置+Clip)，parameterX/parameterY。\n" +
-                     "建议：中心Idle在(0,0)，外圈为跑，内圈为走。";
+                        "必填：采样点（二维位置 + 动画片段），以及 2 个用于驱动的 float 参数（横向/纵向）。\n" +
+                        "建议：中心 Idle 在 (0,0)，外圈为跑，内圈为走。";
             }
 
             protected override string GetCalculatorDisplayName()
@@ -1411,7 +1528,7 @@ namespace ES
                     {
                         runtime.weightCache[i] = runtime.weightTargetCache[i];
                     }
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i] * runtime.totalWeight);
+                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
                 }
             }
         }
@@ -1436,8 +1553,8 @@ namespace ES
             protected override string GetUsageHelp()
             {
                  return "适用：瞄准偏移（Yaw/Pitch）或视角偏移。\n" +
-                     "必填：samples(位置+Clip)，parameterX/parameterY。\n" +
-                     "建议：采样点构成规则网格，便于插值。";
+                        "必填：采样点（二维位置 + 动画片段），以及 2 个用于驱动的 float 参数（横向/纵向）。\n" +
+                        "建议：采样点构成规则网格，便于插值。";
             }
 
             protected override string GetCalculatorDisplayName()
@@ -1518,7 +1635,7 @@ namespace ES
                     {
                         runtime.weightCache[i] = runtime.weightTargetCache[i];
                     }
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i] * runtime.totalWeight);
+                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
                 }
             }
 
@@ -1709,7 +1826,7 @@ namespace ES
             public WeightEvent[] weightEvents = new WeightEvent[0];
 
             [BoxGroup("事件回调")]
-            [LabelText("事件参数名前缀"), Tooltip("触发事件时写入context的参数名前缀")]
+            [LabelText("事件参数名前缀"), Tooltip("触发事件时写入运行时参数的名称前缀")]
             public string eventParamPrefix = "OnWeight_";
 
             public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.DirectBlend;
@@ -1717,8 +1834,8 @@ namespace ES
             protected override string GetUsageHelp()
             {
                  return "适用：表情/手指/局部动作叠加。\n" +
-                     "必填：clips(Clip+weightParameter)。\n" +
-                     "可选：autoNormalize、权重事件(阈值触发)。";
+                        "必填：若干叠加层（动画片段 + 权重驱动参数）。\n" +
+                        "可选：权重归一化、权重事件（阈值触发）。";
             }
 
             protected override string GetCalculatorDisplayName()
@@ -1804,7 +1921,7 @@ namespace ES
                     {
                         runtime.playables[i] = AnimationClipPlayable.Create(graph, clips[i].clip);
                         graph.Connect(runtime.playables[i], 0, runtime.mixer, i);
-                        runtime.mixer.SetInputWeight(i, clips[i].defaultWeight * runtime.totalWeight);
+                        runtime.mixer.SetInputWeight(i, clips[i].defaultWeight);
                         runtime.currentWeights[i] = clips[i].defaultWeight;
                         runtime.weightTargetCache[i] = clips[i].defaultWeight;
                     }
@@ -1869,7 +1986,7 @@ namespace ES
                         runtime.currentWeights[i] = runtime.targetWeights[i];
                     }
 
-                    runtime.mixer.SetInputWeight(i, runtime.currentWeights[i] * runtime.totalWeight);
+                    runtime.mixer.SetInputWeight(i, runtime.currentWeights[i]);
                 }
 
                 // 触发权重事件（基于上/下穿越阈值）
@@ -1898,6 +2015,53 @@ namespace ES
                             context.SetTrigger(paramName);
                         }
                     }
+                }
+            }
+
+            /// <summary>
+            /// DirectBlend 首帧立即更新 — 跳过权重SmoothDamp，
+            /// 直接从 Context 读取目标权重并立即应用到 Mixer，
+            /// 同时重置 weightVelocities 避免残留速度影响后续帧。
+            /// </summary>
+            public override void ImmediateUpdate(AnimationCalculatorRuntime runtime, in StateMachineContext context)
+            {
+                if (runtime == null || !runtime.mixer.IsValid()) return;
+
+                // 读取目标权重
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    string paramName = clips[i].weightParameter;
+                    runtime.targetWeights[i] = string.IsNullOrEmpty(paramName)
+                        ? clips[i].defaultWeight
+                        : context.GetFloat(paramName, clips[i].defaultWeight);
+                }
+
+                // 归一化(如果启用)
+                if (autoNormalize)
+                {
+                    float sum = 0f;
+                    for (int i = 0; i < runtime.targetWeights.Length; i++)
+                        sum += runtime.targetWeights[i];
+                    if (sum > 0.001f)
+                    {
+                        for (int i = 0; i < runtime.targetWeights.Length; i++)
+                            runtime.targetWeights[i] /= sum;
+                    }
+                }
+
+                // 权重直接到位，跳过SmoothDamp
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    runtime.currentWeights[i] = runtime.targetWeights[i];
+                    runtime.weightVelocities[i] = 0f;
+                    runtime.mixer.SetInputWeight(i, runtime.currentWeights[i]);
+                }
+
+                // 同步weightTargetCache（避免首帧事件误触发）
+                if (runtime.weightTargetCache != null)
+                {
+                    for (int i = 0; i < runtime.currentWeights.Length && i < runtime.weightTargetCache.Length; i++)
+                        runtime.weightTargetCache[i] = runtime.currentWeights[i];
                 }
             }
 
@@ -1970,7 +2134,7 @@ namespace ES
             {
                 // DirectBlend: 返回当前权重最大的Clip的长度
                 if (runtime.currentWeights == null || runtime.currentWeights.Length == 0)
-                    return 1f;  // 默认1秒
+                    return 0f;
 
                 int maxWeightIndex = 0;
                 float maxWeight = 0f;
@@ -1987,7 +2151,7 @@ namespace ES
                 {
                     return clips[maxWeightIndex].clip.length;
                 }
-                return 1f;  // 默认1秒
+                return 0f;
             }
         }
 
@@ -2043,8 +2207,8 @@ namespace ES
             protected override string GetUsageHelp()
             {
                  return "适用：前摇-主体-后摇（攻击/施法/开门）。\n" +
-                     "必填：MainClip。\n" +
-                     "可选：Entry/Exit、速度、提前退出。";
+                        "必填：主体动画。\n" +
+                        "可选：前摇/后摇、播放速度、允许提前结束（跳过后摇）。";
             }
 
             protected override string GetCalculatorDisplayName()
@@ -2111,8 +2275,8 @@ namespace ES
                 runtime.mixer = AnimationMixerPlayable.Create(graph, 3);
                 runtime.playables = new AnimationClipPlayable[3];
                 
-                // ★ 关键修复：分配weightCache，使ApplyTotalWeightToRuntime能正确缩放权重
-                // 没有weightCache时，外部fade会通过else分支把权重乘以0，导致再也无法恢复！
+                // ★ 关键修复：分配weightCache，便于外部在需要时“从缓存回写内部Mixer权重”（不再乘 totalWeight）
+                // 没有weightCache时，若外部系统修改过内部mixer权重，将难以恢复到计算器期望的内部权重。
                 runtime.weightCache = new float[3];
 
                 // 初始化阶段：Entry或Main
@@ -2239,15 +2403,15 @@ namespace ES
                 }
 
                 // ★ 关键修复：每帧都更新阶段权重（不仅仅是切换时）
-                // 外部fade/ApplyTotalWeightToRuntime可能随时修改mixer权重
-                // 必须每帧重新写入正确的 weightCache * totalWeight
+                // 外部系统/权重回写可能随时修改mixer权重
+                // 必须每帧重新写入正确的内部权重（0/1）
                 UpdatePhaseWeights(runtime);
             }
 
             /// <summary>
             /// 更新三个阶段的权重（只有当前阶段权重为1）
-            /// ★ 关键修复：将内部权重(0/1)写入weightCache，使ApplyTotalWeightToRuntime能正确工作
-            /// 之前直接写mixer且不维护weightCache，导致fade-in时权重被清零后永远无法恢复
+            /// ★ 关键修复：将内部权重(0/1)写入weightCache，便于在外部修改后从缓存恢复
+            /// 之前直接写mixer且不维护weightCache，外部改动后可能无法回到计算器期望的内部权重
             /// </summary>
             private void UpdatePhaseWeights(AnimationCalculatorRuntime runtime)
             {
@@ -2255,8 +2419,17 @@ namespace ES
                 {
                     float internalWeight = (i == runtime.sequencePhase) ? 1f : 0f;
                     runtime.weightCache[i] = internalWeight;
-                    runtime.mixer.SetInputWeight(i, internalWeight * runtime.totalWeight);
+                    runtime.mixer.SetInputWeight(i, internalWeight);
                 }
+            }
+
+            /// <summary>
+            /// 序列型计算器的首帧立即更新 — 仅刷新当前阶段权重，不推进时间/阶段。
+            /// </summary>
+            public override void ImmediateUpdate(AnimationCalculatorRuntime runtime, in StateMachineContext context)
+            {
+                if (runtime == null || !runtime.mixer.IsValid()) return;
+                UpdatePhaseWeights(runtime);
             }
 
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
@@ -2288,7 +2461,7 @@ namespace ES
                 if (exitClip != null)
                     totalDuration += exitClip.length / exitSpeed;
 
-                return totalDuration > 0f ? totalDuration : 1f;
+                return totalDuration > 0f ? totalDuration : 0f;
             }
 
             public override bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)
@@ -2390,8 +2563,8 @@ namespace ES
             protected override string GetUsageHelp()
             {
                  return "适用：组合多层混合（上半身/下半身分离）。\n" +
-                     "必填：childCalculator。\n" +
-                     "可选：weightScale（整体缩放）。";
+                        "必填：子计算器。\n" +
+                        "可选：权重缩放（整体缩放）。";
             }
 
             protected override string GetCalculatorDisplayName()
@@ -2451,6 +2624,17 @@ namespace ES
                 }
             }
 
+            /// <summary>
+            /// 嵌套计算器的首帧立即更新 — 递归委托给子计算器。
+            /// </summary>
+            public override void ImmediateUpdate(AnimationCalculatorRuntime runtime, in StateMachineContext context)
+            {
+                if (childCalculator != null && runtime.childRuntime != null)
+                {
+                    childCalculator.ImmediateUpdate(runtime.childRuntime, context);
+                }
+            }
+
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
             {
                 if (childCalculator != null && runtime.childRuntime != null)
@@ -2466,7 +2650,7 @@ namespace ES
                 {
                     return childCalculator.GetStandardDuration(runtime.childRuntime);
                 }
-                return 1f;  // 默认1秒
+                return 0f;
             }
 
             public override bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)

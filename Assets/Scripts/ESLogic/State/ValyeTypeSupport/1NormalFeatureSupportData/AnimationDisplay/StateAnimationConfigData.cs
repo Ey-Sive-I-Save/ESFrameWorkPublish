@@ -185,13 +185,27 @@ namespace ES
 
         [FoldoutGroup("IK配置")]
         [LabelText("IK来源模式"), ShowIf("enableIK")]
-        [Tooltip("ConfigOnly=仅Inspector配置\nCodeOnly=仅代码API\nConfigWithCodeOverride=Inspector配置为基础，代码可覆盖")]
+        [Tooltip("选择 IK 数据从哪里来：\n- 仅使用 Inspector 配置\n- 仅使用代码接口\n- 以 Inspector 配置为基础，运行时允许代码覆盖")]
         public IKSourceMode ikSourceMode = IKSourceMode.ConfigOnly;
 
         [FoldoutGroup("IK配置")]
         [LabelText("IK平滑时间"), Range(0f, 0.5f), ShowIf("enableIK")]
         [Tooltip("IK权重变化的平滑过渡时间（秒），0=立即")]
         public float ikSmoothTime = 0.1f;
+
+        [FoldoutGroup("IK配置")]
+        [LabelText("使用IK权重曲线"), ShowIf("enableIK")]
+        [Tooltip("启用后：IK总目标权重会再乘以曲线值（x=归一化进度0-1，y=倍率）。\n适合：出手段拉满、收招段回收等更自然的权重变化。")]
+        public bool useIKTargetWeightCurve = false;
+
+        [FoldoutGroup("IK配置")]
+        [LabelText("IK权重曲线"), ShowIf("@enableIK && useIKTargetWeightCurve")]
+        public AnimationCurve ikTargetWeightCurve = AnimationCurve.Linear(0f, 1f, 1f, 1f);
+
+        [FoldoutGroup("IK配置")]
+        [LabelText("曲线倍率"), Range(0f, 2f), ShowIf("@enableIK && useIKTargetWeightCurve")]
+        [Tooltip("曲线结果的额外倍率（最终倍率=Curve(x)*Scale）。")]
+        public float ikTargetWeightCurveScale = 1f;
 
         [FoldoutGroup("IK配置")]
         [LabelText("状态退出时禁用IK"), ShowIf("enableIK")]
@@ -232,6 +246,18 @@ namespace ES
         [FoldoutGroup("MatchTarget配置")]
         [LabelText("MatchTarget预设"), ShowIf("enableMatchTarget"), InlineProperty]
         public MatchTargetPresetConfig matchTargetPreset = MatchTargetPresetConfig.Default;
+
+        [FoldoutGroup("MatchTarget配置")]
+        [LabelText("启用阶段2"), ShowIf("enableMatchTarget")]
+        public bool enableMatchTargetPhase2 = false;
+
+        [FoldoutGroup("MatchTarget配置")]
+        [LabelText("阶段2触发进度"), Range(0f, 1f), ShowIf("enableMatchTargetPhase2")]
+        public float matchTargetPhase2Trigger = 0.6f;
+
+        [FoldoutGroup("MatchTarget配置")]
+        [LabelText("阶段2预设"), ShowIf("enableMatchTargetPhase2"), InlineProperty]
+        public MatchTargetPresetConfig matchTargetPresetPhase2 = MatchTargetPresetConfig.Default;
 
         /// <summary>
         /// 获取Clip和起始时间
@@ -296,6 +322,18 @@ namespace ES
                     ? ikLookAt.target.position
                     : ikLookAt.fixedPosition;
             }
+        }
+
+        /// <summary>
+        /// 评估IK权重曲线倍率（x=归一化进度0-1）。
+        /// </summary>
+        public float EvaluateIKTargetWeightMultiplier(float normalizedProgress)
+        {
+            if (!enableIK || !useIKTargetWeightCurve) return 1f;
+            if (ikTargetWeightCurve == null) return Mathf.Max(0f, ikTargetWeightCurveScale);
+            float t = Mathf.Clamp01(normalizedProgress);
+            float curve = ikTargetWeightCurve.Evaluate(t);
+            return Mathf.Max(0f, curve * ikTargetWeightCurveScale);
         }
 
         /// <summary>

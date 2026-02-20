@@ -26,6 +26,15 @@ namespace ES
     /// </summary>
     public class AnimationCalculatorRuntime : IPoolableAuto
     {
+        public static bool debugMatchTarget = true;
+
+        /// <summary>
+        /// Runtime 所属的 StateBase（非序列化）。
+        /// 用途：允许 Calculator 在低频事件时向 State 写入运行时信息（例如阶段同步）。
+        /// 对象池回收时会被清空。
+        /// </summary>
+        [System.NonSerialized]
+        public StateBase ownerState;
         // ==================== 对象池 ====================
         /// <summary>
         /// AnimationCalculatorRuntime 对象池
@@ -195,6 +204,25 @@ namespace ES
         public float[] phaseBlendWeights;
         /// <summary>阶段内主次混合速度</summary>
         public float[] phaseBlendVelocities;
+
+        // ==================== SequentialStates Mixer权重写入缓存（性能关键） ====================
+
+        /// <summary>
+        /// SequentialStates：最近一次写入到 runtime.mixer 的“当前阶段索引”。
+        /// 用于将每帧 O(N) 的 SetInputWeight 降到仅更新当前/上一阶段（最多2个输入）。
+        /// </summary>
+        public int sequenceLastAppliedPhaseIndex = -1;
+
+        /// <summary>
+        /// SequentialStates：最近一次写入到 runtime.mixer 的“上一阶段索引”（过渡用）。
+        /// </summary>
+        public int sequenceLastAppliedPrevPhaseIndex = -1;
+
+        /// <summary>SequentialStates：最近一次写入的当前阶段权重</summary>
+        public float sequenceLastAppliedPhaseWeight = -1f;
+
+        /// <summary>SequentialStates：最近一次写入的上一阶段权重</summary>
+        public float sequenceLastAppliedPrevWeight = -1f;
 
         // ==================== IK支持（结构体合并，提升缓存命中率） ====================
 
@@ -403,6 +431,7 @@ namespace ES
         /// </summary>
         private void ResetDataOnly()
         {
+            ownerState = null;
             BoundCalculatorKind = StateAnimationMixerKind.Unknown;
 
             // 权重
@@ -442,6 +471,12 @@ namespace ES
             sequencePrevPhase = -1;
             sequenceTransitionTime = 0f;
             sequenceInTransition = false;
+
+            // SequentialStates：Mixer权重写入缓存
+            sequenceLastAppliedPhaseIndex = -1;
+            sequenceLastAppliedPrevPhaseIndex = -1;
+            sequenceLastAppliedPhaseWeight = -1f;
+            sequenceLastAppliedPrevWeight = -1f;
 
             // IK数据
             ik.Reset();
@@ -569,27 +604,27 @@ namespace ES
         /// <param name="position">目标位置</param>
         /// <param name="rotation">目标旋转</param>
         /// <param name="weight">权重 (0-1)</param>
-        public void SetIKGoal(AvatarIKGoal goal, Vector3 position, Quaternion rotation, float weight)
+        public void SetIKGoal(IKGoal goal, Vector3 position, Quaternion rotation, float weight)
         {
             ik.enabled = true;
             switch (goal)
             {
-                case AvatarIKGoal.LeftHand:
+                case IKGoal.LeftHand:
                     ik.leftHandPosition = position;
                     ik.leftHandRotation = rotation;
                     ik.leftHandWeight = Mathf.Clamp01(weight);
                     break;
-                case AvatarIKGoal.RightHand:
+                case IKGoal.RightHand:
                     ik.rightHandPosition = position;
                     ik.rightHandRotation = rotation;
                     ik.rightHandWeight = Mathf.Clamp01(weight);
                     break;
-                case AvatarIKGoal.LeftFoot:
+                case IKGoal.LeftFoot:
                     ik.leftFootPosition = position;
                     ik.leftFootRotation = rotation;
                     ik.leftFootWeight = Mathf.Clamp01(weight);
                     break;
-                case AvatarIKGoal.RightFoot:
+                case IKGoal.RightFoot:
                     ik.rightFootPosition = position;
                     ik.rightFootRotation = rotation;
                     ik.rightFootWeight = Mathf.Clamp01(weight);
@@ -600,20 +635,20 @@ namespace ES
         /// <summary>
         /// 设置IK提示位置（肘/膝方向）
         /// </summary>
-        public void SetIKHintPosition(AvatarIKHint hint, Vector3 position)
+        public void SetIKHintPosition(IKGoal goal, Vector3 position)
         {
-            switch (hint)
+            switch (goal)
             {
-                case AvatarIKHint.LeftElbow:
+                case IKGoal.LeftHand:
                     ik.leftHandHintPosition = position;
                     break;
-                case AvatarIKHint.RightElbow:
+                case IKGoal.RightHand:
                     ik.rightHandHintPosition = position;
                     break;
-                case AvatarIKHint.LeftKnee:
+                case IKGoal.LeftFoot:
                     ik.leftFootHintPosition = position;
                     break;
-                case AvatarIKHint.RightKnee:
+                case IKGoal.RightFoot:
                     ik.rightFootHintPosition = position;
                     break;
             }
@@ -664,6 +699,16 @@ namespace ES
             matchTarget.endTime = Mathf.Clamp01(endNormTime);
             matchTarget.positionWeight = posWeight;
             matchTarget.rotationWeight = Mathf.Clamp01(rotWeight);
+
+#if UNITY_EDITOR
+            if (debugMatchTarget)
+            {
+                Debug.Log(
+                    $"[MatchTargetRuntime] Start | pos={targetPos:F3} rot={targetRot.eulerAngles:F1} " +
+                    $"body={bodyPart} time=[{matchTarget.startTime:F2},{matchTarget.endTime:F2}] " +
+                    $"posW={posWeight:F2} rotW={matchTarget.rotationWeight:F2}");
+            }
+#endif
         }
 
         /// <summary>
@@ -672,9 +717,18 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsMatchTargetInRange(float normalizedTime)
         {
-            return matchTarget.active && !matchTarget.completed
+            bool inRange = matchTarget.active && !matchTarget.completed
                 && normalizedTime >= matchTarget.startTime
                 && normalizedTime <= matchTarget.endTime;
+#if UNITY_EDITOR
+            if (debugMatchTarget && !inRange)
+            {
+                Debug.Log(
+                    $"[MatchTargetRuntime] Gate: out of range | active={matchTarget.active} completed={matchTarget.completed} " +
+                    $"t={normalizedTime:F2} range=[{matchTarget.startTime:F2},{matchTarget.endTime:F2}]");
+            }
+#endif
+            return inRange;
         }
 
         /// <summary>
@@ -685,6 +739,12 @@ namespace ES
         {
             matchTarget.completed = true;
             matchTarget.active = false;
+#if UNITY_EDITOR
+            if (debugMatchTarget)
+            {
+                Debug.Log("[MatchTargetRuntime] Complete");
+            }
+#endif
         }
 
         // ==================== 内存统计 ====================

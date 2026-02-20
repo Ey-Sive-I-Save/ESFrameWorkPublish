@@ -88,7 +88,8 @@ namespace ES
 
         public void SetCrouch(bool enable)
         {
-            if(enable){
+            if (enable)
+            {
                 stateDomain.stateMachine.SetSupportFlags(StateSupportFlags.Crouched);
             }
             kcc.SetCrouch(enable);
@@ -203,25 +204,6 @@ namespace ES
         public float airAccelerationSpeed = 5f;
         public float drag = 0.1f;
 
-        [Title("飞行")]
-        public float flyMaxSpeed = 10f;
-        public float flyAcceleration = 12f;
-        public float flyDrag = 0.2f;
-        [Tooltip("飞行重力倍率(0=无重力, 1=全重力)")]
-        public float flyGravityScale = 0.1f;
-        [Tooltip("飞行上升倍率(>1 更快上升)")]
-        public float flyAscendMultiplier = 1.5f;
-        [Tooltip("飞行下降倍率(>1 更快下降)")]
-        public float flyDescendMultiplier = 1f;
-        [Tooltip("飞行时强制离地时长")]
-        public float flyUngroundTime = 0.1f;
-
-        [Title("游泳")]
-        public float swimMaxSpeed = 6f;
-        public float swimAcceleration = 8f;
-        public float swimDrag = 0.5f;
-        public float swimBuoyancy = 6f;
-
         [Title("速度倍率/限速")]
         public float speedMultiplier = 1f;
         [Tooltip("<=0 表示不限制")]
@@ -231,6 +213,10 @@ namespace ES
         public float jumpSpeed = 8f;
         [Tooltip("跳跃速度倍率（降低跳跃高度）")]
         public float jumpSpeedMultiplier = 0.8f;
+        [Tooltip("上升阶段重力倍率(>1 更短更硬)")]
+        public float jumpApexGravityMultiplier = 2f;
+        [Tooltip("下落阶段重力倍率(>1 更快落地)")]
+        public float jumpFallGravityMultiplier = 1.3f;
 
         [Title("下蹲")]
         public float standingCapsuleHeight = 2f;
@@ -242,7 +228,7 @@ namespace ES
         public float orientationSharpness = 10f;
 
         [Title("重力")]
-        public Vector3 gravity = new Vector3(0f, -30f, 0f);
+        public Vector3 gravity_ = new Vector3(0f, -9.81f, 0f);
 
         [Title("根运动")]
         public bool useRootMotion = true;
@@ -260,11 +246,35 @@ namespace ES
         [InlineProperty, HideLabel]
         public EntityKCCMonitor monitor = new EntityKCCMonitor();
 
+        [LabelText("Monitor调试")]
+        public bool debugMonitor = false;
+
+        [LabelText("防止静止上漂")]
+        public bool preventUpwardDriftWhenIdle = true;
+
+        [LabelText("上漂阈值(米/帧)")]
+        public float upwardDriftThreshold = 0.005f;
+
         private Vector3 _lastVelocity;
         private Vector3 _rootMotionVelocity;
         private bool _jumpRequested;
         private bool _crouchRequested;
         private bool _isCrouched;
+        private bool _moveInputSetThisFrame;
+        private bool _verticalInputSetThisFrame;
+        private Vector3 _lastTransientPosition;
+
+        [NonSerialized]
+        public EntityBasicFlyModule flyModule;
+
+        [NonSerialized]
+        public EntityBasicSwimModule swimModule;
+
+        [NonSerialized]
+        public EntityBasicClimbModule climbModule;
+
+        [NonSerialized]
+        public EntityBasicMountModule mountModule;
 
         public void Initialize(Entity owner)
         {
@@ -285,16 +295,22 @@ namespace ES
                     crouchedCapsuleHeight = Mathf.Max(0.5f, standingCapsuleHeight * 0.5f);
                 }
             }
+            if (motor != null)
+            {
+                _lastTransientPosition = motor.TransientPosition;
+            }
         }
 
         public void SetMoveInput(Vector3 input)
         {
             moveInput = Vector3.ClampMagnitude(input, 1f);
+            _moveInputSetThisFrame = true;
         }
 
         public void SetVerticalInput(float input)
         {
             verticalInput = Mathf.Clamp(input, -1f, 1f);
+            _verticalInputSetThisFrame = true;
         }
 
         public void SetLookInput(Vector3 input)
@@ -310,6 +326,8 @@ namespace ES
             moveInput = Vector3.zero;
             lookInput = Vector3.forward;
             verticalInput = 0f;
+            _moveInputSetThisFrame = false;
+            _verticalInputSetThisFrame = false;
         }
 
         public void RequestJump()
@@ -350,15 +368,38 @@ namespace ES
 
         public void BeforeCharacterUpdate(Entity owner, float deltaTime)
         {
+            if (!_moveInputSetThisFrame)
+            {
+                moveInput = Vector3.zero;
+            }
+            if (!_verticalInputSetThisFrame)
+            {
+                verticalInput = 0f;
+            }
+            _moveInputSetThisFrame = false;
+            _verticalInputSetThisFrame = false;
+            ApplyCrouch();
+
             if (owner != null && owner.stateDomain != null && owner.stateDomain.stateMachine != null)
             {
                 var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
-                if ((supportFlags & StateSupportFlags.Flying) != 0 && motor != null && flyUngroundTime > 0f)
+                if (supportFlags == StateSupportFlags.Flying && flyModule != null)
                 {
-                    motor.ForceUnground(flyUngroundTime);
+                    flyModule.BeforeCharacterUpdate(owner, this, deltaTime);
+                }
+                if (supportFlags == StateSupportFlags.Swimming && swimModule != null)
+                {
+                    swimModule.BeforeCharacterUpdate(owner, this, deltaTime);
+                }
+                if (supportFlags == StateSupportFlags.Climbing && climbModule != null)
+                {
+                    climbModule.BeforeCharacterUpdate(owner, this, deltaTime);
+                }
+                if (supportFlags == StateSupportFlags.Mounted && mountModule != null)
+                {
+                    mountModule.BeforeCharacterUpdate(owner, this, deltaTime);
                 }
             }
-            ApplyCrouch();
         }
 
         public void UpdateRotation(Entity owner, ref Quaternion currentRotation, float deltaTime)
@@ -366,9 +407,35 @@ namespace ES
             if (owner != null && owner.stateDomain != null && owner.stateDomain.stateMachine != null)
             {
                 var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
-                if ((supportFlags & StateSupportFlags.Mounted) != 0)
+                if (supportFlags == StateSupportFlags.Mounted)
                 {
+                    if (mountModule != null)
+                    {
+                        mountModule.UpdateRotation(owner, this, ref currentRotation, deltaTime);
+                    }
                     return;
+                }
+                if (supportFlags == StateSupportFlags.Climbing)
+                {
+                    if (climbModule != null)
+                    {
+                        climbModule.UpdateRotation(owner, this, ref currentRotation, deltaTime);
+                    }
+                    return;
+                }
+                if (supportFlags == StateSupportFlags.Flying && flyModule != null)
+                {
+                    if (flyModule.UpdateRotation(owner, this, ref currentRotation, deltaTime))
+                    {
+                        return;
+                    }
+                }
+                if (supportFlags == StateSupportFlags.Swimming && swimModule != null)
+                {
+                    if (swimModule.UpdateRotation(owner, this, ref currentRotation, deltaTime))
+                    {
+                        return;
+                    }
                 }
             }
             if (lookInput.sqrMagnitude <= 0f || orientationSharpness <= 0f) return;
@@ -392,50 +459,59 @@ namespace ES
             }
 
             Vector3 targetMovementVelocity = Vector3.zero;
-            var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
-            if ((supportFlags & StateSupportFlags.Mounted) != 0)
+            if (owner == null || owner.stateDomain == null || owner.stateDomain.stateMachine == null || motor == null)
             {
-                currentVelocity = Vector3.zero;
                 _lastVelocity = currentVelocity;
                 return;
             }
-            if ((supportFlags & StateSupportFlags.Flying) != 0)
+            var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
+            if (supportFlags == StateSupportFlags.Mounted)
             {
-                Vector3 up = motor.CharacterUp;
-                float vertical = verticalInput;
-                if (vertical > 0f)
+                if (mountModule != null)
                 {
-                    vertical *= Mathf.Max(0f, flyAscendMultiplier);
+                    mountModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
                 }
-                else if (vertical < 0f)
+                else
                 {
-                    vertical *= Mathf.Max(0f, flyDescendMultiplier);
+                    currentVelocity = Vector3.zero;
                 }
-                Vector3 input = moveInput + up * vertical;
-                input = Vector3.ClampMagnitude(input, 1f);
-                targetMovementVelocity = input * flyMaxSpeed;
-
-                Vector3 velocityDiff = targetMovementVelocity - currentVelocity;
-                currentVelocity += velocityDiff * flyAcceleration * deltaTime;
-                if (flyGravityScale > 0f)
-                {
-                    currentVelocity += gravity * (flyGravityScale * deltaTime);
-                }
-                currentVelocity *= (1f / (1f + (flyDrag * deltaTime)));
+                _lastVelocity = currentVelocity;
+                return;
             }
-            else if ((supportFlags & StateSupportFlags.Swimming) != 0)
+            bool handled = false;
+            if (supportFlags != StateSupportFlags.Climbing && climbModule != null && climbModule.subState == ClimbSubState.ClimbJump)
             {
-                Vector3 up = motor.CharacterUp;
-                Vector3 input = moveInput + up * verticalInput;
-                input = Vector3.ClampMagnitude(input, 1f);
-                targetMovementVelocity = input * swimMaxSpeed;
-
-                Vector3 velocityDiff = targetMovementVelocity - currentVelocity;
-                currentVelocity += velocityDiff * swimAcceleration * deltaTime;
-                currentVelocity += up * swimBuoyancy * deltaTime;
-                currentVelocity *= (1f / (1f + (swimDrag * deltaTime)));
+                handled = climbModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
             }
-            else if (motor.GroundingStatus.IsStableOnGround)
+            if (supportFlags == StateSupportFlags.Climbing)
+            {
+                handled = true;
+                if (climbModule != null)
+                {
+                    climbModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
+                }
+                else
+                {
+                    currentVelocity = Vector3.zero;
+                }
+            }
+            else if (supportFlags == StateSupportFlags.Flying)
+            {
+                handled = true;
+                if (flyModule != null)
+                {
+                    flyModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
+                }
+            }
+            else if (supportFlags == StateSupportFlags.Swimming)
+            {
+                handled = true;
+                if (swimModule != null)
+                {
+                    swimModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
+                }
+            }
+            if (!handled && motor.GroundingStatus.IsStableOnGround)
             {
                 currentVelocity = motor.GetDirectionTangentToSurface(currentVelocity, motor.GroundingStatus.GroundNormal) * currentVelocity.magnitude;
 
@@ -453,7 +529,7 @@ namespace ES
                     currentVelocity = Vector3.ProjectOnPlane(currentVelocity, motor.CharacterUp) + (motor.CharacterUp * finalJumpSpeed);
                 }
             }
-            else
+            else if (!handled)
             {
                 if (moveInput.sqrMagnitude > 0f)
                 {
@@ -465,11 +541,21 @@ namespace ES
                         targetMovementVelocity = Vector3.ProjectOnPlane(targetMovementVelocity, perpenticularObstructionNormal);
                     }
 
-                    Vector3 velocityDiff = Vector3.ProjectOnPlane(targetMovementVelocity - currentVelocity, gravity);
+                    Vector3 velocityDiff = Vector3.ProjectOnPlane(targetMovementVelocity - currentVelocity, gravity_);
                     currentVelocity += velocityDiff * airAccelerationSpeed * deltaTime;
                 }
 
-                currentVelocity += gravity * deltaTime;
+                float gravityScale = 1f;
+                float upVel = Vector3.Dot(currentVelocity, motor.CharacterUp);
+                if (upVel > 0.01f)
+                {
+                    gravityScale = Mathf.Max(0f, jumpApexGravityMultiplier);
+                }
+                else if (upVel < -0.01f)
+                {
+                    gravityScale = Mathf.Max(0f, jumpFallGravityMultiplier);
+                }
+                currentVelocity += gravity_ * (gravityScale * deltaTime);
                 currentVelocity *= (1f / (1f + (drag * deltaTime)));
             }
 
@@ -480,6 +566,13 @@ namespace ES
                 {
                     currentVelocity += _rootMotionVelocity * rootMotionScale;
                 }
+            }
+
+            if (debugMonitor)
+            {
+                Debug.Log(
+                    $"[KCC-Velocity] vel={currentVelocity} rootMotionVel={_rootMotionVelocity} rootMotionScale={rootMotionScale:F2} " +
+                    $"gravity={gravity_} grounded={motor.GroundingStatus.IsStableOnGround}");
             }
 
             if (speedLimit > 0f)
@@ -520,8 +613,36 @@ namespace ES
 
         public void AfterCharacterUpdate(Entity owner, float deltaTime)
         {
+            if (debugMonitor)
+            {
+                Vector3 posDelta = motor.TransientPosition - _lastTransientPosition;
+                Debug.Log(
+                    $"[KCC-Monitor] UpdateFromMotor begin | pos={motor.TransientPosition} delta={posDelta} " +
+                    $"vel={_lastVelocity} dt={deltaTime:F3}");
+            }
+
+            if (preventUpwardDriftWhenIdle)
+            {
+                Vector3 posDelta = motor.TransientPosition - _lastTransientPosition;
+                bool noInput = moveInput.sqrMagnitude <= 0.0001f && Mathf.Abs(verticalInput) <= 0.0001f;
+                bool noVelocity = _lastVelocity.sqrMagnitude <= 0.0001f && _rootMotionVelocity.sqrMagnitude <= 0.0001f;
+                if (posDelta.y > upwardDriftThreshold && noInput && noVelocity)
+                {
+                    if (debugMonitor)
+                    {
+                        Debug.LogWarning($"[KCC-Monitor] Clamp upward drift | deltaY={posDelta.y:F4}");
+                    }
+                    motor.SetPosition(_lastTransientPosition, true);
+                }
+            }
             monitor.UpdateFromMotor(motor, _lastVelocity);
+            if (debugMonitor)
+            {
+                Debug.Log($"[KCC-Monitor] UpdateFromMotor end | hasMotor={monitor.hasMotor} grounded={monitor.isStableOnGround} pos={monitor.position} vel={monitor.velocity}");
+            }
+            _lastTransientPosition = motor.TransientPosition;
         }
+
 
         public bool IsColliderValidForCollisions(Entity owner, Collider coll)
         {
@@ -548,7 +669,7 @@ namespace ES
             // 预留扩展
         }
 
-        
+
     }
 
     [Serializable]

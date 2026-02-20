@@ -31,6 +31,11 @@ namespace ES
         /// <summary>
         /// 热插拔相关任务
         /// </summary>
-        HotPlug = 1 << 3
+        HotPlug = 1 << 3,
+
+        /// <summary>
+        /// Mixer输入权重发生变化（需要更新参考姿态填充/归一化）
+        /// </summary>
+        MixerWeights = 1 << 4
     }
 }

@@ -1,5 +1,362 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-9037187784004118000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed37d52a35a0bb24ab4d1f4b9d208418, type: 3}
+  m_Name: "\u4FE1\u606F\u57FA\u672C\u4EA4\u4E92"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u57FA\u672C\u4EA4\u4E92"
+  sharedData:
+    basicConfig:
+      stateName: "\u6500\u722C\u7FFB\u4E0A"
+      stateId: -1
+      layerType: 0
+      priority: 50
+      stateSupportFlag: 1
+      ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 0
+      canBeFeedback: 0
+      durationMode: 0
+      timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
+      phaseConfig:
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
+    hasAnimation: 1
+    animationConfig:
+      calculator:
+        rid: 3128556117779808275
+      enableIK: 1
+      ikSourceMode: 2
+      ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 1
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 5
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 0.77
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 1
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
+        bodyPart: 5
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0.66
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+    enableFadeInOut: 1
+    fadeFollowTimeScale: 1
+    fadeSpeedMultiplier: 1
+    fadeInDuration: 0.2
+    fadeOutDuration: 0.15
+    useAdvancedFadeCurve: 0
+    fadeInCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    fadeOutCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    tags: []
+    group: Default
+    displayName: 
+    description: 
+    icon: {fileID: 0}
+    mergeData:
+      stateChannelMask: 63
+      stayLevel: 1
+      asLeftRule:
+        enableUnconditionalRule: 0
+        unconditionalRule:
+        - matchBackType: 0
+          stateName: "\u72B6\u6001\u540D"
+          stateID: -1
+        hitByLayerOption: 0
+        EffectialPripority: 2
+        EqualIsEffectial_: 1
+      asRightRule:
+        enableUnconditionalRule: 0
+        unconditionalRule: []
+        hitByLayerOption: 0
+        EffectialPripority: 0
+        EqualIsEffectial_: 1
+    costData:
+      costForMotion: 60
+      costForAgility: 60
+      costForTarget: 60
+      enableCostCalculation: 1
+    canBeTemporary: 1
+    autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
+    allowOverride: 0
+    notifyOnOverride: 1
+    showDebugInfo: 0
+    debugGizmoColor: {r: 1, g: 1, b: 1, a: 1}
+  references:
+    version: 2
+    RefIds:
+    - rid: 3128556117779808275
+      type: {class: StateAnimationMixCalculatorForBlendTree1D, ns: ES, asm: ES_Logic}
+      data:
+        parameterFloat:
+          EnumValue: 6
+          StringValue: 
+        samples:
+        - clip: {fileID: 7400002, guid: 080945c46afd34f3ebc364c1696e6678, type: 3}
+          threshold: 0
+        useCustomThresholdCurve: 0
+        inputMin: 0
+        inputMax: 1
+        thresholdCurve:
+          serializedVersion: 2
+          m_Curve:
+          - serializedVersion: 3
+            time: 0
+            value: 0
+            inSlope: 0
+            outSlope: 1
+            tangentMode: 0
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          - serializedVersion: 3
+            time: 1
+            value: 1
+            inSlope: 1
+            outSlope: 0
+            tangentMode: 0
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          m_PreInfinity: 2
+          m_PostInfinity: 2
+          m_RotationOrder: 4
+        smoothTime: 0.1
 --- !u!114 &-7528922309516859388
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -42,8 +399,95 @@ MonoBehaviour:
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
@@ -54,6 +498,32 @@ MonoBehaviour:
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -95,6 +565,17 @@ MonoBehaviour:
       enableMatchTarget: 0
       autoActivateMatchTarget: 0
       matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
@@ -252,8 +733,95 @@ MonoBehaviour:
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
@@ -264,6 +832,32 @@ MonoBehaviour:
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -305,6 +899,17 @@ MonoBehaviour:
       enableMatchTarget: 0
       autoActivateMatchTarget: 0
       matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
@@ -452,6 +1057,353 @@ MonoBehaviour:
         - clip: {fileID: 7400000, guid: 4bef3980ac3ba994daf7f1c7e07d85ec, type: 3}
           position: {x: 0.35355332, y: -0.35355344}
         smoothTime: 0.173
+--- !u!114 &-3068659702321710508
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed37d52a35a0bb24ab4d1f4b9d208418, type: 3}
+  m_Name: "\u4FE1\u606F\u6025\u505C"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u6025\u505C"
+  sharedData:
+    basicConfig:
+      stateName: "\u6025\u505C"
+      stateId: -1
+      layerType: 0
+      priority: 50
+      stateSupportFlag: 1
+      ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 0
+      canBeFeedback: 0
+      durationMode: 1
+      timedDuration: 1
+      enableProgressTracking: 1
+      enableClipLengthFallback: 0
+      phaseConfig:
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
+    hasAnimation: 1
+    animationConfig:
+      calculator:
+        rid: 3128555966166990854
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+    enableFadeInOut: 1
+    fadeFollowTimeScale: 1
+    fadeSpeedMultiplier: 1
+    fadeInDuration: 0.08
+    fadeOutDuration: 0.1
+    useAdvancedFadeCurve: 0
+    fadeInCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    fadeOutCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    tags:
+    - Skill
+    group: Skills
+    displayName: "\u6280\u80FD"
+    description: "\u4E34\u65F6\u6280\u80FD"
+    icon: {fileID: 0}
+    mergeData:
+      stateChannelMask: 12
+      stayLevel: 1
+      asLeftRule:
+        enableUnconditionalRule: 0
+        unconditionalRule:
+        - matchBackType: 0
+          stateName: "\u72B6\u6001\u540D"
+          stateID: -1
+        hitByLayerOption: 0
+        EffectialPripority: 0
+        EqualIsEffectial_: 1
+      asRightRule:
+        enableUnconditionalRule: 0
+        unconditionalRule: []
+        hitByLayerOption: 0
+        EffectialPripority: 1
+        EqualIsEffectial_: 1
+    costData:
+      costForMotion: 14
+      costForAgility: 11
+      costForTarget: 0
+      enableCostCalculation: 1
+    canBeTemporary: 1
+    autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
+    allowOverride: 0
+    notifyOnOverride: 1
+    showDebugInfo: 0
+    debugGizmoColor: {r: 1, g: 1, b: 1, a: 1}
+  references:
+    version: 2
+    RefIds:
+    - rid: 3128555966166990854
+      type: {class: StateAnimationMixCalculatorForBlendTree2DFreeformDirectional,
+        ns: ES, asm: ES_Logic}
+      data:
+        parameterX:
+          EnumValue: 16
+          StringValue: DirectionX
+        parameterY:
+          EnumValue: 17
+          StringValue: DirectionY
+        samples:
+        - clip: {fileID: 7400000, guid: 244b8b759a9ccd740b2829c4256f4ae8, type: 3}
+          position: {x: 0, y: 0}
+        - clip: {fileID: 7400000, guid: b71e7f9969756a04385d5dc05820e40f, type: 3}
+          position: {x: 1, y: 0}
+        - clip: {fileID: 7400000, guid: 1dba280fc83f29946bf7afab81df7f04, type: 3}
+          position: {x: 0.70710677, y: 0.70710677}
+        - clip: {fileID: 7400000, guid: 244b8b759a9ccd740b2829c4256f4ae8, type: 3}
+          position: {x: 0, y: 1}
+        - clip: {fileID: 7400000, guid: eb0afb00a1c187d41ae2d8e015c0e69e, type: 3}
+          position: {x: -0.70710677, y: 0.70710677}
+        - clip: {fileID: 7400000, guid: e865b8f8eff0f3143b596038c837d19a, type: 3}
+          position: {x: -1, y: 0}
+        - clip: {fileID: 7400000, guid: 2c2b70f908191fd48a044c1ba413937f, type: 3}
+          position: {x: 0, y: -1}
+        smoothTime: 0.173
 --- !u!114 &-548719377006666356
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -494,8 +1446,95 @@ MonoBehaviour:
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
@@ -506,6 +1545,32 @@ MonoBehaviour:
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -547,6 +1612,17 @@ MonoBehaviour:
       enableMatchTarget: 0
       autoActivateMatchTarget: 0
       matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
@@ -721,6 +1797,11 @@ MonoBehaviour:
     - {fileID: 4950162029255616221}
     - {fileID: -548719377006666356}
     - {fileID: 5025475063495647492}
+    - {fileID: -3068659702321710508}
+    - {fileID: 3591491480280316166}
+    - {fileID: 6571922258015345914}
+    - {fileID: 4577117104993715552}
+    - {fileID: -9037187784004118000}
     SerializedBytesString: 
     Prefab: {fileID: 0}
     PrefabModificationsReferencedUnityObjects: []
@@ -739,7 +1820,7 @@ MonoBehaviour:
       Data: 
     - Name: 
       Entry: 12
-      Data: 11
+      Data: 16
     - Name: 
       Entry: 7
       Data: 
@@ -873,6 +1954,66 @@ MonoBehaviour:
       Entry: 8
       Data: 
     - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u6025\u505C"
+    - Name: $v
+      Entry: 10
+      Data: 11
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u6500\u722C\u7FFB\u4E0A"
+    - Name: $v
+      Entry: 10
+      Data: 12
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u7FFB\u8D8A"
+    - Name: $v
+      Entry: 10
+      Data: 13
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u6500\u722C\u8DF3\u8DC3"
+    - Name: $v
+      Entry: 10
+      Data: 14
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u57FA\u672C\u4EA4\u4E92"
+    - Name: $v
+      Entry: 10
+      Data: 15
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
       Entry: 13
       Data: 
     - Name: 
@@ -920,18 +2061,131 @@ MonoBehaviour:
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
     hasAnimation: 1
     animationConfig:
       calculator:
-        rid: 3128556031534694417
+        rid: 3128556332100354050
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -973,6 +2227,17 @@ MonoBehaviour:
       enableMatchTarget: 0
       autoActivateMatchTarget: 0
       matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
@@ -1074,21 +2339,153 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 3128556031534694417
-      type: {class: SequentialClipMixer, ns: ES, asm: ES_Logic}
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 3128556332100354050
+      type: {class: StateAnimationMixCalculatorForPhase4, ns: ES, asm: ES_Logic}
       data:
-        entryClip: {fileID: -5643612920955861, guid: 4fde6d9a7b45dd5449bcc216fe95f319,
-          type: 3}
-        entrySpeed: 1
-        mainConfig:
-          clip: {fileID: 929909973302792849, guid: 02c9f703062e6094ba4eacd4b34df0b5,
+        pre:
+          phaseName: 
+          phaseCalculator:
+            rid: -2
+          primaryClip: {fileID: -5643612920955861, guid: 4fde6d9a7b45dd5449bcc216fe95f319,
             type: 3}
-          speed: 1
-        exitClip: {fileID: 959511169626303400, guid: e0e95bef442702845b14ec423317f978,
-          type: 3}
-        exitSpeed: 1
-        loopMainClip: 0
-        allowEarlyExit: 1
+          enableSecondaryClipBlend: 0
+          secondaryClip: {fileID: 0}
+          blendParameter:
+            EnumValue: 0
+            StringValue: 
+          minDuration: 0
+          maxDuration: 0
+          autoTransition: 0
+          autoTransitionOnAnimationEnd: 1
+          transitionTrigger:
+            EnumValue: 0
+            StringValue: 
+          transitionTriggerThreshold: 0
+          transitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          transitionTarget: 0
+          extraTransitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          extraTransitionTarget: 0
+        main:
+          phaseName: 
+          phaseCalculator:
+            rid: -2
+          primaryClip: {fileID: 929909973302792849, guid: 02c9f703062e6094ba4eacd4b34df0b5,
+            type: 3}
+          enableSecondaryClipBlend: 0
+          secondaryClip: {fileID: 0}
+          blendParameter:
+            EnumValue: 0
+            StringValue: 
+          minDuration: 0
+          maxDuration: 0
+          autoTransition: 0
+          autoTransitionOnAnimationEnd: 0
+          transitionTrigger:
+            EnumValue: 0
+            StringValue: 
+          transitionTriggerThreshold: 0
+          transitionCondition:
+            enable: 1
+            parameter:
+              EnumValue: 2
+              StringValue: 
+            compare: 1
+            threshold: 0
+          transitionTarget: 0
+          extraTransitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          extraTransitionTarget: 0
+        wait:
+          phaseName: 
+          phaseCalculator:
+            rid: -2
+          primaryClip: {fileID: 929909973302792849, guid: 02c9f703062e6094ba4eacd4b34df0b5,
+            type: 3}
+          enableSecondaryClipBlend: 0
+          secondaryClip: {fileID: 0}
+          blendParameter:
+            EnumValue: 0
+            StringValue: 
+          minDuration: 0
+          maxDuration: 0
+          autoTransition: 0
+          autoTransitionOnAnimationEnd: 0
+          transitionTrigger:
+            EnumValue: 0
+            StringValue: 
+          transitionTriggerThreshold: 0
+          transitionCondition:
+            enable: 1
+            parameter:
+              EnumValue: 2
+              StringValue: 
+            compare: 0
+            threshold: 0
+          transitionTarget: 0
+          extraTransitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          extraTransitionTarget: 2
+        released:
+          phaseName: 
+          phaseCalculator:
+            rid: -2
+          primaryClip: {fileID: 959511169626303400, guid: e0e95bef442702845b14ec423317f978,
+            type: 3}
+          enableSecondaryClipBlend: 0
+          secondaryClip: {fileID: 0}
+          blendParameter:
+            EnumValue: 0
+            StringValue: 
+          minDuration: 0
+          maxDuration: 0
+          autoTransition: 0
+          autoTransitionOnAnimationEnd: 0
+          transitionTrigger:
+            EnumValue: 0
+            StringValue: 
+          transitionTriggerThreshold: 0
+          transitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          transitionTarget: 0
+          extraTransitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          extraTransitionTarget: 0
+        transitionDuration: 0.1
+        blendSmoothTime: 0.05
 --- !u!114 &1909882665973813533
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1131,8 +2528,95 @@ MonoBehaviour:
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
@@ -1143,6 +2627,32 @@ MonoBehaviour:
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -1184,6 +2694,17 @@ MonoBehaviour:
       enableMatchTarget: 0
       autoActivateMatchTarget: 0
       matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
@@ -1339,18 +2860,131 @@ MonoBehaviour:
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
     hasAnimation: 1
     animationConfig:
       calculator:
-        rid: 3128555966166990854
+        rid: 3128556332100354049
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -1392,6 +3026,17 @@ MonoBehaviour:
       enableMatchTarget: 0
       autoActivateMatchTarget: 0
       matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
@@ -1493,52 +3138,820 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 3128555966166990854
-      type: {class: StateAnimationMixCalculatorForBlendTree2DFreeformDirectional,
-        ns: ES, asm: ES_Logic}
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 3128556332100354049
+      type: {class: StateAnimationMixCalculatorForPhase4, ns: ES, asm: ES_Logic}
       data:
-        parameterX:
-          EnumValue: 1
-          StringValue: DirectionX
-        parameterY:
-          EnumValue: 3
-          StringValue: DirectionY
-        samples:
-        - clip: {fileID: 7400002, guid: 080945c46afd34f3ebc364c1696e6678, type: 3}
-          position: {x: 0, y: 0}
-        - clip: {fileID: 7400000, guid: de9e84aea2809fd4dab56481e7796f02, type: 3}
-          position: {x: 1, y: 0}
-        - clip: {fileID: 7400000, guid: 5c3fee8971d524740b0b15d98d755f7c, type: 3}
-          position: {x: 0.70710677, y: 0.70710677}
-        - clip: {fileID: 7400000, guid: 2052e59abeb75e741848e7102f47a677, type: 3}
-          position: {x: 0, y: 1}
-        - clip: {fileID: 7400000, guid: 9e484751ff08e214f8b9441bdc72d9eb, type: 3}
-          position: {x: -0.70710677, y: 0.70710677}
-        - clip: {fileID: 7400000, guid: e983ef2aee5563f43b1f7a200572d0c7, type: 3}
-          position: {x: -1, y: -0.00000008742278}
-        - clip: {fileID: 7400000, guid: 10af6be2bc3611e4b880950d2afa62cb, type: 3}
-          position: {x: -0.7071068, y: -0.7071067}
-        - clip: {fileID: 7400000, guid: b0d68a4a5a96d154f946969c11790dab, type: 3}
-          position: {x: 0.000000011924881, y: -1}
-        - clip: {fileID: 7400000, guid: 3a22c86a391a75e49aab7cdb5fae3780, type: 3}
-          position: {x: 0.70710665, y: -0.7071069}
-        - clip: {fileID: 7400000, guid: 23fe2c799289f0b4c87e5184114d35d8, type: 3}
-          position: {x: 0.5, y: 0}
-        - clip: {fileID: 7400000, guid: ae36db0ec29790b4d909645412d2094f, type: 3}
-          position: {x: 0.35355338, y: 0.35355338}
-        - clip: {fileID: 7400000, guid: 3a3075913643e7f43b61bc7ccbc070e2, type: 3}
-          position: {x: -0.000000021855694, y: 0.5}
-        - clip: {fileID: 7400000, guid: d68905673cd2ab94888b03851ded7e4d, type: 3}
-          position: {x: -0.35355338, y: 0.35355338}
-        - clip: {fileID: 7400000, guid: 8963a7997f2bbdd43998a822733ac81e, type: 3}
-          position: {x: -0.5, y: -0.00000004371139}
-        - clip: {fileID: 7400000, guid: 9b7e4ef7c6efe6d41b0daa23baf117e8, type: 3}
-          position: {x: -0.3535534, y: -0.35355335}
-        - clip: {fileID: 7400000, guid: f2f0f7b1c134a3442a8f6570b63ed097, type: 3}
-          position: {x: 0.0000000059624403, y: -0.5}
-        - clip: {fileID: 7400000, guid: 4bef3980ac3ba994daf7f1c7e07d85ec, type: 3}
-          position: {x: 0.35355332, y: -0.35355344}
-        smoothTime: 0.173
+        pre:
+          phaseName: 
+          phaseCalculator:
+            rid: -2
+          primaryClip: {fileID: -5643612920955861, guid: 4fde6d9a7b45dd5449bcc216fe95f319,
+            type: 3}
+          enableSecondaryClipBlend: 0
+          secondaryClip: {fileID: 0}
+          blendParameter:
+            EnumValue: 0
+            StringValue: 
+          minDuration: 0
+          maxDuration: 0
+          autoTransition: 0
+          autoTransitionOnAnimationEnd: 1
+          transitionTrigger:
+            EnumValue: 0
+            StringValue: 
+          transitionTriggerThreshold: 0
+          transitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          transitionTarget: 0
+          extraTransitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          extraTransitionTarget: 0
+        main:
+          phaseName: 
+          phaseCalculator:
+            rid: -2
+          primaryClip: {fileID: 929909973302792849, guid: 02c9f703062e6094ba4eacd4b34df0b5,
+            type: 3}
+          enableSecondaryClipBlend: 0
+          secondaryClip: {fileID: 0}
+          blendParameter:
+            EnumValue: 0
+            StringValue: 
+          minDuration: 0
+          maxDuration: 0
+          autoTransition: 0
+          autoTransitionOnAnimationEnd: 0
+          transitionTrigger:
+            EnumValue: 0
+            StringValue: 
+          transitionTriggerThreshold: 0
+          transitionCondition:
+            enable: 1
+            parameter:
+              EnumValue: 2
+              StringValue: 
+            compare: 1
+            threshold: 0
+          transitionTarget: 0
+          extraTransitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          extraTransitionTarget: 0
+        wait:
+          phaseName: 
+          phaseCalculator:
+            rid: -2
+          primaryClip: {fileID: 929909973302792849, guid: 02c9f703062e6094ba4eacd4b34df0b5,
+            type: 3}
+          enableSecondaryClipBlend: 0
+          secondaryClip: {fileID: 0}
+          blendParameter:
+            EnumValue: 0
+            StringValue: 
+          minDuration: 0
+          maxDuration: 0
+          autoTransition: 0
+          autoTransitionOnAnimationEnd: 0
+          transitionTrigger:
+            EnumValue: 0
+            StringValue: 
+          transitionTriggerThreshold: 0
+          transitionCondition:
+            enable: 1
+            parameter:
+              EnumValue: 2
+              StringValue: 
+            compare: 0
+            threshold: 0
+          transitionTarget: 0
+          extraTransitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          extraTransitionTarget: 2
+        released:
+          phaseName: 
+          phaseCalculator:
+            rid: -2
+          primaryClip: {fileID: 959511169626303400, guid: e0e95bef442702845b14ec423317f978,
+            type: 3}
+          enableSecondaryClipBlend: 0
+          secondaryClip: {fileID: 0}
+          blendParameter:
+            EnumValue: 0
+            StringValue: 
+          minDuration: 0
+          maxDuration: 0
+          autoTransition: 0
+          autoTransitionOnAnimationEnd: 0
+          transitionTrigger:
+            EnumValue: 0
+            StringValue: 
+          transitionTriggerThreshold: 0
+          transitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          transitionTarget: 0
+          extraTransitionCondition:
+            enable: 0
+            parameter:
+              EnumValue: 0
+              StringValue: 
+            compare: 0
+            threshold: 0
+          extraTransitionTarget: 0
+        transitionDuration: 0.1
+        blendSmoothTime: 0.05
+--- !u!114 &3591491480280316166
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed37d52a35a0bb24ab4d1f4b9d208418, type: 3}
+  m_Name: "\u4FE1\u606F\u6500\u722C\u7FFB\u4E0A"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u6500\u722C\u7FFB\u4E0A"
+  sharedData:
+    basicConfig:
+      stateName: "\u6500\u722C\u7FFB\u4E0A"
+      stateId: -1
+      layerType: 0
+      priority: 50
+      stateSupportFlag: 256
+      ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
+      canBeFeedback: 1
+      durationMode: 0
+      timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
+      phaseConfig:
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
+    hasAnimation: 1
+    animationConfig:
+      calculator:
+        rid: 3128556031534694419
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 2
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 0.77
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 1
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
+        bodyPart: 2
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0.66
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+    enableFadeInOut: 1
+    fadeFollowTimeScale: 1
+    fadeSpeedMultiplier: 1
+    fadeInDuration: 0.2
+    fadeOutDuration: 0.15
+    useAdvancedFadeCurve: 0
+    fadeInCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    fadeOutCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    tags: []
+    group: Default
+    displayName: 
+    description: 
+    icon: {fileID: 0}
+    mergeData:
+      stateChannelMask: 63
+      stayLevel: 1
+      asLeftRule:
+        enableUnconditionalRule: 0
+        unconditionalRule:
+        - matchBackType: 0
+          stateName: "\u72B6\u6001\u540D"
+          stateID: -1
+        hitByLayerOption: 0
+        EffectialPripority: 0
+        EqualIsEffectial_: 1
+      asRightRule:
+        enableUnconditionalRule: 0
+        unconditionalRule: []
+        hitByLayerOption: 0
+        EffectialPripority: 0
+        EqualIsEffectial_: 1
+    costData:
+      costForMotion: 60
+      costForAgility: 60
+      costForTarget: 60
+      enableCostCalculation: 1
+    canBeTemporary: 1
+    autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
+    allowOverride: 0
+    notifyOnOverride: 1
+    showDebugInfo: 0
+    debugGizmoColor: {r: 1, g: 1, b: 1, a: 1}
+  references:
+    version: 2
+    RefIds:
+    - rid: 3128556031534694419
+      type: {class: SequentialClipMixer, ns: ES, asm: ES_Logic}
+      data:
+        entryClip: {fileID: 7400000, guid: 2b030510e43fdf14c8742b497213ddfc, type: 3}
+        entrySpeed: 1
+        mainConfig:
+          clip: {fileID: 7400000, guid: dc3daaf6f73f84e4abde901c371a3cd0, type: 3}
+          speed: 1
+        exitClip: {fileID: 7400000, guid: acc34fd711f84b941af762638b2b1080, type: 3}
+        exitSpeed: 1
+        loopMainClip: 0
+        allowEarlyExit: 1
+--- !u!114 &4577117104993715552
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed37d52a35a0bb24ab4d1f4b9d208418, type: 3}
+  m_Name: "\u4FE1\u606F\u6500\u722C\u8DF3\u8DC3"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u6500\u722C\u8DF3\u8DC3"
+  sharedData:
+    basicConfig:
+      stateName: "\u6500\u722C\u8DF3\u8DC3"
+      stateId: -1
+      layerType: 0
+      priority: 50
+      stateSupportFlag: 1
+      ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 0
+      canBeFeedback: 0
+      durationMode: 0
+      timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
+      phaseConfig:
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
+    hasAnimation: 1
+    animationConfig:
+      calculator:
+        rid: 3128556031534694417
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+    enableFadeInOut: 1
+    fadeFollowTimeScale: 1
+    fadeSpeedMultiplier: 1
+    fadeInDuration: 0.2
+    fadeOutDuration: 0.15
+    useAdvancedFadeCurve: 0
+    fadeInCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    fadeOutCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    tags: []
+    group: Default
+    displayName: 
+    description: 
+    icon: {fileID: 0}
+    mergeData:
+      stateChannelMask: 63
+      stayLevel: 3
+      asLeftRule:
+        enableUnconditionalRule: 0
+        unconditionalRule:
+        - matchBackType: 0
+          stateName: "\u72B6\u6001\u540D"
+          stateID: -1
+        hitByLayerOption: 0
+        EffectialPripority: 1
+        EqualIsEffectial_: 1
+      asRightRule:
+        enableUnconditionalRule: 0
+        unconditionalRule: []
+        hitByLayerOption: 0
+        EffectialPripority: 1
+        EqualIsEffectial_: 1
+    costData:
+      costForMotion: 60
+      costForAgility: 60
+      costForTarget: 60
+      enableCostCalculation: 1
+    canBeTemporary: 1
+    autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
+    allowOverride: 0
+    notifyOnOverride: 1
+    showDebugInfo: 0
+    debugGizmoColor: {r: 1, g: 1, b: 1, a: 1}
+  references:
+    version: 2
+    RefIds:
+    - rid: 3128556031534694417
+      type: {class: SequentialClipMixer, ns: ES, asm: ES_Logic}
+      data:
+        entryClip: {fileID: -5643612920955861, guid: 4fde6d9a7b45dd5449bcc216fe95f319,
+          type: 3}
+        entrySpeed: 1
+        mainConfig:
+          clip: {fileID: 929909973302792849, guid: 02c9f703062e6094ba4eacd4b34df0b5,
+            type: 3}
+          speed: 1
+        exitClip: {fileID: 959511169626303400, guid: e0e95bef442702845b14ec423317f978,
+          type: 3}
+        exitSpeed: 1
+        loopMainClip: 0
+        allowEarlyExit: 1
 --- !u!114 &4950162029255616221
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1581,8 +3994,95 @@ MonoBehaviour:
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
@@ -1593,6 +4093,32 @@ MonoBehaviour:
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -1634,6 +4160,17 @@ MonoBehaviour:
       enableMatchTarget: 0
       autoActivateMatchTarget: 0
       matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
@@ -1769,7 +4306,7 @@ MonoBehaviour:
       stateId: -1
       layerType: 0
       priority: 50
-      stateSupportFlag: 16
+      stateSupportFlag: 256
       ignoreSupportFlag: 0
       disableActiveOnSupportFlagSwitching: 0
       supportReStart: 0
@@ -1783,18 +4320,131 @@ MonoBehaviour:
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
     hasAnimation: 1
     animationConfig:
       calculator:
-        rid: 3128556031534694419
+        rid: 3128556092067676178
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -1836,6 +4486,698 @@ MonoBehaviour:
       enableMatchTarget: 0
       autoActivateMatchTarget: 0
       matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+    enableFadeInOut: 1
+    fadeFollowTimeScale: 1
+    fadeSpeedMultiplier: 1
+    fadeInDuration: 0.2
+    fadeOutDuration: 0.15
+    useAdvancedFadeCurve: 0
+    fadeInCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    fadeOutCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    tags: []
+    group: Default
+    displayName: 
+    description: 
+    icon: {fileID: 0}
+    mergeData:
+      stateChannelMask: 63
+      stayLevel: 1
+      asLeftRule:
+        enableUnconditionalRule: 0
+        unconditionalRule:
+        - matchBackType: 0
+          stateName: "\u72B6\u6001\u540D"
+          stateID: -1
+        hitByLayerOption: 0
+        EffectialPripority: 0
+        EqualIsEffectial_: 1
+      asRightRule:
+        enableUnconditionalRule: 0
+        unconditionalRule: []
+        hitByLayerOption: 0
+        EffectialPripority: 1
+        EqualIsEffectial_: 1
+    costData:
+      costForMotion: 60
+      costForAgility: 60
+      costForTarget: 60
+      enableCostCalculation: 1
+    canBeTemporary: 1
+    autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
+    allowOverride: 0
+    notifyOnOverride: 1
+    showDebugInfo: 0
+    debugGizmoColor: {r: 1, g: 1, b: 1, a: 1}
+  references:
+    version: 2
+    RefIds:
+    - rid: 3128556092067676178
+      type: {class: StateAnimationMixCalculatorForBlendTree2DFreeformDirectional,
+        ns: ES, asm: ES_Logic}
+      data:
+        parameterX:
+          EnumValue: 18
+          StringValue: DirectionX
+        parameterY:
+          EnumValue: 19
+          StringValue: DirectionY
+        samples:
+        - clip: {fileID: 7400000, guid: dc3daaf6f73f84e4abde901c371a3cd0, type: 3}
+          position: {x: 0, y: 1}
+        - clip: {fileID: 7400000, guid: dc3daaf6f73f84e4abde901c371a3cd0, type: 3}
+          position: {x: 0, y: -1}
+        - clip: {fileID: 7400000, guid: dc3daaf6f73f84e4abde901c371a3cd0, type: 3}
+          position: {x: -1, y: 0}
+        - clip: {fileID: 7400000, guid: dc3daaf6f73f84e4abde901c371a3cd0, type: 3}
+          position: {x: 1, y: 0}
+        smoothTime: 0.1
+--- !u!114 &5801765727567054659
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed37d52a35a0bb24ab4d1f4b9d208418, type: 3}
+  m_Name: "\u4FE1\u606F\u8DB4"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u8DB4"
+  sharedData:
+    basicConfig:
+      stateName: "\u8DB4"
+      stateId: -1
+      layerType: 0
+      priority: 50
+      stateSupportFlag: 4
+      ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
+      canBeFeedback: 1
+      durationMode: 0
+      timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
+      phaseConfig:
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
+    hasAnimation: 1
+    animationConfig:
+      calculator:
+        rid: 3128556204111691776
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+    enableFadeInOut: 1
+    fadeFollowTimeScale: 1
+    fadeSpeedMultiplier: 1
+    fadeInDuration: 0.2
+    fadeOutDuration: 0.15
+    useAdvancedFadeCurve: 0
+    fadeInCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0
+        inSlope: 0
+        outSlope: 1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 1
+        inSlope: 1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    fadeOutCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 1
+        inSlope: 0
+        outSlope: -1
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: -1
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    tags: []
+    group: Default
+    displayName: 
+    description: 
+    icon: {fileID: 0}
+    mergeData:
+      stateChannelMask: 63
+      stayLevel: 1
+      asLeftRule:
+        enableUnconditionalRule: 0
+        unconditionalRule:
+        - matchBackType: 0
+          stateName: "\u72B6\u6001\u540D"
+          stateID: -1
+        hitByLayerOption: 0
+        EffectialPripority: 0
+        EqualIsEffectial_: 1
+      asRightRule:
+        enableUnconditionalRule: 0
+        unconditionalRule: []
+        hitByLayerOption: 0
+        EffectialPripority: 0
+        EqualIsEffectial_: 1
+    costData:
+      costForMotion: 60
+      costForAgility: 60
+      costForTarget: 60
+      enableCostCalculation: 1
+    canBeTemporary: 1
+    autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
+    allowOverride: 0
+    notifyOnOverride: 1
+    showDebugInfo: 0
+    debugGizmoColor: {r: 1, g: 1, b: 1, a: 1}
+  references:
+    version: 2
+    RefIds:
+    - rid: 3128556204111691776
+      type: {class: StateAnimationMixCalculatorForBlendTree2DFreeformDirectional,
+        ns: ES, asm: ES_Logic}
+      data:
+        parameterX:
+          EnumValue: 1
+          StringValue: DirectionX
+        parameterY:
+          EnumValue: 3
+          StringValue: DirectionY
+        samples:
+        - clip: {fileID: 8993902097722301239, guid: 0d96b4f46077951499942ab26fd580d5,
+            type: 3}
+          position: {x: 0, y: 0}
+        - clip: {fileID: 0}
+          position: {x: 0, y: 0}
+        - clip: {fileID: 0}
+          position: {x: 0, y: 0}
+        - clip: {fileID: 0}
+          position: {x: 0, y: 0}
+        smoothTime: 0.1
+--- !u!114 &6571922258015345914
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed37d52a35a0bb24ab4d1f4b9d208418, type: 3}
+  m_Name: "\u4FE1\u606F\u7FFB\u8D8A"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u7FFB\u8D8A"
+  sharedData:
+    basicConfig:
+      stateName: "\u7FFB\u8D8A"
+      stateId: -1
+      layerType: 0
+      priority: 50
+      stateSupportFlag: 256
+      ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 1
+      canBeFeedback: 1
+      durationMode: 0
+      timedDuration: 1
+      enableProgressTracking: 0
+      enableClipLengthFallback: 0
+      phaseConfig:
+        enablePhase: 0
+        enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
+        mainStartTime: 0.7
+        waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+      useDirectBlend: 0
+      avatarMask: {fileID: 0}
+      description: 
+    hasAnimation: 1
+    animationConfig:
+      calculator:
+        rid: 3128556031534694419
+      enableIK: 0
+      ikSourceMode: 0
+      ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightHand:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLeftFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikRightFoot:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationEulerOffset: {x: 0, y: 0, z: 0}
+        hintTarget: {fileID: 0}
+      ikLookAt:
+        enabled: 0
+        weight: 1
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      enableMatchTarget: 1
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
@@ -1949,7 +5291,7 @@ MonoBehaviour:
         exitSpeed: 1
         loopMainClip: 0
         allowEarlyExit: 1
---- !u!114 &5801765727567054659
+--- !u!114 &7210754730949871393
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1959,7 +5301,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ed37d52a35a0bb24ab4d1f4b9d208418, type: 3}
-  m_Name: "\u4FE1\u606F\u8DB4"
+  m_Name: "\u4FE1\u606F\u4E0B\u8E72"
   m_EditorClassIdentifier: 
   serializationData:
     SerializedFormat: 2
@@ -1970,14 +5312,14 @@ MonoBehaviour:
     PrefabModificationsReferencedUnityObjects: []
     PrefabModifications: []
     SerializationNodes: []
-  KeyName: "\u8DB4"
+  KeyName: "\u4E0B\u8E72"
   sharedData:
     basicConfig:
-      stateName: "\u7AD9\u7ACB\u79FB\u52A8"
+      stateName: "\u4E0B\u8E72"
       stateId: -1
       layerType: 0
       priority: 50
-      stateSupportFlag: 1
+      stateSupportFlag: 2
       ignoreSupportFlag: 0
       disableActiveOnSupportFlagSwitching: 0
       supportReStart: 0
@@ -1986,23 +5328,136 @@ MonoBehaviour:
       canBeFeedback: 1
       durationMode: 0
       timedDuration: 1
-      enableProgressTracking: 0
+      enableProgressTracking: 1
       enableClipLengthFallback: 0
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
     hasAnimation: 1
     animationConfig:
       calculator:
-        rid: 3128556031534694423
+        rid: 3128555966166990854
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -2052,208 +5507,9 @@ MonoBehaviour:
         endNormalizedTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
-    enableFadeInOut: 1
-    fadeFollowTimeScale: 1
-    fadeSpeedMultiplier: 1
-    fadeInDuration: 0.2
-    fadeOutDuration: 0.15
-    useAdvancedFadeCurve: 0
-    fadeInCurve:
-      serializedVersion: 2
-      m_Curve:
-      - serializedVersion: 3
-        time: 0
-        value: 0
-        inSlope: 0
-        outSlope: 1
-        tangentMode: 0
-        weightedMode: 0
-        inWeight: 0
-        outWeight: 0
-      - serializedVersion: 3
-        time: 1
-        value: 1
-        inSlope: 1
-        outSlope: 0
-        tangentMode: 0
-        weightedMode: 0
-        inWeight: 0
-        outWeight: 0
-      m_PreInfinity: 2
-      m_PostInfinity: 2
-      m_RotationOrder: 4
-    fadeOutCurve:
-      serializedVersion: 2
-      m_Curve:
-      - serializedVersion: 3
-        time: 0
-        value: 1
-        inSlope: 0
-        outSlope: -1
-        tangentMode: 0
-        weightedMode: 0
-        inWeight: 0
-        outWeight: 0
-      - serializedVersion: 3
-        time: 1
-        value: 0
-        inSlope: -1
-        outSlope: 0
-        tangentMode: 0
-        weightedMode: 0
-        inWeight: 0
-        outWeight: 0
-      m_PreInfinity: 2
-      m_PostInfinity: 2
-      m_RotationOrder: 4
-    tags: []
-    group: Default
-    displayName: 
-    description: 
-    icon: {fileID: 0}
-    mergeData:
-      stateChannelMask: 63
-      stayLevel: 1
-      asLeftRule:
-        enableUnconditionalRule: 0
-        unconditionalRule:
-        - matchBackType: 0
-          stateName: "\u72B6\u6001\u540D"
-          stateID: -1
-        hitByLayerOption: 0
-        EffectialPripority: 0
-        EqualIsEffectial_: 1
-      asRightRule:
-        enableUnconditionalRule: 0
-        unconditionalRule: []
-        hitByLayerOption: 0
-        EffectialPripority: 0
-        EqualIsEffectial_: 1
-    costData:
-      costForMotion: 60
-      costForAgility: 60
-      costForTarget: 60
-      enableCostCalculation: 1
-    canBeTemporary: 1
-    autoRemoveWhenDone: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
-    allowOverride: 0
-    notifyOnOverride: 1
-    showDebugInfo: 0
-    debugGizmoColor: {r: 1, g: 1, b: 1, a: 1}
-  references:
-    version: 2
-    RefIds:
-    - rid: 3128556031534694423
-      type: {class: SequentialClipMixer, ns: ES, asm: ES_Logic}
-      data:
-        entryClip: {fileID: -7395443891025880771, guid: 61c5661c92b640542bc2e321277c195b,
-          type: 3}
-        entrySpeed: 1
-        mainConfig:
-          clip: {fileID: 7400000, guid: c48f3d6be8b700741b4586aa65268ef2, type: 3}
-          speed: 1
-        exitClip: {fileID: 7172315387746160803, guid: c9a139ea11262014ca258065f7b47463,
-          type: 3}
-        exitSpeed: 1
-        loopMainClip: 0
-        allowEarlyExit: 1
---- !u!114 &7210754730949871393
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ed37d52a35a0bb24ab4d1f4b9d208418, type: 3}
-  m_Name: "\u4FE1\u606F\u4E0B\u8E72"
-  m_EditorClassIdentifier: 
-  serializationData:
-    SerializedFormat: 2
-    SerializedBytes: 
-    ReferencedUnityObjects: []
-    SerializedBytesString: 
-    Prefab: {fileID: 0}
-    PrefabModificationsReferencedUnityObjects: []
-    PrefabModifications: []
-    SerializationNodes: []
-  KeyName: "\u4E0B\u8E72"
-  sharedData:
-    basicConfig:
-      stateName: "\u4E0B\u8E72"
-      stateId: -1
-      layerType: 0
-      priority: 50
-      stateSupportFlag: 2
-      ignoreSupportFlag: 0
-      disableActiveOnSupportFlagSwitching: 0
-      supportReStart: 0
-      resetSupportFlagOnEnter: 1
-      removeSupportFlagOnExit: 1
-      canBeFeedback: 1
-      durationMode: 0
-      timedDuration: 1
-      enableProgressTracking: 1
-      enableClipLengthFallback: 0
-      phaseConfig:
-        enablePhase: 0
-        enableAutoPhaseByTime: 0
-        mainStartTime: 0.7
-        waitStartTime: 0.9
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      description: 
-    hasAnimation: 1
-    animationConfig:
-      calculator:
-        rid: 3128555966166990854
-      enableIK: 0
-      ikSourceMode: 0
-      ikSmoothTime: 0.1
-      disableIKOnExit: 1
-      ikLeftHand:
-        enabled: 0
-        weight: 1
-        target: {fileID: 0}
-        positionOffset: {x: 0, y: 0, z: 0}
-        rotationEulerOffset: {x: 0, y: 0, z: 0}
-        hintTarget: {fileID: 0}
-      ikRightHand:
-        enabled: 0
-        weight: 1
-        target: {fileID: 0}
-        positionOffset: {x: 0, y: 0, z: 0}
-        rotationEulerOffset: {x: 0, y: 0, z: 0}
-        hintTarget: {fileID: 0}
-      ikLeftFoot:
-        enabled: 0
-        weight: 1
-        target: {fileID: 0}
-        positionOffset: {x: 0, y: 0, z: 0}
-        rotationEulerOffset: {x: 0, y: 0, z: 0}
-        hintTarget: {fileID: 0}
-      ikRightFoot:
-        enabled: 0
-        weight: 1
-        target: {fileID: 0}
-        positionOffset: {x: 0, y: 0, z: 0}
-        rotationEulerOffset: {x: 0, y: 0, z: 0}
-        hintTarget: {fileID: 0}
-      ikLookAt:
-        enabled: 0
-        weight: 1
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        bodyWeight: 0
-        headWeight: 1
-        eyesWeight: 0.5
-        clampWeight: 0.5
-      enableMatchTarget: 0
-      autoActivateMatchTarget: 0
-      matchTargetPreset:
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
@@ -2424,8 +5680,95 @@ MonoBehaviour:
       phaseConfig:
         enablePhase: 0
         enableAutoPhaseByTime: 0
+        mutePhaseOverride: 0
         mainStartTime: 0.7
         waitStartTime: 0.9
+        overrideMainIK: 0
+        mainIKTargetWeight: 1
+        preOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        waitOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
+        releasedOverride:
+          enable: 0
+          overrideCost: 0
+          costData:
+            costForMotion: 60
+            costForAgility: 60
+            costForTarget: 60
+            enableCostCalculation: 1
+          overrideMerge: 0
+          mergeData:
+            stateChannelMask: 63
+            stayLevel: 1
+            asLeftRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+            asRightRule:
+              enableUnconditionalRule: 0
+              unconditionalRule: []
+              hitByLayerOption: 0
+              EffectialPripority: 0
+              EqualIsEffectial_: 1
+          overridePriority: 0
+          priority: 50
+          overrideIK: 0
+          ikTargetWeight: 1
       useDirectBlend: 0
       avatarMask: {fileID: 0}
       description: 
@@ -2436,6 +5779,32 @@ MonoBehaviour:
       enableIK: 0
       ikSourceMode: 0
       ikSmoothTime: 0.1
+      useIKTargetWeightCurve: 0
+      ikTargetWeightCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 0
+          outSlope: 0
+          tangentMode: 0
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+      ikTargetWeightCurveScale: 1
       disableIKOnExit: 1
       ikLeftHand:
         enabled: 0
@@ -2477,6 +5846,17 @@ MonoBehaviour:
       enableMatchTarget: 0
       autoActivateMatchTarget: 0
       matchTargetPreset:
+        bodyPart: 0
+        target: {fileID: 0}
+        fixedPosition: {x: 0, y: 0, z: 0}
+        fixedRotationEuler: {x: 0, y: 0, z: 0}
+        startNormalizedTime: 0
+        endNormalizedTime: 1
+        positionWeight: {x: 1, y: 1, z: 1}
+        rotationWeight: 1
+      enableMatchTargetPhase2: 0
+      matchTargetPhase2Trigger: 0.6
+      matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}

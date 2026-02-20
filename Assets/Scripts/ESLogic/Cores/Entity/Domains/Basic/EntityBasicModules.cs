@@ -33,6 +33,22 @@ namespace ES
         private StateBase _jumpState;
         private StateBase _crouchState;
         private StateMachine sm;
+
+        [Title("平均速度窗口")]
+        [LabelText("窗口时长(秒)"), Tooltip("计算AvgSpeedX/Z的滑动窗口大小")]
+        public float avgSpeedWindowDuration = 0.5f;
+
+        /// <summary>
+        /// 滑动窗口速度采样 - 环形缓冲区
+        /// 记录每帧的局部空间水平速度，用于计算前N秒平均值
+        /// </summary>
+        private const int AVG_BUFFER_CAPACITY = 60; // 覆盖60帧（60FPS下=1秒，足够0.5秒窗口）
+        [NonSerialized] private float[] _avgBufX = new float[AVG_BUFFER_CAPACITY];
+        [NonSerialized] private float[] _avgBufZ = new float[AVG_BUFFER_CAPACITY];
+        [NonSerialized] private float[] _avgBufTime = new float[AVG_BUFFER_CAPACITY];
+        [NonSerialized] private int _avgBufHead = 0;
+        [NonSerialized] private int _avgBufCount = 0;
+
         public override void Start()
         {
             base.Start();
@@ -42,13 +58,24 @@ namespace ES
                 _jumpState = sm.GetStateByString(JUMP_StateName);
                 _crouchState = sm.GetStateByString(Crouch_StateName);
             }
+            _avgBufHead = 0;
+            _avgBufCount = 0;
         }
         public void RequestJump()
         {
-          
+            // ★ 攀爬中跳跃 → 攀爬跳跃（同一个键，不同行为）
+            if (MyCore != null && MyCore.kcc.climbModule != null)
+            {
+                var climbSub = MyCore.kcc.climbModule.subState;
+                if (climbSub == ClimbSubState.Climbing || climbSub == ClimbSubState.Approach)
+                {
+                    MyCore.kcc.climbModule.RequestClimbJump();
+                    return;
+                }
+            }
+
             if (sm.TryActivateState(_jumpState))
             {
-
                 jumpRequested = true;
             }
         }
@@ -85,18 +112,48 @@ namespace ES
             crouchHold = _crouchState != null && _crouchState.baseStatus == StateBaseStatus.Running;
             MyCore.SetCrouch(crouchHold);
 
-            // ★ 自动更新StateMachine的SpeedX和SpeedZ参数（移动模块的核心职责）
-            // 通过Entity的stateDomain访问stateMachine，实现Basic域与State域的联动
+            // ★ 使用实际角色速度（而非键盘输入）驱动动画参数
+            // moveInput 是玩家意图，monitor.velocity 是角色实际运动速度
             if (applyMove && MyCore.stateDomain != null && MyCore.stateDomain.stateMachine != null)
             {
-                var context = MyCore.stateDomain.stateMachine.stateContext;
-                if (context != null)
+                var stateMachine = MyCore.stateDomain.stateMachine;
+                if (stateMachine != null)
                 {
-                    // 将世界空间的移动向量转换为角色局部空间（相对于角色朝向）
-                    Vector3 moveLocal = MyCore.transform.InverseTransformDirection(moveWorld);
-                    // 使用局部坐标系设置SpeedX（右）和SpeedZ（前）
-                    context.SpeedX = moveLocal.x;
-                    context.SpeedZ = moveLocal.z;
+                    // ★ 实际速度转换为角色局部空间
+                    Vector3 actualVelocity = MyCore.kcc.monitor.velocity;
+                    Vector3 localVelocity = MyCore.transform.InverseTransformDirection(actualVelocity);
+                    
+                    // 设置当前帧速度参数（性能热点：直写快路径）
+                    stateMachine.SetMotionSpeedXZ(localVelocity.x, localVelocity.z);
+
+                    // ★ 滑动窗口平均速度计算
+                    // 将本帧数据写入环形缓冲区
+                    _avgBufX[_avgBufHead] = localVelocity.x;
+                    _avgBufZ[_avgBufHead] = localVelocity.z;
+                    _avgBufTime[_avgBufHead] = Time.time;
+                    _avgBufHead = (_avgBufHead + 1) % AVG_BUFFER_CAPACITY;
+                    if (_avgBufCount < AVG_BUFFER_CAPACITY) _avgBufCount++;
+
+                    // 计算窗口内平均值
+                    float sumX = 0f, sumZ = 0f;
+                    int validCount = 0;
+                    float windowStart = Time.time - avgSpeedWindowDuration;
+                    for (int i = 0; i < _avgBufCount; i++)
+                    {
+                        int idx = (_avgBufHead - 1 - i + AVG_BUFFER_CAPACITY) % AVG_BUFFER_CAPACITY;
+                        if (_avgBufTime[idx] < windowStart) break; // 超出窗口
+                        sumX += _avgBufX[idx];
+                        sumZ += _avgBufZ[idx];
+                        validCount++;
+                    }
+                    if (validCount > 0)
+                    {
+                        stateMachine.SetAvgSpeedXZ(sumX / validCount, sumZ / validCount);
+                    }
+                    else
+                    {
+                        stateMachine.SetAvgSpeedXZ(0f, 0f);
+                    }
                 }
             }
         }
@@ -194,340 +251,6 @@ namespace ES
             swimDrag = 0.5f,
             swimBuoyancy = 6f
         };
-    }
-
-    [Serializable, TypeRegistryItem("基础飞行模块")]
-    public class EntityBasicFlyModule : EntityBasicModuleBase
-    {
-        [Title("开关")]
-        public bool enableFly = true;
-
-        [Title("状态")]
-        [ReadOnly] public bool flyHold;
-
-        [LabelText("飞行状态名")]
-        public string Fly_StateName = "飞行";
-
-        private StateBase _flyState;
-        private StateMachine sm;
-
-        [Title("应用策略")]
-        [LabelText("启用时应用参数")]
-        public bool applyOnEnable = true;
-
-        [LabelText("每帧持续应用参数")]
-        public bool applyEveryFrame;
-
-        [Title("飞行参数")]
-        [InlineProperty, HideLabel]
-        public FlyParams fly = FlyParams.Default;
-
-        [Title("输入")]
-        [LabelText("垂直输入")]
-        public float verticalInput;
-
-        public void SetVerticalInput(float input)
-        {
-            verticalInput = Mathf.Clamp(input, -1f, 1f);
-        }
-
-        public void SetFly(bool enable)
-        {
-            if (!enableFly || _flyState == null) return;
-
-            if (enable)
-            {
-                if (_flyState.baseStatus != StateBaseStatus.Running)
-                {
-                    sm.TryActivateState(_flyState);
-                }
-            }
-            else
-            {
-                ExitFly();
-            }
-
-            flyHold = _flyState.baseStatus == StateBaseStatus.Running;
-        }
-
-        public void ToggleFly()
-        {
-            if (!enableFly || _flyState == null) return;
-
-            if (_flyState.baseStatus == StateBaseStatus.Running)
-            {
-                ExitFly();
-            }
-            else
-            {
-                sm.TryActivateState(_flyState);
-            }
-
-            flyHold = _flyState.baseStatus == StateBaseStatus.Running;
-        }
-
-        private void ExitFly()
-        {
-            if (_flyState == null) return;
-
-            if (_flyState.baseStatus == StateBaseStatus.Running)
-            {
-                sm.TryDeactivateState(Fly_StateName);
-                if (_flyState.baseStatus == StateBaseStatus.Running)
-                {
-                    sm.ForceExitState(_flyState);
-                }
-            }
-
-            flyHold = _flyState.baseStatus == StateBaseStatus.Running;
-            if (!flyHold && MyCore != null)
-            {
-                MyCore.SetLocomotionSupportFlags(StateSupportFlags.Grounded);
-                MyCore.SetVerticalInput(0f);
-            }
-        }
-
-        public override void Start()
-        {
-            base.Start();
-            if (MyCore != null && MyCore.stateDomain != null && MyCore.stateDomain.stateMachine != null)
-            {
-                sm = MyCore.stateDomain.stateMachine;
-                _flyState = sm.GetStateByString(Fly_StateName);
-            }
-        }
-
-        protected override void OnEnable()
-        {
-            base.OnEnable();
-            if (applyOnEnable)
-            {
-                ApplyParams();
-            }
-        }
-
-        protected override void Update()
-        {
-            if (MyCore == null || !enableFly) return;
-
-            flyHold = _flyState != null && _flyState.baseStatus == StateBaseStatus.Running;
-            if (!flyHold) return;
-
-            MyCore.SetLocomotionSupportFlags(StateSupportFlags.Flying);
-            MyCore.SetVerticalInput(verticalInput);
-
-            if (applyEveryFrame)
-            {
-                ApplyParams();
-            }
-        }
-
-        [Button("应用参数")]
-        public void ApplyParams()
-        {
-            if (MyCore == null) return;
-            var kcc = MyCore.kcc;
-            kcc.flyMaxSpeed = fly.flyMaxSpeed;
-            kcc.flyAcceleration = fly.flyAcceleration;
-            kcc.flyDrag = fly.flyDrag;
-            kcc.flyGravityScale = fly.flyGravityScale;
-        }
-    }
-
-    [Serializable, TypeRegistryItem("基础骑乘模块")]
-    public class EntityBasicMountModule : EntityBasicModuleBase
-    {
-        [Title("开关")]
-        public bool enableMount = true;
-
-        [Title("状态")]
-        [ReadOnly] public bool mountHold;
-
-        [Title("检测")]
-        [LabelText("射线起点(可选)")]
-        public Transform rayOrigin;
-
-        [LabelText("检测距离")]
-        public float mountDistance = 2f;
-
-        [LabelText("检测层")]
-        public LayerMask mountLayerMask = ~0;
-
-        [LabelText("触发器命中")]
-        public QueryTriggerInteraction mountQuery = QueryTriggerInteraction.Ignore;
-
-        [Title("骑乘目标")]
-        [ReadOnly] public EntityMountable currentMount;
-
-        [LabelText("骑乘状态名")]
-        public string Mount_StateName = "骑乘";
-
-        private StateBase _mountState;
-        private StateMachine sm;
-
-        public override void Start()
-        {
-            base.Start();
-            if (MyCore != null && MyCore.stateDomain != null && MyCore.stateDomain.stateMachine != null)
-            {
-                sm = MyCore.stateDomain.stateMachine;
-                _mountState = sm.GetStateByString(Mount_StateName);
-            }
-        }
-
-        public void SetMount(bool enable)
-        {
-            if (!enableMount || _mountState == null) return;
-
-            if (enable)
-            {
-                TryEnterMount();
-            }
-            else
-            {
-                ExitMount();
-            }
-        }
-
-        public void ToggleMount()
-        {
-            if (!enableMount || _mountState == null) return;
-
-            if (_mountState.baseStatus == StateBaseStatus.Running)
-            {
-                ExitMount();
-            }
-            else
-            {
-                TryEnterMount();
-            }
-        }
-
-        private void TryEnterMount()
-        {
-            if (currentMount != null) return;
-
-            var mountable = FindMountable();
-            if (mountable == null) return;
-
-            if (sm.TryActivateState(_mountState))
-            {
-                currentMount = mountable;
-                currentMount.Mount(MyCore);
-                mountHold = true;
-            }
-        }
-
-        private void ExitMount()
-        {
-            if (currentMount != null)
-            {
-                currentMount.Unmount();
-                currentMount = null;
-            }
-
-            if (_mountState != null && _mountState.baseStatus == StateBaseStatus.Running)
-            {
-                sm.TryDeactivateState(Mount_StateName);
-            }
-
-            mountHold = false;
-        }
-
-        private EntityMountable FindMountable()
-        {
-            if (MyCore == null) return null;
-
-            Transform origin = rayOrigin != null ? rayOrigin : MyCore.transform;
-            Vector3 dir = origin.forward;
-            if (Physics.Raycast(origin.position, dir, out RaycastHit hit, mountDistance, mountLayerMask, mountQuery))
-            {
-                return hit.collider.GetComponentInParent<EntityMountable>();
-            }
-
-            return null;
-        }
-
-        protected override void Update()
-        {
-            if (MyCore == null || !enableMount) return;
-
-            if (currentMount == null)
-            {
-                mountHold = false;
-                return;
-            }
-
-            if (_mountState == null || _mountState.baseStatus != StateBaseStatus.Running)
-            {
-                ExitMount();
-                return;
-            }
-
-            mountHold = true;
-            MyCore.SetLocomotionSupportFlags(StateSupportFlags.Mounted);
-            currentMount.TickMounted(MyCore, MyCore.kcc.moveInput, MyCore.kcc.lookInput, Time.deltaTime);
-        }
-    }
-
-    [Serializable, TypeRegistryItem("基础游泳模块")]
-    public class EntityBasicSwimModule : EntityBasicModuleBase
-    {
-        [Title("开关")]
-        public bool enableSwim = true;
-
-        [Title("应用策略")]
-        [LabelText("启用时应用参数")]
-        public bool applyOnEnable = true;
-
-        [LabelText("每帧持续应用参数")]
-        public bool applyEveryFrame;
-
-        [Title("游泳参数")]
-        [InlineProperty, HideLabel]
-        public SwimParams swim = SwimParams.Default;
-
-        [Title("输入")]
-        [LabelText("垂直输入")]
-        public float verticalInput;
-
-        public void SetVerticalInput(float input)
-        {
-            verticalInput = Mathf.Clamp(input, -1f, 1f);
-        }
-
-        protected override void OnEnable()
-        {
-            base.OnEnable();
-            if (applyOnEnable)
-            {
-                ApplyParams();
-            }
-        }
-
-        protected override void Update()
-        {
-            if (MyCore == null || !enableSwim) return;
-
-            MyCore.SetLocomotionSupportFlags(StateSupportFlags.Swimming);
-            MyCore.SetVerticalInput(verticalInput);
-
-            if (applyEveryFrame)
-            {
-                ApplyParams();
-            }
-        }
-
-        [Button("应用参数")]
-        public void ApplyParams()
-        {
-            if (MyCore == null) return;
-            var kcc = MyCore.kcc;
-            kcc.swimMaxSpeed = swim.swimMaxSpeed;
-            kcc.swimAcceleration = swim.swimAcceleration;
-            kcc.swimDrag = swim.swimDrag;
-            kcc.swimBuoyancy = swim.swimBuoyancy;
-        }
     }
 
     [Serializable, TypeRegistryItem("基础技能模块")]
@@ -820,6 +543,266 @@ namespace ES
         }
     }
 
+    /// <summary>
+    /// 急停模块 — 完全独立，可自由添加/移除。
+    /// 
+    /// 检测原理：
+    ///   每帧监测角色实际移动速度（monitor.velocity）的幅度变化率。
+    ///   当速度幅度在短时间内骤减（如从跑步松手），且当前处于地面常态移动时，
+    ///   尝试激活"急停"状态。同时将触发时的AvgSpeedX/Z写入Context，
+    ///   供急停动画BlendTree读取行进方向。
+    /// 
+    /// 优先级设计：
+    ///   急停状态的代价(cost)很低，容易与跑步等常态移动状态合并；
+    ///   但其打断能力很弱，几乎无法打断技能、跳跃等高优先级状态。
+    ///   只有在常态地面移动且速度骤减时才有机会被激活。
+    /// </summary>
+    [Serializable, TypeRegistryItem("基础急停模块")]
+    public class EntityBasicQuickStopModule : EntityBasicModuleBase
+    {
+        [Title("开关")]
+        [LabelText("启用急停检测")]
+        public bool enableQuickStop = true;
+
+        [Title("状态绑定")]
+        [LabelText("急停状态名")]
+        public string QuickStop_StateName = "急停";
+
+        [Title("检测参数")]
+        [LabelText("速度骤减阈值"), Tooltip("角色实际水平速度在窗口内下降超过此值时视为骤减(m/s)")]
+        [Range(0.5f, 10f)]
+        public float speedDropThreshold = 2f;
+
+        [LabelText("最小触发速度(m/s)"), Tooltip("只有窗口内峰值速度大于此值时才可能触发(避免静止时误触发)")]
+        [Range(0.5f, 10f)]
+        public float minSpeedToTrigger = 2f;
+
+        [LabelText("激活冷却(秒)"), Tooltip("两次急停之间的最小间隔")]
+        public float cooldown = 0.6f;
+
+        [LabelText("要求稳定着地"), Tooltip("仅在稳定着地时才检测急停")]
+        public bool requireGrounded = true;
+
+        [Title("自动退出")]
+        [LabelText("自动退出时长(秒)"), Tooltip("急停状态激活后最长持续时间，到期自动退出；<=0 表示由动画/状态机自行管理")]
+        public float autoExitDuration = 0.35f;
+
+        [Title("滑动窗口")]
+        [LabelText("峰值记忆时长(秒)"), Tooltip("在此时间窗口内记录速度峰值，用于检测骤减（解决平滑加速下单帧差值不够的问题）")]
+        [Range(0.05f, 0.5f)]
+        public float peakMemoryDuration = 0.15f;
+
+        [Title("调试")]
+        [LabelText("启用调试日志")]
+        public bool debugLog = false;
+
+        [ShowInInspector, ReadOnly, LabelText("急停中")]
+        public bool isQuickStopping { get; private set; }
+
+        [ShowInInspector, ReadOnly, LabelText("上帧速度幅度")]
+        public float lastSpeedMagnitude { get; private set; }
+
+        [ShowInInspector, ReadOnly, LabelText("当前速度幅度")]
+        public float currentSpeedMagnitude { get; private set; }
+
+        [ShowInInspector, ReadOnly, LabelText("窗口内峰值")]
+        public float peakSpeedMagnitude { get; private set; }
+
+        // 内部状态
+        [NonSerialized] private StateBase _quickStopState;
+        [NonSerialized] private StateMachine _sm;
+        [NonSerialized] private float _lastActivateTime = -999f;
+        [NonSerialized] private float _activateTimestamp;
+        [NonSerialized] private bool _initialized;
+        [NonSerialized] private float _peakValue;
+        [NonSerialized] private float _peakTimestamp;
+
+        public override void Start()
+        {
+            base.Start();
+            _initialized = false;
+            if (MyCore != null && MyCore.stateDomain != null && MyCore.stateDomain.stateMachine != null)
+            {
+                _sm = MyCore.stateDomain.stateMachine;
+                _quickStopState = _sm.GetStateByString(QuickStop_StateName);
+                _initialized = _quickStopState != null;
+
+                if (debugLog)
+                {
+                    if (_quickStopState == null)
+                        Debug.LogWarning($"[急停模块] 初始化失败：状态机中找不到名为 \"{QuickStop_StateName}\" 的状态！请检查状态机配置。");
+                    else
+                        Debug.Log($"[急停模块] 初始化成功：已绑定状态 \"{QuickStop_StateName}\"");
+                }
+            }
+            else if (debugLog)
+            {
+                Debug.LogWarning($"[急停模块] 初始化失败：MyCore={MyCore != null}, stateDomain={MyCore?.stateDomain != null}, sm={MyCore?.stateDomain?.stateMachine != null}");
+            }
+
+            lastSpeedMagnitude = 0f;
+            currentSpeedMagnitude = 0f;
+            _peakValue = 0f;
+            _peakTimestamp = 0f;
+        }
+
+        protected override void Update()
+        {
+            if (MyCore == null || !enableQuickStop || !_initialized) return;
+
+            // ---- 采样角色实际水平速度 ----
+            Vector3 velocity = MyCore.kcc.monitor.velocity;
+            // 取水平分量（忽略垂直速度，避免跳跃/下落干扰）
+            Vector3 horizontalVelocity = new Vector3(velocity.x, 0f, velocity.z);
+            currentSpeedMagnitude = horizontalVelocity.magnitude;
+
+            // ---- 滑动窗口峰值追踪 ----
+            if (currentSpeedMagnitude >= _peakValue)
+            {
+                _peakValue = currentSpeedMagnitude;
+                _peakTimestamp = Time.time;
+            }
+            else if (Time.time - _peakTimestamp > peakMemoryDuration)
+            {
+                // 峰值过期，衰减到当前值
+                _peakValue = currentSpeedMagnitude;
+                _peakTimestamp = Time.time;
+            }
+            peakSpeedMagnitude = _peakValue;
+
+            // ---- 状态跟踪：当前是否在急停中 ----
+            isQuickStopping = _quickStopState != null && _quickStopState.baseStatus == StateBaseStatus.Running;
+
+            // ---- 自动退出逻辑 ----
+            if (isQuickStopping && autoExitDuration > 0f)
+            {
+                if (Time.time - _activateTimestamp >= autoExitDuration)
+                {
+                    TryDeactivate();
+                }
+            }
+
+            // ---- 激活检测 ----
+            if (!isQuickStopping)
+            {
+                TryDetectAndActivate();
+            }
+
+            // ---- 保存本帧数据供下帧比较 ----
+            lastSpeedMagnitude = currentSpeedMagnitude;
+        }
+
+        /// <summary>
+        /// 检测是否满足急停条件并尝试激活。
+        /// 使用滑动窗口峰值代替单帧比较，解决平滑/插值速度下骤减检测不灵敏的问题。
+        /// 触发时Context中的AvgSpeedX/Z已经由移动模块维护，急停BlendTree可直接读取方向。
+        /// </summary>
+        private void TryDetectAndActivate()
+        {
+            // 冷却检查
+            if (Time.time - _lastActivateTime < cooldown)
+            {
+                return;
+            }
+
+            // 着地检查
+            if (requireGrounded && !MyCore.kcc.monitor.isStableOnGround)
+            {
+                if (debugLog) Debug.Log($"[急停模块] 跳过：未着地 (isStableOnGround=false)");
+                return;
+            }
+
+            // 窗口内峰值必须有足够速度（之前在移动）
+            if (_peakValue < minSpeedToTrigger)
+            {
+                return;
+            }
+
+            // 当前实际速度相对于峰值的骤减量
+            float drop = _peakValue - currentSpeedMagnitude;
+            if (drop < speedDropThreshold)
+            {
+                return;
+            }
+
+            if (debugLog)
+            {
+                Debug.Log($"[急停模块] 检测到骤减！peak={_peakValue:F3}m/s, current={currentSpeedMagnitude:F3}m/s, drop={drop:F3} >= threshold={speedDropThreshold:F3}，尝试激活...");
+            }
+
+            // 满足条件，尝试激活
+            bool activated = _sm.TryActivateState(_quickStopState);
+            if (activated)
+            {
+                _lastActivateTime = Time.time;
+                _activateTimestamp = Time.time;
+                isQuickStopping = true;
+                // 激活后重置峰值，避免退出后立刻再次触发
+                _peakValue = 0f;
+                if (debugLog) Debug.Log($"[急停模块] ★ 急停激活成功！AvgSpeedX={_sm.GetFloat(StateDefaultFloatParameter.AvgSpeedX):F2}, AvgSpeedZ={_sm.GetFloat(StateDefaultFloatParameter.AvgSpeedZ):F2}");
+            }
+            else
+            {
+                if (debugLog) Debug.LogWarning($"[急停模块] TryActivateState 返回 false — 被状态机合并/优先级规则拒绝。检查急停状态的 Cost/Priority/MergeRule 配置。");
+            }
+        }
+
+        /// <summary>
+        /// 尝试退出急停状态
+        /// </summary>
+        private void TryDeactivate()
+        {
+            if (_quickStopState == null) return;
+            if (_quickStopState.baseStatus == StateBaseStatus.Running)
+            {
+                _sm.TryDeactivateState(QuickStop_StateName);
+            }
+            isQuickStopping = _quickStopState.baseStatus == StateBaseStatus.Running;
+        }
+
+        /// <summary>
+        /// 外部强制退出急停（例如其他系统需要中断时调用）
+        /// </summary>
+        public void ForceExit()
+        {
+            if (_quickStopState == null || _sm == null) return;
+            if (_quickStopState.baseStatus == StateBaseStatus.Running)
+            {
+                _sm.TryDeactivateState(QuickStop_StateName);
+                if (_quickStopState.baseStatus == StateBaseStatus.Running)
+                {
+                    _sm.ForceExitState(_quickStopState);
+                }
+            }
+            isQuickStopping = false;
+        }
+
+        /// <summary>
+        /// 外部手动触发急停（跳过检测条件，仅检查冷却）
+        /// </summary>
+        public bool RequestQuickStop()
+        {
+            if (!enableQuickStop || !_initialized) return false;
+            if (isQuickStopping) return false;
+            if (Time.time - _lastActivateTime < cooldown) return false;
+
+            if (_sm.TryActivateState(_quickStopState))
+            {
+                _lastActivateTime = Time.time;
+                _activateTimestamp = Time.time;
+                isQuickStopping = true;
+                return true;
+            }
+            return false;
+        }
+
+        public override void OnDestroy()
+        {
+            ForceExit();
+            base.OnDestroy();
+        }
+    }
+
     [Serializable, TypeRegistryItem("基础根运动模块")]
     public class EntityBasicRootMotionModule : EntityBasicModuleBase
     {
@@ -864,4 +847,103 @@ namespace ES
             base.OnDestroy();
         }
     }
+
+    // =====================================================================
+    // ★ 攀爬模块 — 管理墙壁攀爬、顶部攀上、矮墙翻越
+    // =====================================================================
+
+    /// <summary>
+    /// 攀爬子状态枚举
+    /// </summary>
+    public enum ClimbSubState
+    {
+        /// <summary>不在攀爬中</summary>
+        None,
+        /// <summary>正在向攀爬面靠近/贴附</summary>
+        Approach,
+        /// <summary>在墙面上正常攀爬中</summary>
+        Climbing,
+        /// <summary>攀爬到顶部执行翻上动作</summary>
+        ClimbOver,
+        /// <summary>直接翻越矮墙</summary>
+        Vault,
+        /// <summary>攀爬中跳跃（脱离墙面）</summary>
+        ClimbJump,
+    }
+
+    /// <summary>
+    /// 攀爬参数集 — 可在 Inspector 中配置
+    /// </summary>
+    [Serializable]
+    public struct ClimbParams
+    {
+        [LabelText("攀爬移动速度(m/s)")]
+        public float climbSpeed;
+
+        [LabelText("攀爬加速度")]
+        public float climbAcceleration;
+
+        [LabelText("贴壁偏移(米)"), Tooltip("角色中心距离墙面的距离")]
+        public float wallOffset;
+
+        [LabelText("贴壁吸附速度")]
+        public float snapSharpness;
+
+        [LabelText("吸附力上限(m/s)"), Tooltip("贴墙吸附力的最大速度，防止抨动")]
+        public float maxSnapSpeed;
+
+        [LabelText("贴墙持续时间(秒)"), Tooltip("进入攀爬后自动贴墙持续的时间")]
+        public float snapDuration;
+
+        [LabelText("持续着地退出(秒)"), Tooltip("攀爬中脚下持续为地面超过该时间则退出")]
+        public float groundedExitDelay;
+
+        [LabelText("攀爬朝向最大转速(度/秒)"), Tooltip("限制角色面朝墙的旋转速度，避免镜头突兀旋转")]
+        public float climbMaxTurnSpeed;
+
+        [LabelText("重力倍率"), Tooltip("攀爬时重力倍率(0=无重力悬挂)")]
+        public float gravityScale;
+
+        [LabelText("攀爬跳跃速度"), Tooltip("攀爬中按跳跃时脱离墙面的初速")]
+        public float climbJumpSpeed;
+
+        [LabelText("攀爬跳跃法线弹出力"), Tooltip("跳跃时沿墙面法线方向的弹出速度")]
+        public float climbJumpNormalForce;
+
+        [LabelText("攀爬跳跃回贴延迟(秒)"), Tooltip("跳跃后延迟多久再开始检测回贴")]
+        public float climbJumpReattachDelay;
+
+        [LabelText("攀爬跳跃最大时长(秒)"), Tooltip("超过该时间仍未回贴则退出攀爬")]
+        public float climbJumpMaxDuration;
+
+        [LabelText("可翻越最大高度(米)"), Tooltip("低于此高度的墙可直接翻越")]
+        public float vaultMaxHeight;
+
+        [LabelText("顶部检测阈值(米)"), Tooltip("距离攀爬面顶部多近时触发攀上")]
+        public float topReachThreshold;
+
+        [LabelText("最大墙壁距离(米)"), Tooltip("攀爬中角色距墙面超过此距离则脱离")]
+        public float maxWallDistance;
+
+        public static ClimbParams Default => new ClimbParams
+        {
+            climbSpeed = 1.2f,
+            climbAcceleration = 5f,
+            wallOffset = 0.32f,
+            snapSharpness = 8f,
+            maxSnapSpeed = 1f,
+            snapDuration = 1.0f,
+            groundedExitDelay = 2.0f,
+            climbMaxTurnSpeed = 120f,
+            gravityScale = 0f,
+            climbJumpSpeed = 8f,
+            climbJumpNormalForce = 9f,
+            climbJumpReattachDelay = 0.25f,
+            climbJumpMaxDuration = 1.5f,
+            vaultMaxHeight = 1.5f,
+            topReachThreshold = 0.5f,
+            maxWallDistance = 1.2f,
+        };
+    }
+
 }

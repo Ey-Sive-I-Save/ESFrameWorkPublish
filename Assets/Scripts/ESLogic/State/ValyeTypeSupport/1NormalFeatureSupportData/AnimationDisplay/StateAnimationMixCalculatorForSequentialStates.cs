@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
@@ -30,11 +31,45 @@ namespace ES
     {
         public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.SequentialStates;
 
+        private const float WeightEpsilon = 0.0001f;
+        private const float DefaultTriggerThreshold = 0.5f;
+
+        public enum PhaseTransitionCompare
+        {
+            Greater,
+            Less
+        }
+
+        [Serializable]
+        public struct PhaseTransitionCondition
+        {
+            [LabelText("启用条件")]
+            public bool enable;
+
+            [LabelText("参数")]
+            [Tooltip("用于比较的 float 参数")]
+            public StateParameter parameter;
+
+            [LabelText("比较")]
+            public PhaseTransitionCompare compare;
+
+            [LabelText("阈值")]
+            public float threshold;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool Check(in StateMachineContext context)
+            {
+                if (!enable) return false;
+                float v = context.GetFloat(parameter, 0f);
+                return compare == PhaseTransitionCompare.Greater ? (v >= threshold) : (v <= threshold);
+            }
+        }
+
         protected override string GetUsageHelp()
         {
-             return "适用：固定顺序多阶段动作（跳跃/连招/翻滚）。\n" +
-                 "必填：phases(phaseName+primaryClip 或 phaseCalculator)。\n" +
-                 "可选：secondaryClip/触发参数/自动切换/过渡时长。";
+            return "适用：固定顺序多阶段动作（跳跃/连招/翻滚）。\n" +
+                   "必填：阶段列表（阶段名 + 主Clip 或 子计算器）。\n" +
+                   "可选：主/次Clip混合、切换条件、播完切换、自动切换、过渡时间。";
         }
 
         protected override string GetCalculatorDisplayName()
@@ -50,42 +85,64 @@ namespace ES
             [LabelText("阶段名称")]
             public string phaseName;
 
-            [SerializeReference, LabelText("阶段计算器"), Tooltip("可选：使用完整计算器作为该阶段输出")]
+            [SerializeReference, LabelText("阶段计算器"), Tooltip("可选：用一个完整的混合/播放方案作为本阶段输出。\n设置后：本阶段将以该方案的输出为准；本阶段下方的主/次动画与其混合设置不再生效。")]
             public StateAnimationMixCalculator phaseCalculator;
             
             [LabelText("主Clip")]
-            [Tooltip("该阶段的主要动画")]
+            [Tooltip("本阶段的主要动画（未设置【阶段计算器】时生效）")]
+            [ShowIf("@phaseCalculator == null")]
             public AnimationClip primaryClip;
+
+            [LabelText("启用次Clip混合")]
+            [Tooltip("仅在未设置【阶段计算器】且同时配置主/次动画时生效：启用后，使用【混合参数】在主/次动画之间混合。\n关闭时不会创建 2 输入混合器，也不会更新混合权重。")]
+            [ShowIf("@phaseCalculator == null")]
+            public bool enableSecondaryClipBlend;
             
             [LabelText("次Clip（可选）")]
-            [Tooltip("可选的次要动画，用于混合")]
+            [Tooltip("可选的次要动画（仅在未设置【阶段计算器】且启用主次混合时生效）")]
+            [ShowIf("@phaseCalculator == null && enableSecondaryClipBlend")]
             public AnimationClip secondaryClip;
             
             [LabelText("混合参数")]
             [Tooltip("控制主次Clip混合的参数（0=主，1=次）")]
+            [ShowIf("@phaseCalculator == null && enableSecondaryClipBlend")]
             public StateParameter blendParameter;
             
             [LabelText("最小时长")]
-            [Tooltip("该阶段最短持续时间（秒）")]
+            [Tooltip("该阶段最短持续时间（秒）。在此之前不会发生：切换条件/播完切换/自动切换")]
             [Range(0f, 5f)]
             public float minDuration;
             
             [LabelText("最大时长")]
-            [Tooltip("该阶段最长持续时间（秒），0表示无限制")]
+            [Tooltip("该阶段最长持续时间（秒）。>0 时达到会强制切到下一阶段；0 表示无限制")]
             [Range(0f, 10f)]
             public float maxDuration;
             
             [LabelText("自动切换")]
-            [Tooltip("时间到达minDuration后自动进入下一阶段")]
+            [Tooltip("启用后：当本阶段持续时间达到【最小时长】时，在下一次更新会立刻进入下一阶段。\n特点：不需要任何参数/条件，也不会等待到【最大时长】。\n说明：【最大时长】（>0）始终是硬上限，到点一定会强制进入下一阶段（可作为兜底）。")]
             public bool autoTransition;
+
+            [LabelText("播完自动切换")]
+            [Tooltip("启用后：当本阶段持续时间达到【最小时长】并且输出动画播放到末尾时，自动进入下一阶段。\n注意：循环动画或无固定长度的输出可能无法判断“末尾”，此时不会触发；可用【最大时长】作为硬上限兜底。")]
+            public bool autoTransitionOnAnimationEnd;
             
             [LabelText("切换参数")]
-            [Tooltip("手动切换到下一阶段的触发参数")]
+            [HideInInspector]
+            [Tooltip("(兼容旧字段) 旧版“触发参数”。已统一迁移到【切换条件】中")]
             public StateParameter transitionTrigger;
+
+            [LabelText("触发阈值")]
+            [HideInInspector]
+            [Tooltip("(兼容旧字段) 旧版“触发阈值”。已统一迁移到【切换条件】中")]
+            public float transitionTriggerThreshold;
+
+            [LabelText("切换条件（可选）")]
+            [Tooltip("当本阶段持续时间达到【最小时长】后，若条件成立则进入下一阶段。仅保留这一套手动切换规则")]
+            public PhaseTransitionCondition transitionCondition;
         }
         
         // ==================== 配置数据（享元） ====================
-        
+
         [LabelText("阶段列表")]
         [ListDrawerSettings(ShowFoldout = true, NumberOfItemsPerPage = 5)]
         public SequentialPhase[] phases = new SequentialPhase[0];
@@ -252,19 +309,46 @@ namespace ES
             // 验证配置
             for (int i = 0; i < phases.Length; i++)
             {
-                if (phases[i].phaseCalculator == null && phases[i].primaryClip == null)
+                var p = phases[i];
+
+                // 统一切换规则：迁移旧 trigger(+threshold) 到 transitionCondition
+                if (!p.transitionCondition.enable && HasTransitionTrigger(p))
                 {
-                    Debug.LogWarning($"[SequentialStates] 阶段{i} ({phases[i].phaseName}) 缺少主Clip");
+                    p.transitionCondition.enable = true;
+                    p.transitionCondition.parameter = p.transitionTrigger;
+                    p.transitionCondition.compare = PhaseTransitionCompare.Greater;
+                    p.transitionCondition.threshold = p.transitionTriggerThreshold > 0f ? p.transitionTriggerThreshold : DefaultTriggerThreshold;
+
+                    p.transitionTrigger = StateDefaultFloatParameter.None;
+                    p.transitionTriggerThreshold = 0f;
                 }
-                if (phases[i].phaseCalculator != null)
+
+                if (p.phaseCalculator == null && p.primaryClip == null && p.secondaryClip == null)
                 {
-                    phases[i].phaseCalculator.InitializeCalculator();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.LogWarning($"[SequentialStates] 阶段{i} ({p.phaseName}) 缺少主Clip");
+#endif
                 }
-                if (phases[i].minDuration < 0f)
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (p.phaseCalculator != null && (p.primaryClip != null || p.secondaryClip != null))
                 {
-                    Debug.LogError($"[SequentialStates] 阶段{i} ({phases[i].phaseName}) minDuration不能为负");
-                    phases[i].minDuration = 0f;
+                    Debug.LogWarning($"[SequentialStates] 阶段{i} ({p.phaseName}) 同时设置了阶段计算器和动画片段：动画片段与其混合配置将被忽略");
                 }
+#endif
+                if (p.phaseCalculator != null)
+                {
+                    p.phaseCalculator.InitializeCalculator();
+                }
+                if (p.minDuration < 0f)
+                {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.LogError($"[SequentialStates] 阶段{i} ({p.phaseName}) minDuration不能为负");
+#endif
+                    p.minDuration = 0f;
+                }
+
+                phases[i] = p;
             }
 
             _isCalculatorInitialized = true;
@@ -276,7 +360,9 @@ namespace ES
 
             if (phases == null || phases.Length == 0)
             {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.LogError("[SequentialStates] 阶段列表为空");
+#endif
                 return false;
             }
 
@@ -310,38 +396,51 @@ namespace ES
                     }
                     else
                     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                         Debug.LogWarning($"[SequentialStates] 阶段{i} ({phase.phaseName}) 子计算器初始化失败");
+#endif
                     }
                 }
                 else
                 {
                     runtime.phaseUsesCalculator[i] = false;
-                    if (phase.secondaryClip != null)
-                    {
-                        runtime.phaseMixers[i] = AnimationMixerPlayable.Create(graph, 2);
 
-                        if (phase.primaryClip != null)
+                    // 规则：
+                    // - primaryClip存在：可选 secondaryClip 做本地2输入混合
+                    // - primaryClip为空但 secondaryClip存在：将 secondaryClip 视为唯一输出（避免空输出）
+                    if (phase.primaryClip != null)
+                    {
+                        if (phase.enableSecondaryClipBlend && phase.secondaryClip != null)
                         {
+                            runtime.phaseMixers[i] = AnimationMixerPlayable.Create(graph, 2);
+
                             runtime.phasePrimaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.primaryClip);
                             graph.Connect(runtime.phasePrimaryPlayables[i], 0, runtime.phaseMixers[i], 0);
+
+                            runtime.phaseSecondaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.secondaryClip);
+                            graph.Connect(runtime.phaseSecondaryPlayables[i], 0, runtime.phaseMixers[i], 1);
+
+                            runtime.phaseMixers[i].SetInputWeight(0, 1f);
+                            runtime.phaseMixers[i].SetInputWeight(1, 0f);
+
+                            graph.Connect(runtime.phaseMixers[i], 0, runtime.mixer, i);
                         }
-
-                        runtime.phaseSecondaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.secondaryClip);
-                        graph.Connect(runtime.phaseSecondaryPlayables[i], 0, runtime.phaseMixers[i], 1);
-
-                        runtime.phaseMixers[i].SetInputWeight(0, 1f);
-                        runtime.phaseMixers[i].SetInputWeight(1, 0f);
-
-                        graph.Connect(runtime.phaseMixers[i], 0, runtime.mixer, i);
+                        else
+                        {
+                            runtime.phasePrimaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.primaryClip);
+                            graph.Connect(runtime.phasePrimaryPlayables[i], 0, runtime.mixer, i);
+                        }
                     }
-                    else if (phase.primaryClip != null)
+                    else if (phase.secondaryClip != null)
                     {
-                        runtime.phasePrimaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.primaryClip);
-                        graph.Connect(runtime.phasePrimaryPlayables[i], 0, runtime.mixer, i);
+                        runtime.phaseSecondaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.secondaryClip);
+                        graph.Connect(runtime.phaseSecondaryPlayables[i], 0, runtime.mixer, i);
                     }
                     else
                     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
                         Debug.LogWarning($"[SequentialStates] 阶段{i} ({phase.phaseName}) 无可用输出");
+#endif
                     }
                 }
 
@@ -353,16 +452,75 @@ namespace ES
             runtime.sequencePhaseIndex = 0;  // 从第一个阶段开始
             runtime.sequencePhaseTime = 0f;
             runtime.sequenceTotalTime = 0f;
+            runtime.sequenceCompleted = false;
 
             runtime.useSmoothing = blendSmoothTime > 0.001f;
+
+            // 商业级稳健性：初始化时就把第0阶段权重置为1，避免某些路径缺少ImmediateUpdate导致首帧空输出。
+            runtime.mixer.SetInputWeight(0, 1f);
+            runtime.sequenceLastAppliedPhaseIndex = 0;
+            runtime.sequenceLastAppliedPrevPhaseIndex = -1;
+            runtime.sequenceLastAppliedPhaseWeight = 1f;
+            runtime.sequenceLastAppliedPrevWeight = 0f;
 
             output = runtime.mixer;
             return true;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ApplyMixerWeightsOptimized(
+            AnimationCalculatorRuntime runtime,
+            int currentPhase,
+            float currentWeight,
+            int prevPhaseIndex,
+            float prevWeight)
+        {
+            var mixer = runtime.mixer;
+
+            int lastCurrent = runtime.sequenceLastAppliedPhaseIndex;
+            int lastPrev = runtime.sequenceLastAppliedPrevPhaseIndex;
+
+            // 清零不再使用的索引（注意：当 oldCurrent 变成 newPrev 时，不能清零）
+            if (lastCurrent != currentPhase && lastCurrent != prevPhaseIndex && lastCurrent >= 0)
+            {
+                mixer.SetInputWeight(lastCurrent, 0f);
+            }
+            if (lastPrev != prevPhaseIndex && lastPrev != currentPhase && lastPrev >= 0)
+            {
+                mixer.SetInputWeight(lastPrev, 0f);
+            }
+
+            // 当前阶段
+            if (currentPhase >= 0)
+            {
+                if (lastCurrent != currentPhase || Mathf.Abs(runtime.sequenceLastAppliedPhaseWeight - currentWeight) > WeightEpsilon)
+                {
+                    mixer.SetInputWeight(currentPhase, currentWeight);
+                    runtime.sequenceLastAppliedPhaseWeight = currentWeight;
+                }
+            }
+
+            // 上一阶段（过渡用）
+            if (prevPhaseIndex >= 0)
+            {
+                if (lastPrev != prevPhaseIndex || Mathf.Abs(runtime.sequenceLastAppliedPrevWeight - prevWeight) > WeightEpsilon)
+                {
+                    mixer.SetInputWeight(prevPhaseIndex, prevWeight);
+                    runtime.sequenceLastAppliedPrevWeight = prevWeight;
+                }
+            }
+            else
+            {
+                runtime.sequenceLastAppliedPrevWeight = 0f;
+            }
+
+            runtime.sequenceLastAppliedPhaseIndex = currentPhase;
+            runtime.sequenceLastAppliedPrevPhaseIndex = prevPhaseIndex;
+        }
+
         public override void UpdateWeights(AnimationCalculatorRuntime runtime, in StateMachineContext context, float deltaTime)
         {
-            if (!runtime.mixer.IsValid() || phases.Length == 0)
+            if (runtime == null || !runtime.mixer.IsValid() || phases == null || phases.Length == 0)
                 return;
 
             // ★ 修复：使用专用字段代替currentWeights hack
@@ -379,7 +537,7 @@ namespace ES
             // 检查是否需要切换阶段
             bool shouldTransition = false;
             if (currentPhase < phases.Length)
-            {
+            { 
                 var phase = phases[currentPhase];
 
                 // 检查最大时长
@@ -392,14 +550,15 @@ namespace ES
                 {
                     shouldTransition = true;
                 }
-                // 检查手动触发
-                else if (phaseTime >= phase.minDuration && HasTransitionTrigger(phase))
+                // 检查阈值条件
+                else if (phaseTime >= phase.minDuration && phase.transitionCondition.Check(context))
                 {
-                    float triggerValue = context.GetFloat(phase.transitionTrigger, 0f);
-                    if (triggerValue > 0.5f)  // 触发阈值
-                    {
-                        shouldTransition = true;
-                    }
+                    shouldTransition = true;
+                }
+                // 检查：动画播放一遍结束自动切换
+                else if (phase.autoTransitionOnAnimationEnd && phaseTime >= phase.minDuration && IsPhaseAnimationEnded(runtime, currentPhase, phase))
+                {
+                    shouldTransition = true;
                 }
             }
 
@@ -416,6 +575,9 @@ namespace ES
                     }
                     else
                     {
+                        // 非循环：达到末尾后，标记序列完成。
+                        // 注意：这里的“完成”语义依赖 phase.maxDuration/autoTransition/trigger 的配置。
+                        runtime.sequenceCompleted = true;
                         currentPhase = phases.Length - 1;  // 停留在最后一个阶段
                     }
                 }
@@ -462,15 +624,33 @@ namespace ES
                 }
             }
 
+            ApplyMixerWeightsOptimized(runtime, currentPhase, currentWeight, prevPhaseIndex, prevWeight);
+        }
+
+        /// <summary>
+        /// 序列型计算器的首帧立即更新 — 仅刷新当前阶段权重到位，不推进时间/不切换阶段。
+        /// </summary>
+        public override void ImmediateUpdate(AnimationCalculatorRuntime runtime, in StateMachineContext context)
+        {
+            if (runtime == null || !runtime.mixer.IsValid() || phases.Length == 0) return;
+
+            // 不推进时间，只根据当前阶段索引设置权重
+            int currentPhase = runtime.sequencePhaseIndex;
             for (int i = 0; i < phases.Length; i++)
             {
-                float weight = 0f;
-                if (i == currentPhase)
-                    weight = currentWeight;
-                else if (i == prevPhaseIndex)
-                    weight = prevWeight;
+                float weight = (i == currentPhase) ? 1f : 0f;
+                runtime.mixer.SetInputWeight(i, weight);
+            }
 
-                runtime.mixer.SetInputWeight(i, weight * runtime.totalWeight);
+            // 如果当前阶段有子计算器，对其也执行一次立即更新
+            if (currentPhase >= 0 && currentPhase < phases.Length)
+            {
+                var phase = phases[currentPhase];
+                if (phase.phaseCalculator != null && runtime.phaseRuntimes != null
+                    && currentPhase < runtime.phaseRuntimes.Length && runtime.phaseRuntimes[currentPhase] != null)
+                {
+                    phase.phaseCalculator.ImmediateUpdate(runtime.phaseRuntimes[currentPhase], context);
+                }
             }
         }
 
@@ -593,9 +773,36 @@ namespace ES
             runtime.sequencePhaseIndex = 0;
             runtime.sequencePhaseTime = 0f;
             runtime.sequenceTotalTime = 0f;
+            runtime.sequenceCompleted = false;
             runtime.sequencePrevPhase = -1;
             runtime.sequenceTransitionTime = 0f;
             runtime.sequenceInTransition = false;
+
+            // 强制下一帧重新写入mixer权重
+            runtime.sequenceLastAppliedPhaseIndex = -1;
+            runtime.sequenceLastAppliedPrevPhaseIndex = -1;
+            runtime.sequenceLastAppliedPhaseWeight = -1f;
+            runtime.sequenceLastAppliedPrevWeight = -1f;
+        }
+
+        public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
+        {
+            // SequentialStates：阶段可能是变长的（maxDuration=0 表示无限制），因此这里只能给一个“标准/上限时长”。
+            // 约定：
+            // - loopMode: 无限
+            // - 任意阶段 maxDuration<=0: 无法给出标准时长（返回0）
+            // - 否则：sum(maxDuration)
+            if (loopMode) return float.PositiveInfinity;
+            if (phases == null || phases.Length == 0) return 0f;
+
+            float sum = 0f;
+            for (int i = 0; i < phases.Length; i++)
+            {
+                float max = phases[i].maxDuration;
+                if (max <= 0f) return 0f;
+                sum += max;
+            }
+            return sum > 0f ? sum : 0f;
         }
 
         /// <summary>
@@ -612,12 +819,80 @@ namespace ES
             runtime.sequencePrevPhase = -1;
             runtime.sequenceTransitionTime = 0f;
             runtime.sequenceInTransition = false;
+
+            // 强制下一帧重新写入mixer权重
+            runtime.sequenceLastAppliedPhaseIndex = -1;
+            runtime.sequenceLastAppliedPrevPhaseIndex = -1;
+            runtime.sequenceLastAppliedPhaseWeight = -1f;
+            runtime.sequenceLastAppliedPrevWeight = -1f;
         }
 
         private bool HasTransitionTrigger(SequentialPhase phase)
         {
             return phase.transitionTrigger.EnumValue != StateDefaultFloatParameter.None ||
                    !string.IsNullOrEmpty(phase.transitionTrigger.StringValue);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsPlayableEnded(Playable playable)
+        {
+            if (!playable.IsValid()) return false;
+
+            double duration = playable.GetDuration();
+            if (duration <= 0d || double.IsInfinity(duration) || double.IsNaN(duration))
+                return false;
+
+            // Playable 时间精度用 double，这里给一个很小的容差
+            return playable.GetTime() >= duration - 0.0001d;
+        }
+
+        private static bool IsPhaseAnimationEnded(AnimationCalculatorRuntime runtime, int phaseIndex, SequentialPhase phase)
+        {
+            if (runtime == null || phaseIndex < 0) return false;
+
+            // 子计算器：优先看其输出 Playable 是否有可用 duration
+            if (runtime.phaseUsesCalculator != null && phaseIndex < runtime.phaseUsesCalculator.Length && runtime.phaseUsesCalculator[phaseIndex])
+            {
+                if (runtime.phaseRuntimes != null && phaseIndex < runtime.phaseRuntimes.Length)
+                {
+                    var pr = runtime.phaseRuntimes[phaseIndex];
+                    if (pr != null && IsPlayableEnded(pr.outputPlayable))
+                        return true;
+                }
+
+                // duration 不可得时，保守：不自动切换
+                return false;
+            }
+
+            // Clip 模式
+            if (runtime.phaseMixers != null && phaseIndex < runtime.phaseMixers.Length && runtime.phaseMixers[phaseIndex].IsValid())
+            {
+                // 两段混合：等两段都播完再切（避免提前截断）
+                bool primaryEnded = runtime.phasePrimaryPlayables != null && phaseIndex < runtime.phasePrimaryPlayables.Length
+                    ? IsPlayableEnded(runtime.phasePrimaryPlayables[phaseIndex])
+                    : false;
+
+                bool secondaryEnded = runtime.phaseSecondaryPlayables != null && phaseIndex < runtime.phaseSecondaryPlayables.Length
+                    ? IsPlayableEnded(runtime.phaseSecondaryPlayables[phaseIndex])
+                    : false;
+
+                // 若某一侧 clip 本身不存在，IsPlayableEnded 会返回 false；这里用配置兜底
+                if (phase.primaryClip == null) primaryEnded = true;
+                if (phase.secondaryClip == null) secondaryEnded = true;
+
+                return primaryEnded && secondaryEnded;
+            }
+
+            // 单 Clip 直连
+            if (runtime.phasePrimaryPlayables != null && phaseIndex < runtime.phasePrimaryPlayables.Length && runtime.phasePrimaryPlayables[phaseIndex].IsValid())
+                return IsPlayableEnded(runtime.phasePrimaryPlayables[phaseIndex]);
+
+            // secondary-only 直连
+            if (runtime.phaseSecondaryPlayables != null && phaseIndex < runtime.phaseSecondaryPlayables.Length && runtime.phaseSecondaryPlayables[phaseIndex].IsValid())
+                return IsPlayableEnded(runtime.phaseSecondaryPlayables[phaseIndex]);
+
+            // 没有可用输出：不自动切换
+            return false;
         }
 
         private void UpdatePhaseOutput(AnimationCalculatorRuntime runtime, int phaseIndex, in StateMachineContext context, float deltaTime)
@@ -637,7 +912,7 @@ namespace ES
                 return;
             }
 
-            if (phase.secondaryClip == null)
+            if (!phase.enableSecondaryClipBlend || phase.secondaryClip == null)
                 return;
 
             if (runtime.phaseMixers == null || !runtime.phaseMixers[phaseIndex].IsValid())

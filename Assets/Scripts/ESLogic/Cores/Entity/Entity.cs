@@ -368,6 +368,14 @@ namespace ES
 
         public void BeforeCharacterUpdate(Entity owner, float deltaTime)
         {
+            // ★ 在 Simulate 开始前记录位置快照（而非 AfterCharacterUpdate 末尾）。
+            //   这样 posDelta 只反映本次 KCC Simulate 内部产生的真实漂移；
+            //   Update 里 SetPositionAndRotation 的外部位移在 PreSimulation 已写入
+            //   TransientPosition，此时快照即可将其吸收，AfterCharacterUpdate 算出的
+            //   delta 始终接近零，防漂逻辑天然不会误触发。
+            if (motor != null)
+                _lastTransientPosition = motor.TransientPosition;
+
             if (!_moveInputSetThisFrame)
             {
                 moveInput = Vector3.zero;
@@ -395,8 +403,11 @@ namespace ES
                 {
                     climbModule.BeforeCharacterUpdate(owner, this, deltaTime);
                 }
-                if (supportFlags == StateSupportFlags.Mounted && mountModule != null)
+                if (mountModule != null && (supportFlags == StateSupportFlags.Mounted || mountModule.mountHold))
                 {
+                    // ★ mountHold 兜底：即便 Inspector 未配置 StateSupportFlags.Mounted，
+                    //   骑乘期间仍确保 ForceUnground 被调用，防止 KCC 接地系统将角色压回地面，
+                    //   对抗 MatchTarget 向上对齐的位移。
                     mountModule.BeforeCharacterUpdate(owner, this, deltaTime);
                 }
             }
@@ -465,8 +476,11 @@ namespace ES
                 return;
             }
             var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
-            if (supportFlags == StateSupportFlags.Mounted)
+            if (supportFlags == StateSupportFlags.Mounted || (mountModule != null && mountModule.mountHold))
             {
+                // ★ mountHold 兜底：即便 Inspector 未配置 StateSupportFlags.Mounted，
+                //   骑乘期间仍保证把速度归零，防止重力在 MatchTarget 窗口内持续积累，
+                //   MatchTarget 结束时一次性释放导致角色飞回地面。
                 if (mountModule != null)
                 {
                     mountModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
@@ -568,12 +582,7 @@ namespace ES
                 }
             }
 
-            if (debugMonitor)
-            {
-                Debug.Log(
-                    $"[KCC-Velocity] vel={currentVelocity} rootMotionVel={_rootMotionVelocity} rootMotionScale={rootMotionScale:F2} " +
-                    $"gravity={gravity_} grounded={motor.GroundingStatus.IsStableOnGround}");
-            }
+            
 
             if (speedLimit > 0f)
             {
@@ -613,14 +622,7 @@ namespace ES
 
         public void AfterCharacterUpdate(Entity owner, float deltaTime)
         {
-            if (debugMonitor)
-            {
-                Vector3 posDelta = motor.TransientPosition - _lastTransientPosition;
-                Debug.Log(
-                    $"[KCC-Monitor] UpdateFromMotor begin | pos={motor.TransientPosition} delta={posDelta} " +
-                    $"vel={_lastVelocity} dt={deltaTime:F3}");
-            }
-
+          
             if (preventUpwardDriftWhenIdle)
             {
                 Vector3 posDelta = motor.TransientPosition - _lastTransientPosition;
@@ -636,11 +638,6 @@ namespace ES
                 }
             }
             monitor.UpdateFromMotor(motor, _lastVelocity);
-            if (debugMonitor)
-            {
-                Debug.Log($"[KCC-Monitor] UpdateFromMotor end | hasMotor={monitor.hasMotor} grounded={monitor.isStableOnGround} pos={monitor.position} vel={monitor.velocity}");
-            }
-            _lastTransientPosition = motor.TransientPosition;
         }
 
 

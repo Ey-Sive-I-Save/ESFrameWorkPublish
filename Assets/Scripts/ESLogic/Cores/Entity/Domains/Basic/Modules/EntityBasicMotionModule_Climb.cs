@@ -130,11 +130,11 @@ namespace ES
         [LabelText("攀上-结束时间"), Range(0f, 1f)]
         public float climbOverEndTime = 0.8f;
 
-        [LabelText("攀上-位置权重")]
-        public Vector3 climbOverPosWeight = new Vector3(0f, 1f, 1f);
+        [LabelText("攀上-逼近速度(单位/秒)")]
+        public float climbOverApproachSpeed = 3f;
 
-        [LabelText("攀上-旋转权重"), Range(0f, 1f)]
-        public float climbOverRotWeight = 0.5f;
+        [LabelText("攀上-旋转速度(度/秒)")]
+        public float climbOverAngleSpeed = 180f;
 
         [LabelText("翻越-身体部位")]
         public AvatarTarget vaultBodyPart = AvatarTarget.Root;
@@ -145,11 +145,11 @@ namespace ES
         [LabelText("翻越-结束时间"), Range(0f, 1f)]
         public float vaultEndTime = 0.9f;
 
-        [LabelText("翻越-位置权重")]
-        public Vector3 vaultPosWeight = new Vector3(0f, 1f, 1f);
+        [LabelText("翻越-逼近速度(单位/秒)")]
+        public float vaultApproachSpeed = 5f;
 
-        [LabelText("翻越-旋转权重"), Range(0f, 1f)]
-        public float vaultRotWeight = 0f;
+        [LabelText("翻越-旋转速度(度/秒)")]
+        public float vaultAngleSpeed = 0f;
 
         [Title("登顶判定")]
         [LabelText("登顶高度偏移(米)")]
@@ -261,11 +261,11 @@ namespace ES
         [LabelText("攀上-脚部结束时间"), Range(0f, 1f)]
         public float climbOverFootEndTime = 0.95f;
 
-        [LabelText("攀上-脚部位置权重")]
-        public Vector3 climbOverFootPosWeight = new Vector3(0f, 1f, 1f);
+        [LabelText("攀上-脚部逼近速度(单位/秒)")]
+        public float climbOverFootApproachSpeed = 3f;
 
-        [LabelText("攀上-脚部旋转权重"), Range(0f, 1f)]
-        public float climbOverFootRotWeight = 0.5f;
+        [LabelText("攀上-脚部旋转速度(度/秒)")]
+        public float climbOverFootAngleSpeed = 180f;
 
         [Title("逼近配置")]
         [LabelText("持续逼近目标")]
@@ -361,10 +361,7 @@ namespace ES
         {
             if (MyCore == null || !enableClimb) return;
 
-            if (debugClimb)
-            {
-                Debug.Log($"[登顶] Update: subState={subState}, surface={(currentSurface != null ? currentSurface.name : "null")}");
-            }
+            
 
             bool skipGuard = subState == ClimbSubState.None
                 || (subState == ClimbSubState.ClimbJump && _climbJumpState == null);
@@ -777,41 +774,17 @@ namespace ES
 
             _matchTargetStartTime = Time.time;
 
-            if (enableContinuousApproach)
-            {
-                _activeVaultState.allowMatchTargetReapply = true;
-                _activeVaultState.matchTargetReapplyInterval = matchTargetReapplyInterval;
-                _activeVaultState.matchTargetReapplyMinDistance = matchTargetReapplyMinDistance;
-                _activeVaultState.matchTargetReapplyMinAngle = matchTargetReapplyMinAngle;
-            }
+            // enableContinuousApproach: 重施加策略已迁移至 StateMachineConfig.matchTargetReapply 全局配置，无需在此显式设置
 
             Vector3 targetPos = surface.GetMatchTargetPosition(charPos);
             Quaternion targetRot = surface.GetMatchTargetRotation(charPos);
-            var animConfig = _activeVaultState?.stateSharedData?.animationConfig;
-            if (animConfig != null && animConfig.enableMatchTarget)
-            {
-                var preset = animConfig.matchTargetPreset;
-                _activeVaultState.StartMatchTarget(
-                    targetPos,
-                    targetRot,
-                    preset.bodyPart,
-                    preset.startNormalizedTime,
-                    preset.endNormalizedTime,
-                    preset.positionWeight,
-                    preset.rotationWeight
-                );
-            }
-            else
+            // ★ 优先采用 Inspector matchTargetPreset；Inspector 未启用时退回模块级字段（向后兼容）
+            if (!_activeVaultState.StartMatchTargetFromConfig(targetPos, targetRot))
             {
                 _activeVaultState.StartMatchTarget(
-                    targetPos,
-                    targetRot,
-                    vaultBodyPart,
-                    vaultStartTime,
-                    vaultEndTime,
-                    vaultPosWeight,
-                    vaultRotWeight
-                );
+                    targetPos, targetRot,
+                    vaultBodyPart, vaultStartTime, vaultEndTime,
+                    vaultApproachSpeed, vaultAngleSpeed);
             }
 
             if (debugClimb && !_activeVaultState.IsMatchTargetActive)
@@ -866,43 +839,18 @@ namespace ES
 
             _matchTargetStartTime = Time.time;
 
-            if (enableContinuousApproach)
-            {
-                _climbOverState.allowMatchTargetReapply = true;
-                _climbOverState.matchTargetReapplyInterval = matchTargetReapplyInterval;
-                _climbOverState.matchTargetReapplyMinDistance = matchTargetReapplyMinDistance;
-                _climbOverState.matchTargetReapplyMinAngle = matchTargetReapplyMinAngle;
-            }
+            // enableContinuousApproach: 重施加策略已迁移至 StateMachineConfig.matchTargetReapply 全局配置，无需在此显式设置
 
             Vector3 charPos = MyCore.kcc.motor.TransientPosition;
             Vector3 targetPos = currentSurface.GetMatchTargetPosition(charPos);
             Quaternion targetRot = currentSurface.GetMatchTargetRotation(charPos);
-
-            var animConfig = _climbOverState?.stateSharedData?.animationConfig;
-            if (animConfig != null && animConfig.enableMatchTarget)
-            {
-                var preset = animConfig.matchTargetPreset;
-                _climbOverState.StartMatchTarget(
-                    targetPos,
-                    targetRot,
-                    preset.bodyPart,
-                    preset.startNormalizedTime,
-                    preset.endNormalizedTime,
-                    preset.positionWeight,
-                    preset.rotationWeight
-                );
-            }
-            else
+            // ★ 优先采用 Inspector matchTargetPreset；Inspector 未启用时退回模块级字段（向后兼容）
+            if (!_climbOverState.StartMatchTargetFromConfig(targetPos, targetRot))
             {
                 _climbOverState.StartMatchTarget(
-                    targetPos,
-                    targetRot,
-                    climbOverBodyPart,
-                    climbOverStartTime,
-                    climbOverEndTime,
-                    climbOverPosWeight,
-                    climbOverRotWeight
-                );
+                    targetPos, targetRot,
+                    climbOverBodyPart, climbOverStartTime, climbOverEndTime,
+                    climbOverApproachSpeed, climbOverAngleSpeed);
             }
 
             if (debugClimb && !_climbOverState.IsMatchTargetActive)
@@ -914,7 +862,7 @@ namespace ES
             {
                 Debug.Log($"[Climb] ★ 进入ClimbOver! targetPos={targetPos}, targetRot={targetRot.eulerAngles}, " +
                     $"bodyPart={climbOverBodyPart}, timeRange=[{climbOverStartTime:F2},{climbOverEndTime:F2}], " +
-                    $"posWeight={climbOverPosWeight}, rotWeight={climbOverRotWeight}");
+                    $"approachSpeed={climbOverApproachSpeed:F2}单位/秒, angleSpeed={climbOverAngleSpeed:F1}度/秒");
             }
         }
 
@@ -1210,7 +1158,11 @@ namespace ES
 
                 if (activeState != null)
                 {
-                    activeState.UpdateMatchTargetTarget(targetPos, targetRot);
+                    // ★ 改用 PatchMatchTargetWithConfigOffset：
+                    //   原 PatchMatchTarget(targetPos, targetRot) 每帧直接写入 raw 位置，
+                    //   会覆盖 StartMatchTargetFromConfig 在启动时叠加的 Inspector positionOffset/ rotationOffsetEuler。
+                    //   新方法自动从当前激活阶段的 Inspector 配置读取偏移并叠加，确保 Offset 在追踪期间始终生效。
+                    activeState.PatchMatchTargetWithConfigOffset(targetPos, targetRot);
                 }
 
                 if (!_climbOverPhase2Active)
@@ -1220,36 +1172,19 @@ namespace ES
                     bool useStateConfig = animConfig != null && animConfig.enableMatchTargetPhase2;
                     bool useModuleConfig = subState == ClimbSubState.ClimbOver && enableClimbOverFootPhase && !useStateConfig;
 
-                    float trigger = useStateConfig ? animConfig.matchTargetPhase2Trigger : climbOverPhase2Trigger;
-                    bool canTrigger = phaseState != null && phaseState.normalizedProgress >= trigger;
+                    float trigger = useStateConfig ? (animConfig.matchTargetPresetPhase2?.startTime ?? climbOverPhase2Trigger) : climbOverPhase2Trigger;
+                    bool canTrigger = phaseState != null && phaseState.hasEnterTime >= trigger;
 
                     if ((useStateConfig || useModuleConfig) && canTrigger)
                     {
                         Vector3 phase2TargetPos = currentSurface.GetLandingPosition(charPos);
-                        if (useStateConfig)
-                        {
-                            var preset = animConfig.matchTargetPresetPhase2;
-                            phaseState.StartMatchTarget(
-                                phase2TargetPos,
-                                targetRot,
-                                preset.bodyPart,
-                                preset.startNormalizedTime,
-                                preset.endNormalizedTime,
-                                preset.positionWeight,
-                                preset.rotationWeight
-                            );
-                        }
-                        else
+                        // ★ 优先用 Inspector Phase2 配置；未配置时退回模块字段（向后兼容）
+                        if (!phaseState.StartMatchTargetFromPhase2Config(phase2TargetPos, targetRot))
                         {
                             phaseState.StartMatchTarget(
-                                phase2TargetPos,
-                                targetRot,
-                                climbOverFootBodyPart,
-                                climbOverFootStartTime,
-                                climbOverFootEndTime,
-                                climbOverFootPosWeight,
-                                climbOverFootRotWeight
-                            );
+                                phase2TargetPos, targetRot,
+                                climbOverFootBodyPart, climbOverFootStartTime, climbOverFootEndTime,
+                                climbOverFootApproachSpeed, climbOverFootAngleSpeed);
                         }
                         _matchTargetStartTime = Time.time;
                         _climbOverPhase2Active = true;

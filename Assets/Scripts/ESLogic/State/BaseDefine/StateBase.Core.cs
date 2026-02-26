@@ -470,7 +470,12 @@ namespace ES
                 _resolvedRuntimeConfig.asRightRule = null;
             }
 
+            byte oldPriority = _resolvedRuntimeConfig.priority;
             _resolvedRuntimeConfig.priority = priority;
+            if (oldPriority != priority && _layerRuntime != null)
+            {
+                _layerRuntime.MarkDirty(PipelineDirtyFlags.MixerWeights);
+            }
             _resolvedRuntimeConfig.ikOverrideEnabled = ikOverrideEnabled;
             _resolvedRuntimeConfig.ikTargetWeight = ikTargetWeight;
 
@@ -507,14 +512,37 @@ namespace ES
             // 重置动画事件触发标记
             ResetAnimationEventTriggers();
 
-            // ★ 自动应用IK/MatchTarget配置（从Inspector配置到Runtime）
+            // ★ MatchTarget时序器重置必须在runtime创建前完成
+            // （StateMachine在HotPlugStateToPlayable之前调用OnStateEnter，此时_animationRuntime尚为null）
+            ApplyMatchTargetConfigOnEnter();
+
+            // ★ 自动应用IK配置（从Inspector配置到Runtime）
             // 约定：只有有动画Runtime时才会走配置应用，避免在内部函数里到处写 runtime 判空。
             if (_animationRuntime != null)
             {
                 // 防御性：避免复用 runtime 时遗留的“序列已完成”标志导致 UntilAnimationEnd 立刻自动退出。
                 _animationRuntime.sequenceCompleted = false;
+
+                // 防御性：序列类/阶段类计算器在运行中会推进 sequencePhaseIndex。
+                // 若状态退出时停在 Released（例如 Phase4=3），再次进入时必须重置回起始阶段，否则会永久卡在 Released。
+                switch (_animationRuntime.BoundCalculatorKind)
+                {
+                    case StateAnimationMixerKind.Phase4:
+                    case StateAnimationMixerKind.SequentialStates:
+                        _animationRuntime.sequencePhaseIndex = 0;
+                        _animationRuntime.sequencePhaseTime = 0f;
+                        _animationRuntime.sequenceTotalTime = 0f;
+                        _animationRuntime.sequencePrevPhase = -1;
+                        _animationRuntime.sequenceTransitionTime = 0f;
+                        _animationRuntime.sequenceInTransition = false;
+                        _animationRuntime.sequenceLastAppliedPhaseIndex = -1;
+                        _animationRuntime.sequenceLastAppliedPrevPhaseIndex = -1;
+                        _animationRuntime.sequenceLastAppliedPhaseWeight = -1f;
+                        _animationRuntime.sequenceLastAppliedPrevWeight = -1f;
+                        break;
+                }
+
                 ApplyIKConfigOnEnter(_animationRuntime);
-                ApplyMatchTargetConfigOnEnter(_animationRuntime);
             }
 
             if (_animationRuntime != null && _animationRuntime.ik.enabled)
@@ -554,6 +582,212 @@ namespace ES
             //这里需要编写释放逻辑
             OnStateExitLogic();
         }
+
+        #region 便捷接口（由StateBase发起激活/结束）
+
+        #region 退出后自动激活（由StateBase记录）
+
+        public struct ExitAutoActivationData
+        {
+            public StateBase toState;
+            public StateLayerType toLayer;
+            public bool forceEnter;
+            public bool fallbackToForceEnterOnFail;
+            public bool suppressFromFadeOutOverlap;
+            public StateBase ignoreInteractionWithState;
+            public Func<StateMachineContext, bool> condition;
+        }
+
+        [NonSerialized] internal ExitAutoActivationData _exitAutoActivationOneShot;
+        [NonSerialized] internal ExitAutoActivationData _exitAutoActivationPersistent;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void InternalClearExitAutoActivations()
+        {
+            _exitAutoActivationOneShot = default;
+            _exitAutoActivationPersistent = default;
+        }
+
+        public void ClearAllExitAutoActivations()
+        {
+            InternalClearExitAutoActivations();
+        }
+
+        public bool ConsumeExitAutoActivationOneShot(out ExitAutoActivationData data)
+        {
+            var src = _exitAutoActivationOneShot;
+            if (src.toState == null)
+            {
+                data = default;
+                return false;
+            }
+
+            _exitAutoActivationOneShot = default;
+            data = src;
+            return true;
+        }
+
+        public bool TryGetExitAutoActivationPersistent(out ExitAutoActivationData data)
+        {
+            var src = _exitAutoActivationPersistent;
+            if (src.toState == null)
+            {
+                data = default;
+                return false;
+            }
+
+            data = src;
+            return true;
+        }
+
+        public int ClearActivateOnExitIfToState(StateBase toState)
+        {
+            if (toState == null) return 0;
+            int removed = 0;
+            if (_exitAutoActivationOneShot.toState == toState)
+            {
+                _exitAutoActivationOneShot = default;
+                removed++;
+            }
+            if (_exitAutoActivationPersistent.toState == toState)
+            {
+                _exitAutoActivationPersistent = default;
+                removed++;
+            }
+            return removed;
+        }
+
+        public int ClearActivateOnExitIfReferences(StateBase state)
+        {
+            if (state == null) return 0;
+            int changed = 0;
+
+            if (_exitAutoActivationOneShot.toState == state)
+            {
+                _exitAutoActivationOneShot = default;
+                changed++;
+            }
+            else if (_exitAutoActivationOneShot.ignoreInteractionWithState == state)
+            {
+                var one = _exitAutoActivationOneShot;
+                one.ignoreInteractionWithState = null;
+                _exitAutoActivationOneShot = one;
+                changed++;
+            }
+
+            if (_exitAutoActivationPersistent.toState == state)
+            {
+                _exitAutoActivationPersistent = default;
+                changed++;
+            }
+            else if (_exitAutoActivationPersistent.ignoreInteractionWithState == state)
+            {
+                var per = _exitAutoActivationPersistent;
+                per.ignoreInteractionWithState = null;
+                _exitAutoActivationPersistent = per;
+                changed++;
+            }
+
+            return changed;
+        }
+
+        /// <summary>
+        /// 设置：本状态退出时，下一状态一次性激活（触发一次后自动清空）。
+        /// - 当 toState 为 null 时等价于清空一次性配置。
+        /// </summary>
+        public void SetActivateOnExitOneShot(
+            StateBase toState,
+            StateLayerType toLayer = StateLayerType.NotClear,
+            bool forceEnter = false,
+            bool fallbackToForceEnterOnFail = false,
+            bool suppressFromFadeOutOverlap = false,
+            StateBase ignoreInteractionWithState = null,
+            Func<StateMachineContext, bool> condition = null)
+        {
+            if (toState == null)
+            {
+                _exitAutoActivationOneShot = default;
+                return;
+            }
+
+            _exitAutoActivationOneShot = new ExitAutoActivationData
+            {
+                toState = toState,
+                toLayer = toLayer,
+                forceEnter = forceEnter,
+                fallbackToForceEnterOnFail = fallbackToForceEnterOnFail,
+                suppressFromFadeOutOverlap = suppressFromFadeOutOverlap,
+                ignoreInteractionWithState = ignoreInteractionWithState,
+                condition = condition,
+            };
+        }
+
+        /// <summary>
+        /// 设置：本状态退出时，下一状态持久激活（每次退出都会尝试）。
+        /// - 当 toState 为 null 时等价于清空持久配置。
+        /// </summary>
+        public void SetActivateOnExitPersistent(
+            StateBase toState,
+            StateLayerType toLayer = StateLayerType.NotClear,
+            bool forceEnter = false,
+            bool fallbackToForceEnterOnFail = false,
+            bool suppressFromFadeOutOverlap = false,
+            StateBase ignoreInteractionWithState = null,
+            Func<StateMachineContext, bool> condition = null)
+        {
+            if (toState == null)
+            {
+                _exitAutoActivationPersistent = default;
+                return;
+            }
+
+            _exitAutoActivationPersistent = new ExitAutoActivationData
+            {
+                toState = toState,
+                toLayer = toLayer,
+                forceEnter = forceEnter,
+                fallbackToForceEnterOnFail = fallbackToForceEnterOnFail,
+                suppressFromFadeOutOverlap = suppressFromFadeOutOverlap,
+                ignoreInteractionWithState = ignoreInteractionWithState,
+                condition = condition,
+            };
+        }
+
+        public void ClearActivateOnExitOneShot()
+        {
+            _exitAutoActivationOneShot = default;
+        }
+
+        public void ClearActivateOnExitPersistent()
+        {
+            _exitAutoActivationPersistent = default;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// 便捷：激活自己（委托给所属 StateMachine）。
+        /// 说明：只是语法糖；实际激活流程/淡入淡出/Playable热插拔仍由 StateMachine 负责。
+        /// </summary>
+        public bool ActivateSelf(StateLayerType layer = StateLayerType.NotClear)
+        {
+            var m = host;
+            if (m == null) return false;
+            return m.TryActivateState(this, layer);
+        }
+
+        /// <summary>
+        /// 便捷：结束自己（委托给所属 StateMachine）。
+        /// 说明：只是语法糖；退出时会走 StateMachine 的 TruelyDeactivateState（含淡出表现）。
+        /// </summary>
+        public bool EndSelf()
+        {
+            var m = host;
+            if (m == null) return false;
+            return m.TryExitState(this);
+        }
+
+        #endregion
 
         #endregion
 

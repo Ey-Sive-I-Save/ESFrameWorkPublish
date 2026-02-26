@@ -87,10 +87,15 @@ namespace ES
             _enableMatchTargetCached = false;
             _shouldAutoExitFromAnimation = false;
             _playableWeight = 1f;
+            _requestedPlayableWeight = 1f;
+
+            InternalClearExitAutoActivations();
 
             // IK/MatchTarget状态
             _ikActive = false;
             _matchTargetActive = false;
+            _pendingCommand = null;
+            _configAutoPhaseIndex = -1;
             _matchTargetLastAppliedPos = Vector3.zero;
             _matchTargetLastAppliedRot = Quaternion.identity;
             _matchTargetLastApplyTime = -999f;

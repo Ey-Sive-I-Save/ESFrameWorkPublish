@@ -244,17 +244,9 @@ namespace ES
         private void ApplyMatchTargetIfNeeded(ESInteractable target)
         {
             if (_activeState == null) return;
-            if (!target.enableMatchTarget || target.matchTarget == null) return;
+            if (!target.enableMatchTarget) return;
 
-            _activeState.StartMatchTarget(
-                target.matchTarget.position,
-                target.matchTarget.rotation,
-                target.matchTargetBodyPart,
-                target.matchTargetStartTime,
-                target.matchTargetEndTime,
-                target.matchTargetPosWeight,
-                target.matchTargetRotWeight
-            );
+            _activeState.ApplyMatchTarget(target.matchTargetRequest);
         }
 
         private void EndInteraction(bool success)

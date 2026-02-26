@@ -212,19 +212,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 0.77
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 1
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 5
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0.66
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -569,19 +572,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -903,19 +909,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -1269,19 +1278,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -1616,19 +1628,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -2231,26 +2246,29 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
     fadeInDuration: 0.2
-    fadeOutDuration: 0.15
+    fadeOutDuration: 0.39
     useAdvancedFadeCurve: 0
     fadeInCurve:
       serializedVersion: 2
@@ -2369,6 +2387,7 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           transitionTarget: 0
           extraTransitionCondition:
@@ -2377,6 +2396,7 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           extraTransitionTarget: 0
         main:
@@ -2391,7 +2411,7 @@ MonoBehaviour:
             EnumValue: 0
             StringValue: 
           minDuration: 0
-          maxDuration: 0
+          maxDuration: 5.18
           autoTransition: 0
           autoTransitionOnAnimationEnd: 0
           transitionTrigger:
@@ -2404,14 +2424,16 @@ MonoBehaviour:
               EnumValue: 2
               StringValue: 
             compare: 1
+            includeEqual: 0
             threshold: 0
-          transitionTarget: 0
+          transitionTarget: 3
           extraTransitionCondition:
             enable: 0
             parameter:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           extraTransitionTarget: 0
         wait:
@@ -2426,7 +2448,7 @@ MonoBehaviour:
             EnumValue: 0
             StringValue: 
           minDuration: 0
-          maxDuration: 0
+          maxDuration: 4.99
           autoTransition: 0
           autoTransitionOnAnimationEnd: 0
           transitionTrigger:
@@ -2439,29 +2461,31 @@ MonoBehaviour:
               EnumValue: 2
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
-          transitionTarget: 0
+          transitionTarget: 2
           extraTransitionCondition:
             enable: 0
             parameter:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           extraTransitionTarget: 2
         released:
           phaseName: 
           phaseCalculator:
             rid: -2
-          primaryClip: {fileID: 959511169626303400, guid: e0e95bef442702845b14ec423317f978,
+          primaryClip: {fileID: 7172315387746160803, guid: c9a139ea11262014ca258065f7b47463,
             type: 3}
           enableSecondaryClipBlend: 0
           secondaryClip: {fileID: 0}
           blendParameter:
             EnumValue: 0
             StringValue: 
-          minDuration: 0
-          maxDuration: 0
+          minDuration: 1.22
+          maxDuration: 2.15
           autoTransition: 0
           autoTransitionOnAnimationEnd: 0
           transitionTrigger:
@@ -2474,6 +2498,7 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           transitionTarget: 0
           extraTransitionCondition:
@@ -2482,9 +2507,11 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           extraTransitionTarget: 0
         transitionDuration: 0.1
+        transitionWeightSpeedMultiplier: 5.89
         blendSmoothTime: 0.05
 --- !u!114 &1909882665973813533
 MonoBehaviour:
@@ -2691,26 +2718,29 @@ MonoBehaviour:
         headWeight: 1
         eyesWeight: 0.5
         clampWeight: 0.5
-      enableMatchTarget: 0
+      enableMatchTarget: 1
       autoActivateMatchTarget: 0
       matchTargetPreset:
-        bodyPart: 0
+        bodyPart: 2
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 5, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 4.62
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
-        bodyPart: 0
+        bodyPart: 5
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 2.87
+        endTime: 8.98
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -2809,12 +2839,12 @@ MonoBehaviour:
     - rid: 3128556031534694424
       type: {class: SequentialClipMixer, ns: ES, asm: ES_Logic}
       data:
-        entryClip: {fileID: 7400000, guid: 2b030510e43fdf14c8742b497213ddfc, type: 3}
+        entryClip: {fileID: 7400000, guid: dc3daaf6f73f84e4abde901c371a3cd0, type: 3}
         entrySpeed: 1
         mainConfig:
           clip: {fileID: 7400000, guid: dc3daaf6f73f84e4abde901c371a3cd0, type: 3}
           speed: 1
-        exitClip: {fileID: 7400000, guid: acc34fd711f84b941af762638b2b1080, type: 3}
+        exitClip: {fileID: 7400000, guid: dc3daaf6f73f84e4abde901c371a3cd0, type: 3}
         exitSpeed: 1
         loopMainClip: 0
         allowEarlyExit: 1
@@ -3030,19 +3060,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -3168,6 +3201,7 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           transitionTarget: 0
           extraTransitionCondition:
@@ -3176,6 +3210,7 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           extraTransitionTarget: 0
         main:
@@ -3203,6 +3238,7 @@ MonoBehaviour:
               EnumValue: 2
               StringValue: 
             compare: 1
+            includeEqual: 0
             threshold: 0
           transitionTarget: 0
           extraTransitionCondition:
@@ -3211,6 +3247,7 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           extraTransitionTarget: 0
         wait:
@@ -3238,6 +3275,7 @@ MonoBehaviour:
               EnumValue: 2
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           transitionTarget: 0
           extraTransitionCondition:
@@ -3246,6 +3284,7 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           extraTransitionTarget: 2
         released:
@@ -3273,6 +3312,7 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           transitionTarget: 0
           extraTransitionCondition:
@@ -3281,9 +3321,11 @@ MonoBehaviour:
               EnumValue: 0
               StringValue: 
             compare: 0
+            includeEqual: 0
             threshold: 0
           extraTransitionTarget: 0
         transitionDuration: 0.1
+        transitionWeightSpeedMultiplier: 1
         blendSmoothTime: 0.05
 --- !u!114 &3591491480280316166
 MonoBehaviour:
@@ -3497,19 +3539,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 0.77
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 1
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 2
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0.66
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -3829,19 +3874,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -4164,19 +4212,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -4490,19 +4541,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -4830,19 +4884,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -5171,19 +5228,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -5503,19 +5563,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1
@@ -5850,19 +5913,22 @@ MonoBehaviour:
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
       enableMatchTargetPhase2: 0
-      matchTargetPhase2Trigger: 0.6
       matchTargetPresetPhase2:
         bodyPart: 0
         target: {fileID: 0}
         fixedPosition: {x: 0, y: 0, z: 0}
         fixedRotationEuler: {x: 0, y: 0, z: 0}
-        startNormalizedTime: 0
-        endNormalizedTime: 1
+        positionOffset: {x: 0, y: 0, z: 0}
+        rotationOffsetEuler: {x: 0, y: 0, z: 0}
+        startTime: 0
+        endTime: 1
         positionWeight: {x: 1, y: 1, z: 1}
         rotationWeight: 1
     enableFadeInOut: 1

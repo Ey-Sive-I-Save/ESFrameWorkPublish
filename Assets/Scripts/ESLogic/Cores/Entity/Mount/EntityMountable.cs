@@ -60,11 +60,16 @@ namespace ES
             turnSpeed = Mathf.Max(1f, turnSpeed);
         }
 
-        public void Mount(Entity target)
+        /// <param name="skipImmediateSync">
+        /// true = 跳过立即传送（由外部 MatchTarget 负责渐近对齐，对齐完成后再调用 SyncRider）。
+        /// false（默认）= 立即将 Rider 传送到 matchPoint。
+        /// </param>
+        public void Mount(Entity target, bool skipImmediateSync = false)
         {
             rider = target;
             EnsureMatchPoint();
-            SyncRider(force: true);
+            if (!skipImmediateSync)
+                SyncRider(force: true);
             OnMounted?.Invoke(target);
         }
 
@@ -149,8 +154,10 @@ namespace ES
 
             EnsureMatchPoint();
             var motor = rider.kcc.motor;
-            Vector3 pos = alignRiderPosition ? matchPoint.position : motor.Transform.position;
-            Quaternion rot = alignRiderRotation ? matchPoint.rotation : motor.Transform.rotation;
+            // ★ 使用 TransientPosition/TransientRotation（KCC 物理层真实位置），
+            //   不能用 motor.Transform.position（插值渲染位置，会被 PostSimulation 重置）。
+            Vector3    pos = alignRiderPosition ? matchPoint.position : motor.TransientPosition;
+            Quaternion rot = alignRiderRotation ? matchPoint.rotation : motor.TransientRotation;
 
             motor.SetPositionAndRotation(pos, rot, true);
         }

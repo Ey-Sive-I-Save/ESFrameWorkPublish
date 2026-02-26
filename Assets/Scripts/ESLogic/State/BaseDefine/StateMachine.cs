@@ -348,6 +348,42 @@ namespace ES
         [NonSerialized]
         private readonly List<StateBase> _statesToDeactivateCache = new List<StateBase>(16);
 
+        #region 状态过渡：退出后自动激活（链式激活/过渡绑定）
+
+        /// <summary>
+        /// 退出触发激活：用于“状态A结束后自动激活状态B”。
+        /// - oneShot：一次性（触发一次后移除）
+        /// - condition：退出瞬间的判定（可为空）
+        /// - forceEnter：强制进入（不做验证，清空目标层后进入）
+        /// - fallbackToForceEnterOnFail：先TryActivate，失败再ForceEnter
+        /// - suppressFromFadeOutOverlap：触发时立即取消fromState的淡出并卸载Playable（避免A/B在淡出/淡入期间重叠导致的视觉问题）
+        /// - ignoreInteractionWithState：激活B时在合并/冲突计算中忽略某个指定状态（只影响一次激活的验证计算）
+        /// </summary>
+        public struct StateExitActivationOptions
+        {
+            public StateLayerType toLayer;
+            public bool oneShot;
+            public bool forceEnter;
+            public bool fallbackToForceEnterOnFail;
+            public bool suppressFromFadeOutOverlap;
+            public StateBase ignoreInteractionWithState;
+            public Func<StateMachineContext, bool> condition;
+        }
+
+        public readonly struct StateExitActivationHandle
+        {
+            public readonly StateBase fromState;
+            public readonly bool oneShot;
+            public bool IsValid => fromState != null;
+            public StateExitActivationHandle(StateBase fromState, bool oneShot)
+            {
+                this.fromState = fromState;
+                this.oneShot = oneShot;
+            }
+        }
+
+        #endregion
+
         [NonSerialized]
         private readonly Dictionary<StateBase, StateActivationCache> _activationCache = new Dictionary<StateBase, StateActivationCache>(64);
 
@@ -485,6 +521,13 @@ namespace ES
         [NonSerialized]
         protected bool ownsPlayableGraph = false;
 
+        /// <summary>
+        /// MatchTarget 骨骼 Transform 共享缓存，下标 = (int)AvatarTarget（0-5）。<br/>
+        /// 在 <see cref="BindToAnimator"/> 时一次性填充，所有状态共享同一数组，O(1) 运行时访问。
+        /// </summary>
+        [NonSerialized]
+        internal Transform[] _sharedBoneTransforms;
+
         public bool IsPlayableGraphValid => playableGraph.IsValid();
 
         public bool IsPlayableGraphPlaying => playableGraph.IsValid() && playableGraph.IsPlaying();
@@ -506,6 +549,52 @@ namespace ES
         /// </summary>
         [NonSerialized]
         protected bool isDirty = false;
+
+        // ===== Mixer 权重分配缓存（零GC） =====
+        // 用途：按优先级/淡入淡出对同层多个可播放动画做“抢占式”权重分配，保证权重和=1。
+        [NonSerialized]
+        private int[] _mixerWeightSortIndices = new int[64];
+
+        [NonSerialized]
+        private float[] _mixerEffectiveWeights = new float[64];
+
+        [NonSerialized]
+        private bool _isUpdatingMixerInputWeights = false;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void EnsureMixerWeightCacheCapacity(int count)
+        {
+            if (_mixerWeightSortIndices == null || _mixerWeightSortIndices.Length < count)
+            {
+                int newSize = Mathf.NextPowerOfTwo(Mathf.Max(count, 8));
+                _mixerWeightSortIndices = new int[newSize];
+                _mixerEffectiveWeights = new float[newSize];
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int CompareStateForMixerWeightSort(StateBase a, StateBase b)
+        {
+            if (ReferenceEquals(a, b)) return 0;
+
+            a.EnsureResolvedRuntimeConfig();
+            b.EnsureResolvedRuntimeConfig();
+
+            int pa = a.ResolvedConfig.priority;
+            int pb = b.ResolvedConfig.priority;
+            if (pa != pb)
+            {
+                // priority: desc
+                return pb.CompareTo(pa);
+            }
+
+            // activationTime: newer first
+            int timeCompare = b.activationTime.CompareTo(a.activationTime);
+            if (timeCompare != 0) return timeCompare;
+
+            // deterministic tie-break
+            return CompareStateDeterministic(a, b);
+        }
 
         private sealed class StateActivationCache
         {
@@ -897,9 +986,24 @@ namespace ES
 
             InitializeLayerWeights();
 
+            // ★ MatchTarget 骨骼 Transform 缓存：全状态机共享同一数组，只在 BindToAnimator 时初始化一次
+            const int AvatarTargetCount = 6;
+            if (_sharedBoneTransforms == null)
+                _sharedBoneTransforms = new Transform[AvatarTargetCount];
+            if (animator.isHuman)
+            {
+                _sharedBoneTransforms[(int)AvatarTarget.Body]      = animator.GetBoneTransform(HumanBodyBones.Hips);
+                _sharedBoneTransforms[(int)AvatarTarget.LeftFoot]  = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+                _sharedBoneTransforms[(int)AvatarTarget.RightFoot] = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+                _sharedBoneTransforms[(int)AvatarTarget.LeftHand]  = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+                _sharedBoneTransforms[(int)AvatarTarget.RightHand] = animator.GetBoneTransform(HumanBodyBones.RightHand);
+                // Root (index 0) 保持 null：根节点直接用 entity.transform
+            }
+            // Generic Rig：全 null，运行时降级为根节点
+
 #if STATEMACHINEDEBUG
             {
-                var dbg = StateMachineDebugSettings.Instance;
+                var dbg = StateMachineDebugSettings;
                 if (dbg != null && dbg.IsRuntimeInitEnabled)
                 {
                     dbg.LogRuntimeInit($"Animator绑定成功: {animator.gameObject.name}");
@@ -1148,6 +1252,9 @@ namespace ES
             stateLayerMap.Clear();
             _activationCache.Clear();
 
+            // 清理“退出后自动激活”（由 StateBase 自己持有，避免残留引用）
+            ClearAllExitAutoActivations();
+
             // 清理上下文
             if (stateContext != null)
             {
@@ -1229,7 +1336,39 @@ namespace ES
                 playableGraph.Stop();
             }
 
+            // 清理“退出后自动激活”绑定（停止后不应再触发）
+            ClearAllExitAutoActivations();
+
             isRunning = false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RemoveExitActivationBindingsRelatedToState(StateBase state)
+        {
+            if (state == null) return;
+
+            // 1) 该 State 自己的退出配置清空
+            state.ClearAllExitAutoActivations();
+
+            // 2) 其他 State 指向该 State 的配置清空（To/Ignore 都可能引用）
+            var all = _registeredStatesList;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var s = all[i];
+                if (s == null || ReferenceEquals(s, state)) continue;
+
+                s.ClearActivateOnExitIfReferences(state);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ClearAllExitAutoActivations()
+        {
+            var all = _registeredStatesList;
+            for (int i = 0; i < all.Count; i++)
+            {
+                all[i]?.ClearAllExitAutoActivations();
+            }
         }
 
         /// <summary>
@@ -1336,6 +1475,7 @@ namespace ES
 #endif
                 if (state._hasAnimationCached)
                 {
+                    
                     state.UpdateAnimationRuntime(stateContext, deltaTime);
                     state.ProcessMatchTarget(boundAnimator);
                 }
@@ -1347,48 +1487,48 @@ namespace ES
                 }
             }
 
-            // 自动退出已完成的状态
-            foreach (var state in statesToDeactivate)
-            {
-                // 使用缓存的层级映射直接停用
-                if (stateLayerMap.TryGetValue(state, out var layerType))
+                // 自动退出已完成的状态
+                foreach (var state in statesToDeactivate)
                 {
-                    TruelyDeactivateState(state, layerType);
+                    // 使用缓存的层级映射直接停用
+                    if (stateLayerMap.TryGetValue(state, out var layerType))
+                    {
+                        TruelyDeactivateState(state, layerType);
+                    }
                 }
-            }
 
-            // ★ 更新淡入淡出效果
-            UpdateFades(deltaTime);
+                // ★ 更新淡入淡出效果
+                UpdateFades(deltaTime);
 
-            // ★ 统一批处理写入 Mixer 输入权重（含参考姿态填充/归一化）
-            UpdateMixerInputWeights();
+                // ★ 统一批处理写入 Mixer 输入权重（含参考姿态填充/归一化）
+                UpdateMixerInputWeights();
 
 
-            // 更新层级Dirty自动标记（高等级降级到1，保持最低Dirty用于持续检查FallBack）
-            foreach (var layer in layerRuntimes)
-            {
-                layer.UpdateDirtyDecay();
-            }
-
-            // 根据Dirty等级处理不同任务（包括FallBack自动激活）
-            foreach (var layer in layerRuntimes)
-            {
-                ProcessDirtyTasks(layer, layer.layerType);
-            }
-
-            // 同步层级权重到RootMixer
-            UpdateLayerWeights();
-
-            // ★ FinalIK Pose 聚合：每帧从所有 Running State 的 runtime.ik 生成最终 Pose（LateUpdate 驱动输出）
-            UpdateFinalIKPoseCache(deltaTime);
-
-            // Manual模式下需要手动Evaluate推进图
-            if (playableGraph.IsValid())
-            {
-                if (!playableGraph.IsPlaying())
+                // 更新层级Dirty自动标记（高等级降级到1，保持最低Dirty用于持续检查FallBack）
+                foreach (var layer in layerRuntimes)
                 {
-                    playableGraph.Play();
+                    layer.UpdateDirtyDecay();
                 }
+
+                // 根据Dirty等级处理不同任务（包括FallBack自动激活）
+                foreach (var layer in layerRuntimes)
+                {
+                    ProcessDirtyTasks(layer, layer.layerType);
+                }
+
+                // 同步层级权重到RootMixer
+                UpdateLayerWeights();
+
+                // ★ FinalIK Pose 聚合：每帧从所有 Running State 的 runtime.ik 生成最终 Pose（LateUpdate 驱动输出）
+                UpdateFinalIKPoseCache(deltaTime);
+
+                // Manual模式下需要手动Evaluate推进图
+                if (playableGraph.IsValid())
+                {
+                    if (!playableGraph.IsPlaying())
+                    {
+                        playableGraph.Play();
+                    }
 #if STATEMACHINEDEBUG
                 {
                     var dbg = StateMachineDebugSettings.Instance;
@@ -1402,8 +1542,8 @@ namespace ES
                     }
                 }
 #endif
-                playableGraph.Evaluate(deltaTime);
-            }
+                    playableGraph.Evaluate(deltaTime);
+                }
 
 #if UNITY_EDITOR
 #if STATEMACHINEDEBUG
@@ -1414,7 +1554,165 @@ namespace ES
             }
 #endif
 #endif
+        }
 
+        /// <summary>
+        /// 绑定：当 fromState 退出时，自动激活 toState。
+        /// </summary>
+        public StateExitActivationHandle BindActivateOnStateExit(StateBase fromState, StateBase toState, StateExitActivationOptions options = default)
+        {
+            if (fromState == null || toState == null) return default;
+
+            if (options.oneShot)
+            {
+                fromState.SetActivateOnExitOneShot(
+                    toState,
+                    options.toLayer,
+                    options.forceEnter,
+                    options.fallbackToForceEnterOnFail,
+                    options.suppressFromFadeOutOverlap,
+                    options.ignoreInteractionWithState,
+                    options.condition);
+            }
+            else
+            {
+                fromState.SetActivateOnExitPersistent(
+                    toState,
+                    options.toLayer,
+                    options.forceEnter,
+                    options.fallbackToForceEnterOnFail,
+                    options.suppressFromFadeOutOverlap,
+                    options.ignoreInteractionWithState,
+                    options.condition);
+            }
+
+            return new StateExitActivationHandle(fromState, options.oneShot);
+        }
+
+        public StateExitActivationHandle BindActivateOnStateExit(string fromStateKey, string toStateKey, StateExitActivationOptions options = default)
+        {
+            return BindActivateOnStateExit(GetStateByString(fromStateKey), GetStateByString(toStateKey), options);
+        }
+
+        public StateExitActivationHandle BindActivateOnStateExit(int fromStateKey, int toStateKey, StateExitActivationOptions options = default)
+        {
+            return BindActivateOnStateExit(GetStateByInt(fromStateKey), GetStateByInt(toStateKey), options);
+        }
+
+        public bool UnbindActivateOnStateExit(StateExitActivationHandle handle)
+        {
+            if (!handle.IsValid) return false;
+
+            if (handle.oneShot)
+            {
+                // 无法直接查询内部字段：直接清空并返回 true（重复清空也无害）。
+                handle.fromState.ClearActivateOnExitOneShot();
+                return true;
+            }
+
+            handle.fromState.ClearActivateOnExitPersistent();
+            return true;
+        }
+
+        public int UnbindActivateOnStateExit(StateBase fromState, StateBase toState)
+        {
+            if (fromState == null || toState == null) return 0;
+
+            return fromState.ClearActivateOnExitIfToState(toState);
+        }
+
+        private void TryFireExitAutoActivation(StateBase fromState, StateLayerType fromLayer, StateLayerRuntime fromLayerRuntime)
+        {
+            if (fromState == null) return;
+
+            // 选择：一次性优先；一次性为空则尝试持久；都为空则不处理。
+            bool usedOneShot = false;
+            if (fromState.ConsumeExitAutoActivationOneShot(out var binding))
+            {
+                usedOneShot = true;
+            }
+            else
+            {
+                if (!fromState.TryGetExitAutoActivationPersistent(out binding)) return;
+            }
+
+            // 条件判定：不通过则（一次性已消费）再尝试持久；持久不通过则直接结束。
+            if (binding.condition != null)
+            {
+                var ctx = stateContext;
+                bool pass = false;
+                try
+                {
+                    pass = ctx != null && binding.condition(ctx);
+                }
+                catch (Exception e)
+                {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    StateMachineDebugSettings.Instance?.LogError($"[ExitBinding] condition执行异常: From={fromState?.strKey} | {e}");
+#endif
+                    pass = false;
+                }
+
+                if (!pass)
+                {
+                    if (usedOneShot)
+                    {
+                        // 再试一次：持久
+                        if (!fromState.TryGetExitAutoActivationPersistent(out binding)) return;
+                        if (binding.condition != null)
+                        {
+                            try
+                            {
+                                pass = ctx != null && binding.condition(ctx);
+                            }
+                            catch
+                            {
+                                pass = false;
+                            }
+                            if (!pass) return;
+                        }
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+            }
+
+            if (binding.suppressFromFadeOutOverlap && fromLayerRuntime != null)
+            {
+                CancelStaleFadeData(fromState, fromLayerRuntime);
+                fromLayerRuntime.MarkDirty(PipelineDirtyFlags.MixerWeights);
+            }
+
+            var toState = binding.toState;
+            if (toState == null) return;
+
+            var toLayer = ResolveLayerForState(toState, binding.toLayer);
+
+            bool activated;
+            if (binding.forceEnter)
+            {
+                activated = ForceEnterState(toState, toLayer);
+            }
+            else
+            {
+                activated = binding.ignoreInteractionWithState != null
+                    ? TryActivateState(toState, toLayer, binding.ignoreInteractionWithState)
+                    : TryActivateState(toState, toLayer);
+            }
+
+            if (!activated && binding.fallbackToForceEnterOnFail)
+            {
+                activated = ForceEnterState(toState, toLayer);
+            }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!activated)
+            {
+                StateMachineDebugSettings.Instance?.LogWarning($"[ExitBinding] 退出激活失败 | From={fromState.strKey} To={toState.strKey} Force={binding.forceEnter} FallbackForce={binding.fallbackToForceEnterOnFail}");
+            }
+#endif
         }
 
         private void UpdateFinalIKPoseCache(float deltaTime)
@@ -1674,12 +1972,28 @@ namespace ES
             if (state.stateSharedData.basicConfig.useDirectBlend) return;
 
             float fadeOutDuration = GetScaledFadeDuration(state.stateSharedData.fadeOutDuration, state.stateSharedData);
-            if (fadeOutDuration <= 0f || !layer.stateToSlotMap.ContainsKey(state))
+            if (fadeOutDuration <= 0f)
+                return;
+
+            // 关键保证：淡出期间 state 必须仍然“连接在 playable 中”。
+            // 正常情况下，退出时不会 HotUnplug（会在 t>=1 时再卸载）。
+            // 这里做一次防御：如果某些外部逻辑提前断开了连接，则尝试重新 HotPlug，保证淡出可见。
+            if (!layer.stateToSlotMap.ContainsKey(state))
+            {
+                HotPlugStateToPlayable(state, layer);
+            }
+
+            if (!layer.stateToSlotMap.ContainsKey(state))
                 return;
 
             // 记录淡出数据
             int slotIndex = layer.stateToSlotMap[state];
-            float currentWeight = state.PlayableWeight;
+            float currentWeight = Mathf.Clamp01(state.PlayableWeight);
+
+            // 关键：Requested/Effective 分离。
+            // 淡出开始的这一刻，如果不把 Requested 立刻同步到当前 Effective，
+            // 则下一次权重分配可能仍用旧 Requested（常见=1）导致“退出瞬间权重跳变”。
+            state.SetPlayableWeightAssumeBound(currentWeight);
 
             if (!layer.fadeOutStates.TryGetValue(state, out var fadeData))
             {
@@ -1713,97 +2027,178 @@ namespace ES
         /// </summary>
         private void UpdateMixerInputWeights()
         {
-            for (int layerIdx = 0; layerIdx < layerRuntimes.Count; layerIdx++)
+            if (_isUpdatingMixerInputWeights) return;
+            _isUpdatingMixerInputWeights = true;
+            try
             {
-                var layer = layerRuntimes[layerIdx];
-                if (!layer.mixer.IsValid()) continue;
-                if (!layer.HasDirtyFlag(PipelineDirtyFlags.MixerWeights)) continue;
-
-                // 非参考姿态层：只需要把 state.PlayableWeight 写回 mixer 一次即可
-                if (!layer.hasReferencePose)
+                for (int layerIdx = 0; layerIdx < layerRuntimes.Count; layerIdx++)
                 {
-                    var states = layer.connectedStates;
-                    var slots = layer.connectedSlots;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                    if (states.Count != slots.Count) throw new InvalidOperationException($"connectedStates/connectedSlots 计数不一致: {layer.layerType}");
-#endif
-                    for (int i = 0; i < states.Count; i++)
-                    {
-                        var state = states[i];
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                        if (state == null) throw new InvalidOperationException($"connectedStates 存在 null: {layer.layerType}");
-#endif
-                        layer.mixer.SetInputWeight(slots[i], state.PlayableWeight);
-                    }
+                    var layer = layerRuntimes[layerIdx];
+                    if (!layer.mixer.IsValid()) continue;
+                    if (!layer.HasDirtyFlag(PipelineDirtyFlags.MixerWeights)) continue;
 
+                // 统一规则：同层多个可播放动画按“请求权重 × 软优先级因子”进行归一化分配。
+                // 目标：1) 总权重严格=1 2) 分配更均衡，不出现高优先级瞬间把 1 全拿完的激进行为。
+                var states = layer.connectedStates;
+                var slots = layer.connectedSlots;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (states.Count != slots.Count) throw new InvalidOperationException($"connectedStates/connectedSlots 计数不一致: {layer.layerType}");
+#endif
+
+                int stateCount = states.Count;
+                if (stateCount == 0)
+                {
+                    if (layer.hasReferencePose)
+                    {
+                        layer.mixer.SetInputWeight(0, 1f);
+                        layer.referencePoseWeightsNormalized = false;
+                    }
                     layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
                     continue;
                 }
 
-                int inputCount = layer.mixer.GetInputCount();
-                if (inputCount <= 1)
+                EnsureMixerWeightCacheCapacity(stateCount);
+                var sortIndices = _mixerWeightSortIndices;
+                var effectiveWeights = _mixerEffectiveWeights;
+
+                for (int i = 0; i < stateCount; i++)
                 {
-                    // 只有参考姿态自己，权重=1
-                    layer.mixer.SetInputWeight(0, 1f);
-                    layer.referencePoseWeightsNormalized = false;
-                    layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
-                    continue;
+                    sortIndices[i] = i;
+                    effectiveWeights[i] = 0f;
                 }
 
-                // ★ 核心：从状态对象读取"期望权重"（state.PlayableWeight），
-                //   而非从mixer读取——这样不受上帧归一化的污染
-                float intendedWeightSum = 0f;
+                // 计算 score 并归一化：score = RequestedPlayableWeight × priorityFactor。
+                // priorityFactor 使用对数做“软偏置”，避免 priority 数值大时产生过强碾压。
+                float scoreSum = 0f;
+                int bestIdx = 0;
+                StateBase bestState = null;
+                const float kEpsilon = 0.0001f;
+                for (int i = 0; i < stateCount; i++)
                 {
-                    var states = layer.connectedStates;
-                    for (int i = 0; i < states.Count; i++)
-                    {
-                        intendedWeightSum += states[i].PlayableWeight;
-                    }
-                }
-
-                if (intendedWeightSum <= 1f)
-                {
-                    // ★ 权重不足1.0：参考姿态自动填充剩余，防止bind pose下陷
-                    // 注意：外部权重写入已延后到这里，因此每次 dirty 都需要把状态权重写回 mixer。
-                    {
-                        var states = layer.connectedStates;
-                        var slots = layer.connectedSlots;
+                    var state = states[i];
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                        if (states.Count != slots.Count) throw new InvalidOperationException($"connectedStates/connectedSlots 计数不一致: {layer.layerType}");
+                    if (state == null) throw new InvalidOperationException($"connectedStates 存在 null: {layer.layerType}");
 #endif
-                        for (int i = 0; i < states.Count; i++)
-                        {
-                            layer.mixer.SetInputWeight(slots[i], states[i].PlayableWeight);
-                        }
+
+                    float req = state.RequestedPlayableWeight;
+                    if (req <= 0f)
+                    {
+                        effectiveWeights[i] = 0f;
                     }
-                    layer.mixer.SetInputWeight(0, 1f - intendedWeightSum);
-                    layer.referencePoseWeightsNormalized = false;
+                    else
+                    {
+                        if (req > 1f) req = 1f;
+
+                        state.EnsureResolvedRuntimeConfig();
+                        float pr = state.ResolvedConfig.priority;
+                        if (pr < 0f) pr = 0f;
+
+                        float priorityFactor = 1f + Mathf.Log(pr + 1f);
+                        float score = req * priorityFactor;
+                        effectiveWeights[i] = score;
+                        scoreSum += score;
+                    }
+
+                    // 用于“所有请求权重都为 0”的兜底：选最佳状态吃满 1。
+                    if (bestState == null || CompareStateForMixerWeightSort(bestState, state) > 0)
+                    {
+                        bestState = state;
+                        bestIdx = i;
+                    }
+                }
+
+                if (scoreSum <= kEpsilon)
+                {
+                    for (int i = 0; i < stateCount; i++) effectiveWeights[i] = 0f;
+                    effectiveWeights[bestIdx] = 1f;
                 }
                 else
                 {
-                    // ★ 权重超过1.0：归一化所有状态权重，防止角色浮起
-                    // 参考姿态权重=0（活跃状态已完全覆盖）
-                    // 因为每帧都从state.PlayableWeight重新读取，不会永久破坏权重
-                    // 当其他状态淡出后sum回落<=1.0，权重自动恢复为原始值
-                    layer.mixer.SetInputWeight(0, 0f);
-                    float invSum = 1f / intendedWeightSum;
+                    float inv = 1f / scoreSum;
+                    for (int i = 0; i < stateCount; i++)
                     {
-                        var states = layer.connectedStates;
-                        var slots = layer.connectedSlots;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                        if (states.Count != slots.Count) throw new InvalidOperationException($"connectedStates/connectedSlots 计数不一致: {layer.layerType}");
-#endif
-                        for (int i = 0; i < states.Count; i++)
-                        {
-                            layer.mixer.SetInputWeight(slots[i], states[i].PlayableWeight * invSum);
-                        }
+                        effectiveWeights[i] *= inv;
                     }
-
-                    layer.referencePoseWeightsNormalized = true;
                 }
 
-                layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
+                // 写入：1) 状态生效权重（供 IK/查询/调试使用） 2) Mixer 输入权重
+                for (int i = 0; i < stateCount; i++)
+                {
+                    var state = states[i];
+                    float w = effectiveWeights[i];
+                    state.SetEffectivePlayableWeightNoDirty(w);
+                    layer.mixer.SetInputWeight(slots[i], w);
+                }
+
+                if (layer.hasReferencePose)
+                {
+                    // 同层只要存在可播放状态，就强制让“热插槽动画权重和=1”，参考姿态应为 0。
+                    layer.mixer.SetInputWeight(0, 0f);
+                    layer.referencePoseWeightsNormalized = false;
+                }
+
+                // 可靠性收口：清零未使用的槽位权重，避免残留权重导致“看起来总和不是1”。
+                // inputCount 通常很小（<=maxPlayableSlots），这里用 O(N*M) 的包含检查即可。
+                {
+                    int inputCount = layer.mixer.GetInputCount();
+                    int start = layer.hasReferencePose ? 1 : 0;
+                    for (int slot = start; slot < inputCount; slot++)
+                    {
+                        bool used = false;
+                        for (int i = 0; i < stateCount; i++)
+                        {
+                            if (slots[i] == slot)
+                            {
+                                used = true;
+                                break;
+                            }
+                        }
+
+                        if (!used)
+                        {
+                            layer.mixer.SetInputWeight(slot, 0f);
+                        }
+                    }
+                }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                // Debug 校验：本层所有 Mixer 输入权重之和应严格≈1。
+                {
+                    float sum = 0f;
+                    int inputCount = layer.mixer.GetInputCount();
+                    for (int i = 0; i < inputCount; i++)
+                    {
+                        sum += layer.mixer.GetInputWeight(i);
+                    }
+
+                    if (Mathf.Abs(sum - 1f) > 0.001f)
+                    {
+                        StateMachineDebugSettings.Instance.LogWarning(
+                            $"[MixerWeightSum] Layer={layer.layerType} Sum={sum:F4} InputCount={inputCount} HasRefPose={layer.hasReferencePose} StateCount={stateCount}");
+                    }
+                }
+#endif
+
+                    layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
+                }
             }
+            finally
+            {
+                _isUpdatingMixerInputWeights = false;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void TryUpdateMixerWeightsImmediately(StateLayerRuntime layer)
+        {
+            if (layer == null) return;
+            if (!isRunning) return;
+            if (!playableGraph.IsValid()) return;
+            if (!layer.mixer.IsValid()) return;
+            if (_isUpdatingMixerInputWeights) return;
+
+            layer.MarkDirty(PipelineDirtyFlags.MixerWeights);
+            UpdateMixerInputWeights();
         }
 
         /// <summary>
@@ -1861,6 +2256,13 @@ namespace ES
                 float eased = EvaluateFadeCurve(state, t, isFadeIn: false);
                 float weight = Mathf.Lerp(fadeData.startWeight, 0f, eased);
                 state.SetPlayableWeightAssumeBound(weight);
+
+                // 淡出期间：可选继续更新“内部混合权重”（1D/2D/DirectBlend/Phase4 等）。
+                // 仅对已退出逻辑的状态执行，避免 Running 状态同帧重复更新。
+                if (state.baseStatus != StateBaseStatus.Running && stateContext != null)
+                {
+                    state.UpdateAnimationRuntimeForFadeOut(stateContext, deltaTime);
+                }
 
                 if (t >= 1f)
                 {
@@ -2512,6 +2914,9 @@ namespace ES
                 TryDeactivateState(state.strKey);
             }
 
+            // 清理与该状态相关的退出绑定（From/To）
+            RemoveExitActivationBindingsRelatedToState(state);
+
             // 同时从两个字典移除
             if (!string.IsNullOrEmpty(state.strKey))
             {
@@ -2822,7 +3227,7 @@ namespace ES
         // 1. 完善 CheckStateMergeCompatibility 的判断规则
         // 2. 考虑优先级、代价、通道占用等因素
         // 3. 添加自定义合并策略支持
-        public StateActivationResult TestStateActivation(StateBase targetState, StateLayerType layer = StateLayerType.NotClear)
+        public StateActivationResult TestStateActivation(StateBase targetState, StateLayerType layer = StateLayerType.NotClear, StateBase ignoreInteractionWithState = null)
         {
 #if STATEMACHINEDEBUG && UNITY_EDITOR
             {
@@ -2891,7 +3296,7 @@ namespace ES
             }
             #region 缓存与已激活查询
             int layerIndex = (int)layer;
-            var cache = GetOrCreateActivationCache(targetState);
+            var cache = ignoreInteractionWithState == null ? GetOrCreateActivationCache(targetState) : null;
             if (cache != null && cache.versions[layerIndex] == _dirtyVersion)
             {
 #if STATEMACHINEDEBUG && UNITY_EDITOR
@@ -3018,6 +3423,8 @@ namespace ES
             #region 遍历合并测试
             foreach (var existingState in allRunningStates)
             {
+                if (ignoreInteractionWithState != null && existingState == ignoreInteractionWithState)
+                    continue;
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                 {
                     var dbg = StateMachineDebugSettings.Instance;
@@ -3110,6 +3517,18 @@ namespace ES
                 cache.versions[layerIndex] = _dirtyVersion;
             }
             return defaultSuccess;
+        }
+
+        /// <summary>
+        /// 尝试激活状态（通过实例 + 指定层级），并在合并/冲突计算中忽略指定状态。
+        /// 用途：激活新状态时“忽略两状态之间的交互/重叠”（不让 ignoreState 参与合并冲突判定）。
+        /// </summary>
+        public bool TryActivateState(StateBase targetState, StateLayerType layer, StateBase ignoreInteractionWithState)
+        {
+            if (targetState == null) return false;
+            layer = ResolveLayerForState(targetState, layer);
+            var result = TestStateActivation(targetState, layer, ignoreInteractionWithState);
+            return ExecuteStateActivation(targetState, layer, result);
         }
 
 
@@ -3660,6 +4079,22 @@ namespace ES
         }
 
         /// <summary>
+        /// 尝试激活状态（通过键），并在合并/冲突计算中忽略指定状态。
+        /// </summary>
+        public bool TryActivateState(string stateKey, string ignoreInteractionStateKey, StateLayerType layer = StateLayerType.NotClear)
+        {
+            var state = GetStateByString(stateKey);
+            if (state == null)
+            {
+                StateMachineDebugSettings.Instance.LogWarning($"状态 {stateKey} 不存在");
+                return false;
+            }
+
+            var ignore = GetStateByString(ignoreInteractionStateKey);
+            return TryActivateState(state, layer, ignore);
+        }
+
+        /// <summary>
         /// 尝试激活状态（通过Int键）
         /// </summary>
         public bool TryActivateState(int stateKey, StateLayerType layer = StateLayerType.NotClear)
@@ -3672,6 +4107,22 @@ namespace ES
             }
 
             return TryActivateState(state, layer);
+        }
+
+        /// <summary>
+        /// 尝试激活状态（通过Int键），并在合并/冲突计算中忽略指定状态。
+        /// </summary>
+        public bool TryActivateState(int stateKey, int ignoreInteractionStateKey, StateLayerType layer = StateLayerType.NotClear)
+        {
+            var state = GetStateByInt(stateKey);
+            if (state == null)
+            {
+                StateMachineDebugSettings.Instance.LogWarning($"状态ID {stateKey} 不存在");
+                return false;
+            }
+
+            var ignore = GetStateByInt(ignoreInteractionStateKey);
+            return TryActivateState(state, layer, ignore);
         }
 
         /// <summary>
@@ -3722,6 +4173,13 @@ namespace ES
 
                 // 仅触发一次淡出时长判断，后续不做持续判断。
                 ApplyFadeOut(state, layerRuntime);
+
+                // 退出可能发生在 UpdateStateMachine 之外（例如外部脚本调用 Deactivate）。
+                // 为了保证“退出后正在淡出的状态”立刻参与 Mixer 权重分配，这里同帧收口一次。
+                if (layerRuntime.fadeOutStates != null && layerRuntime.fadeOutStates.ContainsKey(state))
+                {
+                    TryUpdateMixerWeightsImmediately(layerRuntime);
+                }
             }
 
             // 若不启用淡出，则立即卸载
@@ -3762,6 +4220,9 @@ namespace ES
             }
 
             MarkDirty(StateDirtyReason.Exit);
+
+            // ★ 退出后自动激活：此时 state 已逻辑退出且已从 running 集合移除。
+            TryFireExitAutoActivation(state, layer, layerRuntime);
         }
 
         /// <summary>
@@ -4074,6 +4535,10 @@ namespace ES
             // 连接到层级Mixer
             playableGraph.Connect(statePlayable, 0, layer.mixer, inputIndex);
 
+            // ★ 关键：新接入的输入槽位默认权重可能不是 0（甚至可能残留旧值）。
+            // 先显式置 0，避免“刚加入瞬间”出现权重/总和异常的 1 帧抖动。
+            layer.mixer.SetInputWeight(inputIndex, 0f);
+
             // 记录映射
             layer.stateToSlotMap[state] = inputIndex;
             state.BindLayerSlot(layer, inputIndex);
@@ -4088,8 +4553,12 @@ namespace ES
             }
 #endif
 
-            // 标记Dirty（热插拔）
-            layer.MarkDirty(PipelineDirtyFlags.HotPlug);
+            // 标记Dirty（热插拔 + 权重）
+            layer.MarkDirty(PipelineDirtyFlags.HotPlug | PipelineDirtyFlags.MixerWeights);
+
+            // ★ 关键：如果热插发生在本帧 UpdateMixerInputWeights 之后，等到下一帧才会分配权重。
+            // 这里立刻做一次权重分配，保证“状态刚激活/加入”的同一帧也满足层内权重和=1。
+            TryUpdateMixerWeightsImmediately(layer);
         }
 
         /// <summary>
@@ -4152,6 +4621,9 @@ namespace ES
 
             // 标记Dirty（热拔插）
             layer.MarkDirty(PipelineDirtyFlags.HotPlug);
+
+            // 立即收口一次权重，避免移除瞬间残留导致 sum!=1
+            TryUpdateMixerWeightsImmediately(layer);
 
             // 让StateBase销毁自己的Playable资源（包括嵌套的Mixer等）
             state.DestroyPlayable();

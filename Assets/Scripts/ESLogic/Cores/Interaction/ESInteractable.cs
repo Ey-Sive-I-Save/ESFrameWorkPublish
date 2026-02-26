@@ -68,20 +68,8 @@ namespace ES
         [Title("MatchTarget (Optional)")]
         public bool enableMatchTarget = false;
 
-        public Transform matchTarget;
-
-        public AvatarTarget matchTargetBodyPart = AvatarTarget.RightHand;
-
-        [Range(0f, 1f)]
-        public float matchTargetStartTime = 0.1f;
-
-        [Range(0f, 1f)]
-        public float matchTargetEndTime = 0.9f;
-
-        public Vector3 matchTargetPosWeight = new Vector3(1f, 1f, 1f);
-
-        [Range(0f, 1f)]
-        public float matchTargetRotWeight = 1f;
+        [ShowIf("enableMatchTarget"), InlineProperty, HideLabel]
+        public MatchTargetRequest matchTargetRequest = MatchTargetRequest.Default;
 
         private float _lastInteractTime = -999f;
 

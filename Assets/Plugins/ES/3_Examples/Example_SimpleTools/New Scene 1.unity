@@ -1638,12 +1638,17 @@ MonoBehaviour:
   ikTargetWeight: 1
   useIKRotation: 1
   enableMatchTarget: 0
-  matchTarget: {fileID: 0}
-  matchTargetBodyPart: 5
-  matchTargetStartTime: 0.1
-  matchTargetEndTime: 0.9
-  matchTargetPosWeight: {x: 1, y: 1, z: 1}
-  matchTargetRotWeight: 1
+  matchTargetRequest:
+    bodyPart: 0
+    target: {fileID: 0}
+    fixedPosition: {x: 0, y: 0, z: 0}
+    fixedRotationEuler: {x: 0, y: 0, z: 0}
+    positionOffset: {x: 0, y: 0, z: 0}
+    rotationOffsetEuler: {x: 0, y: 0, z: 0}
+    startTime: 0
+    endTime: 1
+    positionWeight: {x: 1, y: 1, z: 1}
+    rotationWeight: 1
   doorPivot: {fileID: 352427953}
   localOpenAxis: {x: 0, y: 1, z: 0}
   openAngle: 90
@@ -2139,13 +2144,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 951405575}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.04, z: -0.089}
-  m_LocalScale: {x: 1, y: 1, z: 0.22}
-  m_ConstrainProportionsScale: 0
+  m_LocalRotation: {x: 0, y: -0.15195088, z: 0, w: 0.98838806}
+  m_LocalPosition: {x: 1.31, y: 1.11, z: -0.08899995}
+  m_LocalScale: {x: 0.075, y: 0.12331731, z: 0.039953273}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 992245613}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -17.48, z: 0}
 --- !u!65 &951405577
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2163,7 +2168,7 @@ BoxCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
@@ -2444,8 +2449,8 @@ Transform:
   m_GameObject: {fileID: 992245608}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -1.9300001, y: 0.72000015, z: 3.53}
-  m_LocalScale: {x: 1.38, y: 0.5, z: 3.21}
+  m_LocalPosition: {x: -1.9300001, y: 0.72000015, z: 6.199}
+  m_LocalScale: {x: 1.71, y: 1.04, z: 3.21}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 951405576}
@@ -6883,13 +6888,13 @@ MonoBehaviour:
         climbOverBodyPart: 4
         climbOverStartTime: 0.1
         climbOverEndTime: 0.8
-        climbOverPosWeight: {x: 0, y: 1, z: 1}
-        climbOverRotWeight: 0.5
+        climbOverApproachSpeed: 3
+        climbOverAngleSpeed: 180
         vaultBodyPart: 0
         vaultStartTime: 0.1
         vaultEndTime: 0.9
-        vaultPosWeight: {x: 0, y: 1, z: 1}
-        vaultRotWeight: 0
+        vaultApproachSpeed: 5
+        vaultAngleSpeed: 0
         climbTopCheckHeightOffset: 1.4
         vaultMinDuration: 0.3
         vaultMaxDuration: 1.2
@@ -6924,8 +6929,8 @@ MonoBehaviour:
         climbOverFootBodyPart: 2
         climbOverFootStartTime: 0.6
         climbOverFootEndTime: 0.95
-        climbOverFootPosWeight: {x: 0, y: 1, z: 1}
-        climbOverFootRotWeight: 0.5
+        climbOverFootApproachSpeed: 3
+        climbOverFootAngleSpeed: 180
         enableContinuousApproach: 1
         approachSpeed: 6
         approachMaxSpeed: 3

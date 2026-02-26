@@ -41,7 +41,16 @@ namespace ES
         [NonSerialized]
         private float _playableWeight = 1f;
 
+        [NonSerialized]
+        private float _requestedPlayableWeight = 1f;
+
         public float PlayableWeight => _playableWeight;
+
+        /// <summary>
+        /// 状态“请求权重”（由淡入淡出/外部调用写入）。
+        /// 最终生效权重会由 StateMachine 统一按层级规则（优先级抢占/淡入淡出/归一化）计算并写回。
+        /// </summary>
+        internal float RequestedPlayableWeight => _requestedPlayableWeight;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void SetPlayableWeight(float weight)
@@ -51,6 +60,7 @@ namespace ES
             if (weight < 0f || weight > 1f) throw new ArgumentOutOfRangeException(nameof(weight), weight, "SetPlayableWeight: weight 必须在 [0,1] 范围内");
 #endif
 
+            _requestedPlayableWeight = weight;
             _playableWeight = weight;
             if (_animationRuntime != null)
             {
@@ -74,6 +84,7 @@ namespace ES
         internal void SetPlayableWeightAssumeBound(float weight)
         {
             // 约定：调用方应传入 [0,1]。
+            _requestedPlayableWeight = weight;
             _playableWeight = weight;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -86,6 +97,23 @@ namespace ES
             _animationRuntime.totalWeight = weight;
 
             _layerRuntime.MarkDirty(PipelineDirtyFlags.MixerWeights);
+        }
+
+        /// <summary>
+        /// 写入“生效权重”（不触发 dirty，不回写 mixer）。
+        /// 用途：StateMachine 在批处理写入 Mixer 前，按层级优先级规则计算每个状态的最终权重。
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void SetEffectivePlayableWeightNoDirty(float weight)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (weight < 0f || weight > 1f) throw new ArgumentOutOfRangeException(nameof(weight), weight, "SetEffectivePlayableWeightNoDirty: weight 必须在 [0,1] 范围内");
+#endif
+            _playableWeight = weight;
+            if (_animationRuntime != null)
+            {
+                _animationRuntime.totalWeight = weight;
+            }
         }
 
         internal void BindLayerSlot(StateLayerRuntime layer, int slotIndex)
@@ -357,6 +385,7 @@ namespace ES
 #endif
 #endif
             calculator.UpdateWeights(runtime, context, deltaTime);
+           
 
             // ★ AnimationClip反向控制：检测动画是否播放完毕（仅针对UntilAnimationEnd模式）
             if (_durationModeCached == StateDurationMode.UntilAnimationEnd)
@@ -412,15 +441,68 @@ namespace ES
                 }
             }
 
-            // ★ 更新MatchTarget进度检查
-            if (runtime.matchTarget.active && !runtime.matchTarget.completed)
+            // ★ Config-Auto 时间序列驱动：每帧根据 hasEnterTime 自动推进阶段
+            // 独立于 runtime.matchTarget.active，支持阶段切换和重入。
+            if (_enableMatchTargetCached)
             {
-                if (!hasNp) { np = normalizedProgress; hasNp = true; }
-                if (np > runtime.matchTarget.endTime)
+                TickConfigAutoMatchTarget(hasEnterTime);
+            }
+
+            // ★ 动态MatchTarget目标追踪：如果 Inspector 配置了 Transform 引用，每帧同步位置/旋转
+            if (_enableMatchTargetCached && runtime.matchTarget.active && !runtime.matchTarget.completed)
+            {
+                var animConfigForMT = _animConfigCached;
+                if (animConfigForMT != null && animConfigForMT.HasDynamicMatchTarget())
                 {
-                    runtime.CompleteMatchTarget();
-                    OnMatchTargetCompleted();
+                    animConfigForMT.UpdateMatchTargetFromConfig(runtime, host.HostEntity.transform);
                 }
+            }
+
+            // ★ 代码驱动待执行指令（QueueNextMatchTarget API，与 Config-Auto 无关）
+            if (_pendingCommand != null && !_pendingCommand.consumed)
+            {
+                CheckAndFirePendingCommand(hasEnterTime);
+            }
+
+            // ★ MatchTarget 完成检查已移至 ProcessMatchTarget（含终点 snap）
+            // UpdateAnimationRuntime 不再重复完成，避免 active=false 后 ProcessMatchTarget 无法执行 snap。
+        }
+
+        /// <summary>
+        /// 淡出期间仅更新“内部混合权重”（可选）。
+        /// 说明：状态逻辑已退出，不再运行 OnStateUpdate/自动退出判定/IK/MatchTarget 等，只在需要时继续跟随参数刷新内部Mixer权重。
+        /// </summary>
+        internal void UpdateAnimationRuntimeForFadeOut(StateMachineContext context, float deltaTime)
+        {
+            if (!_hasAnimationCached) return;
+
+            var runtime = _animationRuntime;
+            if (runtime == null || !runtime.IsInitialized) return;
+
+            var calculator = _calculatorCached ?? ResolveCalculatorForPlayableCreation();
+            if (calculator == null) return;
+            if (!calculator.NeedUpdateWhenFadingOut) return;
+
+            // 保持与运行态一致：totalWeight 由管线控制。
+            runtime.totalWeight = _playableWeight;
+
+            calculator.UpdateWeights(runtime, context, deltaTime);
+
+            // 纠正：避免 Calculator 误改 totalWeight 污染后续逻辑。
+            if (!Mathf.Approximately(runtime.totalWeight, _playableWeight))
+            {
+#if STATEMACHINEDEBUG
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsAnimationBlendEnabled)
+                {
+                    string stateName = _basicConfigCached != null ? _basicConfigCached.stateName : "(未知State)";
+                    string calcName = calculator != null ? calculator.GetType().Name : "(无Calculator)";
+                    dbg.LogAnimationBlend(
+                        $"[错误] (淡出) Calculator.UpdateWeights 非法修改 runtime.totalWeight（将被纠正） | " +
+                        $"State={stateName} | Calculator={calcName} | Expected={_playableWeight:F4} | Actual={runtime.totalWeight:F4}");
+                }
+#endif
+                runtime.totalWeight = _playableWeight;
             }
         }
 
@@ -449,10 +531,10 @@ namespace ES
                 {
                     var clipPlayable = (AnimationClipPlayable)playable;
                     var clip = clipPlayable.GetAnimationClip();
-                    if (clip != null && !clip.isLooping)
+                    if (clip != null)
                     {
-                        double duration = playable.GetDuration();
-                        if (!double.IsInfinity(duration) && duration > 0.001)
+                        double duration = clip.length;
+                        if (duration > 0.001)
                         {
                             if (playable.GetTime() >= duration - kFrameToleranceSeconds)
                             {
@@ -477,13 +559,6 @@ namespace ES
             if (standardDuration > 0.001f && !float.IsInfinity(standardDuration))
             {
                 // 保护：循环Clip不应触发 UntilAnimationEnd 的自动退出。
-                // 对于混合器：优先用 GetCurrentClip 判断“当前主导Clip”是否循环。
-                var currentClip = calculator.GetCurrentClip(runtime);
-                if (currentClip != null && currentClip.isLooping)
-                {
-                    return;
-                }
-
                 // 优先用输出Playable的时间（更接近图内真实推进），拿不到再回退到 hasEnterTime。
                 double t;
                 var output = runtime.GetOutputPlayable();

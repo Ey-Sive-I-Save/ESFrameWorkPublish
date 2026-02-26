@@ -243,6 +243,12 @@ namespace ES
         [NonSerialized]
         private bool _debugMixerSlotWeightsDirty = true;
 
+        [NonSerialized]
+        private bool _debugEnablePlayableInputs;
+
+        [NonSerialized]
+        private bool _debugPlayableInputsDirty = true;
+
         [ShowInInspector, FoldoutGroup("Mixer权重调试"), LabelText("启用槽位权重列表(耗时)")]
         private bool DebugEnableMixerSlotWeights
         {
@@ -255,8 +261,23 @@ namespace ES
             }
         }
 
+        [ShowInInspector, FoldoutGroup("Playable调试"), LabelText("启用Playable输入列表(耗时)")]
+        private bool DebugEnablePlayableInputs
+        {
+            get => _debugEnablePlayableInputs;
+            set
+            {
+                if (_debugEnablePlayableInputs == value) return;
+                _debugEnablePlayableInputs = value;
+                _debugPlayableInputsDirty = true;
+            }
+        }
+
         [NonSerialized]
         private readonly List<string> _debugMixerSlotWeightsCache = new List<string>(64);
+
+        [NonSerialized]
+        private readonly List<string> _debugPlayableInputsCache = new List<string>(64);
 
         [NonSerialized]
         private StateBase[] _debugSlotToState;
@@ -266,6 +287,129 @@ namespace ES
 
         [NonSerialized]
         private bool[] _debugSlotFadingOut;
+
+        private struct ClipWeightInfo
+        {
+            public string clipName;
+            public float weight;
+        }
+
+        [NonSerialized]
+        private readonly List<ClipWeightInfo> _debugClipWeightsCache = new List<ClipWeightInfo>(16);
+
+        [NonSerialized]
+        private readonly Dictionary<string, int> _debugClipIndexCache = new Dictionary<string, int>(16);
+
+        [NonSerialized]
+        private readonly System.Text.StringBuilder _debugClipSummarySb = new System.Text.StringBuilder(256);
+
+        private void DebugCollectClipWeightsRecursive(Playable playable, float weight, int depth, int maxDepth, ref string opaqueReason)
+        {
+            if (!playable.IsValid()) return;
+            if (depth > maxDepth) return;
+
+            var type = playable.GetPlayableType();
+            if (type == typeof(AnimatorControllerPlayable))
+            {
+                if (opaqueReason == null) opaqueReason = $"{nameof(AnimatorControllerPlayable)}(内部Controller/BlendTree不可枚举)";
+                return;
+            }
+
+            if (type == typeof(AnimationScriptPlayable))
+            {
+                if (opaqueReason == null) opaqueReason = $"{nameof(AnimationScriptPlayable)}(内部脚本Job不可枚举)";
+                return;
+            }
+
+            if (type == typeof(AnimationClipPlayable))
+            {
+                var clipPlayable = (AnimationClipPlayable)playable;
+                var clip = clipPlayable.GetAnimationClip();
+                string clipName = clip != null ? clip.name : "None";
+
+                if (!_debugClipIndexCache.TryGetValue(clipName, out int idx))
+                {
+                    idx = _debugClipWeightsCache.Count;
+                    _debugClipWeightsCache.Add(new ClipWeightInfo { clipName = clipName, weight = weight });
+                    _debugClipIndexCache[clipName] = idx;
+                }
+                else
+                {
+                    var info = _debugClipWeightsCache[idx];
+                    info.weight += weight;
+                    _debugClipWeightsCache[idx] = info;
+                }
+                return;
+            }
+
+            int inputCount = playable.GetInputCount();
+            if (inputCount <= 0) return;
+
+            for (int i = 0; i < inputCount; i++)
+            {
+                var child = playable.GetInput(i);
+                float w = playable.GetInputWeight(i);
+                if (w <= 0f) continue;
+                DebugCollectClipWeightsRecursive(child, weight * w, depth + 1, maxDepth, ref opaqueReason);
+            }
+        }
+
+        private string DebugGetPlayableClipSummary(Playable playable, float rootWeight, int maxDepth = 8, int maxClipsToShow = 6)
+        {
+            if (!playable.IsValid()) return "";
+
+            _debugClipWeightsCache.Clear();
+            _debugClipIndexCache.Clear();
+
+            string opaqueReason = null;
+            DebugCollectClipWeightsRecursive(playable, rootWeight, 0, maxDepth, ref opaqueReason);
+            if (_debugClipWeightsCache.Count <= 0)
+            {
+                if (opaqueReason != null)
+                {
+                    _debugClipSummarySb.Length = 0;
+                    _debugClipSummarySb.Append(" 片段=(不透明:");
+                    _debugClipSummarySb.Append(opaqueReason);
+                    _debugClipSummarySb.Append(')');
+                    return _debugClipSummarySb.ToString();
+                }
+
+                return "";
+            }
+
+            _debugClipWeightsCache.Sort((a, b) => b.weight.CompareTo(a.weight));
+
+            int showCount = Mathf.Min(maxClipsToShow, _debugClipWeightsCache.Count);
+            int totalCount = _debugClipWeightsCache.Count;
+            int restCount = totalCount - showCount;
+
+            _debugClipSummarySb.Length = 0;
+            _debugClipSummarySb.Append(" 片段=");
+            for (int i = 0; i < showCount; i++)
+            {
+                var info = _debugClipWeightsCache[i];
+                if (i > 0) _debugClipSummarySb.Append(", ");
+                _debugClipSummarySb.Append(info.clipName);
+                _debugClipSummarySb.Append('(');
+                _debugClipSummarySb.Append(info.weight.ToString("F2"));
+                _debugClipSummarySb.Append(')');
+            }
+
+            if (restCount > 0)
+            {
+                _debugClipSummarySb.Append(" +");
+                _debugClipSummarySb.Append(restCount);
+            }
+
+            if (opaqueReason != null)
+            {
+                _debugClipSummarySb.Append(" (不完整:不透明=");
+                _debugClipSummarySb.Append(opaqueReason);
+                _debugClipSummarySb.Append(')');
+            }
+
+            return _debugClipSummarySb.ToString();
+        }
     #endif
 
         /// <summary>
@@ -353,12 +497,20 @@ namespace ES
 
                     if (slot == 0 && hasReferencePose)
                     {
-                        stateName = "[参考姿态]";
+                        string clipName = "None";
+                        if (referencePosePlayable.IsValid())
+                        {
+                            var clip = referencePosePlayable.GetAnimationClip();
+                            if (clip != null) clipName = clip.name;
+                        }
+                        stateName = $"[参考姿态] <{clipName}>";
                         intendedW = mixerW;
                     }
                     else if (state != null)
                     {
-                        stateName = state.strKey;
+                        var clip = state.GetCurrentClip();
+                        string clipName = clip != null ? clip.name : "None";
+                        stateName = $"{state.strKey} [{state.RuntimePhase}] <{clipName}>";
                         intendedW = state.PlayableWeight;
                     }
                     else
@@ -377,6 +529,136 @@ namespace ES
 
                 _debugMixerSlotWeightsDirty = false;
                 return _debugMixerSlotWeightsCache;
+#else
+                return null;
+#endif
+            }
+        }
+
+        /// <summary>
+        /// 实时显示该层 Mixer 的每个输入 Playable 信息（slot/权重/类型/时间等）。
+        /// 默认不启用，避免 Inspector 重绘导致的额外开销。
+        /// </summary>
+        [ShowInInspector, ReadOnly, FoldoutGroup("Playable调试")]
+        [LabelText("Playable输入列表")]
+        private List<string> DebugPlayableInputs
+        {
+            get
+            {
+#if UNITY_EDITOR
+                if (!_debugEnablePlayableInputs)
+                {
+                    _debugPlayableInputsCache.Clear();
+                    _debugPlayableInputsCache.Add("(未启用) 勾选“启用Playable输入列表(耗时)”以显示");
+                    return _debugPlayableInputsCache;
+                }
+
+                if (!mixer.IsValid())
+                {
+                    _debugPlayableInputsCache.Clear();
+                    _debugPlayableInputsCache.Add("Mixer无效");
+                    _debugPlayableInputsDirty = false;
+                    return _debugPlayableInputsCache;
+                }
+
+                int inputCount = mixer.GetInputCount();
+                if (inputCount <= 0)
+                {
+                    _debugPlayableInputsCache.Clear();
+                    _debugPlayableInputsCache.Add("(无输入槽位)");
+                    _debugPlayableInputsDirty = false;
+                    return _debugPlayableInputsCache;
+                }
+
+                // Inspector 重绘频率很高：仅在输入/权重可能变化时重建字符串列表。
+                bool hasActiveFades = fadeInStates.Count > 0 || fadeOutStates.Count > 0;
+                bool hasRelevantDirty = (dirtyFlags & (PipelineDirtyFlags.MixerWeights | PipelineDirtyFlags.HotPlug)) != 0;
+                if (!_debugPlayableInputsDirty && !hasActiveFades && !hasRelevantDirty)
+                {
+                    return _debugPlayableInputsCache;
+                }
+
+                _debugPlayableInputsCache.Clear();
+
+                if (_debugSlotToState == null || _debugSlotToState.Length < inputCount)
+                {
+                    _debugSlotToState = new StateBase[inputCount];
+                    _debugSlotFadingIn = new bool[inputCount];
+                    _debugSlotFadingOut = new bool[inputCount];
+                }
+
+                for (int i = 0; i < inputCount; i++)
+                {
+                    _debugSlotToState[i] = null;
+                    _debugSlotFadingIn[i] = false;
+                    _debugSlotFadingOut[i] = false;
+                }
+
+                foreach (var kvp in stateToSlotMap)
+                {
+                    int slotIndex = kvp.Value;
+                    if ((uint)slotIndex >= (uint)inputCount) continue;
+
+                    var state = kvp.Key;
+                    _debugSlotToState[slotIndex] = state;
+                    _debugSlotFadingIn[slotIndex] = state != null && fadeInStates.ContainsKey(state);
+                    _debugSlotFadingOut[slotIndex] = state != null && fadeOutStates.ContainsKey(state);
+                }
+
+                for (int slot = 0; slot < inputCount; slot++)
+                {
+                    float w = mixer.GetInputWeight(slot);
+                    var input = mixer.GetInput(slot);
+                    var state = _debugSlotToState[slot];
+
+                    // 跳过完全空的槽位
+                    if (slot > 0 && state == null && !input.IsValid() && w <= 0f)
+                    {
+                        continue;
+                    }
+
+                    string stateName;
+                    if (slot == 0 && hasReferencePose)
+                        stateName = "[参考姿态]";
+                    else if (state != null)
+                        stateName = state.strKey;
+                    else
+                        stateName = "(空)";
+
+                    string fadeTag = _debugSlotFadingIn[slot] ? " [淡入中]" : _debugSlotFadingOut[slot] ? " [淡出中]" : "";
+
+                    string playableDesc;
+                    if (!input.IsValid())
+                    {
+                        playableDesc = "Null";
+                    }
+                    else
+                    {
+                        var type = input.GetPlayableType();
+                        string typeName = type != null ? type.Name : "Unknown";
+                        int inCount = input.GetInputCount();
+
+                        double time = input.GetTime();
+                        string durStr = "?";
+                        if (type == typeof(AnimationClipPlayable))
+                        {
+                            var cp = (AnimationClipPlayable)input;
+                            var clip = cp.GetAnimationClip();
+                            if (clip != null)
+                            {
+                                double len = clip.length;
+                                durStr = len.ToString("F2");
+                            }
+                        }
+                        string clipsSummary = DebugGetPlayableClipSummary(input, w);
+                        playableDesc = $"{typeName} in={inCount} t={time:F2}/{durStr}{clipsSummary}";
+                    }
+
+                    _debugPlayableInputsCache.Add($"Slot[{slot}] w={w:F4} {playableDesc} ← {stateName}{fadeTag}");
+                }
+
+                _debugPlayableInputsDirty = false;
+                return _debugPlayableInputsCache;
 #else
                 return null;
 #endif
@@ -751,6 +1033,7 @@ namespace ES
             if ((flags & (PipelineDirtyFlags.MixerWeights | PipelineDirtyFlags.HotPlug)) != 0)
             {
                 _debugMixerSlotWeightsDirty = true;
+                _debugPlayableInputsDirty = true;
             }
 #endif
 #if STATEMACHINEDEBUG

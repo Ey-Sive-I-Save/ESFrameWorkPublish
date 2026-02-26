@@ -7,6 +7,26 @@ using Sirenix.OdinInspector;
 
 namespace ES
 {
+    // ==================== AvatarTarget 中文选项（供 ValueDropdown 使用）====================
+
+    /// <summary>
+    /// 为 Unity 内置 <see cref="AvatarTarget"/> 枚举提供 Odin Inspector 中文下拉选项。
+    /// 在任意字段上添加 <c>[ValueDropdown("@ES.AvatarTargetDropdown.Options")]</c> 即可生效。
+    /// </summary>
+    public static class AvatarTargetDropdown
+    {
+        public static IEnumerable<ValueDropdownItem<AvatarTarget>> Options =>
+            new ValueDropdownItem<AvatarTarget>[]
+            {
+                new ValueDropdownItem<AvatarTarget>("根节点 (Root)",      AvatarTarget.Root),
+                new ValueDropdownItem<AvatarTarget>("身体重心 (Body)",    AvatarTarget.Body),
+                new ValueDropdownItem<AvatarTarget>("左脚 (LeftFoot)",   AvatarTarget.LeftFoot),
+                new ValueDropdownItem<AvatarTarget>("右脚 (RightFoot)",  AvatarTarget.RightFoot),
+                new ValueDropdownItem<AvatarTarget>("左手 (LeftHand)",   AvatarTarget.LeftHand),
+                new ValueDropdownItem<AvatarTarget>("右手 (RightHand)",  AvatarTarget.RightHand),
+            };
+    }
+
     // ==================== IK肢体配置 ====================
 
     /// <summary>
@@ -51,7 +71,7 @@ namespace ES
     /// 注视IK配置
     /// </summary>
     [Serializable]
-    public struct IKLookAtConfig
+    public class IKLookAtConfig
     {
         [LabelText("启用注视"), ToggleLeft]
         public bool enabled;
@@ -114,51 +134,149 @@ namespace ES
     // ==================== MatchTarget配置 ====================
 
     /// <summary>
-    /// MatchTarget预设配置（Inspector可配置）
+    /// MatchTarget 请求（统一数据包）。<br/>
+    /// 同一个数据包可同时出现在：
+    /// <list type="bullet">
+    ///   <item>资产配置 —— <c>StateAnimationConfigData.matchTargetPreset</c></item>
+    ///   <item>场景物体 —— <c>ESInteractable.matchTargetRequest</c> 等脚本字段</item>
+    ///   <item>纯代码构造 —— <c>new MatchTargetRequest { bodyPart = ..., ... }</c></item>
+    /// </list>
+    /// 拿到请求后，只需调用 <c>state.ApplyMatchTarget(request)</c> 一行代码即可应用。
     /// </summary>
     [Serializable]
-    public struct MatchTargetPresetConfig
+    public class MatchTargetRequest
     {
-        [LabelText("身体部位")]
+        [LabelText("身体部位"), ValueDropdown("@ES.AvatarTargetDropdown.Options")]
         public AvatarTarget bodyPart;
 
         [LabelText("目标Transform")]
-        [Tooltip("运行时对齐目标位置/旋转的Transform")]
+        [Tooltip("运行时对齐目标的 Transform；非 null 时位置/旋转从该 Transform 读取，忽略下方固定值")]
         public Transform target;
 
         [LabelText("固定目标位置"), ShowIf("@target == null")]
-        [Tooltip("当无目标Transform时的世界空间固定位置")]
+        [Tooltip("当无 Transform 引用时的世界空间固定位置")]
         public Vector3 fixedPosition;
 
         [LabelText("固定目标旋转"), ShowIf("@target == null")]
         public Vector3 fixedRotationEuler;
 
-        [LabelText("开始时间"), Range(0f, 1f)]
-        [Tooltip("归一化时间 [0-1]，MatchTarget生效的起始点")]
-        public float startNormalizedTime;
+        [LabelText("位置偏移(局部空间)")]
+        [Tooltip("叠加在 target.position / fixedPosition 之上的偏移，以玩家自身局部空间为基准（X=右, Y=上, Z=前）。\n框架内部自动通过玩家旋转将其转换为世界空间后应用。\n运行时可通过 PatchMatchTargetOffset 叠加修改，不影响原始配置。")]
+        [OnValueChanged("SyncPosOffsetEnable")]
+        public Vector3 positionOffset;
 
-        [LabelText("结束时间"), Range(0f, 1f)]
-        [Tooltip("归一化时间 [0-1]，MatchTarget生效的结束点")]
-        public float endNormalizedTime;
+        [LabelText("启用位置偏移"), ToggleLeft]
+        [Tooltip("取消勾选可在不清零偏移值的前提下临时禁用 positionOffset。\n代码调用 SetMatchTargetOffsetActive(false) 亦可运行时动态关闭。")]
+        [ShowIf("@positionOffset != UnityEngine.Vector3.zero")]
+        public bool enablePositionOffset = true;
 
-        [LabelText("位置权重 (XYZ)")]
-        [Tooltip("各轴向的位置对齐权重")]
+        [LabelText("旋转偏移(玩家局部欧拉)")]
+        [Tooltip("在玩家当前朝向（playerTransform.rotation）的局部坐标系上叠加的旋转修正。\n即 playerRot * Euler(offset)，用于弥补动画期望朝向与玩家当前朝向的固定偏差。\n若需对齐到场景物体朝向，请由代码直接传入目标旋转，不走此偏移。")]
+        [OnValueChanged("SyncRotOffsetEnable")]
+        public Vector3 rotationOffsetEuler;
+
+        [LabelText("启用旋转偏移"), ToggleLeft]
+        [Tooltip("取消勾选可在不清零偏移值的前提下临时禁用 rotationOffsetEuler。")]
+        [ShowIf("@rotationOffsetEuler != UnityEngine.Vector3.zero")]
+        public bool enableRotationOffset = true;
+
+        [LabelText("开始时间(秒)"), Min(0f)]
+        [Tooltip("状态进入后经过多少秒开始执行 MatchTarget 对齐（hasEnterTime 基准）")]
+        public float startTime;
+
+        [LabelText("结束时间(秒)"), Min(0f)]
+        [Tooltip("状态进入后经过多少秒结束 MatchTarget 对齐；到达时强制吸附并标记完成")]
+        public float endTime;
+
+        [LabelText("逼近速度 (位置X / 旋转Y)")]
+        [Tooltip("X = 位置逼近速度（单位/秒），内部乘以3倍率。\nY = 旋转逼近速度（度/秒），仅「旋转启用 > 0」时生效。\nZ 暂不使用。")]
         public Vector3 positionWeight;
 
-        [LabelText("旋转权重"), Range(0f, 1f)]
+        [LabelText("旋转启用 (>0=开启)"), Range(0f, 1f)]
+        [Tooltip("大于0则启用旋转对齐，速度由上方【逼近速度.Y】决定。\n0 = 不旋转（方便不需要对齐旋转的场景）。")]
         public float rotationWeight;
 
-        public static MatchTargetPresetConfig Default => new MatchTargetPresetConfig
+        // ── 运行时 helper ──
+
+        /// <summary>
+        /// 获取实际目标位置（Transform 优先，无则固定值），
+        /// 并将 <see cref="positionOffset"/> 从 <paramref name="playerTransform"/> 的局部空间转换为世界空间后叠加。
+        /// </summary>
+        /// <param name="playerTransform">玩家根节点 Transform；为 null 时退化为直接世界空间叠加。</param>
+        public Vector3 GetPosition(Transform playerTransform = null)
         {
-            bodyPart = AvatarTarget.Root,
-            target = null,
-            fixedPosition = Vector3.zero,
-            fixedRotationEuler = Vector3.zero,
-            startNormalizedTime = 0f,
-            endNormalizedTime = 1f,
-            positionWeight = Vector3.one,
-            rotationWeight = 1f
+            var basePos = target != null ? target.position : fixedPosition;
+            if (!enablePositionOffset || positionOffset == Vector3.zero) return basePos;
+            var worldOffset = playerTransform != null
+                ? playerTransform.rotation * positionOffset
+                : positionOffset;
+            return basePos + worldOffset;
+        }
+
+        /// <summary>
+        /// 获取目标旋转。始终以<b>玩家根旋转</b>为基准，再叠加 <see cref="rotationOffsetEuler"/> 偏移。<br/>
+        /// 设计意图：旋转偏移应相对于玩家当前朝向（与位置偏移的坐标系对称）。<br/>
+        /// 若需要对齐到场景物体朝向（如攀爬墙面），由代码直接传入 targetRot，不走此方法。
+        /// </summary>
+        /// <param name="playerTransform">玩家根节点，提供基准旋转；为 null 时退化为 fixedRotationEuler 世界旋转。</param>
+        public Quaternion GetRotation(Transform playerTransform = null)
+        {
+            var baseRot = playerTransform != null
+                ? playerTransform.rotation
+                : Quaternion.Euler(fixedRotationEuler);
+            if (!enableRotationOffset || rotationOffsetEuler == Vector3.zero) return baseRot;
+            return baseRot * Quaternion.Euler(rotationOffsetEuler);
+        }
+
+        /// <summary>由 Odin OnValueChanged 回调：positionOffset 改变时自动同步 enablePositionOffset。
+        /// 全零 → 关闭（偏移无意义）；非零 → 开启。</summary>
+        private void SyncPosOffsetEnable() => enablePositionOffset = positionOffset != Vector3.zero;
+
+        /// <summary>由 Odin OnValueChanged 回调：rotationOffsetEuler 改变时自动同步 enableRotationOffset。
+        /// 全零 → 关闭；非零 → 开启。</summary>
+        private void SyncRotOffsetEnable() => enableRotationOffset = rotationOffsetEuler != Vector3.zero;
+
+        public static MatchTargetRequest Default => new MatchTargetRequest
+        {
+            bodyPart            = AvatarTarget.Root,
+            target              = null,
+            fixedPosition       = Vector3.zero,
+            fixedRotationEuler  = Vector3.zero,
+            positionOffset      = Vector3.zero,
+            enablePositionOffset = true,
+            rotationOffsetEuler = Vector3.zero,
+            enableRotationOffset = true,
+            startTime = 0f,
+            endTime   = 1f,
+            positionWeight      = new Vector3(3f, 360f, 0f),
+            rotationWeight      = 1f
         };
+    }
+
+    // ==================== 待执行指令 ====================
+
+    /// <summary>
+    /// 待执行的 MatchTarget 指令。<br/>
+    /// 注册后，当 <c>normalizedProgress &gt;= triggerAt</c> 时自动激活，
+    /// 以 <see cref="request"/> 参数完整重新启动一次 MatchTarget（覆盖当前时间窗口 / 身体部位 / 权重）。<br/>
+    /// 触发后自动消耗（单次有效）；状态退出 / Cancel 时自动清除。<br/>
+    /// 可调用 <see cref="Reset"/> 重置消耗标记后复用同一实例，避免重复分配。
+    /// </summary>
+    [Serializable]
+    public class MatchTargetPendingCommand
+    {
+        [LabelText("触发时间(秒)"), Min(0f)]
+        [Tooltip("状态进入后经过多少秒触发此指令（hasEnterTime 基准），到达后覆盖当前 MatchTarget 参数")]
+        public float triggerAt;
+
+        [LabelText("指令参数"), InlineProperty, HideLabel]
+        public MatchTargetRequest request = MatchTargetRequest.Default;
+
+        // ── 内部运行时状态（框架控制，外部只需调用 Reset） ──
+        [NonSerialized] internal bool consumed;
+
+        /// <summary>重置消耗标记，使此实例可以被再次排队触发。</summary>
+        public void Reset() => consumed = false;
     }
 
     // ==================== 主配置类 ====================
@@ -245,19 +363,18 @@ namespace ES
 
         [FoldoutGroup("MatchTarget配置")]
         [LabelText("MatchTarget预设"), ShowIf("enableMatchTarget"), InlineProperty]
-        public MatchTargetPresetConfig matchTargetPreset = MatchTargetPresetConfig.Default;
+        public MatchTargetRequest matchTargetPreset = MatchTargetRequest.Default;
 
         [FoldoutGroup("MatchTarget配置")]
         [LabelText("启用阶段2"), ShowIf("enableMatchTarget")]
         public bool enableMatchTargetPhase2 = false;
 
         [FoldoutGroup("MatchTarget配置")]
-        [LabelText("阶段2触发进度"), Range(0f, 1f), ShowIf("enableMatchTargetPhase2")]
-        public float matchTargetPhase2Trigger = 0.6f;
-
-        [FoldoutGroup("MatchTarget配置")]
         [LabelText("阶段2预设"), ShowIf("enableMatchTargetPhase2"), InlineProperty]
-        public MatchTargetPresetConfig matchTargetPresetPhase2 = MatchTargetPresetConfig.Default;
+        [Tooltip("阶段2 开始时间即为触发阈值，不需额外设置触发进度字段")]
+        public MatchTargetRequest matchTargetPresetPhase2 = MatchTargetRequest.Default;
+
+        // 重施加参数已迁移到 StateMachineConfig.matchTargetReapply（全局配置）。
 
         /// <summary>
         /// 获取Clip和起始时间
@@ -382,19 +499,57 @@ namespace ES
         }
 
         /// <summary>
-        /// 将Inspector配置的MatchTarget数据应用到Runtime
+        /// [已废弃] 此方法绕过了 StateBase.StartMatchTarget 的强化逻辑，不应被用户代码调用。<br/>
+        /// 正确入口是 <c>state.ApplyMatchTarget(request)</c> 或配置 <c>autoActivateMatchTarget=true</c>。
         /// </summary>
-        public void ApplyMatchTargetConfigToRuntime(AnimationCalculatorRuntime runtime)
+        [System.Obsolete("Call state.ApplyMatchTarget(request) or enable autoActivateMatchTarget instead.")]
+        public void ApplyMatchTargetConfigToRuntime(AnimationCalculatorRuntime runtime, Transform playerTransform = null)
         {
             if (!enableMatchTarget || !autoActivateMatchTarget || runtime == null) return;
 
             var preset = matchTargetPreset;
-            Vector3 pos = preset.target != null ? preset.target.position : preset.fixedPosition;
-            Quaternion rot = preset.target != null ? preset.target.rotation : Quaternion.Euler(preset.fixedRotationEuler);
-
-            runtime.StartMatchTarget(pos, rot, preset.bodyPart,
-                preset.startNormalizedTime, preset.endNormalizedTime,
+            runtime.StartMatchTarget(
+                preset.GetPosition(playerTransform), preset.GetRotation(playerTransform),
+                preset.bodyPart,
+                preset.startTime, preset.endTime,
                 preset.positionWeight, preset.rotationWeight);
+        }
+
+        /// <summary>
+        /// 检查是否存在需要每帧跟踪的动态 Transform 目标（Phase1 或 Phase2 均会检查）
+        /// </summary>
+        public bool HasDynamicMatchTarget()
+        {
+            if (!enableMatchTarget) return false;
+            if (matchTargetPreset.target != null) return true;
+            if (enableMatchTargetPhase2 && matchTargetPresetPhase2.target != null) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// 每帧从 Inspector 配置的 Transform 引用同步 MatchTarget 目标位置/旋转到 Runtime。
+        /// 仅更新有 Transform 引用的预设（与 IK 的 UpdateIKTargetsFromConfig 设计对齐）。
+        /// </summary>
+        /// <param name="playerTransform">玩家根节点 Transform，用于将 positionOffset / rotationOffsetEuler 从局部空间转换为世界空间；可为 null。</param>
+        public void UpdateMatchTargetFromConfig(AnimationCalculatorRuntime runtime, Transform playerTransform = null)
+        {
+            if (!enableMatchTarget || runtime == null) return;
+            if (!runtime.matchTarget.active || runtime.matchTarget.completed) return;
+
+            // Phase1 动态追踪：通过 GetPosition/GetRotation 保证 positionOffset / rotationOffsetEuler 被正确叠加
+            if (matchTargetPreset.target != null)
+            {
+                runtime.matchTarget.position = matchTargetPreset.GetPosition(playerTransform);
+                runtime.matchTarget.rotation = matchTargetPreset.GetRotation(playerTransform);
+            }
+
+            // Phase2 动态追踪（Phase2激活时，phase2的target覆盖）
+            if (enableMatchTargetPhase2 && matchTargetPresetPhase2.target != null
+                && runtime.matchTarget.startTime >= matchTargetPresetPhase2.startTime)
+            {
+                runtime.matchTarget.position = matchTargetPresetPhase2.GetPosition(playerTransform);
+                runtime.matchTarget.rotation = matchTargetPresetPhase2.GetRotation(playerTransform);
+            }
         }
 
         private static void ApplyLimbConfig(ref Vector3 position, ref Quaternion rotation,

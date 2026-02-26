@@ -146,6 +146,13 @@ namespace ES
         public abstract void UpdateWeights(AnimationCalculatorRuntime runtime, in StateMachineContext context, float deltaTime);
 
         /// <summary>
+        /// 是否需要在“淡出期间（状态已退出逻辑，但Playable仍连接在图中以完成淡出）”继续调用 UpdateWeights。
+        /// 默认 false：淡出阶段冻结内部混合比例，只做外部权重衰减。
+        /// 典型需要开启的：1D/2D混合树、DirectBlend、Phase4（需要持续跟随参数）。
+        /// </summary>
+        public virtual bool NeedUpdateWhenFadingOut => false;
+
+        /// <summary>
         /// 状态首帧立即更新 — 内部混合权重直接到位（无平滑过渡）。
         /// 外部管线权重(FadeIn/FadeOut)由状态机独立管理，不受此影响。
         /// 
@@ -198,8 +205,12 @@ namespace ES
         /// <returns>标准动画时长（秒），0表示无法获取</returns>
         public virtual float GetStandardDuration(AnimationCalculatorRuntime runtime)
         {
-            // 默认实现：返回0（子类需要override）
-            return 0f;
+            // 默认兜底：尽量给一个“合理时长”。
+            // 约定：若能拿到当前主导Clip，则返回 clip.length（不依赖 isLooping）。
+            // 复杂多阶段/可变结构（Sequential/Phase4等）应 override 给出更准确的总时长/完成信号。
+            var clip = GetCurrentClip(runtime);
+            if (clip == null) return 0f;
+            return clip.length;
         }
 
 #if UNITY_EDITOR
@@ -381,7 +392,7 @@ namespace ES
         public class StateAnimationMixCalculatorForBlendTree1D : StateAnimationMixCalculator
         {
             [Serializable]
-            public struct ClipSampleForBlend1D
+            public class ClipSampleForBlend1D
             {
                 public AnimationClip clip;
                 public float threshold;  // 阈值位置
@@ -407,6 +418,8 @@ namespace ES
             public AnimationCurve thresholdCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
 
             public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.BlendTree1D;
+
+            public override bool NeedUpdateWhenFadingOut => true;
 
             protected override string GetUsageHelp()
             {
@@ -797,7 +810,7 @@ namespace ES
         public abstract class StateAnimationMixCalculatorForBlendTree2D : StateAnimationMixCalculator
         {
             [Serializable]
-            public struct ClipSample2D
+            public class ClipSample2D
             {
                 public AnimationClip clip;
                 public Vector2 position;  // 2D空间位置
@@ -816,6 +829,8 @@ namespace ES
             /// Debug设置（可独立配置，默认使用全局设置）
             /// </summary>
             protected StateMachineDebugSettings debugSettings => StateMachineDebugSettings.Instance;
+
+            public override bool NeedUpdateWhenFadingOut => true;
 
 #if UNITY_EDITOR
             /// <summary>
@@ -1792,7 +1807,7 @@ namespace ES
         public class StateAnimationMixCalculatorForDirectBlend : StateAnimationMixCalculator
         {
             [Serializable]
-            public struct DirectClip
+            public class DirectClip
             {
                 public AnimationClip clip;
                 public string weightParameter;  // 权重参数名
@@ -1800,7 +1815,7 @@ namespace ES
             }
 
             [Serializable]
-            public struct WeightEvent
+            public class WeightEvent
             {
                 [LabelText("事件名")]
                 public string eventName;
@@ -1830,6 +1845,8 @@ namespace ES
             public string eventParamPrefix = "OnWeight_";
 
             public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.DirectBlend;
+
+            public override bool NeedUpdateWhenFadingOut => true;
 
             protected override string GetUsageHelp()
             {
@@ -2219,7 +2236,7 @@ namespace ES
             private bool _isCalculatorInitialized;  // 标记Calculator是否已初始化（享元数据）
 
             [Serializable]
-            public struct MainClipConfig
+            public class MainClipConfig
             {
                 [LabelText("主Clip"), Tooltip("必须，核心动画")]
                 public AnimationClip clip;

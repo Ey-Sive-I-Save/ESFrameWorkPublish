@@ -296,9 +296,9 @@ namespace ES
             public Quaternion rotation;
             /// <summary>MatchTarget影响的身体部位掩码</summary>
             public AvatarTarget bodyPart;
-            /// <summary>MatchTarget开始归一化时间</summary>
+            /// <summary>MatchTarget 开始时间（hasEnterTime 秒，状态进入后）</summary>
             public float startTime;
-            /// <summary>MatchTarget结束归一化时间</summary>
+            /// <summary>MatchTarget 结束时间（hasEnterTime 秒，状态进入后）</summary>
             public float endTime;
             /// <summary>MatchTarget位置权重掩码（XYZ分别控制）</summary>
             public Vector3 positionWeight;
@@ -688,15 +688,15 @@ namespace ES
         /// 启动MatchTarget（根动作对齐）
         /// </summary>
         public void StartMatchTarget(Vector3 targetPos, Quaternion targetRot, AvatarTarget bodyPart,
-            float startNormTime, float endNormTime, Vector3 posWeight, float rotWeight = 1f)
+            float startTime, float endTime, Vector3 posWeight, float rotWeight = 1f)
         {
             matchTarget.active = true;
             matchTarget.completed = false;
             matchTarget.position = targetPos;
             matchTarget.rotation = targetRot;
             matchTarget.bodyPart = bodyPart;
-            matchTarget.startTime = Mathf.Clamp01(startNormTime);
-            matchTarget.endTime = Mathf.Clamp01(endNormTime);
+            matchTarget.startTime = Mathf.Max(0f, startTime);   // 秒，不限制上限
+            matchTarget.endTime   = Mathf.Max(0f, endTime);
             matchTarget.positionWeight = posWeight;
             matchTarget.rotationWeight = Mathf.Clamp01(rotWeight);
 
@@ -712,20 +712,18 @@ namespace ES
         }
 
         /// <summary>
-        /// 检查MatchTarget是否在有效时间范围内
+        /// 检查当前 hasEnterTime（秒）是否在 MatchTarget 时间窗内
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsMatchTargetInRange(float normalizedTime)
+        public bool IsMatchTargetInRange(float elapsed)
         {
-            bool inRange = matchTarget.active && !matchTarget.completed
-                && normalizedTime >= matchTarget.startTime
-                && normalizedTime <= matchTarget.endTime;
+            bool inRange = elapsed >= matchTarget.startTime && elapsed <= matchTarget.endTime;
 #if UNITY_EDITOR
             if (debugMatchTarget && !inRange)
             {
                 Debug.Log(
                     $"[MatchTargetRuntime] Gate: out of range | active={matchTarget.active} completed={matchTarget.completed} " +
-                    $"t={normalizedTime:F2} range=[{matchTarget.startTime:F2},{matchTarget.endTime:F2}]");
+                    $"elapsed={elapsed:F3}s range=[{matchTarget.startTime:F3},{matchTarget.endTime:F3}]s");
             }
 #endif
             return inRange;

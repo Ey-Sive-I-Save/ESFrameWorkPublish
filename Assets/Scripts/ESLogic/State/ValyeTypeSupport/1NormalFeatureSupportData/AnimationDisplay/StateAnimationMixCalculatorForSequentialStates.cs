@@ -36,12 +36,14 @@ namespace ES
 
         public enum PhaseTransitionCompare
         {
+            [InspectorName("大于")]
             Greater,
+            [InspectorName("小于")]
             Less
         }
 
         [Serializable]
-        public struct PhaseTransitionCondition
+        public class PhaseTransitionCondition
         {
             [LabelText("启用条件")]
             public bool enable;
@@ -53,6 +55,10 @@ namespace ES
             [LabelText("比较")]
             public PhaseTransitionCompare compare;
 
+            [LabelText("包含等于(=)")]
+            [Tooltip("默认不包含等号：Greater=大于(>)，Less=小于(<)。勾选后变为 >= / <=")]
+            public bool includeEqual;
+
             [LabelText("阈值")]
             public float threshold;
 
@@ -60,8 +66,12 @@ namespace ES
             public bool Check(in StateMachineContext context)
             {
                 if (!enable) return false;
-                float v = context.GetFloat(parameter, 0f);
-                return compare == PhaseTransitionCompare.Greater ? (v >= threshold) : (v <= threshold);
+                float diff = context.GetFloat(parameter, 0f) - threshold;
+
+                if (compare == PhaseTransitionCompare.Greater)
+                    return includeEqual ? (diff >= 0f) : (diff > 0f);
+
+                return includeEqual ? (diff <= 0f) : (diff < 0f);
             }
         }
 
@@ -80,7 +90,7 @@ namespace ES
         /// 顺序阶段定义
         /// </summary>
         [Serializable]
-        public struct SequentialPhase
+        public class SequentialPhase
         {
             [LabelText("阶段名称")]
             public string phaseName;
@@ -787,22 +797,57 @@ namespace ES
 
         public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
         {
-            // SequentialStates：阶段可能是变长的（maxDuration=0 表示无限制），因此这里只能给一个“标准/上限时长”。
+            // SequentialStates：阶段可能是变长的（maxDuration=0 表示无限制），这里提供一个“标准/估算时长”。
             // 约定：
             // - loopMode: 无限
-            // - 任意阶段 maxDuration<=0: 无法给出标准时长（返回0）
-            // - 否则：sum(maxDuration)
+            // - 单阶段：优先 maxDuration（硬上限），否则用主Clip长度/子计算器标准时长（循环输出视为不可估算）
+            // - 任意阶段不可估算：返回0（避免错误的提前退出）
             if (loopMode) return float.PositiveInfinity;
             if (phases == null || phases.Length == 0) return 0f;
 
             float sum = 0f;
             for (int i = 0; i < phases.Length; i++)
             {
-                float max = phases[i].maxDuration;
-                if (max <= 0f) return 0f;
-                sum += max;
+                float d = GetPhaseEstimatedDuration(runtime, i, phases[i]);
+                if (d <= 0.001f || float.IsInfinity(d) || float.IsNaN(d))
+                    return 0f;
+                sum += d;
+            }
+
+            // 过渡时间计入估算（更接近实际总耗时）
+            if (transitionDuration > 0.001f && phases.Length > 1)
+            {
+                sum += transitionDuration * (phases.Length - 1);
             }
             return sum > 0f ? sum : 0f;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private float GetPhaseEstimatedDuration(AnimationCalculatorRuntime runtime, int phaseIndex, SequentialPhase phase)
+        {
+            if (phase.maxDuration > 0.001f)
+                return phase.maxDuration;
+
+            // 子计算器：优先标准时长（并保护循环输出）
+            if (runtime != null && runtime.phaseUsesCalculator != null && phaseIndex >= 0 && phaseIndex < runtime.phaseUsesCalculator.Length && runtime.phaseUsesCalculator[phaseIndex])
+            {
+                if (runtime.phaseRuntimes != null && phaseIndex < runtime.phaseRuntimes.Length)
+                {
+                    var pr = runtime.phaseRuntimes[phaseIndex];
+                    if (pr != null && phase.phaseCalculator != null)
+                    {
+                        float d = phase.phaseCalculator.GetStandardDuration(pr);
+                        if (d > 0.001f && !float.IsInfinity(d) && !float.IsNaN(d))
+                            return d;
+                    }
+                }
+                return 0f;
+            }
+
+            // 直连Clip：用主/次长度（只依赖 clip.length，不使用 isLooping）
+            float p = phase.primaryClip != null ? phase.primaryClip.length : 0f;
+            float s = phase.secondaryClip != null ? phase.secondaryClip.length : 0f;
+            return Mathf.Max(p, s);
         }
 
         /// <summary>
@@ -833,17 +878,32 @@ namespace ES
                    !string.IsNullOrEmpty(phase.transitionTrigger.StringValue);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsPlayableEnded(Playable playable)
+        private static bool IsPlayableEndedInternal(Playable playable, int depth)
         {
             if (!playable.IsValid()) return false;
 
-            double duration = playable.GetDuration();
-            if (duration <= 0d || double.IsInfinity(duration) || double.IsNaN(duration))
-                return false;
+            // 口径收敛：只对 AnimationClipPlayable 用 clip.length 判定。
+            // Mixer/ScriptPlayable 等几乎拿不到可靠“时长/播完”语义，这里直接视为不可判定（返回 false），
+            // 请用 maxDuration / 标准时长机制兜底。
+            var playableType = playable.GetPlayableType();
+            if (playableType == typeof(AnimationClipPlayable))
+            {
+                var cp = (AnimationClipPlayable)playable;
+                var clip = cp.GetAnimationClip();
+                if (clip == null) return false;
 
-            // Playable 时间精度用 double，这里给一个很小的容差
-            return playable.GetTime() >= duration - 0.0001d;
+                double len = clip.length;
+                if (len <= 0.0001d) return false;
+                return playable.GetTime() >= len - 0.0001d;
+            }
+
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsPlayableEnded(Playable playable)
+        {
+            return IsPlayableEndedInternal(playable, 0);
         }
 
         private static bool IsPhaseAnimationEnded(AnimationCalculatorRuntime runtime, int phaseIndex, SequentialPhase phase)

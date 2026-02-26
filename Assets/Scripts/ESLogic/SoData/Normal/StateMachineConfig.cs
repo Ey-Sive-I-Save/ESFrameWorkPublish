@@ -12,6 +12,46 @@ namespace ES
         [HideLabel]
         public StateMachineDisableTransitionPermissionMap disableTransitionPermissionMap = new StateMachineDisableTransitionPermissionMap();
 
+        // ==================== MatchTarget 全局策略 ====================
+
+        [TabGroup("MatchTarget全局")]
+        [LabelText("重施加策略"), InlineProperty, HideLabel]
+        [Tooltip("整个状态机共享同一套重施加阈值，不在每个状态上单独配置")]
+        public MatchTargetReapplySettings matchTargetReapply = MatchTargetReapplySettings.Default;
+    }
+
+    // ==================== MatchTarget 全局重施加设置 ====================
+
+    /// <summary>
+    /// MatchTarget 重施加全局策略（配置在 StateMachineConfig SO 上，整个项目共用一套）。
+    /// <para>原来散落在各 State / ClimbModule 的 allowMatchTargetReapply 等字段已统一到这里。</para>
+    /// </summary>
+    [Serializable]
+    public class MatchTargetReapplySettings
+    {
+        [LabelText("允许重施加")]
+        [Tooltip("启用后：Animator 已在 matching 时，若满足距离/角度/间隔阈值，会重新调用 MatchTarget\n适合需要持续逼近目标的攀爬/交互场景")]
+        public bool allow;
+
+        [LabelText("最小间隔(秒)"), Range(0f, 0.5f), ShowIf("allow")]
+        [Tooltip("两次重施加之间的最短时间间隔，防止每帧都触发")]
+        public float interval;
+
+        [LabelText("最小距离(米)"), Range(0f, 1f), ShowIf("allow")]
+        [Tooltip("目标点位置变化超过此距离才触发重施加（sqrMagnitude，零 GC）")]
+        public float minDistance;
+
+        [LabelText("最小角度(°)"), Range(0f, 30f), ShowIf("allow")]
+        [Tooltip("目标点旋转变化超过此角度才触发重施加（Dot 替代 acos，零 GC）")]
+        public float minAngle;
+
+        public static MatchTargetReapplySettings Default => new MatchTargetReapplySettings
+        {
+            allow       = false,
+            interval    = 0.05f,
+            minDistance  = 0.02f,
+            minAngle    = 2f
+        };
     }
 
     [Serializable,TypeRegistryItem("禁止跳转许可映射")]

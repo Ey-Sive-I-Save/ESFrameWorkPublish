@@ -8,6 +8,8 @@ namespace ES
     /// 高性能集合：List + indexMap（swap-back remove），支持 O(1) Add/Remove/Contains，迭代为连续内存。
     /// 注意：不要直接修改 Items 列表，否则会破坏索引映射。
     /// </summary>
+    /// 
+    [Serializable]
     public sealed class SwapBackSet<T> : IEnumerable<T>
     {
         private readonly List<T> _items;

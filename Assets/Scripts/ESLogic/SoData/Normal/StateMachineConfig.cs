@@ -15,7 +15,8 @@ namespace ES
         // ==================== MatchTarget 全局策略 ====================
 
         [TabGroup("MatchTarget全局")]
-        [LabelText("重施加策略"), InlineProperty, HideLabel]
+        [Header("重施加策略")]
+        [HideLabel]
         [Tooltip("整个状态机共享同一套重施加阈值，不在每个状态上单独配置")]
         public MatchTargetReapplySettings matchTargetReapply = MatchTargetReapplySettings.Default;
     }

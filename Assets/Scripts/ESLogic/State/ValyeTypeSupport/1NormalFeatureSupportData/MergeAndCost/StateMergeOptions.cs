@@ -65,12 +65,12 @@ namespace ES
         [HorizontalGroup("对称条件")]
         [BoxGroup("对称条件/作为承接者")]
         [Tooltip("作为承接者：当已有状态在运行时，本规则用于决定是否接纳新状态或被打断。")]
-        [HideLabel, InlineProperty]
+        [HideLabel]
         public NormalMergeRule asLeftRule;
 
         [BoxGroup("对称条件/作为尝试加入者")]
         [Tooltip("作为尝试加入者：当新状态想加入时，本规则用于决定是否能打断已有状态或被拒绝。")]
-        [HideLabel, InlineProperty]
+        [HideLabel]
         public NormalMergeRule asRightRule;
 
         /// <summary>

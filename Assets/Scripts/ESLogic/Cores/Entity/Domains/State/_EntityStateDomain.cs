@@ -16,7 +16,7 @@ namespace ES
         [LabelText("状态机")]
         public StateMachine stateMachine = new StateMachine();
 
-        [LabelText("默认状态键")]
+        [LabelText("设定默认状态键(可为空)")]
         public string defaultStateKey = "";
         
         [LabelText("初始激活状态名（可为空）")]
@@ -321,19 +321,51 @@ namespace ES
                 return;
             }
 
-            Debug.Log($"=== 状态机所有状态 ({stateMachine.RegisteredStateCount}) ===");
+            // ── 构建完整文本（控制台 + 对话框 + 剪贴板共用同一数据源）────────────
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"=== 状态机所有状态 ({stateMachine.RegisteredStateCount}) ===");
+
             foreach (var kvp in stateMachine.EnumerateRegisteredStatesByKey())
             {
-                var state = kvp.Value;
+                var state     = kvp.Value;
                 var layerType = stateMachine.TryGetStateLayerType(state, out var layer)
-                    ? layer.ToString()
-                    : "Unknown";
-                var isRunning = stateMachine.IsStateRunning(state);
+                    ? layer.ToString() : "Unknown";
+                var isRunning  = stateMachine.IsStateRunning(state);
                 var isFallback = state.stateSharedData?.basicConfig?.canBeFeedback ?? false;
-                
-                Debug.Log($"  [{layerType}] {kvp.Key} (IntKey:{state.intKey}) - " +
-                          $"运行:{isRunning}, Fallback:{isFallback}");
+
+                sb.AppendLine($"  [{layerType}] {kvp.Key} (IntKey:{state.intKey}) - " +
+                              $"运行:{isRunning}, Fallback:{isFallback}");
             }
+
+            // ── 控制台输出 ────────────────────────────────────────────────────────
+            Debug.Log(sb.ToString());
+
+#if UNITY_EDITOR
+            // ── 复制到系统剪贴板（可直接粘贴使用） ───────────────────────────────
+            UnityEditor.EditorGUIUtility.systemCopyBuffer = sb.ToString();
+
+            // ── 弹出编辑器对话框预览（内容已在剪贴板，可随时粘贴） ───────────────
+            // DisplayDialog 单条 message 最多显示约 40 行，超出时截断并提示
+            const int MaxDialogLines = 35;
+            var lines = sb.ToString().Split('\n');
+            string dialogBody;
+            if (lines.Length <= MaxDialogLines)
+            {
+                dialogBody = sb.ToString().TrimEnd();
+            }
+            else
+            {
+                var truncated = new System.Text.StringBuilder();
+                for (int i = 0; i < MaxDialogLines; i++) truncated.AppendLine(lines[i]);
+                truncated.AppendLine($"... （共 {lines.Length - 1} 行，完整内容已复制到剪贴板）");
+                dialogBody = truncated.ToString().TrimEnd();
+            }
+
+            UnityEditor.EditorUtility.DisplayDialog(
+                $"状态机状态列表（{stateMachine.RegisteredStateCount} 个）",
+                dialogBody + "\n\n✓ 完整内容已复制到剪贴板",
+                "确定");
+#endif
         }
 
         #endregion

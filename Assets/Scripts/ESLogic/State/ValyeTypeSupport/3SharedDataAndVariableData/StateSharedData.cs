@@ -48,7 +48,7 @@ namespace ES
         // ========================================
         [TabGroup("基础", "核心", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾蓝\")"), PropertyOrder(0)]
         [BoxGroup("基础/核心/配置", ShowLabel = false)]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         [InfoBox("步骤1：设置状态名、层级、优先级", InfoMessageType.Info)]
         public StateBasicConfig basicConfig = new StateBasicConfig();
 
@@ -64,58 +64,64 @@ namespace ES
 
         [BoxGroup("基础/动画/开关", ShowLabel = false)]
         [ShowIf("hasAnimation")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         [PropertySpace(SpaceBefore = 5, SpaceAfter = 0)]
         public StateAnimationConfigData animationConfig = new StateAnimationConfigData();
 
-        [BoxGroup("基础/动画/过渡", ShowLabel = true), PropertyOrder(2)]
+        [BoxGroup("基础/动画/过渡", ShowLabel = true)]
         [ShowIf("hasAnimation")]
         [InfoBox("步骤3：设置淡入淡出", InfoMessageType.None)]
-        [HorizontalGroup("基础/动画/过渡/切换")]
         [LabelText("启用淡入淡出"), ToggleLeft, GUIColor(0.8f, 0.9f, 1f)]
         public bool enableFadeInOut = true;
 
-        [ShowIf("@hasAnimation && enableFadeInOut")]
+        [ShowIf("hasAnimation")]
+        [EnableIf("enableFadeInOut")]
         [BoxGroup("基础/动画/过渡", ShowLabel = true)]
         [HorizontalGroup("基础/动画/过渡/基础", Width = 0.5f)]
         [LabelText("跟随时间缩放"), ToggleLeft]
         [Tooltip("倍速变化时，淡入淡出同步变化")]
         public bool fadeFollowTimeScale = true;
 
-        [ShowIf("@hasAnimation && enableFadeInOut")]
+        [ShowIf("hasAnimation")]
+        [EnableIf("enableFadeInOut")]
         [BoxGroup("基础/动画/过渡", ShowLabel = true)]
         [HorizontalGroup("基础/动画/过渡/基础", Width = 0.5f)]
         [LabelText("淡入淡出速度"), Range(0.1f, 3f)]
         [Tooltip("1为默认，>1更快，<1更慢")]
         public float fadeSpeedMultiplier = 1f;
 
-        [ShowIf("@hasAnimation && enableFadeInOut")]
+        [ShowIf("hasAnimation")]
+        [EnableIf("enableFadeInOut")]
         [BoxGroup("基础/动画/过渡", ShowLabel = true)]
         [HorizontalGroup("基础/动画/过渡/时长", Width = 0.5f)]
         [LabelText("淡入时长"), Range(0f, 2f), SuffixLabel("秒", Overlay = true)]
         public float fadeInDuration = 0.2f;
 
-        [ShowIf("@hasAnimation && enableFadeInOut")]
+        [ShowIf("hasAnimation")]
+        [EnableIf("enableFadeInOut")]
         [BoxGroup("基础/动画/过渡", ShowLabel = true)]
         [HorizontalGroup("基础/动画/过渡/时长", Width = 0.5f)]
         [LabelText("淡出时长"), Range(0f, 2f), SuffixLabel("秒", Overlay = true)]
         public float fadeOutDuration = 0.15f;
 
-        [ShowIf("@hasAnimation && enableFadeInOut")]
+        [ShowIf("hasAnimation")]
+        [EnableIf("enableFadeInOut")]
         [FoldoutGroup("基础/动画/过渡/高级", expanded: false)]
         [LabelText("使用曲线"), ToggleLeft]
         [Tooltip("开启后可设置曲线；关闭时为线性")]
         public bool useAdvancedFadeCurve = false;
 
         [FoldoutGroup("基础/动画/过渡/高级", expanded: false)]
-        [ShowIf("@hasAnimation && enableFadeInOut && useAdvancedFadeCurve")]
+        [ShowIf("@hasAnimation && useAdvancedFadeCurve")]
+        [EnableIf("enableFadeInOut")]
         [LabelText("淡入曲线")]
         [Tooltip("自定义淡入权重曲线")]
         [PropertySpace(SpaceBefore = 5)]
         public AnimationCurve fadeInCurve = AnimationCurve.Linear(0, 0, 1, 1);
 
         [FoldoutGroup("基础/动画/过渡/高级", expanded: false)]
-        [ShowIf("@hasAnimation && enableFadeInOut && useAdvancedFadeCurve")]
+        [ShowIf("@hasAnimation && useAdvancedFadeCurve")]
+        [EnableIf("enableFadeInOut")]
         [LabelText("淡出曲线")]
         [Tooltip("自定义淡出权重曲线")]
         public AnimationCurve fadeOutCurve = AnimationCurve.Linear(0, 1, 1, 0);
@@ -156,14 +162,14 @@ namespace ES
         [TabGroup("切换", "冲突", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾橙\")"), PropertyOrder(12)]
         [BoxGroup("切换/冲突/规则", ShowLabel = false)]
         [InfoBox("步骤4：设置并行规则和通道占用", InfoMessageType.Info)]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         [PropertySpace(SpaceBefore = 0, SpaceAfter = 5)]
         public StateMergeData mergeData = new StateMergeData();
 
         [TabGroup("切换", "代价", Order = 1, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾黄\")"), PropertyOrder(13)]
         [FoldoutGroup("切换/代价/权重", expanded: false)]
         [InfoBox("步骤5：设置代价与权重", InfoMessageType.Info)]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         [PropertySpace(SpaceBefore = 0, SpaceAfter = 5)]
         public StateCostData costData = new StateCostData();
 

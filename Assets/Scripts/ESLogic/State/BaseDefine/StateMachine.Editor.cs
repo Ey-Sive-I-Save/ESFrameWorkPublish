@@ -32,6 +32,7 @@ namespace ES
         /// <summary>
         /// 是否持续输出统计信息（用于调试）
         /// </summary>
+        [TabGroup("SM_View", "🔬 测试工具", Order = 3, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾黄\")")]
         [LabelText("持续输出统计"), Tooltip("每帧在控制台输出状态机统计信息")]
         [NonSerialized]
         public bool enableContinuousStats = false;
@@ -75,27 +76,28 @@ namespace ES
         }
 
         // === 编辑器测试字段（临时动画热拔插）===
-        [FoldoutGroup("临时动画测试", expanded: false)]
+        [TabGroup("SM_View", "🔬 测试工具")]
+        [BoxGroup("SM_View/🔬 测试工具/临时动画")]
         [LabelText("测试键"), Tooltip("临时状态的唯一标识")]
         public string testTempKey = "测试动画";
 
-        [FoldoutGroup("临时动画测试")]
+        [BoxGroup("SM_View/🔬 测试工具/临时动画")]
         [LabelText("测试动画剪辑"), AssetsOnly]
         public AnimationClip testClip;
 
-        [FoldoutGroup("临时动画测试")]
+        [BoxGroup("SM_View/🔬 测试工具/临时动画")]
         [LabelText("目标层级")]
         public StateLayerType testLayer = StateLayerType.Main;
 
-        [FoldoutGroup("临时动画测试")]
+        [BoxGroup("SM_View/🔬 测试工具/临时动画")]
         [LabelText("播放速度"), Range(0.1f, 3f)]
         public float testSpeed = 1.0f;
 
-        [FoldoutGroup("临时动画测试")]
+        [BoxGroup("SM_View/🔬 测试工具/临时动画")]
         [LabelText("循环播放"), Tooltip("勾选后动画循环播放，不勾选则播放一次后自动退出")]
         public bool testLoopable = false;
 
-        [FoldoutGroup("临时动画测试")]
+        [BoxGroup("SM_View/🔬 测试工具/临时动画")]
         [Button("添加临时动画", ButtonSizes.Medium), GUIColor(0.4f, 0.8f, 1f)]
         private void EditorAddTemporaryAnimation()
         {
@@ -114,7 +116,7 @@ namespace ES
             AddTemporaryAnimation(testTempKey, testClip, testLayer, testSpeed, testLoopable);
         }
 
-        [FoldoutGroup("临时动画测试")]
+        [BoxGroup("SM_View/🔬 测试工具/临时动画")]
         [Button("移除临时动画", ButtonSizes.Medium), GUIColor(1f, 0.7f, 0.4f)]
         private void EditorRemoveTemporaryAnimation()
         {
@@ -161,13 +163,15 @@ namespace ES
             return sb.ToString();
         }
 
-        [Button("输出调试信息", ButtonSizes.Large), PropertyOrder(-1)]
+        [TabGroup("SM_View", "📊 诊断", Order = 4, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾橙\")")]
+        [Button("输出调试信息", ButtonSizes.Large)]
         private void DebugPrint()
         {
             Debug.Log(GetDebugInfo());
         }
 
-        [Button("输出所有状态", ButtonSizes.Medium), PropertyOrder(-1)]
+        [TabGroup("SM_View", "📊 诊断")]
+        [Button("输出所有状态", ButtonSizes.Medium)]
         private void DebugPrintAllStates()
         {
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
@@ -179,13 +183,15 @@ namespace ES
             Debug.Log(sb.ToString());
         }
 
-        [Button("测试RootMixer输出", ButtonSizes.Medium), PropertyOrder(-1)]
+        [TabGroup("SM_View", "📊 诊断")]
+        [Button("测试RootMixer输出", ButtonSizes.Medium)]
         private void DebugPrintRootMixer()
         {
             Debug.Log(GetRootMixerDebugInfo());
         }
 
-        [Button("切换持续统计输出", ButtonSizes.Medium), PropertyOrder(-1)]
+        [TabGroup("SM_View", "📊 诊断")]
+        [Button("切换持续统计输出", ButtonSizes.Medium)]
         [GUIColor("@enableContinuousStats ? new Color(0.4f, 1f, 0.4f) : new Color(0.7f, 0.7f, 0.7f)")]
         private void ToggleContinuousStats()
         {
@@ -193,7 +199,8 @@ namespace ES
             Debug.Log($"[StateMachine] 持续统计输出: {(enableContinuousStats ? "开启" : "关闭")}");
         }
 
-        [Button("打印临时动画列表", ButtonSizes.Medium), PropertyOrder(-1)]
+        [TabGroup("SM_View", "📊 诊断")]
+        [Button("打印临时动画列表", ButtonSizes.Medium)]
         private void DebugPrintTemporaryAnimations()
         {
             if (_temporaryStates.Count == 0)
@@ -215,7 +222,8 @@ namespace ES
             Debug.Log(sb.ToString());
         }
 
-        [Button("一键清除临时动画", ButtonSizes.Medium), PropertyOrder(-1)]
+        [TabGroup("SM_View", "📊 诊断")]
+        [Button("一键清除临时动画", ButtonSizes.Medium)]
         private void DebugClearTemporaryAnimations()
         {
             ClearAllTemporaryAnimations();

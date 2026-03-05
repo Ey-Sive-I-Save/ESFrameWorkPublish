@@ -246,7 +246,11 @@ namespace ES
             if (_activeState == null) return;
             if (!target.enableMatchTarget) return;
 
-            _activeState.ApplyMatchTarget(target.matchTargetRequest);
+            // MatchTargetRequest 仅承载阶段参数与偏移；目标位姿由运行时传入。
+            _activeState.ApplyMatchTarget(
+                target.matchTargetRequest,
+                target.transform.position,
+                target.transform.rotation);
         }
 
         private void EndInteraction(bool success)

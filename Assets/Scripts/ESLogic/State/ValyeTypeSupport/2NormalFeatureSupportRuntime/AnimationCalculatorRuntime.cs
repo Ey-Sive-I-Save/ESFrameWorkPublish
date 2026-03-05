@@ -300,8 +300,10 @@ namespace ES
             public float startTime;
             /// <summary>MatchTarget 结束时间（hasEnterTime 秒，状态进入后）</summary>
             public float endTime;
-            /// <summary>MatchTarget位置权重掩码（XYZ分别控制）</summary>
-            public Vector3 positionWeight;
+            /// <summary>位置逼近速度（单位/秒）</summary>
+            public float positionApproachSpeed;
+            /// <summary>旋转基础逼近速度（度/秒）</summary>
+            public float rotationApproachSpeed;
             /// <summary>MatchTarget旋转权重</summary>
             public float rotationWeight;
             /// <summary>MatchTarget是否完成</summary>
@@ -315,8 +317,9 @@ namespace ES
                 rotation = Quaternion.identity;
                 bodyPart = AvatarTarget.Root;
                 startTime = 0f;
-                endTime = 1f;
-                positionWeight = Vector3.one;
+                endTime = 0.35f;
+                positionApproachSpeed = 4f;
+                rotationApproachSpeed = 240f;
                 rotationWeight = 1f;
                 completed = false;
             }
@@ -666,7 +669,9 @@ namespace ES
         }
 
         /// <summary>
-        /// 平滑更新IK权重（每帧调用）
+        /// 平滑更新IK权重（每帧调用）。
+        /// 当 weight 和 targetWeight 均收敛到接近 0 时，自动关闭 ik.enabled，
+        /// 避免 IK 逻辑块在整个不激活期间持续占用 CPU。
         /// </summary>
         public void UpdateIKWeight(float smoothTime, float deltaTime)
         {
@@ -680,6 +685,14 @@ namespace ES
             {
                 ik.weight = ik.targetWeight;
             }
+
+            // 当目标为 0 且已经衰减到接近 0 时，关闭 IK，避免每帧空跑。
+            if (ik.targetWeight < 0.0001f && ik.weight < 0.0001f)
+            {
+                ik.weight = 0f;
+                ik.weightVelocity = 0f;
+                ik.enabled = false;
+            }
         }
 
         // ==================== MatchTarget便捷方法 ====================
@@ -688,7 +701,7 @@ namespace ES
         /// 启动MatchTarget（根动作对齐）
         /// </summary>
         public void StartMatchTarget(Vector3 targetPos, Quaternion targetRot, AvatarTarget bodyPart,
-            float startTime, float endTime, Vector3 posWeight, float rotWeight = 1f)
+            float startTime, float endTime, float positionApproachSpeed, float rotationApproachSpeed, float rotWeight = 1f)
         {
             matchTarget.active = true;
             matchTarget.completed = false;
@@ -696,8 +709,9 @@ namespace ES
             matchTarget.rotation = targetRot;
             matchTarget.bodyPart = bodyPart;
             matchTarget.startTime = Mathf.Max(0f, startTime);   // 秒，不限制上限
-            matchTarget.endTime   = Mathf.Max(0f, endTime);
-            matchTarget.positionWeight = posWeight;
+            matchTarget.endTime   = Mathf.Max(matchTarget.startTime, Mathf.Max(0f, endTime));
+            matchTarget.positionApproachSpeed = Mathf.Max(0f, positionApproachSpeed);
+            matchTarget.rotationApproachSpeed = Mathf.Max(0f, rotationApproachSpeed);
             matchTarget.rotationWeight = Mathf.Clamp01(rotWeight);
 
 #if UNITY_EDITOR
@@ -706,7 +720,7 @@ namespace ES
                 Debug.Log(
                     $"[MatchTargetRuntime] Start | pos={targetPos:F3} rot={targetRot.eulerAngles:F1} " +
                     $"body={bodyPart} time=[{matchTarget.startTime:F2},{matchTarget.endTime:F2}] " +
-                    $"posW={posWeight:F2} rotW={matchTarget.rotationWeight:F2}");
+                    $"posSpeed={matchTarget.positionApproachSpeed:F2} rotSpeed={matchTarget.rotationApproachSpeed:F2} rotW={matchTarget.rotationWeight:F2}");
             }
 #endif
         }

@@ -141,7 +141,7 @@ namespace ES
     ///   <item>场景物体 —— <c>ESInteractable.matchTargetRequest</c> 等脚本字段</item>
     ///   <item>纯代码构造 —— <c>new MatchTargetRequest { bodyPart = ..., ... }</c></item>
     /// </list>
-    /// 拿到请求后，只需调用 <c>state.ApplyMatchTarget(request)</c> 一行代码即可应用。
+    /// 该数据包仅承载“阶段参数与偏移”；目标位置/旋转由运行时传入。
     /// </summary>
     [Serializable]
     public class MatchTargetRequest
@@ -149,106 +149,81 @@ namespace ES
         [LabelText("身体部位"), ValueDropdown("@ES.AvatarTargetDropdown.Options")]
         public AvatarTarget bodyPart;
 
-        [LabelText("目标Transform")]
-        [Tooltip("运行时对齐目标的 Transform；非 null 时位置/旋转从该 Transform 读取，忽略下方固定值")]
-        public Transform target;
-
-        [LabelText("固定目标位置"), ShowIf("@target == null")]
-        [Tooltip("当无 Transform 引用时的世界空间固定位置")]
-        public Vector3 fixedPosition;
-
-        [LabelText("固定目标旋转"), ShowIf("@target == null")]
-        public Vector3 fixedRotationEuler;
-
         [LabelText("位置偏移(局部空间)")]
-        [Tooltip("叠加在 target.position / fixedPosition 之上的偏移，以玩家自身局部空间为基准（X=右, Y=上, Z=前）。\n框架内部自动通过玩家旋转将其转换为世界空间后应用。\n运行时可通过 PatchMatchTargetOffset 叠加修改，不影响原始配置。")]
+        [Tooltip("叠加在运行时传入目标位置之上的偏移，以玩家自身局部空间为基准（X=右, Y=上, Z=前）。\n框架内部自动通过玩家旋转将其转换为世界空间后应用。\n运行时可通过 AddMatchTargetOffset 叠加修改，不影响原始配置。")]
         [OnValueChanged("SyncPosOffsetEnable")]
         public Vector3 positionOffset;
 
         [LabelText("启用位置偏移"), ToggleLeft]
         [Tooltip("取消勾选可在不清零偏移值的前提下临时禁用 positionOffset。\n代码调用 SetMatchTargetOffsetActive(false) 亦可运行时动态关闭。")]
         [ShowIf("@positionOffset != UnityEngine.Vector3.zero")]
-        public bool enablePositionOffset = true;
+        public bool enablePositionOffset = false;
 
-        [LabelText("旋转偏移(玩家局部欧拉)")]
-        [Tooltip("在玩家当前朝向（playerTransform.rotation）的局部坐标系上叠加的旋转修正。\n即 playerRot * Euler(offset)，用于弥补动画期望朝向与玩家当前朝向的固定偏差。\n若需对齐到场景物体朝向，请由代码直接传入目标旋转，不走此偏移。")]
-        [OnValueChanged("SyncRotOffsetEnable")]
-        public Vector3 rotationOffsetEuler;
+        [LabelText("旋转偏移Y(目标局部Yaw)")]
+        [Tooltip("仅允许 Y 轴旋转偏移（Yaw，度）。\n基于运行时传入的目标旋转Y叠加。")]
+        [OnValueChanged("SyncRotOffsetYawOnlyAndEnable")]
+        public float rotationOffsetY;
 
         [LabelText("启用旋转偏移"), ToggleLeft]
-        [Tooltip("取消勾选可在不清零偏移值的前提下临时禁用 rotationOffsetEuler。")]
-        [ShowIf("@rotationOffsetEuler != UnityEngine.Vector3.zero")]
-        public bool enableRotationOffset = true;
+        [Tooltip("取消勾选可在不清零偏移值的前提下临时禁用 rotationOffsetY。")]
+        [ShowIf("@UnityEngine.Mathf.Abs(rotationOffsetY) > 0.0001f")]
+        public bool enableRotationOffset = false;
 
-        [LabelText("开始时间(秒)"), Min(0f)]
-        [Tooltip("状态进入后经过多少秒开始执行 MatchTarget 对齐（hasEnterTime 基准）")]
-        public float startTime;
+        [LabelText("时间窗(开始/结束秒)")]
+        [OnValueChanged("AutoCorrectTimeRange")]
+        [Tooltip("X=开始时间，Y=结束时间（秒，hasEnterTime 基准）。")]
+        [MinMaxSlider(0f, 10f, true)]
+        public Vector2 timeRange = new Vector2(0f, 0.35f);
 
-        [LabelText("结束时间(秒)"), Min(0f)]
-        [Tooltip("状态进入后经过多少秒结束 MatchTarget 对齐；到达时强制吸附并标记完成")]
-        public float endTime;
+        [LabelText("位移逼近速度")]
+        [OnValueChanged("AutoCorrectWeights")]
+        [Tooltip("位置逼近速度（单位/秒），内部乘以3倍率。")]
+        public float positionApproachSpeed = 4f;
 
-        [LabelText("逼近速度 (位置X / 旋转Y)")]
-        [Tooltip("X = 位置逼近速度（单位/秒），内部乘以3倍率。\nY = 旋转逼近速度（度/秒），仅「旋转启用 > 0」时生效。\nZ 暂不使用。")]
-        public Vector3 positionWeight;
+        [LabelText("旋转基础速度(度/秒)")]
+        [OnValueChanged("AutoCorrectWeights")]
+        [Tooltip("旋转基础速度（度/秒），最终速度 = 该值 * 旋转权重。")]
+        public float rotationApproachSpeed = 240f;
 
-        [LabelText("旋转启用 (>0=开启)"), Range(0f, 1f)]
-        [Tooltip("大于0则启用旋转对齐，速度由上方【逼近速度.Y】决定。\n0 = 不旋转（方便不需要对齐旋转的场景）。")]
-        public float rotationWeight;
-
-        // ── 运行时 helper ──
-
-        /// <summary>
-        /// 获取实际目标位置（Transform 优先，无则固定值），
-        /// 并将 <see cref="positionOffset"/> 从 <paramref name="playerTransform"/> 的局部空间转换为世界空间后叠加。
-        /// </summary>
-        /// <param name="playerTransform">玩家根节点 Transform；为 null 时退化为直接世界空间叠加。</param>
-        public Vector3 GetPosition(Transform playerTransform = null)
-        {
-            var basePos = target != null ? target.position : fixedPosition;
-            if (!enablePositionOffset || positionOffset == Vector3.zero) return basePos;
-            var worldOffset = playerTransform != null
-                ? playerTransform.rotation * positionOffset
-                : positionOffset;
-            return basePos + worldOffset;
-        }
-
-        /// <summary>
-        /// 获取目标旋转。始终以<b>玩家根旋转</b>为基准，再叠加 <see cref="rotationOffsetEuler"/> 偏移。<br/>
-        /// 设计意图：旋转偏移应相对于玩家当前朝向（与位置偏移的坐标系对称）。<br/>
-        /// 若需要对齐到场景物体朝向（如攀爬墙面），由代码直接传入 targetRot，不走此方法。
-        /// </summary>
-        /// <param name="playerTransform">玩家根节点，提供基准旋转；为 null 时退化为 fixedRotationEuler 世界旋转。</param>
-        public Quaternion GetRotation(Transform playerTransform = null)
-        {
-            var baseRot = playerTransform != null
-                ? playerTransform.rotation
-                : Quaternion.Euler(fixedRotationEuler);
-            if (!enableRotationOffset || rotationOffsetEuler == Vector3.zero) return baseRot;
-            return baseRot * Quaternion.Euler(rotationOffsetEuler);
-        }
+        [LabelText("旋转权重(0=关闭)"), Range(0f, 1f)]
+        [OnValueChanged("AutoCorrectWeights")]
+        [Tooltip("旋转权重（0-1），最终旋转速度 = 逼近速度.Y * 旋转权重。\n0 = 不旋转。")]
+        public float rotationWeight = 1f;
 
         /// <summary>由 Odin OnValueChanged 回调：positionOffset 改变时自动同步 enablePositionOffset。
         /// 全零 → 关闭（偏移无意义）；非零 → 开启。</summary>
         private void SyncPosOffsetEnable() => enablePositionOffset = positionOffset != Vector3.zero;
 
-        /// <summary>由 Odin OnValueChanged 回调：rotationOffsetEuler 改变时自动同步 enableRotationOffset。
-        /// 全零 → 关闭；非零 → 开启。</summary>
-        private void SyncRotOffsetEnable() => enableRotationOffset = rotationOffsetEuler != Vector3.zero;
+        /// <summary>由 Odin OnValueChanged 回调：rotationOffsetY 改变时同步 enableRotationOffset。</summary>
+        private void SyncRotOffsetYawOnlyAndEnable()
+        {
+            enableRotationOffset = Mathf.Abs(rotationOffsetY) > 0.0001f;
+        }
+
+        private void AutoCorrectTimeRange()
+        {
+            timeRange.x = Mathf.Max(0f, timeRange.x);
+            timeRange.y = Mathf.Max(0f, timeRange.y);
+            if (timeRange.y < timeRange.x) timeRange.y = timeRange.x;
+        }
+
+        private void AutoCorrectWeights()
+        {
+            positionApproachSpeed = Mathf.Max(0f, positionApproachSpeed);
+            rotationApproachSpeed = Mathf.Max(0f, rotationApproachSpeed);
+            rotationWeight = Mathf.Clamp01(rotationWeight);
+        }
 
         public static MatchTargetRequest Default => new MatchTargetRequest
         {
             bodyPart            = AvatarTarget.Root,
-            target              = null,
-            fixedPosition       = Vector3.zero,
-            fixedRotationEuler  = Vector3.zero,
             positionOffset      = Vector3.zero,
-            enablePositionOffset = true,
-            rotationOffsetEuler = Vector3.zero,
-            enableRotationOffset = true,
-            startTime = 0f,
-            endTime   = 1f,
-            positionWeight      = new Vector3(3f, 360f, 0f),
+            enablePositionOffset = false,
+            rotationOffsetY     = 0f,
+            enableRotationOffset = false,
+            timeRange = new Vector2(0f, 0.35f),
+            positionApproachSpeed = 4f,
+            rotationApproachSpeed = 240f,
             rotationWeight      = 1f
         };
     }
@@ -269,7 +244,8 @@ namespace ES
         [Tooltip("状态进入后经过多少秒触发此指令（hasEnterTime 基准），到达后覆盖当前 MatchTarget 参数")]
         public float triggerAt;
 
-        [LabelText("指令参数"), InlineProperty, HideLabel]
+        [Header("指令参数")]
+        [HideLabel]
         public MatchTargetRequest request = MatchTargetRequest.Default;
 
         // ── 内部运行时状态（框架控制，外部只需调用 Reset） ──
@@ -330,24 +306,24 @@ namespace ES
         [Tooltip("当状态退出时是否自动禁用IK")]
         public bool disableIKOnExit = true;
 
-        [FoldoutGroup("IK配置/肢体目标")]
-        [LabelText("左手IK"), ShowIf("enableIK"), InlineProperty]
+        [Header("左手IK")]
+        [ShowIf("enableIK"), HideLabel]
         public IKLimbConfig ikLeftHand = IKLimbConfig.Default;
 
-        [FoldoutGroup("IK配置/肢体目标")]
-        [LabelText("右手IK"), ShowIf("enableIK"), InlineProperty]
+        [Header("右手IK")]
+        [ShowIf("enableIK"), HideLabel]
         public IKLimbConfig ikRightHand = IKLimbConfig.Default;
 
-        [FoldoutGroup("IK配置/肢体目标")]
-        [LabelText("左脚IK"), ShowIf("enableIK"), InlineProperty]
+        [Header("左脚IK")]
+        [ShowIf("enableIK"), HideLabel]
         public IKLimbConfig ikLeftFoot = IKLimbConfig.Default;
 
-        [FoldoutGroup("IK配置/肢体目标")]
-        [LabelText("右脚IK"), ShowIf("enableIK"), InlineProperty]
+        [Header("右脚IK")]
+        [ShowIf("enableIK"), HideLabel]
         public IKLimbConfig ikRightFoot = IKLimbConfig.Default;
 
-        [FoldoutGroup("IK配置/注视")]
-        [LabelText("注视IK"), ShowIf("enableIK"), InlineProperty]
+        [Header("注视IK")]
+        [ShowIf("enableIK"), HideLabel]
         public IKLookAtConfig ikLookAt = IKLookAtConfig.Default;
 
         // ==================== MatchTarget配置（商业级 Inspector 可视化） ====================
@@ -358,11 +334,12 @@ namespace ES
 
         [FoldoutGroup("MatchTarget配置")]
         [LabelText("状态进入时自动激活"), ShowIf("enableMatchTarget")]
-        [Tooltip("状态Enter时自动触发MatchTarget（否则需要代码手动调用StartMatchTarget）")]
+        [Tooltip("状态Enter时自动启动阶段时序（Phase1/Phase2 由 StateBase 按 timeRange 自动推进）。\n无论 Phase2.timeRange.x 是否更小，Phase2 都必须在 Phase1.timeRange.y（阶段一结束）之后才允许启动。\n关闭时可由代码手动启动 Phase1，Phase2 仍由 StateBase 按同一规则自动推进。")]
         public bool autoActivateMatchTarget = false;
 
         [FoldoutGroup("MatchTarget配置")]
-        [LabelText("MatchTarget预设"), ShowIf("enableMatchTarget"), InlineProperty]
+        [Header("MatchTarget预设")]
+        [ShowIf("enableMatchTarget"), HideLabel]
         public MatchTargetRequest matchTargetPreset = MatchTargetRequest.Default;
 
         [FoldoutGroup("MatchTarget配置")]
@@ -370,7 +347,8 @@ namespace ES
         public bool enableMatchTargetPhase2 = false;
 
         [FoldoutGroup("MatchTarget配置")]
-        [LabelText("阶段2预设"), ShowIf("enableMatchTargetPhase2"), InlineProperty]
+        [Header("阶段2预设")]
+        [ShowIf("@enableMatchTarget && enableMatchTargetPhase2"), HideLabel]
         [Tooltip("阶段2 开始时间即为触发阈值，不需额外设置触发进度字段")]
         public MatchTargetRequest matchTargetPresetPhase2 = MatchTargetRequest.Default;
 
@@ -496,60 +474,6 @@ namespace ES
 
             if (ikLookAt.enabled && ikLookAt.target != null)
                 runtime.ik.lookAtPosition = ikLookAt.target.position;
-        }
-
-        /// <summary>
-        /// [已废弃] 此方法绕过了 StateBase.StartMatchTarget 的强化逻辑，不应被用户代码调用。<br/>
-        /// 正确入口是 <c>state.ApplyMatchTarget(request)</c> 或配置 <c>autoActivateMatchTarget=true</c>。
-        /// </summary>
-        [System.Obsolete("Call state.ApplyMatchTarget(request) or enable autoActivateMatchTarget instead.")]
-        public void ApplyMatchTargetConfigToRuntime(AnimationCalculatorRuntime runtime, Transform playerTransform = null)
-        {
-            if (!enableMatchTarget || !autoActivateMatchTarget || runtime == null) return;
-
-            var preset = matchTargetPreset;
-            runtime.StartMatchTarget(
-                preset.GetPosition(playerTransform), preset.GetRotation(playerTransform),
-                preset.bodyPart,
-                preset.startTime, preset.endTime,
-                preset.positionWeight, preset.rotationWeight);
-        }
-
-        /// <summary>
-        /// 检查是否存在需要每帧跟踪的动态 Transform 目标（Phase1 或 Phase2 均会检查）
-        /// </summary>
-        public bool HasDynamicMatchTarget()
-        {
-            if (!enableMatchTarget) return false;
-            if (matchTargetPreset.target != null) return true;
-            if (enableMatchTargetPhase2 && matchTargetPresetPhase2.target != null) return true;
-            return false;
-        }
-
-        /// <summary>
-        /// 每帧从 Inspector 配置的 Transform 引用同步 MatchTarget 目标位置/旋转到 Runtime。
-        /// 仅更新有 Transform 引用的预设（与 IK 的 UpdateIKTargetsFromConfig 设计对齐）。
-        /// </summary>
-        /// <param name="playerTransform">玩家根节点 Transform，用于将 positionOffset / rotationOffsetEuler 从局部空间转换为世界空间；可为 null。</param>
-        public void UpdateMatchTargetFromConfig(AnimationCalculatorRuntime runtime, Transform playerTransform = null)
-        {
-            if (!enableMatchTarget || runtime == null) return;
-            if (!runtime.matchTarget.active || runtime.matchTarget.completed) return;
-
-            // Phase1 动态追踪：通过 GetPosition/GetRotation 保证 positionOffset / rotationOffsetEuler 被正确叠加
-            if (matchTargetPreset.target != null)
-            {
-                runtime.matchTarget.position = matchTargetPreset.GetPosition(playerTransform);
-                runtime.matchTarget.rotation = matchTargetPreset.GetRotation(playerTransform);
-            }
-
-            // Phase2 动态追踪（Phase2激活时，phase2的target覆盖）
-            if (enableMatchTargetPhase2 && matchTargetPresetPhase2.target != null
-                && runtime.matchTarget.startTime >= matchTargetPresetPhase2.startTime)
-            {
-                runtime.matchTarget.position = matchTargetPresetPhase2.GetPosition(playerTransform);
-                runtime.matchTarget.rotation = matchTargetPresetPhase2.GetRotation(playerTransform);
-            }
         }
 
         private static void ApplyLimbConfig(ref Vector3 position, ref Quaternion rotation,

@@ -320,7 +320,7 @@ namespace ES
     {
         #region 核心数据模块
         
-        [HideLabel,InlineProperty]
+        [HideLabel]
         public StateSharedData sharedData = new StateSharedData();
         
 

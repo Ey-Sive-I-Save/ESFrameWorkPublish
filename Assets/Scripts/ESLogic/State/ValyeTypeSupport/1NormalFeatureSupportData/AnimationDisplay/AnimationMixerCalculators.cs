@@ -2200,7 +2200,6 @@ namespace ES
             public float entrySpeed = 1f;
 
             [BoxGroup("主动画(Main)"), HideLabel]
-            [InlineProperty]
             public MainClipConfig mainConfig = new MainClipConfig();
 
             [BoxGroup("后置动画(Exit)")]

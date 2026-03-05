@@ -15,7 +15,7 @@ namespace ES
         [LabelText("启用默认地面参数")]
         public bool applyGroundDefaults = true;
 
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public GroundedDefaults groundedDefaults = GroundedDefaults.Default;
 
         public override void _AwakeRegisterAllModules()

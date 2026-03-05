@@ -13,13 +13,13 @@ namespace ES
 
         #region Domains
 
-        [TabGroup("域", "基础域"), InlineProperty, HideLabel, SerializeReference]
+        [TabGroup("域", "基础域"), HideLabel, SerializeReference]
         public EntityBasicDomain basicDomain;
 
-        [TabGroup("域", "AI域"), InlineProperty, HideLabel, SerializeReference]
+        [TabGroup("域", "AI域"), HideLabel, SerializeReference]
         public EntityAIDomain aiDomain;
 
-        [TabGroup("域", "状态域"), InlineProperty, HideLabel, SerializeReference]
+        [TabGroup("域", "状态域"), HideLabel, SerializeReference]
         public EntityStateDomain stateDomain;
 
         #endregion
@@ -27,7 +27,7 @@ namespace ES
         #region KCC
 
         [Title("KCC（不走模块，超高频）")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public EntityKCCData kcc = new EntityKCCData();
 
         #endregion
@@ -243,7 +243,7 @@ namespace ES
         public float verticalInput;
 
         [Title("Monitor（运行监视）")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public EntityKCCMonitor monitor = new EntityKCCMonitor();
 
         [LabelText("Monitor调试")]

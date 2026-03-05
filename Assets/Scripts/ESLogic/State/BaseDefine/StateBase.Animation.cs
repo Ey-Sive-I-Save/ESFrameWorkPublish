@@ -448,16 +448,6 @@ namespace ES
                 TickConfigAutoMatchTarget(hasEnterTime);
             }
 
-            // ★ 动态MatchTarget目标追踪：如果 Inspector 配置了 Transform 引用，每帧同步位置/旋转
-            if (_enableMatchTargetCached && runtime.matchTarget.active && !runtime.matchTarget.completed)
-            {
-                var animConfigForMT = _animConfigCached;
-                if (animConfigForMT != null && animConfigForMT.HasDynamicMatchTarget())
-                {
-                    animConfigForMT.UpdateMatchTargetFromConfig(runtime, host.HostEntity.transform);
-                }
-            }
-
             // ★ 代码驱动待执行指令（QueueNextMatchTarget API，与 Config-Auto 无关）
             if (_pendingCommand != null && !_pendingCommand.consumed)
             {

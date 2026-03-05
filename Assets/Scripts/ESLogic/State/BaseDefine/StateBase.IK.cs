@@ -79,6 +79,7 @@ namespace ES
         public void SetIKHintPosition(IKGoal goal, Vector3 position)
         {
             if (_animationRuntime == null) return;
+            _ikActive = true;
             _animationRuntime.SetIKHintPosition(goal, position);
         }
 
@@ -110,10 +111,12 @@ namespace ES
         /// 典型用途：交互/抓取时根据进度或距离动态调节 IK 总权重。
         ///
         /// 说明：
-        /// - 本方法不再维护“独立覆盖开关/覆盖值”。
-        /// - UpdateAnimationRuntime 读取 ResolvedConfig.ikTargetWeight；外部写入后即可自然参与曲线乘子与阶段覆盖逻辑。
+        /// - 直接写入 ResolvedConfig.ikOverrideEnabled=true / .ikTargetWeight=weight，不标脏、不触发 Refresh，
+        ///   避免覆盖值被 RefreshResolvedRuntimeConfig 立即还原。
+        /// - UpdateAnimationRuntime 每帧读取 ResolvedConfig.ikTargetWeight，写入后即参与曲线乘子与阶段覆盖逻辑。
+        /// - 调用 ClearIKExternalTargetWeight() 可恢复由配置合成值驱动（置脏→Refresh 重建，ikOverrideEnabled 清零）。
         /// </summary>
-        public void SetIKExternalTargetWeight(float weight)
+        public void  SetIKExternalTargetWeight(float weight)
         {
             _ikActive = true;
             float clamped = Mathf.Clamp01(weight);
@@ -155,7 +158,7 @@ namespace ES
             if (_animationRuntime != null)
             {
                 _animationRuntime.ik.targetWeight = 0f;
-                // IK权重会在UpdateAnimationWeights中平滑过渡到0
+                // IK权重会在 UpdateAnimationRuntime 中平滑过渡到 0，ik.enabled 在 weight→0 后由 UpdateIKWeight 自动关闭。
             }
         }
 

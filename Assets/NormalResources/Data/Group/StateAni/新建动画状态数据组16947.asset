@@ -209,26 +209,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 5
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 1
       matchTargetPresetPhase2:
         bodyPart: 5
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -569,26 +567,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -906,26 +902,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -1275,26 +1269,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -1625,26 +1617,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -2243,26 +2233,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -2722,28 +2710,26 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 2
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
-        positionOffset: {x: 5, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 4.62
-        positionWeight: {x: 1, y: 1, z: 1}
+        positionOffset: {x: 1, y: 0, z: 0}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 0
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
-      enableMatchTargetPhase2: 0
+      enableMatchTargetPhase2: 1
       matchTargetPresetPhase2:
         bodyPart: 5
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 2.87
-        endTime: 8.98
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 0
+        rotationOffsetY: 0
+        enableRotationOffset: 0
+        timeRange: {x: 0.7778503, y: 5.087266}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
-    enableFadeInOut: 1
+    enableFadeInOut: 0
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
     fadeInDuration: 0.2
@@ -3057,26 +3043,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -3536,26 +3520,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 2
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 1
       matchTargetPresetPhase2:
         bodyPart: 2
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -3635,9 +3617,9 @@ MonoBehaviour:
         EffectialPripority: 0
         EqualIsEffectial_: 1
     costData:
-      costForMotion: 60
-      costForAgility: 60
-      costForTarget: 60
+      costForMotion: 58
+      costForAgility: 69
+      costForTarget: 65
       enableCostCalculation: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
@@ -3871,26 +3853,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -4209,26 +4189,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -4538,26 +4516,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -4881,26 +4857,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -5225,26 +5199,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -5560,26 +5532,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
@@ -5910,26 +5880,24 @@ MonoBehaviour:
       autoActivateMatchTarget: 0
       matchTargetPreset:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
       enableMatchTargetPhase2: 0
       matchTargetPresetPhase2:
         bodyPart: 0
-        target: {fileID: 0}
-        fixedPosition: {x: 0, y: 0, z: 0}
-        fixedRotationEuler: {x: 0, y: 0, z: 0}
         positionOffset: {x: 0, y: 0, z: 0}
-        rotationOffsetEuler: {x: 0, y: 0, z: 0}
-        startTime: 0
-        endTime: 1
-        positionWeight: {x: 1, y: 1, z: 1}
+        enablePositionOffset: 1
+        rotationOffsetY: 0
+        enableRotationOffset: 1
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
         rotationWeight: 1
     enableFadeInOut: 1
     fadeFollowTimeScale: 1

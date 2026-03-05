@@ -95,7 +95,7 @@ namespace ES
 
         // ===== 攀爬参数 =====
         [Title("攀爬参数")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public ClimbParams climbParams = ClimbParams.Default;
 
         [Title("攀爬速度波动")]
@@ -246,27 +246,6 @@ namespace ES
         [LabelText("翻越起点过远退出距离")]
         public float vaultFarExitDistance = 1.5f;
 
-        [Title("攀上-阶段2(脚)"), LabelText("启用二阶段对齐")]
-        public bool enableClimbOverFootPhase = true;
-
-        [LabelText("阶段2触发进度"), Range(0f, 1f), Tooltip("归一化进度到达该值后切换到脚部对齐")]
-        public float climbOverPhase2Trigger = 0.6f;
-
-        [LabelText("攀上-脚部身体部位")]
-        public AvatarTarget climbOverFootBodyPart = AvatarTarget.LeftFoot;
-
-        [LabelText("攀上-脚部开始时间"), Range(0f, 1f)]
-        public float climbOverFootStartTime = 0.6f;
-
-        [LabelText("攀上-脚部结束时间"), Range(0f, 1f)]
-        public float climbOverFootEndTime = 0.95f;
-
-        [LabelText("攀上-脚部逼近速度(单位/秒)")]
-        public float climbOverFootApproachSpeed = 3f;
-
-        [LabelText("攀上-脚部旋转速度(度/秒)")]
-        public float climbOverFootAngleSpeed = 180f;
-
         [Title("逼近配置")]
         [LabelText("持续逼近目标")]
         public bool enableContinuousApproach = true;
@@ -323,7 +302,6 @@ namespace ES
         [NonSerialized] private float _groundedSince = -1f;
         [NonSerialized] private float _climbJumpStartTime = -999f;
         [NonSerialized] private float _matchTargetStartTime = -999f;
-        [NonSerialized] private bool _climbOverPhase2Active;
         [NonSerialized] private float _climbOverGroundedSince = -1f;
         [NonSerialized] private Vector3 _vaultStartPosition;
 
@@ -770,8 +748,6 @@ namespace ES
 
             _vaultStartPosition = charPos;
 
-            _climbOverPhase2Active = false;
-
             _matchTargetStartTime = Time.time;
 
             // enableContinuousApproach: 重施加策略已迁移至 StateMachineConfig.matchTargetReapply 全局配置，无需在此显式设置
@@ -834,8 +810,6 @@ namespace ES
             }
 
             subState = ClimbSubState.ClimbOver;
-
-            _climbOverPhase2Active = false;
 
             _matchTargetStartTime = Time.time;
 
@@ -1121,15 +1095,11 @@ namespace ES
                 bool isVault = subState == ClimbSubState.Vault;
                 if (isVault)
                 {
-                    targetPos = _climbOverPhase2Active
-                        ? currentSurface.GetLandingPosition(charPos)
-                        : currentSurface.GetMatchTargetPosition(charPos);
+                    targetPos = currentSurface.GetMatchTargetPosition(charPos);
                 }
                 else
                 {
-                    targetPos = _climbOverPhase2Active
-                        ? currentSurface.GetLandingPosition(charPos)
-                        : currentSurface.GetMatchTargetPosition(charPos);
+                    targetPos = currentSurface.GetMatchTargetPosition(charPos);
                 }
                 Vector3 toTarget = targetPos - charPos;
                 float dist = toTarget.magnitude;
@@ -1158,37 +1128,11 @@ namespace ES
 
                 if (activeState != null)
                 {
-                    // ★ 改用 PatchMatchTargetWithConfigOffset：
-                    //   原 PatchMatchTarget(targetPos, targetRot) 每帧直接写入 raw 位置，
+                    // ★ 改用 SetMatchTargetTargetWithConfigOffset：
+                    //   原 SetMatchTargetTarget(targetPos, targetRot) 每帧直接写入 raw 位置，
                     //   会覆盖 StartMatchTargetFromConfig 在启动时叠加的 Inspector positionOffset/ rotationOffsetEuler。
                     //   新方法自动从当前激活阶段的 Inspector 配置读取偏移并叠加，确保 Offset 在追踪期间始终生效。
-                    activeState.PatchMatchTargetWithConfigOffset(targetPos, targetRot);
-                }
-
-                if (!_climbOverPhase2Active)
-                {
-                    StateBase phaseState = subState == ClimbSubState.Vault ? (_activeVaultState ?? _vaultState) : _climbOverState;
-                    var animConfig = phaseState?.stateSharedData?.animationConfig;
-                    bool useStateConfig = animConfig != null && animConfig.enableMatchTargetPhase2;
-                    bool useModuleConfig = subState == ClimbSubState.ClimbOver && enableClimbOverFootPhase && !useStateConfig;
-
-                    float trigger = useStateConfig ? (animConfig.matchTargetPresetPhase2?.startTime ?? climbOverPhase2Trigger) : climbOverPhase2Trigger;
-                    bool canTrigger = phaseState != null && phaseState.hasEnterTime >= trigger;
-
-                    if ((useStateConfig || useModuleConfig) && canTrigger)
-                    {
-                        Vector3 phase2TargetPos = currentSurface.GetLandingPosition(charPos);
-                        // ★ 优先用 Inspector Phase2 配置；未配置时退回模块字段（向后兼容）
-                        if (!phaseState.StartMatchTargetFromPhase2Config(phase2TargetPos, targetRot))
-                        {
-                            phaseState.StartMatchTarget(
-                                phase2TargetPos, targetRot,
-                                climbOverFootBodyPart, climbOverFootStartTime, climbOverFootEndTime,
-                                climbOverFootApproachSpeed, climbOverFootAngleSpeed);
-                        }
-                        _matchTargetStartTime = Time.time;
-                        _climbOverPhase2Active = true;
-                    }
+                    activeState.SetMatchTargetTargetWithConfigOffset(targetPos, targetRot);
                 }
 
                 if (debugClimb)
@@ -1297,15 +1241,15 @@ namespace ES
                     bool probedGrounded = CheckVaultGroundProbe(charPos);
                     bool frontBackGrounded = CheckVaultFrontBackGround(charPos);
                     bool farFromStart = Vector3.Distance(charPos, _vaultStartPosition) >= vaultFarExitDistance;
-                    bool allowExit = elapsed >= vaultMinDuration && (!_climbOverPhase2Active || dist <= vaultExitDistance);
+                    bool allowExit = elapsed >= vaultMinDuration && dist <= vaultExitDistance;
                     bool allowImmediateExit = elapsed >= vaultMinDuration;
                     bool canExitByDistance = allowExit && dist <= vaultExitDistance && probedGrounded;
                     if ((allowImmediateExit && frontBackGrounded) || farFromStart || canExitByDistance || elapsed >= vaultMaxDuration)
                     {
                         if (debugClimb)
                         {
-                            string reason = frontBackGrounded ? "frontBackGround" : (farFromStart ? "farFromStart" : (elapsed >= vaultMaxDuration ? "timeout" : (dist <= vaultExitDistance ? "distance" : "phase2")));
-                            Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} dist={dist:F3} phase2={_climbOverPhase2Active} probedGrounded={probedGrounded} frontBack={frontBackGrounded} far={farFromStart}");
+                            string reason = frontBackGrounded ? "frontBackGround" : (farFromStart ? "farFromStart" : (elapsed >= vaultMaxDuration ? "timeout" : "distance"));
+                            Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} dist={dist:F3} probedGrounded={probedGrounded} frontBack={frontBackGrounded} far={farFromStart}");
                         }
                         ExitClimbingState();
                         ResetClimbState();
@@ -1318,23 +1262,21 @@ namespace ES
             if (subState == ClimbSubState.Vault && currentSurface != null && !enableContinuousApproach)
             {
                 Vector3 charPos = MyCore.kcc.motor.TransientPosition;
-                Vector3 targetPos = _climbOverPhase2Active
-                    ? currentSurface.GetLandingPosition(charPos)
-                    : currentSurface.GetMatchTargetPosition(charPos);
+                Vector3 targetPos = currentSurface.GetMatchTargetPosition(charPos);
                 float dist = Vector3.Distance(charPos, targetPos);
                 float elapsed = Time.time - _matchTargetStartTime;
                 bool probedGrounded = CheckVaultGroundProbe(charPos);
                 bool frontBackGrounded = CheckVaultFrontBackGround(charPos);
                 bool farFromStart = Vector3.Distance(charPos, _vaultStartPosition) >= vaultFarExitDistance;
-                bool allowExit = elapsed >= vaultMinDuration && (!_climbOverPhase2Active || dist <= vaultExitDistance);
+                bool allowExit = elapsed >= vaultMinDuration && dist <= vaultExitDistance;
                 bool allowImmediateExit = elapsed >= vaultMinDuration;
                 bool canExitByDistance = allowExit && dist <= vaultExitDistance && probedGrounded;
                 if ((allowImmediateExit && frontBackGrounded) || farFromStart || canExitByDistance || elapsed >= vaultMaxDuration)
                 {
                     if (debugClimb)
                     {
-                        string reason = frontBackGrounded ? "frontBackGround" : (farFromStart ? "farFromStart" : (elapsed >= vaultMaxDuration ? "timeout" : (dist <= vaultExitDistance ? "distance" : "phase2")));
-                        Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} dist={dist:F3} phase2={_climbOverPhase2Active} probedGrounded={probedGrounded} frontBack={frontBackGrounded} far={farFromStart} (noApproach)");
+                        string reason = frontBackGrounded ? "frontBackGround" : (farFromStart ? "farFromStart" : (elapsed >= vaultMaxDuration ? "timeout" : "distance"));
+                        Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} dist={dist:F3} probedGrounded={probedGrounded} frontBack={frontBackGrounded} far={farFromStart} (noApproach)");
                     }
                     ExitClimbingState();
                     ResetClimbState();
@@ -1511,7 +1453,6 @@ namespace ES
             _climbEnterTime = -999f;
             _groundedSince = -1f;
             _climbJumpStartTime = -999f;
-            _climbOverPhase2Active = false;
             _climbOverGroundedSince = -1f;
             _activeVaultState = null;
             _vaultStartPosition = Vector3.zero;

@@ -29,19 +29,26 @@ MonoBehaviour:
     - rid: 5686404864374210568
     - rid: 5686404864374210603
     - rid: 5686404864374210607
+    - rid: 232055334675415041
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
+    - rid: 232055334675415041
+      type: {class: SkillTrackItem_Audio, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        clips: []
+        displayName: 
     - rid: 5686404864374210566
       type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
         clips:
         - name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 2.5896528
-          durationTime: 1.0149999
+          startTime: 3.3486888
+          durationTime: 1.7041106
           AnimationClipName: {fileID: 0}
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 8.185684
@@ -67,7 +74,7 @@ MonoBehaviour:
         enabled: 1
         clips:
         - name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 2.3571947
+          startTime: 2.6863925
           durationTime: 1.5607584
           audioClip: {fileID: 0}
         - name: "\u8F68\u9053\u7247\u6BB5"
@@ -76,7 +83,7 @@ MonoBehaviour:
           audioClip: {fileID: 0}
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 5.241065
-          durationTime: 1
+          durationTime: 0.9748405
           audioClip: {fileID: 0}
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 0
@@ -89,7 +96,7 @@ MonoBehaviour:
         enabled: 1
         clips:
         - name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 5.51
+          startTime: 9.242381
           durationTime: 1
           Activate: 1
         - name: "\u8F68\u9053\u7247\u6BB5"
@@ -105,7 +112,7 @@ MonoBehaviour:
           durationTime: 1.233192
           Activate: 1
         - name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 8.193126
+          startTime: 7.0917788
           durationTime: 1
           Activate: 1
         displayName: 
@@ -115,7 +122,7 @@ MonoBehaviour:
         enabled: 1
         clips:
         - name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 3.237066
+          startTime: 5.5141745
           durationTime: 2.3812869
           OperationDescription: 
           op:

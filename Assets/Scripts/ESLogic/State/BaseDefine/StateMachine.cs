@@ -113,15 +113,15 @@ namespace ES
         /// <summary>
         /// 状态机唯一标识键
         /// </summary>
-        [TitleGroup("状态机设置", Order = 0)]
-        [BoxGroup("状态机设置/基础", ShowLabel = false)]
+        [TabGroup("SM_View", "⚙ 配置", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾蓝\")")]
+        [BoxGroup("SM_View/⚙ 配置/基础设置", ShowLabel = false)]
         [LabelText("状态机键"), ShowInInspector]
         public string stateMachineKey;
 
 
 
-        [TitleGroup("状态机设置", Order = 0)]
-        [BoxGroup("状态机设置/基础", ShowLabel = false)]
+        [TabGroup("SM_View", "⚙ 配置")]
+        [BoxGroup("SM_View/⚙ 配置/基础设置", ShowLabel = false)]
         [LabelText("状态机配置"), ShowInInspector]
         [SerializeField]
         private StateMachineConfig config;
@@ -135,6 +135,7 @@ namespace ES
         /// <summary>
         /// 状态上下文 - 统一管理运行时数据、参数、标记等（整合了原StateMachineContext）
         /// </summary>
+        [TabGroup("SM_View", "▶ 运行时", Order = 1, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")")]
         [LabelText("状态实时上下文"), ShowInInspector]
         [ReadOnly]
         [NonSerialized]
@@ -148,6 +149,7 @@ namespace ES
         /// <summary>
         /// 状态机是否正在运行
         /// </summary>
+        [TabGroup("SM_View", "▶ 运行时")]
         [ShowInInspector, ReadOnly, LabelText("运行状态")]
         public bool isRunning { get; protected set; }
 
@@ -163,6 +165,7 @@ namespace ES
         #region 运行时状态（核心/不建议改）
 
 
+        [TabGroup("SM_View", "▶ 运行时")]
         [ShowInInspector, ReadOnly, LabelText("当前运行状态")]
         [NonSerialized]
         private SwapBackSet<StateBase> runningStates = new SwapBackSet<StateBase>(32);
@@ -212,6 +215,7 @@ namespace ES
 
 
 
+        [TabGroup("SM_View", "▶ 运行时")]
         [ShowInInspector, ReadOnly, LabelText("支持标记")]
         [NonSerialized]
         public StateSupportFlags currentSupportFlags = StateSupportFlags.Grounded;
@@ -298,21 +302,21 @@ namespace ES
         /// <summary>
         /// String键到状态的映射
         /// </summary>
-        [ShowInInspector, FoldoutGroup("状态字典"), LabelText("String映射")]
+        [ShowInInspector, TabGroup("SM_View", "📋 状态字典", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾紫\")"), LabelText("String映射")]
         [SerializeField, SerializeReference]
         private Dictionary<string, StateBase> stringToStateMap = new Dictionary<string, StateBase>();
 
         /// <summary>
         /// Int键到状态的映射
         /// </summary>
-        [ShowInInspector, FoldoutGroup("状态字典"), LabelText("Int映射")]
+        [ShowInInspector, TabGroup("SM_View", "📋 状态字典"), LabelText("Int映射")]
         [SerializeField, SerializeReference]
         private Dictionary<int, StateBase> intToStateMap = new Dictionary<int, StateBase>();
 
         /// <summary>
         /// 状态归属层级映射
         /// </summary>
-        [ShowInInspector, FoldoutGroup("状态字典"), LabelText("状态层级映射")]
+        [ShowInInspector, TabGroup("SM_View", "📋 状态字典"), LabelText("状态层级映射")]
         [NonSerialized]
         private Dictionary<StateBase, StateLayerType> stateLayerMap = new Dictionary<StateBase, StateLayerType>();
 
@@ -424,7 +428,8 @@ namespace ES
         /// <summary>
         /// 默认状态键 - 状态机启动时进入的状态
         /// </summary>
-        [BoxGroup("状态机设置/基础", ShowLabel = false)]
+        [TabGroup("SM_View", "⚙ 配置")]
+        [BoxGroup("SM_View/⚙ 配置/基础设置", ShowLabel = false)]
         [LabelText("默认状态键"), ValueDropdown("GetAllStateKeys")]
         public string defaultStateKey;
         #endregion
@@ -435,12 +440,12 @@ namespace ES
         /// <summary>
         /// 固定层级遮罩配置（按规范使用）
         /// </summary>
-        [TitleGroup("层级设置", Order = 1)]
-        [BoxGroup("层级设置/动作遮罩", ShowLabel = false)]
+        [TabGroup("SM_View", "⚙ 配置")]
+        [BoxGroup("SM_View/⚙ 配置/层级遮罩", ShowLabel = false)]
         [LabelText("上半身遮罩"), AssetsOnly]
         public AvatarMask upperBodyMask;
 
-        [BoxGroup("层级设置/动作遮罩", ShowLabel = false)]
+        [BoxGroup("SM_View/⚙ 配置/层级遮罩", ShowLabel = false)]
         [LabelText("下半身遮罩"), AssetsOnly]
         public AvatarMask lowerBodyMask;
 
@@ -450,7 +455,7 @@ namespace ES
         /// 保证 AnimationMixerPlayable 的输入权重总和始终=1.0。
         /// 建议使用1帧的站立idle动画。
         /// </summary>
-        [BoxGroup("层级设置/动作遮罩", ShowLabel = false)]
+        [BoxGroup("SM_View/⚙ 配置/层级遮罩", ShowLabel = false)]
         [LabelText("参考姿态动画剪辑(防下陷)"), AssetsOnly]
         [Tooltip("防止空状态时角色下陷到地面以下。建议设置为 1 帧的站立待机动画剪辑。")]
         public AnimationClip referencePoseClip;
@@ -458,6 +463,7 @@ namespace ES
         /// <summary>
         /// 层级运行时数据
         /// </summary>
+        [TabGroup("SM_View", "▶ 运行时")]
         [ShowInInspector, LabelText("运行层级")]
         [NonSerialized]
         protected List<StateLayerRuntime> layerRuntimes = new List<StateLayerRuntime>();

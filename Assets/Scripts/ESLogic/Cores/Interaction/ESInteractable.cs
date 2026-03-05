@@ -68,7 +68,8 @@ namespace ES
         [Title("MatchTarget (Optional)")]
         public bool enableMatchTarget = false;
 
-        [ShowIf("enableMatchTarget"), InlineProperty, HideLabel]
+        [InfoBox("仅配置阶段参数与偏移；目标位置/旋转由交互运行时传入（通常使用当前 Interactable 的 Transform）。", InfoMessageType.None, "enableMatchTarget")]
+        [ShowIf("enableMatchTarget"), HideLabel]
         public MatchTargetRequest matchTargetRequest = MatchTargetRequest.Default;
 
         private float _lastInteractTime = -999f;

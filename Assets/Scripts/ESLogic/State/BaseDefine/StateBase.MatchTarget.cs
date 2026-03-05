@@ -26,7 +26,7 @@ using UnityEngine;
 //   SetPositionAndRotation 的结果立刻被下一次 Simulate 覆盖——看起来完全不动。
 //
 // 【3. 插值算法：MoveTowards / RotateTowards 速度驱动，终点始终为 live 目标】
-//   每帧以 matchtargetTowardPosMutipler=3f 倍率和 positionWeight.x（单位/秒）进行：
+//   每帧以 matchtargetTowardPosMutipler=3f 倍率和 positionApproachSpeed（单位/秒）进行：
 //     newPos = MoveTowards(curPos, effectiveTargetPos, posSpeed×3f×dt)
 //     newRot = RotateTowards(curRot, effectiveTargetRot, rotSpeed×1f×dt)
 //   effectiveTargetPos = targetRootPos（每帧实时计算），不再使用首帧终点快照。
@@ -36,7 +36,7 @@ using UnityEngine;
 //   MoveTowards 是绝对速度驱动，不依赖 t∈[0,1] 区间稳定性。
 //   骨骼随动画每帧移动 → effectiveTargetPos 也随之微量变化 → MoveTowards 自动跟随；
 //   只要 endTime 前速度足够，最终误差可降到可接受范围。
-//   对于 Root bodyPart（Mount 场景）：liveOffset=0，目标通过 PatchMatchTarget 每帧更新即可。
+//   对于 Root bodyPart（Mount 场景）：liveOffset=0，目标通过 SetMatchTargetTarget 每帧更新即可。
 //
 // 【5. liveOffset 的作用（bodyPart != Root 时）】
 //   mt.position 是目标骨骼（手/脚/Body）的世界坐标，但 KCC 只能移动根节点。
@@ -48,19 +48,26 @@ using UnityEngine;
 //     TransientPos 在物理层超前于视觉骨骼，会随根节点推进增大，
 //     形成正反馈，导致"围着目标绕圈"的发散行为。
 //
-// 【6. positionWeight / rotationWeight 语义】
-//   positionWeight.x = 位置逼近速度（单位/秒），内部乘以3倍率常量
-//   positionWeight.y = 旋转逼近速度（度/秒），仅 rotationWeight > 0 时生效
-//   rotationWeight   = 旋转启用开关（>0 = 启用旋转对齐）
+// 【6. 速度与权重语义】
+//   positionApproachSpeed = 位置逼近速度（单位/秒），内部乘以3倍率常量
+//   rotationApproachSpeed = 旋转基础逼近速度（度/秒）
+//   rotationWeight        = 旋转权重（0..1），最终旋转速度 = rotationApproachSpeed * rotationWeight
 //
 // 【7. 多阶段时序器 Config-Auto】
 //   _configAutoPhaseIndex：-1=未启动，0=Phase1已启动，1=Phase2已启动
 //   TickConfigAutoMatchTarget 每帧由 elapsed(hasEnterTime) 驱动：
-//     elapsed >= p1.startTime && index<0  → 启动 Phase1，index=0
-//     elapsed >= p2.startTime && index==0 → 启动 Phase2，index=1（无上限检查，防低帧率跳过）
-//   Phase1 未启动时不检查 Phase2（防止 p2.startTime=0 时在第一帧就抢占）。
+//     elapsed >= p1.timeRange.x && index<0  → 启动 Phase1，index=0
+//     elapsed >= p2.timeRange.x && index==0 → 启动 Phase2，index=1（无上限检查，防低帧率跳过）
+//   Phase1 未启动时不检查 Phase2（防止 p2.timeRange.x=0 时在第一帧就抢占）。
 //   每次 StartMatchTarget 清除 _matchTargetSnapshotTaken，
 //   Phase 切换时自动在新窗口首帧重新快照起点（Gizmos 用途）。
+//
+// 【8. 目标位姿归属（关键约束）】
+//   MatchTargetRequest 不再保存目标 Transform/固定位置/固定旋转。
+//   目标位姿由调用方在运行时提供，并写入 _sharedMatchTargetPos/_sharedMatchTargetRot：
+//   - 首次启动：ApplyMatchTarget(request, targetPos, targetRot) 或 StartMatchTargetFromConfig(targetPos, targetRot)
+//   - 持续追踪：SetMatchTargetTargetWithConfigOffset(rawPos, rawRot)
+//   Phase1/Phase2 共用同一份 raw 目标位姿，阶段差异只体现在各自 preset 的参数与 offset。
 //
 // ============================================================================
 //
@@ -72,10 +79,10 @@ using UnityEngine;
 //
 // 【启动/更新/取消】
 // - 启动一次 MatchTarget：public void StartMatchTarget(...)
-// - 统一入口（传入 Request）：public void ApplyMatchTarget(MatchTargetRequest)
-// - 修改运行时目标点：public void PatchMatchTarget(pos, rot)
-// - 修改目标并自动叠加配置 Offset：public void PatchMatchTargetWithConfigOffset(rawPos, rawRot)
-// - 叠加 Entity 局部偏移：public void PatchMatchTargetOffset(posOffset, rotOffsetEuler)
+// - 统一入口（传入 Request + 目标位姿）：public void ApplyMatchTarget(MatchTargetRequest, Vector3, Quaternion)
+// - 修改运行时目标点：public void SetMatchTargetTarget(pos, rot)
+// - 修改目标并自动叠加配置 Offset：public void SetMatchTargetTargetWithConfigOffset(rawPos, rawRot)
+// - 叠加 Entity 局部偏移：public void AddMatchTargetOffset(posOffset, rotOffsetY)
 // - 取消：public void CancelMatchTarget()
 //
 // 【待执行指令（自动触发）】
@@ -89,6 +96,26 @@ namespace ES
 {
     public partial class StateBase
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool HasYawOffset(float yaw)
+            => Mathf.Abs(yaw) > 0.0001f;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Quaternion YawOffsetToQuaternion(float yaw)
+            => Quaternion.Euler(0f, yaw, 0f);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ApplyPresetOffset(MatchTargetRequest preset, Quaternion playerRot, Vector3 rawPos, Quaternion rawRot,
+            out Vector3 outPos, out Quaternion outRot)
+        {
+            outPos = (!preset.enablePositionOffset || preset.positionOffset == Vector3.zero)
+                ? rawPos
+                : rawPos + (playerRot * preset.positionOffset);
+            outRot = (!preset.enableRotationOffset || !HasYawOffset(preset.rotationOffsetY))
+                ? rawRot
+                : rawRot * YawOffsetToQuaternion(preset.rotationOffsetY);
+        }
+
         #region MatchTarget 运行时
 
         /// <summary>
@@ -123,29 +150,38 @@ namespace ES
         /// <summary>启动时缓存的 Inspector 配置局部空间位置偏移原始值（positionOffset，玩家局部坐标系），仅用于 debug 日志展示；零=无偏移或代码驱动模式。
         /// debug 块每帧用当前 playerRot 实时重算世界偏移，确保 Transform 目标移动后仍准确。</summary>
         [NonSerialized] private Vector3 _matchTargetDbgPosOffsetLocal;
-        /// <summary>启动时缓存的旋转偏移欧拉角（rotationOffsetEuler），仅用于 debug 日志展示；零=无偏移或代码驱动模式。</summary>
-        [NonSerialized] private Vector3 _matchTargetDbgRotOffsetEuler;
+        /// <summary>启动时缓存的旋转偏移 Yaw（rotationOffsetY，单位°），仅用于 debug 日志展示；0=无偏移或代码驱动模式。</summary>
+        [NonSerialized] private float _matchTargetDbgRotOffsetY;
         /// <summary>调试用：记录本次 MatchTarget 的启动路径，便于分析偏移是否正确生效。
         /// 取值示例："Config-P1" / "Config-P2" / "Config-Auto-P1" / "Config-Auto-P2" / "ApplyRequest" / "Direct"</summary>
         [NonSerialized] private string _matchTargetDbgStartPath = "Direct";
 
         /// <summary>
         /// 运行时位置偏移开关（true=启用）。由配置的 enablePositionOffset 初始化，
-        /// 调用 <see cref="PatchMatchTargetOffset"/> 时自动置 true；可通过 <see cref="SetMatchTargetOffsetActive"/> 手动控制。
+        /// 调用 <see cref="AddMatchTargetOffset"/> 时自动置 true；可通过 <see cref="SetMatchTargetOffsetActive"/> 手动控制。
         /// </summary>
         [NonSerialized] private bool _matchTargetPosOffsetActive = true;
         /// <summary>
         /// 运行时旋转偏移开关（true=启用）。由配置的 enableRotationOffset 初始化，
-        /// 调用 <see cref="PatchMatchTargetOffset"/> 时自动置 true；可通过 <see cref="SetMatchTargetOffsetActive"/> 手动控制。
+        /// 调用 <see cref="AddMatchTargetOffset"/> 时自动置 true；可通过 <see cref="SetMatchTargetOffsetActive"/> 手动控制。
         /// </summary>
         [NonSerialized] private bool _matchTargetRotOffsetActive = true;
 
         /// <summary>
         /// Config-Auto 模式的当前阶段索引（时间序列驱动，重入安全）。
-        /// -1 = 未启动（状态进入时重置）；0 = Phase1 已开始；1 = Phase2 已开始。
+        /// -1 = 未启动；0 = Phase1 已开始；1 = Phase2 已开始。
+        /// 该索引由 StateBase 内部维护，业务模块无需也不应手动触发 Phase2。
         /// </summary>
         [NonSerialized]
         private int _configAutoPhaseIndex = -1;
+
+        /// <summary>
+        /// 共享的原始目标位姿（不含分阶段 offset）。
+        /// Phase1 / Phase2 均基于这一份 runtime 目标，阶段差异仅体现在各自 offset 与参数。
+        /// </summary>
+        [NonSerialized] private bool _hasSharedMatchTargetPose;
+        [NonSerialized] private Vector3 _sharedMatchTargetPos;
+        [NonSerialized] private Quaternion _sharedMatchTargetRot = Quaternion.identity;
 
         // 重施加阈值已迁移到 StateMachineConfig.matchTargetReapply（全局），不再在 State 实例上维护。
 
@@ -165,6 +201,7 @@ namespace ES
             if (!animConfig.autoActivateMatchTarget) return;
 
             // 重置阶段索引，时序器将从本帧起重新推进（支持状态重入）
+            // 注意：这里不清空 _sharedMatchTargetPose；目标位姿由业务层在启动/追踪时写入。
             _configAutoPhaseIndex = -1;
             _matchTargetActive    = true;
         }
@@ -180,8 +217,9 @@ namespace ES
         /// <param name="endNormTime">结束归一化时间 [0-1]</param>
         /// <param name="approachSpeed">位置逃近速度（单位/秒），<=0 表示不移动位置</param>
         /// <param name="approachAngleSpeed">旋转逃近速度（度/秒），<=0 表示不旋转</param>
+        /// <param name="rotationWeight">旋转权重（0-1），最终旋转速度=approachAngleSpeed*rotationWeight</param>
         public void StartMatchTarget(Vector3 targetPos, Quaternion targetRot, AvatarTarget bodyPart,
-            float startNormTime, float endNormTime, float approachSpeed, float approachAngleSpeed = 360f)
+            float startNormTime, float endNormTime, float approachSpeed, float approachAngleSpeed = 360f, float rotationWeight = 1f)
         {
             if (_animationRuntime == null)
             {
@@ -233,59 +271,55 @@ namespace ES
             _matchTargetLastApplyTime    = -999f;
             _matchTargetSnapshotTaken    = false;          // 强制在窗口首帧重新快照
             _matchTargetDbgStartPath     = "Direct";      // 被高层 API 调用时会在后面立即覆盖
-            // positionWeight.x = 位置启用开关(>0)，positionWeight.y = 旋转启用开关(>0)
             _animationRuntime.StartMatchTarget(targetPos, targetRot, bodyPart, startNormTime, endNormTime,
-                new Vector3(approachSpeed, approachAngleSpeed, 0f), 0f);
+                approachSpeed, approachAngleSpeed, rotationWeight);
         }
 
         /// <summary>
-        /// [已废弃] 请改用 <see cref="PatchMatchTarget"/>，接口完全兼容。
-        /// </summary>
-        [System.Obsolete("Use PatchMatchTarget(position, rotation) instead.")]
-        public void UpdateMatchTargetTarget(Vector3 targetPos, Quaternion targetRot)
-            => PatchMatchTarget(targetPos, targetRot);
-
         // ================================================================
         // ★ 统一入口：ApplyMatchTarget —— 接收 MatchTargetRequest 数据包
         // ================================================================
 
         /// <summary>
         /// 统一 MatchTarget 应用入口。<br/>
-        /// 调用方（资产配置 / 场景物体脚本 / 业务逻辑）只需构造一个 <see cref="MatchTargetRequest"/>，
-        /// 传入此方法即可；无需关心底层 7 参数签名。
+        /// request 仅承载阶段参数与偏移；目标位置/旋转由调用方在运行时传入。
         /// <example><code>
         /// // 场景物体覆盖：
-        /// state.ApplyMatchTarget(interactable.matchTargetRequest);
+        /// state.ApplyMatchTarget(interactable.matchTargetRequest, interactable.transform.position, interactable.transform.rotation);
         ///
         /// // 代码构造：
         /// state.ApplyMatchTarget(new MatchTargetRequest {
         ///     bodyPart = AvatarTarget.Root,
-        ///     target   = ledgeTransform,
-        ///     startTime = 0.1f,
-        ///     endTime   = 0.8f,
-        ///     positionWeight      = new Vector3(0, 1, 1),
+        ///     timeRange = new Vector2(0.1f, 0.8f),
+        ///     positionApproachSpeed = 3f,
+        ///     rotationApproachSpeed = 360f,
         ///     rotationWeight      = 0.5f
-        /// });
+        /// }, targetPos, targetRot);
         /// </code></example>
         /// </summary>
-        public void ApplyMatchTarget(MatchTargetRequest request)
+        public void ApplyMatchTarget(MatchTargetRequest request, Vector3 targetPos, Quaternion targetRot)
         {
-            // positionWeight.x → 位置逼近速度，rotationWeight → 旋转逼近速度（度/秒）
-            // 将 request 中的局部空间偏移通过玩家 Transform 转换为世界空间
-            var playerTrs = host.HostEntity.transform;
+            var playerRot = host.HostEntity.transform.rotation;
             // 同步调试缓存与偏移开关（非零自动开启，全零自动关闭）
             _matchTargetDbgPosOffsetLocal = request.positionOffset;
-            _matchTargetDbgRotOffsetEuler = request.rotationOffsetEuler;
+            _matchTargetDbgRotOffsetY = request.rotationOffsetY;
             _matchTargetPosOffsetActive   = request.positionOffset != Vector3.zero;
-            _matchTargetRotOffsetActive   = request.rotationOffsetEuler != Vector3.zero;
+            _matchTargetRotOffsetActive   = HasYawOffset(request.rotationOffsetY);
+
+            _hasSharedMatchTargetPose = true;
+            _sharedMatchTargetPos = targetPos;
+            _sharedMatchTargetRot = targetRot;
+
+            ApplyPresetOffset(request, playerRot, targetPos, targetRot, out var effectivePos, out var effectiveRot);
             StartMatchTarget(
-                request.GetPosition(playerTrs),
-                request.GetRotation(playerTrs),
+                effectivePos,
+                effectiveRot,
                 request.bodyPart,
-                request.startTime,
-                request.endTime,
-                request.positionWeight.x,
-                request.rotationWeight > 0f ? request.positionWeight.y : 0f);
+                request.timeRange.x,
+                request.timeRange.y,
+                request.positionApproachSpeed,
+                request.rotationApproachSpeed,
+                request.rotationWeight);
             _matchTargetDbgStartPath = "ApplyRequest"; // StartMatchTarget 内会覆盖为 Direct，在此恢复
         }
 
@@ -296,6 +330,7 @@ namespace ES
         /// <summary>
         /// 应用层简化接口（Phase1）：仅传目标位置/旋转，<br/>
         /// bodyPart / 时间范围 / 权重等参数自动从 Inspector <c>matchTargetPreset</c> 读取。
+        /// <para>此接口是业务层首选启动入口（手动模式下由它启动 Phase1）。</para>
         /// <para>返回 <c>true</c> = 成功使用 Inspector 配置启动；<br/>
         /// 返回 <c>false</c> = 配置不可用（未启用 enableMatchTarget），调用方可降级到完整重载。</para>
         /// </summary>
@@ -312,25 +347,23 @@ namespace ES
             }
 
             var preset    = animConfig.matchTargetPreset;
-            var playerTrs = host.HostEntity.transform;
-            // ★ 将 Inspector 配置的局部空间偏移叠加到调用方传入的基准位置/旋转上（同时尊重 enable 开关）
-            Vector3    effectivePos = (!preset.enablePositionOffset || preset.positionOffset == Vector3.zero)
-                ? targetPos
-                : targetPos + (playerTrs.rotation * preset.positionOffset);
-            Quaternion effectiveRot = (!preset.enableRotationOffset || preset.rotationOffsetEuler == Vector3.zero)
-                ? targetRot
-                : targetRot * Quaternion.Euler(preset.rotationOffsetEuler);
-            // positionWeight.y = 旋转逼近速度（度/秒）；rotationWeight [0,1] 作启用开关
-            float rotSpeed = preset.rotationWeight > 0f ? preset.positionWeight.y : 0f;
+            var playerRot = host.HostEntity.transform.rotation;
+            ApplyPresetOffset(preset, playerRot, targetPos, targetRot, out var effectivePos, out var effectiveRot);
+
+            _hasSharedMatchTargetPose = true;
+            _sharedMatchTargetPos = targetPos;
+            _sharedMatchTargetRot = targetRot;
+            _configAutoPhaseIndex = 0;
+
             _matchTargetDbgPosOffsetLocal = preset.positionOffset;
-            _matchTargetDbgRotOffsetEuler  = preset.rotationOffsetEuler;
+            _matchTargetDbgRotOffsetY      = preset.rotationOffsetY;
             _matchTargetPosOffsetActive    = preset.positionOffset != Vector3.zero;    // 非零自动开启，全零自动关闭
-            _matchTargetRotOffsetActive    = preset.rotationOffsetEuler != Vector3.zero;
+            _matchTargetRotOffsetActive    = HasYawOffset(preset.rotationOffsetY);
             StartMatchTarget(
                 effectivePos, effectiveRot,
                 preset.bodyPart,
-                preset.startTime, preset.endTime,
-                preset.positionWeight.x, rotSpeed);
+                preset.timeRange.x, preset.timeRange.y,
+                preset.positionApproachSpeed, preset.rotationApproachSpeed, preset.rotationWeight);
             _matchTargetDbgStartPath = "Config-P1"; // StartMatchTarget 内会覆盖为 Direct，在此恢复
             return true;
         }
@@ -338,6 +371,7 @@ namespace ES
         /// <summary>
         /// 应用层简化接口（Phase2）：仅传目标位置/旋转，<br/>
         /// 参数从 Inspector <c>matchTargetPresetPhase2</c> 自动读取。
+        /// <para>常规业务流不应主动调用此接口；Phase2 推荐由 StateBase 时序器自动推进。</para>
         /// <para>返回 <c>true</c> = 成功；<c>false</c> = Phase2 配置未启用，调用方可走 fallback。</para>
         /// </summary>
         public bool StartMatchTargetFromPhase2Config(Vector3 targetPos, Quaternion targetRot)
@@ -353,24 +387,23 @@ namespace ES
             }
 
             var preset    = animConfig.matchTargetPresetPhase2;
-            var playerTrs = host.HostEntity.transform;
-            // ★ 将 Inspector 配置的局部空间偏移叠加到调用方传入的基准位置/旋转上（同时尊重 enable 开关）
-            Vector3    effectivePos = (!preset.enablePositionOffset || preset.positionOffset == Vector3.zero)
-                ? targetPos
-                : targetPos + (playerTrs.rotation * preset.positionOffset);
-            Quaternion effectiveRot = (!preset.enableRotationOffset || preset.rotationOffsetEuler == Vector3.zero)
-                ? targetRot
-                : targetRot * Quaternion.Euler(preset.rotationOffsetEuler);
-            float rotSpeed = preset.rotationWeight > 0f ? preset.positionWeight.y : 0f;
+            var playerRot = host.HostEntity.transform.rotation;
+            ApplyPresetOffset(preset, playerRot, targetPos, targetRot, out var effectivePos, out var effectiveRot);
+
+            _hasSharedMatchTargetPose = true;
+            _sharedMatchTargetPos = targetPos;
+            _sharedMatchTargetRot = targetRot;
+            _configAutoPhaseIndex = 1;
+
             _matchTargetDbgPosOffsetLocal = preset.positionOffset;
-            _matchTargetDbgRotOffsetEuler  = preset.rotationOffsetEuler;
+            _matchTargetDbgRotOffsetY      = preset.rotationOffsetY;
             _matchTargetPosOffsetActive    = preset.positionOffset != Vector3.zero;    // 非零自动开启，全零自动关闭
-            _matchTargetRotOffsetActive    = preset.rotationOffsetEuler != Vector3.zero;
+            _matchTargetRotOffsetActive    = HasYawOffset(preset.rotationOffsetY);
             StartMatchTarget(
                 effectivePos, effectiveRot,
                 preset.bodyPart,
-                preset.startTime, preset.endTime,
-                preset.positionWeight.x, rotSpeed);
+                preset.timeRange.x, preset.timeRange.y,
+                preset.positionApproachSpeed, preset.rotationApproachSpeed, preset.rotationWeight);
             _matchTargetDbgStartPath = "Config-P2"; // StartMatchTarget 内会覆盖为 Direct，在此恢复
             return true;
         }
@@ -391,8 +424,11 @@ namespace ES
             _matchTargetLastAppliedPos    = Vector3.zero;
             _matchTargetLastAppliedRot    = Quaternion.identity;
             _matchTargetLastApplyTime     = -999f;
+            _hasSharedMatchTargetPose     = false;
+            _sharedMatchTargetPos         = Vector3.zero;
+            _sharedMatchTargetRot         = Quaternion.identity;
             _matchTargetDbgPosOffsetLocal  = Vector3.zero;
-            _matchTargetDbgRotOffsetEuler  = Vector3.zero;
+            _matchTargetDbgRotOffsetY      = 0f;
             _matchTargetPosOffsetActive    = true;
             _matchTargetRotOffsetActive    = true;
             _matchTargetDbgStartPath       = "Direct";
@@ -409,10 +445,10 @@ namespace ES
 
         /// <summary>
         /// 运行时手动控制位置/旋转偏移开关。
-        /// 无需重启 MatchTarget，下一帧 <see cref="PatchMatchTargetWithConfigOffset"/> 调用时即生效。
+        /// 无需重启 MatchTarget，下一帧 <see cref="SetMatchTargetTargetWithConfigOffset"/> 调用时即生效。
         /// </summary>
         /// <param name="posActive">是否应用 positionOffset</param>
-        /// <param name="rotActive">是否应用 rotationOffsetEuler（不传则与 posActive 一致）</param>
+        /// <param name="rotActive">是否应用 rotationOffsetY（不传则与 posActive 一致）</param>
         public void SetMatchTargetOffsetActive(bool posActive, bool? rotActive = null)
         {
             _matchTargetPosOffsetActive = posActive;
@@ -420,7 +456,7 @@ namespace ES
         }
 
         // ================================================================
-        // ★ Patch API —— 修改运行时目标，不 new 新对象、不重新激活 MatchTarget
+        // ★ 目标更新 API —— 修改运行时目标，不 new 新对象、不重新激活 MatchTarget
         // 适用：业务层已有活跃的 MatchTarget，目标点随环境变化需要纠正
         // ================================================================
 
@@ -428,30 +464,38 @@ namespace ES
         /// 同时修改运行时目标位置和旋转，不创建新对象。<br/>
         /// 追加在当前 runtime 位置/旋转上的任何展开偏移将被当前设置的 pos/rot 直接覆盖。
         /// </summary>
-        public void PatchMatchTarget(Vector3 position, Quaternion rotation)
+        public void SetMatchTargetTarget(Vector3 position, Quaternion rotation)
         {
             if (_animationRuntime == null) return;
             ref var mt = ref _animationRuntime.matchTarget;
             mt.position = position;
             mt.rotation = rotation;
+
+            _hasSharedMatchTargetPose = true;
+            _sharedMatchTargetPos = position;
+            _sharedMatchTargetRot = rotation;
         }
 
         /// <summary>
         /// 修改运行时目标（传入 raw 位置/旋转），框架自动从当前激活阶段的 Inspector 配置读取
-        /// <c>positionOffset</c> / <c>rotationOffsetEuler</c> 并叠加后再写入 runtime。<br/>
+        /// <c>positionOffset</c> / <c>rotationOffsetY</c> 并叠加后再写入 runtime。<br/>
         /// <br/>
         /// ★ 适用场景：业务层每帧以动态 raw 位置更新 MatchTarget（如 Climb 跟踪墙面点），
-        /// 同时又希望 Inspector 配置的偏移始终生效，不因每帧 Patch 而被抹除。<br/>
+        /// 同时又希望 Inspector 配置的偏移始终生效，不因每帧目标更新而被抹除。<br/>
         /// <br/>
         /// 阶段检测逻辑：若 <c>enableMatchTargetPhase2=true</c> 且
-        /// <c>runtime.matchTarget.startTime &gt;= preset2.startTime</c>，自动切换到 Phase2 配置；
+        /// <c>runtime.matchTarget.startTime &gt;= preset2.timeRange.x</c>，自动切换到 Phase2 配置；
         /// 否则使用 Phase1 配置（Config-Auto 与代码驱动模式均有效）。
         /// </summary>
-        public void PatchMatchTargetWithConfigOffset(Vector3 rawPosition, Quaternion rawRotation)
+        public void SetMatchTargetTargetWithConfigOffset(Vector3 rawPosition, Quaternion rawRotation)
         {
             if (_animationRuntime == null) return;
             var animConfig = GetAnimConfigCachedOrSharedOrNull();
             var playerTrs = host.HostEntity.transform;
+
+            _hasSharedMatchTargetPose = true;
+            _sharedMatchTargetPos = rawPosition;
+            _sharedMatchTargetRot = rawRotation;
 
             Vector3    pos = rawPosition;
             Quaternion rot = rawRotation;
@@ -460,26 +504,26 @@ namespace ES
             {
                 // 以 runtime startTime 判断当前激活阶段（Config-Auto 与代码驱动均适用）
                 bool usePhase2 = animConfig.enableMatchTargetPhase2
-                    && _animationRuntime.matchTarget.startTime >= animConfig.matchTargetPresetPhase2.startTime;
+                    && _animationRuntime.matchTarget.startTime >= animConfig.matchTargetPresetPhase2.timeRange.x;
                 var preset = usePhase2 ? animConfig.matchTargetPresetPhase2 : animConfig.matchTargetPreset;
 
                 if (_matchTargetPosOffsetActive && preset.positionOffset != Vector3.zero)
                     pos += playerTrs.rotation * preset.positionOffset;
-                if (_matchTargetRotOffsetActive && preset.rotationOffsetEuler != Vector3.zero)
-                    rot = rawRotation * Quaternion.Euler(preset.rotationOffsetEuler);
+                if (_matchTargetRotOffsetActive && HasYawOffset(preset.rotationOffsetY))
+                    rot = rawRotation * YawOffsetToQuaternion(preset.rotationOffsetY);
             }
 
-            PatchMatchTarget(pos, rot);
+            SetMatchTargetTarget(pos, rot);
         }
 
         /// <summary>
         /// 在当前运行时目标上叠加 <b>Entity 局部空间</b> 偏移，不重置原始位置/旋转。<br/>
         /// - <c>positionOffset</c>：Entity 本地坐标偏移，内部自动通过 Entity 的世界旋转转换，
         ///   例如 (0,0,1) = "Entity 朝向前方 1 米"。<br/>
-        /// - <c>rotationOffsetEuler</c>：Entity 本地旋转偏移（欧拉角），以 Entity 当前朝向为基准前乘到目标旋转。<br/>
-        /// 注意：偏移会直接叠加到运行时值上，下一次 <see cref="PatchMatchTarget"/> 调用时将全部覆盖。
+        /// - <c>rotationOffsetY</c>：Entity 本地 Yaw 偏移（度），以 Entity 当前朝向为基准前乘到目标旋转。<br/>
+        /// 注意：偏移会直接叠加到运行时值上，下一次 <see cref="SetMatchTargetTarget"/> 调用时将全部覆盖。
         /// </summary>
-        public void PatchMatchTargetOffset(Vector3 positionOffset, Vector3 rotationOffsetEuler = default)
+        public void AddMatchTargetOffset(Vector3 positionOffset, float rotationOffsetY = 0f)
         {
             if (_animationRuntime == null) return;
             ref var mt = ref _animationRuntime.matchTarget;
@@ -490,9 +534,9 @@ namespace ES
                 mt.position += entityRot * positionOffset;
                 _matchTargetPosOffsetActive = true;   // 手动叠加自动开启开关
             }
-            if (rotationOffsetEuler != Vector3.zero)
+            if (HasYawOffset(rotationOffsetY))
             {
-                mt.rotation = (entityRot * Quaternion.Euler(rotationOffsetEuler)) * mt.rotation;
+                mt.rotation = (entityRot * YawOffsetToQuaternion(rotationOffsetY)) * mt.rotation;
                 _matchTargetRotOffsetActive = true;   // 手动叠加自动开启开关
             }
         }
@@ -504,37 +548,72 @@ namespace ES
 
         /// <summary>
         /// 每帧调用：根据 <paramref name="elapsed"/>（即 hasEnterTime）自动推进 Config-Auto 的多阶段 MatchTarget。<br/>
-        /// 一旦 elapsed 到达某阶段的 <c>startTime</c>，且该阶段尚未启动，立即激活。<br/>
-        /// Phase2 优先级高于 Phase1：时间到达时直接接管，无需等 Phase1 完成。
+        /// 一旦 elapsed 到达某阶段的启动条件，且该阶段尚未启动，立即激活。<br/>
+        /// 关键约束：Phase2 必须等待 Phase1 结束（elapsed &gt;= Phase1.timeRange.y）后才允许启动，
+        /// 即使 Phase2.timeRange.x 更小也不会提前接管。
         /// </summary>
         private void TickConfigAutoMatchTarget(float elapsed)
         {
             var animConfig = GetAnimConfigCachedOrSharedOrNull();
-            if (animConfig == null || !animConfig.enableMatchTarget || !animConfig.autoActivateMatchTarget) return;
+            if (animConfig == null || !animConfig.enableMatchTarget) return;
             if (_animationRuntime == null) return;
+            if (!_hasSharedMatchTargetPose) return;
 
-            var playerTrs = host.HostEntity.transform;
+            var playerRot = host.HostEntity.transform.rotation;
+
+            bool autoMode = animConfig.autoActivateMatchTarget;
+            if (!autoMode)
+            {
+                if (!animConfig.enableMatchTargetPhase2 || _configAutoPhaseIndex != 0) return;
+
+                var p1Manual = animConfig.matchTargetPreset;
+                var p2Manual = animConfig.matchTargetPresetPhase2;
+                float phase2GateTimeManual = Mathf.Max(p2Manual.timeRange.x, p1Manual.timeRange.y);
+                if (elapsed < phase2GateTimeManual) return;
+
+                _configAutoPhaseIndex = 1;
+                _matchTargetDbgPosOffsetLocal = p2Manual.positionOffset;
+                _matchTargetDbgRotOffsetY = p2Manual.rotationOffsetY;
+                _matchTargetPosOffsetActive = p2Manual.positionOffset != Vector3.zero;
+                _matchTargetRotOffsetActive = HasYawOffset(p2Manual.rotationOffsetY);
+
+                ApplyPresetOffset(p2Manual, playerRot, _sharedMatchTargetPos, _sharedMatchTargetRot, out var p2PosManual, out var p2RotManual);
+                StartMatchTarget(
+                    p2PosManual, p2RotManual,
+                    p2Manual.bodyPart, p2Manual.timeRange.x, p2Manual.timeRange.y,
+                    p2Manual.positionApproachSpeed,
+                    p2Manual.rotationApproachSpeed,
+                    p2Manual.rotationWeight);
+                _matchTargetDbgStartPath = "Config-Manual-P2";
+#if UNITY_EDITOR
+                if (debugMatchTarget)
+                    Debug.Log($"{GetMatchTargetLogTag()} [Config-Manual] Phase2 自动接管 elapsed={elapsed:F3}s gate={phase2GateTimeManual:F3}s (需满足Phase1结束)");
+#endif
+                return;
+            }
 
             // ★ 顺序说明：先处理 Phase1，再处理 Phase2。
-            // Phase2 必须等 Phase1 已启动（_configAutoPhaseIndex >= 0）后才能接管，
-            // 否则 Phase2.startTime=0 时会在第一帧就抢占，导致 Phase1 永远无法触发。
+            // Phase2 必须等 Phase1 已启动且达到 Phase1 结束时间后才能接管，
+            // 即使 Phase2.timeRange.x 更小，也不允许越过 Phase1 结束边界。
 
             // Phase1：尚未开始且时间到达时启动
             if (_configAutoPhaseIndex < 0)
             {
                 var p1 = animConfig.matchTargetPreset;
-                if (elapsed >= p1.startTime)
+                if (elapsed >= p1.timeRange.x)
                 {
                     _configAutoPhaseIndex = 0;
                     _matchTargetDbgPosOffsetLocal = p1.positionOffset;
-                    _matchTargetDbgRotOffsetEuler = p1.rotationOffsetEuler;
+                    _matchTargetDbgRotOffsetY = p1.rotationOffsetY;
                     _matchTargetPosOffsetActive   = p1.positionOffset != Vector3.zero;    // 非零自动开启，全零自动关闭
-                    _matchTargetRotOffsetActive   = p1.rotationOffsetEuler != Vector3.zero;
+                    _matchTargetRotOffsetActive   = HasYawOffset(p1.rotationOffsetY);
+                    ApplyPresetOffset(p1, playerRot, _sharedMatchTargetPos, _sharedMatchTargetRot, out var p1Pos, out var p1Rot);
                     StartMatchTarget(
-                        p1.GetPosition(playerTrs), p1.GetRotation(playerTrs),
-                        p1.bodyPart, p1.startTime, p1.endTime,
-                        p1.positionWeight.x,
-                        p1.rotationWeight > 0f ? p1.positionWeight.y : 0f);
+                        p1Pos, p1Rot,
+                        p1.bodyPart, p1.timeRange.x, p1.timeRange.y,
+                        p1.positionApproachSpeed,
+                        p1.rotationApproachSpeed,
+                        p1.rotationWeight);
                     _matchTargetDbgStartPath = "Config-Auto-P1"; // 在 StartMatchTarget 覆盖后恢复
 #if UNITY_EDITOR
                     if (debugMatchTarget)
@@ -545,27 +624,31 @@ namespace ES
                 return;
             }
 
-            // Phase2：Phase1 已启动（index==0），且 Phase2 尚未启动（index<1），且时间到达
+            // Phase2：Phase1 已启动（index==0），且满足 “Phase1结束 + Phase2起始” 双门槛后才启动
             // ★ 不检查 elapsed <= p2.endTime：帧率低时可能一帧跳过整个窗口，导致 Phase2 永远不触发
             if (animConfig.enableMatchTargetPhase2 && _configAutoPhaseIndex == 0)
             {
+                var p1 = animConfig.matchTargetPreset;
                 var p2 = animConfig.matchTargetPresetPhase2;
-                if (elapsed >= p2.startTime)
+                float phase2GateTime = Mathf.Max(p2.timeRange.x, p1.timeRange.y);
+                if (elapsed >= phase2GateTime)
                 {
                     _configAutoPhaseIndex = 1;
                     _matchTargetDbgPosOffsetLocal = p2.positionOffset;
-                    _matchTargetDbgRotOffsetEuler = p2.rotationOffsetEuler;
+                    _matchTargetDbgRotOffsetY = p2.rotationOffsetY;
                     _matchTargetPosOffsetActive   = p2.positionOffset != Vector3.zero;    // 非零自动开启，全零自动关闭
-                    _matchTargetRotOffsetActive   = p2.rotationOffsetEuler != Vector3.zero;
+                    _matchTargetRotOffsetActive   = HasYawOffset(p2.rotationOffsetY);
+                    ApplyPresetOffset(p2, playerRot, _sharedMatchTargetPos, _sharedMatchTargetRot, out var p2Pos, out var p2Rot);
                     StartMatchTarget(
-                        p2.GetPosition(playerTrs), p2.GetRotation(playerTrs),
-                        p2.bodyPart, p2.startTime, p2.endTime,
-                        p2.positionWeight.x,
-                        p2.rotationWeight > 0f ? p2.positionWeight.y : 0f);
+                        p2Pos, p2Rot,
+                        p2.bodyPart, p2.timeRange.x, p2.timeRange.y,
+                        p2.positionApproachSpeed,
+                        p2.rotationApproachSpeed,
+                        p2.rotationWeight);
                     _matchTargetDbgStartPath = "Config-Auto-P2"; // 在 StartMatchTarget 覆盖后恢复
 #if UNITY_EDITOR
                     if (debugMatchTarget)
-                        Debug.Log($"{GetMatchTargetLogTag()} [Config-Auto] Phase2 启动 elapsed={elapsed:F3}s");
+                        Debug.Log($"{GetMatchTargetLogTag()} [Config-Auto] Phase2 启动 elapsed={elapsed:F3}s gate={phase2GateTime:F3}s (需满足Phase1结束)");
 #endif
                 }
             }
@@ -689,8 +772,8 @@ namespace ES
             const float matchtargetTowardPosMutipler = 3f;
             const float matchtargetTowardRotMutipler = 1f;
 
-            float posSpeed = mt.positionWeight.x;
-            float rotSpeed = mt.positionWeight.y;
+            float posSpeed = mt.positionApproachSpeed;
+            float rotSpeed = mt.rotationApproachSpeed * Mathf.Clamp01(mt.rotationWeight);
 
             Vector3    newPos = posSpeed > 0f
                 ? Vector3.MoveTowards(curPos, effectiveTargetPos, posSpeed * matchtargetTowardPosMutipler * Time.deltaTime)
@@ -724,9 +807,9 @@ namespace ES
                 string dbgPosOffsetStr = _matchTargetDbgPosOffsetLocal == Vector3.zero
                     ? "(未配置 / 全零)"
                     : $"[{dbgPosActiveTag}] local={_matchTargetDbgPosOffsetLocal:F3}  world={dbgPosOffsetWorld:F3}";
-                string dbgRotOffsetStr = _matchTargetDbgRotOffsetEuler == Vector3.zero
+                string dbgRotOffsetStr = Mathf.Abs(_matchTargetDbgRotOffsetY) <= 0.0001f
                     ? "(未配置 / 全零)"
-                    : $"[{dbgRotActiveTag}] euler={_matchTargetDbgRotOffsetEuler:F1}";
+                    : $"[{dbgRotActiveTag}] yaw={_matchTargetDbgRotOffsetY:F1}°";
                 Debug.Log(
                     $"{GetMatchTargetLogTag()} [Frame={Time.frameCount}]\n" +
                     $"  时间  elapsed={elapsed:F3}s  window=[{mt.startTime:F3},{mt.endTime:F3}]s\n" +
@@ -856,19 +939,22 @@ namespace ES
 
             var req = cmd.request;
             if (req == null) return;
+            if (!_hasSharedMatchTargetPose) return;
 
 #if UNITY_EDITOR
             if (debugMatchTarget)
                 Debug.Log($"{GetMatchTargetLogTag()} PendingCommand fired at elapsed={elapsed:F3}s triggerAt={cmd.triggerAt:F3}s");
 #endif
 
-            var playerTrs = host.HostEntity.transform;
+            var playerRot = host.HostEntity.transform.rotation;
+            ApplyPresetOffset(req, playerRot, _sharedMatchTargetPos, _sharedMatchTargetRot, out var cmdPos, out var cmdRot);
             StartMatchTarget(
-                req.GetPosition(playerTrs), req.GetRotation(playerTrs),
+                cmdPos, cmdRot,
                 req.bodyPart,
-                req.startTime, req.endTime,
-                req.positionWeight.x,
-                req.rotationWeight > 0f ? req.positionWeight.y : 0f);
+                req.timeRange.x, req.timeRange.y,
+                req.positionApproachSpeed,
+                req.rotationApproachSpeed,
+                req.rotationWeight);
         }
 
         #endregion

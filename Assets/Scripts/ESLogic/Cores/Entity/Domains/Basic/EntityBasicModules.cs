@@ -388,7 +388,7 @@ namespace ES
         [LabelText("自动启用相机组件")]
         public bool autoActivateCamera = true;
 
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public VirtualCameraSlot skillCamera = new VirtualCameraSlot();
     }
 
@@ -399,11 +399,11 @@ namespace ES
         public CameraMode mode = CameraMode.ThirdPerson;
 
         [Title("第一人称")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public CameraRig firstPerson = new CameraRig();
 
         [Title("第三人称")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public CameraRig thirdPerson = new CameraRig();
 
         [Title("当前激活")]
@@ -484,19 +484,19 @@ namespace ES
     public class CameraRig
     {
         [Title("Main")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public VirtualCameraSlot main = new VirtualCameraSlot();
 
         [Title("扩展槽位 A")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public VirtualCameraSlot slotA = new VirtualCameraSlot();
 
         [Title("扩展槽位 B")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public VirtualCameraSlot slotB = new VirtualCameraSlot();
 
         [Title("Dynamic")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public VirtualCameraSlot dynamicSlot = new VirtualCameraSlot();
 
         public Transform GetBestTransform()

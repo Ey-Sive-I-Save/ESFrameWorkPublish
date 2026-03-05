@@ -86,7 +86,7 @@ namespace ES
 
         [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
         [LabelText("运行时阶段配置")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public StatePhaseConfig phaseConfig = new StatePhaseConfig();
 
         [BoxGroup("混合", ShowLabel = true), PropertyOrder(3)]
@@ -234,14 +234,14 @@ namespace ES
         public bool overrideCost = false;
 
         [ShowIf("overrideCost")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public StateCostData costData = new StateCostData();
 
         [LabelText("覆盖冲突规则")]
         public bool overrideMerge = false;
 
         [ShowIf("overrideMerge")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public StateMergeData mergeData = new StateMergeData();
 
         [LabelText("覆盖优先级")]

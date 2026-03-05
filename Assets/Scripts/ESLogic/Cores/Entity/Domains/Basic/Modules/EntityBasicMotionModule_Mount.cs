@@ -211,11 +211,11 @@ namespace ES
             if (_mountState.IsMatchTargetActive && currentMount != null && currentMount.matchPoint != null)
             {
                 // MatchTarget 进行中：每帧修正目标点（载具可能在移动）
-                // ★ 改用 PatchMatchTargetWithConfigOffset：
-                //   原 PatchMatchTarget(pos, rot) 每帧直接写入 raw 位置，
+                // ★ 改用 SetMatchTargetTargetWithConfigOffset：
+                //   原 SetMatchTargetTarget(pos, rot) 每帧直接写入 raw 位置，
                 //   会覆盖 StartMatchTargetFromConfig 在启动时叠加的 Inspector positionOffset/rotationOffsetEuler。
-                //   PatchMatchTargetWithConfigOffset 会自动重新叠加当前阶段的配置偏移，使偏移每帧持续生效。
-                _mountState.PatchMatchTargetWithConfigOffset(
+                //   SetMatchTargetTargetWithConfigOffset 会自动重新叠加当前阶段的配置偏移，使偏移每帧持续生效。
+                _mountState.SetMatchTargetTargetWithConfigOffset(
                     currentMount.matchPoint.position,
                     currentMount.matchPoint.rotation);
             }

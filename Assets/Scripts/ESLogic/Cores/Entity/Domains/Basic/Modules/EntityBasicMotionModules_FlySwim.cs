@@ -27,7 +27,7 @@ namespace ES
         public bool applyEveryFrame;
 
         [Title("飞行参数")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public FlyParams fly = FlyParams.Default;
 
         [LabelText("飞行上升倍率")]
@@ -216,7 +216,7 @@ namespace ES
         public bool applyEveryFrame;
 
         [Title("游泳参数")]
-        [InlineProperty, HideLabel]
+        [HideLabel]
         public SwimParams swim = SwimParams.Default;
 
         [Title("输入")]

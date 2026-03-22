@@ -19,7 +19,7 @@ using UnityEditor;
 // 【共享数据（StateSharedData）】
 // - 运行时初始化标记：public bool IsRuntimeInitialized { get; }
 // - 基础配置（必填）：public StateBasicConfig basicConfig
-// - 动画开关与配置：public bool hasAnimation / public StateAnimationConfigData animationConfig
+// - 动画与程序驱动：public bool hasAnimation / public StateAnimationConfigData animationConfig / public StateProceduralDriveData proceduralDriveConfig
 // - 淡入淡出：public bool enableFadeInOut / public float fadeInDuration / public float fadeOutDuration / public AnimationCurve fadeInCurve / fadeOutCurve
 // - 标签与显示：public List<string> tags / public string group / public string displayName / public string description / public Sprite icon
 // - 切换与代价：public StateMergeData mergeData / public StateCostData costData
@@ -46,8 +46,8 @@ namespace ES
         // ========================================
         // 基础配置（必填）
         // ========================================
-        [TabGroup("基础", "核心", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾蓝\")"), PropertyOrder(0)]
-        [BoxGroup("基础/核心/配置", ShowLabel = false)]
+        [TabGroup("状态配置", "核心", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾蓝\")"), PropertyOrder(0)]
+        [BoxGroup("状态配置/核心/配置", ShowLabel = false)]
         [HideLabel]
         [InfoBox("步骤1：设置状态名、层级、优先级", InfoMessageType.Info)]
         public StateBasicConfig basicConfig = new StateBasicConfig();
@@ -55,63 +55,73 @@ namespace ES
         // ========================================
         // 动画配置
         // ========================================
-        [TabGroup("基础", "动画", Order = 1, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
-        [BoxGroup("基础/动画/开关", ShowLabel = false)]
-        [HorizontalGroup("基础/动画/开关/切换")]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [BoxGroup("状态配置/动画资源/开关", ShowLabel = false)]
+        //  [HorizontalGroup("状态配置/动画资源/开关/切换")]
         [LabelText("启用动画"), ToggleLeft, GUIColor(0.6f, 1f, 0.8f)]
-        [InfoBox("步骤2：需要动画时先勾选启用动画", InfoMessageType.Info)]
+        [InfoBox("步骤4：需要动画时先勾选启用动画", InfoMessageType.Info)]
         public bool hasAnimation = false;
 
-        [BoxGroup("基础/动画/开关", ShowLabel = false)]
-        [ShowIf("hasAnimation")]
+
+
         [HideLabel]
-        [PropertySpace(SpaceBefore = 5, SpaceAfter = 0)]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [ShowIf("hasAnimation")]
+        [InlineProperty]
+        //[BoxGroup("状态配置/动画资源", ShowLabel = true)] 
         public StateAnimationConfigData animationConfig = new StateAnimationConfigData();
 
-        [BoxGroup("基础/动画/过渡", ShowLabel = true)]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [BoxGroup("状态配置/动画资源/过渡", ShowLabel = true)]
         [ShowIf("hasAnimation")]
-        [InfoBox("步骤3：设置淡入淡出", InfoMessageType.None)]
+        [InfoBox("步骤5：设置淡入淡出", InfoMessageType.None)]
         [LabelText("启用淡入淡出"), ToggleLeft, GUIColor(0.8f, 0.9f, 1f)]
         public bool enableFadeInOut = true;
 
         [ShowIf("hasAnimation")]
         [EnableIf("enableFadeInOut")]
-        [BoxGroup("基础/动画/过渡", ShowLabel = true)]
-        [HorizontalGroup("基础/动画/过渡/基础", Width = 0.5f)]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [BoxGroup("状态配置/动画资源/过渡", ShowLabel = true)]
+        [HorizontalGroup("状态配置/动画资源/过渡/基础", Width = 0.5f)]
         [LabelText("跟随时间缩放"), ToggleLeft]
         [Tooltip("倍速变化时，淡入淡出同步变化")]
         public bool fadeFollowTimeScale = true;
 
         [ShowIf("hasAnimation")]
         [EnableIf("enableFadeInOut")]
-        [BoxGroup("基础/动画/过渡", ShowLabel = true)]
-        [HorizontalGroup("基础/动画/过渡/基础", Width = 0.5f)]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [BoxGroup("状态配置/动画资源/过渡", ShowLabel = true)]
+        [HorizontalGroup("状态配置/动画资源/过渡/基础", Width = 0.5f)]
         [LabelText("淡入淡出速度"), Range(0.1f, 3f)]
         [Tooltip("1为默认，>1更快，<1更慢")]
         public float fadeSpeedMultiplier = 1f;
 
         [ShowIf("hasAnimation")]
         [EnableIf("enableFadeInOut")]
-        [BoxGroup("基础/动画/过渡", ShowLabel = true)]
-        [HorizontalGroup("基础/动画/过渡/时长", Width = 0.5f)]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [BoxGroup("状态配置/动画资源/过渡", ShowLabel = true)]
+        [HorizontalGroup("状态配置/动画资源/过渡/时长", Width = 0.5f)]
         [LabelText("淡入时长"), Range(0f, 2f), SuffixLabel("秒", Overlay = true)]
         public float fadeInDuration = 0.2f;
 
         [ShowIf("hasAnimation")]
         [EnableIf("enableFadeInOut")]
-        [BoxGroup("基础/动画/过渡", ShowLabel = true)]
-        [HorizontalGroup("基础/动画/过渡/时长", Width = 0.5f)]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [BoxGroup("状态配置/动画资源/过渡", ShowLabel = true)]
+        [HorizontalGroup("状态配置/动画资源/过渡/时长", Width = 0.5f)]
         [LabelText("淡出时长"), Range(0f, 2f), SuffixLabel("秒", Overlay = true)]
         public float fadeOutDuration = 0.15f;
 
         [ShowIf("hasAnimation")]
         [EnableIf("enableFadeInOut")]
-        [FoldoutGroup("基础/动画/过渡/高级", expanded: false)]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [BoxGroup("状态配置/动画资源/过渡/高级设置", ShowLabel = true)]
         [LabelText("使用曲线"), ToggleLeft]
         [Tooltip("开启后可设置曲线；关闭时为线性")]
         public bool useAdvancedFadeCurve = false;
 
-        [FoldoutGroup("基础/动画/过渡/高级", expanded: false)]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [BoxGroup("状态配置/动画资源/过渡/高级设置", ShowLabel = true)]
         [ShowIf("@hasAnimation && useAdvancedFadeCurve")]
         [EnableIf("enableFadeInOut")]
         [LabelText("淡入曲线")]
@@ -119,37 +129,47 @@ namespace ES
         [PropertySpace(SpaceBefore = 5)]
         public AnimationCurve fadeInCurve = AnimationCurve.Linear(0, 0, 1, 1);
 
-        [FoldoutGroup("基础/动画/过渡/高级", expanded: false)]
+        [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
+        [BoxGroup("状态配置/动画资源/过渡/高级设置", ShowLabel = true)]
         [ShowIf("@hasAnimation && useAdvancedFadeCurve")]
         [EnableIf("enableFadeInOut")]
         [LabelText("淡出曲线")]
         [Tooltip("自定义淡出权重曲线")]
         public AnimationCurve fadeOutCurve = AnimationCurve.Linear(0, 1, 1, 0);
 
+        [TabGroup("状态配置", "IK程序驱动", Order = 3, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾青\")"), PropertyOrder(2)]
+        [InlineProperty]
+        [HideLabel]
+        public StateProceduralDriveData proceduralDriveConfig = new StateProceduralDriveData();
+
         // ========================================
         // 标记信息（可选）
         // ========================================
-        [TabGroup("基础", "标记", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾紫\")"), PropertyOrder(3)]
-        [BoxGroup("基础/标记/分类", ShowLabel = true)]
+        [TabGroup("状态配置", "标记", Order = 4, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾紫\")"), PropertyOrder(3)]
+        [BoxGroup("状态配置/标记/分类", ShowLabel = true)]
         [LabelText("标签")]
         [InfoBox("可选：用于分类和查询（如 Attack / Movement / Skill）", InfoMessageType.None)]
         [PropertySpace(SpaceBefore = 0, SpaceAfter = 5)]
         public List<string> tags = new List<string>();
 
-        [BoxGroup("基础/标记/分类", ShowLabel = true)]
+        [TabGroup("状态配置", "标记", Order = 4, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾紫\")"), PropertyOrder(3)]
+        [BoxGroup("状态配置/标记/分类", ShowLabel = true)]
         [LabelText("分组"), Tooltip("用于UI分组")]
         public string group = "Default";
 
-        [BoxGroup("基础/标记/显示", ShowLabel = true)]
+        [TabGroup("状态配置", "标记", Order = 4, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾紫\")"), PropertyOrder(3)]
+        [BoxGroup("状态配置/标记/显示", ShowLabel = true)]
         [LabelText("显示名"), Tooltip("用于UI显示；留空使用状态名")]
         [PropertySpace(SpaceBefore = 5)]
         public string displayName = "";
 
-        [BoxGroup("基础/标记/显示", ShowLabel = true)]
+        [TabGroup("状态配置", "标记", Order = 4, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾紫\")"), PropertyOrder(3)]
+        [BoxGroup("状态配置/标记/显示", ShowLabel = true)]
         [LabelText("描述"), MultiLineProperty(3)]
         public string description = "";
 
-        [BoxGroup("基础/标记/显示", ShowLabel = true)]
+        [TabGroup("状态配置", "标记", Order = 4, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾紫\")"), PropertyOrder(3)]
+        [BoxGroup("状态配置/标记/显示", ShowLabel = true)]
         [LabelText("图标"), PreviewField(60, ObjectFieldAlignment.Left)]
         [PropertySpace(SpaceAfter = 5)]
         public Sprite icon;
@@ -159,16 +179,16 @@ namespace ES
         // ========================================
         // 切换配置
         // ========================================
-        [TabGroup("切换", "冲突", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾橙\")"), PropertyOrder(12)]
-        [BoxGroup("切换/冲突/规则", ShowLabel = false)]
-        [InfoBox("步骤4：设置并行规则和通道占用", InfoMessageType.Info)]
+        [TabGroup("状态配置", "切换", Order = 1, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾橙\")"), PropertyOrder(12)]
+        [BoxGroup("状态配置/切换/冲突规则", ShowLabel = false)]
+        [InfoBox("步骤2：设置并行规则和通道占用", InfoMessageType.Info)]
         [HideLabel]
         [PropertySpace(SpaceBefore = 0, SpaceAfter = 5)]
         public StateMergeData mergeData = new StateMergeData();
 
-        [TabGroup("切换", "代价", Order = 1, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾黄\")"), PropertyOrder(13)]
-        [FoldoutGroup("切换/代价/权重", expanded: false)]
-        [InfoBox("步骤5：设置代价与权重", InfoMessageType.Info)]
+        [TabGroup("状态配置", "切换", Order = 1, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾橙\")"), PropertyOrder(13)]
+        [BoxGroup("状态配置/切换/代价权重", ShowLabel = false)]
+        [InfoBox("步骤3：设置代价与权重", InfoMessageType.Info)]
         [HideLabel]
         [PropertySpace(SpaceBefore = 0, SpaceAfter = 5)]
         public StateCostData costData = new StateCostData();
@@ -180,37 +200,42 @@ namespace ES
         // ========================================
         // 运行时配置
         // ========================================
-        [TabGroup("扩展", "运行时", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾棕\")"), PropertyOrder(20)]
-        [BoxGroup("扩展/运行时/基础", ShowLabel = true)]
-        [HorizontalGroup("扩展/运行时/基础/第1行")]
+        [TabGroup("状态配置", "扩展", Order = 5, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾棕\")"), PropertyOrder(20)]
+        [BoxGroup("状态配置/扩展/运行时基础", ShowLabel = true)]
+        [HorizontalGroup("状态配置/扩展/运行时基础/第1行")]
         [LabelText("可作为临时状态"), ToggleLeft, GUIColor(0.8f, 1f, 0.9f)]
         [Tooltip("可通过AddTemporaryAnimation临时加入")]
         public bool canBeTemporary = false;
 
-        [BoxGroup("扩展/运行时/基础", ShowLabel = true)]
-        [HorizontalGroup("扩展/运行时/基础/第1行")]
+        [TabGroup("状态配置", "扩展", Order = 5, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾棕\")"), PropertyOrder(20)]
+        [BoxGroup("状态配置/扩展/运行时基础", ShowLabel = true)]
+        [HorizontalGroup("状态配置/扩展/运行时基础/第1行")]
         [ShowIf("canBeTemporary")]
         [LabelText("完成后自动移除"), ToggleLeft]
         [Tooltip("播放完毕后自动移除")]
         public bool autoRemoveWhenDone = false;
 
-        [FoldoutGroup("扩展/运行时/高级", expanded: false)]
+        [TabGroup("状态配置", "扩展", Order = 5, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾棕\")"), PropertyOrder(20)]
+        [BoxGroup("状态配置/扩展/运行时高级", ShowLabel = true)]
         [LabelText("允许运行时替换"), ToggleLeft, GUIColor(1f, 0.9f, 0.6f)]
         [Tooltip("运行时允许替换该状态配置")]
         public bool canReplaceAtRuntime = false;
 
-        [FoldoutGroup("扩展/运行时/高级", expanded: false)]
+        [TabGroup("状态配置", "扩展", Order = 5, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾棕\")"), PropertyOrder(20)]
+        [BoxGroup("状态配置/扩展/运行时高级", ShowLabel = true)]
         [ShowIf("canReplaceAtRuntime")]
         [LabelText("替换时保留数据"), ToggleLeft]
         [Tooltip("保留当前运行数据")]
         public bool keepDataOnReplace = true;
 
-        [FoldoutGroup("扩展/运行时/高级", expanded: false)]
+        [TabGroup("状态配置", "扩展", Order = 5, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾棕\")"), PropertyOrder(20)]
+        [BoxGroup("状态配置/扩展/运行时高级", ShowLabel = true)]
         [LabelText("允许覆盖注册"), ToggleLeft, GUIColor(1f, 0.8f, 0.6f)]
         [Tooltip("注册同名状态时允许覆盖")]
         public bool allowOverride = false;
 
-        [FoldoutGroup("扩展/运行时/高级", expanded: false)]
+        [TabGroup("状态配置", "扩展", Order = 5, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾棕\")"), PropertyOrder(20)]
+        [BoxGroup("状态配置/扩展/运行时高级", ShowLabel = true)]
         [ShowIf("allowOverride")]
         [LabelText("覆盖时通知"), ToggleLeft]
         [Tooltip("被覆盖时发出通知")]
@@ -219,12 +244,13 @@ namespace ES
         // ========================================
         // 调试配置
         // ========================================
-        [TabGroup("扩展", "调试", Order = 1, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾灰\")"), PropertyOrder(22)]
-        [FoldoutGroup("扩展/调试/显示", expanded: false)]
+        [TabGroup("状态配置", "扩展", Order = 5, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾棕\")"), PropertyOrder(22)]
+        [BoxGroup("状态配置/扩展/调试显示", ShowLabel = true)]
         [LabelText("显示调试信息"), ToggleLeft, GUIColor(0.9f, 0.9f, 1f)]
         public bool showDebugInfo = false;
 
-        [FoldoutGroup("扩展/调试/显示", expanded: false)]
+        [TabGroup("状态配置", "扩展", Order = 5, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾棕\")"), PropertyOrder(22)]
+        [BoxGroup("状态配置/扩展/调试显示", ShowLabel = true)]
         [LabelText("调试颜色")]
         public Color debugGizmoColor = Color.white;
 
@@ -237,9 +263,13 @@ namespace ES
         {
             if (_isRuntimeInitialized) return;
 
+            animationConfig ??= new StateAnimationConfigData();
+            proceduralDriveConfig ??= new StateProceduralDriveData();
+
             // 初始化所有子配置
             basicConfig?.InitializeRuntime();
             animationConfig?.InitializeRuntime();
+            proceduralDriveConfig?.InitializeRuntime();
             mergeData?.InitializeRuntime();
 
             _isRuntimeInitialized = true;
@@ -331,10 +361,8 @@ namespace ES
             fadeOutDuration = 0.2f;
             useAdvancedFadeCurve = false;
 
-            basicConfig.enableProgressTracking = false;
+            basicConfig.enableRuntimeProgress = false;
             basicConfig.enableClipLengthFallback = false;
-            basicConfig.phaseConfig.enablePhase = false;
-            basicConfig.phaseConfig.enableAutoPhaseByTime = false;
 
             canBeTemporary = false;
             autoRemoveWhenDone = true;
@@ -380,7 +408,7 @@ namespace ES
                     description = "起跳阶段";
                     fadeInDuration = 0.05f;
                     fadeOutDuration = 0.1f;
-                    basicConfig.enableProgressTracking = true;
+                    basicConfig.enableRuntimeProgress = true;
                     break;
                 case CommonStatePreset.Fall:
                     SetTags("Movement");
@@ -389,7 +417,7 @@ namespace ES
                     description = "空中下落";
                     fadeInDuration = 0.05f;
                     fadeOutDuration = 0.1f;
-                    basicConfig.enableProgressTracking = true;
+                    basicConfig.enableRuntimeProgress = true;
                     break;
                 case CommonStatePreset.Land:
                     SetTags("Movement");
@@ -398,7 +426,7 @@ namespace ES
                     description = "落地过渡";
                     fadeInDuration = 0.05f;
                     fadeOutDuration = 0.1f;
-                    basicConfig.enableProgressTracking = true;
+                    basicConfig.enableRuntimeProgress = true;
                     break;
                 case CommonStatePreset.Attack:
                     SetTags("Attack");
@@ -407,7 +435,7 @@ namespace ES
                     description = "普通攻击";
                     fadeInDuration = 0.1f;
                     fadeOutDuration = 0.15f;
-                    basicConfig.enableProgressTracking = true;
+                    basicConfig.enableRuntimeProgress = true;
                     break;
                 case CommonStatePreset.Skill:
                     SetTags("Skill");
@@ -418,7 +446,7 @@ namespace ES
                     autoRemoveWhenDone = true;
                     fadeInDuration = 0.05f;
                     fadeOutDuration = 0.1f;
-                    basicConfig.enableProgressTracking = true;
+                    basicConfig.enableRuntimeProgress = true;
                     break;
                 case CommonStatePreset.Hit:
                     SetTags("Hit");
@@ -429,7 +457,7 @@ namespace ES
                     autoRemoveWhenDone = true;
                     fadeInDuration = 0.05f;
                     fadeOutDuration = 0.1f;
-                    basicConfig.enableProgressTracking = true;
+                    basicConfig.enableRuntimeProgress = true;
                     break;
                 case CommonStatePreset.Die:
                     SetTags("Dead");
@@ -438,7 +466,7 @@ namespace ES
                     description = "死亡状态";
                     fadeInDuration = 0.05f;
                     fadeOutDuration = 0.2f;
-                    basicConfig.enableProgressTracking = true;
+                    basicConfig.enableRuntimeProgress = true;
                     break;
                 case CommonStatePreset.Revive:
                     SetTags("Revive");
@@ -449,7 +477,7 @@ namespace ES
                     autoRemoveWhenDone = true;
                     fadeInDuration = 0.1f;
                     fadeOutDuration = 0.1f;
-                    basicConfig.enableProgressTracking = true;
+                    basicConfig.enableRuntimeProgress = true;
                     break;
                 case CommonStatePreset.Swim:
                     SetTags("Movement");
@@ -543,6 +571,9 @@ namespace ES
         /// <returns>克隆的StateSharedData</returns>
         public StateSharedData CloneWithAnimation(string newStateName, int newStateId, StateAnimationConfigData newAnimation)
         {
+            animationConfig ??= new StateAnimationConfigData();
+            proceduralDriveConfig ??= new StateProceduralDriveData();
+
             var cloned = Clone();
             cloned._isRuntimeInitialized = false; // 需要重新初始化
 
@@ -553,16 +584,24 @@ namespace ES
                 stateName = newStateName,
                 stateId = newStateId,
                 layerType = originalBasic.layerType,
-                priority = originalBasic.priority,
+                mixerBias = originalBasic.mixerBias,
                 durationMode = originalBasic.durationMode,
                 timedDuration = originalBasic.timedDuration,
-                phaseConfig = originalBasic.phaseConfig, // 阶段配置可共享
                 canBeFeedback = originalBasic.canBeFeedback,
                 stateSupportFlag = originalBasic.stateSupportFlag,
+                ignoreSupportFlag = originalBasic.ignoreSupportFlag,
+                disableActiveOnSupportFlagSwitching = originalBasic.disableActiveOnSupportFlagSwitching,
+                deactivateOnSupportFlagSwitching = originalBasic.deactivateOnSupportFlagSwitching,
+                supportReStart = originalBasic.supportReStart,
                 resetSupportFlagOnEnter = originalBasic.resetSupportFlagOnEnter,
                 removeSupportFlagOnExit = originalBasic.removeSupportFlagOnExit,
+                internalNote = originalBasic.internalNote,
 
             };
+
+            cloned.proceduralDriveConfig = proceduralDriveConfig != null
+                ? proceduralDriveConfig.Clone()
+                : new StateProceduralDriveData();
 
             // 替换动画
             cloned.animationConfig = newAnimation;

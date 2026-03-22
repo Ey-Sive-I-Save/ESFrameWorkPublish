@@ -121,31 +121,8 @@ namespace ES
                 totalProgress = hasEnterTime;
             }
 
-            // 自动阶段评估（无手动锁定时）
-            // 性能关键：不启用阶段自动评估的状态，这里必须是零成本跳过。
-            if (_autoPhaseByTimeCached)
-            {
-                UpdateAutoRuntimePhase();
-            }
-
             // 检测动画事件触发
             CheckAnimationEventTriggers();
-        }
-
-        private void UpdateAutoRuntimePhase()
-        {
-            if (_runtimePhaseManual)
-                return;
-
-            // 调用点已用 _autoPhaseByTimeCached 做过 gating，这里只保留必要字段访问。
-            var phaseConfig = _phaseConfigCached;
-            if (phaseConfig == null) return;
-
-            var nextPhase = phaseConfig.EvaluatePhase(normalizedProgress);
-            if (nextPhase != _runtimePhase)
-            {
-                SwitchRuntimePhase(nextPhase, false);
-            }
         }
 
         /// <summary>

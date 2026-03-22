@@ -468,15 +468,24 @@ namespace ES
         {
             // 触发器在下一帧自动重置
             _activeTriggers.Clear();
+            RefreshMotionDerivedParameters();
             
-            // ===== 速度限制和运动状态更新 =====
-            // 计算水平速度（SpeedX/Z由移动系统控制，这里只处理速度限制）
+            // 更新时间戳
+            lastUpdateTime = Time.time;
+        }
+
+        public void ApplyMotionSpeedXZ(float localSpeedX, float localSpeedZ)
+        {
+            SpeedX = localSpeedX;
+            SpeedZ = localSpeedZ;
+            RefreshMotionDerivedParametersWithoutClamping();
+        }
+
+        private void RefreshMotionDerivedParameters()
+        {
             float horizontalSpeed = Mathf.Sqrt(SpeedX * SpeedX + SpeedZ * SpeedZ);
-            
-            // 根据是否按下冲刺键来限制速度
+
             float maxSpeed = IsSprintKeyPressed > 0.5f ? SprintSpeedThreshold : WalkSpeedThreshold;
-            
-            // 如果超过最大速度，进行限制
             if (horizontalSpeed > maxSpeed)
             {
                 float scale = maxSpeed / horizontalSpeed;
@@ -484,11 +493,9 @@ namespace ES
                 SpeedZ *= scale;
                 horizontalSpeed = maxSpeed;
             }
-            
-            // 更新综合速度
+
             Speed = horizontalSpeed;
-            
-            // 更新运动状态标记（用于动画混合）
+
             if (horizontalSpeed > 0.01f)
             {
                 if (IsSprintKeyPressed > 0.5f)
@@ -512,14 +519,45 @@ namespace ES
             }
             else
             {
-                // 速度接近0时，清除所有运动状态
                 IsWalking = 0f;
                 IsRunning = 0f;
                 IsSprinting = 0f;
             }
-            
-            // 更新时间戳
-            lastUpdateTime = Time.time;
+        }
+
+        private void RefreshMotionDerivedParametersWithoutClamping()
+        {
+            float horizontalSpeed = Mathf.Sqrt(SpeedX * SpeedX + SpeedZ * SpeedZ);
+
+            Speed = horizontalSpeed;
+
+            if (horizontalSpeed > 0.01f)
+            {
+                if (IsSprintKeyPressed > 0.5f)
+                {
+                    IsSprinting = 1f;
+                    IsRunning = 0f;
+                    IsWalking = 0f;
+                }
+                else if (horizontalSpeed > RunSpeedThreshold * 0.8f)
+                {
+                    IsSprinting = 0f;
+                    IsRunning = 1f;
+                    IsWalking = 0f;
+                }
+                else
+                {
+                    IsSprinting = 0f;
+                    IsRunning = 0f;
+                    IsWalking = 1f;
+                }
+            }
+            else
+            {
+                IsWalking = 0f;
+                IsRunning = 0f;
+                IsSprinting = 0f;
+            }
         }
 
         /// <summary>

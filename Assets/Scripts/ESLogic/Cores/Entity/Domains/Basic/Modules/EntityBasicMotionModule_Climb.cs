@@ -5,6 +5,42 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
+    /// 按墙高范围定义不同的攀上动作配置。
+    /// 适用于同一角色面对不同高度墙壁时自动切换攀上动画与 MatchTarget 参数。
+    ///
+    /// 使用方式：
+    ///   在 EntityBasicClimbModule.heightRangePresets 数组中填写多条配置，
+    ///   按 maxWallHeight 升序排列；运行时自动选第一个满足"实际墙高 ≤ maxWallHeight"的项。
+    /// </summary>
+    [Serializable]
+    public class ClimbOverHeightRange
+    {
+        [LabelText("墙高上限(米)"), Tooltip("实际墙高(顶面Y - 角色脚Y) ≤ 此值时命中此配置\n填写时请按升序排列，如：1.2 / 1.8 / 2.5")]
+        public float maxWallHeight = 1.5f;
+
+        [LabelText("动画状态名"), Tooltip("对应状态机中攀上动作状态的名称，留空则跳过此配置")]
+        public string stateName = "";
+
+        [LabelText("身体部位")]
+        public AvatarTarget bodyPart = AvatarTarget.LeftHand;
+
+        [Range(0f, 1f), LabelText("开始归一时间")]
+        public float startTime = 0.1f;
+
+        [Range(0f, 1f), LabelText("结束归一时间")]
+        public float endTime = 0.8f;
+
+        [LabelText("逼近速度(单位/秒)")]
+        public float approachSpeed = 3f;
+
+        [LabelText("旋转速度(度/秒)")]
+        public float angleSpeed = 180f;
+
+        /// <summary>运行时状态缓存（Start 阶段自动填充，不参与序列化）</summary>
+        [NonSerialized] public StateBase _cachedState;
+    }
+
+    /// <summary>
     /// 攀爬模块 — 完整的墙壁攀爬/翻越/攀上系统
     /// 
     /// 核心机制：
@@ -49,7 +85,7 @@ namespace ES
         public bool useRawClimbInput = true;
 
         [LabelText("调试日志"), Tooltip("启用后在Console输出攀爬全流程日志")]
-        public bool debugClimb = false;
+        public bool debugClimb_ = true;
 
         // ===== 检测配置 =====
         [Title("检测")]
@@ -223,6 +259,31 @@ namespace ES
         [LabelText("墙顶判定偏移")]
         public float climbOverTopHeightOffset = 0.05f;
 
+        [LabelText("攀上目标点Y额外抬高"), Tooltip("在 GetMatchTargetPosition 结果基础上额外向上偏移，防止骨骼偏移计算后脚踝卡入地表。\n0.1~0.2 为常用范围；若已在 MatchTargetPreset 配置 positionOffset 则此值可归零。")]
+        public float climbOverMatchTargetYOffset = 0.1f;
+
+        [Title("最小攀上高度")]
+        [LabelText("最小攀上墙高(米)"), Tooltip("实际墙高(顶面Y - 角色脚 Y) 小于此值时不触发 ClimbOver，避免矮台阶误触发。建议 0.5~0.8")]
+        public float minClimbOverWallHeight = 0.5f;
+
+        [Title("高度自适应攀上")]
+        [LabelText("启用高度分级"), Tooltip("开启后根据实际墙高自动匹配对应攀上动画状态；关闭时一律使用默认 ClimbOver 状态")]
+        public bool enableHeightAdaptive = false;
+
+        [LabelText("高度分级列表"), ShowIf("enableHeightAdaptive"),
+         Tooltip("按 maxWallHeight 升序填写；运行时自动选第一个满足(实际墙高 ≤ maxWallHeight)的配置。\n示例: 1.2m 矮墙 / 1.8m 普通墙 / 2.5m 高墙")]
+        public ClimbOverHeightRange[] heightRangePresets = new ClimbOverHeightRange[0];
+
+        [Title("天花板净空检测")]
+        [LabelText("启用净空检测"), Tooltip("攀上前向目标点正上方射线检查天花板，防止角色卡入桥底或低顶棚。默认开启")]
+        public bool enableCeilingCheck = true;
+
+        [LabelText("所需净空高度(米)"), ShowIf("enableCeilingCheck"), Tooltip("目标点上方需要多少米的净空才允许攀上。建议 1.8~2.2")]
+        public float requiredCeilingClearance = 1.8f;
+
+        [LabelText("净空检测层级"), ShowIf("enableCeilingCheck"), Tooltip("建议包含天花板、地板、实体物体层级；默认 ~0 全层")]
+        public LayerMask ceilingCheckLayerMask = ~0;
+
         [Title("翻越前向推进")]
         [LabelText("翻越前向推进速度")]
         public float vaultForwardPushSpeed = 1.2f;
@@ -288,6 +349,8 @@ namespace ES
         private StateBase _vaultState;
         private StateBase _vaultHighState;
         private StateBase _activeVaultState;
+        // 本次攀上实际使用的状态（可能是高度分级状态，与 _climbOverState 不同）
+        private StateBase _activeClimbOverState;
         private StateBase _climbJumpState;
         private StateMachine sm;
         private Collider[] _overlapBuffer = new Collider[16];
@@ -304,6 +367,10 @@ namespace ES
         [NonSerialized] private float _matchTargetStartTime = -999f;
         [NonSerialized] private float _climbOverGroundedSince = -1f;
         [NonSerialized] private Vector3 _vaultStartPosition;
+
+#if UNITY_EDITOR
+        [NonSerialized] private GameObject _debugMatchTargetMarker;
+#endif
 
         private const float ClimbJumpUpMultiplier = 1f;
         private const float ClimbJumpNormalMultiplier = 0.4f;
@@ -328,6 +395,16 @@ namespace ES
                     _vaultHighState = sm.GetStateByString(VaultHigh_StateName);
                 if (!string.IsNullOrEmpty(ClimbJump_StateName))
                     _climbJumpState = sm.GetStateByString(ClimbJump_StateName);
+
+                // ── 高度分级状态缓存 ──────────────────────────────────────────────────
+                if (enableHeightAdaptive && heightRangePresets != null)
+                {
+                    foreach (var preset in heightRangePresets)
+                    {
+                        if (!string.IsNullOrEmpty(preset.stateName))
+                            preset._cachedState = sm.GetStateByString(preset.stateName);
+                    }
+                }
             }
             if (MyCore != null)
             {
@@ -355,7 +432,8 @@ namespace ES
                         anyClimbStateRunning = _climbState != null && _climbState.baseStatus == StateBaseStatus.Running;
                         break;
                     case ClimbSubState.ClimbOver:
-                        anyClimbStateRunning = _climbOverState != null && _climbOverState.baseStatus == StateBaseStatus.Running;
+                        var effectiveClimbOver = _activeClimbOverState ?? _climbOverState;
+                        anyClimbStateRunning = effectiveClimbOver != null && effectiveClimbOver.baseStatus == StateBaseStatus.Running;
                         break;
                     case ClimbSubState.Vault:
                         var vaultState = _activeVaultState ?? _vaultState ?? _vaultHighState;
@@ -376,7 +454,7 @@ namespace ES
                         }
                     }
 
-                    if (debugClimb)
+                    if (debugClimb_)
                     {
                         Debug.LogWarning($"[Climb] 状态机攀爬状态已被外部打断! subState={subState} 但对应状态未Running → 重置为None");
                     }
@@ -396,13 +474,13 @@ namespace ES
                     break;
 
                 case ClimbSubState.Climbing:
-                    if (debugClimb) Debug.Log("[登顶] 进入UpdateClimbing");
+                    if (debugClimb_) Debug.Log("[登顶] 进入UpdateClimbing");
                     UpdateClimbing();
                     break;
 
                 case ClimbSubState.ClimbOver:
                 case ClimbSubState.Vault:
-                    if (debugClimb)
+                    if (debugClimb_)
                     {
                         Debug.Log($"[登顶] 进入UpdateMatchTargetPhase: subState={subState}");
                     }
@@ -417,7 +495,7 @@ namespace ES
 
         public void ToggleClimb()
         {
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.Log($"[Climb] ToggleClimb调用! subState={subState}, detectedSurface={(detectedSurface != null ? detectedSurface.name : "null")}");
             }
@@ -460,7 +538,7 @@ namespace ES
             if (subState != ClimbSubState.Climbing && subState != ClimbSubState.Approach) return;
             if (disableClimbJump)
             {
-                if (debugClimb) Debug.LogWarning("[攀爬] 攀爬跳跃已禁用，忽略请求");
+                if (debugClimb_) Debug.LogWarning("[攀爬] 攀爬跳跃已禁用，忽略请求");
                 return;
             }
 
@@ -474,7 +552,7 @@ namespace ES
             {
                 if (!sm.TryActivateState(_climbJumpState))
                 {
-                    if (debugClimb) Debug.LogWarning($"[攀爬] 激活攀爬跳跃状态失败: {ClimbJump_StateName}");
+                    if (debugClimb_) Debug.LogWarning($"[攀爬] 激活攀爬跳跃状态失败: {ClimbJump_StateName}");
                     return;
                 }
                 ExitClimbingState(false);
@@ -484,7 +562,7 @@ namespace ES
             climbJumpRequested = true;
             _climbJumpStartTime = Time.time;
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.Log($"[Climb] 攀爬跳跃请求! wallNormal={currentWallNormal}, " +
                     $"jumpSpeed={climbParams.climbJumpSpeed}, normalForce={climbParams.climbJumpNormalForce}" +
@@ -578,7 +656,7 @@ namespace ES
                         bool inAreaRange = distToArea <= forwardDetectDistance;
                         bool inHeight = climbable.IsInHeightRange(charPos.y);
 
-                        if (debugClimb)
+                        if (debugClimb_)
                         {
                             Debug.Log($"[Climb] Detect射线{i}: hit={hit.collider.name}, surface={climbable.name}, " +
                                 $"dist={distToArea:F2}/{forwardDetectDistance:F2}(范围{(inAreaRange ? "OK" : "OUT")}), " +
@@ -593,7 +671,7 @@ namespace ES
                             return true;
                         }
                     }
-                    else if (debugClimb)
+                    else if (debugClimb_)
                     {
                         Debug.Log($"[Climb] Detect射线{i}: hit={hit.collider.name} 但无ClimbableSurface组件");
                     }
@@ -614,20 +692,20 @@ namespace ES
             Vector3 lowRayOrigin = charPos + Vector3.up * 0.3f;
             if (!Physics.Raycast(lowRayOrigin, charFwd, out RaycastHit lowHit, forwardDetectDistance, climbableLayerMask))
             {
-                if (debugClimb) Debug.Log("[Climb] TryDetectVault: 低处射线未命中");
+                if (debugClimb_) Debug.Log("[Climb] TryDetectVault: 低处射线未命中");
                 return false;
             }
 
             var climbable = lowHit.collider.GetComponentInParent<ClimbableSurface>();
             if (climbable == null)
             {
-                if (debugClimb) Debug.Log($"[Climb] TryDetectVault: 命中{lowHit.collider.name}但无ClimbableSurface组件");
+                if (debugClimb_) Debug.Log($"[Climb] TryDetectVault: 命中{lowHit.collider.name}但无ClimbableSurface组件");
                 return false;
             }
 
             if (climbable.surfaceType != ClimbableSurfaceType.LowWall && climbable.surfaceType != ClimbableSurfaceType.Ledge)
             {
-                if (debugClimb) Debug.Log($"[Climb] TryDetectVault: surface={climbable.name} 类型={climbable.surfaceType}，非可翻越类型");
+                if (debugClimb_) Debug.Log($"[Climb] TryDetectVault: surface={climbable.name} 类型={climbable.surfaceType}，非可翻越类型");
                 return false;
             }
 
@@ -635,7 +713,7 @@ namespace ES
             float distToArea = Vector3.Distance(charPos, closest);
             if (distToArea > forwardDetectDistance)
             {
-                if (debugClimb) Debug.Log($"[Climb] TryDetectVault: 距离{distToArea:F2} > 前方射线距离{forwardDetectDistance:F2}");
+                if (debugClimb_) Debug.Log($"[Climb] TryDetectVault: 距离{distToArea:F2} > 前方射线距离{forwardDetectDistance:F2}");
                 return false;
             }
 
@@ -653,7 +731,7 @@ namespace ES
 
             float relativeWallHeight = wallTopY - charPos.y;
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.Log($"[Climb] TryDetectVault: surface={climbable.name}, relWallH={relativeWallHeight:F2}, " +
                     $"vaultMaxH={climbParams.vaultMaxHeight:F2}, wallTopY={wallTopY:F2}");
@@ -672,7 +750,7 @@ namespace ES
             bool topClear = !Physics.Raycast(highRayOrigin, charFwd, forwardDetectDistance, climbableLayerMask);
             if (!topClear)
             {
-                if (debugClimb) Debug.Log("[Climb] TryDetectVault: 墙顶上方有阻挡，无法翻越");
+                if (debugClimb_) Debug.Log("[Climb] TryDetectVault: 墙顶上方有阻挡，无法翻越");
                 return false;
             }
 
@@ -693,18 +771,18 @@ namespace ES
         {
             if (disableNormalClimb)
             {
-                if (debugClimb) Debug.LogWarning("[攀爬] 普通攀爬已禁用，拒绝进入");
+                if (debugClimb_) Debug.LogWarning("[攀爬] 普通攀爬已禁用，拒绝进入");
                 return false;
             }
             if (_climbState == null)
             {
-                if (debugClimb) Debug.LogWarning("[Climb] EnterClimbing失败: _climbState为null! 检查状态机中是否存在名为\"" + Climb_StateName + "\"的状态");
+                if (debugClimb_) Debug.LogWarning("[Climb] EnterClimbing失败: _climbState为null! 检查状态机中是否存在名为\"" + Climb_StateName + "\"的状态");
                 return false;
             }
 
             if (!sm.TryActivateState(_climbState))
             {
-                if (debugClimb) Debug.LogWarning($"[Climb] EnterClimbing失败: TryActivateState返回false (状态={Climb_StateName}, baseStatus={_climbState.baseStatus})");
+                if (debugClimb_) Debug.LogWarning($"[Climb] EnterClimbing失败: TryActivateState返回false (状态={Climb_StateName}, baseStatus={_climbState.baseStatus})");
                 return false;
             }
 
@@ -717,7 +795,7 @@ namespace ES
 
             MyCore.kcc.motor.ForceUnground(0.1f);
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.Log($"[Climb] ★ 进入攀爬成功! surface={surface.name}, type={surface.surfaceType}, " +
                     $"wallNormal={wallNormal}, hitPoint={hitPoint}, snapTarget={currentSnapTarget}");
@@ -731,13 +809,13 @@ namespace ES
 
             if (_activeVaultState == null)
             {
-                if (debugClimb) Debug.LogWarning($"[Climb] EnterVault失败: vaultState为null! 检查状态机中是否存在名为\"{Vault_StateName}\"或\"{VaultHigh_StateName}\"的状态");
+                if (debugClimb_) Debug.LogWarning($"[Climb] EnterVault失败: vaultState为null! 检查状态机中是否存在名为\"{Vault_StateName}\"或\"{VaultHigh_StateName}\"的状态");
                 return false;
             }
 
             if (!sm.TryActivateState(_activeVaultState))
             {
-                if (debugClimb) Debug.LogWarning($"[Climb] EnterVault失败: TryActivateState返回false (状态={_activeVaultState.strKey}, baseStatus={_activeVaultState.baseStatus})");
+                if (debugClimb_) Debug.LogWarning($"[Climb] EnterVault失败: TryActivateState返回false (状态={_activeVaultState.strKey}, baseStatus={_activeVaultState.baseStatus})");
                 return false;
             }
 
@@ -763,12 +841,12 @@ namespace ES
                     vaultApproachSpeed, vaultAngleSpeed);
             }
 
-            if (debugClimb && !_activeVaultState.IsMatchTargetActive)
+            if (debugClimb_ && !_activeVaultState.IsMatchTargetActive)
             {
                 Debug.LogWarning("[Climb] Vault MatchTarget未激活，请检查状态配置或Animator");
             }
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.Log($"[Climb] ★ 进入Vault翻越! surface={surface.name}, targetPos={targetPos}, " +
                     $"targetRot={targetRot.eulerAngles}, bodyPart={vaultBodyPart}, " +
@@ -781,62 +859,120 @@ namespace ES
         {
             if (disableClimbOver)
             {
-                if (debugClimb) Debug.LogWarning("[攀爬] 攀爬翻上已禁用，忽略触发");
+                if (debugClimb_) Debug.LogWarning("[攀爬] 攀爬翻上已禁用，忽略触发");
                 return;
             }
-            if (debugClimb)
+            if (debugClimb_) Debug.Log("[登顶] EnterClimbOver: 准备进入登顶状态");
+
+            if (currentSurface == null)
             {
-                Debug.Log("[登顶] EnterClimbOver: 准备进入登顶状态");
-            }
-            if (_climbOverState == null || currentSurface == null)
-            {
-                if (debugClimb) Debug.LogWarning($"[Climb] EnterClimbOver失败: _climbOverState={((_climbOverState != null) ? ClimbOver_StateName : "null")}, surface={(currentSurface != null ? currentSurface.name : "null")}");
+                if (debugClimb_) Debug.LogWarning("[Climb] EnterClimbOver失败: surface=null");
                 return;
             }
 
+            Vector3 charPos = MyCore.kcc.motor.TransientPosition;
+
+            // ── 最小墙高检测 ────────────────────────────────────────────────────────
+            float wallHeight = currentSurface.GetWallHeightAboveCharacter(charPos);
+            if (wallHeight < minClimbOverWallHeight)
+            {
+                if (debugClimb_) Debug.LogWarning($"[Climb] EnterClimbOver取消: 墙高={wallHeight:F2}m < 最小要求={minClimbOverWallHeight:F2}m，障碍过矮不触发攀上");
+                return;
+            }
+
+            // ── 计算 MatchTarget 目标点 ─────────────────────────────────────────────
+            Vector3 targetPos = currentSurface.GetMatchTargetPosition(charPos);
+            targetPos.y += climbOverMatchTargetYOffset;
+            Quaternion targetRot = currentSurface.GetMatchTargetRotation(charPos);
+
+            // ── 天花板净空检测 ───────────────────────────────────────────────────────
+            if (enableCeilingCheck && !currentSurface.HasCeilingClearance(targetPos, requiredCeilingClearance, ceilingCheckLayerMask))
+            {
+                if (debugClimb_) Debug.LogWarning($"[Climb] EnterClimbOver阻止: 天花板净空不足 targetPos={targetPos:F3} required={requiredCeilingClearance:F2}m，跳过攀上");
+                return;
+            }
+
+            // ── 高度分级状态选择 ─────────────────────────────────────────────────────
+            StateBase chosenState = _climbOverState;
+            AvatarTarget chosenBodyPart = climbOverBodyPart;
+            float chosenStartTime = climbOverStartTime;
+            float chosenEndTime = climbOverEndTime;
+            float chosenApproachSpeed = climbOverApproachSpeed;
+            float chosenAngleSpeed = climbOverAngleSpeed;
+
+            if (enableHeightAdaptive && heightRangePresets != null && heightRangePresets.Length > 0)
+            {
+                ClimbOverHeightRange matched = null;
+                float bestMax = float.MaxValue;
+                foreach (var p in heightRangePresets)
+                {
+                    // 在所有"墙高上限 >= 实际墙高"的配置中，选上限最小的（最精确匹配）
+                    if (wallHeight <= p.maxWallHeight && p.maxWallHeight < bestMax
+                        && p._cachedState != null && !string.IsNullOrEmpty(p.stateName))
+                    {
+                        bestMax = p.maxWallHeight;
+                        matched = p;
+                    }
+                }
+                if (matched != null)
+                {
+                    chosenState = matched._cachedState;
+                    chosenBodyPart = matched.bodyPart;
+                    chosenStartTime = matched.startTime;
+                    chosenEndTime = matched.endTime;
+                    chosenApproachSpeed = matched.approachSpeed;
+                    chosenAngleSpeed = matched.angleSpeed;
+                    if (debugClimb_) Debug.Log($"[登顶] 高度分级命中: wallHeight={wallHeight:F2}m ≤ maxWallHeight={matched.maxWallHeight:F2}m → state={matched.stateName}");
+                }
+                else if (debugClimb_)
+                {
+                    Debug.Log($"[登顶] 高度分级未命中(wallHeight={wallHeight:F2}m)，回退默认攀上状态");
+                }
+            }
+
+            if (chosenState == null)
+            {
+                if (debugClimb_) Debug.LogWarning($"[Climb] EnterClimbOver失败: 目标状态为null! enableHeightAdaptive={enableHeightAdaptive}, wallHeight={wallHeight:F2}m, default={((_climbOverState != null) ? ClimbOver_StateName : "null")}");
+                return;
+            }
+
+            // ── 退出当前攀爬状态 ─────────────────────────────────────────────────────
             if (_climbState != null && _climbState.baseStatus == StateBaseStatus.Running)
             {
                 sm.TryDeactivateState(Climb_StateName);
             }
 
-            if (!sm.TryActivateState(_climbOverState))
+            // ── 激活选中的攀上状态 ──────────────────────────────────────────────────
+            if (!sm.TryActivateState(chosenState))
             {
-                if (debugClimb) Debug.LogWarning($"[Climb] EnterClimbOver失败: TryActivateState返回false (状态={ClimbOver_StateName}, baseStatus={_climbOverState.baseStatus})");
+                if (debugClimb_) Debug.LogWarning($"[Climb] EnterClimbOver失败: TryActivateState返回false (状态={chosenState.strKey}, baseStatus={chosenState.baseStatus})");
                 return;
             }
-            if (debugClimb)
-            {
-                Debug.Log($"[登顶] EnterClimbOver: 状态激活成功 name={ClimbOver_StateName}");
-            }
+            if (debugClimb_) Debug.Log($"[登顶] EnterClimbOver: 状态激活成功 name={chosenState.strKey}, wallHeight={wallHeight:F2}m");
 
+            _activeClimbOverState = chosenState;
             subState = ClimbSubState.ClimbOver;
-
             _matchTargetStartTime = Time.time;
 
-            // enableContinuousApproach: 重施加策略已迁移至 StateMachineConfig.matchTargetReapply 全局配置，无需在此显式设置
-
-            Vector3 charPos = MyCore.kcc.motor.TransientPosition;
-            Vector3 targetPos = currentSurface.GetMatchTargetPosition(charPos);
-            Quaternion targetRot = currentSurface.GetMatchTargetRotation(charPos);
             // ★ 优先采用 Inspector matchTargetPreset；Inspector 未启用时退回模块级字段（向后兼容）
-            if (!_climbOverState.StartMatchTargetFromConfig(targetPos, targetRot))
+            if (!chosenState.StartMatchTargetFromConfig(targetPos, targetRot))
             {
-                _climbOverState.StartMatchTarget(
+                chosenState.StartMatchTarget(
                     targetPos, targetRot,
-                    climbOverBodyPart, climbOverStartTime, climbOverEndTime,
-                    climbOverApproachSpeed, climbOverAngleSpeed);
+                    chosenBodyPart, chosenStartTime, chosenEndTime,
+                    chosenApproachSpeed, chosenAngleSpeed);
             }
 
-            if (debugClimb && !_climbOverState.IsMatchTargetActive)
+            if (debugClimb_ && !chosenState.IsMatchTargetActive)
             {
                 Debug.LogWarning("[Climb] ClimbOver MatchTarget未激活，请检查状态配置或Animator");
             }
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.Log($"[Climb] ★ 进入ClimbOver! targetPos={targetPos}, targetRot={targetRot.eulerAngles}, " +
-                    $"bodyPart={climbOverBodyPart}, timeRange=[{climbOverStartTime:F2},{climbOverEndTime:F2}], " +
-                    $"approachSpeed={climbOverApproachSpeed:F2}单位/秒, angleSpeed={climbOverAngleSpeed:F1}度/秒");
+                    $"bodyPart={chosenBodyPart}, timeRange=[{chosenStartTime:F2},{chosenEndTime:F2}], " +
+                    $"approachSpeed={chosenApproachSpeed:F2}单位/秒, angleSpeed={chosenAngleSpeed:F1}度/秒, wallHeight={wallHeight:F2}m");
             }
         }
 
@@ -868,7 +1004,7 @@ namespace ES
             float approachSpeed = Mathf.Min(climbParams.snapSharpness * dist, climbParams.maxSnapSpeed * 2f);
             climbVelocityRequest = disableApproachPull ? Vector3.zero : (moveDir * approachSpeed);
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.LogWarning($"[攀爬-靠近] 角色位置={charPos} 吸附点={currentSnapTarget} 距离={dist:F3} 速度={climbVelocityRequest}");
             }
@@ -889,7 +1025,7 @@ namespace ES
                 if (_groundedSince < 0f) _groundedSince = Time.time;
                 if (Time.time - _groundedSince >= climbParams.groundedExitDelay)
                 {
-                    if (debugClimb) Debug.LogWarning($"[攀爬][自动退出] 持续着地超过阈值: groundedFor={(Time.time - _groundedSince):F2}s >= {climbParams.groundedExitDelay:F2}s");
+                    if (debugClimb_) Debug.LogWarning($"[攀爬][自动退出] 持续着地超过阈值: groundedFor={(Time.time - _groundedSince):F2}s >= {climbParams.groundedExitDelay:F2}s");
                     ForceExitClimb();
                     return;
                 }
@@ -901,7 +1037,7 @@ namespace ES
 
             if (hasInputRaw && _lastWallRayDistance > climbParams.maxWallDistance)
             {
-                if (debugClimb)
+                if (debugClimb_)
                     Debug.LogWarning($"[攀爬][自动退出] 离墙过远: rayDist={_lastWallRayDistance:F2} > maxWallDist={climbParams.maxWallDistance:F2}");
                 ForceExitClimb();
                 return;
@@ -986,13 +1122,13 @@ namespace ES
                 climbVelocityRequest += snapForce;
             }
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.LogWarning(
                     $"[攀爬-贴墙时长] timeSinceEnter={timeSinceEnter:F2} snapDuration={climbParams.snapDuration:F2} allowSnap={allowSnap} distError={distError:F3}");
             }
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Vector3 charFwd = MyCore.kcc.motor.CharacterForward;
                 Vector3 charRight = Vector3.Cross(Vector3.up, charFwd).normalized;
@@ -1025,7 +1161,7 @@ namespace ES
                     $"  总输出={totalLocal:F3}");
             }
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 float relY = charPos.y - currentSurface.transform.position.y;
                 float topY = currentSurface.GetTopWorldY();
@@ -1038,7 +1174,7 @@ namespace ES
                     $"bottomOffset={currentSurface.bottomHeightOffset:F3}, lossyScale={currentSurface.transform.lossyScale:F3}");
             }
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.Log($"[登顶] 射线检查: hasInput={hasInputRaw}, lastWallDist={_lastWallRayDistance:F2}, maxWallDist={climbParams.maxWallDistance:F2}");
             }
@@ -1047,14 +1183,14 @@ namespace ES
             {
                 if (nearTop)
                 {
-                    if (debugClimb)
+                    if (debugClimb_)
                     {
                         Debug.LogWarning("[登顶] 近顶时失去墙面射线，允许继续登顶判断");
                     }
                 }
                 else
                 {
-                    if (debugClimb)
+                    if (debugClimb_)
                         Debug.LogWarning($"[登顶][自动退出] 离墙过远: rayDist={_lastWallRayDistance:F2} > maxWallDist={climbParams.maxWallDistance:F2}");
                     ForceExitClimb();
                     return;
@@ -1065,16 +1201,16 @@ namespace ES
             {
                 if (!disableClimbOver)
                 {
-                    if (debugClimb) Debug.Log("[登顶] ★ 到达顶部，触发ClimbOver!");
+                    if (debugClimb_) Debug.Log("[登顶] ★ 到达顶部，触发ClimbOver!");
                     EnterClimbOver();
                     return;
                 }
-                if (debugClimb) Debug.Log("[登顶] 到达顶部，但翻上被禁用，继续保持攀爬");
+                if (debugClimb_) Debug.Log("[登顶] 到达顶部，但翻上被禁用，继续保持攀爬");
             }
 
             if (!inRange)
             {
-                if (debugClimb) Debug.LogWarning("[攀爬][自动退出] 超出攀爬高度范围(inRange=false)");
+                if (debugClimb_) Debug.LogWarning("[攀爬][自动退出] 超出攀爬高度范围(inRange=false)");
                 ForceExitClimb();
             }
         }
@@ -1083,7 +1219,9 @@ namespace ES
         {
             climbVelocityRequest = Vector3.zero;
 
-            StateBase activeState = (subState == ClimbSubState.ClimbOver) ? _climbOverState : (_activeVaultState ?? _vaultState);
+            StateBase activeState = (subState == ClimbSubState.ClimbOver)
+                ? (_activeClimbOverState ?? _climbOverState)
+                : (_activeVaultState ?? _vaultState);
 
             if (enableContinuousApproach && currentSurface != null)
             {
@@ -1100,7 +1238,37 @@ namespace ES
                 else
                 {
                     targetPos = currentSurface.GetMatchTargetPosition(charPos);
+                    targetPos.y += climbOverMatchTargetYOffset;
                 }
+#if UNITY_EDITOR
+                if (debugClimb_)
+                {
+                    if (_debugMatchTargetMarker == null)
+                    {
+                        _debugMatchTargetMarker = new GameObject("[DEBUG] ClimbMatchTargetPos")
+                        {
+                            hideFlags = UnityEngine.HideFlags.DontSave
+                        };
+                    }
+                    _debugMatchTargetMarker.transform.position = targetPos;
+                    _debugMatchTargetMarker.transform.rotation = targetRot;
+
+                    // ── 打印完整诊断：Target位置/旋转/与角色关系 ─────────────────────────
+                    Vector3 charFeet = charPos; // KCC TransientPosition 即脚部位置
+                    Vector3 delta    = targetPos - charFeet;
+                    Debug.Log(
+                        $"[MatchTarget诊断] ══════════════════════════\n" +
+                        $"  subState      = {subState}\n" +
+                        $"  charPos(脚)   = {charFeet:F3}\n" +
+                        $"  targetPos     = {targetPos:F3}  (含YOffset={climbOverMatchTargetYOffset:F3})\n" +
+                        $"  targetRot     = {targetRot.eulerAngles:F1}\n" +
+                        $"  Δpos(目标-角色) = {delta:F3}  距离={delta.magnitude:F3}\n" +
+                        $"  surface       = {(currentSurface != null ? currentSurface.name : "null")}\n" +
+                        $"  surfaceTopY   = {(currentSurface != null ? currentSurface.GetTopWorldY().ToString("F3") : "N/A")}\n" +
+                        $"  climbOverMatchTargetYOffset = {climbOverMatchTargetYOffset:F3}\n" +
+                        $"════════════════════════════════════════════");
+                }
+#endif
                 Vector3 toTarget = targetPos - charPos;
                 float dist = toTarget.magnitude;
                 float landingDist = dist;
@@ -1135,7 +1303,7 @@ namespace ES
                     activeState.SetMatchTargetTargetWithConfigOffset(targetPos, targetRot);
                 }
 
-                if (debugClimb)
+                if (debugClimb_)
                 {
                     if (subState == ClimbSubState.ClimbOver)
                     {
@@ -1146,7 +1314,8 @@ namespace ES
                 if (subState == ClimbSubState.ClimbOver)
                 {
                     float elapsed = Time.time - _matchTargetStartTime;
-                    bool progressDone = _climbOverState != null && _climbOverState.normalizedProgress >= climbOverExitNormalized;
+                    bool progressDone = (_activeClimbOverState ?? _climbOverState) != null
+                        && (_activeClimbOverState ?? _climbOverState).normalizedProgress >= climbOverExitNormalized;
                     bool reached = landingDist <= climbOverExitDistance;
 
                     bool probedGrounded = CheckClimbOverGroundProbe(charPos);
@@ -1207,7 +1376,7 @@ namespace ES
 
                     if (canExit || timeout)
                     {
-                        if (debugClimb)
+                        if (debugClimb_)
                         {
                             string reason = timeout ? "timeout" : (groundedReady ? "grounded" : (reached ? "distance" : "progress"));
                             Debug.LogWarning($"[登顶][自动退出] reason={reason} elapsed={elapsed:F2} min={climbOverMinDuration:F2} max={climbOverMaxDuration:F2} landingDist={landingDist:F3} progress={_climbOverState?.normalizedProgress:F2} probedGrounded={probedGrounded}");
@@ -1246,7 +1415,7 @@ namespace ES
                     bool canExitByDistance = allowExit && dist <= vaultExitDistance && probedGrounded;
                     if ((allowImmediateExit && frontBackGrounded) || farFromStart || canExitByDistance || elapsed >= vaultMaxDuration)
                     {
-                        if (debugClimb)
+                        if (debugClimb_)
                         {
                             string reason = frontBackGrounded ? "frontBackGround" : (farFromStart ? "farFromStart" : (elapsed >= vaultMaxDuration ? "timeout" : "distance"));
                             Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} dist={dist:F3} probedGrounded={probedGrounded} frontBack={frontBackGrounded} far={farFromStart}");
@@ -1273,7 +1442,7 @@ namespace ES
                 bool canExitByDistance = allowExit && dist <= vaultExitDistance && probedGrounded;
                 if ((allowImmediateExit && frontBackGrounded) || farFromStart || canExitByDistance || elapsed >= vaultMaxDuration)
                 {
-                    if (debugClimb)
+                    if (debugClimb_)
                     {
                         string reason = frontBackGrounded ? "frontBackGround" : (farFromStart ? "farFromStart" : (elapsed >= vaultMaxDuration ? "timeout" : "distance"));
                         Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} dist={dist:F3} probedGrounded={probedGrounded} frontBack={frontBackGrounded} far={farFromStart} (noApproach)");
@@ -1286,7 +1455,7 @@ namespace ES
             }
             if (activeState != null && !activeState.IsMatchTargetActive && Time.time - _matchTargetStartTime > matchTargetFailTimeout)
             {
-                if (debugClimb)
+                if (debugClimb_)
                 {
                     Debug.LogWarning($"[攀爬][自动退出] MatchTarget未激活: elapsed={(Time.time - _matchTargetStartTime):F2} > failTimeout={matchTargetFailTimeout:F2}");
                 }
@@ -1296,7 +1465,7 @@ namespace ES
             }
             if (activeState == null || activeState.baseStatus != StateBaseStatus.Running)
             {
-                if (debugClimb)
+                if (debugClimb_)
                 {
                     Debug.LogWarning($"[攀爬][自动退出] activeState无效或未Running: subState={subState} active={(activeState != null ? activeState.strKey : "null")}");
                 }
@@ -1310,7 +1479,7 @@ namespace ES
             float jumpElapsed = Time.time - _climbJumpStartTime;
             if (jumpElapsed >= climbParams.climbJumpMaxDuration)
             {
-                if (debugClimb) Debug.LogWarning($"[攀爬跳跃][自动退出] 超时: elapsed={jumpElapsed:F2} >= {climbParams.climbJumpMaxDuration:F2}");
+                if (debugClimb_) Debug.LogWarning($"[攀爬跳跃][自动退出] 超时: elapsed={jumpElapsed:F2} >= {climbParams.climbJumpMaxDuration:F2}");
                 ForceExitClimb();
                 return;
             }
@@ -1331,7 +1500,7 @@ namespace ES
 
             if (MyCore.kcc.monitor.isStableOnGround)
             {
-                if (debugClimb) Debug.LogWarning("[攀爬跳跃][自动退出] 落地");
+                if (debugClimb_) Debug.LogWarning("[攀爬跳跃][自动退出] 落地");
                 if (_climbJumpState != null && _climbJumpState.baseStatus == StateBaseStatus.Running)
                 {
                     sm.TryDeactivateState(ClimbJump_StateName);
@@ -1397,10 +1566,10 @@ namespace ES
                 {
                     if (subState == ClimbSubState.Climbing || subState == ClimbSubState.Approach)
                     {
-                        if (debugClimb) Debug.LogWarning("[攀爬][自动退出] 丢失墙面接触(射线未命中)");
+                        if (debugClimb_) Debug.LogWarning("[攀爬][自动退出] 丢失墙面接触(射线未命中)");
                         ForceExitClimb();
                     }
-                    else if (debugClimb)
+                    else if (debugClimb_)
                     {
                         Debug.LogWarning($"[攀爬][忽略退出] 丢失墙面接触但处于{subState}");
                     }
@@ -1421,6 +1590,14 @@ namespace ES
                 sm.TryDeactivateState(ClimbOver_StateName);
                 if (_climbOverState.baseStatus == StateBaseStatus.Running)
                     sm.ForceExitState(_climbOverState);
+            }
+            // 高度自适应：若本次使用了不同于默认的攀上状态，也要确保退出
+            if (_activeClimbOverState != null && _activeClimbOverState != _climbOverState
+                && _activeClimbOverState.baseStatus == StateBaseStatus.Running)
+            {
+                sm.TryDeactivateState(_activeClimbOverState.strKey);
+                if (_activeClimbOverState.baseStatus == StateBaseStatus.Running)
+                    sm.ForceExitState(_activeClimbOverState);
             }
             if (_vaultState != null && _vaultState.baseStatus == StateBaseStatus.Running)
             {
@@ -1455,6 +1632,7 @@ namespace ES
             _climbJumpStartTime = -999f;
             _climbOverGroundedSince = -1f;
             _activeVaultState = null;
+            _activeClimbOverState = null;
             _vaultStartPosition = Vector3.zero;
 
             if (sm != null)
@@ -1611,7 +1789,7 @@ namespace ES
                 }
             }
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.LogWarning(
                     $"[攀爬-朝向] 墙法线={wallNormal:F3} 面朝目标={(-wallNormal):F3} " +
@@ -1694,7 +1872,7 @@ namespace ES
             Vector3 velDiff = targetMovementVelocity - currentVelocity;
             currentVelocity += velDiff * climbParams.climbAcceleration * deltaTime;
 
-            if (debugClimb)
+            if (debugClimb_)
             {
                 Debug.LogWarning(
                     $"[攀爬-KCC速度] 目标={targetMovementVelocity:F3} 当前={currentVelocity:F3} " +

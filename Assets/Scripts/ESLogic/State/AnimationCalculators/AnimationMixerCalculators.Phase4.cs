@@ -1,13 +1,18 @@
-using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
-using UnityEngine.Animations;
 using UnityEngine.Playables;
+using UnityEngine.Animations;
 using Sirenix.OdinInspector;
+using System;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace ES
 {
-    /// <summary>
+     /// <summary>
     /// 阶段播放器（严格四阶段）
     /// - 固定 4 个阶段：Pre → Main → Wait → Released
     /// - 默认按时间推进（最大时长）
@@ -16,7 +21,7 @@ namespace ES
     /// </summary>
     [Serializable, TypeRegistryItem("高级·阶段播放器(四阶段)")]
     public class StateAnimationMixCalculatorForPhase4 : StateAnimationMixCalculator
-    {
+    { 
         public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.Phase4;
 
         public override bool NeedUpdateWhenFadingOut => true;
@@ -1579,4 +1584,5 @@ namespace ES
             owner.SetRuntimePhaseFromCalculator(phase, true);
         }
     }
+
 }

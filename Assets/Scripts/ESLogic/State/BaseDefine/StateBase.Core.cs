@@ -10,6 +10,8 @@ using UnityEngine.Animations;
 // ============================================================================
 // 文件：StateBase.Core.cs 220
 // 作用：StateBase 的核心部分（Host 绑定、共享数据缓存、生命周期、运行时阶段、ResolvedConfig）。
+// 关系约束：StateBase 只负责状态本体生命周期；模块侧若要和某个 StateBase 保持严格同步，
+// 必须优先复用 StateLifecycleTracker，不要在 AI/业务模块里重复手写生命周期布尔守卫。
 //
 // Public（本文件对外可直接使用的成员，按出现顺序；“先功能、后成员”，便于扫读）：
 //
@@ -92,13 +94,12 @@ namespace ES
         public StateVariableData stateVariableData;
 
         [NonSerialized] internal StateBasicConfig _basicConfigCached;
-        [NonSerialized] private StatePhaseConfig _phaseConfigCached;
         [NonSerialized] internal StateAnimationConfigData _animConfigCached;
+        [NonSerialized] internal StateProceduralDriveData _proceduralDriveConfigCached;
         [NonSerialized] internal StateAnimationMixCalculator _calculatorCached;
         [NonSerialized] internal bool _hasAnimationCached;
         [NonSerialized] internal bool _hasAnimationMarkerCached;
-        [NonSerialized] private bool _needsProgressTrackingCached;
-        [NonSerialized] private bool _autoPhaseByTimeCached;
+        [NonSerialized] private bool _needsRuntimeProgressCached;
         [NonSerialized] private StateDurationMode _durationModeCached;
         [NonSerialized] private bool _enableIKCached;
         [NonSerialized] private bool _enableMatchTargetCached;
@@ -116,13 +117,12 @@ namespace ES
             if (shared == null)
             {
                 _basicConfigCached = null;
-                _phaseConfigCached = null;
                 _animConfigCached = null;
+                _proceduralDriveConfigCached = null;
                 _calculatorCached = null;
                 _hasAnimationCached = false;
                 _hasAnimationMarkerCached = false;
-                _needsProgressTrackingCached = false;
-                _autoPhaseByTimeCached = false;
+                _needsRuntimeProgressCached = false;
                 _durationModeCached = StateDurationMode.Timed;
                 _enableIKCached = false;
                 _enableMatchTargetCached = false;
@@ -133,23 +133,17 @@ namespace ES
             _basicConfigCached = basic;
             _durationModeCached = basic != null ? basic.durationMode : StateDurationMode.Timed;
 
-            var phase = basic != null ? basic.phaseConfig : null;
-            _phaseConfigCached = phase;
-
-            bool needsProgress = basic != null && basic.enableProgressTracking;
-            if (phase != null && phase.enablePhase && phase.enableAutoPhaseByTime)
-            {
-                needsProgress = true;
-            }
-            _needsProgressTrackingCached = needsProgress;
+            _needsRuntimeProgressCached = basic != null && basic.enableRuntimeProgress;
 
             var animConfig = shared.animationConfig;
+            var proceduralDriveConfig = shared.proceduralDriveConfig;
             var sharedCalculator = animConfig != null ? animConfig.calculator : null;
             // ★ 运行时覆盖：如果外部已直接设置 _calculatorCached，则不再被 sharedData 覆盖。
             // 这让“无需修改 StateSharedData，直接替换本 State 的 calculator”成为可能。
             var calculator = _calculatorCached ?? sharedCalculator;
 
             _animConfigCached = animConfig;
+            _proceduralDriveConfigCached = proceduralDriveConfig;
             _calculatorCached = calculator;
 
             bool hasAnim = shared.hasAnimation && animConfig != null && calculator != null;
@@ -158,18 +152,9 @@ namespace ES
             // 保留原始标记（用于进度/阶段等逻辑 gating，保持旧语义）
             _hasAnimationMarkerCached = shared.hasAnimation;
 
-            // ★ AutoPhaseByTime 热路径开关：只在真正启用阶段自动评估时为 true。
-            // 目的：不启用阶段的状态，在进度更新时不会额外访问 phaseConfig / EvaluatePhase。
-            _autoPhaseByTimeCached = _hasAnimationMarkerCached && phase != null && phase.enablePhase && phase.enableAutoPhaseByTime;
+            _enableIKCached = hasAnim && proceduralDriveConfig != null && proceduralDriveConfig.enableIK;
+            _enableMatchTargetCached = hasAnim && proceduralDriveConfig != null && proceduralDriveConfig.enableMatchTarget;
 
-            _enableIKCached = hasAnim && animConfig.enableIK;
-            _enableMatchTargetCached = hasAnim && animConfig.enableMatchTarget;
-
-            // IK 权重曲线依赖 normalizedProgress：若启用曲线，即便用户未显式勾选 enableProgressTracking，也需要更新进度。
-            if (_enableIKCached && animConfig != null && animConfig.useIKTargetWeightCurve)
-            {
-                _needsProgressTrackingCached = true;
-            }
         }
 
         /// <summary>
@@ -259,6 +244,13 @@ namespace ES
             return GetAnimConfigCachedOrShared(GetSharedDataOrNull());
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal StateProceduralDriveData GetProceduralDriveConfigCachedOrSharedOrNull()
+        {
+            var shared = GetSharedDataOrNull();
+            return _proceduralDriveConfigCached ?? (shared != null ? shared.proceduralDriveConfig : null);
+        }
+
         /// <summary>
         /// 运行时动画数据 - 由Calculator创建并管理，零GC
         /// </summary>
@@ -289,30 +281,6 @@ namespace ES
 #if UNITY_EDITOR
     [ShowInInspector, ReadOnly, FoldoutGroup("运行时阶段"), PropertyOrder(-1)]
         private StateRuntimePhase DebugRuntimePhase => _runtimePhase;
-
-    [ShowInInspector, ReadOnly, FoldoutGroup("运行时阶段"), PropertyOrder(-1)]
-        private float DebugMainStartTime
-        {
-            get
-            {
-                var shared = stateSharedData;
-                var basic = shared != null ? shared.basicConfig : null;
-                var phase = basic != null ? basic.phaseConfig : null;
-                return phase != null ? phase.mainStartTime : 0f;
-            }
-        }
-
-        [ShowInInspector, ReadOnly, FoldoutGroup("运行时阶段"), PropertyOrder(-1)]
-        private float DebugWaitStartTime
-        {
-            get
-            {
-                var shared = stateSharedData;
-                var basic = shared != null ? shared.basicConfig : null;
-                var phase = basic != null ? basic.phaseConfig : null;
-                return phase != null ? phase.waitStartTime : 0f;
-            }
-        }
 #endif
 
         [NonSerialized]
@@ -328,9 +296,7 @@ namespace ES
             public StateStayLevel stayLevel;
             public NormalMergeRule asLeftRule;
             public NormalMergeRule asRightRule;
-            public byte priority;
-            public bool ikOverrideEnabled;
-            public float ikTargetWeight;
+            public StateMixerBias mixerBias;
         }
 
         private ResolvedRuntimeConfig _resolvedRuntimeConfig;
@@ -407,48 +373,7 @@ namespace ES
             var basic = shared.basicConfig;
             var costData = shared.costData;
             var mergeData = shared.mergeData;
-            byte priority = basic != null ? basic.priority : (byte)0;
-            bool ikOverrideEnabled = false;
-            float ikTargetWeight = _ikDefaultTargetWeight;
-
-            var phaseConfig = basic != null ? basic.phaseConfig : null;
-            if (phaseConfig != null && phaseConfig.enablePhase)
-            {
-                StatePhaseOverrideConfig overrideConfig = null;
-                switch (_runtimePhase)
-                {
-                    case StateRuntimePhase.Pre:
-                        overrideConfig = phaseConfig.preOverride;
-                        break;
-                    case StateRuntimePhase.Wait:
-                        overrideConfig = phaseConfig.waitOverride;
-                        break;
-                    case StateRuntimePhase.Released:
-                        overrideConfig = phaseConfig.releasedOverride;
-                        break;
-                }
-
-                if (!phaseConfig.mutePhaseOverride && overrideConfig != null && overrideConfig.enable)
-                {
-                    if (overrideConfig.overrideCost && overrideConfig.costData != null)
-                        costData = overrideConfig.costData;
-                    if (overrideConfig.overrideMerge && overrideConfig.mergeData != null)
-                        mergeData = overrideConfig.mergeData;
-                    if (overrideConfig.overridePriority)
-                        priority = overrideConfig.priority;
-                    if (overrideConfig.overrideIK)
-                    {
-                        ikOverrideEnabled = true;
-                        ikTargetWeight = overrideConfig.ikTargetWeight;
-                    }
-                }
-
-                if (_runtimePhase == StateRuntimePhase.Main && phaseConfig.overrideMainIK)
-                {
-                    ikOverrideEnabled = true;
-                    ikTargetWeight = phaseConfig.mainIKTargetWeight;
-                }
-            }
+            StateMixerBias mixerBias = basic != null ? basic.mixerBias : StateMixerBias.Normal;
 
             _resolvedRuntimeConfig.costForMotion = costData != null ? costData.costForMotion : (byte)0;
             _resolvedRuntimeConfig.costForAgility = costData != null ? costData.costForAgility : (byte)0;
@@ -470,18 +395,11 @@ namespace ES
                 _resolvedRuntimeConfig.asRightRule = null;
             }
 
-            byte oldPriority = _resolvedRuntimeConfig.priority;
-            _resolvedRuntimeConfig.priority = priority;
-            if (oldPriority != priority && _layerRuntime != null)
+            StateMixerBias oldMixerBias = _resolvedRuntimeConfig.mixerBias;
+            _resolvedRuntimeConfig.mixerBias = mixerBias;
+            if (oldMixerBias != mixerBias && _layerRuntime != null)
             {
                 _layerRuntime.MarkDirty(PipelineDirtyFlags.MixerWeights);
-            }
-            _resolvedRuntimeConfig.ikOverrideEnabled = ikOverrideEnabled;
-            _resolvedRuntimeConfig.ikTargetWeight = ikTargetWeight;
-
-            if (_animationRuntime != null && _animationRuntime.ik.enabled)
-            {
-                SetIKTargetWeight(ikTargetWeight);
             }
 
             _resolvedRuntimeDirty = false;
@@ -545,11 +463,6 @@ namespace ES
                 ApplyIKConfigOnEnter(_animationRuntime);
             }
 
-            if (_animationRuntime != null && _animationRuntime.ik.enabled)
-            {
-                _ikDefaultTargetWeight = _animationRuntime.ik.targetWeight;
-            }
-
             _resolvedRuntimeDirty = true;
             RefreshResolvedRuntimeConfig();
 
@@ -568,8 +481,8 @@ namespace ES
             SwitchRuntimePhase(StateRuntimePhase.Released, true);
 
             // ★ 状态退出时自动清理IK
-            var animConfig = GetAnimConfigCachedOrSharedOrNull();
-            if (animConfig != null && animConfig.disableIKOnExit)
+            var proceduralDriveConfig = GetProceduralDriveConfigCachedOrSharedOrNull();
+            if (proceduralDriveConfig != null && proceduralDriveConfig.disableIKOnExit)
             {
                 DisableIK();
             }

@@ -24,30 +24,27 @@ MonoBehaviour:
   KeyName: AA!
   sharedData:
     basicConfig:
-      stateId: 0
       stateName: "\u65B0\u72B6\u6001"
-      priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
+      stateId: 0
+      layerType: 0
+      mixerBias: 2
       stateSupportFlag: 1
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      deactivateOnSupportFlagSwitching: 1
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 0
       canBeFeedback: 0
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 0
       durationMode: 1
       timedDuration: 1
-      phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
-    hasAnimation: 0
+      enableRuntimeProgress: 0
+      enableClipLengthFallback: 0
+      internalNote: 
+    hasAnimation: 1
     animationConfig:
       calculator:
-        rid: 3128556031534694416
+        rid: 232055556231921665
     enableFadeInOut: 1
     fadeFollowTimeScale: 1
     fadeSpeedMultiplier: 1
@@ -102,6 +99,47 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
+    proceduralDriveConfig:
+      enableIK: 0
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikRightHand:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikLeftFoot:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikRightFoot:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikLookAt:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      ikSegments: []
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        positionOffset: {x: 0, y: 0, z: 0}
+        enablePositionOffset: 0
+        rotationOffsetY: 0
+        enableRotationOffset: 0
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
+        rotationWeight: 1
+      matchTargetTimeline: []
     tags: []
     group: Default
     displayName: 
@@ -115,22 +153,22 @@ MonoBehaviour:
         unconditionalRule: []
         hitByLayerOption: 0
         EffectialPripority: 0
-        EqualIsEffectial: 0
+        EqualIsEffectial_: 1
       asRightRule:
         enableUnconditionalRule: 0
         unconditionalRule: []
         hitByLayerOption: 0
         EffectialPripority: 0
-        EqualIsEffectial: 0
+        EqualIsEffectial_: 1
     costData:
       costForMotion: 60
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -138,11 +176,14 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 3128556031534694416
-      type: {class: StateAnimationMixCalculatorForSimpleClip, ns: ES, asm: ES_Logic}
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 232055556231921665
+      type: {class: MixerCalculator, ns: ES, asm: ES_Logic}
       data:
-        clip: {fileID: 0}
-        speed: 1
+        childCalculator:
+          rid: -2
+        weightScale: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -247,26 +288,23 @@ MonoBehaviour:
   KeyName: AA2
   sharedData:
     basicConfig:
-      stateId: 0
       stateName: "\u65B0\u72B6\u6001"
-      priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
+      stateId: 0
+      layerType: 0
+      mixerBias: 2
       stateSupportFlag: 1
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      deactivateOnSupportFlagSwitching: 1
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 0
       canBeFeedback: 0
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 0
       durationMode: 1
       timedDuration: 1
-      phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+      enableRuntimeProgress: 0
+      enableClipLengthFallback: 0
+      internalNote: 
     hasAnimation: 0
     animationConfig:
       calculator:
@@ -325,6 +363,47 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
+    proceduralDriveConfig:
+      enableIK: 0
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikRightHand:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikLeftFoot:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikRightFoot:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikLookAt:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      ikSegments: []
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        positionOffset: {x: 0, y: 0, z: 0}
+        enablePositionOffset: 0
+        rotationOffsetY: 0
+        enableRotationOffset: 0
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
+        rotationWeight: 1
+      matchTargetTimeline: []
     tags: []
     group: Default
     displayName: 
@@ -338,22 +417,22 @@ MonoBehaviour:
         unconditionalRule: []
         hitByLayerOption: 0
         EffectialPripority: 0
-        EqualIsEffectial: 0
+        EqualIsEffectial_: 1
       asRightRule:
         enableUnconditionalRule: 0
         unconditionalRule: []
         hitByLayerOption: 0
         EffectialPripority: 0
-        EqualIsEffectial: 0
+        EqualIsEffectial_: 1
     costData:
       costForMotion: 60
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0
@@ -390,26 +469,23 @@ MonoBehaviour:
   KeyName: AA5
   sharedData:
     basicConfig:
-      stateId: 0
       stateName: "\u65B0\u72B6\u6001"
-      priority: 50
-      pipelineType: 0
-      disableActiveOnSupportFlagSwitching: 0
+      stateId: 0
+      layerType: 0
+      mixerBias: 2
       stateSupportFlag: 1
-      supportReStart: 0
       ignoreSupportFlag: 0
+      disableActiveOnSupportFlagSwitching: 0
+      deactivateOnSupportFlagSwitching: 1
+      supportReStart: 0
+      resetSupportFlagOnEnter: 1
+      removeSupportFlagOnExit: 0
       canBeFeedback: 0
-      description: 
-      useDirectBlend: 0
-      avatarMask: {fileID: 0}
-      mainStateCriterion: 0
-      directMainWeight: 1
-      preparedMainCriterionValue: 0
       durationMode: 1
       timedDuration: 1
-      phaseConfig:
-        returnStartTime: 0.7
-        releaseStartTime: 0.9
+      enableRuntimeProgress: 0
+      enableClipLengthFallback: 0
+      internalNote: 
     hasAnimation: 0
     animationConfig:
       calculator:
@@ -468,6 +544,47 @@ MonoBehaviour:
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
+    proceduralDriveConfig:
+      enableIK: 0
+      disableIKOnExit: 1
+      ikLeftHand:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikRightHand:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikLeftFoot:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikRightFoot:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+      ikLookAt:
+        enabled: 0
+        targetWeight: 1
+        lerpingRate: 1
+        bodyWeight: 0
+        headWeight: 1
+        eyesWeight: 0.5
+        clampWeight: 0.5
+      ikSegments: []
+      enableMatchTarget: 0
+      autoActivateMatchTarget: 0
+      matchTargetPreset:
+        bodyPart: 0
+        positionOffset: {x: 0, y: 0, z: 0}
+        enablePositionOffset: 0
+        rotationOffsetY: 0
+        enableRotationOffset: 0
+        timeRange: {x: 0, y: 0.35}
+        positionApproachSpeed: 4
+        rotationApproachSpeed: 240
+        rotationWeight: 1
+      matchTargetTimeline: []
     tags: []
     group: Default
     displayName: 
@@ -481,22 +598,22 @@ MonoBehaviour:
         unconditionalRule: []
         hitByLayerOption: 0
         EffectialPripority: 0
-        EqualIsEffectial: 0
+        EqualIsEffectial_: 1
       asRightRule:
         enableUnconditionalRule: 0
         unconditionalRule: []
         hitByLayerOption: 0
         EffectialPripority: 0
-        EqualIsEffectial: 0
+        EqualIsEffectial_: 1
     costData:
       costForMotion: 60
       costForAgility: 60
       costForTarget: 60
       enableCostCalculation: 1
-    canReplaceAtRuntime: 0
-    keepDataOnReplace: 1
     canBeTemporary: 1
     autoRemoveWhenDone: 1
+    canReplaceAtRuntime: 0
+    keepDataOnReplace: 1
     allowOverride: 0
     notifyOnOverride: 1
     showDebugInfo: 0

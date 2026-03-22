@@ -8,6 +8,14 @@ namespace ES
     [CreateAssetMenu(fileName = "StateMachineConfig", menuName = "ES/StateMachineConfig")]
     public class StateMachineConfig : ESEditorGlobalSo<StateMachineConfig> 
     {
+        [TabGroup("层级遮罩")]
+        [LabelText("上半身遮罩"), AssetsOnly]
+        public AvatarMask upperBodyMask;
+
+        [TabGroup("层级遮罩")]
+        [LabelText("下半身遮罩"), AssetsOnly]
+        public AvatarMask lowerBodyMask;
+
         [TabGroup("禁用跳转许可")]
         [HideLabel]
         public StateMachineDisableTransitionPermissionMap disableTransitionPermissionMap = new StateMachineDisableTransitionPermissionMap();

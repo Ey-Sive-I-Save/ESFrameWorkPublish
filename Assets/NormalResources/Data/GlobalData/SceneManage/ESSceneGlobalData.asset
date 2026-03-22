@@ -66,6 +66,13 @@ MonoBehaviour:
     Description: 
     Group: "\u9ED8\u8BA4"
     Enabled: 1
+  - DisplayName: AimIK Pole
+    ScenePath: Assets/Plugins/RootMotion/FinalIK/_DEMOS/Aim IK/AimIK Pole.unity
+    SceneAsset: {fileID: 102900000, guid: 4cb81a7ab90c447829d4d26f8ca89245, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
   SceneGroups:
   - "\u9ED8\u8BA4"
   - "\u6838\u5FC3\u573A\u666F"

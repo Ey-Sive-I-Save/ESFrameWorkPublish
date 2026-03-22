@@ -16,8 +16,31 @@ namespace ES
     public abstract class Core : MonoBehaviour, ICore
     {
         #region 模块表
-        [NonSerialized,ShowInInspector,TabGroup("常规","模块表",TextColor = "@ESDesignUtility.ColorSelector.Color_04"),ReadOnly,HideLabel,PropertyOrder(5),HideReferenceObjectPicker]
+        [NonSerialized, HideInInspector]
         public Dictionary<Type, IModule> ModuleTables = new Dictionary<Type, IModule>();
+
+        [ShowInInspector, TabGroup("常规", "模块表", TextColor = "@ESDesignUtility.ColorSelector.Color_04"), ReadOnly, HideLabel, PropertyOrder(5)]
+        [ListDrawerSettings(IsReadOnly = true, DraggableItems = false, DefaultExpandedState = true, ShowFoldout = true)]
+        private List<string> ModuleTableDebugView => BuildModuleTableDebugView();
+
+        private List<string> BuildModuleTableDebugView()
+        {
+            var lines = new List<string>(ModuleTables.Count);
+            foreach (var pair in ModuleTables)
+            {
+                string keyName = pair.Key != null ? pair.Key.Name : "<null>";
+                string valueName = pair.Value != null ? pair.Value.GetType().Name : "<null>";
+                lines.Add($"{keyName} -> {valueName}");
+            }
+
+            if (lines.Count == 0)
+            {
+                lines.Add("<空>");
+            }
+
+            return lines;
+        }
+
         public KeyType GetMoudle<KeyType>() where KeyType : class, IModule, new()
         {
             if (ModuleTables.TryGetValue(typeof(KeyType), out var module))

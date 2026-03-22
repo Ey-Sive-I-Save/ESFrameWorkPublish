@@ -105,9 +105,12 @@ namespace ES
                 MyCore.RequestJump();
                 jumpRequested = false;
             }
-            else if (MyCore.kcc.monitor.isStableOnGround&&_jumpState.hasEnterTime>0.1f)
+            else if (_jumpState != null
+                && _jumpState.baseStatus == StateBaseStatus.Running
+                && MyCore.kcc.monitor.isStableOnGround
+                && _jumpState.hasEnterTime > 0.1f)
             {
-                sm?.TryDeactivateState(JUMP_StateName);
+                sm?.TryDeactivateState(_jumpState.strKey);
             }
             crouchHold = _crouchState != null && _crouchState.baseStatus == StateBaseStatus.Running;
             MyCore.SetCrouch(crouchHold);
@@ -162,19 +165,149 @@ namespace ES
     [Serializable, TypeRegistryItem("基础战斗模块")]
     public class EntityBasicCombatModule : EntityBasicModuleBase
     {
+        [Title("瞄准状态管理")]
+        [LabelText("瞄准状态键")]
+        public string aimStateKey = "瞄准";
+
+        [LabelText("瞄准状态 AniInfo")]
+        public StateAniDataInfo aimStateInfo;
+
+        [LabelText("允许注入瞄准状态")]
+        [Tooltip("当状态机中找不到瞄准状态时，允许通过 AimStateInfo 自动注册。")]
+        public bool allowAimStateInjection = true;
+
+        [Title("探头状态管理")]
+        [LabelText("探头状态键")]
+        public string peekStateKey = "探头";
+
+        [LabelText("探头状态 AniInfo")]
+        public StateAniDataInfo peekStateInfo;
+
+        [LabelText("允许注入探头状态")]
+        [Tooltip("当状态机中找不到探头状态时，允许通过 PeekStateInfo 自动注册。")]
+        public bool allowPeekStateInjection = true;
+
         [Title("状态")]
         [ReadOnly] public bool isBlocking;
         [ReadOnly] public bool isSliding;
         [ReadOnly] public bool isAiming;
+        [ReadOnly] public bool isPeeking;
+        [ReadOnly] public float aimPeek;
         [ReadOnly] public int weaponIndex;
+        [ReadOnly] public string lastAimStateFailureReason;
+        [ReadOnly] public string lastPeekStateFailureReason;
+
+        [NonSerialized] private StateMachine _sm;
+        [NonSerialized] private StateBase _aimState;
+        [NonSerialized] private StateBase _peekState;
+        [NonSerialized] private StateLifecycleTracker _aimLifecycle = new StateLifecycleTracker();
+        [NonSerialized] private StateLifecycleTracker _peekLifecycle = new StateLifecycleTracker();
+
+        public override void Start()
+        {
+            base.Start();
+            CacheStateMachine();
+            ResolveAimState();
+            ResolvePeekState();
+            _aimLifecycle.Bind(_sm, _aimState, GetAimStateKeyForLifecycle());
+            _peekLifecycle.Bind(_sm, _peekState, GetPeekStateKeyForLifecycle());
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (_aimLifecycle.CheckExit())
+            {
+                LogCombatState($"Aim lifecycle detected exit | State={GetStateDebugName(_aimState)} | IsAiming={isAiming}");
+                OnAimExit();
+                return;
+            }
+
+            if (_peekLifecycle.CheckExit())
+            {
+                LogCombatState($"Peek lifecycle detected exit | State={GetStateDebugName(_peekState)} | IsPeeking={isPeeking} | AimPeek={aimPeek:F2}");
+                OnPeekExit();
+            }
+
+            if (!_aimLifecycle.IsActive)
+                return;
+
+            if (_aimState == null)
+                RebindAimLifecycle(ResolveAimState());
+
+            if (_peekLifecycle.IsActive && _peekState == null)
+                RebindPeekLifecycle(ResolvePeekState());
+        }
 
         [Title("最近触发")]
         [ReadOnly] public float lastAttackTime;
         [ReadOnly] public float lastHeavyAttackTime;
 
+        [Title("枪械开火")]
+        [LabelText("启用枪械开火")]
+        public bool enableGunFire = true;
+
+        [LabelText("攻击输入触发开火")]
+        [Tooltip("开启后，左键攻击输入会直接走枪械开火逻辑。")]
+        public bool fireOnAttackInput = true;
+
+        [LabelText("必须在瞄准中")]
+        [Tooltip("开启后，只有进入瞄准状态时左键才会开火。")]
+        public bool requireAimToFire = true;
+
+        [LabelText("射击间隔(秒)")]
+        [MinValue(0.01f)]
+        public float fireInterval = 0.12f;
+
+        [LabelText("射击距离")]
+        [MinValue(0.5f)]
+        public float fireDistance = 120f;
+
+        [LabelText("枪口/开火原点")]
+        [Tooltip("优先作为子弹/射线的发射原点；为空时回退到相机或角色自身。")]
+        public Transform fireOrigin;
+
+        [LabelText("命中层")]
+        public LayerMask fireLayerMask = Physics.DefaultRaycastLayers;
+
+        [LabelText("射线命中触发器")]
+        public QueryTriggerInteraction fireQueryTriggerInteraction = QueryTriggerInteraction.Ignore;
+
+        [LabelText("开火触发后坐力")]
+        public bool recoilOnFire = true;
+
+        [LabelText("后坐力强度")]
+        [Range(0f, 2f)]
+        public float fireRecoilMagnitude = 1f;
+
+        [LabelText("绘制调试射线")]
+        public bool debugDrawFireRay;
+
+        [LabelText("输出开火日志")]
+        public bool debugFireLog;
+
+        [ShowInInspector, ReadOnly, LabelText("最近开火时间")]
+        public float lastFireTime;
+
+        [ShowInInspector, ReadOnly, LabelText("累计开火次数")]
+        public int fireCount;
+
+        [ShowInInspector, ReadOnly, LabelText("最近命中点")]
+        public Vector3 lastFireHitPoint;
+
+        [ShowInInspector, ReadOnly, LabelText("最近命中物")]
+        public string lastFireHitName;
+
+        [NonSerialized] private StateFinalIKDriver _cachedIKDriver;
+        [NonSerialized] private Animator _cachedIKDriverAnimator;
+
         public void TriggerAttack()
         {
             lastAttackTime = Time.time;
+
+            if (fireOnAttackInput)
+                TryFireWeapon();
         }
 
         public void TriggerHeavyAttack()
@@ -192,14 +325,561 @@ namespace ES
             isSliding = enable;
         }
 
-        public void SetAim(bool enable)
+        public bool SetAim(bool enable)
         {
-            isAiming = enable;
+            LogCombatState($"SetAim request | Enable={enable} | IsActive={_aimLifecycle.IsActive} | IsAiming={isAiming} | AimStateKey={aimStateKey}");
+
+            if (!enable)
+            {
+                if (_aimLifecycle.RequestExit())
+                {
+                    LogCombatState($"SetAim disable accepted | State={GetStateDebugName(_aimState)}");
+                    OnAimExit();
+                }
+                return true;
+            }
+
+            if (_aimLifecycle.IsActive)
+            {
+                LogCombatState($"SetAim ignored because lifecycle already active | State={GetStateDebugName(_aimState)}");
+                return true;
+            }
+
+            CacheStateMachine();
+            var aimState = ResolveAimState();
+            if (_sm == null || aimState == null)
+            {
+                lastAimStateFailureReason = "瞄准状态未配置或未注册";
+                LogCombatState($"SetAim failed | Reason={lastAimStateFailureReason} | StateMachineNull={_sm == null}");
+                ForceStopAimInternal();
+                return false;
+            }
+
+            if (aimState.baseStatus == StateBaseStatus.Running)
+            {
+                _aimLifecycle.Bind(_sm, aimState, GetAimStateKeyForLifecycle());
+                if (_aimLifecycle.TryEnter(true))
+                    OnAimEnter();
+                else
+                    _aimLifecycle.SyncFromBoundState();
+
+                isAiming = true;
+                lastAimStateFailureReason = string.Empty;
+                LogCombatState($"SetAim reused running state | State={GetStateDebugName(aimState)}");
+                return true;
+            }
+
+            var activationResult = _sm.TestStateActivation(aimState);
+            if (!activationResult.CanActivate)
+            {
+                lastAimStateFailureReason = activationResult.failureReason;
+                LogCombatState($"SetAim activation test failed | State={GetStateDebugName(aimState)} | Reason={lastAimStateFailureReason}");
+                ForceStopAimInternal();
+                return false;
+            }
+
+            bool activated = aimState.baseStatus == StateBaseStatus.Running || _sm.TryActivateState(aimState);
+            _aimLifecycle.Bind(_sm, aimState, GetAimStateKeyForLifecycle());
+
+            if (!_aimLifecycle.TryEnter(activated))
+            {
+                lastAimStateFailureReason = string.IsNullOrEmpty(activationResult.failureReason) && !activated
+                    ? "瞄准状态激活失败"
+                    : activationResult.failureReason;
+                LogCombatState($"SetAim lifecycle enter failed | State={GetStateDebugName(aimState)} | Activated={activated} | Reason={lastAimStateFailureReason}");
+                ForceStopAimInternal();
+                return false;
+            }
+
+            LogCombatState($"SetAim activated | State={GetStateDebugName(aimState)} | Layer={TryGetStateLayer(aimState)}");
+            OnAimEnter();
+            return true;
+        }
+
+        public void SetAimPeek(float normalizedPeek)
+        {
+            SetAimPeekInternal(normalizedPeek);
+        }
+
+        public void SetAimPeekLeft(float intensity = 1f)
+        {
+            SetAimPeekInternal(-Mathf.Clamp01(intensity));
+        }
+
+        public void SetAimPeekRight(float intensity = 1f)
+        {
+            SetAimPeekInternal(Mathf.Clamp01(intensity));
+        }
+
+        public void ClearAimPeek()
+        {
+            RequestStopPeek();
         }
 
         public void SwitchWeaponNext()
         {
             weaponIndex++;
+        }
+
+        public bool TryFireWeapon()
+        {
+            if (!enableGunFire || MyCore == null)
+                return false;
+
+            if (requireAimToFire && !isAiming)
+            {
+                if (debugFireLog)
+                    Debug.Log("[EntityBasicCombatModule] 开火被忽略：当前未处于瞄准状态。", MyCore);
+                return false;
+            }
+
+            if (Time.time - lastFireTime < fireInterval)
+                return false;
+
+            Vector3 rayOrigin;
+            Vector3 rayDirection;
+            Vector3 visualOrigin;
+            ResolveFireRay(out rayOrigin, out rayDirection, out visualOrigin);
+
+            float distance = Mathf.Max(0.5f, fireDistance);
+            RaycastHit hit;
+            bool hasHit = Physics.Raycast(
+                rayOrigin,
+                rayDirection,
+                out hit,
+                distance,
+                fireLayerMask,
+                fireQueryTriggerInteraction);
+
+            Vector3 endPoint = hasHit ? hit.point : rayOrigin + rayDirection * distance;
+
+            lastFireTime = Time.time;
+            fireCount++;
+            lastFireHitPoint = endPoint;
+            lastFireHitName = hasHit && hit.collider != null ? hit.collider.name : string.Empty;
+
+            if (recoilOnFire)
+            {
+                var ikDriver = ResolveIKDriver();
+                if (ikDriver != null)
+                    ikDriver.HandleRecoil(fireRecoilMagnitude);
+            }
+
+            if (debugDrawFireRay)
+                Debug.DrawLine(visualOrigin, endPoint, hasHit ? Color.red : Color.yellow, 0.2f);
+
+            if (debugFireLog)
+            {
+                string hitName = hasHit && hit.collider != null ? hit.collider.name : "<none>";
+                Debug.Log(
+                    $"[EntityBasicCombatModule] Fire #{fireCount} | Origin={rayOrigin} | Dir={rayDirection} | Hit={hitName} | Point={endPoint}",
+                    MyCore);
+            }
+
+            return true;
+        }
+
+        private void CacheStateMachine()
+        {
+            if (_sm == null && MyCore != null && MyCore.stateDomain != null)
+            {
+                _sm = MyCore.stateDomain.stateMachine;
+            }
+        }
+
+        private void ResolveFireRay(out Vector3 rayOrigin, out Vector3 rayDirection, out Vector3 visualOrigin)
+        {
+            Transform cameraTransform = GetActiveCameraTransform();
+            Transform actualOrigin = fireOrigin != null ? fireOrigin : (cameraTransform != null ? cameraTransform : MyCore.transform);
+
+            Vector3 aimingOrigin = cameraTransform != null ? cameraTransform.position : actualOrigin.position;
+            Vector3 aimingDirection = cameraTransform != null ? cameraTransform.forward : actualOrigin.forward;
+            if (aimingDirection.sqrMagnitude <= 0.0001f)
+                aimingDirection = MyCore.transform.forward;
+
+            rayOrigin = aimingOrigin;
+            rayDirection = aimingDirection.normalized;
+            visualOrigin = actualOrigin.position;
+
+            if (cameraTransform != null && actualOrigin != cameraTransform)
+            {
+                float distance = Mathf.Max(0.5f, fireDistance);
+                Vector3 targetPoint = aimingOrigin + rayDirection * distance;
+                if (Physics.Raycast(aimingOrigin, rayDirection, out RaycastHit preHit, distance, fireLayerMask, fireQueryTriggerInteraction))
+                    targetPoint = preHit.point;
+
+                Vector3 muzzleDirection = targetPoint - actualOrigin.position;
+                if (muzzleDirection.sqrMagnitude > 0.0001f)
+                {
+                    rayOrigin = actualOrigin.position;
+                    rayDirection = muzzleDirection.normalized;
+                }
+                else
+                {
+                    rayOrigin = actualOrigin.position;
+                    rayDirection = actualOrigin.forward.sqrMagnitude > 0.0001f ? actualOrigin.forward.normalized : rayDirection;
+                }
+            }
+            else
+            {
+                rayOrigin = actualOrigin.position;
+                rayDirection = actualOrigin.forward.sqrMagnitude > 0.0001f ? actualOrigin.forward.normalized : rayDirection;
+            }
+        }
+
+        private Transform GetActiveCameraTransform()
+        {
+            if (MyCore == null)
+                return null;
+
+            if (MyCore.ModuleTables.TryGetValue(typeof(EntityBasicCameraModule), out var module))
+            {
+                var cameraModule = module as EntityBasicCameraModule;
+                if (cameraModule != null)
+                    return cameraModule.GetActiveCameraTransform();
+            }
+
+            return null;
+        }
+
+        private StateFinalIKDriver ResolveIKDriver()
+        {
+            if (MyCore == null)
+                return null;
+
+            var animator = MyCore.animator;
+            if (animator == null)
+                return null;
+
+            if (_cachedIKDriver != null && _cachedIKDriverAnimator == animator)
+                return _cachedIKDriver;
+
+            _cachedIKDriverAnimator = animator;
+            _cachedIKDriver = animator.GetComponent<StateFinalIKDriver>();
+            return _cachedIKDriver;
+        }
+
+        private StateBase ResolveAimState()
+        {
+            CacheStateMachine();
+            if (_sm == null)
+                return null;
+
+            string desiredKey = aimStateKey;
+            if (string.IsNullOrEmpty(desiredKey) && aimStateInfo != null)
+            {
+                var shared = aimStateInfo.sharedData;
+                if (shared != null && shared.basicConfig != null)
+                    desiredKey = shared.basicConfig.stateName;
+            }
+
+            StateBase state = FindRegisteredStateByInfo(aimStateInfo);
+            if (state == null && !string.IsNullOrEmpty(desiredKey))
+                state = _sm.GetStateByString(desiredKey);
+
+            if (aimStateInfo != null && state != null && !IsStateBoundToInfo(state, aimStateInfo) && allowAimStateInjection)
+            {
+                LogCombatState($"ResolveAimState detected key/info mismatch | DesiredKey={desiredKey} | Existing={GetStateDebugName(state)} | Re-registerFromInfo=True");
+                state = _sm.RegisterStateFromInfo(aimStateInfo, desiredKey, false) ?? state;
+            }
+
+            if (state == null && allowAimStateInjection && aimStateInfo != null)
+            {
+                string keyOverride = string.IsNullOrEmpty(desiredKey) ? null : desiredKey;
+                state = _sm.RegisterStateFromInfo(aimStateInfo, keyOverride, false);
+            }
+
+            _aimState = state;
+            LogCombatState($"ResolveAimState result | DesiredKey={desiredKey} | State={GetStateDebugName(state)} | BoundToInfo={IsStateBoundToInfo(state, aimStateInfo)}");
+            RebindAimLifecycle(state);
+            return state;
+        }
+
+        private StateBase ResolvePeekState()
+        {
+            CacheStateMachine();
+            if (_sm == null)
+                return null;
+
+            string desiredKey = peekStateKey;
+            if (string.IsNullOrEmpty(desiredKey) && peekStateInfo != null)
+            {
+                var shared = peekStateInfo.sharedData;
+                if (shared != null && shared.basicConfig != null)
+                    desiredKey = shared.basicConfig.stateName;
+            }
+
+            StateBase state = FindRegisteredStateByInfo(peekStateInfo);
+            if (state == null && !string.IsNullOrEmpty(desiredKey))
+                state = _sm.GetStateByString(desiredKey);
+
+            if (peekStateInfo != null && state != null && !IsStateBoundToInfo(state, peekStateInfo) && allowPeekStateInjection)
+            {
+                LogCombatState($"ResolvePeekState detected key/info mismatch | DesiredKey={desiredKey} | Existing={GetStateDebugName(state)} | Re-registerFromInfo=True");
+                state = _sm.RegisterStateFromInfo(peekStateInfo, desiredKey, false) ?? state;
+            }
+
+            if (state == null && allowPeekStateInjection && peekStateInfo != null)
+            {
+                string keyOverride = string.IsNullOrEmpty(desiredKey) ? null : desiredKey;
+                state = _sm.RegisterStateFromInfo(peekStateInfo, keyOverride, false);
+            }
+
+            _peekState = state;
+            LogCombatState($"ResolvePeekState result | DesiredKey={desiredKey} | State={GetStateDebugName(state)} | BoundToInfo={IsStateBoundToInfo(state, peekStateInfo)}");
+            RebindPeekLifecycle(state);
+            return state;
+        }
+
+        private bool IsAimStateRunning()
+        {
+            if (!_aimLifecycle.IsActive)
+                return false;
+
+            if (_aimState == null)
+                _aimState = ResolveAimState();
+
+            return _aimState != null && _aimState.baseStatus == StateBaseStatus.Running;
+        }
+
+        private bool IsPeekStateRunning()
+        {
+            if (!_peekLifecycle.IsActive)
+                return false;
+
+            if (_peekState == null)
+                _peekState = ResolvePeekState();
+
+            return _peekState != null && _peekState.baseStatus == StateBaseStatus.Running;
+        }
+
+        private StateBase FindRegisteredStateByInfo(StateAniDataInfo info)
+        {
+            if (_sm == null || info == null || info.sharedData == null)
+                return null;
+
+            foreach (var kvp in _sm.EnumerateRegisteredStatesByKey())
+            {
+                var state = kvp.Value;
+                if (IsStateBoundToInfo(state, info))
+                    return state;
+            }
+
+            return null;
+        }
+
+        private static bool IsStateBoundToInfo(StateBase state, StateAniDataInfo info)
+        {
+            if (state == null || info == null)
+                return false;
+
+            return ReferenceEquals(state.stateSharedData, info.sharedData);
+        }
+
+        public override void OnDestroy()
+        {
+            if (_aimLifecycle.Dispose())
+                OnAimExit();
+
+            if (_peekLifecycle.Dispose())
+                OnPeekExit();
+
+            base.OnDestroy();
+        }
+
+        private void OnAimEnter()
+        {
+            isAiming = true;
+            lastAimStateFailureReason = string.Empty;
+            LogCombatState($"Aim enter | State={GetStateDebugName(_aimState)} | Layer={TryGetStateLayer(_aimState)}");
+        }
+
+        private void OnAimExit()
+        {
+            LogCombatState($"Aim exit | State={GetStateDebugName(_aimState)} | PeekActive={_peekLifecycle.IsActive} | IsAiming={isAiming}");
+            if (_peekLifecycle.RequestExit())
+                OnPeekExit();
+            else
+                ForceStopPeekInternal();
+
+            ForceStopAimInternal();
+            lastAimStateFailureReason = string.Empty;
+        }
+
+        private void OnPeekEnter()
+        {
+            isPeeking = true;
+            lastPeekStateFailureReason = string.Empty;
+            LogCombatState($"Peek enter | State={GetStateDebugName(_peekState)} | AimPeek={aimPeek:F2}");
+        }
+
+        private void OnPeekExit()
+        {
+            ForceStopPeekInternal();
+            lastPeekStateFailureReason = string.Empty;
+            LogCombatState($"Peek exit | State={GetStateDebugName(_peekState)}");
+        }
+
+        private void ForceStopAimInternal()
+        {
+            isAiming = false;
+            ForceStopPeekInternal();
+        }
+
+        private void ForceStopPeekInternal()
+        {
+            isPeeking = false;
+            aimPeek = 0f;
+        }
+
+        private void RebindAimLifecycle(StateBase state)
+        {
+            _aimLifecycle.Bind(_sm, state, GetAimStateKeyForLifecycle());
+        }
+
+        private void RebindPeekLifecycle(StateBase state)
+        {
+            _peekLifecycle.Bind(_sm, state, GetPeekStateKeyForLifecycle());
+        }
+
+        private string GetAimStateKeyForLifecycle()
+        {
+            if (_aimState != null && !string.IsNullOrEmpty(_aimState.strKey))
+                return _aimState.strKey;
+
+            if (!string.IsNullOrEmpty(aimStateKey))
+                return aimStateKey;
+
+            if (aimStateInfo != null && aimStateInfo.sharedData != null && aimStateInfo.sharedData.basicConfig != null)
+                return aimStateInfo.sharedData.basicConfig.stateName;
+
+            return string.Empty;
+        }
+
+        private string GetPeekStateKeyForLifecycle()
+        {
+            if (_peekState != null && !string.IsNullOrEmpty(_peekState.strKey))
+                return _peekState.strKey;
+
+            if (!string.IsNullOrEmpty(peekStateKey))
+                return peekStateKey;
+
+            if (peekStateInfo != null && peekStateInfo.sharedData != null && peekStateInfo.sharedData.basicConfig != null)
+                return peekStateInfo.sharedData.basicConfig.stateName;
+
+            return string.Empty;
+        }
+
+        private bool SetAimPeekInternal(float normalizedPeek)
+        {
+            if (!IsAimStateRunning())
+            {
+                RequestStopPeek();
+                return false;
+            }
+
+            float clampedPeek = Mathf.Clamp(normalizedPeek, -1f, 1f);
+            if (Mathf.Abs(clampedPeek) <= 0.001f)
+            {
+                RequestStopPeek();
+                return true;
+            }
+
+            if (!TryEnsurePeekStateActive())
+            {
+                ForceStopPeekInternal();
+                return false;
+            }
+
+            aimPeek = clampedPeek;
+            isPeeking = true;
+            lastPeekStateFailureReason = string.Empty;
+            return true;
+        }
+
+        private bool TryEnsurePeekStateActive()
+        {
+            if (_peekLifecycle.IsActive && IsPeekStateRunning())
+                return true;
+
+            CacheStateMachine();
+            var peekState = ResolvePeekState();
+            if (_sm == null || peekState == null)
+            {
+                lastPeekStateFailureReason = "探头状态未配置或未注册";
+                LogCombatState($"TryEnsurePeekStateActive failed | Reason={lastPeekStateFailureReason} | StateMachineNull={_sm == null}");
+                return false;
+            }
+
+            if (peekState.baseStatus == StateBaseStatus.Running)
+            {
+                _peekLifecycle.Bind(_sm, peekState, GetPeekStateKeyForLifecycle());
+                if (_peekLifecycle.TryEnter(true))
+                    OnPeekEnter();
+                else
+                    _peekLifecycle.SyncFromBoundState();
+
+                isPeeking = true;
+                lastPeekStateFailureReason = string.Empty;
+                LogCombatState($"TryEnsurePeekStateActive reused running state | State={GetStateDebugName(peekState)}");
+                return true;
+            }
+
+            var activationResult = _sm.TestStateActivation(peekState);
+            if (!activationResult.CanActivate)
+            {
+                lastPeekStateFailureReason = activationResult.failureReason;
+                LogCombatState($"TryEnsurePeekStateActive activation test failed | State={GetStateDebugName(peekState)} | Reason={lastPeekStateFailureReason}");
+                return false;
+            }
+
+            bool activated = peekState.baseStatus == StateBaseStatus.Running || _sm.TryActivateState(peekState);
+            _peekLifecycle.Bind(_sm, peekState, GetPeekStateKeyForLifecycle());
+
+            if (!_peekLifecycle.TryEnter(activated))
+            {
+                lastPeekStateFailureReason = string.IsNullOrEmpty(activationResult.failureReason) && !activated
+                    ? "探头状态激活失败"
+                    : activationResult.failureReason;
+                LogCombatState($"TryEnsurePeekStateActive lifecycle enter failed | State={GetStateDebugName(peekState)} | Activated={activated} | Reason={lastPeekStateFailureReason}");
+                return false;
+            }
+
+            LogCombatState($"TryEnsurePeekStateActive activated | State={GetStateDebugName(peekState)} | Layer={TryGetStateLayer(peekState)}");
+            OnPeekEnter();
+            return true;
+        }
+
+        private void RequestStopPeek()
+        {
+            if (_peekLifecycle.RequestExit())
+                OnPeekExit();
+            else
+                ForceStopPeekInternal();
+        }
+
+        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
+        private void LogCombatState(string message)
+        {
+            StateMachineDebug.Log($"[EntityBasicCombatModule] {message}");
+        }
+
+        private string GetStateDebugName(StateBase state)
+        {
+            if (state == null)
+                return "<null>";
+
+            var basic = state.stateSharedData != null ? state.stateSharedData.basicConfig : null;
+            string stateName = basic != null ? basic.stateName : string.Empty;
+            return $"{state.strKey}|Name={stateName}|Id={state.intKey}|Status={state.baseStatus}";
+        }
+
+        private string TryGetStateLayer(StateBase state)
+        {
+            if (_sm != null && state != null && _sm.TryGetStateLayerType(state, out var layerType))
+                return layerType.ToString();
+
+            return "<unknown>";
         }
     }
 

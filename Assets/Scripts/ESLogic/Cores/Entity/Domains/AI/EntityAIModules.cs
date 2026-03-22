@@ -52,6 +52,12 @@ namespace ES
         [LabelText("瞄准")]
         public InputActionProperty aimAction;
 
+        [LabelText("左探头")]
+        public InputActionProperty peekLeftAction;
+
+        [LabelText("右探头")]
+        public InputActionProperty peekRightAction;
+
         [LabelText("技能1")]
         public InputActionProperty skill1Action;
 
@@ -106,6 +112,8 @@ namespace ES
             slideAction = default;
             switchWeaponAction = default;
             aimAction = default;
+            peekLeftAction = default;
+            peekRightAction = default;
             skill1Action = default;
             skill2Action = default;
             skill3Action = default;
@@ -159,6 +167,9 @@ namespace ES
         public bool ConsumeInteract() => snapshot.ConsumeInteract();
         public void ClearOneShot() => snapshot.ClearOneShot();
         public bool EyeHold => snapshot.eyeHold;
+        public bool PeekLeftHold => snapshot.peekLeftHold;
+        public bool PeekRightHold => snapshot.peekRightHold;
+        public float AimPeek => snapshot.AimPeek;
         public float FlyVertical => snapshot.flyVertical;
 
 #if ENABLE_INPUT_SYSTEM
@@ -170,6 +181,8 @@ namespace ES
         private InputAction _slide;
         private InputAction _switchWeapon;
         private InputAction _aim;
+        private InputAction _peekLeft;
+        private InputAction _peekRight;
         private InputAction _skill1;
         private InputAction _skill2;
         private InputAction _skill3;
@@ -222,6 +235,8 @@ namespace ES
             _slide = slideAction.action;
             _switchWeapon = switchWeaponAction.action;
             _aim = aimAction.action;
+            _peekLeft = peekLeftAction.action;
+            _peekRight = peekRightAction.action;
             _skill1 = skill1Action.action;
             _skill2 = skill2Action.action;
             _skill3 = skill3Action.action;
@@ -243,6 +258,8 @@ namespace ES
             RegisterButton(_slide, OnSlide);
             RegisterButton(_switchWeapon, OnSwitchWeapon);
             RegisterButton(_aim, OnAim);
+            RegisterHoldButton(_peekLeft, OnPeekLeft);
+            RegisterHoldButton(_peekRight, OnPeekRight);
             RegisterButton(_skill1, OnSkill1);
             RegisterButton(_skill2, OnSkill2);
             RegisterButton(_skill3, OnSkill3);
@@ -269,6 +286,8 @@ namespace ES
             UnregisterButton(_slide, OnSlide);
             UnregisterButton(_switchWeapon, OnSwitchWeapon);
             UnregisterButton(_aim, OnAim);
+            UnregisterHoldButton(_peekLeft, OnPeekLeft);
+            UnregisterHoldButton(_peekRight, OnPeekRight);
             UnregisterButton(_skill1, OnSkill1);
             UnregisterButton(_skill2, OnSkill2);
             UnregisterButton(_skill3, OnSkill3);
@@ -299,6 +318,14 @@ namespace ES
             if (!action.enabled) action.Enable();
         }
 
+        private static void RegisterHoldButton(InputAction action, Action<InputAction.CallbackContext> callback)
+        {
+            if (action == null) return;
+            action.performed += callback;
+            action.canceled += callback;
+            if (!action.enabled) action.Enable();
+        }
+
         private static void UnregisterAxis(InputAction action, Action<InputAction.CallbackContext> callback)
         {
             if (action == null) return;
@@ -310,6 +337,13 @@ namespace ES
         {
             if (action == null) return;
             action.performed -= callback;
+        }
+
+        private static void UnregisterHoldButton(InputAction action, Action<InputAction.CallbackContext> callback)
+        {
+            if (action == null) return;
+            action.performed -= callback;
+            action.canceled -= callback;
         }
 
         private void OnMove(InputAction.CallbackContext ctx)
@@ -350,6 +384,16 @@ namespace ES
         private void OnAim(InputAction.CallbackContext ctx)
         {
             snapshot.aim = true;
+        }
+
+        private void OnPeekLeft(InputAction.CallbackContext ctx)
+        {
+            snapshot.peekLeftHold = ctx.ReadValue<float>() > 0.5f;
+        }
+
+        private void OnPeekRight(InputAction.CallbackContext ctx)
+        {
+            snapshot.peekRightHold = ctx.ReadValue<float>() > 0.5f;
         }
 
         private void OnSkill1(InputAction.CallbackContext ctx)
@@ -474,6 +518,19 @@ namespace ES
         [LabelText("AIM(可选)")]
         public Transform aimTransform;
 
+        [Title("瞄准驱动")]
+        [LabelText("驱动 AimIK")]
+        public bool driveAimIK = true;
+
+        [LabelText("AimIK 权重"), Range(0f, 1f)]
+        public float aimIKWeight = 0f;
+
+        [LabelText("瞄准目标距离")]
+        public float aimTargetDistance = 30f;
+
+        [LabelText("无相机时瞄准高度")]
+        public float fallbackAimHeight = 1.5f;
+
         [LabelText("相机旋转目标(可选)")]
         public Transform cameraPivot;
 
@@ -543,6 +600,9 @@ namespace ES
         private float _totalMoveTime;
         private float _last1sSpeedSum;
         private readonly Queue<SpeedSample> _speedSamples = new Queue<SpeedSample>(64);
+        private StateFinalIKDriver _ikDriver;
+        private Animator _ikDriverAnimator;
+        private Transform _runtimeAimTarget;
 
         [ShowInInspector, ReadOnly, LabelText("总运动时长")]
         public float totalMoveTime;
@@ -677,7 +737,15 @@ namespace ES
                 if (input.ConsumeBlock()) combatModule.SetBlock(true);
                 if (input.ConsumeSlide()) combatModule.SetSlide(true);
                 if (input.ConsumeSwitchWeapon()) combatModule.SwitchWeaponNext();
-                if (input.ConsumeAim()) combatModule.SetAim(true);
+                if (input.ConsumeAim()) combatModule.SetAim(!combatModule.isAiming);
+
+                combatModule.SetAimPeek(input.AimPeek);
+
+                var ikDriver = ResolveIKDriver();
+                if (ikDriver != null)
+                {
+                    ApplyCombatAimAndPeek(ikDriver, combatModule, cam);
+                }
             }
 
             if (TryGetModule(out EntityBasicSkillModule skillModule))
@@ -700,6 +768,92 @@ namespace ES
             }
             module = null;
             return false;
+        }
+
+        private StateFinalIKDriver ResolveIKDriver()
+        {
+            if (MyCore == null)
+                return null;
+
+            var animator = MyCore.animator;
+            if (animator == null)
+                return null;
+
+            if (_ikDriver != null && _ikDriverAnimator == animator)
+                return _ikDriver;
+
+            _ikDriverAnimator = animator;
+            _ikDriver = animator.GetComponent<StateFinalIKDriver>();
+            return _ikDriver;
+        }
+
+        private void ApplyCombatAimAndPeek(StateFinalIKDriver ikDriver, EntityBasicCombatModule combatModule, Transform cam)
+        {
+            ikDriver.SetAimPeekViewReference(cam);
+
+            if (!combatModule.isAiming)
+            {
+                ikDriver.ClearAimPeek();
+                ikDriver.HandleStopAim();
+                return;
+            }
+
+            if (!driveAimIK)
+            {
+                ikDriver.HandleAim(aimIKWeight);
+                ikDriver.SetAimPeek(combatModule.aimPeek);
+                return;
+            }
+
+            var aimTarget = ResolveRuntimeAimTarget(cam);
+            ikDriver.HandleAim(aimTarget, aimIKWeight);
+            ikDriver.SetAimPeek(combatModule.aimPeek);
+        }
+
+        private Transform ResolveRuntimeAimTarget(Transform cam)
+        {
+            if (MyCore == null)
+                return null;
+
+            EnsureRuntimeAimTarget();
+
+            Vector3 origin;
+            Vector3 forward;
+
+            if (cam != null)
+            {
+                origin = cam.position;
+                forward = cam.forward;
+            }
+            else
+            {
+                origin = aimTransform != null
+                    ? aimTransform.position
+                    : MyCore.transform.position + Vector3.up * fallbackAimHeight;
+
+                forward = _lastLookWorld.sqrMagnitude > 0.0001f
+                    ? _lastLookWorld.normalized
+                    : MyCore.transform.forward;
+            }
+
+            if (forward.sqrMagnitude <= 0.0001f)
+                forward = Vector3.forward;
+
+            _runtimeAimTarget.SetPositionAndRotation(
+                origin + forward.normalized * Mathf.Max(0.1f, aimTargetDistance),
+                Quaternion.LookRotation(forward.normalized, Vector3.up));
+
+            return _runtimeAimTarget;
+        }
+
+        private void EnsureRuntimeAimTarget()
+        {
+            if (_runtimeAimTarget != null || MyCore == null)
+                return;
+
+            var go = new GameObject("__EntityAIAimTarget");
+            go.hideFlags = HideFlags.HideAndDontSave;
+            _runtimeAimTarget = go.transform;
         }
 
         private static Vector3 GetMoveWorld(Vector2 move, Transform cam)
@@ -1071,6 +1225,21 @@ namespace ES
             string moduleName = module != null ? module.GetType().Name : "null";
             Debug.LogWarning($"[EntityAIInputDispatch] Camera null reason={reason}, module={moduleName}");
         }
+
+        public override void OnDestroy()
+        {
+            if (_runtimeAimTarget != null)
+            {
+                if (Application.isPlaying)
+                    UnityEngine.Object.Destroy(_runtimeAimTarget.gameObject);
+                else
+                    UnityEngine.Object.DestroyImmediate(_runtimeAimTarget.gameObject);
+
+                _runtimeAimTarget = null;
+            }
+
+            base.OnDestroy();
+        }
     }
 
     public enum TurnMode
@@ -1116,6 +1285,12 @@ namespace ES
 
         [LabelText("瞄准")]
         public bool aim;
+
+        [LabelText("左探头(按住)")]
+        public bool peekLeftHold;
+
+        [LabelText("右探头(按住)")]
+        public bool peekRightHold;
 
         [LabelText("技能1")]
         public bool skill1;
@@ -1181,6 +1356,7 @@ namespace ES
         public bool ConsumeJump() => Consume(ref jump);
 
         public bool EyeHold => eyeHold;
+        public float AimPeek => peekLeftHold == peekRightHold ? 0f : (peekRightHold ? 1f : -1f);
         public bool ConsumeCrouchToggle() => Consume(ref crouchToggle);
         public bool ConsumeFlyToggle() => Consume(ref flyToggle);
         public bool ConsumeMountToggle() => Consume(ref mountToggle);
@@ -1231,6 +1407,8 @@ namespace ES
         Slide,
         SwitchWeapon,
         Aim,
+        PeekLeft,
+        PeekRight,
         Skill1,
         Skill2,
         Skill3,
@@ -1264,6 +1442,8 @@ namespace ES
             ApplySingle(module, InputActionKey.Slide, schemeKey);
             ApplySingle(module, InputActionKey.SwitchWeapon, schemeKey);
             ApplySingle(module, InputActionKey.Aim, schemeKey);
+            ApplySingle(module, InputActionKey.PeekLeft, schemeKey);
+            ApplySingle(module, InputActionKey.PeekRight, schemeKey);
             ApplySingle(module, InputActionKey.Skill1, schemeKey);
             ApplySingle(module, InputActionKey.Skill2, schemeKey);
             ApplySingle(module, InputActionKey.Skill3, schemeKey);
@@ -1305,6 +1485,12 @@ namespace ES
                     break;
                 case InputActionKey.Aim:
                     module.aimAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.PeekLeft:
+                    module.peekLeftAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.PeekRight:
+                    module.peekRightAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
                     break;
                 case InputActionKey.Skill1:
                     module.skill1Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
@@ -1415,6 +1601,8 @@ namespace ES
                     case InputActionKey.Slide: list.Add("<Keyboard>/leftCtrl"); break;
                     case InputActionKey.SwitchWeapon: list.Add("<Keyboard>/tab"); break;
                     case InputActionKey.Aim: list.Add("<Mouse>/rightButton"); break;
+                    case InputActionKey.PeekLeft: list.Add("<Keyboard>/z"); break;
+                    case InputActionKey.PeekRight: list.Add("<Keyboard>/x"); break;
                     case InputActionKey.Skill1: list.Add("<Keyboard>/1"); break;
                     case InputActionKey.Skill2: list.Add("<Keyboard>/2"); break;
                     case InputActionKey.Skill3: list.Add("<Keyboard>/3"); break;

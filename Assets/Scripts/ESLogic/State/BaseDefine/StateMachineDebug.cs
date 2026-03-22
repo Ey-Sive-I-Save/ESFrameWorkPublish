@@ -20,21 +20,18 @@ namespace ES
     public static class StateMachineDebug
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public static void Log(string message)
         {
             StateMachineDebugSettings.Instance.LogStateTransition(message);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public static void LogWarning(string message)
         {
             StateMachineDebugSettings.Instance.LogWarning(message);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public static void LogError(string message)
         {
             StateMachineDebugSettings.Instance.LogError(message);

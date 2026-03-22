@@ -74,7 +74,7 @@ namespace ES
                 {
                     _runtimeFallbackInstance = CreateInstance<StateMachineDebugSettings>();
                     _runtimeFallbackInstance.hideFlags = HideFlags.HideAndDontSave;
-                    _runtimeFallbackInstance.enableDebug = false;
+                    _runtimeFallbackInstance.enableDebug = true;
                     _runtimeFallbackInstance.alwaysLogErrors = true;
                 }
 
@@ -152,7 +152,6 @@ namespace ES
         /// <summary>
         /// 条件日志 - 状态切换
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogStateTransition(string message)
         {
             if (enableDebug && logStateTransitions)
@@ -162,7 +161,6 @@ namespace ES
         /// <summary>
         /// 条件日志 - 动画混合
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogAnimationBlend(string message)
         {
             if (enableDebug && logAnimationBlending)
@@ -172,7 +170,6 @@ namespace ES
         /// <summary>
         /// 条件日志 - 三角化
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogTriangulation(string message)
         {
             if (enableDebug && logTriangulation)
@@ -182,7 +179,6 @@ namespace ES
         /// <summary>
         /// 条件日志 - Runtime初始化
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogRuntimeInit(string message)
         {
             if (enableDebug && logRuntimeInit)
@@ -192,7 +188,6 @@ namespace ES
         /// <summary>
         /// 条件日志 - FallBack
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogFallback(string message)
         {
             if (enableDebug && logFallback)
@@ -202,7 +197,6 @@ namespace ES
         /// <summary>
         /// 条件日志 - Dirty系统
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogDirty(string message)
         {
             if (enableDebug && logDirtySystem)
@@ -212,7 +206,6 @@ namespace ES
         /// <summary>
         /// 条件日志 - 淡入淡出效果
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogFade(string message)
         {
             if (enableDebug && logFadeEffects)
@@ -222,7 +215,6 @@ namespace ES
         /// <summary>
         /// 条件日志 - 性能统计
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogPerformance(string message)
         {
             if (enableDebug && logPerformanceStats)
@@ -232,7 +224,6 @@ namespace ES
         /// <summary>
         /// 条件日志 - 权重详细
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogWeightDetail(string message)
         {
             if (enableDebug && logWeightDetails)
@@ -242,7 +233,6 @@ namespace ES
         /// <summary>
         /// 警告日志 - 根据alwaysLogErrors设置
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogWarning(string message)
         {
             if (enableDebug || alwaysLogErrors)
@@ -252,7 +242,6 @@ namespace ES
         /// <summary>
         /// 错误日志 - 根据alwaysLogErrors设置
         /// </summary>
-        [System.Diagnostics.Conditional("STATEMACHINEDEBUG")]
         public void LogError(string message)
         {
             if (enableDebug || alwaysLogErrors)

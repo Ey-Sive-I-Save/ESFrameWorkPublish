@@ -100,7 +100,7 @@ namespace ES
 
         /// <summary>
         /// 输出Playable - 最终连接到Layer Mixer的节点
-        /// 可能是singlePlayable、mixer、或LayerMixerPlayable（带AvatarMask时）
+        /// 可能是singlePlayable或mixer
         /// </summary>
         public Playable outputPlayable;
 
@@ -163,6 +163,11 @@ namespace ES
         /// 推荐深度≤2层
         /// </summary>
         public AnimationCalculatorRuntime childRuntime;
+
+        /// <summary>
+        /// 第二子Calculator的Runtime（双混合器支持）
+        /// </summary>
+        public AnimationCalculatorRuntime childRuntimeB;
 
         // ==================== 序列混合器数据（SequentialClipMixer） ====================
 
@@ -244,40 +249,66 @@ namespace ES
         {
             /// <summary>IK是否启用</summary>
             public bool enabled;
-            /// <summary>IK总权重（0=纯动画, 1=纯IK）</summary>
-            public float weight;
-            /// <summary>IK目标权重（平滑过渡用）</summary>
-            public float targetWeight;
-            /// <summary>IK权重变化速度</summary>
-            public float weightVelocity;
+            public IKGoalRuntimeData leftHand;
+            public IKGoalRuntimeData rightHand;
+            public IKGoalRuntimeData leftFoot;
+            public IKGoalRuntimeData rightFoot;
+            public IKLookAtRuntimeData lookAt;
 
-            // Per-limb权重
-            public float leftHandWeight, rightHandWeight, leftFootWeight, rightFootWeight;
-            /// <summary>注视IK权重</summary>
-            public float lookAtWeight;
-
-            // 目标位置
-            public Vector3 leftHandPosition, rightHandPosition, leftFootPosition, rightFootPosition;
-            /// <summary>注视目标位置</summary>
-            public Vector3 lookAtPosition;
-
-            // 目标旋转
-            public Quaternion leftHandRotation, rightHandRotation, leftFootRotation, rightFootRotation;
-
-            // 提示位置（肘/膝）
-            public Vector3 leftHandHintPosition, rightHandHintPosition, leftFootHintPosition, rightFootHintPosition;
+            public bool HasAnyTargetWeight =>
+                leftHand.targetWeight > 0.0001f || rightHand.targetWeight > 0.0001f ||
+                leftFoot.targetWeight > 0.0001f || rightFoot.targetWeight > 0.0001f ||
+                lookAt.targetWeight > 0.0001f;
 
             /// <summary>重置所有IK数据到默认值</summary>
             public void Reset()
             {
                 enabled = false;
-                weight = 0f;
+                leftHand.Reset();
+                rightHand.Reset();
+                leftFoot.Reset();
+                rightFoot.Reset();
+                lookAt.Reset();
+            }
+        }
+
+        public struct IKGoalRuntimeData
+        {
+            public float targetWeight;
+            public float lerpingRate;
+            public Vector3 position;
+            public Quaternion rotation;
+            public Vector3 hintPosition;
+
+            public void Reset()
+            {
                 targetWeight = 0f;
-                weightVelocity = 0f;
-                leftHandWeight = rightHandWeight = leftFootWeight = rightFootWeight = lookAtWeight = 0f;
-                leftHandPosition = rightHandPosition = leftFootPosition = rightFootPosition = lookAtPosition = Vector3.zero;
-                leftHandRotation = rightHandRotation = leftFootRotation = rightFootRotation = Quaternion.identity;
-                leftHandHintPosition = rightHandHintPosition = leftFootHintPosition = rightFootHintPosition = Vector3.zero;
+                lerpingRate = 1f;
+                position = Vector3.zero;
+                rotation = Quaternion.identity;
+                hintPosition = Vector3.zero;
+            }
+        }
+
+        public struct IKLookAtRuntimeData
+        {
+            public float targetWeight;
+            public float lerpingRate;
+            public Vector3 position;
+            public float bodyWeight;
+            public float headWeight;
+            public float eyesWeight;
+            public float clampWeight;
+
+            public void Reset()
+            {
+                targetWeight = 0f;
+                lerpingRate = 1f;
+                position = Vector3.zero;
+                bodyWeight = 0.5f;
+                headWeight = 1f;
+                eyesWeight = 1f;
+                clampWeight = 0.5f;
             }
         }
 
@@ -601,38 +632,47 @@ namespace ES
         // ==================== IK便捷方法 ====================
 
         /// <summary>
-        /// 设置IK目标（带平滑过渡）
+        /// 设置IK目标（目标位姿 + 目标权重 + 渐进率）
         /// </summary>
         /// <param name="goal">IK目标类型</param>
         /// <param name="position">目标位置</param>
         /// <param name="rotation">目标旋转</param>
-        /// <param name="weight">权重 (0-1)</param>
-        public void SetIKGoal(IKGoal goal, Vector3 position, Quaternion rotation, float weight)
+        /// <param name="weight">目标权重 (0-1)</param>
+        /// <param name="lerpingRate">lerping 速度倍率（1 为默认）</param>
+        public void SetIKGoal(IKGoal goal, Vector3 position, Quaternion rotation, float weight, float lerpingRate = 1f)
         {
             ik.enabled = true;
+            float clampedWeight = Mathf.Clamp01(weight);
+            float normalizedLerpingRate = Mathf.Clamp(lerpingRate, 0.05f, 8f);
             switch (goal)
             {
                 case IKGoal.LeftHand:
-                    ik.leftHandPosition = position;
-                    ik.leftHandRotation = rotation;
-                    ik.leftHandWeight = Mathf.Clamp01(weight);
+                    ik.leftHand.position = position;
+                    ik.leftHand.rotation = rotation;
+                    ik.leftHand.targetWeight = clampedWeight;
+                    ik.leftHand.lerpingRate = normalizedLerpingRate;
                     break;
                 case IKGoal.RightHand:
-                    ik.rightHandPosition = position;
-                    ik.rightHandRotation = rotation;
-                    ik.rightHandWeight = Mathf.Clamp01(weight);
+                    ik.rightHand.position = position;
+                    ik.rightHand.rotation = rotation;
+                    ik.rightHand.targetWeight = clampedWeight;
+                    ik.rightHand.lerpingRate = normalizedLerpingRate;
                     break;
                 case IKGoal.LeftFoot:
-                    ik.leftFootPosition = position;
-                    ik.leftFootRotation = rotation;
-                    ik.leftFootWeight = Mathf.Clamp01(weight);
+                    ik.leftFoot.position = position;
+                    ik.leftFoot.rotation = rotation;
+                    ik.leftFoot.targetWeight = clampedWeight;
+                    ik.leftFoot.lerpingRate = normalizedLerpingRate;
                     break;
                 case IKGoal.RightFoot:
-                    ik.rightFootPosition = position;
-                    ik.rightFootRotation = rotation;
-                    ik.rightFootWeight = Mathf.Clamp01(weight);
+                    ik.rightFoot.position = position;
+                    ik.rightFoot.rotation = rotation;
+                    ik.rightFoot.targetWeight = clampedWeight;
+                    ik.rightFoot.lerpingRate = normalizedLerpingRate;
                     break;
             }
+
+            ik.enabled = ik.HasAnyTargetWeight;
         }
 
         /// <summary>
@@ -643,56 +683,49 @@ namespace ES
             switch (goal)
             {
                 case IKGoal.LeftHand:
-                    ik.leftHandHintPosition = position;
+                    ik.leftHand.hintPosition = position;
                     break;
                 case IKGoal.RightHand:
-                    ik.rightHandHintPosition = position;
+                    ik.rightHand.hintPosition = position;
                     break;
                 case IKGoal.LeftFoot:
-                    ik.leftFootHintPosition = position;
+                    ik.leftFoot.hintPosition = position;
                     break;
                 case IKGoal.RightFoot:
-                    ik.rightFootHintPosition = position;
+                    ik.rightFoot.hintPosition = position;
                     break;
             }
         }
 
         /// <summary>
-        /// 设置注视目标
+        /// 设置注视目标（简化版，骨骼子权重保持当前值不变）
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetLookAtTarget(Vector3 position, float weight)
+        public void SetLookAtTarget(Vector3 position, float weight, float lerpingRate = 1f)
         {
             ik.enabled = true;
-            ik.lookAtPosition = position;
-            ik.lookAtWeight = Mathf.Clamp01(weight);
+            ik.lookAt.position = position;
+            ik.lookAt.targetWeight = Mathf.Clamp01(weight);
+            ik.lookAt.lerpingRate = Mathf.Clamp(lerpingRate, 0.05f, 8f);
+            ik.enabled = ik.HasAnyTargetWeight;
         }
 
         /// <summary>
-        /// 平滑更新IK权重（每帧调用）。
-        /// 当 weight 和 targetWeight 均收敛到接近 0 时，自动关闭 ik.enabled，
-        /// 避免 IK 逻辑块在整个不激活期间持续占用 CPU。
+        /// 设置注视目标（完整版，同时指定 Body/Head/Eyes/Clamp 四个骨骼分权重）。
+        /// 适用于 IKSourceMode.CodeOnly 场景，或需要在运行时逐帧差异化骨骼响应强度的场合。
         /// </summary>
-        public void UpdateIKWeight(float smoothTime, float deltaTime)
+        public void SetLookAtTarget(Vector3 position, float weight, float lerpingRate,
+            float bodyWeight, float headWeight, float eyesWeight, float clampWeight)
         {
-            if (!ik.enabled) return;
-
-            if (smoothTime > 0.001f)
-            {
-                ik.weight = Mathf.SmoothDamp(ik.weight, ik.targetWeight, ref ik.weightVelocity, smoothTime, float.MaxValue, deltaTime);
-            }
-            else
-            {
-                ik.weight = ik.targetWeight;
-            }
-
-            // 当目标为 0 且已经衰减到接近 0 时，关闭 IK，避免每帧空跑。
-            if (ik.targetWeight < 0.0001f && ik.weight < 0.0001f)
-            {
-                ik.weight = 0f;
-                ik.weightVelocity = 0f;
-                ik.enabled = false;
-            }
+            ik.enabled = true;
+            ik.lookAt.position      = position;
+            ik.lookAt.targetWeight  = Mathf.Clamp01(weight);
+            ik.lookAt.lerpingRate   = Mathf.Clamp(lerpingRate, 0.05f, 8f);
+            ik.lookAt.bodyWeight    = Mathf.Clamp01(bodyWeight);
+            ik.lookAt.headWeight    = Mathf.Clamp01(headWeight);
+            ik.lookAt.eyesWeight    = Mathf.Clamp01(eyesWeight);
+            ik.lookAt.clampWeight   = Mathf.Clamp01(clampWeight);
+            ik.enabled = ik.HasAnyTargetWeight;
         }
 
         // ==================== MatchTarget便捷方法 ====================
@@ -847,7 +880,7 @@ namespace ES
             sb.Append($" | Playables={GetActivePlayableCount()}");
 
             if (ik.enabled)
-                sb.Append($" | IK={ik.weight:F2}");
+                sb.Append($" | IK={(ik.HasAnyTargetWeight ? "Active" : "Idle")}");
             if (matchTarget.active)
                 sb.Append($" | MT={matchTarget.bodyPart} [{matchTarget.startTime:F2}-{matchTarget.endTime:F2}]");
 

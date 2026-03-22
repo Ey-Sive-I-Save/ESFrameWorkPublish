@@ -35,7 +35,7 @@ namespace ES.Examples
                     stateName = "Walk_Base",
                     stateId = 100,
                     layerType = StateLayerType.Main,
-                    priority = 50
+                    mixerBias = StateMixerBias.Normal
                 },
                 mergeData = new StateMergeData
                 {
@@ -71,7 +71,7 @@ namespace ES.Examples
                 basicConfig = new StateBasicConfig
                 {
                     layerType = StateLayerType.Main,
-                    priority = 80,
+                    mixerBias = StateMixerBias.High,
                     durationMode = StateDurationMode.UntilAnimationEnd
                 },
                 mergeData = new StateMergeData

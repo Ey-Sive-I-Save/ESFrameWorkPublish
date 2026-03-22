@@ -4,6 +4,13 @@ namespace ES
     // 文件：StateBase.cs
     // 作用：StateBase 的最小壳文件，仅用于保留类型入口；具体实现拆分在多个 partial 文件中。
     //
+    // 重要约定：
+    // - StateBase 负责“状态本体”的生命周期实现与运行态；
+    // - StateLifecycleTracker 负责“模块侧/AI侧/业务侧”与该状态对应的 Enter/Exit 幂等包装；
+    // - 任何需要和某个 StateBase 严格同步进入/退出的模块，都应复用 StateLifecycleTracker，
+    //   不要自己再维护一套 _isActive / entered / exited / wasRunning 之类的生命周期控制。
+    // - 以后若 AI 或用户侧模块需要接入状态，请默认先找 StateLifecycleTracker，而不是自己手写生命周期守卫。
+    //
     // Public：本文件仅声明 public partial class StateBase（无额外 public 成员）。
     // Private/Internal：无。
     //
@@ -21,7 +28,7 @@ namespace ES
     // - StateBase.Animation.cs
     //   - PlayableGraph 生命周期：CreatePlayable/DestroyPlayable。
     //   - 外部管线权重：PlayableWeight、SetPlayableWeight、层级 Mixer 槽位绑定/解绑、权重写入。
-    //   - 每帧动画运行时刷新：UpdateAnimationRuntime/ImmediateUpdateAnimationRuntime（权重、IK曲线/MatchTarget进度等）。
+    //   - 每帧动画运行时刷新：UpdateAnimationRuntime/ImmediateUpdateAnimationRuntime（权重、状态级 IK 目标同步、MatchTarget 进度等）。
     //   - 自动退出判定：ShouldAutoExit、UntilAnimationEnd 的完成检测（含 sequenceCompleted / 标准时长）。
     //
     // - StateBase.Progress.cs

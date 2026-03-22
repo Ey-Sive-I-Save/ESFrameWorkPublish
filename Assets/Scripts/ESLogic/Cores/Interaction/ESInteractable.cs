@@ -35,28 +35,19 @@ namespace ES
 
         public Transform ikHintTarget;
 
-        [Range(0f, 1f)]
-        public float ikWeight = 1f;
-
-        [LabelText("IK TargetWeight"), Tooltip("IK总目标权重(targetWeight)：控制最终 IK 强度的总开关（0=完全关闭，1=完全开启）。\n交互模块会在交互期间每帧读取它，并写入到交互状态的 IK targetWeight（支持运行时动态变化）。")]
+        [LabelText("IK 目标权重")]
         [Range(0f, 1f)]
         public float ikTargetWeight = 1f;
+
+        [LabelText("IK LerpingRate"), Tooltip("控制本次交互写入 Driver 的 lerping 速度倍率。它不是权重。1=默认，小于1更慢，大于1更快。")] 
+        [Range(0.05f, 8f)]
+        public float ikLerpingRate = 1f;
 
         [LabelText("Use IK Rotation")]
         public bool useIKRotation = true;
 
         /// <summary>
-        /// 评估“单肢体权重”（left/right hand/foot 的 limb weight）。
-        /// 默认直接使用 Inspector 的 ikWeight。
-        /// 你可以在派生类里重写，实现：随进度/距离/曲线动态变化。
-        /// </summary>
-        public virtual float EvaluateIKLimbWeight(Entity entity, float normalized01)
-        {
-            return ikWeight;
-        }
-
-        /// <summary>
-        /// 评估“总目标权重”（IK targetWeight，决定 ik.weight 的平滑目标）。
+        /// 评估“目标权重”。
         /// 默认直接使用 Inspector 的 ikTargetWeight。
         /// 你可以在派生类里重写，实现：随进度/距离/曲线动态变化。
         /// </summary>
@@ -65,10 +56,20 @@ namespace ES
             return ikTargetWeight;
         }
 
+        /// <summary>
+        /// 评估“lerping 速度倍率”。
+        /// 默认直接使用 Inspector 的 ikLerpingRate。
+        /// 你可以在派生类里重写，实现：随进度/距离/曲线动态变化。
+        /// </summary>
+        public virtual float EvaluateIKLerpingRate(Entity entity, float normalized01)
+        {
+            return ikLerpingRate;
+        }
+
         [Title("MatchTarget (Optional)")]
         public bool enableMatchTarget = false;
 
-        [InfoBox("仅配置阶段参数与偏移；目标位置/旋转由交互运行时传入（通常使用当前 Interactable 的 Transform）。", InfoMessageType.None, "enableMatchTarget")]
+        [InfoBox("仅配置请求参数与偏移；目标位置/旋转由交互运行时传入（通常使用当前 Interactable 的 Transform）。", InfoMessageType.None, "enableMatchTarget")]
         [ShowIf("enableMatchTarget"), HideLabel]
         public MatchTargetRequest matchTargetRequest = MatchTargetRequest.Default;
 

@@ -9,10 +9,10 @@ namespace ES
     ///
     /// 目标：
     /// - 加入该模块后，在常态移动（走路/跑步）时，左右脚自动贴合台阶/地面高度与法线。
-    /// - 不破坏原有功能：不修改任何状态配置；仅在 finalIKPose 输出阶段做“可选后处理”。
+    /// - 不破坏原有功能：不修改任何状态配置；仅在 stateGeneralFinalIKDriverPose 输出阶段做“可选后处理”。
     ///
     /// 工作方式：
-    /// - 订阅 StateMachine.OnFinalIKPosePostProcess
+    /// - 订阅 StateMachine.OnStateGeneralFinalIKDriverPosePostProcess
     /// - 当当前状态没有主动驱动脚IK时（pose.leftFoot/rightFoot 权重≈0），本模块才写入脚IK
     /// - 使用 SphereCast/Raycast 探测脚下地面点与法线，生成脚的IK position/rotation
     ///
@@ -373,7 +373,7 @@ namespace ES
 
             if (!_subscribed)
             {
-                _sm.OnFinalIKPosePostProcess += OnFinalIKPosePostProcess;
+                _sm.OnStateGeneralFinalIKDriverPosePostProcess += OnStateGeneralFinalIKDriverPosePostProcess;
                 _subscribed = true;
             }
         }
@@ -382,7 +382,7 @@ namespace ES
         {
             if (_subscribed && _sm != null)
             {
-                _sm.OnFinalIKPosePostProcess -= OnFinalIKPosePostProcess;
+                _sm.OnStateGeneralFinalIKDriverPosePostProcess -= OnStateGeneralFinalIKDriverPosePostProcess;
             }
 
             _subscribed = false;
@@ -414,7 +414,7 @@ namespace ES
             _hasLastBonePos = false;
         }
 
-        private void OnFinalIKPosePostProcess(StateMachine machine, ref StateIKPose pose, float deltaTime)
+        private void OnStateGeneralFinalIKDriverPosePostProcess(StateMachine machine, ref StateGeneralFinalIKDriverPose pose, float deltaTime)
         {
             Debug_OnCallbackEnter();
             if (!enableFootPlacement) { Debug_Skip("开关关闭"); return; }

@@ -3,7 +3,7 @@ using UnityEngine;
 
 // ============================================================================
 // 文件：StateBase.IK.cs
-// 作用：StateBase 的 IK 运行时接口与自动应用配置（外部可写入 ResolvedConfig.ikTargetWeight 与内部逻辑共用）。
+// 作用：StateBase 的 IK 运行时接口与自动应用配置（状态侧只定义节点目标权重；lerpingRate 由 Driver 或外部系统负责）。
 //
 // Public（本文件定义的对外成员；按模块分组，“先功能、后成员”，便于扫读）：
 //
@@ -12,16 +12,11 @@ using UnityEngine;
 // - 设置 IK Hint（肘/膝）：public void SetIKHintPosition(...)
 // - 设置注视目标（LookAt）：public void SetLookAtTarget(...)
 //
-// 【总权重控制】
-// - 设置 IK 总目标权重：public void SetIKTargetWeight(float weight)
-// - 外部写入 IK 总目标权重（共用 ResolvedConfig）：public void SetIKExternalTargetWeight(float weight)
-// - 取消外部写入（回到配置合成结果）：public void ClearIKExternalTargetWeight()
-//
 // 【状态控制与查询】
 // - 立即禁用 IK：public void DisableIK()
 // - 是否激活：public bool IsIKActive { get; }
 //
-// Private/Internal：进入时应用配置、默认权重缓存、以及 ResolvedConfig 的 IK 权重合成结果。
+// Private/Internal：IK 激活状态与运行时写入辅助。
 // ============================================================================
 
 namespace ES
@@ -36,27 +31,20 @@ namespace ES
         [NonSerialized]
         private bool _ikActive = false;
 
-        private float _ikDefaultTargetWeight = 1f;
-
         /// <summary>
-        /// 状态进入时自动从 StateAnimationConfigData 应用IK配置到Runtime
-        /// 仅在 enableIK=true 且 ikSourceMode != CodeOnly 时生效
+        /// 状态进入时同步 IK 开关缓存。
+        /// 目标位姿必须由运行时代码提供，状态资产不再承担“配置目标”。
         /// </summary>
         private void ApplyIKConfigOnEnter(AnimationCalculatorRuntime runtime)
         {
-    #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (runtime == null) throw new InvalidOperationException("ApplyIKConfigOnEnter: runtime 不能为空（调用方应在边界处做一次性判空）");
-    #endif
+            var proceduralDriveConfig = GetProceduralDriveConfigCachedOrSharedOrNull();
+            if (proceduralDriveConfig == null) return;
+            if (!proceduralDriveConfig.enableIK) return;
 
-            var animConfig = GetAnimConfigCachedOrSharedOrNull();
-            if (animConfig == null) return;
-            if (!animConfig.enableIK) return;
-            if (animConfig.ikSourceMode == IKSourceMode.CodeOnly) return;
-
-            // 从Inspector配置数据写入Runtime
-            Transform rootTransform = host?.BoundAnimator?.transform;
-            animConfig.ApplyIKConfigToRuntime(runtime, rootTransform);
-            _ikActive = true;
+            if (runtime != null)
+            {
+                runtime.ik.enabled = runtime.ik.enabled || runtime.ik.HasAnyTargetWeight;
+            }
         }
 
         /// <summary>
@@ -65,12 +53,27 @@ namespace ES
         /// <param name="goal">IK目标（左/右手/脚）</param>
         /// <param name="position">目标位置</param>
         /// <param name="rotation">目标旋转</param>
-        /// <param name="weight">权重 [0-1]</param>
-        public void SetIKGoal(IKGoal goal, Vector3 position, Quaternion rotation, float weight)
+        /// <param name="weight">目标权重 [0-1]</param>
+        /// <param name="lerpingRate">lerping 速度倍率，1 为默认</param>
+        public void SetIKGoal(IKGoal goal, Vector3 position, Quaternion rotation, float weight, float lerpingRate = 1f)
         {
             if (_animationRuntime == null) return;
             _ikActive = true;
-            _animationRuntime.SetIKGoal(goal, position, rotation, weight);
+            _animationRuntime.SetIKGoal(goal, position, rotation, weight, lerpingRate);
+        }
+
+        /// <summary>
+        /// 设置 IK 目标（常用简化版：直接传目标 Transform）。
+        /// </summary>
+        public void SetIKGoal(IKGoal goal, Transform target, float weight, float lerpingRate = 1f, Transform hintTarget = null, bool useTargetRotation = true)
+        {
+            if (target == null) return;
+
+            Quaternion rotation = useTargetRotation ? target.rotation : Quaternion.identity;
+            SetIKGoal(goal, target.position, rotation, weight, lerpingRate);
+
+            if (hintTarget != null)
+                SetIKHintPosition(goal, hintTarget.position);
         }
 
         /// <summary>
@@ -84,64 +87,33 @@ namespace ES
         }
 
         /// <summary>
-        /// 设置注视目标
+        /// 设置注视目标（简化版，骨骼子权重保持当前值不变）
         /// </summary>
-        public void SetLookAtTarget(Vector3 position, float weight)
+        public void SetLookAtTarget(Vector3 position, float weight, float lerpingRate = 1f)
         {
             if (_animationRuntime == null) return;
             _ikActive = true;
-            _animationRuntime.SetLookAtTarget(position, weight);
+            _animationRuntime.SetLookAtTarget(position, weight, lerpingRate);
         }
 
         /// <summary>
-        /// 设置IK总目标权重（平滑过渡）
+        /// 设置注视目标（常用简化版：直接传目标 Transform）。
         /// </summary>
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void SetIKTargetWeight(float weight)
+        public void SetLookAtTarget(Transform target, float weight, float lerpingRate = 1f)
+        {
+            if (target == null) return;
+            SetLookAtTarget(target.position, weight, lerpingRate);
+        }
+
+        /// <summary>
+        /// 设置注视目标（完整版，同时指定 Body/Head/Eyes/Clamp 四个骨骼分权重）。
+        /// </summary>
+        public void SetLookAtTarget(Vector3 position, float weight, float lerpingRate,
+            float bodyWeight, float headWeight, float eyesWeight, float clampWeight)
         {
             if (_animationRuntime == null) return;
-            float clamped = Mathf.Clamp01(weight);
-            // 避免每帧写相同值（减少无意义的 native bridge 写入）
-            if (Mathf.Abs(_animationRuntime.ik.targetWeight - clamped) <= 0.0001f) return;
-            _animationRuntime.ik.targetWeight = clamped;
-        }
-
-        /// <summary>
-        /// 外部写入 IK 的“总目标权重”（与内部逻辑共用同一个数据源：ResolvedConfig.ikTargetWeight）。
-        /// 典型用途：交互/抓取时根据进度或距离动态调节 IK 总权重。
-        ///
-        /// 说明：
-        /// - 直接写入 ResolvedConfig.ikOverrideEnabled=true / .ikTargetWeight=weight，不标脏、不触发 Refresh，
-        ///   避免覆盖值被 RefreshResolvedRuntimeConfig 立即还原。
-        /// - UpdateAnimationRuntime 每帧读取 ResolvedConfig.ikTargetWeight，写入后即参与曲线乘子与阶段覆盖逻辑。
-        /// - 调用 ClearIKExternalTargetWeight() 可恢复由配置合成值驱动（置脏→Refresh 重建，ikOverrideEnabled 清零）。
-        /// </summary>
-        public void  SetIKExternalTargetWeight(float weight)
-        {
             _ikActive = true;
-            float clamped = Mathf.Clamp01(weight);
-
-            // 确保 ResolvedConfig 是最新的合成结果；随后外部写入直接修改该结果，实现“共用”。
-            EnsureResolvedRuntimeConfig();
-            var resolved = ResolvedConfig;
-            resolved.ikOverrideEnabled = true;
-            resolved.ikTargetWeight = clamped;
-
-            if (_animationRuntime != null)
-            {
-                _animationRuntime.ik.enabled = true;
-                // 立即把目标权重写到 runtime，避免等到下一帧 UpdateAnimationRuntime 才生效。
-                SetIKTargetWeight(clamped);
-            }
-        }
-
-        /// <summary>
-        /// 取消外部写入，恢复由配置合成（RefreshResolvedRuntimeConfig）驱动。
-        /// </summary>
-        public void ClearIKExternalTargetWeight()
-        {
-            _resolvedRuntimeDirty = true;
-            RefreshResolvedRuntimeConfig();
+            _animationRuntime.SetLookAtTarget(position, weight, lerpingRate, bodyWeight, headWeight, eyesWeight, clampWeight);
         }
 
         /// <summary>
@@ -157,8 +129,7 @@ namespace ES
 
             if (_animationRuntime != null)
             {
-                _animationRuntime.ik.targetWeight = 0f;
-                // IK权重会在 UpdateAnimationRuntime 中平滑过渡到 0，ik.enabled 在 weight→0 后由 UpdateIKWeight 自动关闭。
+                _animationRuntime.ResetIKData();
             }
         }
 

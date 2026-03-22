@@ -30,85 +30,74 @@ namespace ES
     // ==================== IK肢体配置 ====================
 
     /// <summary>
-    /// 单个IK肢体目标配置（Inspector可配置）
+    /// 单个IK肢体配置（仅定义是否启用、目标权重与响应速度倍率，不承担目标位姿）
     /// </summary>
     [Serializable]
     public class IKLimbConfig
     {
+        [HorizontalGroup("行", Width = 0.28f)]
         [LabelText("启用"), ToggleLeft]
         public bool enabled;
 
-        [LabelText("权重"), Range(0f, 1f), ShowIf("enabled")]
-        public float weight;
+        [HorizontalGroup("行", Width = 0.36f)]
+        [LabelText("目标权重"), Range(0f, 1f), ShowIf("enabled")]
+        [Tooltip("该节点写入最终 IK Pose 的目标权重。1 = 全量应用，0 = 不应用。")]
+        public float targetWeight;
 
-        [LabelText("目标Transform"), ShowIf("enabled")]
-        [Tooltip("运行时IK目标位置/旋转跟踪的Transform，为null时使用下方的固定偏移")]
-        public Transform target;
-
-        [LabelText("固定位置偏移"), ShowIf("@enabled && target == null")]
-        [Tooltip("当无目标Transform时，相对于角色根节点的固定位置偏移")]
-        public Vector3 positionOffset;
-
-        [LabelText("固定旋转偏移"), ShowIf("@enabled && target == null")]
-        public Vector3 rotationEulerOffset;
-
-        [LabelText("Hint Transform"), ShowIf("enabled")]
-        [Tooltip("肘/膝引导方向的Transform（可选）")]
-        public Transform hintTarget;
+        [HorizontalGroup("行")]
+        [LabelText("LerpingRate"), Range(0.05f, 8f), ShowIf("enabled")]
+        [Tooltip("该节点写入 Driver 的 lerping 速度倍率。它不是权重。1 = 默认速度；小于 1 更慢，大于 1 更快。")]
+        public float lerpingRate = 1f;
 
         public static IKLimbConfig Default => new IKLimbConfig
         {
             enabled = false,
-            weight = 1f,
-            target = null,
-            positionOffset = Vector3.zero,
-            rotationEulerOffset = Vector3.zero,
-            hintTarget = null
+            targetWeight = 1f,
+            lerpingRate = 1f
         };
     }
 
     /// <summary>
-    /// 注视IK配置
+    /// 注视IK配置（仅定义目标权重、响应速度倍率与骨骼分权重，不承担目标位置）
     /// </summary>
     [Serializable]
     public class IKLookAtConfig
     {
+        [HorizontalGroup("基础行", Width = 0.28f)]
         [LabelText("启用注视"), ToggleLeft]
         public bool enabled;
 
-        [LabelText("注视权重"), Range(0f, 1f), ShowIf("enabled")]
-        public float weight;
+        [HorizontalGroup("基础行", Width = 0.36f)]
+        [LabelText("目标权重"), Range(0f, 1f), ShowIf("enabled")]
+        [Tooltip("该 LookAt 目标写入最终 IK Pose 的目标权重。1 = 全量应用，0 = 不应用。")]
+        public float targetWeight;
 
-        [LabelText("注视目标"), ShowIf("enabled")]
-        [Tooltip("运行时头部朝向跟踪的Transform")]
-        public Transform target;
+        [HorizontalGroup("基础行")]
+        [LabelText("LerpingRate"), Range(0.05f, 8f), ShowIf("enabled")]
+        [Tooltip("该 LookAt 写入 Driver 的 lerping 速度倍率。它不是权重。1 = 默认速度；小于 1 更慢，大于 1 更快。")]
+        public float lerpingRate = 1f;
 
-        [LabelText("固定注视点"), ShowIf("@enabled && target == null")]
-        [Tooltip("当无目标Transform时，世界空间中的固定注视位置")]
-        public Vector3 fixedPosition;
-
-        [FoldoutGroup("Body权重", expanded: false)]
+        [HorizontalGroup("细分行")]
         [LabelText("Body"), Range(0f, 1f), ShowIf("enabled")]
         public float bodyWeight;
 
-        [FoldoutGroup("Body权重", expanded: false)]
+        [HorizontalGroup("细分行")]
         [LabelText("Head"), Range(0f, 1f), ShowIf("enabled")]
         public float headWeight;
 
-        [FoldoutGroup("Body权重", expanded: false)]
+        [HorizontalGroup("细分行")]
         [LabelText("Eyes"), Range(0f, 1f), ShowIf("enabled")]
         public float eyesWeight;
 
-        [FoldoutGroup("Body权重", expanded: false)]
+        [HorizontalGroup("细分行")]
         [LabelText("Clamp"), Range(0f, 1f), ShowIf("enabled")]
         public float clampWeight;
 
         public static IKLookAtConfig Default => new IKLookAtConfig
         {
             enabled = false,
-            weight = 1f,
-            target = null,
-            fixedPosition = Vector3.zero,
+            targetWeight = 1f,
+            lerpingRate = 1f,
             bodyWeight = 0f,
             headWeight = 1f,
             eyesWeight = 0.5f,
@@ -116,19 +105,129 @@ namespace ES
         };
     }
 
-    /// <summary>
-    /// IK目标来源模式
-    /// </summary>
-    public enum IKSourceMode
+    [Serializable]
+    public class StateIKSegmentConfig
     {
-        [InspectorName("仅配置（Inspector固定值）")]
-        ConfigOnly = 0,
+        [HorizontalGroup("段头", Width = 0.2f)]
+        [LabelText("启用"), ToggleLeft]
+        public bool enabled = true;
 
-        [InspectorName("仅代码（API动态设置）")]
-        CodeOnly = 1,
+        [HorizontalGroup("段头", Width = 0.28f)]
+        [LabelText("段名")]
+        public string name = "Segment";
 
-        [InspectorName("配置+代码覆盖")]
-        ConfigWithCodeOverride = 2
+        [HorizontalGroup("段头", Width = 0.34f)]
+        [LabelText("归一化区间")]
+        [MinMaxSlider(0f, 1f, true)]
+        public Vector2 normalizedRange = new Vector2(0f, 1f);
+
+        [HorizontalGroup("段头")]
+        [LabelText("羽化")]
+        [Range(0f, 0.5f)]
+        [Tooltip("段首尾的软过渡区间。0 = 进入区间即全量生效；大于 0 时会在边缘自然渐入渐出。")]
+        public float feather = 0.08f;
+
+        [Title("左手IK", bold: false)]
+        [ShowIf("enabled"), InlineProperty, HideLabel]
+        public IKLimbConfig ikLeftHand = IKLimbConfig.Default;
+
+        [Title("右手IK", bold: false)]
+        [ShowIf("enabled"), InlineProperty, HideLabel]
+        public IKLimbConfig ikRightHand = IKLimbConfig.Default;
+
+        [Title("左脚IK", bold: false)]
+        [ShowIf("enabled"), InlineProperty, HideLabel]
+        public IKLimbConfig ikLeftFoot = IKLimbConfig.Default;
+
+        [Title("右脚IK", bold: false)]
+        [ShowIf("enabled"), InlineProperty, HideLabel]
+        public IKLimbConfig ikRightFoot = IKLimbConfig.Default;
+
+        [Title("注视IK", bold: false)]
+        [ShowIf("enabled"), InlineProperty, HideLabel]
+        public IKLookAtConfig ikLookAt = IKLookAtConfig.Default;
+
+        public float EvaluateInfluence(float normalizedProgress)
+        {
+            if (!enabled)
+                return 0f;
+
+            float start = Mathf.Clamp01(normalizedRange.x);
+            float end = Mathf.Clamp01(normalizedRange.y);
+            if (end < start)
+            {
+                float temp = start;
+                start = end;
+                end = temp;
+            }
+
+            if (normalizedProgress < start || normalizedProgress > end)
+                return 0f;
+
+            float duration = end - start;
+            if (duration <= 0.0001f)
+                return 1f;
+
+            float effectiveFeather = Mathf.Clamp(feather, 0f, duration * 0.5f);
+            if (effectiveFeather <= 0.0001f)
+                return 1f;
+
+            float enterWeight = normalizedProgress <= start + effectiveFeather
+                ? Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(start, start + effectiveFeather, normalizedProgress))
+                : 1f;
+            float exitWeight = normalizedProgress >= end - effectiveFeather
+                ? Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(end, end - effectiveFeather, normalizedProgress))
+                : 1f;
+            return Mathf.Min(enterWeight, exitWeight);
+        }
+
+        public IKLimbConfig GetGoalConfig(IKGoal goal)
+        {
+            return goal switch
+            {
+                IKGoal.LeftHand => ikLeftHand,
+                IKGoal.RightHand => ikRightHand,
+                IKGoal.LeftFoot => ikLeftFoot,
+                IKGoal.RightFoot => ikRightFoot,
+                _ => null
+            };
+        }
+    }
+
+    public struct ResolvedIKLimbConfig
+    {
+        public bool enabled;
+        public float targetWeight;
+        public float lerpingRate;
+
+        public static ResolvedIKLimbConfig Disabled => new ResolvedIKLimbConfig
+        {
+            enabled = false,
+            targetWeight = 0f,
+            lerpingRate = 1f,
+        };
+    }
+
+    public struct ResolvedIKLookAtConfig
+    {
+        public bool enabled;
+        public float targetWeight;
+        public float lerpingRate;
+        public float bodyWeight;
+        public float headWeight;
+        public float eyesWeight;
+        public float clampWeight;
+
+        public static ResolvedIKLookAtConfig Disabled => new ResolvedIKLookAtConfig
+        {
+            enabled = false,
+            targetWeight = 0f,
+            lerpingRate = 1f,
+            bodyWeight = 0f,
+            headWeight = 1f,
+            eyesWeight = 0.5f,
+            clampWeight = 0.5f,
+        };
     }
 
     // ==================== MatchTarget配置 ====================
@@ -137,11 +236,11 @@ namespace ES
     /// MatchTarget 请求（统一数据包）。<br/>
     /// 同一个数据包可同时出现在：
     /// <list type="bullet">
-    ///   <item>资产配置 —— <c>StateAnimationConfigData.matchTargetPreset</c></item>
+    ///   <item>资产配置 —— <c>StateProceduralDriveData.matchTargetPreset</c></item>
     ///   <item>场景物体 —— <c>ESInteractable.matchTargetRequest</c> 等脚本字段</item>
     ///   <item>纯代码构造 —— <c>new MatchTargetRequest { bodyPart = ..., ... }</c></item>
     /// </list>
-    /// 该数据包仅承载“阶段参数与偏移”；目标位置/旋转由运行时传入。
+    /// 该数据包仅承载“请求参数与偏移”；目标位置/旋转由运行时传入。
     /// </summary>
     [Serializable]
     public class MatchTargetRequest
@@ -232,7 +331,14 @@ namespace ES
 
     /// <summary>
     /// 待执行的 MatchTarget 指令。<br/>
-    /// 注册后，当 <c>normalizedProgress &gt;= triggerAt</c> 时自动激活，
+    /// 可用于：
+    /// <list type="bullet">
+    ///   <item>代码调用 <c>QueueNextMatchTarget</c> 的一次性指令（此时应传入新实例，不得传入 SO 内的对象）</item>
+    /// </list>
+    /// ★ SO 配置里的 <c>matchTargetTimeline</c> 列表仅作为纯只读数据使用；
+    ///   框架通过每实体独立的索引 <c>_configMatchTargetNextTimelineIndex</c> 推进，
+    ///   <b>不会读写</b>此类上的任何运行时字段，多实体共享同一 SO 完全安全。<br/>
+    /// 注册后，当 <c>hasEnterTime &gt;= triggerAt</c> 时自动激活，
     /// 以 <see cref="request"/> 参数完整重新启动一次 MatchTarget（覆盖当前时间窗口 / 身体部位 / 权重）。<br/>
     /// 触发后自动消耗（单次有效）；状态退出 / Cancel 时自动清除。<br/>
     /// 可调用 <see cref="Reset"/> 重置消耗标记后复用同一实例，避免重复分配。
@@ -241,18 +347,368 @@ namespace ES
     public class MatchTargetPendingCommand
     {
         [LabelText("触发时间(秒)"), Min(0f)]
-        [Tooltip("状态进入后经过多少秒触发此指令（hasEnterTime 基准），到达后覆盖当前 MatchTarget 参数")]
+        [Tooltip("状态进入后经过多少秒触发此步骤（hasEnterTime 基准），到达后覆盖当前 MatchTarget 参数")]
         public float triggerAt;
 
         [Header("指令参数")]
         [HideLabel]
         public MatchTargetRequest request = MatchTargetRequest.Default;
 
-        // ── 内部运行时状态（框架控制，外部只需调用 Reset） ──
+        // ── 内部运行时状态（仅用于代码驱动的 QueueNextMatchTarget 路径，不用于 SO 时间线） ──
         [NonSerialized] internal bool consumed;
 
-        /// <summary>重置消耗标记，使此实例可以被再次排队触发。</summary>
+        /// <summary>重置消耗标记，使此实例可以被再次排队触发（仅用于代码驱动路径，勿对 SO 内对象调用）。</summary>
         public void Reset() => consumed = false;
+    }
+
+    [Serializable]
+    public partial class StateProceduralDriveData : IRuntimeInitializable
+    {
+        [NonSerialized] private bool _isRuntimeInitialized;
+        public bool IsRuntimeInitialized => _isRuntimeInitialized;
+
+        [BoxGroup("IK配置", ShowLabel = false)]
+        [BoxGroup("IK配置/基础", ShowLabel = true)]
+        [LabelText("启用IK"), Tooltip("是否允许对此状态进行IK控制")]
+        public bool enableIK = false;
+
+        [BoxGroup("IK配置", ShowLabel = false)]
+        [BoxGroup("IK配置/基础", ShowLabel = true)]
+        [LabelText("状态退出时禁用IK"), ShowIf("enableIK")]
+        [Tooltip("当状态退出时是否自动禁用IK")]
+        public bool disableIKOnExit = true;
+
+        [BoxGroup("IK配置", ShowLabel = false)]
+        [BoxGroup("IK配置/四肢与注视", ShowLabel = true)]
+        [Title("左手IK", bold: false)]
+        [ShowIf("enableIK"), InlineProperty, HideLabel]
+        public IKLimbConfig ikLeftHand = IKLimbConfig.Default;
+
+        [BoxGroup("IK配置", ShowLabel = false)]
+        [BoxGroup("IK配置/四肢与注视", ShowLabel = true)]
+        [Title("右手IK", bold: false)]
+        [ShowIf("enableIK"), InlineProperty, HideLabel]
+        public IKLimbConfig ikRightHand = IKLimbConfig.Default;
+
+        [BoxGroup("IK配置", ShowLabel = false)]
+        [BoxGroup("IK配置/四肢与注视", ShowLabel = true)]
+        [Title("左脚IK", bold: false)]
+        [ShowIf("enableIK"), InlineProperty, HideLabel]
+        public IKLimbConfig ikLeftFoot = IKLimbConfig.Default;
+
+        [BoxGroup("IK配置", ShowLabel = false)]
+        [BoxGroup("IK配置/四肢与注视", ShowLabel = true)]
+        [Title("右脚IK", bold: false)]
+        [ShowIf("enableIK"), InlineProperty, HideLabel]
+        public IKLimbConfig ikRightFoot = IKLimbConfig.Default;
+
+        [BoxGroup("IK配置", ShowLabel = false)]
+        [BoxGroup("IK配置/四肢与注视", ShowLabel = true)]
+        [Title("注视IK", bold: false)]
+        [ShowIf("enableIK"), InlineProperty, HideLabel]
+        public IKLookAtConfig ikLookAt = IKLookAtConfig.Default;
+
+        [BoxGroup("IK配置", ShowLabel = false)]
+        [BoxGroup("IK配置/段列表", ShowLabel = true)]
+        [LabelText("多段 IK")]
+        [Tooltip("按归一化进度求值的 IK 段列表。段可以重叠，重叠区会按影响力自动混合；列表为空时仅使用上方基础 IK 配置。")]
+        [ShowIf("enableIK")]
+        [ListDrawerSettings(ShowFoldout = true, DefaultExpandedState = true, DraggableItems = true, ShowPaging = false)]
+        public List<StateIKSegmentConfig> ikSegments = new List<StateIKSegmentConfig>();
+
+        [BoxGroup("MatchTarget配置", ShowLabel = false)]
+        [BoxGroup("MatchTarget配置/基础", ShowLabel = true)]
+        [LabelText("启用MatchTarget"), Tooltip("是否允许此状态使用MatchTarget对齐")]
+        public bool enableMatchTarget = false;
+
+        [BoxGroup("MatchTarget配置", ShowLabel = false)]
+        [BoxGroup("MatchTarget配置/基础", ShowLabel = true)]
+        [LabelText("状态进入时自动激活"), ShowIf("enableMatchTarget")]
+        [Tooltip("状态 Enter 时自动启动下方初始预设；若还配置了后续步骤列表，也会按 triggerAt 秒自动接管。\n关闭时可由代码手动启动初始预设，后续步骤仍会继续按时间自动推进。")]
+        public bool autoActivateMatchTarget = false;
+
+        [BoxGroup("MatchTarget配置", ShowLabel = false)]
+        [BoxGroup("MatchTarget配置/初始预设", ShowLabel = true)]
+        [Title("MatchTarget预设", bold: false)]
+        [ShowIf("enableMatchTarget"), HideLabel]
+        public MatchTargetRequest matchTargetPreset = MatchTargetRequest.Default;
+
+        [BoxGroup("MatchTarget配置", ShowLabel = false)]
+        [BoxGroup("MatchTarget配置/时序步骤", ShowLabel = true)]
+        [LabelText("后续步骤"), ShowIf("enableMatchTarget")]
+        [Tooltip("按 triggerAt 秒依次覆盖当前 MatchTarget。列表为空时仅使用上方初始预设。\n适合商业项目里的抓取收口、攀爬跨越、挂载对位等多段对齐。")]
+        [ListDrawerSettings(ShowFoldout = true, DefaultExpandedState = true, DraggableItems = true, ShowPaging = false)]
+        public List<MatchTargetPendingCommand> matchTargetTimeline = new List<MatchTargetPendingCommand>();
+
+        public float GetGoalTargetWeight(IKGoal goal, float normalizedProgress = 0f)
+        {
+            var cfg = ResolveGoalConfig(goal, normalizedProgress);
+            return cfg.enabled ? Mathf.Clamp01(cfg.targetWeight) : 0f;
+        }
+
+        public float GetGoalLerpingRate(IKGoal goal, float normalizedProgress = 0f)
+        {
+            var cfg = ResolveGoalConfig(goal, normalizedProgress);
+            return cfg.enabled ? Mathf.Clamp(cfg.lerpingRate, 0.05f, 8f) : 1f;
+        }
+
+        public ResolvedIKLookAtConfig GetResolvedLookAtConfig(float normalizedProgress = 0f)
+        {
+            if (!enableIK)
+                return ResolvedIKLookAtConfig.Disabled;
+
+            float clampedProgress = Mathf.Clamp01(normalizedProgress);
+            float totalInfluence = 0f;
+            float totalWeight = 0f;
+            float weightedTarget = 0f;
+            float weightedResponse = 0f;
+            float weightedBody = 0f;
+            float weightedHead = 0f;
+            float weightedEyes = 0f;
+            float weightedClamp = 0f;
+
+            if (ikSegments != null)
+            {
+                for (int i = 0; i < ikSegments.Count; i++)
+                {
+                    StateIKSegmentConfig segment = ikSegments[i];
+                    if (segment == null || !segment.enabled)
+                        continue;
+
+                    float influence = segment.EvaluateInfluence(clampedProgress);
+                    if (influence <= 0.0001f)
+                        continue;
+
+                    IKLookAtConfig segmentConfig = segment.ikLookAt;
+                    if (segmentConfig == null || !segmentConfig.enabled)
+                        continue;
+
+                    totalInfluence += influence;
+                    totalWeight += influence;
+                    weightedTarget += Mathf.Clamp01(segmentConfig.targetWeight) * influence;
+                    weightedResponse += Mathf.Clamp(segmentConfig.lerpingRate, 0.05f, 8f) * influence;
+                    weightedBody += Mathf.Clamp01(segmentConfig.bodyWeight) * influence;
+                    weightedHead += Mathf.Clamp01(segmentConfig.headWeight) * influence;
+                    weightedEyes += Mathf.Clamp01(segmentConfig.eyesWeight) * influence;
+                    weightedClamp += Mathf.Clamp01(segmentConfig.clampWeight) * influence;
+                }
+            }
+
+            float fallbackInfluence = Mathf.Clamp01(1f - totalInfluence);
+            if (ikLookAt != null && ikLookAt.enabled && fallbackInfluence > 0.0001f)
+            {
+                totalWeight += fallbackInfluence;
+                weightedTarget += Mathf.Clamp01(ikLookAt.targetWeight) * fallbackInfluence;
+                weightedResponse += Mathf.Clamp(ikLookAt.lerpingRate, 0.05f, 8f) * fallbackInfluence;
+                weightedBody += Mathf.Clamp01(ikLookAt.bodyWeight) * fallbackInfluence;
+                weightedHead += Mathf.Clamp01(ikLookAt.headWeight) * fallbackInfluence;
+                weightedEyes += Mathf.Clamp01(ikLookAt.eyesWeight) * fallbackInfluence;
+                weightedClamp += Mathf.Clamp01(ikLookAt.clampWeight) * fallbackInfluence;
+            }
+
+            if (totalWeight <= 0.0001f)
+                return ResolvedIKLookAtConfig.Disabled;
+
+            return new ResolvedIKLookAtConfig
+            {
+                enabled = true,
+                targetWeight = weightedTarget / totalWeight,
+                lerpingRate = weightedResponse / totalWeight,
+                bodyWeight = weightedBody / totalWeight,
+                headWeight = weightedHead / totalWeight,
+                eyesWeight = weightedEyes / totalWeight,
+                clampWeight = weightedClamp / totalWeight,
+            };
+        }
+
+        public StateProceduralDriveData Clone()
+        {
+            return new StateProceduralDriveData
+            {
+                enableIK = enableIK,
+                disableIKOnExit = disableIKOnExit,
+                ikLeftHand = CloneLimb(ikLeftHand),
+                ikRightHand = CloneLimb(ikRightHand),
+                ikLeftFoot = CloneLimb(ikLeftFoot),
+                ikRightFoot = CloneLimb(ikRightFoot),
+                ikLookAt = CloneLookAt(ikLookAt),
+                ikSegments = CloneSegments(ikSegments),
+                enableMatchTarget = enableMatchTarget,
+                autoActivateMatchTarget = autoActivateMatchTarget,
+                matchTargetPreset = CloneRequest(matchTargetPreset),
+                matchTargetTimeline = CloneTimeline(matchTargetTimeline),
+            };
+        }
+
+        public void InitializeRuntime()
+        {
+            if (_isRuntimeInitialized) return;
+            _isRuntimeInitialized = true;
+        }
+
+        private ResolvedIKLimbConfig ResolveGoalConfig(IKGoal goal, float normalizedProgress)
+        {
+            if (!enableIK)
+                return ResolvedIKLimbConfig.Disabled;
+
+            float clampedProgress = Mathf.Clamp01(normalizedProgress);
+            float totalInfluence = 0f;
+            float totalWeight = 0f;
+            float weightedTarget = 0f;
+            float weightedResponse = 0f;
+
+            if (ikSegments != null)
+            {
+                for (int i = 0; i < ikSegments.Count; i++)
+                {
+                    StateIKSegmentConfig segment = ikSegments[i];
+                    if (segment == null || !segment.enabled)
+                        continue;
+
+                    float influence = segment.EvaluateInfluence(clampedProgress);
+                    if (influence <= 0.0001f)
+                        continue;
+
+                    IKLimbConfig segmentConfig = segment.GetGoalConfig(goal);
+                    if (segmentConfig == null || !segmentConfig.enabled)
+                        continue;
+
+                    totalInfluence += influence;
+                    totalWeight += influence;
+                    weightedTarget += Mathf.Clamp01(segmentConfig.targetWeight) * influence;
+                    weightedResponse += Mathf.Clamp(segmentConfig.lerpingRate, 0.05f, 8f) * influence;
+                }
+            }
+
+            IKLimbConfig fallback = ResolveBaseGoalConfig(goal);
+            float fallbackInfluence = Mathf.Clamp01(1f - totalInfluence);
+            if (fallback != null && fallback.enabled && fallbackInfluence > 0.0001f)
+            {
+                totalWeight += fallbackInfluence;
+                weightedTarget += Mathf.Clamp01(fallback.targetWeight) * fallbackInfluence;
+                weightedResponse += Mathf.Clamp(fallback.lerpingRate, 0.05f, 8f) * fallbackInfluence;
+            }
+
+            if (totalWeight <= 0.0001f)
+                return ResolvedIKLimbConfig.Disabled;
+
+            return new ResolvedIKLimbConfig
+            {
+                enabled = true,
+                targetWeight = weightedTarget / totalWeight,
+                lerpingRate = weightedResponse / totalWeight,
+            };
+        }
+
+        private IKLimbConfig ResolveBaseGoalConfig(IKGoal goal)
+        {
+            return goal switch
+            {
+                IKGoal.LeftHand => ikLeftHand,
+                IKGoal.RightHand => ikRightHand,
+                IKGoal.LeftFoot => ikLeftFoot,
+                IKGoal.RightFoot => ikRightFoot,
+                _ => null
+            };
+        }
+
+        private static IKLimbConfig CloneLimb(IKLimbConfig source)
+        {
+            if (source == null) return null;
+            return new IKLimbConfig
+            {
+                enabled = source.enabled,
+                targetWeight = source.targetWeight,
+                lerpingRate = source.lerpingRate,
+            };
+        }
+
+        private static IKLookAtConfig CloneLookAt(IKLookAtConfig source)
+        {
+            if (source == null) return null;
+            return new IKLookAtConfig
+            {
+                enabled = source.enabled,
+                targetWeight = source.targetWeight,
+                lerpingRate = source.lerpingRate,
+                bodyWeight = source.bodyWeight,
+                headWeight = source.headWeight,
+                eyesWeight = source.eyesWeight,
+                clampWeight = source.clampWeight,
+            };
+        }
+
+        private static MatchTargetRequest CloneRequest(MatchTargetRequest source)
+        {
+            if (source == null) return null;
+            return new MatchTargetRequest
+            {
+                bodyPart = source.bodyPart,
+                positionOffset = source.positionOffset,
+                enablePositionOffset = source.enablePositionOffset,
+                rotationOffsetY = source.rotationOffsetY,
+                enableRotationOffset = source.enableRotationOffset,
+                timeRange = source.timeRange,
+                positionApproachSpeed = source.positionApproachSpeed,
+                rotationApproachSpeed = source.rotationApproachSpeed,
+                rotationWeight = source.rotationWeight,
+            };
+        }
+
+        private static List<StateIKSegmentConfig> CloneSegments(List<StateIKSegmentConfig> source)
+        {
+            var result = new List<StateIKSegmentConfig>();
+            if (source == null) return result;
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                var segment = source[i];
+                if (segment == null)
+                {
+                    result.Add(null);
+                    continue;
+                }
+
+                result.Add(new StateIKSegmentConfig
+                {
+                    enabled = segment.enabled,
+                    name = segment.name,
+                    normalizedRange = segment.normalizedRange,
+                    feather = segment.feather,
+                    ikLeftHand = CloneLimb(segment.ikLeftHand),
+                    ikRightHand = CloneLimb(segment.ikRightHand),
+                    ikLeftFoot = CloneLimb(segment.ikLeftFoot),
+                    ikRightFoot = CloneLimb(segment.ikRightFoot),
+                    ikLookAt = CloneLookAt(segment.ikLookAt),
+                });
+            }
+
+            return result;
+        }
+
+        private static List<MatchTargetPendingCommand> CloneTimeline(List<MatchTargetPendingCommand> source)
+        {
+            var result = new List<MatchTargetPendingCommand>();
+            if (source == null) return result;
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                var step = source[i];
+                if (step == null)
+                {
+                    result.Add(null);
+                    continue;
+                }
+
+                result.Add(new MatchTargetPendingCommand
+                {
+                    triggerAt = step.triggerAt,
+                    request = CloneRequest(step.request) ?? MatchTargetRequest.Default,
+                });
+            }
+
+            return result;
+        }
     }
 
     // ==================== 主配置类 ====================
@@ -263,96 +719,15 @@ namespace ES
     /// 所有Calculator实现已移至AnimationMixerCalculators.cs
     /// </summary>
     [Serializable]
+    
     public class StateAnimationConfigData : IRuntimeInitializable
     {
         [NonSerialized] private bool _isRuntimeInitialized;
         public bool IsRuntimeInitialized => _isRuntimeInitialized;
 
+        
         [SerializeReference,LabelText("动画混合计算器")]
         public StateAnimationMixCalculator calculator = new StateAnimationMixCalculatorForSimpleClip();
-
-        // ==================== IK配置（商业级 Inspector 可视化） ====================
-
-        [FoldoutGroup("IK配置")]
-        [LabelText("启用IK"), Tooltip("是否允许对此状态进行IK控制")]
-        public bool enableIK = false;
-
-        [FoldoutGroup("IK配置")]
-        [LabelText("IK来源模式"), ShowIf("enableIK")]
-        [Tooltip("选择 IK 数据从哪里来：\n- 仅使用 Inspector 配置\n- 仅使用代码接口\n- 以 Inspector 配置为基础，运行时允许代码覆盖")]
-        public IKSourceMode ikSourceMode = IKSourceMode.ConfigOnly;
-
-        [FoldoutGroup("IK配置")]
-        [LabelText("IK平滑时间"), Range(0f, 0.5f), ShowIf("enableIK")]
-        [Tooltip("IK权重变化的平滑过渡时间（秒），0=立即")]
-        public float ikSmoothTime = 0.1f;
-
-        [FoldoutGroup("IK配置")]
-        [LabelText("使用IK权重曲线"), ShowIf("enableIK")]
-        [Tooltip("启用后：IK总目标权重会再乘以曲线值（x=归一化进度0-1，y=倍率）。\n适合：出手段拉满、收招段回收等更自然的权重变化。")]
-        public bool useIKTargetWeightCurve = false;
-
-        [FoldoutGroup("IK配置")]
-        [LabelText("IK权重曲线"), ShowIf("@enableIK && useIKTargetWeightCurve")]
-        public AnimationCurve ikTargetWeightCurve = AnimationCurve.Linear(0f, 1f, 1f, 1f);
-
-        [FoldoutGroup("IK配置")]
-        [LabelText("曲线倍率"), Range(0f, 2f), ShowIf("@enableIK && useIKTargetWeightCurve")]
-        [Tooltip("曲线结果的额外倍率（最终倍率=Curve(x)*Scale）。")]
-        public float ikTargetWeightCurveScale = 1f;
-
-        [FoldoutGroup("IK配置")]
-        [LabelText("状态退出时禁用IK"), ShowIf("enableIK")]
-        [Tooltip("当状态退出时是否自动禁用IK")]
-        public bool disableIKOnExit = true;
-
-        [Header("左手IK")]
-        [ShowIf("enableIK"), HideLabel]
-        public IKLimbConfig ikLeftHand = IKLimbConfig.Default;
-
-        [Header("右手IK")]
-        [ShowIf("enableIK"), HideLabel]
-        public IKLimbConfig ikRightHand = IKLimbConfig.Default;
-
-        [Header("左脚IK")]
-        [ShowIf("enableIK"), HideLabel]
-        public IKLimbConfig ikLeftFoot = IKLimbConfig.Default;
-
-        [Header("右脚IK")]
-        [ShowIf("enableIK"), HideLabel]
-        public IKLimbConfig ikRightFoot = IKLimbConfig.Default;
-
-        [Header("注视IK")]
-        [ShowIf("enableIK"), HideLabel]
-        public IKLookAtConfig ikLookAt = IKLookAtConfig.Default;
-
-        // ==================== MatchTarget配置（商业级 Inspector 可视化） ====================
-
-        [FoldoutGroup("MatchTarget配置")]
-        [LabelText("启用MatchTarget"), Tooltip("是否允许此状态使用MatchTarget对齐")]
-        public bool enableMatchTarget = false;
-
-        [FoldoutGroup("MatchTarget配置")]
-        [LabelText("状态进入时自动激活"), ShowIf("enableMatchTarget")]
-        [Tooltip("状态Enter时自动启动阶段时序（Phase1/Phase2 由 StateBase 按 timeRange 自动推进）。\n无论 Phase2.timeRange.x 是否更小，Phase2 都必须在 Phase1.timeRange.y（阶段一结束）之后才允许启动。\n关闭时可由代码手动启动 Phase1，Phase2 仍由 StateBase 按同一规则自动推进。")]
-        public bool autoActivateMatchTarget = false;
-
-        [FoldoutGroup("MatchTarget配置")]
-        [Header("MatchTarget预设")]
-        [ShowIf("enableMatchTarget"), HideLabel]
-        public MatchTargetRequest matchTargetPreset = MatchTargetRequest.Default;
-
-        [FoldoutGroup("MatchTarget配置")]
-        [LabelText("启用阶段2"), ShowIf("enableMatchTarget")]
-        public bool enableMatchTargetPhase2 = false;
-
-        [FoldoutGroup("MatchTarget配置")]
-        [Header("阶段2预设")]
-        [ShowIf("@enableMatchTarget && enableMatchTargetPhase2"), HideLabel]
-        [Tooltip("阶段2 开始时间即为触发阈值，不需额外设置触发进度字段")]
-        public MatchTargetRequest matchTargetPresetPhase2 = MatchTargetRequest.Default;
-
-        // 重施加参数已迁移到 StateMachineConfig.matchTargetReapply（全局配置）。
 
         /// <summary>
         /// 获取Clip和起始时间
@@ -362,157 +737,6 @@ namespace ES
         public virtual (AnimationClip clip, float normalizedTime) GetClipAndTime(StateMachineContext context)
         {
             return (null, 0f);
-        }
-
-        // ==================== IK运行时应用 ====================
-
-        /// <summary>
-        /// 将Inspector配置的IK数据应用到Runtime（状态Enter时调用）
-        /// </summary>
-        public void ApplyIKConfigToRuntime(AnimationCalculatorRuntime runtime, Transform rootTransform = null)
-        {
-            if (!enableIK || runtime == null) return;
-            if (ikSourceMode == IKSourceMode.CodeOnly) return; // 纯代码模式不自动应用配置
-
-            runtime.ik.enabled = true;
-            runtime.ik.targetWeight = 1f;
-
-            // 左手
-            if (ikLeftHand.enabled)
-            {
-                ApplyLimbConfig(ref runtime.ik.leftHandPosition, ref runtime.ik.leftHandRotation,
-                    ref runtime.ik.leftHandWeight, ref runtime.ik.leftHandHintPosition,
-                    ikLeftHand, rootTransform);
-            }
-
-            // 右手
-            if (ikRightHand.enabled)
-            {
-                ApplyLimbConfig(ref runtime.ik.rightHandPosition, ref runtime.ik.rightHandRotation,
-                    ref runtime.ik.rightHandWeight, ref runtime.ik.rightHandHintPosition,
-                    ikRightHand, rootTransform);
-            }
-
-            // 左脚
-            if (ikLeftFoot.enabled)
-            {
-                ApplyLimbConfig(ref runtime.ik.leftFootPosition, ref runtime.ik.leftFootRotation,
-                    ref runtime.ik.leftFootWeight, ref runtime.ik.leftFootHintPosition,
-                    ikLeftFoot, rootTransform);
-            }
-
-            // 右脚
-            if (ikRightFoot.enabled)
-            {
-                ApplyLimbConfig(ref runtime.ik.rightFootPosition, ref runtime.ik.rightFootRotation,
-                    ref runtime.ik.rightFootWeight, ref runtime.ik.rightFootHintPosition,
-                    ikRightFoot, rootTransform);
-            }
-
-            // 注视
-            if (ikLookAt.enabled)
-            {
-                runtime.ik.lookAtWeight = ikLookAt.weight;
-                runtime.ik.lookAtPosition = ikLookAt.target != null
-                    ? ikLookAt.target.position
-                    : ikLookAt.fixedPosition;
-            }
-        }
-
-        /// <summary>
-        /// 评估IK权重曲线倍率（x=归一化进度0-1）。
-        /// </summary>
-        public float EvaluateIKTargetWeightMultiplier(float normalizedProgress)
-        {
-            if (!enableIK || !useIKTargetWeightCurve) return 1f;
-            if (ikTargetWeightCurve == null) return Mathf.Max(0f, ikTargetWeightCurveScale);
-            float t = Mathf.Clamp01(normalizedProgress);
-            float curve = ikTargetWeightCurve.Evaluate(t);
-            return Mathf.Max(0f, curve * ikTargetWeightCurveScale);
-        }
-
-        /// <summary>
-        /// 每帧更新IK目标位置（仅在有Transform引用时需要）
-        /// </summary>
-        public void UpdateIKTargetsFromConfig(AnimationCalculatorRuntime runtime)
-        {
-            if (!enableIK || runtime == null || !runtime.ik.enabled) return;
-            if (ikSourceMode == IKSourceMode.CodeOnly) return;
-
-            // 仅更新有Transform引用的肢体（跟踪动态目标）
-            if (ikLeftHand.enabled && ikLeftHand.target != null)
-            {
-                runtime.ik.leftHandPosition = ikLeftHand.target.position;
-                runtime.ik.leftHandRotation = ikLeftHand.target.rotation;
-            }
-            if (ikLeftHand.enabled && ikLeftHand.hintTarget != null)
-                runtime.ik.leftHandHintPosition = ikLeftHand.hintTarget.position;
-
-            if (ikRightHand.enabled && ikRightHand.target != null)
-            {
-                runtime.ik.rightHandPosition = ikRightHand.target.position;
-                runtime.ik.rightHandRotation = ikRightHand.target.rotation;
-            }
-            if (ikRightHand.enabled && ikRightHand.hintTarget != null)
-                runtime.ik.rightHandHintPosition = ikRightHand.hintTarget.position;
-
-            if (ikLeftFoot.enabled && ikLeftFoot.target != null)
-            {
-                runtime.ik.leftFootPosition = ikLeftFoot.target.position;
-                runtime.ik.leftFootRotation = ikLeftFoot.target.rotation;
-            }
-            if (ikLeftFoot.enabled && ikLeftFoot.hintTarget != null)
-                runtime.ik.leftFootHintPosition = ikLeftFoot.hintTarget.position;
-
-            if (ikRightFoot.enabled && ikRightFoot.target != null)
-            {
-                runtime.ik.rightFootPosition = ikRightFoot.target.position;
-                runtime.ik.rightFootRotation = ikRightFoot.target.rotation;
-            }
-            if (ikRightFoot.enabled && ikRightFoot.hintTarget != null)
-                runtime.ik.rightFootHintPosition = ikRightFoot.hintTarget.position;
-
-            if (ikLookAt.enabled && ikLookAt.target != null)
-                runtime.ik.lookAtPosition = ikLookAt.target.position;
-        }
-
-        private static void ApplyLimbConfig(ref Vector3 position, ref Quaternion rotation,
-            ref float weight, ref Vector3 hintPosition, IKLimbConfig config, Transform rootTransform)
-        {
-            weight = config.weight;
-
-            if (config.target != null)
-            {
-                position = config.target.position;
-                rotation = config.target.rotation;
-            }
-            else if (rootTransform != null)
-            {
-                // 相对于角色根节点的偏移
-                position = rootTransform.TransformPoint(config.positionOffset);
-                rotation = rootTransform.rotation * Quaternion.Euler(config.rotationEulerOffset);
-            }
-            else
-            {
-                position = config.positionOffset;
-                rotation = Quaternion.Euler(config.rotationEulerOffset);
-            }
-
-            if (config.hintTarget != null)
-                hintPosition = config.hintTarget.position;
-        }
-
-        /// <summary>
-        /// 检查是否有任何IK肢体配置了Transform目标（需要每帧更新）
-        /// </summary>
-        public bool HasDynamicIKTargets()
-        {
-            if (!enableIK || ikSourceMode == IKSourceMode.CodeOnly) return false;
-            return (ikLeftHand.enabled && ikLeftHand.target != null)
-                || (ikRightHand.enabled && ikRightHand.target != null)
-                || (ikLeftFoot.enabled && ikLeftFoot.target != null)
-                || (ikRightFoot.enabled && ikRightFoot.target != null)
-                || (ikLookAt.enabled && ikLookAt.target != null);
         }
 
         /// <summary>

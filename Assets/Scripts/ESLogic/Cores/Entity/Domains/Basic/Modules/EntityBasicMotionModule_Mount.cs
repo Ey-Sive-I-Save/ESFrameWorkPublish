@@ -37,7 +37,7 @@ namespace ES
 
         // ★ 通用生命周期跟踪器：封装 _isActive 幂等守卫 + Update 轮询打断检测。
         //   任何需要"与状态严格同步进入/退出"的模块复用同一套逻辑，无需重复编写。
-        private StateLifecycleTracker _lifecycle;
+        private StateLifecycleTracker _lifecycle = new StateLifecycleTracker();
 
         // TryEnterMount → OnMountEnter 之间的参数桥接（避免闭包捕获堆分配）
         private EntityMountable _pendingMountable;
@@ -56,7 +56,6 @@ namespace ES
             }
 
             // 构造跟踪器并绑定状态（无委托，零 GC）
-            _lifecycle = new StateLifecycleTracker();
             _lifecycle.Bind(sm, _mountState, Mount_StateName);
         }
 
@@ -74,8 +73,8 @@ namespace ES
         public void ToggleMount()
         {
             if (!enableMount || _mountState == null) return;
-            if (_lifecycle.IsActive) { if (_lifecycle.RequestExit()) OnMountExit(); }
-            else                     TryEnterMount();
+            if (_lifecycle.RequestExit()) OnMountExit();
+            else                         TryEnterMount();
         }
 
         // ================================================================
@@ -280,7 +279,7 @@ namespace ES
         public override void OnDestroy()
         {
             // 实体销毁时保证骑乘生命周期干净退出（幂等，多次调用安全）
-            if (_lifecycle != null && _lifecycle.Dispose()) OnMountExit();
+            if (_lifecycle.Dispose()) OnMountExit();
 
             if (MyCore != null && MyCore.kcc.mountModule == this)
             {

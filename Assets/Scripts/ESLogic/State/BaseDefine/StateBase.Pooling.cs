@@ -68,20 +68,18 @@ namespace ES
             _runtimePhaseManual = false;
             _resolvedRuntimeConfig = null;
             _resolvedRuntimeDirty = true;
-            _ikDefaultTargetWeight = 1f;
             strKey = null;
             intKey = -1;
             stateSharedData = null;
             stateVariableData = null;
 
             _basicConfigCached = null;
-            _phaseConfigCached = null;
             _animConfigCached = null;
+            _proceduralDriveConfigCached = null;
             _calculatorCached = null;
             _hasAnimationCached = false;
             _hasAnimationMarkerCached = false;
-            _needsProgressTrackingCached = false;
-            _autoPhaseByTimeCached = false;
+            _needsRuntimeProgressCached = false;
             _durationModeCached = StateDurationMode.Timed;
             _enableIKCached = false;
             _enableMatchTargetCached = false;
@@ -95,7 +93,9 @@ namespace ES
             _ikActive = false;
             _matchTargetActive = false;
             _pendingCommand = null;
-            _configAutoPhaseIndex = -1;
+            _configMatchTargetSequenceActive = false;
+            _configMatchTargetNextTimelineIndex = 0;
+            _activeMatchTargetRequest = null;
             _matchTargetLastAppliedPos = Vector3.zero;
             _matchTargetLastAppliedRot = Quaternion.identity;
             _matchTargetLastApplyTime = -999f;

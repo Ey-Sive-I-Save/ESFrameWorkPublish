@@ -101,7 +101,33 @@ namespace ES
         [LabelText("矮墙高度(米)"), Tooltip("实际矮墙高度，用于判断是否可以直接翻越")]
         public float wallHeight = 1.2f;
 
+        [ShowIf("@surfaceType != ClimbableSurfaceType.Wall")]
+        [LabelText("攀上目标点内缩深度(米)"),
+         Tooltip("GetMatchTargetPosition 计算时将目标点从墙面外边缘向内（平台内侧）收缩的距离。\n" +
+                 "默认 0.3m：确保目标在平台顶面而非悬挂边缘，骨骼对齐后脚部踩实地面。\n" +
+                 "若使用 matchTargetAnchor 则此值无效。")]
+        public float matchTargetTopInset = 0.3f;
+
         private const float DefaultLandingExtraOffset = 0.2f;
+
+        // MatchTarget 射线探测：缓存本物体及父物体链的碰撞体（两个方向都要找），避免每帧分配
+        [NonSerialized] private Collider[] _cachedSurfaceColliders;
+        // Physics.RaycastNonAlloc 复用缓冲区（Unity 单线程，static 共享安全）
+        private static readonly RaycastHit[] _sharedRayBuffer = new RaycastHit[32];
+
+        private void EnsureSurfaceColliders()
+        {
+            if (_cachedSurfaceColliders != null) return;
+            var set = new System.Collections.Generic.HashSet<Collider>();
+            // 子物体（含自身）
+            foreach (var c in GetComponentsInChildren<Collider>(true))
+                set.Add(c);
+            // 父物体链：ClimbableSurface 常挂在空的触发子节点上，实体 Collider 在父物体
+            foreach (var c in GetComponentsInParent<Collider>(true))
+                set.Add(c);
+            _cachedSurfaceColliders = new Collider[set.Count];
+            set.CopyTo(_cachedSurfaceColliders);
+        }
 
         // ===== 运行时接口 =====
 
@@ -230,34 +256,115 @@ namespace ES
         }
 
         /// <summary>
-        /// 获取MatchTarget的目标位置（双面感知版本）
+        /// 获取 MatchTarget 的目标位置（双面感知 + 物理顶面精确版）。
+        ///
+        /// 核心思路：
+        ///  1. XZ = GetClosestClimbPoint → 角色投影到墙面贴合点，切线轴夹紧到区域范围
+        ///  2. Y  = Physics.RaycastNonAlloc 向下找物理顶面（不受"起点在碰撞体内"的限制）
+        ///         备选：遍历每个 Collider bounds 中心 XZ 再射
+        ///         兜底：逻辑区域顶部 Y
         /// </summary>
         public Vector3 GetMatchTargetPosition(Vector3 characterPosition)
         {
             if (matchTargetAnchor != null)
                 return matchTargetAnchor.position;
 
-            Vector3 normal = GetDynamicNormal(characterPosition);
-            Vector3 localNormal = transform.InverseTransformDirection(normal).normalized;
-            Vector3 half = GetLocalHalfSize();
-            Vector3 local = areaCenter;
-            local.y = areaCenter.y + half.y;
+            EnsureSurfaceColliders();
 
-            int axis = GetPrimaryAxis(localNormal);
-            if (axis == 0)
+            // ── Step 1: XZ ─────────────────────────────────────────────────────────
+            Vector3 facePoint = GetClosestClimbPoint(characterPosition);
+            // 可选：沿法线向内缩进（0 = 不缩进；正值将骨骼目标拉进平台内侧）
+            if (matchTargetTopInset > 0.001f)
+                facePoint -= GetDynamicNormal(characterPosition).normalized * matchTargetTopInset;
+
+            // ── Step 2: Y ──────────────────────────────────────────────────────────
+            float topY = GetTopWorldY();
+            float scanY = topY + 2f;
+            foreach (var col in _cachedSurfaceColliders)
+                if (col != null && !col.isTrigger)
+                    scanY = Mathf.Max(scanY, col.bounds.max.y + 0.5f);
+
+            float rayLen = scanY - topY + 3f;
+
+            // 首选：facePoint XZ 向下
+            if (TryRaycastOwnSurface(new Vector3(facePoint.x, scanY, facePoint.z), Vector3.down, rayLen, out RaycastHit hit))
             {
-                local.x = areaCenter.x + Mathf.Sign(localNormal.x) * half.x;
-            }
-            else if (axis == 1)
-            {
-                local.y = areaCenter.y + Mathf.Sign(localNormal.y) * half.y;
-            }
-            else
-            {
-                local.z = areaCenter.z + Mathf.Sign(localNormal.z) * half.z;
+#if UNITY_EDITOR
+                Debug.Log($"[ClimbableSurface] GetMatchTarget 命中 point={hit.point:F3} col={hit.collider.name}");
+#endif
+                return hit.point;
             }
 
-            return transform.TransformPoint(local);
+            // 备选：每个碰撞体 bounds 中心 XZ（应对 areaConfig 与碰撞体位置不匹配）
+            foreach (var col in _cachedSurfaceColliders)
+            {
+                if (col == null || col.isTrigger) continue;
+                Vector3 bc = col.bounds.center;
+                if (TryRaycastOwnSurface(new Vector3(bc.x, scanY, bc.z), Vector3.down, rayLen, out hit))
+                {
+#if UNITY_EDITOR
+                    Debug.Log($"[ClimbableSurface] GetMatchTarget 备选命中(bounds中心) point={hit.point:F3} col={hit.collider.name}");
+#endif
+                    return hit.point;
+                }
+            }
+
+            // 兜底
+#if UNITY_EDITOR
+            Debug.LogWarning($"[ClimbableSurface] GetMatchTarget 全部未命中，兜底逻辑顶Y！\n" +
+                $"  name={name}  facePoint={facePoint:F3}  topY={topY:F3}  colliders={_cachedSurfaceColliders.Length}\n" +
+                $"  请检查: 1)Collider非Trigger 2)Collider在子/父节点 3)areaCenter/areaSize与碰撞体对齐");
+#endif
+            return new Vector3(facePoint.x, topY, facePoint.z);
+        }
+
+        /// <summary>
+        /// 用 Physics.RaycastNonAlloc 射线，筛选属于本物体（含子/父）的最近命中点。
+        /// Physics.RaycastNonAlloc 不受"起点在碰撞体内部=无命中"的限制（Collider.Raycast有此问题）。
+        /// </summary>
+        private bool TryRaycastOwnSurface(Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit bestHit)
+        {
+            EnsureSurfaceColliders();
+            int count = Physics.RaycastNonAlloc(origin, direction, _sharedRayBuffer, maxDistance, ~0, QueryTriggerInteraction.Ignore);
+            bestHit = default;
+            float closestDist = float.MaxValue;
+            bool found = false;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit h = _sharedRayBuffer[i];
+                foreach (var col in _cachedSurfaceColliders)
+                {
+                    if (col == h.collider && h.distance < closestDist)
+                    {
+                        closestDist = h.distance;
+                        bestHit = h;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            return found;
+        }
+
+        /// <summary>
+        /// 返回平台顶部 Y 与角色脚部 Y 的高度差（米）。
+        /// 供攀爬模块据此选择不同高度段的攀上动画/MatchTarget 配置。
+        /// </summary>
+        public float GetWallHeightAboveCharacter(Vector3 characterPosition)
+        {
+            return GetTopWorldY() - characterPosition.y;
+        }
+
+        /// <summary>
+        /// 检查指定世界点正上方是否具备足够净空（防止攀上时角色撞头）。
+        /// </summary>
+        /// <param name="originWorld">检测起点（通常为攀上目标手部位置）</param>
+        /// <param name="requiredHeight">所需净空高度（米），建议 1.8~2.2</param>
+        /// <param name="layerMask">碰撞检测层级</param>
+        /// <returns>true = 净空充足，可以攀上；false = 被天花板遮挡，应阻止攀上</returns>
+        public bool HasCeilingClearance(Vector3 originWorld, float requiredHeight, LayerMask layerMask)
+        {
+            return !Physics.Raycast(originWorld, Vector3.up, requiredHeight, layerMask);
         }
 
         /// <summary>

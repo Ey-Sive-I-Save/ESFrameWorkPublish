@@ -224,21 +224,10 @@ namespace ES
 
             float normalized01 = duration > 0.001f ? Mathf.Clamp01(elapsed / duration) : 0f;
 
-            // 1) 总目标权重（targetWeight）：决定最终 IK 强度（会在状态内部 SmoothDamp 到 ik.weight）
             float targetWeight = Mathf.Clamp01(target.EvaluateIKTargetWeight(MyCore, normalized01));
-            _activeState.SetIKExternalTargetWeight(targetWeight);
+            float lerpingRate = Mathf.Clamp(target.EvaluateIKLerpingRate(MyCore, normalized01), 0.05f, 8f);
 
-            // 2) 单肢体权重（limb weight）：控制某个手/脚的权重（通常用来控制“这次交互用哪只手、权重多少”）
-            float limbWeight = Mathf.Clamp01(target.EvaluateIKLimbWeight(MyCore, normalized01));
-
-            Vector3 pos = target.ikTarget.position;
-            Quaternion rot = target.useIKRotation ? target.ikTarget.rotation : MyCore.transform.rotation;
-            _activeState.SetIKGoal(target.ikGoal, pos, rot, limbWeight);
-
-            if (target.ikHintTarget != null)
-            {
-                _activeState.SetIKHintPosition(target.ikGoal, target.ikHintTarget.position);
-            }
+            _activeState.SetIKGoal(target.ikGoal, target.ikTarget, targetWeight, lerpingRate, target.ikHintTarget, target.useIKRotation);
         }
 
         private void ApplyMatchTargetIfNeeded(ESInteractable target)
@@ -246,7 +235,7 @@ namespace ES
             if (_activeState == null) return;
             if (!target.enableMatchTarget) return;
 
-            // MatchTargetRequest 仅承载阶段参数与偏移；目标位姿由运行时传入。
+            // MatchTargetRequest 仅承载请求参数与偏移；目标位姿由运行时传入。
             _activeState.ApplyMatchTarget(
                 target.matchTargetRequest,
                 target.transform.position,

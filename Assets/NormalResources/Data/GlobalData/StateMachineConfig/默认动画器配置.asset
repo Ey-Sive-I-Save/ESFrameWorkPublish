@@ -22,6 +22,8 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   HasConfirm: 1
+  upperBodyMask: {fileID: 31900000, guid: f748df921432c9a438ec18f6fdb170f3, type: 2}
+  lowerBodyMask: {fileID: 31900000, guid: e4e335fe917ba284ea1da6748b090fe2, type: 2}
   disableTransitionPermissionMap:
     baseKeys: 000001000200040008001000200040008000000100020004
     relations:
@@ -49,3 +51,8 @@ MonoBehaviour:
       relatedKeys: 080010002000040002000001
     - key: 1024
       relatedKeys: 08001000200004000200000100028000
+  matchTargetReapply:
+    allow: 0
+    interval: 0.05
+    minDistance: 0.02
+    minAngle: 2

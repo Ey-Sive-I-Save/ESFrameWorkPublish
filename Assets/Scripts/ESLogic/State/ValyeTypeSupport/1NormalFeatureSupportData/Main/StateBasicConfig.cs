@@ -17,7 +17,7 @@ namespace ES
         public bool IsRuntimeInitialized => _isRuntimeInitialized;
         [BoxGroup("标识", ShowLabel = true), PropertyOrder(0)]
         [LabelText("状态名称")]
-        [InfoBox("优先配置：名称、层级、优先级", InfoMessageType.Info)]
+        [InfoBox("优先配置：名称、层级、混合偏置。混合偏置只影响同层 Mixer 的权重分配与最终排序；默认值为“标准”。", InfoMessageType.Info)]
         public string stateName = "新状态";
 
         [BoxGroup("标识", ShowLabel = true), PropertyOrder(0)]
@@ -26,47 +26,109 @@ namespace ES
         public int stateId;
 
         [BoxGroup("标识", ShowLabel = true), PropertyOrder(0)]
-        [LabelText("所属层级(重要！)")]
+        [LabelText("#状态所属层级")]
+        [Tooltip(
+            "定义该状态参与哪一条状态层的并行与覆盖计算，这是状态最核心的归属信息之一。" +
+            "层级决定了它会和哪些状态互相混合、互相覆盖、互相竞争权重。" +
+            "通常应把它理解为“这条状态属于身体哪一层语义管线”，而不是简单的显示分组。" +
+            "选错层级会直接导致动画覆盖关系、Mixer 分配、IK 叠加和最终表现异常。" +
+            "除非你非常确定该状态应该进入别的层，否则不要随意改动。")]
         public StateLayerType layerType = StateLayerType.Base;
 
         [BoxGroup("标识", ShowLabel = true), PropertyOrder(0)]
-        [LabelText("默认优先级(仅作为最后判据)")]
-        [Tooltip("优先级仅在所有其它判定无法决断时作为最终比较依据；建议范围0-255。")]
-        [Range(0, 255)]
-        public byte priority = 50;
+        [LabelText("#同层混合偏置")]
+        [Tooltip(
+            "用于控制同层多个状态同时参与 Mixer 时，谁更容易拿到更高权重。" +
+            "它只影响两件事：1. 同层状态的权重分配；2. 最终排序时的同层偏置。" +
+            "它不影响合并规则，不影响打断规则，也不影响跨层关系。" +
+            "默认值为“标准”，适合绝大多数状态。" +
+            "建议用法：背景 = 几乎只做陪衬；偏低 = 希望参与混合但尽量让位；标准 = 常规默认；偏高 = 希望在同层混合中更主动；关键 = 必须明显压过同层普通状态。" +
+            "使用 5 档离散值而不是旧的 0-255，可避免难以理解和难以维护的微调。")]
+        public StateMixerBias mixerBias = StateMixerBias.Normal;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("状态所处于的支持标记(无代表通用)")]
+        [LabelText("#状态适用环境")]
+        [Tooltip(
+            "定义该状态默认适用于哪一种角色环境或运动语义，例如地面、游泳、飞行、攀爬。" +
+            "状态机在激活、保留、Fallback 和支持标记切换时，都会把它作为重要约束条件。" +
+            "如果这里填写了某个明确标记，通常表示这个状态只应该在该环境下成立；如果为无，则表示它更偏向通用状态。" +
+            "这个字段本质上是“状态的适用环境声明”，不是临时运行时开关。")]
         public StateSupportFlags stateSupportFlag = StateSupportFlags.Grounded;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("忽略进入支持标记")]
+        [LabelText("#忽略入场环境")]
+        [Tooltip(
+            "开启后，状态在尝试进入时不再严格检查当前角色的支持标记是否与 stateSupportFlag 一致。" +
+            "适合那些需要跨环境强制打入的状态，例如某些过渡表现、强制演出、特殊控制态。" +
+            "关闭时，状态进入会遵守支持标记约束，更安全，也更符合常规语义。" +
+            "注意：这只影响“进入时”的检查，不代表进入后所有支持标记逻辑都被完全忽略。")]
         public bool ignoreSupportFlag = false;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("是否必须不允许激活于状态支持标记切换")]
+        [LabelText("#切换时禁激活")]
+        [Tooltip(
+            "该字段控制的是“激活判定”，不是“已激活状态的保留判定”。" +
+            "开启后，当当前支持标记与本状态的 stateSupportFlag 不匹配，且本次属于支持标记切换场景时，状态会被禁止激活。" +
+            "也就是说，它决定的是“切换过程中能不能打进来”。" +
+            "关闭后，则允许在某些支持标记切换窗口里继续尝试激活，是否最终允许还会结合其他支持标记转移规则判断。" +
+            "适合那些强依赖环境、在错误支持标记下绝不能被激活的状态。" 
+            )]
         public bool disableActiveOnSupportFlagSwitching = false;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("支持ReStart")]
+        [LabelText("#切换后自动失活")]
+        [Tooltip(
+            "该字段控制的是“已经在运行中的状态”，不是激活判定。" +
+            "开启后，当状态机当前支持标记切换到与本状态 stateSupportFlag 不再匹配时，该状态会被自动失活。" +
+            "例如一个只适用于 Grounded 的状态，在角色切到 Swimming、Flying、Climbing 后，会被系统主动退出，避免状态残留在错误环境中。" +
+            "关闭后，即使支持标记已经不匹配，状态也允许继续保留，适合过渡态、表现态、桥接态，或你明确希望跨支持标记短暂延续的状态。" +
+            "默认开启，是为了保持当前框架已有的支持标记切换后清理行为。" +
+            "前缀 # 表示该字段必须先阅读 Tooltip 再配置。")]
+        public bool deactivateOnSupportFlagSwitching = true;
+
+        [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
+        [LabelText("#支持重复激活")]
+        [Tooltip(
+            "定义当该状态已经处于运行中时，是否允许再次请求进入并执行一次“重新开始”。" +
+            "开启后，同一个状态重复激活时可以重置自身进入逻辑、重新计算动画或重新触发关键效果。" +
+            "关闭时，重复进入请求通常会被视为无效或被忽略，更适合那些一旦运行就应保持连续性的状态。" +
+            "这个字段决定的是“同状态重复激活”的行为策略，不是普通的状态切换能力。")]
         public bool supportReStart = false;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("进入时重设支持标记")]
+        [LabelText("#入场时重设标记")]
+        [Tooltip(
+            "开启后，状态进入时会主动把状态机当前支持标记重设为本状态声明的 stateSupportFlag。" +
+            "适合那些进入后就应该明确切换宿主语义的状态，例如进入游泳态后，整体环境语义应立即变成 Swimming。" +
+            "关闭时，状态进入不会主动重写当前支持标记，更适合只消费环境、不定义环境的状态。" +
+            "如果你不希望一个状态进入后改写整个状态机的环境语义，就不要开启它。")]
         public bool resetSupportFlagOnEnter = true;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("退出时移除支持标记")]
+        [LabelText("#退出时移除标记")]
+        [Tooltip(
+            "开启后，状态退出时会把自己对应的支持标记从当前状态机语义中移除。" +
+            "适合那些退出后应明确结束某种环境语义占用的状态。" +
+            "关闭时，退出不会主动清理支持标记，通常依赖其他状态进入或外部系统重新设置。" +
+            "如果环境语义是由多个系统共同维护的，这个开关就需要谨慎使用，否则容易在退出时把仍然有效的标记一起清掉。")]
         public bool removeSupportFlagOnExit = false;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("可作为Fallback状态")]
-        [Tooltip("勾选后该状态可被用作Fallback状态（如资源无匹配或失效时的兜底流转）。")]
+        [LabelText("#允许作为Fallback")]
+        [Tooltip(
+            "勾选后，该状态允许被系统当作 Fallback 状态使用。" +
+            "Fallback 的含义是：当某层没有更合适的可运行状态、资源失配、条件落空，或系统需要一个稳定兜底时，可以自动转入该状态。" +
+            "因此它更适合那些安全、稳定、可长时间停留、不会产生副作用的状态。" +
+            "不要把强动作、一次性技能、强依赖目标的状态设成 Fallback，否则兜底逻辑会变得危险。")]
         public bool canBeFeedback = false;
 
         [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
-        [LabelText("持续时间模式")]
-        [Tooltip("无限：永久持续 | 按动画结束：跟随动画长度 | 定时：指定固定时长")]
+        [LabelText("#状态自然持续模式")]
+        [Tooltip(
+            "定义该状态在没有被外部打断时，应以什么规则判定自己何时自然结束。" +
+            "无限 = 会一直保持，直到外部明确退出；按动画结束 = 以当前动画播放完毕作为自动退出依据；定时 = 以 timedDuration 指定的固定时长为准。" +
+            "这是状态生命周期的主规则之一，会直接影响自动退出、临时状态行为和动画驱动逻辑。" +
+            "如果你不确定，常规表现状态优先考虑“按动画结束”，持续控制态再考虑“无限”，强设计时长的状态再用“定时”。")]
         public StateDurationMode durationMode = StateDurationMode.UntilAnimationEnd;
 
         [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
@@ -75,64 +137,34 @@ namespace ES
         public float timedDuration = 1f;
 
         [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
-        [LabelText("启用进度追踪")]
-        [Tooltip("仅在需要阶段/事件/进度时开启，默认关闭以降低开销")]
-        public bool enableProgressTracking = false;
+        [LabelText("#启用运行时进度")]
+        [Tooltip(
+            "开启后，状态会持续计算运行时动画进度，包括 normalizedProgress、totalProgress 和 loopCount。" +
+            "所有依赖动画进度的逻辑，例如分段 IK、分段 LookAt、按进度触发的时序行为与后续可能接入的事件机制，都依赖它。" +
+            "关闭后可以少做一部分运行时进度计算，但所有依赖动画进度的功能都会失效、退化，或长期停留在初始进度。" +
+            "只有当该状态完全不依赖动画进度驱动时才建议关闭。")]
+        public bool enableRuntimeProgress = false;
 
         [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
         [LabelText("启用Clip时长兜底")]
         [Tooltip("仅用于UntilAnimationEnd模式的兜底计算，默认关闭")]
         public bool enableClipLengthFallback = false;
 
-        [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
-        [LabelText("运行时阶段配置")]
-        [HideLabel]
-        public StatePhaseConfig phaseConfig = new StatePhaseConfig();
-
-        [BoxGroup("混合", ShowLabel = true), PropertyOrder(3)]
-        [LabelText("使用直接混合（无淡入淡出）")]
-        [Tooltip("启用后动画立即切换到目标权重，不进行平滑过渡。适用于表情、UI反馈等需要即时响应的动画")]
-        public bool useDirectBlend = false;
-
-        [BoxGroup("混合", ShowLabel = true), PropertyOrder(3)]
-        [LabelText("Avatar Mask（可选）"), AssetsOnly]
-        [Tooltip("指定Avatar Mask来控制动画影响的骨骼范围。\n常用场景：\n- 上半身动作：攻击/换弹仅影响上半身\n- 下半身动作：移动/跳跃仅影响下半身\n- 左手/右手分离控制")]
-        public AvatarMask avatarMask = null;
-
         [BoxGroup("说明", ShowLabel = true), PropertyOrder(4)]
-        [LabelText("状态描述"), TextArea(2, 3)]
-        public string description = "";
+        [LabelText("内部备注"), TextArea(2, 3)]
+        [Tooltip("仅供策划、程序或美术在资产上记录说明，不参与运行时逻辑、状态判断、导出显示名或 UI 展示链路。" +
+             "如果你需要给编辑器列表、预设说明或展示层使用，请填写 StateSharedData 里的 description，而不是这里。")]
+        [FormerlySerializedAs("description")]
+        public string internalNote = "";
 
         /// <summary>
         /// 验证并修正配置（编辑器与运行时可调用）。
         /// 会：
         /// - 确保 <see cref="timedDuration"/> 非负
-        /// - 保证 <see cref="phaseConfig.mainStartTime"/> <= <see cref="phaseConfig.waitStartTime"/>
-        /// - 将 <see cref="priority"/> 限制在 [0,255]
         /// </summary>
         public void ValidateAndFix()
         {
             if (timedDuration < 0f) timedDuration = 0f;
-
-            // clamp priority
-            if (priority < 0) priority = 0;
-            if (priority > 255) priority = 255;
-
-            // ensure phase ordering
-            if (phaseConfig != null)
-            {
-                if (phaseConfig.mainStartTime < 0f) phaseConfig.mainStartTime = 0f;
-                if (phaseConfig.mainStartTime > 1f) phaseConfig.mainStartTime = 1f;
-                if (phaseConfig.waitStartTime < 0f) phaseConfig.waitStartTime = 0f;
-                if (phaseConfig.waitStartTime > 1f) phaseConfig.waitStartTime = 1f;
-
-                if (phaseConfig.waitStartTime < phaseConfig.mainStartTime)
-                {
-                    // 保持 release >= return，若不满足则将 release 调整为 return
-                    phaseConfig.waitStartTime = phaseConfig.mainStartTime;
-                }
-
-            }
         }
 
         /// <summary>
@@ -143,124 +175,6 @@ namespace ES
             if (_isRuntimeInitialized) return;
 
             ValidateAndFix();
-            phaseConfig?.InitializeRuntime();
-
-            _isRuntimeInitialized = true;
-        }
-    }
-
-
-    /// <summary>
-    /// 状态阶段配置
-    /// </summary>
-    [Serializable]
-    public class StatePhaseConfig : IRuntimeInitializable
-    {
-        [NonSerialized] private bool _isRuntimeInitialized;
-        public bool IsRuntimeInitialized => _isRuntimeInitialized;
-        [LabelText("启用阶段")]
-        public bool enablePhase = false;
-
-        [LabelText("启用按时间自动切换")]
-        public bool enableAutoPhaseByTime = false;
-
-        [LabelText("静默阶段覆盖")]
-        [Tooltip("启用后忽略Pre/Wait/Released覆盖，仅使用Main(默认)配置")]
-        public bool mutePhaseOverride = false;
-
-        [LabelText("Main阶段开始时间(归一化)"), Range(0, 1)]
-        [Tooltip("达到此时间点进入Main阶段")]
-        [FormerlySerializedAs("returnStartTime")]
-        public float mainStartTime = 0.7f;
-
-        [LabelText("Wait阶段开始时间(归一化)"), Range(0, 1)]
-        [Tooltip("达到此时间点进入Wait阶段（回收/衔接）")]
-        [FormerlySerializedAs("releaseStartTime")]
-        public float waitStartTime = 0.9f;
-
-        [Title("Main阶段IK")]
-        [LabelText("覆盖Main阶段IK目标权重")]
-        [Tooltip("启用后：当状态运行时阶段进入 Main 时，强制把IK总目标权重设置为 mainIKTargetWeight（0=不影响/关闭IK，1=完全启用IK）。\n不启用时：Main阶段沿用默认IK目标权重，或由Pre/Wait/Released阶段覆盖决定。")]
-        public bool overrideMainIK = false;
-
-        [ShowIf("overrideMainIK"), Range(0f, 1f)]
-        [Tooltip("Main阶段的IK总目标权重（会被平滑过渡到该值）。")]
-        public float mainIKTargetWeight = 1f;
-
-        [Title("阶段覆盖")]
-        [LabelText("Pre阶段覆盖")]
-        public StatePhaseOverrideConfig preOverride = new StatePhaseOverrideConfig();
-
-        [LabelText("Wait阶段覆盖")]
-        public StatePhaseOverrideConfig waitOverride = new StatePhaseOverrideConfig();
-
-        [LabelText("Released阶段覆盖")]
-        public StatePhaseOverrideConfig releasedOverride = new StatePhaseOverrideConfig();
-
-        // 代价相关参数已移除
-
-        /// <summary>
-        /// 运行时初始化
-        /// </summary>
-        public void InitializeRuntime()
-        {
-            if (_isRuntimeInitialized) return;
-            preOverride?.InitializeRuntime();
-            waitOverride?.InitializeRuntime();
-            releasedOverride?.InitializeRuntime();
-            _isRuntimeInitialized = true;
-        }
-
-        public StateRuntimePhase EvaluatePhase(float normalizedProgress)
-        {
-            if (normalizedProgress < mainStartTime)
-                return StateRuntimePhase.Pre;
-            if (normalizedProgress < waitStartTime)
-                return StateRuntimePhase.Main;
-            return StateRuntimePhase.Wait;
-        }
-    }
-
-    [Serializable]
-    public class StatePhaseOverrideConfig : IRuntimeInitializable
-    {
-        [NonSerialized] private bool _isRuntimeInitialized;
-        public bool IsRuntimeInitialized => _isRuntimeInitialized;
-
-        [LabelText("启用覆盖")]
-        public bool enable = false;
-
-        [LabelText("覆盖代价")]
-        public bool overrideCost = false;
-
-        [ShowIf("overrideCost")]
-        [HideLabel]
-        public StateCostData costData = new StateCostData();
-
-        [LabelText("覆盖冲突规则")]
-        public bool overrideMerge = false;
-
-        [ShowIf("overrideMerge")]
-        [HideLabel]
-        public StateMergeData mergeData = new StateMergeData();
-
-        [LabelText("覆盖优先级")]
-        public bool overridePriority = false;
-
-        [ShowIf("overridePriority"), Range(0, 255)]
-        public byte priority = 50;
-
-        [LabelText("覆盖IK目标权重")]
-        public bool overrideIK = false;
-
-        [ShowIf("overrideIK"), Range(0f, 1f)]
-        public float ikTargetWeight = 1f;
-
-        public void InitializeRuntime()
-        {
-            if (_isRuntimeInitialized) return;
-            costData?.InitializeRuntime();
-            mergeData?.InitializeRuntime();
             _isRuntimeInitialized = true;
         }
     }

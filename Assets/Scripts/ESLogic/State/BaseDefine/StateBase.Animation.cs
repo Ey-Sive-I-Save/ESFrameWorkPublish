@@ -372,7 +372,7 @@ namespace ES
             if (calculator == null) return;
 
             // ★ 修复：进度更新只调用一次（之前被调用了两次导致2x速度推进！）
-            if (_needsProgressTrackingCached)
+            if (_needsRuntimeProgressCached)
             {
                 UpdateRuntimeProgress(deltaTime);
             }
@@ -405,41 +405,6 @@ namespace ES
             // normalizedProgress 可能涉及除法/分支：按需且最多计算一次。
             float np = 0f;
             bool hasNp = false;
-
-            // ★ 更新IK权重平滑过渡
-            if (runtime.ik.enabled)
-            {
-                var animConfig = _animConfigCached;
-                var resolved = _resolvedRuntimeConfig;
-                float target;
-                if (!_ikActive)
-                {
-                    // IK被显式禁用：仍然要把targetWeight推向0，才能让ik.weight平滑衰减。
-                    target = 0f;
-                }
-                else
-                {
-                    // ★ 深度集成：ResolvedConfig的IK目标权重与配置曲线相乘（更自然的进出手/收招权重）
-                    // ResolvedConfig.ikTargetWeight 已包含：默认值 + Phase覆盖 + Main阶段覆盖
-                    target = resolved != null ? resolved.ikTargetWeight : runtime.ik.targetWeight;
-                    if (_enableIKCached && animConfig != null)
-                    {
-                        if (!hasNp) { np = normalizedProgress; hasNp = true; }
-                        target *= animConfig.EvaluateIKTargetWeightMultiplier(np);
-                    }
-                }
-
-                SetIKTargetWeight(target);
-
-                float ikSmooth = animConfig != null ? animConfig.ikSmoothTime : 0f;
-                runtime.UpdateIKWeight(ikSmooth, deltaTime);
-
-                // ★ 动态IK目标追踪：如果配置了Transform引用，每帧同步位置
-                if (_ikActive && _enableIKCached && animConfig != null && animConfig.HasDynamicIKTargets())
-                {
-                    animConfig.UpdateIKTargetsFromConfig(runtime);
-                }
-            }
 
             // ★ Config-Auto 时间序列驱动：每帧根据 hasEnterTime 自动推进阶段
             // 独立于 runtime.matchTarget.active，支持阶段切换和重入。

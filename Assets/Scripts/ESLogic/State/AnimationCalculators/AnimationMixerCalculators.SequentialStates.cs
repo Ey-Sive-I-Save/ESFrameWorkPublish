@@ -1,9 +1,14 @@
-using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
-using UnityEngine.Animations;
 using UnityEngine.Playables;
+using UnityEngine.Animations;
 using Sirenix.OdinInspector;
+using System;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace ES
 {
@@ -1007,4 +1012,5 @@ namespace ES
             runtime.phaseMixers[phaseIndex].SetInputWeight(1, secondaryWeight);
         }
     }
+
 }

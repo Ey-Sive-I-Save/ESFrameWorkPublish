@@ -22,8 +22,8 @@ using Debug = UnityEngine.Debug;
 // - 查询某状态是否运行：public bool IsStateRunning(StateBase state)
 //
 // 【IK 汇总输出】
-// - 最终 IK 姿态：public StateIKPose finalIKPose
-// - IK 后处理扩展点：public delegate FinalIKPosePostProcessDelegate(...) / public event OnFinalIKPosePostProcess
+// - StateGeneralFinalIKDriver 姿态：public StateGeneralFinalIKDriverPose stateGeneralFinalIKDriverPose
+// - IK 后处理扩展点：public delegate StateGeneralFinalIKDriverPosePostProcessDelegate(...) / public event OnStateGeneralFinalIKDriverPosePostProcess
 //
 // 【运行时约束】
 // - 支持标记：public StateSupportFlags currentSupportFlags
@@ -193,19 +193,19 @@ namespace ES
         #region FinalIK 输出（BipedIK）
 
         /// <summary>
-        /// 由 StateMachine 每帧聚合得到的最终 IK Pose（供 LateUpdate 驱动 FinalIK 使用）。
+        /// 由 StateMachine 每帧聚合得到的 StateFinalIKDriver 姿态快照。
         /// </summary>
         [NonSerialized]
-        public StateIKPose finalIKPose;
+        public StateGeneralFinalIKDriverPose stateGeneralFinalIKDriverPose;
 
         /// <summary>
-        /// FinalIK Pose 后处理回调：允许外部模块在不侵入状态系统的前提下，
-        /// 对 finalIKPose 做“最后一公里”的增量修正（例如：走台阶脚贴合、轻量LookAt等）。
+        /// StateGeneralFinalIKDriver Pose 后处理回调：允许外部模块在不侵入状态系统的前提下，
+        /// 对 stateGeneralFinalIKDriverPose 做“最后一公里”的增量修正（例如：走台阶脚贴合、轻量 LookAt 等）。
         /// 不订阅时完全不影响原有逻辑与性能。
         /// </summary>
-        public delegate void FinalIKPosePostProcessDelegate(StateMachine machine, ref StateIKPose pose, float deltaTime);
+        public delegate void StateGeneralFinalIKDriverPosePostProcessDelegate(StateMachine machine, ref StateGeneralFinalIKDriverPose pose, float deltaTime);
 
-        public event FinalIKPosePostProcessDelegate OnFinalIKPosePostProcess;
+        public event StateGeneralFinalIKDriverPosePostProcessDelegate OnStateGeneralFinalIKDriverPosePostProcess;
 
         #endregion
 
@@ -277,6 +277,11 @@ namespace ES
 
                 var stateFlag = basicConfig.stateSupportFlag;
                 if (stateFlag == StateSupportFlags.None)
+                {
+                    continue;
+                }
+
+                if (!basicConfig.deactivateOnSupportFlagSwitching)
                 {
                     continue;
                 }
@@ -557,12 +562,21 @@ namespace ES
         protected bool isDirty = false;
 
         // ===== Mixer 权重分配缓存（零GC） =====
-        // 用途：按优先级/淡入淡出对同层多个可播放动画做“抢占式”权重分配，保证权重和=1。
+        // 用途：按混合偏置/淡入淡出对同层多个可播放动画做“抢占式”权重分配，保证权重和=1。
         [NonSerialized]
         private int[] _mixerWeightSortIndices = new int[64];
 
         [NonSerialized]
         private float[] _mixerEffectiveWeights = new float[64];
+
+        private static readonly float[] MixerBiasScoreFactors =
+        {
+            0.85f,
+            0.93f,
+            1.00f,
+            1.08f,
+            1.16f,
+        };
 
         [NonSerialized]
         private bool _isUpdatingMixerInputWeights = false;
@@ -579,6 +593,15 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static float ResolveMixerBiasScoreFactor(StateMixerBias mixerBias)
+        {
+            int index = (int)mixerBias;
+            if ((uint)index >= MixerBiasScoreFactors.Length)
+                index = (int)StateMixerBias.Normal;
+            return MixerBiasScoreFactors[index];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int CompareStateForMixerWeightSort(StateBase a, StateBase b)
         {
             if (ReferenceEquals(a, b)) return 0;
@@ -586,12 +609,12 @@ namespace ES
             a.EnsureResolvedRuntimeConfig();
             b.EnsureResolvedRuntimeConfig();
 
-            int pa = a.ResolvedConfig.priority;
-            int pb = b.ResolvedConfig.priority;
-            if (pa != pb)
+            int ba = (int)a.ResolvedConfig.mixerBias;
+            int bb = (int)b.ResolvedConfig.mixerBias;
+            if (ba != bb)
             {
-                // priority: desc
-                return pb.CompareTo(pa);
+                // mixer bias: desc
+                return bb.CompareTo(ba);
             }
 
             // activationTime: newer first
@@ -913,12 +936,18 @@ namespace ES
 
         private AvatarMask ResolveLayerMask(StateLayerType layerType)
         {
+            var globalConfig = config != null ? config : StateMachineConfig.Instance;
+
             switch (layerType)
             {
                 case StateLayerType.UpperBody:
-                    return upperBodyMask;
+                    return upperBodyMask != null
+                        ? upperBodyMask
+                        : globalConfig != null ? globalConfig.upperBodyMask : null;
                 case StateLayerType.LowerBody:
-                    return lowerBodyMask;
+                    return lowerBodyMask != null
+                        ? lowerBodyMask
+                        : globalConfig != null ? globalConfig.lowerBodyMask : null;
                 default:
                     return null;
             }
@@ -1489,6 +1518,10 @@ namespace ES
                 // ★ 检查是否应该自动退出（按持续时间模式）
                 if (state.ShouldAutoExit(Time.time))
                 {
+                    string autoExitLayerName = stateLayerMap.TryGetValue(state, out var autoExitLayer)
+                        ? autoExitLayer.ToString()
+                        : "<unknown>";
+                    StateMachineDebug.Log($"[AutoExit] State={state.strKey} | Layer={autoExitLayerName} | ActivationTime={state.activationTime:F3} | Now={Time.time:F3}");
                     statesToDeactivate.Add(state);
                 }
             }
@@ -1525,8 +1558,8 @@ namespace ES
                 // 同步层级权重到RootMixer
                 UpdateLayerWeights();
 
-                // ★ FinalIK Pose 聚合：每帧从所有 Running State 的 runtime.ik 生成最终 Pose（LateUpdate 驱动输出）
-                UpdateFinalIKPoseCache(deltaTime);
+                // ★ General IK Pose 聚合：每帧从所有 Running State 的 runtime.ik 生成最终姿态快照（LateUpdate 驱动输出）
+                UpdateStateGeneralFinalIKDriverPoseCache(deltaTime);
 
                 // Manual模式下需要手动Evaluate推进图
                 if (playableGraph.IsValid())
@@ -1721,16 +1754,16 @@ namespace ES
 #endif
         }
 
-        private void UpdateFinalIKPoseCache(float deltaTime)
+        private void UpdateStateGeneralFinalIKDriverPoseCache(float deltaTime)
         {
-            finalIKPose.Reset();
+            stateGeneralFinalIKDriverPose.Reset();
 
             // 临时容器：按层级做 override（上层优先），同层多状态做权重混合
-            StateIKPose upper = default;
-            StateIKPose lower = default;
-            StateIKPose buff = default;
-            StateIKPose main = default;
-            StateIKPose @base = default;
+            StateGeneralFinalIKDriverPose upper = default;
+            StateGeneralFinalIKDriverPose lower = default;
+            StateGeneralFinalIKDriverPose buff = default;
+            StateGeneralFinalIKDriverPose main = default;
+            StateGeneralFinalIKDriverPose @base = default;
             upper.Reset();
             lower.Reset();
             buff.Reset();
@@ -1744,10 +1777,9 @@ namespace ES
                 if (state == null || state.baseStatus != StateBaseStatus.Running) continue;
 
                 var runtime = state.AnimationRuntime;
-                if (runtime == null || !runtime.ik.enabled) continue;
-                if (runtime.ik.weight < 0.001f) continue;
+                if (runtime == null || !runtime.ik.enabled || !runtime.ik.HasAnyTargetWeight) continue;
 
-                float master = runtime.ik.weight * state.PlayableWeight;
+                float master = state.PlayableWeight;
                 if (master < 0.001f) continue;
 
                 if (!stateLayerMap.TryGetValue(state, out var layerType))
@@ -1760,31 +1792,31 @@ namespace ES
             }
 
             // 按层级 override 合成：UpperBody > LowerBody > Buff > Main > Base
-            ComposeOverride(ref finalIKPose, ref upper);
-            ComposeOverride(ref finalIKPose, ref lower);
-            ComposeOverride(ref finalIKPose, ref buff);
-            ComposeOverride(ref finalIKPose, ref main);
-            ComposeOverride(ref finalIKPose, ref @base);
+            ComposeOverride(ref stateGeneralFinalIKDriverPose, ref upper);
+            ComposeOverride(ref stateGeneralFinalIKDriverPose, ref lower);
+            ComposeOverride(ref stateGeneralFinalIKDriverPose, ref buff);
+            ComposeOverride(ref stateGeneralFinalIKDriverPose, ref main);
+            ComposeOverride(ref stateGeneralFinalIKDriverPose, ref @base);
 
             // 输出权重 clamp
-            ClampPoseWeights(ref finalIKPose);
+            ClampPoseWeights(ref stateGeneralFinalIKDriverPose);
 
             // 外部后处理（可选）：例如脚贴合台阶等
-            var cb = OnFinalIKPosePostProcess;
+            var cb = OnStateGeneralFinalIKDriverPosePostProcess;
             if (cb != null)
             {
-                cb(this, ref finalIKPose, deltaTime);
-                ClampPoseWeights(ref finalIKPose);
+                cb(this, ref stateGeneralFinalIKDriverPose, deltaTime);
+                ClampPoseWeights(ref stateGeneralFinalIKDriverPose);
             }
         }
 
-        private static ref StateIKPose GetLayerPoseRef(
+        private static ref StateGeneralFinalIKDriverPose GetLayerPoseRef(
             StateLayerType layerType,
-            ref StateIKPose upper,
-            ref StateIKPose lower,
-            ref StateIKPose buff,
-            ref StateIKPose main,
-            ref StateIKPose @base)
+            ref StateGeneralFinalIKDriverPose upper,
+            ref StateGeneralFinalIKDriverPose lower,
+            ref StateGeneralFinalIKDriverPose buff,
+            ref StateGeneralFinalIKDriverPose main,
+            ref StateGeneralFinalIKDriverPose @base)
         {
             switch (layerType)
             {
@@ -1797,29 +1829,45 @@ namespace ES
             }
         }
 
-        private static void AccumulateFromRuntime(ref StateIKPose pose, StateBase state, float master)
-        {
+        private static void AccumulateFromRuntime(ref StateGeneralFinalIKDriverPose pose, StateBase state, float master)
+        { 
             ref var ik = ref state.AnimationRuntime.ik;
+            var proceduralDriveConfig = state.stateSharedData != null ? state.stateSharedData.proceduralDriveConfig : null;
+            float normalizedProgress = Mathf.Clamp01(state.normalizedProgress);
+            float leftHandWeight = (proceduralDriveConfig != null ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.LeftHand, normalizedProgress) : 1f) * ik.leftHand.targetWeight * master;
+            float rightHandWeight = (proceduralDriveConfig != null ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.RightHand, normalizedProgress) : 1f) * ik.rightHand.targetWeight * master;
+            float leftFootWeight = (proceduralDriveConfig != null ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.LeftFoot, normalizedProgress) : 1f) * ik.leftFoot.targetWeight * master;
+            float rightFootWeight = (proceduralDriveConfig != null ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.RightFoot, normalizedProgress) : 1f) * ik.rightFoot.targetWeight * master;
 
-            AccumulateGoal(ref pose.leftHand, ik.leftHandWeight * master, ik.leftHandPosition, ik.leftHandRotation, ik.leftHandHintPosition);
-            AccumulateGoal(ref pose.rightHand, ik.rightHandWeight * master, ik.rightHandPosition, ik.rightHandRotation, ik.rightHandHintPosition);
-            AccumulateGoal(ref pose.leftFoot, ik.leftFootWeight * master, ik.leftFootPosition, ik.leftFootRotation, ik.leftFootHintPosition);
-            AccumulateGoal(ref pose.rightFoot, ik.rightFootWeight * master, ik.rightFootPosition, ik.rightFootRotation, ik.rightFootHintPosition);
+            float leftHandLerpingRate = (proceduralDriveConfig != null ? proceduralDriveConfig.GetGoalLerpingRate(IKGoal.LeftHand, normalizedProgress) : 1f) * ik.leftHand.lerpingRate;
+            float rightHandLerpingRate = (proceduralDriveConfig != null ? proceduralDriveConfig.GetGoalLerpingRate(IKGoal.RightHand, normalizedProgress) : 1f) * ik.rightHand.lerpingRate;
+            float leftFootLerpingRate = (proceduralDriveConfig != null ? proceduralDriveConfig.GetGoalLerpingRate(IKGoal.LeftFoot, normalizedProgress) : 1f) * ik.leftFoot.lerpingRate;
+            float rightFootLerpingRate = (proceduralDriveConfig != null ? proceduralDriveConfig.GetGoalLerpingRate(IKGoal.RightFoot, normalizedProgress) : 1f) * ik.rightFoot.lerpingRate;
 
-            float lookW = ik.lookAtWeight * master;
+            AccumulateGoal(ref pose.leftHand, leftHandWeight, leftHandLerpingRate, ik.leftHand.position, ik.leftHand.rotation, ik.leftHand.hintPosition);
+            AccumulateGoal(ref pose.rightHand, rightHandWeight, rightHandLerpingRate, ik.rightHand.position, ik.rightHand.rotation, ik.rightHand.hintPosition);
+            AccumulateGoal(ref pose.leftFoot, leftFootWeight, leftFootLerpingRate, ik.leftFoot.position, ik.leftFoot.rotation, ik.leftFoot.hintPosition);
+            AccumulateGoal(ref pose.rightFoot, rightFootWeight, rightFootLerpingRate, ik.rightFoot.position, ik.rightFoot.rotation, ik.rightFoot.hintPosition);
+
+            var lookAtConfig = proceduralDriveConfig != null ? proceduralDriveConfig.GetResolvedLookAtConfig(normalizedProgress) : ResolvedIKLookAtConfig.Disabled;
+            float lookConfigWeight = proceduralDriveConfig != null ? (lookAtConfig.enabled ? Mathf.Clamp01(lookAtConfig.targetWeight) : 0f) : 1f;
+            float lookW = lookConfigWeight * ik.lookAt.targetWeight * master;
             if (lookW > 0.001f)
             {
-                AccumulateLookAt(ref pose, lookW, ik.lookAtPosition, state);
+                float lookAtLerpingRate = (proceduralDriveConfig != null ? Mathf.Clamp(lookAtConfig.lerpingRate, 0.05f, 8f) : 1f) * ik.lookAt.lerpingRate;
+                AccumulateLookAt(ref pose, lookW, lookAtLerpingRate, ik.lookAt.position, state);
             }
         }
 
-        private static void AccumulateGoal(ref IKGoalPose goal, float w, Vector3 pos, Quaternion rot, Vector3 hintPos)
+        private static void AccumulateGoal(ref IKGoalPose goal, float w, float lerpingRate, Vector3 pos, Quaternion rot, Vector3 hintPos)
         {
             if (w <= 0.001f) return;
+            float normalizedLerpingRate = Mathf.Clamp(lerpingRate, 0.05f, 8f);
 
             if (goal.weight <= 0.001f)
             {
                 goal.weight = w;
+                goal.lerpingRate = normalizedLerpingRate;
                 goal.position = pos;
                 goal.rotation = rot;
                 goal.hintPosition = hintPos;
@@ -1828,6 +1876,7 @@ namespace ES
 
             float newW = goal.weight + w;
             float t = w / newW;
+            goal.lerpingRate = Mathf.Lerp(goal.lerpingRate, normalizedLerpingRate, t);
             goal.position = Vector3.Lerp(goal.position, pos, t);
             goal.rotation = Quaternion.Slerp(goal.rotation, rot, t);
 
@@ -1839,11 +1888,13 @@ namespace ES
             goal.weight = newW;
         }
 
-        private static void AccumulateLookAt(ref StateIKPose pose, float w, Vector3 lookAtPos, StateBase state)
+        private static void AccumulateLookAt(ref StateGeneralFinalIKDriverPose pose, float w, float lerpingRate, Vector3 lookAtPos, StateBase state)
         {
+            float normalizedLerpingRate = Mathf.Clamp(lerpingRate, 0.05f, 8f);
             if (pose.lookAtWeight <= 0.001f)
             {
                 pose.lookAtWeight = w;
+                pose.lookAtLerpingRate = normalizedLerpingRate;
                 pose.lookAtPosition = lookAtPos;
                 ApplyLookAtConfig(ref pose, state);
                 return;
@@ -1851,16 +1902,17 @@ namespace ES
 
             float newW = pose.lookAtWeight + w;
             float t = w / newW;
+            pose.lookAtLerpingRate = Mathf.Lerp(pose.lookAtLerpingRate, normalizedLerpingRate, t);
             pose.lookAtPosition = Vector3.Lerp(pose.lookAtPosition, lookAtPos, t);
             pose.lookAtWeight = newW;
         }
 
-        private static void ApplyLookAtConfig(ref StateIKPose pose, StateBase state)
+        private static void ApplyLookAtConfig(ref StateGeneralFinalIKDriverPose pose, StateBase state)
         {
-            var animConfig = state.stateSharedData != null ? state.stateSharedData.animationConfig : null;
-            if (animConfig != null && animConfig.enableIK && animConfig.ikLookAt.enabled)
+            var proceduralDriveConfig = state.stateSharedData != null ? state.stateSharedData.proceduralDriveConfig : null;
+            var cfg = proceduralDriveConfig != null ? proceduralDriveConfig.GetResolvedLookAtConfig(state.normalizedProgress) : ResolvedIKLookAtConfig.Disabled;
+            if (cfg.enabled)
             {
-                var cfg = animConfig.ikLookAt;
                 pose.lookAtBodyWeight = cfg.bodyWeight;
                 pose.lookAtHeadWeight = cfg.headWeight;
                 pose.lookAtEyesWeight = cfg.eyesWeight;
@@ -1875,7 +1927,7 @@ namespace ES
             }
         }
 
-        private static void ComposeOverride(ref StateIKPose dst, ref StateIKPose src)
+        private static void ComposeOverride(ref StateGeneralFinalIKDriverPose dst, ref StateGeneralFinalIKDriverPose src)
         {
             if (dst.leftHand.weight <= 0.001f && src.leftHand.weight > 0.001f) dst.leftHand = src.leftHand;
             if (dst.rightHand.weight <= 0.001f && src.rightHand.weight > 0.001f) dst.rightHand = src.rightHand;
@@ -1885,6 +1937,7 @@ namespace ES
             if (dst.lookAtWeight <= 0.001f && src.lookAtWeight > 0.001f)
             {
                 dst.lookAtWeight = src.lookAtWeight;
+                dst.lookAtLerpingRate = src.lookAtLerpingRate;
                 dst.lookAtPosition = src.lookAtPosition;
                 dst.lookAtBodyWeight = src.lookAtBodyWeight;
                 dst.lookAtHeadWeight = src.lookAtHeadWeight;
@@ -1893,7 +1946,7 @@ namespace ES
             }
         }
 
-        private static void ClampPoseWeights(ref StateIKPose pose)
+        private static void ClampPoseWeights(ref StateGeneralFinalIKDriverPose pose)
         {
             pose.leftHand.weight = Mathf.Clamp01(pose.leftHand.weight);
             pose.rightHand.weight = Mathf.Clamp01(pose.rightHand.weight);
@@ -1943,7 +1996,6 @@ namespace ES
         private void ApplyFadeIn(StateBase state, StateLayerRuntime layer)
         {
             if (!state.stateSharedData.enableFadeInOut) return;
-            if (state.stateSharedData.basicConfig.useDirectBlend) return;
 
             float fadeInDuration = GetScaledFadeDuration(state.stateSharedData.fadeInDuration, state.stateSharedData);
             if (fadeInDuration <= 0f || !layer.stateToSlotMap.ContainsKey(state))
@@ -1975,19 +2027,10 @@ namespace ES
         private void ApplyFadeOut(StateBase state, StateLayerRuntime layer)
         {
             if (!state.stateSharedData.enableFadeInOut) return;
-            if (state.stateSharedData.basicConfig.useDirectBlend) return;
 
             float fadeOutDuration = GetScaledFadeDuration(state.stateSharedData.fadeOutDuration, state.stateSharedData);
             if (fadeOutDuration <= 0f)
                 return;
-
-            // 关键保证：淡出期间 state 必须仍然“连接在 playable 中”。
-            // 正常情况下，退出时不会 HotUnplug（会在 t>=1 时再卸载）。
-            // 这里做一次防御：如果某些外部逻辑提前断开了连接，则尝试重新 HotPlug，保证淡出可见。
-            if (!layer.stateToSlotMap.ContainsKey(state))
-            {
-                HotPlugStateToPlayable(state, layer);
-            }
 
             if (!layer.stateToSlotMap.ContainsKey(state))
                 return;
@@ -2073,8 +2116,8 @@ namespace ES
                     effectiveWeights[i] = 0f;
                 }
 
-                // 计算 score 并归一化：score = RequestedPlayableWeight × priorityFactor。
-                // priorityFactor 使用对数做“软偏置”，避免 priority 数值大时产生过强碾压。
+                // 计算 score 并归一化：score = RequestedPlayableWeight × discreteBiasFactor。
+                // discreteBiasFactor 来自离散 mixerBias 档位，用稳定的档位差而不是旧的 priority 对数偏置。
                 float scoreSum = 0f;
                 int bestIdx = 0;
                 StateBase bestState = null;
@@ -2096,11 +2139,8 @@ namespace ES
                         if (req > 1f) req = 1f;
 
                         state.EnsureResolvedRuntimeConfig();
-                        float pr = state.ResolvedConfig.priority;
-                        if (pr < 0f) pr = 0f;
-
-                        float priorityFactor = 1f + Mathf.Log(pr + 1f);
-                        float score = req * priorityFactor;
+                        float mixerBiasFactor = ResolveMixerBiasScoreFactor(state.ResolvedConfig.mixerBias);
+                        float score = req * mixerBiasFactor;
                         effectiveWeights[i] = score;
                         scoreSum += score;
                     }
@@ -2397,6 +2437,7 @@ namespace ES
                     {
                         // Debug.Log($"[FallBack-Activate] 🔍 查找FallBack状态: StateID={fallbackStateId}");
                         var fallbackState = GetStateByInt(fallbackStateId);
+                        StateMachineDebug.Log($"[FallbackActivate] Layer={layer} | Support={currentSupportFlags} | FallbackStateId={fallbackStateId} | FallbackState={(fallbackState != null ? fallbackState.strKey : "<null>")}");
 
                         bool activated = TryActivateState(fallbackState, layer);
                         if (activated)
@@ -2663,19 +2704,9 @@ namespace ES
             }
 
             layer = ResolveLayerForState(state, layer);
-            if (intToStateMap.ContainsKey(stateKey))
-            {
-                StateMachineDebugSettings.Instance.LogWarning($"状态ID {stateKey} 已存在，跳过注册");
-                return false;
-            }
 
             // 自动生成StringKey（从SharedData获取或自动生成）
             string autoStrKey = GenerateUniqueStringKey(state);
-            if (stringToStateMap.ContainsKey(autoStrKey))
-            {
-                StateMachineDebugSettings.Instance.LogWarning($"自动生成的StringKey {autoStrKey} 已存在，跳过注册");
-                return false;
-            }
 
             return RegisterStateCore(autoStrKey, stateKey, state, layer);
         }
@@ -2698,18 +2729,6 @@ namespace ES
             }
 
             layer = ResolveLayerForState(state, layer);
-
-            if (stringToStateMap.ContainsKey(stringKey))
-            {
-                StateMachineDebugSettings.Instance.LogWarning($"状态 {stringKey} 已存在，跳过注册");
-                return false;
-            }
-
-            if (intToStateMap.ContainsKey(intKey))
-            {
-                StateMachineDebugSettings.Instance.LogWarning($"状态ID {intKey} 已存在，跳过注册");
-                return false;
-            }
 
             return RegisterStateCore(stringKey, intKey, state, layer);
         }
@@ -2801,6 +2820,20 @@ namespace ES
             return candidateName;
         }
 
+        private string GenerateUniqueStringKey(string preferredKey)
+        {
+            string baseName = string.IsNullOrEmpty(preferredKey) ? "State" : preferredKey;
+            string candidateName = baseName;
+            int attempt = 0;
+
+            while (stringToStateMap.ContainsKey(candidateName))
+            {
+                candidateName = $"{baseName}_r{++attempt}";
+            }
+
+            return candidateName;
+        }
+
         /// <summary>
         /// 检查并设置Fallback状态
         /// </summary>
@@ -2841,6 +2874,33 @@ namespace ES
 #endif
 
             var sharedData = state.stateSharedData;
+
+            if (string.IsNullOrEmpty(stringKey))
+            {
+                StateMachineDebugSettings.Instance.LogError("RegisterStateCore: stringKey 不能为空");
+                return false;
+            }
+
+            if (stringToStateMap.TryGetValue(stringKey, out var existedByString) && !ReferenceEquals(existedByString, state))
+            {
+                string oldStringKey = stringKey;
+                stringKey = GenerateUniqueStringKey(stringKey);
+                StateMachineDebugSettings.Instance.LogStateTransition(
+                    $"⚠️ String键冲突: '{oldStringKey}'已存在，自动重命名为'{stringKey}'");
+            }
+
+            if (intKey <= 0)
+            {
+                intKey = GenerateUniqueIntKey(state);
+            }
+
+            if (intToStateMap.TryGetValue(intKey, out var existedByInt) && !ReferenceEquals(existedByInt, state))
+            {
+                int oldIntKey = intKey;
+                intKey = GenerateUniqueIntKey(state);
+                StateMachineDebugSettings.Instance.LogStateTransition(
+                    $"⚠️ Int键冲突: ID={oldIntKey} 已存在，自动重新分配为 {intKey}");
+            }
 
             // 同时注册到两个字典
             stringToStateMap[stringKey] = state;
@@ -3431,6 +3491,7 @@ namespace ES
             {
                 if (ignoreInteractionWithState != null && existingState == ignoreInteractionWithState)
                     continue;
+
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                 {
                     var dbg = StateMachineDebugSettings.Instance;
@@ -3728,6 +3789,7 @@ namespace ES
 
                 if (onlyInterruptTest)
                 {
+                    string interruptReason = $"[MergeCheckReason] Existing={existing?.strKey} Incoming={incoming?.strKey} | ChannelOverlap={channelOverlap} | CostTotals={totalMotionCost}/{totalAgilityCost}/{totalTargetCost} | ExistingStay={leftResolved.stayLevel} IncomingStay={rightResolved.stayLevel} | ExistingPriority={leftRule.EffectialPripority} IncomingPriority={rightRule.EffectialPripority} | ExistingEqualEffective={leftRule.EqualIsEffectial_} IncomingEqualEffective={rightRule.EqualIsEffectial_} | ExistingHitBy={leftRule.hitByLayerOption} IncomingHitBy={rightRule.hitByLayerOption}";
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                     {
                         var dbg = StateMachineDebugSettings.Instance;
@@ -3742,6 +3804,7 @@ namespace ES
                     //右边不允许打断，左边不允许被打断，都会提前终止
                     if (rightRule.hitByLayerOption == StateHitByLayerOption.Never)
                     {
+                        StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=IncomingNeverHits");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                         StateMachineDebugSettings.Instance?.LogWarning("[MergeCheck] Fail: Right hitByLayer=Never");
 #endif
@@ -3749,6 +3812,7 @@ namespace ES
                     }
                     if (leftRule.hitByLayerOption == StateHitByLayerOption.Never)
                     {
+                        StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=ExistingNeverBeHit");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                         StateMachineDebugSettings.Instance?.LogWarning("[MergeCheck] Fail: Left hitByLayer=Never");
 #endif
@@ -3760,6 +3824,7 @@ namespace ES
                         if (leftRule.hitByLayerOption == StateHitByLayerOption.SameLevelTest
                             && rightRule.hitByLayerOption == StateHitByLayerOption.SameLevelTest)
                         {
+                            StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=SameLevelTestButNoStayOverlap");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                             StateMachineDebugSettings.Instance?.LogWarning("[MergeCheck] Fail: SameLevelTest + Rubbish overlap");
 #endif
@@ -3767,6 +3832,7 @@ namespace ES
                         }
                         else if (rightResolved.stayLevel > leftResolved.stayLevel)
                         {
+                            StateMachineDebug.Log($"{interruptReason} | Decision=HitAndReplace | Reason=IncomingStayLevelHigher");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                             {
                                 var dbg = StateMachineDebugSettings.Instance;
@@ -3788,6 +3854,7 @@ namespace ES
                     {
                         if (rightPriority < leftPriority)
                         {
+                            StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=IncomingPriorityLowerEqualAllowed");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                             {
                                 var dbg = StateMachineDebugSettings.Instance;
@@ -3799,10 +3866,12 @@ namespace ES
 #endif
                             return StateMergeResult.MergeFail;
                         }
-                        else return StateMergeResult.HitAndReplace;
+                        StateMachineDebug.Log($"{interruptReason} | Decision=HitAndReplace | Reason=PriorityEqualAndEqualIsEffective");
+                        return StateMergeResult.HitAndReplace;
                     }
                     else if (rightPriority < leftPriority)
                     {
+                        StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=IncomingPriorityLower");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                         {
                             var dbg = StateMachineDebugSettings.Instance;
@@ -3816,6 +3885,7 @@ namespace ES
                     }
                     else if (rightPriority > leftPriority)
                     {
+                        StateMachineDebug.Log($"{interruptReason} | Decision=HitAndReplace | Reason=IncomingPriorityHigher");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                         {
                             var dbg = StateMachineDebugSettings.Instance;
@@ -3828,6 +3898,7 @@ namespace ES
                         return StateMergeResult.HitAndReplace;
                     }
                     // 无法决定打断方向，合并失败
+                    StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=NoInterruptDirection");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
                     StateMachineDebugSettings.Instance?.LogWarning("[MergeCheck] Fail: Unable to decide interrupt direction");
 #endif
@@ -4006,6 +4077,11 @@ namespace ES
 #endif
                     for (int i = 0; i < interruptStates.Count; i++)
                     {
+                        var interruptedState = interruptStates[i];
+                        string interruptedLayerName = stateLayerMap.TryGetValue(interruptedState, out var interruptedLayer)
+                            ? interruptedLayer.ToString()
+                            : "<unknown>";
+                        StateMachineDebug.Log($"[Interrupt] Activating={targetState.strKey} | TargetLayer={layer} | Interrupting={interruptedState?.strKey} | InterruptStateLayer={interruptedLayerName}");
                         TruelyDeactivateState(interruptStates[i], layer);
                     }
                 }
@@ -4159,6 +4235,52 @@ namespace ES
             return TryActivateState(targetState, StateLayerType.NotClear);
         }
 
+        private StateLayerRuntime ResolveConnectedLayerRuntimeForState(StateBase state, StateLayerType fallbackLayer, out StateLayerType resolvedLayer)
+        {
+            resolvedLayer = fallbackLayer;
+
+            if (state == null)
+            {
+                return GetLayerByType(fallbackLayer);
+            }
+
+            if (stateLayerMap.TryGetValue(state, out var mappedLayer))
+            {
+                resolvedLayer = mappedLayer;
+            }
+            else
+            {
+                resolvedLayer = ResolveLayerForState(state, fallbackLayer);
+            }
+
+            var layerRuntime = GetLayerByType(resolvedLayer);
+            if (layerRuntime != null &&
+                (layerRuntime.stateToSlotMap.ContainsKey(state)
+                 || layerRuntime.fadeInStates.ContainsKey(state)
+                 || layerRuntime.fadeOutStates.ContainsKey(state)
+                 || layerRuntime.runningStates.Contains(state)))
+            {
+                return layerRuntime;
+            }
+
+            for (int i = 0; i < layerRuntimes.Count; i++)
+            {
+                var candidate = layerRuntimes[i];
+                if (candidate == null) continue;
+
+                if (candidate.stateToSlotMap.ContainsKey(state)
+                    || candidate.fadeInStates.ContainsKey(state)
+                    || candidate.fadeOutStates.ContainsKey(state)
+                    || candidate.runningStates.Contains(state))
+                {
+                    resolvedLayer = candidate.layerType;
+                    return candidate;
+                }
+            }
+
+            return layerRuntime;
+        }
+
         /// <summary>
         /// 停用状态（内部方法）
         /// </summary>
@@ -4166,8 +4288,12 @@ namespace ES
         {
             if (state == null) return;
 
+            StateMachineDebug.Log($"[Deactivate] Begin | State={state.strKey} | RequestedLayer={layer} | BaseStatus={state.baseStatus}");
+
+            var layerRuntime = ResolveConnectedLayerRuntimeForState(state, layer, out layer);
+            StateMachineDebug.Log($"[Deactivate] ResolvedLayer | State={state.strKey} | RequestedLayer={layer} | ResolvedRuntime={(layerRuntime != null ? layerRuntime.layerType.ToString() : "<null>")}");
+
             // ★ 应用淡出逻辑（如果启用）
-            var layerRuntime = GetLayerByType(layer);
             if (layerRuntime != null)
             {
                 // ★ 可靠性收口：退出时取消未完成的淡入，避免 OnFadeInComplete 在已退出状态上触发。
@@ -4189,8 +4315,7 @@ namespace ES
             }
 
             // 若不启用淡出，则立即卸载
-            bool useDirectBlend = state.stateSharedData?.basicConfig?.useDirectBlend == true;
-            if (layerRuntime != null && (!state.stateSharedData.enableFadeInOut || state.stateSharedData.fadeOutDuration <= 0f || useDirectBlend))
+            if (layerRuntime != null && (!state.stateSharedData.enableFadeInOut || state.stateSharedData.fadeOutDuration <= 0f))
             {
                 HotUnplugStateFromPlayable(state, layerRuntime);
 
@@ -4227,6 +4352,8 @@ namespace ES
 
             MarkDirty(StateDirtyReason.Exit);
 
+            StateMachineDebug.Log($"[Deactivate] End | State={state.strKey} | FinalLayer={layer} | BaseStatus={state.baseStatus} | RunningCount={runningStates.Count}");
+
             // ★ 退出后自动激活：此时 state 已逻辑退出且已从 running 集合移除。
             TryFireExitAutoActivation(state, layer, layerRuntime);
         }
@@ -4239,6 +4366,9 @@ namespace ES
             var state = GetStateByString(stateKey);
             if (state == null || state.baseStatus != StateBaseStatus.Running)
             {
+                bool foundState = state != null;
+                string baseStatusText = foundState ? state.baseStatus.ToString() : "<null>";
+                StateMachineDebug.LogWarning($"[Deactivate] Skip | Key={stateKey} | Found={foundState} | BaseStatus={baseStatusText}");
                 return false;
             }
 
@@ -4647,16 +4777,6 @@ namespace ES
             // 委托给StateBase创建Playable
             if (state.CreatePlayable(playableGraph, out Playable output))
             {
-                var mask = state.stateSharedData?.basicConfig?.avatarMask;
-                if (mask != null && output.IsValid() && (layer == null || layer.allowStateMaskOverride || layer.avatarMask == null))
-                {
-                    var layerMixer = AnimationLayerMixerPlayable.Create(playableGraph, 1);
-                    playableGraph.Connect(output, 0, layerMixer, 0);
-                    layerMixer.SetInputWeight(0, 1f);
-                    layerMixer.SetLayerMaskFromAvatarMask(0, mask);
-                    output = layerMixer;
-                }
-
 #if STATEMACHINEDEBUG
                 {
                     var dbg = StateMachineDebugSettings.Instance;
@@ -4878,8 +4998,7 @@ namespace ES
         {
             var ctx = stateContext;
             if (ctx == null) return;
-            ctx.SpeedX = localSpeedX;
-            ctx.SpeedZ = localSpeedZ;
+            ctx.ApplyMotionSpeedXZ(localSpeedX, localSpeedZ);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

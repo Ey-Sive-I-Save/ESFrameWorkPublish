@@ -18,26 +18,26 @@ namespace ES
     ///   - ikHintTarget（肘/膝的提示点，可选）
     /// - 然后每帧把这些值写进“正在 Running 的交互状态”的 runtime IK：
     ///   SetIKGoal / SetIKHintPosition
-    /// - 状态机再把所有 Running state 的 runtime IK 聚合到 finalIKPose
-    /// - LateUpdate 的 FinalIK Driver 再把 finalIKPose 输出给 FinalIK（BipedIK.UpdateBipedIK）
+    /// - 状态机再把所有 Running state 的 runtime IK 聚合到 stateGeneralFinalIKDriverPose
+    /// - LateUpdate 的 FinalIK Driver 再把 stateGeneralFinalIKDriverPose 输出给 FinalIK（BipedIK.UpdateBipedIK）
     ///
     /// 所以：只要你在运行时持续更新 ikTarget/ikHintTarget 的 Transform（位置/旋转），即使状态已经激活，IK 也会实时跟随。
     ///
     /// 用法（最短）：
     /// 1) 把本脚本挂到“可交互物体”上（它继承 ESInteractable）
     /// 2) 配好 interactionStateInfo（交互时要注入/进入哪个状态）
-    /// 3) 配 ikGoal（默认 RightHand）+ ikWeight + useIKRotation
+    /// 3) 配 ikGoal（默认 RightHand）+ ikTargetWeight + ikLerpingRate + useIKRotation
     /// 4) 可选：指定 driveTarget/driveHint（为空则用本物体 transform）；它们代表“真实在动的目标点”
     /// 5) 交互开始后，你移动 driveTarget（比如门把手在动画里动），角色手 IK 会跟着动
     /// </summary>
     public sealed class Example_DynamicIKInteractable : ESInteractable
     {
-        [Header("权重（可选：用曲线动态改变）")]
+        [Header("IK 参数（可选：用曲线动态改变）")]
         public bool useWeightCurves = false;
 
-        public AnimationCurve limbWeightCurve = AnimationCurve.Linear(0f, 1f, 1f, 1f);
-
         public AnimationCurve targetWeightCurve = AnimationCurve.Linear(0f, 1f, 1f, 1f);
+
+        public AnimationCurve lerpingRateCurve = AnimationCurve.Linear(0f, 1f, 1f, 1f);
 
         [Header("动态目标来源（你可以在运行时移动它）")]
         public Transform driveTarget;
@@ -78,16 +78,16 @@ namespace ES
             _demoBasePos = (driveTarget != null ? driveTarget.position : transform.position);
         }
 
-        public override float EvaluateIKLimbWeight(Entity entity, float normalized01)
-        {
-            if (!useWeightCurves) return base.EvaluateIKLimbWeight(entity, normalized01);
-            return Mathf.Clamp01(limbWeightCurve != null ? limbWeightCurve.Evaluate(normalized01) : ikWeight);
-        }
-
         public override float EvaluateIKTargetWeight(Entity entity, float normalized01)
         {
             if (!useWeightCurves) return base.EvaluateIKTargetWeight(entity, normalized01);
             return Mathf.Clamp01(targetWeightCurve != null ? targetWeightCurve.Evaluate(normalized01) : ikTargetWeight);
+        }
+
+        public override float EvaluateIKLerpingRate(Entity entity, float normalized01)
+        {
+            if (!useWeightCurves) return base.EvaluateIKLerpingRate(entity, normalized01);
+            return Mathf.Clamp(lerpingRateCurve != null ? lerpingRateCurve.Evaluate(normalized01) : ikLerpingRate, 0.05f, 8f);
         }
 
         public override void OnInteractUpdate(Entity entity, float deltaTime)

@@ -12,6 +12,12 @@ namespace ES
         [LabelText("动画状态数据包")]
         public StateAniDataPack stateAniDataPack;
 
+        [LabelText("枪械状态数据包")]
+        public GunStateAniDataPack gunStateAniDataPack;
+
+        [LabelText("额外状态数据包")]
+        public List<StateAniDataPack> additionalStateAniDataPacks = new List<StateAniDataPack>();
+
         [Title("状态机")]
         [LabelText("状态机")]
         public StateMachine stateMachine = new StateMachine();
@@ -25,10 +31,13 @@ namespace ES
 
         [NonSerialized] private bool _stateMachineInitialized;
         [NonSerialized] private Animator _cachedAnimator;
+        [NonSerialized] private bool _warnedMissingCoreForStateMachineInit;
+        [NonSerialized] private bool _warnedMissingAnimatorForStateMachineInit;
 
-        [NonSerialized] private StateAniDataPack _cachedPack;
         [NonSerialized] private bool _packDirty = true;
         [NonSerialized] private List<StateAniDataInfo> _cachedInfos = new List<StateAniDataInfo>(64);
+        [NonSerialized] private List<StateAniDataPack> _cachedPackSources = new List<StateAniDataPack>(4);
+        [NonSerialized] private List<StateAniDataPack> _workingPackSources = new List<StateAniDataPack>(4);
 
         public override void _AwakeRegisterAllModules()
         {
@@ -65,20 +74,25 @@ namespace ES
 
         private void InitializeStateAniDataPack()
         {
-            if (stateAniDataPack == null) return;
-            if (_cachedPack != stateAniDataPack)
+            CollectPackSources(_workingPackSources);
+            if (_workingPackSources.Count == 0) return;
+
+            if (HavePackSourcesChanged(_workingPackSources))
             {
-                _cachedPack = stateAniDataPack;
+                CachePackSources(_workingPackSources);
                 _packDirty = true;
             }
 
             if (!_packDirty) return;
-
-            stateAniDataPack.Check();
             _cachedInfos.Clear();
-            
-            // 批量注册所有状态
-            RegisterStatesFromInfos(stateAniDataPack.Infos.Values, allowOverride: false);
+
+            for (int i = 0; i < _workingPackSources.Count; i++)
+            {
+                var pack = _workingPackSources[i];
+                if (pack == null) continue;
+                pack.Check();
+                RegisterStatesFromInfos(pack.Infos.Values, allowOverride: false);
+            }
 
             // 确保默认状态在注册完成后可被激活
             if (!string.IsNullOrEmpty(defaultStateKey))
@@ -91,6 +105,43 @@ namespace ES
             }
 
             _packDirty = false;
+        }
+
+        private void CollectPackSources(List<StateAniDataPack> result)
+        {
+            result.Clear();
+            AppendPack(result, stateAniDataPack);
+            AppendPack(result, gunStateAniDataPack);
+
+            if (additionalStateAniDataPacks == null) return;
+            for (int i = 0; i < additionalStateAniDataPacks.Count; i++)
+                AppendPack(result, additionalStateAniDataPacks[i]);
+        }
+
+        private static void AppendPack(List<StateAniDataPack> result, StateAniDataPack pack)
+        {
+            if (pack == null || result.Contains(pack)) return;
+            result.Add(pack);
+        }
+
+        private bool HavePackSourcesChanged(List<StateAniDataPack> current)
+        {
+            if (_cachedPackSources.Count != current.Count)
+                return true;
+
+            for (int i = 0; i < current.Count; i++)
+            {
+                if (!ReferenceEquals(_cachedPackSources[i], current[i]))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void CachePackSources(List<StateAniDataPack> current)
+        {
+            _cachedPackSources.Clear();
+            _cachedPackSources.AddRange(current);
         }
         
         /// <summary>
@@ -112,6 +163,24 @@ namespace ES
                 }
             }
             
+            return successCount;
+        }
+
+        public int RegisterStatesFromPack(StateAniDataPack pack, bool allowOverride = false)
+        {
+            if (pack == null) return 0;
+            pack.Check();
+            return RegisterStatesFromInfos(pack.Infos.Values, allowOverride);
+        }
+
+        public int RegisterStatesFromPacks(IEnumerable<StateAniDataPack> packs, bool allowOverride = false)
+        {
+            if (packs == null) return 0;
+
+            int successCount = 0;
+            foreach (var pack in packs)
+                successCount += RegisterStatesFromPack(pack, allowOverride);
+
             return successCount;
         }
         
@@ -143,12 +212,27 @@ namespace ES
         
         private void InitializeStateMachine()
         {
-            if (MyCore == null) return;
+            if (MyCore == null)
+            {
+                WarnStateMachineInitSkipped(
+                    ref _warnedMissingCoreForStateMachineInit,
+                    "[StateDomain] InitializeStateMachine 已跳过：MyCore 为空，状态机不会初始化，StateFinalIKDriver 也不会被绑定启用。");
+                return;
+            }
+
             if (_cachedAnimator == null)
             {
                 _cachedAnimator = MyCore.animator;
             }
-            if (_cachedAnimator == null) return;
+            if (_cachedAnimator == null)
+            {
+                string entityName = MyCore.GetType().Name;
+                WarnStateMachineInitSkipped(
+                    ref _warnedMissingAnimatorForStateMachineInit,
+                    $"[StateDomain] InitializeStateMachine 已跳过：{entityName}.animator 为空，StateMachine.BindToAnimator 未执行，StateFinalIKDriver 将保持禁用。请先给 Entity.animator 正确赋值。"
+                );
+                return;
+            }
 
             if (stateMachine == null) stateMachine = new StateMachine();
             stateMachine.stateMachineKey = string.IsNullOrEmpty(defaultStateKey) ? "Entity" : defaultStateKey;
@@ -156,6 +240,8 @@ namespace ES
             stateMachine.defaultStateKey = defaultStateKey;
             stateMachine.StartStateMachine();
             _stateMachineInitialized = true;
+            _warnedMissingCoreForStateMachineInit = false;
+            _warnedMissingAnimatorForStateMachineInit = false;
             
             // 6. 尝试激活初始状态
             if (!string.IsNullOrEmpty(initialStateName))
@@ -173,6 +259,13 @@ namespace ES
                 
                 Debug.Log($"[StateDomain] 初始状态已配置: {initialStateName}（待状态转换验证后启用）");
             }
+        }
+
+        private void WarnStateMachineInitSkipped(ref bool warnedFlag, string message)
+        {
+            if (warnedFlag) return;
+            warnedFlag = true;
+            Debug.LogWarning(message);
         }
 
         #region 测试方法
@@ -196,13 +289,14 @@ namespace ES
         [Button("重新注册所有状态（覆盖）"), FoldoutGroup("状态注册")]
         public void TestReregisterAllStates()
         {
-            if (stateAniDataPack == null)
+            CollectPackSources(_workingPackSources);
+            if (_workingPackSources.Count == 0)
             {
                 Debug.LogWarning("[StateDomain] 状态数据包为空");
                 return;
             }
-            
-            int count = RegisterStatesFromInfos(stateAniDataPack.Infos.Values, allowOverride: true);
+
+            int count = RegisterStatesFromPacks(_workingPackSources, allowOverride: true);
             Debug.Log($"[StateDomain] 重新注册完成，共 {count} 个状态");
         }
 

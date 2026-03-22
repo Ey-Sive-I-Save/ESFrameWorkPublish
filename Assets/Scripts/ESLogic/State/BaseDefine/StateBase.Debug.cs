@@ -28,7 +28,7 @@ namespace ES
             sb.Append($" | Weight={_playableWeight:F2}");
             sb.Append($" | Time={hasEnterTime:F2}s Progress={normalizedProgress:F2} Loop={loopCount}");
             if (_ikActive && _animationRuntime != null)
-                sb.Append($" | IK={_animationRuntime.ik.weight:F2}");
+                sb.Append($" | IK={( _animationRuntime.ik.HasAnyTargetWeight ? "Active" : "Idle" )}");
             if (_matchTargetActive)
                 sb.Append(" | MT=Active");
             if (_shouldAutoExitFromAnimation)

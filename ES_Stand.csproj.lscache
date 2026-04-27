@@ -125,6 +125,7 @@ Assets/Plugins/ES/0_Stand/
  Stand_Tools/OnlyEditor/
   -SoEditorLoader.cs
   EditorIconSupport.cs
+  ICorePreviewProvider.cs
   MenuItemPathDefine.cs
  Stand_Tools/SimpleTools/
   ESStandExtension.String.cs

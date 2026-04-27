@@ -462,7 +462,7 @@ MonoBehaviour:
       stateName: "\u7AD9\u7ACB\u79FB\u52A8"
       stateId: 1
       layerType: 0
-      mixerBias: 2
+      mixerBias: 0
       stateSupportFlag: 1
       ignoreSupportFlag: 0
       disableActiveOnSupportFlagSwitching: 0
@@ -700,7 +700,7 @@ MonoBehaviour:
       stateName: "\u6025\u505C"
       stateId: -1
       layerType: 0
-      mixerBias: 2
+      mixerBias: 3
       stateSupportFlag: 1
       ignoreSupportFlag: 0
       disableActiveOnSupportFlagSwitching: 0
@@ -1406,7 +1406,7 @@ MonoBehaviour:
       stateName: "\u8DF3\u8DC3"
       stateId: -1
       layerType: 0
-      mixerBias: 2
+      mixerBias: 4
       stateSupportFlag: 1
       ignoreSupportFlag: 0
       disableActiveOnSupportFlagSwitching: 0

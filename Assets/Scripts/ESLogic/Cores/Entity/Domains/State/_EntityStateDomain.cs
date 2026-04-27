@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Text;
 using Sirenix.OdinInspector;
 using UnityEngine;
+using UnityEngine.Playables;
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -12,7 +14,7 @@ using UnityEditor;
 namespace ES
 {
     [Serializable, TypeRegistryItem("状态域")]
-    public class EntityStateDomain : Domain<Entity, EntityStateModuleBase>
+    public class EntityStateDomain : Domain<Entity, EntityStateModuleBase>, ICorePreviewProvider
     {
         private static readonly StateSupportFlags[] PreflightSupportFlags =
         {
@@ -53,7 +55,7 @@ namespace ES
 
         [LabelText("设定默认状态键(可为空)")]
         public string defaultStateKey = "";
-        
+
         [LabelText("初始激活状态名（可为空）")]
         [Tooltip("状态机启动后自动激活的状态，留空则不自动激活")]
         public string initialStateName = "";
@@ -74,7 +76,7 @@ namespace ES
             // 必须先初始化StateMachine（创建层级等基础设施），再初始化StateAniDataPack（注册状态）
             InitializeStateMachine();
             InitializeStateAniDataPack();
-        } 
+        }
 
         protected override void Update()
         {
@@ -172,7 +174,7 @@ namespace ES
             _cachedPackSources.Clear();
             _cachedPackSources.AddRange(current);
         }
-        
+
         /// <summary>
         /// 批量注册状态（从Info列表）
         /// </summary>
@@ -182,7 +184,7 @@ namespace ES
         public int RegisterStatesFromInfos(IEnumerable<StateAniDataInfo> infos, bool allowOverride = false)
         {
             if (infos == null) return 0;
-            
+
             int successCount = 0;
             foreach (var info in infos)
             {
@@ -191,7 +193,7 @@ namespace ES
                     successCount++;
                 }
             }
-            
+
             return successCount;
         }
 
@@ -212,7 +214,7 @@ namespace ES
 
             return successCount;
         }
-        
+
         /// <summary>
         /// 注册单个状态（从Info）- 纯粹委托给StateMachine
         /// </summary>
@@ -226,19 +228,19 @@ namespace ES
                 Debug.LogError("[StateDomain] 状态机未初始化，无法注册状态");
                 return null;
             }
-            
+
             // 直接委托给StateMachine处理所有逻辑（初始化、键冲突、注册）
             var state = stateMachine.RegisterStateFromInfo(info, allowOverride);
-            
+
             // 注册成功后缓存Info（用于Domain层管理）
             if (state != null && info != null)
             {
                 _cachedInfos.Add(info);
             }
-            
+
             return state;
         }
-        
+
         private void InitializeStateMachine()
         {
             if (MyCore == null)
@@ -271,7 +273,7 @@ namespace ES
             _stateMachineInitialized = true;
             _warnedMissingCoreForStateMachineInit = false;
             _warnedMissingAnimatorForStateMachineInit = false;
-            
+
             // 6. 尝试激活初始状态
             if (!string.IsNullOrEmpty(initialStateName))
             {
@@ -285,7 +287,7 @@ namespace ES
                 // {
                 //     Debug.LogWarning($"[StateDomain] 无法激活初始状态: {initialStateName}");
                 // }
-                
+
                 Debug.Log($"[StateDomain] 初始状态已配置: {initialStateName}（待状态转换验证后启用）");
             }
         }
@@ -307,7 +309,7 @@ namespace ES
                 Debug.LogWarning("[StateDomain] 请提供有效的StateAniDataInfo");
                 return;
             }
-            
+
             var state = RegisterStateFromInfo(info, allowOverride);
             if (state != null)
             {
@@ -450,10 +452,10 @@ namespace ES
 
             foreach (var kvp in stateMachine.EnumerateRegisteredStatesByKey())
             {
-                var state     = kvp.Value;
+                var state = kvp.Value;
                 var layerType = stateMachine.TryGetStateLayerType(state, out var layer)
                     ? layer.ToString() : "Unknown";
-                var isRunning  = stateMachine.IsStateRunning(state);
+                var isRunning = stateMachine.IsStateRunning(state);
                 var isFallback = state.stateSharedData?.basicConfig?.canBeFeedback ?? false;
 
                 sb.AppendLine($"  [{layerType}] {kvp.Key} (IntKey:{state.intKey}) - " +
@@ -908,58 +910,160 @@ namespace ES
         }
 
         #endregion
-        
+
         #region EditorPreview
-        #if UNITY_EDITOR
-        // 让本Domain在ESSEditorPreview中以SingleArea独占区块显示
+#if UNITY_EDITOR
+        // 缓存各层级的折叠状态（避免每次OnGUI重置）
+        private static Dictionary<StateLayerType, bool> layerFoldouts = new Dictionary<StateLayerType, bool>();
+
         public bool EditorPreviewIsSingleArea => true;
         public bool EditorPreviewCanPreview => Application.isPlaying && stateMachine != null;
         public bool EditorPreviewCanPreviewNonPlay => false;
-        public void EditorPreviewDrawPreviewGUI() => EditorPreviewDrawPreviewGUIImpl();
-        public void EditorPreviewDrawPreviewGUINonPlay() { GUILayout.Label("进入运行模式后显示实时信息"); }
 
+        public void EditorPreviewDrawPreviewGUI() => EditorPreviewDrawPreviewGUIImpl();
+        public void EditorPreviewDrawPreviewGUINonPlay()
+        {
+            // 非运行模式显示友好提示
+            EditorGUILayout.HelpBox("进入运行模式后显示状态机实时信息", MessageType.Info);
+        }
         private void EditorPreviewDrawPreviewGUIImpl()
         {
             var sm = stateMachine;
-            if (sm == null) { GUILayout.Label("无状态机"); return; }
-            GUILayout.Label("【状态机全部状态/权重实时预览】", UnityEditor.EditorStyles.boldLabel);
+            if (sm == null)
+            {
+                UnityEditor.EditorGUILayout.HelpBox("无状态机", UnityEditor.MessageType.Warning);
+                return;
+            }
+
+            UnityEditor.EditorGUILayout.LabelField("状态机实时预览", UnityEditor.EditorStyles.boldLabel);
             var layers = sm.LayerRuntimes;
             if (layers == null) return;
+
             foreach (var layer in layers)
             {
                 if (layer == null) continue;
-                bool layerFold = UnityEditor.EditorGUILayout.Foldout(true, $"层级: {layer.layerType}  (权重: {layer.weight:F2})", true);
-                if (!layerFold) continue;
+
+                if (!layerFoldouts.ContainsKey(layer.layerType))
+                    layerFoldouts[layer.layerType] = true;
+
+                int runningCount = layer.runningStates.Count;
+                int slotCount = layer.stateToSlotMap.Count;
+                bool foldout = UnityEditor.EditorGUILayout.Foldout(
+                    layerFoldouts[layer.layerType],
+                    $"层级: {layer.layerType}  (权重: {layer.weight:F2})  运行状态: {runningCount}/{slotCount}",
+                    true);
+                layerFoldouts[layer.layerType] = foldout;
+                if (!foldout) continue;
+
+                UnityEditor.EditorGUILayout.BeginVertical(UnityEditor.EditorStyles.helpBox);
+
                 foreach (var kvp in layer.stateToSlotMap)
                 {
                     var state = kvp.Key;
                     int slot = kvp.Value;
+                    if (state == null) continue;
+
+                    // 权重
                     float weight = 0f;
-                    // 类型安全地访问 AnimationMixerPlayable（修正API调用）
-                    // 统一用 Playable 结构体API，兼容所有Unity版本
-                    var playable = (UnityEngine.Playables.Playable)layer.mixer;
-                    if (UnityEngine.Playables.PlayableExtensions.IsValid(playable))
-                    {
-                        int inputCount = UnityEngine.Playables.PlayableExtensions.GetInputCount(playable);
-                        if (slot >= 0 && slot < inputCount)
-                        {
-                            weight = UnityEngine.Playables.PlayableExtensions.GetInputWeight(playable, slot);
-                        }
-                    }
+                    if (layer.mixer.IsValid() && slot >= 0 && slot < layer.mixer.GetInputCount())
+                        weight = layer.mixer.GetInputWeight(slot);
+
                     bool isActive = layer.runningStates.Contains(state);
-                    var style = isActive ? UnityEditor.EditorStyles.boldLabel : UnityEditor.EditorStyles.label;
+                    bool isFadingIn = layer.fadeInStates.ContainsKey(state);
+                    bool isFadingOut = layer.fadeOutStates.ContainsKey(state);
+
+                    // 当前 RuntimePhase
+                    var phase = state.RuntimePhase;
+
+                    // ---- 状态名称样式 ----
+                    var nameStyle = new GUIStyle(UnityEditor.EditorStyles.label);
+                    if (isActive) nameStyle.fontStyle = FontStyle.Bold;
+                    if (isFadingIn)
+                        nameStyle.normal.textColor = Color.Lerp(Color.white, Color.green, 0.7f);
+                    else if (isFadingOut)
+                        nameStyle.normal.textColor = Color.Lerp(Color.white, Color.red, 0.6f);
+
                     UnityEditor.EditorGUILayout.BeginHorizontal();
-                    GUILayout.Label(state.strKey ?? state.GetType().Name, style, GUILayout.Width(160));
-                    UnityEditor.EditorGUILayout.LabelField($"{weight:F2}", GUILayout.Width(40));
-                    var r = GUILayoutUtility.GetRect(80, 18);
-                    UnityEditor.EditorGUI.ProgressBar(r, weight, "");
+
+                    // ① 状态名称（含 Tooltip 显示激活时间等）
+                    string tooltip = $"激活时间: {state.activationTime:F2}\n持续: {state.hasEnterTime:F2}s";
+                    GUILayout.Label(new GUIContent(state.strKey ?? state.GetType().Name, tooltip), nameStyle, GUILayout.Width(140));
+
+                    // ② RuntimePhase 标签（彩色）
+                    Color phaseColor = phase switch
+                    {
+                        StateRuntimePhase.Pre => new Color(0.4f, 0.8f, 1f),     // 淡蓝
+                        StateRuntimePhase.Main => new Color(0.3f, 0.9f, 0.3f),   // 绿色
+                        StateRuntimePhase.Wait => new Color(1f, 0.8f, 0.2f),     // 黄色
+                        StateRuntimePhase.Released => new Color(0.5f, 0.5f, 0.5f), // 灰色
+                        _ => Color.white
+                    };
+                    var phaseStyle = new GUIStyle(EditorStyles.miniLabel)
+                    {
+                        normal = { textColor = phaseColor },
+                        fontStyle = FontStyle.Bold,
+                        alignment = TextAnchor.MiddleCenter
+                    };
+                    GUILayout.Label(phase.ToString(), phaseStyle, GUILayout.Width(55));
+
+                    // ③ 权重数值
+                    UnityEditor.EditorGUILayout.LabelField($"{weight:F2}", GUILayout.Width(35));
+
+                    // ④ 动态进度条（夸张长度变化）
+                    float maxBarWidth = Mathf.Max(40, UnityEditor.EditorGUIUtility.currentViewWidth - 290);
+                    float barWidth = Mathf.Lerp(4f, maxBarWidth, weight);
+                    var barRect = UnityEditor.EditorGUILayout.GetControlRect(
+                        GUILayout.Width(barWidth), GUILayout.Height(18));
+
+                    // 黑色背景
+                    UnityEditor.EditorGUI.DrawRect(barRect, Color.black);
+
+                    // 填充色
+                    float fillFactor = Mathf.Clamp01(weight);
+                    var fillRect = new Rect(barRect.x, barRect.y, barRect.width, barRect.height);
+                    Color lowColor = new Color(0.1f, 0.1f, 0.1f);
+                    Color highColor = new Color(0.2f, 1f, 0.2f);
+                    Color fillColor = Color.Lerp(lowColor, highColor, fillFactor);
+                    UnityEditor.EditorGUI.DrawRect(fillRect, fillColor);
+
+                    // 光晕
+                    if (weight > 0.1f)
+                    {
+                        var glowRect = new Rect(barRect.x, barRect.y, barRect.width, 4);
+                        UnityEditor.EditorGUI.DrawRect(glowRect, new Color(1f, 1f, 1f, weight * 0.5f));
+                    }
+
+                    // 白边框
+                    UnityEditor.EditorGUI.DrawRect(new Rect(barRect.x, barRect.y, barRect.width, 1), Color.white);
+                    UnityEditor.EditorGUI.DrawRect(new Rect(barRect.x, barRect.y + barRect.height - 1, barRect.width, 1), Color.white);
+                    UnityEditor.EditorGUI.DrawRect(new Rect(barRect.x, barRect.y, 1, barRect.height), Color.white);
+                    UnityEditor.EditorGUI.DrawRect(new Rect(barRect.x + barRect.width - 1, barRect.y, 1, barRect.height), Color.white);
+
+                    // 居中百分比
+                    GUIStyle percentStyle = new GUIStyle(UnityEditor.EditorStyles.boldLabel)
+                    {
+                        normal = { textColor = Color.white },
+                        alignment = TextAnchor.MiddleCenter
+                    };
+                    GUI.Label(barRect, $"{weight:P0}", percentStyle);
+
+                    // ⑤ 淡入/淡出标签
+                    if (isFadingIn)
+                        GUILayout.Label("淡入", UnityEditor.EditorStyles.miniLabel, GUILayout.Width(35));
+                    else if (isFadingOut)
+                        GUILayout.Label("淡出", UnityEditor.EditorStyles.miniLabel, GUILayout.Width(35));
+                    else
+                        GUILayout.Space(35); // 对齐
+
                     UnityEditor.EditorGUILayout.EndHorizontal();
                 }
+
+                UnityEditor.EditorGUILayout.EndVertical();
             }
         }
-        #endif
+#endif
 
         #endregion
-   
+
     }
 }

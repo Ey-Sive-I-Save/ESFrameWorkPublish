@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace ES
 {
@@ -13,10 +14,12 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void InternalOnStateConnected(StateBase state, int slotIndex)
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (state == null) throw new ArgumentNullException(nameof(state));
-            if (_connectedIndexMap.ContainsKey(state)) throw new InvalidOperationException($"State 已在 connectedStates 中: {state.strKey}");
-#endif
+            if (state == null) return;
+            if (_connectedIndexMap.ContainsKey(state))
+            {
+                Debug.LogError($"[StateLayerRuntime] 状态已存在于 connectedStates: {state.strKey}");
+                return;
+            }
             int idx = connectedStates.Count;
             connectedStates.Add(state);
             connectedSlots.Add(slotIndex);

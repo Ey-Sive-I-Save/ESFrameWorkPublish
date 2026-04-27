@@ -266,8 +266,21 @@ Assets/Scripts/ESLogic/
    StateLayerRuntime.Dirty.cs
    StateLayerRuntime.FallBack.cs
   StateMachine/
+   StateMachine.Activation.cs
    StateMachine.cs
+   StateMachine.Dirty.cs
    StateMachine.Editor.cs
+   StateMachine.Fades.cs
+   StateMachine.HotPlug.cs
+   StateMachine.IK.cs
+   StateMachine.Layers.cs
+   StateMachine.Lifecycle.cs
+   StateMachine.MixerWeights.cs
+   StateMachine.PlayableGraph.cs
+   StateMachine.States.cs
+   StateMachine.SupportFlags.cs
+   StateMachine.TemporaryAnimations.cs
+   StateMachine.Utils.cs
    StateMachineDebug.cs
    StateMachineDebugSettings.cs
  State/IK/

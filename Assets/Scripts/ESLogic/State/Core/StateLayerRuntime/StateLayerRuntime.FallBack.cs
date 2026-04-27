@@ -4,17 +4,38 @@ namespace ES
 {
     public partial class StateLayerRuntime
     {
-        [LabelText("Grounded FallBack")]      public int FallBackForGrounded = -1;
-        [LabelText("Crouched FallBack")]      public int FallBackForCrouched = -1;
-        [LabelText("Prone FallBack")]         public int FallBackForProne = -1;
-        [LabelText("Swimming FallBack")]      public int FallBackForSwimming = -1;
-        [LabelText("Flying FallBack")]        public int FallBackForFlying = -1;
-        [LabelText("Mounted FallBack")]       public int FallBackForMounted = -1;
-        [LabelText("Climbing FallBack")]      public int FallBackForClimbing = -1;
-        [LabelText("SpecialInteraction FallBack")] public int FallBackForSpecialInteraction = -1;
-        [LabelText("Observer FallBack")]      public int FallBackForObserver = -1;
-        [LabelText("Dead FallBack")]          public int FallBackForDead = -1;
-        [LabelText("Transition FallBack")]    public int FallBackForTransition = -1;
+        [FoldoutGroup("回退设置", expanded: false), LabelText("Grounded"), ReadOnly]
+        public int FallBackForGrounded = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("Crouched"), ReadOnly]
+        public int FallBackForCrouched = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("Prone"), ReadOnly]
+        public int FallBackForProne = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("Swimming"), ReadOnly]
+        public int FallBackForSwimming = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("Flying"), ReadOnly]
+        public int FallBackForFlying = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("Mounted"), ReadOnly]
+        public int FallBackForMounted = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("Climbing"), ReadOnly]
+        public int FallBackForClimbing = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("SpecialInteraction"), ReadOnly]
+        public int FallBackForSpecialInteraction = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("Observer"), ReadOnly]
+        public int FallBackForObserver = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("Dead"), ReadOnly]
+        public int FallBackForDead = -1;
+
+        [FoldoutGroup("回退设置"), LabelText("Transition"), ReadOnly]
+        public int FallBackForTransition = -1;
 
         public int GetFallBack(StateSupportFlags supportFlag = StateSupportFlags.None)
         {

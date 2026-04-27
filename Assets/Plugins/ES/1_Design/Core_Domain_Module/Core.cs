@@ -109,7 +109,7 @@ namespace ES
 
         //使用的域
         protected List<IDomain> domains = new List<IDomain>(3);
-
+        public IReadOnlyList<IDomain> Domains => domains;
 
 
         #endregion

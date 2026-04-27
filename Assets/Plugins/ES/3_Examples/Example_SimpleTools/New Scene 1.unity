@@ -2706,7 +2706,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 887
+    m_Bits: 4294967295
 --- !u!114 &851290614
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8308,10 +8308,13 @@ MonoBehaviour:
           stateMachineKey: 
           config: {fileID: 11400000, guid: b449f64f05658744a948c6bf1e40c76b, type: 2}
           defaultStateKey: 
-          upperBodyMask: {fileID: 0}
-          lowerBodyMask: {fileID: 0}
+          upperBodyMask: {fileID: 31900000, guid: f748df921432c9a438ec18f6fdb170f3,
+            type: 2}
+          lowerBodyMask: {fileID: 31900000, guid: e4e335fe917ba284ea1da6748b090fe2,
+            type: 2}
           referencePoseClip: {fileID: 7400002, guid: 080945c46afd34f3ebc364c1696e6678,
             type: 3}
+          inspectorSelectedLayer: 0
           testTempKey: TestAnim
           testClip: {fileID: 0}
           testLayer: 1

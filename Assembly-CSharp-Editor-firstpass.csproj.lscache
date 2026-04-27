@@ -57,6 +57,7 @@ Assets/Plugins/ES/Editor/
   ESEditorInspector.cs
   ESEditorPreview.cs
   ESEditorToolBar.cs
+  tempCodeRunnerFile.cs
  ESDrawer/AttributeDrawers/
   ESBackGroundAttributeDrawer.cs
   ESBoolOptionAttributeDrawer.cs

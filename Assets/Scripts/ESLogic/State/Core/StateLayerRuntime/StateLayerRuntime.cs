@@ -15,34 +15,53 @@ namespace ES
     {
         [NonSerialized] public StateMachine stateMachine;
 
-        [LabelText("层级类型")] public StateLayerType layerType;
-        [LabelText("AvatarMask")] public AvatarMask avatarMask;
-        [LabelText("混合模式")] public StateLayerBlendMode blendMode = StateLayerBlendMode.Override;
-        [LabelText("允许状态Mask覆盖")] public bool allowStateMaskOverride;
-        [LabelText("空转反馈状态"), ShowInInspector] public StateBase feedbackState;
-        [LabelText("当前运行状态集合"), ShowInInspector, ReadOnly] [NonSerialized] public SwapBackSet<StateBase> runningStates = new SwapBackSet<StateBase>(16);
-        [LabelText("层级权重"), Range(0f, 1f)] public float weight = 1f;
-        [NonSerialized] internal float lastAppliedRootMixerWeight = float.NaN;
-        [LabelText("是否启用")] public bool isEnabled = true;
-        [LabelText("优先级"), Tooltip("数值越大优先级越高")] public byte priority;
+        // ---- 初始化配置（只读）----
+        [LabelText("层级类型"), ReadOnly]
+        public StateLayerType layerType;
 
+        [LabelText("AvatarMask"), ReadOnly]
+        public AvatarMask avatarMask;
+
+        [LabelText("混合模式"), ReadOnly]
+        public StateLayerBlendMode blendMode = StateLayerBlendMode.Override;
+
+        [LabelText("允许状态Mask覆盖"), ReadOnly]
+        public bool allowStateMaskOverride;
+
+        [LabelText("最大Playable槽位"), ReadOnly]
+        public int maxPlayableSlots = 32;
+
+        // ---- 运行时权重/开关（由 StateMachine 控制，只读）----
+        [LabelText("层级权重"), Range(0f, 1f), ReadOnly]
+        public float weight = 1f;
+
+        [LabelText("是否启用"), ReadOnly]
+        public bool isEnabled = true;
+
+        // ---- 运行时状态（只读调试）----
+        [LabelText("空转反馈状态"), ShowInInspector, ReadOnly]
+        public StateBase feedbackState;
+
+        [LabelText("当前运行状态集合"), ShowInInspector, ReadOnly]
+        [NonSerialized] public SwapBackSet<StateBase> runningStates = new SwapBackSet<StateBase>(16);
+
+        [LabelText("槽位映射"), ShowInInspector, ReadOnly]
+        [NonSerialized] public Dictionary<StateBase, int> stateToSlotMap = new Dictionary<StateBase, int>(64);
+
+        // ---- 内部 Playable / 淡入淡出（隐藏）----
         [NonSerialized] public AnimationMixerPlayable mixer;
         [NonSerialized] public AnimationClipPlayable referencePosePlayable;
         [NonSerialized] public bool hasReferencePose;
         [NonSerialized] public bool referencePoseWeightsNormalized;
         [NonSerialized] public int rootInputIndex = -1;
-
         [NonSerialized] public Stack<int> freeSlots = new Stack<int>(64);
-        [NonSerialized, ShowInInspector] public Dictionary<StateBase, int> stateToSlotMap = new Dictionary<StateBase, int>(64);
-
         [NonSerialized] public Dictionary<StateBase, StateFadeData> fadeInStates = new Dictionary<StateBase, StateFadeData>();
         [NonSerialized] public Dictionary<StateBase, StateFadeData> fadeOutStates = new Dictionary<StateBase, StateFadeData>();
         [NonSerialized] public List<StateBase> fadeInToRemoveCache = new List<StateBase>(8);
         [NonSerialized] public List<StateBase> fadeOutToRemoveCache = new List<StateBase>(8);
         [NonSerialized] private readonly List<KeyValuePair<StateBase, int>> _stateToSlotListCache = new List<KeyValuePair<StateBase, int>>(64);
-
-        [LabelText("最大Playable槽位")] public int maxPlayableSlots = 32;
-
+        /// <summary>上一次写入 RootMixer 的层级权重（用于阈值比较）</summary>
+        [NonSerialized] internal float lastAppliedRootMixerWeight = float.NaN;
         public StateLayerRuntime(StateLayerType type, StateMachine machine)
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD

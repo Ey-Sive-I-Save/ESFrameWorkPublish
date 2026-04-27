@@ -1,30 +1,21 @@
+using System.Collections.Generic;
+using UnityEditor;
+using UnityEngine;
+using Sirenix.OdinInspector.Editor;
 using ES;
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEditor;
-using Gaskellgames;
-using Sirenix.OdinInspector.Editor;
 
 namespace ES.EditorTools
 {
     [CustomEditor(typeof(Core), true)]
     public class CorePreviewEditor : OdinEditor
     {
-        
-        public override bool HasPreviewGUI()
-        {
-            return true;
-        }
+        public override bool HasPreviewGUI() => true;
 
-        // 独占区块收集
-        private static List<object> singleAreaList = new List<object>();
-        private static bool foldoutSingleArea = false;
-
-        // 折叠状态缓存
-        private static bool foldoutDomain = true;
-        private static bool foldoutModules = true;
+        private static readonly List<ICorePreviewProvider> singleAreaList = new List<ICorePreviewProvider>();
+        private static bool foldoutSingleArea = true;
+        private static bool foldoutDomain = false;
+        private static bool foldoutModules = false;
 
         public override void OnPreviewGUI(Rect r, GUIStyle background)
         {
@@ -36,162 +27,152 @@ namespace ES.EditorTools
             }
 
             singleAreaList.Clear();
+            CollectSingleAreaObjects(core);
 
-            int offset = 20;
-            var areaRect = new Rect(r.x, r.y + offset, r.width, r.height - offset);
+            int headerHeight = 30;
+            int margin = 8;
+            var areaRect = new Rect(r.x + margin, r.y + headerHeight, r.width - margin * 2, r.height - headerHeight);
             GUILayout.BeginArea(areaRect);
-            GUILayout.Label($"【Core 运行时预览】", EditorStyles.boldLabel);
-            GUILayout.Label($"类型: {core.GetType().Name}");
 
-            // 通用模板：Play/非Play分离
-            if (Application.isPlaying)
-            {
-                // Domain 区域
-                foldoutDomain = EditorGUILayout.Foldout(foldoutDomain, "Domain_ 预览", true);
-                if (foldoutDomain)
-                {
-                    var domainField = core.GetType().GetField("stateDomain", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-                    var domain = domainField?.GetValue(core);
-                    DrawPreviewIfSupported(domain, "Domain_");
-                }
+            DrawHeader(core);
 
-                // Modules 区域
-                foldoutModules = EditorGUILayout.Foldout(foldoutModules, "Modules_ 预览", true);
-                if (foldoutModules)
-                {
-                    var moduleTablesField = core.GetType().GetField("ModuleTables", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-                    var moduleTables = moduleTablesField?.GetValue(core) as System.Collections.IDictionary;
-                    if (moduleTables != null)
-                    {
-                        foreach (System.Collections.DictionaryEntry entry in moduleTables)
-                        {
-                            var module = entry.Value;
-                            DrawPreviewIfSupported(module, module?.GetType().Name + "_");
-                        }
-                    }
-                    else
-                    {
-                        GUILayout.Label("无 ModuleTables");
-                    }
-                }
-            }
-            else
-            {
-                // 非Play模式也支持独立的NonPlay预览
-                // Domain 区域
-                foldoutDomain = EditorGUILayout.Foldout(foldoutDomain, "Domain_ 预览", true);
-                if (foldoutDomain)
-                {
-                    var domainField = core.GetType().GetField("stateDomain", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-                    var domain = domainField?.GetValue(core);
-                    DrawPreviewIfSupported(domain, "Domain_");
-                }
+            // 1. Domain 预览：遍历 Domains 列表
+            DrawDomainsSection("Domain_ 预览", ref foldoutDomain, core.Domains);
 
-                // Modules 区域
-                foldoutModules = EditorGUILayout.Foldout(foldoutModules, "Modules_ 预览", true);
-                if (foldoutModules)
-                {
-                    var moduleTablesField = core.GetType().GetField("ModuleTables", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-                    var moduleTables = moduleTablesField?.GetValue(core) as System.Collections.IDictionary;
-                    if (moduleTables != null)
-                    {
-                        foreach (System.Collections.DictionaryEntry entry in moduleTables)
-                        {
-                            var module = entry.Value;
-                            DrawPreviewIfSupported(module, module?.GetType().Name + "_");
-                        }
-                    }
-                    else
-                    {
-                        GUILayout.Label("无 ModuleTables");
-                    }
-                }
-            }
+            // 2. Modules 预览
+            DrawModulesSection("Modules_ 预览", ref foldoutModules, core.ModuleTables);
 
-
-            // 独占区块统一绘制
+            // 3. 独占区块
             if (singleAreaList.Count > 0)
             {
-                GUILayout.Space(8);
-                foldoutSingleArea = EditorGUILayout.Foldout(foldoutSingleArea, "SingleArea_ 独占区块", false);
-                if (foldoutSingleArea)
-                {
-                    foreach (var obj in singleAreaList)
-                    {
-                        var type = obj.GetType();
-                        bool isPlaying = Application.isPlaying;
-                        string drawMethodName = isPlaying ? "EditorPreviewDrawPreviewGUI" : "EditorPreviewDrawPreviewGUINonPlay";
-                        var method = type.GetMethod(drawMethodName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-                        GUILayout.BeginVertical("box");
-                        GUILayout.Label(type.Name + "_", EditorStyles.boldLabel);
-                        if (method != null)
-                        {
-                            method.Invoke(obj, null);
-                        }
-                        else
-                        {
-                            GUILayout.Label($"{type.Name}_（未实现 {drawMethodName}）");
-                        }
-                        GUILayout.EndVertical();
-                    }
-                }
+                GUILayout.Space(10);
+                DrawSingleAreaSection();
             }
 
             GUILayout.EndArea();
         }
 
-        // 通用模板：自动调用 EditorPreview 前缀扩展方法
-        private void DrawPreviewIfSupported(object obj, string label)
+        private void CollectSingleAreaObjects(Core core)
         {
-            if (obj == null) return;
-            var type = obj.GetType();
-            // Play/非Play分离
-            bool isPlaying = Application.isPlaying;
-            string canPreviewName = isPlaying ? "EditorPreviewCanPreview" : "EditorPreviewCanPreviewNonPlay";
-            string drawMethodName = isPlaying ? "EditorPreviewDrawPreviewGUI" : "EditorPreviewDrawPreviewGUINonPlay";
-
-            // 检查 EditorPreviewCanPreview
-            var canPreviewProp = type.GetProperty(canPreviewName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-            bool canPreview = true;
-            if (canPreviewProp != null)
+            // 检查 Domains 列表
+            if (core.Domains != null)
             {
-                canPreview = (bool)canPreviewProp.GetValue(obj);
-            }
-            if (!canPreview) return;
-
-            // 检查是否有独占区块
-            var singleAreaProp = type.GetProperty("EditorPreviewIsSingleArea", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-            bool isSingleArea = false;
-            if (singleAreaProp != null)
-            {
-                isSingleArea = (bool)singleAreaProp.GetValue(obj);
-            }
-            if (isSingleArea)
-            {
-                if (!singleAreaList.Contains(obj))
-                    singleAreaList.Add(obj);
-                return; // 独占区块不在此处绘制
+                foreach (var domain in core.Domains)
+                {
+                    if (domain is ICorePreviewProvider provider && provider.EditorPreviewIsSingleArea)
+                        singleAreaList.Add(provider);
+                }
             }
 
-            // 查找 EditorPreviewDrawPreviewGUI
-            var method = type.GetMethod(drawMethodName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-            GUILayout.BeginVertical("box");
-            GUILayout.Label(label, EditorStyles.boldLabel);
-            if (method != null)
+            // 检查 ModuleTables
+            if (core.ModuleTables != null)
             {
-                method.Invoke(obj, null);
+                foreach (var module in core.ModuleTables.Values)
+                {
+                    if (module is ICorePreviewProvider provider && provider.EditorPreviewIsSingleArea)
+                        singleAreaList.Add(provider);
+                }
             }
-            else
+        }
+
+        private void DrawHeader(Core core)
+        {
+            GUILayout.BeginHorizontal(EditorStyles.toolbar);
+            GUILayout.Label($"Core 运行时预览 | {core.GetType().Name}", EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            var stateColor = Application.isPlaying ? new Color(0.3f, 1f, 0.3f) : new Color(0.7f, 0.7f, 0.7f);
+            var style = new GUIStyle(GUI.skin.label) { normal = { textColor = stateColor }, fontStyle = FontStyle.Bold };
+            GUILayout.Label(Application.isPlaying ? "● PLAY" : "○ STOP", style);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(5);
+        }
+
+        // 绘制 Domains 列表（可折叠）
+        private void DrawDomainsSection(string title, ref bool foldout, IReadOnlyList<IDomain> domains)
+        {
+            GUILayout.BeginVertical(EditorStyles.helpBox);
+            foldout = EditorGUILayout.Foldout(foldout, title, true);
+            if (foldout)
             {
-                GUILayout.Label($"{label}（未实现 {drawMethodName}）");
+                GUILayout.Space(4);
+                if (domains == null || domains.Count == 0)
+                {
+                    EditorGUILayout.HelpBox("暂无数据", MessageType.Info);
+                }
+                else
+                {
+                    foreach (var domain in domains)
+                    {
+                        DrawPreviewIfSupported(domain, domain?.GetType().Name ?? "Unknown");
+                    }
+                }
+            }
+            GUILayout.EndVertical();
+            GUILayout.Space(4);
+        }
+
+        // 绘制 Modules 字典
+        private void DrawModulesSection(string title, ref bool foldout, IDictionary<Type, IModule> modules)
+        {
+            GUILayout.BeginVertical(EditorStyles.helpBox);
+            foldout = EditorGUILayout.Foldout(foldout, title, true);
+            if (foldout)
+            {
+                GUILayout.Space(4);
+                if (modules == null || modules.Count == 0)
+                {
+                    EditorGUILayout.HelpBox("暂无数据", MessageType.Info);
+                }
+                else
+                {
+                    foreach (var kv in modules)
+                    {
+                        DrawPreviewIfSupported(kv.Value, kv.Key.Name); // Type 类型转 string
+                    }
+                }
+            }
+            GUILayout.EndVertical();
+            GUILayout.Space(4);
+        }
+
+        private void DrawSingleAreaSection()
+        {
+            var originalColor = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(1f, 1f, 0.8f);
+            GUILayout.BeginVertical(EditorStyles.helpBox);
+            GUI.backgroundColor = originalColor;
+
+            GUILayout.Label("★ 独占区块", EditorStyles.boldLabel);
+
+            foreach (var provider in singleAreaList)
+            {
+                GUILayout.BeginVertical(EditorStyles.helpBox);
+                GUILayout.Label(provider.GetType().Name, EditorStyles.boldLabel);
+                if (Application.isPlaying)
+                    provider.EditorPreviewDrawPreviewGUI();
+                else
+                    provider.EditorPreviewDrawPreviewGUINonPlay();
+                GUILayout.EndVertical();
+                GUILayout.Space(4);
             }
             GUILayout.EndVertical();
         }
 
-
-        public override void OnPreviewSettings()
+        private void DrawPreviewIfSupported(object obj, string label)
         {
-            // 可选：添加预览栏右上角设置
+            if (obj is not ICorePreviewProvider provider) return;
+            if (!provider.EditorPreviewCanPreview) return;
+            if (provider.EditorPreviewIsSingleArea) return;
+
+            GUILayout.BeginVertical(EditorStyles.helpBox);
+            GUILayout.Label(label, EditorStyles.boldLabel);
+            if (Application.isPlaying)
+                provider.EditorPreviewDrawPreviewGUI();
+            else
+                provider.EditorPreviewDrawPreviewGUINonPlay();
+            GUILayout.EndVertical();
         }
+
+        public override void OnPreviewSettings() { }
     }
 }

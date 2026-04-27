@@ -5,15 +5,9 @@ namespace ES
 {
     using Sirenix.OdinInspector;
     using Sirenix.OdinInspector.Editor;
-    using System.Collections;
-    using System.Collections.Generic;
-    using UnityEngine;
     using UnityEditor;
     using System;
-    using ES;
-    using Sirenix.Serialization;
     using System.IO;
-    using UnityEngine.UIElements;
     using System.Linq;
     using Sirenix.Utilities;
 
@@ -30,7 +24,7 @@ namespace ES
             #region 简单重写
             public override GUIContent ESWindow_GetWindowGUIContent()
             {
-                var content = new GUIContent("ES数据窗口", "使用ES数据工具完成快速各种数据配置与开发");
+                var content = new GUIContent("ES数据窗口", "用于创建、查询与维护SO数据（Info/Group/Pack/常规SO）");
                 return content;
             }
             public override void ESWindow_OnOpen()
@@ -95,10 +89,6 @@ namespace ES
                 {
                     UsingWindow = this;
                     ES_LoadData();
-                }
-                if (UsingWindow != null)
-                {
-
                 }
                 base.OnImGUI();
             }
@@ -725,7 +715,7 @@ namespace ES
             [VerticalGroup("总组/数据组")]
             [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据组")]
-            public string createText = "--创建新信息配置--";
+            public string createText = "--创建新信息（Info）--";
             [InfoBox("建议修改一下键名或者信息名防止重复！", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
             [InfoBox("该元素的键已经出现了！！请修改", VisibleIf = "@!(group?.NotContainsInfoKey(DataKey)??false)", InfoMessageType = InfoMessageType.Error)]
             [OnValueChanged("Change"),ESBackGround("yellow",0.2f), LabelText("数据信息的键")]
@@ -750,21 +740,21 @@ namespace ES
             public List<ISoDataInfo> soInfos = new List<ISoDataInfo>();
             [DisplayAsString(fontSize: 30, TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             [VerticalGroup("总组/数据组")]
-            public string showText = "--数据组详情--";
+            public string showText = "--当前数据组详情--";
             [InlineEditor(Expanded = true), SerializeReference, LabelText("数据组")]
             [VerticalGroup("总组/数据组"), OnValueChanged("RefreshInfos")]
             public ISoDataGroup group;
 
             private string ShowTitle()
             {
-                return group != null ? "开始配置数据组:※ 【" + group.FileName + "】" : "!!先选中要配置的数据组！!";
+                return group != null ? "开始配置数据组：※【" + group.FileName + "】" : "请先在Project中选中一个数据组资产";
             }
 
             #region 按钮
             [HorizontalGroup("总组", width: 100)]
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("去新建或筛选组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            [Button("前往【组】查询/新建", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
             public void CreateNewPage()
             {
                 ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = ESSODataWindowHelper.GetGroupName(group.GetType());
@@ -795,9 +785,7 @@ namespace ES
                         info.SetKey(DataKey);
                         group._TryAddInfoToDic(DataKey, @object);
                         AssetDatabase.AddObjectToAsset(@object, groupAssetPath);
-                        EditorUtility.SetDirty(group as ScriptableObject);
-                        AssetDatabase.SaveAssets();
-                        AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
+                        MarkGroupAssetDirtyAndSave(group, groupAssetPath, "新建单元信息");
                     }
                     else
                     {
@@ -835,9 +823,7 @@ namespace ES
 
                         group._TryAddInfoToDic(DataKey, copy);
                         AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
-                        EditorUtility.SetDirty(group as ScriptableObject);
-                        AssetDatabase.SaveAssets();
-                        AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
+                        MarkGroupAssetDirtyAndSave(group, groupAssetPath, "拷贝选定信息");
                     }
                     else
                     {
@@ -891,9 +877,7 @@ namespace ES
                             info.SetKey(DataKey);
                             group._TryAddInfoToDic(DataKey, copy);
                             AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
-                            EditorUtility.SetDirty(group as ScriptableObject);
-                            AssetDatabase.SaveAssets();
-                            AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
+                            MarkGroupAssetDirtyAndSave(group, groupAssetPath, "持久粘贴");
                         }
                         else
                         {
@@ -939,6 +923,25 @@ namespace ES
                     File.SetAttributes(fullPath, attrs & ~FileAttributes.ReadOnly);
                 }
             }
+
+            private static void MarkGroupAssetDirtyAndSave(ISoDataGroup targetGroup, string groupAssetPath, string actionName)
+            {
+                var groupAsset = targetGroup as ScriptableObject;
+                if (groupAsset == null)
+                {
+                    Debug.LogError($"[{actionName}] 数据组资产为空，无法保存。");
+                    return;
+                }
+
+                // 只标记Group主资产为脏，不对Info子资产调用SetDirty。
+                EditorUtility.SetDirty(groupAsset);
+                AssetDatabase.SaveAssets();
+
+                if (!string.IsNullOrEmpty(groupAssetPath))
+                {
+                    AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
+                }
+            }
             public void RefreshInfos()
             {
                 if (group != null)
@@ -972,12 +975,10 @@ namespace ES
 
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("检查刷新", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("校验并刷新", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void Check()
             {
                 List<string> ToRemove = new List<string>();
-                AssetDatabase.Refresh();
-                AssetDatabase.SaveAssets();
                 bool hasChange = false;
                 if (group != null)
                     foreach (var i in group.AllKeys)
@@ -987,7 +988,6 @@ namespace ES
                         ScriptableObject so_ = so as ScriptableObject;
                         if (so_ != null)
                         {
-                            Debug.Log("apply");
                             if (so.GetKey() != i)
                             {
                                 so.SetKey(i);
@@ -996,7 +996,6 @@ namespace ES
                         }
                         else
                         {
-                            Debug.Log("RemoveInfo");
                             ToRemove.Add(i);
                             hasChange = true;
                         }
@@ -1005,18 +1004,18 @@ namespace ES
                 {
                     group._RemoveInfoFromDic(i);
                 }
-                AssetDatabase.Refresh();
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
+
                 if (hasChange)
                 {
+                    var groupAssetPath = AssetDatabase.GetAssetPath(group as ScriptableObject);
+                    MarkGroupAssetDirtyAndSave(group, groupAssetPath, "检查刷新");
                     ESSODataInfoWindow.UsingWindow?.ESWindow_RefreshWindow();
                 }
 
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("载入子数据", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("从列表载入子数据", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void Collect()
             {
                 UnityEngine.Object ob = group as ScriptableObject;
@@ -1026,12 +1025,14 @@ namespace ES
                 {
                     ScriptableObject obd = i as ScriptableObject;
                     string soPath = AssetDatabase.GetAssetPath(obd);
-                    Debug.Log(soPath);
-                    if (soPath.StartsWith(groupPath))
+                    if (!string.IsNullOrEmpty(soPath) && soPath.StartsWith(groupPath, StringComparison.OrdinalIgnoreCase))
                     {
                         group._TryAddInfoToDic(i.GetKey(), obd);
                     }
                 }
+
+                var groupAssetPath = AssetDatabase.GetAssetPath(group as ScriptableObject);
+                MarkGroupAssetDirtyAndSave(group, groupAssetPath, "载入子数据");
             }
             #endregion
         }
@@ -1045,13 +1046,13 @@ namespace ES
 
             [DisplayAsString(fontSize: 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), HideLabel]
             [VerticalGroup("总组/数据组")]
-            public string handleName = "--文件相关--";
+            public string handleName = "--文件操作--";
 
             [VerticalGroup("总组/数据组"), LabelText("重命名文件"), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
             public string renameFile = "新文件名";
             [VerticalGroup("总组/数据组")]
             [DisplayAsString(fontSize: 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), HideLabel]
-            public string handleSOData = "--配置数据--";
+            public string handleSOData = "--数据内容--";
             [InlineEditor, LabelText("数据")]
 
             [VerticalGroup("总组/数据组"), SerializeReference]
@@ -1339,6 +1340,7 @@ namespace ES
         {
             static ESSODataWindowHelper()
             {
+                Selection.selectionChanged -= ForDataWindowSelection;
                 Selection.selectionChanged += ForDataWindowSelection;
             }
             private static void ForDataWindowSelection()
@@ -1370,7 +1372,12 @@ namespace ES
             public static void SelectSoGroup(ScriptableObject so)
             {
                 Selection.activeObject = so;
-                Debug.Log("AAA"+ ESSODataInfoWindow.MenuItems);
+
+                if (ESSODataInfoWindow.UsingWindow == null || ESSODataInfoWindow.UsingWindow.MenuTree == null)
+                {
+                    return;
+                }
+
                 if (ESSODataInfoWindow.MenuItems.TryGetValue(ESSODataInfoWindow.PageName_DataGroupOnChooseEditInfo, out var pageItem))
                 {
                     ESSODataInfoWindow.UsingWindow.MenuTree.Selection.Add(pageItem);

@@ -10,6 +10,9 @@ namespace ES
         [Title("开关")]
         public bool enableMount = true;
 
+        [LabelText("调试日志")]
+        public bool debugMount = false;
+
         [Title("状态")]
         [ReadOnly] public bool mountHold;
 
@@ -56,7 +59,7 @@ namespace ES
             }
 
             // 构造跟踪器并绑定状态（无委托，零 GC）
-            _lifecycle.Bind(sm, _mountState, Mount_StateName);
+            _lifecycle.Bind(sm, _mountState, ResolveMountStateKeyForLifecycle(_mountState));
         }
 
         // ================================================================
@@ -109,7 +112,8 @@ namespace ES
             // 若 MatchTarget 未配置/失败，ApplyMountMatchTarget 内部 fallback 会直接 StartMatchTarget，
             // 同样需要先不传送，否则起点==终点，位移为零。
             currentMount.Mount(MyCore, skipImmediateSync: true);
-            Debug.Log($"[Mount] OnMountEnter 执行 | currentMount={currentMount.name} | matchPoint={(currentMount.matchPoint != null ? currentMount.matchPoint.name : "null")}");
+            if (debugMount)
+                Debug.Log($"[Mount] OnMountEnter 执行 | currentMount={currentMount.name} | matchPoint={(currentMount.matchPoint != null ? currentMount.matchPoint.name : "null")}");
 
             // ★ 不在代码里调用 sm.SetSupportFlags(Mounted)！
             //   StateMachine 的 Flag 清理（TruelyDeactivateState）只会清除与 Inspector 配置匹配的 Flag。
@@ -146,27 +150,32 @@ namespace ES
         {
             if (_mountState == null || mountable.matchPoint == null)
             {
-                Debug.LogWarning($"[Mount] ApplyMountMatchTarget 跳过 | _mountState={((_mountState == null) ? "null" : _mountState.ToString())} | matchPoint={(mountable.matchPoint == null ? "null" : mountable.matchPoint.name)}");
+                if (debugMount)
+                    Debug.LogWarning($"[Mount] ApplyMountMatchTarget 跳过 | _mountState={((_mountState == null) ? "null" : _mountState.ToString())} | matchPoint={(mountable.matchPoint == null ? "null" : mountable.matchPoint.name)}");
                 return;
             }
 
-            Debug.Log($"[Mount] 尝试 StartMatchTargetFromConfig | matchPoint.pos={mountable.matchPoint.position:F3} | matchPoint.rot={mountable.matchPoint.rotation.eulerAngles:F1}");
+            if (debugMount)
+                Debug.Log($"[Mount] 尝试 StartMatchTargetFromConfig | matchPoint.pos={mountable.matchPoint.position:F3} | matchPoint.rot={mountable.matchPoint.rotation.eulerAngles:F1}");
             bool ok = _mountState.StartMatchTargetFromConfig(
                 mountable.matchPoint.position,
                 mountable.matchPoint.rotation);
 
-            Debug.Log($"[Mount] StartMatchTargetFromConfig 结果={ok} | IsMatchTargetActive={_mountState.IsMatchTargetActive}");
+            if (debugMount)
+                Debug.Log($"[Mount] StartMatchTargetFromConfig 结果={ok} | IsMatchTargetActive={_mountState.IsMatchTargetActive}");
 
             if (!ok)
             {
-                Debug.Log("[Mount] Inspector 未配置，走 Fallback 全参）");
+                if (debugMount)
+                    Debug.Log("[Mount] Inspector 未配置，走 Fallback 全参）");
                 _mountState.StartMatchTarget(
                     mountable.matchPoint.position,
                     mountable.matchPoint.rotation,
                     AvatarTarget.Root,
                     0.05f, 0.6f,
                     3f, 360f);  // approachSpeed=3单位/秒, approachAngleSpeed=360度/秒
-                Debug.Log($"[Mount] Fallback 后 IsMatchTargetActive={_mountState.IsMatchTargetActive}");
+                if (debugMount)
+                    Debug.Log($"[Mount] Fallback 后 IsMatchTargetActive={_mountState.IsMatchTargetActive}");
             }
         }
 
@@ -180,15 +189,25 @@ namespace ES
             {
 #if UNITY_EDITOR
                 var mountable = hit.collider.GetComponentInParent<EntityMountable>();
-                Debug.Log($"[Mount] 射线命中: {hit.collider.name} | 距离={hit.distance:F2} | EntityMountable={(mountable != null ? mountable.name : "null（无法骑乘）")}");
+                if (debugMount)
+                    Debug.Log($"[Mount] 射线命中: {hit.collider.name} | 距离={hit.distance:F2} | EntityMountable={(mountable != null ? mountable.name : "null（无法骑乘）")}");
                 return mountable;
 #else
                 return hit.collider.GetComponentInParent<EntityMountable>();
 #endif
             }
-   Debug.Log($"[Mount] 射线没命中:  |)");
+   if (debugMount)
+       Debug.Log($"[Mount] 射线没命中:  |)");
              
             return null;
+        }
+
+        private string ResolveMountStateKeyForLifecycle(StateBase state)
+        {
+            if (state != null && !string.IsNullOrEmpty(state.strKey))
+                return state.strKey;
+
+            return string.IsNullOrEmpty(Mount_StateName) ? string.Empty : Mount_StateName;
         }
 
         protected override void Update()

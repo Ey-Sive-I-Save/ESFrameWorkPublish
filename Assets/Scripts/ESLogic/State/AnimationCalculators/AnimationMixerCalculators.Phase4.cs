@@ -1473,7 +1473,10 @@ namespace ES
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                     if (allowThisFrameLog)
                     {
-                        dbg?.LogAnimationBlend($"[Phase4] 阶段输出更新(子计算器) | 阶段={phaseIndex} {phase.phaseName} | 计算器={phase.phaseCalculator.GetType().Name} | dt={deltaTime:F3}");
+                        if (dbg != null)
+                        {
+                            dbg.LogAnimationBlend($"[Phase4] 阶段输出更新(子计算器) | 阶段={phaseIndex} {phase.phaseName} | 计算器={phase.phaseCalculator.GetType().Name} | dt={deltaTime:F3}");
+                        }
                     }
 #endif
                 }
@@ -1483,7 +1486,10 @@ namespace ES
                 {
                     string calcName = phase.phaseCalculator != null ? phase.phaseCalculator.GetType().Name : "(空)";
                     string rt = phaseRuntime != null ? "有效" : "空";
-                    dbg?.LogAnimationBlend($"[Phase4] 阶段输出更新被跳过(子计算器) | 阶段={phaseIndex} {phase.phaseName} | 计算器={calcName} | Runtime={rt}");
+                    if (dbg != null)
+                    {
+                        dbg.LogAnimationBlend($"[Phase4] 阶段输出更新被跳过(子计算器) | 阶段={phaseIndex} {phase.phaseName} | 计算器={calcName} | Runtime={rt}");
+                    }
                 }
 #endif
                 return;
@@ -1496,12 +1502,18 @@ namespace ES
                 {
                     if (phase.enableSecondaryClipBlend && phase.secondaryClip == null)
                     {
-                        dbg?.LogAnimationBlend($"[Phase4] 阶段未能启用主次混合：次Clip为空 | 阶段={phaseIndex} {phase.phaseName}");
+                        if (dbg != null)
+                        {
+                            dbg.LogAnimationBlend($"[Phase4] 阶段未能启用主次混合：次Clip为空 | 阶段={phaseIndex} {phase.phaseName}");
+                        }
                     }
                     else
                     {
                         // 你问的“只有一个动画（无次Clip/未启用主次混合）走哪条路径”：就是这里直接返回，不会走主次混合更新。
-                        dbg?.LogAnimationBlend($"[Phase4] 阶段输出更新(单Clip/无混合) | 阶段={phaseIndex} {phase.phaseName} | enableSecondaryClipBlend={phase.enableSecondaryClipBlend}");
+                        if (dbg != null)
+                        {
+                            dbg.LogAnimationBlend($"[Phase4] 阶段输出更新(单Clip/无混合) | 阶段={phaseIndex} {phase.phaseName} | enableSecondaryClipBlend={phase.enableSecondaryClipBlend}");
+                        }
                     }
                 }
 #endif
@@ -1513,7 +1525,10 @@ namespace ES
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 if (allowThisFrameLog)
                 {
-                    dbg?.LogAnimationBlend($"[Phase4] 阶段主次混合被跳过：phaseMixers无效 | 阶段={phaseIndex} {phase.phaseName}");
+                    if (dbg != null)
+                    {
+                        dbg.LogAnimationBlend($"[Phase4] 阶段主次混合被跳过：phaseMixers无效 | 阶段={phaseIndex} {phase.phaseName}");
+                    }
                 }
 #endif
                 return;
@@ -1526,7 +1541,10 @@ namespace ES
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 if (allowThisFrameLog)
                 {
-                    dbg?.LogAnimationBlend($"[Phase4] 阶段主次混合被跳过：权重缓存为空 | 阶段={phaseIndex} {phase.phaseName}");
+                    if (dbg != null)
+                    {
+                        dbg.LogAnimationBlend($"[Phase4] 阶段主次混合被跳过：权重缓存为空 | 阶段={phaseIndex} {phase.phaseName}");
+                    }
                 }
 #endif
                 return;
@@ -1559,9 +1577,12 @@ namespace ES
             {
                 string pName = phase.primaryClip != null ? phase.primaryClip.name : "None";
                 string sName = phase.secondaryClip != null ? phase.secondaryClip.name : "None";
-                dbg?.LogAnimationBlend(
-                    $"[Phase4] 阶段输出更新(主次混合) | 阶段={phaseIndex} {phase.phaseName} | " +
-                    $"目标={targetBlend:F2} 实际={runtime.phaseBlendWeights[phaseIndex]:F2} | 主={pName}({w0:F2}) 次={sName}({w1:F2})");
+                if (dbg != null)
+                {
+                    dbg.LogAnimationBlend(
+                        $"[Phase4] 阶段输出更新(主次混合) | 阶段={phaseIndex} {phase.phaseName} | " +
+                        $"目标={targetBlend:F2} 实际={runtime.phaseBlendWeights[phaseIndex]:F2} | 主={pName}({w0:F2}) 次={sName}({w1:F2})");
+                }
             }
 #endif
         }

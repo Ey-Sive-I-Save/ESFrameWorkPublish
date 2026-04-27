@@ -1,13 +1,42 @@
+
+
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Sirenix.OdinInspector;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace ES
 {
     [Serializable, TypeRegistryItem("状态域")]
     public class EntityStateDomain : Domain<Entity, EntityStateModuleBase>
     {
+        private static readonly StateSupportFlags[] PreflightSupportFlags =
+        {
+            StateSupportFlags.Grounded,
+            StateSupportFlags.Crouched,
+            StateSupportFlags.Prone,
+            StateSupportFlags.Swimming,
+            StateSupportFlags.Flying,
+            StateSupportFlags.Mounted,
+            StateSupportFlags.Climbing,
+            StateSupportFlags.SpecialInteraction,
+            StateSupportFlags.Observer,
+            StateSupportFlags.Dead,
+            StateSupportFlags.Transition,
+        };
+
+        private sealed class PreflightFaultState : StateBase
+        {
+            protected override void OnStateEnterLogic()
+            {
+                throw new InvalidOperationException("PreflightFaultState.OnStateEnterLogic");
+            }
+        }
+
         [Title("状态数据")]
         [LabelText("动画状态数据包")]
         public StateAniDataPack stateAniDataPack;
@@ -462,6 +491,475 @@ namespace ES
 #endif
         }
 
+        [Button("预检状态机配置"), FoldoutGroup("测试功能")]
+        public bool TestPreflightStateMachineConfig()
+        {
+            return RunStateMachinePreflight(logToConsole: true);
+        }
+
+        public bool RunStateMachinePreflight(bool logToConsole)
+        {
+            var errors = new List<string>(16);
+            var warnings = new List<string>(16);
+            var allInfos = new List<StateAniDataInfo>(128);
+            var stateById = new Dictionary<int, StateAniDataInfo>(128);
+            var fallbackCandidateCount = new Dictionary<string, int>(64);
+
+            if (MyCore == null)
+            {
+                errors.Add("MyCore 为空，StateDomain 还未绑定到 Entity。");
+            }
+
+            var animator = MyCore != null ? MyCore.animator : _cachedAnimator;
+            if (animator == null)
+            {
+                errors.Add("Animator 为空，StateMachine 无法绑定 PlayableGraph。");
+            }
+
+            if (stateMachine == null)
+            {
+                errors.Add("stateMachine 为空。");
+            }
+
+            CollectPackSources(_workingPackSources);
+            if (_workingPackSources.Count == 0)
+            {
+                warnings.Add("未配置任何 StateAniDataPack。");
+            }
+
+            var nameSet = new HashSet<string>(StringComparer.Ordinal);
+            var idSet = new HashSet<int>();
+
+            for (int i = 0; i < _workingPackSources.Count; i++)
+            {
+                var pack = _workingPackSources[i];
+                if (pack == null)
+                {
+                    warnings.Add($"第 {i} 个状态包为空引用。");
+                    continue;
+                }
+
+                pack.Check();
+
+                if (pack.Infos == null)
+                {
+                    warnings.Add($"状态包 {pack.name} 的 Infos 为空。");
+                    continue;
+                }
+
+                foreach (var info in pack.Infos.Values)
+                {
+                    allInfos.Add(info);
+
+                    if (info == null)
+                    {
+                        warnings.Add($"状态包 {pack.name} 含空的 StateAniDataInfo。");
+                        continue;
+                    }
+
+                    var basic = info.sharedData != null ? info.sharedData.basicConfig : null;
+                    if (basic == null)
+                    {
+                        errors.Add($"状态包 {pack.name} 中存在 basicConfig 为空的状态。");
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(basic.stateName))
+                    {
+                        errors.Add($"状态包 {pack.name} 中存在空状态名（stateName）。");
+                    }
+                    else if (!nameSet.Add(basic.stateName))
+                    {
+                        errors.Add($"状态名重复: {basic.stateName}。");
+                    }
+
+                    if (basic.stateId >= 0 && !idSet.Add(basic.stateId))
+                    {
+                        errors.Add($"状态ID重复: {basic.stateId}。");
+                    }
+
+                    if (basic.stateId >= 0 && !stateById.ContainsKey(basic.stateId))
+                    {
+                        stateById.Add(basic.stateId, info);
+                    }
+
+                    if (basic.ignoreSupportFlag && basic.disableActiveOnSupportFlagSwitching)
+                    {
+                        warnings.Add($"状态 {basic.stateName} 同时开启 ignoreSupportFlag 与 disableActiveOnSupportFlagSwitching，切换矩阵语义冲突。");
+                    }
+
+                    if (basic.durationMode == StateDurationMode.UntilAnimationEnd && (info.sharedData == null || !info.sharedData.hasAnimation))
+                    {
+                        errors.Add($"状态 {basic.stateName} 使用 UntilAnimationEnd，但未启用动画。");
+                    }
+
+                    var shared = info.sharedData;
+                    var animConfig = shared != null ? shared.animationConfig : null;
+                    if (shared != null && shared.hasAnimation)
+                    {
+                        if (animConfig == null)
+                        {
+                            errors.Add($"状态 {basic.stateName} 标记 hasAnimation=true，但 animationConfig 为空。");
+                        }
+                        else if (animConfig.calculator == null)
+                        {
+                            errors.Add($"状态 {basic.stateName} 的 animationConfig.calculator 为空。");
+                        }
+                    }
+
+                    ValidateIKContract(info, errors, warnings);
+
+                    if (basic.canBeFeedback)
+                    {
+                        string fbKey = BuildFallbackCoverageKey(basic.layerType, NormalizeSingleSupportFlagForPreflight(basic.stateSupportFlag));
+                        fallbackCandidateCount.TryGetValue(fbKey, out int existing);
+                        fallbackCandidateCount[fbKey] = existing + 1;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(defaultStateKey) && !nameSet.Contains(defaultStateKey))
+            {
+                warnings.Add($"defaultStateKey={defaultStateKey} 未在已配置状态包中找到。");
+            }
+
+            ValidateFallbackCoverageFromPacks(fallbackCandidateCount, warnings);
+            ValidateFallbackReachabilityInRuntime(errors, warnings, stateById);
+            ValidateActivationMatrixCurrentRuntime(errors, warnings);
+            ValidateActivationRollbackConsistency(errors, warnings);
+
+            bool success = errors.Count == 0;
+
+            if (logToConsole)
+            {
+                var sb = new StringBuilder(512);
+                sb.AppendLine("=== StateDomain 预检报告 ===");
+                sb.AppendLine($"Entity: {(MyCore != null ? MyCore.name : "<null>")}");
+                sb.AppendLine($"PackCount: {_workingPackSources.Count} | Errors: {errors.Count} | Warnings: {warnings.Count}");
+
+                if (errors.Count > 0)
+                {
+                    sb.AppendLine("[Errors]");
+                    for (int i = 0; i < errors.Count; i++) sb.AppendLine($"  - {errors[i]}");
+                }
+
+                if (warnings.Count > 0)
+                {
+                    sb.AppendLine("[Warnings]");
+                    for (int i = 0; i < warnings.Count; i++) sb.AppendLine($"  - {warnings[i]}");
+                }
+
+                if (success)
+                {
+                    Debug.Log(sb.ToString());
+                }
+                else
+                {
+                    Debug.LogError(sb.ToString());
+                }
+            }
+
+            return success;
+        }
+
+        private static StateSupportFlags NormalizeSingleSupportFlagForPreflight(StateSupportFlags flag)
+        {
+            if (flag == StateSupportFlags.None) return StateSupportFlags.Grounded;
+            ushort value = (ushort)flag;
+            ushort lowest = (ushort)(value & (ushort)(-(short)value));
+            return (StateSupportFlags)lowest;
+        }
+
+        private static string BuildFallbackCoverageKey(StateLayerType layer, StateSupportFlags flag)
+        {
+            return layer + "|" + flag;
+        }
+
+        private static bool HasAnyIKGoalEnabled(StateProceduralDriveData procedural)
+        {
+            if (procedural == null) return false;
+
+            if (procedural.ikLeftHand != null && procedural.ikLeftHand.enabled) return true;
+            if (procedural.ikRightHand != null && procedural.ikRightHand.enabled) return true;
+            if (procedural.ikLeftFoot != null && procedural.ikLeftFoot.enabled) return true;
+            if (procedural.ikRightFoot != null && procedural.ikRightFoot.enabled) return true;
+            if (procedural.ikLookAt != null && procedural.ikLookAt.enabled) return true;
+
+            var segments = procedural.ikSegments;
+            if (segments == null) return false;
+
+            for (int i = 0; i < segments.Count; i++)
+            {
+                var segment = segments[i];
+                if (segment == null || !segment.enabled) continue;
+
+                if (segment.ikLeftHand != null && segment.ikLeftHand.enabled) return true;
+                if (segment.ikRightHand != null && segment.ikRightHand.enabled) return true;
+                if (segment.ikLeftFoot != null && segment.ikLeftFoot.enabled) return true;
+                if (segment.ikRightFoot != null && segment.ikRightFoot.enabled) return true;
+                if (segment.ikLookAt != null && segment.ikLookAt.enabled) return true;
+            }
+
+            return false;
+        }
+
+        private static void ValidateIKContract(StateAniDataInfo info, List<string> errors, List<string> warnings)
+        {
+            if (info == null || info.sharedData == null || info.sharedData.basicConfig == null) return;
+
+            string stateName = info.sharedData.basicConfig.stateName;
+            var shared = info.sharedData;
+            var procedural = shared.proceduralDriveConfig;
+            if (procedural == null) return;
+
+            if (procedural.enableIK)
+            {
+                if (!shared.hasAnimation)
+                {
+                    errors.Add($"状态 {stateName} 启用了 procedural IK，但 hasAnimation=false。");
+                }
+
+                if (!HasAnyIKGoalEnabled(procedural))
+                {
+                    errors.Add($"状态 {stateName} 启用了 procedural IK，但未配置任何启用的 IK limb/lookAt/segment。");
+                }
+            }
+
+            if (procedural.enableMatchTarget && !shared.hasAnimation)
+            {
+                warnings.Add($"状态 {stateName} 启用了 MatchTarget 但无动画，运行时将无法生效。");
+            }
+        }
+
+        private static void ValidateFallbackCoverageFromPacks(Dictionary<string, int> fallbackCandidateCount, List<string> warnings)
+        {
+            for (int layer = 0; layer < (int)StateLayerType.Count; layer++)
+            {
+                var layerType = (StateLayerType)layer;
+                for (int i = 0; i < PreflightSupportFlags.Length; i++)
+                {
+                    var supportFlag = PreflightSupportFlags[i];
+                    string key = BuildFallbackCoverageKey(layerType, supportFlag);
+                    fallbackCandidateCount.TryGetValue(key, out int count);
+
+                    if (count <= 0)
+                    {
+                        warnings.Add($"Fallback覆盖缺失: Layer={layerType}, Support={supportFlag} 无 canBeFeedback 状态候选。");
+                    }
+                    else if (count > 1)
+                    {
+                        warnings.Add($"Fallback候选重复: Layer={layerType}, Support={supportFlag} 有 {count} 个 canBeFeedback 候选，最终注册覆盖顺序需确认。");
+                    }
+                }
+            }
+        }
+
+        private void ValidateFallbackReachabilityInRuntime(List<string> errors, List<string> warnings, Dictionary<int, StateAniDataInfo> stateById)
+        {
+            if (stateMachine == null || !_stateMachineInitialized) return;
+
+            for (int layer = 0; layer < (int)StateLayerType.Count; layer++)
+            {
+                var layerType = (StateLayerType)layer;
+                var layerRuntime = stateMachine.GetLayer(layerType);
+                if (layerRuntime == null)
+                {
+                    errors.Add($"运行时层级丢失: {layerType}");
+                    continue;
+                }
+
+                for (int i = 0; i < PreflightSupportFlags.Length; i++)
+                {
+                    var supportFlag = PreflightSupportFlags[i];
+                    int fallbackStateId = layerRuntime.GetFallBack(supportFlag);
+                    if (fallbackStateId < 0)
+                    {
+                        continue;
+                    }
+
+                    var fallbackState = stateMachine.GetStateByInt(fallbackStateId);
+                    if (fallbackState == null)
+                    {
+                        errors.Add($"Fallback不可达: Layer={layerType}, Support={supportFlag}, StateID={fallbackStateId} 未注册。");
+                        continue;
+                    }
+
+                    if (!stateMachine.TryGetStateLayerType(fallbackState, out var fallbackLayer) || fallbackLayer != layerType)
+                    {
+                        errors.Add($"Fallback层级错误: Layer={layerType}, Support={supportFlag}, State={fallbackState.strKey} 实际层={fallbackLayer}。");
+                    }
+
+                    if (stateById.TryGetValue(fallbackStateId, out var info)
+                        && info != null
+                        && info.sharedData != null
+                        && info.sharedData.basicConfig != null
+                        && !info.sharedData.basicConfig.canBeFeedback)
+                    {
+                        warnings.Add($"Fallback规范风险: State={fallbackState.strKey} 被登记为Fallback，但 canBeFeedback=false。");
+                    }
+                }
+            }
+        }
+
+        private void ValidateActivationMatrixCurrentRuntime(List<string> errors, List<string> warnings)
+        {
+            if (stateMachine == null || !_stateMachineInitialized) return;
+
+            foreach (var kvp in stateMachine.EnumerateRegisteredStatesByKey())
+            {
+                var state = kvp.Value;
+                if (state == null || state.stateSharedData == null || state.stateSharedData.basicConfig == null)
+                {
+                    errors.Add($"激活矩阵校验失败: 注册状态 {kvp.Key} 为空或配置缺失。");
+                    continue;
+                }
+
+                var basic = state.stateSharedData.basicConfig;
+                var result = stateMachine.TestStateActivation(state, basic.layerType);
+                if (!result.CanActivate)
+                {
+                    warnings.Add($"激活矩阵当前态不可达: State={state.strKey}, Layer={basic.layerType}, Reason={result.failureReason}");
+                }
+            }
+        }
+
+        private void ValidateActivationRollbackConsistency(List<string> errors, List<string> warnings)
+        {
+            if (stateMachine == null || !_stateMachineInitialized) return;
+
+            int runningBefore = stateMachine.GetRunningStateCount();
+            int layerBefore = stateMachine.GetLayerStateCount(StateLayerType.Main);
+
+            string probeKey = "__preflight_fault_probe__" + Guid.NewGuid().ToString("N");
+            int probeId = -1;
+            bool registered = false;
+            try
+            {
+                var probe = new PreflightFaultState
+                {
+                    stateSharedData = new StateSharedData
+                    {
+                        basicConfig = new StateBasicConfig
+                        {
+                            stateName = probeKey,
+                            stateId = -1,
+                            layerType = StateLayerType.Main,
+                            durationMode = StateDurationMode.Infinite,
+                            ignoreSupportFlag = true,
+                            resetSupportFlagOnEnter = false,
+                            supportReStart = false,
+                            canBeFeedback = false,
+                        },
+                        hasAnimation = false,
+                    },
+                    stateVariableData = new StateVariableData()
+                };
+
+                probe.stateSharedData.InitializeRuntime();
+                registered = stateMachine.RegisterState(probeKey, probe, StateLayerType.Main);
+                if (!registered)
+                {
+                    errors.Add("激活回滚探针注册失败，无法验证回滚一致性。");
+                    return;
+                }
+
+                probeId = probe.intKey;
+
+                bool activated = stateMachine.TryActivateState(probe, StateLayerType.Main);
+                if (activated)
+                {
+                    errors.Add("激活回滚探针异常：故障注入状态竟然激活成功，回滚链路未命中。");
+                }
+
+                int runningAfter = stateMachine.GetRunningStateCount();
+                int layerAfter = stateMachine.GetLayerStateCount(StateLayerType.Main);
+                if (runningAfter != runningBefore || layerAfter != layerBefore)
+                {
+                    errors.Add($"激活回滚不一致: Running {runningBefore}->{runningAfter}, MainLayer {layerBefore}->{layerAfter}");
+                }
+
+                if (!stateMachine.TryGetActivationEventFromLatest(0, out var latest))
+                {
+                    warnings.Add("结构化激活事件为空：无法用于线上归因。");
+                }
+                else if (latest.kind != StateMachine.ActivationEventKind.Rollback && latest.kind != StateMachine.ActivationEventKind.Failure)
+                {
+                    warnings.Add($"结构化激活事件未记录失败结论: LatestKind={latest.kind}");
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"激活回滚探针执行异常: {ex.Message}");
+            }
+            finally
+            {
+                if (registered)
+                {
+                    if (probeId > 0)
+                    {
+                        stateMachine.UnregisterState(probeId);
+                    }
+                    else
+                    {
+                        stateMachine.UnregisterState(probeKey);
+                    }
+                }
+            }
+        }
+
         #endregion
+        
+        #region EditorPreview
+        #if UNITY_EDITOR
+        // 让本Domain在ESSEditorPreview中以SingleArea独占区块显示
+        public bool EditorPreviewIsSingleArea => true;
+        public bool EditorPreviewCanPreview => Application.isPlaying && stateMachine != null;
+        public bool EditorPreviewCanPreviewNonPlay => false;
+        public void EditorPreviewDrawPreviewGUI() => EditorPreviewDrawPreviewGUIImpl();
+        public void EditorPreviewDrawPreviewGUINonPlay() { GUILayout.Label("进入运行模式后显示实时信息"); }
+
+        private void EditorPreviewDrawPreviewGUIImpl()
+        {
+            var sm = stateMachine;
+            if (sm == null) { GUILayout.Label("无状态机"); return; }
+            GUILayout.Label("【状态机全部状态/权重实时预览】", UnityEditor.EditorStyles.boldLabel);
+            var layers = sm.LayerRuntimes;
+            if (layers == null) return;
+            foreach (var layer in layers)
+            {
+                if (layer == null) continue;
+                bool layerFold = UnityEditor.EditorGUILayout.Foldout(true, $"层级: {layer.layerType}  (权重: {layer.weight:F2})", true);
+                if (!layerFold) continue;
+                foreach (var kvp in layer.stateToSlotMap)
+                {
+                    var state = kvp.Key;
+                    int slot = kvp.Value;
+                    float weight = 0f;
+                    // 类型安全地访问 AnimationMixerPlayable（修正API调用）
+                    // 统一用 Playable 结构体API，兼容所有Unity版本
+                    var playable = (UnityEngine.Playables.Playable)layer.mixer;
+                    if (UnityEngine.Playables.PlayableExtensions.IsValid(playable))
+                    {
+                        int inputCount = UnityEngine.Playables.PlayableExtensions.GetInputCount(playable);
+                        if (slot >= 0 && slot < inputCount)
+                        {
+                            weight = UnityEngine.Playables.PlayableExtensions.GetInputWeight(playable, slot);
+                        }
+                    }
+                    bool isActive = layer.runningStates.Contains(state);
+                    var style = isActive ? UnityEditor.EditorStyles.boldLabel : UnityEditor.EditorStyles.label;
+                    UnityEditor.EditorGUILayout.BeginHorizontal();
+                    GUILayout.Label(state.strKey ?? state.GetType().Name, style, GUILayout.Width(160));
+                    UnityEditor.EditorGUILayout.LabelField($"{weight:F2}", GUILayout.Width(40));
+                    var r = GUILayoutUtility.GetRect(80, 18);
+                    UnityEditor.EditorGUI.ProgressBar(r, weight, "");
+                    UnityEditor.EditorGUILayout.EndHorizontal();
+                }
+            }
+        }
+        #endif
+
+        #endregion
+   
     }
 }

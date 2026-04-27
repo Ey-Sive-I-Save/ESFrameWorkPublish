@@ -49,6 +49,27 @@ namespace ES
         [LabelText("切换武器")]
         public InputActionProperty switchWeaponAction;
 
+        [LabelText("拿枪")]
+        public InputActionProperty equipWeaponAction;
+
+        [LabelText("收枪")]
+        public InputActionProperty holsterWeaponAction;
+
+        [LabelText("切到武器槽1")]
+        public InputActionProperty weaponSlot1Action;
+
+        [LabelText("切到武器槽2")]
+        public InputActionProperty weaponSlot2Action;
+
+        [LabelText("切到武器槽3")]
+        public InputActionProperty weaponSlot3Action;
+
+        [LabelText("切到武器槽4")]
+        public InputActionProperty weaponSlot4Action;
+
+        [LabelText("切到武器槽5")]
+        public InputActionProperty weaponSlot5Action;
+
         [LabelText("瞄准")]
         public InputActionProperty aimAction;
 
@@ -111,6 +132,13 @@ namespace ES
             blockAction = default;
             slideAction = default;
             switchWeaponAction = default;
+            equipWeaponAction = default;
+            holsterWeaponAction = default;
+            weaponSlot1Action = default;
+            weaponSlot2Action = default;
+            weaponSlot3Action = default;
+            weaponSlot4Action = default;
+            weaponSlot5Action = default;
             aimAction = default;
             peekLeftAction = default;
             peekRightAction = default;
@@ -155,6 +183,13 @@ namespace ES
         public bool ConsumeBlock() => snapshot.ConsumeBlock();
         public bool ConsumeSlide() => snapshot.ConsumeSlide();
         public bool ConsumeSwitchWeapon() => snapshot.ConsumeSwitchWeapon();
+        public bool ConsumeEquipWeapon() => snapshot.ConsumeEquipWeapon();
+        public bool ConsumeHolsterWeapon() => snapshot.ConsumeHolsterWeapon();
+        public bool ConsumeWeaponSlot1() => snapshot.ConsumeWeaponSlot1();
+        public bool ConsumeWeaponSlot2() => snapshot.ConsumeWeaponSlot2();
+        public bool ConsumeWeaponSlot3() => snapshot.ConsumeWeaponSlot3();
+        public bool ConsumeWeaponSlot4() => snapshot.ConsumeWeaponSlot4();
+        public bool ConsumeWeaponSlot5() => snapshot.ConsumeWeaponSlot5();
         public bool ConsumeAim() => snapshot.ConsumeAim();
         public bool ConsumeSkill1() => snapshot.ConsumeSkill1();
         public bool ConsumeSkill2() => snapshot.ConsumeSkill2();
@@ -180,6 +215,13 @@ namespace ES
         private InputAction _block;
         private InputAction _slide;
         private InputAction _switchWeapon;
+        private InputAction _equipWeapon;
+        private InputAction _holsterWeapon;
+        private InputAction _weaponSlot1;
+        private InputAction _weaponSlot2;
+        private InputAction _weaponSlot3;
+        private InputAction _weaponSlot4;
+        private InputAction _weaponSlot5;
         private InputAction _aim;
         private InputAction _peekLeft;
         private InputAction _peekRight;
@@ -234,6 +276,13 @@ namespace ES
             _block = blockAction.action;
             _slide = slideAction.action;
             _switchWeapon = switchWeaponAction.action;
+            _equipWeapon = equipWeaponAction.action;
+            _holsterWeapon = holsterWeaponAction.action;
+            _weaponSlot1 = weaponSlot1Action.action;
+            _weaponSlot2 = weaponSlot2Action.action;
+            _weaponSlot3 = weaponSlot3Action.action;
+            _weaponSlot4 = weaponSlot4Action.action;
+            _weaponSlot5 = weaponSlot5Action.action;
             _aim = aimAction.action;
             _peekLeft = peekLeftAction.action;
             _peekRight = peekRightAction.action;
@@ -257,6 +306,13 @@ namespace ES
             RegisterButton(_block, OnBlock);
             RegisterButton(_slide, OnSlide);
             RegisterButton(_switchWeapon, OnSwitchWeapon);
+            RegisterButton(_equipWeapon, OnEquipWeapon);
+            RegisterButton(_holsterWeapon, OnHolsterWeapon);
+            RegisterButton(_weaponSlot1, OnWeaponSlot1);
+            RegisterButton(_weaponSlot2, OnWeaponSlot2);
+            RegisterButton(_weaponSlot3, OnWeaponSlot3);
+            RegisterButton(_weaponSlot4, OnWeaponSlot4);
+            RegisterButton(_weaponSlot5, OnWeaponSlot5);
             RegisterButton(_aim, OnAim);
             RegisterHoldButton(_peekLeft, OnPeekLeft);
             RegisterHoldButton(_peekRight, OnPeekRight);
@@ -285,6 +341,13 @@ namespace ES
             UnregisterButton(_block, OnBlock);
             UnregisterButton(_slide, OnSlide);
             UnregisterButton(_switchWeapon, OnSwitchWeapon);
+            UnregisterButton(_equipWeapon, OnEquipWeapon);
+            UnregisterButton(_holsterWeapon, OnHolsterWeapon);
+            UnregisterButton(_weaponSlot1, OnWeaponSlot1);
+            UnregisterButton(_weaponSlot2, OnWeaponSlot2);
+            UnregisterButton(_weaponSlot3, OnWeaponSlot3);
+            UnregisterButton(_weaponSlot4, OnWeaponSlot4);
+            UnregisterButton(_weaponSlot5, OnWeaponSlot5);
             UnregisterButton(_aim, OnAim);
             UnregisterHoldButton(_peekLeft, OnPeekLeft);
             UnregisterHoldButton(_peekRight, OnPeekRight);
@@ -379,6 +442,41 @@ namespace ES
         private void OnSwitchWeapon(InputAction.CallbackContext ctx)
         {
             snapshot.switchWeapon = true;
+        }
+
+        private void OnEquipWeapon(InputAction.CallbackContext ctx)
+        {
+            snapshot.equipWeapon = true;
+        }
+
+        private void OnHolsterWeapon(InputAction.CallbackContext ctx)
+        {
+            snapshot.holsterWeapon = true;
+        }
+
+        private void OnWeaponSlot1(InputAction.CallbackContext ctx)
+        {
+            snapshot.weaponSlot1 = true;
+        }
+
+        private void OnWeaponSlot2(InputAction.CallbackContext ctx)
+        {
+            snapshot.weaponSlot2 = true;
+        }
+
+        private void OnWeaponSlot3(InputAction.CallbackContext ctx)
+        {
+            snapshot.weaponSlot3 = true;
+        }
+
+        private void OnWeaponSlot4(InputAction.CallbackContext ctx)
+        {
+            snapshot.weaponSlot4 = true;
+        }
+
+        private void OnWeaponSlot5(InputAction.CallbackContext ctx)
+        {
+            snapshot.weaponSlot5 = true;
         }
 
         private void OnAim(InputAction.CallbackContext ctx)
@@ -736,7 +834,15 @@ namespace ES
                 if (input.ConsumeHeavyAttack()) combatModule.TriggerHeavyAttack();
                 if (input.ConsumeBlock()) combatModule.SetBlock(true);
                 if (input.ConsumeSlide()) combatModule.SetSlide(true);
-                if (input.ConsumeSwitchWeapon()) combatModule.SwitchWeaponNext();
+                bool weaponActionHandled = false;
+                if (!weaponActionHandled && input.ConsumeWeaponSlot1()) { combatModule.SwitchWeaponTo(0); weaponActionHandled = true; }
+                if (!weaponActionHandled && input.ConsumeWeaponSlot2()) { combatModule.SwitchWeaponTo(1); weaponActionHandled = true; }
+                if (!weaponActionHandled && input.ConsumeWeaponSlot3()) { combatModule.SwitchWeaponTo(2); weaponActionHandled = true; }
+                if (!weaponActionHandled && input.ConsumeWeaponSlot4()) { combatModule.SwitchWeaponTo(3); weaponActionHandled = true; }
+                if (!weaponActionHandled && input.ConsumeWeaponSlot5()) { combatModule.SwitchWeaponTo(4); weaponActionHandled = true; }
+                if (!weaponActionHandled && input.ConsumeSwitchWeapon()) { combatModule.SwitchWeaponNext(); weaponActionHandled = true; }
+                if (!weaponActionHandled && input.ConsumeEquipWeapon()) { combatModule.EquipCurrentWeapon(); weaponActionHandled = true; }
+                if (!weaponActionHandled && input.ConsumeHolsterWeapon()) { combatModule.HolsterCurrentWeapon(); weaponActionHandled = true; }
                 if (input.ConsumeAim()) combatModule.SetAim(!combatModule.isAiming);
 
                 combatModule.SetAimPeek(input.AimPeek);
@@ -1283,6 +1389,27 @@ namespace ES
         [LabelText("切换武器")]
         public bool switchWeapon;
 
+        [LabelText("拿枪")]
+        public bool equipWeapon;
+
+        [LabelText("收枪")]
+        public bool holsterWeapon;
+
+        [LabelText("切到武器槽1")]
+        public bool weaponSlot1;
+
+        [LabelText("切到武器槽2")]
+        public bool weaponSlot2;
+
+        [LabelText("切到武器槽3")]
+        public bool weaponSlot3;
+
+        [LabelText("切到武器槽4")]
+        public bool weaponSlot4;
+
+        [LabelText("切到武器槽5")]
+        public bool weaponSlot5;
+
         [LabelText("瞄准")]
         public bool aim;
 
@@ -1332,6 +1459,13 @@ namespace ES
             block = false;
             slide = false;
             switchWeapon = false;
+            equipWeapon = false;
+            holsterWeapon = false;
+            weaponSlot1 = false;
+            weaponSlot2 = false;
+            weaponSlot3 = false;
+            weaponSlot4 = false;
+            weaponSlot5 = false;
             aim = false;
             skill1 = false;
             skill2 = false;
@@ -1349,6 +1483,13 @@ namespace ES
         public bool ConsumeBlock() => Consume(ref block);
         public bool ConsumeSlide() => Consume(ref slide);
         public bool ConsumeSwitchWeapon() => Consume(ref switchWeapon);
+        public bool ConsumeEquipWeapon() => Consume(ref equipWeapon);
+        public bool ConsumeHolsterWeapon() => Consume(ref holsterWeapon);
+        public bool ConsumeWeaponSlot1() => Consume(ref weaponSlot1);
+        public bool ConsumeWeaponSlot2() => Consume(ref weaponSlot2);
+        public bool ConsumeWeaponSlot3() => Consume(ref weaponSlot3);
+        public bool ConsumeWeaponSlot4() => Consume(ref weaponSlot4);
+        public bool ConsumeWeaponSlot5() => Consume(ref weaponSlot5);
         public bool ConsumeAim() => Consume(ref aim);
         public bool ConsumeSkill1() => Consume(ref skill1);
         public bool ConsumeSkill2() => Consume(ref skill2);
@@ -1406,6 +1547,13 @@ namespace ES
         Block,
         Slide,
         SwitchWeapon,
+        EquipWeapon,
+        HolsterWeapon,
+        WeaponSlot1,
+        WeaponSlot2,
+        WeaponSlot3,
+        WeaponSlot4,
+        WeaponSlot5,
         Aim,
         PeekLeft,
         PeekRight,
@@ -1441,6 +1589,13 @@ namespace ES
             ApplySingle(module, InputActionKey.Block, schemeKey);
             ApplySingle(module, InputActionKey.Slide, schemeKey);
             ApplySingle(module, InputActionKey.SwitchWeapon, schemeKey);
+            ApplySingle(module, InputActionKey.EquipWeapon, schemeKey);
+            ApplySingle(module, InputActionKey.HolsterWeapon, schemeKey);
+            ApplySingle(module, InputActionKey.WeaponSlot1, schemeKey);
+            ApplySingle(module, InputActionKey.WeaponSlot2, schemeKey);
+            ApplySingle(module, InputActionKey.WeaponSlot3, schemeKey);
+            ApplySingle(module, InputActionKey.WeaponSlot4, schemeKey);
+            ApplySingle(module, InputActionKey.WeaponSlot5, schemeKey);
             ApplySingle(module, InputActionKey.Aim, schemeKey);
             ApplySingle(module, InputActionKey.PeekLeft, schemeKey);
             ApplySingle(module, InputActionKey.PeekRight, schemeKey);
@@ -1482,6 +1637,27 @@ namespace ES
                     break;
                 case InputActionKey.SwitchWeapon:
                     module.switchWeaponAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.EquipWeapon:
+                    module.equipWeaponAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.HolsterWeapon:
+                    module.holsterWeaponAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.WeaponSlot1:
+                    module.weaponSlot1Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.WeaponSlot2:
+                    module.weaponSlot2Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.WeaponSlot3:
+                    module.weaponSlot3Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.WeaponSlot4:
+                    module.weaponSlot4Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
+                    break;
+                case InputActionKey.WeaponSlot5:
+                    module.weaponSlot5Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
                     break;
                 case InputActionKey.Aim:
                     module.aimAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
@@ -1600,12 +1776,19 @@ namespace ES
                     case InputActionKey.Block: list.Add("<Keyboard>/leftShift"); break;
                     case InputActionKey.Slide: list.Add("<Keyboard>/leftCtrl"); break;
                     case InputActionKey.SwitchWeapon: list.Add("<Keyboard>/tab"); break;
+                    case InputActionKey.EquipWeapon: list.Add("<Keyboard>/q"); break;
+                    case InputActionKey.HolsterWeapon: list.Add("<Keyboard>/t"); break;
+                    case InputActionKey.WeaponSlot1: list.Add("<Keyboard>/1"); break;
+                    case InputActionKey.WeaponSlot2: list.Add("<Keyboard>/2"); break;
+                    case InputActionKey.WeaponSlot3: list.Add("<Keyboard>/3"); break;
+                    case InputActionKey.WeaponSlot4: list.Add("<Keyboard>/4"); break;
+                    case InputActionKey.WeaponSlot5: list.Add("<Keyboard>/5"); break;
                     case InputActionKey.Aim: list.Add("<Mouse>/rightButton"); break;
                     case InputActionKey.PeekLeft: list.Add("<Keyboard>/z"); break;
                     case InputActionKey.PeekRight: list.Add("<Keyboard>/x"); break;
-                    case InputActionKey.Skill1: list.Add("<Keyboard>/1"); break;
-                    case InputActionKey.Skill2: list.Add("<Keyboard>/2"); break;
-                    case InputActionKey.Skill3: list.Add("<Keyboard>/3"); break;
+                    case InputActionKey.Skill1: list.Add("<Keyboard>/f1"); break;
+                    case InputActionKey.Skill2: list.Add("<Keyboard>/f2"); break;
+                    case InputActionKey.Skill3: list.Add("<Keyboard>/f3"); break;
                     case InputActionKey.Jump: list.Add("<Keyboard>/space"); break;
                     case InputActionKey.Crouch: list.Add("<Keyboard>/c"); break;
                     case InputActionKey.Fly: list.Add("<Keyboard>/f"); break;
@@ -1624,6 +1807,13 @@ namespace ES
                     case InputActionKey.Block: list.Add("<Gamepad>/leftShoulder"); break;
                     case InputActionKey.Slide: list.Add("<Gamepad>/rightShoulder"); break;
                     case InputActionKey.SwitchWeapon: list.Add("<Gamepad>/dpad/right"); break;
+                    case InputActionKey.EquipWeapon: list.Add("<Gamepad>/buttonWest"); break;
+                    case InputActionKey.HolsterWeapon: list.Add("<Gamepad>/start"); break;
+                    case InputActionKey.WeaponSlot1: list.Add("<Gamepad>/dpad/up"); break;
+                    case InputActionKey.WeaponSlot2: list.Add("<Gamepad>/dpad/right"); break;
+                    case InputActionKey.WeaponSlot3: list.Add("<Gamepad>/dpad/down"); break;
+                    case InputActionKey.WeaponSlot4: list.Add("<Gamepad>/dpad/left"); break;
+                    case InputActionKey.WeaponSlot5: list.Add("<Gamepad>/rightStickPress"); break;
                     case InputActionKey.Aim: list.Add("<Gamepad>/leftTrigger"); break;
                     case InputActionKey.Skill1: list.Add("<Gamepad>/dpad/up"); break;
                     case InputActionKey.Skill2: list.Add("<Gamepad>/dpad/left"); break;

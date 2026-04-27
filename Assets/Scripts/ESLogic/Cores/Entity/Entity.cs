@@ -230,6 +230,11 @@ namespace ES
         [Title("重力")]
         public Vector3 gravity_ = new Vector3(0f, -9.81f, 0f);
 
+        [Title("跳跃请求")]
+        [LabelText("跳跃请求缓冲时长(秒)")]
+        [Tooltip("跳跃请求超过该时长仍未在地面被消费，则自动过期，避免落地后二次起跳。")]
+        public float jumpRequestBufferTime = 0.12f;
+
         [Title("根运动")]
         public bool useRootMotion = true;
         public float rootMotionScale = 1f;
@@ -258,6 +263,7 @@ namespace ES
         private Vector3 _lastVelocity;
         private Vector3 _rootMotionVelocity;
         private bool _jumpRequested;
+        private float _jumpRequestTime = -999f;
         private bool _crouchRequested;
         private bool _isCrouched;
         private bool _moveInputSetThisFrame;
@@ -333,6 +339,7 @@ namespace ES
         public void RequestJump()
         {
             _jumpRequested = true;
+            _jumpRequestTime = Time.time;
         }
 
         public void SetCrouch(bool enable)
@@ -527,6 +534,11 @@ namespace ES
             }
             if (!handled && motor.GroundingStatus.IsStableOnGround)
             {
+                if (_jumpRequested && jumpRequestBufferTime > 0f && Time.time - _jumpRequestTime > jumpRequestBufferTime)
+                {
+                    _jumpRequested = false;
+                }
+
                 currentVelocity = motor.GetDirectionTangentToSurface(currentVelocity, motor.GroundingStatus.GroundNormal) * currentVelocity.magnitude;
 
                 Vector3 inputRight = Vector3.Cross(moveInput, motor.CharacterUp);
@@ -538,6 +550,7 @@ namespace ES
                 if (_jumpRequested)
                 {
                     _jumpRequested = false;
+                    _jumpRequestTime = -999f;
                     motor.ForceUnground(0.1f);
                     float finalJumpSpeed = jumpSpeed * Mathf.Max(0f, jumpSpeedMultiplier);
                     currentVelocity = Vector3.ProjectOnPlane(currentVelocity, motor.CharacterUp) + (motor.CharacterUp * finalJumpSpeed);
@@ -545,6 +558,12 @@ namespace ES
             }
             else if (!handled)
             {
+                if (_jumpRequested && jumpRequestBufferTime > 0f && Time.time - _jumpRequestTime > jumpRequestBufferTime)
+                {
+                    _jumpRequested = false;
+                    _jumpRequestTime = -999f;
+                }
+
                 if (moveInput.sqrMagnitude > 0f)
                 {
                     targetMovementVelocity = moveInput * airMaxSpeed;

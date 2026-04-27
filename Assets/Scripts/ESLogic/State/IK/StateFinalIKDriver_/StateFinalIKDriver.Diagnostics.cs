@@ -1,6 +1,9 @@
 using UnityEngine;
 using RootMotion.FinalIK;
 using Sirenix.OdinInspector;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace ES
 {
@@ -199,10 +202,36 @@ namespace ES
                 if (!enableFullBodyBipedIK)
                     return "未启用 FullBodyBipedIK，Recoil 不可用";
 
-                if ((_refs?.recoil ?? presetRecoil ?? GetComponent<Recoil>()) == null)
+                Recoil resolvedRecoil = null;
+                if (_refs != null)
+                {
+                    resolvedRecoil = _refs.recoil;
+                }
+                if (resolvedRecoil == null)
+                {
+                    resolvedRecoil = presetRecoil;
+                }
+                if (resolvedRecoil == null)
+                {
+                    resolvedRecoil = GetComponent<Recoil>();
+                }
+                if (resolvedRecoil == null)
                     return "缺少 Recoil 组件";
 
-                if ((_refs?.fullBodyBipedIK ?? presetFullBodyBipedIK ?? GetComponent<FullBodyBipedIK>()) == null)
+                FullBodyBipedIK resolvedFullBodyBipedIK = null;
+                if (_refs != null)
+                {
+                    resolvedFullBodyBipedIK = _refs.fullBodyBipedIK;
+                }
+                if (resolvedFullBodyBipedIK == null)
+                {
+                    resolvedFullBodyBipedIK = presetFullBodyBipedIK;
+                }
+                if (resolvedFullBodyBipedIK == null)
+                {
+                    resolvedFullBodyBipedIK = GetComponent<FullBodyBipedIK>();
+                }
+                if (resolvedFullBodyBipedIK == null)
                     return "缺少 FullBodyBipedIK 组件";
 
                 if (!_recoilReady)
@@ -230,11 +259,42 @@ namespace ES
         [HideIf("IsBipedIKReady")]
         public string BipedIKError => _bipedIKError;
 
+        [PropertyOrder(7)]
+        [TitleGroup("DriverLayout/诊断/状态概览")]
+        [ShowInInspector, ReadOnly, LabelText("BipedIK（运行时连接）")]
+        public BipedIK RuntimeResolvedBipedIK => _bipedIK;
+
         [PropertyOrder(8)]
         [TitleGroup("DriverLayout/诊断/状态概览")]
         [ShowInInspector, ReadOnly, LabelText("AimIK 错误原因")]
         [HideIf("IsAimIKReady")]
         public string AimIKError => _aimIKError;
+
+        [PropertyOrder(9)]
+        [TitleGroup("DriverLayout/诊断/状态概览")]
+        [ShowInInspector, ReadOnly, LabelText("Biped 运行门控原因")]
+        public string BipedRuntimeGateReason => _bipedRuntimeGateReason;
+
+        [PropertyOrder(9)]
+        [TitleGroup("DriverLayout/诊断/状态概览")]
+        [ShowInInspector, ReadOnly, LabelText("GoalTarget 就绪")]
+        public bool GoalTargetReady => _goalTargetsReady;
+
+        [PropertyOrder(9)]
+        [TitleGroup("DriverLayout/诊断/状态概览")]
+        [ShowInInspector, ReadOnly, LabelText("缺失 GoalTarget")]
+        [HideIf("GoalTargetReady")]
+        public string MissingGoalTargets => GetMissingGoalTargetNames();
+
+    #if UNITY_EDITOR
+        [PropertyOrder(9)]
+        [TitleGroup("DriverLayout/诊断/状态概览")]
+        [Button("打开交互运行时面板", ButtonSizes.Medium)]
+        private void OpenInteractionRuntimePanel()
+        {
+            EditorApplication.ExecuteMenuItem("ES/Debug/Interaction Runtime Panel");
+        }
+    #endif
 
         [PropertyOrder(10)]
         [TitleGroup("DriverLayout/诊断/运行统计", BoldTitle = true)]
@@ -281,6 +341,11 @@ namespace ES
         [TitleGroup("DriverLayout/诊断/当前数据")]
         [ShowInInspector, ReadOnly, LabelText("当前 Driver Pose")]
         public StateGeneralFinalIKDriverPose CurrentPose => _stateMachine != null ? _stateMachine.stateGeneralFinalIKDriverPose : default;
+
+        [PropertyOrder(21)]
+        [TitleGroup("DriverLayout/诊断/当前数据")]
+        [ShowInInspector, ReadOnly, MultiLineProperty(8), LabelText("状态 IK 贡献明细")]
+        public string StateIKContributions => _stateMachine != null ? _stateMachine.stateGeneralFinalIKContributionSummary : "StateMachine 未绑定";
 
         [PropertyOrder(22)]
         [TitleGroup("DriverLayout/诊断/当前数据")]
@@ -334,7 +399,13 @@ namespace ES
         [TitleGroup("DriverLayout/诊断/已解析求解器")]
         [HorizontalGroup("DriverLayout/诊断/已解析求解器/程序动画", LabelWidth = 100)]
         [ShowInInspector, ReadOnly, LabelText("全身IK (FullBodyBipedIK)")]
-        private FullBodyBipedIK DBG_FullBodyBipedIK => _refs?.fullBodyBipedIK;
+        private FullBodyBipedIK DBG_FullBodyBipedIK
+        {
+            get
+            {
+                return _refs != null ? _refs.fullBodyBipedIK : null;
+            }
+        }
 
         [PropertyOrder(35)]
         [TitleGroup("DriverLayout/诊断/已解析求解器")]

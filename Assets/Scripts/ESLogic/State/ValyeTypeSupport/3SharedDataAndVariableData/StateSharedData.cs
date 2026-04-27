@@ -267,10 +267,14 @@ namespace ES
             proceduralDriveConfig ??= new StateProceduralDriveData();
 
             // 初始化所有子配置
-            basicConfig?.InitializeRuntime();
-            animationConfig?.InitializeRuntime();
-            proceduralDriveConfig?.InitializeRuntime();
-            mergeData?.InitializeRuntime();
+            if (basicConfig != null)
+                basicConfig.InitializeRuntime();
+            if (animationConfig != null)
+                animationConfig.InitializeRuntime();
+            if (proceduralDriveConfig != null)
+                proceduralDriveConfig.InitializeRuntime();
+            if (mergeData != null)
+                mergeData.InitializeRuntime();
 
             _isRuntimeInitialized = true;
         }
@@ -541,7 +545,10 @@ namespace ES
         /// </summary>
         public void RemoveTag(string tag)
         {
-            tags?.Remove(tag);
+            if (tags != null)
+            {
+                tags.Remove(tag);
+            }
         }
 
         /// <summary>

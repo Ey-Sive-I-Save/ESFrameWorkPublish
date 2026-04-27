@@ -5,6 +5,23 @@ namespace ES
 {
     public class ESInteractable : MonoBehaviour
     {
+        public enum IKWriteBuildResult
+        {
+            Success = 0,
+            Disabled = 1,
+            MissingTarget = 2,
+        }
+
+        public struct IKWriteRequest
+        {
+            public IKGoal goal;
+            public Transform target;
+            public Transform hintTarget;
+            public float weight;
+            public float lerpingRate;
+            public bool useTargetRotation;
+        }
+
         [Title("Interactable")]
         public bool isInteractable = true;
 
@@ -64,6 +81,28 @@ namespace ES
         public virtual float EvaluateIKLerpingRate(Entity entity, float normalized01)
         {
             return ikLerpingRate;
+        }
+
+        /// <summary>
+        /// 组装本帧 IK 写入请求。交互模块只需消费该请求即可。
+        /// </summary>
+        public virtual IKWriteBuildResult TryBuildIKWriteRequest(Entity entity, float normalized01, out IKWriteRequest request)
+        {
+            request = default;
+
+            if (!enableIK)
+                return IKWriteBuildResult.Disabled;
+
+            if (ikTarget == null)
+                return IKWriteBuildResult.MissingTarget;
+
+            request.goal = ikGoal;
+            request.target = ikTarget;
+            request.hintTarget = ikHintTarget;
+            request.weight = Mathf.Clamp01(EvaluateIKTargetWeight(entity, normalized01));
+            request.lerpingRate = Mathf.Clamp(EvaluateIKLerpingRate(entity, normalized01), 0.05f, 8f);
+            request.useTargetRotation = useIKRotation;
+            return IKWriteBuildResult.Success;
         }
 
         [Title("MatchTarget (Optional)")]

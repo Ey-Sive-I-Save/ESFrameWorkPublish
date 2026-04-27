@@ -353,42 +353,6 @@ namespace ES
         private void QuickAddComp_HitReaction()     => QuickAddCompInternal<HitReaction>("HitReaction");
         private void QuickAddComp_Recoil()          => QuickAddCompInternal<Recoil>("Recoil");
 
-        [TabGroup("DriverLayout", "示例脚本", Order = 90)]
-        [PropertyOrder(0)]
-        [BoxGroup("DriverLayout/示例脚本/快捷添加盒", ShowLabel = false)]
-        [TitleGroup("DriverLayout/示例脚本/快捷添加盒/快捷添加", BoldTitle = true)]
-        [InfoBox("将对应示例脚本挂载到当前 GameObject。\nEntity / Driver 依赖字段需添加后在 Inspector 中手动指定。", InfoMessageType.None)]
-        [Button("Example_IKAimController  —  AimIK 对准目标", ButtonSizes.Medium)]
-        private void QuickAddExample_AimController()     => QuickAddCompInternal<ES.Examples.Example_IKAimController>("Example_IKAimController");
-
-        [TabGroup("DriverLayout", "示例脚本")]
-        [PropertyOrder(1)]
-        [BoxGroup("DriverLayout/示例脚本/快捷添加盒", ShowLabel = false)]
-        [TitleGroup("DriverLayout/示例脚本/快捷添加盒/快捷添加")]
-        [Button("Example_IKHitAndRecoil  —  受击 + 后坐力", ButtonSizes.Medium)]
-        private void QuickAddExample_HitAndRecoil()      => QuickAddCompInternal<ES.Examples.Example_IKHitAndRecoil>("Example_IKHitAndRecoil");
-
-        [TabGroup("DriverLayout", "示例脚本")]
-        [PropertyOrder(2)]
-        [BoxGroup("DriverLayout/示例脚本/快捷添加盒", ShowLabel = false)]
-        [TitleGroup("DriverLayout/示例脚本/快捷添加盒/快捷添加")]
-        [Button("Example_IKGrounderController  —  自动接地", ButtonSizes.Medium)]
-        private void QuickAddExample_GrounderController() => QuickAddCompInternal<ES.Examples.Example_IKGrounderController>("Example_IKGrounderController");
-
-        [TabGroup("DriverLayout", "示例脚本")]
-        [PropertyOrder(3)]
-        [BoxGroup("DriverLayout/示例脚本/快捷添加盒", ShowLabel = false)]
-        [TitleGroup("DriverLayout/示例脚本/快捷添加盒/快捷添加")]
-        [Button("Example_IKPoseHook  —  LookAt 事件钩子", ButtonSizes.Medium)]
-        private void QuickAddExample_PoseHook()          => QuickAddCompInternal<ES.Examples.Example_IKPoseHook>("Example_IKPoseHook");
-
-        [TabGroup("DriverLayout", "示例脚本")]
-        [PropertyOrder(4)]
-        [BoxGroup("DriverLayout/示例脚本/快捷添加盒", ShowLabel = false)]
-        [TitleGroup("DriverLayout/示例脚本/快捷添加盒/快捷添加")]
-        [Button("Example_IKStateBase  —  右手抓握 IK", ButtonSizes.Medium)]
-        private void QuickAddExample_StateBase()         => QuickAddCompInternal<ES.Examples.Example_IKStateBase>("Example_IKStateBase");
-
         private void QuickAddCompInternal<T>(string label) where T : MonoBehaviour
         {
             if (Application.isPlaying)

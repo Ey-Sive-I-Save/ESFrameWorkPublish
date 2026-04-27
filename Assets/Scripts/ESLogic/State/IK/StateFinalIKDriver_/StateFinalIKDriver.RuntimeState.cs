@@ -116,6 +116,7 @@ namespace ES
         private int _solverUpdateCount;
         private float _lastApplyTime;
         private float _lastSolverUpdateTime;
+        private string _bipedRuntimeGateReason = "未评估";
 
         private const float WarnInterval = 2.0f;
     }

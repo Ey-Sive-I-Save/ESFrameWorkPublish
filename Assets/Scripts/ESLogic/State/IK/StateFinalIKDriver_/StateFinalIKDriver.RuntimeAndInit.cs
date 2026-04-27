@@ -122,6 +122,9 @@ namespace ES
             // ── 初始参数应用（就绪的 IK 组件按 Inspector 配置进行一次性设置）────
             ApplyIKInitialSettings();
 
+            // ── 初始化收口：将已连接且启用的 IK 组件统一启用一次。
+            EnableResolvedIKComponentsOnceAfterInit();
+
             _wasBipedIKBound = _bipedIKReady;
             _hasLastPose     = false;
             _runtimeBindingReady = true;
@@ -171,7 +174,26 @@ namespace ES
         //      LateUpdate 热路径不再做 StateMachine/Animator 判空。
         private void LateUpdate()
         {
-            if (!_runtimeBindingReady || !_stateMachine.isRunning) return;
+            if (!_runtimeBindingReady)
+            {
+                _bipedRuntimeGateReason = "Driver 未完成运行时绑定（_runtimeBindingReady=false）";
+                return;
+            }
+
+            if (!_stateMachine.isRunning)
+            {
+                _bipedRuntimeGateReason = "StateMachine 未运行（isRunning=false）";
+                return;
+            }
+
+            // 运行时自愈：目标点若被外部删除/失效，自动重建，避免整条 IK 链路卡住。
+            if (!_goalTargetsReady || !AreGoalTargetTransformsAlive())
+            {
+                _goalTargetsReady = false;
+                EnsureGoalTargetTransforms();
+                if (_goalTargetsReady)
+                    SeedGoalTargetsFromCurrentRigPose();
+            }
 
             float now = Time.unscaledTime;
             _ikWeightSmoothDeltaTime = Time.deltaTime;
@@ -200,10 +222,13 @@ namespace ES
             if (enableRealtimeWeightTest)
                 ApplyRealtimeWeightTest(ref pose);
 
-            bool bipedRuntimeReady = _bipedIKReady && _goalTargetsReady && _hintTargetsReady;
+            // Hint 是可选项：未提供 Hint 时仍允许 Biped 正常解算。
+            bool bipedRuntimeReady = _bipedIKReady && _goalTargetsReady;
             bool hasActiveLookAt = pose.lookAtWeight > 0.001f || HasActiveLookAtWeightSmoothing();
             bool requiresBipedFallbackLookAt = !_lookAtIKReady && hasActiveLookAt;
             bool requiresBipedSolve = bipedRuntimeReady && (pose.HasLimbWeight || HasActiveBipedWeightSmoothing() || requiresBipedFallbackLookAt);
+
+            _bipedRuntimeGateReason = BuildBipedRuntimeGateReason(in pose, bipedRuntimeReady, requiresBipedSolve, hasActiveLookAt, requiresBipedFallbackLookAt);
 
             if (!bipedRuntimeReady)
             {
@@ -213,10 +238,12 @@ namespace ES
                     && (now - _lastWarnTime) >= WarnInterval)
                 {
                     _lastWarnTime = now;
-                    var err = string.IsNullOrEmpty(_bipedIKError) ? "原因未知" : _bipedIKError;
+                    var err = string.IsNullOrEmpty(_bipedRuntimeGateReason)
+                        ? (string.IsNullOrEmpty(_bipedIKError) ? "原因未知" : _bipedIKError)
+                        : _bipedRuntimeGateReason;
                     Debug.LogWarning(
                         $"[StateFinalIKDriver] stateGeneralFinalIKDriverPose 有权重，但 Biped 运行条件未满足：{err}\n" +
-                        "→ 检查 BipedIK 组件、References，以及运行时目标/Hint Transform 是否已正确建立。",
+                        "→ 检查 BipedIK 组件、References，以及运行时目标 Transform 是否已正确建立（Hint 非必需）。",
                         _animator);
                 }
 
@@ -845,7 +872,7 @@ namespace ES
             var limb = _bipedIK.GetGoalIK(avatarGoal);
             if (limb.target != target) limb.target = target;
 
-            if (goal.hintPosition != Vector3.zero)
+            if (goal.hintPosition != Vector3.zero && hint != null)
             {
                 if ((hint.position - goal.hintPosition).sqrMagnitude > 0.000001f)
                     hint.position = goal.hintPosition;
@@ -864,7 +891,7 @@ namespace ES
 
         private void ApplyCurrentPoseToBipedIK()
         {
-            if (!_runtimeBindingReady || !_bipedIKReady || !_goalTargetsReady || !_hintTargetsReady) return;
+            if (!_runtimeBindingReady || !_bipedIKReady || !_goalTargetsReady) return;
 
             ref var pose = ref _stateMachine.stateGeneralFinalIKDriverPose;
 
@@ -1230,9 +1257,69 @@ namespace ES
             _sn_rfP = _rfTarget.position; _sn_rfR = _rfTarget.rotation;
         }
 
+        private bool AreGoalTargetTransformsAlive()
+        {
+            return _lhTarget != null && _rhTarget != null && _lfTarget != null && _rfTarget != null;
+        }
+
+        private string GetMissingGoalTargetNames()
+        {
+            System.Text.StringBuilder sb = null;
+
+            if (_lhTarget == null)
+            {
+                sb = new System.Text.StringBuilder();
+                sb.Append("LH");
+            }
+
+            if (_rhTarget == null)
+            {
+                if (sb == null) sb = new System.Text.StringBuilder();
+                else sb.Append(", ");
+                sb.Append("RH");
+            }
+
+            if (_lfTarget == null)
+            {
+                if (sb == null) sb = new System.Text.StringBuilder();
+                else sb.Append(", ");
+                sb.Append("LF");
+            }
+
+            if (_rfTarget == null)
+            {
+                if (sb == null) sb = new System.Text.StringBuilder();
+                else sb.Append(", ");
+                sb.Append("RF");
+            }
+
+            return sb != null ? sb.ToString() : string.Empty;
+        }
+
         private bool HasRuntimeBinding()
         {
             return _stateMachine != null && _animator != null;
+        }
+
+        private void EnableResolvedIKComponentsOnceAfterInit()
+        {
+            // Driver 自管求解链（Biped/LookAt/Aim/Grounder）必须保持由 Driver 手动调度，
+            // 不能在此处强制 enabled=true，否则会产生双重求解并可能锁住四肢。
+
+            if (enableFullBodyBipedIK && _refs.fullBodyBipedIK != null)
+            {
+                _refs.fullBodyBipedIK.enabled = true;
+            }
+
+            if (enableHitReaction && _hitReaction != null && _hitReactionReady)
+            {
+                _hitReaction.enabled = true;
+            }
+
+            if (enableRecoil && _recoil != null && _recoilReady)
+            {
+                _recoil.enabled = true;
+            }
         }
 
         private void SetDriverEnabled(bool active, string reason)
@@ -1508,6 +1595,50 @@ namespace ES
             if ((1f - Mathf.Abs(Quaternion.Dot(a.rotation, b.rotation))) > rE) return false;
             if ((a.hintPosition - b.hintPosition).sqrMagnitude            > pE) return false;
             return true;
+        }
+
+        private string BuildBipedRuntimeGateReason(
+            in StateGeneralFinalIKDriverPose pose,
+            bool bipedRuntimeReady,
+            bool requiresBipedSolve,
+            bool hasActiveLookAt,
+            bool requiresBipedFallbackLookAt)
+        {
+            if (!_bipedIKReady)
+            {
+                return string.IsNullOrEmpty(_bipedIKError)
+                    ? "BipedIK 未就绪"
+                    : $"BipedIK 未就绪：{_bipedIKError}";
+            }
+
+            if (!_goalTargetsReady)
+            {
+                string missing = GetMissingGoalTargetNames();
+                if (string.IsNullOrEmpty(missing))
+                    return "运行时 Goal Target 未就绪（_goalTargetsReady=false）";
+
+                return $"运行时 Goal Target 未就绪（缺失：{missing}）";
+            }
+
+            if (!bipedRuntimeReady)
+            {
+                return "Biped 运行条件未满足（bipedRuntimeReady=false）";
+            }
+
+            if (!requiresBipedSolve)
+            {
+                if (!pose.HasLimbWeight && !HasActiveBipedWeightSmoothing())
+                {
+                    if (hasActiveLookAt && !requiresBipedFallbackLookAt)
+                        return "仅存在 LookAt 权重（由 LookAtIK 处理，不走 Biped 四肢求解）";
+
+                    return "当前无可求解四肢权重（pose.HasLimbWeight=false 且无平滑残留）";
+                }
+
+                return "当前帧无需触发 Biped 求解（requiresBipedSolve=false）";
+            }
+
+            return "Biped 运行正常（可求解）";
         }
     }
 }

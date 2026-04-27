@@ -27,40 +27,12 @@ namespace ES
             {
                 if (EnumValue != StateDefaultFloatParameter.None)
                 {
-                    // 硬编码映射，零GC
-                    switch (EnumValue)
+                    if (StateDefaultFloatParameterUtility.TryGetName(EnumValue, out var enumName))
                     {
-                        // 核心运动参数 (1-7)
-                        case StateDefaultFloatParameter.SpeedX: return "SpeedX";
-                        case StateDefaultFloatParameter.SpeedY: return "SpeedY";
-                        case StateDefaultFloatParameter.SpeedZ: return "SpeedZ";
-                        case StateDefaultFloatParameter.AimYaw: return "AimYaw";
-                        case StateDefaultFloatParameter.AimPitch: return "AimPitch";
-                        case StateDefaultFloatParameter.Speed: return "Speed";
-                        case StateDefaultFloatParameter.IsGrounded: return "IsGrounded";
-                        
-                        // 运动阈值 (8-10)
-                        case StateDefaultFloatParameter.WalkSpeedThreshold: return "WalkSpeedThreshold";
-                        case StateDefaultFloatParameter.RunSpeedThreshold: return "RunSpeedThreshold";
-                        case StateDefaultFloatParameter.SprintSpeedThreshold: return "SprintSpeedThreshold";
-                        
-                        // 运动状态标记 (11-15)
-                        case StateDefaultFloatParameter.IsWalking: return "IsWalking";
-                        case StateDefaultFloatParameter.IsRunning: return "IsRunning";
-                        case StateDefaultFloatParameter.IsSprinting: return "IsSprinting";
-                        case StateDefaultFloatParameter.IsCrouching: return "IsCrouching";
-                        case StateDefaultFloatParameter.IsSliding: return "IsSliding";
-                        
-                        // 历史平均速度 (16-17)
-                        case StateDefaultFloatParameter.AvgSpeedX: return "AvgSpeedX";
-                        case StateDefaultFloatParameter.AvgSpeedZ: return "AvgSpeedZ";
-                        
-                        // 攀爬参数 (18-19)
-                        case StateDefaultFloatParameter.ClimbHorizontal: return "ClimbHorizontal";
-                        case StateDefaultFloatParameter.ClimbVertical: return "ClimbVertical";
-                        
-                        default: return "None";
+                        return enumName;
                     }
+
+                    return "None";
                 }
                 return StringValue ?? string.Empty;
             }

@@ -18,6 +18,7 @@ namespace ES
 
         private StateBase _flyState;
         private StateMachine sm;
+        [NonSerialized] private StateLifecycleTracker _flyLifecycle = new StateLifecycleTracker();
 
         [Title("应用策略")]
         [LabelText("启用时应用参数")]
@@ -54,17 +55,16 @@ namespace ES
 
             if (enable)
             {
-                if (_flyState.baseStatus != StateBaseStatus.Running)
-                {
-                    sm.TryActivateState(_flyState);
-                }
+                _flyLifecycle.Bind(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
+                bool activated = _flyState.baseStatus == StateBaseStatus.Running || sm.TryActivateState(_flyState);
+                _flyLifecycle.TryEnter(activated);
             }
             else
             {
                 ExitFly();
             }
 
-            flyHold = _flyState.baseStatus == StateBaseStatus.Running;
+            flyHold = _flyLifecycle.IsActive;
         }
 
         public void ToggleFly()
@@ -77,26 +77,31 @@ namespace ES
             }
             else
             {
-                sm.TryActivateState(_flyState);
+                _flyLifecycle.Bind(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
+                bool activated = _flyState.baseStatus == StateBaseStatus.Running || sm.TryActivateState(_flyState);
+                _flyLifecycle.TryEnter(activated);
             }
 
-            flyHold = _flyState.baseStatus == StateBaseStatus.Running;
+            flyHold = _flyLifecycle.IsActive;
         }
 
         private void ExitFly()
         {
             if (_flyState == null) return;
 
-            if (_flyState.baseStatus == StateBaseStatus.Running)
+            _flyLifecycle.Bind(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
+
+            if (!_flyLifecycle.RequestExit() && _flyState.baseStatus == StateBaseStatus.Running)
             {
                 sm.TryDeactivateState(Fly_StateName);
-                if (_flyState.baseStatus == StateBaseStatus.Running)
-                {
-                    sm.ForceExitState(_flyState);
-                }
             }
 
-            flyHold = _flyState.baseStatus == StateBaseStatus.Running;
+            if (_flyState.baseStatus == StateBaseStatus.Running)
+            {
+                sm.ForceExitState(_flyState);
+            }
+
+            flyHold = _flyLifecycle.IsActive;
             if (!flyHold && MyCore != null)
             {
                 MyCore.SetLocomotionSupportFlags(StateSupportFlags.Grounded);
@@ -111,6 +116,7 @@ namespace ES
             {
                 sm = MyCore.stateDomain.stateMachine;
                 _flyState = sm.GetStateByString(Fly_StateName);
+                _flyLifecycle.Bind(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
             }
             if (MyCore != null)
             {
@@ -131,7 +137,9 @@ namespace ES
         {
             if (MyCore == null || !enableFly) return;
 
-            flyHold = _flyState != null && _flyState.baseStatus == StateBaseStatus.Running;
+            _flyLifecycle.CheckExit();
+
+            flyHold = _flyLifecycle.IsActive;
             if (!flyHold) return;
 
             MyCore.SetLocomotionSupportFlags(StateSupportFlags.Flying);
@@ -194,11 +202,22 @@ namespace ES
 
         public override void OnDestroy()
         {
+            ExitFly();
+            _flyLifecycle.Dispose();
+
             if (MyCore != null && MyCore.kcc.flyModule == this)
             {
                 MyCore.kcc.flyModule = null;
             }
             base.OnDestroy();
+        }
+
+        private string GetFlyStateKeyForLifecycle(StateBase state)
+        {
+            if (state != null && !string.IsNullOrEmpty(state.strKey))
+                return state.strKey;
+
+            return string.IsNullOrEmpty(Fly_StateName) ? string.Empty : Fly_StateName;
         }
     }
 

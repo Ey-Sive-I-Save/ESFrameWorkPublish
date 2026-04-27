@@ -109,6 +109,8 @@ namespace ES
         public float matchTargetTopInset = 0.3f;
 
         private const float DefaultLandingExtraOffset = 0.2f;
+        private const float LandingProbeUpOffset = 2.0f;
+        private const float LandingProbeDownDistance = 8.0f;
 
         // MatchTarget 射线探测：缓存本物体及父物体链的碰撞体（两个方向都要找），避免每帧分配
         [NonSerialized] private Collider[] _cachedSurfaceColliders;
@@ -266,16 +268,25 @@ namespace ES
         /// </summary>
         public Vector3 GetMatchTargetPosition(Vector3 characterPosition)
         {
-            if (matchTargetAnchor != null)
+            return GetTopPositionNearEntry(characterPosition, false);
+        }
+
+        /// <summary>
+        /// 获取靠近入场位置的墙顶点（用于 Vault Phase0）。
+        /// 当 ignoreMatchTargetAnchor=true 时，忽略固定锚点，强制按入场位置动态求顶点。
+        /// </summary>
+        public Vector3 GetTopPositionNearEntry(Vector3 entryCharacterPosition, bool ignoreMatchTargetAnchor)
+        {
+            if (!ignoreMatchTargetAnchor && matchTargetAnchor != null)
                 return matchTargetAnchor.position;
 
             EnsureSurfaceColliders();
 
             // ── Step 1: XZ ─────────────────────────────────────────────────────────
-            Vector3 facePoint = GetClosestClimbPoint(characterPosition);
+            Vector3 facePoint = GetClosestClimbPoint(entryCharacterPosition);
             // 可选：沿法线向内缩进（0 = 不缩进；正值将骨骼目标拉进平台内侧）
             if (matchTargetTopInset > 0.001f)
-                facePoint -= GetDynamicNormal(characterPosition).normalized * matchTargetTopInset;
+                facePoint -= GetDynamicNormal(entryCharacterPosition).normalized * matchTargetTopInset;
 
             // ── Step 2: Y ──────────────────────────────────────────────────────────
             float topY = GetTopWorldY();
@@ -407,18 +418,164 @@ namespace ES
         /// </summary>
         public Vector3 GetLandingPosition(Vector3 characterPosition)
         {
-            if (landingPoint != null)
+            return GetLandingPositionFromEntry(characterPosition, GetDynamicNormal(characterPosition), false);
+        }
+
+        /// <summary>
+        /// 获取翻越后着地位置（显式入场法线版本）。
+        /// 适用于 Vault：使用进入翻越时确定的墙面法线，保证落点始终在对侧，避免角色位置变化导致法线翻面回跳。
+        /// </summary>
+        public Vector3 GetLandingPositionFromEntry(Vector3 entryCharacterPosition, Vector3 entryApproachNormalWorld, bool ignoreLandingPoint)
+        {
+            return GetLandingPosition(entryCharacterPosition, entryApproachNormalWorld, ignoreLandingPoint);
+        }
+
+        /// <summary>
+        /// 获取翻越后着地位置（显式法线版本）。
+        /// 会基于给定角色位置投影到墙面，取另一侧最近可落脚点。
+        /// </summary>
+        public Vector3 GetLandingPosition(Vector3 characterPosition, Vector3 approachNormalWorld)
+        {
+            return GetLandingPosition(characterPosition, approachNormalWorld, false);
+        }
+
+        /// <summary>
+        /// 获取翻越后着地位置（显式法线版本，可选择忽略固定落点锚点）。
+        /// </summary>
+        public Vector3 GetLandingPosition(Vector3 characterPosition, Vector3 approachNormalWorld, bool ignoreLandingPoint)
+        {
+            if (!ignoreLandingPoint && landingPoint != null)
                 return landingPoint.position;
-            // 双面：基于动态法线，落到墙体另一侧（自动映射，无需额外配置）
-            Vector3 approachNormal = GetDynamicNormal(characterPosition).normalized;
-            Vector3 localNormal = transform.InverseTransformDirection(approachNormal).normalized;
-            Vector3 half = GetLocalHalfSize();
-            int axis = GetPrimaryAxis(localNormal);
-            float halfThickness = axis == 0 ? half.x : (axis == 1 ? half.y : half.z);
+
+            Vector3 approachNormal = approachNormalWorld;
+            if (approachNormal.sqrMagnitude < 0.0001f)
+            {
+                approachNormal = GetDynamicNormal(characterPosition);
+            }
+            approachNormal = approachNormal.normalized;
 
             Vector3 surfacePoint = GetClosestClimbPoint(characterPosition);
-            float travel = halfThickness * 2f + DefaultLandingExtraOffset;
-            return surfacePoint - approachNormal * travel;
+            Vector3 oppositePoint;
+            if (!TryComputeOppositePointFromColliderProjection(surfacePoint, approachNormal, out oppositePoint))
+            {
+                // Fallback：无有效 Collider 时退回逻辑区域厚度估算。
+                Vector3 localNormal = transform.InverseTransformDirection(approachNormal).normalized;
+                Vector3 half = GetLocalHalfSize();
+                int axis = GetPrimaryAxis(localNormal);
+                float halfThickness = axis == 0 ? half.x : (axis == 1 ? half.y : half.z);
+                float travel = halfThickness * 2f + DefaultLandingExtraOffset;
+                oppositePoint = surfacePoint - approachNormal * travel;
+            }
+
+            // 关键修正：翻越目标优先取“另一侧向下探测到的地面”，而不是沿墙顶平面直接平移。
+            // 这样落地点会稳定在平台/墙体另一侧下方可站立面，避免目标停留在顶边附近。
+            Vector3 probeOrigin = oppositePoint + Vector3.up * LandingProbeUpOffset;
+            if (TryRaycastExcludeOwnSurface(probeOrigin, Vector3.down, LandingProbeDownDistance, out RaycastHit hit))
+            {
+                // 安全约束：命中点必须在“过墙方向”上，避免把起点附近地面误判为落点。
+                float passDistance = Vector3.Dot(hit.point - surfacePoint, -approachNormal);
+                if (passDistance > DefaultLandingExtraOffset)
+                {
+                    return hit.point;
+                }
+            }
+
+            return oppositePoint;
+        }
+
+        private bool TryComputeOppositePointFromColliderProjection(Vector3 surfacePoint, Vector3 approachNormal, out Vector3 oppositePoint)
+        {
+            EnsureSurfaceColliders();
+            oppositePoint = surfacePoint;
+
+            if (_cachedSurfaceColliders == null || _cachedSurfaceColliders.Length == 0)
+            {
+                return false;
+            }
+
+            Vector3 n = approachNormal.normalized;
+            float surfaceD = Vector3.Dot(surfacePoint, n);
+            bool found = false;
+            float projectionMin = float.MaxValue;
+
+            for (int i = 0; i < _cachedSurfaceColliders.Length; i++)
+            {
+                Collider col = _cachedSurfaceColliders[i];
+                if (col == null || col.isTrigger)
+                {
+                    continue;
+                }
+
+                Bounds b = col.bounds;
+                float centerD = Vector3.Dot(b.center, n);
+                Vector3 ext = b.extents;
+                float radius = Mathf.Abs(n.x) * ext.x + Mathf.Abs(n.y) * ext.y + Mathf.Abs(n.z) * ext.z;
+
+                float minD = centerD - radius;
+                float maxD = centerD + radius;
+
+                // 仅采用包含当前表面点投影的碰撞体，避免被远处子碰撞体干扰。
+                if (surfaceD < minD - 0.02f || surfaceD > maxD + 0.02f)
+                {
+                    continue;
+                }
+
+                if (minD < projectionMin)
+                {
+                    projectionMin = minD;
+                }
+                found = true;
+            }
+
+            if (!found)
+            {
+                return false;
+            }
+
+            float crossDistance = Mathf.Max(0.05f, surfaceD - projectionMin);
+            oppositePoint = surfacePoint - n * (crossDistance + DefaultLandingExtraOffset);
+            return true;
+        }
+
+        private bool TryRaycastExcludeOwnSurface(Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit bestHit)
+        {
+            EnsureSurfaceColliders();
+            int count = Physics.RaycastNonAlloc(origin, direction, _sharedRayBuffer, maxDistance, ~0, QueryTriggerInteraction.Ignore);
+
+            bestHit = default;
+            float closestDist = float.MaxValue;
+            bool found = false;
+
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = _sharedRayBuffer[i];
+                if (IsOwnSurfaceCollider(hit.collider))
+                    continue;
+
+                if (hit.distance < closestDist)
+                {
+                    closestDist = hit.distance;
+                    bestHit = hit;
+                    found = true;
+                }
+            }
+
+            return found;
+        }
+
+        private bool IsOwnSurfaceCollider(Collider collider)
+        {
+            if (collider == null)
+                return false;
+
+            EnsureSurfaceColliders();
+            for (int i = 0; i < _cachedSurfaceColliders.Length; i++)
+            {
+                if (_cachedSurfaceColliders[i] == collider)
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>

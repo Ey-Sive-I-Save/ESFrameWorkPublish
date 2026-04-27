@@ -123,8 +123,12 @@ namespace ES
         {
             foreach (var i in ModulesIEnumable)
             {
+                if (i == null) continue;
                 i._TryRegisterToHost(this);
             }
+
+            // 防御式清理：序列化或编辑器操作可能残留空模块引用。
+            TryRemoveNullModules(rightNow: true);
         }
 
         #endregion

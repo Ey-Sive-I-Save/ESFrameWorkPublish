@@ -330,7 +330,10 @@ namespace ES.Commercial
                 }
             }
             
-            closest?.AddForceAtPosition(force, position, ForceMode.Impulse);
+            if (closest != null)
+            {
+                closest.AddForceAtPosition(force, position, ForceMode.Impulse);
+            }
         }
     }
     

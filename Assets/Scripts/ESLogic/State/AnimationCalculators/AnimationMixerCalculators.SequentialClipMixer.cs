@@ -174,8 +174,11 @@ namespace ES
 
                 output = runtime.mixer;
 
+                string entryName = entryClip != null ? entryClip.name : "None";
+                string exitName = exitClip != null ? exitClip.name : "None";
+
                 StateMachineDebugSettings.Instance.LogRuntimeInit(
-                    $"[SequentialMixer] 初始化完成: Entry={entryClip?.name ?? "None"}, Main={mainConfig.clip.name}, Exit={exitClip?.name ?? "None"}, StartPhase={runtime.sequencePhase}");
+                    $"[SequentialMixer] 初始化完成: Entry={entryName}, Main={mainConfig.clip.name}, Exit={exitName}, StartPhase={runtime.sequencePhase}");
                 return true;
             }
 

@@ -33,11 +33,10 @@
 //   bool IsBound          当前是否已绑定到状态/状态机上下文
 //   StateBase BoundState  当前绑定状态（可空）
 //   string BoundStateName 当前绑定状态名/键（可空）
-//   void Bind(...)        绑定状态（Start 或状态解析变化时调用）
+//   void Bind(...)        绑定状态（Start 或状态解析变化时调用；stateName 由调用方保证确定）
 //   bool TryEnter(bool)   尝试进入（幂等），true = 本次成功进入请执行回调
 //   bool RequestExit()    主动请求退出（幂等），true = 本次触发请执行回调
 //   bool CheckExit()      每帧检测外部打断（幂等），true = 检测到打断请执行回调
-//   bool SyncFromBoundState() 同步当前活跃标记到绑定状态运行态（恢复/重绑时可用）
 // ============================================================================
 
 using System.Runtime.CompilerServices;
@@ -73,6 +72,7 @@ namespace ES
 
         /// <summary>
         /// 绑定要跟踪的状态与状态机（在模块 <c>Start</c> 中调用）。
+        /// <paramref name="stateName"/> 需由调用方提前解析为确定值（不在此处做回退推导）。
         /// 如果在活跃期间重绑，而新绑定状态并未运行，则会自动清除活跃标记，避免旧生命周期残留。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -81,9 +81,6 @@ namespace ES
             _sm        = sm;
             _state     = state;
             _stateName = stateName;
-
-            if ((_stateName == null || _stateName.Length == 0) && state != null)
-                _stateName = state.strKey;
 
             _hasStateName = _stateName != null && _stateName.Length > 0;
 
@@ -160,20 +157,6 @@ namespace ES
 
             _isActive = false;
             return true;
-        }
-
-        /// <summary>
-        /// 将当前活跃标记同步到绑定状态的真实运行态。<br/>
-        /// 常用于重绑、延迟解析状态或恢复场景；返回 <c>true</c> 表示同步过程中活跃标记发生了变化。
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool SyncFromBoundState()
-        {
-            var state = _state;
-            bool nextActive = state != null && state.baseStatus == StateBaseStatus.Running;
-            bool changed = _isActive != nextActive;
-            _isActive = nextActive;
-            return changed;
         }
 
         /// <summary>

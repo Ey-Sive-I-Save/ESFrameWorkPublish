@@ -350,6 +350,10 @@ namespace ES
         [Tooltip("状态进入后经过多少秒触发此步骤（hasEnterTime 基准），到达后覆盖当前 MatchTarget 参数")]
         public float triggerAt;
 
+        [LabelText("使用独立目标点"), ToggleLeft]
+        [Tooltip("开启后，该步骤将不再沿用共享 runtime 目标位姿，而是按“独立步骤出现顺序”读取独立目标点（第1个独立步骤->ForIndex0，第2个->ForIndex1，第3个->ForIndex2）")]
+        public bool useIndependentTargetPoint = false;
+
         [Header("指令参数")]
         [HideLabel]
         public MatchTargetRequest request = MatchTargetRequest.Default;
@@ -359,6 +363,26 @@ namespace ES
 
         /// <summary>重置消耗标记，使此实例可以被再次排队触发（仅用于代码驱动路径，勿对 SO 内对象调用）。</summary>
         public void Reset() => consumed = false;
+    }
+
+    /// <summary>
+    /// MatchTarget 独立目标槽位数据。
+    /// 仅在步骤勾选“使用独立目标点”时生效。
+    /// </summary>
+    [Serializable]
+    public class MatchTargetIndependentTargetSlot
+    {
+        [LabelText("启用"), ToggleLeft]
+        [Tooltip("关闭时，引用该槽位的步骤会回退到共享 runtime 目标位姿")]
+        public bool enabled = false;
+
+        [LabelText("目标位置(世界)")]
+        public Vector3 position = Vector3.zero;
+
+        [LabelText("目标旋转Euler(世界)")]
+        public Vector3 eulerAngles = Vector3.zero;
+
+        public Quaternion Rotation => Quaternion.Euler(eulerAngles);
     }
 
     [Serializable]
@@ -439,6 +463,34 @@ namespace ES
         [Tooltip("按 triggerAt 秒依次覆盖当前 MatchTarget。列表为空时仅使用上方初始预设。\n适合商业项目里的抓取收口、攀爬跨越、挂载对位等多段对齐。")]
         [ListDrawerSettings(ShowFoldout = true, DefaultExpandedState = true, DraggableItems = true, ShowPaging = false)]
         public List<MatchTargetPendingCommand> matchTargetTimeline = new List<MatchTargetPendingCommand>();
+
+        [BoxGroup("MatchTarget配置", ShowLabel = false)]
+        [FoldoutGroup("MatchTarget配置/高级-独立目标点(不推荐)", Expanded = false)]
+        [ShowIf("enableMatchTarget")]
+        [InfoBox("独立目标点配置属于高级用法。多数业务场景应优先使用运行时注入目标位姿，避免在配置资产中固化世界坐标。", InfoMessageType.Warning)]
+        [LabelText("显示独立目标点编辑项"), ToggleLeft]
+        public bool showIndependentTargetPointEditors = false;
+
+        [BoxGroup("MatchTarget配置", ShowLabel = false)]
+        [FoldoutGroup("MatchTarget配置/高级-独立目标点(不推荐)", Expanded = false)]
+        [LabelText("ForIndex0")]
+        [ShowIf("@enableMatchTarget && showIndependentTargetPointEditors")]
+        [InlineProperty, HideReferenceObjectPicker]
+        public MatchTargetIndependentTargetSlot matchTargetForIndex0 = new MatchTargetIndependentTargetSlot();
+
+        [BoxGroup("MatchTarget配置", ShowLabel = false)]
+        [FoldoutGroup("MatchTarget配置/高级-独立目标点(不推荐)", Expanded = false)]
+        [LabelText("ForIndex1")]
+        [ShowIf("@enableMatchTarget && showIndependentTargetPointEditors")]
+        [InlineProperty, HideReferenceObjectPicker]
+        public MatchTargetIndependentTargetSlot matchTargetForIndex1 = new MatchTargetIndependentTargetSlot();
+
+        [BoxGroup("MatchTarget配置", ShowLabel = false)]
+        [FoldoutGroup("MatchTarget配置/高级-独立目标点(不推荐)", Expanded = false)]
+        [LabelText("ForIndex2")]
+        [ShowIf("@enableMatchTarget && showIndependentTargetPointEditors")]
+        [InlineProperty, HideReferenceObjectPicker]
+        public MatchTargetIndependentTargetSlot matchTargetForIndex2 = new MatchTargetIndependentTargetSlot();
 
         public float GetGoalTargetWeight(IKGoal goal, float normalizedProgress = 0f)
         {
@@ -537,7 +589,32 @@ namespace ES
                 autoActivateMatchTarget = autoActivateMatchTarget,
                 matchTargetPreset = CloneRequest(matchTargetPreset),
                 matchTargetTimeline = CloneTimeline(matchTargetTimeline),
+                matchTargetForIndex0 = CloneIndependentTargetSlot(matchTargetForIndex0),
+                matchTargetForIndex1 = CloneIndependentTargetSlot(matchTargetForIndex1),
+                matchTargetForIndex2 = CloneIndependentTargetSlot(matchTargetForIndex2),
             };
+        }
+
+        public bool TryGetIndependentMatchTargetPose(int index, out Vector3 pos, out Quaternion rot)
+        {
+            MatchTargetIndependentTargetSlot slot = index switch
+            {
+                0 => matchTargetForIndex0,
+                1 => matchTargetForIndex1,
+                2 => matchTargetForIndex2,
+                _ => null,
+            };
+
+            if (slot != null && slot.enabled)
+            {
+                pos = slot.position;
+                rot = slot.Rotation;
+                return true;
+            }
+
+            pos = Vector3.zero;
+            rot = Quaternion.identity;
+            return false;
         }
 
         public void InitializeRuntime()
@@ -703,11 +780,23 @@ namespace ES
                 result.Add(new MatchTargetPendingCommand
                 {
                     triggerAt = step.triggerAt,
+                    useIndependentTargetPoint = step.useIndependentTargetPoint,
                     request = CloneRequest(step.request) ?? MatchTargetRequest.Default,
                 });
             }
 
             return result;
+        }
+
+        private static MatchTargetIndependentTargetSlot CloneIndependentTargetSlot(MatchTargetIndependentTargetSlot source)
+        {
+            if (source == null) return new MatchTargetIndependentTargetSlot();
+            return new MatchTargetIndependentTargetSlot
+            {
+                enabled = source.enabled,
+                position = source.position,
+                eulerAngles = source.eulerAngles,
+            };
         }
     }
 

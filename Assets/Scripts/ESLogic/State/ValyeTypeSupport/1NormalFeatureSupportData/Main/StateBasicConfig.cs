@@ -21,7 +21,7 @@ namespace ES
         public string stateName = "新状态";
 
         [BoxGroup("标识", ShowLabel = true), PropertyOrder(0)]
-        [LabelText("状态ID(重复时会被运行时Hash值顶掉)")]
+        [LabelText("状态ID(重复时会被运行时Hash覆盖)")]
         [Tooltip("用于唯一标识状态；重复ID会被运行时Hash覆盖。建议由资源导出或工具保证唯一性。")]
         public int stateId;
 
@@ -56,7 +56,7 @@ namespace ES
         public StateSupportFlags stateSupportFlag = StateSupportFlags.Grounded;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("#忽略入场环境")]
+        [LabelText("#忽略入场标记约束")]
         [Tooltip(
             "开启后，状态在尝试进入时不再严格检查当前角色的支持标记是否与 stateSupportFlag 一致。" +
             "适合那些需要跨环境强制打入的状态，例如某些过渡表现、强制演出、特殊控制态。" +
@@ -65,7 +65,7 @@ namespace ES
         public bool ignoreSupportFlag = false;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("#切换时禁激活")]
+        [LabelText("#标记切换时禁激活")]
         [Tooltip(
             "该字段控制的是“激活判定”，不是“已激活状态的保留判定”。" +
             "开启后，当当前支持标记与本状态的 stateSupportFlag 不匹配，且本次属于支持标记切换场景时，状态会被禁止激活。" +
@@ -76,7 +76,7 @@ namespace ES
         public bool disableActiveOnSupportFlagSwitching = false;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("#切换后自动失活")]
+        [LabelText("#标记切换后自动失活")]
         [Tooltip(
             "该字段控制的是“已经在运行中的状态”，不是激活判定。" +
             "开启后，当状态机当前支持标记切换到与本状态 stateSupportFlag 不再匹配时，该状态会被自动失活。" +
@@ -87,7 +87,7 @@ namespace ES
         public bool deactivateOnSupportFlagSwitching = true;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("#支持重复激活")]
+        [LabelText("#同状态支持重复激活")]
         [Tooltip(
             "定义当该状态已经处于运行中时，是否允许再次请求进入并执行一次“重新开始”。" +
             "开启后，同一个状态重复激活时可以重置自身进入逻辑、重新计算动画或重新触发关键效果。" +
@@ -96,7 +96,7 @@ namespace ES
         public bool supportReStart = false;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("#入场时重设标记")]
+        [LabelText("#入场时重设支持标记")]
         [Tooltip(
             "开启后，状态进入时会主动把状态机当前支持标记重设为本状态声明的 stateSupportFlag。" +
             "适合那些进入后就应该明确切换宿主语义的状态，例如进入游泳态后，整体环境语义应立即变成 Swimming。" +
@@ -105,7 +105,7 @@ namespace ES
         public bool resetSupportFlagOnEnter = true;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("#退出时移除标记")]
+        [LabelText("#退出时移除支持标记")]
         [Tooltip(
             "开启后，状态退出时会把自己对应的支持标记从当前状态机语义中移除。" +
             "适合那些退出后应明确结束某种环境语义占用的状态。" +
@@ -114,7 +114,7 @@ namespace ES
         public bool removeSupportFlagOnExit = false;
 
         [BoxGroup("支持标记", ShowLabel = true), PropertyOrder(1)]
-        [LabelText("#允许作为Fallback")]
+        [LabelText("#允许作为兜底Fallback")]
         [Tooltip(
             "勾选后，该状态允许被系统当作 Fallback 状态使用。" +
             "Fallback 的含义是：当某层没有更合适的可运行状态、资源失配、条件落空，或系统需要一个稳定兜底时，可以自动转入该状态。" +
@@ -146,7 +146,7 @@ namespace ES
         public bool enableRuntimeProgress = false;
 
         [BoxGroup("生命周期", ShowLabel = true), PropertyOrder(2)]
-        [LabelText("启用Clip时长兜底")]
+        [LabelText("启用Clip时长兜底(UntilAnimationEnd)")]
         [Tooltip("仅用于UntilAnimationEnd模式的兜底计算，默认关闭")]
         public bool enableClipLengthFallback = false;
 

@@ -171,7 +171,8 @@ namespace ES
                 // 输出Mixer供父级连接(支持多层级)
                 output = runtime.mixer;
                 
-                debugSettings.LogRuntimeInit($"[BlendTree2D] Runtime初始化完成: {samples.Length}个采样点, 中心点索引={centerIndex}, 三角形数量={_sharedTriangles?.Length ?? 0}");
+                int triangleCount = _sharedTriangles != null ? _sharedTriangles.Length : 0;
+                debugSettings.LogRuntimeInit($"[BlendTree2D] Runtime初始化完成: {samples.Length}个采样点, 中心点索引={centerIndex}, 三角形数量={triangleCount}");
                 return true;
             }
 

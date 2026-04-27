@@ -187,6 +187,34 @@ namespace ES
         [LabelText("翻越-旋转速度(度/秒)")]
         public float vaultAngleSpeed = 0f;
 
+        [Title("翻越落地阶段")]
+        [LabelText("翻越-落地身体部位"), Tooltip("第二段 MatchTarget（对面落点）使用的身体部位")]
+        public AvatarTarget vaultLandingBodyPart = AvatarTarget.Root;
+
+        [LabelText("翻越-落地开始时间"), Range(0f, 1f), Tooltip("落地阶段在动画归一时间中的起点，应在第一段结束时间之后")]
+        public float vaultLandingStartTime = 0.5f;
+
+        [LabelText("翻越-落地结束时间"), Range(0f, 1f)]
+        public float vaultLandingEndTime = 0.95f;
+
+        [LabelText("翻越-落地逼近速度(单位/秒)")]
+        public float vaultLandingApproachSpeed = 3f;
+
+        [LabelText("翻越墙顶点使用入场快照"), Tooltip("开启后，Phase0 对齐点固定为进入翻越时的墙顶点，避免每帧重算导致目标抖动")]
+        public bool vaultFreezeWallTopSnapshot = true;
+
+        [LabelText("翻越Phase1共享目标切到落点"), Tooltip("开启后，进入落地阶段时共享目标也切到落点，避免时间线配置异常时骨骼仍被墙顶目标牵制")]
+        public bool vaultUseLandingAsSharedTargetInPhase1 = true;
+
+        [LabelText("翻越最高点贴合入场位置"), Tooltip("开启后，Phase0 墙顶目标按翻越起点附近计算，不使用固定中心点")]
+        public bool vaultTopUseEntryAlignedPoint = true;
+
+        [LabelText("翻越最高点忽略固定锚点"), Tooltip("开启后，Vault Phase0 不使用 ClimbableSurface.matchTargetAnchor，改为按入场位置动态求顶点")]
+        public bool vaultTopIgnoreMatchTargetAnchor = true;
+
+        [LabelText("翻越入场锁定落点"), Tooltip("开启后仅在 EnterVault 时按玩家入场位置计算一次落点，后续不再动态刷新")]
+        public bool vaultLockLandingPointAtEnter = true;
+
         [Title("登顶判定")]
         [LabelText("登顶高度偏移(米)")]
         public float climbTopCheckHeightOffset = 1.4f;
@@ -197,6 +225,9 @@ namespace ES
 
         [LabelText("翻越最大持续时间(秒)")]
         public float vaultMaxDuration = 1.2f;
+
+        [LabelText("翻越Phase0超时宽限(秒)"), Tooltip("当尚未进入落地阶段(phase1)时，允许在最大持续时间基础上额外等待，避免因动画前段偏慢导致提前自动退出")]
+        public float vaultPhase0TimeoutGrace = 0.6f;
 
         [LabelText("翻越退出距离(米)"), Tooltip("距离目标点足够近时自动退出")]
         public float vaultExitDistance = 0.15f;
@@ -353,7 +384,10 @@ namespace ES
         private StateBase _activeClimbOverState;
         private StateBase _climbJumpState;
         private StateMachine sm;
-        private Collider[] _overlapBuffer = new Collider[16];
+        private StateLifecycleTracker _climbLifecycle = new StateLifecycleTracker();
+        private StateLifecycleTracker _climbOverLifecycle = new StateLifecycleTracker();
+        private StateLifecycleTracker _vaultLifecycle = new StateLifecycleTracker();
+        private StateLifecycleTracker _climbJumpLifecycle = new StateLifecycleTracker();
 
         [NonSerialized] public Vector3 climbVelocityRequest;
         [NonSerialized] public bool climbJumpRequested;
@@ -367,6 +401,16 @@ namespace ES
         [NonSerialized] private float _matchTargetStartTime = -999f;
         [NonSerialized] private float _climbOverGroundedSince = -1f;
         [NonSerialized] private Vector3 _vaultStartPosition;
+        // 翻越入场时（角色在入口侧）捕获一次，避免越过墙后GetDynamicNormal反转导致落点错误
+        [NonSerialized] private Vector3 _vaultLandingPos;
+        // 入场时捕获的墙顶对齐点（共享目标/Phase0）
+        [NonSerialized] private Vector3 _vaultWallTopPos;
+        // 仅用于调试可视化：false=逼近墙顶；true=逼近落点
+        [NonSerialized] private bool _vaultPhase1Active;
+
+        private const int VaultIndependentTargetLandingIndex0 = 0;
+        private const int VaultIndependentTargetLandingIndex1 = 1;
+        private const int VaultIndependentTargetLandingIndex2 = 2;
 
 #if UNITY_EDITOR
         [NonSerialized] private GameObject _debugMatchTargetMarker;
@@ -395,6 +439,11 @@ namespace ES
                     _vaultHighState = sm.GetStateByString(VaultHigh_StateName);
                 if (!string.IsNullOrEmpty(ClimbJump_StateName))
                     _climbJumpState = sm.GetStateByString(ClimbJump_StateName);
+
+                _climbLifecycle.Bind(sm, _climbState, ResolveStateKeyForLifecycle(_climbState, Climb_StateName));
+                _climbOverLifecycle.Bind(sm, _climbOverState, ResolveStateKeyForLifecycle(_climbOverState, ClimbOver_StateName));
+                _vaultLifecycle.Bind(sm, _vaultState, ResolveStateKeyForLifecycle(_vaultState, Vault_StateName));
+                _climbJumpLifecycle.Bind(sm, _climbJumpState, ResolveStateKeyForLifecycle(_climbJumpState, ClimbJump_StateName));
 
                 // ── 高度分级状态缓存 ──────────────────────────────────────────────────
                 if (enableHeightAdaptive && heightRangePresets != null)
@@ -550,7 +599,7 @@ namespace ES
 
             if (_climbJumpState != null)
             {
-                if (!sm.TryActivateState(_climbJumpState))
+                if (!TryActivateTrackedState(_climbJumpLifecycle, _climbJumpState, ClimbJump_StateName))
                 {
                     if (debugClimb_) Debug.LogWarning($"[攀爬] 激活攀爬跳跃状态失败: {ClimbJump_StateName}");
                     return;
@@ -780,7 +829,7 @@ namespace ES
                 return false;
             }
 
-            if (!sm.TryActivateState(_climbState))
+            if (!TryActivateTrackedState(_climbLifecycle, _climbState, Climb_StateName))
             {
                 if (debugClimb_) Debug.LogWarning($"[Climb] EnterClimbing失败: TryActivateState返回false (状态={Climb_StateName}, baseStatus={_climbState.baseStatus})");
                 return false;
@@ -813,7 +862,7 @@ namespace ES
                 return false;
             }
 
-            if (!sm.TryActivateState(_activeVaultState))
+            if (!TryActivateTrackedState(_vaultLifecycle, _activeVaultState, _activeVaultState != null ? _activeVaultState.strKey : Vault_StateName))
             {
                 if (debugClimb_) Debug.LogWarning($"[Climb] EnterVault失败: TryActivateState返回false (状态={_activeVaultState.strKey}, baseStatus={_activeVaultState.baseStatus})");
                 return false;
@@ -821,19 +870,66 @@ namespace ES
 
             currentSurface = surface;
             Vector3 charPos = MyCore.kcc.motor.TransientPosition;
-            currentWallNormal = surface.GetDynamicNormal(charPos);
+            Vector3 entryNormal = surface.GetDynamicNormal(charPos);
+            if (entryNormal.sqrMagnitude < 0.0001f)
+            {
+                entryNormal = wallNormal.sqrMagnitude > 0.0001f ? wallNormal.normalized : Vector3.back;
+            }
+            Vector3 up = (MyCore?.kcc?.motor != null) ? MyCore.kcc.motor.CharacterUp : Vector3.up;
+            Vector3 planarEntryNormal = Vector3.ProjectOnPlane(entryNormal, up);
+            if (planarEntryNormal.sqrMagnitude > 0.0001f)
+            {
+                entryNormal = planarEntryNormal.normalized;
+            }
+
+            // 让法线明确指向“角色所在入口侧”，避免符号反转导致落点回到原侧。
+            Vector3 facePoint = surface.GetClosestClimbPoint(charPos);
+            Vector3 toChar = Vector3.ProjectOnPlane(charPos - facePoint, up);
+            if (toChar.sqrMagnitude > 0.0001f && Vector3.Dot(entryNormal, toChar) < 0f)
+            {
+                entryNormal = -entryNormal;
+            }
+
+            currentWallNormal = entryNormal;
             subState = ClimbSubState.Vault;
 
             _vaultStartPosition = charPos;
+            // 仅在翻越入场时依据玩家当前位置计算一次“墙体另一侧最近落点”。
+            // 之后默认锁定，避免第二段被动态重算拉回起点侧。
+            Vector3 landingA = surface.GetLandingPositionFromEntry(charPos, currentWallNormal, true);
+            float sideA = Vector3.Dot(landingA - _vaultStartPosition, -currentWallNormal);
+            if (sideA <= 0.02f)
+            {
+                Vector3 flipped = -currentWallNormal;
+                Vector3 landingB = surface.GetLandingPositionFromEntry(charPos, flipped, true);
+                float sideB = Vector3.Dot(landingB - _vaultStartPosition, -flipped);
+                if (sideB > sideA)
+                {
+                    currentWallNormal = flipped;
+                    landingA = landingB;
+                    sideA = sideB;
+                }
+            }
+            _vaultLandingPos = landingA;
+            _vaultPhase1Active = false;
 
             _matchTargetStartTime = Time.time;
 
             // enableContinuousApproach: 重施加策略已迁移至 StateMachineConfig.matchTargetReapply 全局配置，无需在此显式设置
 
-            Vector3 targetPos = surface.GetMatchTargetPosition(charPos);
+            Vector3 targetPos = vaultTopUseEntryAlignedPoint
+                ? surface.GetTopPositionNearEntry(charPos, vaultTopIgnoreMatchTargetAnchor)
+                : surface.GetMatchTargetPosition(charPos);
+            _vaultWallTopPos = targetPos; // 入场时捕获 Phase0 对齐点
             Quaternion targetRot = surface.GetMatchTargetRotation(charPos);
+
+            // 新版独立目标点：仅将最终落点写入索引0。
+            // 墙顶仍使用共享目标（Phase0），第二段由时间线 Step0 自动读取 Index0。
+            UpdateVaultIndependentTargets(charPos);
+
             // ★ 优先采用 Inspector matchTargetPreset；Inspector 未启用时退回模块级字段（向后兼容）
-            if (!_activeVaultState.StartMatchTargetFromConfig(targetPos, targetRot))
+            bool startedFromConfig = _activeVaultState.StartMatchTargetFromConfig(targetPos, targetRot);
+            if (!startedFromConfig)
             {
                 _activeVaultState.StartMatchTarget(
                     targetPos, targetRot,
@@ -851,6 +947,8 @@ namespace ES
                 Debug.Log($"[Climb] ★ 进入Vault翻越! surface={surface.name}, targetPos={targetPos}, " +
                     $"targetRot={targetRot.eulerAngles}, bodyPart={vaultBodyPart}, " +
                     $"timeRange=[{vaultStartTime:F2},{vaultEndTime:F2}] state={_activeVaultState.strKey}");
+                float landingSideDot = Vector3.Dot(_vaultLandingPos - _vaultStartPosition, -currentWallNormal);
+                Debug.Log($"[翻越][入场落点] lockAtEnter={vaultLockLandingPointAtEnter} start={_vaultStartPosition:F3} normal={currentWallNormal:F3} landing={_vaultLandingPos:F3} sideDot={landingSideDot:F3}");
             }
             return true;
         }
@@ -939,11 +1037,11 @@ namespace ES
             // ── 退出当前攀爬状态 ─────────────────────────────────────────────────────
             if (_climbState != null && _climbState.baseStatus == StateBaseStatus.Running)
             {
-                sm.TryDeactivateState(Climb_StateName);
+                TryDeactivateTrackedState(_climbLifecycle, _climbState, Climb_StateName, false);
             }
 
             // ── 激活选中的攀上状态 ──────────────────────────────────────────────────
-            if (!sm.TryActivateState(chosenState))
+            if (!TryActivateTrackedState(_climbOverLifecycle, chosenState, chosenState != null ? chosenState.strKey : ClimbOver_StateName))
             {
                 if (debugClimb_) Debug.LogWarning($"[Climb] EnterClimbOver失败: TryActivateState返回false (状态={chosenState.strKey}, baseStatus={chosenState.baseStatus})");
                 return;
@@ -994,7 +1092,6 @@ namespace ES
             if (subState != ClimbSubState.Approach) return;
 
             float dist = Vector3.Distance(charPos, currentSnapTarget);
-            Debug.Log(dist+"  "+charPos+"  "+ currentSnapTarget );
             if (dist < 0.1f)
             {
                 subState = ClimbSubState.Climbing;
@@ -1227,18 +1324,29 @@ namespace ES
             {
                 Vector3 charPos = MyCore.kcc.motor.TransientPosition;
                 Vector3 targetPos;
+                Vector3 sharedTargetPos;
                 Vector3 moveTargetPos;
                 Quaternion targetRot = currentSurface.GetMatchTargetRotation(charPos);
 
                 bool isVault = subState == ClimbSubState.Vault;
                 if (isVault)
                 {
-                    targetPos = currentSurface.GetMatchTargetPosition(charPos);
+                    float vaultElapsed = Time.time - _matchTargetStartTime;
+                    UpdateVaultIndependentTargets(charPos);
+                    _vaultPhase1Active = IsVaultLandingPhaseActive(vaultElapsed);
+
+                    // 共享目标严格保持墙顶（Phase0）。
+                    // 落地阶段由时间线步骤读取独立目标槽位0，不回写共享目标，避免语义混淆。
+                    sharedTargetPos = (vaultUseLandingAsSharedTargetInPhase1 && _vaultPhase1Active)
+                        ? _vaultLandingPos
+                        : _vaultWallTopPos;
+                    targetPos = _vaultPhase1Active ? _vaultLandingPos : _vaultWallTopPos;
                 }
                 else
                 {
                     targetPos = currentSurface.GetMatchTargetPosition(charPos);
                     targetPos.y += climbOverMatchTargetYOffset;
+                    sharedTargetPos = targetPos;
                 }
 #if UNITY_EDITOR
                 if (debugClimb_)
@@ -1300,7 +1408,7 @@ namespace ES
                     //   原 SetMatchTargetTarget(targetPos, targetRot) 每帧直接写入 raw 位置，
                     //   会覆盖 StartMatchTargetFromConfig 在启动时叠加的 Inspector positionOffset/ rotationOffsetEuler。
                     //   新方法自动从当前激活阶段的 Inspector 配置读取偏移并叠加，确保 Offset 在追踪期间始终生效。
-                    activeState.SetMatchTargetTargetWithConfigOffset(targetPos, targetRot);
+                    activeState.SetMatchTargetTargetWithConfigOffset(sharedTargetPos, targetRot);
                 }
 
                 if (debugClimb_)
@@ -1390,35 +1498,26 @@ namespace ES
 
                 if (subState == ClimbSubState.Vault)
                 {
-                    if (dist > vaultExitDistance)
-                    {
-                        Vector3 forward = MyCore.kcc.motor.CharacterForward;
-                        if (forward.sqrMagnitude < 0.0001f)
-                        {
-                            forward = -currentSurface.GetDynamicNormal(charPos);
-                        }
-                        float pushT = Mathf.Clamp01(dist / Mathf.Max(0.01f, vaultForwardPushDistance));
-                        Vector3 up = MyCore.kcc.motor.CharacterUp;
-                        Vector3 currentUp = Vector3.Project(climbVelocityRequest, up);
-                        Vector3 forwardPlanar = Vector3.ProjectOnPlane(forward.normalized, up).normalized;
-                        float pushSpeed = Mathf.Lerp(vaultForwardPushSpeed * 0.5f, vaultForwardPushSpeed, pushT);
-                        float finalSpeed = Mathf.Max(Vector3.ProjectOnPlane(climbVelocityRequest, up).magnitude, pushSpeed);
-                        climbVelocityRequest = currentUp + forwardPlanar * finalSpeed;
-                    }
-
                     float elapsed = Time.time - _matchTargetStartTime;
-                    bool probedGrounded = CheckVaultGroundProbe(charPos);
-                    bool frontBackGrounded = CheckVaultFrontBackGround(charPos);
-                    bool farFromStart = Vector3.Distance(charPos, _vaultStartPosition) >= vaultFarExitDistance;
-                    bool allowExit = elapsed >= vaultMinDuration && dist <= vaultExitDistance;
-                    bool allowImmediateExit = elapsed >= vaultMinDuration;
-                    bool canExitByDistance = allowExit && dist <= vaultExitDistance && probedGrounded;
-                    if ((allowImmediateExit && frontBackGrounded) || farFromStart || canExitByDistance || elapsed >= vaultMaxDuration)
+                    // Phase 0→1 已在 targetPos 计算前处理，此处仅执行退出判断
+
+                    float vaultLandingDist = Vector3.Distance(charPos, _vaultLandingPos);
+                    bool reachedLanding = elapsed >= vaultMinDuration && vaultLandingDist <= vaultExitDistance;
+                    bool exitFar = elapsed >= vaultMinDuration
+                        && _vaultPhase1Active
+                        && Vector3.Distance(charPos, _vaultStartPosition) >= vaultFarExitDistance
+                        && !reachedLanding;
+                    bool timeout = IsVaultTimeout(elapsed);
+
+                    if (reachedLanding || timeout || exitFar)
                     {
                         if (debugClimb_)
                         {
-                            string reason = frontBackGrounded ? "frontBackGround" : (farFromStart ? "farFromStart" : (elapsed >= vaultMaxDuration ? "timeout" : "distance"));
-                            Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} dist={dist:F3} probedGrounded={probedGrounded} frontBack={frontBackGrounded} far={farFromStart}");
+                            float progress = _activeVaultState != null ? _activeVaultState.normalizedProgress : -1f;
+                            string reason = reachedLanding
+                                ? "landingReached"
+                                : (timeout ? (_vaultPhase1Active ? "timeout" : "timeoutBeforePhase1") : "farFromStart");
+                            Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} grace={vaultPhase0TimeoutGrace:F2} landingDist={vaultLandingDist:F3} phase1={_vaultPhase1Active} progress={progress:F2} landingStart={vaultLandingStartTime:F2}");
                         }
                         ExitClimbingState();
                         ResetClimbState();
@@ -1431,21 +1530,27 @@ namespace ES
             if (subState == ClimbSubState.Vault && currentSurface != null && !enableContinuousApproach)
             {
                 Vector3 charPos = MyCore.kcc.motor.TransientPosition;
-                Vector3 targetPos = currentSurface.GetMatchTargetPosition(charPos);
-                float dist = Vector3.Distance(charPos, targetPos);
                 float elapsed = Time.time - _matchTargetStartTime;
-                bool probedGrounded = CheckVaultGroundProbe(charPos);
-                bool frontBackGrounded = CheckVaultFrontBackGround(charPos);
-                bool farFromStart = Vector3.Distance(charPos, _vaultStartPosition) >= vaultFarExitDistance;
-                bool allowExit = elapsed >= vaultMinDuration && dist <= vaultExitDistance;
-                bool allowImmediateExit = elapsed >= vaultMinDuration;
-                bool canExitByDistance = allowExit && dist <= vaultExitDistance && probedGrounded;
-                if ((allowImmediateExit && frontBackGrounded) || farFromStart || canExitByDistance || elapsed >= vaultMaxDuration)
+                UpdateVaultIndependentTargets(charPos);
+                _vaultPhase1Active = IsVaultLandingPhaseActive(elapsed);
+
+                float vaultLandingDist = Vector3.Distance(charPos, _vaultLandingPos);
+                bool reachedLanding = elapsed >= vaultMinDuration && vaultLandingDist <= vaultExitDistance;
+                bool exitFar = elapsed >= vaultMinDuration
+                    && _vaultPhase1Active
+                    && Vector3.Distance(charPos, _vaultStartPosition) >= vaultFarExitDistance
+                    && !reachedLanding;
+                bool timeout = IsVaultTimeout(elapsed);
+
+                if (reachedLanding || timeout || exitFar)
                 {
                     if (debugClimb_)
                     {
-                        string reason = frontBackGrounded ? "frontBackGround" : (farFromStart ? "farFromStart" : (elapsed >= vaultMaxDuration ? "timeout" : "distance"));
-                        Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} dist={dist:F3} probedGrounded={probedGrounded} frontBack={frontBackGrounded} far={farFromStart} (noApproach)");
+                        float progress = _activeVaultState != null ? _activeVaultState.normalizedProgress : -1f;
+                        string reason = reachedLanding
+                            ? "landingReached"
+                            : (timeout ? (_vaultPhase1Active ? "timeout" : "timeoutBeforePhase1") : "farFromStart");
+                        Debug.LogWarning($"[翻越][自动退出] reason={reason} elapsed={elapsed:F2} min={vaultMinDuration:F2} max={vaultMaxDuration:F2} grace={vaultPhase0TimeoutGrace:F2} landingDist={vaultLandingDist:F3} phase1={_vaultPhase1Active} progress={progress:F2} landingStart={vaultLandingStartTime:F2} (noApproach)");
                     }
                     ExitClimbingState();
                     ResetClimbState();
@@ -1453,7 +1558,9 @@ namespace ES
                     return;
                 }
             }
-            if (activeState != null && !activeState.IsMatchTargetActive && Time.time - _matchTargetStartTime > matchTargetFailTimeout)
+            // Vault 由超时 / 过远统一退出，不用 failTimeout（两段 MT 之间有正常间隙，会误触发）
+            if (subState != ClimbSubState.Vault
+                && activeState != null && !activeState.IsMatchTargetActive && Time.time - _matchTargetStartTime > matchTargetFailTimeout)
             {
                 if (debugClimb_)
                 {
@@ -1472,6 +1579,41 @@ namespace ES
                 ResetClimbState();
                 _exitClimbTimestamp = Time.time;
             }
+        }
+
+        private bool IsVaultTimeout(float elapsed)
+        {
+            if (elapsed < vaultMaxDuration)
+            {
+                return false;
+            }
+
+            if (_vaultPhase1Active)
+            {
+                return true;
+            }
+
+            float progress = _activeVaultState != null ? _activeVaultState.normalizedProgress : 0f;
+            bool stillInPhase0 = progress + 0.0001f < vaultLandingStartTime;
+            if (stillInPhase0 && elapsed < vaultMaxDuration + Mathf.Max(0f, vaultPhase0TimeoutGrace))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsVaultLandingPhaseActive(float elapsed)
+        {
+            float progress = _activeVaultState != null ? _activeVaultState.normalizedProgress : 0f;
+            if (progress + 0.0001f >= vaultLandingStartTime)
+            {
+                return true;
+            }
+
+            // 兜底：若状态机进度异常未更新，按持续时间估算进入第二段，避免角色长期卡在墙顶阶段。
+            float fallbackElapsed = Mathf.Lerp(vaultMinDuration, vaultMaxDuration, Mathf.Clamp01(vaultLandingStartTime));
+            return elapsed >= fallbackElapsed;
         }
 
         private void UpdateClimbJump()
@@ -1503,9 +1645,7 @@ namespace ES
                 if (debugClimb_) Debug.LogWarning("[攀爬跳跃][自动退出] 落地");
                 if (_climbJumpState != null && _climbJumpState.baseStatus == StateBaseStatus.Running)
                 {
-                    sm.TryDeactivateState(ClimbJump_StateName);
-                    if (_climbJumpState.baseStatus == StateBaseStatus.Running)
-                        sm.ForceExitState(_climbJumpState);
+                    TryDeactivateTrackedState(_climbJumpLifecycle, _climbJumpState, ClimbJump_StateName, true);
                 }
                 ExitClimbingState();
                 ResetClimbState();
@@ -1577,46 +1717,119 @@ namespace ES
             }
         }
 
+        private void UpdateVaultIndependentTargets(Vector3 charPos)
+        {
+            if (currentSurface == null || _activeVaultState == null)
+            {
+                return;
+            }
+
+            // Vault 落点固定为入场计算结果；这里不再按运行时位置重算，避免第二段目标回跳。
+
+            if (!vaultFreezeWallTopSnapshot)
+            {
+                Vector3 topSamplePos = vaultTopUseEntryAlignedPoint ? _vaultStartPosition : charPos;
+                _vaultWallTopPos = vaultTopUseEntryAlignedPoint
+                    ? currentSurface.GetTopPositionNearEntry(topSamplePos, vaultTopIgnoreMatchTargetAnchor)
+                    : currentSurface.GetMatchTargetPosition(topSamplePos);
+            }
+            Quaternion landingRot = currentSurface.GetMatchTargetRotation(_vaultLandingPos);
+
+            // 为了兼容不同时间线配置（例如存在多个独立步骤），将落地点镜像写入 0/1/2 槽位。
+            // Vault 业务语义仍是“墙顶共享、落地独立”，这里仅做运行时容错，避免配置顺序导致第二段失效。
+            _activeVaultState.SetMatchTargetIndependentTarget(VaultIndependentTargetLandingIndex0, _vaultLandingPos, landingRot, true);
+            _activeVaultState.SetMatchTargetIndependentTarget(VaultIndependentTargetLandingIndex1, _vaultLandingPos, landingRot, true);
+            _activeVaultState.SetMatchTargetIndependentTarget(VaultIndependentTargetLandingIndex2, _vaultLandingPos, landingRot, true);
+        }
+
+        private void ClearVaultIndependentTargets(StateBase vaultState)
+        {
+            if (vaultState == null)
+            {
+                return;
+            }
+
+            vaultState.DisableMatchTargetIndependentTarget(VaultIndependentTargetLandingIndex0);
+            vaultState.DisableMatchTargetIndependentTarget(VaultIndependentTargetLandingIndex1);
+            vaultState.DisableMatchTargetIndependentTarget(VaultIndependentTargetLandingIndex2);
+        }
+
         private void ExitClimbingState(bool includeJumpState = true)
         {
+            ClearVaultIndependentTargets(_activeVaultState);
+            ClearVaultIndependentTargets(_vaultState);
+            ClearVaultIndependentTargets(_vaultHighState);
+
             if (_climbState != null && _climbState.baseStatus == StateBaseStatus.Running)
             {
-                sm.TryDeactivateState(Climb_StateName);
-                if (_climbState.baseStatus == StateBaseStatus.Running)
-                    sm.ForceExitState(_climbState);
+                TryDeactivateTrackedState(_climbLifecycle, _climbState, Climb_StateName, true);
             }
             if (_climbOverState != null && _climbOverState.baseStatus == StateBaseStatus.Running)
             {
-                sm.TryDeactivateState(ClimbOver_StateName);
-                if (_climbOverState.baseStatus == StateBaseStatus.Running)
-                    sm.ForceExitState(_climbOverState);
+                TryDeactivateTrackedState(_climbOverLifecycle, _climbOverState, ClimbOver_StateName, true);
             }
             // 高度自适应：若本次使用了不同于默认的攀上状态，也要确保退出
             if (_activeClimbOverState != null && _activeClimbOverState != _climbOverState
                 && _activeClimbOverState.baseStatus == StateBaseStatus.Running)
             {
-                sm.TryDeactivateState(_activeClimbOverState.strKey);
-                if (_activeClimbOverState.baseStatus == StateBaseStatus.Running)
-                    sm.ForceExitState(_activeClimbOverState);
+                TryDeactivateTrackedState(_climbOverLifecycle, _activeClimbOverState, _activeClimbOverState.strKey, true);
             }
             if (_vaultState != null && _vaultState.baseStatus == StateBaseStatus.Running)
             {
-                sm.TryDeactivateState(Vault_StateName);
-                if (_vaultState.baseStatus == StateBaseStatus.Running)
-                    sm.ForceExitState(_vaultState);
+                TryDeactivateTrackedState(_vaultLifecycle, _vaultState, Vault_StateName, true);
             }
             if (_vaultHighState != null && _vaultHighState.baseStatus == StateBaseStatus.Running)
             {
-                sm.TryDeactivateState(VaultHigh_StateName);
-                if (_vaultHighState.baseStatus == StateBaseStatus.Running)
-                    sm.ForceExitState(_vaultHighState);
+                TryDeactivateTrackedState(_vaultLifecycle, _vaultHighState, VaultHigh_StateName, true);
             }
             if (includeJumpState && _climbJumpState != null && _climbJumpState.baseStatus == StateBaseStatus.Running)
             {
-                sm.TryDeactivateState(ClimbJump_StateName);
-                if (_climbJumpState.baseStatus == StateBaseStatus.Running)
-                    sm.ForceExitState(_climbJumpState);
+                TryDeactivateTrackedState(_climbJumpLifecycle, _climbJumpState, ClimbJump_StateName, true);
             }
+        }
+
+        private bool TryActivateTrackedState(StateLifecycleTracker lifecycle, StateBase state, string fallbackKey)
+        {
+            if (lifecycle == null || sm == null || state == null)
+                return false;
+
+            lifecycle.Bind(sm, state, ResolveStateKeyForLifecycle(state, fallbackKey));
+            bool activated = state.baseStatus == StateBaseStatus.Running || sm.TryActivateState(state);
+            if (!activated)
+                return false;
+
+            if (lifecycle.TryEnter(true))
+                return true;
+
+            return lifecycle.IsActive;
+        }
+
+        private void TryDeactivateTrackedState(StateLifecycleTracker lifecycle, StateBase state, string fallbackKey, bool forceIfStillRunning)
+        {
+            if (sm == null || state == null)
+                return;
+
+            if (lifecycle != null)
+            {
+                lifecycle.Bind(sm, state, ResolveStateKeyForLifecycle(state, fallbackKey));
+                if (!lifecycle.RequestExit() && state.baseStatus == StateBaseStatus.Running)
+                    sm.TryDeactivateState(ResolveStateKeyForLifecycle(state, fallbackKey));
+            }
+            else if (state.baseStatus == StateBaseStatus.Running)
+            {
+                sm.TryDeactivateState(ResolveStateKeyForLifecycle(state, fallbackKey));
+            }
+
+            if (forceIfStillRunning && state.baseStatus == StateBaseStatus.Running)
+                sm.ForceExitState(state);
+        }
+
+        private string ResolveStateKeyForLifecycle(StateBase state, string fallbackKey)
+        {
+            if (state != null && !string.IsNullOrEmpty(state.strKey))
+                return state.strKey;
+
+            return string.IsNullOrEmpty(fallbackKey) ? string.Empty : fallbackKey;
         }
 
         private void ResetClimbState()
@@ -1634,6 +1847,9 @@ namespace ES
             _activeVaultState = null;
             _activeClimbOverState = null;
             _vaultStartPosition = Vector3.zero;
+            _vaultLandingPos = Vector3.zero;
+            _vaultWallTopPos = Vector3.zero;
+            _vaultPhase1Active = false;
 
             if (sm != null)
             {
@@ -1675,67 +1891,6 @@ namespace ES
             }
 
             return false;
-        }
-
-        private bool CheckVaultGroundProbe(Vector3 characterPosition)
-        {
-            if (MyCore?.kcc?.motor == null)
-            {
-                return false;
-            }
-
-            Vector3 up = MyCore.kcc.motor.CharacterUp;
-            Vector3 fwd = MyCore.kcc.motor.CharacterForward;
-            Vector3 right = Vector3.Cross(up, fwd).normalized;
-            Vector3 originBase = characterPosition + up * vaultGroundProbeHeightOffset;
-            float r = Mathf.Max(0.01f, vaultGroundProbeRadius);
-            LayerMask mask = MyCore.kcc.motor.StableGroundLayers;
-
-            Vector3[] offsets =
-            {
-                Vector3.zero,
-                fwd * r,
-                -fwd * r,
-                right * r,
-                -right * r
-            };
-
-            for (int i = 0; i < offsets.Length; i++)
-            {
-                Vector3 origin = originBase + offsets[i];
-                if (Physics.Raycast(origin, -up, out _, vaultGroundProbeDistance, mask))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private bool CheckVaultFrontBackGround(Vector3 characterPosition)
-        {
-            if (MyCore?.kcc?.motor == null)
-            {
-                return false;
-            }
-
-            Vector3 up = MyCore.kcc.motor.CharacterUp;
-            Vector3 fwd = MyCore.kcc.motor.CharacterForward;
-            if (fwd.sqrMagnitude < 0.0001f)
-            {
-                fwd = -currentWallNormal;
-            }
-            Vector3 originBase = characterPosition + up * vaultGroundProbeHeightOffset;
-            float d = Mathf.Max(0.01f, vaultFrontBackProbeDistance);
-            LayerMask mask = MyCore.kcc.motor.StableGroundLayers;
-
-            Vector3 originFwd = originBase + fwd.normalized * d;
-            Vector3 originBack = originBase - fwd.normalized * d;
-
-            bool hitFwd = Physics.Raycast(originFwd, -up, out _, vaultGroundProbeDistance, mask);
-            bool hitBack = Physics.Raycast(originBack, -up, out _, vaultGroundProbeDistance, mask);
-
-            return hitFwd && hitBack;
         }
 
         public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, float deltaTime)

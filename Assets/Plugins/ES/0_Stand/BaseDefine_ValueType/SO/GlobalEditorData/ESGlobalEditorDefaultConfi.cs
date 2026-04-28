@@ -43,7 +43,7 @@ namespace ES
     [FolderPath, LabelText("默认的全局Global父文件夹")]
     public string Path_GlobalParent;
 
-    [VerticalGroup("总体/文件夹路径")]
+    [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认Library库放置文件夹")]
     [InlineButton("Ping_", "<*>")]
     public string Path_AllLibraryFolder_ = "Assets/NormalResources/Data/Library";

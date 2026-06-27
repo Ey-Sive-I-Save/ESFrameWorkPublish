@@ -158,7 +158,7 @@ namespace ES
             {
                 if (GUILayout.Button("资源分析与去向生成", GUILayout.Height(50)))
                 {
-                    ESEditorHandle.AddSimpleHanldeTask(() =>
+                    ESEditorHandle.AddSimpleHandleTask(() =>
                     {
                         if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-资源分析与去向生成", "开始分配资源去向，旧的手动地址可能失效！！", "直接来吧", "取消"))
                         {
@@ -183,7 +183,7 @@ namespace ES
             {
                 if (GUILayout.Button("构建AB与依赖", GUILayout.Height(50)))
                 {
-                    ESEditorHandle.AddSimpleHanldeTask(() =>
+                    ESEditorHandle.AddSimpleHandleTask(() =>
                     {
                         try
                         {
@@ -218,7 +218,7 @@ namespace ES
             {
                 if (GUILayout.Button("上传到服务器", GUILayout.Height(50)))
                 {
-                    ESEditorHandle.AddSimpleHanldeTask(() =>
+                    ESEditorHandle.AddSimpleHandleTask(() =>
                     {
                         if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-上传到服务器", "开始上传到服务器，需要保证已经完成基础配置并且支持！！", "直接来吧", "取消"))
                         {
@@ -246,7 +246,7 @@ namespace ES
             {
                 if (GUILayout.Button("一键完成", GUILayout.Height(50)))
                 {
-                    ESEditorHandle.AddSimpleHanldeTask(() =>
+                    ESEditorHandle.AddSimpleHandleTask(() =>
                     {
                         if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-一键完成全部流程", "从资源去向分配开始完成全部工作", "直接来吧", "取消"))
                         {

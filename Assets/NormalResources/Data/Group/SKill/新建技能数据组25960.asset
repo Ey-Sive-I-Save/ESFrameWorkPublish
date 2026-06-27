@@ -1,0 +1,250 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-5062685032875773599
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bf9ff1c8123ffc49bc87396ef67138b, type: 3}
+  m_Name: "\u4FE1\u606F\u6570\u636E\u952E1694"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u6570\u636E\u952E"
+  sequence:
+    tracks_:
+    - rid: 5686404864374210566
+    - rid: 5686404864374210567
+    - rid: 5686404864374210568
+    - rid: 5686404864374210603
+    - rid: 5686404864374210607
+    - rid: 232055334675415041
+    - rid: 6099247325386113043
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 232055334675415041
+      type: {class: SkillTrackItem_Audio, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        clips:
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 1.3097094
+          durationTime: 1.0000001
+          audioClip: {fileID: 0}
+        displayName: 
+    - rid: 5686404864374210566
+      type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        clips:
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 6.459249
+          durationTime: 1.7041097
+          AnimationClipName: {fileID: 0}
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 8.594968
+          durationTime: 1
+          AnimationClipName: {fileID: 0}
+        - name: "\u6587\u5316\u670D\u52A1"
+          startTime: 1.1801324
+          durationTime: 2.0985117
+          AnimationClipName: {fileID: 0}
+        - name: "\u8F68\u9053\u7247\u6BB5233"
+          startTime: 5.3463063
+          durationTime: 1
+          AnimationClipName: {fileID: 0}
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 3.4659848
+          durationTime: 2.5301213
+          AnimationClipName: {fileID: 0}
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 5.339393
+          durationTime: 1
+          AnimationClipName: {fileID: 0}
+        displayName: "\u9ED8\u8BA4\u52A8\u753B"
+        AnimationIM: "\u8FD9\u662F\u4E00\u4E2A\u52A8\u753B\u8F68\u9053"
+    - rid: 5686404864374210567
+      type: {class: SkillTrackItem_Audio, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        clips:
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 2.4482636
+          durationTime: 2.6938343
+          audioClip: {fileID: 8300000, guid: 259e3d9f89bea8049a6ec1bb94d9771f, type: 3}
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 7.3994513
+          durationTime: 1
+          audioClip: {fileID: 8300000, guid: 88af74873f18b1945822fc3f7da6a386, type: 3}
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 5.2462792
+          durationTime: 0.97484064
+          audioClip: {fileID: 8300000, guid: c05bb84f3ad49934888c9b769073afe7, type: 3}
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 0.9220203
+          durationTime: 0.9999999
+          audioClip: {fileID: 8300000, guid: 45df00ec34648e240a5c0030f534ebe8, type: 3}
+        displayName: 
+    - rid: 5686404864374210568
+      type: {class: SkillTrackItem_GameObject, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        clips:
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 9.242381
+          durationTime: 1
+          Activate: 1
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 3.0304692
+          durationTime: 2.2622259
+          Activate: 1
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 1.3367971
+          durationTime: 0.9999999
+          Activate: 1
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 5.6853294
+          durationTime: 1.233192
+          Activate: 1
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 7.8073153
+          durationTime: 1.0000005
+          Activate: 1
+        displayName: 
+    - rid: 5686404864374210603
+      type: {class: SkillTrackItem_Operation, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        clips:
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 3.3761165
+          durationTime: 2.3812864
+          OperationDescription: 
+          op:
+            rid: -2
+        displayName: 
+    - rid: 5686404864374210607
+      type: {class: SkillTrackItem_GameObject, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        clips:
+        - name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 1.55528
+          durationTime: 0.9999999
+          Activate: 1
+        displayName: 
+    - rid: 6099247325386113043
+      type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        clips: []
+        displayName: 
+        AnimationIM: "\u8FD9\u662F\u4E00\u4E2A\u52A8\u753B\u8F68\u9053"
+--- !u!114 &-2033546133254404354
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bf9ff1c8123ffc49bc87396ef67138b, type: 3}
+  m_Name: "\u4FE1\u606F\u6D4B1"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u6D4B1"
+  sequence:
+    tracks_: []
+  references:
+    version: 2
+    RefIds: []
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9794335b3f60f004db3e26ff98c967f2, type: 3}
+  m_Name: "\u65B0\u5EFA\u6280\u80FD\u6570\u636E\u7EC425960"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects:
+    - {fileID: -5062685032875773599}
+    - {fileID: -2033546133254404354}
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes:
+    - Name: Infos
+      Entry: 7
+      Data: 0|System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[ES.SKillDataInfo,
+        ES_Logic]], mscorlib
+    - Name: comparer
+      Entry: 7
+      Data: 1|System.Collections.Generic.GenericEqualityComparer`1[[System.String,
+        mscorlib]], mscorlib
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 12
+      Data: 2
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u6570\u636E\u952E"
+    - Name: $v
+      Entry: 10
+      Data: 0
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u6D4B1"
+    - Name: $v
+      Entry: 10
+      Data: 1
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 13
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 

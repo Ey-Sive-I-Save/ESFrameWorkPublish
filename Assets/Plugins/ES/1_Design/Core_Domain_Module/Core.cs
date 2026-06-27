@@ -13,7 +13,7 @@ namespace ES
     {
     }
     [DefaultExecutionOrder(-2)]//顺序在前
-    public abstract class Core : MonoBehaviour, ICore
+    public abstract class Core : MonoBehaviour, ICore, IPreviewCollector
     {
         #region 模块表
         [NonSerialized, HideInInspector]
@@ -110,6 +110,47 @@ namespace ES
         //使用的域
         protected List<IDomain> domains = new List<IDomain>(3);
         public IReadOnlyList<IDomain> Domains => domains;
+
+        public void CollectPreviewElements(
+            List<IPreviewElement> normalProviders,
+            List<IPreviewElement> singleProviders)
+        {
+            CollectPreviewElements(domains, normalProviders, singleProviders);
+
+            if (ModuleTables == null) return;
+
+            foreach (var module in ModuleTables.Values)
+            {
+                AddPreviewElement(module, normalProviders, singleProviders);
+            }
+        }
+
+        private static void CollectPreviewElements(
+            IEnumerable<IDomain> domains,
+            List<IPreviewElement> normalProviders,
+            List<IPreviewElement> singleProviders)
+        {
+            if (domains == null) return;
+
+            foreach (var domain in domains)
+            {
+                AddPreviewElement(domain, normalProviders, singleProviders);
+            }
+        }
+
+        private static void AddPreviewElement(
+            object obj,
+            List<IPreviewElement> normalProviders,
+            List<IPreviewElement> singleProviders)
+        {
+            if (obj is not IPreviewElement provider) return;
+            if (!provider.CanPreview) return;
+
+            if (provider.IsSingleArea)
+                singleProviders.Add(provider);
+            else
+                normalProviders.Add(provider);
+        }
 
 
         #endregion

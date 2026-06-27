@@ -17,8 +17,11 @@ namespace ES
         public bool TryRemoveTrackClip(ITrackClip item);
 
         public IEnumerable<Type> SupprtedClipTypes();
+
+        List<IEditorTimeSampler> CreateSamplers(ITrackSequence sequence);
+
     }
-    
+
     [Serializable]
     public abstract class TrackItemBase<TClip> : ITrackItem where TClip : class, ITrackClip
     {
@@ -60,6 +63,21 @@ namespace ES
         }
 
         public IEnumerable<Type> SupprtedClipTypes() => new Type[] { typeof(TClip) };
+
+
+        public virtual List<IEditorTimeSampler> CreateSamplers(ITrackSequence sequence)
+        {
+            var list = new List<IEditorTimeSampler>();
+            foreach (var clip in clips)
+            {
+                var clipSampler = clip.CreateSampler(sequence, this);
+                if (clipSampler != null)
+                {
+                    list.Add(clipSampler);
+                }
+            }
+            return list;
+        }
     }
     //每类轨道的枚举
     public enum TrackItemType

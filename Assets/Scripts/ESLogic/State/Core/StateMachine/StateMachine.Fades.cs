@@ -58,16 +58,6 @@ namespace ES
                     $"[淡出] 状态 {state.strKey} 开始淡出，时长 {fadeOutDuration:F2}秒，起始权重 {currentWeight:F2}");
             }
         }
-
-        private void UpdateFades(float deltaTime)
-        {
-            UpdateLayerFades(baseLayer, deltaTime);
-            UpdateLayerFades(mainLayer, deltaTime);
-            UpdateLayerFades(buffLayer, deltaTime);
-            UpdateLayerFades(upperBodyLayer, deltaTime);
-            UpdateLayerFades(lowerBodyLayer, deltaTime);
-        }
-
         private void UpdateLayerFades(StateLayerRuntime layer, float deltaTime)
         {
             if (layer.fadeInStates.Count == 0 && layer.fadeOutStates.Count == 0)

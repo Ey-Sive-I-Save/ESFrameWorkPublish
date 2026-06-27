@@ -14,7 +14,7 @@ using UnityEditor;
 namespace ES
 {
     [Serializable, TypeRegistryItem("状态域")]
-    public class EntityStateDomain : Domain<Entity, EntityStateModuleBase>, ICorePreviewProvider
+    public class EntityStateDomain : Domain<Entity, EntityStateModuleBase>, IPreviewElement
     {
         private static readonly StateSupportFlags[] PreflightSupportFlags =
         {
@@ -916,11 +916,11 @@ namespace ES
         // 缓存各层级的折叠状态（避免每次OnGUI重置）
         private static Dictionary<StateLayerType, bool> layerFoldouts = new Dictionary<StateLayerType, bool>();
 
-        public bool EditorPreviewIsSingleArea => true;
-        public bool EditorPreviewCanPreview => Application.isPlaying && stateMachine != null;
+        public bool IsSingleArea => true;
+        public bool CanPreview => Application.isPlaying && stateMachine != null;
         public bool EditorPreviewCanPreviewNonPlay => false;
 
-        public void EditorPreviewDrawPreviewGUI() => EditorPreviewDrawPreviewGUIImpl();
+        public void DrawPreviewGUIPlaying() => EditorPreviewDrawPreviewGUIImpl();
         public void EditorPreviewDrawPreviewGUINonPlay()
         {
             // 非运行模式显示友好提示

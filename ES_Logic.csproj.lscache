@@ -170,11 +170,16 @@ Assets/Scripts/ESLogic/
  Editor/EntityBasicInteractionDebugWindow.cs
  Features/
   ContextFeature/ContextPoolPlayer.cs
-  TrackItemAndClip/SkillTrack/SkillTrackItems/
-   SkillTrackItem_Animation.cs
-   SkillTrackItem_Audio.cs
-   SkillTrackItem_GameObject.cs
-   SkillTrackItem_Operaion.cs
+  TrackItemAndClip/
+   BaseDefine/SkillSequenceEntry.cs
+   SkillTrack/SkillTrackItems/
+    SkillTrackItem_Animation.cs
+    SkillTrackItem_Audio.cs
+    SkillTrackItem_GameObject.cs
+    SkillTrackItem_Operaion.cs
+   Tools/
+    EditorPlay.cs
+    Sampler.cs
  GameManager/-GameManager_Core/
   -GameManager_ReadMe.cs
   GameManager.cs

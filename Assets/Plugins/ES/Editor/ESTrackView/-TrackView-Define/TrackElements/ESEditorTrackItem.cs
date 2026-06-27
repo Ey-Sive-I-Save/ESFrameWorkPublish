@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Reflection;
+using RootMotion.Demos;
 using UnityEngine;
 using UnityEngine.UIElements;
 namespace ES
@@ -50,11 +51,14 @@ namespace ES
 
             UpdateTrackMessage();
             UpdateTrackColor();
-            UpdateNodeMatch(true);
+            UpdateNodeMatchAndForeachUpdate(true);
             //Debug.Log("初始化轨道项：" + item.GetType() + item.DisplayName);
             return this;
         }
-
+        public void UpdateWhenEdit()
+        {
+            UpdateTrackMessage();
+        }
         private void UpdateTrackMessage()
         {
             m_TrackNameLabel.text = item.DisplayName;
@@ -346,6 +350,8 @@ namespace ES
             }
         }
 
+        
+
         public void SetCurrentTime(float time)
         {
             foreach (var node in TrackClips)
@@ -364,12 +370,19 @@ namespace ES
             // }
         }
 
-        internal void UpdateNodesPos()
+        
+
+        internal void UpdateNodes()
         {
             SetTimeScaleAndStartShow(ESTrackViewWindow.window.pixelPerSecond, ESTrackViewWindow.window.StartShow);
+            foreach(var node in TrackClips)
+            {
+                node.UpdateNodeView();
+            }
+       
         }
-
-        public void UpdateNodeMatch(bool update = true)
+        //检查节点是否对其
+        public void UpdateNodeMatchAndForeachUpdate(bool update = true)
         {
             var listEditorNow = this.TrackClips.ToList();
             foreach (var clip in item.Clips)
@@ -393,7 +406,7 @@ namespace ES
                 RemoveClip(toRemove);
             }
 
-            UpdateNodesPos();
+            UpdateNodes();
         }
     }
 

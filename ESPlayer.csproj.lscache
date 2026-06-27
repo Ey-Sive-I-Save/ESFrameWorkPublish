@@ -299,6 +299,8 @@ Temp/bin/Debug/
  ES_Design.dll
  ES_Logic.dll
  ES_Stand.dll
+ KCC.dll
+ RootMotion.dll
 
 [analyzerReferences]
 C:/Users/asus/.vscode/extensions/visualstudiotoolsforunity.vstuc-1.2.2/Analyzers/Microsoft.Unity.Analyzers.dll

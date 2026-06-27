@@ -23,7 +23,7 @@ namespace ES
     /// • 接口实现：完整实现IPoolableAuto，支持自动回收
     /// • 扩展就绪：预留了目标数据字段的扩展空间
     /// </summary>
-    public class ESRuntimeTarget : IPoolableAuto
+    public partial class ESRuntimeTarget : IPoolableAuto
     {
         #region 对象池基本支持
 

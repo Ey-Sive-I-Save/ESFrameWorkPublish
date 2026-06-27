@@ -1,0 +1,321 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using Sirenix.OdinInspector;
+using Sirenix.OdinInspector.Editor;
+using Sirenix.Utilities.Editor;
+using UnityEditor;
+using UnityEngine;
+namespace ES
+{
+    public class GameObjectRefer : SerializedMonoBehaviour
+    {
+        [LabelText("游戏对象划分(key可忽略)")]
+        [SerializeReference]
+        [Searchable]
+        [ListDrawerSettings(
+            DraggableItems = true,
+            DefaultExpandedState = true,
+            ShowIndexLabels = false
+
+        )]
+        public List<GameObjectTreeItem> children = new List<GameObjectTreeItem>();
+
+        private MultiKeyDictionary<string, GameObject> runtimeDict;
+        private bool isBuilt = false;
+
+
+        #region 运行时 API（需先 Build）
+
+        /// <summary> 构建运行时字典（在 Awake 或手动调用）</summary>
+        public void Build()
+        {
+            runtimeDict = new MultiKeyDictionary<string, GameObject>();
+            foreach (var item in children)
+                item?.BuildDictionary(runtimeDict, "");
+            isBuilt = true;
+        }
+
+        /// <summary> 检查是否已构建 </summary>
+        public bool IsBuilt => isBuilt;
+
+        /// <summary> 通过路径获取 GameObject（运行时）</summary>
+        public GameObject GetGameObject(string path)
+        {
+            if (!isBuilt) Build();
+            return runtimeDict.TryGetValue(path, out var go) ? go : null;
+        }
+
+        /// <summary> 尝试获取（运行时）</summary>
+        public bool TryGetGameObject(string path, out GameObject go)
+        {
+            if (!isBuilt) Build();
+            return runtimeDict.TryGetValue(path, out go);
+        }
+
+        /// <summary> 判断路径是否存在（运行时）</summary>
+        public bool ContainsKey(string path)
+        {
+            if (!isBuilt) Build();
+            return runtimeDict.ContainsKey(path);
+        }
+
+        /// <summary> 通过 GameObject 获取所有路径（运行时）</summary>
+        public string[] GetPathsByGameObject(GameObject go)
+        {
+            if (!isBuilt) Build();
+            return runtimeDict.GetKeysByValue(go);
+        }
+
+        /// <summary> 获取第一个路径（运行时）</summary>
+        public string GetFirstPathByGameObject(GameObject go)
+        {
+            if (!isBuilt) Build();
+            return runtimeDict.GetFirstKeyByValue(go);
+        }
+
+        /// <summary> 获取所有路径（运行时）</summary>
+        public IEnumerable<string> GetAllPaths()
+        {
+            if (!isBuilt) Build();
+            return runtimeDict.Keys;
+        }
+        /// <summary> 重新构建（当树结构发生动态变化后调用）</summary>
+        public void Rebuild()
+        {
+            runtimeDict = null;
+            isBuilt = false;
+            Build();
+
+        }
+
+        #endregion
+
+        #region 编辑器 API（实时查询，无需 Build，适合编辑器工具）
+
+        /// <summary> 实时通过路径查找（遍历树结构，低性能）</summary>
+        public GameObject GetGameObjectEditor(string path)
+        {
+            return FindGameObjectInTree(children, path);
+        }
+
+        /// <summary> 实时获取所有路径（遍历）</summary>
+        public List<string> GetAllPathsEditor()
+        {
+            var paths = new List<string>();
+            CollectPaths(children, "", paths);
+            return paths;
+        }
+
+        /// <summary> 实时通过 GameObject 获取所有路径（遍历）</summary>
+        public List<string> GetPathsByGameObjectEditor(GameObject go)
+        {
+            var result = new List<string>();
+            FindPathsByGameObject(children, "", go, result);
+            return result;
+        }
+
+        #endregion
+
+        #region 内部辅助方法（编辑器实时查找）
+
+        private GameObject FindGameObjectInTree(List<GameObjectTreeItem> items, string targetPath)
+        {
+            foreach (var item in items)
+            {
+                if (item is GameObjectGroup group)
+                {
+                    string groupPath = group.itemName;
+                    if (targetPath.StartsWith(groupPath))
+                    {
+                        string remaining = targetPath.Substring(groupPath.Length);
+                        if (remaining.StartsWith("/")) remaining = remaining.Substring(1);
+                        if (string.IsNullOrEmpty(remaining))
+                            return null; // 路径刚好是分组名，没有对象
+                        return FindGameObjectInTree(group.children, remaining);
+                    }
+                }
+                else if (item is GameObjectLeaf leaf)
+                {
+                    string leafPath = leaf.itemName;
+                    if (leafPath == targetPath)
+                        return leaf.gameObject;
+                }
+            }
+            return null;
+        }
+
+        private void CollectPaths(List<GameObjectTreeItem> items, string currentPath, List<string> outPaths)
+        {
+            foreach (var item in items)
+            {
+                string myPath = string.IsNullOrEmpty(currentPath) ? item.itemName : $"{currentPath}/{item.itemName}";
+                if (item is GameObjectLeaf leaf)
+                {
+                    outPaths.Add(myPath);
+                }
+                else if (item is GameObjectGroup group)
+                {
+                    CollectPaths(group.children, myPath, outPaths);
+                }
+            }
+        }
+
+        private void FindPathsByGameObject(List<GameObjectTreeItem> items, string currentPath, GameObject target, List<string> outPaths)
+        {
+            foreach (var item in items)
+            {
+                string myPath = string.IsNullOrEmpty(currentPath) ? item.itemName : $"{currentPath}/{item.itemName}";
+                if (item is GameObjectLeaf leaf && leaf.gameObject == target)
+                {
+                    outPaths.Add(myPath);
+                }
+                else if (item is GameObjectGroup group)
+                {
+                    FindPathsByGameObject(group.children, myPath, target, outPaths);
+                }
+            }
+        }
+
+        #endregion
+
+        #region Unity 生命周期
+
+        private void Awake()
+        {
+            Build();
+        }
+
+        #endregion
+
+
+
+        #region 分组
+        [Serializable]
+        public abstract class GameObjectTreeItem
+        {
+            [LabelText("key名称")]
+            public string itemName = "新节点";
+
+            // 修改为 MultiKeyDictionary
+            public abstract void BuildDictionary(MultiKeyDictionary<string, GameObject> dict, string currentPath);
+            protected GameObjectTreeItem()
+            {
+                // 生成随机短后缀（8位）
+                string suffix = Guid.NewGuid().ToString("N").Substring(0, 4);
+                itemName = $"新节点_{suffix}";
+            }
+        }
+
+        [Serializable, TypeRegistryItem("分组")]
+        public class GameObjectGroup : GameObjectTreeItem
+        {
+            [LabelText("子节点")]
+            [SerializeReference]
+            public List<GameObjectTreeItem> children = new List<GameObjectTreeItem>();
+            protected GameObjectGroup()
+            {
+                // 生成随机短后缀（8位）
+                string suffix = Guid.NewGuid().ToString("N").Substring(0, 4);
+                itemName = $"新组_{suffix}";
+            }
+            public override void BuildDictionary(MultiKeyDictionary<string, GameObject> dict, string currentPath)
+            {
+                string myPath = string.IsNullOrEmpty(currentPath) ? itemName : $"{currentPath}/{itemName}";
+                foreach (var child in children)
+                {
+                    child.BuildDictionary(dict, myPath);
+                }
+            }
+            /// <summary>
+            /// 尝试添加 GameObject 引用作为新的叶子节点
+            /// </summary>
+            /// <param name="go">目标 GameObject</param>
+            /// <param name="key">指定键名（为空则使用 go.name）</param>
+            /// <param name="preventDuplicateName">是否防止重名：true 时若已存在同名叶子则跳过；false 时自动添加 _N 后缀</param>
+            /// <param name="skipDuplicateObject">是否跳过重复对象：true 时若同一 GameObject 已存在任何叶子则跳过</param>
+            /// <returns>添加成功返回 true，否则 false</returns>
+            public bool TryAddGameObject(GameObject go, string key = null,
+      bool preventDuplicateName = false, bool skipDuplicateObject = false)
+            {
+                if (go == null) return false;
+
+                string baseName = string.IsNullOrEmpty(key) ? go.name : key;
+
+                // 检查重复对象（如果需要）
+                if (skipDuplicateObject)
+                {
+                    for (int i = 0; i < children.Count; i++)
+                    {
+                        if (children[i] is GameObjectLeaf leaf && leaf.gameObject == go)
+                        {
+                            Debug.LogWarning($"尝试添加重复的 GameObject: {go.name}，已跳过。");
+                            return false;
+                        }
+                    }
+                }
+
+                // 防止重名模式
+                if (preventDuplicateName)
+                {
+                    for (int i = 0; i < children.Count; i++)
+                    {
+                        if (children[i] is GameObjectLeaf leaf && leaf.itemName == baseName)
+                        {
+                            Debug.LogWarning($"尝试添加重复的叶子节点名称: {baseName}，已跳过。");
+                            return false;
+                        }
+                    }
+                    children.Add(new GameObjectLeaf { itemName = baseName, gameObject = go });
+                    return true;
+                }
+                else
+                {
+                    // 允许重名，自动添加 _N 后缀
+                    string finalName = baseName;
+                    int counter = 1;
+                    while (true)
+                    {
+                        bool exists = false;
+                        for (int i = 0; i < children.Count; i++)
+                        {
+                            if (children[i] is GameObjectLeaf leaf && leaf.itemName == finalName)
+                            {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        if (!exists) break;
+                        finalName = $"{baseName}_{counter++}";
+                    }
+                    children.Add(new GameObjectLeaf { itemName = finalName, gameObject = go });
+                    return true;
+                }
+            }
+        }
+
+        [Serializable, TypeRegistryItem("GameObject引用")]
+        public class GameObjectLeaf : GameObjectTreeItem
+        {
+            [LabelText("目标对象")]
+            public GameObject gameObject;
+            public GameObjectLeaf()
+            {
+                // 生成随机短后缀（8位）
+                string suffix = Guid.NewGuid().ToString("N").Substring(0, 4);
+                itemName = $"新对象_{suffix}";
+            }
+            public override void BuildDictionary(MultiKeyDictionary<string, GameObject> dict, string currentPath)
+            {
+                string fullPath = string.IsNullOrEmpty(currentPath) ? itemName : $"{currentPath}/{itemName}";
+                // 直接添加，MultiKeyDictionary 会自动处理重复键（覆盖旧键）
+                dict.Add(fullPath, gameObject);
+                // 如果需要警告，可自行添加逻辑
+            }
+        }
+        #endregion
+
+
+    }
+}

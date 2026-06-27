@@ -99,3 +99,5 @@ MonoBehaviour:
     ExcludeFolders: []
     IsEnabled: 1
     IncludeDependencies_: 0
+  audioPlayer: {fileID: 6562891526412292501, guid: aa000403673e85a42a63700344521f6d,
+    type: 3}

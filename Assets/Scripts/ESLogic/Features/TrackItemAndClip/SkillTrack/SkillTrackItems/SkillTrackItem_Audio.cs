@@ -15,5 +15,10 @@ namespace ES
     {
         [LabelText("音频剪辑")]
         public AudioClip audioClip;
+
+        public override IEditorTimeSampler CreateSampler(ITrackSequence sequence, ITrackItem track)
+        {
+            return new AudioSampler(audioClip,startTime);
+        }
     }
 }

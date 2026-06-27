@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.UIElements;
@@ -45,7 +46,7 @@ namespace ES
             style.minHeight = 30;
             style.maxHeight = 30;
             style.backgroundColor = new Color(0.4f, 0.7f, 1f, 0.8f);
-            style.position= Position.Absolute;
+            style.position = Position.Absolute;
             // style.borderLeftWidth = 2;
             // style.borderRightWidth = 2;
             // style.borderTopWidth = 2;
@@ -108,6 +109,8 @@ namespace ES
 
 
             BindDragEvent();
+
+
         }
 
         private bool isDragging = false;
@@ -140,6 +143,17 @@ namespace ES
             popLabel.style.textOverflow = TextOverflow.Ellipsis;
             popLabel.style.color = Color.white;
             popLabel.style.fontSize = 12;
+
+            // 基础边框（半透明白色，像素宽度 1）
+            style.borderLeftWidth = 3;
+            style.borderRightWidth = 2;
+            style.borderTopWidth = 1;
+            style.borderBottomWidth = 1;
+            style.borderLeftColor = new Color(0, 0, 0, 0.5f);
+            style.borderRightColor = new Color(1, 1, 1, 0.5f);
+            style.borderTopColor = new Color(1, 1, 1, 0.5f);
+            style.borderBottomColor = new Color(1, 1, 1, 0.5f);
+
             this.Add(popup);
 
             this.RegisterCallback<PointerDownEvent>(OnPointerDown);
@@ -155,6 +169,7 @@ namespace ES
         }
         private void OnPointerDown(PointerDownEvent evt)
         {
+            this.BringToFront();
             if (evt.button != 1) // 左键
             {
                 lastHandleTime = Time.realtimeSinceStartup;
@@ -190,7 +205,7 @@ namespace ES
 
         private void OnPointerUp(PointerUpEvent evt)
         {
-            if (Time.realtimeSinceStartup - lastHandleTime < 0.125f)
+            if (Time.realtimeSinceStartup - lastHandleTime < 0.15f)
             {
                 //点击操作
                 ESTrackViewWindowHelper.EditClip(this);
@@ -265,19 +280,16 @@ namespace ES
         {
             var w = Duration * Cache_pixelsPerSecond;
             float nowLEFT = this.style.left.value.value;
-            Debug.Log( "WW" + this.style.left + " LL" + nowLEFT + " START " + Cahce_ShowStart);
             var newStartTime = Cahce_ShowStart;
             if (nowLEFT != 0)
             {
-                Debug.Log(Cache_pixelsPerSecond+ "" + Cahce_ShowStart);
                 newStartTime = nowLEFT / Cache_pixelsPerSecond + Cahce_ShowStart;
 
             }
-            // Debug.Log("WW"+w+" LL"+left+" START "+ShowStart);
             style.width = w;
             StartTime = newStartTime;
-
-            popLabel.text = $"[{StartTime:F4}s -- {StartTime + Duration:F4}]";
+            AdjustFontToFit();
+            popLabel.text = $"[{StartTime:F2}s -- {StartTime + Duration:F2}]";
 
         }
 
@@ -311,17 +323,125 @@ namespace ES
             style.borderTopColor = color * 1.2f;
             style.borderBottomColor = color * 0.5f;
         }
-
+        private Color originalBgColor;
+        private bool hasSetORI=false;
         public void HighlightIfActive(float currentTime)
         {
             if (currentTime >= StartTime && currentTime <= StartTime + Duration)
             {
-                AddToClassList("active-node");
+                style.borderTopColor = Color.yellow;
+                style.borderTopWidth = 2;
+                style.borderBottomColor = Color.yellow;
+                style.borderBottomWidth = 2;
+                if(!hasSetORI)
+                originalBgColor = style.backgroundColor.value;
+                hasSetORI=true;
+
+                // 设置为醒目的高亮色（例如亮橙色半透明）
+                style.backgroundColor = new Color(1f, 0.5f, 0f, 0.6f);
             }
             else
             {
-                RemoveFromClassList("active-node");
+                if(hasSetORI){
+                style.backgroundColor = originalBgColor;
+                }
+
+                // 恢复原来的样式（需要你记录一下原来的颜色，或设为默认）
+                style.borderTopWidth = 0;
+                style.borderBottomWidth = 0;
             }
         }
+
+        public void UpdateNodeView()
+        {
+            m_ClipNameLabel.text = ClipName;
+            AdjustFontToFit();
+        }
+
+        void AdjustFontToFit() // 注意：这里应直接传入你算好的 w 和 h
+        {
+
+            float maxW = style.width.value.value * 0.6f;
+            float maxH = Mathf.Clamp(m_ClipNameLabel.contentRect.height * 1.5f, 20, 80);
+            string text = m_ClipNameLabel.text;
+
+            // ❶ 输出函数入口全部已知条件
+            //   Debug.Log($"[AdjustFontToFit] 开始 | 文本: '{text}' | 分配容器尺寸: {maxW} x {maxH}");
+
+            if (string.IsNullOrEmpty(text) || maxW <= 0 || maxH <= 0)
+            {
+                Debug.LogWarning("[AdjustFontToFit] 提前退出：文本为空或容器尺寸无效");
+                return;
+            }
+
+            // ❷ 输出你设定的搜索范围边界
+            float maxPossibleSize = Mathf.Min(100f, maxW * 0.8f, maxH * 0.8f);
+            float minSize = 4f;
+            //Debug.Log($"[搜索范围] 最大尝试字号: {maxPossibleSize}, 最小: {minSize}, 步长: 0.5");
+
+            float bestSize = minSize;
+            float lastTestedSize = -1;
+            bool found = false;
+
+            for (float size = maxPossibleSize; size >= minSize; size -= 0.5f)
+            {
+                m_ClipNameLabel.style.fontSize = size;
+                Vector2 textSize = m_ClipNameLabel.MeasureTextSize(
+                    text,
+                    float.MaxValue,
+                    VisualElement.MeasureMode.Undefined,
+                    float.MaxValue,
+                    VisualElement.MeasureMode.Undefined
+                );
+
+                // ❸ 每个测试的字号和测量结果都打印（如果怕刷屏，可以只记录最后一个没通过和第一个通过的）
+                // 这里全打出来方便你排查，以后可注释掉
+                // Debug.Log($"[尝试字号] {size:F1} | 测量尺寸: {textSize.x:F1} x {textSize.y:F1} | 容器: {maxW} x {maxH}");
+
+                if (textSize.x <= maxW && textSize.y <= maxH)
+                {
+                    bestSize = size;
+                    found = true;
+                    //  Debug.Log($"[✓ 通过] 字号 {bestSize:F1} 可放入容器");
+                    break;
+                }
+
+                if (size < maxPossibleSize && !found)
+                {
+                    lastTestedSize = size;
+                }
+            }
+
+            if (!found)
+            {
+                //  Debug.LogWarning($"[未找到] 最小字号 {minSize} 仍放不下，强制使用最小字号");
+            }
+
+            // ❹ 输出循环结果
+            //            Debug.Log($"[循环结果] 找到的最佳字号: {bestSize:F1}");
+
+            // ❺ 尝试微调并输出
+            float fineTune = bestSize + 0.3f;
+            m_ClipNameLabel.style.fontSize = fineTune;
+            Vector2 fineSize = m_ClipNameLabel.MeasureTextSize(
+                text, float.MaxValue, VisualElement.MeasureMode.Undefined,
+                float.MaxValue, VisualElement.MeasureMode.Undefined);
+            // Debug.Log($"[微调尝试] 字号 {fineTune:F1} | 测量尺寸: {fineSize.x:F1} x {fineSize.y:F1} | 容器: {maxW} x {maxH}");
+
+            if (fineSize.x <= maxW && fineSize.y <= maxH)
+            {
+                bestSize = fineTune;
+                //  Debug.Log($"[微调通过] 最终字号: {bestSize:F1}");
+            }
+            else
+            {
+                //  Debug.Log($"[微调未通过] 保持字号: {bestSize:F1}");
+            }
+
+            // 最终设置
+            m_ClipNameLabel.style.fontSize = bestSize;
+            //  Debug.Log($"[AdjustFontToFit] 完成 | 最终设置字号: {bestSize:F1}\n");
+        }
+
     }
 }

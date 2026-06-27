@@ -434,7 +434,7 @@ namespace ES
                 //复制
                 if (keyDown.keyCode == KeyCode.C)
                 {
-                    ESEditorHandle.AddSimpleHanldeTask(() =>
+                    ESEditorHandle.AddSimpleHandleTask(() =>
                     {
                         DoAction_NodePaste();
                     }, 10, "NodePaste");
@@ -444,7 +444,7 @@ namespace ES
             }
             if (keyDown.keyCode == KeyCode.Delete)
             {
-                ESEditorHandle.AddSimpleHanldeTask(() =>
+                ESEditorHandle.AddSimpleHandleTask(() =>
                 {
                     DoAction_NodeDelete();
                 }, 10, "NodeDelete");
@@ -459,7 +459,7 @@ namespace ES
                 //限制一下0.2s执行一次  不然短时间会多次执行
                 if (commandEvent.commandName.Equals("Paste"))
                 {
-                    ESEditorHandle.AddSimpleHanldeTask(() =>
+                    ESEditorHandle.AddSimpleHandleTask(() =>
                     {
                         DoAction_NodePaste();
                     }, 10, "NodePaste");

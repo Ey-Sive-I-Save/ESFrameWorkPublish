@@ -2706,7 +2706,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 887
 --- !u!114 &851290614
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7158,6 +7158,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 2081736451}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: a166f20cb1bba8b4780ce3e897fcc411,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2081736452}
   m_SourcePrefab: {fileID: 100100000, guid: a166f20cb1bba8b4780ce3e897fcc411, type: 3}
 --- !u!1 &2081736437 stripped
 GameObject:
@@ -9350,6 +9354,67 @@ MonoBehaviour:
       rotationOffset: {x: 0, y: 0, z: 0}
       rotation: {x: -0, y: 0, z: 0}
       rotationWeight: 0
+--- !u!114 &2081736452
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2081736437}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 520773bf554895c458a9963560d17c9f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  children:
+  - rid: 8409196899027910664
+  - rid: 8409196899027910665
+  references:
+    version: 2
+    RefIds:
+    - rid: 8409196899027910664
+      type: {class: GameObjectRefer/GameObjectLeaf, ns: ES, asm: ES_Logic}
+      data:
+        itemName: "\u65B0\u8282\u70B9"
+        gameObject: {fileID: 0}
+    - rid: 8409196899027910665
+      type: {class: GameObjectRefer/GameObjectGroup, ns: ES, asm: ES_Logic}
+      data:
+        itemName: "\u7EC4"
+        children:
+        - rid: 8409196899027910666
+        - rid: 8409196899027910667
+        - rid: 8409196899027910668
+        - rid: 8409196899027910669
+    - rid: 8409196899027910666
+      type: {class: GameObjectRefer/GameObjectLeaf, ns: ES, asm: ES_Logic}
+      data:
+        itemName: "\u6D4B\u8BD51"
+        gameObject: {fileID: 2081736437}
+    - rid: 8409196899027910667
+      type: {class: GameObjectRefer/GameObjectLeaf, ns: ES, asm: ES_Logic}
+      data:
+        itemName: "\u6D4B\u8BD52"
+        gameObject: {fileID: 0}
+    - rid: 8409196899027910668
+      type: {class: GameObjectRefer/GameObjectLeaf, ns: ES, asm: ES_Logic}
+      data:
+        itemName: Canvas
+        gameObject: {fileID: 851290612}
+    - rid: 8409196899027910669
+      type: {class: GameObjectRefer/GameObjectLeaf, ns: ES, asm: ES_Logic}
+      data:
+        itemName: "\u8F66"
+        gameObject: {fileID: 992245608}
 --- !u!4 &2082297912 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3921343858316364178, guid: a166f20cb1bba8b4780ce3e897fcc411,

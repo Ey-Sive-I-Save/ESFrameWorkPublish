@@ -6,6 +6,7 @@ namespace ES
 {
   public interface ITrackSequence
   {
+    public string Name { get; }
     public IEnumerable<ITrackItem> Tracks { get; }
     public bool TryAddTrackItem(ITrackItem item);
     public bool TryRemoveTrackItem(ITrackItem item);
@@ -21,13 +22,15 @@ namespace ES
 
     public IEnumerable<ITrackItem> Tracks => tracks_;
 
-    public bool TryAddTrackItem(ITrackItem item)
+        public abstract string Name { get; }
+
+        public bool TryAddTrackItem(ITrackItem item)
     {
       if (item is ItemType tItem)
       {
         if (!tracks_.Contains(tItem))
         {
-          Debug.Log("添加轨道项："+item.GetType()+item.DisplayName);
+          Debug.Log("添加轨道项：" + item.GetType() + item.DisplayName);
           tracks_.Add(tItem);
           return true;
         }

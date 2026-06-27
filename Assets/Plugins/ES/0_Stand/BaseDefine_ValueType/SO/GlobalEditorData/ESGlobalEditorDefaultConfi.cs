@@ -183,6 +183,37 @@ namespace ES
 
     #endregion
 
+    #region 工具支持配置
+    [TabGroup("工具支持")]
+    public AudioSource audioPlayer;
+    private static AudioSource _previewSource;
+    [Button("测试播放")]
+    public static void Play(AudioClip clip)
+    {
+      if (clip == null)
+      {
+        Debug.LogWarning("EditorAudio.Play: clip is null");
+        return;
+      }
+
+      // 如果还没有创建，就建一个
+      if (_previewSource == null)
+      {
+        var go = new GameObject("EditorAudioPreview");
+        go.hideFlags = HideFlags.HideAndDontSave;
+
+        _previewSource = go.AddComponent<AudioSource>();
+        _previewSource.playOnAwake = false;
+      }
+
+      _previewSource.Stop();
+      _previewSource.clip = clip;
+      _previewSource.Play();
+    }
+
+    #endregion
+
+
     #region 方法
 
     public void Exclude()

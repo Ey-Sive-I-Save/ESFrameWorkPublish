@@ -123,11 +123,9 @@ Assets/Plugins/ES/Editor/
   ESTrackRuler.cs
   ESTrackTimerToolbar.cs
   ESTrackViewWindow.cs
-  tempCodeRunnerFile.cs
   TrackElements/
    ESEditorTrackClip.cs
    ESEditorTrackItem.cs
-   tempCodeRunnerFile.cs
  ESTreeCollector/ESTree_Center/
   ESTreeCollector.cs
   ESTreeMenuBuilder.cs

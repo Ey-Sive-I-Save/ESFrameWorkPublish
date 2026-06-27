@@ -92,6 +92,13 @@ namespace ES
                     return string.IsNullOrEmpty(group) ? myName : (group + "/" + myName);
                 }
 
+                var createTrack = t.GetCustomAttribute<CreateTrackItemAttribute>();
+                if (createTrack != null)
+                {
+                    var trackName=createTrack.menuName;
+                    return trackName;
+                }
+
                 return t.Name;
             });
         }

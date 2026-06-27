@@ -15,5 +15,13 @@ namespace ES
     {
         [LabelText("动画剪辑")]
         public AnimationClip AnimationClipName;
+
+        public override IEditorTimeSampler CreateSampler(ITrackSequence sequence, ITrackItem track)
+        {
+            return new AnimationSampler(null,AnimationClipName,startTime);
+        }
+
+        
+       
     }
 }

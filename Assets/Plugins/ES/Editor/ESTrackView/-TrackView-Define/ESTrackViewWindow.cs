@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using DG.Tweening;
 using ES;
+using ES.ES;
 using Sirenix.OdinInspector.Editor;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Cursor = UnityEngine.UIElements.Cursor;
 
 // 抑制私有字段未使用警告
 #pragma warning disable CS0414
@@ -18,6 +20,11 @@ public class ESTrackViewWindow : OdinEditorWindow
     public static ESTrackViewWindow window;
     public static ITrackSequence Sequence { get { if (TrackContainer != null) return TrackContainer.Sequence; return null; } }
     public static IEditorTrackSupport_GetSequence TrackContainer;
+
+    // 播放器实例
+    public static EditorTimelinePlayer Player => EditorTimelinePlayer.Instance;
+
+
 
     [SerializeField]
     private VisualTreeAsset m_VisualTreeAsset = default;
@@ -43,6 +50,27 @@ public class ESTrackViewWindow : OdinEditorWindow
         base.OnDestroy();
 
     }
+    protected override void OnEnable()
+    {
+        base.OnEnable();
+        s_CursorDefault = new Cursor
+        {
+            texture = EditorGUIUtility.Load("Cursors/d_Cursor_Arrow") as Texture2D,
+            hotspot = new Vector2(7, 7)
+        };
+
+        s_CursorPan = new Cursor
+        {
+            texture = EditorGUIUtility.Load("Cursors/d_Cursor_Pan") as Texture2D,
+            hotspot = new Vector2(12, 12)
+        };
+
+        s_CursorSelect = new Cursor
+        {
+            texture = EditorGUIUtility.Load("Cursors/d_Cursor_Cross") as Texture2D,
+            hotspot = new Vector2(7, 7)
+        };
+    }
     protected override void OnDisable()
     {
         base.OnDisable();
@@ -58,7 +86,7 @@ public class ESTrackViewWindow : OdinEditorWindow
     }
     protected override void Initialize()
     {
-        if (window == null) 
+        if (window == null)
         {
             window = this;
 
@@ -122,6 +150,14 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     public List<ESEditorTrackItem> Items = new List<ESEditorTrackItem>();
 
+    public ESTrackTimerToolbar toolbar;
+
+    private VisualElement timeCursor;
+    private bool isDraggingCursor = false;
+    private float dragOffsetX = 0; // 鼠标点击点相对于游标中心的偏移(视情况可省略)
+
+    private float cursorTime = 0f; // 当前游标所在的时间（秒）
+
 
     #endregion
 
@@ -160,6 +196,8 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     #endregion
 
+
+    #region 初始化核心
     [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【轨道】编辑器", false, 2)]
     public static void OpenWindow()
     {
@@ -169,6 +207,11 @@ public class ESTrackViewWindow : OdinEditorWindow
     public static void InitNewSequenceAndOpenWindow()
     {
         OpenWindow();
+        //简单更新
+        if (window.toolbar != null)
+        {
+            window.toolbar.Name.text = "轴：" + TrackContainer.trackName;
+        }
         //开始重建
         var elements = ESTrackViewWindow.window.leftPanel.Children().ToList();
 
@@ -190,13 +233,30 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         if (Sequence != null)
         {
+            if (Sequence != null)
+            {
+                var seqPlayer = window.BuildSequencePlayer(Sequence);
+                EditorTimelinePlayer.Instance.ActiveSequence = seqPlayer;  // ★ 关键
+            }
             foreach (var t in Sequence.Tracks)
             {
                 var item = new ESEditorTrackItem().InitWithItem(t);
                 ESTrackViewWindow.window.leftPanel.Add(item);
                 ESTrackViewWindow.window.Items.Add(item);
             }
+
+            ESEditorHandle.AddSimpleHandleTask(() =>
+            {
+                foreach (var it in ESTrackViewWindow.window.Items)
+                {
+                    it.UpdateNodes();
+                }
+
+
+            });
         }
+
+
 
 
 
@@ -231,13 +291,17 @@ public class ESTrackViewWindow : OdinEditorWindow
                       HandleStartEndScale(startScale, endScale);
                       ApplyStartEndToUISlider(startScale, endScale);
                   }).StartingIn(100);
-
+        CreateTimeCursor();
+        window.timeCursor.BringToFront();
 
     }
 
+
     private void FindTrackAssets()
     {
-        if (Sequence != null) InitNewSequenceAndOpenWindow();
+        if (Selection.activeObject is IEditorTrackSupport_GetSequence support &&
+        support.Sequence != null) { InitNewSequenceAndOpenWindow(); return; }
+
         var allAssets = ESDesignUtility.SafeEditor.FindAllSOAssets<IEditorTrackSupport_GetSequence>();
         if (allAssets.Count > 0)
         {
@@ -266,6 +330,9 @@ public class ESTrackViewWindow : OdinEditorWindow
         {
             InitNewSequenceAndOpenWindow();
         }
+
+        if (window.timeCursor != null) window.timeCursor.BringToFront();
+
     }
     private void BindButtonsHandles()
     {
@@ -294,6 +361,8 @@ public class ESTrackViewWindow : OdinEditorWindow
         m_SelectionVisual = rootVisualElement.Query("SeletionContent");
 
         CreatorToolBar = rootVisualElement.Query<ESTrackCreatorToolbar>();
+
+        toolbar = rootVisualElement.Query<ESTrackTimerToolbar>();
     }
 
     private void BindNormalHandles()
@@ -318,6 +387,182 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     }
 
+    private void CreateTimeCursor()
+    {
+        timeCursor = new VisualElement
+        {
+            name = "time-cursor",
+            style =
+        {
+            position = Position.Absolute,
+            width = 6,                // 加宽便于拖动，视觉可用 border 控制
+            backgroundColor = Color.red,
+            top = 0,
+            bottom = 0,
+            // 设置光标样式
+            cursor = new Cursor { texture = EditorGUIUtility.IconContent("d_GridLayout").image as Texture2D, hotspot = Vector2.zero }
+        }
+        };
+
+        // 视觉上仍显示一条细线
+        var innerLine = new VisualElement
+        {
+            style =
+        {
+            width = 2,
+            backgroundColor = Color.red,
+            position = Position.Absolute,
+            // 水平居中
+            left = 2,
+            top = 0,
+            bottom = 0
+        }
+        };
+        timeCursor.Add(innerLine);
+
+        leftPanel.Add(timeCursor);
+        timeCursor.BringToFront();
+
+        // 直接绑定鼠标事件
+        timeCursor.RegisterCallback<MouseDownEvent>(OnTimeCursorMouseDown);
+        timeCursor.RegisterCallback<MouseMoveEvent>(OnTimeCursorMouseMove);
+        timeCursor.RegisterCallback<MouseUpEvent>(OnTimeCursorMouseUp);
+
+
+    }
+    #endregion
+
+    #region  播放支持
+    /// <summary> 根据一个序列数据，创建并填充采样器的播放器 </summary>
+    private EditorSequencePlayer BuildSequencePlayer(ITrackSequence sequence)
+    {
+        var seqPlayer = new EditorSequencePlayer
+        {
+            Name = "名字-未定义",
+            Duration = 100,
+            Speed = 1f
+        };
+
+        foreach (var track in sequence.Tracks)
+        {
+            var trackSamplers = track.CreateSamplers(sequence);
+            foreach (var sampler in trackSamplers)
+            {
+                seqPlayer.RegisterSampler(sampler);
+            }
+        }
+
+        // 绑定 UI 更新事件
+        seqPlayer.OnTimeUpdated += OnSequenceTimeUpdated;
+
+        return seqPlayer;
+    }
+    private void OnSequenceTimeUpdated(float time)
+    {
+        // 1. 更新工具栏上的时间文本
+        // 假设你有一个方法能拿到工具栏引用，例如：
+        window.toolbar.UpdateTime(time);
+
+        cursorTime = time;
+        // 2. 移动时间游标（如果你有实现的话）
+        MoveTimeCursor(time);
+
+        // 3. 高亮当前播放片段
+        HighlightActiveClips(time);
+
+        // 如果上述功能还没建好，直接打日志或留空即可
+        // Debug.Log("当前时间: " + time);
+    }
+    private void MoveTimeCursor(float currentTime)
+    {
+        if (timeCursor == null) return;
+
+        // 当前显示区域的起始时间
+        float startShow = StartShow;   // 或者 window.StartShow
+                                       // 当前每像素秒数
+        float pixelsPerSec = pixelPerSecond;
+
+        // 计算游标在 rightPanel 内的 x 位置
+        // 注意：剪辑块起始偏移为 LeftTrackPixel，因此游标也需要加上这个偏移
+        float xPos = ESTrackViewWindow.LeftTrackPixel + (currentTime - startShow) * pixelsPerSec;
+
+        timeCursor.style.left = xPos;
+
+        toolbar.UpdateTime(currentTime);
+
+
+    }
+
+    private void HighlightActiveClips(float currentTime)
+    {
+        if (window == null) return;
+        foreach (var item in window.Items)
+        {
+
+            item.SetCurrentTime(currentTime);
+        }
+    }
+
+    #region 游标
+
+    // 强制结束拖动的方法
+
+
+    private void OnTimeCursorMouseDown(MouseDownEvent evt)
+    {
+        // 仅左键
+        if (evt.button != 0) return;
+        // 防止事件来源不是游标自身（虽然通常是）
+        if (evt.target != timeCursor && !timeCursor.Contains(evt.target as VisualElement)) return;
+
+        isDraggingCursor = true;
+        timeCursor.CaptureMouse();                     // 鼠标事件全归游标
+        EditorTimelinePlayer.Instance.ActiveSequence?.Pause();
+        evt.StopPropagation();
+    }
+
+    private void OnTimeCursorMouseMove(MouseMoveEvent evt)
+    {
+        if (!isDraggingCursor) return;
+
+        // 自愈检查：如果左键没按了，强制结束拖动
+        if ((evt.pressedButtons & 1) == 0)
+        {
+            ForceEndCursorDrag();
+            return;
+        }
+
+        // 计算新时间
+        Vector2 localPos = rightPanel.WorldToLocal(evt.mousePosition);
+        float mouseX = localPos.x;
+        float startShow = StartShow;
+        float pixelsPerSec = pixelPerSecond;
+        float newTime = startShow + (mouseX) / pixelsPerSec;
+        float totalDuration = EditorTimelinePlayer.Instance.ActiveSequence?.Duration ?? 10f;
+        newTime = Mathf.Clamp(newTime, 0f, totalDuration);
+        cursorTime = newTime;  // 记录
+        EditorTimelinePlayer.Instance.SetTime(newTime);
+        MoveTimeCursor(newTime);
+    }
+
+    private void OnTimeCursorMouseUp(MouseUpEvent evt)
+    {
+        if (!isDraggingCursor || evt.button != 0) return;
+        ForceEndCursorDrag();
+        evt.StopPropagation();
+    }
+
+    private void ForceEndCursorDrag()
+    {
+        isDraggingCursor = false;
+        timeCursor.ReleaseMouse();
+    }
+
+
+    #endregion
+    #endregion
+
+
     #region  水平缩放偏移
     void HorSliderChange(ChangeEvent<Vector2> change)
     { //HandleStartEndScale(0, 1);
@@ -328,10 +573,10 @@ public class ESTrackViewWindow : OdinEditorWindow
         startScale = Mathf.Clamp(start, 0, 0.9f);
         endScale = Mathf.Clamp(end, start, 1f);
         showScale = 1 / Mathf.Clamp(Mathf.Abs(startScale - endScale), 0.1f, 10);
-
         pixelPerSecond = standPixelPerSecond * showScale;
         //Debug.Log("更新V2");
         UpdateClipsSimple();
+        MoveTimeCursor(cursorTime);   // 保持时间点，位置自动适配
     }
 
     private void HandleVerStartEndScaleAndApply(float start, float end)
@@ -564,6 +809,8 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         UpdateCursor();
 
+        MoveTimeCursor(cursorTime);
+
         // Debug.Log("结束平移");
     }
     #endregion
@@ -639,14 +886,15 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         menu.AddSeparator("");
 
-        menu.AddItem(new GUIContent("【轨道】编辑轨道"), false, () =>
+        menu.AddItem(new GUIContent("【编辑】编辑轨道"), false, () =>
        {
            drawerSOForTrackItem.drawerData = trackItem.item;
            if (Last_EditorWindowForTrackItem != null)
            {
                Last_EditorWindowForTrackItem.Close();
            }
-           trackItem.UpdateNodeMatch();
+           trackItem.UpdateNodeMatchAndForeachUpdate();
+           trackItem.UpdateWhenEdit();
            Last_EditorWindowForTrackItem = InspectObject(drawerSOForTrackItem);
            // Debug.Log("开始编辑轨道" + trackItem.item.GetType() + trackItem.item.DisplayName);
            Last_EditorWindowForTrackItem.titleContent = new GUIContent("编辑轨道" + "<" + trackItem.item.DisplayName);
@@ -655,7 +903,8 @@ public class ESTrackViewWindow : OdinEditorWindow
            {
                drawerSOForTrackItem.drawerData = null;
                ESTrackViewWindowHelper.SaveContainerChanges();
-               trackItem.UpdateNodeMatch();
+               trackItem.UpdateNodeMatchAndForeachUpdate();
+               trackItem.UpdateWhenEdit();
            };
 
 
@@ -664,7 +913,7 @@ public class ESTrackViewWindow : OdinEditorWindow
        });
         menu.AddSeparator("");
 
-        menu.AddItem(new GUIContent("【轨道】删除轨道"), false, () =>
+        menu.AddItem(new GUIContent("【❌️删除】删除轨道"), false, () =>
         {
             if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("删除轨道" + trackItem.item.DisplayName, "确认删除该轨道吗？\n虽然记录了可撤销但是不能保证完整恢复", "删除", "取消"))
             {
@@ -789,21 +1038,39 @@ public class ESTrackViewWindow : OdinEditorWindow
     #endregion
     #region 辅助方法
 
+
+    private static Cursor s_CursorDefault;
+    private static Cursor s_CursorPan;
+    private static Cursor s_CursorSelect;
+    /// <summary>
+    /// 根据当前交互模式更新 TrackView 右侧面板的光标
+    /// </summary>
     private void UpdateCursor()
     {
-       // switch (m_CurrentMode)
+        // 防御性检查：防止在面板尚未初始化时访问
+        if (rightPanel == null)
+            return;
+
+        // 根据当前交互模式切换光标
+        switch (m_CurrentMode)
         {
-            // case InteractionMode.Panning:
-            //     rightPanel.style.cursor = LoadCursor("PanCursor");
-            //     break;
+            // 平移模式（拖拽画布 / 时间轴）
+            case InteractionMode.Panning:
+                // 使用 Unity Editor 内置的 Pan 光标（抓手）
+                rightPanel.style.cursor = s_CursorPan;
+                break;
 
-            // case InteractionMode.Selecting:
-            //     rightPanel.style.cursor = LoadCursor("SelectCursor");
-            //     break;
+            // 选择模式（框选 Clip / 区域）
+            case InteractionMode.Selecting:
+                // 使用 Unity Editor 内置的 Cross 光标（十字准星）
+                rightPanel.style.cursor = s_CursorSelect;
+                break;
 
-            // default:
-            //     rightPanel.style.cursor = Texture2D.whiteTexture;
-            //     break;
+            // 默认 / 空闲状态
+            default:
+                // 使用系统默认箭头光标
+                rightPanel.style.cursor = s_CursorDefault;
+                break;
         }
     }
 
@@ -920,7 +1187,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         var items = rootVisualElement.Query<ESEditorTrackItem>().ToList();
         foreach (var i in items)
         {
-            i.UpdateNodesPos();
+            i.UpdateNodes();
         }
     }
 }
@@ -940,6 +1207,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
     {
         if (Selection.activeObject is IEditorTrackSupport_GetSequence SupportSequence)
         {
+            Debug.Log("已经选中了技能序列" + Selection.activeObject.name);
             var se = SupportSequence.Sequence;
             if (se != null)
             {
@@ -1020,6 +1288,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
             ESTrackViewWindow.window.Last_EditorWindowForTrackClip.Close();
         }
         clip.SetTimeScaleAndStartShowCache();
+        clip.UpdateNodeView();
         ESTrackViewWindow.window.Last_EditorWindowForTrackClip = ESTrackViewWindow.InspectObject(ESTrackViewWindow.window.drawerSOForTrackClip);
         Debug.Log("开始编辑片段" + clip.trackClip.GetType() + clip.trackClip.DisplayName);
         ESTrackViewWindow.window.Last_EditorWindowForTrackClip.titleContent = new GUIContent("编辑片段<" + clip.trackClip.DisplayName);
@@ -1027,6 +1296,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
         ESTrackViewWindow.window.Last_EditorWindowForTrackClip.OnClose += () =>
         {
             clip.SetTimeScaleAndStartShowCache();
+            clip.UpdateNodeView();
             ESTrackViewWindow.window.drawerSOForTrackItem.drawerData = null;
             ESTrackViewWindowHelper.SaveContainerChanges();
         };

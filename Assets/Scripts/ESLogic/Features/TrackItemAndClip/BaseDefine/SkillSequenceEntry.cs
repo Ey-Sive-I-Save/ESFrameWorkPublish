@@ -1,11 +1,11 @@
-using ES;
+﻿using ES;
 using Sirenix.OdinInspector;
 using System;
-using System.Collections;
 using System.Collections.Generic;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
-
 
 namespace ES
 {
@@ -13,43 +13,32 @@ namespace ES
     {
         public ITrackSequence Sequence { get; }
         public TrackItemType trackItemType { get; }
-
         public string trackName { get; }
 
-        #region  编辑器支持
-        // 叶子节点：一个具体的菜单项
+        #region 编辑器支持
+
         public class MenuLeaf
         {
-            public string Name;                               // 显示在菜单第三级上的文字
-            public IEditorTrackSupport_GetSequence Target;    // 对应的对象
+            public string Name;
+            public IEditorTrackSupport_GetSequence Target;
         }
 
-        // 中间层：分组
         public class MenuGroup
         {
-            public string GroupName;                 // 分组名（菜单第二级）
+            public string GroupName;
             public List<MenuLeaf> Leaves = new List<MenuLeaf>();
         }
 
-        // 顶层：分类
         public class MenuCategory
         {
-            public string CategoryName;              // 分类名（菜单第一级）
+            public string CategoryName;
             public List<MenuGroup> Groups = new List<MenuGroup>();
         }
 
         private static List<MenuCategory> _menuCategories = new List<MenuCategory>();
 
-        /// <summary>
-        /// 直接添加一个菜单项，自动归入对应的分类/分组，无需事先遍历
-        /// </summary>
-        /// <param name="category">第一层：分类名</param>
-        /// <param name="group">第二层：分组名</param>
-        /// <param name="leafName">第三层：菜单项显示名</param>
-        /// <param name="item">绑定的对象</param>
         public static void AddMenuItem(string category, string group, string leafName, IEditorTrackSupport_GetSequence item)
         {
-            // 查找或创建分类
             MenuCategory cat = _menuCategories.Find(c => c.CategoryName == category);
             if (cat == null)
             {
@@ -57,7 +46,6 @@ namespace ES
                 _menuCategories.Add(cat);
             }
 
-            // 查找或创建分组
             MenuGroup grp = cat.Groups.Find(g => g.GroupName == group);
             if (grp == null)
             {
@@ -65,10 +53,8 @@ namespace ES
                 cat.Groups.Add(grp);
             }
 
-            // 添加叶子（允许同名，不覆盖）
             grp.Leaves.Add(new MenuLeaf { Name = leafName, Target = item });
         }
-
 
 #if UNITY_EDITOR
         public static void ShowDynamicMenu(Rect rect, GenericMenu.MenuFunction2 action)
@@ -94,18 +80,9 @@ namespace ES
         }
 #endif
 
-        private void OnItemSelected(object userData)
-        {
-            var selected = userData as IEditorTrackSupport_GetSequence;
-            if (selected != null)
-            {
-                Debug.Log($"选中: {selected}");
-                // 处理逻辑
-            }
-        }
-
         #endregion
     }
+
     [Serializable]
     public class SkillTrackSequence : TrackSequenceBase<ISkillTrackItem>
     {
@@ -125,25 +102,88 @@ namespace ES
 
     public interface ISkillTrackItem : ITrackItem
     {
-
     }
 
     [Serializable]
     public class SkillTrackItem<SkillTrackClipT> : TrackItemBase<SkillTrackClipT>, ISkillTrackItem where SkillTrackClipT : SkillTrackClip
     {
+        [FoldoutGroup("编辑器预览上下文")]
+        [LabelText("覆盖轨道目标")]
+        public bool overrideTrackPreviewTarget;
 
+        [FoldoutGroup("编辑器预览上下文")]
+        [ShowIf(nameof(overrideTrackPreviewTarget))]
+        [LabelText("轨道目标表达式")]
+        [SerializeReference]
+        public ESGetGameObjectExpression trackTargetExpression;
+
+#if UNITY_EDITOR
+        public override List<IEditorTimeSampler> CreateEditorSamplers(ITrackSequence sequence, object editorTarget)
+        {
+            var runtimeTarget = editorTarget as ESRuntimeTarget;
+            if (!overrideTrackPreviewTarget)
+                return base.CreateEditorSamplers(sequence, runtimeTarget);
+
+            ESRuntimeTarget target = ESRuntimeTarget.Pool.GetInPool();
+            target.SetEntity(runtimeTarget != null ? runtimeTarget.userEntity : null);
+
+            GameObject targetObject = trackTargetExpression != null
+                ? trackTargetExpression.Evaluate(runtimeTarget, null)
+                : null;
+
+            if (targetObject != null)
+                target.SetEntity(FindEntityInSelfOrParents(targetObject));
+
+            return CreateClipEditorSamplers(sequence, target, true);
+        }
+
+        private static Entity FindEntityInSelfOrParents(GameObject gameObject)
+        {
+            Transform current = gameObject != null ? gameObject.transform : null;
+            while (current != null)
+            {
+                Entity entity = current.GetComponent<Entity>();
+                if (entity != null)
+                    return entity;
+
+                current = current.parent;
+            }
+
+            return null;
+        }
+
+        private List<IEditorTimeSampler> CreateClipEditorSamplers(ITrackSequence sequence, ESRuntimeTarget editorTarget, bool ownsEditorTarget)
+        {
+            var list = new List<IEditorTimeSampler>
+            {
+                new TrackEditorSampler(this, editorTarget, ownsEditorTarget)
+            };
+
+            if (clips == null)
+                return list;
+
+            foreach (var clip in clips)
+            {
+                if (clip == null)
+                    continue;
+
+                var clipSampler = clip.CreateEditorSampler(sequence, this, editorTarget);
+                if (clipSampler != null)
+                    list.Add(new TrackClipEditorSampler(clip, clipSampler));
+            }
+
+            return list;
+        }
+#endif
     }
 
     [Serializable, ESCreatePath("轨道项", "技能标准轨道")]
     public class SkillTrackItemStand : SkillTrackItem<SkillTrackClip>
     {
-
     }
 
     [Serializable]
     public class SkillTrackClip : TrackClipBase
     {
-
     }
-
 }

@@ -22,14 +22,22 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   drawerData:
-    rid: 8409196899027910661
+    rid: 8409197517669138472
   references:
     version: 2
     RefIds:
-    - rid: 8409196899027910661
-      type: {class: SkillTrackClip_Audio, ns: ES, asm: ES_Logic}
+    - rid: 8409197517669138472
+      type: {class: SkillTrackClip_GameObject, ns: ES, asm: ES_Logic}
       data:
         name: "\u8F68\u9053\u7247\u6BB5"
-        startTime: 7.3994513
-        durationTime: 1
-        audioClip: {fileID: 8300000, guid: 88af74873f18b1945822fc3f7da6a386, type: 3}
+        startTime: 7.8073153
+        durationTime: 1.0000005
+        targetMode: 1
+        targetExpression:
+          rid: 8409197517669138473
+        Activate: 0
+    - rid: 8409197517669138473
+      type: {class: ESGetGameObjectExpression_RuntimeTargetGameObjectReferPath, ns: ES,
+        asm: ES_Logic}
+      data:
+        path: "\u65B0\u5BF9\u8C61_e68d"

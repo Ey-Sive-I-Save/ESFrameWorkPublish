@@ -73,7 +73,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void _TryStopOp(ESRuntimeTarget target, IOpSupporter logic)
         {
-            if(Enabled){
+            if(Enabled || MustTriggerStop){
                 StopOperation(target, logic);
             }
         }

@@ -101,12 +101,20 @@ namespace ES
             _matchTargetLastApplyTime = -999f;
 
             DestroyPlayable();
+            OnStateResetAsPoolableLogic();
+        }
+
+        /// <summary>
+        /// 派生状态的池化清理扩展点。不要在这里访问 host 或 Playable，它们已经被基类清理。
+        /// </summary>
+        protected virtual void OnStateResetAsPoolableLogic()
+        {
         }
 
         /// <summary>
         /// 尝试回收到对象池
         /// </summary>
-        public void TryAutoPushedToPool()
+        public virtual void TryAutoPushedToPool()
         {
             if (!IsRecycled)
             {

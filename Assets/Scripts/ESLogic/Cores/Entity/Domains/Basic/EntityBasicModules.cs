@@ -3148,4 +3148,101 @@ namespace ES
         };
     }
 
+    [Serializable, TypeRegistryItem("基础简易技能测试模块")]
+    public class EntityBasicSimpleSkillTestModule : EntityBasicModuleBase
+    {
+        [LabelText("启用按键释放")]
+        public bool enableKeyRelease = true;
+
+        [LabelText("技能列表")]
+        public System.Collections.Generic.List<SKillDataInfo> skills = new System.Collections.Generic.List<SKillDataInfo>();
+
+        [ShowInInspector, ReadOnly, LabelText("上次释放索引")]
+        public int lastReleasedIndex = -1;
+
+        [ShowInInspector, ReadOnly, LabelText("上次释放技能")]
+        public SKillDataInfo lastReleasedSkill;
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (!enableKeyRelease || skills == null)
+                return;
+
+            int count = skills.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var skill = skills[i];
+                if (skill == null || skill.releaseKey == KeyCode.None)
+                    continue;
+
+                if (Input.GetKeyDown(skill.releaseKey))
+                    ReleaseSkill(i);
+            }
+        }
+
+        public bool ReleaseSkill(int index)
+        {
+            if (skills == null || index < 0 || index >= skills.Count)
+                return false;
+
+            return ReleaseSkill(skills[index], index);
+        }
+
+        public bool ReleaseSkill(SKillDataInfo skill)
+        {
+            return ReleaseSkill(skill, FindSkillIndex(skill));
+        }
+
+        private bool ReleaseSkill(SKillDataInfo skill, int index)
+        {
+            if (skill == null || skill.sequence == null)
+                return false;
+
+            var entity = MyCore;
+            var stateDomain = entity != null ? entity.stateDomain : null;
+            var stateMachine = stateDomain != null ? stateDomain.stateMachine : null;
+            if (stateMachine == null)
+                return false;
+
+            StateLayerType layer = skill.GetRuntimeLayer();
+            string tempKey = BuildTemporarySkillKey(skill, index);
+            bool success = stateMachine.AddTemporarySkillSequence(
+                tempKey,
+                skill.sequence,
+                skill.baseStateInfo,
+                layer,
+                skill.forceEnterState);
+
+            if (!success)
+                return false;
+
+            lastReleasedIndex = index;
+            lastReleasedSkill = skill;
+            return true;
+        }
+
+        private int FindSkillIndex(SKillDataInfo skill)
+        {
+            if (skills == null || skill == null)
+                return -1;
+
+            int count = skills.Count;
+            for (int i = 0; i < count; i++)
+            {
+                if (skills[i] == skill)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private string BuildTemporarySkillKey(SKillDataInfo skill, int index)
+        {
+            string skillName = skill != null && !string.IsNullOrEmpty(skill.name) ? skill.name : "Skill";
+            return index >= 0 ? skillName + "_" + index : skillName;
+        }
+    }
+
 }

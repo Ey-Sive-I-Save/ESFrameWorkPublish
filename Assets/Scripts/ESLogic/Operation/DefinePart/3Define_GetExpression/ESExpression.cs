@@ -103,7 +103,9 @@ namespace ES
 
         public override float Evaluate(ESRuntimeTarget target, IOpSupporter support)
         {
-            return m_Left.Evaluate(target, support) + m_Right.Evaluate(target, support);
+            float leftValue = m_Left != null ? m_Left.Evaluate(target, support) : 0f;
+            float rightValue = m_Right != null ? m_Right.Evaluate(target, support) : 0f;
+            return leftValue + rightValue;
         }
     }
 
@@ -128,7 +130,9 @@ namespace ES
 
         public override float Evaluate(ESRuntimeTarget target, IOpSupporter support)
         {
-            return m_Left.Evaluate(target, support) * m_Right.Evaluate(target, support);
+            float leftValue = m_Left != null ? m_Left.Evaluate(target, support) : 0f;
+            float rightValue = m_Right != null ? m_Right.Evaluate(target, support) : 0f;
+            return leftValue * rightValue;
         }
     }
 
@@ -178,7 +182,10 @@ namespace ES
 
         public override bool Evaluate(ESRuntimeTarget target, IOpSupporter support)
         {
-            return m_Left.Evaluate(target, support) && m_Right.Evaluate(target, support);
+            return m_Left != null
+                   && m_Right != null
+                   && m_Left.Evaluate(target, support)
+                   && m_Right.Evaluate(target, support);
         }
     }
 
@@ -203,7 +210,8 @@ namespace ES
 
         public override bool Evaluate(ESRuntimeTarget target, IOpSupporter support)
         {
-            return m_Left.Evaluate(target, support) || m_Right.Evaluate(target, support);
+            return (m_Left != null && m_Left.Evaluate(target, support))
+                   || (m_Right != null && m_Right.Evaluate(target, support));
         }
     }
 
@@ -242,6 +250,9 @@ namespace ES
 
         public override bool Evaluate(ESRuntimeTarget target, IOpSupporter support)
         {
+            if (m_Left == null || m_Right == null)
+                return false;
+
             float leftValue = m_Left.Evaluate(target, support);
             float rightValue = m_Right.Evaluate(target, support);
 

@@ -22,6 +22,11 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: "\u6570\u636E\u952E"
+  releaseKey: 0
+  forceEnterState: 0
+  baseStateInfo: {fileID: 0}
+  overrideStateLayer: 0
+  stateLayer: 1
   sequence:
     tracks_:
     - rid: 5686404864374210566
@@ -46,6 +51,9 @@ MonoBehaviour:
           durationTime: 1.0000001
           audioClip: {fileID: 0}
         displayName: 
+        overrideTrackPreviewTarget: 0
+        trackTargetExpression:
+          rid: -2
     - rid: 5686404864374210566
       type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
       data:
@@ -54,28 +62,47 @@ MonoBehaviour:
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 6.459249
           durationTime: 1.7041097
-          AnimationClipName: {fileID: 0}
+          targetExpression:
+            rid: -2
+          AnimationClipName: {fileID: 7400000, guid: 38587c17cd6cfdd4b8e25d3326747748,
+            type: 3}
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 8.594968
           durationTime: 1
-          AnimationClipName: {fileID: 0}
+          targetExpression:
+            rid: -2
+          AnimationClipName: {fileID: 7400000, guid: baa3c56345be38e46b3cf654cf6e3c4c,
+            type: 3}
         - name: "\u6587\u5316\u670D\u52A1"
           startTime: 1.1801324
           durationTime: 2.0985117
-          AnimationClipName: {fileID: 0}
+          targetExpression:
+            rid: -2
+          AnimationClipName: {fileID: 7400010, guid: c79d18b7598993246a99ebc7c22b5f0d,
+            type: 3}
         - name: "\u8F68\u9053\u7247\u6BB5233"
           startTime: 5.3463063
           durationTime: 1
+          targetExpression:
+            rid: -2
           AnimationClipName: {fileID: 0}
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 3.4659848
           durationTime: 2.5301213
-          AnimationClipName: {fileID: 0}
+          targetExpression:
+            rid: -2
+          AnimationClipName: {fileID: 7400000, guid: c62dd38c11e60514cbfbd75556f131da,
+            type: 3}
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 5.339393
           durationTime: 1
+          targetExpression:
+            rid: -2
           AnimationClipName: {fileID: 0}
         displayName: "\u9ED8\u8BA4\u52A8\u753B"
+        overrideTrackPreviewTarget: 0
+        trackTargetExpression:
+          rid: -2
         AnimationIM: "\u8FD9\u662F\u4E00\u4E2A\u52A8\u753B\u8F68\u9053"
     - rid: 5686404864374210567
       type: {class: SkillTrackItem_Audio, ns: ES, asm: ES_Logic}
@@ -95,10 +122,13 @@ MonoBehaviour:
           durationTime: 0.97484064
           audioClip: {fileID: 8300000, guid: c05bb84f3ad49934888c9b769073afe7, type: 3}
         - name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 0.9220203
+          startTime: 0.967399
           durationTime: 0.9999999
           audioClip: {fileID: 8300000, guid: 45df00ec34648e240a5c0030f534ebe8, type: 3}
         displayName: 
+        overrideTrackPreviewTarget: 0
+        trackTargetExpression:
+          rid: -2
     - rid: 5686404864374210568
       type: {class: SkillTrackItem_GameObject, ns: ES, asm: ES_Logic}
       data:
@@ -107,24 +137,35 @@ MonoBehaviour:
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 9.242381
           durationTime: 1
+          targetMode: 0
+          targetExpression:
+            rid: -2
           Activate: 1
-        - name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 3.0304692
-          durationTime: 2.2622259
-          Activate: 1
-        - name: "\u8F68\u9053\u7247\u6BB5"
+        - name: "\u8F68\u9053\u7247\u6BB5tttt"
           startTime: 1.3367971
           durationTime: 0.9999999
-          Activate: 1
+          targetMode: 1
+          targetExpression:
+            rid: 8409197517669138443
+          Activate: 0
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 5.6853294
           durationTime: 1.233192
-          Activate: 1
+          targetMode: 1
+          targetExpression:
+            rid: 8409197517669138470
+          Activate: 0
         - name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 7.8073153
           durationTime: 1.0000005
-          Activate: 1
+          targetMode: 1
+          targetExpression:
+            rid: 8409197517669138474
+          Activate: 0
         displayName: 
+        overrideTrackPreviewTarget: 0
+        trackTargetExpression:
+          rid: -2
     - rid: 5686404864374210603
       type: {class: SkillTrackItem_Operation, ns: ES, asm: ES_Logic}
       data:
@@ -137,23 +178,43 @@ MonoBehaviour:
           op:
             rid: -2
         displayName: 
+        overrideTrackPreviewTarget: 0
+        trackTargetExpression:
+          rid: -2
     - rid: 5686404864374210607
       type: {class: SkillTrackItem_GameObject, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
-        clips:
-        - name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 1.55528
-          durationTime: 0.9999999
-          Activate: 1
+        clips: []
         displayName: 
+        overrideTrackPreviewTarget: 0
+        trackTargetExpression:
+          rid: -2
     - rid: 6099247325386113043
       type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
         clips: []
         displayName: 
+        overrideTrackPreviewTarget: 0
+        trackTargetExpression:
+          rid: -2
         AnimationIM: "\u8FD9\u662F\u4E00\u4E2A\u52A8\u753B\u8F68\u9053"
+    - rid: 8409197517669138443
+      type: {class: ESGetGameObjectExpression_RuntimeTargetGameObjectReferPath, ns: ES,
+        asm: ES_Logic}
+      data:
+        path: "\u65B0\u8282\u70B9"
+    - rid: 8409197517669138470
+      type: {class: ESGetGameObjectExpression_RuntimeTargetGameObjectReferPath, ns: ES,
+        asm: ES_Logic}
+      data:
+        path: "\u65B0\u5BF9\u8C61_61ea"
+    - rid: 8409197517669138474
+      type: {class: ESGetGameObjectExpression_RuntimeTargetGameObjectReferPath, ns: ES,
+        asm: ES_Logic}
+      data:
+        path: "\u65B0\u5BF9\u8C61_e68d"
 --- !u!114 &-2033546133254404354
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -176,6 +237,11 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: "\u6D4B1"
+  releaseKey: 0
+  forceEnterState: 0
+  baseStateInfo: {fileID: 0}
+  overrideStateLayer: 0
+  stateLayer: 1
   sequence:
     tracks_: []
   references:

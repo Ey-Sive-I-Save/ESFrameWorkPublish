@@ -19,6 +19,9 @@ namespace ES
         public IEnumerable<Type> SupprtedClipTypes();
 
         List<IEditorTimeSampler> CreateSamplers(ITrackSequence sequence);
+#if UNITY_EDITOR
+        List<IEditorTimeSampler> CreateEditorSamplers(ITrackSequence sequence, object editorTarget);
+#endif
 
     }
 
@@ -68,8 +71,14 @@ namespace ES
         public virtual List<IEditorTimeSampler> CreateSamplers(ITrackSequence sequence)
         {
             var list = new List<IEditorTimeSampler>();
+            if (clips == null)
+                return list;
+
             foreach (var clip in clips)
             {
+                if (clip == null)
+                    continue;
+
                 var clipSampler = clip.CreateSampler(sequence, this);
                 if (clipSampler != null)
                 {
@@ -78,6 +87,33 @@ namespace ES
             }
             return list;
         }
+
+#if UNITY_EDITOR
+        public virtual List<IEditorTimeSampler> CreateEditorSamplers(ITrackSequence sequence, object editorTarget)
+        {
+            var list = new List<IEditorTimeSampler>();
+            list.Add(CreateTrackEditorSampler(editorTarget, false));
+            if (clips == null)
+                return list;
+
+            foreach (var clip in clips)
+            {
+                if (clip == null)
+                    continue;
+
+                var clipSampler = clip.CreateEditorSampler(sequence, this, editorTarget);
+                if (clipSampler != null)
+                    list.Add(new TrackClipEditorSampler(clip, clipSampler));
+            }
+
+            return list;
+        }
+
+        protected virtual TrackEditorSampler CreateTrackEditorSampler(object editorTarget, bool ownsEditorTarget)
+        {
+            return new TrackEditorSampler(this, editorTarget, ownsEditorTarget);
+        }
+#endif
     }
     //每类轨道的枚举
     public enum TrackItemType

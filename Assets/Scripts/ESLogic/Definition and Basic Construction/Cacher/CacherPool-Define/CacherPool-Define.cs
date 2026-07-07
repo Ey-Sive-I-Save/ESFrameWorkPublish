@@ -10,6 +10,8 @@ namespace ES {
     [Serializable, TypeRegistryItem("标准缓存池")]
     public class CacherPool 
     {
+        private static readonly Action<float> EmptyAction = EmptyUpdate;
+
         #region 值定义
         //---------------约定类------------------
         //可用于整数计数
@@ -49,13 +51,31 @@ namespace ES {
         //-------------------委托类----------------------------
         //运行时委托
         [LabelText("<Update运行时>")]
-        public Action<float> OnUpdate = (when) => { };
+        public Action<float> OnUpdate = EmptyAction;
         //退出时委托
         [LabelText("<Exit退出时委托>")]
-        public Action<float> OnExit = (when) => { };
+        public Action<float> OnExit = EmptyAction;
         #endregion
 
+        public void Clear()
+        {
+            IntValue = 0;
+            FloatValue = 0;
+            Level = 0;
+            Times = 0;
+            Time = 0;
+            Random = 0.5f;
 
+            Trans.Clear();
+            Vectors.Clear();
+            Direcs.Clear();
+            Tags.Clear();
+
+            OnUpdate = EmptyAction;
+            OnExit = EmptyAction;
+        }
+
+        private static void EmptyUpdate(float when) { }
 
     }
     [Serializable]

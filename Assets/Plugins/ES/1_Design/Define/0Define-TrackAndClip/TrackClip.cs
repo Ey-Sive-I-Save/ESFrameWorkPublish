@@ -3,11 +3,17 @@ using System.Collections.Generic;
 using Sirenix.OdinInspector;
 #if UNITY_EDITOR
 using Sirenix.Utilities.Editor;
-#endif
 using UnityEditor;
+#endif
 using UnityEngine;
 namespace ES
 {
+    public enum TrackClipEditorTargetMode
+    {
+        InheritTrackTarget,
+        OverrideClipTarget
+    }
+
     public interface ITrackClip
     {
         public string DisplayName { get; set; }
@@ -15,6 +21,9 @@ namespace ES
         public float DurationTime { get; set; }
 
         IEditorTimeSampler CreateSampler(ITrackSequence sequence, ITrackItem track);
+#if UNITY_EDITOR
+        IEditorTimeSampler CreateEditorSampler(ITrackSequence sequence, ITrackItem track, object editorTarget);
+#endif
 
         // public IEnumerable<>
     }
@@ -44,8 +53,15 @@ namespace ES
 
         public virtual IEditorTimeSampler CreateSampler(ITrackSequence sequence, ITrackItem track)
         {
-            return new DefaultDebugSampler(sequence.Name, track.DisplayName, this);
+            return new DefaultEditorDebugSampler(sequence.Name, track.DisplayName, this);
         }
+
+#if UNITY_EDITOR
+        public virtual IEditorTimeSampler CreateEditorSampler(ITrackSequence sequence, ITrackItem track, object editorTarget)
+        {
+            return CreateSampler(sequence, track);
+        }
+#endif
 
         public string DisplayName { get => name; set => name = value; }
         public float StartTime { get => startTime; set => startTime = value; }

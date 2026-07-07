@@ -53,6 +53,9 @@ public class ESTrackViewWindow : OdinEditorWindow
     protected override void OnEnable()
     {
         base.OnEnable();
+        window = this;
+        Selection.selectionChanged -= OnTrackWindowSelectionChanged;
+        Selection.selectionChanged += OnTrackWindowSelectionChanged;
         s_CursorDefault = new Cursor
         {
             texture = EditorGUIUtility.Load("Cursors/d_Cursor_Arrow") as Texture2D,
@@ -70,10 +73,15 @@ public class ESTrackViewWindow : OdinEditorWindow
             texture = EditorGUIUtility.Load("Cursors/d_Cursor_Cross") as Texture2D,
             hotspot = new Vector2(7, 7)
         };
+
+        EditorApplication.delayCall -= RefreshPreselectEntityDelayed;
+        EditorApplication.delayCall += RefreshPreselectEntityDelayed;
     }
     protected override void OnDisable()
     {
         base.OnDisable();
+        Selection.selectionChanged -= OnTrackWindowSelectionChanged;
+        EditorApplication.delayCall -= RefreshPreselectEntityDelayed;
         if (Last_EditorWindowForTrackItem != null)
         {
             Last_EditorWindowForTrackItem.Close();
@@ -82,7 +90,10 @@ public class ESTrackViewWindow : OdinEditorWindow
         {
             Last_EditorWindowForTrackClip.Close();
         }
-
+        if (Last_EditorWindowForSkillDataInfo != null)
+        {
+            Last_EditorWindowForSkillDataInfo.Close();
+        }
     }
     protected override void Initialize()
     {
@@ -151,6 +162,8 @@ public class ESTrackViewWindow : OdinEditorWindow
     public List<ESEditorTrackItem> Items = new List<ESEditorTrackItem>();
 
     public ESTrackTimerToolbar toolbar;
+    public Entity PreselectEntity { get; private set; }
+    public Entity RunningEntity { get; private set; }
 
     private VisualElement timeCursor;
     private bool isDraggingCursor = false;
@@ -233,9 +246,10 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         if (Sequence != null)
         {
+            window.UpdatePreselectEntityFromSelection(false);
             if (Sequence != null)
             {
-                var seqPlayer = window.BuildSequencePlayer(Sequence);
+                var seqPlayer = window.BuildSequencePlayer(Sequence, window.PreselectEntity);
                 EditorTimelinePlayer.Instance.ActiveSequence = seqPlayer;  // ★ 关键
             }
             foreach (var t in Sequence.Tracks)
@@ -363,6 +377,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         CreatorToolBar = rootVisualElement.Query<ESTrackCreatorToolbar>();
 
         toolbar = rootVisualElement.Query<ESTrackTimerToolbar>();
+        RefreshEntityDisplay();
     }
 
     private void BindNormalHandles()
@@ -434,7 +449,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     #region  播放支持
     /// <summary> 根据一个序列数据，创建并填充采样器的播放器 </summary>
-    private EditorSequencePlayer BuildSequencePlayer(ITrackSequence sequence)
+    private EditorSequencePlayer BuildSequencePlayer(ITrackSequence sequence, Entity editorEntity)
     {
         var seqPlayer = new EditorSequencePlayer
         {
@@ -442,13 +457,42 @@ public class ESTrackViewWindow : OdinEditorWindow
             Duration = 100,
             Speed = 1f
         };
+        seqPlayer.PreviewTarget.SetEntity(editorEntity);
+
+        if (sequence == null || sequence.Tracks == null)
+            return seqPlayer;
 
         foreach (var track in sequence.Tracks)
         {
-            var trackSamplers = track.CreateSamplers(sequence);
-            foreach (var sampler in trackSamplers)
+            if (track == null)
+                continue;
+
+            List<IEditorTimeSampler> trackSamplers = null;
+            try
             {
-                seqPlayer.RegisterSampler(sampler);
+                trackSamplers = track.CreateEditorSamplers(sequence, seqPlayer.PreviewTarget);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ESTrackViewWindow] CreateEditorSamplers failed. Track={track.DisplayName}, Type={track.GetType().Name}");
+                Debug.LogException(e);
+            }
+
+            if (trackSamplers == null)
+                continue;
+
+            for (int i = 0; i < trackSamplers.Count; i++)
+            {
+                IEditorTimeSampler sampler = trackSamplers[i];
+                try
+                {
+                    seqPlayer.RegisterSampler(sampler);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[ESTrackViewWindow] RegisterSampler failed. Track={track.DisplayName}, Sampler={sampler?.GetType().Name ?? "<Null>"}");
+                    Debug.LogException(e);
+                }
             }
         }
 
@@ -456,6 +500,237 @@ public class ESTrackViewWindow : OdinEditorWindow
         seqPlayer.OnTimeUpdated += OnSequenceTimeUpdated;
 
         return seqPlayer;
+    }
+
+    private Entity ResolvePreviewEntity()
+    {
+        GameObject selectedGameObject = Selection.activeGameObject;
+        if (selectedGameObject == null && Selection.activeObject is Component selectedComponent)
+            selectedGameObject = selectedComponent.gameObject;
+
+        if (selectedGameObject != null)
+        {
+            var entity = FindEntityInSelfOrParents(selectedGameObject);
+            if (entity != null)
+                return entity;
+        }
+
+        UnityEngine.Object[] selectedObjects = Selection.objects;
+        for (int i = 0; i < selectedObjects.Length; i++)
+        {
+            if (selectedObjects[i] is GameObject gameObject)
+            {
+                Entity entity = FindEntityInSelfOrParents(gameObject);
+                if (entity != null)
+                    return entity;
+            }
+
+            if (selectedObjects[i] is Component component)
+            {
+                Entity entity = FindEntityInSelfOrParents(component.gameObject);
+                if (entity != null)
+                    return entity;
+            }
+        }
+
+        return null;
+    }
+
+    private static Entity FindEntityInSelfOrParents(GameObject gameObject)
+    {
+        Transform current = gameObject != null ? gameObject.transform : null;
+        while (current != null)
+        {
+            Entity entity = current.GetComponent<Entity>();
+            if (entity != null)
+                return entity;
+
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    public void UpdatePreselectEntityFromSelection(bool askWhenParentEntity)
+    {
+        Entity selectedEntity = ResolvePreviewEntity();
+        if (selectedEntity == null || selectedEntity == PreselectEntity)
+        {
+            RefreshEntityDisplay();
+            return;
+        }
+
+        bool directEntity = IsSelectionDirectEntity(selectedEntity);
+        if (directEntity || !askWhenParentEntity || window == null)
+        {
+            SetPreselectEntity(selectedEntity);
+            return;
+        }
+
+        bool confirm = EditorUtility.DisplayDialog(
+            "更改轨道预览 Entity",
+            $"当前选择对象的父级包含 Entity: {selectedEntity.name}\n是否将它设为轨道预览 Entity?",
+            "更改",
+            "保持当前");
+
+        if (confirm)
+            SetPreselectEntity(selectedEntity);
+        else
+            RefreshEntityDisplay();
+    }
+
+    private static bool IsSelectionDirectEntity(Entity entity)
+    {
+        if (entity == null)
+            return false;
+
+        if (Selection.activeGameObject != null && Selection.activeGameObject.GetComponent<Entity>() == entity)
+            return true;
+
+        if (Selection.activeObject is Component component && component.GetComponent<Entity>() == entity)
+            return true;
+
+        return false;
+    }
+
+    public void SetPreselectEntity(Entity entity)
+    {
+        PreselectEntity = entity;
+        RefreshEntityDisplay();
+    }
+
+    private void OnTrackWindowSelectionChanged()
+    {
+        UpdatePreselectEntityFromSelection(true);
+    }
+
+    private void RefreshPreselectEntityDelayed()
+    {
+        if (this == null)
+            return;
+
+        UpdatePreselectEntityFromSelection(false);
+    }
+
+    public void SealRunningEntityForPlay()
+    {
+        UpdatePreselectEntityFromSelection(false);
+        RunningEntity = PreselectEntity;
+        if (RunningEntity == null)
+            Debug.LogWarning("[ESTrackViewWindow] UserEntity is null when starting EditorPlay. Select a GameObject or Component with Entity in self or parents, or choose one from the Entity menu.");
+
+        var activeSequence = EditorTimelinePlayer.Instance.ActiveSequence;
+        float keepTime = activeSequence != null ? activeSequence.CurrentTime : cursorTime;
+        float keepSpeed = activeSequence != null ? activeSequence.Speed : 1f;
+        float keepDuration = activeSequence != null ? activeSequence.Duration : 100f;
+
+        if (Sequence != null)
+        {
+            var rebuiltPlayer = BuildSequencePlayer(Sequence, RunningEntity);
+            rebuiltPlayer.Speed = keepSpeed;
+            rebuiltPlayer.Duration = keepDuration;
+            EditorTimelinePlayer.Instance.ActiveSequence = rebuiltPlayer;
+            rebuiltPlayer.SetTime(keepTime);
+        }
+        else if (activeSequence != null && activeSequence.PreviewTarget != null && !activeSequence.PreviewTarget.IsRecycled)
+        {
+            activeSequence.PreviewTarget.SetEntity(RunningEntity);
+        }
+
+        RefreshEntityDisplay();
+    }
+
+    [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "轨道/临时播放当前技能序列", false, 30)]
+    public static void PlayCurrentSequenceAsTemporarySkillStateMenu()
+    {
+        PlayCurrentSequenceAsTemporarySkillState();
+    }
+
+    public static bool PlayCurrentSequenceAsTemporarySkillState(StateLayerType layer = StateLayerType.Main, bool forceEnter = false)
+    {
+        if (window == null)
+            InitNewSequenceAndOpenWindow();
+
+        var currentWindow = window;
+        var sequence = Sequence;
+        if (currentWindow == null || sequence == null)
+        {
+            Debug.LogWarning("[ESTrackViewWindow] 临时技能状态播放失败：当前没有打开的轨道序列。");
+            return false;
+        }
+
+        currentWindow.UpdatePreselectEntityFromSelection(false);
+        Entity entity = currentWindow.RunningEntity != null ? currentWindow.RunningEntity : currentWindow.PreselectEntity;
+        if (entity == null || entity.stateDomain == null || entity.stateDomain.stateMachine == null)
+        {
+            Debug.LogWarning("[ESTrackViewWindow] 临时技能状态播放失败：未找到可用 Entity 或 StateMachine。");
+            return false;
+        }
+
+        string sequenceName = !string.IsNullOrEmpty(sequence.Name) ? sequence.Name : "SkillSequence";
+        string tempKey = "TrackPreview_" + sequenceName;
+        StateAniDataInfo baseStateInfo = TrackContainer is SKillDataInfo skillDataInfo ? skillDataInfo.baseStateInfo : null;
+        return entity.stateDomain.stateMachine.AddTemporarySkillSequence(tempKey, sequence, baseStateInfo, layer, forceEnter);
+    }
+
+    private void RefreshEntityDisplay()
+    {
+        toolbar?.UpdateEntity(PreselectEntity, RunningEntity);
+    }
+
+    public void ShowEntitySelectMenu()
+    {
+        var menu = new GenericMenu();
+        Entity[] entities = FindObjectsOfType<Entity>();
+        Array.Sort(entities, (a, b) => string.CompareOrdinal(GetEntityMenuPath(a), GetEntityMenuPath(b)));
+
+        int addedCount = 0;
+        if (entities.Length > 0)
+        {
+            foreach (var entity in entities)
+            {
+                if (entity == null || !entity.gameObject.activeInHierarchy)
+                    continue;
+
+                Entity captured = entity;
+                menu.AddItem(new GUIContent(GetEntityMenuPath(entity)), entity == PreselectEntity, () =>
+                {
+                    SetPreselectEntity(captured);
+                    Selection.activeObject = captured.gameObject;
+                });
+                addedCount++;
+            }
+        }
+
+        if (addedCount == 0)
+            menu.AddDisabledItem(new GUIContent("No active Entity"));
+
+        menu.ShowAsContext();
+    }
+
+    private static string GetEntityMenuPath(Entity entity)
+    {
+        if (entity == null)
+            return "<None>";
+
+        string sceneName = entity.gameObject.scene.IsValid() ? entity.gameObject.scene.name : "NoScene";
+        return $"{sceneName}/{GetGameObjectPath(entity.gameObject)}";
+    }
+
+    private static string GetGameObjectPath(GameObject gameObject)
+    {
+        if (gameObject == null)
+            return "<None>";
+
+        string path = gameObject.name;
+        Transform current = gameObject.transform.parent;
+        while (current != null)
+        {
+            path = current.name + "/" + path;
+            current = current.parent;
+        }
+
+        return path;
     }
     private void OnSequenceTimeUpdated(float time)
     {
@@ -872,6 +1147,7 @@ public class ESTrackViewWindow : OdinEditorWindow
     }
     public OdinEditorWindow Last_EditorWindowForTrackItem;
     public OdinEditorWindow Last_EditorWindowForTrackClip;
+    public OdinEditorWindow Last_EditorWindowForSkillDataInfo;
 
     public void ShowMenu_SelectTrackAndAddTrack(ESEditorTrackItem trackItem)
     {
@@ -1200,11 +1476,14 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
 
     public override void InitInvoke()
     {
+        Selection.selectionChanged -= ForTrackWindowSelection;
         Selection.selectionChanged += ForTrackWindowSelection;
     }
 
     private static void ForTrackWindowSelection()
     {
+        ESTrackViewWindow.window?.UpdatePreselectEntityFromSelection(true);
+
         if (Selection.activeObject is IEditorTrackSupport_GetSequence SupportSequence)
         {
             Debug.Log("已经选中了技能序列" + Selection.activeObject.name);
@@ -1235,6 +1514,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
                         ESTrackViewWindow.window.leftPanel.Add(item);
                         ESTrackViewWindow.window.Items.Add(item);
                         ESDesignUtility.SafeEditor.Wrap_SetDirty(ESTrackViewWindow.TrackContainer as UnityEngine.Object);
+                        SkillSequenceRuntimeCache.NotifySequenceChanged(ESTrackViewWindow.Sequence);
                     }
                 }
             }
@@ -1253,6 +1533,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
                 {
                     ESTrackViewWindow.window.leftPanel.Remove(ediTrack);
                     ESDesignUtility.SafeEditor.Wrap_SetDirty(ESTrackViewWindow.TrackContainer as UnityEngine.Object);
+                    SkillSequenceRuntimeCache.NotifySequenceChanged(ESTrackViewWindow.Sequence);
                 }
 
             }
@@ -1273,6 +1554,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
                     {
                         trackItemEditor.RemoveClip(clip);
                         ESDesignUtility.SafeEditor.Wrap_SetDirty(ESTrackViewWindow.TrackContainer as UnityEngine.Object);
+                        SkillSequenceRuntimeCache.NotifySequenceChanged(ESTrackViewWindow.Sequence);
                         break;
                     }
                 }
@@ -1308,6 +1590,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
         {
             Undo.RecordObject(ESTrackViewWindow.TrackContainer as UnityEngine.Object, "Save Track Container Changes");
             ESDesignUtility.SafeEditor.Wrap_SetDirty(ESTrackViewWindow.TrackContainer as UnityEngine.Object);
+            SkillSequenceRuntimeCache.NotifySequenceChanged(ESTrackViewWindow.Sequence);
         }
     }
 }

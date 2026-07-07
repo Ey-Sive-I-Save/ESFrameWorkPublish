@@ -18,7 +18,11 @@ namespace ES
 
         public override IEditorTimeSampler CreateSampler(ITrackSequence sequence, ITrackItem track)
         {
-            return new AudioSampler(audioClip,startTime);
+#if UNITY_EDITOR
+            return new AudioEditorSampler(audioClip,startTime);
+#else
+            return base.CreateSampler(sequence, track);
+#endif
         }
     }
 }

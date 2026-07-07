@@ -32,8 +32,11 @@ namespace ES
         public void Build()
         {
             runtimeDict = new MultiKeyDictionary<string, GameObject>();
-            foreach (var item in children)
-                item?.BuildDictionary(runtimeDict, "");
+            if (children != null)
+            {
+                foreach (var item in children)
+                    item?.BuildDictionary(runtimeDict, "");
+            }
             isBuilt = true;
         }
 
@@ -97,7 +100,20 @@ namespace ES
         /// <summary> 实时通过路径查找（遍历树结构，低性能）</summary>
         public GameObject GetGameObjectEditor(string path)
         {
-            return FindGameObjectInTree(children, path);
+            return FindGameObjectByFullPath(children, "", path);
+        }
+        [Button("测试Editor查询")]
+        public void DebugGameObjectEditor(string path)
+        {
+            GameObject gameObject = GetGameObjectEditor(path);
+            if (gameObject != null)
+            {
+                Debug.Log($"[GameObjectRefer] Editor query success | Path={path} | GameObject={gameObject.name}", gameObject);
+                return;
+            }
+
+            List<string> paths = GetAllPathsEditor();
+            Debug.LogWarning($"[GameObjectRefer] Editor query failed | Path={path} | AvailableCount={paths.Count}\n{string.Join("\n", paths)}", this);
         }
 
         /// <summary> 实时获取所有路径（遍历）</summary>
@@ -120,14 +136,53 @@ namespace ES
 
         #region 内部辅助方法（编辑器实时查找）
 
-        private GameObject FindGameObjectInTree(List<GameObjectTreeItem> items, string targetPath)
+        private GameObject FindGameObjectByFullPath(List<GameObjectTreeItem> items, string currentPath, string targetPath)
         {
+            if (items == null || string.IsNullOrEmpty(targetPath))
+                return null;
+
             foreach (var item in items)
             {
+                if (item == null)
+                    continue;
+
+                if (string.IsNullOrEmpty(item.itemName))
+                    continue;
+
+                string itemPath = string.IsNullOrEmpty(currentPath) ? item.itemName : $"{currentPath}/{item.itemName}";
+                if (item is GameObjectLeaf leaf)
+                {
+                    if (itemPath == targetPath && leaf.gameObject != null)
+                        return leaf.gameObject;
+
+                    continue;
+                }
+
+                if (item is GameObjectGroup group)
+                {
+                    GameObject result = FindGameObjectByFullPath(group.children, itemPath, targetPath);
+                    if (result != null)
+                        return result;
+                }
+            }
+
+            return null;
+        }
+
+        private GameObject FindGameObjectInTree(List<GameObjectTreeItem> items, string targetPath)
+        {
+            if (items == null || string.IsNullOrEmpty(targetPath))
+                return null;
+
+            foreach (var item in items)
+            {
+                if (item == null)
+                    continue;
+
                 if (item is GameObjectGroup group)
                 {
                     string groupPath = group.itemName;
-                    if (targetPath.StartsWith(groupPath))
+                    if (IsDirectPathMatch(targetPath, groupPath))
                     {
                         string remaining = targetPath.Substring(groupPath.Length);
                         if (remaining.StartsWith("/")) remaining = remaining.Substring(1);
@@ -148,11 +203,23 @@ namespace ES
 
         private void CollectPaths(List<GameObjectTreeItem> items, string currentPath, List<string> outPaths)
         {
+            if (items == null || outPaths == null)
+                return;
+
             foreach (var item in items)
             {
+                if (item == null)
+                    continue;
+
+                if (string.IsNullOrEmpty(item.itemName))
+                    continue;
+
                 string myPath = string.IsNullOrEmpty(currentPath) ? item.itemName : $"{currentPath}/{item.itemName}";
                 if (item is GameObjectLeaf leaf)
                 {
+                    if (leaf.gameObject == null)
+                        continue;
+
                     outPaths.Add(myPath);
                 }
                 else if (item is GameObjectGroup group)
@@ -164,8 +231,17 @@ namespace ES
 
         private void FindPathsByGameObject(List<GameObjectTreeItem> items, string currentPath, GameObject target, List<string> outPaths)
         {
+            if (items == null || target == null || outPaths == null)
+                return;
+
             foreach (var item in items)
             {
+                if (item == null)
+                    continue;
+
+                if (string.IsNullOrEmpty(item.itemName))
+                    continue;
+
                 string myPath = string.IsNullOrEmpty(currentPath) ? item.itemName : $"{currentPath}/{item.itemName}";
                 if (item is GameObjectLeaf leaf && leaf.gameObject == target)
                 {
@@ -176,6 +252,14 @@ namespace ES
                     FindPathsByGameObject(group.children, myPath, target, outPaths);
                 }
             }
+        }
+
+        private static bool IsDirectPathMatch(string targetPath, string groupPath)
+        {
+            if (string.IsNullOrEmpty(targetPath) || string.IsNullOrEmpty(groupPath))
+                return false;
+
+            return targetPath == groupPath || targetPath.StartsWith(groupPath + "/", StringComparison.Ordinal);
         }
 
         #endregion
@@ -214,7 +298,7 @@ namespace ES
             [LabelText("子节点")]
             [SerializeReference]
             public List<GameObjectTreeItem> children = new List<GameObjectTreeItem>();
-            protected GameObjectGroup()
+            public GameObjectGroup()
             {
                 // 生成随机短后缀（8位）
                 string suffix = Guid.NewGuid().ToString("N").Substring(0, 4);
@@ -222,9 +306,18 @@ namespace ES
             }
             public override void BuildDictionary(MultiKeyDictionary<string, GameObject> dict, string currentPath)
             {
+                if (dict == null)
+                    return;
+
                 string myPath = string.IsNullOrEmpty(currentPath) ? itemName : $"{currentPath}/{itemName}";
+                if (children == null)
+                    return;
+
                 foreach (var child in children)
                 {
+                    if (child == null)
+                        continue;
+
                     child.BuildDictionary(dict, myPath);
                 }
             }
@@ -308,10 +401,29 @@ namespace ES
             }
             public override void BuildDictionary(MultiKeyDictionary<string, GameObject> dict, string currentPath)
             {
+                if (dict == null)
+                    return;
+
                 string fullPath = string.IsNullOrEmpty(currentPath) ? itemName : $"{currentPath}/{itemName}";
-                // 直接添加，MultiKeyDictionary 会自动处理重复键（覆盖旧键）
+
+                if (string.IsNullOrEmpty(fullPath))
+                {
+                    Debug.LogWarning("GameObjectRefer 构建时发现空路径，已跳过。");
+                    return;
+                }
+
+                if (gameObject == null)
+                {
+                    Debug.LogWarning($"GameObjectRefer 构建时发现空 GameObject 引用，路径: {fullPath}，已跳过。");
+                    return;
+                }
+
+                if (dict.ContainsKey(fullPath))
+                {
+                    Debug.LogWarning($"GameObjectRefer 构建时发现重复路径: {fullPath}，后写入的 GameObject 将覆盖旧值。");
+                }
+
                 dict.Add(fullPath, gameObject);
-                // 如果需要警告，可自行添加逻辑
             }
         }
         #endregion

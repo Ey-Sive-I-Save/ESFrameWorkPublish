@@ -4,11 +4,11 @@ using Sirenix.Utilities;
 
 #if UNITY_EDITOR
 using Sirenix.Utilities.Editor;
+using UnityEditor;
 #endif
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 
 namespace ES

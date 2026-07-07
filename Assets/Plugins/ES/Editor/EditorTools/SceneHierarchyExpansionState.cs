@@ -35,7 +35,7 @@ public static class SceneHierarchyExpansionState
     private const bool AutoLoadOnSceneOpened = true;
     private const bool AutoSaveBeforeAssemblyReload = true;
     private const bool AutoRestoreAfterPlayMode = true;
-    private const bool LogTiming = true;
+    private static readonly bool LogTiming = true;
 
     private const string MenuRoot = "Tools/Scene Hierarchy Expansion/";
     private const string StoragePrefix = "Standalone.SceneHierarchyExpansionState.";

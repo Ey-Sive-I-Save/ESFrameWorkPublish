@@ -1,0 +1,20 @@
+{
+    "name": "ESVMCP.Editor.Obsolete",
+    "rootNamespace": "ES.VMCP.Editor",
+    "references": [
+        "ESVMCP.Obsolete"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "ES_ENABLE_OBSOLETE_CODE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

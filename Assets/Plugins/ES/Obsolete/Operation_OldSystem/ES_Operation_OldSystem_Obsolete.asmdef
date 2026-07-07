@@ -1,0 +1,16 @@
+{
+    "name": "ES_Operation_OldSystem_Obsolete",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "ES_ENABLE_OBSOLETE_CODE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

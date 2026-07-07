@@ -3,12 +3,12 @@ using Sirenix.OdinInspector;
 #if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities.Editor;
+using UnityEditor;
 #endif
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using UnityEditor;
 using UnityEngine;
 
 namespace ES

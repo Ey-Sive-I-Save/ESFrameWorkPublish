@@ -18,19 +18,12 @@ namespace ES {
         // ============ 二级菜单 ============
         public const string INSTALL_DEPENDENCY = "【安装与依赖】";
         public const string EDITOR_TOOLS = "【窗口】";
-        public const string VMCP_SYSTEM = "【VMCP系统】";
         public const string ASSET_CREATION = "【资产创建】";
         public const string TEST_TOOLS = "测试工具";
         
         // ============ 三级菜单 ============
         // 编辑器工具
         public const string EDITOR_DOCS = "【文档】";
-        
-        // VMCP系统
-        public const string VMCP_ASSET_MANAGEMENT = "【资产管理】";
-        public const string VMCP_ASSET_CREATION = "【资产创建】";
-        public const string VMCP_SYSTEM_MANAGEMENT = "【系统管理】";
-        public const string VMCP_HELP = "【帮助】";
         
         // 资产创建
         public const string ASSET_GLOBAL_SO = "全局SO";
@@ -47,13 +40,6 @@ namespace ES {
         // 编辑器工具
         public const string EDITOR_TOOLS_PATH = ROOT_PATH + EDITOR_TOOLS + "/";
         public const string EDITOR_DOCS_PATH = EDITOR_TOOLS_PATH + EDITOR_DOCS + "/";
-        
-        // VMCP系统
-        public const string VMCP_SYSTEM_PATH = ROOT_PATH + VMCP_SYSTEM + "/";
-        public const string VMCP_ASSET_MANAGEMENT_PATH = VMCP_SYSTEM_PATH + VMCP_ASSET_MANAGEMENT + "/";
-        public const string VMCP_ASSET_CREATION_PATH = VMCP_SYSTEM_PATH + VMCP_ASSET_CREATION + "/";
-        public const string VMCP_SYSTEM_MANAGEMENT_PATH = VMCP_SYSTEM_PATH + VMCP_SYSTEM_MANAGEMENT + "/";
-        public const string VMCP_HELP_PATH = VMCP_SYSTEM_PATH + VMCP_HELP + "/";
         
         // 资产创建
         public const string ASSET_CREATION_PATH = ROOT_PATH + ASSET_CREATION + "/";

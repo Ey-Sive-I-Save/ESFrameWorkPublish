@@ -62,7 +62,8 @@ public class ESTreeMenuShower : OdinEditorWindow
             UsingWindow.minSize = new Vector2() { x = 200, y = 400 };
             UsingWindow.maxSize = new Vector2() { x = 200, y = 500 };
             UsingWindow.ShowPopup();
-            UsingWindow.position = new Rect(ESEditorGlobal.ActionMousePos + Vector2.up * 50, UsingWindow.minSize);
+            Vector2 popupPosition = GUIUtility.GUIToScreenPoint(Event.current?.mousePosition ?? Vector2.zero);
+            UsingWindow.position = new Rect(popupPosition + Vector2.up * 50, UsingWindow.minSize);
         }
         return UsingWindow;
     }

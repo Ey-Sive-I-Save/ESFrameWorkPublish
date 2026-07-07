@@ -45,7 +45,7 @@ MonoBehaviour:
     - Name: MetalMaterial 10
       ColorTag: 0
       namedOption: 0
-      OB: {fileID: 2100000, guid: 3890bf180a9f2aa4a9e845d873d56547, type: 2}
+      OB: {fileID: 0}
     - Name: "\u84DD\u8272\u65B9\u5757"
       ColorTag: 0
       namedOption: 0

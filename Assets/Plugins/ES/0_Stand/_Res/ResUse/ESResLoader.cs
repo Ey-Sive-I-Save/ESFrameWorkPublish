@@ -1,4 +1,4 @@
-using ES;
+﻿using ES;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -361,7 +361,7 @@ namespace ES
             var res = FindResInThisLoaderList(key, loadType);
             if (res != null)
             {
-                Debug.Log("已经被加载过");
+                ESLog.Verbose("已经被加载过");
                 RegisterLocalRes(res, key, loadType, skipGlobalRetain: false);
                 if (listener != null) res.OnLoadOKAction_Submit(listener);
                 return;
@@ -379,18 +379,18 @@ namespace ES
 
                     if (dependsAssetBundles != null && dependsAssetBundles.Length > 0)
                     {
-                        Debug.Log($"[ESResLoader] 资源 '{res.ResName}' 有 {dependsAssetBundles.Length} 个依赖AB需要加载");
+                        ESLog.Verbose($"[ESResLoader] 资源 '{res.ResName}' 有 {dependsAssetBundles.Length} 个依赖AB需要加载");
                         foreach (var depend in dependsAssetBundles)
                         {
                             string abName = withHash ? ESResMaster.PathAndNameTool_GetPreName(depend) : depend;
-                            Debug.Log($"[ESResLoader] -> 添加依赖AB任务: {abName}");
+                            ESLog.Verbose($"[ESResLoader] -> 添加依赖AB任务: {abName}");
                             AddAB2LoadByABPreNameSourcer(abName);
                         }
                     }
                 }
 
                 bool isNew = AddRes2ThisLoaderRes(res, key, loadType, AtLastOrFirst);
-                Debug.Log($"[ESResLoader] 尝试添加 '{res.ResName}' 到加载列表, 结果: {(isNew ? "成功(新任务)" : "已存在(复用)")}");
+                ESLog.Verbose($"[ESResLoader] 尝试添加 '{res.ResName}' 到加载列表, 结果: {(isNew ? "成功(新任务)" : "已存在(复用)")}");
 
                 if (isNew)
                 {
@@ -498,7 +498,7 @@ namespace ES
 
             if (thisLoaderRes != null)//只要新的
             {
-                Debug.Log($"[ESResLoader] 资源 '{res?.ResName ?? "Unknown"}' 已存在于Loader中，跳过添加 (Key: {key}, Type: {loadType})");
+                ESLog.Verbose($"[ESResLoader] 资源 '{res?.ResName ?? "Unknown"}' 已存在于Loader中，跳过添加 (Key: {key}, Type: {loadType})");
                 return false;
             }
             //可以加入了
@@ -519,11 +519,11 @@ namespace ES
                 {
                     ThisLoaderResSourcesWaitToLoad.AddFirst(res);
                 }
-                Debug.Log($"[ESResLoader] 新资源 '{res.ResName}' 已添加到等待队列 (Key: {key}, Type: {loadType}, 队列位置: {(addToLast ? "末尾" : "开头")})");
+                ESLog.Verbose($"[ESResLoader] 新资源 '{res.ResName}' 已添加到等待队列 (Key: {key}, Type: {loadType}, 队列位置: {(addToLast ? "末尾" : "开头")})");
             }
             else
             {
-                Debug.Log($"[ESResLoader] 新资源 '{res.ResName}' 已就绪，直接添加到列表 (Key: {key}, Type: {loadType})");
+                ESLog.Verbose($"[ESResLoader] 新资源 '{res.ResName}' 已就绪，直接添加到列表 (Key: {key}, Type: {loadType})");
             }
             return true;
         }
@@ -589,7 +589,7 @@ namespace ES
                 if (!mListeners_ForLoadAllOK.Contains(listener))
                 {
                     mListeners_ForLoadAllOK.Add(listener);
-                    Debug.Log($"[ESResLoader.LoadAllAsync] 添加完成回调，当前回调数量: {mListeners_ForLoadAllOK.Count}");
+                    ESLog.Verbose($"[ESResLoader.LoadAllAsync] 添加完成回调，当前回调数量: {mListeners_ForLoadAllOK.Count}");
                 }
             }
 
@@ -598,12 +598,12 @@ namespace ES
             if (!mIsLoadingInProgress)
             {
                 mIsLoadingInProgress = true;
-                Debug.Log("[ESResLoader.LoadAllAsync] 开始新的加载流程");
+                ESLog.Verbose("[ESResLoader.LoadAllAsync] 开始新的加载流程");
                 DoLoadAsync();
             }
             else
             {
-                Debug.Log("[ESResLoader.LoadAllAsync] 加载已在进行中，仅注册回调");
+                ESLog.Verbose("[ESResLoader.LoadAllAsync] 加载已在进行中，仅注册回调");
             }
         }
         /// <summary>
@@ -649,17 +649,17 @@ namespace ES
         /// </remarks>
         private void DoLoadAsync()
         {
-            Debug.Log($"[ESResLoader.DoLoadAsync] 进入异步加载调度。当前加载计数: {mLoadingCount}, 等待队列长度: {ThisLoaderResSourcesWaitToLoad.Count}");
+            ESLog.Verbose($"[ESResLoader.DoLoadAsync] 进入异步加载调度。当前加载计数: {mLoadingCount}, 等待队列长度: {ThisLoaderResSourcesWaitToLoad.Count}");
 
             if (mLoadingCount == 0 && ThisLoaderResSourcesWaitToLoad.Count == 0)
             {
-                Debug.Log("[ESResLoader.DoLoadAsync] 所有资源已加载完成，触发完成回调。");
+                ESLog.Verbose("[ESResLoader.DoLoadAsync] 所有资源已加载完成，触发完成回调。");
                 // 触发所有回调
                 InvokeAllLoadCompleteCallbacks();
                 return;
             }
 
-            Debug.Log("[ESResLoader.DoLoadAsync] 开始处理等待队列中的资源。" + ThisLoaderResSourcesWaitToLoad.Count);
+            ESLog.Verbose("[ESResLoader.DoLoadAsync] 开始处理等待队列中的资源。" + ThisLoaderResSourcesWaitToLoad.Count);
             var nextNode = ThisLoaderResSourcesWaitToLoad.First;
             LinkedListNode<ESResSourceBase> currentNode = null;
             while (nextNode != null)
@@ -668,20 +668,20 @@ namespace ES
                 var res = currentNode.Value;
                 nextNode = currentNode.Next;//循环判定
 
-                Debug.Log($"[ESResLoader.DoLoadAsync] 检查资源 '{res?.ResName ?? "Unknown"}' 的依赖状态。");
+                ESLog.Verbose($"[ESResLoader.DoLoadAsync] 检查资源 '{res?.ResName ?? "Unknown"}' 的依赖状态。");
                 if (res.IsDependResLoadFinish())
                 {
-                    Debug.Log($"[ESResLoader.DoLoadAsync] 资源 '{res.ResName}' 依赖已完成，从等待队列移除。");
+                    ESLog.Verbose($"[ESResLoader.DoLoadAsync] 资源 '{res.ResName}' 依赖已完成，从等待队列移除。");
                     ThisLoaderResSourcesWaitToLoad.Remove(currentNode);
                     if (res.State != ResSourceState.Ready)
                     {
-                        Debug.Log($"[ESResLoader.DoLoadAsync] 资源 '{res.ResName}' 状态为 {res.State}，开始异步加载。");
+                        ESLog.Verbose($"[ESResLoader.DoLoadAsync] 资源 '{res.ResName}' 状态为 {res.State}，开始异步加载。");
                         res.OnLoadOKAction_Submit(OnOneResLoadFinished);
                         res.LoadAsync();
                     }
                     else
                     {
-                        Debug.Log($"[ESResLoader.DoLoadAsync] 资源 '{res.ResName}' 已就绪，减少加载计数。");
+                        ESLog.Verbose($"[ESResLoader.DoLoadAsync] 资源 '{res.ResName}' 已就绪，减少加载计数。");
                         if (mLoadingCount > 0)
                         {
                             --mLoadingCount;
@@ -690,19 +690,19 @@ namespace ES
                 }
                 else
                 {
-                    Debug.Log($"[ESResLoader.DoLoadAsync] 资源 '{res?.ResName ?? "Unknown"}' 依赖未完成，跳过。");
+                    ESLog.Verbose($"[ESResLoader.DoLoadAsync] 资源 '{res?.ResName ?? "Unknown"}' 依赖未完成，跳过。");
                 }
             }
 
             if (mLoadingCount == 0 && ThisLoaderResSourcesWaitToLoad.Count == 0)
             {
-                Debug.Log("[ESResLoader.DoLoadAsync] 循环后检查：所有资源加载完成，触发完成回调。");
+                ESLog.Verbose("[ESResLoader.DoLoadAsync] 循环后检查：所有资源加载完成，触发完成回调。");
                 // 触发所有回调
                 InvokeAllLoadCompleteCallbacks();
             }
             else
             {
-                Debug.Log($"[ESResLoader.DoLoadAsync] 循环后检查：仍有 {mLoadingCount} 个加载中，{ThisLoaderResSourcesWaitToLoad.Count} 个等待依赖，继续调度。");
+                ESLog.Verbose($"[ESResLoader.DoLoadAsync] 循环后检查：仍有 {mLoadingCount} 个加载中，{ThisLoaderResSourcesWaitToLoad.Count} 个等待依赖，继续调度。");
             }
         }
 
@@ -723,7 +723,7 @@ namespace ES
 
             if (mListeners_ForLoadAllOK != null && mListeners_ForLoadAllOK.Count > 0)
             {
-                Debug.Log($"[ESResLoader] 触发 {mListeners_ForLoadAllOK.Count} 个加载完成回调");
+                ESLog.Verbose($"[ESResLoader] 触发 {mListeners_ForLoadAllOK.Count} 个加载完成回调");
 
                 // 复制列表以避免回调中修改列表导致的问题
                 var callbacks = new List<Action>(mListeners_ForLoadAllOK);

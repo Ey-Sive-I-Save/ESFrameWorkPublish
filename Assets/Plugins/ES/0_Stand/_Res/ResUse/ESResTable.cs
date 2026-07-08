@@ -1,4 +1,4 @@
-using ES;
+﻿using ES;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -805,7 +805,7 @@ namespace ES {
             if (cleanedCount > 0)
             {
                 _totalRecycledCount += cleanedCount;
-                Debug.Log($"[ESResTable.CleanupRecycledEntries] 清理了 {cleanedCount} 个废弃条目，总计清理: {_totalRecycledCount}");
+                ESLog.Verbose($"[ESResTable.CleanupRecycledEntries] 清理了 {cleanedCount} 个废弃条目，总计清理: {_totalRecycledCount}");
             }
 
             return cleanedCount;
@@ -987,7 +987,7 @@ namespace ES {
             if (res == null || res.IsRecycled)
             {
                 map.Remove(key);
-                Debug.Log($"[ESResTable.TryResolveEntry] 自动清理废弃条目: {key}");
+                ESLog.Verbose($"[ESResTable.TryResolveEntry] 自动清理废弃条目: {key}");
                 return null;
             }
 
@@ -1037,7 +1037,7 @@ namespace ES {
                     map[key] = res;
                     refCounts[key] = 0;
                     res.ResetReferenceCounter();
-                    Debug.Log($"[ESResTable.TryRegisterEntry] 替换废弃条目: {key}");
+                    ESLog.Verbose($"[ESResTable.TryRegisterEntry] 替换废弃条目: {key}");
                     return true;
                 }
 
@@ -1121,7 +1121,7 @@ namespace ES {
             refCounts[key] = count;
             res.RetainReference();
             
-            Debug.Log($"[ESResTable.Acquire] {res.ResName} | 引用计数: {count - 1} → {count}");
+            ESLog.Verbose($"[ESResTable.Acquire] {res.ResName} | 引用计数: {count - 1} → {count}");
             return count;
         }
 
@@ -1193,20 +1193,20 @@ namespace ES {
             map.TryGetValue(key, out res);
             res?.ReleaseReference();
             
-            Debug.Log($"[ESResTable.Release] {res?.ResName ?? key.ToString()} | 引用计数: {count + 1} → {count} | 卸载: {(count == 0 && unloadWhenZero ? "是" : "否")}");
+            ESLog.Verbose($"[ESResTable.Release] {res?.ResName ?? key.ToString()} | 引用计数: {count + 1} → {count} | 卸载: {(count == 0 && unloadWhenZero ? "是" : "否")}");
 
             if (count == 0)
             {
                 refCounts.Remove(key);
                 if (unloadWhenZero)
                 {
-                    Debug.Log($"[ESResTable.Release] 即将卸载资源: {res?.ResName ?? key.ToString()}");
+                    ESLog.Verbose($"[ESResTable.Release] 即将卸载资源: {res?.ResName ?? key.ToString()}");
                     TryRemoveEntry(map, refCounts, key, true);
                 }
                 else
                 {
                     // ✅ 优化7：引用计数为0但不卸载时，依然保留在map中供后续使用
-                    Debug.Log($"[ESResTable.Release] 引用计数为0但保留在内存: {res?.ResName ?? key.ToString()}");
+                    ESLog.Verbose($"[ESResTable.Release] 引用计数为0但保留在内存: {res?.ResName ?? key.ToString()}");
                 }
             }
             else

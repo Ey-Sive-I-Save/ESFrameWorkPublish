@@ -11,7 +11,7 @@ using UnityEngine;
 namespace ES
 {
 
-    #region  閲囨牱鍣?
+    #region 采样器
 
 
 #if UNITY_EDITOR
@@ -417,7 +417,7 @@ namespace ES
                 return;
             }
 
-            // 棣栨閲囨牱鏃剁紦瀛樺師濮嬬姸鎬?
+            // 首次采样时缓存原始激活状态。
             if (!_hasCachedOriginal)
             {
                 _originalActiveState = _target.activeSelf;
@@ -492,7 +492,7 @@ namespace ES
     public class ParticleEditorSampler : EditorTimeSamplerBase
     {
         private ParticleSystem particleSystem;
-        private float startTime; // 杞ㄩ亾璧峰鏃堕棿鍋忕Щ
+        private float startTime; // 轨道起始时间偏移。
 
         public ParticleEditorSampler(ParticleSystem ps, float trackStartTime = 0f)
         {
@@ -505,10 +505,10 @@ namespace ES
             if (particleSystem == null) return;
 
             float localTime = Mathf.Max(0, time - startTime);
-            // 妯℃嫙绮掑瓙鍒版寚瀹氭椂闂达紝restart=true 琛ㄧず浠庡垵濮嬬姸鎬佸紑濮嬫ā鎷?
+            // 模拟粒子到指定时间，restart=true 表示从初始状态开始模拟。
             particleSystem.Simulate(localTime, true, true);
 
-            // 濡傛灉鏃堕棿鎺ヨ繎0锛屽仠姝㈢矑瀛愬苟娓呴櫎
+            // 如果时间接近 0，停止粒子并清除。
             if (localTime < 0.01f)
                 particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
@@ -547,7 +547,7 @@ namespace ES
         _audioSource = go.AddComponent<AudioSource>();
         _audioSource.playOnAwake = false;
         _audioSource.clip = _clip;
-        _audioSource.Stop(); // 纭繚鍒濆鐘舵€佷负鍋滄
+        _audioSource.Stop(); // 确保初始状态为停止。
     }
 
     public override void SampleTime(float time)
@@ -559,14 +559,14 @@ namespace ES
 
         if (!isValid)
         {
-            // 涓嶅湪鏈夋晥鍖洪棿鍐咃細鍋滄鎾斁骞舵竻闄ゆ渶鍚庨噰鏍疯褰?
+            // 不在有效区间内：停止播放并清除最后采样记录。
             if (_audioSource.isPlaying)
                 _audioSource.Stop();
             _lastSampledTime = -1f;
             return;
         }
 
-        // 鏈夋晥鍖洪棿鍐咃細鏍规嵁鏃堕棿鍙樺寲鍐冲畾鏄惁閲嶆柊瀹氫綅
+        // 有效区间内：根据时间变化决定是否重新定位。
         bool shouldSeek = !_audioSource.isPlaying ||
                           Mathf.Abs(localTime - _lastSampledTime) > SeekThreshold;
 
@@ -594,7 +594,7 @@ namespace ES
     #endregion
 
 
-    #region  閲囨牱鏄犲皠
+    #region 采样映射
 
 #if UNITY_EDITOR
     public class EditorSamplerRegistry
@@ -623,7 +623,7 @@ namespace ES
                     var sampler = clip.CreateSampler(sequence, track);
                     if (sampler == null)
                     {
-                        // 娌℃湁涓撶敤閲囨牱鍣ㄦ椂锛屼娇鐢ㄩ粯璁よ皟璇曢噰鏍峰櫒
+                        // 没有专用采样器时，使用默认调试采样器。
                         sampler = new DefaultEditorDebugSampler(sequence.Name, track.DisplayName, clip);
                     }
                     _map[clip] = sampler;

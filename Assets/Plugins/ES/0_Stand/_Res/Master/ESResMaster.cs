@@ -1,4 +1,4 @@
-using Sirenix.OdinInspector;
+﻿using Sirenix.OdinInspector;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -86,6 +86,8 @@ namespace ES
                 Settings.RuntimeAwake();//装载
             }
 
+            ESLog.EnableVerbose = Settings != null && Settings.EnableResVerboseLog;
+
             // 初始化默认路径缓存
             DefaultPaths.InitDefaultPaths();
 
@@ -113,21 +115,21 @@ namespace ES
         private bool isLoading = false;
         private void TryStartLoadTask()
         {
-            Debug.Log($"[ESResMaster.TryStartLoadTask] 尝试启动加载任务。任务队列长度: {ResLoadTasks.Count}, 正在加载: {isLoading}");
+            ESLog.Verbose($"[ESResMaster.TryStartLoadTask] 尝试启动加载任务。任务队列长度: {ResLoadTasks.Count}, 正在加载: {isLoading}");
 
             if (ResLoadTasks.Count == 0)
             {
-                Debug.Log("[ESResMaster.TryStartLoadTask] 任务队列为空，无需启动。");
+                ESLog.Verbose("[ESResMaster.TryStartLoadTask] 任务队列为空，无需启动。");
                 return;
             }
 
             if (isLoading)
             {
-                Debug.Log("[ESResMaster.TryStartLoadTask] 正在加载中，跳过启动。");
+                ESLog.Verbose("[ESResMaster.TryStartLoadTask] 正在加载中，跳过启动。");
                 return;
             }
 
-            Debug.Log("[ESResMaster.TryStartLoadTask] 启动加载任务协程。");
+            ESLog.Verbose("[ESResMaster.TryStartLoadTask] 启动加载任务协程。");
             StartCoroutine(LoadResTask());
         }
         public void PushResLoadTask(IEnumeratorTask task)
@@ -145,7 +147,7 @@ namespace ES
         }
         private IEnumerator LoadResTask()
         {
-            Debug.Log("[ESResMaster.LoadResTask] 开始加载任务协程，设置isLoading为true，支持并发处理。");
+            ESLog.Verbose("[ESResMaster.LoadResTask] 开始加载任务协程，设置isLoading为true，支持并发处理。");
             isLoading = true;
             int runningTasks = 0;
             int taskIndex = 0;
@@ -155,14 +157,14 @@ namespace ES
                 // 启动新任务，如果有空闲槽且队列不空
                 while (ResLoadTasks.Count > 0 && runningTasks < mMaxCoroutineCount)
                 {
-                    Debug.Log($"[ESResMaster.LoadResTask] 启动并发任务 {taskIndex + 1}，当前运行任务数: {runningTasks + 1}/{mMaxCoroutineCount}");
+                    ESLog.Verbose($"[ESResMaster.LoadResTask] 启动并发任务 {taskIndex + 1}，当前运行任务数: {runningTasks + 1}/{mMaxCoroutineCount}");
                     var task = ResLoadTasks.First;
                     ResLoadTasks.RemoveFirst();
                     runningTasks++;
                     StartCoroutine(ExecuteTask(task.Value, taskIndex, () =>
                     {
                         runningTasks--;
-                        Debug.Log($"[ESResMaster.LoadResTask] 任务 {taskIndex + 1} 执行完成，剩余运行任务数: {runningTasks}");
+                        ESLog.Verbose($"[ESResMaster.LoadResTask] 任务 {taskIndex + 1} 执行完成，剩余运行任务数: {runningTasks}");
                     }));
                     taskIndex++;
                 }
@@ -170,14 +172,14 @@ namespace ES
                 yield return null;
             }
 
-            Debug.Log("[ESResMaster.LoadResTask] 所有任务加载完成，设置isLoading为false。");
+            ESLog.Verbose("[ESResMaster.LoadResTask] 所有任务加载完成，设置isLoading为false。");
             isLoading = false;
             yield return null;
         }
 
         private IEnumerator ExecuteTask(IEnumeratorTask task, int index, Action onComplete)
         {
-            Debug.Log($"[ESResMaster.LoadResTask] 开始执行任务 {index + 1}: {task?.ToString() ?? "Unknown"}");
+            ESLog.Verbose($"[ESResMaster.LoadResTask] 开始执行任务 {index + 1}: {task?.ToString() ?? "Unknown"}");
             yield return StartCoroutine(task.DoTaskAsync(OnLoadTaskOK));
             onComplete();
         }

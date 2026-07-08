@@ -126,7 +126,7 @@ namespace ES
                 // 即使不需要下载，也必须加载每个库的JSON信息
                 foreach (var lib in remoteGameIdentity.RequiredLibrariesFolders)
                 {
-                    Debug.Log("使用库 " + lib.FolderName + " 无需下载" + lib.IsRemote);
+                    ESLog.Verbose("使用库 " + lib.FolderName + " 无需下载" + lib.IsRemote);
                     EnsureLibraryMetadataLoaded(lib);
                 }
 
@@ -243,7 +243,7 @@ namespace ES
                 }
                 else
                 {
-                    Debug.Log("使用本地库 " + lib.FolderName);
+                    ESLog.Verbose("使用本地库 " + lib.FolderName);
                     string libIdentityPath = DefaultPaths.GetLocalBuildLibIdentityPath(lib.FolderName);
                     if (TryRegisterLibraryFromLocal(lib.FolderName, libIdentityPath, false, null, out var registeredLocalLib))
                     {
@@ -591,13 +591,13 @@ namespace ES
                 }
                 else
                 {
-                    Debug.Log($"ConsumerIdentity {consumerName} 无需更新: 版本匹配 ({remoteConsumerIdentity.Version})");
+                    ESLog.Verbose($"ConsumerIdentity {consumerName} 无需更新: 版本匹配 ({remoteConsumerIdentity.Version})");
                 }
             }
             else if (localConsumerIdentity != null)
             {
                 // 使用本地
-                Debug.Log($"使用本地ConsumerIdentity {consumerName}");
+                ESLog.Verbose($"使用本地ConsumerIdentity {consumerName}");
             }
             else
             {
@@ -613,7 +613,7 @@ namespace ES
 
             if (!needDownload)
             {
-                Debug.Log($"扩展包 {consumerName} 无需下载");
+                ESLog.Verbose($"扩展包 {consumerName} 无需下载");
                 yield break;
             }
 
@@ -657,7 +657,7 @@ namespace ES
                     {
                         string indexJson = indexReq.downloadHandler.text;
                         jsonFileNames = JsonConvert.DeserializeObject<string[]>(indexJson);
-                        Debug.Log($"从索引文件获取到 {jsonFileNames.Length} 个文件");
+                        ESLog.Verbose($"从索引文件获取到 {jsonFileNames.Length} 个文件");
                     }
                     catch (Exception ex)
                     {
@@ -695,7 +695,7 @@ namespace ES
                     }
                     else
                     {
-                        Debug.Log($"从目录列表解析到 {jsonFileNames.Length} 个JSON文件");
+                        ESLog.Verbose($"从目录列表解析到 {jsonFileNames.Length} 个JSON文件");
                     }
                 }
                 else
@@ -738,7 +738,7 @@ namespace ES
                 }
                 else
                 {
-                    Debug.Log($"下载JSON文件成功 {fileName}");
+                    ESLog.Verbose($"下载JSON文件成功 {fileName}");
                 }
             }
 
@@ -804,7 +804,7 @@ namespace ES
                 return true;
             }
 
-            Debug.Log("GameIdentity无需更新，所有信息匹配");
+            ESLog.Verbose("GameIdentity无需更新，所有信息匹配");
             return false;
         }
 
@@ -832,7 +832,7 @@ namespace ES
             }
             else
             {
-                Debug.Log($"库 {libFolderName} 无需更新: ChangeCount匹配 ({remoteLibIdentity.ChangeCount})");
+                ESLog.Verbose($"库 {libFolderName} 无需更新: ChangeCount匹配 ({remoteLibIdentity.ChangeCount})");
                 return false;
             }
         }

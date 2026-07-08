@@ -44,6 +44,10 @@ namespace ES
         [LabelText("游戏版本号")]
         public string Version = "1.0.0";
 
+        [VerticalGroup("总体/构建与运行")]
+        [LabelText("输出资源详细流程日志")]
+        public bool EnableResVerboseLog = false;
+
         [HorizontalGroup("总体")]
         [Header("文件夹")]
         [VerticalGroup("总体/文件夹路径")]

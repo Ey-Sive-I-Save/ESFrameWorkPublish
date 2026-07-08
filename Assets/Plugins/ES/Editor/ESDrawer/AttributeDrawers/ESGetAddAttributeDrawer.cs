@@ -57,34 +57,63 @@ namespace ES {
         public void TryGetOrAdd(Component go, ESGetAddOption option, IPropertyValueEntry entry)
         {
             Component cNow = null;
+            Type componentType = entry.BaseValueType;
             if (option == ESGetAddOption.SelfOnly)
             {
-                cNow = go.gameObject.GetComponent(entry.BaseValueType);
+                cNow = go.gameObject.GetComponent(componentType);
             }
             else if (option == ESGetAddOption.ContainsParent)
             {
-                cNow = go.gameObject.GetComponentInParent(entry.BaseValueType);
+                cNow = go.gameObject.GetComponentInParent(componentType);
             }
             else if (option == ESGetAddOption.ContainsSon)
             {
-                cNow = go.gameObject.GetComponentInChildren(entry.BaseValueType);
+                cNow = go.gameObject.GetComponentInChildren(componentType);
             }
             else if (option == ESGetAddOption.ContainsParentAndSon)
             {
-                cNow = go.gameObject.GetComponentInParent(entry.BaseValueType) ?? go.gameObject.GetComponentInChildren(entry.BaseValueType);
+                cNow = go.gameObject.GetComponentInParent(componentType) ?? go.gameObject.GetComponentInChildren(componentType);
             }
 
             if (cNow != null)
             {
+                Undo.RecordObject(go, "ES Get Component");
                 entry.WeakSmartValue = cNow;
                 EditorUtility.SetDirty(go);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(go);
             }
             else
             {
-                cNow = go.gameObject.AddComponent(entry.BaseValueType);
+                if (!CanAddComponent(componentType))
+                {
+                    Debug.LogWarning($"ESGetAdd无法添加组件类型：{componentType?.FullName}");
+                    return;
+                }
+
+                try
+                {
+                    cNow = Undo.AddComponent(go.gameObject, componentType);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"ESGetAdd添加组件失败：{componentType.FullName}\n{e.Message}");
+                    return;
+                }
+                Undo.RecordObject(go, "ES Add Component");
                 entry.WeakSmartValue = cNow;
                 EditorUtility.SetDirty(go);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(go);
             }
+        }
+
+        private static bool CanAddComponent(Type componentType)
+        {
+            return componentType != null
+                   && typeof(Component).IsAssignableFrom(componentType)
+                   && componentType != typeof(Component)
+                   && !componentType.IsAbstract
+                   && !componentType.IsInterface
+                   && !componentType.ContainsGenericParameters;
         }
     }
 

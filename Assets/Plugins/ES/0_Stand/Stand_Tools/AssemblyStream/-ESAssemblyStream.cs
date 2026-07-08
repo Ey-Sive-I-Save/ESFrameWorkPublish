@@ -90,6 +90,8 @@ namespace ES
             [InitializeOnLoadMethod]
             private static void EditorInitLoad()
             {
+                try
+                {
 
                 //对于Editor来说，使用Loaded委托是无意义的
                 EditorAssembies = AppDomain.CurrentDomain.GetAssemblies();
@@ -121,6 +123,11 @@ namespace ES
                     }
                 }
                 Debug.Log("【程序集流】耗时" + (DateTime.Now - startEditorStreamTime));
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[ESAssemblyStream.EditorInitLoad] " + ex);
+                }
             }
 
             private static void Editor_InitAssembiesAndRegisters()
@@ -279,7 +286,7 @@ namespace ES
                                 #endregion
                                 {
                                     #region 字段特性
-                                    var Fields = nowType.GetFields();
+                                    var Fields = nowType.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                                     for (int indexField = 0; indexField < Fields.Length; indexField++)
                                     {
                                         var infoF = Fields[indexField];
@@ -341,7 +348,7 @@ namespace ES
                                 }
                                 nowType.GetAttribute<InspectorNameAttribute>();
                                 #region 字段特性
-                                var Fields = nowType.GetFields();
+                                var Fields = nowType.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                                 for (int indexField = 0; indexField < Fields.Length; indexField++)
                                 {
                                     var infoF = Fields[indexField];
@@ -647,6 +654,8 @@ namespace ES
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
             private static void RuntimeInitLoad_000_AfterAssembliesLoaded()
             {
+                try
+                {
                 DateTime startEditorStreamTime = DateTime.Now;
                 
                 //可以进行默认的加载捏
@@ -691,6 +700,11 @@ namespace ES
 #pragma warning disable CS0162
                 AppDomain.CurrentDomain.AssemblyLoad += HotRuntimeLoadNewAssembly;
 #pragma warning restore CS0162
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[ESAssemblyStream.RuntimeInitLoad_000_AfterAssembliesLoaded] " + ex);
+                }
             }   
             private static void HotRuntimeLoadNewAssembly(object sender, AssemblyLoadEventArgs args)
             {
@@ -732,6 +746,8 @@ namespace ES
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
             private static void RuntimeInitLoad_111_BeforeSceneLoad()
             {
+                try
+                {
                 DateTime startEditorStreamTime = DateTime.Now;
                 //专属功能
                 InitRuntime_ApplyThisTimingRegisters(ESAssemblyLoadTiming._1_BeforeFirstSceneLoad);//应用注册器
@@ -747,11 +763,18 @@ namespace ES
                     InitRuntime_LoadRegisteredTypes(i);
                 }
                 Debug.Log("第一阶段耗时" + (DateTime.Now - startEditorStreamTime));
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[ESAssemblyStream.RuntimeInitLoad_111_BeforeSceneLoad] " + ex);
+                }
             } 
 
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
             private static void RuntimeInitLoad_222_AfterSceneLoad()
             { 
+                try
+                {
                 DateTime startEditorStreamTime = DateTime.Now;
                 //专属功能
                 InitRuntime_ApplyThisTimingRegisters(ESAssemblyLoadTiming._2_AfterFirstSceneLoad);//应用注册器
@@ -767,6 +790,11 @@ namespace ES
                     InitRuntime_LoadRegisteredTypes(i);
                 }
                 Debug.Log("终止" + (DateTime.Now - startEditorStreamTime));
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[ESAssemblyStream.RuntimeInitLoad_222_AfterSceneLoad] " + ex);
+                }
             }
 
             #region Init流程
@@ -922,7 +950,7 @@ namespace ES
                                 #region 字段特性
                                 if (handler_fieldAttribute != null)
                                 {
-                                    var Fields = nowType.GetFields();
+                                    var Fields = nowType.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                                     for (int indexField = 0; indexField < Fields.Length; indexField++)
                                     {
                                         var infoF = Fields[indexField];
@@ -1065,7 +1093,7 @@ namespace ES
                                 #region 字段特性
                                 if (handler_fieldAttribute != null)
                                 {
-                                    var Fields = nowType.GetFields();
+                                    var Fields = nowType.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                                     for (int indexField = 0; indexField < Fields.Length; indexField++)
                                     {
                                         var infoF = Fields[indexField];
@@ -1188,7 +1216,7 @@ namespace ES
                                 }
                                 nowType.GetAttribute<InspectorNameAttribute>();
                                 #region 字段特性
-                                var Fields = nowType.GetFields();
+                                var Fields = nowType.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
                                 for (int indexField = 0; indexField < Fields.Length; indexField++)
                                 {
                                     var infoF = Fields[indexField];

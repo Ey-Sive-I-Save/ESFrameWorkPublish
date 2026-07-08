@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace ES
 {
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, AllowMultiple = false)]
     public class ESCreatePathAttribute : Attribute
     {
         public string GroupName;

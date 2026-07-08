@@ -117,7 +117,9 @@ namespace ES
         /// <returns>描述文本或枚举名称。</returns>
         public static string _GetDescription(this Enum enumValue)
         {
+            if (enumValue == null) return "";
             var fieldInfo = enumValue.GetType().GetField(enumValue.ToString());
+            if (fieldInfo == null) return enumValue.ToString();
             var attributes = fieldInfo.GetCustomAttributes(typeof(DescriptionAttribute), false) as DescriptionAttribute[];
             return attributes.Length > 0 ? attributes[0].Description : enumValue.ToString();
         }
@@ -218,6 +220,7 @@ namespace ES
         {
             Type type = enumValue.GetType();
             FieldInfo field = type.GetField(enumValue.ToString());
+            if (field == null) return defaultValue;
             var att = field.GetCustomAttribute<ESMessageAttribute>();
             return att?.message ?? defaultValue;
         }

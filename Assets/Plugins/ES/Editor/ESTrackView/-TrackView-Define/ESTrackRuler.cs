@@ -99,10 +99,10 @@ namespace ES
             }
         }
         #region  颜色
-        public static Color levelup_1 = new Color(1, 1, 1, 0.7f);
-        public static Color levelup_2 = new Color(1, 1, 1, 1f);
-        public static Color levelup_down1 = new Color(1,1,1,0.1f);
-        public static Color levelup_down2 = new Color(1, 1, 1, 0.25f);
+        public static Color levelup_1 = new Color(0.72f, 0.76f, 0.82f, 0.4f);
+        public static Color levelup_2 = new Color(0.9f, 0.92f, 0.96f, 0.68f);
+        public static Color levelup_down1 = new Color(0.55f, 0.6f, 0.68f, 0.045f);
+        public static Color levelup_down2 = new Color(0.62f, 0.67f, 0.74f, 0.11f);
         #endregion
         
         
@@ -113,18 +113,20 @@ namespace ES
 
             int off = level - LevelLow.GetHashCode();
            
-            float height = 10 + off * 5;
-            float FontSize = 4 + off * 3;
+            float height = 9 + off * 5;
+            float FontSize = Mathf.Clamp(7 + off * 2, 8, 11);
 
            
             if (off >= 0 && off <= MaxLevelGo)
             {
              
                 var f = LevelsPX[(RulerLevel)level];
-                if (off == 0) painter.strokeColor = Color.gray;
+                if (off == 0) painter.strokeColor = new Color(0.5f, 0.55f, 0.62f, 0.28f);
                 else painter.strokeColor = off > 1 ? levelup_2 : levelup_1;
                 painter.lineWidth = off + 1;
-                for (float realSecondPoint = 0; realSecondPoint <= totalTime; realSecondPoint += f)
+                float firstTick = Mathf.Ceil(showStart / f) * f;
+                float lastTick = Mathf.Floor(showEnd / f) * f;
+                for (float realSecondPoint = firstTick; realSecondPoint <= lastTick + 0.0001f; realSecondPoint += f)
                 {
                     if(realSecondPoint<showStart||realSecondPoint>showEnd)continue;
                     float secondsOffsetFromStart=realSecondPoint-showStart;
@@ -148,7 +150,7 @@ namespace ES
                             
                             rec.Add(pixel);
                             painter.BeginPath();
-                            context.DrawText(FormatSecondsToMinuteSecond(realSecondPoint), vv, FontSize, Color.white);
+                            context.DrawText(FormatSecondsToMinuteSecond(realSecondPoint), vv, FontSize, new Color(0.86f, 0.89f, 0.94f, 0.92f));
                             painter.lineWidth = 1;
                             painter.strokeColor = off > 1 ? levelup_down2 : levelup_down1;
 
@@ -163,10 +165,40 @@ namespace ES
                         }
                     }
                 }
+                if (off > 0)
+                    DrawEndBoundaryTick(painter, context, height, FontSize, off);
                 
             }
 
 
+        }
+
+        private void DrawEndBoundaryTick(Painter2D painter, MeshGenerationContext context, float height, float fontSize, int off)
+        {
+            if (showEnd <= showStart)
+                return;
+
+            int pixel = Mathf.RoundToInt((showEnd - showStart) * pxPerSecond);
+            if (pixel < 0)
+                return;
+
+            if (rec.Contains(pixel))
+                return;
+
+            float labelX = Mathf.Clamp(pixel - 30f, 0f, Mathf.Max(0f, contentRect.width - 36f));
+            Vector2 tickTop = new Vector2(pixel, 0);
+            Vector2 tickBottom = new Vector2(pixel, height);
+
+            rec.Add(pixel);
+            painter.BeginPath();
+            painter.strokeColor = off > 1 ? levelup_down2 : levelup_down1;
+            painter.lineWidth = off + 1;
+            painter.MoveTo(tickTop);
+            painter.LineTo(tickBottom);
+            painter.Stroke();
+            painter.ClosePath();
+
+            context.DrawText(FormatSecondsToMinuteSecond(showEnd), new Vector2(labelX, height), fontSize, new Color(0.86f, 0.89f, 0.94f, 0.92f));
         }
         public static string FormatSecondsToMinuteSecond(float totalSeconds)
         {

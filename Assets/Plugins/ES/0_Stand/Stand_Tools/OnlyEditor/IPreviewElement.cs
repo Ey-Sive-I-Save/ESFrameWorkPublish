@@ -49,6 +49,41 @@ namespace ES
         void EditorPreviewDrawPreviewGUINonPlay();
     }
 
+    public enum PreviewAreaMode
+    {
+        Normal = 0,
+        Large = 1
+    }
+
+    /// <summary>
+    /// Optional, clearer replacement for IPreviewElement.IsSingleArea.
+    /// Existing preview elements can keep using IsSingleArea.
+    /// </summary>
+    public interface IPreviewAreaModeProvider
+    {
+        PreviewAreaMode PreviewAreaMode { get; }
+    }
+
+    /// <summary>
+    /// Optional lifecycle contract for preview elements that create editor resources.
+    /// Use this for cameras, lights, render textures, PlayableGraphs, and hidden GameObjects.
+    /// </summary>
+    public interface IPreviewElementLifecycle
+    {
+        void OnPreviewEnable();
+        void OnPreviewDisable();
+        void DisposePreview();
+    }
+
+    /// <summary>
+    /// Optional editor update contract for preview elements that need stable repaint/update.
+    /// </summary>
+    public interface IPreviewElementEditorUpdate
+    {
+        bool WantsPreviewEditorUpdate { get; }
+        void OnPreviewEditorUpdate(float deltaTime);
+    }
+
     /// <summary>
     /// 编辑器预览元素收集器。
     /// 用于 Core 这类自身不直接绘制、但持有多个可预览对象的聚合类型。

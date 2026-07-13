@@ -48,7 +48,7 @@ namespace ES
                 ESSO soAsset = AssetDatabase.LoadAssetAtPath<ESSO>(assetPath);
                 if (soAsset != null)
                 {
-                    soAsset.OnEditorInitialized();
+                    soAsset.Editor_EnsureInitializedAndRegistered();
                 }
             }
         }
@@ -62,13 +62,14 @@ namespace ES
         /// <summary>对已注册的每个 ESSO 实例执行一次 Apply 操作。</summary>
         public override void InitInvoke()
         {
-            var keys = ESEditorSO.SOS.Groups.Keys;
+            var keys = new List<Type>(ESEditorSO.SOS.Groups.Keys);
             foreach (var i in keys)
             {
-                var group = ESEditorSO.SOS.GetGroupDirectly(i);
+                var group = new List<ESSO>(ESEditorSO.SOS.GetGroupDirectly(i));
                 foreach (var g in group)
                 {
-                    g.OnEditorApply();
+                    if (g != null)
+                        g.OnEditorApply();
                 }
             }
         }

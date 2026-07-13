@@ -16,7 +16,7 @@
 | `Poolable-Define.cs` | 0_Stand/Stand_Tools | 中划线在C#中不规范 | `PoolableDefine.cs` 或 `IPoolable.cs` |
 | `ContextPool-Define.cs` | 1_Design | 同上 | `ContextPoolDefine.cs` |
 | `CacherPool-Define.cs` | 1_Design | 同上 | `CacherPoolDefine.cs` |
-| `LinkRecievePool.cs` | 1_Design/Link | 拼写错误（Recieve→Receive） | `LinkReceivePool.cs` |
+| `LinkReceivePool.cs` | 1_Design/Link | 拼写错误（Receive→Receive） | `LinkReceivePool.cs` |
 
 **问题说明**：
 - C# 文件名应使用 PascalCase（大驼峰命名）
@@ -52,7 +52,7 @@
 
 | 文件名 | 错误 | 正确拼写 | 影响 |
 |--------|------|---------|------|
-| `LinkRecievePool.cs` | Recieve | **Receive** | 搜索困难、外部开发者困惑 |
+| `LinkReceivePool.cs` | Receive | **Receive** | 搜索困难、外部开发者困惑 |
 | `Singal_Dirty` (字段名) | Singal | **Signal** | 代码审查时易被忽略 |
 
 **问题说明**：
@@ -339,7 +339,7 @@ namespace ES.Editor.Windows
 
 ### P0 - 立即修复（影响专业性）
 1. **拼写错误**：
-   - `LinkRecievePool.cs` → `LinkReceivePool.cs`
+   - `LinkReceivePool.cs` → `LinkReceivePool.cs`
    - 代码中的 `Singal_Dirty` → `Signal_Dirty`
 
 2. **中划线文件名**：
@@ -414,7 +414,7 @@ public class NamingConventionChecker
         // 检查3：拼写错误（简单检查）
         var commonMisspellings = new Dictionary<string, string>
         {
-            { "Recieve", "Receive" },
+            { "Receive", "Receive" },
             { "Singal", "Signal" }
         };
         
@@ -511,7 +511,7 @@ public class FileRenamer : EditorWindow
 ## 九、总结
 
 ### 主要问题
-1. ❌ **拼写错误**：`Recieve` → `Receive`（影响搜索和API一致性）
+1. ❌ **拼写错误**：`Receive` → `Receive`（影响搜索和API一致性）
 2. ❌ **中划线使用**：`Poolable-Define.cs` 不符合C#规范
 3. ⚠️ **下划线滥用**：文件夹和公共字段中使用下划线
 

@@ -21,14 +21,14 @@ namespace ES
         public Vector2 nodePos;
         [ToggleGroup("inlineData", "内置数据")]
         public bool inlineData;
-        public virtual  bool MutiLineOut => false;
+        public virtual  bool MultiLineOut => false;
         public ESNodeState State { get; set; } = ESNodeState.None;
 
         public void SetFlow(INodeRunner runner, int index = 0)
         {
             if (runner is NodeRunnerSO no)
             {
-                if (this.MutiLineOut)
+                if (this.MultiLineOut)
                 {
                     if (!Flows.Contains(no))
                     {

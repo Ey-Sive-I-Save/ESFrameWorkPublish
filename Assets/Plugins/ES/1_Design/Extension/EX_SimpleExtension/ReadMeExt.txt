@@ -98,7 +98,7 @@ Vector3 pos = transform.position;
 Vector3 scale = new Vector3(2f, 3f, 4f);
 
 // 分量乘法 / 安全除法
-Vector3 r = pos._MutiVector3(scale);
+Vector3 r = pos._MultiVector3(scale);
 Vector3 d = pos._SafeDivideVector3(new Vector3(1f, 0f, 2f)); // 对于 0 分量会使用 1 避免除零
 
 // 分量替换

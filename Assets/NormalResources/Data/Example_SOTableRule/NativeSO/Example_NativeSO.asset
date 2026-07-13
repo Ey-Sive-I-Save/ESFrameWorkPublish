@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4361ddd2db6a4eed870adb5e607e558e, type: 3}
+  m_Name: Example_NativeSO
+  m_EditorClassIdentifier: 
+  itemId: native_sword_001
+  displayName: "\u6D4B\u8BD5\u957F\u5251"
+  level: 3
+  price: 12.5
+  enabledInGame: 1
+  quality: 1
+  tags: 3
+  keywords:
+  - "\u6B66\u5668"
+  - "\u8FD1\u6218"
+  - "\u6D4B\u8BD5"
+  levelRewards:
+  - 100
+  - 200
+  - 300
+  qualityOptions:
+  - 0
+  - 1
+  internalWeight: 7
+  nestedConfig:
+    growthMultiplier: 1.2
+    note: "\u5D4C\u5957\u5B57\u6BB5\u6D4B\u8BD5"
+  readonlyValue: 99

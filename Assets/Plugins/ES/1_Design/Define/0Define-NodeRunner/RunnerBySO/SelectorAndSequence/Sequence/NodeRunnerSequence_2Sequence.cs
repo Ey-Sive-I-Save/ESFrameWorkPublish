@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace ES {
     [CreateNodeRunnerSoMenu(NodeEnvironment.None, "队列", "2单元队列")]
-    public class NodeRunnerSelector_2Sequence : NodeSequnence_ConfirmNodes
+    public class NodeRunnerSelector_2Sequence : NodeSequence_ConfirmNodes
     {
         public override string GetOptionName()
         {

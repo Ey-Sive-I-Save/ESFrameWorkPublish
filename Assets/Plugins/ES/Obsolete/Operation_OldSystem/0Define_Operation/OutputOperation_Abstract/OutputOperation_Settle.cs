@@ -8,7 +8,7 @@ using UnityEngine;
 
 
 namespace ES {
-    public class OutputOpeationSettleFlag : OverLoadFlag<OutputOpeationSettleFlag>
+    public class OutputOperationSettleFlag : OverLoadFlag<OutputOperationSettleFlag>
     {
 
     }
@@ -27,7 +27,7 @@ namespace ES {
     
 
    /* [Serializable, TypeRegistryItem("结算输出-测试专属-攻击�?)]
-    public class OutputOpeationBuffSettle_Test_Attack : OutputOpeationFloat_EEB
+    public class OutputOperationBuffSettle_Test_Attack : OutputOperationFloat_EEB
     {
         public override SettlementFloat GetSettlement(Entity on, Entity from, EntityState_Buff with)
         {
@@ -35,7 +35,7 @@ namespace ES {
         }
     }
     [Serializable, TypeRegistryItem("结算输出-测试专属-暴击�?)]
-    public class OutputOpeationBuffSettle_Test_Cri : OutputOpeationFloat_EEB
+    public class OutputOperationBuffSettle_Test_Cri : OutputOperationFloat_EEB
     {
         public override SettlementFloat GetSettlement(Entity on, Entity from, EntityState_Buff with)
         {
@@ -43,7 +43,7 @@ namespace ES {
         }
     }
     [Serializable, TypeRegistryItem("结算输出-测试专属-防御�?)]
-    public class OutputOpeationBuffSettle_Test_Defend : OutputOpeationFloat_EEB
+    public class OutputOperationBuffSettle_Test_Defend : OutputOperationFloat_EEB
     {
         public override SettlementFloat GetSettlement(Entity on, Entity from, EntityState_Buff with)
         {

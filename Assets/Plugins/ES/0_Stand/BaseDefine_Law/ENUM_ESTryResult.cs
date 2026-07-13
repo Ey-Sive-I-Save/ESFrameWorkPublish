@@ -18,7 +18,7 @@ namespace ES
         /// <summary>
         /// 无意义重试
         /// </summary>
-        [InspectorName("无意义重试")] ReTry = 4,
+        [InspectorName("无意义重试")] Repeat = 4,
         /// <summary>
         /// 还没结果
         /// </summary>

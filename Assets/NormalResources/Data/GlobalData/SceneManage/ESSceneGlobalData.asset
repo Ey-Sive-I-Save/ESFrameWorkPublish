@@ -53,7 +53,7 @@ MonoBehaviour:
     Group: "\u6838\u5FC3\u573A\u666F"
     Enabled: 1
   - DisplayName: New Scene 1
-    ScenePath: Assets/Plugins/ES/3_Examples/Example_SimpleTools/New Scene 1.unity
+    ScenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene 1.unity
     SceneAsset: {fileID: 102900000, guid: b4b75588872fe9740ab90f542b86ce3e, type: 3}
     Color: {r: 1, g: 1, b: 1, a: 1}
     Description: 

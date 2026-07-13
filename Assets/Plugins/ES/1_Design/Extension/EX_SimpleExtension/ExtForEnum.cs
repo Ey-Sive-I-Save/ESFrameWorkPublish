@@ -4,7 +4,6 @@ using System.Runtime.CompilerServices;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
@@ -25,7 +24,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _AddFlag<T>(this T enumValue, T flag) where T : Enum
         {
-            return (T)(object)((int)(object)enumValue | (int)(object)flag);
+            return enumValue._AddFlag64(flag);
         }
 
         /// <summary>
@@ -38,7 +37,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _RemoveFlag<T>(this T enumValue, T flag) where T : Enum
         {
-            return (T)(object)((int)(object)enumValue & ~(int)(object)flag);
+            return enumValue._RemoveFlag64(flag);
         }
 
         /// <summary>
@@ -51,7 +50,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _ToggleFlag<T>(this T enumValue, T flag) where T : Enum
         {
-            return enumValue.HasFlag(flag) ? enumValue._RemoveFlag(flag) : enumValue._AddFlag(flag);
+            return enumValue._ToggleFlag64(flag);
         }
 
         /// <summary>
@@ -64,7 +63,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _SwitchFlag<T>(this T enumValue, T flag) where T : Enum
         {
-            return enumValue.HasFlag(flag) ? enumValue._RemoveFlag(flag) : enumValue._AddFlag(flag);
+            return enumValue._ToggleFlag64(flag);
         }
 
         /// <summary>
@@ -73,14 +72,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool _HasAllFlags<T>(this T enumValue, params T[] flags) where T : Enum
         {
-            int Value = (int)(object)enumValue;
-            foreach (T flag in flags)
-            {
-                int Flag = (int)(object)(flag);
-                if ((Value & Flag) != Flag)
-                    return false;
-            }
-            return true;
+            return enumValue._HasAllFlags64(flags);
         }
 
         /// <summary>
@@ -89,14 +81,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool _HasAnyFlags<T>(this T enumValue, params T[] flags) where T : Enum
         {
-            int Value = (int)(object)enumValue;
-            foreach (T flag in flags)
-            {
-                int Flag = (int)(object)(flag);
-                if ((Value & Flag) == Flag)
-                    return true;
-            }
-            return false;
+            return enumValue._HasAnyFlags64(flags);
         }
 
         /// <summary>
@@ -107,7 +92,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static IEnumerable<T> _GetEnumValues<T>() where T : Enum
         {
-            return Enum.GetValues(typeof(T)).Cast<T>();
+            return EnumValueCache<T>.Values;
         }
 
         /// <summary>
@@ -144,7 +129,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _Next<T>(this T enumValue) where T : Enum
         {
-            T[] values = (T[])Enum.GetValues(typeof(T));
+            T[] values = EnumValueCache<T>.Values;
             int index = Array.IndexOf(values, enumValue) + 1;
             return index >= values.Length ? values[0] : values[index];
         }
@@ -158,7 +143,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _Previous<T>(this T enumValue) where T : Enum
         {
-            T[] values = (T[])Enum.GetValues(typeof(T));
+            T[] values = EnumValueCache<T>.Values;
             int index = Array.IndexOf(values, enumValue) - 1;
             return index < 0 ? values[values.Length - 1] : values[index];
         }
@@ -171,7 +156,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _Random<T>() where T : Enum
         {
-            T[] values = (T[])Enum.GetValues(typeof(T));
+            T[] values = EnumValueCache<T>.Values;
             return values[UnityEngine.Random.Range(0, values.Length)];
         }
         #endregion
@@ -250,10 +235,10 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _AddFlag64<T>(this T enumValue, T flag) where T : Enum
         {
-            long v = Convert.ToInt64(enumValue);
-            long f = Convert.ToInt64(flag);
-            long r = v | f;
-            return (T)Enum.ToObject(typeof(T), r);
+            ulong v = ToUInt64Bits(enumValue);
+            ulong f = ToUInt64Bits(flag);
+            ulong r = v | f;
+            return FromUInt64Bits<T>(r);
         }
 
         /// <summary>
@@ -266,10 +251,10 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _RemoveFlag64<T>(this T enumValue, T flag) where T : Enum
         {
-            long v = Convert.ToInt64(enumValue);
-            long f = Convert.ToInt64(flag);
-            long r = v & ~f;
-            return (T)Enum.ToObject(typeof(T), r);
+            ulong v = ToUInt64Bits(enumValue);
+            ulong f = ToUInt64Bits(flag);
+            ulong r = v & ~f;
+            return FromUInt64Bits<T>(r);
         }
 
         /// <summary>
@@ -282,11 +267,11 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _ToggleFlag64<T>(this T enumValue, T flag) where T : Enum
         {
-            long v = Convert.ToInt64(enumValue);
-            long f = Convert.ToInt64(flag);
+            ulong v = ToUInt64Bits(enumValue);
+            ulong f = ToUInt64Bits(flag);
             bool hasAll = (v & f) == f;
-            long r = hasAll ? (v & ~f) : (v | f);
-            return (T)Enum.ToObject(typeof(T), r);
+            ulong r = hasAll ? (v & ~f) : (v | f);
+            return FromUInt64Bits<T>(r);
         }
 
         /// <summary>
@@ -299,10 +284,10 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool _HasAllFlags64<T>(this T enumValue, params T[] flags) where T : Enum
         {
-            long v = Convert.ToInt64(enumValue);
+            ulong v = ToUInt64Bits(enumValue);
             foreach (T flag in flags)
             {
-                long f = Convert.ToInt64(flag);
+                ulong f = ToUInt64Bits(flag);
                 if ((v & f) != f)
                     return false;
             }
@@ -319,10 +304,10 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool _HasAnyFlags64<T>(this T enumValue, params T[] flags) where T : Enum
         {
-            long v = Convert.ToInt64(enumValue);
+            ulong v = ToUInt64Bits(enumValue);
             foreach (T flag in flags)
             {
-                long f = Convert.ToInt64(flag);
+                ulong f = ToUInt64Bits(flag);
                 if ((v & f) == f)
                     return true;
             }
@@ -345,7 +330,49 @@ namespace ES
             return att?.displayName ?? enumValue.ToString();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong ToUInt64Bits<T>(T enumValue) where T : Enum
+        {
+            TypeCode code = Type.GetTypeCode(Enum.GetUnderlyingType(typeof(T)));
+            switch (code)
+            {
+                case TypeCode.SByte: return unchecked((ulong)Convert.ToSByte(enumValue));
+                case TypeCode.Int16: return unchecked((ulong)Convert.ToInt16(enumValue));
+                case TypeCode.Int32: return unchecked((ulong)Convert.ToInt32(enumValue));
+                case TypeCode.Int64: return unchecked((ulong)Convert.ToInt64(enumValue));
+                case TypeCode.Byte: return Convert.ToByte(enumValue);
+                case TypeCode.UInt16: return Convert.ToUInt16(enumValue);
+                case TypeCode.UInt32: return Convert.ToUInt32(enumValue);
+                case TypeCode.UInt64: return Convert.ToUInt64(enumValue);
+                default: return Convert.ToUInt64(enumValue);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static T FromUInt64Bits<T>(ulong value) where T : Enum
+        {
+            Type type = typeof(T);
+            TypeCode code = Type.GetTypeCode(Enum.GetUnderlyingType(type));
+            switch (code)
+            {
+                case TypeCode.SByte: return (T)Enum.ToObject(type, unchecked((sbyte)value));
+                case TypeCode.Int16: return (T)Enum.ToObject(type, unchecked((short)value));
+                case TypeCode.Int32: return (T)Enum.ToObject(type, unchecked((int)value));
+                case TypeCode.Int64: return (T)Enum.ToObject(type, unchecked((long)value));
+                case TypeCode.Byte: return (T)Enum.ToObject(type, unchecked((byte)value));
+                case TypeCode.UInt16: return (T)Enum.ToObject(type, unchecked((ushort)value));
+                case TypeCode.UInt32: return (T)Enum.ToObject(type, unchecked((uint)value));
+                case TypeCode.UInt64: return (T)Enum.ToObject(type, value);
+                default: return (T)Enum.ToObject(type, value);
+            }
+        }
+
         #endregion
+    }
+
+    internal static class EnumValueCache<T> where T : Enum
+    {
+        public static readonly T[] Values = (T[])Enum.GetValues(typeof(T));
     }
 }
 

@@ -46,19 +46,19 @@ namespace ES
             }
         }
     }
-    public interface IValueEntryOperation<Target,Logic, TargetType,OpeationType, OpeationOptions> : IOperation<Target,Logic>
+    public interface IValueEntryOperation<Target,Logic, TargetType,OperationType, OperationOptions> : IOperation<Target,Logic>
     {
-        public abstract void HandleValueEntryOpeation(Target target,Logic logic, OpeationType Opeation_, OpeationOptions SelectType_);
+        public abstract void HandleValueEntryOperation(Target target,Logic logic, OperationType Operation_, OperationOptions SelectType_);
 
-        public abstract void HandleValueEntryCancel(Target target,Logic logic, OpeationType Opeation_, OpeationOptions SelectType_);
+        public abstract void HandleValueEntryCancel(Target target,Logic logic, OperationType Operation_, OperationOptions SelectType_);
     }
 
-    public abstract class ValueEntryOperation<Target,Logic, ValueType_, OpeationType, WithSelector> : IValueEntryOperation<Target,Logic, ValueType_, OpeationType, WithSelector>
+    public abstract class ValueEntryOperation<Target,Logic, ValueType_, OperationType, WithSelector> : IValueEntryOperation<Target,Logic, ValueType_, OperationType, WithSelector>
     {
-        public abstract void HandleValueEntryCancel(Target target,Logic logic, OpeationType Opeation_, WithSelector SelectType_);
-        public abstract void HandleValueEntryOpeation(Target target,Logic logic, OpeationType Opeation_, WithSelector SelectType_);
-        protected abstract void ExpandOperation(ref ValueType_ or, OpeationType Opeation, WithSelector SelectType_);
-        protected abstract void ExpandCancel(ref ValueType_ or, OpeationType Opeation, WithSelector SelectType_);
+        public abstract void HandleValueEntryCancel(Target target,Logic logic, OperationType Operation_, WithSelector SelectType_);
+        public abstract void HandleValueEntryOperation(Target target,Logic logic, OperationType Operation_, WithSelector SelectType_);
+        protected abstract void ExpandOperation(ref ValueType_ or, OperationType Operation, WithSelector SelectType_);
+        protected abstract void ExpandCancel(ref ValueType_ or, OperationType Operation, WithSelector SelectType_);
 
 
     }

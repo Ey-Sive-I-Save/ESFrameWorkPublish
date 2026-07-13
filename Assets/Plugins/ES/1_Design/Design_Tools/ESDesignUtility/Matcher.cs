@@ -67,6 +67,9 @@ namespace ES
          */
         public static class Matcher
         {
+            public const bool IsExperimental = true;
+            public const string ExperimentalNote = "Matcher contains experimental serializer/conversion helpers. MessagePack/XML polymorphism is not a stable full-feature implementation yet.";
+
             // 类型转换缓存，用于提升性能
             #region 类型转换
             /// <summary>

@@ -290,7 +290,7 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.8, g: 0.8, b: 0.8, a: 1}
-    - _Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _Color: {r: 0.8, g: 0.8, b: 0.8, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
@@ -861,7 +861,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 887
 --- !u!114 &359568060
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1421,13 +1421,13 @@ MonoBehaviour:
       Entry: 8
       Data: 
   refer:
-    GUID: 
+    _guid: 
   prefab:
-    GUID: 
+    _guid: 
   clip:
-    GUID: 
+    _guid: 
   mat:
-    GUID: 
+    _guid: 
   test: 
 --- !u!114 &644293401
 MonoBehaviour:
@@ -1674,13 +1674,13 @@ MonoBehaviour:
       Entry: 8
       Data: 
   refer:
-    GUID: 31fc93595747c614292c0704566db088
+    _guid: 
   prefab:
-    GUID: 654862dffa87dc94383f4bcc31955f04
+    _guid: 
   clip:
-    GUID: 
+    _guid: 
   mat:
-    GUID: 
+    _guid: 
   test: "{\r\n    \"$id\": 0,\r\n    \"$type\": \"0|System.Collections.Generic.Dictionary`2[[System.String,
     mscorlib],[System.String, mscorlib]], mscorlib\",\r\n    \"comparer\": {\r\n       
     \"$id\": 1,\r\n        \"$type\": \"1|System.Collections.Generic.GenericEqualityComparer`1[[System.String,
@@ -2017,13 +2017,13 @@ MonoBehaviour:
       Entry: 8
       Data: 
   refer:
-    GUID: 
+    _guid: 
   prefab:
-    GUID: 
+    _guid: 
   clip:
-    GUID: 
+    _guid: 
   mat:
-    GUID: 
+    _guid: 
   test: 
 --- !u!114 &845946181
 MonoBehaviour:
@@ -2361,13 +2361,13 @@ MonoBehaviour:
       Entry: 8
       Data: 
   refer:
-    GUID: 
+    _guid: 
   prefab:
-    GUID: 
+    _guid: 
   clip:
-    GUID: 
+    _guid: 
   mat:
-    GUID: 
+    _guid: 
   test: 
 --- !u!114 &929920462
 MonoBehaviour:
@@ -2584,120 +2584,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: edcde16c1e8f0174b9e37dcf84345cec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  OriginalDomain:
-    myCore: {fileID: 0}
-    MyModules:
-      ValuesNow: []
-      MayHasAddingElement: 1
-  MessagevalueEntryDomain:
-    rid: 5686404887800446976
-  AutoOpenAndCloseByEnableState: 1
-  InitOpen: 0
-  Refer_Rect:
-    _value: {fileID: 0}
-    HasValidValue: 0
-  RegisterToPanel: 1
-  _registerKey: "\u6CE8\u518CUI"
-  _myParentPanel: {fileID: 0}
-  whenRegister:
-    rid: -2
-  whenOpen:
-    rid: 2432690923676893185
-  whenClose:
-    rid: -2
-  ContextPool:
-    _InitValues: []
-    LinkRCL_Tag:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_Float:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_Vector:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_Int:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_String:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_Bool:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_ClassT:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_UnityObjectT:
-      CIRS:
-        _autoCreateOnAccess: 1
-  testElement: "\u6D4B\u8BD5"
-  _myRoot: {fileID: 0}
-  references:
-    version: 2
-    RefIds:
-    - rid: -2
-      type: {class: , ns: , asm: }
-    - rid: 2432690923676893185
-      type: {class: UITweenOutputOperation, ns: ES, asm: ES_Logic}
-      data:
-        TweenGetter:
-          rid: 2432690923676893186
-        enableCancel: 1
-        uiTweenType: 0
-        alwaysReStart: 0
-        cancelToComplete: 1
-        cancelToCompleteAndCallBack: 1
-        enableEase: 0
-        SelfDefine: 0
-        ease: 0
-        SelfDefineCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 0
-            inSlope: 0
-            outSlope: 1
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          - serializedVersion: 3
-            time: 1
-            value: 1
-            inSlope: 1
-            outSlope: 0
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 4
-        enableTimeControl: 0
-        delay: -1
-        ignoreUnityTimeScale: 0
-        enableOther: 0
-        rele: 0
-    - rid: 2432690923676893186
-      type: {class: UITweenGetter_EasyAnchorPos, ns: , asm: ES_Logic}
-      data:
-        duar: 1
-        EnableInit: 0
-        vector2From: {x: 0, y: 0}
-        vector2: {x: -11.38, y: 0}
-        isFrom: 0
-    - rid: 5686404887800446976
-      type: {class: ESUIMessagevalueEntryDomain, ns: ES, asm: ES_Logic}
-      data:
-        myCore: {fileID: 0}
-        MyModules:
-          ValuesNow: []
-          MayHasAddingElement: 1
-        RegisterMain:
-          rid: -2
-        EnableMainLink: 1
 --- !u!4 &1108918425
 Transform:
   m_ObjectHideFlags: 0
@@ -2770,6 +2656,55 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!1 &1125729938
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1125729940}
+  - component: {fileID: 1125729939}
+  m_Layer: 0
+  m_Name: GameObject (3)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1125729939
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1125729938}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48f74fbf26724fe0b03569d27cb3f2c7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hp: 100
+  moveSpeed: 4.5
+  isAlive: 1
+  currentState: Idle
+  target: {fileID: 0}
+--- !u!4 &1125729940
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1125729938}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.87346, y: 0.8389255, z: 1.8052285}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1269041000
 GameObject:
   m_ObjectHideFlags: 0
@@ -3074,30 +3009,6 @@ MonoBehaviour:
     - rid: 6988048868860755968
     - rid: 6988048868860755969
     - rid: 6988048868860755970
-    LinkRCL_Tag:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_Float:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_Vector:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_Int:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_String:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_Bool:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_ClassT:
-      CIRS:
-        _autoCreateOnAccess: 1
-    LinkRCL_UnityObjectT:
-      CIRS:
-        _autoCreateOnAccess: 1
   AutoInit: 1
   AutoEnable: 1
   references:
@@ -4098,13 +4009,13 @@ MonoBehaviour:
       Entry: 8
       Data: 
   refer:
-    GUID: 
+    _guid: 
   prefab:
-    GUID: 
+    _guid: 
   clip:
-    GUID: 
+    _guid: 
   mat:
-    GUID: 
+    _guid: 
   test: 
 --- !u!114 &2065569499
 MonoBehaviour:
@@ -4541,3 +4452,4 @@ SceneRoots:
   - {fileID: 1963609468}
   - {fileID: 1759247917}
   - {fileID: 1992404919}
+  - {fileID: 1125729940}

@@ -447,10 +447,10 @@ namespace ES
             color.b *= factor;
         }
         /// <summary>
-        /// 兼容旧名的就地方法（已弃用）：_WithRGBMutiRef -> _WithRGBMultiInplace
+        /// 兼容旧名的就地方法（已弃用）：_WithRGBMultiRef -> _WithRGBMultiInplace
         /// </summary>
         [Obsolete("Use _SetRGBMulti instead")]
-        public static void _WithRGBMutiRef(ref this Color color, float factor) => _SetRGBMulti(ref color, factor);
+        public static void _WithRGBMultiRef(ref this Color color, float factor) => _SetRGBMulti(ref color, factor);
     }
 }
 

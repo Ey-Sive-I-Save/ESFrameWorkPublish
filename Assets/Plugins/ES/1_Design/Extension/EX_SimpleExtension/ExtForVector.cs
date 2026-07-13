@@ -18,7 +18,7 @@ namespace ES
         /// <param name="vAxis">作为乘数的向量。</param>
         /// <returns>返回新的向量，其每个分量为对应分量的乘积。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3 _MutiVector3(this Vector3 v, Vector3 vAxis)
+        public static Vector3 _MultiVector3(this Vector3 v, Vector3 vAxis)
         {
             return new Vector3(v.x * vAxis.x, v.y * vAxis.y, v.z * vAxis.z);
         }
@@ -110,7 +110,7 @@ namespace ES
         /// <param name="yMulti">Y 的乘数。</param>
         /// <returns>返回 Y 分量变换后的新向量。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3 _WithYMuti(this Vector3 v, float yMulti)
+        public static Vector3 _WithYMulti(this Vector3 v, float yMulti)
         {
             v.y *= yMulti;
             return v;
@@ -123,7 +123,7 @@ namespace ES
         /// <param name="xMulti">X 的乘数。</param>
         /// <returns>返回 X 分量变换后的新向量。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3 _WithXMuti(this Vector3 v, float xMulti)
+        public static Vector3 _WithXMulti(this Vector3 v, float xMulti)
         {
             v.x *= xMulti;
             return v;
@@ -136,7 +136,7 @@ namespace ES
         /// <param name="zMulti">Z 的乘数。</param>
         /// <returns>返回 Z 分量变换后的新向量。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector3 _WithZMuti(this Vector3 v, float zMulti)
+        public static Vector3 _WithZMulti(this Vector3 v, float zMulti)
         {
             v.z *= zMulti;
             return v;

@@ -72,12 +72,12 @@ Assets/Plugins/ES/1_Design/Define/
    NodeContainerSO.cs
    NodeRunnerSO.cs
    OperationRunnerSupport/
-    NodeRunnerSupport_Opeation.cs
+    NodeRunnerSupport_Operation.cs
     NodeRunnerSupport_Target.cs
     NodeRunnerSupport_TargetSolver.cs
    SelectorAndSequence/
     NodeRunnerSelector.cs
-    NodeSequnence.cs
+    NodeSequence.cs
     Selectors/
      NodeRunnerSelector_2for1.cs
      NodeRunnerSelector_3for1.cs

@@ -28,6 +28,6 @@ MonoBehaviour:
   CodegenMode: 1
   Path_Net: https://eysive-teset.oss-cn-beijing.aliyuncs.com
   Path_ResLibraryFolder: Assets/NormalResources/Data/ResLibrary
-  Path_ABHelperCodeGen: Assets/Scripts/ESLogic/CodeGen/ESABHelper
+  Path_ABHelperCodeGen: Assets/Scripts/ESLogic/Runtime/CodeGen/ESABHelper
   Path_LocalABPath_: Assets/StreamingAssets\Res
   Path_Sub_DownloadRelative_: Res

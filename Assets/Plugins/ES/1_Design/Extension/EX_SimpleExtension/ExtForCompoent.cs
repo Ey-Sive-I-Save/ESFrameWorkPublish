@@ -119,10 +119,22 @@ namespace ES
         /// <returns>屏幕坐标（Vector3，其中 z 为相机到点的深度）；若无法获得相机或 self 为 null 则返回 Vector3.zero / Screen position; Vector3.zero on failure.</returns>
         public static Vector3 _GetScreenPosition(this Component component, Camera camera = null)
         {
+            if (component == null) return Vector3.zero;
 
             if (camera == null) camera = Camera.main;
             if (camera == null) return Vector3.zero;
 
+            return camera.WorldToScreenPoint(component.transform.position);
+        }
+
+        /// <summary>
+        /// Fast variant: 使用调用方传入的 Camera 计算屏幕坐标，不隐式查询 Camera.main。适合血条、UI标记、调试标签等每帧热路径。
+        /// Fast variant: uses the supplied Camera only and never queries Camera.main.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Vector3 _GetScreenPositionFast(this Component component, Camera camera)
+        {
+            if (component == null || camera == null) return Vector3.zero;
             return camera.WorldToScreenPoint(component.transform.position);
         }
 
@@ -304,6 +316,7 @@ namespace ES
         /// <returns>直接子 Transform 的数组 / Array of direct child Transforms.</returns>
         public static Transform[] _GetChildrensOneLayer(this Transform transform)
         {
+            if (transform == null) return System.Array.Empty<Transform>();
             Transform[] children = new Transform[transform.childCount];
             for (int i = 0; i < transform.childCount; i++)
                 children[i] = transform.GetChild(i);
@@ -330,21 +343,18 @@ namespace ES
         /// <param name="transform">目标 Transform / Target Transform.</param>
         public static void _DestroyAllChildren(this Transform transform)
         {
+            if (transform == null) return;
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 GameObject go = transform.GetChild(i).gameObject;
-                if (Application.isPlaying)
-                {
-                    UnityEngine.Object.Destroy(go);
-                }
-                else
-                {
 #if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
                     UnityEngine.Object.DestroyImmediate(go);
-#else
-                    UnityEngine.Object.Destroy(go);
-#endif
+                    continue;
                 }
+#endif
+                UnityEngine.Object.Destroy(go);
             }
         }
 

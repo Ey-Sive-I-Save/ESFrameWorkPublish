@@ -2,6 +2,7 @@
 using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 #if UNITY_EDITOR
 #endif
 using UnityEngine;
@@ -48,6 +49,7 @@ namespace ES
                 return module as KeyType;
             }
             var moduleNew = new KeyType();
+            bool registered = false;
             for (int i = 0; i < domains.Count; i++)
             {
                 var d = domains[i];
@@ -55,8 +57,15 @@ namespace ES
                 if (d != null&&d.GetType()==moduleNew.DomainType)
                 {
                     d.TryAddModuleRuntimeWithoutTypeMatch(moduleNew);
+                    registered = true;
                 }
             }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!registered)
+            {
+                Debug.LogWarning($"[Core] Module {typeof(KeyType).Name} created but no matching domain was registered. DomainType: {moduleNew.DomainType?.Name}");
+            }
+#endif
             return moduleNew;
         }
         public T GetMoudle<ABKey,T>() where ABKey:class,IModule where T : class, IModule, new()
@@ -66,6 +75,7 @@ namespace ES
                 return module as T;
             }
             var moduleNew = new T();
+            bool registered = false;
             for (int i = 0; i < domains.Count; i++)
             {
                 var d = domains[i];
@@ -73,8 +83,15 @@ namespace ES
                 if (d != null && d.GetType() == moduleNew.DomainType)
                 {
                     d.TryAddModuleRuntimeWithoutTypeMatch(moduleNew);
+                    registered = true;
                 }
             }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!registered)
+            {
+                Debug.LogWarning($"[Core] Module {typeof(T).Name} created but no matching domain was registered. DomainType: {moduleNew.DomainType?.Name}");
+            }
+#endif
             return moduleNew;
         }
         #endregion
@@ -115,7 +132,13 @@ namespace ES
             List<IPreviewElement> normalProviders,
             List<IPreviewElement> singleProviders)
         {
+#if UNITY_EDITOR
+            EnsureEditorPreviewDomainRelationships(domains);
+#endif
             CollectPreviewElements(domains, normalProviders, singleProviders);
+#if UNITY_EDITOR
+            CollectPreviewElementsFromSerializedDomainFields(normalProviders, singleProviders);
+#endif
 
             if (ModuleTables == null) return;
 
@@ -124,6 +147,45 @@ namespace ES
                 AddPreviewElement(module, normalProviders, singleProviders);
             }
         }
+
+#if UNITY_EDITOR
+        private void EnsureEditorPreviewDomainRelationships(IEnumerable<IDomain> domainList)
+        {
+            if (domainList == null)
+                return;
+
+            foreach (var domain in domainList)
+                domain?._Editor_RegisterAllButOnlyCreateRelationship(this);
+        }
+
+        private void CollectPreviewElementsFromSerializedDomainFields(
+            List<IPreviewElement> normalProviders,
+            List<IPreviewElement> singleProviders)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            Type type = GetType();
+
+            while (type != null && type != typeof(MonoBehaviour))
+            {
+                FieldInfo[] fields = type.GetFields(flags);
+                for (int i = 0; i < fields.Length; i++)
+                {
+                    FieldInfo field = fields[i];
+                    if (!typeof(IDomain).IsAssignableFrom(field.FieldType))
+                        continue;
+
+                    object value = field.GetValue(this);
+                    if (value is IDomain domain)
+                    {
+                        domain._Editor_RegisterAllButOnlyCreateRelationship(this);
+                        AddPreviewElement(domain, normalProviders, singleProviders);
+                    }
+                }
+
+                type = type.BaseType;
+            }
+        }
+#endif
 
         private static void CollectPreviewElements(
             IEnumerable<IDomain> domains,
@@ -239,6 +301,13 @@ namespace ES
             if (domain != null)
             {
                 domain._RegisterThisDomainToCore(this);
+                if (domain.Core_Base != this)
+                {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.LogWarning($"[Core] Domain {domain.GetType().Name} can not register to core {GetType().Name}. Check Domain generic Core type.");
+#endif
+                    return;
+                }
                 domains.Add(domain);
             }
         }

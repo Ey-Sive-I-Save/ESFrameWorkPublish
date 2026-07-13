@@ -9,11 +9,11 @@ namespace ES
         _Variable VariableData { get; set; }
     }
 
-    #region 测试泛型
-    public class TestSharedAndVariable : ISharedAndVariable<object, TestDeepClone>
+    #region 示例
+    public class ExampleSharedAndVariable : ISharedAndVariable<object, ExampleDeepCloneData>
     {
         public object SharedData { get; set; }
-        public TestDeepClone VariableData { get ; set ; }
+        public ExampleDeepCloneData VariableData { get ; set ; }
     }
     #endregion
 }

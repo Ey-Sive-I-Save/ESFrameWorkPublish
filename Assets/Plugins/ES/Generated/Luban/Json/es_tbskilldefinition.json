@@ -1,0 +1,19 @@
+[
+  {
+    "id": 100001,
+    "groupId": 1001,
+    "key": "SampleSkill",
+    "nameTextKey": "skill.sample.name",
+    "descTextKey": "skill.sample.desc",
+    "timelineAssetKey": "SkillTimeline/SampleSkill",
+    "tags": "Skill|Active",
+    "unlockCondition": "Level>=1",
+    "castPrerequisite": "HasTarget",
+    "numericPrepareExpression": "Power*1.0",
+    "contextPrepareExpression": "FillInitialTargets",
+    "canCancel": true,
+    "canStack": false,
+    "sharedEnergyKey": "",
+    "sharedCountKey": ""
+  }
+]

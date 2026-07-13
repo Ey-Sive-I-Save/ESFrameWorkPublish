@@ -35,10 +35,29 @@ namespace ES
             if (!init_Editor)
             {
                 init_Editor = true;
-                ESEditorSO.SOS.Add(this.GetType(), this);
+                Editor_RegisterToSOIndex();
             }
 #endif
         }
+
+#if UNITY_EDITOR
+        public void Editor_RegisterToSOIndex()
+        {
+            init_Editor = true;
+            if (ESEditorSO.SOS.Groups.TryGetValue(this.GetType(), out var group) && group.Contains(this))
+                return;
+
+            ESEditorSO.SOS.Add(this.GetType(), this);
+        }
+
+        public void Editor_EnsureInitializedAndRegistered()
+        {
+            if (!init_Editor)
+                OnEditorInitialized();
+
+            Editor_RegisterToSOIndex();
+        }
+#endif
         public virtual void OnEditorApply()
         {
 

@@ -43,6 +43,10 @@ namespace ES
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
+                if (reverse.TryGetValue(value, out var oldKey) && !EqualityComparer<TKey>.Default.Equals(oldKey, key))
+                {
+                    return;
+                }
                 if (forward.TryGetValue(key, out var oldValue))
                 {
                     reverse.Remove(oldValue);

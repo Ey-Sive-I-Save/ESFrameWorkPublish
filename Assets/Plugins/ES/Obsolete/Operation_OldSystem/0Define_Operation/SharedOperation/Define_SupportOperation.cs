@@ -14,29 +14,29 @@ namespace ES {
      * 而Support提供的是修改的值和操作类型
        
      
-    public interface ISupportOperation<Target,Logic, OpeationType, OpeationOptions>
+    public interface ISupportOperation<Target,Logic, OperationType, OperationOptions>
     {
-        public OpeationOptions GetOperationOptions { get; }
-        public abstract OpeationType GetOpeationValue(Target target,Logic logic);
+        public OperationOptions GetOperationOptions { get; }
+        public abstract OperationType GetOperationValue(Target target,Logic logic);
 
     }
-    public abstract class SupportOperation<Target,Logic, OpeationType, OpeationOptions> : ISupportOperation<Target,Logic, OpeationType, OpeationOptions>
+    public abstract class SupportOperation<Target,Logic, OperationType, OperationOptions> : ISupportOperation<Target,Logic, OperationType, OperationOptions>
     {
-        public abstract OpeationOptions GetOperationOptions { get; }
+        public abstract OperationOptions GetOperationOptions { get; }
 
-        public abstract OpeationType GetOpeationValue(Target target,Logic logic);
+        public abstract OperationType GetOperationValue(Target target,Logic logic);
     }
 
     //演示
     #region 演示
     //直接显示输入
-    public abstract class SupportOperation_DirectInput<Target,Logic, OpeationType, OpeationOptions> : SupportOperation<Target,Logic, OpeationType, OpeationOptions> {
+    public abstract class SupportOperation_DirectInput<Target,Logic, OperationType, OperationOptions> : SupportOperation<Target,Logic, OperationType, OperationOptions> {
         [LabelText("操作�?)]
-        public OpeationType opValue;
+        public OperationType opValue;
         [LabelText("操作类型")]
-        public OpeationOptions opType;
-        public sealed override OpeationOptions GetOperationOptions { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => opType; }
-        public sealed override OpeationType GetOpeationValue(Target target,Logic logic)
+        public OperationOptions opType;
+        public sealed override OperationOptions GetOperationOptions { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => opType; }
+        public sealed override OperationType GetOperationValue(Target target,Logic logic)
         {
             return opValue;
         }

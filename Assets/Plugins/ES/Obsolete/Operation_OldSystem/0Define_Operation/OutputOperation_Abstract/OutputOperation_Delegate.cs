@@ -18,7 +18,7 @@ namespace ES
         public int count = 0;
     }
     [Serializable]
-    public abstract class OutputOpeationDelegate<Target,Logic, MakeAction> :
+    public abstract class OutputOperationDelegate<Target,Logic, MakeAction> :
         OutputOperation_MustCancel<Target,Logic>
         where MakeAction : Delegate
         where Logic : IOpStoreDictionary<IOperation, DeleAndCount, OutputOperationDelegateFlag>
@@ -62,7 +62,7 @@ namespace ES
                 use.count--;
                 if (use.count <= 0)
                 {
-                    //提前退�?
+                    //提前退�?
                     Debug.Log("COUNT3");
                     TryCancel(target,logic);
                 }

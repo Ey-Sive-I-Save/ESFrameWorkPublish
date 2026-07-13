@@ -1,0 +1,6 @@
+##var,id,packId,key,displayNameKey,comment
+##type,int,int,string,string,string
+##group,client,client,client,client,editor
+##,Group Id,Pack Id,Stable key,Localization key,Editor comment
+,1001,1,SkillDefinition,group.skill.definition.name,Single skill body definition
+,2001,2,Text,group.localization.text.name,Localization text table

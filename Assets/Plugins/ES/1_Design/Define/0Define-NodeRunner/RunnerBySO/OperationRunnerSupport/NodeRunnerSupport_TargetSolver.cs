@@ -11,7 +11,7 @@ namespace ES {
     {
         public override NodePort GetInputNode()
         {
-            return new NodePort() { Name = "处理目标", IsMutiConnect = false };
+            return new NodePort() { Name = "处理目标", IsMultiConnect = false };
         }
 
     }

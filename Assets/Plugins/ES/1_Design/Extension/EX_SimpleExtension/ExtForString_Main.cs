@@ -10,7 +10,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
-using UnityEngine.Windows;
 
 namespace ES
 {
@@ -47,6 +46,15 @@ namespace ES
     /// </summary>
     public static class ExtForString_Main
     {
+        private static readonly Regex ChineseCharacterRegex = new Regex(@"[\u4e00-\u9fa5]", RegexOptions.Compiled);
+        private static readonly char[] ChineseSymbolChars = "。？！，、；：“”‘’（）《》——……·【】·^ ∧ ¶ =  # / ∞ △ ※ ●＋ － × ÷ ± ≌ ∽ ≤ ≥ ≠ ≡ ∫ ∮ ∑ ∏".ToCharArray();
+        private static readonly char[] NormalSymbolChars = ". , ? ! ' \" : ; ... — –  ( )   { } + − × ÷ = ≠ ≈ ± ≤ ≥ % ° °C °F π ∫ ∑ ∏ √ ∞ / \\ | # & * ~ @ $ £ € ¥ ¢ ^".ToCharArray();
+        private static readonly Regex IdentifierInvalidCharRegex = new Regex(@"\W", RegexOptions.Compiled);
+        private static readonly Regex MultiUnderscoreRegex = new Regex(@"_{2,}", RegexOptions.Compiled);
+        private static readonly Regex ExtraSpacesRegex = new Regex(@"\s+", RegexOptions.Compiled);
+        private static readonly Regex NewlineRegex = new Regex(@"\r?\n", RegexOptions.Compiled);
+        private static readonly Regex WhitespaceRegex = new Regex(@"[ \t]+", RegexOptions.Compiled);
+
         #region 截取系列
         // ==================================================================================
         // 字符串截取和保留操作
@@ -95,6 +103,7 @@ namespace ES
         public static string _KeepBeforeByFirst(this string source, string separator, bool includeSeparator = false, StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
+            if (string.IsNullOrEmpty(separator)) return source;
 
             int index = source.IndexOf(separator, comparison);
             if (index < 0) return source; // 未找到分隔符返回原字符串
@@ -114,6 +123,7 @@ namespace ES
         public static string _KeepBeforeByLast(this string source, string separator, bool includeSeparator = false, StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
+            if (string.IsNullOrEmpty(separator)) return source;
 
             int index = source.LastIndexOf(separator, comparison);
             if (index < 0) return source; // 未找到分隔符返回原字符串
@@ -133,6 +143,7 @@ namespace ES
         public static string _KeepAfterByFirst(this string source, string separator, bool includeSeparator = false, StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
+            if (string.IsNullOrEmpty(separator)) return source;
 
             int index = source.IndexOf(separator, comparison);
             if (index < 0) return source; // 未找到分隔符返回原字符串
@@ -152,6 +163,7 @@ namespace ES
         public static string _KeepAfterByLast(this string source, string separator, bool includeSeparator = false, StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
+            if (string.IsNullOrEmpty(separator)) return source;
 
             int index = source.LastIndexOf(separator, comparison);
             if (index < 0) return source; // 未找到分隔符返回原字符串
@@ -221,6 +233,7 @@ namespace ES
         public static string _KeepBetween(this string source, string startSeparator, string endSeparator, bool includeSeparators = false, StringComparison comparison = StringComparison.Ordinal)
         {
             if (string.IsNullOrEmpty(source)) return source;
+            if (string.IsNullOrEmpty(startSeparator) || string.IsNullOrEmpty(endSeparator)) return string.Empty;
 
             int startIndex = source.IndexOf(startSeparator, comparison);
             if (startIndex < 0) return string.Empty;
@@ -405,7 +418,8 @@ namespace ES
         /// <returns></returns>
         public static bool _HasSpace(this string input)
         {
-            return input.Contains(" ");
+            if (string.IsNullOrEmpty(input)) return false;
+            return input.IndexOf(' ') >= 0;
         }
         /// <summary>
         /// 检测字符串是否包含中文汉字
@@ -435,9 +449,9 @@ namespace ES
         /// </summary>
         /// <param name="input">待检测的字符串</param>
         /// <returns>如果包含中文汉字返回true，否则返回false</returns>
-        private static readonly Regex ChineseCharacterRegex = new Regex(@"[\u4e00-\u9fa5]", RegexOptions.Compiled);
         public static bool _ContainsChineseCharacter(this string input)
         {
+            if (string.IsNullOrEmpty(input)) return false;
             return ChineseCharacterRegex.IsMatch(input); // 使用预编译版本
         }
         /// <summary>
@@ -447,7 +461,8 @@ namespace ES
         /// <returns></returns>
         public static bool _ContainChineseCharacterOrChineseSymbol(this string input)
         {
-            return Regex.IsMatch(input, @"[\u4e00-\u9fa5]") || Regex.IsMatch(input, @"[。？！，、；：“”‘’（）《》——……·【】·^ ∧ ¶ =  # / ∞ △ ※ ●＋ － × ÷ ± ≌ ∽ ≤ ≥ ≠ ≡ ∫ ∮ ∑ ∏]");
+            if (string.IsNullOrEmpty(input)) return false;
+            return ChineseCharacterRegex.IsMatch(input) || input.IndexOfAny(ChineseSymbolChars) >= 0;
         }
         /// <summary>
         /// 包含中文汉字或者任意符号
@@ -456,9 +471,10 @@ namespace ES
         /// <returns></returns>
         public static bool _ContainChineseCharacterOrNormalSymbol(this string input)
         {
-            return Regex.IsMatch(input, @"[\u4e00-\u9fa5]")
-                || Regex.IsMatch(input, @"[。？！，、；：“”‘’（）《》——……·【】·^ ∧ ¶ =  # / ∞ △ ※ ●＋ － × ÷ ± ≌ ∽ ≤ ≥ ≠ ≡ ∫ ∮ ∑ ∏]")
-                || Regex.IsMatch(input, @"[. , ? ! ' "" : ; ... — –  ( )   { } + − × ÷ = ≠ ≈ ± ≤ ≥ % ° °C °F π ∫ ∑ ∏ √ ∞ / \ | # & * ~ @ $ £ € ¥ ¢ ^]");
+            if (string.IsNullOrEmpty(input)) return false;
+            return ChineseCharacterRegex.IsMatch(input)
+                || input.IndexOfAny(ChineseSymbolChars) >= 0
+                || input.IndexOfAny(NormalSymbolChars) >= 0;
 
         }
         /// <summary>
@@ -468,7 +484,7 @@ namespace ES
         /// <returns></returns>
         private static bool _IsCSharpKeyword(this string value)
         {
-            return Array.Exists(keywords, k => k.Equals(value, StringComparison.Ordinal));
+            return !string.IsNullOrEmpty(value) && CSharpKeywordSet.Contains(value);
         }
         public static string[] keywords = {
             "abstract", "as", "base", "bool", "break", "byte", "case", "catch",
@@ -482,6 +498,7 @@ namespace ES
             "try", "typeof", "uint", "ulong", "unchecked", "unsafe", "ushort", "using",
             "virtual", "void", "volatile", "while"
         };
+        private static readonly HashSet<string> CSharpKeywordSet = new HashSet<string>(keywords, StringComparer.Ordinal);
 
         /// <summary>
         /// 验证字符串是否为有效的C#标识符名称
@@ -520,7 +537,7 @@ namespace ES
                 return false;
 
             // 步骤1：查询是否包含所有非字母、数字、下划线的字符
-            if (Regex.IsMatch(input, @"\W"))
+            if (IdentifierInvalidCharRegex.IsMatch(input))
                 return false;
 
             // 步骤2：查询是否以数字开头
@@ -541,6 +558,7 @@ namespace ES
         /// <returns></returns>
         public static int _GetSlashCount(this string selfStr)
         {
+            if (string.IsNullOrEmpty(selfStr)) return 0;
             string nor = selfStr.Replace("\\", "/");
             return nor.Count((n) => n == '/');
 
@@ -572,7 +590,8 @@ namespace ES
         /// <returns></returns>
         public static string _RemoveExtraSpaces(this string str)
         {
-            return Regex.Replace(str, @"\s+", " ").Trim();
+            if (string.IsNullOrEmpty(str)) return str;
+            return ExtraSpacesRegex.Replace(str, " ").Trim();
         }
         /// <summary>
         /// 把一系列字符串,以分隔符加入连接
@@ -582,6 +601,7 @@ namespace ES
         /// <returns></returns>
         public static string _StringJoin(this IEnumerable<string> self, string separator)
         {
+            if (self == null) return string.Empty;
             return string.Join(separator, self);
         }
         /// <summary>
@@ -592,7 +612,8 @@ namespace ES
         /// <returns></returns>
         public static string _RemoveSubStrings(this string str, params string[] targets)
         {
-            return targets.Aggregate(str, (current, t) => current.Replace(t, string.Empty));
+            if (string.IsNullOrEmpty(str) || targets == null || targets.Length == 0) return str;
+            return targets.Aggregate(str, (current, t) => string.IsNullOrEmpty(t) ? current : current.Replace(t, string.Empty));
         }
         /// <summary>
         /// 移除最后的扩展名
@@ -601,6 +622,7 @@ namespace ES
         /// <returns></returns>
         public static string _RemoveExtension(this string str)
         {
+            if (string.IsNullOrEmpty(str)) return str;
             int thePoint = str.LastIndexOf('.');
             if (thePoint >= 0) return str.Substring(0, thePoint);
             return str;
@@ -673,6 +695,9 @@ namespace ES
         /// <returns></returns>
         public static string _FirstUpper(this string input, CultureInfo culture)
         {
+            if (string.IsNullOrEmpty(input)) return input;
+            if (culture == null) culture = CultureInfo.CurrentCulture;
+
             // 处理单字符情况
             if (input.Length == 1)
                 return char.ToUpper(input[0], culture).ToString();
@@ -690,6 +715,9 @@ namespace ES
         /// </summary>
         public static string _FirstLower(this string input, CultureInfo culture)
         {
+            if (string.IsNullOrEmpty(input)) return input;
+            if (culture == null) culture = CultureInfo.CurrentCulture;
+
             // 处理单字符情况
             if (input.Length == 1)
                 return char.ToLower(input[0], culture).ToString();
@@ -712,14 +740,14 @@ namespace ES
                 return "_";
 
             // 步骤1：替换所有非字母、数字、下划线的字符为下划线[6,7](@ref)
-            string normalized = Regex.Replace(input, @"[\W]", "_");
+            string normalized = IdentifierInvalidCharRegex.Replace(input, "_");
 
             // 步骤2：处理开头数字（添加下划线前缀）[3,4](@ref)
             if (char.IsDigit(normalized[0]))
                 normalized = "_" + normalized;
 
             // 步骤3：合并连续下划线[6](@ref)
-            normalized = Regex.Replace(normalized, @"_{2,}", "_");
+            normalized = MultiUnderscoreRegex.Replace(normalized, "_");
 
             // 步骤4：处理C#关键字冲突（添加@前缀）[3,10](@ref)
             if (normalized._IsCSharpKeyword())
@@ -734,10 +762,11 @@ namespace ES
         /// <returns></returns>
         public static string _ToCode(this string code)
         {
+            if (string.IsNullOrEmpty(code)) return code + "\n//ES已修正";
+
             int indentLevel = 0;
-            string cleanedCode = Regex.Replace(code, @"\r?\n", "\n"); // 统一换行符
-            string pattern = @"[ \t]+";  // \s 匹配使用的空白符（空格、制表符等）
-            cleanedCode = Regex.Replace(cleanedCode, pattern, " "); // 最多保留两个连续空行和空格
+            string cleanedCode = NewlineRegex.Replace(code, "\n"); // 统一换行符
+            cleanedCode = WhitespaceRegex.Replace(cleanedCode, " "); // 最多保留两个连续空行和空格
 
             StringBuilder sb = new StringBuilder();
             foreach (char c in cleanedCode)
@@ -757,10 +786,6 @@ namespace ES
 
             return sb.ToString() + "\n//ES已修正";
         }
-
-        // 添加预编译的正则表达式（在类级别）
-        private static readonly Regex NewlineRegex = new Regex(@"\r?\n", RegexOptions.Compiled);
-        private static readonly Regex WhitespaceRegex = new Regex(@"[ \t]+", RegexOptions.Compiled);
 
         /// <summary>
         /// 转化成代码格式（性能优化版本）
@@ -948,6 +973,7 @@ namespace ES
         /// <returns>32位十六进制小写的MD5哈希字符串</returns>
         public static string _ToMD5Hash(this string str)
         {
+            if (str == null) str = string.Empty;
             using (var md5 = System.Security.Cryptography.MD5.Create())
             {
                 var hashBytes = md5.ComputeHash(Encoding.UTF8.GetBytes(str));
@@ -961,6 +987,7 @@ namespace ES
         /// <returns></returns>
         public static string _ToSHA1Hash(this string str)
         {
+            if (str == null) str = string.Empty;
             using (var sha1 = System.Security.Cryptography.SHA1.Create())
             {
                 var hashBytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(str));
@@ -974,10 +1001,11 @@ namespace ES
         /// <returns></returns>
         public static string _ToSha256Hash(this string str)
         {
+            if (str == null) str = string.Empty;
             using (SHA256 sha256 = SHA256.Create())
             {
                 byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(str));
-                return BitConverter.ToString(bytes).Replace("-", "").ToLower();
+                return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
             }
         }
 

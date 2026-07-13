@@ -187,7 +187,7 @@ public class MyFeature : IESWithLife
 
 **核心文件**：
 - `Poolable-Define.cs`
-- `LinkRecievePool.cs`（实际应用示例）
+- `LinkReceivePool.cs`（实际应用示例）
 
 **核心API**：
 ```csharp

@@ -39,7 +39,7 @@ namespace ES
                     case EnumCollect.HandleTwoNumber.Set: return f2;
                     case EnumCollect.HandleTwoNumber.Add: return f1 + f2;
                     case EnumCollect.HandleTwoNumber.Sub: return f1 - f2;
-                    case EnumCollect.HandleTwoNumber.Muti: return f1 * f2;
+                    case EnumCollect.HandleTwoNumber.Multi: return f1 * f2;
                     case EnumCollect.HandleTwoNumber.Divide: if (f2 == 0) f2 = 1; return f1 / f2;
                     case EnumCollect.HandleTwoNumber.Model: if (f2 == 0) f2 = 1; return f1 % f2;
                     case EnumCollect.HandleTwoNumber.Mask_And: return (int)f1 & (int)f2;
@@ -113,7 +113,7 @@ namespace ES
                     case EnumCollect.HandleTwoNumber.Set: return i2;
                     case EnumCollect.HandleTwoNumber.Add: return i1 + i2;
                     case EnumCollect.HandleTwoNumber.Sub: return i1 - i2;
-                    case EnumCollect.HandleTwoNumber.Muti: return i1 * i2;
+                    case EnumCollect.HandleTwoNumber.Multi: return i1 * i2;
                     case EnumCollect.HandleTwoNumber.Divide: if (i2 == 0) i2 = 1; return i1 / i2;
                     case EnumCollect.HandleTwoNumber.Model: if (i2 == 0) i2 = 1; return i1 % i2;
                     case EnumCollect.HandleTwoNumber.Mask_And: return (int)i1 & (int)i2;

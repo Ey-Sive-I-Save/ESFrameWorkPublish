@@ -21,7 +21,7 @@ namespace ES {
             [InspectorName("直接设置")] Set,
             [InspectorName("加上")] Add,
             [InspectorName("减去")] Sub,
-            [InspectorName("逼近")] Muti,
+            [InspectorName("逼近")] Multi,
             [InspectorName("远离")] Div,
             [InspectorName("循环")] Model
         }

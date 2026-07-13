@@ -1,8 +1,9 @@
-using ES;
+﻿using ES;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace ES
@@ -49,7 +50,32 @@ namespace ES
             /// - 当前实现基于递归反射，若对象图包含循环引用可能导致栈溢出或重复克隆（请在外部避免循环引用或扩展本方法以支持引用跟踪）。
             /// - 调用此方法应在 Unity 主线程中进行（若传入 Unity 对象且选择实例化）。
             /// </remarks>
+            [ThreadStatic]
+            private static Dictionary<object, object> _activeCloneVisited;
+
             public static object DeepCloneAnyObject(object obj, bool HardUnityObject = true, Func<object> selfDefineCreator = null)
+            {
+                if (_activeCloneVisited != null)
+                {
+                    return DeepCloneAnyObjectInternal(obj, HardUnityObject, selfDefineCreator, _activeCloneVisited);
+                }
+
+                var visited = new Dictionary<object, object>(ReferenceEqualityComparer.Instance);
+                _activeCloneVisited = visited;
+                try
+                {
+                    return DeepCloneAnyObjectInternal(obj, HardUnityObject, selfDefineCreator, visited);
+                }
+                finally
+                {
+                    if (ReferenceEquals(_activeCloneVisited, visited))
+                    {
+                        _activeCloneVisited = null;
+                    }
+                }
+            }
+
+            private static object DeepCloneAnyObjectInternal(object obj, bool HardUnityObject = true, Func<object> selfDefineCreator = null, Dictionary<object, object> visited = null)
             {
                 //为NULL返回NULL
                 if (obj == null)
@@ -66,13 +92,21 @@ namespace ES
                     return obj;
                 }
 
+                visited ??= new Dictionary<object, object>(ReferenceEqualityComparer.Instance);
+                if (visited.TryGetValue(obj, out object existingClone))
+                {
+                    return existingClone;
+                }
+
                 //如果是UnityObject -- 首次调用会实例化，否则直接引用
                 if (obj is UnityEngine.Object uObj)
                 {
                     if (uObj == null) return null;
                     if (HardUnityObject)
                     {
-                        return UnityEngine.Object.Instantiate(uObj);
+                        var unityClone = UnityEngine.Object.Instantiate(uObj);
+                        visited[obj] = unityClone;
+                        return unityClone;
                     }
                     else
                     {
@@ -86,9 +120,10 @@ namespace ES
                     var array = obj as Array;
                     Type elementType = type.GetElementType();
                     Array copiedArray = Array.CreateInstance(elementType, array.Length);
+                    visited[obj] = copiedArray;
                     for (int i = 0; i < array.Length; i++)
                     {
-                        copiedArray.SetValue(DeepCloneAnyObject(array.GetValue(i), false), i);
+                        copiedArray.SetValue(DeepCloneAnyObjectInternal(array.GetValue(i), false, null, visited), i);
                     }
                     return copiedArray;
                 }
@@ -102,10 +137,15 @@ namespace ES
                         var addMethod = type.GetMethod("Add");
                         if (addMethod != null)
                         {
-                            var copiedCollection = Activator.CreateInstance(type);
+                            if (!TryCreateCloneInstance(type, out var copiedCollection, selfDefineCreator))
+                            {
+                                return obj;
+                            }
+
+                            visited[obj] = copiedCollection;
                             foreach (var item in (IEnumerable)obj)
                             {
-                                var use = DeepCloneAnyObject(item, false);
+                                var use = DeepCloneAnyObjectInternal(item, false, null, visited);
                                 addMethod.Invoke(copiedCollection, new object[] { use });
                             }
                             return copiedCollection;
@@ -125,7 +165,12 @@ namespace ES
                 //如果是结构体("已经排除了原始类型--无法通过直接赋值来拷贝结构体，因为已经作为Struct装箱了
 
                 // 如果是普通引用类型或结构体--结合
-                var clonedObject = selfDefineCreator != null ? selfDefineCreator.Invoke() : Activator.CreateInstance(type);
+                if (!TryCreateCloneInstance(type, out var clonedObject, selfDefineCreator))
+                {
+                    return obj;
+                }
+
+                visited[obj] = clonedObject;
                 if (clonedObject is IDeepClone deep)
                 {
                     deep.DeepCloneFrom(obj);
@@ -137,11 +182,55 @@ namespace ES
                         continue;
 
                     object fieldValue = field.GetValue(obj);
-                    object clonedValue = DeepCloneAnyObject(fieldValue, false);
+                    object clonedValue = DeepCloneAnyObjectInternal(fieldValue, false, null, visited);
 
                     field.SetValue(clonedObject, clonedValue);
                 }
                 return clonedObject;
+            }
+
+            private static bool TryCreateCloneInstance(Type type, out object instance, Func<object> selfDefineCreator = null)
+            {
+                instance = null;
+                try
+                {
+                    instance = selfDefineCreator != null ? selfDefineCreator.Invoke() : Activator.CreateInstance(type);
+                    return instance != null;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"DeepCloneAnyObject cannot create instance of {type.FullName}. Return original reference. {ex.GetType().Name}: {ex.Message}");
+                    return false;
+                }
+            }
+
+            private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
+            {
+                public static readonly ReferenceEqualityComparer Instance = new ReferenceEqualityComparer();
+
+                public new bool Equals(object x, object y)
+                {
+                    return ReferenceEquals(x, y);
+                }
+
+                public int GetHashCode(object obj)
+                {
+                    return RuntimeHelpers.GetHashCode(obj);
+                }
+            }
+
+            private static bool TryGetTrackedClone(object source, out object clone)
+            {
+                clone = null;
+                return source != null && _activeCloneVisited != null && _activeCloneVisited.TryGetValue(source, out clone);
+            }
+
+            private static void TrackClone(object source, object clone)
+            {
+                if (source != null && clone != null && _activeCloneVisited != null)
+                {
+                    _activeCloneVisited[source] = clone;
+                }
             }
             /// <summary>
             /// 针对常见集合类型（List/Dictionary/HashSet/Queue/Stack/LinkedList/ArrayList）做深拷贝的分发入口。
@@ -153,6 +242,25 @@ namespace ES
             /// <returns>返回克隆后的集合对象，类型与输入集合一致（若无法克隆会返回原集合并记录警告）。</returns>
             public static object DeepCloneCollection(object collection, Type collectionType = null, Func<object> creator = null)
             {
+                if (collection == null) return null;
+                if (_activeCloneVisited == null)
+                {
+                    var visited = new Dictionary<object, object>(ReferenceEqualityComparer.Instance);
+                    _activeCloneVisited = visited;
+                    try
+                    {
+                        return DeepCloneCollection(collection, collectionType, creator);
+                    }
+                    finally
+                    {
+                        if (ReferenceEquals(_activeCloneVisited, visited))
+                        {
+                            _activeCloneVisited = null;
+                        }
+                    }
+                }
+
+                if (TryGetTrackedClone(collection, out var trackedClone)) return trackedClone;
                 collectionType ??= collection.GetType();
                 // 特殊处理常见集合 带泛型
                 if (collectionType.IsGenericType)
@@ -217,6 +325,7 @@ namespace ES
 
                 // 创建新字典实例
                 object newDict = Activator.CreateInstance(dictType);
+                TrackClone(dictionary, newDict);
                 var addMethod = dictType.GetMethod("Add");
                 if (addMethod != null && dictionary is IDictionary idict)
                 {
@@ -250,6 +359,7 @@ namespace ES
                 var newList = Activator.CreateInstance(
                     listType,
                     new object[] { count }); // 指定初始容量
+                TrackClone(list, newList);
 
                 var addMethod = listType.GetMethod("Add");
 
@@ -274,6 +384,7 @@ namespace ES
 
                 // 创建新HashSet实例
                 object newHashSet = Activator.CreateInstance(hashSetType);
+                TrackClone(hashSet, newHashSet);
 
                 // 获取Add方法
                 MethodInfo addMethod = hashSetType.GetMethod("Add");
@@ -305,6 +416,7 @@ namespace ES
 
                 // 创建新的Stack实例
                 var newStack = Activator.CreateInstance(stackType, new object[] { count });
+                TrackClone(stack, newStack);
 
                 // 获取Push方法
                 MethodInfo pushMethod = stackType.GetMethod("Push");
@@ -346,6 +458,7 @@ namespace ES
 
                 // 创建新的LinkedList实例
                 object newList = Activator.CreateInstance(linkedListType);
+                TrackClone(linkedList, newList);
 
                 // 获取AddLast方法（我们选择在末尾添加，保持顺序）
                 MethodInfo addLastMethod = linkedListType.GetMethod("AddLast", new Type[] { elementType }) ?? linkedListType.GetMethod("AddLast");
@@ -405,11 +518,13 @@ namespace ES
                 {
                     // 尝试使用容量创建实例
                     newQueue = Activator.CreateInstance(queueType, new object[] { capacity });
+                    TrackClone(queue, newQueue);
                 }
                 catch
                 {
                     // 如果带参数的构造函数不可用，使用无参构造函数
                     newQueue = Activator.CreateInstance(queueType);
+                    TrackClone(queue, newQueue);
                 }
 
                 // 4. 获取Enqueue方法（缓存机制）
@@ -437,6 +552,7 @@ namespace ES
             public static ArrayList DeepCloneArrayList(ArrayList arrayList)
             {
                 ArrayList newList = new ArrayList(arrayList.Count);
+                TrackClone(arrayList, newList);
 
                 foreach (var item in arrayList)
                 {
@@ -459,6 +575,7 @@ namespace ES
                 collectionType ??= collection.GetType();
                 // 尝试创建实例
                 object newCollection = creator?.Invoke() ?? Activator.CreateInstance(collectionType);
+                TrackClone(collection, newCollection);
 
 
                 // 尝试查找Add方法

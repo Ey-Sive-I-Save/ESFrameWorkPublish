@@ -29,7 +29,7 @@ namespace ES
         int CurCount { get; }
 
         /// <summary>
-        /// 获取对象池统计信息
+        /// 获取对象池统计信息。仅编辑器下有效，Player Runtime 返回 null。
         /// </summary>
         PoolStatistics GetStatistics();
     }

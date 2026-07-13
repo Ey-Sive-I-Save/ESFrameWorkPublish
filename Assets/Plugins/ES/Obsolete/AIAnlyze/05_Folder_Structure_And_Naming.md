@@ -27,7 +27,7 @@
     - 建议根据内容重命名为更准确的领域词（例如 `BaseContracts`, `RuntimeHosting`, `ValueTypes` 等）。
 
 - **个别文件名存在轻微拼写问题**  
-  - 如：`LinkRecievePool.cs`（应为 Receive），`INTER_IENUM.cs`（缩写风格不统一），`IWithLife.cs`（少了形容词“Living”之类，但问题不大）。
+  - 如：`LinkReceivePool.cs`（应为 Receive），`INTER_IENUM.cs`（缩写风格不统一），`IWithLife.cs`（少了形容词“Living”之类，但问题不大）。
   - 虽然不会影响运行，但在大型团队中会加大搜索/自动补全的心智负担。
 
 ## 3. 结构层级上的改进建议

@@ -183,6 +183,100 @@ namespace ES
 #endif
     }
 
+#if UNITY_EDITOR
+    [TabGroup("UnityPackage鎵╁睍閰嶇疆")]
+    [Button("校验并清理无效路径", ButtonSizes.Medium)]
+    [GUIColor(0.8f, 1f, 0.7f)]
+    public void ValidateAndCleanPackagePaths()
+    {
+      CleanPathList(PackageCollectPath, nameof(PackageCollectPath), true);
+
+      if (ExtendedPackageConfigs != null)
+      {
+        for (int i = 0; i < ExtendedPackageConfigs.Count; i++)
+        {
+          var config = ExtendedPackageConfigs[i];
+          if (config == null) continue;
+
+          config.OutputPath = NormalizeAssetPath(config.OutputPath);
+          CleanPathList(config.CollectPaths, $"{config.ConfigName}.CollectPaths", true);
+          CleanPathList(config.ExcludeFolders, $"{config.ConfigName}.ExcludeFolders", true);
+        }
+      }
+
+      EditorUtility.SetDirty(this);
+      AssetDatabase.SaveAssets();
+    }
+
+    [TabGroup("鏂囦欢澶圭鐞?")]
+    [Button("校验基础文件夹路径", ButtonSizes.Medium)]
+    [GUIColor(0.8f, 0.9f, 1f)]
+    public void ValidateBaseFolderPaths()
+    {
+      ValidateFolderPath(Path_SoInfoParent, nameof(Path_SoInfoParent), false);
+      ValidateFolderPath(Path_PackParent, nameof(Path_PackParent), false);
+      ValidateFolderPath(Path_GroupParent, nameof(Path_GroupParent), false);
+      ValidateFolderPath(Path_NormalScriptParent, nameof(Path_NormalScriptParent), false);
+      ValidateFolderPath(Path_NormalParent, nameof(Path_NormalParent), false);
+      ValidateFolderPath(Path_ResourceParent, nameof(Path_ResourceParent), false);
+      ValidateFolderPath(Path_GlobalParent, nameof(Path_GlobalParent), true);
+      ValidateFolderPath(Path_AllLibraryFolder_, nameof(Path_AllLibraryFolder_), false);
+    }
+
+    private static string NormalizeAssetPath(string path)
+    {
+      return string.IsNullOrWhiteSpace(path) ? string.Empty : path.Replace('\\', '/').Trim();
+    }
+
+    private static bool ValidateFolderPath(string path, string label, bool allowEmpty)
+    {
+      path = NormalizeAssetPath(path);
+      if (string.IsNullOrEmpty(path))
+      {
+        if (!allowEmpty) Debug.LogWarning($"[ESGlobalEditorDefaultConfi] {label} is empty.");
+        return allowEmpty;
+      }
+
+      if (AssetDatabase.IsValidFolder(path)) return true;
+
+      Debug.LogWarning($"[ESGlobalEditorDefaultConfi] Invalid folder path in {label}: {path}");
+      return false;
+    }
+
+    private static void CleanPathList(List<string> paths, string label, bool removeInvalid)
+    {
+      if (paths == null) return;
+
+      HashSet<string> used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      for (int i = paths.Count - 1; i >= 0; i--)
+      {
+        string path = NormalizeAssetPath(paths[i]);
+        bool remove = string.IsNullOrEmpty(path);
+
+        if (!remove && used.Contains(path))
+        {
+          remove = true;
+        }
+
+        if (!remove && removeInvalid && !AssetDatabase.IsValidFolder(path))
+        {
+          Debug.LogWarning($"[ESGlobalEditorDefaultConfi] Remove invalid folder path in {label}: {path}");
+          remove = true;
+        }
+
+        if (remove)
+        {
+          paths.RemoveAt(i);
+        }
+        else
+        {
+          paths[i] = path;
+          used.Add(path);
+        }
+      }
+    }
+#endif
+
     #endregion
 
     #region 工具支持配置

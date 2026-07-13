@@ -1,0 +1,847 @@
+ES IPreviewElement 编辑器预览系统说明
+====================================
+
+说明
+----
+当前项目里没有独立的 IPreviewEditor 接口。实际的预览系统由以下几类角色组合出来：
+
+1. IPreviewElement
+   业务对象实现它，声明“我能不能预览、是否独占预览区、PlayMode 怎么画、EditMode 怎么画”。
+   参考底部伪代码：P01。
+
+2. IPreviewCollector
+   聚合对象实现它，用来把内部 Domain、Module、子对象等 IPreviewElement 收集出来。
+   参考底部伪代码：P02。
+
+3. BasePreviewEditor<T>
+   统一接管 Unity Inspector 底部 Preview 区域。
+   它负责收集、去重、分组、滚动、折叠、异常捕获和最终绘制。
+   参考底部伪代码：P03、P04、P05、P06。
+
+4. CorePreviewEditor / MonoBehaviourPreviewEditor
+   把 BasePreviewEditor<T> 注册到 Unity CustomEditor 系统。
+   参考底部伪代码：P07。
+
+5. Core
+   Core 是 IPreviewCollector 的典型实现。它会把自身持有的 Domain 和 Module 中可预览的对象交给 BasePreviewEditor。
+   参考底部伪代码：P08、P09。
+
+
+整体原理
+--------
+Unity Inspector 底部有一块 Preview GUI 区域。自定义 Editor 只要：
+
+1. HasPreviewGUI() 返回 true
+2. OnPreviewGUI(Rect r, GUIStyle background) 中绘制内容
+
+Unity 就会显示 Inspector 预览区。
+
+本框架把这个能力抽象成“业务对象提供预览内容，BasePreviewEditor 统一承载绘制”。
+
+粗略调用链：
+
+Unity Inspector
+  -> CustomEditor
+  -> BasePreviewEditor<T>.HasPreviewGUI()
+  -> BasePreviewEditor<T>.OnPreviewGUI()
+  -> 收集 IPreviewElement
+  -> CanPreview 过滤
+  -> HashSet 去重
+  -> 按 IsSingleArea 分到普通区或独占区
+  -> 根据 Application.isPlaying 分发绘制：
+       PlayMode 调 DrawPreviewGUIPlaying()
+       EditMode 调 EditorPreviewDrawPreviewGUINonPlay()
+
+完整执行流程参考底部伪代码：P03、P04、P05、P06。
+
+
+IPreviewElement 的职责
+----------------------
+IPreviewElement 是业务侧真正需要实现的接口。
+
+它不关心 Unity CustomEditor，不关心 Inspector Preview 区域怎么打开，只负责回答四个问题：
+
+1. CanPreview
+   当前对象是否可以显示预览。
+
+2. IsSingleArea
+   是否放到独占预览区域。
+
+3. DrawPreviewGUIPlaying
+   编辑器 PlayMode 下的预览绘制。
+
+4. EditorPreviewDrawPreviewGUINonPlay
+   编辑器 EditMode 下的预览绘制。
+
+参考底部伪代码：P01、P10、P11。
+
+
+IPreviewCollector 的职责
+-----------------------
+IPreviewCollector 适合 Core 这种“自己不一定直接画，但持有很多可预览子对象”的聚合对象。
+
+它接收两个列表：
+
+normalProviders:
+普通预览元素。
+
+singleProviders:
+独占预览元素。
+
+实现者把内部所有 IPreviewElement 按 IsSingleArea 加进去即可。
+
+参考底部伪代码：P02、P08、P09。
+
+
+BasePreviewEditor<T> 的职责
+---------------------------
+BasePreviewEditor<T> 是整套系统的承载器。
+
+它做这些事：
+
+1. 告诉 Unity 当前 Inspector 有 Preview GUI。
+2. 每次 OnPreviewGUI 时重新收集可预览对象。
+3. 支持从 GameObject、Component、UnityEngine.Object 三种目标中收集。
+4. 支持 IPreviewCollector 二级收集。
+5. 用 HashSet 防止同一个预览元素重复绘制。
+6. 用 CanPreview 做动态过滤。
+7. 用 IsSingleArea 做普通区和独占区分流。
+8. 用 EditorPrefs 保存折叠状态。
+9. 给每个 provider 包 helpBox 和标题。
+10. 捕获单个 provider 绘制异常，避免一个模块炸掉整个 Preview。
+
+参考底部伪代码：P03、P04、P05、P06。
+
+
+Core 如何接入
+-------------
+Core 的重点不是自己绘制，而是作为 IPreviewCollector，把 Domain 和 Module 暴露出去。
+
+Core 的收集逻辑大致是：
+
+1. 确保编辑器下 Domain 和 Core 的关系已经建立。
+2. 从 domains 列表收集 IPreviewElement。
+3. 反射扫描 Core 自己字段里的 IDomain，再收集其中的 IPreviewElement。
+4. 从 ModuleTables.Values 收集 IPreviewElement。
+5. 按 IsSingleArea 分配到 normalProviders 或 singleProviders。
+
+参考底部伪代码：P08、P09。
+
+
+业务 Domain 如何接入
+--------------------
+一个业务 Domain 如果想进入预览面板，直接实现 IPreviewElement。
+
+常见写法：
+
+CanPreview:
+检查数据是否存在。比如 stateMachine != null。
+
+IsSingleArea:
+复杂面板、大图、轨道、渲染贴图，一般 true。
+简单状态文本、调试信息，一般 false。
+
+DrawPreviewGUIPlaying:
+显示运行时状态，比如状态机当前层、权重、运行中的状态。
+
+EditorPreviewDrawPreviewGUINonPlay:
+显示编辑器预览，比如轨道预览、配置检查、资源静态信息。
+
+参考底部伪代码：P11、P12。
+
+
+当前 EntityStateDomain 的思路
+-----------------------------
+EntityStateDomain 实现 IPreviewElement。
+
+它使用独占区域：
+
+IsSingleArea = true
+
+PlayMode 下：
+绘制状态机运行时预览。
+
+EditMode 下：
+绘制实体轨道预览，包括选择轨道、播放、停止、重建、预览相机、RenderTexture、清理临时对象等。
+
+这类复杂预览必须注意生命周期：
+
+1. 临时对象必须有明确 marker。
+2. 退出、重建、播放模式切换、脚本重载时都要清理。
+3. RenderTexture、PlayableGraph、隐藏相机、隐藏灯光都不能永久滞留。
+
+参考底部伪代码：P12、P13。
+
+
+设计优点
+--------
+1. 业务对象只关心自己怎么画，不关心 Inspector Editor 怎么注册。
+
+2. Core 作为聚合器，可以自动把 Domain 和 Module 暴露给预览系统。
+
+3. 支持普通区域和独占区域，简单信息和复杂工具都能放。
+
+4. PlayMode/EditMode 绘制分开，避免运行时逻辑和编辑器静态逻辑混在一起。
+
+5. BasePreviewEditor 统一处理滚动、折叠、异常捕获、去重。
+
+6. 子系统扩展成本低：实现 IPreviewElement 即可。
+
+
+注意事项
+--------
+1. IPreviewElement 的绘制函数会在 Inspector 预览刷新时调用，不要做重资源加载、全项目扫描、频繁实例化。
+
+2. 需要临时对象、相机、RenderTexture、PlayableGraph 时，必须提供清理逻辑。
+
+3. CanPreview 应尽量严格。数据没准备好时返回 false。
+
+4. IsSingleArea 为 true 的元素会放在独占区域，但不是互斥锁。多个 true 会依次绘制。
+
+5. 如果一个类型已经有更具体的 CustomEditor，兜底 Editor 未必会接管它。关键类型应单独写 CustomEditor。
+
+6. 非 Editor 目录下使用 UnityEditor API 时，必须用 #if UNITY_EDITOR 包住。
+
+7. 预览绘制里不要修改真实业务数据，除非这是明确的编辑器工具行为。
+
+8. EditMode 下创建的临时 GameObject 必须不可保存，且必须能被清理器识别。
+
+
+一句话总结
+----------
+这套预览系统的核心思路是：
+
+业务对象实现 IPreviewElement 声明“我能预览并且我自己会画”，
+聚合对象实现 IPreviewCollector 负责把内部 Domain/Module 收集出来，
+BasePreviewEditor<T> 统一接管 Unity Inspector Preview 区域并调度绘制。
+
+
+伪代码
+======
+
+P01 - IPreviewElement 接口
+-------------------------
+interface IPreviewElement
+{
+    // 当前元素是否显示在预览面板中
+    bool CanPreview { get; }
+
+    // true: 放入独占区域
+    // false: 放入普通模块区域
+    bool IsSingleArea { get; }
+
+    // Unity Editor 正在 PlayMode 时调用
+    void DrawPreviewGUIPlaying();
+
+    // Unity Editor 非 PlayMode 时调用
+    void EditorPreviewDrawPreviewGUINonPlay();
+}
+
+
+P02 - IPreviewCollector 接口
+---------------------------
+interface IPreviewCollector
+{
+    void CollectPreviewElements(
+        List<IPreviewElement> normalProviders,
+        List<IPreviewElement> singleProviders);
+}
+
+
+P03 - BasePreviewEditor 字段结构
+-------------------------------
+class BasePreviewEditor<T> : OdinEditor where T : UnityEngine.Object
+{
+    Vector2 scrollPosition;
+
+    List<IPreviewElement> normalProviders = new();
+    List<IPreviewElement> singleProviders = new();
+
+    // 防止同一个对象被重复收集和重复绘制
+    HashSet<IPreviewElement> collectedProviders = new();
+
+    // 临时 buffer，避免每次递归收集都 new List
+    List<IPreviewElement> overrideNormalBuffer = new();
+    List<IPreviewElement> overrideSingleBuffer = new();
+    List<IPreviewElement> collectorNormalBuffer = new();
+    List<IPreviewElement> collectorSingleBuffer = new();
+
+    static bool foldoutNormal;
+    static bool foldoutSingle;
+}
+
+
+P04 - BasePreviewEditor 生命周期
+-------------------------------
+class BasePreviewEditor<T>
+{
+    OnEnable()
+    {
+        base.OnEnable();
+
+        foldoutNormal = EditorPrefs.GetBool("NormalFoldoutKey", true);
+        foldoutSingle = EditorPrefs.GetBool("SingleFoldoutKey", true);
+    }
+
+    bool HasPreviewGUI()
+    {
+        return true;
+    }
+
+    void OnPreviewSettings()
+    {
+        // 当前项目里留空
+    }
+}
+
+
+P05 - BasePreviewEditor.OnPreviewGUI 主流程
+------------------------------------------
+void OnPreviewGUI(Rect rect, GUIStyle background)
+{
+    targetObj = target as T;
+    if (targetObj == null)
+    {
+        DrawLabel(rect, "Missing target");
+        return;
+    }
+
+    normalProviders.Clear();
+    singleProviders.Clear();
+    collectedProviders.Clear();
+
+    CollectPreviewElementsFromTarget(targetObj);
+
+    BeginArea(rect);
+    BeginScrollView(ref scrollPosition);
+
+    DrawHeader(targetObj);
+    DrawNormalPreviewArea();
+    DrawSinglePreviewArea();
+
+    EndScrollView();
+    EndArea();
+}
+
+
+P06 - BasePreviewEditor 收集和绘制
+---------------------------------
+void CollectPreviewElementsFromTarget(T targetObj)
+{
+    if (targetObj is GameObject go)
+    {
+        CollectPreviewElementsFromGameObject(go);
+        return;
+    }
+
+    if (targetObj is Component component)
+    {
+        CollectPreviewElementsFromGameObject(component.gameObject);
+        return;
+    }
+
+    CollectFromOverride(targetObj);
+}
+
+void CollectPreviewElementsFromGameObject(GameObject go)
+{
+    foreach (Component component in go.GetComponents<Component>())
+    {
+        if (component == null)
+            continue;
+
+        if (component is IPreviewElement element)
+            AddPreviewElement(element);
+
+        if (component is IPreviewCollector collector)
+            CollectFromCollector(collector);
+    }
+}
+
+void CollectFromOverride(T targetObj)
+{
+    overrideNormalBuffer.Clear();
+    overrideSingleBuffer.Clear();
+
+    try
+    {
+        // 子类可 override 这个方法
+        CollectPreviewElements(targetObj, overrideNormalBuffer, overrideSingleBuffer);
+
+        AddPreviewElementsFromBuffer(overrideNormalBuffer);
+        AddPreviewElementsFromBuffer(overrideSingleBuffer);
+    }
+    catch (Exception e)
+    {
+        LogException(e);
+    }
+    finally
+    {
+        overrideNormalBuffer.Clear();
+        overrideSingleBuffer.Clear();
+    }
+}
+
+void CollectFromCollector(IPreviewCollector collector)
+{
+    collectorNormalBuffer.Clear();
+    collectorSingleBuffer.Clear();
+
+    try
+    {
+        collector.CollectPreviewElements(collectorNormalBuffer, collectorSingleBuffer);
+
+        AddPreviewElementsFromBuffer(collectorNormalBuffer);
+        AddPreviewElementsFromBuffer(collectorSingleBuffer);
+    }
+    catch (Exception e)
+    {
+        LogException(e);
+    }
+    finally
+    {
+        collectorNormalBuffer.Clear();
+        collectorSingleBuffer.Clear();
+    }
+}
+
+void AddPreviewElement(IPreviewElement element)
+{
+    if (element == null)
+        return;
+
+    if (!element.CanPreview)
+        return;
+
+    if (!collectedProviders.Add(element))
+        return;
+
+    if (element.IsSingleArea)
+        singleProviders.Add(element);
+    else
+        normalProviders.Add(element);
+}
+
+void DrawNormalPreviewArea()
+{
+    if (normalProviders.Count == 0)
+    {
+        DrawHelpBox("No preview modules available");
+        return;
+    }
+
+    BeginHelpBox();
+    foldoutNormal = DrawFoldout(foldoutNormal, "Preview Modules");
+
+    if (foldoutNormal)
+    {
+        foreach (provider in normalProviders)
+            DrawProviderContent(provider);
+    }
+
+    EndHelpBox();
+}
+
+void DrawSinglePreviewArea()
+{
+    if (singleProviders.Count == 0)
+        return;
+
+    BeginHighlightedHelpBox();
+    foldoutSingle = DrawFoldout(foldoutSingle, "Single Preview Area");
+
+    if (foldoutSingle)
+    {
+        foreach (provider in singleProviders)
+            DrawProviderContent(provider);
+    }
+
+    EndHelpBox();
+}
+
+void DrawProviderContent(IPreviewElement provider)
+{
+    if (provider == null || !provider.CanPreview)
+        return;
+
+    BeginHelpBox();
+    DrawBoldLabel(provider.GetType().Name);
+
+    try
+    {
+        if (Application.isPlaying)
+            provider.DrawPreviewGUIPlaying();
+        else
+            provider.EditorPreviewDrawPreviewGUINonPlay();
+    }
+    catch (Exception e)
+    {
+        DrawErrorHelpBox("Preview module draw failed: " + e.Message);
+        LogException(e);
+    }
+
+    EndHelpBox();
+}
+
+
+P07 - CustomEditor 注册
+----------------------
+// 给 Core 及其子类注册预览 Editor
+[CustomEditor(typeof(Core), true)]
+class CorePreviewEditor : BasePreviewEditor<Core>
+{
+}
+
+// 给普通 UnityEngine.Object 提供兜底预览 Editor
+// 如果目标类型有更具体的 CustomEditor，Unity 会优先用更具体的 Editor
+[CustomEditor(typeof(UnityEngine.Object), true)]
+class MonoBehaviourPreviewEditor : BasePreviewEditor<UnityEngine.Object>
+{
+}
+
+
+P08 - Core 作为 IPreviewCollector
+--------------------------------
+class Core : MonoBehaviour, IPreviewCollector
+{
+    List<IDomain> domains;
+    Dictionary<Type, Module> ModuleTables;
+
+    void CollectPreviewElements(
+        List<IPreviewElement> normalProviders,
+        List<IPreviewElement> singleProviders)
+    {
+        EnsureEditorPreviewDomainRelationships(domains);
+
+        CollectPreviewElementsFromDomainList(domains, normalProviders, singleProviders);
+
+        CollectPreviewElementsFromSerializedDomainFields(normalProviders, singleProviders);
+
+        if (ModuleTables != null)
+        {
+            foreach (module in ModuleTables.Values)
+            {
+                AddPreviewElement(module, normalProviders, singleProviders);
+            }
+        }
+    }
+}
+
+
+P09 - Core 收集 Domain / Module 的细节
+-------------------------------------
+void EnsureEditorPreviewDomainRelationships(IEnumerable<IDomain> domains)
+{
+    if (domains == null)
+        return;
+
+    foreach (domain in domains)
+    {
+        if (domain != null)
+            domain._Editor_RegisterAllButOnlyCreateRelationship(this);
+    }
+}
+
+void CollectPreviewElementsFromDomainList(
+    IEnumerable<IDomain> domains,
+    List<IPreviewElement> normalProviders,
+    List<IPreviewElement> singleProviders)
+{
+    if (domains == null)
+        return;
+
+    foreach (domain in domains)
+        AddPreviewElement(domain, normalProviders, singleProviders);
+}
+
+void CollectPreviewElementsFromSerializedDomainFields(
+    List<IPreviewElement> normalProviders,
+    List<IPreviewElement> singleProviders)
+{
+    type = this.GetType();
+
+    while (type != null && type != typeof(MonoBehaviour))
+    {
+        foreach (field in type.GetFields(instancePublicNonPublic))
+        {
+            if (!typeof(IDomain).IsAssignableFrom(field.FieldType))
+                continue;
+
+            value = field.GetValue(this);
+            if (value is IDomain domain)
+            {
+                domain._Editor_RegisterAllButOnlyCreateRelationship(this);
+                AddPreviewElement(domain, normalProviders, singleProviders);
+            }
+        }
+
+        type = type.BaseType;
+    }
+}
+
+void AddPreviewElement(
+    object obj,
+    List<IPreviewElement> normalProviders,
+    List<IPreviewElement> singleProviders)
+{
+    if (obj is not IPreviewElement provider)
+        return;
+
+    if (!provider.CanPreview)
+        return;
+
+    if (provider.IsSingleArea)
+        singleProviders.Add(provider);
+    else
+        normalProviders.Add(provider);
+}
+
+
+P10 - 普通 MonoBehaviour 接入模板
+--------------------------------
+class MyPreviewComponent : MonoBehaviour, IPreviewElement
+{
+    bool CanPreview
+    {
+        get
+        {
+            return true;
+        }
+    }
+
+    bool IsSingleArea
+    {
+        get
+        {
+            return false;
+        }
+    }
+
+    void DrawPreviewGUIPlaying()
+    {
+        EditorGUILayout.LabelField("运行时预览");
+        EditorGUILayout.LabelField("Time = " + Time.time);
+
+        if (GUILayout.Button("运行时按钮"))
+            Debug.Log("Preview Button Clicked");
+    }
+
+    void EditorPreviewDrawPreviewGUINonPlay()
+    {
+        EditorGUILayout.LabelField("编辑器预览");
+        EditorGUILayout.LabelField("这里显示配置、静态信息或资源检查结果");
+    }
+}
+
+
+P11 - Domain 接入模板
+--------------------
+class MyDomain : Domain<CoreType, ModuleType>, IPreviewElement
+{
+    bool CanPreview
+    {
+        get
+        {
+            return ownerCore != null && data != null;
+        }
+    }
+
+    bool IsSingleArea
+    {
+        get
+        {
+            return true;
+        }
+    }
+
+    void DrawPreviewGUIPlaying()
+    {
+        DrawRuntimeState();
+        DrawRuntimeDebugButtons();
+    }
+
+    void EditorPreviewDrawPreviewGUINonPlay()
+    {
+        DrawEditorStaticPreview();
+        DrawValidationMessages();
+    }
+}
+
+
+P12 - EntityStateDomain 预览结构
+-------------------------------
+class EntityStateDomain : Domain<Entity, EntityStateModuleBase>, IPreviewElement
+{
+    bool IsSingleArea => true;
+
+    bool CanPreview
+    {
+        get
+        {
+            return stateMachine != null || !Application.isPlaying;
+        }
+    }
+
+    void DrawPreviewGUIPlaying()
+    {
+        DrawStateMachineRuntimePreview();
+    }
+
+    void EditorPreviewDrawPreviewGUINonPlay()
+    {
+        DrawTrackPreviewInEditMode();
+    }
+
+    void DrawTrackPreviewInEditMode()
+    {
+        DrawFoldout("实体轨道预览");
+
+        entity = ResolveEditorPreviewEntity();
+        if (entity == null)
+        {
+            DisposePreviewRender();
+            DrawHelpBox("没有找到 Entity");
+            return;
+        }
+
+        EnsurePreviewTrackAutoSelected();
+
+        DrawTrackSelector();
+        DrawPlaybackButtons();
+        DrawSpeedSlider();
+        DrawTimeSlider();
+
+        EnsurePreviewRender(entity);
+        DrawPreviewRenderArea(entity);
+    }
+}
+
+
+P13 - 复杂 EditMode 预览的临时资源清理模型
+-----------------------------------------
+class ComplexPreviewElement : IPreviewElement
+{
+    GameObject previewRoot;
+    Camera previewCamera;
+    RenderTexture renderTexture;
+    PlayableGraph graph;
+
+    void RebuildPreview()
+    {
+        DisposePreview();
+
+        previewRoot = InstantiateSourceAsHiddenPreviewObject();
+        previewCamera = CreateHiddenPreviewCamera();
+        renderTexture = CreateRenderTexture();
+        graph = CreatePlayableGraph();
+    }
+
+    void DisposePreview()
+    {
+        StopEditorUpdate();
+
+        if (graph.IsValid())
+            graph.Destroy();
+
+        if (renderTexture != null)
+            DestroyImmediate(renderTexture);
+
+        if (previewCamera != null)
+            DestroyImmediate(previewCamera.gameObject);
+
+        if (previewRoot != null)
+            DestroyImmediate(previewRoot);
+
+        CleanupLingeringPreviewObjects();
+    }
+
+    static void RegisterCleanupHooks()
+    {
+        EditorApplication.delayCall += CleanupLingeringPreviewObjects;
+        AssemblyReloadEvents.beforeAssemblyReload += CleanupLingeringPreviewObjects;
+        EditorApplication.playModeStateChanged += state =>
+        {
+            if (state == ExitingEditMode || state == ExitingPlayMode)
+                CleanupLingeringPreviewObjects();
+        };
+        EditorApplication.quitting += CleanupLingeringPreviewObjects;
+    }
+
+    static void CleanupLingeringPreviewObjects()
+    {
+        foreach (go in Resources.FindObjectsOfTypeAll<GameObject>())
+        {
+            if (IsPreviewObject(go))
+                DestroyImmediate(GetPreviewRoot(go));
+        }
+    }
+}
+
+
+P14 - 推荐的预览对象识别规则
+---------------------------
+bool IsPreviewObject(GameObject obj)
+{
+    if (obj == null)
+        return false;
+
+    if (EditorUtility.IsPersistent(obj))
+        return false;
+
+    if (obj has PreviewMarkerComponent)
+        return true;
+
+    if (obj.name contains "_ESPreview")
+        return true;
+
+    if (obj.name starts with "PreviewCameraName")
+        return true;
+
+    if (obj.name starts with "PreviewLightName")
+        return true;
+
+    if (obj.layer == PreviewLayer && HasPreviewHideFlags(obj.hideFlags))
+        return true;
+
+    return false;
+}
+
+bool HasPreviewHideFlags(HideFlags flags)
+{
+    return flags has HideInHierarchy
+        || flags has HideInInspector
+        || flags has DontSaveInEditor
+        || flags has DontSaveInBuild
+        || flags has DontUnloadUnusedAsset;
+}
+
+
+P15 - AI 实现新预览模块时的推荐步骤
+----------------------------------
+Step 1:
+确定业务对象是普通 MonoBehaviour、Domain、Module，还是 Core 聚合对象。
+
+Step 2:
+如果对象自己绘制，直接实现 IPreviewElement。
+
+Step 3:
+如果对象只是聚合内部对象，实现 IPreviewCollector。
+
+Step 4:
+CanPreview 中只做轻量判断，不做重计算。
+
+Step 5:
+EditorPreviewDrawPreviewGUINonPlay 里只做编辑器安全操作。
+
+Step 6:
+复杂预览需要临时对象时，必须同时写：
+- Rebuild
+- Dispose
+- CleanupLingering
+- AssemblyReload cleanup
+- PlayModeState cleanup
+- Editor quitting cleanup
+
+Step 7:
+如果 Unity 没有自动使用 BasePreviewEditor，给目标类型补一个更具体的 CustomEditor。
+

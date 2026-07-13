@@ -14,18 +14,31 @@ namespace ES
     /// <summary>
     /// DragAtSolver 专门为拖动资源并放置 提供了便捷的工具
     /// </summary>
-    public class ESDragAtSolver
+    public class ESDragAtSolver : ESEditorSolver
     {
-        private float defaultHeight = 40;
+        private float fallbackHeight = 40;
         private bool isDraging = false;
-        public static Color canReceiveColor = new Color(0, 0, 0, 0.25f);
-        public static Color isReceivingColor = new Color(0, 0, 0, 0.8f);
-        public Color normalColor = new Color(1, 1, 0, 0.25f);
+        public Color canReceiveColor = new Color(0.12f, 0.36f, 0.68f, 0.55f);
+        public Color isReceivingColor = new Color(0.03f, 0.42f, 0.18f, 0.82f);
+        public Color normalColor = new Color(1f, 0.82f, 0.12f, 0.18f);
+
+        public ESDragAtSolver InitSolver(
+            Color? normalColor = null,
+            Color? canReceiveColor = null,
+            Color? isReceivingColor = null)
+        {
+            if (normalColor.HasValue) this.normalColor = normalColor.Value;
+            if (canReceiveColor.HasValue) this.canReceiveColor = canReceiveColor.Value;
+            if (isReceivingColor.HasValue) this.isReceivingColor = isReceivingColor.Value;
+            return CompleteInitSolver<ESDragAtSolver>();
+        }
+
+        [Obsolete("Height is frame context. Prefer Update(out users, area, ev, fallbackHeight) or pass ESAreaSolver.GetAreaRect().")]
         public virtual void SetHeight(int defaultHeight = 40)
         {
-            this.defaultHeight = defaultHeight;
+            this.fallbackHeight = defaultHeight;
         }
-        public virtual bool Update(out UnityEngine.Object[] users, Rect? defaultArea = null, Event ev = null)
+        public virtual bool Update(out UnityEngine.Object[] users, Rect? defaultArea = null, Event ev = null, float? fallbackHeight = null)
         {
 #if UNITY_EDITOR
             //刷新绘制区域
@@ -38,11 +51,14 @@ namespace ES
                 orSpace = defaultArea.Value;
             }
 
-            Rect area = (defaultArea != null && defaultArea.Value.height > 2) ? defaultArea.Value : orSpace.SetYMax(orSpace.yMin + defaultHeight);
+            Rect area = (defaultArea != null && defaultArea.Value.height > 2) ? defaultArea.Value : orSpace.SetYMax(orSpace.yMin + (fallbackHeight ?? this.fallbackHeight));
             users = DragAndDrop.objectReferences;
 
             ev ??= Event.current;
-            if (users.Length > 0)
+            if (ev == null)
+                return false;
+
+            if (users != null && users.Length > 0)
             {
                 if (ev.type == EventType.DragExited || ev.type == EventType.MouseUp)
                 {
@@ -71,7 +87,13 @@ namespace ES
                     {
                         DragAndDrop.AcceptDrag();
                         users = DragAndDrop.objectReferences;
+                        ev.Use();
                         return true;
+                    }
+
+                    if (area.Contains(ev.mousePosition))
+                    {
+                        ev.Use();
                     }
                 }
             }

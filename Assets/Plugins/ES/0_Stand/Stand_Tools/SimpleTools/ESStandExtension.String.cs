@@ -11,7 +11,7 @@ internal static class STANDExtensionForString
 {
     public static string _KeepBeforeByFirst(this string source)
     {
-        return "";
+        return source;
     }
     #region 截取系列
     // ================== 基础截取方法 ==================

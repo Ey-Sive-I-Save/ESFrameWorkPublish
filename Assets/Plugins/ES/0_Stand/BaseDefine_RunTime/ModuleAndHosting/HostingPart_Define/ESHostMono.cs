@@ -126,7 +126,7 @@ namespace ES
         {
             if (ModulesIEnumable != null)
             {
-                foreach (var i in ModulesIEnumable)
+                foreach (var i in new List<USE_Module>(ModulesIEnumable))
                 {
                     if (i.Signal_Dirty &&TestModuleStateBefoUpdate(i) == ESTryResult.Fail) { }
                     else i.TryUpdateSelf();
@@ -175,7 +175,11 @@ namespace ES
             {
                 module._TryTestInActiveAndDisable();
                 _TryRemoveFromListOnly(module);
-                module.OnDestroy();
+                if (!module.HasDestroy)
+                {
+                    module.HasDestroy = true;
+                    module.OnDestroy();
+                }
                 return ESTryResult.Fail;
             }
             module.Signal_Dirty = false;

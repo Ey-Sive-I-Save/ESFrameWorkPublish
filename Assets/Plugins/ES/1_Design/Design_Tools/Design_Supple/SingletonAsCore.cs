@@ -48,7 +48,16 @@ namespace ES
             if (_instance != null && _instance != this)
             {
                 Debug.LogWarning($"[{typeof(T)}] 场景中已存在一个实例，销毁新创建的实例: {gameObject.name}");
-                DestroyImmediate(gameObject);
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+                {
+                    DestroyImmediate(gameObject);
+                }
+                else
+#endif
+                {
+                    Destroy(gameObject);
+                }
                 return;
             }
 

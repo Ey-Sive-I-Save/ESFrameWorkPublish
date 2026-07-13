@@ -116,7 +116,7 @@ namespace ES
         /// <summary>
         /// 重置回调状态
         /// </summary>
-        public void Reset()
+        public virtual void Reset()
         {
             Progress = 0f;
             IsDone = false;
@@ -141,7 +141,7 @@ namespace ES
             ESCallback<T>.Pool.PushToPool(this);
         }
 
-        public void OnResetAsPoolable()
+        public virtual void OnResetAsPoolable()
         {
             Reset();
             ClearCallbacks();
@@ -194,6 +194,17 @@ namespace ES
         public ESDownloadCallback()
         {
             lastUpdateTime = Time.realtimeSinceStartup;
+        }
+
+        public override void Reset()
+        {
+            base.Reset();
+            TotalSize = 0;
+            DownloadedSize = 0;
+            DownloadSpeed = 0;
+            EstimatedTimeRemaining = 0;
+            lastUpdateTime = Time.realtimeSinceStartup;
+            lastDownloadedSize = 0;
         }
 
         /// <summary>

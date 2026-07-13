@@ -29,12 +29,12 @@ namespace ES
         [SerializeReference, LabelText("数据支持")] public Target target;
         public override void TryOperation(Target target,Logic logic)
         {
-            var value = support.GetOpeationValue(target,logic);
-            target.HandleValueEntryOpeation(target,logic,value, support.GetOperationOptions);
+            var value = support.GetOperationValue(target,logic);
+            target.HandleValueEntryOperation(target,logic,value, support.GetOperationOptions);
         }
         public override void TryCancel(Target target,Logic logic)
         {
-            var value = support.GetOpeationValue(target, logic);
+            var value = support.GetOperationValue(target, logic);
             target.HandleValueEntryCancel(target, logic, value, support.GetOperationOptions);
         }
     }

@@ -21,6 +21,8 @@ namespace ES
     [Serializable]
     public class LinkReceivePool : SafeKeyGroup<Type, IReceiveLink> /**/
     {
+        private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>();
+        private readonly List<IReceiveLink> _actionReceivers = new List<IReceiveLink>();
         public override string Editor_ShowDes => "Link收发安全键组";
 
         #region 核心功能 (Core Functionality)
@@ -35,10 +37,12 @@ namespace ES
         {
             var links = GetGroupDirectly(typeof(Link));
             links.ApplyBuffers();
+            RecyclePending();
             int count = links.ValuesNow.Count;
             for (int i = 0; i < count; i++)
             {
-                if (links.ValuesNow[i] is IReceiveLink<Link> irl)
+                var receiver = links.ValuesNow[i];
+                if (receiver is IReceiveLink<Link> irl)
                 {
                     if (irl is UnityEngine.Object ob)
                     {
@@ -47,8 +51,35 @@ namespace ES
                     }
                     else if (irl != null) irl.OnLink(link);
                 }
-                else Remove(typeof(Link), null);
+                else
+                {
+                    Remove(typeof(Link), receiver);
+                    ScheduleRecycle(receiver);
+                }
             }
+        }
+
+        private void ScheduleRecycle(object receiver)
+        {
+            if (receiver is IPoolableAuto poolable && !poolable.IsRecycled)
+            {
+                _pendingRecycle.Add(poolable);
+            }
+        }
+
+        private void RecyclePending()
+        {
+            int count = _pendingRecycle.Count;
+            if (count == 0) return;
+            for (int i = 0; i < count; i++)
+            {
+                var poolable = _pendingRecycle[i];
+                if (poolable != null && !poolable.IsRecycled)
+                {
+                    poolable.TryAutoPushedToPool();
+                }
+            }
+            _pendingRecycle.Clear();
         }
 
         #endregion
@@ -73,6 +104,7 @@ namespace ES
         public void RemoveReceiver<Link>(IReceiveLink<Link> receiver)
         {
             Remove(typeof(Link), receiver);
+            ScheduleRecycle(receiver);
         }
 
         /// <summary>
@@ -83,7 +115,9 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddReceiver<Link>(Action<Link> action)
         {
-            Add(typeof(Link), action.MakeReceive());
+            var receiver = action.MakeReceive();
+            _actionReceivers.Add(receiver);
+            Add(typeof(Link), receiver);
         }
 
         /// <summary>
@@ -94,7 +128,51 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveReceiver<Link>(Action<Link> action)
         {
-            Remove(typeof(Link), action.MakeReceive());
+            for (int i = _actionReceivers.Count - 1; i >= 0; i--)
+            {
+                if (_actionReceivers[i] is ReceiveLink<Link> receiveLink && receiveLink.action == action)
+                {
+                    _actionReceivers.RemoveAt(i);
+                    RemoveReceiver(receiveLink);
+                    return;
+                }
+            }
+
+            var links = GetGroupDirectly(typeof(Link));
+            for (int i = 0; i < links.ValuesNow.Count; i++)
+            {
+                var receiver = links.ValuesNow[i];
+                if (receiver is ReceiveLink<Link> receiveLink && receiveLink.action == action)
+                {
+                    RemoveReceiver(receiveLink);
+                    return;
+                }
+            }
+        }
+
+        public new void Clear()
+        {
+            ApplyBuffers();
+            RecyclePending();
+            foreach (var pair in Groups)
+            {
+                var receivers = pair.Value;
+                for (int i = 0; i < receivers.ValuesNow.Count; i++)
+                {
+                    if (receivers.ValuesNow[i] is IPoolableAuto poolable && !poolable.IsRecycled)
+                    {
+                        poolable.TryAutoPushedToPool();
+                    }
+                }
+            }
+            base.Clear();
+            _actionReceivers.Clear();
+        }
+
+        public new void ApplyBuffers()
+        {
+            base.ApplyBuffers();
+            RecyclePending();
         }
 
         #endregion

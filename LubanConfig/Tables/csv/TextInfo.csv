@@ -1,0 +1,10 @@
+##var,key,zhCN,enUS
+##type,string,string,string
+##group,client,client,client
+##,Text key,Simplified Chinese,English
+,pack.skill.name,技能配置,Skill Config
+,pack.localization.name,多语言配置,Localization Config
+,group.skill.definition.name,技能定义,Skill Definition
+,group.localization.text.name,文本,Text
+,skill.sample.name,示例技能,Sample Skill
+,skill.sample.desc,用于验证 Luban 基础接入的示例技能。,Sample skill for validating Luban integration.

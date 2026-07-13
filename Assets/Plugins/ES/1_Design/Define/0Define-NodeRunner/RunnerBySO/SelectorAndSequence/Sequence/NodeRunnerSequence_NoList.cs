@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace ES {
     [CreateNodeRunnerSoMenu(NodeEnvironment.None,"筛选", "无序队列")]
-    public class NodeRunnerSequence_NoList : NodeSequnence_MutiLines
+    public class NodeRunnerSequence_NoList : NodeSequence_MultiLines
     {
        
         public override string GetOptionName()

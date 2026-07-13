@@ -20,12 +20,19 @@ namespace ES
         }
     }
 
-    #region 例子
-    public class TestDeepClone : IDeepClone<TestDeepClone>
+    #region 示例
+    public class ExampleDeepCloneData : IDeepClone<ExampleDeepCloneData>
     {
-        public void DeepCloneFrom(TestDeepClone t)
+        public int Count;
+        public string Name;
+
+        public void DeepCloneFrom(ExampleDeepCloneData t)
         {
-            throw new System.NotImplementedException();
+            if (t == null)
+                return;
+
+            Count = t.Count;
+            Name = t.Name;
         }
     }
 

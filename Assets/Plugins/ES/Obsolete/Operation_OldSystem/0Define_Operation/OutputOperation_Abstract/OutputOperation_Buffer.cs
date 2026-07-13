@@ -20,7 +20,7 @@ namespace ES
         public abstract void TryCancel(Target target,Logic logic);
         public Buffer GetBufferOnEnableExpand(Target target,Logic logic)
         {
-            var use = MakeTheOpeation(target, logic);
+            var use = MakeTheOperation(target, logic);
             logic.GetFromOpStore(OutputOperationBufferFlag.Default).Add(this as This, use);
             return use;
         }
@@ -38,7 +38,7 @@ namespace ES
             }
             return default;
         }
-        protected abstract Buffer MakeTheOpeation(Target target,Logic logic);
+        protected abstract Buffer MakeTheOperation(Target target,Logic logic);
         public abstract void TryUpdateTheBuffer(Target target,Logic logic, Buffer buffer);
         public abstract void TryStopTheBuffer(Target target,Logic logic, Buffer buffer);
     }
@@ -57,7 +57,7 @@ namespace ES
         public BufferSource bufferSource;
         [LabelText("数值导�?), SerializeReference]
         public ValueEntryOp valueEntryOp;
-        protected override Buffer MakeTheOpeation(Target target,Logic logic)
+        protected override Buffer MakeTheOperation(Target target,Logic logic)
         {
             var buffer = BufferOperation<ValueType, BufferSource, Buffer>.GetOne();
             buffer.timeHasGo = 0;
@@ -68,7 +68,7 @@ namespace ES
         {
             if (valueEntryOp != null)
             {
-                valueEntryOp.HandleValueEntryOpeation(target, logic,bufferSource.EvaluateThisFrame(ref buffer.timeHasGo), FloatValueEntryType.Add);
+                valueEntryOp.HandleValueEntryOperation(target, logic,bufferSource.EvaluateThisFrame(ref buffer.timeHasGo), FloatValueEntryType.Add);
                 if (buffer.timeHasGo >= bufferSource.allTime)
                 {
                     TryStopTheBuffer(target, logic,buffer);//提前退�?
@@ -82,7 +82,7 @@ namespace ES
             {
                 if (valueEntryOp != null)
                 {
-                    valueEntryOp.HandleValueEntryOpeation(target, logic, bufferSource.EvaluateToEndFrame(ref buffer.timeHasGo), FloatValueEntryType.Add);
+                    valueEntryOp.HandleValueEntryOperation(target, logic, bufferSource.EvaluateToEndFrame(ref buffer.timeHasGo), FloatValueEntryType.Add);
                     use.Remove(buffer);
                 } 
                 foreach(var i in use)

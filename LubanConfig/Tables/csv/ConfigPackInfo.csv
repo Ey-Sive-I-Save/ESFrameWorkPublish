@@ -1,0 +1,6 @@
+##var,id,key,displayNameKey,comment
+##type,int,string,string,string
+##group,client,client,client,editor
+##,Pack Id,Stable key,Localization key,Editor comment
+,1,Skill,pack.skill.name,Skill config pack
+,2,Localization,pack.localization.name,Localization config pack

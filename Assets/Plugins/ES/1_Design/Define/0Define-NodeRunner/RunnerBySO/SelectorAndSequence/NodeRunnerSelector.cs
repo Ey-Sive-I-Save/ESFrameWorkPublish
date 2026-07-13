@@ -12,7 +12,7 @@ namespace ES
     {
         public override NodePort GetInputNode()
         {
-            return new NodePort() { Name = "筛选", IsMutiConnect = false };
+            return new NodePort() { Name = "筛选", IsMultiConnect = false };
         }
 
         public override string GetTitle()
@@ -30,19 +30,19 @@ namespace ES
             var list = new List<NodePort>(PortNum);
             for (int i = 0; i < PortNum; i++)
             {
-                list.Add(new NodePort() { Name = "通" + i, IsMutiConnect = false });
+                list.Add(new NodePort() { Name = "通" + i, IsMultiConnect = false });
             }
             return list;
         }
     }
-    public abstract class NodeRunnerSelector_MutiLines : NodeRunnerSelector
+    public abstract class NodeRunnerSelector_MultiLines : NodeRunnerSelector
     {
-        public override bool MutiLineOut => true;
+        public override bool MultiLineOut => true;
         public virtual int SelectNum => 2;
         public override List<NodePort> GetOutputNodes()
         {
             var list = new List<NodePort>(1);
-            list.Add(new NodePort() { Name = "多通", IsMutiConnect = true });
+            list.Add(new NodePort() { Name = "多通", IsMultiConnect = true });
             return list;
         }
     }

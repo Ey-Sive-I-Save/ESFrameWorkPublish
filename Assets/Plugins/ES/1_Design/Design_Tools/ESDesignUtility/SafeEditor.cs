@@ -24,6 +24,42 @@ namespace ES
                 return path.Replace('\\', '/');
             }
 
+            private static bool _TryGetSafeAssetsSubFolderFullPath(string path, out string safeFullPath)
+            {
+                safeFullPath = null;
+                if (string.IsNullOrWhiteSpace(path)) return false;
+
+                try
+                {
+                    string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                    string candidate = _NormalizeAssetPath(path);
+                    if (candidate == "Assets" || candidate.StartsWith("Assets/", StringComparison.Ordinal))
+                    {
+                        candidate = Path.Combine(projectRoot, candidate);
+                    }
+
+                    string fullPath = Path.GetFullPath(candidate).Replace('\\', '/').TrimEnd('/');
+                    string assetsPath = Path.GetFullPath(Application.dataPath).Replace('\\', '/').TrimEnd('/');
+
+                    if (string.Equals(fullPath, assetsPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
+                    if (!fullPath.StartsWith(assetsPath + "/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
+                    safeFullPath = fullPath;
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
             #region 获取特殊数据
             /// <summary>
             /// 获得全部标签
@@ -192,7 +228,7 @@ namespace ES
             /// </summary>
             /// <typeparam name="T">SO类型</typeparam>
             /// <returns></returns>
-            public static List<T> FindAllSOAssets<T>() where T : class
+            public static List<T> FindAllSOAssets<T>(bool includeGroupInfos = true) where T : class
             {
                 List<T> values = new List<T>(3);
 #if UNITY_EDITOR
@@ -234,6 +270,7 @@ namespace ES
 
                 // 额外：支持从 ISoDataGroup 中展开 T。
                 // 由于 Group 的 info 类型是动态的，无法用 t:TypeName 精确索引，因此这里仍需要扫描所有 ScriptableObject。
+                if (includeGroupInfos)
                 {
                     var all = allScriptableObjectGuids ?? AssetDatabase.FindAssets("t:ScriptableObject");
                     foreach (var guid in all)
@@ -681,6 +718,13 @@ namespace ES
             /// <param name="fullPath"></param>
             public static void Quick_System_DeleteAllFilesInFolder_Always(string fullPath)
             {
+                if (!_TryGetSafeAssetsSubFolderFullPath(fullPath, out string safeFullPath))
+                {
+                    UnityEngine.Debug.LogWarning($"Quick_System_DeleteAllFilesInFolder_Always refused unsafe path: {fullPath}");
+                    return;
+                }
+
+                fullPath = safeFullPath;
                 if (Directory.Exists(fullPath))
                 {
                     DirectoryInfo dirInfo = new DirectoryInfo(fullPath);

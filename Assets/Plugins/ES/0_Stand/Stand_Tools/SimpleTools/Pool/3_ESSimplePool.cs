@@ -111,7 +111,6 @@ namespace ES
 #endif
                 mCreatedObjects.Remove(obj);
                 OnObjectDisposed(obj);
-                mOnDestroy?.Invoke(obj);
                 return false;
             }
             // 重置对象
@@ -171,8 +170,7 @@ namespace ES
     }
 
     /// <summary>
-    /// 单例对象池（商业级实现，支持自定义配置）
-    /// 线程安全的单例模式
+    /// 单例对象池。面向 Unity 主线程使用，不提供线程安全保证。
     /// </summary>
     public class ESSimplePoolSingleton<T> : ESSimplePool<T> where T : IPoolable, new()
     {

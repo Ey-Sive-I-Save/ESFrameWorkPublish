@@ -1,7 +1,7 @@
 fileFormatVersion: 2
 guid: 804e2dd341d8cc04ba2450bef370a74e
 ModelImporter:
-  serializedVersion: 21300
+  serializedVersion: 22200
   internalIDToNameTable: []
   externalObjects: {}
   materials:
@@ -24,7 +24,7 @@ ModelImporter:
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
     importConstraints: 0
-    animationCompression: 1
+    animationCompression: 3
     animationRotationError: 0.5
     animationPositionError: 0.5
     animationScaleError: 0.5
@@ -69,6 +69,7 @@ ModelImporter:
     addColliders: 0
     useSRGBMaterialColor: 1
     sortHierarchyByName: 1
+    importPhysicalCameras: 1
     importVisibility: 1
     importBlendShapes: 1
     importCameras: 1
@@ -224,12 +225,14 @@ ModelImporter:
     - name: lowerarm_twist_01_l_end
       parentName: lowerarm_twist_01_l
       position: {x: 0.00000012874602, y: 0.18167411, z: 0.000000072121615}
-      rotation: {x: 0.000000012107196, y: 0.000000098720186, z: 0.000000026077032, w: 1}
+      rotation: {x: 0.000000012107196, y: 0.000000098720186, z: 0.000000026077032,
+        w: 1}
       scale: {x: 1, y: 0.9999999, z: 1.0000001}
     - name: lowerarm_twist_01_l_end_end
       parentName: lowerarm_twist_01_l_end
       position: {x: 0.000000019073486, y: 0.18167408, z: 0.00000002026558}
-      rotation: {x: 0.000000055879354, y: -0.000000031664968, z: -0.00000008568168, w: 1}
+      rotation: {x: 0.000000055879354, y: -0.000000031664968, z: -0.00000008568168,
+        w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: lowerarm_twist_01_l_end_end_end
       parentName: lowerarm_twist_01_l_end_end
@@ -424,7 +427,8 @@ ModelImporter:
     - name: weapon_l_end_end
       parentName: weapon_l_end
       position: {x: 0.000000009536743, y: 0.03147642, z: -0.000000009536743}
-      rotation: {x: 0.00000035762787, y: 0.0000000037252903, z: -0.00000032782555, w: 1}
+      rotation: {x: 0.00000035762787, y: 0.0000000037252903, z: -0.00000032782555,
+        w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: weapon_l_end_end_end
       parentName: weapon_l_end_end
@@ -444,7 +448,8 @@ ModelImporter:
     - name: upperarm_twist_01_l_end_end
       parentName: upperarm_twist_01_l_end
       position: {x: 0.0000001835823, y: 0.18514115, z: -0.0000000047683715}
-      rotation: {x: -0.00000094715506, y: -0.000000025582269, z: 0.0000003138557, w: 1}
+      rotation: {x: -0.00000094715506, y: -0.000000025582269, z: 0.0000003138557,
+        w: 1}
       scale: {x: 0.99999994, y: 1, z: 1}
     - name: upperarm_twist_01_l_end_end_end
       parentName: upperarm_twist_01_l_end_end
@@ -454,12 +459,14 @@ ModelImporter:
     - name: upperarm_twist_02_l
       parentName: upperarm_l
       position: {x: -0.18514101, y: 0.00000016212464, z: -0.00000013262033}
-      rotation: {x: -0.000000097323195, y: -0.00000006853951, z: 0.00000010384245, w: 1}
+      rotation: {x: -0.000000097323195, y: -0.00000006853951, z: 0.00000010384245,
+        w: 1}
       scale: {x: 1.0000001, y: 1.0000001, z: 1.0000002}
     - name: upperarm_twist_02_l_end
       parentName: upperarm_twist_02_l
       position: {x: 0.00000016510486, y: 0.18514122, z: -0.0000000333786}
-      rotation: {x: 0.00000059604645, y: 0.0000000032596295, z: -0.0000008745119, w: 1}
+      rotation: {x: 0.00000059604645, y: 0.0000000032596295, z: -0.0000008745119,
+        w: 1}
       scale: {x: 0.9999999, y: 1.0000001, z: 0.99999994}
     - name: upperarm_twist_02_l_end_end
       parentName: upperarm_twist_02_l_end
@@ -494,7 +501,8 @@ ModelImporter:
     - name: lowerarm_twist_02_r_end
       parentName: lowerarm_twist_02_r
       position: {x: 0.000000085830685, y: 0.18167377, z: 0.00000014543534}
-      rotation: {x: -0.00000044517216, y: -0.0000014901159, z: -0.000000029802322, w: 1}
+      rotation: {x: -0.00000044517216, y: -0.0000014901159, z: -0.000000029802322,
+        w: 1}
       scale: {x: 1.0000001, y: 1, z: 1.0000001}
     - name: lowerarm_twist_02_r_end_end
       parentName: lowerarm_twist_02_r_end
@@ -744,7 +752,8 @@ ModelImporter:
     - name: upperarm_twist_02_r
       parentName: upperarm_r
       position: {x: 0.18513884, y: 0.00000006556511, z: -0.0000039137153}
-      rotation: {x: -0.00000019837174, y: -0.00000014159016, z: -0.00000009778889, w: 1}
+      rotation: {x: -0.00000019837174, y: -0.00000014159016, z: -0.00000009778889,
+        w: 1}
       scale: {x: 0.99999976, y: 0.9999998, z: 0.9999999}
     - name: upperarm_twist_02_r_end
       parentName: upperarm_twist_02_r
@@ -804,12 +813,14 @@ ModelImporter:
     - name: calf_twist_02_r_end
       parentName: calf_twist_02_r
       position: {x: -0.000000014901161, y: 0.2814535, z: 0.0000000023841857}
-      rotation: {x: 0.000000006897607, y: -0.000000007450581, z: 0.00000022980382, w: 1}
+      rotation: {x: 0.000000006897607, y: -0.000000007450581, z: 0.00000022980382,
+        w: 1}
       scale: {x: 1, y: 1.0000002, z: 1}
     - name: calf_twist_02_r_end_end
       parentName: calf_twist_02_r_end
       position: {x: 0.000000048279762, y: 0.2814533, z: -0.000000021457671}
-      rotation: {x: -0.00000002825982, y: -0.0000010250369, z: -0.00000020687003, w: 1}
+      rotation: {x: -0.00000002825982, y: -0.0000010250369, z: -0.00000020687003,
+        w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: calf_twist_02_r_end_end_end
       parentName: calf_twist_02_r_end_end
@@ -824,7 +835,8 @@ ModelImporter:
     - name: calf_twist_01_r_end
       parentName: calf_twist_01_r
       position: {x: -0.0000000166893, y: 0.28145346, z: 0.0000000166893}
-      rotation: {x: -0.00000003076274, y: -0.0000004400499, z: -0.00000003410969, w: 1}
+      rotation: {x: -0.00000003076274, y: -0.0000004400499, z: -0.00000003410969,
+        w: 1}
       scale: {x: 0.9999999, y: 1.0000001, z: 1.0000002}
     - name: calf_twist_01_r_end_end
       parentName: calf_twist_01_r_end
@@ -844,12 +856,14 @@ ModelImporter:
     - name: thigh_twist_01_r_end
       parentName: thigh_twist_01_r
       position: {x: -0.000000005960464, y: 0.28894207, z: 0.000000007152557}
-      rotation: {x: 0.0000000034051482, y: 0.00000048126094, z: 0.000000017811544, w: 1}
+      rotation: {x: 0.0000000034051482, y: 0.00000048126094, z: 0.000000017811544,
+        w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: thigh_twist_01_r_end_end
       parentName: thigh_twist_01_r_end
       position: {x: -0.00000013530254, y: 0.28894198, z: 0.0000000047683715}
-      rotation: {x: 0.000000013082173, y: -0.0000000020372681, z: 0.00000040116723, w: 1}
+      rotation: {x: 0.000000013082173, y: -0.0000000020372681, z: 0.00000040116723,
+        w: 1}
       scale: {x: 1, y: 0.99999994, z: 1}
     - name: thigh_twist_01_r_end_end_end
       parentName: thigh_twist_01_r_end_end
@@ -899,12 +913,14 @@ ModelImporter:
     - name: ball_l_end
       parentName: ball_l
       position: {x: 0.000000006556511, y: 0.1678116, z: -0.0000000024514155}
-      rotation: {x: 0.0000000136119525, y: -0.000000033454057, z: -0.00000006376649, w: 1}
+      rotation: {x: 0.0000000136119525, y: -0.000000033454057, z: -0.00000006376649,
+        w: 1}
       scale: {x: 0.9999999, y: 1, z: 1}
     - name: ball_l_end_end
       parentName: ball_l_end
       position: {x: -0.000000022649765, y: 0.16781154, z: 0.0000000011635711}
-      rotation: {x: -0.000000004219146, y: -0.000000010807241, z: -0.00000002849265, w: 1}
+      rotation: {x: -0.000000004219146, y: -0.000000010807241, z: -0.00000002849265,
+        w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: ball_l_end_end_end
       parentName: ball_l_end_end
@@ -924,7 +940,8 @@ ModelImporter:
     - name: calf_twist_02_l_end_end
       parentName: calf_twist_02_l_end
       position: {x: -0.0000000062584875, y: 0.28145313, z: 0.000000005960464}
-      rotation: {x: -0.0000000102154445, y: 0.0000000011641532, z: -0.00000020454172, w: 1}
+      rotation: {x: -0.0000000102154445, y: 0.0000000011641532, z: -0.00000020454172,
+        w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: calf_twist_02_l_end_end_end
       parentName: calf_twist_02_l_end_end
@@ -939,7 +956,8 @@ ModelImporter:
     - name: calf_twist_01_l_end
       parentName: calf_twist_01_l
       position: {x: 0.00000000923872, y: 0.2814531, z: -0.000000009536743}
-      rotation: {x: -0.000000020489097, y: 0.000000005820767, z: -0.000000086613, w: 1}
+      rotation: {x: -0.000000020489097, y: 0.000000005820767, z: -0.000000086613,
+        w: 1}
       scale: {x: 0.9999999, y: 1, z: 0.9999999}
     - name: calf_twist_01_l_end_end
       parentName: calf_twist_01_l_end
@@ -959,12 +977,14 @@ ModelImporter:
     - name: thigh_twist_01_l_end
       parentName: thigh_twist_01_l
       position: {x: 0.0000000011920929, y: 0.28894252, z: 0.000000007152557}
-      rotation: {x: -0.000000010186341, y: 0.000000017345883, z: 0.00000025390182, w: 1}
+      rotation: {x: -0.000000010186341, y: 0.000000017345883, z: 0.00000025390182,
+        w: 1}
       scale: {x: 1, y: 0.99999994, z: 1.0000001}
     - name: thigh_twist_01_l_end_end
       parentName: thigh_twist_01_l_end
       position: {x: -0.00000003106892, y: 0.28894246, z: -0.0000000023841857}
-      rotation: {x: -0.00000003473542, y: -0.000000018044375, z: -0.0000002705492, w: 1}
+      rotation: {x: -0.00000003473542, y: -0.000000018044375, z: -0.0000002705492,
+        w: 1}
       scale: {x: 1, y: 0.99999994, z: 1}
     - name: thigh_twist_01_l_end_end_end
       parentName: thigh_twist_01_l_end_end
@@ -979,12 +999,14 @@ ModelImporter:
     - name: thigh_twist_02_l_end
       parentName: thigh_twist_02_l
       position: {x: -0.000000055134294, y: 0.28894258, z: -0.0000000166893}
-      rotation: {x: -0.0000000073050614, y: 0.000000081257895, z: 0.0000003053574, w: 1}
+      rotation: {x: -0.0000000073050614, y: 0.000000081257895, z: 0.0000003053574,
+        w: 1}
       scale: {x: 1, y: 0.9999999, z: 1.0000001}
     - name: thigh_twist_02_l_end_end
       parentName: thigh_twist_02_l_end
       position: {x: -0.000000047832728, y: 0.2889424, z: -0.0000000047683715}
-      rotation: {x: -0.00000003844616, y: -0.00000002013985, z: -0.00000027159695, w: 1}
+      rotation: {x: -0.00000003844616, y: -0.00000002013985, z: -0.00000027159695,
+        w: 1}
       scale: {x: 1, y: 0.9999999, z: 1}
     - name: thigh_twist_02_l_end_end_end
       parentName: thigh_twist_02_l_end_end
@@ -1004,12 +1026,14 @@ ModelImporter:
     - name: ik_foot_l_end
       parentName: ik_foot_l
       position: {x: -0.000000008158386, y: 0.16349421, z: 8.3091434e-10}
-      rotation: {x: -0.000000022435064, y: -0.0000000045333763, z: -0.000000073006966, w: 1}
+      rotation: {x: -0.000000022435064, y: -0.0000000045333763, z: -0.000000073006966,
+        w: 1}
       scale: {x: 1, y: 0.9999998, z: 0.9999999}
     - name: ik_foot_l_end_end
       parentName: ik_foot_l_end
       position: {x: 0.0000000019371509, y: 0.1634942, z: 0.000000008593633}
-      rotation: {x: -0.000000018570846, y: 0.0000000040708987, z: -0.00000003735477, w: 1}
+      rotation: {x: -0.000000018570846, y: 0.0000000040708987, z: -0.00000003735477,
+        w: 1}
       scale: {x: 0.99999994, y: 0.9999999, z: 0.9999999}
     - name: ik_foot_l_end_end_end
       parentName: ik_foot_l_end_end
@@ -1029,7 +1053,8 @@ ModelImporter:
     - name: ik_foot_r_end_end
       parentName: ik_foot_r_end
       position: {x: -0.000000009462237, y: 0.16349426, z: 0.000000012733508}
-      rotation: {x: 0.0000000100929185, y: -0.000000044866283, z: -0.00000004170579, w: 1}
+      rotation: {x: 0.0000000100929185, y: -0.000000044866283, z: -0.00000004170579,
+        w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: ik_foot_r_end_end_end
       parentName: ik_foot_r_end_end
@@ -1054,12 +1079,14 @@ ModelImporter:
     - name: ik_hand_l_end
       parentName: ik_hand_l
       position: {x: -0.00000016450882, y: 0.47768477, z: 0.000000030994414}
-      rotation: {x: 0.000000055879354, y: 0.000000044703476, z: -0.00000006332993, w: 1}
+      rotation: {x: 0.000000055879354, y: 0.000000044703476, z: -0.00000006332993,
+        w: 1}
       scale: {x: 1.0000004, y: 0.99999994, z: 1.0000001}
     - name: ik_hand_l_end_end
       parentName: ik_hand_l_end
       position: {x: 0.000000038146972, y: 0.4776847, z: 0}
-      rotation: {x: 0.000000029802322, y: 0.000000026077032, z: -0.000000052154064, w: 1}
+      rotation: {x: 0.000000029802322, y: 0.000000026077032, z: -0.000000052154064,
+        w: 1}
       scale: {x: 1, y: 1, z: 1}
     - name: ik_hand_l_end_end_end
       parentName: ik_hand_l_end_end
@@ -1069,7 +1096,8 @@ ModelImporter:
     - name: ik_hand_r
       parentName: ik_hand_gun
       position: {x: 0.00000030517577, y: -0.0000002479553, z: 0.000000009536743}
-      rotation: {x: -0.00000024214395, y: -0.00000011548404, z: 0.00000014901164, w: 1}
+      rotation: {x: -0.00000024214395, y: -0.00000011548404, z: 0.00000014901164,
+        w: 1}
       scale: {x: 0.9999998, y: 0.99999976, z: 0.9999996}
     - name: ik_hand_r_end
       parentName: ik_hand_r
@@ -1079,7 +1107,8 @@ ModelImporter:
     - name: ik_hand_r_end_end
       parentName: ik_hand_r_end
       position: {x: -0.000000019073486, y: 0.4776846, z: 0}
-      rotation: {x: -0.00000001117587, y: -0.00000014528632, z: -0.00000011920929, w: 1}
+      rotation: {x: -0.00000001117587, y: -0.00000014528632, z: -0.00000011920929,
+        w: 1}
       scale: {x: 1, y: 1, z: 1.0000001}
     - name: ik_hand_r_end_end_end
       parentName: ik_hand_r_end_end
@@ -1143,12 +1172,13 @@ ModelImporter:
     hasTranslationDoF: 0
     hasExtraRoot: 1
     skeletonHasParents: 1
-  lastHumanDescriptionAvatarSource: {fileID: 9000000, guid: d29cbff10f581744f9c6dbba594f9d91, type: 3}
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
   autoGenerateAvatarMappingIfUnspecified: 1
-  animationType: 2
+  animationType: 3
   humanoidOversampling: 1
   avatarSetup: 2
   addHumanoidExtraRootOnlyWhenUsingAvatar: 1
+  importBlendShapeDeformPercent: 0
   remapMaterialsIfMaterialImportModeIsNone: 0
   additionalBone: 0
   userData: 

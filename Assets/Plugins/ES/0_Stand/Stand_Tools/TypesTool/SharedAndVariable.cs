@@ -18,16 +18,13 @@ namespace ES
         public static void ApplyFrom<Shared, Variable>(ISharedAndVariable<Shared, Variable> applier, ISharedAndVariable<Shared, Variable> from)
             where Variable : class, IDeepClone<Variable>, new()
         {
+            if (applier == null || from == null)
+                return;
+
             applier.SharedData = from.SharedData;
+            from.VariableData ??= new Variable();
             applier.VariableData ??= new Variable();
-            if (from.VariableData != null)
-            {
-                applier.VariableData.DeepCloneFrom(from.VariableData);
-            }
-            else
-            {
-                from.VariableData = new Variable();
-            }
+            applier.VariableData.DeepCloneFrom(from.VariableData);
         }
 
         /// <summary>
@@ -43,16 +40,13 @@ namespace ES
     where SharedFrom : SharedApplier where VariableFrom : class, VariableApplier, IDeepClone<VariableFrom>, new()
           where VariableApplier : class, IDeepClone<VariableApplier>, new()
         {
+            if (applier == null || from == null)
+                return;
+
             applier.SharedData = from.SharedData;
+            from.VariableData ??= new VariableFrom();
             applier.VariableData ??= new VariableApplier();
-            if (from.VariableData != null)
-            {
-                applier.VariableData.DeepCloneFrom(from.VariableData);
-            }
-            else
-            {
-                from.VariableData = new VariableFrom();
-            }
+            applier.VariableData.DeepCloneFrom(from.VariableData);
         }
 
         /// <summary>

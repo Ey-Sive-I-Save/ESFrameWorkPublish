@@ -37,6 +37,9 @@ namespace ES
         [ShowInInspector, PropertyOrder(100)]
         private bool[,] editorMatrix;
 
+        [SerializeField, LabelText("对称模式"), PropertyOrder(99)]
+        private bool editorSymmetricMode;
+
         [NonSerialized] private bool _suppressMatrixApply;
 
         [Button("从关系生成矩阵"), PropertyOrder(101)]
@@ -63,6 +66,21 @@ namespace ES
 
         public IReadOnlyList<string> BaseKeys => baseKeys;
         public IReadOnlyList<RelationEntry> Relations => relations;
+
+        public void AddRelation(string fromKey, string toKey)
+        {
+            AddRelationNoRebuild(fromKey, toKey);
+            _cacheReady = false;
+            RebuildCache();
+        }
+
+        public void AddRelationTwoWay(string a, string b)
+        {
+            AddRelationNoRebuild(a, b);
+            AddRelationNoRebuild(b, a);
+            _cacheReady = false;
+            RebuildCache();
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsRelatedOneWay(string fromKey, string toKey)
@@ -170,7 +188,11 @@ namespace ES
             for (int i = 0; i < count; i++)
             {
                 var key = baseKeys[i] ?? string.Empty;
-                _index[key] = i;
+                if (_index.ContainsKey(key))
+                {
+                    continue;
+                }
+                _index.Add(key, i);
             }
 
             if (relations == null || relations.Count == 0 || _index == null) return;
@@ -248,6 +270,7 @@ namespace ES
                 return;
             }
 
+            ApplySymmetricMode(count);
             relations.Clear();
             for (int r = 0; r < count; r++)
             {
@@ -271,6 +294,20 @@ namespace ES
             _cacheReady = false;
         }
 
+        private void ApplySymmetricMode(int count)
+        {
+            if (!editorSymmetricMode || editorMatrix == null) return;
+            for (int r = 0; r < count; r++)
+            {
+                for (int c = r + 1; c < count; c++)
+                {
+                    bool related = editorMatrix[r, c] || editorMatrix[c, r];
+                    editorMatrix[r, c] = related;
+                    editorMatrix[c, r] = related;
+                }
+            }
+        }
+
         private ValueTuple<string, LabelDirection> GetMatrixLabel(TableAxis axis, int index)
         {
             int count = baseKeys != null ? baseKeys.Count : 0;
@@ -286,6 +323,29 @@ namespace ES
             return ValueTuple.Create(label, LabelDirection.LeftToRight);
         }
 #endif
+
+        private void AddRelationNoRebuild(string fromKey, string toKey)
+        {
+            if (relations == null) relations = new List<RelationEntry>();
+
+            for (int i = 0; i < relations.Count; i++)
+            {
+                if (string.Equals(relations[i].key, fromKey, StringComparison.Ordinal))
+                {
+                    var entry = relations[i];
+                    if (entry.relatedKeys == null) entry.relatedKeys = new List<string>();
+                    if (!entry.relatedKeys.Contains(toKey)) entry.relatedKeys.Add(toKey);
+                    relations[i] = entry;
+                    return;
+                }
+            }
+
+            relations.Add(new RelationEntry
+            {
+                key = fromKey,
+                relatedKeys = new List<string> { toKey }
+            });
+        }
     }
 
     /// <summary>
@@ -318,6 +378,9 @@ namespace ES
         [ShowInInspector, PropertyOrder(100)]
         private bool[,] editorMatrix;
 
+        [SerializeField, LabelText("对称模式"), PropertyOrder(99)]
+        private bool editorSymmetricMode;
+
         [NonSerialized] private bool _suppressMatrixApply;
 
         [Button("从关系生成矩阵"), PropertyOrder(101)]
@@ -344,6 +407,33 @@ namespace ES
 
         public IReadOnlyList<int> BaseKeys => baseKeys;
         public IReadOnlyList<RelationEntry> Relations => relations;
+
+        public void AddRelation(int fromKey, int toKey)
+        {
+            AddRelationNoRebuild(fromKey, toKey);
+            _cacheReady = false;
+            RebuildCache();
+        }
+
+        public void AddRelationTwoWay(int a, int b)
+        {
+            AddRelationNoRebuild(a, b);
+            AddRelationNoRebuild(b, a);
+            _cacheReady = false;
+            RebuildCache();
+        }
+
+        public void AddRelation<TEnum>(TEnum fromKey, TEnum toKey) where TEnum : struct, Enum
+        {
+            if (!TryEnumToInt32(fromKey, out var from) || !TryEnumToInt32(toKey, out var to)) return;
+            AddRelation(from, to);
+        }
+
+        public void AddRelationTwoWay<TEnum>(TEnum a, TEnum b) where TEnum : struct, Enum
+        {
+            if (!TryEnumToInt32(a, out var intA) || !TryEnumToInt32(b, out var intB)) return;
+            AddRelationTwoWay(intA, intB);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsRelatedOneWay(int fromKey, int toKey)
@@ -389,13 +479,13 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsRelatedMaskFast<TEnum>(TEnum fromKey, uint targetMask) where TEnum : struct, Enum
         {
-            return IsRelatedMaskFast(Convert.ToInt32(fromKey), targetMask);
+            return TryEnumToInt32(fromKey, out var from) && IsRelatedMaskFast(from, targetMask);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsRelatedFast<TEnum>(TEnum fromKey, TEnum toKey) where TEnum : struct, Enum
         {
-            return IsRelatedFast(Convert.ToInt32(fromKey), Convert.ToInt32(toKey));
+            return TryEnumToInt32(fromKey, out var from) && TryEnumToInt32(toKey, out var to) && IsRelatedFast(from, to);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -420,13 +510,17 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetMaskFast<TEnum>(TEnum key, out uint mask) where TEnum : struct, Enum
         {
-            return TryGetMaskFast(Convert.ToInt32(key), out mask);
+            if (TryEnumToInt32(key, out var intKey)) return TryGetMaskFast(intKey, out mask);
+            mask = 0u;
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetIndex<TEnum>(TEnum key, out int index) where TEnum : struct, Enum
         {
-            return TryGetIndex(Convert.ToInt32(key), out index);
+            if (TryEnumToInt32(key, out var intKey)) return TryGetIndex(intKey, out index);
+            index = -1;
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -451,19 +545,19 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsRelated<TEnum>(TEnum fromKey, TEnum toKey) where TEnum : struct, Enum
         {
-            return IsRelated(Convert.ToInt32(fromKey), Convert.ToInt32(toKey));
+            return TryEnumToInt32(fromKey, out var from) && TryEnumToInt32(toKey, out var to) && IsRelated(from, to);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint GetMask<TEnum>(TEnum key) where TEnum : struct, Enum
         {
-            return TryGetIndex(Convert.ToInt32(key), out var index) ? GetMaskByIndex(index) : 0u;
+            return TryGetIndex(key, out var index) ? GetMaskByIndex(index) : 0u;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int GetIndexOrMinusOne<TEnum>(TEnum key) where TEnum : struct, Enum
         {
-            return TryGetIndex(Convert.ToInt32(key), out var index) ? index : -1;
+            return TryGetIndex(key, out var index) ? index : -1;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -502,7 +596,12 @@ namespace ES
 
             for (int i = 0; i < count; i++)
             {
-                _index[baseKeys[i]] = i;
+                int key = baseKeys[i];
+                if (_index.ContainsKey(key))
+                {
+                    continue;
+                }
+                _index.Add(key, i);
             }
 
             if (relations == null || relations.Count == 0 || _index == null) return;
@@ -545,7 +644,10 @@ namespace ES
             var values = Enum.GetValues(typeof(TEnum));
             for (int i = 0; i < values.Length; i++)
             {
-                baseKeys.Add(Convert.ToInt32(values.GetValue(i)));
+                if (TryEnumToInt32((TEnum)values.GetValue(i), out var intValue))
+                {
+                    baseKeys.Add(intValue);
+                }
             }
 
             _cacheReady = false;
@@ -566,6 +668,45 @@ namespace ES
         {
             if (_cacheReady) return;
             RebuildCache();
+        }
+
+        private static bool TryEnumToInt32<TEnum>(TEnum value, out int result) where TEnum : struct, Enum
+        {
+            TypeCode code = Type.GetTypeCode(Enum.GetUnderlyingType(typeof(TEnum)));
+            switch (code)
+            {
+                case TypeCode.SByte:
+                case TypeCode.Int16:
+                case TypeCode.Int32:
+                    result = Convert.ToInt32(value);
+                    return true;
+                case TypeCode.Int64:
+                    long longValue = Convert.ToInt64(value);
+                    if (longValue < int.MinValue || longValue > int.MaxValue)
+                    {
+                        result = 0;
+                        return false;
+                    }
+                    result = (int)longValue;
+                    return true;
+                case TypeCode.Byte:
+                case TypeCode.UInt16:
+                    result = Convert.ToInt32(value);
+                    return true;
+                case TypeCode.UInt32:
+                case TypeCode.UInt64:
+                    ulong ulongValue = Convert.ToUInt64(value);
+                    if (ulongValue > int.MaxValue)
+                    {
+                        result = 0;
+                        return false;
+                    }
+                    result = (int)ulongValue;
+                    return true;
+                default:
+                    result = 0;
+                    return false;
+            }
         }
 
 #if UNITY_EDITOR
@@ -599,6 +740,7 @@ namespace ES
                 return;
             }
 
+            ApplySymmetricMode(count);
             relations.Clear();
             for (int r = 0; r < count; r++)
             {
@@ -622,6 +764,20 @@ namespace ES
             _cacheReady = false;
         }
 
+        private void ApplySymmetricMode(int count)
+        {
+            if (!editorSymmetricMode || editorMatrix == null) return;
+            for (int r = 0; r < count; r++)
+            {
+                for (int c = r + 1; c < count; c++)
+                {
+                    bool related = editorMatrix[r, c] || editorMatrix[c, r];
+                    editorMatrix[r, c] = related;
+                    editorMatrix[c, r] = related;
+                }
+            }
+        }
+
         private ValueTuple<string, LabelDirection> GetMatrixLabel(TableAxis axis, int index)
         {
             int count = baseKeys != null ? baseKeys.Count : 0;
@@ -637,6 +793,29 @@ namespace ES
             return ValueTuple.Create(label, LabelDirection.LeftToRight);
         }
 #endif
+
+        private void AddRelationNoRebuild(int fromKey, int toKey)
+        {
+            if (relations == null) relations = new List<RelationEntry>();
+
+            for (int i = 0; i < relations.Count; i++)
+            {
+                if (relations[i].key == fromKey)
+                {
+                    var entry = relations[i];
+                    if (entry.relatedKeys == null) entry.relatedKeys = new List<int>();
+                    if (!entry.relatedKeys.Contains(toKey)) entry.relatedKeys.Add(toKey);
+                    relations[i] = entry;
+                    return;
+                }
+            }
+
+            relations.Add(new RelationEntry
+            {
+                key = fromKey,
+                relatedKeys = new List<int> { toKey }
+            });
+        }
     }
 
     /// <summary>
@@ -668,6 +847,9 @@ namespace ES
         [OnValueChanged("EditorApplyMatrix")]
         [ShowInInspector, PropertyOrder(100)]
         private bool[,] editorMatrix;
+
+        [SerializeField, LabelText("对称模式"), PropertyOrder(99)]
+        private bool editorSymmetricMode;
 
         [NonSerialized] private bool _suppressMatrixApply;
 
@@ -741,6 +923,12 @@ namespace ES
 
             _cacheReady = false;
             RebuildCache();
+        }
+
+        public void AddRelationTwoWay(TEnum a, TEnum b)
+        {
+            AddRelation(a, b);
+            AddRelation(b, a);
         }
 
         public void AddRelations(TEnum fromKey, IEnumerable<TEnum> toKeys)
@@ -923,7 +1111,12 @@ namespace ES
 
             for (int i = 0; i < count; i++)
             {
-                _index[baseKeys[i]] = i;
+                TEnum key = baseKeys[i];
+                if (_index.ContainsKey(key))
+                {
+                    continue;
+                }
+                _index.Add(key, i);
             }
 
             if (relations == null || relations.Count == 0 || _index == null) return;
@@ -1020,6 +1213,7 @@ namespace ES
                 return;
             }
 
+            ApplySymmetricMode(count);
             relations.Clear();
             for (int r = 0; r < count; r++)
             {
@@ -1041,6 +1235,20 @@ namespace ES
             }
 
             _cacheReady = false;
+        }
+
+        private void ApplySymmetricMode(int count)
+        {
+            if (!editorSymmetricMode || editorMatrix == null) return;
+            for (int r = 0; r < count; r++)
+            {
+                for (int c = r + 1; c < count; c++)
+                {
+                    bool related = editorMatrix[r, c] || editorMatrix[c, r];
+                    editorMatrix[r, c] = related;
+                    editorMatrix[c, r] = related;
+                }
+            }
         }
 
         private ValueTuple<string, LabelDirection> GetMatrixLabel(TableAxis axis, int index)

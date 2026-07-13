@@ -1,0 +1,45 @@
+<module name="es">
+    <bean name="ConfigPackInfo">
+        <var name="id" type="int" comment="Pack Id"/>
+        <var name="key" type="string" comment="Stable key"/>
+        <var name="displayNameKey" type="string" comment="Localization key"/>
+        <var name="comment" type="string" comment="Editor comment"/>
+    </bean>
+
+    <bean name="ConfigGroupInfo">
+        <var name="id" type="int"/>
+        <var name="packId" type="int"/>
+        <var name="key" type="string"/>
+        <var name="displayNameKey" type="string"/>
+        <var name="comment" type="string"/>
+    </bean>
+
+    <bean name="TextInfo">
+        <var name="key" type="string"/>
+        <var name="zhCN" type="string"/>
+        <var name="enUS" type="string"/>
+    </bean>
+
+    <bean name="SkillDefinitionInfo">
+        <var name="id" type="int"/>
+        <var name="groupId" type="int"/>
+        <var name="key" type="string"/>
+        <var name="nameTextKey" type="string"/>
+        <var name="descTextKey" type="string"/>
+        <var name="timelineAssetKey" type="string"/>
+        <var name="tags" type="string"/>
+        <var name="unlockCondition" type="string"/>
+        <var name="castPrerequisite" type="string"/>
+        <var name="numericPrepareExpression" type="string"/>
+        <var name="contextPrepareExpression" type="string"/>
+        <var name="canCancel" type="bool"/>
+        <var name="canStack" type="bool"/>
+        <var name="sharedEnergyKey" type="string"/>
+        <var name="sharedCountKey" type="string"/>
+    </bean>
+
+    <table name="TbConfigPack" value="ConfigPackInfo" input="csv/ConfigPackInfo.csv" index="id" mode="map" group="client,server,editor"/>
+    <table name="TbConfigGroup" value="ConfigGroupInfo" input="csv/ConfigGroupInfo.csv" index="id" mode="map" group="client,server,editor"/>
+    <table name="TbText" value="TextInfo" input="csv/TextInfo.csv" index="key" mode="map" group="client,server,editor"/>
+    <table name="TbSkillDefinition" value="SkillDefinitionInfo" input="csv/SkillDefinitionInfo.csv" index="id" mode="map" group="client,server,editor"/>
+</module>

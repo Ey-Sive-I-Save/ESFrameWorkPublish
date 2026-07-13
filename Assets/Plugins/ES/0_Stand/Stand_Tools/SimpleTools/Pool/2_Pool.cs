@@ -6,8 +6,7 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
-    /// 对象池基类（商业级实现）
-    /// 主线程优先：在主线程时尽量避免加锁；若从其他线程访问则用锁保护
+    /// 对象池基类。面向 Unity 主线程使用，不提供线程安全保证。
     /// </summary>
     /// <typeparam name="T">池化对象类型</typeparam>
     public abstract class AbstractPool<T> : IPool<T> where T : IPoolable
@@ -121,6 +120,10 @@ namespace ES
             {
                 // 创建新对象，增加空值检查
                 use = mFactory.Create();
+                if (use == null)
+                {
+                    throw new InvalidOperationException($"[AbstractPool] Factory returned null for type {typeof(T).Name}.");
+                }
                 
                 // 添加到追踪集合
                 mCreatedObjects.Add(use);
@@ -149,7 +152,7 @@ namespace ES
         public abstract bool PushToPool(T obj);
 
         /// <summary>
-        /// 获取对象池统计信息
+        /// 获取对象池统计信息。仅编辑器下有效，Player Runtime 返回 null。
         /// </summary>
         public PoolStatistics GetStatistics()
         {

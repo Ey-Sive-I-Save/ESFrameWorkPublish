@@ -29,10 +29,18 @@ public class LinkReceiveChannelPool<Channel, Link>
     #region 字段 (Fields)
 
     /// <summary>
-    /// 通道接收者分组，使用 SafeKeyGroup 按通道组织接收者列表，确保线程安全。
+    /// 通道接收者分组，使用 SafeKeyGroup 按通道组织支持派发期间安全增删的接收者列表。
     /// </summary>
     [HideLabel]
     private SafeKeyGroup<Channel, IReceiveChannelLink<Channel, Link>> _channelReceivers = new SafeKeyGroup<Channel, IReceiveChannelLink<Channel, Link>>();
+    private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>();
+    private readonly List<ActionReceiverRecord> _actionReceivers = new List<ActionReceiverRecord>();
+
+    private struct ActionReceiverRecord
+    {
+        public Channel Channel;
+        public ReceiveChannelLink<Channel, Link> Receiver;
+    }
 
     #endregion
 
@@ -47,6 +55,7 @@ public class LinkReceiveChannelPool<Channel, Link>
     public void SendLink(Channel channel, Link link)
     {
         _channelReceivers.ApplyBuffers();
+        RecyclePending();
         if (_channelReceivers.Groups.TryGetValue(channel, out var receivers))
         {
             int count = receivers.ValuesNow.Count;
@@ -88,7 +97,30 @@ public class LinkReceiveChannelPool<Channel, Link>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void Internal_TryRemove(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
     {
-        _channelReceivers.Remove(channel, receiver);
+        RemoveReceiver(channel, receiver);
+    }
+
+    private void ScheduleRecycle(object receiver)
+    {
+        if (receiver is IPoolableAuto poolable && !poolable.IsRecycled)
+        {
+            _pendingRecycle.Add(poolable);
+        }
+    }
+
+    private void RecyclePending()
+    {
+        int count = _pendingRecycle.Count;
+        if (count == 0) return;
+        for (int i = 0; i < count; i++)
+        {
+            var poolable = _pendingRecycle[i];
+            if (poolable != null && !poolable.IsRecycled)
+            {
+                poolable.TryAutoPushedToPool();
+            }
+        }
+        _pendingRecycle.Clear();
     }
 
     /// <summary>
@@ -111,6 +143,7 @@ public class LinkReceiveChannelPool<Channel, Link>
     public void RemoveReceiver(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
     {
         _channelReceivers.Remove(channel, receiver);
+        ScheduleRecycle(receiver);
     }
 
     /// <summary>
@@ -121,7 +154,9 @@ public class LinkReceiveChannelPool<Channel, Link>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddReceiver(Channel channel, Action<Channel, Link> action)
     {
-        _channelReceivers.Add(channel, action.MakeReceive());
+        var receiver = action.MakeReceive();
+        _actionReceivers.Add(new ActionReceiverRecord { Channel = channel, Receiver = receiver });
+        _channelReceivers.Add(channel, receiver);
     }
 
     /// <summary>
@@ -132,7 +167,29 @@ public class LinkReceiveChannelPool<Channel, Link>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void RemoveReceiver(Channel channel, Action<Channel, Link> action)
     {
-        _channelReceivers.Remove(channel, action.MakeReceive());
+        for (int i = _actionReceivers.Count - 1; i >= 0; i--)
+        {
+            var record = _actionReceivers[i];
+            if (EqualityComparer<Channel>.Default.Equals(record.Channel, channel) && record.Receiver.action == action)
+            {
+                _actionReceivers.RemoveAt(i);
+                RemoveReceiver(channel, record.Receiver);
+                return;
+            }
+        }
+
+        if (_channelReceivers.Groups.TryGetValue(channel, out var receivers))
+        {
+            for (int i = 0; i < receivers.ValuesNow.Count; i++)
+            {
+                var receiver = receivers.ValuesNow[i];
+                if (receiver is ReceiveChannelLink<Channel, Link> receiveLink && receiveLink.action == action)
+                {
+                    RemoveReceiver(channel, receiver);
+                    return;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -141,7 +198,21 @@ public class LinkReceiveChannelPool<Channel, Link>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Clear()
     {
+        _channelReceivers.ApplyBuffers();
+        RecyclePending();
+        foreach (var pair in _channelReceivers.Groups)
+        {
+            var receivers = pair.Value;
+            for (int i = 0; i < receivers.ValuesNow.Count; i++)
+            {
+                if (receivers.ValuesNow[i] is IPoolableAuto poolable && !poolable.IsRecycled)
+                {
+                    poolable.TryAutoPushedToPool();
+                }
+            }
+        }
         _channelReceivers.Clear();
+        _actionReceivers.Clear();
     }
 
     /// <summary>
@@ -151,6 +222,7 @@ public class LinkReceiveChannelPool<Channel, Link>
     public void ApplyBuffers()
     {
         _channelReceivers.ApplyBuffers();
+        RecyclePending();
     }
 
     #endregion

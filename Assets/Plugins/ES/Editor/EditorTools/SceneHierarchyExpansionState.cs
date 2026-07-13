@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using ES;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -12,7 +13,7 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 保存并恢复已加载场景中 GameObject 在 Hierarchy 面板里的展开状态。
-/// 本脚本刻意保持独立：不依赖 ES、Odin、asmdef 或任何项目工具类。
+/// 项目级持久化数据归属 ESGlobalProjectAssetGuideData；EditorPrefs 仅用于读取旧数据并迁移。
 /// </summary>
 [InitializeOnLoad]
 public static class SceneHierarchyExpansionState
@@ -37,7 +38,7 @@ public static class SceneHierarchyExpansionState
     private const bool AutoRestoreAfterPlayMode = true;
     private static readonly bool LogTiming = true;
 
-    private const string MenuRoot = "Tools/Scene Hierarchy Expansion/";
+    private const string MenuRoot = MenuItemPathDefine.ROOT_PATH + "场景层级展开/";
     private const string StoragePrefix = "Standalone.SceneHierarchyExpansionState.";
 
     private static int restoreRetryCount;
@@ -102,8 +103,7 @@ public static class SceneHierarchyExpansionState
 
             data.expandedTransformPaths.Sort(StringComparer.Ordinal);
 
-            // 保存到 EditorPrefs：不创建资产文件，不影响版本库，按项目和场景 GUID 隔离。
-            EditorPrefs.SetString(GetStorageKey(scene), JsonUtility.ToJson(data));
+            SaveSceneExpansionData(scene, data);
             storedSceneCount++;
             storedExpandedCount += data.expandedTransformPaths.Count;
         }
@@ -131,9 +131,13 @@ public static class SceneHierarchyExpansionState
         {
             var scene = SceneManager.GetSceneAt(i);
             if (CanStoreScene(scene))
+            {
                 EditorPrefs.DeleteKey(GetStorageKey(scene));
+                ClearSceneExpansionData(scene);
+            }
         }
 
+        SaveProjectGuideDataIfNeeded();
         Debug.Log("[SceneHierarchyExpansionState] Cleared saved hierarchy expansion state for loaded scenes.");
     }
 
@@ -219,12 +223,7 @@ public static class SceneHierarchyExpansionState
             if (!CanStoreScene(scene))
                 continue;
 
-            string json = EditorPrefs.GetString(GetStorageKey(scene), string.Empty);
-            if (string.IsNullOrEmpty(json))
-                continue;
-
-            var data = JsonUtility.FromJson<SceneExpansionData>(json);
-            if (data == null || data.expandedTransformPaths == null)
+            if (!TryLoadSceneExpansionData(scene, out SceneExpansionData data))
                 continue;
 
             loadedSceneCount++;
@@ -537,6 +536,67 @@ public static class SceneHierarchyExpansionState
 
         // 同一个工程复制到不同目录时，project hash 可以避免 EditorPrefs 键冲突。
         return StoragePrefix + GetProjectHash() + "." + sceneId;
+    }
+
+    private static string GetSceneGuid(Scene scene)
+    {
+        string sceneGuid = AssetDatabase.AssetPathToGUID(scene.path);
+        return string.IsNullOrEmpty(sceneGuid) ? scene.path : sceneGuid;
+    }
+
+    private static void SaveSceneExpansionData(Scene scene, SceneExpansionData data)
+    {
+        ESGlobalProjectAssetGuideData globalData = ESGlobalProjectAssetGuideData.GetOrCreateData();
+        if (globalData == null)
+            return;
+
+        globalData.SetSceneExpansion(GetSceneGuid(scene), scene.path, data.expandedTransformPaths);
+        if (globalData.saveSceneExpansionAssetImmediately)
+            SaveProjectGuideDataIfNeeded();
+    }
+
+    private static bool TryLoadSceneExpansionData(Scene scene, out SceneExpansionData data)
+    {
+        data = null;
+        string sceneGuid = GetSceneGuid(scene);
+
+        if (ESGlobalProjectAssetGuideData.TryFindExistingData(out ESGlobalProjectAssetGuideData globalData)
+            && globalData.TryGetSceneExpansion(sceneGuid, out ESGlobalProjectAssetGuideData.SceneHierarchyExpansionRecord record)
+            && record != null
+            && record.expandedTransformPaths != null)
+        {
+            data = new SceneExpansionData();
+            data.expandedTransformPaths.AddRange(record.expandedTransformPaths);
+            return true;
+        }
+
+        string json = EditorPrefs.GetString(GetStorageKey(scene), string.Empty);
+        if (string.IsNullOrEmpty(json))
+            return false;
+
+        data = JsonUtility.FromJson<SceneExpansionData>(json);
+        if (data == null || data.expandedTransformPaths == null)
+            return false;
+
+        SaveSceneExpansionData(scene, data);
+        return true;
+    }
+
+    private static void ClearSceneExpansionData(Scene scene)
+    {
+        if (!ESGlobalProjectAssetGuideData.TryFindExistingData(out ESGlobalProjectAssetGuideData globalData) || globalData == null)
+            return;
+
+        globalData.ClearSceneExpansion(GetSceneGuid(scene));
+    }
+
+    private static void SaveProjectGuideDataIfNeeded()
+    {
+        if (!ESGlobalProjectAssetGuideData.TryFindExistingData(out ESGlobalProjectAssetGuideData globalData) || globalData == null)
+            return;
+
+        EditorUtility.SetDirty(globalData);
+        AssetDatabase.SaveAssets();
     }
 
     private static string GetProjectHash()

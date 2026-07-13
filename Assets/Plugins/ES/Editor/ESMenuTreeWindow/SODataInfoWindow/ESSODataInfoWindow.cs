@@ -81,6 +81,9 @@ namespace ES
             public string selectGroupTypeName_ = "Buff数据";
 
             public string selectNormalTypeName_ = "Normal_SO";
+            private const string PrefKeySelectedPackType = "ES.SODataInfoWindow.SelectedPackType";
+            private const string PrefKeySelectedGroupType = "ES.SODataInfoWindow.SelectedGroupType";
+            private const string PrefKeySelectedNormalType = "ES.SODataInfoWindow.SelectedNormalType";
             private bool HasDelegate = false;
 
             public static string guidForCopiedGroup = "";
@@ -110,6 +113,9 @@ namespace ES
             public string pathForDefaultSetting;
             public override void ES_LoadData()
             {
+                selectPackTypeName_ = EditorPrefs.GetString(PrefKeySelectedPackType, selectPackTypeName_);
+                selectGroupTypeName_ = EditorPrefs.GetString(PrefKeySelectedGroupType, selectGroupTypeName_);
+                selectNormalTypeName_ = EditorPrefs.GetString(PrefKeySelectedNormalType, selectNormalTypeName_);
                 if (EditorPrefs.HasKey("guidForCopiedGroup"))
                 {
                     guidForCopiedGroup = EditorPrefs.GetString("guidForCopiedGroup");
@@ -122,6 +128,9 @@ namespace ES
             }
             public override void ES_SaveData()
             {
+                EditorPrefs.SetString(PrefKeySelectedPackType, selectPackTypeName_ ?? "");
+                EditorPrefs.SetString(PrefKeySelectedGroupType, selectGroupTypeName_ ?? "");
+                EditorPrefs.SetString(PrefKeySelectedNormalType, selectNormalTypeName_ ?? "");
                 if (CopyGroup != null)
                 {
                     guidForCopiedGroup = ESDesignUtility.SafeEditor.GetAssetGUID(CopyGroup) ?? guidForCopiedGroup;
@@ -133,10 +142,36 @@ namespace ES
                 }
             }
 
+            public void SaveSelectedDataTypeNames()
+            {
+                EditorPrefs.SetString(PrefKeySelectedPackType, selectPackTypeName_ ?? "");
+                EditorPrefs.SetString(PrefKeySelectedGroupType, selectGroupTypeName_ ?? "");
+                EditorPrefs.SetString(PrefKeySelectedNormalType, selectNormalTypeName_ ?? "");
+            }
+
+            public static string ResolveSavedSelection(string currentValue, string savedValue, IEnumerable<string> allNames)
+            {
+                string[] names = allNames?
+                    .Where(static name => !name.IsNullOrWhitespace())
+                    .ToArray();
+
+                if (names == null || names.Length == 0)
+                    return currentValue ?? "";
+
+                if (!currentValue.IsNullOrWhitespace() && names.Contains(currentValue))
+                    return currentValue;
+
+                if (!savedValue.IsNullOrWhitespace() && names.Contains(savedValue))
+                    return savedValue;
+
+                return names[0];
+            }
+
             #endregion
             protected override void ES_OnBuildMenuTree(OdinMenuTree tree)
             {
                 base.ES_OnBuildMenuTree(tree);
+                ES_LoadData();
                 {   //独立功能块
                     Part_BuildDataScriptCodePage(tree);
                     Part_BuildSoPackPage(tree);
@@ -391,15 +426,17 @@ namespace ES
             private void Refresh()
             {
                 AssetDatabase.Refresh();
-                createName_ = "新建" + createPackType_;
+                if (ESSODataInfoWindow.UsingWindow != null)
+                    ESSODataInfoWindow.UsingWindow.selectPackTypeName_ = createPackType_;
+                createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createPackType_, "DataPack");
                 createText = $"--新建【{createPackType_}】--";
             }
             public override ESWindowPageBase ES_Refresh()
             {
-                if (createPackType_.IsNullOrWhitespace())
-                {
-                    createPackType_ = ESSODataWindowHelper.GetPackNames().First();
-                }
+                createPackType_ = ESSODataInfoWindow.ResolveSavedSelection(
+                    createPackType_,
+                    ESSODataInfoWindow.UsingWindow?.selectPackTypeName_,
+                    ESSODataWindowHelper.GetPackNames());
                 Refresh();
                 FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_PackParent;
                 return base.ES_Refresh();
@@ -476,15 +513,16 @@ namespace ES
             public void FindAInfoGroupAsset()
             {
                 //找到全部数据组
-                var GroupType = ESSODataWindowHelper.GetGroupType(createPackType_.Replace("包", "组"));
+                var GroupType = ESSODataWindowHelper.GetGroupTypeForPackType(ESSODataWindowHelper.GetPackType(createPackType_));
                 CachingAddGroups = ESEditorSO.SOS.GetGroup<ISoDataGroup>(GroupType) ?? CachingAddGroups;
             }
             private void OnValueChanged_ResetConfigure()
             {
                 hasChange = false;
                 ESSODataInfoWindow.UsingWindow.selectPackTypeName_ = createPackType_;
+                ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
                 ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
-                createName_ = "新建" + createPackType_;
+                createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createPackType_, "DataPack");
             }
             private bool TypeSelectorSettingForDataPack(Type type)
             {
@@ -545,8 +583,7 @@ namespace ES
             [Button("搜集匹配数据组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void SearchAllGroup()
             {   //找到全部数据组
-                var namePack = ESSODataWindowHelper.GetPackName(pack.GetType());
-                var GroupType = ESSODataWindowHelper.GetGroupType(namePack.Replace("包", "组"));
+                var GroupType = ESSODataWindowHelper.GetGroupTypeForPackType(pack.GetType());
                 CachingGroups = ESEditorSO.SOS.GetGroup<ISoDataGroup>(GroupType) ?? CachingGroups;
             }
             [VerticalGroup("总组/按钮组")]
@@ -612,18 +649,19 @@ namespace ES
             private void Refresh()
             {
                 AssetDatabase.Refresh();
-                ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = createGroup_;
+                if (ESSODataInfoWindow.UsingWindow != null)
+                    ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = createGroup_;
                 createText = $"--新建【{createGroup_}】--";
             }
             public override ESWindowPageBase ES_Refresh()
             {
                 FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_GroupParent;
-                if (createGroup_.IsNullOrWhitespace())
-                {
-                    createGroup_ = ESSODataWindowHelper.GetGroupNames().First();
-                }
+                createGroup_ = ESSODataInfoWindow.ResolveSavedSelection(
+                    createGroup_,
+                    ESSODataInfoWindow.UsingWindow?.selectGroupTypeName_,
+                    ESSODataWindowHelper.GetGroupNames());
                 Refresh();
-                createName_ = "新建" + createGroup_;
+                createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createGroup_, "DataGroup");
                 return base.ES_Refresh();
 
             }
@@ -692,8 +730,9 @@ namespace ES
             {
                 hasChange = false;
                 ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = createGroup_;
+                ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
                 ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
-                createName_ = "新建" + createGroup_;
+                createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createGroup_, "DataGroup");
             }
             #endregion
         }
@@ -772,11 +811,13 @@ namespace ES
             public void CreateNewPage()
             {
                 ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = ESSODataWindowHelper.GetGroupName(group.GetType());
+                ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
                 if (ESSODataInfoWindow.MenuItems.TryGetValue(ESSODataInfoWindow.PageName_DataGroupCreate, out var pageItem))
                 {
                     ESSODataInfoWindow.UsingWindow.MenuTree.Selection.Add(pageItem);
                 }
                 ESSODataInfoWindow.UsingWindow.pageForSodataGroup.createGroup_ = ESSODataWindowHelper.GetGroupName(group.GetType());
+                ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
@@ -1155,19 +1196,20 @@ namespace ES
             private void Refresh()
             {
                 AssetDatabase.Refresh();
-                ESSODataInfoWindow.UsingWindow.selectNormalTypeName_ = createNormal_;
-                createText = $"--新建【{createNormal_}】--";
+                if (ESSODataInfoWindow.UsingWindow != null)
+                    ESSODataInfoWindow.UsingWindow.selectNormalTypeName_ = createNormal_;
+                createText = $"--新建【{ESSODataWindowHelper.GetTypePathDisplayName(createNormal_, "SO")}】--";
             }
             public override ESWindowPageBase ES_Refresh()
             {
 
                 FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_NormalParent;
-                if (createNormal_.IsNullOrWhitespace())
-                {
-                    createNormal_ = ESSODataWindowHelper.GetNormalSONames().First();
-                }
+                createNormal_ = ESSODataInfoWindow.ResolveSavedSelection(
+                    createNormal_,
+                    ESSODataInfoWindow.UsingWindow?.selectNormalTypeName_,
+                    ESGlobalEditorDefaultConfi.GetUseableNormalSoNames());
                 Refresh();
-                createName_ = "新建" + createNormal_;
+                createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createNormal_, "SO");
                 return base.ES_Refresh();
 
             }
@@ -1178,7 +1220,7 @@ namespace ES
 
             [OnValueChanged("OnValueChanged_ResetConfigure"), InfoBox("建议选择一个预设类型的常规SO配置,或者自己创建支持,默认类型无法直接使用", infoMessageType: InfoMessageType.Warning/*, VisibleIf = "@createGroup_==EvWindowDataAndTool.DataType.None"*/)]
             [VerticalGroup("总组/数据"), Space(5), LabelText("预定义类型")]
-            [ValueDropdown("@ESGlobalEditorDefaultConfi.GetUseableNormalSoNames()", AppendNextDrawer = false)]
+            [ValueDropdown("GetNormalSoDropdownItems", AppendNextDrawer = false)]
             public string createNormal_ = "";
 
             #region 按钮
@@ -1229,8 +1271,15 @@ namespace ES
             {
                 hasChange = false;
                 ESSODataInfoWindow.UsingWindow.selectNormalTypeName_ = createNormal_;
+                ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
                 ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
-                createName_ = "新建" + createNormal_;
+                createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createNormal_, "SO");
+            }
+
+            private IEnumerable<ValueDropdownItem<string>> GetNormalSoDropdownItems()
+            {
+                return ESGlobalEditorDefaultConfi.GetUseableNormalSoNames()
+                    .Select(static name => new ValueDropdownItem<string>(ESSODataWindowHelper.GetTypePathDisplayName(name, "SO"), name));
             }
             #endregion
         }
@@ -1419,6 +1468,40 @@ namespace ES
                 }
             }
             #region 简单方法
+            public static string GetTypePathDisplayName(string rawName, string fallbackName)
+            {
+                string name = GetFirstValidTypePathLine(rawName);
+                return name.IsNullOrWhitespace() ? fallbackName : name;
+            }
+
+            public static string GetTypeLeafDisplayName(string rawName, string fallbackName)
+            {
+                string name = GetFirstValidTypePathLine(rawName);
+                if (name.IsNullOrWhitespace())
+                    return fallbackName;
+
+                int lastSlash = name.LastIndexOf('/');
+                if (lastSlash >= 0 && lastSlash < name.Length - 1)
+                    name = name.Substring(lastSlash + 1).Trim();
+
+                return name.IsNullOrWhitespace() ? fallbackName : name;
+            }
+
+            private static string GetFirstValidTypePathLine(string rawName)
+            {
+                if (rawName.IsNullOrWhitespace())
+                    return string.Empty;
+
+                return rawName
+                    .Replace('\\', '/')
+                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(static x => x.Trim().Trim('/').Trim())
+                    .FirstOrDefault(static x =>
+                        !x.IsNullOrWhitespace() &&
+                        !x.StartsWith("<summary", StringComparison.OrdinalIgnoreCase) &&
+                        !x.StartsWith("</summary", StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
+            }
+
             public static string[] GetInfoNames()
             {
                 return ESDesignUtility.Creator.CreatePaths.GetKeys("数据信息");
@@ -1437,19 +1520,47 @@ namespace ES
             }
             public static Type GetInfoType(string name)
             {
-                return ESDesignUtility.Creator.CreatePaths.GetElement("数据信息", name);
+                return GetCreatePathTypeOrNull("数据信息", name);
             }
             public static Type GetGroupType(string name)
             {
-                return ESDesignUtility.Creator.CreatePaths.GetElement("数据组", name);
+                return GetCreatePathTypeOrNull("数据组", name);
             }
             public static Type GetPackType(string name)
             {
-                return ESDesignUtility.Creator.CreatePaths.GetElement("数据包", name);
+                return GetCreatePathTypeOrNull("数据包", name);
+            }
+            public static Type GetGroupTypeForPackType(Type packType)
+            {
+                Type infoType = GetInfoTypeFromSoDataPack(packType);
+                if (infoType == null)
+                    return null;
+
+                var groups = ESDesignUtility.Creator.CreatePaths.GetDic("数据组");
+                foreach (var item in groups)
+                {
+                    Type groupType = item.Value;
+                    if (GetInfoTypeFromSoDataGroup(groupType) == infoType)
+                        return groupType;
+                }
+
+                return null;
             }
             public static Type GetNormalType(string name)
             {
-                return ESEditorSO.AllSoNames[name];
+                if (name.IsNullOrWhitespace())
+                    return null;
+
+                return ESEditorSO.AllSoNames.TryGetValue(name, out var type) ? type : null;
+            }
+
+            private static Type GetCreatePathTypeOrNull(string groupName, string name)
+            {
+                if (groupName.IsNullOrWhitespace() || name.IsNullOrWhitespace())
+                    return null;
+
+                var dic = ESDesignUtility.Creator.CreatePaths.GetDic(groupName);
+                return dic != null && dic.TryGetValue(name, out var type) ? type : null;
             }
             public static string GetPackName(Type name)
             {
@@ -1486,6 +1597,29 @@ namespace ES
                     }
                 }
                 return "";
+            }
+
+            private static Type GetInfoTypeFromSoDataPack(Type packType)
+            {
+                return GetGenericArgumentFromBaseType(packType, typeof(SoDataPack<>));
+            }
+
+            private static Type GetInfoTypeFromSoDataGroup(Type groupType)
+            {
+                return GetGenericArgumentFromBaseType(groupType, typeof(SoDataGroup<>));
+            }
+
+            private static Type GetGenericArgumentFromBaseType(Type type, Type genericBaseTypeDefinition)
+            {
+                while (type != null && type != typeof(object))
+                {
+                    if (type.IsGenericType && type.GetGenericTypeDefinition() == genericBaseTypeDefinition)
+                        return type.GetGenericArguments()[0];
+
+                    type = type.BaseType;
+                }
+
+                return null;
             }
             public static bool HasNull(params UnityEngine.Object[] objects)
             {

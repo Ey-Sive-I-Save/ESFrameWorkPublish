@@ -26,7 +26,7 @@ namespace ES
         public void ConfirmFlow(int count);
         public string GetTitle();
         public ESNodeState State { get; set; }
-        public bool MutiLineOut { get; }
+        public bool MultiLineOut { get; }
     }
     public enum ESNodeState
     {
@@ -51,7 +51,7 @@ namespace ES
 
     public class NodePort
     {
-        public bool IsMutiConnect = false;
+        public bool IsMultiConnect = false;
         public string Name = "端";
 
     }

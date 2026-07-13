@@ -15,8 +15,9 @@ namespace ES
 
         public bool TryAddTrackClip(ITrackClip item);
         public bool TryRemoveTrackClip(ITrackClip item);
+        public bool SortClipsByTime();
 
-        public IEnumerable<Type> SupprtedClipTypes();
+        public IEnumerable<Type> SupportedClipTypes();
 
         List<IEditorTimeSampler> CreateSamplers(ITrackSequence sequence);
 #if UNITY_EDITOR
@@ -28,9 +29,14 @@ namespace ES
     [Serializable]
     public abstract class TrackItemBase<TClip> : ITrackItem where TClip : class, ITrackClip
     {
+        [TitleGroup("轨道设置", "控制当前轨道是否参与预览/运行，以及轨道在编辑器中的显示名称。")]
+        [HorizontalGroup("轨道设置/基础", Width = 70)]
         [LabelText("启用")]
         public bool enabled = true;
-        [FoldoutGroup("轨道片段管理")]
+
+        [TitleGroup("轨道设置")]
+        [LabelText("片段列表")]
+        [ListDrawerSettings(DefaultExpandedState = true, DraggableItems = true, ShowFoldout = true, ShowIndexLabels = true)]
         public List<TClip> clips = new List<TClip>();
         public bool Enabled { get => enabled; set => enabled = value; }
         public IEnumerable<ITrackClip> Clips => clips;
@@ -42,6 +48,7 @@ namespace ES
             get { if (displayName == "") { return this.GetType()._GetTypeDisplayName(); } return displayName; }
             set { displayName = value; }
         }
+        [TitleGroup("轨道设置")]
         [LabelText("显示名称")]
         public string displayName = "";
         public bool TryAddTrackClip(ITrackClip item)
@@ -65,7 +72,44 @@ namespace ES
             return false;
         }
 
-        public IEnumerable<Type> SupprtedClipTypes() => new Type[] { typeof(TClip) };
+        public bool SortClipsByTime()
+        {
+            if (clips == null || clips.Count <= 1)
+                return false;
+
+            bool changed = false;
+            for (int i = 1; i < clips.Count; i++)
+            {
+                TClip previous = clips[i - 1];
+                TClip current = clips[i];
+                float previousStart = previous != null ? previous.StartTime : float.MaxValue;
+                float currentStart = current != null ? current.StartTime : float.MaxValue;
+                if (currentStart < previousStart)
+                {
+                    changed = true;
+                    break;
+                }
+            }
+
+            if (!changed)
+                return false;
+
+            clips.Sort((a, b) =>
+            {
+                float aStart = a != null ? a.StartTime : float.MaxValue;
+                float bStart = b != null ? b.StartTime : float.MaxValue;
+                int startCompare = aStart.CompareTo(bStart);
+                if (startCompare != 0)
+                    return startCompare;
+
+                float aEnd = a != null ? a.StartTime + Mathf.Max(0f, a.DurationTime) : float.MaxValue;
+                float bEnd = b != null ? b.StartTime + Mathf.Max(0f, b.DurationTime) : float.MaxValue;
+                return aEnd.CompareTo(bEnd);
+            });
+            return true;
+        }
+
+        public IEnumerable<Type> SupportedClipTypes() => new Type[] { typeof(TClip) };
 
 
         public virtual List<IEditorTimeSampler> CreateSamplers(ITrackSequence sequence)
@@ -76,7 +120,7 @@ namespace ES
 
             foreach (var clip in clips)
             {
-                if (clip == null)
+                if (clip == null || !clip.Enabled)
                     continue;
 
                 var clipSampler = clip.CreateSampler(sequence, this);
@@ -98,7 +142,7 @@ namespace ES
 
             foreach (var clip in clips)
             {
-                if (clip == null)
+                if (clip == null || !clip.Enabled)
                     continue;
 
                 var clipSampler = clip.CreateEditorSampler(sequence, this, editorTarget);

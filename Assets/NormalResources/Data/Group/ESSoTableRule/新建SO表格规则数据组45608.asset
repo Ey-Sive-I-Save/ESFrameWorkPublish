@@ -1,0 +1,166 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-7031916951403410217
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7422ebe64a1c0b49b3c7d5ba37cc654, type: 3}
+  m_Name: "\u4FE1\u606F\u6570\u636E\u952E94193"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u6570\u636E\u952E"
+  enabled: 1
+  ruleKey: ESSoTableDataRule
+  description: 
+  typeBinding:
+    objectKind: 0
+    objectTypeName: 
+    packTypeName: ES.ESSoTableDataRulePack
+    groupTypeName: ES.ESSoTableDataRuleGroup
+    infoTypeName: ES.ESSoTableDataRule
+  buildStage:
+    sourceBinding:
+      sourceKind: 0
+      soAsset: {fileID: 0}
+      soFolder: {fileID: 0}
+      includeSubFolders: 1
+      monoScript: {fileID: 0}
+      folderAssets: []
+      folderSyncMode: 1
+      createMissingAssetsInFolder: 1
+      updateExistingAssetsInFolder: 1
+      sourceGuid: 
+      sourcePath: 
+      sourceTypeName: 
+    tableFilePath: 
+    allowTableHeaderOverride: 1
+  useBatches:
+  - enabled: 1
+    batchName: ESSoTableDataRule
+    direction: 0
+    sourceBinding:
+      sourceKind: 0
+      soAsset: {fileID: 0}
+      soFolder: {fileID: 0}
+      includeSubFolders: 1
+      monoScript: {fileID: 0}
+      folderAssets: []
+      folderSyncMode: 1
+      createMissingAssetsInFolder: 1
+      updateExistingAssetsInFolder: 1
+      sourceGuid: 
+      sourcePath: 
+      sourceTypeName: 
+    fileKind: 2
+    columnNameMode: 0
+    fileName: ESSoTableDataRule
+    sheetName: ESSoTableDataRule
+    outputRoot: SoTableConfig/Tables
+    csvRelativePath: csv
+    xlsxRelativePath: xlsx
+    importConflictPolicy: 1
+    exportConflictPolicy: 1
+    applyRangeMode: 0
+    sliceColumnName: 
+    sliceStartValue: 
+    sliceEndValue: 
+    includeSliceStart: 1
+    includeSliceEnd: 1
+    targetGroupKey: 
+    targetInfoKey: 
+  tableName: TbSoTableDataRule
+  beanName: ESSoTableDataRule
+  infoExpandMode: 0
+  groupSliceMode: 1
+  packColumnName: pack
+  groupColumnName: group
+  infoKeyColumnName: key
+  nameMatchMode: 0
+  rowBinding:
+    targetMode: 0
+    rowKeyColumnName: key
+    listFieldPath: 
+    elementKeyFieldPath: key
+    createMissingElement: 1
+    allowEmptyRowKey: 0
+  nestedFieldRule:
+    expandNestedFields: 1
+    maxDepth: 1
+    columnSeparator: _
+  header:
+    varMark: '##var'
+    typeMark: '##type'
+    groupMark: '##group'
+    commentMark: '##'
+    defaultGroup: client,server,editor
+  columns: []
+  allowCreateInfoOnImport: 1
+  allowCreateGroupOnImport: 1
+  refreshPackBeforeExport: 1
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 79b1a230e4cb6f740b7efa540c52ee07, type: 3}
+  m_Name: "\u65B0\u5EFASO表格\u89C4\u5219\u6570\u636E\u7EC445608"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects:
+    - {fileID: -7031916951403410217}
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes:
+    - Name: Infos
+      Entry: 7
+      Data: 0|System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[ES.ESSoTableDataRule,
+        ES_Stand]], mscorlib
+    - Name: comparer
+      Entry: 7
+      Data: 1|System.Collections.Generic.GenericEqualityComparer`1[[System.String,
+        mscorlib]], mscorlib
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 12
+      Data: 1
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u6570\u636E\u952E"
+    - Name: $v
+      Entry: 10
+      Data: 0
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 13
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 

@@ -12,7 +12,7 @@ namespace ES
     ///
     /// 状态型 Link 的订阅容器类，用于管理状态变化的通知。
     /// 功能特性：
-    /// - 维护一个线程安全的接收者列表 (SafeNormalList)；
+    /// - 维护一个支持派发期间安全增删的接收者列表 (SafeNormalList)；
     /// - 当状态从 LastFlag 变化到新值时，通知所有监听者 (oldValue, newValue)；
     /// - 新增监听者会立即收到一次补发回调，以同步当前状态。
     /// </summary>
@@ -22,9 +22,11 @@ namespace ES
         #region 字段 (Fields)
 
         /// <summary>
-        /// 接收者列表，使用 SafeNormalList 确保线程安全。
+        /// 接收者列表，使用 SafeNormalList 支持派发期间安全增删。
         /// </summary>
         private SafeNormalList<IReceiveStateLink<LinkState>> _receivers = new SafeNormalList<IReceiveStateLink<LinkState>>();
+        private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>();
+        private readonly List<ReceiveStateLink<LinkState>> _actionReceivers = new List<ReceiveStateLink<LinkState>>();
 
         /// <summary>
         /// 上一次发送的状态值，用于检测状态变化。
@@ -60,8 +62,8 @@ namespace ES
         /// <param name="link">新的状态值。</param>
         public void SendLink(LinkState link)
         {
-            _receivers.ApplyBuffers();
-            if (!LastFlag.Equals(link))
+            ApplyBuffersAndRecycle();
+            if (!EqualityComparer<LinkState>.Default.Equals(LastFlag, link))
             {
                 int count = _receivers.ValuesNow.Count;
                 for (int i = 0; i < count; i++)
@@ -91,6 +93,36 @@ namespace ES
         private void Internal_TryRemove(IReceiveStateLink<LinkState> ir)
         {
             _receivers.Remove(ir);
+            ScheduleRecycle(ir);
+        }
+
+        private void ApplyBuffersAndRecycle()
+        {
+            _receivers.ApplyBuffers();
+            RecyclePending();
+        }
+
+        private void ScheduleRecycle(object receiver)
+        {
+            if (receiver is IPoolableAuto poolable && !poolable.IsRecycled)
+            {
+                _pendingRecycle.Add(poolable);
+            }
+        }
+
+        private void RecyclePending()
+        {
+            int count = _pendingRecycle.Count;
+            if (count == 0) return;
+            for (int i = 0; i < count; i++)
+            {
+                var poolable = _pendingRecycle[i];
+                if (poolable != null && !poolable.IsRecycled)
+                {
+                    poolable.TryAutoPushedToPool();
+                }
+            }
+            _pendingRecycle.Clear();
         }
 
         /// <summary>
@@ -102,7 +134,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddReceiver(ref LinkState nowFlag, IReceiveStateLink<LinkState> e)
         {
-            if (nowFlag.Equals(LastFlag))
+            if (EqualityComparer<LinkState>.Default.Equals(nowFlag, LastFlag))
             {
                 // 状态一致，无需补发
             }
@@ -122,7 +154,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveReceiver(ref LinkState nowFlag, IReceiveStateLink<LinkState> e)
         {
-            if (nowFlag.Equals(DefaultFlag))
+            if (EqualityComparer<LinkState>.Default.Equals(nowFlag, DefaultFlag))
             {
                 // 已是默认状态，无需重置
             }
@@ -132,6 +164,7 @@ namespace ES
                 e.OnLink(DefaultFlag);
             }
             _receivers.Remove(e);
+            ScheduleRecycle(e);
         }
 
         /// <summary>
@@ -142,7 +175,9 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddReceiver(ref LinkState nowFlag, Action<LinkState, LinkState> e)
         {
-            AddReceiver(ref nowFlag, e.MakeReceive<LinkState>());
+            var receiver = e.MakeReceive<LinkState>();
+            _actionReceivers.Add(receiver);
+            AddReceiver(ref nowFlag, receiver);
         }
 
         /// <summary>
@@ -153,7 +188,26 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveReceiver(ref LinkState nowFlag, Action<LinkState, LinkState> e)
         {
-            RemoveReceiver(ref nowFlag, e.MakeReceive<LinkState>());
+            for (int i = _actionReceivers.Count - 1; i >= 0; i--)
+            {
+                var receiver = _actionReceivers[i];
+                if (receiver.action == e)
+                {
+                    _actionReceivers.RemoveAt(i);
+                    RemoveReceiver(ref nowFlag, receiver);
+                    return;
+                }
+            }
+
+            for (int i = 0; i < _receivers.ValuesNow.Count; i++)
+            {
+                var receiver = _receivers.ValuesNow[i];
+                if (receiver is ReceiveStateLink<LinkState> receiveLink && receiveLink.action == e)
+                {
+                    RemoveReceiver(ref nowFlag, receiver);
+                    return;
+                }
+            }
         }
 
         /// <summary>
@@ -162,7 +216,16 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
+            ApplyBuffersAndRecycle();
+            for (int i = 0; i < _receivers.ValuesNow.Count; i++)
+            {
+                if (_receivers.ValuesNow[i] is IPoolableAuto poolable && !poolable.IsRecycled)
+                {
+                    poolable.TryAutoPushedToPool();
+                }
+            }
             _receivers.Clear();
+            _actionReceivers.Clear();
         }
 
         /// <summary>
@@ -171,7 +234,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ApplyBuffers()
         {
-            _receivers.ApplyBuffers();
+            ApplyBuffersAndRecycle();
         }
 
         #endregion

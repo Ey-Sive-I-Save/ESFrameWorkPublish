@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace ES
 {
-    public abstract class NodeSequnence : NodeRunnerSO
+    public abstract class NodeSequence : NodeRunnerSO
     {
 
         public override NodePort GetInputNode()
         {
-            return new NodePort() { Name = "序列", IsMutiConnect = false };
+            return new NodePort() { Name = "序列", IsMultiConnect = false };
         }
 
         public override string GetTitle()
@@ -18,7 +18,7 @@ namespace ES
         public abstract string GetOptionName();
     }
 
-    public abstract class NodeSequnence_ConfirmNodes : NodeSequnence
+    public abstract class NodeSequence_ConfirmNodes : NodeSequence
     {
         public virtual int PortNum => 2;
         public override List<NodePort> GetOutputNodes()
@@ -26,18 +26,18 @@ namespace ES
             var list = new List<NodePort>(PortNum);
             for (int i = 0; i < PortNum; i++)
             {
-                list.Add(new NodePort() { Name = "序号" + i, IsMutiConnect = false });
+                list.Add(new NodePort() { Name = "序号" + i, IsMultiConnect = false });
             }
             return list;
         }
     }
-    public abstract class NodeSequnence_MutiLines : NodeSequnence
+    public abstract class NodeSequence_MultiLines : NodeSequence
     {
-        public override bool MutiLineOut => true;
+        public override bool MultiLineOut => true;
         public override List<NodePort> GetOutputNodes()
         {
             var list = new List<NodePort>(1);
-            list.Add(new NodePort() { Name = "多通", IsMutiConnect = true });
+            list.Add(new NodePort() { Name = "多通", IsMultiConnect = true });
             return list;
         }
     }

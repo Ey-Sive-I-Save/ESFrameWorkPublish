@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Sirenix.OdinInspector.Editor;
 using UnityEditor;
 using UnityEngine;
-using Sirenix.OdinInspector.Editor;
 
 namespace ES.EditorTools
 {
@@ -14,12 +14,16 @@ namespace ES.EditorTools
     {
         private const string FoldoutNormalPrefsKey = "ES_EditorPreview_FoldoutNormal";
         private const string FoldoutSinglePrefsKey = "ES_EditorPreview_FoldoutSingle";
+        private const double PreviewEditorUpdateInterval = 1d / 30d;
+        private const float PreviewEditorMaxDeltaTime = 1f / 15f;
 
         private Vector2 scrollPosition;
 
         private readonly List<IPreviewElement> normalProviders = new List<IPreviewElement>();
         private readonly List<IPreviewElement> singleProviders = new List<IPreviewElement>();
         private readonly HashSet<IPreviewElement> collectedProviders = new HashSet<IPreviewElement>();
+        private readonly HashSet<IPreviewElement> activeProviders = new HashSet<IPreviewElement>();
+        private readonly List<IPreviewElement> inactiveBuffer = new List<IPreviewElement>();
 
         // Collector/子类扩展先写入缓冲区，再统一经过 AddPreviewElement 做过滤、去重和分区。
         // Override 和 Collector 分开使用缓冲区，避免子类调用 base.CollectPreviewElements 时互相清空。
@@ -27,6 +31,7 @@ namespace ES.EditorTools
         private readonly List<IPreviewElement> overrideSingleBuffer = new List<IPreviewElement>();
         private readonly List<IPreviewElement> collectorNormalBuffer = new List<IPreviewElement>();
         private readonly List<IPreviewElement> collectorSingleBuffer = new List<IPreviewElement>();
+        private double lastEditorUpdateTime;
 
         // 这里保持 static：所有预览编辑器共享折叠状态，这是当前工具的设计。
         private static bool foldoutNormal;
@@ -38,6 +43,17 @@ namespace ES.EditorTools
 
             foldoutNormal = EditorPrefs.GetBool(FoldoutNormalPrefsKey, true);
             foldoutSingle = EditorPrefs.GetBool(FoldoutSinglePrefsKey, true);
+            lastEditorUpdateTime = EditorApplication.timeSinceStartup;
+
+            EditorApplication.update -= OnPreviewEditorUpdate;
+            EditorApplication.update += OnPreviewEditorUpdate;
+        }
+
+        protected override void OnDisable()
+        {
+            EditorApplication.update -= OnPreviewEditorUpdate;
+            ReleaseAllActivePreviewElements(dispose: true);
+            base.OnDisable();
         }
 
         public override bool HasPreviewGUI() => true;
@@ -63,6 +79,7 @@ namespace ES.EditorTools
             var targetObj = target as T;
             if (targetObj == null)
             {
+                ReleaseAllActivePreviewElements(dispose: true);
                 EditorGUI.LabelField(r, $"未找到 {typeof(T).Name} 实例");
                 return;
             }
@@ -71,6 +88,7 @@ namespace ES.EditorTools
             singleProviders.Clear();
             collectedProviders.Clear();
             CollectPreviewElementsFromTarget(targetObj);
+            SyncActivePreviewElements();
 
             GUILayout.BeginArea(r);
             using (var scrollView = new GUILayout.ScrollViewScope(scrollPosition, false, true))
@@ -144,7 +162,7 @@ namespace ES.EditorTools
             GUILayout.BeginVertical(EditorStyles.helpBox);
             GUI.backgroundColor = originalColor;
 
-            var newFoldout = EditorGUILayout.Foldout(foldoutSingle, "★ 独占预览区", true);
+            var newFoldout = EditorGUILayout.Foldout(foldoutSingle, "大预览区域", true);
             SaveFoldoutIfChanged(FoldoutSinglePrefsKey, ref foldoutSingle, newFoldout);
 
             if (foldoutSingle)
@@ -254,9 +272,135 @@ namespace ES.EditorTools
                 return;
 
             if (element.IsSingleArea)
+            {
+                singleProviders.Add(element);
+                return;
+            }
+
+            if (element is IPreviewAreaModeProvider modeProvider
+                && modeProvider.PreviewAreaMode == PreviewAreaMode.Large)
                 singleProviders.Add(element);
             else
                 normalProviders.Add(element);
+        }
+
+        private void SyncActivePreviewElements()
+        {
+            inactiveBuffer.Clear();
+            foreach (var provider in activeProviders)
+            {
+                if (provider == null || !collectedProviders.Contains(provider) || !provider.CanPreview)
+                    inactiveBuffer.Add(provider);
+            }
+
+            for (int i = 0; i < inactiveBuffer.Count; i++)
+                DeactivatePreviewElement(inactiveBuffer[i], dispose: true);
+
+            inactiveBuffer.Clear();
+
+            foreach (var provider in collectedProviders)
+            {
+                if (provider == null || activeProviders.Contains(provider))
+                    continue;
+
+                activeProviders.Add(provider);
+                ActivatePreviewElement(provider);
+            }
+        }
+
+        private void ActivatePreviewElement(IPreviewElement provider)
+        {
+            if (provider is not IPreviewElementLifecycle lifecycle)
+                return;
+
+            try
+            {
+                lifecycle.OnPreviewEnable();
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
+
+        private void DeactivatePreviewElement(IPreviewElement provider, bool dispose)
+        {
+            if (provider != null)
+            {
+                try
+                {
+                    if (provider is IPreviewElementLifecycle lifecycle)
+                    {
+                        lifecycle.OnPreviewDisable();
+                        if (dispose)
+                            lifecycle.DisposePreview();
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
+
+            activeProviders.Remove(provider);
+        }
+
+        private void ReleaseAllActivePreviewElements(bool dispose)
+        {
+            inactiveBuffer.Clear();
+            inactiveBuffer.AddRange(activeProviders);
+
+            for (int i = 0; i < inactiveBuffer.Count; i++)
+                DeactivatePreviewElement(inactiveBuffer[i], dispose);
+
+            inactiveBuffer.Clear();
+            activeProviders.Clear();
+        }
+
+        private void OnPreviewEditorUpdate()
+        {
+            if (activeProviders.Count <= 0)
+                return;
+
+            double now = EditorApplication.timeSinceStartup;
+            if (now - lastEditorUpdateTime < PreviewEditorUpdateInterval)
+                return;
+
+            float deltaTime = Mathf.Min(PreviewEditorMaxDeltaTime, (float)(now - lastEditorUpdateTime));
+            lastEditorUpdateTime = now;
+
+            bool wantsRepaint = false;
+            inactiveBuffer.Clear();
+
+            foreach (var provider in activeProviders)
+            {
+                if (provider == null || !provider.CanPreview)
+                {
+                    inactiveBuffer.Add(provider);
+                    continue;
+                }
+
+                if (provider is not IPreviewElementEditorUpdate editorUpdate || !editorUpdate.WantsPreviewEditorUpdate)
+                    continue;
+
+                try
+                {
+                    editorUpdate.OnPreviewEditorUpdate(deltaTime);
+                    wantsRepaint = true;
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
+
+            for (int i = 0; i < inactiveBuffer.Count; i++)
+                DeactivatePreviewElement(inactiveBuffer[i], dispose: true);
+
+            inactiveBuffer.Clear();
+
+            if (wantsRepaint)
+                Repaint();
         }
 
         private static void SaveFoldoutIfChanged(string prefsKey, ref bool currentValue, bool newValue)

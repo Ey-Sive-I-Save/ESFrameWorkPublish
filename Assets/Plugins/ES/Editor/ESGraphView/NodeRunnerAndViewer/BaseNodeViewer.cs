@@ -85,7 +85,7 @@ namespace ES
                 var input = Runner.GetInputNode();
                 if (input != null)
                 {
-                    Port part = GetPortForNode(this, Direction.Input, input.IsMutiConnect ? Port.Capacity.Multi : Port.Capacity.Single);
+                    Port part = GetPortForNode(this, Direction.Input, input.IsMultiConnect ? Port.Capacity.Multi : Port.Capacity.Single);
                     part.portName = input.Name;
                     this.inputContainer.Add(part);
                 }
@@ -93,7 +93,7 @@ namespace ES
                    if (inputs != null) {
                        foreach (var input in inputs)
                        {
-                           Port part = GetPortForNode(this, Direction.Input, input.IsMutiConnect ? Port.Capacity.Multi: Port.Capacity.Single);
+                           Port part = GetPortForNode(this, Direction.Input, input.IsMultiConnect ? Port.Capacity.Multi: Port.Capacity.Single);
                            part.portName = input.Name;
                            this.contentContainer.Add(part);
                        }
@@ -105,7 +105,7 @@ namespace ES
                 {
                     foreach (var output in outputs)
                     {
-                        Port part = GetPortForNode(this, Direction.Output, output.IsMutiConnect ? Port.Capacity.Multi : Port.Capacity.Single);
+                        Port part = GetPortForNode(this, Direction.Output, output.IsMultiConnect ? Port.Capacity.Multi : Port.Capacity.Single);
                         part.portName = output.Name;
                         this.outputContainer.Add(part);
                     }

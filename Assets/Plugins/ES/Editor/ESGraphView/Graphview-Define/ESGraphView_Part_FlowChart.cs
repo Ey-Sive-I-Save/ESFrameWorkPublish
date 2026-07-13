@@ -411,7 +411,7 @@ namespace ES
                         var nodeV = map[portFlow];
                         if (nodeV != null)
                         {
-                            int current = nodeR.MutiLineOut ? 0 : index;
+                            int current = nodeR.MultiLineOut ? 0 : index;
                             if (allPorts.Count > current)
                             {
                                 var from = allPorts[current];

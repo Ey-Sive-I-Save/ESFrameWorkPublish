@@ -1,0 +1,5 @@
+##var,id,groupId,key,nameTextKey,descTextKey,timelineAssetKey,tags,unlockCondition,castPrerequisite,numericPrepareExpression,contextPrepareExpression,canCancel,canStack,sharedEnergyKey,sharedCountKey
+##type,int,int,string,string,string,string,string,string,string,string,string,bool,bool,string,string
+##group,client,client,client,client,client,client,client,client,client,client,client,client,client,client,client
+##,Skill Id,Group Id,Stable key,Name text key,Description text key,SO or asset key,Tags,Unlock expression,Cast prerequisite,Numeric prepare expression,Context prepare expression,Can cancel,Can stack,Shared energy key,Shared count key
+,100001,1001,SampleSkill,skill.sample.name,skill.sample.desc,SkillTimeline/SampleSkill,Skill|Active,Level>=1,HasTarget,Power*1.0,FillInitialTargets,true,false,,

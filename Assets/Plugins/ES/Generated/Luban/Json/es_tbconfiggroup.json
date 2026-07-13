@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1001,
+    "packId": 1,
+    "key": "SkillDefinition",
+    "displayNameKey": "group.skill.definition.name",
+    "comment": "Single skill body definition"
+  },
+  {
+    "id": 2001,
+    "packId": 2,
+    "key": "Text",
+    "displayNameKey": "group.localization.text.name",
+    "comment": "Localization text table"
+  }
+]

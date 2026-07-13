@@ -129,11 +129,131 @@ namespace ES
 #if UNITY_EDITOR
                 if (s != null)
                 {
-                    string path = AssetDatabase.GetAssetPath(s);
+                    string path = NormalizeAssetPath(AssetDatabase.GetAssetPath(s));
                     return path;
                 }
 #endif
                 return "";
+            }
+
+            public static string NormalizeAssetPath(string path)
+            {
+                return _NormalizeAssetPath(path) ?? string.Empty;
+            }
+
+            public static string GetAssetGUID(UnityEngine.Object asset, bool emptyIfInvalid)
+            {
+#if UNITY_EDITOR
+                var path = Wrap_GetAssetPath(asset);
+                if (string.IsNullOrEmpty(path)) return emptyIfInvalid ? string.Empty : null;
+                var guid = AssetDatabase.AssetPathToGUID(path);
+                if (!string.IsNullOrEmpty(guid)) return guid;
+#endif
+                return emptyIfInvalid ? string.Empty : null;
+            }
+
+            public static bool IsScriptAsset(UnityEngine.Object asset)
+            {
+                return Wrap_GetAssetPath(asset).EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+            }
+
+            public static UnityEngine.Object GetMainAsset(UnityEngine.Object asset)
+            {
+#if UNITY_EDITOR
+                var path = Wrap_GetAssetPath(asset);
+                return string.IsNullOrEmpty(path) ? asset : AssetDatabase.LoadMainAssetAtPath(path);
+#else
+                return asset;
+#endif
+            }
+
+            public static List<UnityEngine.Object> ExpandFolder(UnityEngine.Object folder, bool includeSubAssets = false, Predicate<UnityEngine.Object> filter = null)
+            {
+                return ExpandFolder(Wrap_GetAssetPath(folder), includeSubAssets, filter);
+            }
+
+            public static List<UnityEngine.Object> ExpandFolder(string folderPath, bool includeSubAssets = false, Predicate<UnityEngine.Object> filter = null)
+            {
+                var result = new List<UnityEngine.Object>();
+#if UNITY_EDITOR
+                folderPath = NormalizeAssetPath(folderPath);
+                if (string.IsNullOrEmpty(folderPath) || !AssetDatabase.IsValidFolder(folderPath)) return result;
+
+                var guids = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
+                foreach (var guid in guids)
+                {
+                    var path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (AssetDatabase.IsValidFolder(path)) continue;
+
+                    if (includeSubAssets)
+                    {
+                        foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(path))
+                        {
+                            if (asset == null || (filter != null && !filter(asset))) continue;
+                            result.Add(asset);
+                        }
+                    }
+                    else
+                    {
+                        var asset = AssetDatabase.LoadMainAssetAtPath(path);
+                        if (asset == null || (filter != null && !filter(asset))) continue;
+                        result.Add(asset);
+                    }
+                }
+#endif
+                return result;
+            }
+
+            public static void Ping(UnityEngine.Object asset, bool select = true)
+            {
+#if UNITY_EDITOR
+                if (asset == null) return;
+                if (select) Selection.activeObject = asset;
+                EditorGUIUtility.PingObject(asset);
+#endif
+            }
+
+            public static void RecordUndo(UnityEngine.Object target, string undoName = "ES Edit")
+            {
+#if UNITY_EDITOR
+                if (target == null) return;
+                Undo.RecordObject(target, undoName);
+#endif
+            }
+
+            public static void MarkDirty(UnityEngine.Object target, bool recordPrefabModification = true)
+            {
+#if UNITY_EDITOR
+                if (target == null) return;
+                EditorUtility.SetDirty(target);
+                if (recordPrefabModification && PrefabUtility.IsPartOfPrefabInstance(target))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+#endif
+            }
+
+            public static void RecordAndDirty(UnityEngine.Object target, string undoName = "ES Edit", bool recordPrefabModification = true)
+            {
+                RecordUndo(target, undoName);
+                MarkDirty(target, recordPrefabModification);
+            }
+
+            public static void RecordAndDirtyComponent(Component component, string undoName = "ES Edit")
+            {
+#if UNITY_EDITOR
+                if (component == null) return;
+                RecordAndDirty(component, undoName);
+                if (component.gameObject != null && PrefabUtility.IsPartOfPrefabInstance(component.gameObject))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(component.gameObject);
+#endif
+            }
+
+            public static void RegisterCreatedObject(UnityEngine.Object target, string undoName = "ES Create")
+            {
+#if UNITY_EDITOR
+                if (target == null) return;
+                Undo.RegisterCreatedObjectUndo(target, undoName);
+                MarkDirty(target);
+#endif
             }
             #endregion
 
@@ -246,12 +366,7 @@ namespace ES
 
             public static string GetAssetGUID(UnityEngine.Object uo)
             {
-#if UNITY_EDITOR
-                string path = AssetDatabase.GetAssetPath(uo);
-                string guid = AssetDatabase.AssetPathToGUID(path);
-                if (guid != null && !guid.IsNullOrWhitespace()) return guid;
-#endif
-                return null;
+                return GetAssetGUID(uo, false);
             }
 
 

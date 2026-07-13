@@ -33,6 +33,7 @@ namespace ES
         public static T _RandomItem<T>(this T[] array, System.Random rng, T ifNullOrEmpty = default)
         {
             if (array == null || array.Length == 0) return ifNullOrEmpty;
+            if (rng == null) return array[UnityEngine.Random.Range(0, array.Length)];
             int idx = rng.Next(0, array.Length);
             return array[idx];
         }
@@ -58,6 +59,7 @@ namespace ES
         public static T _RandomItem<T>(this List<T> list, System.Random rng, T ifNullOrEmpty = default)
         {
             if (list == null || list.Count == 0) return ifNullOrEmpty;
+            if (rng == null) return list[UnityEngine.Random.Range(0, list.Count)];
             int idx = rng.Next(0, list.Count);
             return list[idx];
         }
@@ -179,10 +181,11 @@ namespace ES
         {
             if (source == null) return new List<T>();
             int count = source.Count;
-            if (n <= 0) return new List<T>();
+            if (n <= 0 || count <= 0) return new List<T>();
             var result = new List<T>(Math.Min(n, count));
             if (withReplacement)
             {
+                result.Capacity = Math.Max(result.Capacity, n);
                 for (int i = 0; i < n; i++) result.Add(source[UnityEngine.Random.Range(0, count)]);
                 return result;
             }
@@ -209,7 +212,7 @@ namespace ES
             long total = 0;
             foreach (var w in weights) { if (w > 0) total += w; }
             if (total <= 0) return -1;
-            long r = UnityEngine.Random.Range(0, (int)total);
+            long r = RandomLongExclusive(total);
             long sum = 0;
             for (int i = 0; i < weights.Length; i++)
             {
@@ -248,7 +251,7 @@ namespace ES
             long total = 0;
             foreach (var w in weights) { if (w > 0) total += w; }
             if (total <= 0) return -1;
-            long r = UnityEngine.Random.Range(0, (int)total);
+            long r = RandomLongExclusive(total);
             long sum = 0;
             for (int i = 0; i < weights.Count; i++)
             {
@@ -262,6 +265,17 @@ namespace ES
         /// <summary>
         /// 按权重从数组中选择一个索引（权重为 float）。返回 -1 表示失败或总权重为0。
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static long RandomLongExclusive(long maxExclusive)
+        {
+            if (maxExclusive <= 1) return 0;
+            if (maxExclusive <= int.MaxValue) return UnityEngine.Random.Range(0, (int)maxExclusive);
+
+            long high = UnityEngine.Random.Range(0, 1 << 30);
+            long low = UnityEngine.Random.Range(0, 1 << 30);
+            return ((high << 30) | low) % maxExclusive;
+        }
+
         public static int _WeightedRandomIndex(this List<float> weights)
         {
             if (weights == null || weights.Count == 0) return -1;

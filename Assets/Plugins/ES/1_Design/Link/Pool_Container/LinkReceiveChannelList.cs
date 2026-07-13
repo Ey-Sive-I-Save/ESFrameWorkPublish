@@ -13,7 +13,7 @@ namespace ES
     ///
     /// 通道型 Link 接收者容器，为单一通道管理一组接收者。
     /// 功能特性：
-    /// - 维护一个线程安全的接收者列表 (SafeNormalList)；
+    /// - 维护一个支持派发期间安全增删的接收者列表 (SafeNormalList)；
     /// - 通过 SendLink 方法广播通道数据给所有有效接收者；
     /// - 自动清理已销毁的 Unity 对象接收者；
     /// - 支持接口和委托两种接收者类型；
@@ -26,9 +26,11 @@ namespace ES
         #region 字段 (Fields)
 
         /// <summary>
-        /// 接收者列表，使用 SafeNormalList 确保线程安全。
+        /// 接收者列表，使用 SafeNormalList 支持派发期间安全增删。
         /// </summary>
         private SafeNormalList<IReceiveChannelLink<Channel, Link>> _receivers = new SafeNormalList<IReceiveChannelLink<Channel, Link>>();
+        private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>();
+        private readonly List<ReceiveChannelLink<Channel, Link>> _actionReceivers = new List<ReceiveChannelLink<Channel, Link>>();
 
         #endregion
 
@@ -42,7 +44,7 @@ namespace ES
         /// <param name="link">链接数据。</param>
         public void SendLink(Channel channel, Link link)
         {
-            _receivers.ApplyBuffers();
+            ApplyBuffersAndRecycle();
 
             int count = _receivers.ValuesNow.Count;
             for (int i = 0; i < count; i++)
@@ -80,7 +82,36 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Internal_TryRemove(IReceiveChannelLink<Channel, Link> receiver)
         {
-            _receivers.Remove(receiver);
+            RemoveReceiver(receiver);
+        }
+
+        private void ApplyBuffersAndRecycle()
+        {
+            _receivers.ApplyBuffers();
+            RecyclePending();
+        }
+
+        private void ScheduleRecycle(object receiver)
+        {
+            if (receiver is IPoolableAuto poolable && !poolable.IsRecycled)
+            {
+                _pendingRecycle.Add(poolable);
+            }
+        }
+
+        private void RecyclePending()
+        {
+            int count = _pendingRecycle.Count;
+            if (count == 0) return;
+            for (int i = 0; i < count; i++)
+            {
+                var poolable = _pendingRecycle[i];
+                if (poolable != null && !poolable.IsRecycled)
+                {
+                    poolable.TryAutoPushedToPool();
+                }
+            }
+            _pendingRecycle.Clear();
         }
 
         /// <summary>
@@ -101,6 +132,7 @@ namespace ES
         public void RemoveReceiver(IReceiveChannelLink<Channel, Link> receiver)
         {
             _receivers.Remove(receiver);
+            ScheduleRecycle(receiver);
         }
 
         /// <summary>
@@ -110,7 +142,9 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddReceiver(Action<Channel, Link> action)
         {
-            _receivers.Add(action.MakeReceive());
+            var receiver = action.MakeReceive();
+            _actionReceivers.Add(receiver);
+            _receivers.Add(receiver);
         }
 
         /// <summary>
@@ -120,7 +154,26 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveReceiver(Action<Channel, Link> action)
         {
-            _receivers.Remove(action.MakeReceive());
+            for (int i = _actionReceivers.Count - 1; i >= 0; i--)
+            {
+                var receiver = _actionReceivers[i];
+                if (receiver.action == action)
+                {
+                    _actionReceivers.RemoveAt(i);
+                    RemoveReceiver(receiver);
+                    return;
+                }
+            }
+
+            for (int i = 0; i < _receivers.ValuesNow.Count; i++)
+            {
+                var receiver = _receivers.ValuesNow[i];
+                if (receiver is ReceiveChannelLink<Channel, Link> receiveLink && receiveLink.action == action)
+                {
+                    RemoveReceiver(receiver);
+                    return;
+                }
+            }
         }
 
         /// <summary>
@@ -129,7 +182,16 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
+            ApplyBuffersAndRecycle();
+            for (int i = 0; i < _receivers.ValuesNow.Count; i++)
+            {
+                if (_receivers.ValuesNow[i] is IPoolableAuto poolable && !poolable.IsRecycled)
+                {
+                    poolable.TryAutoPushedToPool();
+                }
+            }
             _receivers.Clear();
+            _actionReceivers.Clear();
         }
 
         /// <summary>
@@ -138,7 +200,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ApplyBuffers()
         {
-            _receivers.ApplyBuffers();
+            ApplyBuffersAndRecycle();
         }
 
         #endregion

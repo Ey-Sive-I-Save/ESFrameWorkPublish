@@ -55,7 +55,7 @@ namespace ES
         //显式实现
         ESTryResult IESModule._TryRegisterToHost(IESOringinHosting host)
         {
-            if (Signal_HasSubmit) return ESTryResult.ReTry;
+            if (Signal_HasSubmit) return ESTryResult.Repeat;
             return _TryRegisterToHost(host as Host);
         }
         //显式实现
@@ -176,6 +176,7 @@ namespace ES
                 if (value != _hasSubmit)
                 {
                     _hasSubmit = value;
+                    Signal_Dirty = true;
                 }
             }
         }
@@ -189,9 +190,9 @@ namespace ES
         /*可能会因为对象销毁和自己被移除队列时，触发它*/
         public abstract void TryDestroySelf();//踢出
 
-        public ESTryResult _TryRegisterToHost(IESOringinHosting host)
+        public virtual ESTryResult _TryRegisterToHost(IESOringinHosting host)
         {
-            if (Signal_HasSubmit) return ESTryResult.ReTry;
+            if (Signal_HasSubmit) return ESTryResult.Repeat;
             if (host != null)
             {
                 _SetHost(host);
@@ -216,7 +217,7 @@ namespace ES
 
         public virtual ESTryResult _TryRegisterToHost(Host host)
         {
-            if (Signal_HasSubmit) return ESTryResult.ReTry;
+            if (Signal_HasSubmit) return ESTryResult.Repeat;
             if (host != null)
             {
                 _SetHost(host);
@@ -226,9 +227,19 @@ namespace ES
             return ESTryResult.Fail;
         }
 
+        public sealed override ESTryResult _TryRegisterToHost(IESOringinHosting host)
+        {
+            if (Signal_HasSubmit) return ESTryResult.Repeat;
+            if (host is Host use)
+            {
+                return _TryRegisterToHost(use);
+            }
+            return ESTryResult.Fail;
+        }
+
         public abstract void _SetHost(Host host);
 
-        public virtual Host GetHost { get; }
+        public abstract Host GetHost { get; }
 
         public sealed override void _SetHost(IESOringinHosting host)
         {

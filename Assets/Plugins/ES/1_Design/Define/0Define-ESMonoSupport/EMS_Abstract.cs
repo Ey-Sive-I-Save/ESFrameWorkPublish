@@ -12,16 +12,16 @@ namespace ES {
     {
        
     }
-    public abstract class EMS_Abstarct_Define <Channel, Link> : EMS_Abstract 
+    public abstract class EMS_Abstract_Define <Channel, Link> : EMS_Abstract 
     {
         public abstract void SendLink(Channel channel, Link link);
-        public abstract void AddRecieve(IReceiveChannelLink<Channel, Link> ir);
-        public abstract void RemoveRecieve(IReceiveChannelLink<Channel, Link> ir);
+        public abstract void AddReceive(IReceiveChannelLink<Channel, Link> ir);
+        public abstract void RemoveReceive(IReceiveChannelLink<Channel, Link> ir);
 
     }
     #region 抽象定义EMS
     [HideMonoScript]
-    public abstract class EMS_Abstract_ChannelLinkList<Channel,Link> : EMS_Abstarct_Define<Channel, Link> 
+    public abstract class EMS_Abstract_ChannelLinkList<Channel,Link> : EMS_Abstract_Define<Channel, Link> 
     {
         [ShowInInspector, LabelText("发送到"), ReadOnly]
         public LinkReceiveChannelList<Channel, Link> Links = new LinkReceiveChannelList<Channel, Link>();
@@ -31,19 +31,19 @@ namespace ES {
             Links.SendLink(channel,link);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sealed override void AddRecieve(IReceiveChannelLink<Channel,Link> t) 
+        public sealed override void AddReceive(IReceiveChannelLink<Channel,Link> t) 
         {
             Links.AddReceiver(t);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sealed override void RemoveRecieve(IReceiveChannelLink<Channel, Link> t)
+        public sealed override void RemoveReceive(IReceiveChannelLink<Channel, Link> t)
         {
             Links.RemoveReceiver(t);
         }
     }
     [HideMonoScript]
-    public abstract class EMS_Abstract_ChannelLinkSingle<Channel,Link> : EMS_Abstarct_Define<Channel, Link> 
+    public abstract class EMS_Abstract_ChannelLinkSingle<Channel,Link> : EMS_Abstract_Define<Channel, Link> 
     {
         [ShowInInspector,LabelText("发送到"),ReadOnly]
         public IReceiveChannelLink<Channel, Link> Link_;
@@ -58,12 +58,12 @@ namespace ES {
             Link_.OnLink(channel, link);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sealed override void AddRecieve(IReceiveChannelLink<Channel,Link> t)
+        public sealed override void AddReceive(IReceiveChannelLink<Channel,Link> t)
         {
             Link_ = t;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public sealed override void RemoveRecieve(IReceiveChannelLink<Channel, Link> t)
+        public sealed override void RemoveReceive(IReceiveChannelLink<Channel, Link> t)
         {
             if (Link_ == t) Link_ = null;
         }

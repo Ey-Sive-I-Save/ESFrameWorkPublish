@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9570577a2c324a7ab0b8726853cc066a, type: 3}
+  m_Name: Example_Info_A
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: info_a
+  displayName: "\u793A\u4F8BInfo A"
+  count: 10
+  ratio: 1.5
+  enabledInGame: 1
+  quality: 2
+  tags: 4
+  dropTags:
+  - "\u91D1\u5E01"
+  - "\u6750\u6599"
+  values:
+  - 1
+  - 2
+  - 3
+  qualityOptions:
+  - 1
+  - 2
+  privateScore: 88

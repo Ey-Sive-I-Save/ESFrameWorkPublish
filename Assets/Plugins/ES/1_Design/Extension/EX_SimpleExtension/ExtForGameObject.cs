@@ -20,6 +20,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T _GetOrAddComponent<T>(this GameObject gameObject) where T : Component
         {
+            if (gameObject == null) return null;
             T component = gameObject.GetComponent<T>();
             return component != null ? component : gameObject.AddComponent<T>();
         }
@@ -31,6 +32,7 @@ namespace ES
         /// <returns>返回 Component 数组；若 gameObject 为 null 则返回空数组。</returns>
         public static Component[] _GetAllComponents(this GameObject gameObject)
         {
+            if (gameObject == null) return Array.Empty<Component>();
             return gameObject.GetComponents<Component>();
         }
 
@@ -107,6 +109,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool _IsInLayerMask(this GameObject gameObject, LayerMask mask)
         {
+            if (gameObject == null) return false;
             return (mask.value & (1 << gameObject.layer)) != 0;
         }
 
@@ -119,6 +122,7 @@ namespace ES
             if (gameObject == null) return;
             var t = gameObject.transform;
             if (parent == t.parent) return;
+            if (parent == t || (parent != null && parent.IsChildOf(t))) return;
 
             // 防止创建父子循环
             // if (parent == t || (parent != null && parent.IsChildOf(t)))
@@ -185,18 +189,19 @@ namespace ES
         /// </summary>
         public static void _DestroyChildren(this GameObject gameObject, float delay = 0f)
         {
-            var children = new List<GameObject>();
-            for (int i = 0; i < gameObject.transform.childCount; i++) children.Add(gameObject.transform.GetChild(i).gameObject);
-            for (int i = 0; i < children.Count; i++)
+            if (gameObject == null) return;
+            Transform parent = gameObject.transform;
+            for (int i = parent.childCount - 1; i >= 0; i--)
             {
+                GameObject child = parent.GetChild(i).gameObject;
 #if UNITY_EDITOR
                 if (!Application.isPlaying && delay <= 0f)
                 {
-                    UnityEngine.Object.DestroyImmediate(children[i]);
+                    UnityEngine.Object.DestroyImmediate(child);
                     continue;
                 }
 #endif
-                UnityEngine.Object.Destroy(children[i], delay);
+                UnityEngine.Object.Destroy(child, delay);
             }
         }
 
@@ -205,18 +210,19 @@ namespace ES
         /// </summary>
         public static void _DestroyChildrenImmediate(this GameObject gameObject)
         {
-            var children = new List<GameObject>();
-            for (int i = 0; i < gameObject.transform.childCount; i++) children.Add(gameObject.transform.GetChild(i).gameObject);
-            for (int i = 0; i < children.Count; i++)
+            if (gameObject == null) return;
+            Transform parent = gameObject.transform;
+            for (int i = parent.childCount - 1; i >= 0; i--)
             {
-                if (Application.isPlaying)
+                GameObject child = parent.GetChild(i).gameObject;
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
                 {
-                    UnityEngine.Object.Destroy(children[i]);
+                    UnityEngine.Object.DestroyImmediate(child);
+                    continue;
                 }
-                else
-                {
-                    UnityEngine.Object.DestroyImmediate(children[i]);
-                }
+#endif
+                UnityEngine.Object.Destroy(child);
             }
         }
 

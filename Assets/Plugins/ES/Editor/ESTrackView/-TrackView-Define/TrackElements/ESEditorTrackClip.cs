@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.PlayerLoop;
 using UnityEngine.UIElements;
@@ -23,7 +24,16 @@ namespace ES
 
         private VisualElement popup;
         private Label popLabel;
+        private VisualElement m_ClipIcon;
         private Label m_ClipNameLabel;
+        private TextField m_RenameField;
+        private bool isRenaming;
+        private bool m_IsSelected;
+        private bool m_IsHovering;
+        private bool m_HasValidationWarning;
+        private string m_ValidationWarning;
+        private Color m_LastTrackAccentColor = new Color(0.42f, 0.46f, 0.52f, 1f);
+        private double m_IgnoreRenameFocusOutUntil;
 
         public event Action<ESEditorTrackClip> OnClipClicked;
 #pragma warning disable CS0067
@@ -38,14 +48,19 @@ namespace ES
             Duration = duration;
             UserData = data;
             this.focusable = true;
+            tooltip = name;
             // 基础样式
             AddToClassList("track-node");
             style.position = Position.Absolute;
             style.flexShrink = 0;
             style.minWidth = 30;
-            style.minHeight = 30;
-            style.maxHeight = 30;
-            style.backgroundColor = new Color(0.4f, 0.7f, 1f, 0.8f);
+            style.minHeight = 26;
+            style.maxHeight = 26;
+            style.backgroundColor = new Color(0.18f, 0.31f, 0.44f, 0.95f);
+            style.borderTopLeftRadius = 3;
+            style.borderTopRightRadius = 3;
+            style.borderBottomLeftRadius = 3;
+            style.borderBottomRightRadius = 3;
             style.position = Position.Absolute;
             // style.borderLeftWidth = 2;
             // style.borderRightWidth = 2;
@@ -67,13 +82,30 @@ namespace ES
             {
                 style =
             {
+                flexDirection = FlexDirection.Row,
                 flexGrow = 1,
-                justifyContent = Justify.Center,
+                justifyContent = Justify.FlexStart,
                 alignItems = Align.Center,
-                paddingLeft = 4,
-                paddingRight = 4
+                paddingLeft = 6,
+                paddingRight = 6
             }
             };
+
+            m_ClipIcon = new VisualElement
+            {
+                style =
+            {
+                width = 11,
+                height = 11,
+                minWidth = 11,
+                marginRight = 4,
+                borderTopLeftRadius = 2,
+                borderTopRightRadius = 2,
+                borderBottomLeftRadius = 2,
+                borderBottomRightRadius = 2
+            }
+            };
+            m_ClipContent.Add(m_ClipIcon);
 
             m_ClipNameLabel = new Label(name)
             {
@@ -81,9 +113,9 @@ namespace ES
             {
                 unityFontStyleAndWeight = FontStyle.Bold,
                 fontSize = 10,
-                color = Color.white,
-                unityTextAlign = TextAnchor.MiddleCenter,
-                whiteSpace = WhiteSpace.Normal,
+                color = new Color(0.93f, 0.96f, 1f, 1f),
+                unityTextAlign = TextAnchor.MiddleLeft,
+                whiteSpace = WhiteSpace.NoWrap,
                 overflow = Overflow.Hidden,
                 textOverflow = TextOverflow.Ellipsis
             }
@@ -91,10 +123,26 @@ namespace ES
 
             m_ClipContent.Add(m_ClipNameLabel);
             Add(m_ClipContent);
+            RefreshClipIcon();
+            RefreshEnabledVisual();
 
             // 注册事件
             RegisterCallback<ClickEvent>(evt =>
             {
+                if (isRenaming)
+                {
+                    evt.StopPropagation();
+                    return;
+                }
+
+                if (evt.clickCount >= 2 && evt.button == 0)
+                {
+                    BeginRename();
+                    evt.StopPropagation();
+                    return;
+                }
+
+                ESTrackViewWindow.window?.SelectClip(this);
                 OnClipClicked?.Invoke(this);
             });
 
@@ -134,6 +182,10 @@ namespace ES
             popup.style.height = 30;
             // popup.style.translate = new Translate(new Length(-50, LengthUnit.Percent), 0);
             popup.style.backgroundColor = new Color(0, 0, 0, 0.5f);
+            popup.style.borderTopLeftRadius = 3;
+            popup.style.borderTopRightRadius = 3;
+            popup.style.borderBottomLeftRadius = 3;
+            popup.style.borderBottomRightRadius = 3;
             popup.style.display = DisplayStyle.None;
             popup.Add(popLabel = new Label());
             popLabel.style.left = 0;
@@ -146,13 +198,13 @@ namespace ES
 
             // 基础边框（半透明白色，像素宽度 1）
             style.borderLeftWidth = 3;
-            style.borderRightWidth = 2;
+            style.borderRightWidth = 1;
             style.borderTopWidth = 1;
             style.borderBottomWidth = 1;
-            style.borderLeftColor = new Color(0, 0, 0, 0.5f);
-            style.borderRightColor = new Color(1, 1, 1, 0.5f);
-            style.borderTopColor = new Color(1, 1, 1, 0.5f);
-            style.borderBottomColor = new Color(1, 1, 1, 0.5f);
+            style.borderLeftColor = new Color(0.04f, 0.05f, 0.06f, 0.9f);
+            style.borderRightColor = new Color(0.42f, 0.5f, 0.6f, 0.28f);
+            style.borderTopColor = new Color(0.52f, 0.58f, 0.66f, 0.32f);
+            style.borderBottomColor = new Color(0.04f, 0.05f, 0.06f, 0.7f);
 
             this.Add(popup);
 
@@ -163,13 +215,67 @@ namespace ES
 
             // 鼠标离开时如果未按下则结束拖动
             this.RegisterCallback<PointerLeaveEvent>(OnPointerLeave);
+            this.RegisterCallback<PointerEnterEvent>(OnPointerEnter);
 
             // 全局鼠标移动（用于持续拖动）
             this.RegisterCallback<PointerMoveEvent>(OnPointerMove);
         }
+
+        public void SetSelected(bool selected)
+        {
+            m_IsSelected = selected;
+            RefreshInteractionVisual();
+        }
+
+        private void RefreshInteractionVisual()
+        {
+            if (m_ClipContent != null)
+            {
+                m_ClipContent.style.backgroundColor = m_IsSelected
+                    ? new Color(0.35f, 0.52f, 0.76f, 0.16f)
+                    : m_IsHovering
+                        ? new Color(1f, 1f, 1f, 0.035f)
+                    : Color.clear;
+            }
+
+            style.borderRightWidth = m_IsSelected ? 2 : 1;
+            style.borderRightColor = m_IsSelected
+                ? new Color(0.48f, 0.68f, 0.95f, 0.72f)
+                : new Color(0.08f, 0.09f, 0.11f, 0.82f);
+        }
+
         private void OnPointerDown(PointerDownEvent evt)
         {
+            if (isRenaming)
+            {
+                evt.StopPropagation();
+                return;
+            }
+
             this.BringToFront();
+            if (evt.button == 0)
+                ESTrackViewWindow.window?.SelectClip(this);
+
+            if (evt.button == 0 && evt.shiftKey)
+            {
+                ESTrackViewWindowHelper.EditClip(this);
+                evt.StopPropagation();
+                return;
+            }
+
+            if (evt.button == 0 && evt.clickCount >= 2)
+            {
+                BeginRename();
+                evt.StopPropagation();
+                return;
+            }
+
+            if (isRenaming)
+            {
+                evt.StopPropagation();
+                return;
+            }
+
             if (evt.button != 1) // 左键
             {
                 lastHandleTime = Time.realtimeSinceStartup;
@@ -205,17 +311,16 @@ namespace ES
 
         private void OnPointerUp(PointerUpEvent evt)
         {
-            if (Time.realtimeSinceStartup - lastHandleTime < 0.15f)
-            {
-                //点击操作
-                ESTrackViewWindowHelper.EditClip(this);
-            }
+            if (isRenaming)
+                return;
+
             if (isDragging)
             {
                 isDragging = false;
                 this.RemoveFromClassList("dragging");
                 popup.style.display = DisplayStyle.None;
                 this.ReleasePointer(evt.pointerId);
+                ESTrackViewWindow.window?.SyncTotalTimeFromCurrentSequence(true);
                 evt.StopPropagation();
             }
 
@@ -224,12 +329,152 @@ namespace ES
                 isExpanding = false;
                 popup.style.display = DisplayStyle.None;
                 this.ReleasePointer(evt.pointerId);
+                ESTrackViewWindow.window?.SyncTotalTimeFromCurrentSequence(true);
                 evt.StopPropagation();
             }
         }
 
+        private void BeginRename()
+        {
+            if (trackClip == null || isRenaming)
+                return;
+
+            isRenaming = true;
+            ESTrackViewWindow.window?.SetRenamingClip(this);
+            isDragging = false;
+            isExpanding = false;
+            RemoveFromClassList("dragging");
+            RemoveFromClassList("expanding");
+            popup.style.display = DisplayStyle.None;
+
+            m_ClipNameLabel.style.display = DisplayStyle.None;
+            if (m_ClipIcon != null)
+                m_ClipIcon.style.display = DisplayStyle.None;
+
+            if (m_RenameField == null)
+            {
+                m_RenameField = new TextField
+                {
+                    isDelayed = false
+                };
+                m_RenameField.selectAllOnFocus = false;
+                m_RenameField.selectAllOnMouseUp = false;
+                m_RenameField.style.position = Position.Absolute;
+                m_RenameField.style.left = 3;
+                m_RenameField.style.right = 3;
+                m_RenameField.style.top = 4;
+                m_RenameField.style.height = 22;
+                m_RenameField.style.fontSize = 11;
+                m_RenameField.style.color = new Color(0.92f, 0.95f, 1f, 1f);
+                m_RenameField.style.backgroundColor = new Color(0.075f, 0.085f, 0.1f, 1f);
+                m_RenameField.tooltip = "正在重命名片段：Enter 确认，Esc 取消";
+                m_RenameField.RegisterCallback<KeyDownEvent>(OnRenameKeyDown);
+                Add(m_RenameField);
+            }
+
+            m_RenameField.SetValueWithoutNotify(ClipName);
+            m_RenameField.style.display = DisplayStyle.Flex;
+            schedule.Execute(() =>
+            {
+                if (!isRenaming || m_RenameField == null)
+                    return;
+
+                m_RenameField.Focus();
+                m_RenameField.SelectAll();
+            }).ExecuteLater(0);
+        }
+
+        private void StopRenameFieldPointerEvent(PointerDownEvent evt)
+        {
+            MarkRenameFieldInternalClick();
+            evt.StopPropagation();
+        }
+
+        private void StopRenameFieldPointerEvent(PointerUpEvent evt)
+        {
+            MarkRenameFieldInternalClick();
+            evt.StopPropagation();
+        }
+
+        private void StopRenameFieldClickEvent(ClickEvent evt)
+        {
+            MarkRenameFieldInternalClick();
+            evt.StopPropagation();
+        }
+
+        private void MarkRenameFieldInternalClick()
+        {
+            m_IgnoreRenameFocusOutUntil = EditorApplication.timeSinceStartup + 0.35d;
+        }
+
+        public void CommitRenameIfPointerOutsideRenameField(Vector2 worldPosition)
+        {
+            if (!isRenaming || m_RenameField == null)
+                return;
+
+            if (m_RenameField.worldBound.Contains(worldPosition))
+                return;
+
+            CommitRename();
+        }
+
+        private void OnRenameKeyDown(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+            {
+                CommitRename();
+                evt.StopPropagation();
+                return;
+            }
+
+            if (evt.keyCode == KeyCode.Escape)
+            {
+                CancelRename();
+                evt.StopPropagation();
+            }
+        }
+
+        private void CommitRename()
+        {
+            if (!isRenaming)
+                return;
+
+            string newName = m_RenameField != null ? m_RenameField.value : ClipName;
+            newName = string.IsNullOrWhiteSpace(newName) ? ClipName : newName.Trim();
+            if (trackClip != null && trackClip.DisplayName != newName)
+            {
+                UnityEngine.Object undoTarget = ESTrackViewWindow.TrackContainer as UnityEngine.Object;
+                if (undoTarget != null)
+                    Undo.RecordObject(undoTarget, "重命名轨道片段");
+
+                ClipName = newName;
+                ESTrackViewWindowHelper.SaveContainerDisplayChanges();
+            }
+
+            EndRename();
+        }
+
+        private void CancelRename()
+        {
+            EndRename();
+        }
+
+        private void EndRename()
+        {
+            isRenaming = false;
+            ESTrackViewWindow.window?.ClearRenamingClip(this);
+            if (m_RenameField != null)
+                m_RenameField.style.display = DisplayStyle.None;
+
+            m_ClipNameLabel.style.display = DisplayStyle.Flex;
+            RefreshClipIcon();
+            UpdateNodeView();
+        }
+
         private void OnPointerLeave(PointerLeaveEvent evt)
         {
+            m_IsHovering = false;
+            RefreshInteractionVisual();
             if (!isDragging)
             {
                 // popup.style.display = DisplayStyle.None;
@@ -308,6 +553,9 @@ namespace ES
             // Debug.Log("WW"+w+" LL"+left+" START "+ShowStart);
             style.width = w;
             style.left = left;
+            if (!isRenaming && m_ClipIcon != null)
+                m_ClipIcon.style.display = w >= 44f ? DisplayStyle.Flex : DisplayStyle.None;
+            AdjustFontToFit();
         }
 
         public void SetTimeScaleAndStartShowCache()
@@ -317,11 +565,119 @@ namespace ES
 
         public void SetClipColor(Color color)
         {
-            style.backgroundColor = color;
-            style.borderLeftColor = color * 0.7f;
-            style.borderRightColor = color * 0.7f;
-            style.borderTopColor = color * 1.2f;
-            style.borderBottomColor = color * 0.5f;
+            m_LastTrackAccentColor = color;
+            if (m_HasValidationWarning)
+                return;
+
+            ApplyNormalClipColor(color);
+            RefreshEnabledVisual();
+        }
+
+        private void ApplyNormalClipColor(Color color)
+        {
+            Color baseColor = new Color(
+                Mathf.Clamp01(color.r * 0.42f + 0.035f),
+                Mathf.Clamp01(color.g * 0.42f + 0.035f),
+                Mathf.Clamp01(color.b * 0.42f + 0.035f),
+                0.96f);
+            Color accentColor = new Color(color.r * 0.88f, color.g * 0.88f, color.b * 0.88f, 0.9f);
+            style.backgroundColor = baseColor;
+            style.borderLeftColor = accentColor;
+            if (!m_IsSelected)
+                style.borderRightColor = new Color(0.08f, 0.09f, 0.11f, 0.82f);
+            style.borderTopColor = new Color(0.42f, 0.47f, 0.54f, 0.34f);
+            style.borderBottomColor = new Color(0.02f, 0.025f, 0.03f, 0.82f);
+        }
+
+        public void SetValidationWarning(string warning)
+        {
+            m_HasValidationWarning = !string.IsNullOrWhiteSpace(warning);
+            m_ValidationWarning = warning;
+            if (!m_HasValidationWarning)
+                ApplyNormalClipColor(m_LastTrackAccentColor);
+
+            ApplyValidationVisual();
+            RefreshEnabledVisual();
+        }
+
+        public void ToggleEnabled()
+        {
+            if (trackClip == null)
+                return;
+
+            UnityEngine.Object undoTarget = ESTrackViewWindow.TrackContainer as UnityEngine.Object;
+            if (undoTarget != null)
+                Undo.RecordObject(undoTarget, trackClip.Enabled ? "禁用片段" : "启用片段");
+
+            trackClip.Enabled = !trackClip.Enabled;
+            RefreshEnabledVisual();
+            ESTrackViewWindowHelper.SaveContainerDisplayChanges();
+            if (ESTrackViewWindow.Sequence != null)
+                SkillSequenceRuntimeCache.NotifySequenceChanged(ESTrackViewWindow.Sequence);
+            ESTrackViewWindow.window?.RebuildActivePreviewPlayer();
+        }
+
+        public void RefreshEnabledVisual()
+        {
+            bool enabled = trackClip == null || trackClip.Enabled;
+            style.opacity = enabled ? 1f : 0.92f;
+            tooltip = m_HasValidationWarning
+                ? ClipName + "\n预警：" + m_ValidationWarning
+                : enabled ? ClipName : ClipName + "（已禁用）";
+
+            if (m_ClipNameLabel != null)
+                m_ClipNameLabel.style.color = enabled
+                    ? new Color(0.93f, 0.96f, 1f, 1f)
+                    : new Color(0.38f, 0.40f, 0.44f, 1f);
+
+            if (!enabled && !m_HasValidationWarning)
+            {
+                style.backgroundColor = new Color(0.012f, 0.013f, 0.016f, 1f);
+                style.borderLeftColor = new Color(0.035f, 0.038f, 0.045f, 1f);
+                style.borderRightColor = new Color(0.006f, 0.007f, 0.009f, 1f);
+                style.borderTopColor = new Color(0.04f, 0.043f, 0.05f, 1f);
+                style.borderBottomColor = new Color(0.002f, 0.003f, 0.004f, 1f);
+            }
+
+            ApplyValidationVisual();
+        }
+
+        private void ApplyValidationVisual()
+        {
+            if (!m_HasValidationWarning)
+                return;
+
+            bool enabled = trackClip == null || trackClip.Enabled;
+            style.opacity = enabled ? 1f : 0.92f;
+            style.backgroundColor = enabled
+                ? new Color(0.78f, 0.05f, 0.045f, 0.98f)
+                : new Color(0.09f, 0.006f, 0.005f, 1f);
+            style.borderLeftWidth = 4;
+            style.borderRightWidth = 2;
+            style.borderTopWidth = 2;
+            style.borderBottomWidth = 2;
+            style.borderLeftColor = enabled ? new Color(1f, 0.18f, 0.12f, 1f) : new Color(0.45f, 0.035f, 0.025f, 1f);
+            style.borderRightColor = enabled ? new Color(1f, 0.46f, 0.34f, 0.95f) : new Color(0.22f, 0.025f, 0.02f, 1f);
+            style.borderTopColor = enabled ? new Color(1f, 0.55f, 0.42f, 0.95f) : new Color(0.30f, 0.035f, 0.028f, 0.95f);
+            style.borderBottomColor = enabled ? new Color(0.32f, 0f, 0f, 1f) : new Color(0.08f, 0f, 0f, 1f);
+
+            if (m_ClipNameLabel != null)
+                m_ClipNameLabel.style.color = enabled ? Color.white : new Color(0.62f, 0.46f, 0.46f, 1f);
+        }
+
+        public void RefreshClipIcon()
+        {
+            if (m_ClipIcon == null)
+                return;
+
+            Texture2D icon = ESTrackViewIconUtility.ResolveClipIcon(trackClip);
+            if (icon != null)
+                m_ClipIcon.style.backgroundImage = icon;
+
+            m_ClipIcon.style.backgroundColor = ESTrackViewIconUtility.ResolveIconBackColor(trackClip != null ? trackClip.GetType() : null);
+            m_ClipIcon.tooltip = trackClip != null ? trackClip.DisplayName : "片段";
+            if (!isRenaming)
+                m_ClipIcon.style.display = resolvedStyle.width >= 44f ? DisplayStyle.Flex : DisplayStyle.None;
         }
         private Color originalBgColor;
         private bool hasSetORI=false;
@@ -329,118 +685,58 @@ namespace ES
         {
             if (currentTime >= StartTime && currentTime <= StartTime + Duration)
             {
-                style.borderTopColor = Color.yellow;
-                style.borderTopWidth = 2;
-                style.borderBottomColor = Color.yellow;
-                style.borderBottomWidth = 2;
-                if(!hasSetORI)
-                originalBgColor = style.backgroundColor.value;
-                hasSetORI=true;
+                if (!hasSetORI)
+                    originalBgColor = style.backgroundColor.value;
+                hasSetORI = true;
 
-                // 设置为醒目的高亮色（例如亮橙色半透明）
-                style.backgroundColor = new Color(1f, 0.5f, 0f, 0.6f);
+                style.borderTopColor = new Color(0.82f, 0.76f, 0.48f, 0.95f);
+                style.borderTopWidth = 1;
+                style.borderBottomColor = new Color(0.82f, 0.76f, 0.48f, 0.78f);
+                style.borderBottomWidth = 1;
+                style.backgroundColor = new Color(
+                    Mathf.Clamp01(originalBgColor.r + 0.035f),
+                    Mathf.Clamp01(originalBgColor.g + 0.035f),
+                    Mathf.Clamp01(originalBgColor.b + 0.035f),
+                    originalBgColor.a);
             }
             else
             {
-                if(hasSetORI){
-                style.backgroundColor = originalBgColor;
+                if (hasSetORI)
+                {
+                    style.backgroundColor = originalBgColor;
                 }
 
-                // 恢复原来的样式（需要你记录一下原来的颜色，或设为默认）
-                style.borderTopWidth = 0;
-                style.borderBottomWidth = 0;
+                style.borderTopWidth = 1;
+                style.borderBottomWidth = 1;
+                style.borderTopColor = new Color(0.42f, 0.47f, 0.54f, 0.34f);
+                style.borderBottomColor = new Color(0.02f, 0.025f, 0.03f, 0.82f);
             }
+        }
+
+        private void OnPointerEnter(PointerEnterEvent evt)
+        {
+            m_IsHovering = true;
+            RefreshInteractionVisual();
         }
 
         public void UpdateNodeView()
         {
             m_ClipNameLabel.text = ClipName;
+            tooltip = ClipName;
             AdjustFontToFit();
         }
 
-        void AdjustFontToFit() // 注意：这里应直接传入你算好的 w 和 h
+        void AdjustFontToFit()
         {
-
-            float maxW = style.width.value.value * 0.6f;
-            float maxH = Mathf.Clamp(m_ClipNameLabel.contentRect.height * 1.5f, 20, 80);
-            string text = m_ClipNameLabel.text;
-
-            // ❶ 输出函数入口全部已知条件
-            //   Debug.Log($"[AdjustFontToFit] 开始 | 文本: '{text}' | 分配容器尺寸: {maxW} x {maxH}");
-
-            if (string.IsNullOrEmpty(text) || maxW <= 0 || maxH <= 0)
+            float availableWidth = Mathf.Max(0f, style.width.value.value - 30f);
+            if (string.IsNullOrEmpty(m_ClipNameLabel.text) || availableWidth <= 0f)
             {
-                Debug.LogWarning("[AdjustFontToFit] 提前退出：文本为空或容器尺寸无效");
+                m_ClipNameLabel.style.fontSize = 8f;
                 return;
             }
 
-            // ❷ 输出你设定的搜索范围边界
-            float maxPossibleSize = Mathf.Min(100f, maxW * 0.8f, maxH * 0.8f);
-            float minSize = 4f;
-            //Debug.Log($"[搜索范围] 最大尝试字号: {maxPossibleSize}, 最小: {minSize}, 步长: 0.5");
-
-            float bestSize = minSize;
-            float lastTestedSize = -1;
-            bool found = false;
-
-            for (float size = maxPossibleSize; size >= minSize; size -= 0.5f)
-            {
-                m_ClipNameLabel.style.fontSize = size;
-                Vector2 textSize = m_ClipNameLabel.MeasureTextSize(
-                    text,
-                    float.MaxValue,
-                    VisualElement.MeasureMode.Undefined,
-                    float.MaxValue,
-                    VisualElement.MeasureMode.Undefined
-                );
-
-                // ❸ 每个测试的字号和测量结果都打印（如果怕刷屏，可以只记录最后一个没通过和第一个通过的）
-                // 这里全打出来方便你排查，以后可注释掉
-                // Debug.Log($"[尝试字号] {size:F1} | 测量尺寸: {textSize.x:F1} x {textSize.y:F1} | 容器: {maxW} x {maxH}");
-
-                if (textSize.x <= maxW && textSize.y <= maxH)
-                {
-                    bestSize = size;
-                    found = true;
-                    //  Debug.Log($"[✓ 通过] 字号 {bestSize:F1} 可放入容器");
-                    break;
-                }
-
-                if (size < maxPossibleSize && !found)
-                {
-                    lastTestedSize = size;
-                }
-            }
-
-            if (!found)
-            {
-                //  Debug.LogWarning($"[未找到] 最小字号 {minSize} 仍放不下，强制使用最小字号");
-            }
-
-            // ❹ 输出循环结果
-            //            Debug.Log($"[循环结果] 找到的最佳字号: {bestSize:F1}");
-
-            // ❺ 尝试微调并输出
-            float fineTune = bestSize + 0.3f;
-            m_ClipNameLabel.style.fontSize = fineTune;
-            Vector2 fineSize = m_ClipNameLabel.MeasureTextSize(
-                text, float.MaxValue, VisualElement.MeasureMode.Undefined,
-                float.MaxValue, VisualElement.MeasureMode.Undefined);
-            // Debug.Log($"[微调尝试] 字号 {fineTune:F1} | 测量尺寸: {fineSize.x:F1} x {fineSize.y:F1} | 容器: {maxW} x {maxH}");
-
-            if (fineSize.x <= maxW && fineSize.y <= maxH)
-            {
-                bestSize = fineTune;
-                //  Debug.Log($"[微调通过] 最终字号: {bestSize:F1}");
-            }
-            else
-            {
-                //  Debug.Log($"[微调未通过] 保持字号: {bestSize:F1}");
-            }
-
-            // 最终设置
-            m_ClipNameLabel.style.fontSize = bestSize;
-            //  Debug.Log($"[AdjustFontToFit] 完成 | 最终设置字号: {bestSize:F1}\n");
+            float targetSize = Mathf.Lerp(8f, 11.5f, Mathf.InverseLerp(40f, 180f, availableWidth));
+            m_ClipNameLabel.style.fontSize = targetSize;
         }
 
     }

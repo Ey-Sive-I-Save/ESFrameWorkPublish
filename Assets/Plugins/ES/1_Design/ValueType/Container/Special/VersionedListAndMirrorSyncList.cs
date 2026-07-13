@@ -84,7 +84,7 @@ namespace ES
                 for (int i = 0; i < MirrorValidators.Count; i++)
                 {
                     var va = MirrorValidators[i];
-                    bool available = va.Available?.Invoke() ?? false;
+                    bool available = va.mirror != null && (va.Available?.Invoke() ?? false);
                     if (available)
                     {
                         if (va.mirror.VersionNow < minVersionNew)
@@ -101,6 +101,7 @@ namespace ES
                 if (minVersionNew > VersionMin)
                 {
                     int countToRemove = minVersionNew - VersionMin;
+                    if (countToRemove > VersionedRecordChanges.Count) countToRemove = VersionedRecordChanges.Count;
                     VersionedRecordChanges.RemoveRange(0, countToRemove);
                     VersionMin = minVersionNew;
                 }
@@ -117,6 +118,7 @@ namespace ES
 
             //更新
             if (versionRecord) VersionItem(add, true);
+            if (AutoApplyBuffers) ApplyBuffersIfDirty();
         }
         [Button("移除测试")]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -127,24 +129,31 @@ namespace ES
 
             //更新
             if (versionRecord) VersionItem(add, false);
+            if (AutoApplyBuffers) ApplyBuffersIfDirty();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddRange(IEnumerable<T> add)
+        public void AddRange(IEnumerable<T> add, bool versionRecord = true)
         {
+            if (add == null) return;
             foreach (var i in add)
             {
                 EnqueueOp(i, true);
+                if (versionRecord) VersionItem(i, true);
             }
             isDirty = true;
+            if (AutoApplyBuffers) ApplyBuffersIfDirty();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveRange(IEnumerable<T> remove)
+        public void RemoveRange(IEnumerable<T> remove, bool versionRecord = true)
         {
+            if (remove == null) return;
             foreach (var i in remove)
             {
                 EnqueueOp(i, false);
+                if (versionRecord) VersionItem(i, false);
             }
             isDirty = true;
+            if (AutoApplyBuffers) ApplyBuffersIfDirty();
         }
         public bool Contains(T who)
         {
@@ -217,6 +226,7 @@ namespace ES
         #endregion
         public void BindMirrorValidators(MirrorSyncListValidator<T> validator)
         {
+            if (validator == null || validator.mirror == null) return;
             if (MirrorValidators.Contains(validator)) return;
             if (validator.Available?.Invoke() ?? false)
             {
@@ -294,14 +304,23 @@ namespace ES
         {
             if (Source != null)
             {
+                Source.ApplyBuffersIfDirty();
                 if (Source.VersionMax > VersionNow)
                 {
                     int UpdateCount = Source.VersionMax - VersionNow;//更新数量是？
                     int count = Source.VersionedRecordChanges.Count;
+                    if (VersionNow < Source.VersionMin || UpdateCount > count)
+                    {
+                        HasInit = false;
+                        VersionNow = Source.VersionMax;
+                        Source.UpdateVersion();
+                        yield break;
+                    }
                     for (int index = count - UpdateCount; index < count && UpdateCount >= 0; index++, UpdateCount--)
                     {
                         yield return Source.VersionedRecordChanges[index];
                     }
+                    HasInit = true;
                     VersionNow = Source.VersionMax;
                     Source.UpdateVersion();
                 }
@@ -314,6 +333,7 @@ namespace ES
         [Button("镜像处添加")]
         public void Add_IgnoreVersion(T t)
         {
+            if (Source == null) return;
             if (Source.MirrorValidators.Count == 1)//只有自己哈
             {
                 Source.Add(t, false);
@@ -328,6 +348,7 @@ namespace ES
         [Button("镜像处移除")]
         public void Remove_IgnoreVersion(T t)
         {
+            if (Source == null) return;
             if (Source.MirrorValidators.Count == 1)//只有自己哈
             {
                 Source.Remove(t, false);
@@ -362,7 +383,7 @@ namespace ES
         public MirrorSyncListValidator(MirrorSync<T> mirror, Func<bool> Available)
         {
             this.mirror = mirror;
-            this.Available = Available;
+            this.Available = Available ?? DefaultAvailable;
         }
         public MirrorSyncListValidator(MirrorSync<T> mirror, UnityEngine.Object baseOn)
         {

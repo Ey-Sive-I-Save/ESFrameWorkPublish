@@ -120,16 +120,22 @@ namespace ES
 
         protected virtual void Awake()
         {
-            if (TableKeyType != null)
+            if (TableKeyType != null && MyCore != null)
             {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (MyCore.ModuleTables.TryGetValue(TableKeyType, out var oldModule) && oldModule != null && oldModule != this)
+                {
+                    Debug.LogWarning($"[Module] TableKeyType conflict: {TableKeyType.Name} already maps to {oldModule.GetType().Name}, overwritten by {GetType().Name}.");
+                }
+#endif
                 MyCore.ModuleTables[this.TableKeyType] = this;
             }
         }
         public override void OnDestroy()
         {
-            if (TableKeyType != null)
+            if (TableKeyType != null && MyCore != null)
             {
-                if (MyCore.ModuleTables[this.TableKeyType] == this)
+                if (MyCore.ModuleTables.TryGetValue(this.TableKeyType, out var module) && module == this)
                 {
                     MyCore.ModuleTables.Remove(TableKeyType);
                 };
@@ -151,6 +157,7 @@ namespace ES
             if (Domain is Domain_ domain_)
             {
                 this.MyDomain = domain_;
+                this.MyCore = domain_.MyCore;
                 Awake();
             }
         }

@@ -1,0 +1,32 @@
+[
+  {
+    "key": "pack.skill.name",
+    "zhCN": "技能配置",
+    "enUS": "Skill Config"
+  },
+  {
+    "key": "pack.localization.name",
+    "zhCN": "多语言配置",
+    "enUS": "Localization Config"
+  },
+  {
+    "key": "group.skill.definition.name",
+    "zhCN": "技能定义",
+    "enUS": "Skill Definition"
+  },
+  {
+    "key": "group.localization.text.name",
+    "zhCN": "文本",
+    "enUS": "Text"
+  },
+  {
+    "key": "skill.sample.name",
+    "zhCN": "示例技能",
+    "enUS": "Sample Skill"
+  },
+  {
+    "key": "skill.sample.desc",
+    "zhCN": "用于验证 Luban 基础接入的示例技能。",
+    "enUS": "Sample skill for validating Luban integration."
+  }
+]

@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Unity.Burst;
 using UnityEngine;
 
 namespace ES
@@ -199,7 +198,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float _ToRadians(this float degrees)
         {
-            return degrees * MathF.PI / 180f;
+            return degrees * Mathf.Deg2Rad;
         }
 
         /// <summary>

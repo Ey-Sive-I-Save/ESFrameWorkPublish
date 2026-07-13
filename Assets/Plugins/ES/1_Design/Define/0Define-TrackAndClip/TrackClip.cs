@@ -16,6 +16,7 @@ namespace ES
 
     public interface ITrackClip
     {
+        public bool Enabled { get; set; }
         public string DisplayName { get; set; }
         public float StartTime { get; set; }
         public float DurationTime { get; set; }
@@ -31,16 +32,37 @@ namespace ES
     public class TrackClipBase : ITrackClip 
     {
         public static float defaultEndTime = 10f;
+
+        [TitleGroup("片段基础", "片段名称会显示在轨道时间轴中。")]
+        [HorizontalGroup("片段基础/基础", Width = 70)]
+        [LabelText("启用")]
+        public bool enabled = true;
+
+        [HorizontalGroup("片段基础/基础")]
         [LabelText("名称")]
         public string name = "轨道片段";
 
-        [BoxGroup("时间", showLabel: false)]
-        [LabelText("开始时间"), HorizontalGroup("时间/时间信息H", 0.5f)]
+        [TitleGroup("时间范围", "单位：秒。时间轴窗口会根据所有片段结束时间自动扩展最大长度。")]
+        [HorizontalGroup("时间范围/时间信息", 0.5f)]
+        [LabelText("开始")]
+        [MinValue(0f)]
+        [SuffixLabel("秒", true)]
         public float startTime = 0;
-        [LabelText("持续时间"), HorizontalGroup("时间/时间信息H", 0.5f)]
+
+        [HorizontalGroup("时间范围/时间信息", 0.5f)]
+        [LabelText("持续")]
+        [MinValue(0f)]
+        [SuffixLabel("秒", true)]
         public float durationTime = 1;
 
-        [BoxGroup("时间")]
+        [TitleGroup("时间范围")]
+        [ShowInInspector]
+        [ReadOnly]
+        [LabelText("结束时间")]
+        [SuffixLabel("秒", true)]
+        public float EndTimePreview => startTime + Mathf.Max(0f, durationTime);
+
+        [TitleGroup("时间范围")]
         [OnInspectorGUI]
         public void EditorTime()
         {
@@ -64,6 +86,7 @@ namespace ES
 #endif
 
         public string DisplayName { get => name; set => name = value; }
+        public bool Enabled { get => enabled; set => enabled = value; }
         public float StartTime { get => startTime; set => startTime = value; }
         public float DurationTime { get => durationTime; set => durationTime = value; }
     }

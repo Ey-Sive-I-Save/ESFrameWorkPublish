@@ -37,7 +37,7 @@ namespace ES {
             [InspectorName("设置")] Set,
             [InspectorName("加")] Add,
             [InspectorName("减")] Sub,
-            [InspectorName("乘")] Muti,
+            [InspectorName("乘")] Multi,
             [InspectorName("除")] Divide,
             [InspectorName("取余")] Model,
 

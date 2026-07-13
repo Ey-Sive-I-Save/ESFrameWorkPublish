@@ -27,7 +27,7 @@ namespace ES
 
         public override NodePort GetInputNode()
         {
-            if (Option.HasFlag(DyncmicRunnerPortsOption.NoInput))
+            if (Option.HasFlag(DynamicRunnerPortsOption.NoInput))
             {
                 return null;
             }
@@ -39,7 +39,7 @@ namespace ES
         public override List<NodePort> GetOutputNodes()
         {
             List<NodePort> outputNodes = new List<NodePort>();
-            if (Option.HasFlag(DyncmicRunnerPortsOption.NoOutput))
+            if (Option.HasFlag(DynamicRunnerPortsOption.NoOutput))
             {
                 return outputNodes;
             }
@@ -61,10 +61,10 @@ namespace ES
         }
 
         public abstract Type DefaultValueType();
-        public virtual DyncmicRunnerPortsOption Option => DyncmicRunnerPortsOption.None;
+        public virtual DynamicRunnerPortsOption Option => DynamicRunnerPortsOption.None;
     }
     [Flags]
-    public enum DyncmicRunnerPortsOption
+    public enum DynamicRunnerPortsOption
     {
         None = 0,
         NoInput = 1,

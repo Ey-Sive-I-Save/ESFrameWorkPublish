@@ -218,14 +218,14 @@
                 [BoxGroup("Left Oriented Title")]
                 public int E;
             
-                // Box with a title recieved from a field.
+                // Box with a title Received from a field.
                 [BoxGroup("$DynamicTitle1"), LabelText("Dynamic Title")]
                 public string DynamicTitle1 = "Dynamic box title";
             
                 [BoxGroup("$DynamicTitle1")]
                 public int F;
             
-                // Box with a title recieved from a property.
+                // Box with a title Received from a property.
                 [BoxGroup("$DynamicTitle2")]
                 public int G;
             

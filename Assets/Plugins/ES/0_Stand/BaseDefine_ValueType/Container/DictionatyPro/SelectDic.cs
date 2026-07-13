@@ -45,7 +45,7 @@ namespace ES
             if (e == null) return;
             if (Contents.TryGetValue(t, out var dic))
             {
-                if (Contents.TryGetValue(t, out _))
+                if (dic.ContainsKey(k))
                 {
 
                 }

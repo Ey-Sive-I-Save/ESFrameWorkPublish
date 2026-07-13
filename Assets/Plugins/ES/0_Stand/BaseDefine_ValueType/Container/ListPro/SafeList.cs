@@ -83,9 +83,10 @@ namespace ES
 
         public override bool Contains(T who)
         {
-            if (ValuesBufferToRemove.Contains(who)) return false;
-            if (ValuesBufferToAdd.Contains(who)) return true;
-            return ValuesNow.Contains(who);
+            var result = ValuesNow.Contains(who);
+            if (ValuesBufferToAdd.Contains(who)) result = true;
+            if (ValuesBufferToRemove.Contains(who)) result = false;
+            return result;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void ApplyBuffers(bool force = false)
@@ -162,9 +163,10 @@ namespace ES
         }
         public override bool Contains(T who)
         {
-            if (ValuesBufferToRemove.Contains(who)) return false;
-            if (ValuesBufferToAdd.Contains(who)) return true;
-            return ValuesNow.Contains(who);
+            var result = ValuesNow.Contains(who);
+            if (ValuesBufferToAdd.Contains(who)) result = true;
+            if (ValuesBufferToRemove.Contains(who)) result = false;
+            return result;
         }
         public override void ApplyBuffers(bool forceUpdate = false)
         {
@@ -297,15 +299,16 @@ namespace ES
         }
         public override bool Contains(T who)
         {
+            var result = ValuesNow.Contains(who);
             lock (ValuesBufferToAdd)
             {
-                if (ValuesBufferToAdd.Contains(who)) return true;
+                if (ValuesBufferToAdd.Contains(who)) result = true;
             }
             lock (ValuesBufferToRemove)
             {
-                if (ValuesBufferToRemove.Contains(who)) return false;
+                if (ValuesBufferToRemove.Contains(who)) result = false;
             }
-            return ValuesNow.Contains(who);
+            return result;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void ApplyBuffers(bool force = false)
@@ -383,9 +386,10 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool Contains(T who)
         {
-            lock (ValuesBufferToAdd) if (ValuesBufferToAdd.Contains(who)) return true;
-            lock (ValuesBufferToRemove) if (ValuesBufferToRemove.Contains(who)) return false;
-            return ValuesNow.Contains(who);
+            var result = ValuesNow.Contains(who);
+            lock (ValuesBufferToAdd) if (ValuesBufferToAdd.Contains(who)) result = true;
+            lock (ValuesBufferToRemove) if (ValuesBufferToRemove.Contains(who)) result = false;
+            return result;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

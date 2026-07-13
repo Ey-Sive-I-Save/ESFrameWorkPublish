@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace ES {
     [CreateNodeRunnerSoMenu(NodeEnvironment.None, "队列", "动态数目队列")]
-    public class NodeRunnerSelector_DynamicSequence : NodeSequnence_ConfirmNodes
+    public class NodeRunnerSelector_DynamicSequence : NodeSequence_ConfirmNodes
     {
         [OnValueChanged("PortChange"),PropertyRange(1,10)]
         public int NUM = 2;

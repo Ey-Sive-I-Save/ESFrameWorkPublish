@@ -16,7 +16,9 @@ namespace ES
 {
     
     internal static partial class ExtensionNormal
-    {   
+    {
+        private static readonly Dictionary<Type, string> TypeDisplayNameCache = new Dictionary<Type, string>();
+
         /// <summary>
         /// 产生一个只有自己的列表
         /// </summary>
@@ -55,20 +57,46 @@ namespace ES
         
         public static string _GetTypeDisplayName(this Type type)
         {
+            if (type == null) return string.Empty;
+            if (TypeDisplayNameCache.TryGetValue(type, out var cached)) return cached;
+
+            string displayName;
             #if UNITY_EDITOR
             var tr=type.GetCustomAttribute<TypeRegistryItemAttribute>();
 
-            if(tr!=null)return tr.Name;
+            if(tr!=null)
+            {
+                displayName = tr.Name;
+                TypeDisplayNameCache[type] = displayName;
+                return displayName;
+            }
             #endif
             var cf=type.GetCustomAttribute<CreateAssetMenuAttribute>();
-            if(cf!=null)return cf.menuName;
+            if(cf!=null)
+            {
+                displayName = cf.menuName;
+                TypeDisplayNameCache[type] = displayName;
+                return displayName;
+            }
            var esM=type.GetCustomAttribute<ESMessageAttribute>();
-           if(esM!=null)return esM.message;
+           if(esM!=null)
+           {
+               displayName = esM.message;
+               TypeDisplayNameCache[type] = displayName;
+               return displayName;
+           }
            
            var createPath=type.GetCustomAttribute<ESCreatePathAttribute>();
-          if(createPath!=null)return createPath.GroupName+"/"+createPath.MyName;
+          if(createPath!=null)
+          {
+              displayName = createPath.GroupName+"/"+createPath.MyName;
+              TypeDisplayNameCache[type] = displayName;
+              return displayName;
+          }
 
-           return type.Name;
+           displayName = type.Name;
+           TypeDisplayNameCache[type] = displayName;
+           return displayName;
         }
     }
 }

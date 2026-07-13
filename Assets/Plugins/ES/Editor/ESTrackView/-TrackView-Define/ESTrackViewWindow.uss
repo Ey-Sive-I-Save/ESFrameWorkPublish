@@ -1,13 +1,30 @@
 .custom-label {
     font-size: 20px;
     -unity-font-style: bold;
-    color: rgb(68, 138, 255);
+    color: rgb(142, 166, 196);
 }
 
-Button:normal {
-    background-color: rgba(0, 0, 0, 0.37);
+Button {
+    background-color: rgba(24, 28, 33, 0.96);
+    border-top-color: rgba(66, 76, 88, 0.72);
+    border-right-color: rgba(18, 22, 27, 0.9);
+    border-bottom-color: rgba(18, 22, 27, 0.9);
+    border-left-color: rgba(66, 76, 88, 0.72);
+    color: rgb(214, 220, 228);
 }
 
 .normalBlock {
-    background-color: rgba(0, 0, 0, 0.63);
+    background-color: rgba(16, 20, 25, 0.9);
+    border-top-color: rgba(70, 82, 98, 0.65);
+    border-right-color: rgba(8, 10, 13, 0.8);
+    border-bottom-color: rgba(8, 10, 13, 0.8);
+    border-left-color: rgba(70, 82, 98, 0.65);
+}
+
+.track-node.dragging {
+    background-color: rgba(56, 104, 152, 0.98);
+}
+
+.track-node.expanding {
+    background-color: rgba(58, 125, 109, 0.98);
 }

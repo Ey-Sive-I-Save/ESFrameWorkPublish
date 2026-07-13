@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "key": "Skill",
+    "displayNameKey": "pack.skill.name",
+    "comment": "Skill config pack"
+  },
+  {
+    "id": 2,
+    "key": "Localization",
+    "displayNameKey": "pack.localization.name",
+    "comment": "Localization config pack"
+  }
+]

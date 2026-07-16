@@ -188,9 +188,8 @@ namespace ES
         }
 
         [PropertyOrder(50)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/操作")]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/骨骼绑定")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/骨骼绑定/操作")]
         [Button("应用 AimIK 设置", ButtonSizes.Medium)]
         private void ApplyDriverAimChainFromInspector()
         {
@@ -213,9 +212,8 @@ namespace ES
         }
 
         [PropertyOrder(41)]
-        [BoxGroup("【受击反馈】（HitReaction）/Driver配置盒", ShowLabel = false)]
-        [TitleGroup("【受击反馈】（HitReaction）/Driver配置盒/Driver配置")]
-        [HorizontalGroup("【受击反馈】（HitReaction）/Driver配置盒/Driver配置/操作")]
+        [FoldoutGroup("DriverLayout/公共部分/受击反馈/配置")]
+        [HorizontalGroup("DriverLayout/公共部分/受击反馈/配置/操作")]
         [Button("从当前向下识别骨骼盒", ButtonSizes.Medium)]
         private void AutoFillDriverHitReactionColliders()
         {
@@ -265,9 +263,8 @@ namespace ES
         }
 
         [PropertyOrder(42)]
-        [BoxGroup("【受击反馈】（HitReaction）/Driver配置盒", ShowLabel = false)]
-        [TitleGroup("【受击反馈】（HitReaction）/Driver配置盒/Driver配置")]
-        [HorizontalGroup("【受击反馈】（HitReaction）/Driver配置盒/Driver配置/操作")]
+        [FoldoutGroup("DriverLayout/公共部分/受击反馈/配置")]
+        [HorizontalGroup("DriverLayout/公共部分/受击反馈/配置/操作")]
         [Button("应用 Driver 受击配置", ButtonSizes.Medium)]
         private void ApplyDriverHitReactionFromInspector()
         {
@@ -287,9 +284,8 @@ namespace ES
         }
 
         [PropertyOrder(43)]
-        [BoxGroup("【受击反馈】（HitReaction）/Driver配置盒", ShowLabel = false)]
-        [TitleGroup("【受击反馈】（HitReaction）/Driver配置盒/Driver配置")]
-        [HorizontalGroup("【受击反馈】（HitReaction）/Driver配置盒/Driver配置/操作")]
+        [FoldoutGroup("DriverLayout/公共部分/受击反馈/配置")]
+        [HorizontalGroup("DriverLayout/公共部分/受击反馈/配置/操作")]
         [Button("清空 Driver 受击配置", ButtonSizes.Medium)]
         private void ClearDriverHitReactionSetup()
         {
@@ -303,9 +299,8 @@ namespace ES
         }
 
         [PropertyOrder(41)]
-        [BoxGroup("【后坐力】（Recoil）/Driver配置盒", ShowLabel = false)]
-        [TitleGroup("【后坐力】（Recoil）/Driver配置盒/Driver配置")]
-        [HorizontalGroup("【后坐力】（Recoil）/Driver配置盒/Driver配置/操作")]
+        [FoldoutGroup("DriverLayout/公共部分/后坐力/配置")]
+        [HorizontalGroup("DriverLayout/公共部分/后坐力/配置/操作")]
         [Button("应用 Driver 后坐力配置", ButtonSizes.Medium)]
         private void ApplyDriverRecoilFromInspector()
         {
@@ -325,9 +320,8 @@ namespace ES
         }
 
         [PropertyOrder(42)]
-        [BoxGroup("【后坐力】（Recoil）/Driver配置盒", ShowLabel = false)]
-        [TitleGroup("【后坐力】（Recoil）/Driver配置盒/Driver配置")]
-        [HorizontalGroup("【后坐力】（Recoil）/Driver配置盒/Driver配置/操作")]
+        [FoldoutGroup("DriverLayout/公共部分/后坐力/配置")]
+        [HorizontalGroup("DriverLayout/公共部分/后坐力/配置/操作")]
         [Button("清空 Driver 后坐力配置", ButtonSizes.Medium)]
         private void ClearDriverRecoilSetup()
         {

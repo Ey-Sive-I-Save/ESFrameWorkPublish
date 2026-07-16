@@ -31,11 +31,6 @@ namespace ES
                 // 可在此添加中等优先级任务
             }
 
-            if (layerData.HasDirtyFlag(PipelineDirtyFlags.HotPlug))
-            {
-                layerData.ClearDirty(PipelineDirtyFlags.HotPlug);
-            }
-
             if (layerData.HasDirtyFlag(PipelineDirtyFlags.FallbackCheck))
             {
                 if (layerData.runningStates.Count == 0)
@@ -47,11 +42,22 @@ namespace ES
                         var fallbackState = GetStateByInt(fallbackStateId);
                         StateMachineDebug.Log($"[FallbackActivate] Layer={layer} | Support={currentSupportFlags} | FallbackStateId={fallbackStateId} | FallbackState={(fallbackState != null ? fallbackState.strKey : "<null>")}");
 
-                        bool activated = TryActivateState(fallbackState, layer);
-                        if (activated)
+                        if (fallbackState == null)
                         {
+                            StateMachineDebug.LogWarning($"[FallbackActivate] Skip: fallback state not found. Layer={layer} | StateId={fallbackStateId}");
                             layerData.ClearDirty(PipelineDirtyFlags.FallbackCheck);
+                            return;
                         }
+
+                        bool activated = TryActivateState(fallbackState, layer);
+                        if (!activated)
+                            StateMachineDebug.LogWarning($"[FallbackActivate] Failed. Layer={layer} | State={fallbackState.strKey} | StateId={fallbackStateId}");
+
+                        layerData.ClearDirty(PipelineDirtyFlags.FallbackCheck);
+                    }
+                    else
+                    {
+                        layerData.ClearDirty(PipelineDirtyFlags.FallbackCheck);
                     }
                 }
                 else

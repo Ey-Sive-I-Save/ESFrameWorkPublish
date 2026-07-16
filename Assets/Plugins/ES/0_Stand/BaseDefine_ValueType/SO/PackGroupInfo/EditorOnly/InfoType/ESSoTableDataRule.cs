@@ -24,36 +24,36 @@ namespace ES
         [LabelText("XLSX")]
         Xlsx,
 
-        [LabelText("CSV 闂?XLSX")]
+        [LabelText("CSV 和 XLSX")]
         CsvAndXlsx
     }
 
     public enum ESSoTableRuleDirection
     {
-        [LabelText("")]
+        [LabelText("双向")]
         Both,
 
-        [LabelText("")]
+        [LabelText("仅 SO 到表格")]
         SoToTableOnly,
 
-        [LabelText("婵炲濮撮幊鎾诲Υ閸愵喖鍐€闁绘挸楠搁悡?SO")]
+        [LabelText("仅表格写回 SO")]
         TableToSoOnly,
 
-        [LabelText("")]
+        [LabelText("忽略")]
         Ignore
     }
 
     public enum ESTableColumnAvailability
     {
-        [Tooltip("跟随本行的启用开关。")]
+        [Tooltip("跟随本行的启用开关")]
         [LabelText("普通")]
         Normal,
 
-        [Tooltip("即使启用开关关闭，也参与导入导出。")]
+        [Tooltip("即使启用开关关闭，也参与导入导出")]
         [LabelText("强制启用")]
         ForceEnabled,
 
-        [Tooltip("无论启用开关如何，都不参与导入导出。")]
+        [Tooltip("无论启用开关如何，都不参与导入导出")]
         [LabelText("强制禁用")]
         ForceDisabled
     }
@@ -63,7 +63,7 @@ namespace ES
         [LabelText("英文列名")]
         English,
 
-        [LabelText("中文显示名")]
+        [LabelText("中文显示")]
         Chinese
     }
 
@@ -81,95 +81,163 @@ namespace ES
 
     public enum ESTableColumnAuthority
     {
-        [LabelText("表格权威")]
-        [Tooltip("导入时表格值覆盖 SO 字段。")]
+        [LabelText("表格覆盖")]
+        [Tooltip("导入时表格值覆盖 SO 字段")]
         TableAuthority,
 
-        [LabelText("SO权威")]
-        [Tooltip("SO 字段已有内容时，表格不能覆盖；SO 为空时允许表格补值。")]
+        [LabelText("保留现有值")]
+        [Tooltip("字段已有内容时，表格不覆盖；为空时允许表格补值")]
         SoAuthority,
 
         [LabelText("忽略")]
-        [Tooltip("保留映射记录，但导入导出都不使用。")]
+        [Tooltip("保留映射记录，但导入导出都不使用")]
         Ignore
     }
 
     public enum ESTableInfoExpandMode
     {
-        [LabelText("")]
+        [LabelText("只使用显式映射")]
         ExplicitMappingsOnly,
 
-        [LabelText("")]
+        [LabelText("展开可序列化字段")]
         SerializedFields,
 
-        [LabelText("")]
+        [LabelText("嵌套对象展开为多列")]
         NestedObjectColumns,
 
-        [LabelText("婵犮垼娉涚粔闈涱焽閸涱垪鍋撻悽娈挎敯闁芥牕瀚粚鍗炩攽閸℃瑦鎲兼繛?Json")]
+        [LabelText("复杂对象保存为 Json")]
         ComplexObjectAsJson
     }
 
     public enum ESTableGroupSliceMode
     {
-        [LabelText("闂婎偄娲ㄩ弲顐﹀汲?Group")]
+        [LabelText("忽略 Group")]
         IgnoreGroup,
 
-        [LabelText("")]
+        [LabelText("Group 名写入列")]
         GroupNameColumn,
 
-        [LabelText("濠殿噯绲界换瀣煂?Group 婵炴垶鎸撮崑鎾斥槈?Sheet")]
+        [LabelText("每个 Group 一个 Sheet")]
         OneGroupPerSheet,
 
-        [LabelText("")]
+        [LabelText("每个 Group 一个文件")]
         OneGroupPerFile
     }
 
     public enum ESTableNameMatchMode
     {
-        [LabelText("")]
+        [LabelText("完全匹配")]
         Exact,
 
-        [LabelText("")]
+        [LabelText("忽略大小写")]
         IgnoreCase,
 
-        [LabelText("")]
+        [LabelText("字段名转列名")]
         FieldToColumn,
 
-        [LabelText("")]
+        [LabelText("自定义")]
         Custom
     }
 
     public enum ESTableValueWriteMode
     {
-        [LabelText("")]
+        [LabelText("普通值")]
         PlainValue,
 
-        [LabelText("Unity 闁诲海鏁搁、濠囨寘?GUID")]
+        [LabelText("Unity 对象 GUID")]
         UnityObjectGuid,
 
-        [LabelText("")]
+        [LabelText("Unity 对象路径")]
         UnityObjectPath,
 
         [LabelText("Json")]
         Json,
 
-        [LabelText("")]
+        [LabelText("类型名")]
         TypeName
     }
 
     public enum ESTableConflictPolicy
     {
-        [LabelText("")]
+        [LabelText("跳过")]
         Skip,
 
-        [LabelText("")]
+        [LabelText("覆盖")]
         Overwrite,
 
-        [LabelText("")]
+        [LabelText("创建副本")]
         CreateCopy,
 
-        [LabelText("")]
+        [LabelText("报错")]
         Error
+    }
+
+    public enum ESTableExportWriteMode
+    {
+        [LabelText("整表重建")]
+        [Tooltip("直接使用本次导出的完整表格内容。只有明确需要完全重建表格时使用")]
+        Rebuild,
+
+        [LabelText("按 Key 更新并追加")]
+        [Tooltip("默认模式。目标表已存在时，按对象 Key/子级 Key 更新已有行，追加新行，并尽量保留旧表未映射列和备注")]
+        MergeByKey,
+
+        [LabelText("仅按 Key 更新")]
+        [Tooltip("只更新目标表里已经存在的 Key；本次导出的新增 Key 不追加到旧表")]
+        UpdateExistingOnly
+    }
+
+    public enum ESTableSerialChildWriteMode
+    {
+        [LabelText("按宿主重建子级")]
+        [Tooltip("List 行导出时，只重建本次导出的宿主 SO 的子级行；不重建整张表，也不影响其他宿主")]
+        RebuildByOwner,
+
+        [LabelText("按子级 Key 合并")]
+        [Tooltip("List 行导出时，按宿主 Key + 子级 Key 更新已有子级行，并追加新增子级行")]
+        MergeByKey,
+
+        [LabelText("仅更新已有子级")]
+        [Tooltip("List 行导出时，只更新表格中已存在的子级行，不追加新增子级")]
+        UpdateExistingOnly
+    }
+
+    public enum ESTableSerialChildImportSyncMode
+    {
+        [LabelText("保留表外子级")]
+        [Tooltip("导入时，表格没有出现的旧子级继续保留")]
+        KeepMissing,
+
+        [LabelText("重建触达宿主子级")]
+        [Tooltip("导入时，对本次表格触达的宿主 SO，先清空子级容器，再按表格顺序重建")]
+        RebuildTouchedOwners,
+
+        [LabelText("按表裁剪子级")]
+        [Tooltip("导入时，只裁剪本次表格覆盖到的宿主 SO 子级。这个模式需要预检确认")]
+        PruneMissingByTable,
+
+        [LabelText("仅 delete 指令删除")]
+        [Tooltip("导入时不自动裁剪，只有明确 delete 行指令才删除子级")]
+        DeleteDirectiveOnly
+    }
+    public enum ESTableRowDirective
+    {
+        Normal,
+        Skip,
+        Required,
+        Patch,
+        Replace,
+        Owner,
+        Delete,
+        Comment
+    }
+
+    public struct ESTableRowDirectiveInfo
+    {
+        public ESTableRowDirective directive;
+        public string rawText;
+        public bool debug;
+        public string effectiveText;
     }
 
     public enum ESSoTableRuleUseDirection
@@ -184,6 +252,36 @@ namespace ES
         ImportAndExport
     }
 
+    public enum ESTableBatchExecuteChoice
+    {
+        Execute,
+        Plan,
+        Cancel
+    }
+
+    public sealed class ESTablePlanRiskSummary
+    {
+        public int addedOwners;
+        public int addedChildren;
+        public int modifiedFields;
+        public int skippedRows;
+        public int errors;
+        public int deleteOwners;
+        public int deleteChildren;
+        public int clearFields;
+        public int overwriteNonEmptyFields;
+        public int rebuildTables;
+        public readonly List<string> errorLines = new List<string>();
+        public readonly List<string> riskLines = new List<string>();
+
+        public bool HasErrors => errors > 0;
+        public bool HasHighRisk => deleteOwners > 0
+            || deleteChildren > 0
+            || clearFields > 0
+            || overwriteNonEmptyFields > 0
+            || rebuildTables > 0;
+    }
+
     public enum ESSoTableRuleBindSourceKind
     {
         [LabelText("")]
@@ -195,7 +293,7 @@ namespace ES
         [LabelText("")]
         SoFolder,
 
-        [LabelText("闂佺厧鐡ㄧ喊宥咃耿?MonoScript")]
+        [LabelText("MonoScript")]
         MonoScript
     }
 
@@ -204,7 +302,7 @@ namespace ES
         [LabelText("SoData Pack/Group/Info")]
         SoData,
 
-        [LabelText("闂佸搫鎷嬮崳锝夊焵?ScriptableObject")]
+        [LabelText("普通 ScriptableObject")]
         ScriptableObject
     }
 
@@ -249,7 +347,7 @@ namespace ES
     public sealed class ESTableColumnNameMap
     {
         [LabelText("启用")]
-        [PropertyTooltip("普通状态下是否参与导入导出。强制启用/禁用会覆盖这个开关。")]
+        [PropertyTooltip("普通状态下是否参与导入导出。强制启用/禁用会覆盖这个开关")]
         [TableColumnWidth(42, Resizable = false)]
         [PropertyOrder(-1)]
         [HideLabel]
@@ -257,84 +355,83 @@ namespace ES
         public bool enabled = true;
 
         [LabelText("锁定")]
-        [PropertyTooltip("锁定后不会被重建规则删除，也不会在导入时被表格写回覆盖。")]
+        [PropertyTooltip("锁定后不会被重建规则删除，也不会在导入时被表格写回覆盖")]
         public bool locked;
 
-        [LabelText("字段权威")]
-        [PropertyTooltip("表格权威：导入覆盖 SO；SO权威：SO 有值时不被表格覆盖；忽略：保留记录但不参与导入导出。")]
-        public ESTableColumnAuthority authority = ESTableColumnAuthority.TableAuthority;
+        [LabelText("导入策略")]
+        [PropertyTooltip("表格覆盖：导入时表格覆盖 SO；保留现有值：SO 有值时不覆盖，SO 为空时允许补值；忽略：保留记录但不参与导入导出")]
+        public ESTableColumnAuthority authority = ESTableColumnAuthority.SoAuthority;
 
         [LabelText("详情")]
-        [PropertyTooltip("打开后显示写入方式、Key 标记、说明、表格类型和方向等低频字段。")]
+        [PropertyTooltip("打开后显示写入方式、Key 标记、说明、表格类型和方向等低频字段")]
         public bool showDetail;
 
-        [LabelText("SO 字段名")]
+        [LabelText("SO 字段")]
         [TableColumnWidth(220, Resizable = true)]
         [PropertyOrder(0)]
-        [PropertyTooltip("SO 对象里的字段路径，例如 name 或 config.value。")]
+        [PropertyTooltip("SO 对象里的字段路径，例如 name 或 config.value")]
         public string soFieldPath;
 
         [LabelText("写入方式")]
         [TableColumnWidth(110, Resizable = false)]
         [PropertyOrder(1)]
-        [PropertyTooltip("控制导入时如何把表格文本写回 SO 字段。")]
+        [PropertyTooltip("控制导入时如何把表格文本写回 SO 字段")]
         public ESTableValueWriteMode valueWriteMode = ESTableValueWriteMode.PlainValue;
 
         [LabelText("InfoKey")]
         [TableColumnWidth(58, Resizable = false)]
         [PropertyOrder(2)]
-        [PropertyTooltip("该列作为 Info 的唯一标识列。")]
+        [PropertyTooltip("该列作为 Info 的唯一标识列")]
         public bool isInfoKey;
 
         [LabelText("GroupKey")]
         [TableColumnWidth(72, Resizable = false)]
         [PropertyOrder(3)]
-        [PropertyTooltip("该列作为 Group 分组标识列。")]
+        [PropertyTooltip("该列作为 Group 分组标识列")]
         public bool isGroupKey;
 
-        [LabelText("SO 显示名")]
+        [LabelText("SO 显示")]
         [TableColumnWidth(140, Resizable = true)]
         [PropertyOrder(4)]
-        [PropertyTooltip("编辑器里给人看的名字，不要求和字段名一致。")]
+        [PropertyTooltip("编辑器里给人看的名字，不要求和字段名一致")]
         public string displayName;
 
         [LabelText("说明")]
         [TableColumnWidth(240, Resizable = true)]
         [TextArea(1, 2)]
         [PropertyOrder(5)]
-        [PropertyTooltip("写入表头注释行的说明文字。")]
+        [PropertyTooltip("写入表头注释行的说明文字")]
         public string comment;
 
         [LabelText("表格列名")]
         [TableColumnWidth(190, Resizable = true)]
         [PropertyOrder(6)]
-        [PropertyTooltip("导出到 CSV/XLSX 的列名，也是导入时匹配列的名字。")]
+        [PropertyTooltip("导出到 CSV/XLSX 的列名，也是导入时匹配列的名字")]
         public string columnName;
 
         [LabelText("表格类型")]
         [TableColumnWidth(105, Resizable = false)]
         [PropertyOrder(7)]
-        [PropertyTooltip("写入 表格表头类型行的类型名。")]
+        [PropertyTooltip("写入表格表头类型行的类型名")]
         public string tableType;
 
         [LabelText("方向")]
         [TableColumnWidth(105, Resizable = false)]
         [PropertyOrder(8)]
-        [PropertyTooltip("控制该字段参与导出、导入、双向，或完全忽略。")]
+        [PropertyTooltip("控制该字段参与导出、导入、双向，或完全忽略")]
         public ESSoTableRuleDirection direction = ESSoTableRuleDirection.Both;
 
         [LabelText("可用状态")]
-        [PropertyTooltip("普通表示跟随启用开关；强制启用/强制禁用用于锁定关键字段。")]
+        [PropertyTooltip("普通表示跟随启用开关；强制启用/强制禁用用于锁定关键字段")]
         public ESTableColumnAvailability availability = ESTableColumnAvailability.Normal;
 
         [LabelText("保留未映射列")]
-        [PropertyTooltip("导出时尽量把旧表格里没有映射到 SO 字段的列追加保留下来，适合手工维护的备注列。")]
+        [PropertyTooltip("导出时尽量把旧表格里没有映射到 SO 字段的列追加保留下来，适合手工维护的备注列")]
         public bool allowPassThrough;
 
         public bool IsIgnored => authority == ESTableColumnAuthority.Ignore || direction == ESSoTableRuleDirection.Ignore;
         public bool IsUsable => !IsIgnored && (availability == ESTableColumnAvailability.ForceEnabled || (availability == ESTableColumnAvailability.Normal && enabled));
     }
-
     public sealed class ESTableCompiledColumn
     {
         public int tableColumnIndex;
@@ -423,59 +520,59 @@ namespace ES
     public sealed class ESSoTableRuleSourceBinding
     {
         [FoldoutGroup("", Expanded = false)]
-        [LabelText("")]
+        [LabelText("绑定来源")]
         [ReadOnly]
         public ESSoTableRuleBindSourceKind sourceKind;
 
         [TitleGroup("")]
-        [LabelText("")]
+        [LabelText("SO 文件")]
         [AssetsOnly]
         public ScriptableObject soAsset;
 
         [TitleGroup("")]
-        [LabelText("")]
+        [LabelText("SO 文件夹")]
         [AssetsOnly]
         public DefaultAsset soFolder;
 
         [TitleGroup("")]
-        [LabelText("")]
+        [LabelText("包含子文件夹")]
         public bool includeSubFolders = true;
 
         [TitleGroup("")]
-        [LabelText("")]
+        [LabelText("脚本")]
         [AssetsOnly]
         public MonoScript monoScript;
 
         [FoldoutGroup("")]
-        [LabelText("")]
+        [LabelText("文件夹资产")]
         [ReadOnly]
         [ListDrawerSettings(ShowFoldout = true, DraggableItems = false, ShowIndexLabels = true)]
         public List<ScriptableObject> folderAssets = new List<ScriptableObject>();
 
         [FoldoutGroup("", Expanded = false)]
-        [LabelText("")]
+        [LabelText("文件夹同步模式")]
         public ESTableFolderSyncMode folderSyncMode = ESTableFolderSyncMode.Incremental;
 
         [FoldoutGroup("")]
-        [LabelText("闂佹眹鍨婚崰鎰板垂濮樿京纾介柛婵嗗娴?SO")]
+        [LabelText("允许创建缺失 SO")]
         public bool createMissingAssetsInFolder = true;
 
         [FoldoutGroup("")]
-        [LabelText("闂佸搫娲ら悺銊╁蓟婵犲偆鍟呴柛娆忣槹缁?SO")]
+        [LabelText("允许更新已有 SO")]
         public bool updateExistingAssetsInFolder = true;
 
         [FoldoutGroup("")]
-        [LabelText("闂佸搫顦崕鑼姳?GUID")]
+        [LabelText("来源 GUID")]
         [ReadOnly]
         public string sourceGuid;
 
         [FoldoutGroup("")]
-        [LabelText("")]
+        [LabelText("来源路径")]
         [ReadOnly]
         public string sourcePath;
 
         [FoldoutGroup("")]
-        [LabelText("")]
+        [LabelText("来源类型")]
         [ReadOnly]
         public string sourceTypeName;
 
@@ -487,24 +584,23 @@ namespace ES
             sourceGuid = string.IsNullOrEmpty(sourcePath) ? string.Empty : AssetDatabase.AssetPathToGUID(sourcePath);
         }
     }
-
     [Serializable]
     [InlineProperty]
     [HideReferenceObjectPicker]
     public sealed class ESSoTableRuleBuildStage
     {
         [LabelText("构建来源")]
-        [PropertyTooltip("只用于生成或重建 Rule 字段映射，不用于批量导入导出。")]
+        [PropertyTooltip("只用于生成或重建 Rule 字段映射，不用于批量导入导出")]
         [HideLabel]
         public ESSoTableRuleSourceBinding sourceBinding = new ESSoTableRuleSourceBinding();
 
         [LabelText("表格样本路径")]
-        [PropertyTooltip("拖入或选择 CSV/XLSX，用它的表头生成字段映射。")]
+        [PropertyTooltip("拖入或选择 CSV/XLSX，用它的表头生成字段映射")]
         [Sirenix.OdinInspector.FilePath(Extensions = "csv,xlsx", AbsolutePath = true)]
         public string tableFilePath;
 
         [LabelText("允许表头覆盖")]
-        [PropertyTooltip("从表格样本重建时，允许表头结果覆盖现有字段映射。")]
+        [PropertyTooltip("从表格样本重建时，允许表头结构覆盖现有字段映射")]
         public bool allowTableHeaderOverride = true;
     }
 
@@ -514,75 +610,105 @@ namespace ES
     public sealed class ESSoTableRuleUseBatch
     {
         [LabelText("启用")]
-        [PropertyTooltip("关闭后执行全部批次时会跳过这一批。")]
+        [PropertyTooltip("关闭后执行全部批次时会跳过这一批")]
         public bool enabled = true;
 
         [LabelText("批次名")]
-        [PropertyTooltip("给这一批导入导出配置起一个容易识别的名字。")]
+        [PropertyTooltip("给这一批导入导出配置起一个容易识别的名字")]
         public string batchName = "New Batch";
 
         [LabelText("执行方向")]
-        [PropertyTooltip("控制这一批是导出、导入，还是先导入再导出。")]
+        [PropertyTooltip("控制这一批是导出、导入，还是先导入再导出")]
         public ESSoTableRuleUseDirection direction = ESSoTableRuleUseDirection.Export;
 
+        [LabelText("超级批")]
+        public bool useSuperBatch;
+
+        [LabelText("超级批关系表")]
+        [Sirenix.OdinInspector.FilePath(Extensions = "csv,xlsx", AbsolutePath = true)]
+        public string superBatchTablePath;
+
+        [LabelText("跳过无效关系行")]
+        public bool superBatchSkipInvalidRows = true;
+
         [LabelText("数据来源")]
-        [PropertyTooltip("这一批要处理的单个 SO 或 SO 文件夹。")]
+        [PropertyTooltip("这一批要处理的单个 SO 或 SO 文件夹")]
         [HideLabel]
         public ESSoTableRuleSourceBinding sourceBinding = new ESSoTableRuleSourceBinding();
 
         [LabelText("文件格式")]
-        [PropertyTooltip("这一批输出或读取的表格格式。")]
+        [PropertyTooltip("这一批输出或读取的表格格式")]
         public ESTableFileKind fileKind = ESTableFileKind.CsvAndXlsx;
 
         [LabelText("表格列名")]
-        [PropertyTooltip("选择导出表头和导入匹配时使用英文列名，还是字段的中文显示名。")]
+        [PropertyTooltip("选择导出表头和导入匹配时使用英文列名，还是字段的中文显示名")]
         public ESTableColumnNameMode columnNameMode = ESTableColumnNameMode.English;
 
         [LabelText("文件名")]
-        [PropertyTooltip("不带扩展名的 CSV/XLSX 文件名。")]
+        [PropertyTooltip("不带扩展名的 CSV/XLSX 文件名")]
         public string fileName;
 
         [LabelText("Sheet 名")]
-        [PropertyTooltip("XLSX 工作表名。CSV 不使用。")]
+        [PropertyTooltip("XLSX 工作表名。CSV 不使用")]
         public string sheetName;
 
         [LabelText("输出根目录")]
-        [PropertyTooltip("相对项目根目录的表格输出目录。")]
+        [PropertyTooltip("相对项目根目录的表格输出目录")]
         [FolderPath(AbsolutePath = false)]
         public string outputRoot = "SoTableConfig/Tables";
 
         [LabelText("CSV 相对路径")]
-        [PropertyTooltip("CSV 相对输出根目录的子路径。")]
+        [PropertyTooltip("CSV 相对输出根目录的子路径")]
         [FolderPath(AbsolutePath = false)]
         public string csvRelativePath = "csv";
 
         [LabelText("XLSX 相对路径")]
-        [PropertyTooltip("XLSX 相对输出根目录的子路径。")]
+        [PropertyTooltip("XLSX 相对输出根目录的子路径")]
         [FolderPath(AbsolutePath = false)]
         public string xlsxRelativePath = "xlsx";
 
         [LabelText("导入冲突")]
-        [PropertyTooltip("导入表格写回 SO 时，遇到已有对象或冲突数据的处理策略。")]
+        [PropertyTooltip("导入表格写回 SO 时，遇到已有对象或冲突数据的处理策略")]
         public ESTableConflictPolicy importConflictPolicy = ESTableConflictPolicy.Overwrite;
 
         [LabelText("导出冲突")]
-        [PropertyTooltip("导出表格时，目标文件已存在的处理策略。")]
+        [PropertyTooltip("导出表格时，目标文件已存在的处理策略")]
         public ESTableConflictPolicy exportConflictPolicy = ESTableConflictPolicy.Overwrite;
 
+        [LabelText("导出写入模式")]
+        [PropertyTooltip("控制导出到已存在表格时如何写入。默认按 Key 合并，避免重建表格导致备注、断言、未映射列丢失")]
+        public ESTableExportWriteMode exportWriteMode = ESTableExportWriteMode.MergeByKey;
+
+        [LabelText("子级导出模式")]
+        [PropertyTooltip("当一行对应 List 子级元素时，控制子级行如何写入已有表格")]
+        public ESTableSerialChildWriteMode serialChildWriteMode = ESTableSerialChildWriteMode.RebuildByOwner;
+
+        [LabelText("子级导入同步")]
+        [PropertyTooltip("当一行对应 List 子级元素时，控制表格缺失的旧子级是保留、重建、裁剪，还是只允许 delete 指令删除")]
+        public ESTableSerialChildImportSyncMode serialChildImportSyncMode = ESTableSerialChildImportSyncMode.KeepMissing;
+
+        [LabelText("仅生效字段")]
+        [PropertyTooltip("逗号/分号分隔。留空表示全部字段。可写表格列名、SO 字段路径或显示名")]
+        public string activeFields;
+
+        [LabelText("排除字段")]
+        [PropertyTooltip("逗号/分号分隔。优先级高于仅生效字段。可写表格列名、SO 字段路径或显示名")]
+        public string excludedFields;
+
         [LabelText("应用范围")]
-        [PropertyTooltip("导入写回时使用全量、片段截取，或仅写回某个 Group 下的某个 Info。")]
+        [PropertyTooltip("导入写回时使用全量、片段截取，或仅写回某个 Group 下的某个 Info")]
         public ESTableBatchApplyRangeMode applyRangeMode = ESTableBatchApplyRangeMode.All;
 
         [LabelText("截取列名")]
-        [PropertyTooltip("片段截取用的列名，可以是 Key 或其他表格列名。留空时使用 Info Key。")]
+        [PropertyTooltip("片段截取用的列名，可以是 Key 或其他表格列名。留空时使用 Info Key")]
         public string sliceColumnName;
 
         [LabelText("起点值")]
-        [PropertyTooltip("片段截取起点。找到该值后开始应用。")]
+        [PropertyTooltip("片段截取起点。找到该值后开始应用")]
         public string sliceStartValue;
 
         [LabelText("终点值")]
-        [PropertyTooltip("片段截取终点。找到该值后停止应用。")]
+        [PropertyTooltip("片段截取终点。找到该值后停止应用")]
         public string sliceEndValue;
 
         [LabelText("包含起点")]
@@ -592,16 +718,15 @@ namespace ES
         public bool includeSliceEnd = true;
 
         [LabelText("目标 Group")]
-        [PropertyTooltip("仅应用单个 Group/Info 时匹配的 Group 列值。")]
+        [PropertyTooltip("仅应用单个 Group/Info 时匹配的 Group 列值")]
         public string targetGroupKey;
 
         [LabelText("目标 Info")]
-        [PropertyTooltip("仅应用单个 Group/Info 时匹配的 Info Key。")]
+        [PropertyTooltip("仅应用单个 Group/Info 时匹配的 Info Key")]
         public string targetInfoKey;
     }
-
     [ESCreatePath("数据信息", "SO表格规则数据信息")]
-    public class ESSoTableDataRule : SoDataInfo
+    public partial class ESSoTableDataRule : SoDataInfo
     {
         private static readonly ESReflectionRowBridge RowBridge = new ESReflectionRowBridge();
         private static readonly JsonSerializerSettings CellJsonSettings = new JsonSerializerSettings
@@ -611,6 +736,8 @@ namespace ES
         };
         [NonSerialized]
         private ESSoTableRuleUseBatch activeUseBatch;
+        [NonSerialized]
+        private string activeImportTablePath;
 
         [TitleGroup("")]
         [HorizontalGroup("", Width = 80)]
@@ -618,13 +745,17 @@ namespace ES
         public bool enabled = true;
 
         [HorizontalGroup("")]
-        [LabelText("闁荤喐鐟ョ€氼剟宕?Key")]
+        [LabelText("规则 Key")]
         public string ruleKey;
 
         [TitleGroup("")]
         [LabelText("")]
         [TextArea(2, 5)]
         public string description;
+
+        [LabelText("Debug 行号")]
+        [PropertyTooltip("用于行级 Debug 的表格行号，按 Excel 行号填写。表头第 1 行就是 1。")]
+        public int debugRowNumber = 5;
 
         [FoldoutGroup("", Expanded = false)]
         [HideLabel]
@@ -653,7 +784,7 @@ namespace ES
         public ESTableInfoExpandMode infoExpandMode = ESTableInfoExpandMode.ExplicitMappingsOnly;
 
         [FoldoutGroup("婵°倕鍊归…鍥殽?Pack Group Info")]
-        [LabelText("Group 闂佽鎯屾禍婊嗐亹閸ヮ剙妫橀柣鐔稿绾偓")]
+        [LabelText("Group 截取方式")]
         public ESTableGroupSliceMode groupSliceMode = ESTableGroupSliceMode.GroupNameColumn;
 
         [FoldoutGroup("婵°倕鍊归…鍥殽?Pack Group Info")]
@@ -692,15 +823,15 @@ namespace ES
         [TableList(AlwaysExpanded = true, ShowIndexLabels = true, DrawScrollView = true, MinScrollViewHeight = 180)]
         public List<ESTableColumnNameMap> columns = new List<ESTableColumnNameMap>();
 
-        [FoldoutGroup("婵°倕鍊归…鍥殽?闁诲海鏁搁崢褔宕ｉ崱娆屽亾閻㈤潧甯堕柛銈庡幘缁敻寮介锝嗩吅")]
-        [LabelText("闁诲海鏁搁崢褔宕ｉ崱娑樼睄閻犲搫鎼敮鎺楁偣娴ｄ警鐒鹃柛銊ュ船椤?Info")]
+        [FoldoutGroup("导入导出策略")]
+        [LabelText("导入时允许创建 Info")]
         public bool allowCreateInfoOnImport = true;
 
-        [FoldoutGroup("婵°倕鍊归…鍥殽?闁诲海鏁搁崢褔宕ｉ崱娆屽亾閻㈤潧甯堕柛銈庡幘缁敻寮介锝嗩吅")]
-        [LabelText("闁诲海鏁搁崢褔宕ｉ崱娑樼睄閻犲搫鎼敮鎺楁偣娴ｄ警鐒鹃柛銊ュ船椤?Group")]
+        [FoldoutGroup("导入导出策略")]
+        [LabelText("导入时允许创建 Group")]
         public bool allowCreateGroupOnImport = true;
 
-        [FoldoutGroup("婵°倕鍊归…鍥殽?闁诲海鏁搁崢褔宕ｉ崱娆屽亾閻㈤潧甯堕柛銈庡幘缁敻寮介锝嗩吅")]
+        [FoldoutGroup("导入导出策略")]
         [LabelText("")]
         public bool refreshPackBeforeExport = true;
 
@@ -1096,66 +1227,208 @@ namespace ES
         [Button("导出表格")]
         public void ExportTableFiles()
         {
-            List<List<string>> table = BuildTableRows();
-            if (table.Count == 0)
+            TryExportTableFiles();
+        }
+
+        private bool TryExportTableFiles()
+        {
+            try
             {
-                Debug.LogWarning("没有可导出的字段映射。", this);
-                return;
+                List<List<string>> table = BuildTableRows();
+                if (table.Count == 0)
+                {
+                    Debug.LogWarning("No mapped columns available for export.", this);
+                    return false;
+                }
+
+                ESTableFileKind currentFileKind = GetActiveFileKind();
+                string csvPath = GetOutputPath(GetActiveCsvRelativePath(), ".csv");
+                string xlsxPath = GetOutputPath(GetActiveXlsxRelativePath(), ".xlsx");
+                List<List<string>> csvTable = null;
+                List<List<string>> xlsxTable = null;
+
+                if (currentFileKind == ESTableFileKind.Csv || currentFileKind == ESTableFileKind.CsvAndXlsx)
+                {
+                    csvTable = BuildExportWriteTable(table, csvPath);
+                    if (csvTable == null)
+                        return false;
+                }
+
+                if (currentFileKind == ESTableFileKind.Xlsx || currentFileKind == ESTableFileKind.CsvAndXlsx)
+                {
+                    xlsxTable = BuildExportWriteTable(table, xlsxPath);
+                    if (xlsxTable == null)
+                        return false;
+                }
+
+                if (csvTable != null)
+                    WriteCsv(csvPath, csvTable);
+                if (xlsxTable != null)
+                    WriteXlsx(xlsxPath, xlsxTable, string.IsNullOrEmpty(GetActiveSheetName()) ? "Sheet1" : GetActiveSheetName());
+
+                AssetDatabase.Refresh();
+                Debug.Log($"Table export complete: {csvPath} / {xlsxPath}", this);
+                return true;
             }
-
-            ESTableFileKind currentFileKind = GetActiveFileKind();
-            string csvPath = GetOutputPath(GetActiveCsvRelativePath(), ".csv");
-            string xlsxPath = GetOutputPath(GetActiveXlsxRelativePath(), ".xlsx");
-
-            if (currentFileKind == ESTableFileKind.Csv || currentFileKind == ESTableFileKind.CsvAndXlsx)
-                WriteCsv(csvPath, table);
-
-            if (currentFileKind == ESTableFileKind.Xlsx || currentFileKind == ESTableFileKind.CsvAndXlsx)
-                WriteXlsx(xlsxPath, table, string.IsNullOrEmpty(GetActiveSheetName()) ? "Sheet1" : GetActiveSheetName());
-
-            AssetDatabase.Refresh();
-            Debug.Log($"表格导出完成：{csvPath} / {xlsxPath}", this);
+            catch (Exception e)
+            {
+                Debug.LogError("Table export failed: " + e.Message + "\n" + e, this);
+                return false;
+            }
         }
 
         [TitleGroup("")]
         [HorizontalGroup("")]
-        [Button("自动读取写回")]
+        [Button("Auto Import")]
         public void ImportTableFileAuto()
+        {
+            TryImportTableFileAuto();
+        }
+
+        private bool TryImportTableFileAuto()
         {
             string path = ResolveExistingInputPath();
             if (string.IsNullOrEmpty(path))
             {
-                Debug.LogWarning("没有找到可导入的 CSV 或 XLSX 文件。", this);
-                return;
+                Debug.LogWarning("No CSV/XLSX file found for import.", this);
+                return false;
             }
 
-            List<List<string>> table = ReadTableFileAuto(path);
-            if (table.Count < 5)
-            {
-                Debug.LogWarning("表格行数不足，无法按当前 表格表头结构导入。", this);
-                return;
-            }
-
-            int changedCount = ApplyTableRowsToExistingObjects(table);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            Debug.Log($"表格导入完成：{path}，已更新 SO 数量：{changedCount}", this);
+            return TryImportTableFile(path);
         }
 
         [TitleGroup("")]
         [HorizontalGroup("")]
-        [Button("选择表格写回")]
+        [Button("Import Selected Table")]
         public void ImportTableFileByPanel()
         {
-            string path = EditorUtility.OpenFilePanel("选择 CSV 或 XLSX 表格", GetOutputFolder(GetActiveCsvRelativePath()), "csv,xlsx");
+            string path = EditorUtility.OpenFilePanel("Select CSV or XLSX table", GetOutputFolder(GetActiveCsvRelativePath()), "csv,xlsx");
             if (string.IsNullOrEmpty(path))
                 return;
 
-            List<List<string>> table = ReadTableFileAuto(path);
-            int changedCount = ApplyTableRowsToExistingObjects(table);
-            AssetDatabase.SaveAssets();
+            TryImportTableFile(path);
+        }
+
+        private bool TryImportTableFile(string path)
+        {
+            try
+            {
+                List<List<string>> table = ReadTableFileAuto(path);
+                if (table.Count < 5)
+                {
+                    Debug.LogWarning("SO Table import stopped: table needs 4 header rows and at least 1 data row.", this);
+                    return false;
+                }
+
+                if (!ConfirmImportRiskBeforeWrite(table, path))
+                    return false;
+
+                int changedCount;
+                activeImportTablePath = path;
+                try
+                {
+                    changedCount = ApplyTableRowsToExistingObjects(table);
+                }
+                finally
+                {
+                    activeImportTablePath = null;
+                }
+
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                Debug.Log($"Table import complete: {path}, updated SO count: {changedCount}", this);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("Table import failed: " + e.Message + "\n" + e, this);
+                return false;
+            }
+        }
+
+        [TitleGroup("")]
+        [HorizontalGroup("")]
+        [Button("Generate Empty Example")]
+        public void GenerateEmptyTableExample()
+        {
+            List<List<string>> table = BuildEmptyExampleTableRows();
+            if (table.Count == 0)
+            {
+                Debug.LogWarning("没有可生成案例表的字段映射。请先生成字段映射。", this);
+                return;
+            }
+
+            string file = FirstConfiguredName();
+            if (string.IsNullOrWhiteSpace(file))
+                file = "SoTableExample";
+            file = file + "_Example";
+
+            string root = Path.Combine(Application.dataPath, "..", "SoTableConfig", "Examples");
+            string csvPath = Path.GetFullPath(Path.Combine(root, "csv", file + ".csv"));
+            string xlsxPath = Path.GetFullPath(Path.Combine(root, "xlsx", file + ".xlsx"));
+            WriteCsv(csvPath, table);
+            WriteXlsx(xlsxPath, table, string.IsNullOrEmpty(GetActiveSheetName()) ? "Sheet1" : GetActiveSheetName());
             AssetDatabase.Refresh();
-            Debug.Log($"表格导入完成：{path}，已更新 SO 数量：{changedCount}", this);
+            Debug.Log("空表案例已生成：" + csvPath + " / " + xlsxPath, this);
+        }
+
+        private List<List<string>> BuildEmptyExampleTableRows()
+        {
+            List<ESTableColumnNameMap> enabledColumns = GetEnabledColumns();
+            var table = new List<List<string>>();
+            if (enabledColumns.Count == 0)
+                return table;
+
+            table.Add(BuildHeaderRow(header.varMark, enabledColumns, GetActiveTableColumnName));
+            table.Add(BuildHeaderRow(header.typeMark, enabledColumns, c => string.IsNullOrEmpty(c.tableType) ? "string" : c.tableType));
+            table.Add(BuildHeaderRow(header.groupMark, enabledColumns, c => string.IsNullOrEmpty(header.defaultGroup) ? "client" : header.defaultGroup));
+            table.Add(BuildHeaderRow(header.commentMark, enabledColumns, c => string.IsNullOrEmpty(c.comment) ? c.displayName : c.comment));
+
+            var assertRow = new List<string> { "##assert" };
+            for (int i = 0; i < enabledColumns.Count; i++)
+            {
+                ESTableColumnNameMap column = enabledColumns[i];
+                if (column.isInfoKey || IsObjectKeyColumn(column) || IsSerialChildRowKeyColumn(column))
+                    assertRow.Add("required;unique");
+                else if (string.Equals(column.tableType, "json", StringComparison.OrdinalIgnoreCase) || column.valueWriteMode == ESTableValueWriteMode.Json)
+                    assertRow.Add("json");
+                else
+                    assertRow.Add(string.Empty);
+            }
+            table.Add(assertRow);
+
+            var directiveRow = new List<string> { "##rowDirective | 空=正常导入；skip/ignore/disabled=跳过；comment:=备注；required=整行和Key必填；patch=只写非空；replace=强制覆盖；owner=只写SO本体；delete=删除；debug=打印本行追踪；debug:patch/debug:delete=按真实指令执行并打印" };
+            for (int i = 0; i < enabledColumns.Count; i++)
+                directiveRow.Add(string.Empty);
+            table.Add(directiveRow);
+
+            var demoRow = new List<string> { string.Empty };
+            for (int i = 0; i < enabledColumns.Count; i++)
+                demoRow.Add(BuildExampleCellValue(enabledColumns[i]));
+            table.Add(demoRow);
+
+            return table;
+        }
+
+        private string BuildExampleCellValue(ESTableColumnNameMap column)
+        {
+            if (column == null)
+                return string.Empty;
+            if (column.isInfoKey || IsObjectKeyColumn(column))
+                return "example_001";
+            if (IsSerialChildRowKeyColumn(column))
+                return rowBinding != null && rowBinding.allowEmptyRowKey ? string.Empty : "row_001";
+
+            string type = column.tableType ?? string.Empty;
+            if (type.IndexOf("int", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "1";
+            if (type.IndexOf("float", StringComparison.OrdinalIgnoreCase) >= 0 || type.IndexOf("double", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "1.0";
+            if (type.IndexOf("bool", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "true";
+            if (column.valueWriteMode == ESTableValueWriteMode.Json || type.IndexOf("json", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "{}";
+            return "example";
         }
 
         public void AddUseBatch()
@@ -1262,11 +1535,24 @@ namespace ES
             if (useBatches == null)
                 return;
 
+            ESTableBatchExecuteChoice choice = ShowAllBatchesExecuteDialog();
+            if (choice == ESTableBatchExecuteChoice.Cancel)
+                return;
+            if (choice == ESTableBatchExecuteChoice.Plan)
+            {
+                LogAllBatchesExecutionPlan();
+                return;
+            }
+
+            ESTablePlanRiskSummary summary = BuildAllBatchesRiskSummary();
+            if (!ConfirmPlanRiskBeforeExecute(summary, null))
+                return;
+
             for (int i = 0; i < useBatches.Count; i++)
             {
                 ESSoTableRuleUseBatch batch = useBatches[i];
                 if (batch != null && batch.enabled)
-                    ExecuteUseBatch(batch);
+                    ExecuteUseBatchDirect(batch);
             }
         }
 
@@ -1275,19 +1561,51 @@ namespace ES
             if (batch == null)
                 return;
 
+            ESTableBatchExecuteChoice choice = ShowBatchExecuteDialog(batch);
+            if (choice == ESTableBatchExecuteChoice.Cancel)
+                return;
+            if (choice == ESTableBatchExecuteChoice.Plan)
+            {
+                LogBatchExecutionPlan(batch);
+                return;
+            }
+
+            ESTablePlanRiskSummary summary = BuildBatchRiskSummary(batch);
+            if (!ConfirmPlanRiskBeforeExecute(summary, batch))
+                return;
+
+            ExecuteUseBatchDirect(batch);
+        }
+
+        private void ExecuteUseBatchDirect(ESSoTableRuleUseBatch batch)
+        {
+            if (batch == null)
+                return;
+
             ESSoTableRuleUseBatch oldBatch = activeUseBatch;
             try
             {
                 activeUseBatch = batch;
-                if (batch.direction == ESSoTableRuleUseDirection.Export)
-                    ExportTableFiles();
-                else if (batch.direction == ESSoTableRuleUseDirection.Import)
-                    ImportTableFileAuto();
-                else
+                if (batch.useSuperBatch)
                 {
-                    ImportTableFileAuto();
-                    ExportTableFiles();
+                    ExecuteSuperBatch(batch);
+                    return;
                 }
+
+                if (batch.direction == ESSoTableRuleUseDirection.Export)
+                {
+                    TryExportTableFiles();
+                    return;
+                }
+
+                if (batch.direction == ESSoTableRuleUseDirection.Import)
+                {
+                    TryImportTableFileAuto();
+                    return;
+                }
+
+                if (TryImportTableFileAuto())
+                    TryExportTableFiles();
             }
             finally
             {
@@ -1332,35 +1650,183 @@ namespace ES
 
             int changedCount = 0;
             int ownerCursor = 0;
+            bool tableHasObjectKey = HasObjectKeyColumn(tableColumnMap);
+            bool serialChildRows = rowBinding != null && rowBinding.IsListElementRow;
+            bool pruneMissingChildren = serialChildRows && GetActiveSerialChildImportSyncMode() == ESTableSerialChildImportSyncMode.PruneMissingByTable;
+            bool rebuildTouchedChildren = serialChildRows && GetActiveSerialChildImportSyncMode() == ESTableSerialChildImportSyncMode.RebuildTouchedOwners;
+            Dictionary<ScriptableObject, HashSet<string>> importedChildKeysByOwner = pruneMissingChildren
+                ? new Dictionary<ScriptableObject, HashSet<string>>()
+                : null;
+            HashSet<ScriptableObject> rebuiltChildOwners = rebuildTouchedChildren
+                ? new HashSet<ScriptableObject>()
+                : null;
+            Dictionary<string, ISoDataGroup> groupsByKey = BuildGroupsByKey();
             ESTableBatchApplyFilter applyFilter = BuildApplyFilter(table, tableColumnMap);
-            for (int rowIndex = 4; rowIndex < table.Count; rowIndex++)
+            for (int rowIndex = GetDataStartRowIndex(table); rowIndex < table.Count; rowIndex++)
             {
                 List<string> row = table[rowIndex];
                 if (row == null || row.Count == 0)
                     continue;
+                ESTableRowDirectiveInfo directive = ParseRowDirective(row);
+                if (directive.directive == ESTableRowDirective.Skip || directive.directive == ESTableRowDirective.Comment)
+                    continue;
+                if (directive.directive == ESTableRowDirective.Required && IsDataRowEmpty(row))
+                {
+                    Debug.LogWarning("第 " + (rowIndex + 1) + " 行标记为 required，但整行为空，已跳过。", this);
+                    continue;
+                }
                 if (!ShouldApplyTableRow(row, applyFilter))
                     continue;
 
-                ScriptableObject owner = FindOwnerForTableRow(row, tableColumnMap, ownersByKey, owners, ref ownerCursor);
+                string groupKey = GetGroupKeyFromTableRow(row, tableColumnMap);
+                ISoDataGroup targetGroup = ResolveImportGroup(groupKey, groupsByKey, ownerType, ownerType, row, tableColumnMap);
+                ScriptableObject owner = FindOwnerForTableRow(row, tableColumnMap, ownersByKey, owners, ref ownerCursor, tableHasObjectKey);
+                if (targetGroup != null && ownerType != null && typeof(ISoDataInfo).IsAssignableFrom(ownerType))
+                {
+                    string infoKey = GetObjectKeyFromTableRow(row, tableColumnMap);
+                    if (directive.directive == ESTableRowDirective.Delete)
+                    {
+                        if (string.IsNullOrWhiteSpace(infoKey))
+                        {
+                            if (TryDeleteGroupAsset(targetGroup, out string deleteGroupReason))
+                            {
+                                RefreshPackAfterGroupDeletion(targetGroup);
+                                changedCount++;
+                            }
+                            else
+                            {
+                                Debug.LogWarning("Row " + (rowIndex + 1) + " delete Group failed: " + deleteGroupReason, targetGroup as ScriptableObject);
+                            }
+
+                            continue;
+                        }
+
+                        if (TryDeleteInfoFromGroup(targetGroup, infoKey, out string deleteReason))
+                        {
+                            EditorUtility.SetDirty(targetGroup as ScriptableObject);
+                            changedCount++;
+                        }
+                        else
+                        {
+                            Debug.LogWarning("第 " + (rowIndex + 1) + " 行删除 Group/Info 失败：" + deleteReason, targetGroup as ScriptableObject);
+                        }
+                        continue;
+                    }
+
+                    owner = ResolveInfoOwnerInGroup(targetGroup, infoKey, out bool createdInfo, out string resolveReason);
+                    if (owner == null)
+                    {
+                        if (!string.IsNullOrEmpty(resolveReason))
+                            Debug.LogWarning("第 " + (rowIndex + 1) + " 行 Group/Info 解析失败：" + resolveReason, targetGroup as ScriptableObject);
+                        continue;
+                    }
+
+                    if (createdInfo)
+                    {
+                        changedCount++;
+                        RefreshPackAfterGroupMutation(targetGroup);
+                    }
+                }
+
+                if (owner == null)
+                    owner = TryCreateOwnerForTableRow(row, tableColumnMap, ownerType, owners, ownersByKey);
                 if (owner == null)
                     continue;
 
                 object rowObject = owner;
-                if (rowBinding != null && rowBinding.IsListElementRow)
+                StringBuilder rowDebug = BuildRowDebugHeader(directive, rowIndex, owner);
+                if (serialChildRows)
                 {
                     string rowKey = rowKeyColumnIndex >= 0 && rowKeyColumnIndex < row.Count ? row[rowKeyColumnIndex] : string.Empty;
-                    if (!RowBridge.TryGetOrCreateRow(owner, rowKey, rowBinding, out rowObject, out string reason))
+                    AppendRowDebugTarget(rowDebug, owner, rowKey);
+                    bool emptyRowKeyAllowedByRebuild = string.IsNullOrWhiteSpace(rowKey) && CanImportEmptyChildKeyForRebuild(owner);
+                    if (directive.directive == ESTableRowDirective.Required && string.IsNullOrWhiteSpace(rowKey) && !emptyRowKeyAllowedByRebuild)
+                    {
+                        Debug.LogWarning("第 " + (rowIndex + 1) + " 行标记为 required，但子级 Key 为空，已跳过。", owner);
+                        continue;
+                    }
+
+                    if (directive.directive == ESTableRowDirective.Delete)
+                    {
+                        if (rowDebug != null)
+                            rowDebug.AppendLine("操作：删除子级");
+                        if (TryDeleteChildRow(owner, rowKey, out string deleteReason))
+                        {
+                            EditorUtility.SetDirty(owner);
+                            if (rowDebug != null)
+                                rowDebug.AppendLine("结果：删除子级成功");
+                            changedCount++;
+                        }
+                        else
+                        {
+                            if (rowDebug != null)
+                                rowDebug.AppendLine("结果：删除子级失败，" + deleteReason);
+                            Debug.LogWarning("第 " + (rowIndex + 1) + " 行删除子级失败：" + deleteReason, owner);
+                        }
+                        if (rowDebug != null)
+                            Debug.Log(rowDebug.ToString(), owner);
+                        continue;
+                    }
+
+                    if (rebuildTouchedChildren && directive.directive != ESTableRowDirective.Owner && !EnsureChildRowsClearedForRebuild(owner, rebuiltChildOwners, out string rebuildReason))
+                    {
+                        Debug.LogWarning("第 " + (rowIndex + 1) + " 行子级重建失败：" + rebuildReason, owner);
+                        continue;
+                    }
+
+                    if (directive.directive != ESTableRowDirective.Owner && emptyRowKeyAllowedByRebuild)
+                    {
+                        if (!TryCreateAppendedChildRow(owner, out rowObject, out string appendReason))
+                        {
+                            Debug.LogWarning("第 " + (rowIndex + 1) + " 行无 Key 子级追加失败：" + appendReason, owner);
+                            continue;
+                        }
+                    }
+                    else if (directive.directive != ESTableRowDirective.Owner && !RowBridge.TryGetOrCreateRow(owner, rowKey, rowBinding, out rowObject, out string reason))
                     {
                         Debug.LogWarning(reason, owner);
                         continue;
                     }
+
+                    if (pruneMissingChildren && directive.directive != ESTableRowDirective.Owner && !string.IsNullOrWhiteSpace(rowKey))
+                        AddImportedChildKey(importedChildKeysByOwner, owner, rowKey);
+                }
+                else if (directive.directive == ESTableRowDirective.Delete)
+                {
+                    if (rowDebug != null)
+                        rowDebug.AppendLine("操作：删除 SO 资产");
+                    if (TryDeleteOwnerAsset(owner, out string deleteReason))
+                    {
+                        if (rowDebug != null)
+                            rowDebug.AppendLine("结果：删除 SO 成功");
+                        changedCount++;
+                    }
+                    else
+                    {
+                        if (rowDebug != null)
+                            rowDebug.AppendLine("结果：删除 SO 失败，" + deleteReason);
+                        Debug.LogWarning("第 " + (rowIndex + 1) + " 行删除 SO 失败：" + deleteReason, owner);
+                    }
+                    if (rowDebug != null)
+                        Debug.Log(rowDebug.ToString(), owner);
+                    continue;
                 }
 
-                Undo.RecordObject(owner, "闁荤偞绋忛崝宥夋偋閹间礁绀冩繛鍡楃箲缁€鈧?SO");
-                ApplyTableRowToObject(row, compiledColumns, owner, rowObject);
+                Undo.RecordObject(owner, "SO 表格导入写回");
+                bool forceTableValues = directive.directive == ESTableRowDirective.Replace;
+                bool skipEmptyCells = directive.directive == ESTableRowDirective.Patch;
+                bool ownerColumnsOnly = directive.directive == ESTableRowDirective.Owner;
+                if (rowDebug != null && !serialChildRows)
+                    rowDebug.AppendLine("目标对象：SO 本体");
+                ApplyTableRowToObject(row, compiledColumns, owner, rowObject, forceTableValues, skipEmptyCells, ownerColumnsOnly, rowDebug);
                 EditorUtility.SetDirty(owner);
                 changedCount++;
+                if (rowDebug != null)
+                    Debug.Log(rowDebug.ToString(), owner);
             }
+
+            if (pruneMissingChildren)
+                changedCount += PruneMissingChildRows(importedChildKeysByOwner);
 
             return changedCount;
         }
@@ -1508,20 +1974,20 @@ namespace ES
             for (int i = 0; i < enabledColumns.Count; i++)
             {
                 ESTableColumnNameMap column = enabledColumns[i];
-                if (column.isInfoKey || (rowBinding != null && column.columnName == rowBinding.rowKeyColumnName))
+                if (IsObjectKeyColumn(column))
                     return column;
             }
 
             return null;
         }
 
-        private ScriptableObject FindOwnerForTableRow(List<string> row, Dictionary<int, ESTableColumnNameMap> tableColumnMap, Dictionary<string, ScriptableObject> ownersByKey, List<ScriptableObject> owners, ref int ownerCursor)
+        private ScriptableObject FindOwnerForTableRow(List<string> row, Dictionary<int, ESTableColumnNameMap> tableColumnMap, Dictionary<string, ScriptableObject> ownersByKey, List<ScriptableObject> owners, ref int ownerCursor, bool tableHasObjectKey)
         {
             string key = null;
             foreach (KeyValuePair<int, ESTableColumnNameMap> pair in tableColumnMap)
             {
                 ESTableColumnNameMap column = pair.Value;
-                if (!column.isInfoKey && (rowBinding == null || column.columnName != rowBinding.rowKeyColumnName))
+                if (!IsObjectKeyColumn(column))
                     continue;
 
                 key = pair.Key < row.Count ? row[pair.Key] : string.Empty;
@@ -1532,10 +1998,497 @@ namespace ES
             if (!string.IsNullOrEmpty(key) && ownersByKey.TryGetValue(key, out ScriptableObject keyedOwner))
                 return keyedOwner;
 
+            if (tableHasObjectKey)
+                return null;
+
             if (ownerCursor < owners.Count)
                 return owners[ownerCursor++];
 
             return null;
+        }
+
+        private bool HasObjectKeyColumn(Dictionary<int, ESTableColumnNameMap> tableColumnMap)
+        {
+            foreach (KeyValuePair<int, ESTableColumnNameMap> pair in tableColumnMap)
+            {
+                if (IsObjectKeyColumn(pair.Value))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private ScriptableObject TryCreateOwnerForTableRow(List<string> row, Dictionary<int, ESTableColumnNameMap> tableColumnMap, Type ownerType, List<ScriptableObject> owners, Dictionary<string, ScriptableObject> ownersByKey)
+        {
+            if (!CanCreateOwnerInActiveFolder(ownerType, out string folderPath))
+                return null;
+
+            string key = GetObjectKeyFromTableRow(row, tableColumnMap);
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                Debug.LogWarning("SO Table import skipped row: object key is empty, cannot create owner asset.", this);
+                return null;
+            }
+
+            string assetName = SanitizeAssetFileName(key);
+            string assetPath = AssetDatabase.GenerateUniqueAssetPath(Path.Combine(folderPath, assetName + ".asset"));
+            var owner = ScriptableObject.CreateInstance(ownerType);
+            owner.name = assetName;
+            if (owner is ISoDataInfo info)
+                info.SetKey(key);
+            if (owner is IString stringKey)
+                stringKey.SetSTR(key);
+
+            AssetDatabase.CreateAsset(owner, assetPath);
+            owners.Add(owner);
+            ownersByKey[key] = owner;
+
+            Debug.Log("SO Table import created owner asset: " + assetPath, owner);
+            return owner;
+        }
+
+        private Dictionary<string, ISoDataGroup> BuildGroupsByKey()
+        {
+            var result = new Dictionary<string, ISoDataGroup>(StringComparer.OrdinalIgnoreCase);
+            ESSoTableRuleSourceBinding source = GetActiveUseSourceBinding();
+            if (source == null)
+                return result;
+
+            AddGroupCandidates(result, source.soAsset);
+
+            if (source.folderAssets != null)
+            {
+                for (int i = 0; i < source.folderAssets.Count; i++)
+                    AddGroupCandidates(result, source.folderAssets[i]);
+            }
+
+            return result;
+        }
+
+        private static void AddGroupCandidates(Dictionary<string, ISoDataGroup> result, ScriptableObject asset)
+        {
+            if (result == null || asset == null)
+                return;
+
+            if (asset is ISoDataGroup group)
+            {
+                string key = GetGroupAssetKey(group);
+                if (!string.IsNullOrWhiteSpace(key) && !result.ContainsKey(key))
+                    result[key] = group;
+            }
+
+            if (asset is ISoDataPack pack)
+            {
+                if (pack.CachingGroups != null)
+                {
+                    for (int i = 0; i < pack.CachingGroups.Count; i++)
+                    {
+                        ISoDataGroup cachedGroup = pack.CachingGroups[i];
+                        if (cachedGroup == null)
+                            continue;
+
+                        string key = GetGroupAssetKey(cachedGroup);
+                        if (!string.IsNullOrWhiteSpace(key) && !result.ContainsKey(key))
+                            result[key] = cachedGroup;
+                    }
+                }
+            }
+        }
+
+        private string GetGroupKeyFromTableRow(List<string> row, Dictionary<int, ESTableColumnNameMap> tableColumnMap)
+        {
+            if (tableColumnMap != null)
+            {
+                foreach (KeyValuePair<int, ESTableColumnNameMap> pair in tableColumnMap)
+                {
+                    ESTableColumnNameMap column = pair.Value;
+                    if (column == null)
+                        continue;
+
+                    if (!column.isGroupKey && !string.Equals(GetActiveTableColumnName(column), groupColumnName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    return pair.Key < row.Count ? row[pair.Key] : string.Empty;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private ISoDataGroup ResolveImportGroup(string groupKey, Dictionary<string, ISoDataGroup> groupsByKey, Type ownerType, Type groupOwnerType, List<string> row, Dictionary<int, ESTableColumnNameMap> tableColumnMap)
+        {
+            if (groupOwnerType == null || !typeof(ISoDataInfo).IsAssignableFrom(ownerType))
+                return null;
+
+            string effectiveKey = string.IsNullOrWhiteSpace(groupKey) ? GetActiveBatchTargetGroupKey() : groupKey;
+            if (!string.IsNullOrWhiteSpace(effectiveKey) && groupsByKey != null && groupsByKey.TryGetValue(effectiveKey, out ISoDataGroup existingGroup))
+                return existingGroup;
+
+            if (groupsByKey != null && groupsByKey.Count == 1 && string.IsNullOrWhiteSpace(effectiveKey))
+            {
+                foreach (ISoDataGroup single in groupsByKey.Values)
+                    return single;
+            }
+
+            if (!allowCreateGroupOnImport)
+                return null;
+
+            if (string.IsNullOrWhiteSpace(effectiveKey))
+                return null;
+
+            if (typeBinding == null || typeBinding.GroupType == null)
+                return null;
+
+            if (!CanCreateGroupInActiveFolder(out string folderPath))
+                return null;
+
+            ScriptableObject group = ScriptableObject.CreateInstance(typeBinding.GroupType);
+            if (group == null)
+                return null;
+
+            string assetName = SanitizeAssetFileName(effectiveKey);
+            group.name = assetName;
+            string assetPath = AssetDatabase.GenerateUniqueAssetPath(Path.Combine(folderPath, assetName + ".asset"));
+            AssetDatabase.CreateAsset(group, assetPath);
+            EditorUtility.SetDirty(group);
+
+            ISoDataGroup createdGroup = group as ISoDataGroup;
+            if (createdGroup != null)
+            {
+                if (groupsByKey != null)
+                    groupsByKey[effectiveKey] = createdGroup;
+
+                Debug.Log("SO Table import created group asset: " + assetPath, group);
+                return createdGroup;
+            }
+
+            AssetDatabase.DeleteAsset(assetPath);
+            return null;
+        }
+
+        private ScriptableObject ResolveInfoOwnerInGroup(ISoDataGroup targetGroup, string infoKey, out bool createdInfo, out string reason)
+        {
+            createdInfo = false;
+            reason = string.Empty;
+
+            if (targetGroup == null)
+            {
+                reason = "Group 目标为空。";
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(infoKey))
+            {
+                reason = "Info Key 为空，无法在 Group 中定位或创建。";
+                return null;
+            }
+
+            ISoDataInfo existing = targetGroup.GetInfoByKey(infoKey);
+            if (existing is ScriptableObject existingObject)
+                return existingObject;
+
+            if (!allowCreateInfoOnImport)
+            {
+                reason = "当前规则不允许在导入时创建 Info。";
+                return null;
+            }
+
+            Type infoType = targetGroup.GetSOInfoType();
+            if (infoType == null || !typeof(ScriptableObject).IsAssignableFrom(infoType))
+            {
+                reason = "Group 未提供可创建的 Info 类型。";
+                return null;
+            }
+
+            if (!CanWriteSubAssetToGroup(targetGroup, out string groupAssetPath))
+            {
+                reason = "无法写入 Group 子资产。";
+                return null;
+            }
+
+            ScriptableObject infoAsset = ScriptableObject.CreateInstance(infoType);
+            if (infoAsset == null)
+            {
+                reason = "创建 Info 实例失败。";
+                return null;
+            }
+
+            infoAsset.name = SanitizeAssetFileName(infoKey);
+            if (infoAsset is ISoDataInfo info)
+                info.SetKey(infoKey);
+            if (infoAsset is IString stringKey)
+                stringKey.SetSTR(infoKey);
+
+            Undo.RecordObject(targetGroup as ScriptableObject, "SO Table Create Group Info");
+            AssetDatabase.AddObjectToAsset(infoAsset, groupAssetPath);
+            targetGroup._TryAddInfoToDic(infoKey, infoAsset);
+            EditorUtility.SetDirty(targetGroup as ScriptableObject);
+            AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
+            createdInfo = true;
+            return infoAsset;
+        }
+
+        private bool TryDeleteInfoFromGroup(ISoDataGroup targetGroup, string infoKey, out string reason)
+        {
+            reason = string.Empty;
+            if (targetGroup == null)
+            {
+                reason = "Group 为空。";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(infoKey))
+            {
+                reason = "Info Key 为空，无法删除。";
+                return false;
+            }
+
+            ISoDataInfo info = targetGroup.GetInfoByKey(infoKey);
+            ScriptableObject infoAsset = info as ScriptableObject;
+            if (infoAsset == null)
+            {
+                reason = "未找到可删除的 Info 资产。";
+                return false;
+            }
+
+            string groupAssetPath = AssetDatabase.GetAssetPath(targetGroup as ScriptableObject);
+            if (!string.IsNullOrEmpty(groupAssetPath))
+                Undo.RecordObject(targetGroup as ScriptableObject, "SO Table Delete Group Info");
+
+            targetGroup._RemoveInfoFromDic(infoKey);
+            Undo.DestroyObjectImmediate(infoAsset);
+            if (!string.IsNullOrEmpty(groupAssetPath))
+                AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
+
+            return true;
+        }
+
+        private bool TryDeleteGroupAsset(ISoDataGroup targetGroup, out string reason)
+        {
+            reason = string.Empty;
+            if (targetGroup == null)
+            {
+                reason = "Group 为空。";
+                return false;
+            }
+
+            ScriptableObject groupAsset = targetGroup as ScriptableObject;
+            if (groupAsset == null)
+            {
+                reason = "Group 不是可删除的 ScriptableObject。";
+                return false;
+            }
+
+            string groupAssetPath = AssetDatabase.GetAssetPath(groupAsset);
+            if (string.IsNullOrWhiteSpace(groupAssetPath))
+            {
+                reason = "Group 没有有效资源路径。";
+                return false;
+            }
+
+            return AssetDatabase.DeleteAsset(groupAssetPath);
+        }
+
+        private void RefreshPackAfterGroupMutation(ISoDataGroup targetGroup)
+        {
+            if (targetGroup == null)
+                return;
+
+            ESSoTableRuleSourceBinding source = GetActiveUseSourceBinding();
+            if (source == null)
+                return;
+
+            HashSet<ISoDataPack> packs = new HashSet<ISoDataPack>();
+            CollectPacksForRefresh(source.soAsset, packs);
+            if (source.folderAssets != null)
+            {
+                for (int i = 0; i < source.folderAssets.Count; i++)
+                    CollectPacksForRefresh(source.folderAssets[i], packs);
+            }
+
+            foreach (ISoDataPack pack in packs)
+            {
+                if (pack == null)
+                    continue;
+
+                if (pack is ScriptableObject packAsset)
+                    Undo.RecordObject(packAsset, "SO Table Refresh Pack");
+
+                pack._AddInfosFromGroup(targetGroup);
+                if (pack is ScriptableObject dirtyPack)
+                    EditorUtility.SetDirty(dirtyPack);
+            }
+        }
+
+        private void RefreshPackAfterGroupDeletion(ISoDataGroup deletedGroup)
+        {
+            if (deletedGroup == null)
+                return;
+
+            ESSoTableRuleSourceBinding source = GetActiveUseSourceBinding();
+            if (source == null)
+                return;
+
+            HashSet<ISoDataPack> packs = new HashSet<ISoDataPack>();
+            CollectPacksForRefresh(source.soAsset, packs);
+            if (source.folderAssets != null)
+            {
+                for (int i = 0; i < source.folderAssets.Count; i++)
+                    CollectPacksForRefresh(source.folderAssets[i], packs);
+            }
+
+            foreach (ISoDataPack pack in packs)
+            {
+                if (pack == null)
+                    continue;
+
+                List<ISoDataGroup> cachedGroups = pack.CachingGroups;
+                if (cachedGroups != null)
+                    cachedGroups.RemoveAll(g => g == null || ReferenceEquals(g, deletedGroup));
+
+                pack.Check();
+                if (pack is ScriptableObject dirtyPack)
+                    EditorUtility.SetDirty(dirtyPack);
+            }
+        }
+
+        private static void CollectPacksForRefresh(UnityEngine.Object asset, HashSet<ISoDataPack> result)
+        {
+            if (asset == null || result == null)
+                return;
+
+            if (asset is ISoDataPack pack)
+                result.Add(pack);
+        }
+
+        private bool CanCreateGroupInActiveFolder(out string folderPath)
+        {
+            folderPath = null;
+            ESSoTableRuleSourceBinding source = GetActiveUseSourceBinding();
+            if (source == null)
+                return false;
+
+            if (source.soFolder != null)
+                folderPath = AssetDatabase.GetAssetPath(source.soFolder);
+            else if (source.soAsset != null)
+                folderPath = Path.GetDirectoryName(AssetDatabase.GetAssetPath(source.soAsset));
+
+            return !string.IsNullOrWhiteSpace(folderPath) && AssetDatabase.IsValidFolder(folderPath);
+        }
+
+        private string GetActiveBatchTargetGroupKey()
+        {
+            ESSoTableRuleUseBatch batch = GetActiveUseBatch();
+            return batch != null ? batch.targetGroupKey : string.Empty;
+        }
+
+        private static string GetGroupAssetKey(ISoDataGroup group)
+        {
+            if (group == null)
+                return string.Empty;
+
+            if (group is ScriptableObject so)
+                return so.name;
+
+            return group.FileName;
+        }
+
+        private static bool CanWriteSubAssetToGroup(ISoDataGroup group, out string groupAssetPath)
+        {
+            groupAssetPath = null;
+            if (group == null)
+                return false;
+
+            groupAssetPath = AssetDatabase.GetAssetPath(group as ScriptableObject);
+            return !string.IsNullOrWhiteSpace(groupAssetPath);
+        }
+
+        private bool CanCreateOwnerInActiveFolder(Type ownerType, out string folderPath)
+        {
+            folderPath = null;
+            if (ownerType == null || ownerType.IsAbstract || !typeof(ScriptableObject).IsAssignableFrom(ownerType))
+                return false;
+
+            ESSoTableRuleSourceBinding source = GetActiveUseSourceBinding();
+            if (source == null || source.soFolder == null || !source.createMissingAssetsInFolder)
+                return false;
+
+            folderPath = AssetDatabase.GetAssetPath(source.soFolder);
+            return AssetDatabase.IsValidFolder(folderPath);
+        }
+
+        private string GetObjectKeyFromTableRow(List<string> row, Dictionary<int, ESTableColumnNameMap> tableColumnMap)
+        {
+            foreach (KeyValuePair<int, ESTableColumnNameMap> pair in tableColumnMap)
+            {
+                if (!IsObjectKeyColumn(pair.Value))
+                    continue;
+
+                return pair.Key < row.Count ? row[pair.Key] : string.Empty;
+            }
+
+            return null;
+        }
+
+        private bool IsObjectKeyColumn(ESTableColumnNameMap column)
+        {
+            if (column == null || IsSerialChildRowKeyColumn(column))
+                return false;
+            if (column.isInfoKey)
+                return true;
+
+            return IsLikelyObjectKeyName(column.columnName) || IsLikelyObjectKeyName(column.soFieldPath);
+        }
+
+        private bool IsSerialChildRowKeyColumn(ESTableColumnNameMap column)
+        {
+            if (column == null || rowBinding == null || !rowBinding.IsListElementRow)
+                return false;
+
+            string rowKeyPath = BuildListElementPath(rowBinding.elementKeyFieldPath);
+            if (!string.IsNullOrWhiteSpace(column.soFieldPath) && string.Equals(column.soFieldPath, rowKeyPath, StringComparison.Ordinal))
+                return true;
+
+            return !string.IsNullOrWhiteSpace(column.columnName)
+                && string.Equals(column.columnName, rowBinding.rowKeyColumnName, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(column.soFieldPath)
+                && column.soFieldPath.StartsWith(rowBinding.listFieldPath + "[].", StringComparison.Ordinal);
+        }
+
+        private static bool IsLikelyObjectKeyName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            string normalized = value.Replace("_", string.Empty).Replace("-", string.Empty).Replace(".", string.Empty).Trim();
+            return normalized.Equals("id", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("key", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("itemid", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("keyname", StringComparison.OrdinalIgnoreCase)
+                || normalized.Equals("rulekey", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string SanitizeAssetFileName(string value)
+        {
+            string name = string.IsNullOrWhiteSpace(value) ? "ImportedSO" : value.Trim();
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            for (int i = 0; i < invalidChars.Length; i++)
+                name = name.Replace(invalidChars[i], '_');
+
+            return string.IsNullOrWhiteSpace(name) ? "ImportedSO" : name;
+        }
+
+        private static string GetProjectRelativePath(string fullPath)
+        {
+            if (string.IsNullOrWhiteSpace(fullPath))
+                return string.Empty;
+
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string normalizedFullPath = Path.GetFullPath(fullPath);
+            if (normalizedFullPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+                return normalizedFullPath.Substring(projectRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            return normalizedFullPath;
         }
 
         private ESTableBatchApplyFilter BuildApplyFilter(List<List<string>> table, Dictionary<int, ESTableColumnNameMap> tableColumnMap)
@@ -1612,6 +2565,413 @@ namespace ES
             return filter.sliceStarted;
         }
 
+        private bool ConfirmImportRiskBeforeWrite(List<List<string>> table, string path)
+        {
+            ESTablePlanRiskSummary assertionSummary = BuildImportAssertionSummary(table);
+            if (assertionSummary.HasErrors)
+            {
+                var errorBuilder = new StringBuilder();
+                errorBuilder.AppendLine("表格断言预检失败，已阻止写入 SO。");
+                errorBuilder.AppendLine("表格：" + path);
+                for (int i = 0; i < assertionSummary.errorLines.Count; i++)
+                    errorBuilder.AppendLine(assertionSummary.errorLines[i]);
+                Debug.LogWarning(errorBuilder.ToString(), this);
+                EditorUtility.DisplayDialog("SO 表格断言失败", "表格断言预检失败，已阻止写入 SO。请查看 Console 里的行列错误。", "知道了");
+                return false;
+            }
+
+            int deleteRows = CountDirectiveRows(table, ESTableRowDirective.Delete);
+            bool pruneMissingChildren = rowBinding != null
+                && rowBinding.IsListElementRow
+                && GetActiveSerialChildImportSyncMode() == ESTableSerialChildImportSyncMode.PruneMissingByTable;
+            bool rebuildTouchedChildren = rowBinding != null
+                && rowBinding.IsListElementRow
+                && GetActiveSerialChildImportSyncMode() == ESTableSerialChildImportSyncMode.RebuildTouchedOwners;
+
+            if (deleteRows <= 0 && !pruneMissingChildren && !rebuildTouchedChildren)
+                return true;
+
+            var builder = new StringBuilder();
+            builder.AppendLine("SO 表格导入将执行高风险操作。");
+            builder.AppendLine();
+            builder.AppendLine("表格：" + path);
+            if (deleteRows > 0)
+                builder.AppendLine("delete 指令行数：" + deleteRows);
+            if (pruneMissingChildren)
+                builder.AppendLine("子级裁剪：已启用。触达宿主下表格缺失的旧子级可能被删除。");
+            if (rebuildTouchedChildren)
+                builder.AppendLine("子级重建：已启用。触达宿主下的子级会先清空，再按表格重建。");
+            builder.AppendLine();
+            builder.AppendLine("点击取消将停止写入，不会修改 SO。");
+
+            return EditorUtility.DisplayDialog("SO 表格高风险导入", builder.ToString(), "继续", "取消");
+        }
+
+        private ESTablePlanRiskSummary BuildImportAssertionSummary(List<List<string>> table)
+        {
+            var summary = new ESTablePlanRiskSummary();
+            if (table == null || FindAssertRowIndex(table) < 0)
+                return summary;
+
+            List<ESTableColumnNameMap> enabledColumns = GetEnabledColumns();
+            Dictionary<string, ESTableColumnNameMap> columnMap = BuildColumnMap(enabledColumns);
+            Dictionary<int, ESTableColumnNameMap> tableColumnMap = BuildTableColumnMap(table, columnMap);
+            Type ownerType = typeBinding.RowOwnerType;
+            Type listElementType = GetConfiguredListElementType(ownerType);
+            List<ESTableCompiledColumn> compiledColumns = CompileColumns(enabledColumns, ownerType, listElementType, tableColumnMap);
+            ESTableBatchApplyFilter applyFilter = BuildApplyFilter(table, tableColumnMap);
+            ValidateColumnAssertions(table, compiledColumns, applyFilter, summary);
+            return summary;
+        }
+
+        private static int CountDirectiveRows(List<List<string>> table, ESTableRowDirective directive)
+        {
+            if (table == null)
+                return 0;
+
+            int count = 0;
+            for (int rowIndex = GetDataStartRowIndex(table); rowIndex < table.Count; rowIndex++)
+            {
+                if (ParseRowDirective(table[rowIndex]).directive == directive)
+                    count++;
+            }
+
+            return count;
+        }
+
+        private static ESTableRowDirectiveInfo ParseRowDirective(List<string> row)
+        {
+            string raw = GetCell(row, 0).Trim();
+            var result = new ESTableRowDirectiveInfo
+            {
+                rawText = raw,
+                directive = ESTableRowDirective.Normal
+            };
+
+            if (string.IsNullOrWhiteSpace(raw))
+                return result;
+
+            string normalized = raw.Trim().ToLowerInvariant();
+            if (normalized == "debug")
+            {
+                result.debug = true;
+                result.effectiveText = string.Empty;
+                return result;
+            }
+
+            if (normalized.StartsWith("debug:", StringComparison.Ordinal))
+            {
+                result.debug = true;
+                normalized = normalized.Substring("debug:".Length).Trim();
+                result.effectiveText = normalized;
+            }
+
+            int chineseStart = normalized.IndexOf('(');
+            if (chineseStart >= 0)
+                normalized = normalized.Substring(0, chineseStart).Trim();
+
+            if (normalized.StartsWith("comment", StringComparison.Ordinal))
+                result.directive = ESTableRowDirective.Comment;
+            else if (normalized == "skip" || normalized == "ignore" || normalized == "disabled")
+                result.directive = ESTableRowDirective.Skip;
+            else if (normalized == "required")
+                result.directive = ESTableRowDirective.Required;
+            else if (normalized == "patch")
+                result.directive = ESTableRowDirective.Patch;
+            else if (normalized == "replace")
+                result.directive = ESTableRowDirective.Replace;
+            else if (normalized == "owner")
+                result.directive = ESTableRowDirective.Owner;
+            else if (normalized == "delete")
+                result.directive = ESTableRowDirective.Delete;
+
+            if (string.IsNullOrEmpty(result.effectiveText))
+                result.effectiveText = normalized;
+
+            return result;
+        }
+
+        private static bool IsDataRowEmpty(List<string> row)
+        {
+            if (row == null)
+                return true;
+
+            for (int i = 1; i < row.Count; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(row[i]))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static int GetDataStartRowIndex(List<List<string>> table)
+        {
+            int index = 4;
+            if (table == null)
+                return index;
+
+            while (index < table.Count)
+            {
+                string marker = GetCell(table[index], 0).Trim();
+                if (!marker.StartsWith("##", StringComparison.Ordinal))
+                    break;
+                index++;
+            }
+
+            return index;
+        }
+
+        private static void AddImportedChildKey(Dictionary<ScriptableObject, HashSet<string>> importedChildKeysByOwner, ScriptableObject owner, string rowKey)
+        {
+            if (importedChildKeysByOwner == null || owner == null || string.IsNullOrWhiteSpace(rowKey))
+                return;
+
+            if (!importedChildKeysByOwner.TryGetValue(owner, out HashSet<string> keys))
+            {
+                keys = new HashSet<string>(StringComparer.Ordinal);
+                importedChildKeysByOwner[owner] = keys;
+            }
+
+            keys.Add(rowKey);
+        }
+
+        private int PruneMissingChildRows(Dictionary<ScriptableObject, HashSet<string>> importedChildKeysByOwner)
+        {
+            if (importedChildKeysByOwner == null || importedChildKeysByOwner.Count == 0)
+                return 0;
+
+            int changedCount = 0;
+            foreach (KeyValuePair<ScriptableObject, HashSet<string>> pair in importedChildKeysByOwner)
+            {
+                ScriptableObject owner = pair.Key;
+                HashSet<string> keepKeys = pair.Value;
+                if (owner == null || keepKeys == null)
+                    continue;
+
+                int removed = PruneMissingChildRows(owner, keepKeys);
+                if (removed > 0)
+                {
+                    EditorUtility.SetDirty(owner);
+                    changedCount += removed;
+                }
+            }
+
+            return changedCount;
+        }
+
+        private int PruneMissingChildRows(ScriptableObject owner, HashSet<string> keepKeys)
+        {
+            if (owner == null || keepKeys == null || rowBinding == null || !rowBinding.IsListElementRow)
+                return 0;
+
+            IDictionary dictionary = RowBridge.EnsureDictionary(owner, rowBinding);
+            if (dictionary != null)
+            {
+                var removeKeys = new List<object>();
+                foreach (DictionaryEntry entry in dictionary)
+                {
+                    string key = entry.Key != null ? entry.Key.ToString() : string.Empty;
+                    if (!keepKeys.Contains(key))
+                        removeKeys.Add(entry.Key);
+                }
+
+                if (removeKeys.Count == 0)
+                    return 0;
+
+                Undo.RecordObject(owner, "SO Table Prune Child Rows");
+                for (int i = 0; i < removeKeys.Count; i++)
+                    dictionary.Remove(removeKeys[i]);
+                return removeKeys.Count;
+            }
+
+            IList list = RowBridge.EnsureContainer(owner, rowBinding);
+            if (list == null)
+                return 0;
+
+            int removed = 0;
+            for (int i = list.Count - 1; i >= 0; i--)
+            {
+                object element = list[i];
+                string key = ESRowBindingReflectionUtility.GetMemberValue(element, rowBinding.elementKeyFieldPath)?.ToString();
+                if (string.IsNullOrWhiteSpace(key) || keepKeys.Contains(key))
+                    continue;
+
+                if (removed == 0)
+                    Undo.RecordObject(owner, "SO Table Prune Child Rows");
+                list.RemoveAt(i);
+                removed++;
+            }
+
+            return removed;
+        }
+
+        private bool EnsureChildRowsClearedForRebuild(ScriptableObject owner, HashSet<ScriptableObject> rebuiltOwners, out string reason)
+        {
+            reason = string.Empty;
+            if (owner == null)
+            {
+                reason = "宿主 SO 为空。";
+                return false;
+            }
+            if (rebuiltOwners == null)
+                return true;
+            if (rebuiltOwners.Contains(owner))
+                return true;
+            if (rowBinding == null || !rowBinding.IsListElementRow)
+            {
+                reason = "当前规则不是子级行模式。";
+                return false;
+            }
+
+            IDictionary dictionary = RowBridge.EnsureDictionary(owner, rowBinding);
+            if (dictionary != null)
+            {
+                Undo.RecordObject(owner, "SO Table Rebuild Child Rows");
+                dictionary.Clear();
+                rebuiltOwners.Add(owner);
+                return true;
+            }
+
+            IList list = RowBridge.EnsureContainer(owner, rowBinding);
+            if (list == null)
+            {
+                reason = "无法获取子级 List：" + rowBinding.listFieldPath;
+                return false;
+            }
+
+            Undo.RecordObject(owner, "SO Table Rebuild Child Rows");
+            list.Clear();
+            rebuiltOwners.Add(owner);
+            return true;
+        }
+
+        private bool TryCreateAppendedChildRow(ScriptableObject owner, out object rowObject, out string reason)
+        {
+            rowObject = null;
+            reason = string.Empty;
+            if (owner == null)
+            {
+                reason = "宿主 SO 为空。";
+                return false;
+            }
+            if (rowBinding == null || !rowBinding.IsListElementRow)
+            {
+                reason = "当前规则不是子级行模式。";
+                return false;
+            }
+            if (RowBridge.EnsureDictionary(owner, rowBinding) != null)
+            {
+                reason = "Dictionary 子级不能使用空 Key；请填写 Key，或改用 List 子级。";
+                return false;
+            }
+
+            IList list = RowBridge.EnsureContainer(owner, rowBinding);
+            if (list == null)
+            {
+                reason = "无法获取子级 List：" + rowBinding.listFieldPath;
+                return false;
+            }
+
+            Type elementType = ESRowBindingReflectionUtility.GetListElementType(list.GetType());
+            if (elementType == null)
+            {
+                reason = "无法推导 List 元素类型：" + rowBinding.listFieldPath;
+                return false;
+            }
+
+            rowObject = Activator.CreateInstance(elementType);
+            if (!string.IsNullOrWhiteSpace(rowBinding.elementKeyFieldPath))
+                ESRowBindingReflectionUtility.SetMemberValue(rowObject, rowBinding.elementKeyFieldPath, string.Empty);
+            list.Add(rowObject);
+            return true;
+        }
+
+        private bool CanImportEmptyChildKeyForRebuild(ScriptableObject owner)
+        {
+            if (owner == null || rowBinding == null || !rowBinding.IsListElementRow || !rowBinding.allowEmptyRowKey)
+                return false;
+            if (GetActiveSerialChildImportSyncMode() != ESTableSerialChildImportSyncMode.RebuildTouchedOwners)
+                return false;
+
+            return RowBridge.EnsureDictionary(owner, rowBinding) == null;
+        }
+
+        private bool TryDeleteChildRow(ScriptableObject owner, string rowKey, out string reason)
+        {
+            reason = string.Empty;
+            if (owner == null)
+            {
+                reason = "宿主 SO 为空。";
+                return false;
+            }
+            if (rowBinding == null || !rowBinding.IsListElementRow)
+            {
+                reason = "当前规则不是 List 子级行。";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(rowKey))
+            {
+                reason = "子级 Key 为空。";
+                return false;
+            }
+
+            IDictionary dictionary = RowBridge.EnsureDictionary(owner, rowBinding);
+            if (dictionary != null)
+            {
+                if (!dictionary.Contains(rowKey))
+                {
+                    reason = "找不到子级 Key：" + rowKey;
+                    return false;
+                }
+
+                Undo.RecordObject(owner, "SO Table Delete Child Row");
+                dictionary.Remove(rowKey);
+                return true;
+            }
+
+            IList list = RowBridge.EnsureContainer(owner, rowBinding);
+            if (list == null)
+            {
+                reason = "无法获取子级容器：" + rowBinding.listFieldPath;
+                return false;
+            }
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                object element = list[i];
+                string elementKey = ESRowBindingReflectionUtility.GetMemberValue(element, rowBinding.elementKeyFieldPath)?.ToString();
+                if (string.Equals(elementKey, rowKey, StringComparison.Ordinal))
+                {
+                    Undo.RecordObject(owner, "SO Table Delete Child Row");
+                    list.RemoveAt(i);
+                    return true;
+                }
+            }
+
+            reason = "找不到子级 Key：" + rowKey;
+            return false;
+        }
+
+        private static bool TryDeleteOwnerAsset(ScriptableObject owner, out string reason)
+        {
+            reason = string.Empty;
+            if (owner == null)
+            {
+                reason = "目标 SO 为空。";
+                return false;
+            }
+
+            string path = AssetDatabase.GetAssetPath(owner);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                reason = "目标不是可删除的普通资产。";
+                return false;
+            }
+
+            return AssetDatabase.DeleteAsset(path);
+        }
+
         private static string GetCell(List<string> row, int columnIndex)
         {
             return row != null && columnIndex >= 0 && columnIndex < row.Count ? row[columnIndex] : string.Empty;
@@ -1632,24 +2992,91 @@ namespace ES
             return -1;
         }
 
-        private void ApplyTableRowToObject(List<string> row, List<ESTableCompiledColumn> compiledColumns, ScriptableObject owner, object rowObject)
+        private StringBuilder BuildRowDebugHeader(ESTableRowDirectiveInfo directive, int rowIndex, ScriptableObject owner)
+        {
+            if (!directive.debug)
+                return null;
+
+            var builder = new StringBuilder();
+            builder.AppendLine("SO 表格行 Debug");
+            builder.AppendLine("表格行号：" + (rowIndex + 1));
+            builder.AppendLine("原始行指令：" + (string.IsNullOrEmpty(directive.rawText) ? "(空)" : directive.rawText));
+            builder.AppendLine("实际行指令：" + directive.directive);
+            builder.AppendLine("批次：" + (GetActiveUseBatch() != null ? GetActiveUseBatch().batchName : "(默认批次)"));
+            builder.AppendLine("导入表格：" + (string.IsNullOrEmpty(activeImportTablePath) ? "(未记录)" : activeImportTablePath));
+            builder.AppendLine("目标 SO：" + (owner != null ? owner.name : "(空)"));
+            builder.AppendLine("SO 类型：" + (owner != null ? owner.GetType().FullName : "(空)"));
+            builder.AppendLine("SO 路径：" + (owner != null ? AssetDatabase.GetAssetPath(owner) : "(空)"));
+            return builder;
+        }
+
+        private void AppendRowDebugTarget(StringBuilder debugLog, ScriptableObject owner, string rowKey)
+        {
+            if (debugLog == null)
+                return;
+
+            debugLog.AppendLine("目标对象：List 子级");
+            debugLog.AppendLine("子级 Key：" + (string.IsNullOrWhiteSpace(rowKey) ? "(空)" : rowKey));
+            debugLog.AppendLine("容器字段：" + (rowBinding != null ? rowBinding.listFieldPath : string.Empty));
+            debugLog.AppendLine("宿主路径：" + (owner != null ? AssetDatabase.GetAssetPath(owner) : "(空)"));
+        }
+
+        private static void AppendFieldDebug(StringBuilder debugLog, ESTableCompiledColumn column, string message)
+        {
+            if (debugLog == null)
+                return;
+
+            string columnName = column != null && column.map != null ? column.map.columnName : "(未知列)";
+            string fieldPath = column != null ? column.memberPath : "(未知字段)";
+            string target = column != null && column.useRowObject ? "子级" : "SO";
+            debugLog.AppendLine("字段[" + columnName + "] -> " + target + "." + fieldPath + "：" + message);
+        }
+
+        private static string FormatDebugValue(object value)
+        {
+            if (value == null)
+                return "(null)";
+            if (value is UnityEngine.Object unityObject)
+                return unityObject == null ? "(null)" : unityObject.name + " <" + AssetDatabase.GetAssetPath(unityObject) + ">";
+            return value.ToString();
+        }
+
+        private void ApplyTableRowToObject(List<string> row, List<ESTableCompiledColumn> compiledColumns, ScriptableObject owner, object rowObject, bool forceTableValues, bool skipEmptyCells, bool ownerColumnsOnly, StringBuilder debugLog = null)
         {
             for (int i = 0; i < compiledColumns.Count; i++)
             {
                 ESTableCompiledColumn column = compiledColumns[i];
                 if (!column.canWrite || column.tableColumnIndex < 0 || column.tableColumnIndex >= row.Count)
+                {
+                    AppendFieldDebug(debugLog, column, "跳过：列不可写或表格索引无效");
                     continue;
+                }
+                if (ownerColumnsOnly && column.useRowObject)
+                {
+                    AppendFieldDebug(debugLog, column, "跳过：owner 行只写 SO 本体字段");
+                    continue;
+                }
+                if (skipEmptyCells && string.IsNullOrWhiteSpace(row[column.tableColumnIndex]))
+                {
+                    AppendFieldDebug(debugLog, column, "跳过：patch 行空单元格不写回");
+                    continue;
+                }
 
                 object target = column.useRowObject ? rowObject : owner;
-                if (column.map.authority == ESTableColumnAuthority.SoAuthority)
+                if (!forceTableValues && column.map.authority == ESTableColumnAuthority.SoAuthority)
                 {
                     object currentValue = ESRowBindingReflectionUtility.GetMemberValue(target, column.memberPath);
                     if (!IsEmptyAuthorityValue(currentValue))
+                    {
+                        AppendFieldDebug(debugLog, column, "跳过：导入策略为保留现有值，当前值非空，当前值=" + FormatDebugValue(currentValue));
                         continue;
+                    }
                 }
 
+                object oldValue = ESRowBindingReflectionUtility.GetMemberValue(target, column.memberPath);
                 object value = ConvertStringToValue(row[column.tableColumnIndex], column.valueType, column.map.valueWriteMode);
                 ESRowBindingReflectionUtility.SetMemberValue(target, column.memberPath, value);
+                AppendFieldDebug(debugLog, column, "写入：" + FormatDebugValue(oldValue) + " -> " + FormatDebugValue(value));
             }
         }
 
@@ -1833,11 +3260,52 @@ namespace ES
             for (int i = 0; i < columns.Count; i++)
             {
                 ESTableColumnNameMap column = columns[i];
-                if (column != null && column.IsUsable && !string.IsNullOrWhiteSpace(column.columnName))
+                if (column != null && column.IsUsable && !string.IsNullOrWhiteSpace(column.columnName) && IsColumnAllowedByActiveBatch(column))
                     enabledColumns.Add(column);
             }
 
             return enabledColumns;
+        }
+
+        private bool IsColumnAllowedByActiveBatch(ESTableColumnNameMap column)
+        {
+            ESSoTableRuleUseBatch batch = GetActiveUseBatch();
+            if (batch == null || column == null)
+                return true;
+
+            HashSet<string> excluded = BuildFieldNameSet(batch.excludedFields);
+            if (MatchesFieldNameSet(column, excluded))
+                return false;
+
+            HashSet<string> active = BuildFieldNameSet(batch.activeFields);
+            return active.Count == 0 || MatchesFieldNameSet(column, active);
+        }
+
+        private static HashSet<string> BuildFieldNameSet(string text)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(text))
+                return result;
+
+            string[] parts = text.Split(new[] { ',', ';', '|', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string item = parts[i].Trim();
+                if (!string.IsNullOrEmpty(item))
+                    result.Add(item);
+            }
+
+            return result;
+        }
+
+        private static bool MatchesFieldNameSet(ESTableColumnNameMap column, HashSet<string> names)
+        {
+            if (column == null || names == null || names.Count == 0)
+                return false;
+
+            return (!string.IsNullOrWhiteSpace(column.columnName) && names.Contains(column.columnName))
+                || (!string.IsNullOrWhiteSpace(column.soFieldPath) && names.Contains(column.soFieldPath))
+                || (!string.IsNullOrWhiteSpace(column.displayName) && names.Contains(column.displayName));
         }
 
         private List<ESTableColumnNameMap> CollectLockedColumns()
@@ -1952,6 +3420,337 @@ namespace ES
             }
 
             return false;
+        }
+
+        private List<List<string>> BuildExportWriteTable(List<List<string>> newTable, string path)
+        {
+            if (newTable == null)
+                return null;
+
+            ESTableExportWriteMode mode = GetActiveExportWriteMode();
+            ESTableSerialChildWriteMode childMode = GetActiveSerialChildWriteMode();
+            bool serialChildRows = rowBinding != null && rowBinding.IsListElementRow;
+            if (mode == ESTableExportWriteMode.Rebuild || string.IsNullOrEmpty(path) || !File.Exists(path))
+                return CloneTable(newTable);
+
+            List<List<string>> oldTable = ReadTableFileAuto(path);
+            if (oldTable == null || oldTable.Count == 0)
+                return CloneTable(newTable);
+
+            if (serialChildRows && childMode == ESTableSerialChildWriteMode.RebuildByOwner && rowBinding.allowEmptyRowKey)
+                return BuildExportWriteTableRebuildOwnersAllowEmptyKeys(newTable, oldTable);
+
+            int oldKeyIndex = FindExportObjectKeyColumnIndex(oldTable);
+            int newKeyIndex = FindExportObjectKeyColumnIndex(newTable);
+            if (oldKeyIndex < 0 || newKeyIndex < 0)
+            {
+                Debug.LogWarning("Export stopped: missing object Key column. Configure an Info Key/object Key column before exporting to an existing table.", this);
+                return null;
+            }
+
+            int oldRowKeyIndex = FindExportRowKeyColumnIndex(oldTable);
+            int newRowKeyIndex = FindExportRowKeyColumnIndex(newTable);
+            if (rowBinding != null && rowBinding.IsListElementRow && (oldRowKeyIndex < 0 || newRowKeyIndex < 0))
+            {
+                Debug.LogWarning("Export stopped: list-row export requires a row Key column when updating an existing table.", this);
+                return null;
+            }
+
+            List<List<string>> result = CloneTable(oldTable);
+            MergeExportHeaders(result, newTable);
+
+            Dictionary<string, int> oldRowsByKey = BuildExportRowsByKey(result, oldKeyIndex, oldRowKeyIndex, out string oldKeyError);
+            if (!string.IsNullOrEmpty(oldKeyError))
+            {
+                Debug.LogWarning("Export stopped: existing table has invalid Key data. " + oldKeyError, this);
+                return null;
+            }
+
+            Dictionary<string, int> resultColumnMap = BuildRawHeaderIndexMap(result);
+            Dictionary<string, int> newColumnMap = BuildRawHeaderIndexMap(newTable);
+            HashSet<string> newKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> touchedOwnerKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int rowIndex = GetDataStartRowIndex(newTable); rowIndex < newTable.Count; rowIndex++)
+            {
+                List<string> newRow = newTable[rowIndex];
+                string key = BuildExportRowKey(newRow, newKeyIndex, newRowKeyIndex);
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    Debug.LogWarning("Export stopped: new table contains an empty Key at row " + (rowIndex + 1) + ".", this);
+                    return null;
+                }
+                if (!newKeys.Add(key))
+                {
+                    Debug.LogWarning("Export stopped: duplicate Key in new table: " + key + ".", this);
+                    return null;
+                }
+                if (serialChildRows)
+                {
+                    string ownerKey = BuildExportObjectKey(newRow, newKeyIndex);
+                    if (!string.IsNullOrWhiteSpace(ownerKey))
+                        touchedOwnerKeys.Add(ownerKey);
+                }
+
+                if (oldRowsByKey.TryGetValue(key, out int targetRowIndex))
+                {
+                    MergeExportDataRow(result[targetRowIndex], newRow, newColumnMap, resultColumnMap);
+                    continue;
+                }
+
+                if (ShouldAppendExportRow(serialChildRows, mode, childMode))
+                {
+                    List<string> appended = new List<string>();
+                    EnsureCellCount(appended, result[0].Count);
+                    MergeExportDataRow(appended, newRow, newColumnMap, resultColumnMap);
+                    result.Add(appended);
+                    oldRowsByKey[key] = result.Count - 1;
+                }
+            }
+
+            if (serialChildRows && childMode == ESTableSerialChildWriteMode.RebuildByOwner)
+                RemoveMissingSerialChildRowsForOwners(result, oldKeyIndex, oldRowKeyIndex, touchedOwnerKeys, newKeys);
+
+            return result;
+        }
+
+        private ESTableExportWriteMode GetActiveExportWriteMode()
+        {
+            ESSoTableRuleUseBatch batch = GetActiveUseBatch();
+            return batch != null ? batch.exportWriteMode : ESTableExportWriteMode.MergeByKey;
+        }
+
+        private ESTableConflictPolicy GetActiveImportConflictPolicy()
+        {
+            ESSoTableRuleUseBatch batch = GetActiveUseBatch();
+            return batch != null ? batch.importConflictPolicy : ESTableConflictPolicy.Overwrite;
+        }
+
+        private ESTableSerialChildWriteMode GetActiveSerialChildWriteMode()
+        {
+            ESSoTableRuleUseBatch batch = GetActiveUseBatch();
+            return batch != null ? batch.serialChildWriteMode : ESTableSerialChildWriteMode.RebuildByOwner;
+        }
+
+        private ESTableSerialChildImportSyncMode GetActiveSerialChildImportSyncMode()
+        {
+            ESSoTableRuleUseBatch batch = GetActiveUseBatch();
+            return batch != null ? batch.serialChildImportSyncMode : ESTableSerialChildImportSyncMode.KeepMissing;
+        }
+
+        private static bool ShouldAppendExportRow(bool serialChildRows, ESTableExportWriteMode tableMode, ESTableSerialChildWriteMode childMode)
+        {
+            if (!serialChildRows)
+                return tableMode == ESTableExportWriteMode.MergeByKey;
+
+            return childMode == ESTableSerialChildWriteMode.MergeByKey
+                || childMode == ESTableSerialChildWriteMode.RebuildByOwner;
+        }
+
+        private void RemoveMissingSerialChildRowsForOwners(List<List<string>> table, int objectKeyIndex, int rowKeyIndex, HashSet<string> touchedOwnerKeys, HashSet<string> newKeys)
+        {
+            if (table == null || touchedOwnerKeys == null || touchedOwnerKeys.Count == 0 || newKeys == null)
+                return;
+
+            for (int rowIndex = table.Count - 1; rowIndex >= GetDataStartRowIndex(table); rowIndex--)
+            {
+                List<string> row = table[rowIndex];
+                string ownerKey = BuildExportObjectKey(row, objectKeyIndex);
+                if (string.IsNullOrWhiteSpace(ownerKey) || !touchedOwnerKeys.Contains(ownerKey))
+                    continue;
+
+                string fullKey = BuildExportRowKey(row, objectKeyIndex, rowKeyIndex);
+                if (!newKeys.Contains(fullKey))
+                    table.RemoveAt(rowIndex);
+            }
+        }
+
+        private List<List<string>> BuildExportWriteTableRebuildOwnersAllowEmptyKeys(List<List<string>> newTable, List<List<string>> oldTable)
+        {
+            int oldObjectKeyIndex = FindExportObjectKeyColumnIndex(oldTable);
+            int newObjectKeyIndex = FindExportObjectKeyColumnIndex(newTable);
+            if (oldObjectKeyIndex < 0 || newObjectKeyIndex < 0)
+            {
+                Debug.LogWarning("Export stopped: missing object Key column. Empty child Key rebuild still requires an owner/object Key column.", this);
+                return null;
+            }
+
+            List<List<string>> result = CloneTable(oldTable);
+            MergeExportHeaders(result, newTable);
+
+            Dictionary<string, int> resultColumnMap = BuildRawHeaderIndexMap(result);
+            Dictionary<string, int> newColumnMap = BuildRawHeaderIndexMap(newTable);
+            HashSet<string> touchedOwnerKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int rowIndex = GetDataStartRowIndex(newTable); rowIndex < newTable.Count; rowIndex++)
+            {
+                string ownerKey = BuildExportObjectKey(newTable[rowIndex], newObjectKeyIndex);
+                if (string.IsNullOrWhiteSpace(ownerKey))
+                {
+                    Debug.LogWarning("Export stopped: new table contains an empty owner Key at row " + (rowIndex + 1) + ".", this);
+                    return null;
+                }
+
+                touchedOwnerKeys.Add(ownerKey);
+            }
+
+            for (int rowIndex = result.Count - 1; rowIndex >= GetDataStartRowIndex(result); rowIndex--)
+            {
+                string ownerKey = BuildExportObjectKey(result[rowIndex], oldObjectKeyIndex);
+                if (!string.IsNullOrWhiteSpace(ownerKey) && touchedOwnerKeys.Contains(ownerKey))
+                    result.RemoveAt(rowIndex);
+            }
+
+            for (int rowIndex = GetDataStartRowIndex(newTable); rowIndex < newTable.Count; rowIndex++)
+            {
+                List<string> appended = new List<string>();
+                EnsureCellCount(appended, result[0].Count);
+                MergeExportDataRow(appended, newTable[rowIndex], newColumnMap, resultColumnMap);
+                result.Add(appended);
+            }
+
+            return result;
+        }
+
+        private int FindExportObjectKeyColumnIndex(List<List<string>> table)
+        {
+            int index = FindRawTableColumnIndex(table, GetActiveInfoKeyColumnName());
+            if (index >= 0)
+                return index;
+
+            string[] names = { "itemId", "id", "key", "KeyName", "name" };
+            for (int i = 0; i < names.Length; i++)
+            {
+                index = FindRawTableColumnIndex(table, names[i]);
+                if (index >= 0)
+                    return index;
+            }
+
+            return -1;
+        }
+
+        private int FindExportRowKeyColumnIndex(List<List<string>> table)
+        {
+            return rowBinding != null && rowBinding.IsListElementRow
+                ? FindRawTableColumnIndex(table, rowBinding.rowKeyColumnName)
+                : -1;
+        }
+
+        private string BuildExportRowKey(List<string> row, int objectKeyIndex, int rowKeyIndex)
+        {
+            string objectKey = BuildExportObjectKey(row, objectKeyIndex);
+            if (string.IsNullOrWhiteSpace(objectKey))
+                return string.Empty;
+
+            if (rowBinding == null || !rowBinding.IsListElementRow)
+                return objectKey;
+
+            string rowKey = GetCell(row, rowKeyIndex).Trim();
+            if (string.IsNullOrWhiteSpace(rowKey))
+                return string.Empty;
+
+            return objectKey + "\u001f" + rowKey;
+        }
+
+        private static string BuildExportObjectKey(List<string> row, int objectKeyIndex)
+        {
+            return GetCell(row, objectKeyIndex).Trim();
+        }
+
+        private Dictionary<string, int> BuildExportRowsByKey(List<List<string>> table, int objectKeyIndex, int rowKeyIndex, out string error)
+        {
+            error = string.Empty;
+            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (int rowIndex = GetDataStartRowIndex(table); rowIndex < table.Count; rowIndex++)
+            {
+                string key = BuildExportRowKey(table[rowIndex], objectKeyIndex, rowKeyIndex);
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    error = "Empty Key at row " + (rowIndex + 1) + ".";
+                    return result;
+                }
+                if (result.ContainsKey(key))
+                {
+                    error = "Duplicate Key " + key + " at row " + (rowIndex + 1) + ".";
+                    return result;
+                }
+
+                result[key] = rowIndex;
+            }
+
+            return result;
+        }
+
+        private static Dictionary<string, int> BuildRawHeaderIndexMap(List<List<string>> table)
+        {
+            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (table == null || table.Count == 0)
+                return result;
+
+            List<string> headerRow = table[0];
+            for (int i = 1; i < headerRow.Count; i++)
+            {
+                string name = headerRow[i];
+                if (!string.IsNullOrWhiteSpace(name) && !result.ContainsKey(name))
+                    result[name] = i;
+            }
+
+            return result;
+        }
+
+        private static void MergeExportHeaders(List<List<string>> result, List<List<string>> newTable)
+        {
+            EnsureRowCount(result, Math.Min(4, newTable.Count));
+            Dictionary<string, int> resultColumnMap = BuildRawHeaderIndexMap(result);
+            for (int columnIndex = 1; newTable.Count > 0 && columnIndex < newTable[0].Count; columnIndex++)
+            {
+                string columnName = newTable[0][columnIndex];
+                if (string.IsNullOrWhiteSpace(columnName) || resultColumnMap.ContainsKey(columnName))
+                    continue;
+
+                int addedIndex = result[0].Count;
+                for (int rowIndex = 0; rowIndex < result.Count; rowIndex++)
+                    EnsureCellCount(result[rowIndex], addedIndex + 1);
+                for (int headerRow = 0; headerRow < 4 && headerRow < newTable.Count; headerRow++)
+                    result[headerRow][addedIndex] = GetCell(newTable[headerRow], columnIndex);
+
+                resultColumnMap[columnName] = addedIndex;
+            }
+        }
+
+        private static void MergeExportDataRow(List<string> targetRow, List<string> sourceRow, Dictionary<string, int> sourceColumnMap, Dictionary<string, int> targetColumnMap)
+        {
+            EnsureCellCount(targetRow, targetColumnMap.Count + 1);
+            foreach (KeyValuePair<string, int> pair in sourceColumnMap)
+            {
+                if (!targetColumnMap.TryGetValue(pair.Key, out int targetIndex))
+                    continue;
+
+                EnsureCellCount(targetRow, targetIndex + 1);
+                targetRow[targetIndex] = GetCell(sourceRow, pair.Value);
+            }
+        }
+
+        private static List<List<string>> CloneTable(List<List<string>> table)
+        {
+            var result = new List<List<string>>();
+            if (table == null)
+                return result;
+
+            for (int i = 0; i < table.Count; i++)
+                result.Add(table[i] == null ? new List<string>() : new List<string>(table[i]));
+            return result;
+        }
+
+        private static void EnsureRowCount(List<List<string>> table, int count)
+        {
+            while (table.Count < count)
+                table.Add(new List<string>());
+        }
+
+        private static void EnsureCellCount(List<string> row, int count)
+        {
+            while (row.Count < count)
+                row.Add(string.Empty);
         }
 
         private List<ScriptableObject> CollectExportOwners()
@@ -2256,1978 +4055,7 @@ namespace ES
             return batch != null && !string.IsNullOrEmpty(batch.xlsxRelativePath) ? batch.xlsxRelativePath : "xlsx";
         }
 
-        private static List<List<string>> ReadTableFileAuto(string path)
-        {
-            string extension = Path.GetExtension(path)?.ToLowerInvariant();
-            if (extension == ".csv")
-                return ReadCsv(path);
-            if (extension == ".xlsx")
-                return ReadXlsx(path);
-
-            throw new NotSupportedException("Unsupported table type: " + extension);
-        }
-
-        private static void WriteCsv(string path, List<List<string>> table)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            var builder = new StringBuilder(4096);
-            for (int i = 0; i < table.Count; i++)
-            {
-                List<string> row = table[i];
-                for (int j = 0; j < row.Count; j++)
-                {
-                    if (j > 0)
-                        builder.Append(',');
-                    builder.Append(EscapeCsv(row[j]));
-                }
-
-                builder.AppendLine();
-            }
-
-            File.WriteAllText(path, builder.ToString(), new UTF8Encoding(true));
-        }
-
-        private static List<List<string>> ReadCsv(string path)
-        {
-            string text = File.ReadAllText(path, Encoding.UTF8);
-            var table = new List<List<string>>();
-            var row = new List<string>();
-            var cell = new StringBuilder();
-            bool inQuote = false;
-
-            for (int i = 0; i < text.Length; i++)
-            {
-                char c = text[i];
-                if (inQuote)
-                {
-                    if (c == '"')
-                    {
-                        if (i + 1 < text.Length && text[i + 1] == '"')
-                        {
-                            cell.Append('"');
-                            i++;
-                        }
-                        else
-                        {
-                            inQuote = false;
-                        }
-                    }
-                    else
-                    {
-                        cell.Append(c);
-                    }
-
-                    continue;
-                }
-
-                if (c == '"')
-                {
-                    inQuote = true;
-                }
-                else if (c == ',')
-                {
-                    row.Add(cell.ToString());
-                    cell.Length = 0;
-                }
-                else if (c == '\r' || c == '\n')
-                {
-                    if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n')
-                        i++;
-
-                    row.Add(cell.ToString());
-                    cell.Length = 0;
-                    table.Add(row);
-                    row = new List<string>();
-                }
-                else
-                {
-                    cell.Append(c);
-                }
-            }
-
-            if (cell.Length > 0 || row.Count > 0)
-            {
-                row.Add(cell.ToString());
-                table.Add(row);
-            }
-
-            return table;
-        }
-
-        private static string EscapeCsv(string value)
-        {
-            if (string.IsNullOrEmpty(value))
-                return string.Empty;
-
-            bool needQuote = value.IndexOfAny(new[] { ',', '"', '\r', '\n' }) >= 0;
-            if (!needQuote)
-                return value;
-
-            return "\"" + value.Replace("\"", "\"\"") + "\"";
-        }
-
-        private static void WriteXlsx(string path, List<List<string>> table, string sheet)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            if (File.Exists(path))
-                File.Delete(path);
-
-            using (FileStream stream = File.Create(path))
-            using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
-            {
-                AddZipText(archive, "[Content_Types].xml", BuildContentTypesXml());
-                AddZipText(archive, "_rels/.rels", BuildRootRelsXml());
-                AddZipText(archive, "xl/workbook.xml", BuildWorkbookXml(sheet));
-                AddZipText(archive, "xl/_rels/workbook.xml.rels", BuildWorkbookRelsXml());
-                AddZipText(archive, "xl/worksheets/sheet1.xml", BuildWorksheetXml(table));
-            }
-        }
-
-        private static List<List<string>> ReadXlsx(string path)
-        {
-            using (FileStream stream = File.OpenRead(path))
-            using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
-            {
-                List<string> sharedStrings = ReadSharedStrings(archive);
-                ZipArchiveEntry sheetEntry = archive.GetEntry("xl/worksheets/sheet1.xml");
-                if (sheetEntry == null)
-                    return new List<List<string>>();
-
-                using (Stream sheetStream = sheetEntry.Open())
-                    return ReadWorksheet(sheetStream, sharedStrings);
-            }
-        }
-
-        private static List<string> ReadSharedStrings(ZipArchive archive)
-        {
-            var values = new List<string>();
-            ZipArchiveEntry entry = archive.GetEntry("xl/sharedStrings.xml");
-            if (entry == null)
-                return values;
-
-            var doc = new XmlDocument();
-            using (Stream stream = entry.Open())
-                doc.Load(stream);
-
-            XmlNodeList items = doc.GetElementsByTagName("si", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
-            for (int i = 0; i < items.Count; i++)
-                values.Add(GetCombinedText(items[i]));
-
-            return values;
-        }
-
-        private static List<List<string>> ReadWorksheet(Stream sheetStream, List<string> sharedStrings)
-        {
-            var doc = new XmlDocument();
-            doc.Load(sheetStream);
-
-            var table = new List<List<string>>();
-            XmlNodeList rows = doc.GetElementsByTagName("row", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
-            for (int i = 0; i < rows.Count; i++)
-            {
-                var row = new List<string>();
-                foreach (XmlNode cellNode in rows[i].ChildNodes)
-                {
-                    if (cellNode.LocalName != "c")
-                        continue;
-
-                    int columnIndex = GetCellColumnIndex(cellNode.Attributes?["r"]?.Value);
-                    while (row.Count < columnIndex)
-                        row.Add(string.Empty);
-
-                    row.Add(ReadCellValue(cellNode, sharedStrings));
-                }
-
-                table.Add(row);
-            }
-
-            return table;
-        }
-
-        private static string ReadCellValue(XmlNode cellNode, List<string> sharedStrings)
-        {
-            string type = cellNode.Attributes?["t"]?.Value;
-            if (type == "inlineStr")
-            {
-                XmlNode inlineNode = FindFirstChild(cellNode, "is");
-                return inlineNode != null ? GetCombinedText(inlineNode) : string.Empty;
-            }
-
-            XmlNode valueNode = FindFirstChild(cellNode, "v");
-            string raw = valueNode?.InnerText ?? string.Empty;
-            if (type == "s" && int.TryParse(raw, out int sharedIndex) && sharedIndex >= 0 && sharedIndex < sharedStrings.Count)
-                return sharedStrings[sharedIndex];
-
-            return raw;
-        }
-
-        private static XmlNode FindFirstChild(XmlNode node, string localName)
-        {
-            if (node == null)
-                return null;
-
-            foreach (XmlNode child in node.ChildNodes)
-            {
-                if (child.LocalName == localName)
-                    return child;
-            }
-
-            return null;
-        }
-
-        private static string GetCombinedText(XmlNode node)
-        {
-            if (node == null)
-                return string.Empty;
-
-            var builder = new StringBuilder();
-            AppendTextNodes(node, builder);
-            return builder.ToString();
-        }
-
-        private static void AppendTextNodes(XmlNode node, StringBuilder builder)
-        {
-            if (node.LocalName == "t")
-                builder.Append(node.InnerText);
-
-            foreach (XmlNode child in node.ChildNodes)
-                AppendTextNodes(child, builder);
-        }
-
-        private static int GetCellColumnIndex(string cellRef)
-        {
-            if (string.IsNullOrEmpty(cellRef))
-                return 0;
-
-            int column = 0;
-            for (int i = 0; i < cellRef.Length; i++)
-            {
-                char c = cellRef[i];
-                if (c < 'A' || c > 'Z')
-                    break;
-
-                column = column * 26 + (c - 'A' + 1);
-            }
-
-            return Math.Max(0, column - 1);
-        }
-
-        private static void AddZipText(ZipArchive archive, string path, string content)
-        {
-            ZipArchiveEntry entry = archive.CreateEntry(path);
-            using (Stream entryStream = entry.Open())
-            using (var writer = new StreamWriter(entryStream, new UTF8Encoding(false)))
-                writer.Write(content);
-        }
-
-        private static string BuildContentTypesXml()
-        {
-            return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
-                   "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
-                   "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
-                   "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
-                   "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>" +
-                   "<Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>" +
-                   "</Types>";
-        }
-
-        private static string BuildRootRelsXml()
-        {
-            return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
-                   "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
-                   "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>" +
-                   "</Relationships>";
-        }
-
-        private static string BuildWorkbookXml(string sheet)
-        {
-            return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
-                   "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">" +
-                   "<sheets><sheet name=\"" + EscapeXml(sheet) + "\" sheetId=\"1\" r:id=\"rId1\"/></sheets>" +
-                   "</workbook>";
-        }
-
-        private static string BuildWorkbookRelsXml()
-        {
-            return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
-                   "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
-                   "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>" +
-                   "</Relationships>";
-        }
-
-        private static string BuildWorksheetXml(List<List<string>> table)
-        {
-            var builder = new StringBuilder(8192);
-            builder.Append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
-            builder.Append("<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>");
-
-            for (int rowIndex = 0; rowIndex < table.Count; rowIndex++)
-            {
-                builder.Append("<row r=\"").Append(rowIndex + 1).Append("\">");
-                List<string> row = table[rowIndex];
-                for (int columnIndex = 0; columnIndex < row.Count; columnIndex++)
-                {
-                    string cellRef = GetExcelColumnName(columnIndex + 1) + (rowIndex + 1).ToString(CultureInfo.InvariantCulture);
-                    builder.Append("<c r=\"").Append(cellRef).Append("\" t=\"inlineStr\"><is><t>");
-                    builder.Append(EscapeXml(row[columnIndex]));
-                    builder.Append("</t></is></c>");
-                }
-                builder.Append("</row>");
-            }
-
-            builder.Append("</sheetData></worksheet>");
-            return builder.ToString();
-        }
-
-        private static string GetExcelColumnName(int columnNumber)
-        {
-            var columnName = new StringBuilder();
-            while (columnNumber > 0)
-            {
-                int modulo = (columnNumber - 1) % 26;
-                columnName.Insert(0, (char)('A' + modulo));
-                columnNumber = (columnNumber - modulo) / 26;
-            }
-
-            return columnName.ToString();
-        }
-
-        private static string EscapeXml(string value)
-        {
-            if (string.IsNullOrEmpty(value))
-                return string.Empty;
-
-            return value
-                .Replace("&", "&amp;")
-                .Replace("<", "&lt;")
-                .Replace(">", "&gt;")
-                .Replace("\"", "&quot;")
-                .Replace("'", "&apos;");
-        }
-
-        private bool TryGetReflectionPathForColumn(string soFieldPath, Type rowOwnerType, Type listElementType, out Type ownerType, out string memberPath)
-        {
-            ownerType = rowOwnerType;
-            memberPath = soFieldPath;
-
-            if (rowBinding == null || !rowBinding.IsListElementRow || listElementType == null)
-                return ownerType != null && !string.IsNullOrWhiteSpace(memberPath);
-
-            string listPrefix = rowBinding.listFieldPath + "[].";
-            if (soFieldPath.StartsWith(listPrefix, StringComparison.Ordinal))
-            {
-                ownerType = listElementType;
-                memberPath = soFieldPath.Substring(listPrefix.Length);
-                return !string.IsNullOrWhiteSpace(memberPath);
-            }
-
-            if (soFieldPath == rowBinding.listFieldPath || soFieldPath == rowBinding.listFieldPath + "[]")
-                return false;
-
-            return ownerType != null && !string.IsNullOrWhiteSpace(memberPath);
-        }
-
-        private void RebuildColumnsFromTypeFields(Type dataType, bool listElementField)
-        {
-            RebuildColumnsFromTypeFields(dataType, listElementField, string.Empty, string.Empty, 0);
-        }
-
-        private void RebuildColumnsFromTypeFields(Type dataType, bool listElementField, string fieldPrefix, string columnPrefix, int depth)
-        {
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-            FieldInfo[] fields = dataType.GetFields(flags);
-            for (int i = 0; i < fields.Length; i++)
-            {
-                FieldInfo field = fields[i];
-                if (!ShouldExportField(field))
-                    continue;
-
-                if (field.DeclaringType == typeof(SoDataInfo) && field.Name == nameof(SoDataInfo.KeyName))
-                    continue;
-                if (listElementField && rowBinding != null && field.Name == rowBinding.elementKeyFieldPath)
-                    continue;
-
-                string fieldPath = CombineFieldPath(fieldPrefix, field.Name);
-                string columnName = CombineColumnName(columnPrefix, field.Name);
-                if (ShouldExpandNestedField(field.FieldType, depth))
-                {
-                    RebuildColumnsFromTypeFields(field.FieldType, listElementField, fieldPath, columnName, depth + 1);
-                    continue;
-                }
-
-                columns.Add(new ESTableColumnNameMap
-                {
-                    soFieldPath = listElementField ? BuildListElementPath(fieldPath) : fieldPath,
-                    columnName = columnName,
-                    displayName = fieldPath,
-                    tableType = ESSoTableRuleTypeUtility.GuessTableType(field.FieldType),
-                    valueWriteMode = ESSoTableRuleTypeUtility.GuessValueWriteMode(field.FieldType)
-                });
-            }
-        }
-
-        private bool ShouldExpandNestedField(Type fieldType, int depth)
-        {
-            if (nestedFieldRule == null || !nestedFieldRule.expandNestedFields)
-                return false;
-            if (depth >= nestedFieldRule.maxDepth)
-                return false;
-
-            return ESSoTableRuleTypeUtility.CanExpandAsNestedObject(fieldType);
-        }
-
-        private static string CombineFieldPath(string prefix, string fieldName)
-        {
-            return string.IsNullOrEmpty(prefix) ? fieldName : prefix + "." + fieldName;
-        }
-
-        private string CombineColumnName(string prefix, string fieldName)
-        {
-            if (string.IsNullOrEmpty(prefix))
-                return fieldName;
-
-            string separator = nestedFieldRule != null && !string.IsNullOrEmpty(nestedFieldRule.columnSeparator)
-                ? nestedFieldRule.columnSeparator
-                : "_";
-            return prefix + separator + fieldName;
-        }
-
-        private string BuildListElementPath(string elementFieldPath)
-        {
-            if (rowBinding == null || string.IsNullOrEmpty(rowBinding.listFieldPath))
-                return elementFieldPath;
-
-            if (string.IsNullOrEmpty(elementFieldPath))
-                return rowBinding.listFieldPath;
-
-            return rowBinding.listFieldPath + "[]." + elementFieldPath;
-        }
-
-        private static bool ShouldExportField(FieldInfo field)
-        {
-            if (field == null || field.IsStatic || field.IsLiteral || field.IsInitOnly || field.IsNotSerialized)
-                return false;
-
-            if (Attribute.IsDefined(field, typeof(NonSerializedAttribute)))
-                return false;
-
-            if (HasOdinSerializeAttribute(field))
-                return true;
-
-            bool unitySerializedByVisibility = field.IsPublic || Attribute.IsDefined(field, typeof(SerializeField));
-            return unitySerializedByVisibility && IsUnitySerializableFieldType(field.FieldType);
-        }
-
-        private static bool HasOdinSerializeAttribute(FieldInfo field)
-        {
-            object[] attributes = field.GetCustomAttributes(false);
-            for (int i = 0; i < attributes.Length; i++)
-            {
-                if (attributes[i].GetType().FullName == "Sirenix.Serialization.OdinSerializeAttribute")
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static bool IsUnitySerializableFieldType(Type type)
-        {
-            if (type == null || type.IsPointer)
-                return false;
-
-            if (type.IsPrimitive || type.IsEnum || type == typeof(string))
-                return true;
-
-            if (typeof(UnityEngine.Object).IsAssignableFrom(type))
-                return true;
-
-            if (type.IsArray)
-                return type.GetArrayRank() == 1 && IsUnitySerializableFieldType(type.GetElementType());
-
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
-                return IsUnitySerializableFieldType(type.GetGenericArguments()[0]);
-
-            if (type.IsClass || type.IsValueType)
-                return Attribute.IsDefined(type, typeof(SerializableAttribute));
-
-            return false;
-        }
     }
 
-    [CustomEditor(typeof(ESSoTableDataRule))]
-    public sealed class ESSoTableDataRuleEditor : Editor
-    {
-        private GUIStyle _heroStyle;
-        private GUIStyle _heroTitleStyle;
-        private GUIStyle _heroSubTitleStyle;
-        private GUIStyle _cardStyle;
-        private GUIStyle _foldoutTitleStyle;
-        private GUIStyle _foldoutHintStyle;
-        private GUIStyle _sectionTitleStyle;
-        private GUIStyle _pillStyle;
-        private GUIStyle _mutedStyle;
-        private GUIStyle _metricValueStyle;
-        private readonly ESDropZoneSolver _tablePathDropZone = new ESDropZoneSolver();
-        private readonly ESDropZoneSolver _folderPathDropZone = new ESDropZoneSolver();
-        private string _prefsKeyPrefix;
-        private bool _showBasic = true;
-        private bool _showBuildStage = true;
-        private bool _showUseStage = true;
-        private bool _showColumns = true;
-        private bool _showAdvanced;
-        private bool _showAdvancedExpert;
-        private bool _showTypeCache;
-
-        private void OnEnable()
-        {
-            _tablePathDropZone.InitSolver<UnityEngine.Object>(allowFolderExpand: false, rejectScripts: false, maxCount: 1);
-            _folderPathDropZone.InitSolver<DefaultAsset>(allowFolderExpand: false, rejectScripts: true, maxCount: 1);
-            _prefsKeyPrefix = BuildPrefsKeyPrefix(target);
-            LoadFoldoutPrefs();
-        }
-
-        private static string BuildPrefsKeyPrefix(UnityEngine.Object editorTarget)
-        {
-            string assetPath = editorTarget != null ? AssetDatabase.GetAssetPath(editorTarget) : string.Empty;
-            string guid = string.IsNullOrEmpty(assetPath) ? string.Empty : AssetDatabase.AssetPathToGUID(assetPath);
-            string identity = string.IsNullOrEmpty(guid) && editorTarget != null ? editorTarget.GetInstanceID().ToString(CultureInfo.InvariantCulture) : guid;
-            return "ES.ESSoTableDataRuleEditor." + identity + ".";
-        }
-
-        private void LoadFoldoutPrefs()
-        {
-            _showBasic = LoadFoldoutPref("basic", _showBasic);
-            _showBuildStage = LoadFoldoutPref("build", _showBuildStage);
-            _showUseStage = LoadFoldoutPref("use", _showUseStage);
-            _showColumns = LoadFoldoutPref("columns", _showColumns);
-            _showAdvanced = LoadFoldoutPref("advanced", _showAdvanced);
-            _showAdvancedExpert = LoadFoldoutPref("advancedExpert", _showAdvancedExpert);
-            _showTypeCache = LoadFoldoutPref("typeCache", _showTypeCache);
-        }
-
-        private bool LoadFoldoutPref(string key, bool defaultValue)
-        {
-            return EditorPrefs.GetBool(_prefsKeyPrefix + key, defaultValue);
-        }
-
-        private void SaveFoldoutPref(string key, bool value)
-        {
-            EditorPrefs.SetBool(_prefsKeyPrefix + key, value);
-        }
-
-        public override void OnInspectorGUI()
-        {
-            var rule = target as ESSoTableDataRule;
-            if (rule == null || targets.Length != 1)
-            {
-                base.OnInspectorGUI();
-                return;
-            }
-
-            EnsureStyles();
-            DrawHeader(rule);
-            DrawQuickActions(rule);
-            DrawOverview(rule);
-            DrawWarnings(rule);
-            EditorGUILayout.Space(8);
-            DrawChineseFields();
-        }
-
-        private void EnsureStyles()
-        {
-            if (_heroStyle != null)
-                return;
-
-            _heroStyle = new GUIStyle(EditorStyles.helpBox)
-            {
-                padding = new RectOffset(14, 14, 12, 12),
-                margin = new RectOffset(0, 0, 4, 8)
-            };
-
-            _heroTitleStyle = new GUIStyle(EditorStyles.boldLabel)
-            {
-                fontSize = 16,
-                alignment = TextAnchor.MiddleLeft
-            };
-
-            _heroSubTitleStyle = new GUIStyle(EditorStyles.miniLabel)
-            {
-                wordWrap = true
-            };
-
-            _cardStyle = new GUIStyle(EditorStyles.helpBox)
-            {
-                padding = new RectOffset(10, 10, 8, 8),
-                margin = new RectOffset(0, 0, 4, 4)
-            };
-
-            _foldoutTitleStyle = new GUIStyle(EditorStyles.boldLabel)
-            {
-                fontSize = 14,
-                alignment = TextAnchor.MiddleLeft,
-                padding = new RectOffset(6, 6, 0, 0)
-            };
-
-            _foldoutHintStyle = new GUIStyle(EditorStyles.wordWrappedMiniLabel)
-            {
-                wordWrap = true,
-                padding = new RectOffset(9, 9, 5, 7)
-            };
-
-            _sectionTitleStyle = new GUIStyle(EditorStyles.miniBoldLabel)
-            {
-                alignment = TextAnchor.MiddleLeft
-            };
-
-            _pillStyle = new GUIStyle(EditorStyles.miniButton)
-            {
-                alignment = TextAnchor.MiddleCenter,
-                fixedHeight = 20,
-                padding = new RectOffset(8, 8, 2, 2)
-            };
-
-            _mutedStyle = new GUIStyle(EditorStyles.miniLabel)
-            {
-                wordWrap = true
-            };
-
-            _metricValueStyle = new GUIStyle(EditorStyles.boldLabel)
-            {
-                alignment = TextAnchor.MiddleRight
-            };
-        }
-
-        private void DrawHeader(ESSoTableDataRule rule)
-        {
-            using (new EditorGUILayout.VerticalScope(_heroStyle))
-            {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    using (new EditorGUILayout.VerticalScope())
-                    {
-                        string title = string.IsNullOrWhiteSpace(rule.ruleKey) ? rule.name : rule.ruleKey;
-                        EditorGUILayout.LabelField(title, _heroTitleStyle);
-                        EditorGUILayout.LabelField(BuildHeroSubtitle(rule), _heroSubTitleStyle);
-                    }
-
-                    GUILayout.FlexibleSpace();
-                    GUILayout.Label(rule.enabled ? "\u5df2\u542f\u7528" : "\u5df2\u505c\u7528", _pillStyle, GUILayout.Width(82));
-                }
-            }
-        }
-
-        private string BuildHeroSubtitle(ESSoTableDataRule rule)
-        {
-            string source = GetSourceSummary(rule);
-            string table = string.IsNullOrWhiteSpace(rule.tableName)
-                ? FirstNotEmpty(GetBatchFileName(rule), rule.ruleKey, "\u672a\u8bbe\u7f6e\u8868\u540d")
-                : rule.tableName;
-
-            return "SO 表格 \u8868\u683c\u89c4\u5219  |  " + source + "  |  " + table;
-        }
-
-        private void DrawQuickActions(ESSoTableDataRule rule)
-        {
-            using (new EditorGUILayout.VerticalScope(_cardStyle))
-            {
-                EditorGUILayout.LabelField("Rule \u6784\u5efa\u64cd\u4f5c", _sectionTitleStyle);
-                using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
-                {
-                    if (GUILayout.Button("\u4ece\u5f53\u524d\u9009\u62e9\u751f\u6210", EditorStyles.toolbarButton))
-                        ExecuteAndExit(rule, rule.BindAndGenerateFromSelection);
-
-                    using (new EditorGUI.DisabledScope(!HasAnySource(rule)))
-                    {
-                        if (GUILayout.Button("\u4ece\u7ed1\u5b9a\u6765\u6e90\u751f\u6210", EditorStyles.toolbarButton))
-                            ExecuteAndExit(rule, () => BindPreferredSource(rule));
-                    }
-
-                    if (GUILayout.Button("\u91cd\u5efa\u5b57\u6bb5\u6620\u5c04", EditorStyles.toolbarButton))
-                        ExecuteAndExit(rule, rule.RebuildColumnsFromInfoFields);
-
-                    if (GUILayout.Button("\u9884\u70ed\u53cd\u5c04\u7f13\u5b58", EditorStyles.toolbarButton))
-                        ExecuteAndExit(rule, rule.PrewarmReflectionCache);
-                    if (GUILayout.Button("\u4ece\u8868\u683c\u8868\u5934\u6784\u5efa", EditorStyles.toolbarButton))
-                        ExecuteAndExit(rule, rule.RebuildColumnsFromBuildTable);
-
-                    GUILayout.FlexibleSpace();
-                }
-
-                EditorGUILayout.LabelField("Rule \u4f7f\u7528\u64cd\u4f5c", _sectionTitleStyle);
-                using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
-                {
-                    if (GUILayout.Button("\u65b0\u589e\u6279\u6b21", EditorStyles.toolbarButton, GUILayout.Width(90)))
-                        ExecuteAndExit(rule, rule.AddUseBatch);
-
-                    using (new EditorGUI.DisabledScope(!HasColumns(rule)))
-                    {
-                        if (GUILayout.Button("\u6267\u884c\u5168\u90e8\u542f\u7528\u6279\u6b21", EditorStyles.toolbarButton, GUILayout.Width(160)))
-                            ExecuteAndExit(rule, rule.ExecuteAllEnabledBatches);
-                    }
-
-                    GUILayout.FlexibleSpace();
-                }
-            }
-        }
-
-        private static void ExecuteAndExit(ESSoTableDataRule rule, Action action)
-        {
-            if (action == null)
-                return;
-
-            action();
-            EditorUtility.SetDirty(rule);
-            GUIUtility.ExitGUI();
-        }
-
-        private void DrawOverview(ESSoTableDataRule rule)
-        {
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                DrawMetricCard("\u5b57\u6bb5\u6620\u5c04", GetColumnCount(rule).ToString(), "\u5df2\u542f\u7528 " + GetEnabledColumnCount(rule));
-                DrawMetricCard("\u7ed1\u5b9a\u6765\u6e90", GetSourceKind(rule), ShortenMiddle(GetSourcePath(rule), 36));
-                DrawMetricCard("\u7c7b\u578b", GetInfoTypeName(rule), GetPackGroupSummary(rule));
-            }
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                DrawMetricCard("\u8f93\u51fa", GetOutputMode(rule), ShortenMiddle(GetOutputPath(rule), 42));
-                DrawMetricCard("\u547d\u540d", FirstNotEmpty(rule.tableName, GetBatchFileName(rule), "-"), FirstNotEmpty(rule.beanName, GetBatchSheetName(rule), "-"));
-                DrawMetricCard("\u6279\u6b21", GetBatchCountText(rule), GetBatchPolicyText(rule));
-            }
-        }
-
-        private void DrawMetricCard(string title, string value, string detail)
-        {
-            using (new EditorGUILayout.VerticalScope(_cardStyle, GUILayout.MinHeight(58)))
-            {
-                EditorGUILayout.LabelField(title, _sectionTitleStyle);
-                EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(value) ? "-" : value, _metricValueStyle);
-                EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(detail) ? "-" : detail, _mutedStyle);
-            }
-        }
-
-        private void DrawWarnings(ESSoTableDataRule rule)
-        {
-            if (!rule.enabled)
-                EditorGUILayout.HelpBox("\u5f53\u524d\u89c4\u5219\u5df2\u505c\u7528\u3002\u4ecd\u7136\u53ef\u4ee5\u4ece\u8fd9\u4e2a\u9762\u677f\u624b\u52a8\u6267\u884c\u5bfc\u5165\u5bfc\u51fa\u3002", MessageType.Info);
-
-            if (!HasAnySource(rule))
-                EditorGUILayout.HelpBox("\u8fd8\u6ca1\u6709\u6307\u5b9a SO\u3001\u6587\u4ef6\u5939\u6216\u811a\u672c\u3002\u53ef\u4ee5\u5148\u5728\u7ed1\u5b9a\u533a\u57df\u62d6\u5165\u6765\u6e90\uff0c\u6216\u5728 Project \u91cc\u9009\u4e2d\u5bf9\u8c61\u540e\u70b9\u201c\u4ece\u5f53\u524d\u9009\u62e9\u751f\u6210\u201d\u3002", MessageType.Warning);
-
-            if (!HasColumns(rule))
-                EditorGUILayout.HelpBox("\u8fd8\u6ca1\u6709\u5b57\u6bb5\u6620\u5c04\u3002\u5bfc\u51fa\u524d\u9700\u8981\u5148\u7ed1\u5b9a\u6765\u6e90\uff0c\u6216\u70b9\u51fb\u201c\u91cd\u5efa\u5b57\u6bb5\u6620\u5c04\u201d\u3002", MessageType.Warning);
-
-            Type packType;
-            Type groupType;
-            Type infoType;
-            if (!rule.TryGetTargetTypes(out packType, out groupType, out infoType))
-                EditorGUILayout.HelpBox("Pack\u3001Group \u6216 Info \u7c7b\u578b\u8fd8\u6ca1\u6709\u5b8c\u6574\u89e3\u6790\u3002\u901a\u5e38\u4ece\u6709\u6548\u7684 SoData \u6765\u6e90\u91cd\u65b0\u751f\u6210\u5373\u53ef\u3002", MessageType.Info);
-        }
-
-        private void DrawChineseFields()
-        {
-            serializedObject.Update();
-
-            DrawFoldout("basic", ref _showBasic, "\u57fa\u7840\u914d\u7f6e", "\u8fd9\u91cc\u53ea\u653e Rule \u81ea\u8eab\u7684\u542f\u7528\u3001Key \u548c\u8bf4\u660e\uff0c\u4e0d\u51b3\u5b9a\u5b57\u6bb5\u548c\u6279\u6b21\u3002", DrawBasicFields);
-            DrawFoldout("build", ref _showBuildStage, "Rule \u6784\u5efa\u9636\u6bb5", "\u7528 SO\u3001MonoScript \u6216\u8868\u683c\u6837\u672c\u751f\u6210\u5b57\u6bb5\u6620\u5c04\uff1b\u53ea\u6784\u5efa\u89c4\u5219\uff0c\u4e0d\u6267\u884c\u6279\u91cf\u5bfc\u5165\u5bfc\u51fa\u3002", DrawBuildStageFields);
-            DrawFoldout("use", ref _showUseStage, "Rule \u4f7f\u7528\u9636\u6bb5", "\u914d\u7f6e\u4e00\u4e2a\u6216\u591a\u4e2a\u6267\u884c\u6279\u6b21\uff1a\u5904\u7406\u54ea\u4e9b SO\u3001\u8f93\u51fa\u5230\u54ea\u4e2a\u8868\u683c\u3001\u6309\u4ec0\u4e48\u8303\u56f4\u5199\u56de\u3002", DrawUseStageFields);
-            DrawFoldout("columns", ref _showColumns, "\u5b57\u6bb5\u6620\u5c04", "\u5b9a\u4e49 SO \u5b57\u6bb5\u4e0e\u8868\u683c\u5217\u7684\u5bf9\u5e94\u5173\u7cfb\uff1b\u9501\u5b9a\u3001\u6743\u5a01\u3001\u6392\u5e8f\u90fd\u5728\u8fd9\u91cc\u7ba1\u3002", DrawColumnFields);
-            DrawFoldout("advanced", ref _showAdvanced, "\u9ad8\u7ea7\u914d\u7f6e", "\u65e5\u5e38\u5148\u7528\u5feb\u901f\u65b9\u6848\u3002\u53ea\u6709\u884c\u7ed1\u5b9a\u3001\u5b50\u5bf9\u8c61\u5c55\u5f00\u3001\u8868\u5934\u6a21\u677f\u9700\u8981\u8c03\u65f6\u624d\u8fdb\u4e13\u5bb6\u8be6\u60c5\u3002", DrawAdvancedFields);
-            DrawFoldout("typeCache", ref _showTypeCache, "\u7c7b\u578b\u7f13\u5b58", "\u8fd9\u662f\u4ece\u6784\u5efa\u6765\u6e90\u89e3\u6790\u51fa\u7684\u7c7b\u578b\u7ed3\u679c\uff0c\u901a\u5e38\u53ea\u7528\u67e5\u770b\uff0c\u4e0d\u624b\u52a8\u6539\u3002", DrawTypeCacheFields);
-
-            serializedObject.ApplyModifiedProperties();
-        }
-
-        private void DrawFoldout(string prefsKey, ref bool expanded, string title, string hint, Action drawContent)
-        {
-            using (new EditorGUILayout.VerticalScope(_cardStyle))
-            {
-                bool oldExpanded = expanded;
-                Rect headerRect = GUILayoutUtility.GetRect(0, 32, GUILayout.ExpandWidth(true));
-                Color headerColor = expanded
-                    ? new Color(0.18f, 0.29f, 0.38f, 0.98f)
-                    : new Color(0.13f, 0.16f, 0.20f, 0.98f);
-                EditorGUI.DrawRect(headerRect, headerColor);
-                EditorGUI.DrawRect(new Rect(headerRect.x, headerRect.y, 5, headerRect.height), new Color(0.32f, 0.72f, 0.92f, 1f));
-
-                Event current = Event.current;
-                if (current != null && current.type == EventType.MouseDown && headerRect.Contains(current.mousePosition))
-                {
-                    expanded = !expanded;
-                    current.Use();
-                }
-
-                Rect foldoutRect = new Rect(headerRect.x + 9, headerRect.y + 6, 18, 20);
-                expanded = EditorGUI.Foldout(foldoutRect, expanded, GUIContent.none, true);
-                if (expanded != oldExpanded)
-                    SaveFoldoutPref(prefsKey, expanded);
-
-                Rect titleRect = new Rect(headerRect.x + 29, headerRect.y + 6, headerRect.width - 36, 20);
-                GUI.Label(titleRect, title, _foldoutTitleStyle);
-
-                if (!string.IsNullOrWhiteSpace(hint))
-                {
-                    Rect hintRect = GUILayoutUtility.GetRect(0, 38, GUILayout.ExpandWidth(true));
-                    EditorGUI.DrawRect(hintRect, expanded ? new Color(0.10f, 0.13f, 0.16f, 0.92f) : new Color(0.09f, 0.10f, 0.12f, 0.82f));
-                    GUI.Label(hintRect, hint, _foldoutHintStyle);
-                }
-
-                if (!expanded)
-                    return;
-
-                EditorGUILayout.Space(4);
-                drawContent?.Invoke();
-            }
-        }
-
-        private void DrawBasicFields()
-        {
-            DrawProperty("enabled", "\u542f\u7528");
-            DrawProperty("ruleKey", "\u89c4\u5219 Key");
-            DrawProperty("description", "\u89c4\u5219\u8bf4\u660e");
-        }
-
-        private void DrawBuildStageFields()
-        {
-            SerializedProperty buildStageProperty = serializedObject.FindProperty("buildStage");
-            if (buildStageProperty == null)
-                return;
-
-            SerializedProperty source = buildStageProperty.FindPropertyRelative("sourceBinding");
-            if (source != null)
-            {
-                EditorGUILayout.LabelField("\u6784\u5efa\u6765\u6e90\uff08\u7528\u6765\u751f\u6210\u89c4\u5219\uff09", _sectionTitleStyle);
-                DrawChild(source, "soAsset", "\u5355\u4e2a SO \u6837\u672c");
-                DrawChild(source, "monoScript", "\u811a\u672c\u7c7b\u578b");
-            }
-
-            DrawPathProperty(buildStageProperty.FindPropertyRelative("tableFilePath"), "\u8868\u683c\u6837\u672c\u8def\u5f84", true, "csv,xlsx");
-            DrawChild(buildStageProperty, "allowTableHeaderOverride", "\u5141\u8bb8\u8868\u5934\u8986\u76d6\u5b57\u6bb5\u6620\u5c04");
-
-            EditorGUILayout.HelpBox("\u6784\u5efa\u9636\u6bb5\u53ea\u8d1f\u8d23\u751f\u6210\u89c4\u5219\uff1a\u7528\u5355\u4e2a SO\u3001\u811a\u672c\u6216\u8868\u683c\u8868\u5934\u63a8\u5bfc\u5b57\u6bb5\u6620\u5c04\u3002\u4e0d\u5728\u8fd9\u91cc\u914d\u6279\u91cf\u5bfc\u5165\u5bfc\u51fa\u6570\u636e\u3002", MessageType.Info);
-        }
-
-        private void DrawUseStageFields()
-        {
-            SerializedProperty batches = serializedObject.FindProperty("useBatches");
-            if (batches == null)
-                return;
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField("\u6279\u6b21\u6570\u91cf\uff1a" + batches.arraySize, _sectionTitleStyle);
-                if (GUILayout.Button("\u65b0\u589e\u6279\u6b21", EditorStyles.miniButton, GUILayout.Width(82)))
-                {
-                    serializedObject.ApplyModifiedProperties();
-                    ((ESSoTableDataRule)target).AddUseBatch();
-                    serializedObject.Update();
-                }
-            }
-
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
-            {
-                if (GUILayout.Button("\u542f\u7528\u5168\u90e8", EditorStyles.toolbarButton, GUILayout.Width(76)))
-                    SetAllBatchesEnabled(batches, true);
-                if (GUILayout.Button("\u505c\u7528\u5168\u90e8", EditorStyles.toolbarButton, GUILayout.Width(76)))
-                    SetAllBatchesEnabled(batches, false);
-                if (GUILayout.Button("\u8865\u9f50\u9ed8\u8ba4\u8def\u5f84", EditorStyles.toolbarButton, GUILayout.Width(108)))
-                    ApplyDefaultPathToAllBatches(batches, (ESSoTableDataRule)target);
-                GUILayout.FlexibleSpace();
-            }
-
-            for (int i = 0; i < batches.arraySize; i++)
-            {
-                SerializedProperty batch = batches.GetArrayElementAtIndex(i);
-                SerializedProperty batchName = batch.FindPropertyRelative("batchName");
-                string title = "\u6279\u6b21 " + (i + 1);
-                if (batchName != null && !string.IsNullOrEmpty(batchName.stringValue))
-                    title += "  " + batchName.stringValue;
-
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        batch.isExpanded = EditorGUILayout.Foldout(batch.isExpanded, title, true);
-                        using (new EditorGUI.DisabledScope(!HasColumns((ESSoTableDataRule)target)))
-                        {
-                            if (GUILayout.Button("\u6267\u884c", EditorStyles.miniButton, GUILayout.Width(52)))
-                            {
-                                serializedObject.ApplyModifiedProperties();
-                                ((ESSoTableDataRule)target).ExecuteUseBatch(((ESSoTableDataRule)target).useBatches[i]);
-                                GUIUtility.ExitGUI();
-                            }
-                        }
-
-                        using (new EditorGUI.DisabledScope(i == 0))
-                        {
-                            if (GUILayout.Button("\u4e0a\u79fb", EditorStyles.miniButton, GUILayout.Width(44)))
-                            {
-                                batches.MoveArrayElement(i, i - 1);
-                                break;
-                            }
-                        }
-
-                        using (new EditorGUI.DisabledScope(i >= batches.arraySize - 1))
-                        {
-                            if (GUILayout.Button("\u4e0b\u79fb", EditorStyles.miniButton, GUILayout.Width(44)))
-                            {
-                                batches.MoveArrayElement(i, i + 1);
-                                break;
-                            }
-                        }
-
-                        if (GUILayout.Button("\u590d\u5236", EditorStyles.miniButton, GUILayout.Width(44)))
-                        {
-                            batches.InsertArrayElementAtIndex(i);
-                            SerializedProperty copy = batches.GetArrayElementAtIndex(i + 1);
-                            SerializedProperty copyName = copy.FindPropertyRelative("batchName");
-                            if (copyName != null)
-                                copyName.stringValue = FirstNotEmpty(copyName.stringValue, "\u6279\u6b21") + " \u526f\u672c";
-                            break;
-                        }
-
-                        if (GUILayout.Button("\u5220\u9664", EditorStyles.miniButton, GUILayout.Width(52)))
-                        {
-                            batches.DeleteArrayElementAtIndex(i);
-                            break;
-                        }
-                    }
-
-                    if (!batch.isExpanded)
-                        continue;
-
-                    DrawChild(batch, "enabled", "\u542f\u7528");
-                    DrawChild(batch, "batchName", "\u6279\u6b21\u540d");
-                    DrawChildEnum(batch, "direction", "\u6267\u884c\u65b9\u5411", new[] { "\u5bfc\u51fa", "\u5bfc\u5165", "\u5bfc\u5165\u5e76\u5bfc\u51fa" });
-
-                    SerializedProperty source = batch.FindPropertyRelative("sourceBinding");
-                    if (source != null)
-                    {
-                        EditorGUILayout.LabelField("\u6570\u636e\u6765\u6e90\uff08\u8fd9\u4e00\u6279\u8981\u5904\u7406\u54ea\u4e9b SO\uff09", _sectionTitleStyle);
-                        DrawChild(source, "soAsset", "SO \u6587\u4ef6");
-                        DrawChild(source, "soFolder", "SO \u6587\u4ef6\u5939");
-                        DrawChild(source, "includeSubFolders", "\u5305\u542b\u5b50\u6587\u4ef6\u5939");
-                        DrawChildEnum(source, "folderSyncMode", "\u6587\u4ef6\u5939\u540c\u6b65\u6a21\u5f0f", new[] { "\u53ea\u6bd4\u5bf9", "\u589e\u91cf\u540c\u6b65", "\u91cd\u5efa\u751f\u6210" });
-                    }
-
-                    EditorGUILayout.LabelField("\u8868\u683c\u8def\u5f84", _sectionTitleStyle);
-                    DrawChildEnum(batch, "fileKind", "\u6587\u4ef6\u683c\u5f0f", "\u8fd9\u4e00\u6279\u5bfc\u5165\u6216\u5bfc\u51fa CSV\u3001XLSX\uff0c\u6216\u4e24\u8005\u540c\u65f6\u751f\u6210\u3002", new[] { "CSV", "XLSX", "CSV \u548c XLSX" });
-                    DrawChildEnum(batch, "columnNameMode", "\u8868\u683c\u5217\u540d", "\u82f1\u6587\u5217\u540d\u4f7f\u7528\u6620\u5c04\u7684\u8868\u683c\u5217\u540d\uff1b\u4e2d\u6587\u663e\u793a\u540d\u4f7f\u7528 SO \u663e\u793a\u540d\u4f5c\u4e3a\u8868\u5934\u5339\u914d\u3002", new[] { "\u82f1\u6587\u5217\u540d", "\u4e2d\u6587\u663e\u793a\u540d" });
-                    DrawChild(batch, "fileName", "\u6587\u4ef6\u540d", "\u8868\u683c\u6587\u4ef6\u540d\uff0c\u4e0d\u9700\u8981\u586b .csv \u6216 .xlsx \u6269\u5c55\u540d\u3002");
-                    DrawChild(batch, "sheetName", "Sheet \u540d", "XLSX \u7684 Sheet \u540d\u3002CSV \u4e0d\u4f7f\u7528\u8fd9\u4e2a\u5b57\u6bb5\u3002");
-                    DrawPathProperty(batch.FindPropertyRelative("outputRoot"), "\u8f93\u51fa\u6839\u76ee\u5f55", false, string.Empty);
-                    DrawChild(batch, "csvRelativePath", "CSV \u76f8\u5bf9\u8def\u5f84", "\u76f8\u5bf9\u8f93\u51fa\u6839\u76ee\u5f55\u7684 CSV \u5b50\u76ee\u5f55\u3002");
-                    DrawChild(batch, "xlsxRelativePath", "XLSX \u76f8\u5bf9\u8def\u5f84", "\u76f8\u5bf9\u8f93\u51fa\u6839\u76ee\u5f55\u7684 XLSX \u5b50\u76ee\u5f55\u3002");
-                    if (GUILayout.Button("\u5e94\u7528\u9ed8\u8ba4\u8868\u683c\u8def\u5f84", EditorStyles.miniButton, GUILayout.Width(150)))
-                        ApplyDefaultBatchPath(batch, (ESSoTableDataRule)target);
-
-                    EditorGUILayout.LabelField("\u6279\u6b21\u7b56\u7565", _sectionTitleStyle);
-                    DrawChildEnum(batch, "importConflictPolicy", "\u5bfc\u5165\u51b2\u7a81", "\u8868\u683c\u5199\u56de SO \u65f6\u9047\u5230\u5df2\u6709\u6570\u636e\u6216\u51b2\u7a81\u9879\u7684\u5904\u7406\u65b9\u5f0f\u3002", new[] { "\u8df3\u8fc7", "\u8986\u76d6", "\u521b\u5efa\u526f\u672c", "\u62a5\u9519" });
-                    DrawChildEnum(batch, "exportConflictPolicy", "\u5bfc\u51fa\u51b2\u7a81", "\u5bfc\u51fa\u8868\u683c\u65f6\u5982\u679c\u76ee\u6807\u6587\u4ef6\u5df2\u5b58\u5728\uff0c\u91c7\u7528\u54ea\u79cd\u5904\u7406\u65b9\u5f0f\u3002", new[] { "\u8df3\u8fc7", "\u8986\u76d6", "\u521b\u5efa\u526f\u672c", "\u62a5\u9519" });
-
-                    EditorGUILayout.LabelField("\u5e94\u7528\u8303\u56f4\uff08\u5bfc\u5165\u5199\u56de\uff09", _sectionTitleStyle);
-                    DrawChildEnum(batch, "applyRangeMode", "\u8303\u56f4", "\u5bfc\u5165\u5199\u56de\u65f6\u662f\u5e94\u7528\u6574\u5f20\u8868\uff0c\u8fd8\u662f\u53ea\u6309\u67d0\u5217\u7684\u8d77\u6b62\u503c\u5e94\u7528\u4e00\u6bb5\uff0c\u6216\u53ea\u5e94\u7528\u4e00\u4e2a Group/Info\u3002", new[] { "\u5168\u91cf\u5e94\u7528", "\u7247\u6bb5\u622a\u53d6", "\u5355\u4e2a Group/Info" });
-                    SerializedProperty range = batch.FindPropertyRelative("applyRangeMode");
-                    if (range != null && range.enumValueIndex == (int)ESTableBatchApplyRangeMode.Slice)
-                    {
-                        DrawChild(batch, "sliceColumnName", "\u622a\u53d6\u5217\u540d", "\u7528\u54ea\u4e00\u5217\u6765\u5224\u65ad\u7247\u6bb5\u8d77\u6b62\u3002\u7559\u7a7a\u65f6\u4f7f\u7528 Info Key \u5217\u3002");
-                        DrawChild(batch, "sliceStartValue", "\u8d77\u70b9\u503c", "\u5728\u622a\u53d6\u5217\u91cc\u627e\u5230\u8fd9\u4e2a\u503c\u540e\u5f00\u59cb\u5199\u56de\u3002");
-                        DrawChild(batch, "sliceEndValue", "\u7ec8\u70b9\u503c", "\u5728\u622a\u53d6\u5217\u91cc\u627e\u5230\u8fd9\u4e2a\u503c\u540e\u505c\u6b62\u5199\u56de\u3002");
-                        DrawChild(batch, "includeSliceStart", "\u5305\u542b\u8d77\u70b9", "\u8d77\u70b9\u884c\u672c\u8eab\u662f\u5426\u4e5f\u8981\u5199\u56de\u3002");
-                        DrawChild(batch, "includeSliceEnd", "\u5305\u542b\u7ec8\u70b9", "\u7ec8\u70b9\u884c\u672c\u8eab\u662f\u5426\u4e5f\u8981\u5199\u56de\u3002");
-                    }
-                    else if (range != null && range.enumValueIndex == (int)ESTableBatchApplyRangeMode.SingleGroupInfo)
-                    {
-                        DrawChild(batch, "targetGroupKey", "\u76ee\u6807 Group", "\u53ea\u5199\u56de\u8fd9\u4e2a Group \u4e0b\u7684\u6570\u636e\u3002\u7559\u7a7a\u5219\u4e0d\u9650\u5236 Group\u3002");
-                        DrawChild(batch, "targetInfoKey", "\u76ee\u6807 Info", "\u53ea\u5199\u56de\u8fd9\u4e2a Info Key \u5bf9\u5e94\u7684\u6570\u636e\u3002\u7559\u7a7a\u5219\u4e0d\u9650\u5236 Info\u3002");
-                    }
-                }
-            }
-
-            EditorGUILayout.HelpBox("\u4f7f\u7528\u9636\u6bb5\u53ef\u4ee5\u914d\u591a\u4e2a\u6279\u6b21\uff1a\u540c\u4e00\u5957\u5b57\u6bb5\u89c4\u5219\uff0c\u5206\u522b\u5904\u7406\u4e0d\u540c SO \u6587\u4ef6\u6216\u6587\u4ef6\u5939\u3002", MessageType.Info);
-        }
-
-        private void DrawAdvancedFields()
-        {
-            EditorGUILayout.LabelField("\u5feb\u901f\u65b9\u6848", _sectionTitleStyle);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                var rule = target as ESSoTableDataRule;
-                if (GUILayout.Button("\u6807\u51c6 SO \u8868", EditorStyles.miniButton))
-                    ExecuteAndExit(rule, rule.ApplyPresetStandardSoTable);
-                if (GUILayout.Button("\u53ea\u5bfc\u51fa", EditorStyles.miniButton))
-                    ExecuteAndExit(rule, rule.ApplyPresetExportOnly);
-                if (GUILayout.Button("\u8868\u683c\u5199\u56de", EditorStyles.miniButton))
-                    ExecuteAndExit(rule, rule.ApplyPresetImportBack);
-                if (GUILayout.Button("\u666e\u901a SO \u7b80\u5316", EditorStyles.miniButton))
-                    ExecuteAndExit(rule, rule.ApplyPresetSimpleScriptableObject);
-            }
-
-            EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("\u5e38\u7528\u89c4\u5219", _sectionTitleStyle);
-            DrawEnumProperty("infoExpandMode", "Info \u5c55\u5f00\u65b9\u5f0f", "\u51b3\u5b9a\u4e00\u4e2a Info \u5bf9\u8c61\u7684\u5b57\u6bb5\u5982\u4f55\u751f\u6210\u8868\u683c\u5217\uff1a\u53ea\u7528\u663e\u5f0f\u6620\u5c04\u3001\u626b\u53ef\u5e8f\u5217\u5316\u5b57\u6bb5\u3001\u628a\u5b50\u5bf9\u8c61\u5c55\u5f00\u6210\u591a\u5217\uff0c\u6216\u628a\u590d\u6742\u5bf9\u8c61\u4fdd\u5b58\u4e3a Json\u3002", new[] { "\u53ea\u4f7f\u7528\u663e\u5f0f\u6620\u5c04", "\u5c55\u5f00\u53ef\u5e8f\u5217\u5316\u5b57\u6bb5", "\u5d4c\u5957\u5bf9\u8c61\u5c55\u5f00\u591a\u5217", "\u590d\u6742\u5bf9\u8c61\u4fdd\u5b58\u4e3a Json" });
-            DrawEnumProperty("groupSliceMode", "Group \u622a\u53d6\u65b9\u5f0f", "\u51b3\u5b9a\u5bfc\u51fa\u8868\u683c\u65f6 Group \u5982\u4f55\u8868\u8fbe\uff1a\u5ffd\u7565\u3001\u5199\u5165\u4e00\u5217\u3001\u6bcf\u4e2a Group \u4e00\u4e2a Sheet\uff0c\u6216\u6bcf\u4e2a Group \u4e00\u4e2a\u6587\u4ef6\u3002", new[] { "\u5ffd\u7565 Group", "Group \u540d\u5199\u5165\u5217", "\u6bcf\u4e2a Group \u4e00\u4e2a Sheet", "\u6bcf\u4e2a Group \u4e00\u4e2a\u6587\u4ef6" });
-            DrawProperty("infoKeyColumnName", "Info Key \u5217\u540d", "\u8868\u683c\u4e2d\u7528\u6765\u5339\u914d Info \u7684 Key \u5217\u540d\u3002\u5bfc\u5165\u5199\u56de\u65f6\u4f18\u5148\u7528\u5b83\u627e\u5230\u5bf9\u5e94 SO\u3002");
-            DrawEnumProperty("nameMatchMode", "\u540d\u79f0\u5339\u914d", "\u5bfc\u5165\u65f6\u8868\u683c\u5217\u540d\u548c\u5b57\u6bb5\u540d\u7684\u5339\u914d\u7b56\u7565\u3002\u4e00\u822c\u7528\u5b57\u6bb5\u540d\u8f6c\u5217\u540d\u6216\u5b8c\u5168\u5339\u914d\u3002", new[] { "\u5b8c\u5168\u5339\u914d", "\u5ffd\u7565\u5927\u5c0f\u5199", "\u5b57\u6bb5\u540d\u8f6c\u5217\u540d", "\u81ea\u5b9a\u4e49" });
-            DrawProperty("allowCreateInfoOnImport", "\u5bfc\u5165\u65f6\u5141\u8bb8\u521b\u5efa Info", "\u8868\u683c\u91cc\u6709\u65b0 Key\uff0c\u4f46 SO \u4e2d\u627e\u4e0d\u5230\u5bf9\u5e94 Info \u65f6\uff0c\u662f\u5426\u5141\u8bb8\u81ea\u52a8\u521b\u5efa\u3002");
-            DrawProperty("refreshPackBeforeExport", "\u5bfc\u51fa\u524d\u540c\u6b65 Pack \u7f13\u5b58", "\u5bfc\u51fa\u524d\u5148\u8ba9 Pack \u5237\u65b0\u5185\u90e8\u7f13\u5b58\uff0c\u907f\u514d\u8868\u683c\u4f7f\u7528\u5230\u8fc7\u671f\u7684 Group/Info \u5217\u8868\u3002");
-
-            EditorGUILayout.Space(6);
-            bool oldExpert = _showAdvancedExpert;
-            _showAdvancedExpert = EditorGUILayout.Foldout(_showAdvancedExpert, "\u4e13\u5bb6\u8be6\u60c5", true, EditorStyles.foldout);
-            if (_showAdvancedExpert != oldExpert)
-                SaveFoldoutPref("advancedExpert", _showAdvancedExpert);
-            if (!_showAdvancedExpert)
-            {
-                EditorGUILayout.HelpBox("\u65e5\u5e38\u60c5\u51b5\u7528\u4e0a\u9762\u7684\u5feb\u901f\u65b9\u6848\u548c\u5e38\u7528\u89c4\u5219\u5c31\u591f\u4e86\u3002\u884c\u7ed1\u5b9a\u3001\u5b50\u5bf9\u8c61\u5c55\u5f00\u3001\u8868\u5934\u6a21\u677f\u5df2\u653e\u5230\u4e13\u5bb6\u8be6\u60c5\u91cc\u3002", MessageType.Info);
-                return;
-            }
-
-            EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("Pack / Group / Info", _sectionTitleStyle);
-            DrawProperty("packColumnName", "Pack \u5217\u540d", "\u5bfc\u51fa\u8868\u683c\u65f6 Pack \u6807\u8bc6\u5217\u7684\u5217\u540d\u3002\u591a Pack \u5408\u5e76\u8868\u65f6\u624d\u5e38\u7528\u3002");
-            DrawProperty("groupColumnName", "Group \u5217\u540d", "\u5bfc\u51fa\u8868\u683c\u65f6 Group \u6807\u8bc6\u5217\u7684\u5217\u540d\u3002\u5bfc\u5165\u5355\u4e2a Group/Info \u65f6\u4e5f\u4f1a\u7528\u5230\u3002");
-
-            EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("\u884c\u7ed1\u5b9a", _sectionTitleStyle);
-            DrawChildEnum("rowBinding", "targetMode", "\u884c\u76ee\u6807", "\u51b3\u5b9a\u8868\u683c\u7684\u4e00\u884c\u5bf9\u5e94\u4ec0\u4e48\uff1a\u6574\u4e2a Info/SO \u5bf9\u8c61\uff0c\u6216\u5bf9\u8c61\u5185\u90e8\u67d0\u4e2a List \u7684\u5143\u7d20\u3002", new[] { "\u4e00\u884c = \u4e00\u4e2a\u5bf9\u8c61", "\u4e00\u884c = \u5bf9\u8c61\u5185 List \u5143\u7d20" });
-            DrawChild("rowBinding", "rowKeyColumnName", "\u884c Key \u5217\u540d", "\u5f53\u4e00\u884c\u5bf9\u5e94 List \u5143\u7d20\u65f6\uff0c\u7528\u8fd9\u5217\u627e\u5230\u5177\u4f53\u5143\u7d20\u3002");
-            DrawChild("rowBinding", "listFieldPath", "List \u5b57\u6bb5\u8def\u5f84", "\u5bf9\u8c61\u5185\u7684 List \u5b57\u6bb5\u8def\u5f84\uff0c\u4f8b\u5982 rewards \u6216 config.items\u3002");
-            DrawChild("rowBinding", "elementKeyFieldPath", "\u5143\u7d20 Key \u5b57\u6bb5\u8def\u5f84", "\u7528\u6765\u5339\u914d List \u5143\u7d20\u7684 Key \u5b57\u6bb5\u3002");
-            DrawChild("rowBinding", "createMissingElement", "\u5bfc\u5165\u65f6\u521b\u5efa\u7f3a\u5931\u5143\u7d20", "\u8868\u683c\u91cc\u6709\u65b0\u5143\u7d20 Key\uff0cList \u91cc\u4e0d\u5b58\u5728\u65f6\uff0c\u662f\u5426\u81ea\u52a8\u521b\u5efa\u3002");
-            DrawChild("rowBinding", "allowEmptyRowKey", "\u5141\u8bb8\u7a7a Key", "\u5141\u8bb8\u884c Key \u4e3a\u7a7a\u3002\u4e00\u822c\u4e0d\u5efa\u8bae\u6253\u5f00\uff0c\u9664\u975e\u884c\u987a\u5e8f\u5c31\u662f\u552f\u4e00\u5339\u914d\u4f9d\u636e\u3002");
-
-            EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("\u5b50\u5bf9\u8c61\u5b57\u6bb5", _sectionTitleStyle);
-            DrawChild("nestedFieldRule", "expandNestedFields", "\u5c55\u5f00\u5b50\u5bf9\u8c61\u5b57\u6bb5", "\u6784\u5efa\u6620\u5c04\u65f6\uff0c\u662f\u5426\u628a\u53ef\u5e8f\u5217\u5316\u7684\u5b50\u5bf9\u8c61\u5b57\u6bb5\u5c55\u5f00\u6210\u591a\u4e2a\u8868\u683c\u5217\u3002");
-            DrawChild("nestedFieldRule", "maxDepth", "\u6700\u5927\u5c55\u5f00\u6df1\u5ea6", "\u5b50\u5bf9\u8c61\u6700\u591a\u5c55\u5f00\u51e0\u5c42\u3002\u8d8a\u5927\u5217\u8d8a\u591a\uff0c\u8868\u683c\u4e5f\u8d8a\u590d\u6742\u3002");
-            DrawChild("nestedFieldRule", "columnSeparator", "\u5217\u540d\u5206\u9694\u7b26", "\u5b50\u5bf9\u8c61\u5c55\u5f00\u540e\u5217\u540d\u7684\u8fde\u63a5\u7b26\uff0c\u4f8b\u5982 config_value\u4e2d\u7684 _\u3002");
-
-            EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("\u8868\u5934\u6a21\u677f", _sectionTitleStyle);
-            DrawChild("header", "varMark", "\u53d8\u91cf\u884c\u6807\u8bb0", "SO表格 \u8868\u5934\u7b2c 1 \u884c\u7684\u6807\u8bb0\uff0c\u9ed8\u8ba4 ##var\u3002");
-            DrawChild("header", "typeMark", "\u7c7b\u578b\u884c\u6807\u8bb0", "SO表格 \u8868\u5934\u7b2c 2 \u884c\u7684\u6807\u8bb0\uff0c\u9ed8\u8ba4 ##type\u3002");
-            DrawChild("header", "groupMark", "\u5206\u7ec4\u884c\u6807\u8bb0", "SO表格 \u8868\u5934\u7b2c 3 \u884c\u7684\u6807\u8bb0\uff0c\u9ed8\u8ba4 ##group\u3002");
-            DrawChild("header", "commentMark", "\u6ce8\u91ca\u884c\u6807\u8bb0", "SO表格 \u8868\u5934\u7b2c 4 \u884c\u7684\u6807\u8bb0\uff0c\u9ed8\u8ba4 ##\u3002");
-            DrawChild("header", "defaultGroup", "\u9ed8\u8ba4\u5206\u7ec4", "\u5b57\u6bb5\u6ca1\u6709\u5355\u72ec\u6307\u5b9a group \u65f6\uff0c\u5199\u5165\u8868\u5934\u7684\u9ed8\u8ba4 group \u503c\u3002");
-
-            EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField("\u5bfc\u5165\u884c\u4e3a", _sectionTitleStyle);
-            DrawProperty("allowCreateGroupOnImport", "\u5bfc\u5165\u65f6\u5141\u8bb8\u521b\u5efa Group", "\u8868\u683c\u91cc\u51fa\u73b0\u65b0 Group\uff0c\u4f46 Pack \u91cc\u627e\u4e0d\u5230\u5bf9\u5e94 Group \u65f6\uff0c\u662f\u5426\u5141\u8bb8\u81ea\u52a8\u521b\u5efa\u3002");
-        }
-
-        private void DrawTypeCacheFields()
-        {
-            using (new EditorGUI.DisabledScope(true))
-            {
-                DrawChildEnum("typeBinding", "objectKind", "\u5bf9\u8c61\u4f53\u7cfb", new[] { "SoData Pack / Group / Info", "\u666e\u901a ScriptableObject" });
-                DrawChild("typeBinding", "objectTypeName", "\u666e\u901a SO \u7c7b\u578b");
-                DrawChild("typeBinding", "packTypeName", "Pack \u7c7b\u578b");
-                DrawChild("typeBinding", "groupTypeName", "Group \u7c7b\u578b");
-                DrawChild("typeBinding", "infoTypeName", "Info \u7c7b\u578b");
-            }
-        }
-
-        private void DrawColumnFields()
-        {
-            SerializedProperty columns = serializedObject.FindProperty("columns");
-            if (columns == null)
-                return;
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField("\u5217\u6620\u5c04\u6570\u91cf\uff1a" + columns.arraySize, _sectionTitleStyle);
-                if (GUILayout.Button("\u5168\u90e8\u8be6\u60c5", EditorStyles.miniButton, GUILayout.Width(82)))
-                    SetColumnDetails(columns, true);
-                if (GUILayout.Button("\u6536\u8d77\u8be6\u60c5", EditorStyles.miniButton, GUILayout.Width(82)))
-                    SetColumnDetails(columns, false);
-                if (GUILayout.Button("\u6e05\u9664\u672a\u9501\u5b9a", EditorStyles.miniButton, GUILayout.Width(96)))
-                    ClearUnlockedColumns(columns);
-                if (GUILayout.Button("\u5168\u90e8\u5ffd\u7565", EditorStyles.miniButton, GUILayout.Width(82)))
-                    SetColumnAuthority(columns, ESTableColumnAuthority.Ignore);
-                if (GUILayout.Button("\u8868\u683c\u6743\u5a01", EditorStyles.miniButton, GUILayout.Width(82)))
-                    SetColumnAuthority(columns, ESTableColumnAuthority.TableAuthority);
-                if (GUILayout.Button("\u65b0\u589e\u5217", EditorStyles.miniButton, GUILayout.Width(72)))
-                    columns.InsertArrayElementAtIndex(columns.arraySize);
-            }
-
-            DrawColumnHeader();
-
-            for (int i = 0; i < columns.arraySize; i++)
-            {
-                SerializedProperty item = columns.GetArrayElementAtIndex(i);
-
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                {
-                    using (new EditorGUILayout.HorizontalScope(GUILayout.MinHeight(22)))
-                    {
-                        DrawColumnIndex(i);
-                        DrawCompactChild(item, "enabled", GUIContent.none, 34);
-                        DrawCompactChild(item, "locked", GUIContent.none, 34);
-                        DrawCompactChild(item, "authority", GUIContent.none, 86);
-                        DrawCompactChild(item, "soFieldPath", GUIContent.none, 190);
-                        DrawCompactChild(item, "displayName", GUIContent.none, 150);
-                        DrawCompactChild(item, "columnName", GUIContent.none, 150);
-                        DrawCompactChild(item, "availability", GUIContent.none, 84);
-                        DrawCompactChild(item, "showDetail", GUIContent.none, 48);
-
-                        using (new EditorGUI.DisabledScope(i == 0))
-                        {
-                            if (GUILayout.Button("\u4e0a", EditorStyles.miniButton, GUILayout.Width(32)))
-                            {
-                                columns.MoveArrayElement(i, i - 1);
-                                break;
-                            }
-                        }
-
-                        using (new EditorGUI.DisabledScope(i >= columns.arraySize - 1))
-                        {
-                            if (GUILayout.Button("\u4e0b", EditorStyles.miniButton, GUILayout.Width(32)))
-                            {
-                                columns.MoveArrayElement(i, i + 1);
-                                break;
-                            }
-                        }
-
-                        SerializedProperty locked = item.FindPropertyRelative("locked");
-                        using (new EditorGUI.DisabledScope(locked != null && locked.boolValue))
-                        {
-                            if (GUILayout.Button("\u5220", EditorStyles.miniButton, GUILayout.Width(34)))
-                            {
-                                columns.DeleteArrayElementAtIndex(i);
-                                break;
-                            }
-                        }
-                    }
-
-                    SerializedProperty showDetail = item.FindPropertyRelative("showDetail");
-                    if (showDetail == null || !showDetail.boolValue)
-                        continue;
-
-                    EditorGUILayout.Space(2);
-                    DrawChildEnum(item, "valueWriteMode", "SO \u5199\u5165\u65b9\u5f0f", new[] { "\u666e\u901a\u503c", "Unity \u5bf9\u8c61 GUID", "Unity \u5bf9\u8c61\u8def\u5f84", "Json", "\u7c7b\u578b\u540d" });
-                    DrawChild(item, "isInfoKey", "Info Key");
-                    DrawChild(item, "isGroupKey", "Group Key");
-                    DrawChild(item, "comment", "\u4e2d\u6587\u8bf4\u660e");
-                    DrawChild(item, "tableType", "SO表格 \u7c7b\u578b");
-                    DrawChildEnum(item, "direction", "\u65b9\u5411", new[] { "\u53cc\u5411", "\u4ec5 SO \u5230\u8868\u683c", "\u4ec5\u8868\u683c\u5230 SO", "\u5ffd\u7565" });
-                    DrawChild(item, "allowPassThrough", "\u4fdd\u7559\u672a\u6620\u5c04\u5217");
-                }
-            }
-        }
-
-        private void DrawColumnHeader()
-        {
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
-            {
-                GUILayout.Label("\u5217", EditorStyles.miniBoldLabel, GUILayout.Width(48));
-                GUILayout.Label("\u7528", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                GUILayout.Label("\u9501", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                GUILayout.Label("\u6743\u5a01", EditorStyles.miniBoldLabel, GUILayout.Width(86));
-                GUILayout.Label("SO \u5b57\u6bb5\u540d", EditorStyles.miniBoldLabel, GUILayout.Width(190));
-                GUILayout.Label("SO \u663e\u793a\u540d", EditorStyles.miniBoldLabel, GUILayout.Width(150));
-                GUILayout.Label("\u8868\u683c\u5217\u540d", EditorStyles.miniBoldLabel, GUILayout.Width(150));
-                GUILayout.Label("\u53ef\u7528", EditorStyles.miniBoldLabel, GUILayout.Width(84));
-                GUILayout.Label("\u8be6\u60c5", EditorStyles.miniBoldLabel, GUILayout.Width(48));
-                GUILayout.FlexibleSpace();
-            }
-        }
-
-        private void DrawColumnIndex(int index)
-        {
-            GUILayout.Label((index + 1).ToString() + " / " + ToColumnLetters(index), EditorStyles.miniLabel, GUILayout.Width(48));
-        }
-
-        private static string ToColumnLetters(int index)
-        {
-            index = Mathf.Max(0, index);
-            var builder = new StringBuilder();
-            int value = index;
-            do
-            {
-                int mod = value % 26;
-                builder.Insert(0, (char)('A' + mod));
-                value = value / 26 - 1;
-            }
-            while (value >= 0);
-
-            return builder.ToString();
-        }
-
-        private static void SetColumnDetails(SerializedProperty columns, bool value)
-        {
-            if (columns == null)
-                return;
-
-            for (int i = 0; i < columns.arraySize; i++)
-            {
-                SerializedProperty item = columns.GetArrayElementAtIndex(i);
-                SerializedProperty showDetail = item.FindPropertyRelative("showDetail");
-                if (showDetail != null)
-                    showDetail.boolValue = value;
-            }
-        }
-
-        private static void SetColumnAuthority(SerializedProperty columns, ESTableColumnAuthority authority)
-        {
-            if (columns == null)
-                return;
-
-            for (int i = 0; i < columns.arraySize; i++)
-            {
-                SerializedProperty item = columns.GetArrayElementAtIndex(i);
-                SerializedProperty authorityProperty = item.FindPropertyRelative("authority");
-                if (authorityProperty != null)
-                    authorityProperty.enumValueIndex = (int)authority;
-            }
-        }
-
-        private static void ClearUnlockedColumns(SerializedProperty columns)
-        {
-            if (columns == null)
-                return;
-
-            for (int i = columns.arraySize - 1; i >= 0; i--)
-            {
-                SerializedProperty item = columns.GetArrayElementAtIndex(i);
-                SerializedProperty locked = item.FindPropertyRelative("locked");
-                if (locked == null || !locked.boolValue)
-                    columns.DeleteArrayElementAtIndex(i);
-            }
-        }
-
-        private void DrawCompactChild(SerializedProperty parent, string childName, GUIContent label, float width)
-        {
-            SerializedProperty child = parent.FindPropertyRelative(childName);
-            if (child == null)
-            {
-                GUILayout.Space(width);
-                return;
-            }
-
-            EditorGUILayout.PropertyField(child, label, GUILayout.Width(width));
-        }
-
-        private void DrawPathProperty(SerializedProperty property, string label, bool filePath, string extensions)
-        {
-            if (property == null)
-                return;
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.PropertyField(property, new GUIContent(label), true);
-                if (GUILayout.Button(filePath ? "\u9009\u62e9\u6587\u4ef6" : "\u9009\u62e9\u6587\u4ef6\u5939", EditorStyles.miniButton, GUILayout.Width(86)))
-                {
-                    string selected = filePath
-                        ? EditorUtility.OpenFilePanel(label, GetPathPanelFolder(property.stringValue), extensions)
-                        : EditorUtility.OpenFolderPanel(label, GetPathPanelFolder(property.stringValue), string.Empty);
-                    if (!string.IsNullOrEmpty(selected))
-                        property.stringValue = filePath ? selected : MakeProjectRelative(selected);
-                }
-            }
-
-            Rect dropRect = GUILayoutUtility.GetRect(0, 22, GUILayout.ExpandWidth(true));
-            ESDropZoneSolver dropZone = filePath ? _tablePathDropZone : _folderPathDropZone;
-            if (dropZone.Draw(dropRect, out UnityEngine.Object[] dropped))
-            {
-                string path = ResolveDroppedPath(dropped, filePath, extensions);
-                if (!string.IsNullOrEmpty(path))
-                    property.stringValue = filePath ? path : MakeProjectRelative(path);
-            }
-
-            string prompt = filePath ? "\u62d6\u5165 Project \u91cc\u7684 CSV / XLSX \u8868\u683c" : "\u62d6\u5165 Project \u91cc\u7684\u8868\u683c\u8f93\u51fa\u6587\u4ef6\u5939";
-            string detail = string.IsNullOrEmpty(dropZone.LastRejectReason)
-                ? dropZone.LastAcceptedCount > 0 ? "\u677e\u5f00\u540e\u63a5\u6536 " + dropZone.LastAcceptedCount + " \u4e2a\u5bf9\u8c61" : prompt
-                : "\u62d2\u7edd\uff1a" + dropZone.LastRejectReason;
-            GUI.Label(dropRect, detail, EditorStyles.centeredGreyMiniLabel);
-        }
-
-        private static string GetPathPanelFolder(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                return Application.dataPath;
-
-            string fullPath = Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(Application.dataPath, "..", path));
-            if (Directory.Exists(fullPath))
-                return fullPath;
-
-            string folder = Path.GetDirectoryName(fullPath);
-            return string.IsNullOrEmpty(folder) ? Application.dataPath : folder;
-        }
-
-        private static string MakeProjectRelative(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                return string.Empty;
-
-            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..")).Replace('\\', '/').TrimEnd('/');
-            string fullPath = Path.GetFullPath(path).Replace('\\', '/');
-            if (fullPath.StartsWith(projectRoot + "/", StringComparison.OrdinalIgnoreCase))
-                return fullPath.Substring(projectRoot.Length + 1);
-
-            return fullPath;
-        }
-
-        private static string ResolveDroppedPath(UnityEngine.Object[] dropped, bool filePath, string extensions)
-        {
-            if (dropped == null)
-                return string.Empty;
-
-            for (int i = 0; i < dropped.Length; i++)
-            {
-                string assetPath = AssetDatabase.GetAssetPath(dropped[i]);
-                if (string.IsNullOrEmpty(assetPath))
-                    continue;
-
-                string fullPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", assetPath));
-                if (!filePath && AssetDatabase.IsValidFolder(assetPath))
-                    return assetPath;
-
-                if (filePath && File.Exists(fullPath) && IsAllowedExtension(fullPath, extensions))
-                    return fullPath;
-            }
-
-            return string.Empty;
-        }
-
-        private static bool IsAllowedExtension(string path, string extensions)
-        {
-            if (string.IsNullOrWhiteSpace(extensions))
-                return true;
-
-            string extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
-            string[] allowed = extensions.Split(',');
-            for (int i = 0; i < allowed.Length; i++)
-            {
-                if (extension == allowed[i].Trim().TrimStart('.').ToLowerInvariant())
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static void ApplyDefaultBatchPath(SerializedProperty batch, ESSoTableDataRule rule)
-        {
-            if (batch == null || rule == null)
-                return;
-
-            SetStringChild(batch, "fileName", FirstNotEmpty(GetStringChild(batch, "fileName"), rule.ruleKey, rule.tableName, rule.name));
-            SetStringChild(batch, "sheetName", FirstNotEmpty(GetStringChild(batch, "sheetName"), rule.ruleKey, rule.beanName, rule.name));
-            SetStringChild(batch, "outputRoot", FirstNotEmpty(GetStringChild(batch, "outputRoot"), "SoTableConfig/Tables"));
-            SetStringChild(batch, "csvRelativePath", FirstNotEmpty(GetStringChild(batch, "csvRelativePath"), "csv"));
-            SetStringChild(batch, "xlsxRelativePath", FirstNotEmpty(GetStringChild(batch, "xlsxRelativePath"), "xlsx"));
-        }
-
-        private static void ApplyDefaultPathToAllBatches(SerializedProperty batches, ESSoTableDataRule rule)
-        {
-            if (batches == null)
-                return;
-
-            for (int i = 0; i < batches.arraySize; i++)
-                ApplyDefaultBatchPath(batches.GetArrayElementAtIndex(i), rule);
-        }
-
-        private static void SetAllBatchesEnabled(SerializedProperty batches, bool enabled)
-        {
-            if (batches == null)
-                return;
-
-            for (int i = 0; i < batches.arraySize; i++)
-            {
-                SerializedProperty batch = batches.GetArrayElementAtIndex(i);
-                SerializedProperty enabledProperty = batch.FindPropertyRelative("enabled");
-                if (enabledProperty != null)
-                    enabledProperty.boolValue = enabled;
-            }
-        }
-
-        private static string GetStringChild(SerializedProperty parent, string childName)
-        {
-            SerializedProperty child = parent.FindPropertyRelative(childName);
-            return child != null ? child.stringValue : string.Empty;
-        }
-
-        private static void SetStringChild(SerializedProperty parent, string childName, string value)
-        {
-            SerializedProperty child = parent.FindPropertyRelative(childName);
-            if (child != null)
-                child.stringValue = value;
-        }
-
-        private void DrawProperty(string propertyName, string label)
-        {
-            DrawProperty(propertyName, label, string.Empty);
-        }
-
-        private void DrawProperty(string propertyName, string label, string tooltip)
-        {
-            SerializedProperty property = serializedObject.FindProperty(propertyName);
-            if (property != null)
-                EditorGUILayout.PropertyField(property, new GUIContent(label, tooltip), true);
-        }
-
-        private void DrawEnumProperty(string propertyName, string label, string[] displayNames)
-        {
-            DrawEnumProperty(propertyName, label, string.Empty, displayNames);
-        }
-
-        private void DrawEnumProperty(string propertyName, string label, string tooltip, string[] displayNames)
-        {
-            SerializedProperty property = serializedObject.FindProperty(propertyName);
-            DrawEnumProperty(property, label, tooltip, displayNames);
-        }
-
-        private void DrawChild(string parentName, string childName, string label)
-        {
-            DrawChild(parentName, childName, label, string.Empty);
-        }
-
-        private void DrawChild(string parentName, string childName, string label, string tooltip)
-        {
-            SerializedProperty parent = serializedObject.FindProperty(parentName);
-            if (parent == null)
-                return;
-
-            DrawChild(parent, childName, label, tooltip);
-        }
-
-        private void DrawChild(SerializedProperty parent, string childName, string label)
-        {
-            DrawChild(parent, childName, label, string.Empty);
-        }
-
-        private void DrawChild(SerializedProperty parent, string childName, string label, string tooltip)
-        {
-            SerializedProperty child = parent.FindPropertyRelative(childName);
-            if (child != null)
-                EditorGUILayout.PropertyField(child, new GUIContent(label, tooltip), true);
-        }
-
-        private void DrawChildEnum(string parentName, string childName, string label, string[] displayNames)
-        {
-            DrawChildEnum(parentName, childName, label, string.Empty, displayNames);
-        }
-
-        private void DrawChildEnum(string parentName, string childName, string label, string tooltip, string[] displayNames)
-        {
-            SerializedProperty parent = serializedObject.FindProperty(parentName);
-            if (parent == null)
-                return;
-
-            DrawChildEnum(parent, childName, label, tooltip, displayNames);
-        }
-
-        private void DrawChildEnum(SerializedProperty parent, string childName, string label, string[] displayNames)
-        {
-            DrawChildEnum(parent, childName, label, string.Empty, displayNames);
-        }
-
-        private void DrawChildEnum(SerializedProperty parent, string childName, string label, string tooltip, string[] displayNames)
-        {
-            SerializedProperty child = parent.FindPropertyRelative(childName);
-            DrawEnumProperty(child, label, tooltip, displayNames);
-        }
-
-        private void DrawEnumProperty(SerializedProperty property, string label, string[] displayNames)
-        {
-            DrawEnumProperty(property, label, string.Empty, displayNames);
-        }
-
-        private void DrawEnumProperty(SerializedProperty property, string label, string tooltip, string[] displayNames)
-        {
-            if (property == null)
-                return;
-
-            if (property.propertyType != SerializedPropertyType.Enum || displayNames == null || displayNames.Length == 0)
-            {
-                EditorGUILayout.PropertyField(property, new GUIContent(label, tooltip), true);
-                return;
-            }
-
-            int index = Mathf.Clamp(property.enumValueIndex, 0, displayNames.Length - 1);
-            property.enumValueIndex = EditorGUILayout.Popup(new GUIContent(label, tooltip), index, displayNames);
-        }
-
-        private static void BindPreferredSource(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleSourceBinding source = GetBuildSourceBinding(rule);
-            if (source == null)
-                return;
-
-            if (source.soFolder != null)
-            {
-                rule.BindAndGenerateFromFolder();
-                return;
-            }
-
-            if (source.soAsset != null)
-            {
-                rule.BindAndGenerateFromSoAsset();
-                return;
-            }
-
-            if (source.monoScript != null)
-                rule.BindAndGenerateFromMonoScript();
-        }
-
-        private static bool HasAnySource(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleSourceBinding source = GetBuildSourceBinding(rule);
-            return source != null &&
-                   (source.soAsset != null || source.soFolder != null || source.monoScript != null);
-        }
-
-        private static bool HasColumns(ESSoTableDataRule rule)
-        {
-            return rule.columns != null && rule.columns.Count > 0;
-        }
-
-        private static int GetColumnCount(ESSoTableDataRule rule)
-        {
-            return rule.columns == null ? 0 : rule.columns.Count;
-        }
-
-        private static int GetEnabledColumnCount(ESSoTableDataRule rule)
-        {
-            if (rule.columns == null)
-                return 0;
-
-            int count = 0;
-            for (int i = 0; i < rule.columns.Count; i++)
-            {
-                if (rule.columns[i] != null && rule.columns[i].enabled)
-                    count++;
-            }
-
-            return count;
-        }
-
-        private static string GetSourceSummary(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleSourceBinding source = GetBuildSourceBinding(rule);
-            if (source == null)
-                return "\u65e0\u6765\u6e90";
-
-            if (source.soFolder != null)
-                return "\u6587\u4ef6\u5939\uff1a" + source.soFolder.name;
-            if (source.soAsset != null)
-                return "SO\uff1a" + source.soAsset.name;
-            if (source.monoScript != null)
-                return "\u811a\u672c\uff1a" + source.monoScript.name;
-
-            return GetBindSourceKindText(source.sourceKind);
-        }
-
-        private static string GetSourceKind(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleSourceBinding source = GetBuildSourceBinding(rule);
-            if (source == null)
-                return "\u65e0";
-
-            if (source.soFolder != null)
-                return "\u6587\u4ef6\u5939";
-            if (source.soAsset != null)
-                return "SO \u6587\u4ef6";
-            if (source.monoScript != null)
-                return "\u811a\u672c";
-
-            return GetBindSourceKindText(source.sourceKind);
-        }
-
-        private static ESSoTableRuleSourceBinding GetBuildSourceBinding(ESSoTableDataRule rule)
-        {
-            if (rule == null)
-                return null;
-
-            return rule.buildStage != null ? rule.buildStage.sourceBinding : null;
-        }
-        private static string GetSourcePath(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleSourceBinding source = GetBuildSourceBinding(rule);
-            if (source == null)
-                return string.Empty;
-
-            string path = string.Empty;
-            if (source.soFolder != null)
-                path = AssetDatabase.GetAssetPath(source.soFolder);
-            else if (source.soAsset != null)
-                path = AssetDatabase.GetAssetPath(source.soAsset);
-            else if (source.monoScript != null)
-                path = AssetDatabase.GetAssetPath(source.monoScript);
-
-            return FirstNotEmpty(path, source.sourcePath, "-");
-        }
-
-        private static string GetInfoTypeName(ESSoTableDataRule rule)
-        {
-            if (rule.typeBinding == null)
-                return "-";
-
-            return ShortTypeName(FirstNotEmpty(rule.typeBinding.infoTypeName, rule.typeBinding.objectTypeName, "-"));
-        }
-
-        private static string GetPackGroupSummary(ESSoTableDataRule rule)
-        {
-            if (rule.typeBinding == null)
-                return "-";
-
-            return ShortTypeName(rule.typeBinding.packTypeName) + " / " + ShortTypeName(rule.typeBinding.groupTypeName);
-        }
-
-        private static string GetOutputMode(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleUseBatch batch = GetPrimaryBatch(rule);
-            ESTableFileKind fileKind = batch != null ? batch.fileKind : ESTableFileKind.CsvAndXlsx;
-            return GetFileKindText(fileKind) + "  |  " + GetGroupSliceModeText(rule.groupSliceMode);
-        }
-
-        private static string GetOutputPath(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleUseBatch batch = GetPrimaryBatch(rule);
-            string root = batch != null ? FirstNotEmpty(batch.outputRoot, "SoTableConfig/Tables") : "SoTableConfig/Tables";
-            string file = FirstNotEmpty(GetBatchFileName(rule), rule.tableName, rule.ruleKey, rule.name);
-            return root + "/" + file;
-        }
-
-        private static ESSoTableRuleUseBatch GetPrimaryBatch(ESSoTableDataRule rule)
-        {
-            if (rule == null || rule.useBatches == null || rule.useBatches.Count == 0)
-                return null;
-
-            for (int i = 0; i < rule.useBatches.Count; i++)
-            {
-                if (rule.useBatches[i] != null && rule.useBatches[i].enabled)
-                    return rule.useBatches[i];
-            }
-
-            return rule.useBatches[0];
-        }
-
-        private static string GetBatchFileName(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleUseBatch batch = GetPrimaryBatch(rule);
-            return batch != null ? batch.fileName : string.Empty;
-        }
-
-        private static string GetBatchSheetName(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleUseBatch batch = GetPrimaryBatch(rule);
-            return batch != null ? batch.sheetName : string.Empty;
-        }
-
-        private static string GetBatchCountText(ESSoTableDataRule rule)
-        {
-            int count = rule != null && rule.useBatches != null ? rule.useBatches.Count : 0;
-            if (count == 0)
-                return "\u672a\u914d\u7f6e";
-            return count + " \u4e2a\u6279\u6b21";
-        }
-
-        private static string GetBatchPolicyText(ESSoTableDataRule rule)
-        {
-            ESSoTableRuleUseBatch batch = GetPrimaryBatch(rule);
-            if (batch == null)
-                return "\u4f7f\u7528\u9636\u6bb5\u5c1a\u672a\u914d\u7f6e";
-
-            return "\u5bfc\u5165 " + GetConflictPolicyText(batch.importConflictPolicy) + " / \u5bfc\u51fa " + GetConflictPolicyText(batch.exportConflictPolicy);
-        }
-
-        private static string FirstNotEmpty(params string[] values)
-        {
-            if (values == null)
-                return string.Empty;
-
-            for (int i = 0; i < values.Length; i++)
-            {
-                if (!string.IsNullOrWhiteSpace(values[i]))
-                    return values[i];
-            }
-
-            return string.Empty;
-        }
-
-        private static string ShortTypeName(string typeName)
-        {
-            if (string.IsNullOrWhiteSpace(typeName))
-                return "-";
-
-            int index = typeName.LastIndexOf('.');
-            return index >= 0 && index + 1 < typeName.Length ? typeName.Substring(index + 1) : typeName;
-        }
-
-        private static string ShortenMiddle(string value, int maxLength)
-        {
-            if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
-                return string.IsNullOrWhiteSpace(value) ? "-" : value;
-
-            int keep = Math.Max(4, (maxLength - 3) / 2);
-            return value.Substring(0, keep) + "..." + value.Substring(value.Length - keep);
-        }
-
-        private static string GetFileKindText(ESTableFileKind value)
-        {
-            switch (value)
-            {
-                case ESTableFileKind.Csv:
-                    return "CSV";
-                case ESTableFileKind.Xlsx:
-                    return "XLSX";
-                case ESTableFileKind.CsvAndXlsx:
-                    return "CSV \u548c XLSX";
-                default:
-                    return value.ToString();
-            }
-        }
-
-        private static string GetGroupSliceModeText(ESTableGroupSliceMode value)
-        {
-            switch (value)
-            {
-                case ESTableGroupSliceMode.IgnoreGroup:
-                    return "\u5ffd\u7565 Group";
-                case ESTableGroupSliceMode.GroupNameColumn:
-                    return "Group \u540d\u5199\u5165\u5217";
-                case ESTableGroupSliceMode.OneGroupPerSheet:
-                    return "\u6bcf\u4e2a Group \u4e00\u4e2a Sheet";
-                case ESTableGroupSliceMode.OneGroupPerFile:
-                    return "\u6bcf\u4e2a Group \u4e00\u4e2a\u6587\u4ef6";
-                default:
-                    return value.ToString();
-            }
-        }
-
-        private static string GetConflictPolicyText(ESTableConflictPolicy value)
-        {
-            switch (value)
-            {
-                case ESTableConflictPolicy.Skip:
-                    return "\u8df3\u8fc7";
-                case ESTableConflictPolicy.Overwrite:
-                    return "\u8986\u76d6";
-                case ESTableConflictPolicy.CreateCopy:
-                    return "\u521b\u5efa\u526f\u672c";
-                case ESTableConflictPolicy.Error:
-                    return "\u62a5\u9519";
-                default:
-                    return value.ToString();
-            }
-        }
-
-        private static string GetBindSourceKindText(ESSoTableRuleBindSourceKind value)
-        {
-            switch (value)
-            {
-                case ESSoTableRuleBindSourceKind.None:
-                    return "\u65e0";
-                case ESSoTableRuleBindSourceKind.SoAsset:
-                    return "SO \u6587\u4ef6";
-                case ESSoTableRuleBindSourceKind.SoFolder:
-                    return "SO \u6587\u4ef6\u5939";
-                case ESSoTableRuleBindSourceKind.MonoScript:
-                    return "\u811a\u672c";
-                default:
-                    return value.ToString();
-            }
-        }
-    }
-
-    public static class ESSoTableRuleTypeUtility
-    {
-        public static Type FindType(string typeName)
-        {
-            if (string.IsNullOrWhiteSpace(typeName))
-                return null;
-
-            Type type = Type.GetType(typeName);
-            if (type != null)
-                return type;
-
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int i = 0; i < assemblies.Length; i++)
-            {
-                type = assemblies[i].GetType(typeName);
-                if (type != null)
-                    return type;
-            }
-
-            return null;
-        }
-
-        public static bool TryResolveSoDataTypes(Type sourceType, out Type packType, out Type groupType, out Type infoType, out string reason)
-        {
-            packType = null;
-            groupType = null;
-            infoType = null;
-            reason = string.Empty;
-
-            if (sourceType == null)
-            {
-                reason = "脚本类型为空，无法生成 Rule。";
-                return false;
-            }
-
-            if (typeof(ISoDataPack).IsAssignableFrom(sourceType))
-            {
-                packType = sourceType;
-                infoType = TryGetInfoTypeFromPack(sourceType);
-            }
-            else if (typeof(ISoDataGroup).IsAssignableFrom(sourceType))
-            {
-                groupType = sourceType;
-                infoType = TryGetInfoTypeFromGroup(sourceType);
-            }
-            else if (typeof(ISoDataInfo).IsAssignableFrom(sourceType))
-            {
-                infoType = sourceType;
-            }
-            else
-            {
-                reason = "脚本不是 SoData Pack、SoData Group 或 SoData Info。";
-                return false;
-            }
-
-            if (infoType == null)
-            {
-                reason = "无法从 Pack/Group 脚本推断 Info 类型。请确认脚本继承 SoDataPack<TInfo> 或 SoDataGroup<TInfo>。";
-                return false;
-            }
-
-            if (packType == null)
-                packType = FindSoDataPackType(infoType);
-            if (groupType == null)
-                groupType = FindSoDataGroupType(infoType);
-
-            if (packType == null || groupType == null)
-            {
-                reason = "已解析 Info 类型 " + infoType.Name + "，但没有找到对应的 SoDataPack<" + infoType.Name + "> 或 SoDataGroup<" + infoType.Name + "> 实现。";
-                return false;
-            }
-
-            return true;
-        }
-
-        public static Type FindSoDataPackType(Type infoType)
-        {
-            return FindFirstDerivedGeneric(typeof(SoDataPack<>), infoType);
-        }
-
-        public static Type FindSoDataGroupType(Type infoType)
-        {
-            return FindFirstDerivedGeneric(typeof(SoDataGroup<>), infoType);
-        }
-
-        private static Type TryGetInfoTypeFromPack(Type packType)
-        {
-            return TryGetGenericArgumentFromBase(packType, typeof(SoDataPack<>));
-        }
-
-        private static Type TryGetInfoTypeFromGroup(Type groupType)
-        {
-            return TryGetGenericArgumentFromBase(groupType, typeof(SoDataGroup<>));
-        }
-
-        private static Type TryGetGenericArgumentFromBase(Type type, Type openGenericBase)
-        {
-            Type current = type;
-            while (current != null && current != typeof(object))
-            {
-                if (current.IsGenericType && current.GetGenericTypeDefinition() == openGenericBase)
-                    return current.GetGenericArguments()[0];
-
-                current = current.BaseType;
-            }
-
-            return null;
-        }
-
-        private static Type FindFirstDerivedGeneric(Type openGenericBase, Type genericArgument)
-        {
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int i = 0; i < assemblies.Length; i++)
-            {
-                Type[] types;
-                try
-                {
-                    types = assemblies[i].GetTypes();
-                }
-                catch (ReflectionTypeLoadException ex)
-                {
-                    types = ex.Types;
-                }
-
-                for (int j = 0; j < types.Length; j++)
-                {
-                    Type type = types[j];
-                    if (type == null || type.IsAbstract)
-                        continue;
-
-                    Type argument = TryGetGenericArgumentFromBase(type, openGenericBase);
-                    if (argument == genericArgument)
-                        return type;
-                }
-            }
-
-            return null;
-        }
-
-        public static string GuessTableType(Type type)
-        {
-            if (type == typeof(bool))
-                return "bool";
-            if (type == typeof(byte) || type == typeof(short) || type == typeof(int))
-                return "int";
-            if (type == typeof(long))
-                return "long";
-            if (type == typeof(float))
-                return "float";
-            if (type == typeof(double))
-                return "double";
-            if (type == typeof(string))
-                return "string";
-            if (type.IsEnum)
-                return "string";
-            if (typeof(UnityEngine.Object).IsAssignableFrom(type))
-                return "string";
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
-                return "list," + GuessTableType(type.GetGenericArguments()[0]);
-
-            return "string";
-        }
-
-        public static bool CanExpandAsNestedObject(Type type)
-        {
-            if (type == null)
-                return false;
-            if (type.IsPrimitive || type.IsEnum)
-                return false;
-            if (type == typeof(string) || type == typeof(decimal))
-                return false;
-            if (type == typeof(Vector2) || type == typeof(Vector3) || type == typeof(Vector4) || type == typeof(Color) || type == typeof(Rect) || type == typeof(Quaternion))
-                return false;
-            if (typeof(UnityEngine.Object).IsAssignableFrom(type))
-                return false;
-            if (typeof(System.Collections.IEnumerable).IsAssignableFrom(type) && type != typeof(string))
-                return false;
-            if (type.IsAbstract || type.IsInterface)
-                return false;
-
-            return Attribute.IsDefined(type, typeof(SerializableAttribute)) || type.IsValueType;
-        }
-
-        public static ESTableValueWriteMode GuessValueWriteMode(Type type)
-        {
-            if (typeof(UnityEngine.Object).IsAssignableFrom(type))
-                return ESTableValueWriteMode.UnityObjectGuid;
-
-            if (type.IsEnum)
-                return ESTableValueWriteMode.PlainValue;
-
-            if (type.IsPrimitive || type == typeof(string))
-                return ESTableValueWriteMode.PlainValue;
-
-            return ESTableValueWriteMode.Json;
-        }
-    }
 }
 #endif

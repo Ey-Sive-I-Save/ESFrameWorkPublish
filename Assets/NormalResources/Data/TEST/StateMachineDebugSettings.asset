@@ -22,14 +22,14 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   HasConfirm: 1
-  enableDebug: 1
-  logStateTransitions: 1
-  logAnimationBlending: 1
-  logTriangulation: 1
-  logRuntimeInit: 1
-  logFallback: 1
-  logDirtySystem: 1
-  logFadeEffects: 1
+  enableDebug: 0
+  logStateTransitions: 0
+  logAnimationBlending: 0
+  logTriangulation: 0
+  logRuntimeInit: 0
+  logFallback: 0
+  logDirtySystem: 0
+  logFadeEffects: 0
   alwaysLogErrors: 1
   logPerformanceStats: 0
-  logWeightDetails: 1
+  logWeightDetails: 0

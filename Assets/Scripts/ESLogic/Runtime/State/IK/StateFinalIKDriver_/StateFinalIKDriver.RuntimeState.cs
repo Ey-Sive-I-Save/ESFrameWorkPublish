@@ -105,8 +105,10 @@ namespace ES
         private bool _hitReactionReady;
         private Recoil _recoil;
         private bool _recoilReady;
+        private bool _fullBodyBipedIKReady;
 
         private bool _fullLookAtCompare = true;
+        private string _finalIKScheduleSummary = "未调度";
 
         private float _lastBindTryTime;
         private float _lastWarnTime;

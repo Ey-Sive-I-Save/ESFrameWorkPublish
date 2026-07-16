@@ -26,7 +26,7 @@ namespace ES
             if (!tracker.IsActive)
                 return false;
 
-            tracker.Dispose();
+            tracker.Release();
             return true;
         }
     }

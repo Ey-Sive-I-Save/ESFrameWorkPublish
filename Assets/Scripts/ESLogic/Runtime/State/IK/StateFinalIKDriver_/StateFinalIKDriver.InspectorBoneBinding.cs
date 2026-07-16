@@ -175,8 +175,7 @@ namespace ES
         [SerializeField] private Transform bindingRightFoot;
 
         [PropertyOrder(30)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定", BoldTitle = true)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/骨骼绑定")]
         [InfoBox("AimIK 的 solver.bones 不再提供单独输入。Driver 会严格从总面板统一骨骼绑定派生 4 节父到子骨链，末节强制为 neck；不合法时会直接拒绝应用。solver.transform 仍必须绑定到玩家自定义的枪口/枪身方向节点，而不是骨头本身。", InfoMessageType.None)]
         [ShowInInspector, ReadOnly]
         [ShowIf("enableAimIK")]
@@ -184,25 +183,23 @@ namespace ES
         private string AimDerivedChainSummary => BuildAimDerivedChainSummary();
 
         [PropertyOrder(31)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/骨骼绑定")]
         [ShowInInspector, ReadOnly]
         [GUIColor("@GetAimBindingSummaryColor()")]
         [ShowIf("enableAimIK")]
         [LabelText("绑定校验")]
         private string AimBindingValidationSummary => GetAimBindingValidationSummary();
 
-        [SerializeField, HideInInspector] private bool useDriverAimBoneChain = false;
+        private bool useDriverAimBoneChain = false;
 
-        [SerializeField, HideInInspector] private Transform aimChainBone1;
-        [SerializeField, HideInInspector] private Transform aimChainBone2;
-        [SerializeField, HideInInspector] private Transform aimChainBone3;
-        [SerializeField, HideInInspector] private Transform aimChainBone4;
+        private Transform aimChainBone1;
+        private Transform aimChainBone2;
+        private Transform aimChainBone3;
+        private Transform aimChainBone4;
 
         [PropertyOrder(35)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/控制", LabelWidth = 70)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/骨骼绑定")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/控制", LabelWidth = 70)]
         [LabelText("瞄准方向节点")]
         [Tooltip("写入 AimIK.solver.transform。这里应指定玩家自定义的枪口/枪身方向节点，不应直接填骨头；Driver 不会自动注入。")]
         [ValidateInput(nameof(ValidateAimControlledTransform), "AimIK 缺少合法的瞄准方向节点。请绑定玩家自定义枪口/枪身方向节点，且不要直接使用躯干骨骼。")]
@@ -210,70 +207,62 @@ namespace ES
         [SerializeField] private Transform aimControlledTransform;
 
         [PropertyOrder(36)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/控制", LabelWidth = 70)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/骨骼绑定")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/控制", LabelWidth = 70)]
         [LabelText("极向目标")]
         [ShowIf("enableAimIK")]
-        [SerializeField] private Transform aimPoleTarget;
+        [SerializeField] private Transform aimPoleTarget = null;
 
         [PropertyOrder(37)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/控制", LabelWidth = 70)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/骨骼绑定")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/控制", LabelWidth = 70)]
         [LabelText("极向轴")]
         [ShowIf("enableAimIK")]
         [SerializeField] private Vector3 aimPoleAxis = Vector3.up;
 
         [PropertyOrder(38)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/控制", LabelWidth = 70)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/骨骼绑定")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/控制", LabelWidth = 70)]
         [LabelText("极向权重")]
         [Range(0f, 1f)]
         [ShowIf("enableAimIK")]
         [SerializeField] private float aimPoleWeight = 0f;
 
         [PropertyOrder(40)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/探头锚点", LabelWidth = 70)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/探头")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/探头/锚点", LabelWidth = 70)]
         [LabelText("左肩锚点")]
         [Tooltip("推荐填写左探头时的瞄准锚点/相机锚点。配置后，探头将优先改用锚点和视角前向来重建 Aim 目标，而不是简单横向平移目标点。")]
         [ShowIf("enableAimIK")]
-        [SerializeField] private Transform aimPeekLeftAnchor;
+        [SerializeField] private Transform aimPeekLeftAnchor = null;
 
         [PropertyOrder(41)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/探头锚点", LabelWidth = 70)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/探头")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/探头/锚点", LabelWidth = 70)]
         [LabelText("右肩锚点")]
         [Tooltip("推荐填写右探头时的瞄准锚点/相机锚点。与左肩锚点配合后，运行时会优先走肩位切换方案。")]
         [ShowIf("enableAimIK")]
-        [SerializeField] private Transform aimPeekRightAnchor;
+        [SerializeField] private Transform aimPeekRightAnchor = null;
 
         [PropertyOrder(42)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/探头", LabelWidth = 70)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/探头")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/探头/参考", LabelWidth = 70)]
         [LabelText("探头参考")]
         [Tooltip("旧版探头偏移使用的局部空间参考。仅当未配置左右肩锚点时，才会退回到该参考节点 + 局部偏移方案。")]
         [ShowIf("enableAimIK")]
-        [SerializeField] private Transform aimPeekReferenceTransform;
+        [SerializeField] private Transform aimPeekReferenceTransform = null;
 
         [PropertyOrder(43)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/探头", LabelWidth = 70)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/探头")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/探头/偏移", LabelWidth = 70)]
         [LabelText("左探头")]
         [Tooltip("旧版兜底方案：Aim 目标在参考节点局部空间下的左探头偏移。仅在未配置左/右肩锚点时生效。")]
         [ShowIf("enableAimIK")]
         [SerializeField] private Vector3 aimPeekLeftLocalOffset = new Vector3(-0.12f, 0f, 0f);
 
         [PropertyOrder(44)]
-        [BoxGroup("【瞄准IK】（AimIK）/骨骼绑定盒", ShowLabel = false)]
-        [TitleGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定")]
-        [HorizontalGroup("【瞄准IK】（AimIK）/骨骼绑定盒/骨骼绑定/探头", LabelWidth = 70)]
+        [FoldoutGroup("DriverLayout/公共部分/瞄准IK/探头")]
+        [HorizontalGroup("DriverLayout/公共部分/瞄准IK/探头/偏移", LabelWidth = 70)]
         [LabelText("右探头")]
         [Tooltip("旧版兜底方案：Aim 目标在参考节点局部空间下的右探头偏移。仅在未配置左/右肩锚点时生效。")]
         [ShowIf("enableAimIK")]

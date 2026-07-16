@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Diagnostics;
 
 // ============================================================================
 // 文件：StateMachineDebug.cs
@@ -20,18 +21,21 @@ namespace ES
     public static class StateMachineDebug
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Conditional("STATEMACHINEDEBUG")]
         public static void Log(string message)
         {
             StateMachineDebugSettings.Instance.LogStateTransition(message);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Conditional("STATEMACHINEDEBUG")]
         public static void LogWarning(string message)
         {
             StateMachineDebugSettings.Instance.LogWarning(message);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [Conditional("STATEMACHINEDEBUG")]
         public static void LogError(string message)
         {
             StateMachineDebugSettings.Instance.LogError(message);

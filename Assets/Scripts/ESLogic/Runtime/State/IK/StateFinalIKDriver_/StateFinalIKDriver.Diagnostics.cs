@@ -142,7 +142,7 @@ namespace ES
             }
         }
 
-        [TabGroup("DriverLayout", "诊断", Order = 100)]
+        [TabGroup("DriverLayout", "诊断", Order = 300)]
         [PropertyOrder(0)]
         [TitleGroup("DriverLayout/诊断/状态概览", BoldTitle = true)]
         [ShowInInspector, ReadOnly, LabelText("已就绪功能集")]
@@ -152,6 +152,11 @@ namespace ES
         [TitleGroup("DriverLayout/诊断/状态概览", BoldTitle = true)]
         [ShowInInspector, ReadOnly, LabelText("组件启用状态")]
         public string DriverEnableStateSummary => _driverEnableStateSummary;
+
+        [PropertyOrder(0)]
+        [TitleGroup("DriverLayout/诊断/状态概览")]
+        [ShowInInspector, ReadOnly, LabelText("FinalIK求解顺序")]
+        public string FinalIKScheduleSummary => _finalIKScheduleSummary;
 
         [PropertyOrder(1)]
         [TitleGroup("DriverLayout/诊断/状态概览")]
@@ -176,6 +181,12 @@ namespace ES
         [HorizontalGroup("DriverLayout/诊断/状态概览/注视瞄准", LabelWidth = 100)]
         [ShowInInspector, ReadOnly, LabelText("骨链瞄准 (AimIK)")]
         public bool IsAimIKReady => _aimIKReady;
+
+        [PropertyOrder(5)]
+        [TitleGroup("DriverLayout/诊断/状态概览")]
+        [HorizontalGroup("DriverLayout/诊断/状态概览/程序动画", LabelWidth = 100)]
+        [ShowInInspector, ReadOnly, LabelText("全身IK (FBBIK)")]
+        public bool IsFullBodyBipedIKReady => _fullBodyBipedIKReady;
 
         [PropertyOrder(5)]
         [TitleGroup("DriverLayout/诊断/状态概览")]

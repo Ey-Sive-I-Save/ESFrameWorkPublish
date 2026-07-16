@@ -105,6 +105,9 @@ namespace ES
         private readonly AnimationClip _clip;
         private readonly float _startTime;
         private readonly float _durationTime;
+        private readonly float _clipStartOffset;
+        private readonly float _playbackSpeed;
+        private readonly bool _loopClip;
         private readonly GameObject _target;
         private bool _loggedInvalidSetup;
 
@@ -121,11 +124,19 @@ namespace ES
         }
 
         public AnimationClipEditorSampler(GameObject target, AnimationClip clip, float startTime, float durationTime)
+            : this(target, clip, startTime, durationTime, 0f, 1f, false)
+        {
+        }
+
+        public AnimationClipEditorSampler(GameObject target, AnimationClip clip, float startTime, float durationTime, float clipStartOffset, float playbackSpeed, bool loopClip)
         {
             _target = target;
             _clip = clip;
             _startTime = startTime;
             _durationTime = Mathf.Max(0f, durationTime);
+            _clipStartOffset = Mathf.Max(0f, clipStartOffset);
+            _playbackSpeed = Mathf.Max(0.01f, playbackSpeed);
+            _loopClip = loopClip;
         }
 
         public override void OnEditorPreviewStart()
@@ -154,9 +165,10 @@ namespace ES
                 return;
             }
 
-            float localTime = useEndFrame ? _durationTime : sequenceTime - _startTime;
-            localTime = Mathf.Clamp(localTime, 0f, _durationTime);
-            localTime = Mathf.Clamp(localTime, 0f, _clip.length);
+            float elapsed = useEndFrame ? _durationTime : sequenceTime - _startTime;
+            elapsed = Mathf.Clamp(elapsed, 0f, _durationTime);
+            float localTime = _clipStartOffset + elapsed * _playbackSpeed;
+            localTime = _loopClip ? Mathf.Repeat(localTime, _clip.length) : Mathf.Clamp(localTime, 0f, _clip.length);
             AnimationMode.BeginSampling();
             AnimationMode.SampleAnimationClip(_target, _clip, localTime);
             AnimationMode.EndSampling();
@@ -735,6 +747,9 @@ namespace ES
         private readonly AnimationClip _clip;
         private readonly float _startTime;
         private readonly float _durationTime;
+        private readonly float _clipStartOffset;
+        private readonly float _playbackSpeed;
+        private readonly bool _loopClip;
         private readonly GameObject _target;
         private bool _loggedInvalidSetup;
 
@@ -746,11 +761,19 @@ namespace ES
         public bool CanSample => _clip != null && _target != null && _durationTime > 0.0001f && _clip.length > 0.0001f;
 
         public AdvancedAnimationClipEditorSampler(GameObject target, AnimationClip clip, float startTime, float durationTime)
+            : this(target, clip, startTime, durationTime, 0f, 1f, false)
+        {
+        }
+
+        public AdvancedAnimationClipEditorSampler(GameObject target, AnimationClip clip, float startTime, float durationTime, float clipStartOffset, float playbackSpeed, bool loopClip)
         {
             _target = target;
             _clip = clip;
             _startTime = startTime;
             _durationTime = Mathf.Max(0f, durationTime);
+            _clipStartOffset = Mathf.Max(0f, clipStartOffset);
+            _playbackSpeed = Mathf.Max(0.01f, playbackSpeed);
+            _loopClip = loopClip;
         }
 
         public override void OnEditorPreviewStart()
@@ -776,9 +799,9 @@ namespace ES
             if (_clip == null)
                 return 0f;
 
-            float localTime = sequenceTime - _startTime;
-            localTime = Mathf.Clamp(localTime, 0f, _durationTime);
-            return Mathf.Clamp(localTime, 0f, _clip.length);
+            float elapsed = Mathf.Clamp(sequenceTime - _startTime, 0f, _durationTime);
+            float localTime = _clipStartOffset + elapsed * _playbackSpeed;
+            return _loopClip ? Mathf.Repeat(localTime, _clip.length) : Mathf.Clamp(localTime, 0f, _clip.length);
         }
 
         public void LogInvalidSetupOnce()

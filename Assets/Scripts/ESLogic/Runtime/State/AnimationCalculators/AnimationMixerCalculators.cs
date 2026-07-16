@@ -43,6 +43,22 @@ namespace ES
         SkillTimelineSequence = 10
     }
 
+    [Serializable]
+    public sealed class StateAnimationClipOverrideRule
+    {
+        [LabelText("槽位索引")]
+        public int clipIndex = -1;
+
+        [LabelText("源Clip")]
+        public AnimationClip sourceClip;
+
+        [LabelText("标记")]
+        public string marker;
+
+        [LabelText("目标Clip")]
+        public AnimationClip targetClip;
+    }
+
     /// <summary>
     /// 动画Clip计算器基类 - 零GC高性能抽象
     /// 配置数据(享元),运行时数据分离
@@ -197,6 +213,56 @@ namespace ES
             // 默认实现：不支持覆盖
             StateMachineDebugSettings.Instance.LogWarning($"[{GetType().Name}] 不支持Clip覆盖");
             return false;
+        }
+
+        public virtual bool OverrideClipBySource(AnimationCalculatorRuntime runtime, AnimationClip sourceClip, AnimationClip newClip)
+        {
+            StateMachineDebugSettings.Instance.LogWarning($"[{GetType().Name}] 不支持按源Clip覆盖");
+            return false;
+        }
+
+        public virtual bool OverrideClipByMarker(AnimationCalculatorRuntime runtime, string marker, AnimationClip newClip)
+        {
+            StateMachineDebugSettings.Instance.LogWarning($"[{GetType().Name}] 不支持按标记覆盖");
+            return false;
+        }
+
+        public virtual int OverrideClips(AnimationCalculatorRuntime runtime, IList<StateAnimationClipOverrideRule> rules)
+        {
+            if (rules == null || rules.Count == 0)
+                return 0;
+
+            int changedCount = 0;
+            for (int i = 0; i < rules.Count; i++)
+            {
+                StateAnimationClipOverrideRule rule = rules[i];
+                if (rule == null || rule.targetClip == null)
+                    continue;
+
+                bool changed = false;
+                if (rule.clipIndex >= 0)
+                {
+                    changed = OverrideClip(runtime, rule.clipIndex, rule.targetClip);
+                }
+                else if (rule.sourceClip != null)
+                {
+                    changed = OverrideClipBySource(runtime, rule.sourceClip, rule.targetClip);
+                }
+                else if (!string.IsNullOrWhiteSpace(rule.marker))
+                {
+                    changed = OverrideClipByMarker(runtime, rule.marker, rule.targetClip);
+                }
+
+                if (changed)
+                    changedCount++;
+            }
+
+            return changedCount;
+        }
+
+        public virtual int RestoreAllOverrideClips(AnimationCalculatorRuntime runtime)
+        {
+            return runtime != null ? runtime.RestoreAllOverrideClips(this) : 0;
         }
 
         /// <summary>

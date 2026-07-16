@@ -205,7 +205,7 @@ namespace ES
             ReStartButton.clicked += OnStopAndReset;
             LastBlockButton.clicked += JumpToPreviousClip;
             NextBlockButton.clicked += JumpToNextClip;
-            SelectOtherTimeLine.clicked += ShowTimelineMenu;
+            SelectOtherTimeLine.clicked += ShowTimelineMenuFromButton;
             EditSkillDataButton.clicked += () => ESTrackSkillDataEditorActions.OpenCurrentSkillDataInfoEditor(ESTrackViewWindow.window);
             BindAndPlaySkillButton.clicked += () => ESTrackSkillDataEditorActions.BindCurrentSkillDataToEntityAndPlay(ESTrackViewWindow.window);
             SelectEntityButton.clicked += ShowEntityMenu;
@@ -239,7 +239,7 @@ namespace ES
         private void ShowMoreMenu()
         {
             var menu = new GenericMenu();
-            menu.AddItem(new GUIContent("【时间轴】/切换当前编辑时间轴"), false, ShowTimelineMenu);
+            menu.AddItem(new GUIContent("【时间轴】/切换当前编辑时间轴"), false, ShowTimelineMenuFromMoreMenu);
             menu.AddSeparator("");
             menu.AddItem(new GUIContent("【技能】/打开当前技能配置"), false, () => ESTrackSkillDataEditorActions.OpenCurrentSkillDataInfoEditor(ESTrackViewWindow.window));
             menu.AddItem(new GUIContent("【技能】/绑定到预览使用者并释放"), false, () => ESTrackSkillDataEditorActions.BindCurrentSkillDataToEntityAndPlay(ESTrackViewWindow.window));
@@ -250,15 +250,29 @@ namespace ES
             menu.DropDown(MoreButton.worldBound);
         }
 
-        private void ShowTimelineMenu()
+        private void ShowTimelineMenuFromButton()
         {
+            IEditorTrackSupport_GetSequence.ShowDynamicMenu(SelectOtherTimeLine.worldBound, OnTimelineSelected);
+        }
+
+        private void ShowTimelineMenuFromMoreMenu()
+        {
+            EditorApplication.delayCall += ShowTimelineMenuDelayed;
+        }
+
+        private void ShowTimelineMenuDelayed()
+        {
+            EditorApplication.delayCall -= ShowTimelineMenuDelayed;
             IEditorTrackSupport_GetSequence.ShowDynamicMenu(MoreButton.worldBound, OnTimelineSelected);
         }
 
         private void OnTimelineSelected(object userData)
         {
             if (userData is IEditorTrackSupport_GetSequence editorTrackSupport_GetSequence)
+            {
+                ESTrackViewWindowHelper.CancelPendingSelectionTrackRefresh();
                 ESTrackViewWindow.TryUpdateTrackSequence(editorTrackSupport_GetSequence);
+            }
         }
 
         private void ShowEntityMenu()

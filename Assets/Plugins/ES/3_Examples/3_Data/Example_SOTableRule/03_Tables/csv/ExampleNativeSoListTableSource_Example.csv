@@ -1,0 +1,7 @@
+﻿##rowDirective(行指令说明),空=正常导入；owner(切换SO)=只写SO字段并作为后续List行归属；skip(跳过)/ignore(忽略)/disabled(停用)=跳过；comment:(备注)=备注；required(必填行)=整行和Key必填；patch(补丁)=只写非空；replace(强制覆盖)=强制覆盖；delete(删除)=删除普通SO,,,,,,,,,
+##assert(列断言),required(必填);unique(唯一),,,required(必填);unique(唯一),,,enum:Normal|Rare|Epic(枚举),enum:None|Tradable|Stackable|TestOnly(枚举),,
+##var(字段名),itemId,displayName,enabledInGame,rowKey,rewardName,amount,quality,tags,nestedConfig_growthMultiplier,nestedConfig_note
+##type(类型),string,string,bool,string,string,int,string,string,float,string
+##group(分组),"client,server,editor","client,server,editor","client,server,editor","client,server,editor","client,server,editor","client,server,editor","client,server,editor","client,server,editor","client,server,editor","client,server,editor"
+##(说明),SO ID,显示名,启用,行 Key,奖励名,数量,品质,标签,嵌套配置_成长倍率,嵌套配置_备注
+,item001,显示名示例,true,row001,奖励名示例,6,Normal,None,9.5,嵌套配置_备注示例

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -440,10 +440,10 @@ namespace ES
                 if (!string.IsNullOrEmpty(ClimbJump_StateName))
                     _climbJumpState = sm.GetStateByString(ClimbJump_StateName);
 
-                _climbLifecycle.Bind(sm, _climbState, ResolveStateKeyForLifecycle(_climbState, Climb_StateName));
-                _climbOverLifecycle.Bind(sm, _climbOverState, ResolveStateKeyForLifecycle(_climbOverState, ClimbOver_StateName));
-                _vaultLifecycle.Bind(sm, _vaultState, ResolveStateKeyForLifecycle(_vaultState, Vault_StateName));
-                _climbJumpLifecycle.Bind(sm, _climbJumpState, ResolveStateKeyForLifecycle(_climbJumpState, ClimbJump_StateName));
+                _climbLifecycle.SetTarget(sm, _climbState, ResolveStateKeyForLifecycle(_climbState, Climb_StateName));
+                _climbOverLifecycle.SetTarget(sm, _climbOverState, ResolveStateKeyForLifecycle(_climbOverState, ClimbOver_StateName));
+                _vaultLifecycle.SetTarget(sm, _vaultState, ResolveStateKeyForLifecycle(_vaultState, Vault_StateName));
+                _climbJumpLifecycle.SetTarget(sm, _climbJumpState, ResolveStateKeyForLifecycle(_climbJumpState, ClimbJump_StateName));
 
                 // ── 高度分级状态缓存 ──────────────────────────────────────────────────
                 if (enableHeightAdaptive && heightRangePresets != null)
@@ -1793,7 +1793,7 @@ namespace ES
             if (lifecycle == null || sm == null || state == null)
                 return false;
 
-            lifecycle.Bind(sm, state, ResolveStateKeyForLifecycle(state, fallbackKey));
+            lifecycle.SetTarget(sm, state, ResolveStateKeyForLifecycle(state, fallbackKey));
             bool activated = state.baseStatus == StateBaseStatus.Running || sm.TryActivateState(state);
             if (!activated)
                 return false;
@@ -1811,7 +1811,7 @@ namespace ES
 
             if (lifecycle != null)
             {
-                lifecycle.Bind(sm, state, ResolveStateKeyForLifecycle(state, fallbackKey));
+                lifecycle.SetTarget(sm, state, ResolveStateKeyForLifecycle(state, fallbackKey));
                 if (!lifecycle.RequestExit() && state.baseStatus == StateBaseStatus.Running)
                     sm.TryDeactivateState(ResolveStateKeyForLifecycle(state, fallbackKey));
             }

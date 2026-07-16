@@ -29,6 +29,7 @@ namespace ES
             {
                 public AnimationClip clip;
                 public float threshold;  // 阈值位置
+                public string marker;
             }
 
             public StateParameter parameterFloat = StateDefaultFloatParameter.Speed;
@@ -52,7 +53,7 @@ namespace ES
 
             public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.BlendTree1D;
 
-            public override bool NeedUpdateWhenFadingOut => true;
+            public override bool NeedUpdateWhenFadingOut => false;
 
             protected override string GetUsageHelp()
             {
@@ -120,15 +121,34 @@ namespace ES
                     return false;
                 }
 
-                if (samples.Length == 1 && samples[0].clip != null)
+                for (int i = 0; i < samples.Length; i++)
                 {
+                    if (samples[i] == null || samples[i].clip == null)
+                    {
+                        StateMachineDebugSettings.Instance.LogError($"[BlendTree1D] 采样点{i}缺少Clip，已拒绝初始化，避免权重输出到空输入");
+                        return false;
+                    }
+                }
+
+                if (samples.Length == 1)
+                {
+                    runtime.mixer = AnimationMixerPlayable.Create(graph, 1);
+                    runtime.EnsureMixerInputWeightCache(1);
+                    runtime.RegisterClipOverrideSlot(0, samples[0].clip, samples[0].marker);
                     runtime.singlePlayable = AnimationClipPlayable.Create(graph, samples[0].clip);
-                    output = runtime.singlePlayable;
+                    runtime.weightCache = new float[1] { 1f };
+                    runtime.weightTargetCache = new float[1] { 1f };
+                    runtime.weightVelocityCache = new float[1];
+                    graph.Connect(runtime.singlePlayable, 0, runtime.mixer, 0);
+                    runtime.SetMixerInputWeightIfChanged(runtime.mixer, 0, 1f);
+                    output = runtime.mixer;
                     return true;
                 }
 
                 // 创建Mixer(可被父Mixer连接)
                 runtime.mixer = AnimationMixerPlayable.Create(graph, samples.Length);
+                runtime.EnsureMixerInputWeightCache(samples.Length);
+                runtime.EnsureClipOverrideSlots(samples.Length);
 
                 // 创建所有Clip的Playable(索引固定)
                 runtime.playables = new AnimationClipPlayable[samples.Length];
@@ -144,8 +164,9 @@ namespace ES
                     if (samples[i].clip != null)
                     {
                         runtime.playables[i] = AnimationClipPlayable.Create(graph, samples[i].clip);
+                        runtime.RegisterClipOverrideSlot(i, samples[i].clip, samples[i].marker);
                         graph.Connect(runtime.playables[i], 0, runtime.mixer, i);
-                        runtime.mixer.SetInputWeight(i, 0f);
+                        runtime.SetMixerInputWeightIfChanged(runtime.mixer, i, 0f);
                         runtime.weightCache[i] = 0f;
                     }
                 }
@@ -204,7 +225,8 @@ namespace ES
                     // 线性插值
                     float leftThreshold = samples[leftIndex].threshold;
                     float rightThreshold = samples[rightIndex].threshold;
-                    float t = (input - leftThreshold) / (rightThreshold - leftThreshold);
+                    float range = rightThreshold - leftThreshold;
+                    float t = Mathf.Abs(range) > 0.0001f ? (input - leftThreshold) / range : 0f;
 
                     // 设置权重(仅2个Clip)
                     runtime.weightTargetCache[leftIndex] = 1f - t;
@@ -230,7 +252,7 @@ namespace ES
                     {
                         runtime.weightCache[i] = runtime.weightTargetCache[i];
                     }
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
+                    runtime.SetMixerInputWeightIfChanged(runtime.mixer, i, runtime.weightCache[i]);
                 }
             }
 
@@ -304,7 +326,8 @@ namespace ES
                     int leftIndex = rightIndex - 1;
                     float leftThreshold = samples[leftIndex].threshold;
                     float rightThreshold = samples[rightIndex].threshold;
-                    float t = (mappedInput - leftThreshold) / (rightThreshold - leftThreshold);
+                    float range = rightThreshold - leftThreshold;
+                    float t = Mathf.Abs(range) > 0.0001f ? (mappedInput - leftThreshold) / range : 0f;
                     runtime.weightTargetCache[leftIndex] = 1f - t;
                     runtime.weightTargetCache[rightIndex] = t;
                 }
@@ -314,7 +337,7 @@ namespace ES
                 {
                     runtime.weightCache[i] = runtime.weightTargetCache[i];
                     runtime.weightVelocityCache[i] = 0f;
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
+                    runtime.SetMixerInputWeightIfChanged(runtime.mixer, i, runtime.weightCache[i]);
                 }
             }
 
@@ -334,6 +357,9 @@ namespace ES
                 
                 for (int i = 1; i < samples.Length; i++)
                 {
+                    if (!runtime.playables[i].IsValid())
+                        continue;
+
                     float weight = runtime.mixer.GetInputWeight(i);
                     if (weight > maxWeight)
                     {
@@ -341,8 +367,10 @@ namespace ES
                         maxWeightIndex = i;
                     }
                 }
-                
-                return runtime.playables[maxWeightIndex].GetAnimationClip();
+
+                return runtime.playables[maxWeightIndex].IsValid()
+                    ? runtime.playables[maxWeightIndex].GetAnimationClip()
+                    : null;
             }
             
             /// <summary>
@@ -356,12 +384,22 @@ namespace ES
                     var singleOldSpeed = runtime.singlePlayable.GetSpeed();
                     var singleOldTime = runtime.singlePlayable.GetTime();
 
+                    if (runtime.mixer.IsValid())
+                    {
+                        runtime.mixer.DisconnectInput(0);
+                    }
+
                     runtime.singlePlayable.Destroy();
                     runtime.singlePlayable = AnimationClipPlayable.Create(singleGraph, newClip);
                     runtime.singlePlayable.SetSpeed(singleOldSpeed);
                     runtime.singlePlayable.SetTime(singleOldTime);
+                    if (runtime.mixer.IsValid())
+                    {
+                        singleGraph.Connect(runtime.singlePlayable, 0, runtime.mixer, 0);
+                        runtime.SetMixerInputWeightIfChanged(runtime.mixer, 0, 1f);
+                    }
+                    runtime.UpdateClipOverrideSlot(0, newClip);
 
-                    samples[0].clip = newClip;
                     return true;
                 }
 
@@ -397,9 +435,49 @@ namespace ES
                 runtime.playables[clipIndex].SetSpeed(oldSpeed);
                 runtime.playables[clipIndex].SetTime(oldTime);
                 graph.Connect(runtime.playables[clipIndex], 0, runtime.mixer, clipIndex);
-                
-                samples[clipIndex].clip = newClip;
+                runtime.UpdateClipOverrideSlot(clipIndex, newClip);
                 return true;
+            }
+
+            public override bool OverrideClipBySource(AnimationCalculatorRuntime runtime, AnimationClip sourceClip, AnimationClip newClip)
+            {
+                if (sourceClip == null || runtime == null)
+                    return false;
+
+                int mappedSlot = runtime.FindClipSlotByOriginalOrCurrent(sourceClip);
+                if (mappedSlot >= 0)
+                    return OverrideClip(runtime, mappedSlot, newClip);
+
+                if (runtime.playables == null)
+                    return false;
+
+                bool changed = false;
+                for (int i = 0; i < runtime.playables.Length; i++)
+                {
+                    if (runtime.playables[i].IsValid() && runtime.playables[i].GetAnimationClip() == sourceClip)
+                        changed |= OverrideClip(runtime, i, newClip);
+                }
+
+                return changed;
+            }
+
+            public override bool OverrideClipByMarker(AnimationCalculatorRuntime runtime, string marker, AnimationClip newClip)
+            {
+                if (string.IsNullOrWhiteSpace(marker) || samples == null)
+                    return false;
+
+                int mappedSlot = runtime != null ? runtime.FindClipSlotByMarker(marker) : -1;
+                if (mappedSlot >= 0)
+                    return OverrideClip(runtime, mappedSlot, newClip);
+
+                bool changed = false;
+                for (int i = 0; i < samples.Length; i++)
+                {
+                    if (samples[i] != null && string.Equals(samples[i].marker, marker, StringComparison.OrdinalIgnoreCase))
+                        changed |= OverrideClip(runtime, i, newClip);
+                }
+
+                return changed;
             }
 
             public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
@@ -425,9 +503,12 @@ namespace ES
                     }
                 }
 
-                if (maxWeightIndex < samples.Length && samples[maxWeightIndex].clip != null)
+                if (runtime.playables != null &&
+                    maxWeightIndex < runtime.playables.Length &&
+                    runtime.playables[maxWeightIndex].IsValid())
                 {
-                    return samples[maxWeightIndex].clip.length;
+                    var clip = runtime.playables[maxWeightIndex].GetAnimationClip();
+                    return clip != null ? clip.length : 0f;
                 }
                 return 0f;
             }

@@ -59,9 +59,9 @@ MonoBehaviour:
         clips:
         - enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 1.3097094
+          startTime: 1.3472527
           durationTime: 1.0000001
-          audioClip: {fileID: 0}
+          audioClip: {fileID: 8300000, guid: 720ed2b9ac2d7e844a7134533c1fa005, type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
@@ -75,6 +75,48 @@ MonoBehaviour:
         enabled: 1
         clips:
         - enabled: 1
+          name: "\u6587\u5316\u670D\u52A122235\u5243\u5200\u9AD8\u5730"
+          startTime: 1.2255319
+          durationTime: 2.8851063
+          targetExpression:
+            rid: -2
+          AnimationClipName: {fileID: 7400010, guid: c79d18b7598993246a99ebc7c22b5f0d,
+            type: 3}
+          clipStartOffset: 0
+          playbackSpeed: 1
+          loopClip: 0
+        - enabled: 1
+          name: 1aaaa55999
+          startTime: 3.6765957
+          durationTime: 2.5301216
+          targetExpression:
+            rid: -2
+          AnimationClipName: {fileID: 7400000, guid: c62dd38c11e60514cbfbd75556f131da,
+            type: 3}
+          clipStartOffset: 0
+          playbackSpeed: 1
+          loopClip: 0
+        - enabled: 0
+          name: "\u8F68\u9053\u7247\u6BB5233"
+          startTime: 5.4948072
+          durationTime: 1
+          targetExpression:
+            rid: -2
+          AnimationClipName: {fileID: 0}
+          clipStartOffset: 0
+          playbackSpeed: 1
+          loopClip: 0
+        - enabled: 0
+          name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 5.8240566
+          durationTime: 1
+          targetExpression:
+            rid: -2
+          AnimationClipName: {fileID: 0}
+          clipStartOffset: 0
+          playbackSpeed: 1
+          loopClip: 0
+        - enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 6.5534983
           durationTime: 1.7041101
@@ -82,6 +124,9 @@ MonoBehaviour:
             rid: -2
           AnimationClipName: {fileID: 7400000, guid: 38587c17cd6cfdd4b8e25d3326747748,
             type: 3}
+          clipStartOffset: 0
+          playbackSpeed: 1
+          loopClip: 0
         - enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 8.594968
@@ -90,36 +135,9 @@ MonoBehaviour:
             rid: -2
           AnimationClipName: {fileID: 7400000, guid: baa3c56345be38e46b3cf654cf6e3c4c,
             type: 3}
-        - enabled: 1
-          name: "\u6587\u5316\u670D\u52A122235\u5243\u5200\u9AD8\u5730"
-          startTime: 0.35493827
-          durationTime: 2.0985117
-          targetExpression:
-            rid: -2
-          AnimationClipName: {fileID: 7400010, guid: c79d18b7598993246a99ebc7c22b5f0d,
-            type: 3}
-        - enabled: 0
-          name: "\u8F68\u9053\u7247\u6BB5233"
-          startTime: 5.4948072
-          durationTime: 1
-          targetExpression:
-            rid: -2
-          AnimationClipName: {fileID: 0}
-        - enabled: 1
-          name: 1aaaa55999
-          startTime: 2.7160494
-          durationTime: 2.5301216
-          targetExpression:
-            rid: -2
-          AnimationClipName: {fileID: 7400000, guid: c62dd38c11e60514cbfbd75556f131da,
-            type: 3}
-        - enabled: 0
-          name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 5.8240566
-          durationTime: 1
-          targetExpression:
-            rid: -2
-          AnimationClipName: {fileID: 0}
+          clipStartOffset: 0
+          playbackSpeed: 1
+          loopClip: 0
         displayName: "\u9ED8\u8BA4\u52A8\u753B"
         overrideTrackPreviewTarget: 0
         trackTargetExpression:
@@ -134,17 +152,17 @@ MonoBehaviour:
         clips:
         - enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5dddaaaa"
-          startTime: 2.7234042
-          durationTime: 2.6938345
-          audioClip: {fileID: 8300000, guid: 259e3d9f89bea8049a6ec1bb94d9771f, type: 3}
+          startTime: 1.5888842
+          durationTime: 0.9999999
+          audioClip: {fileID: 8300000, guid: 45df00ec34648e240a5c0030f534ebe8, type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
         - enabled: 1
-          name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 6.5617023
-          durationTime: 1
-          audioClip: {fileID: 8300000, guid: 88af74873f18b1945822fc3f7da6a386, type: 3}
+          name: "\u8F68\u9053\u97F3\u9891"
+          startTime: 3.7276595
+          durationTime: 2.6938345
+          audioClip: {fileID: 8300000, guid: 259e3d9f89bea8049a6ec1bb94d9771f, type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
@@ -158,9 +176,9 @@ MonoBehaviour:
           stopOnClipExit: 0
         - enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 0.35744682
-          durationTime: 0.9999999
-          audioClip: {fileID: 8300000, guid: 45df00ec34648e240a5c0030f534ebe8, type: 3}
+          startTime: 6.5617023
+          durationTime: 1
+          audioClip: {fileID: 8300000, guid: 88af74873f18b1945822fc3f7da6a386, type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
@@ -182,16 +200,8 @@ MonoBehaviour:
         enabled: 1
         clips:
         - enabled: 1
-          name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 9.242381
-          durationTime: 1
-          targetMode: 0
-          targetExpression:
-            rid: -2
-          Activate: 1
-        - enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5tttt"
-          startTime: 1.4609054
+          startTime: 1.7561727
           durationTime: 0.9999999
           targetMode: 1
           targetExpression:
@@ -199,7 +209,7 @@ MonoBehaviour:
           Activate: 0
         - enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 3.5685625
+          startTime: 4.114642
           durationTime: 1.233192
           targetMode: 1
           targetExpression:
@@ -213,6 +223,14 @@ MonoBehaviour:
           targetExpression:
             rid: 8409197517669138474
           Activate: 0
+        - enabled: 1
+          name: "\u8F68\u9053\u7247\u6BB5"
+          startTime: 9.242381
+          durationTime: 1
+          targetMode: 0
+          targetExpression:
+            rid: -2
+          Activate: 1
         displayName: 
         overrideTrackPreviewTarget: 0
         trackTargetExpression:
@@ -224,8 +242,8 @@ MonoBehaviour:
         clips:
         - enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5\u6D4B\u8BD5wwww"
-          startTime: 1.9341564
-          durationTime: 2.5206766
+          startTime: 1.9716997
+          durationTime: 2.5206764
           OperationDescription: 
           op:
             rid: 23628769593655300
@@ -256,7 +274,7 @@ MonoBehaviour:
     - rid: 5686404864374210607
       type: {class: SkillTrackItem_GameObject, ns: ES, asm: ES_Logic}
       data:
-        enabled: 1
+        enabled: 0
         clips: []
         displayName: 
         overrideTrackPreviewTarget: 0
@@ -267,7 +285,7 @@ MonoBehaviour:
       data:
         enabled: 1
         clips: []
-        displayName: 
+        displayName: "\u7B2C\u4E8C\u53EA\u52A8\u753B"
         overrideTrackPreviewTarget: 0
         trackTargetExpression:
           rid: -2
@@ -317,11 +335,26 @@ MonoBehaviour:
   overrideStateLayer: 0
   stateLayer: 1
   sequence:
-    tracks_: []
-    cachedMaxTime: 10
+    tracks_:
+    - rid: 23628851274842168
+    cachedMaxTime: 10.5
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 23628851274842168
+      type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
+      data:
+        enabled: 1
+        clips: []
+        displayName: "\u52A8\u753B\u8F68\u9053"
+        overrideTrackPreviewTarget: 0
+        trackTargetExpression:
+          rid: -2
+        AnimationIM: "\u8FD9\u662F\u4E00\u4E2A\u52A8\u753B\u8F68\u9053"
+        useAdvancedPreviewTransition: 1
+        previewTransitionDuration: 0.15
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

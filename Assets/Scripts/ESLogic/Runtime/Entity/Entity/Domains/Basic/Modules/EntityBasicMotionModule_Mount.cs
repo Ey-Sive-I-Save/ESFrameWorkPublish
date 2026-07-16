@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -59,7 +59,7 @@ namespace ES
             }
 
             // 构造跟踪器并绑定状态（无委托，零 GC）
-            _lifecycle.Bind(sm, _mountState, ResolveMountStateKeyForLifecycle(_mountState));
+            _lifecycle.SetTarget(sm, _mountState, ResolveMountStateKeyForLifecycle(_mountState));
         }
 
         // ================================================================
@@ -298,7 +298,7 @@ namespace ES
         public override void OnDestroy()
         {
             // 实体销毁时保证骑乘生命周期干净退出（幂等，多次调用安全）
-            if (_lifecycle.Dispose()) OnMountExit();
+            if (_lifecycle.Release()) OnMountExit();
 
             if (MyCore != null && MyCore.kcc.mountModule == this)
             {

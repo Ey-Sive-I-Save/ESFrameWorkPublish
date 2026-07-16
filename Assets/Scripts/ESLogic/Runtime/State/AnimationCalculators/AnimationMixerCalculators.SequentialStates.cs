@@ -392,6 +392,7 @@ namespace ES
             runtime.phaseUsesCalculator = new bool[phases.Length];
             runtime.phaseBlendWeights = new float[phases.Length];
             runtime.phaseBlendVelocities = new float[phases.Length];
+            runtime.EnsureClipOverrideSlots(phases.Length * 2);
 
             for (int i = 0; i < phases.Length; i++)
             {
@@ -430,9 +431,11 @@ namespace ES
                             runtime.phaseMixers[i] = AnimationMixerPlayable.Create(graph, 2);
 
                             runtime.phasePrimaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.primaryClip);
+                            runtime.RegisterClipOverrideSlot(i * 2, phase.primaryClip, BuildPhaseMarker(phase.phaseName, i, "Primary"));
                             graph.Connect(runtime.phasePrimaryPlayables[i], 0, runtime.phaseMixers[i], 0);
 
                             runtime.phaseSecondaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.secondaryClip);
+                            runtime.RegisterClipOverrideSlot(i * 2 + 1, phase.secondaryClip, BuildPhaseMarker(phase.phaseName, i, "Secondary"));
                             graph.Connect(runtime.phaseSecondaryPlayables[i], 0, runtime.phaseMixers[i], 1);
 
                             runtime.phaseMixers[i].SetInputWeight(0, 1f);
@@ -443,12 +446,14 @@ namespace ES
                         else
                         {
                             runtime.phasePrimaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.primaryClip);
+                            runtime.RegisterClipOverrideSlot(i * 2, phase.primaryClip, BuildPhaseMarker(phase.phaseName, i, "Primary"));
                             graph.Connect(runtime.phasePrimaryPlayables[i], 0, runtime.mixer, i);
                         }
                     }
                     else if (phase.secondaryClip != null)
                     {
                         runtime.phaseSecondaryPlayables[i] = AnimationClipPlayable.Create(graph, phase.secondaryClip);
+                        runtime.RegisterClipOverrideSlot(i * 2 + 1, phase.secondaryClip, BuildPhaseMarker(phase.phaseName, i, "Secondary"));
                         graph.Connect(runtime.phaseSecondaryPlayables[i], 0, runtime.mixer, i);
                     }
                     else
@@ -480,6 +485,12 @@ namespace ES
 
             output = runtime.mixer;
             return true;
+        }
+
+        private static string BuildPhaseMarker(string phaseName, int phaseIndex, string localName)
+        {
+            string name = string.IsNullOrWhiteSpace(phaseName) ? phaseIndex.ToString() : phaseName;
+            return name + "." + localName;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -776,7 +787,115 @@ namespace ES
                 graph.Connect(runtime.phaseSecondaryPlayables[phaseIndex], 0, runtime.phaseMixers[phaseIndex], 1);
             }
 
+            runtime.UpdateClipOverrideSlot(clipIndex, newClip);
             return true;
+        }
+
+        public override bool OverrideClipBySource(AnimationCalculatorRuntime runtime, AnimationClip sourceClip, AnimationClip newClip)
+        {
+            if (runtime == null || sourceClip == null || newClip == null || phases == null)
+                return false;
+
+            int mappedSlot = runtime.FindClipSlotByOriginalOrCurrent(sourceClip);
+            if (mappedSlot >= 0)
+                return OverrideClip(runtime, mappedSlot, newClip);
+
+            bool changed = false;
+            for (int i = 0; i < phases.Length; i++)
+            {
+                var phase = phases[i];
+                if (phase == null)
+                    continue;
+
+                if (runtime.phaseUsesCalculator != null && runtime.phaseUsesCalculator[i])
+                {
+                    if (phase.phaseCalculator != null && runtime.phaseRuntimes != null && i < runtime.phaseRuntimes.Length)
+                        changed |= phase.phaseCalculator.OverrideClipBySource(runtime.phaseRuntimes[i], sourceClip, newClip);
+                    continue;
+                }
+
+                if (runtime.phasePrimaryPlayables != null && i < runtime.phasePrimaryPlayables.Length &&
+                    runtime.phasePrimaryPlayables[i].IsValid() &&
+                    runtime.phasePrimaryPlayables[i].GetAnimationClip() == sourceClip)
+                {
+                    changed |= OverrideClip(runtime, i * 2, newClip);
+                }
+
+                if (runtime.phaseSecondaryPlayables != null && i < runtime.phaseSecondaryPlayables.Length &&
+                    runtime.phaseSecondaryPlayables[i].IsValid() &&
+                    runtime.phaseSecondaryPlayables[i].GetAnimationClip() == sourceClip)
+                {
+                    changed |= OverrideClip(runtime, i * 2 + 1, newClip);
+                }
+            }
+
+            return changed;
+        }
+
+        public override bool OverrideClipByMarker(AnimationCalculatorRuntime runtime, string marker, AnimationClip newClip)
+        {
+            if (runtime == null || string.IsNullOrWhiteSpace(marker) || newClip == null || phases == null)
+                return false;
+
+            int mappedSlot = runtime.FindClipSlotByMarker(marker);
+            if (mappedSlot >= 0)
+                return OverrideClip(runtime, mappedSlot, newClip);
+
+            bool changed = false;
+            for (int i = 0; i < phases.Length; i++)
+            {
+                var phase = phases[i];
+                if (phase == null)
+                    continue;
+
+                if (runtime.phaseUsesCalculator != null && runtime.phaseUsesCalculator[i])
+                {
+                    if (phase.phaseCalculator != null && runtime.phaseRuntimes != null && i < runtime.phaseRuntimes.Length)
+                        changed |= phase.phaseCalculator.OverrideClipByMarker(runtime.phaseRuntimes[i], marker, newClip);
+                    continue;
+                }
+
+                string phaseName = string.IsNullOrWhiteSpace(phase.phaseName) ? i.ToString() : phase.phaseName;
+                if (MarkerMatches(marker, phaseName, "Primary"))
+                    changed |= OverrideClip(runtime, i * 2, newClip);
+
+                if (MarkerMatches(marker, phaseName, "Secondary"))
+                    changed |= OverrideClip(runtime, i * 2 + 1, newClip);
+            }
+
+            return changed;
+        }
+
+        public override int RestoreAllOverrideClips(AnimationCalculatorRuntime runtime)
+        {
+            if (runtime == null)
+                return 0;
+
+            int changed = runtime.RestoreAllOverrideClips(this);
+            if (phases == null || runtime.phaseRuntimes == null || runtime.phaseUsesCalculator == null)
+                return changed;
+
+            for (int i = 0; i < phases.Length && i < runtime.phaseRuntimes.Length && i < runtime.phaseUsesCalculator.Length; i++)
+            {
+                if (!runtime.phaseUsesCalculator[i])
+                    continue;
+
+                var phase = phases[i];
+                if (phase?.phaseCalculator == null || runtime.phaseRuntimes[i] == null)
+                    continue;
+
+                changed += phase.phaseCalculator.RestoreAllOverrideClips(runtime.phaseRuntimes[i]);
+            }
+
+            return changed;
+        }
+
+        private static bool MarkerMatches(string input, string phaseName, string localName)
+        {
+            return string.Equals(input, phaseName, StringComparison.OrdinalIgnoreCase) && localName == "Primary" ||
+                   string.Equals(input, phaseName + "." + localName, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(input, phaseName + "/" + localName, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(input, phaseName + ":" + localName, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

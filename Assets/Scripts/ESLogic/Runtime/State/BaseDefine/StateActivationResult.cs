@@ -16,7 +16,9 @@ namespace ES
         [InspectorName("有合并")]
         HasMerge = 1 << 2,
         [InspectorName("重启")]
-        Restart = 1 << 3
+        Restart = 1 << 3,
+        [InspectorName("有弱打断")]
+        HasWeakInterrupt = 1 << 4
     }
 
     /// <summary>
@@ -45,6 +47,16 @@ namespace ES
         /// </summary>
         public int interruptCount;
 
+        /// <summary>
+        /// 运行时弱打断列表：旧状态保留运行，只被新状态临时压制。
+        /// </summary>
+        public List<StateBase> statesToWeakInterrupt;
+
+        /// <summary>
+        /// 运行时弱打断数量
+        /// </summary>
+        public int weakInterruptCount;
+
         public bool CanActivate => (code & StateActivationCode.Success) != 0;
 
         public bool RequiresInterruption => (code & StateActivationCode.HasInterrupt) != 0;
@@ -52,6 +64,8 @@ namespace ES
         public bool CanMerge => (code & StateActivationCode.HasMerge) != 0;
 
         public bool IsRestart => (code & StateActivationCode.Restart) != 0;
+
+        public bool RequiresWeakInterruption => (code & StateActivationCode.HasWeakInterrupt) != 0;
 
 #if UNITY_EDITOR
         /// <summary>
@@ -77,7 +91,9 @@ namespace ES
             code = StateActivationCode.Success,
             failureReason = string.Empty,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -89,7 +105,9 @@ namespace ES
             code = StateActivationCode.Success | StateActivationCode.HasMerge,
             failureReason = string.Empty,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -101,7 +119,9 @@ namespace ES
             code = StateActivationCode.Success | StateActivationCode.HasInterrupt,
             failureReason = string.Empty,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -113,7 +133,9 @@ namespace ES
             code = StateActivationCode.Success | StateActivationCode.Restart,
             failureReason = string.Empty,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
     #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -125,7 +147,9 @@ namespace ES
             code = StateActivationCode.Fail,
             failureReason = StateFailureReasons.StateIsNull,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -137,7 +161,9 @@ namespace ES
             code = StateActivationCode.Fail,
             failureReason = StateFailureReasons.MachineNotRunning,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -149,7 +175,9 @@ namespace ES
             code = StateActivationCode.Fail,
             failureReason = StateFailureReasons.StateAlreadyRunning,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -161,7 +189,9 @@ namespace ES
             code = StateActivationCode.Fail,
             failureReason = StateFailureReasons.PipelineNotFound,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -173,7 +203,9 @@ namespace ES
             code = StateActivationCode.Fail,
             failureReason = StateFailureReasons.PipelineDisabled,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -185,7 +217,9 @@ namespace ES
             code = StateActivationCode.Fail,
             failureReason = StateFailureReasons.InvalidPipelineIndex,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -197,7 +231,9 @@ namespace ES
             code = StateActivationCode.Fail,
             failureReason = StateFailureReasons.SupportFlagsNotSatisfied,
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -209,7 +245,9 @@ namespace ES
             code = StateActivationCode.Fail,
             failureReason = "跨层级冲突",
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0
@@ -221,7 +259,9 @@ namespace ES
             code = StateActivationCode.Fail,
             failureReason = "合并冲突",
             statesToInterrupt = _sharedEmptyList,
-            interruptCount = 0
+            interruptCount = 0,
+            statesToWeakInterrupt = _sharedEmptyList,
+            weakInterruptCount = 0
 #if UNITY_EDITOR
             , debugMergeStates = _sharedEmptyList,
             debugMergeCount = 0

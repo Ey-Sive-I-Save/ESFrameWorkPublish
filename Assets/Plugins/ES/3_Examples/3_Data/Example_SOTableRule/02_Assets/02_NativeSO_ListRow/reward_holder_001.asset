@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 117b1e461bc671046aae78bbe00677c8, type: 3}
+  m_Name: reward_holder_001
+  m_EditorClassIdentifier: 
+  itemId: reward_holder_001
+  displayName: "\u7B2C1\u7EC4\u5956\u52B1"
+  enabledInGame: 1
+  rewards:
+  - rowKey: reward_005
+    rewardName: "\u4F53\u529B\u8865\u7ED905"
+    amount: 9999
+    quality: 1
+    tags: 4
+    nestedConfig:
+      growthMultiplier: 1.25
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_001 #05"
+  - rowKey: reward_006
+    rewardName: "\u94A5\u5319\u788E\u724706"
+    amount: 1
+    quality: 2
+    tags: 0
+    nestedConfig:
+      growthMultiplier: 1.3
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_001 #06"
+  - rowKey: reward_007
+    rewardName: "\u6D3B\u52A8\u4EE3\u5E0107"
+    amount: 85
+    quality: 0
+    tags: 2
+    nestedConfig:
+      growthMultiplier: 1.35
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_001 #07"
+  - rowKey: reward_008
+    rewardName: "\u88C5\u5907\u56FE\u7EB808"
+    amount: 4
+    quality: 1
+    tags: 1
+    nestedConfig:
+      growthMultiplier: 1.4
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_001 #08"
+  - rowKey: reward_009
+    rewardName: "\u6280\u80FD\u4E6609"
+    amount: 1
+    quality: 2
+    tags: 3
+    nestedConfig:
+      growthMultiplier: 1.45
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_001 #09"
+  - rowKey: reward_010
+    rewardName: "\u5B9D\u77F3\u793C\u530510"
+    amount: 100
+    quality: 0
+    tags: 4
+    nestedConfig:
+      growthMultiplier: 1.5
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_001 #10"
+  - rowKey: reward_001
+    rewardName: "\u901A\u5173\u91D1\u5E012323"
+    amount: 999
+    quality: 0
+    tags: 2
+    nestedConfig:
+      growthMultiplier: 1.2
+      note: "\u5D4C\u5957\u5B57\u6BB5\u6D4B\u8BD5"

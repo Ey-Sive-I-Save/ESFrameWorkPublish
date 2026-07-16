@@ -12,7 +12,7 @@
 //
 // 用法模板：
 //   tracker = new StateLifecycleTracker();
-//   tracker.Bind(sm, state, "stateName");           // Start()
+//   tracker.SetTarget(sm, state, "stateName");      // Start()
 //
 //   // 主动进入（将激活结果直接传入，无闭包）
 //   if (tracker.TryEnter(sm.TryActivateState(s)))
@@ -26,14 +26,16 @@
 //   if (tracker.CheckExit()) { OnMyExit(); return; }
 //
 //   // OnDestroy
-//   if (tracker.Dispose()) OnMyExit();
+//   if (tracker.Release()) OnMyExit();
 //
 // Public API：
 //   bool IsActive         当前是否处于激活中
 //   bool IsBound          当前是否已绑定到状态/状态机上下文
 //   StateBase BoundState  当前绑定状态（可空）
 //   string BoundStateName 当前绑定状态名/键（可空）
-//   void Bind(...)        绑定状态（Start 或状态解析变化时调用；stateName 由调用方保证确定）
+//   StateLayerType BoundLayer 当前绑定层级（可为 NotClear）
+//   bool SetTarget(...)   设置跟踪目标，true = 旧 active 被新目标失效，请执行 Exit 回调
+//   bool TryRebind(...)   SetTarget 的语义化别名
 //   bool TryEnter(bool)   尝试进入（幂等），true = 本次成功进入请执行回调
 //   bool RequestExit()    主动请求退出（幂等），true = 本次触发请执行回调
 //   bool CheckExit()      每帧检测外部打断（幂等），true = 检测到打断请执行回调
@@ -56,6 +58,7 @@ namespace ES
         private bool         _hasStateName;
         private StateBase    _state;
         private string       _stateName;
+        private StateLayerType _layer;
         private StateMachine _sm;
 
         /// <summary>当前是否处于激活状态（Enter 已执行、Exit 尚未执行）。</summary>
@@ -70,22 +73,47 @@ namespace ES
         /// <summary>当前绑定的状态名/键。</summary>
         public string BoundStateName => _stateName;
 
+        /// <summary>当前绑定的层级。NotClear 表示由状态机/状态自身解析。</summary>
+        public StateLayerType BoundLayer => _layer;
+
         /// <summary>
-        /// 绑定要跟踪的状态与状态机（在模块 <c>Start</c> 中调用）。
+        /// 设置/重设要跟踪的状态目标。
         /// <paramref name="stateName"/> 需由调用方提前解析为确定值（不在此处做回退推导）。
-        /// 如果在活跃期间重绑，而新绑定状态并未运行，则会自动清除活跃标记，避免旧生命周期残留。
+        /// 如果在活跃期间切换目标，而新目标并未运行，则会自动清除活跃标记，避免旧生命周期残留。
+        /// 返回 <c>true</c> 时表示旧 active 生命周期被新目标失效，调用方应补执行 Exit 回调。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Bind(StateMachine sm, StateBase state, string stateName)
+        public bool SetTarget(StateMachine sm, StateBase state, string stateName, StateLayerType layer = StateLayerType.NotClear)
         {
+            bool wasActive = _isActive;
+
             _sm        = sm;
             _state     = state;
             _stateName = stateName;
+            _layer     = layer;
 
             _hasStateName = _stateName != null && _stateName.Length > 0;
 
             if (_isActive && (_state == null || _state.baseStatus != StateBaseStatus.Running))
                 _isActive = false;
+
+            return wasActive && !_isActive;
+        }
+
+        /// <summary>
+        /// 安全重绑定状态上下文。幂等，不会主动触发 Enter。<br/>
+        /// 这是 <see cref="SetTarget"/> 的语义化别名：如果重绑定导致旧 active 生命周期失效，
+        /// 返回 <c>true</c>，调用方应补执行 Exit 回调。<br/>
+        /// 典型用途：模块运行中重新解析状态引用、热切换状态配置、数据重载后重新绑定。
+        /// <example><code>
+        /// if (tracker.TryRebind(sm, newState, newStateName))
+        ///     OnMyExit();
+        /// </code></example>
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryRebind(StateMachine sm, StateBase state, string stateName, StateLayerType layer = StateLayerType.NotClear)
+        {
+            return SetTarget(sm, state, stateName, layer);
         }
 
         /// <summary>
@@ -163,15 +191,16 @@ namespace ES
         /// 销毁/清理时调用，保证活跃生命周期被干净结束。幂等。<br/>
         /// 返回 <c>true</c> = 确实有活跃生命周期被清理，调用方应执行 Exit 回调。
         /// <example><code>
-        /// if (tracker.Dispose()) OnMyExit();
+        /// if (tracker.Release()) OnMyExit();
         /// </code></example>
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Dispose()
+        public bool Release()
         {
             if (!_isActive) return false;
             _isActive = false;
             return true;
         }
+
     }
 }

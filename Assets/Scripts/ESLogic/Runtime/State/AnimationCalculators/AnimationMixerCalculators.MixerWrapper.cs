@@ -20,27 +20,28 @@ namespace ES
         /// 性能: 一层嵌套几乎无影响，推荐深度≤2层
         /// </summary>
         [Serializable, TypeRegistryItem("混合器包装器")]
+        [Obsolete("MixerCalculator 仅为旧数据兼容保留。新配置请直接使用具体计算器，不要再包一层 Wrapper。")]
         // 对应枚举：MixerWrapper
         public class MixerCalculator : StateAnimationMixCalculator
         {
             [SerializeReference, LabelText("子计算器")]
             public StateAnimationMixCalculator childCalculator;
 
-            [LabelText("权重缩放"), Range(0f, 1f), Tooltip("对子Calculator的输出权重进行缩放")]
+            [HideInInspector, Obsolete("内部缩放会破坏单输出权重和，可能导致默认姿势/T Pose。字段仅保留旧序列化兼容。")]
             public float weightScale = 1f;
 
             public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.MixerWrapper;
 
             protected override string GetUsageHelp()
             {
-                 return "适用：组合多层混合（上半身/下半身分离）。\n" +
-                        "必填：子计算器。\n" +
-                        "可选：权重缩放（整体缩放）。";
+                 return "旧数据兼容用包装器。\n" +
+                        "新配置不要使用它，请直接选择具体动画计算器。\n" +
+                        "不要在这里做整体权重缩放，单输入降权会导致默认姿势/T Pose 风险。";
             }
 
             protected override string GetCalculatorDisplayName()
             {
-                return "混合器包装器";
+                return "混合器包装器(旧兼容)";
             }
 
             /// <summary>
@@ -59,7 +60,7 @@ namespace ES
             public override AnimationCalculatorRuntime CreateRuntimeData()
             {
                 // 创建运行时数据，包含子Calculator的Runtime
-                var runtime = new AnimationCalculatorRuntime();
+                var runtime = base.CreateRuntimeData();
                 if (childCalculator != null)
                 {
                     runtime.childRuntime = childCalculator.CreateRuntimeData();
@@ -76,7 +77,15 @@ namespace ES
                 }
 
                 // 初始化子Calculator，将其输出作为我们的输出
-                bool success = childCalculator.InitializeRuntime(runtime.childRuntime, graph, ref output);
+                Playable childOutput = Playable.Null;
+                bool success = childCalculator.InitializeRuntime(runtime.childRuntime, graph, ref childOutput);
+                if (!success || !childOutput.IsValid())
+                {
+                    StateMachineDebugSettings.Instance.LogError("[MixerCalculator] 子计算器没有提供有效输出");
+                    return false;
+                }
+
+                output = childOutput;
                 
                 if (success)
                 {
@@ -93,6 +102,7 @@ namespace ES
                     // 递归更新子Calculator
                     childCalculator.UpdateWeights(runtime.childRuntime, context, deltaTime);
                 }
+
             }
 
             /// <summary>
@@ -104,6 +114,7 @@ namespace ES
                 {
                     childCalculator.ImmediateUpdate(runtime.childRuntime, context);
                 }
+
             }
 
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
@@ -131,6 +142,33 @@ namespace ES
                     return childCalculator.OverrideClip(runtime.childRuntime, clipIndex, newClip);
                 }
                 return false;
+            }
+
+            public override bool OverrideClipBySource(AnimationCalculatorRuntime runtime, AnimationClip sourceClip, AnimationClip newClip)
+            {
+                if (childCalculator != null && runtime.childRuntime != null)
+                {
+                    return childCalculator.OverrideClipBySource(runtime.childRuntime, sourceClip, newClip);
+                }
+                return false;
+            }
+
+            public override bool OverrideClipByMarker(AnimationCalculatorRuntime runtime, string marker, AnimationClip newClip)
+            {
+                if (childCalculator != null && runtime.childRuntime != null)
+                {
+                    return childCalculator.OverrideClipByMarker(runtime.childRuntime, marker, newClip);
+                }
+                return false;
+            }
+
+            public override int RestoreAllOverrideClips(AnimationCalculatorRuntime runtime)
+            {
+                if (childCalculator != null && runtime.childRuntime != null)
+                {
+                    return childCalculator.RestoreAllOverrideClips(runtime.childRuntime);
+                }
+                return 0;
             }
         }
 

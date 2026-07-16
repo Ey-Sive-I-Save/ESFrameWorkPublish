@@ -273,14 +273,30 @@ namespace ES
 
             Playable created = Playable.Null;
             if (!TryInitializePlayableRuntime(calculator, runtime, graph, ref created))
+            {
+                runtime.Cleanup();
+                runtime.TryAutoPushedToPool();
+                if (ReferenceEquals(_animationRuntime, runtime))
+                {
+                    _animationRuntime = null;
+                }
                 return false;
+            }
 
             // 初始化成功但未显式回填 created 时，回退从 runtime 获取。
             if (!created.IsValid())
             {
                 created = runtime.GetOutputPlayable();
                 if (!created.IsValid())
+                {
+                    runtime.Cleanup();
+                    runtime.TryAutoPushedToPool();
+                    if (ReferenceEquals(_animationRuntime, runtime))
+                    {
+                        _animationRuntime = null;
+                    }
                     return false;
+                }
             }
             output = created;
             return output.IsValid();
@@ -578,6 +594,165 @@ namespace ES
             if (calculator == null) return null;
 
             return calculator.GetCurrentClip(runtime);
+        }
+
+        /// <summary>
+        /// 运行时替换当前动画计算器中的指定Clip槽位。
+        /// 只替换本State当前AnimationCalculatorRuntime里的Playable，不写回共享配置，因此不会影响其他实体。
+        /// 要求状态已经创建过Playable；未激活/未初始化的状态应修改配置或在进入后再调用。
+        /// </summary>
+        public bool TryOverrideAnimationClip(int clipIndex, AnimationClip newClip)
+        {
+            if (newClip == null)
+            {
+                LogAnimationContractWarning($"TryOverrideAnimationClip: newClip为空。State={GetStateNameSafe()} Index={clipIndex}");
+                return false;
+            }
+
+            var runtime = _animationRuntime;
+            if (runtime == null || !runtime.IsInitialized)
+            {
+                LogAnimationContractWarning($"TryOverrideAnimationClip: 动画Runtime尚未初始化，无法运行时替换。State={GetStateNameSafe()} Index={clipIndex}");
+                return false;
+            }
+
+            var calculator = _calculatorCached ?? ResolveCalculatorForPlayableCreation();
+            if (calculator == null)
+            {
+                LogAnimationContractWarning($"TryOverrideAnimationClip: Calculator为空。State={GetStateNameSafe()} Index={clipIndex}");
+                return false;
+            }
+
+            bool changed = calculator.OverrideClip(runtime, clipIndex, newClip);
+            if (!changed)
+                return false;
+
+            if (_layerRuntime != null)
+            {
+                _layerRuntime.MarkDirty(PipelineDirtyFlags.MixerWeights);
+            }
+
+            return true;
+        }
+
+        public bool TryOverrideAnimationClip(AnimationClip sourceClip, AnimationClip newClip)
+        {
+            if (sourceClip == null || newClip == null)
+            {
+                LogAnimationContractWarning($"TryOverrideAnimationClip(source): sourceClip/newClip不能为空。State={GetStateNameSafe()}");
+                return false;
+            }
+
+            if (!TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator))
+                return false;
+
+            bool changed = calculator.OverrideClipBySource(runtime, sourceClip, newClip);
+            if (changed)
+                MarkAnimationOverrideDirty();
+
+            return changed;
+        }
+
+        public bool TryOverrideAnimationClip(string marker, AnimationClip newClip)
+        {
+            if (string.IsNullOrWhiteSpace(marker) || newClip == null)
+            {
+                LogAnimationContractWarning($"TryOverrideAnimationClip(marker): marker/newClip不能为空。State={GetStateNameSafe()} Marker={marker}");
+                return false;
+            }
+
+            if (!TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator))
+                return false;
+
+            bool changed = calculator.OverrideClipByMarker(runtime, marker, newClip);
+            if (changed)
+                MarkAnimationOverrideDirty();
+
+            return changed;
+        }
+
+        public int TryOverrideAnimationClips(IList<StateAnimationClipOverrideRule> rules)
+        {
+            if (rules == null || rules.Count == 0)
+                return 0;
+
+            if (!TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator))
+                return 0;
+
+            int changedCount = calculator.OverrideClips(runtime, rules);
+            if (changedCount > 0)
+                MarkAnimationOverrideDirty();
+
+            return changedCount;
+        }
+
+        public bool TryGetAnimationClipOverrideSlot(int clipIndex, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            slot = default;
+            var runtime = _animationRuntime;
+            return runtime != null && runtime.TryGetClipOverrideSlot(clipIndex, out slot);
+        }
+
+        public bool TryGetAnimationClipOverrideSlot(AnimationClip sourceOrCurrentClip, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            slot = default;
+            var runtime = _animationRuntime;
+            if (runtime == null || sourceOrCurrentClip == null)
+                return false;
+
+            int slotIndex = runtime.FindClipSlotByOriginalOrCurrent(sourceOrCurrentClip);
+            return slotIndex >= 0 && runtime.TryGetClipOverrideSlot(slotIndex, out slot);
+        }
+
+        public bool TryGetAnimationClipOverrideSlot(string marker, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            slot = default;
+            var runtime = _animationRuntime;
+            if (runtime == null || string.IsNullOrWhiteSpace(marker))
+                return false;
+
+            int slotIndex = runtime.FindClipSlotByMarker(marker);
+            return slotIndex >= 0 && runtime.TryGetClipOverrideSlot(slotIndex, out slot);
+        }
+
+        public int RestoreAllAnimationClipOverrides()
+        {
+            if (!TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator))
+                return 0;
+
+            int changedCount = calculator.RestoreAllOverrideClips(runtime);
+            if (changedCount > 0)
+                MarkAnimationOverrideDirty();
+
+            return changedCount;
+        }
+
+        private bool TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator)
+        {
+            runtime = _animationRuntime;
+            calculator = null;
+            if (runtime == null || !runtime.IsInitialized)
+            {
+                LogAnimationContractWarning($"TryOverrideAnimationClip: 动画Runtime尚未初始化，无法运行时替换。State={GetStateNameSafe()}");
+                return false;
+            }
+
+            calculator = _calculatorCached ?? ResolveCalculatorForPlayableCreation();
+            if (calculator == null)
+            {
+                LogAnimationContractWarning($"TryOverrideAnimationClip: Calculator为空。State={GetStateNameSafe()}");
+                return false;
+            }
+
+            return true;
+        }
+
+        private void MarkAnimationOverrideDirty()
+        {
+            if (_layerRuntime != null)
+            {
+                _layerRuntime.MarkDirty(PipelineDirtyFlags.MixerWeights);
+            }
         }
 
         /// <summary>

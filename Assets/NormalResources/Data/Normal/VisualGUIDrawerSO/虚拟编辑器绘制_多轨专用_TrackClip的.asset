@@ -22,17 +22,9 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   drawerData:
-    rid: 23628807303331842
+    rid: -2
   references:
     version: 2
     RefIds:
-    - rid: 23628807303331842
-      type: {class: SkillTrackClip_Audio, ns: ES, asm: ES_Logic}
-      data:
-        name: "\u97F3\u9891\u7247\u6BB5"
-        startTime: 8.655319
-        durationTime: 1
-        audioClip: {fileID: 8300000, guid: c05bb84f3ad49934888c9b769073afe7, type: 3}
-        volume: 1
-        addAudioSourceIfMissing: 1
-        stopOnClipExit: 0
+    - rid: -2
+      type: {class: , ns: , asm: }

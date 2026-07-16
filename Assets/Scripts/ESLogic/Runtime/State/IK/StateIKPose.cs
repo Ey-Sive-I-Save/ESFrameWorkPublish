@@ -20,15 +20,19 @@ namespace ES
     public struct IKGoalPose
     {
         public float weight;
+        public float rotationWeight;
         // lerping 速度倍率，不是静态混合值：1 为默认速度，小于 1 更慢，大于 1 更快。
         public float lerpingRate;
         public Vector3 position;
         public Quaternion rotation;
         public Vector3 hintPosition;
 
+        public bool HasAnyWeight => weight > 0.001f || rotationWeight > 0.001f;
+
         public void Reset()
         {
             weight = 0f;
+            rotationWeight = 0f;
             lerpingRate = 1f;
             position = Vector3.zero;
             rotation = Quaternion.identity;
@@ -54,8 +58,8 @@ namespace ES
 
         /// <summary>四肢中任意一肢有权重（BipedIK 专用检查，不含 LookAt）。</summary>
         public bool HasLimbWeight =>
-            leftHand.weight > 0.001f || rightHand.weight > 0.001f ||
-            leftFoot.weight > 0.001f || rightFoot.weight > 0.001f;
+            leftHand.HasAnyWeight || rightHand.HasAnyWeight ||
+            leftFoot.HasAnyWeight || rightFoot.HasAnyWeight;
 
         /// <summary>四肢或 LookAt 任意有权重。</summary>
         public bool HasAnyWeight => HasLimbWeight || lookAtWeight > 0.001f;

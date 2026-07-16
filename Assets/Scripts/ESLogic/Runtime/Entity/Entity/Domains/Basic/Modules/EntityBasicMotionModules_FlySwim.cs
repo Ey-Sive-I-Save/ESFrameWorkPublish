@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -55,7 +55,7 @@ namespace ES
 
             if (enable)
             {
-                _flyLifecycle.Bind(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
+                _flyLifecycle.SetTarget(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
                 bool activated = _flyState.baseStatus == StateBaseStatus.Running || sm.TryActivateState(_flyState);
                 _flyLifecycle.TryEnter(activated);
             }
@@ -77,7 +77,7 @@ namespace ES
             }
             else
             {
-                _flyLifecycle.Bind(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
+                _flyLifecycle.SetTarget(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
                 bool activated = _flyState.baseStatus == StateBaseStatus.Running || sm.TryActivateState(_flyState);
                 _flyLifecycle.TryEnter(activated);
             }
@@ -89,7 +89,7 @@ namespace ES
         {
             if (_flyState == null) return;
 
-            _flyLifecycle.Bind(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
+            _flyLifecycle.SetTarget(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
 
             if (!_flyLifecycle.RequestExit() && _flyState.baseStatus == StateBaseStatus.Running)
             {
@@ -116,7 +116,7 @@ namespace ES
             {
                 sm = MyCore.stateDomain.stateMachine;
                 _flyState = sm.GetStateByString(Fly_StateName);
-                _flyLifecycle.Bind(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
+                _flyLifecycle.SetTarget(sm, _flyState, GetFlyStateKeyForLifecycle(_flyState));
             }
             if (MyCore != null)
             {
@@ -203,7 +203,7 @@ namespace ES
         public override void OnDestroy()
         {
             ExitFly();
-            _flyLifecycle.Dispose();
+            _flyLifecycle.Release();
 
             if (MyCore != null && MyCore.kcc.flyModule == this)
             {

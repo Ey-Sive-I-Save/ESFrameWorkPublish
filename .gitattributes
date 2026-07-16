@@ -1,2 +1,17 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+*.cs text eol=crlf
+*.uxml text eol=crlf
+*.uss text eol=crlf
+*.json text eol=crlf
+*.asmdef text eol=crlf
+*.asmref text eol=crlf
+*.asset text eol=crlf
+*.meta text eol=crlf
+*.prefab text eol=crlf
+*.unity text eol=crlf
+*.controller text eol=crlf
+*.anim text eol=crlf
+*.mat text eol=crlf
+*.playable text eol=crlf

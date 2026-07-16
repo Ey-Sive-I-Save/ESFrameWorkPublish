@@ -26,7 +26,7 @@ namespace ES
     /// </summary>
     public class AnimationCalculatorRuntime : IPoolableAuto
     {
-        public static bool debugMatchTarget = true;
+        public static bool debugMatchTarget = false;
 
         /// <summary>
         /// Runtime 所属的 StateBase（非序列化）。
@@ -120,6 +120,18 @@ namespace ES
         /// </summary>
         public AnimationClipPlayable singlePlayable;
 
+        public struct ClipOverrideSlot
+        {
+            public int slotIndex;
+            public AnimationClip originalClip;
+            public AnimationClip currentClip;
+            public string marker;
+            public bool isValid;
+            public bool IsOverridden => isValid && originalClip != currentClip;
+        }
+
+        public ClipOverrideSlot[] clipOverrideSlots;
+
         // ==================== 1D混合树数据 ====================
 
         /// <summary>上一帧输入值（平滑用）</summary>
@@ -155,6 +167,8 @@ namespace ES
         public float[] weightVelocityCache;
         /// <summary>是否启用权重平滑</summary>
         public bool useSmoothing = true;
+        /// <summary>最近一次写入内部Mixer的输入权重，用于跳过无效SetInputWeight</summary>
+        public float[] lastMixerInputWeights;
 
         // ==================== 嵌套支持 ====================
 
@@ -256,8 +270,8 @@ namespace ES
             public IKLookAtRuntimeData lookAt;
 
             public bool HasAnyTargetWeight =>
-                leftHand.targetWeight > 0.0001f || rightHand.targetWeight > 0.0001f ||
-                leftFoot.targetWeight > 0.0001f || rightFoot.targetWeight > 0.0001f ||
+                leftHand.HasAnyWeight || rightHand.HasAnyWeight ||
+                leftFoot.HasAnyWeight || rightFoot.HasAnyWeight ||
                 lookAt.targetWeight > 0.0001f;
 
             /// <summary>重置所有IK数据到默认值</summary>
@@ -275,14 +289,18 @@ namespace ES
         public struct IKGoalRuntimeData
         {
             public float targetWeight;
+            public float rotationWeight;
             public float lerpingRate;
             public Vector3 position;
             public Quaternion rotation;
             public Vector3 hintPosition;
 
+            public bool HasAnyWeight => targetWeight > 0.0001f || rotationWeight > 0.0001f;
+
             public void Reset()
             {
                 targetWeight = 0f;
+                rotationWeight = 0f;
                 lerpingRate = 1f;
                 position = Vector3.zero;
                 rotation = Quaternion.identity;
@@ -337,6 +355,16 @@ namespace ES
             public float rotationApproachSpeed;
             /// <summary>MatchTarget旋转权重</summary>
             public float rotationWeight;
+            /// <summary>是否根据剩余时间自动提高逼近速度，保证窗口末端更容易对齐</summary>
+            public bool autoCatchUpByRemainingTime;
+            /// <summary>自动追赶速度安全倍率</summary>
+            public float catchUpSafetyMultiplier;
+            /// <summary>窗口结束帧是否强制吸附到目标</summary>
+            public bool snapToTargetOnEnd;
+            /// <summary>结束帧位置吸附容差；0表示总是吸附</summary>
+            public float snapPositionTolerance;
+            /// <summary>结束帧旋转吸附容差；0表示总是吸附</summary>
+            public float snapRotationTolerance;
             /// <summary>MatchTarget是否完成</summary>
             public bool completed;
 
@@ -352,6 +380,11 @@ namespace ES
                 positionApproachSpeed = 4f;
                 rotationApproachSpeed = 240f;
                 rotationWeight = 1f;
+                autoCatchUpByRemainingTime = true;
+                catchUpSafetyMultiplier = 1.15f;
+                snapToTargetOnEnd = false;
+                snapPositionTolerance = 0f;
+                snapRotationTolerance = 0f;
                 completed = false;
             }
         }
@@ -376,7 +409,15 @@ namespace ES
             if (childRuntime != null)
             {
                 childRuntime.Cleanup();
+                childRuntime.TryAutoPushedToPool();
                 childRuntime = null;
+            }
+
+            if (childRuntimeB != null)
+            {
+                childRuntimeB.Cleanup();
+                childRuntimeB.TryAutoPushedToPool();
+                childRuntimeB = null;
             }
 
             // 清理阶段子Runtime
@@ -387,6 +428,7 @@ namespace ES
                     if (phaseRuntimes[i] != null)
                     {
                         phaseRuntimes[i].Cleanup();
+                        phaseRuntimes[i].TryAutoPushedToPool();
                         phaseRuntimes[i] = null;
                     }
                 }
@@ -472,6 +514,7 @@ namespace ES
             totalWeight = 1f;
             lastAppliedTotalWeight = 1f;
             usesInternalWeight = true;
+            clipOverrideSlots = null;
 
             // 1D数据
             lastInput = 0f;
@@ -491,6 +534,7 @@ namespace ES
             weightCache = null;
             weightTargetCache = null;
             weightVelocityCache = null;
+            lastMixerInputWeights = null;
             useSmoothing = true;
 
             // 序列数据（SequentialClipMixer）
@@ -641,33 +685,43 @@ namespace ES
         /// <param name="lerpingRate">lerping 速度倍率（1 为默认）</param>
         public void SetIKGoal(IKGoal goal, Vector3 position, Quaternion rotation, float weight, float lerpingRate = 1f)
         {
+            SetIKGoal(goal, position, rotation, weight, weight, lerpingRate);
+        }
+
+        public void SetIKGoal(IKGoal goal, Vector3 position, Quaternion rotation, float positionWeight, float rotationWeight, float lerpingRate)
+        {
             ik.enabled = true;
-            float clampedWeight = Mathf.Clamp01(weight);
+            float clampedPositionWeight = Mathf.Clamp01(positionWeight);
+            float clampedRotationWeight = Mathf.Clamp01(rotationWeight);
             float normalizedLerpingRate = Mathf.Clamp(lerpingRate, 0.05f, 8f);
             switch (goal)
             {
                 case IKGoal.LeftHand:
                     ik.leftHand.position = position;
                     ik.leftHand.rotation = rotation;
-                    ik.leftHand.targetWeight = clampedWeight;
+                    ik.leftHand.targetWeight = clampedPositionWeight;
+                    ik.leftHand.rotationWeight = clampedRotationWeight;
                     ik.leftHand.lerpingRate = normalizedLerpingRate;
                     break;
                 case IKGoal.RightHand:
                     ik.rightHand.position = position;
                     ik.rightHand.rotation = rotation;
-                    ik.rightHand.targetWeight = clampedWeight;
+                    ik.rightHand.targetWeight = clampedPositionWeight;
+                    ik.rightHand.rotationWeight = clampedRotationWeight;
                     ik.rightHand.lerpingRate = normalizedLerpingRate;
                     break;
                 case IKGoal.LeftFoot:
                     ik.leftFoot.position = position;
                     ik.leftFoot.rotation = rotation;
-                    ik.leftFoot.targetWeight = clampedWeight;
+                    ik.leftFoot.targetWeight = clampedPositionWeight;
+                    ik.leftFoot.rotationWeight = clampedRotationWeight;
                     ik.leftFoot.lerpingRate = normalizedLerpingRate;
                     break;
                 case IKGoal.RightFoot:
                     ik.rightFoot.position = position;
                     ik.rightFoot.rotation = rotation;
-                    ik.rightFoot.targetWeight = clampedWeight;
+                    ik.rightFoot.targetWeight = clampedPositionWeight;
+                    ik.rightFoot.rotationWeight = clampedRotationWeight;
                     ik.rightFoot.lerpingRate = normalizedLerpingRate;
                     break;
             }
@@ -734,7 +788,9 @@ namespace ES
         /// 启动MatchTarget（根动作对齐）
         /// </summary>
         public void StartMatchTarget(Vector3 targetPos, Quaternion targetRot, AvatarTarget bodyPart,
-            float startTime, float endTime, float positionApproachSpeed, float rotationApproachSpeed, float rotWeight = 1f)
+            float startTime, float endTime, float positionApproachSpeed, float rotationApproachSpeed, float rotWeight = 1f,
+            bool autoCatchUpByRemainingTime = true, float catchUpSafetyMultiplier = 1.15f,
+            bool snapToTargetOnEnd = false, float snapPositionTolerance = 0f, float snapRotationTolerance = 0f)
         {
             matchTarget.active = true;
             matchTarget.completed = false;
@@ -746,6 +802,11 @@ namespace ES
             matchTarget.positionApproachSpeed = Mathf.Max(0f, positionApproachSpeed);
             matchTarget.rotationApproachSpeed = Mathf.Max(0f, rotationApproachSpeed);
             matchTarget.rotationWeight = Mathf.Clamp01(rotWeight);
+            matchTarget.autoCatchUpByRemainingTime = autoCatchUpByRemainingTime;
+            matchTarget.catchUpSafetyMultiplier = Mathf.Max(1f, catchUpSafetyMultiplier);
+            matchTarget.snapToTargetOnEnd = snapToTargetOnEnd;
+            matchTarget.snapPositionTolerance = Mathf.Max(0f, snapPositionTolerance);
+            matchTarget.snapRotationTolerance = Mathf.Max(0f, snapRotationTolerance);
 
 #if UNITY_EDITOR
             if (debugMatchTarget)
@@ -864,6 +925,139 @@ namespace ES
         private static int GetArraySize(float[] arr)
         {
             return arr != null ? arr.Length * 4 + 16 : 0; // data + array header
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnsureMixerInputWeightCache(int inputCount)
+        {
+            if (inputCount <= 0)
+                return;
+
+            if (lastMixerInputWeights == null || lastMixerInputWeights.Length != inputCount)
+            {
+                lastMixerInputWeights = new float[inputCount];
+                for (int i = 0; i < inputCount; i++)
+                    lastMixerInputWeights[i] = float.NaN;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetMixerInputWeightIfChanged(AnimationMixerPlayable targetMixer, int inputIndex, float weight, float epsilon = 0.0001f)
+        {
+            if (!targetMixer.IsValid())
+                return;
+
+            if (lastMixerInputWeights == null || (uint)inputIndex >= (uint)lastMixerInputWeights.Length)
+            {
+                targetMixer.SetInputWeight(inputIndex, weight);
+                return;
+            }
+
+            if (Mathf.Abs(lastMixerInputWeights[inputIndex] - weight) <= epsilon)
+                return;
+
+            targetMixer.SetInputWeight(inputIndex, weight);
+            lastMixerInputWeights[inputIndex] = weight;
+        }
+
+        public void EnsureClipOverrideSlots(int slotCount)
+        {
+            if (slotCount <= 0)
+                return;
+
+            if (clipOverrideSlots == null || clipOverrideSlots.Length != slotCount)
+                clipOverrideSlots = new ClipOverrideSlot[slotCount];
+        }
+
+        public void RegisterClipOverrideSlot(int slotIndex, AnimationClip originalClip, string marker = null)
+        {
+            if (slotIndex < 0)
+                return;
+
+            EnsureClipOverrideSlots(slotIndex + 1);
+            clipOverrideSlots[slotIndex] = new ClipOverrideSlot
+            {
+                slotIndex = slotIndex,
+                originalClip = originalClip,
+                currentClip = originalClip,
+                marker = marker,
+                isValid = originalClip != null
+            };
+        }
+
+        public void UpdateClipOverrideSlot(int slotIndex, AnimationClip currentClip)
+        {
+            if (clipOverrideSlots == null || (uint)slotIndex >= (uint)clipOverrideSlots.Length)
+                return;
+
+            var slot = clipOverrideSlots[slotIndex];
+            slot.currentClip = currentClip;
+            slot.isValid = slot.isValid || currentClip != null;
+            clipOverrideSlots[slotIndex] = slot;
+        }
+
+        public bool TryGetClipOverrideSlot(int slotIndex, out ClipOverrideSlot slot)
+        {
+            if (clipOverrideSlots != null && (uint)slotIndex < (uint)clipOverrideSlots.Length && clipOverrideSlots[slotIndex].isValid)
+            {
+                slot = clipOverrideSlots[slotIndex];
+                return true;
+            }
+
+            slot = default;
+            return false;
+        }
+
+        public int FindClipSlotByOriginalOrCurrent(AnimationClip clip)
+        {
+            if (clip == null || clipOverrideSlots == null)
+                return -1;
+
+            for (int i = 0; i < clipOverrideSlots.Length; i++)
+            {
+                var slot = clipOverrideSlots[i];
+                if (!slot.isValid)
+                    continue;
+
+                if (slot.originalClip == clip || slot.currentClip == clip)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        public int FindClipSlotByMarker(string marker)
+        {
+            if (string.IsNullOrWhiteSpace(marker) || clipOverrideSlots == null)
+                return -1;
+
+            for (int i = 0; i < clipOverrideSlots.Length; i++)
+            {
+                var slot = clipOverrideSlots[i];
+                if (slot.isValid && string.Equals(slot.marker, marker, System.StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+
+            return -1;
+        }
+
+        public int RestoreAllOverrideClips(StateAnimationMixCalculator calculator)
+        {
+            if (calculator == null || clipOverrideSlots == null)
+                return 0;
+
+            int changed = 0;
+            for (int i = 0; i < clipOverrideSlots.Length; i++)
+            {
+                var slot = clipOverrideSlots[i];
+                if (!slot.IsOverridden || slot.originalClip == null)
+                    continue;
+
+                if (calculator.OverrideClip(this, slot.slotIndex, slot.originalClip))
+                    changed++;
+            }
+
+            return changed;
         }
 
         // ==================== 调试 ====================

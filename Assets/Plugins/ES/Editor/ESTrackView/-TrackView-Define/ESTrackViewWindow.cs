@@ -26,10 +26,27 @@ public class ESTrackViewWindow : OdinEditorWindow
     private static byte[] s_CopiedClipData;
     private static Type s_CopiedClipType;
     private static float s_CopiedClipStartTime;
+    private static readonly List<CopiedClipPayload> s_CopiedClips = new List<CopiedClipPayload>();
     private bool m_AutoValidationScheduled;
+    private bool m_ViewRefreshScheduled;
+    private readonly HashSet<ESEditorTrackClip> m_SelectedClips = new HashSet<ESEditorTrackClip>();
+    private readonly List<ITrackClip> m_ValidationErrorClips = new List<ITrackClip>();
+    private int m_ValidationErrorCursor = -1;
+    private readonly Dictionary<ESEditorTrackClip, float> m_GroupDragStartTimes = new Dictionary<ESEditorTrackClip, float>();
+    private ESEditorTrackClip m_GroupDragAnchor;
+    private float m_GroupDragAnchorStartTime;
+    private bool m_IsApplyingGroupDrag;
 
     // 播放器实例
     public static EditorTimelinePlayer Player => EditorTimelinePlayer.Instance;
+
+    private sealed class CopiedClipPayload
+    {
+        public byte[] data;
+        public Type clipType;
+        public float startTime;
+        public int trackIndex;
+    }
 
 
 
@@ -54,6 +71,8 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     protected override void OnDestroy()
     {
+        EditorApplication.update -= FlushScheduledViewRefresh;
+        EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
         CleanupTrackPreviewPlayer();
         base.OnDestroy();
 
@@ -84,10 +103,15 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         EditorApplication.delayCall -= RefreshPreselectEntityDelayed;
         EditorApplication.delayCall += RefreshPreselectEntityDelayed;
+        EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+        EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
     }
     protected override void OnDisable()
     {
+        EditorApplication.update -= FlushScheduledViewRefresh;
+        EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
         CleanupTrackPreviewPlayer();
+        ClearFocusedEditingClip(null);
         base.OnDisable();
         Selection.selectionChanged -= OnTrackWindowSelectionChanged;
         EditorApplication.delayCall -= RefreshPreselectEntityDelayed;
@@ -120,6 +144,21 @@ public class ESTrackViewWindow : OdinEditorWindow
         }
 
         window = null;
+    }
+
+    private void OnPlayModeStateChanged(PlayModeStateChange state)
+    {
+        if (state != PlayModeStateChange.ExitingEditMode && state != PlayModeStateChange.EnteredPlayMode)
+            return;
+
+        try
+        {
+            EditorTimelinePlayer.Instance.ActiveSequence = null;
+        }
+        catch (Exception e)
+        {
+            Debug.LogException(e);
+        }
     }
     protected override void Initialize()
     {
@@ -162,6 +201,17 @@ public class ESTrackViewWindow : OdinEditorWindow
     private const float MinHorizontalScaleSpan = 0.1f;
     public static float standPixelPerSecond => ResolveWidth() / Mathf.Max(TotalTime, 0.01f);
     public float StartShow => startScale * TotalTime;
+    public float GetVisibleEndTime()
+    {
+        float panelWidth = rightPanel != null ? rightPanel.layout.width : 0f;
+        if (panelWidth <= 0f && m_ContentContainer != null)
+            panelWidth = m_ContentContainer.layout.width;
+
+        if (panelWidth <= 0f || pixelPerSecond <= 0.0001f)
+            return float.PositiveInfinity;
+
+        return StartShow + panelWidth / pixelPerSecond;
+    }
 
     public const float totalPixel = 800;
     public const float LeftTrackPixel = 200;
@@ -195,6 +245,7 @@ public class ESTrackViewWindow : OdinEditorWindow
     public Entity RunningEntity { get; private set; }
     public ESEditorTrackItem SelectedTrackItem { get; private set; }
     public ESEditorTrackClip SelectedClip { get; private set; }
+    public ESEditorTrackClip FocusedEditingClip { get; private set; }
     public ESEditorTrackClip RenamingClip { get; private set; }
     public ESEditorTrackItem RenamingTrack { get; private set; }
     private ESEditorTrackItem m_DragSortingTrack;
@@ -268,6 +319,7 @@ public class ESTrackViewWindow : OdinEditorWindow
             window.toolbar.Name.text = "轴：" + TrackContainer.trackName;
         }
 
+        window.ClearFocusedEditingClip(null);
         window.SyncTotalTimeFromSequence(Sequence, true);
         //开始重建
         if (ESTrackViewWindow.window.leftPanel == null)
@@ -363,6 +415,9 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     private void FindTrackAssets()
     {
+        if (TrackContainer != null && TrackContainer.Sequence != null)
+            return;
+
         if (Selection.activeObject is IEditorTrackSupport_GetSequence support &&
         support.Sequence != null)
         {
@@ -400,7 +455,14 @@ public class ESTrackViewWindow : OdinEditorWindow
             InitNewSequenceAndOpenWindow();
         }
 
-        if (window.timeCursor != null) window.timeCursor.BringToFront();
+        if (window != null)
+        {
+            if (window.timeCursor != null)
+                window.timeCursor.BringToFront();
+
+            window.ForceRefreshClipLayoutNow();
+            window.Repaint();
+        }
 
     }
     private void BindButtonsHandles()
@@ -766,20 +828,327 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     public void SelectClip(ESEditorTrackClip clip)
     {
+        SelectClip(clip, false);
+    }
+
+    public void SetFocusedEditingClip(ESEditorTrackClip clip)
+    {
+        if (FocusedEditingClip == clip)
+        {
+            FocusedEditingClip?.SetFocusedEditing(true);
+            return;
+        }
+
+        if (FocusedEditingClip != null)
+            FocusedEditingClip.SetFocusedEditing(false);
+
+        FocusedEditingClip = clip;
+        if (FocusedEditingClip != null)
+            FocusedEditingClip.SetFocusedEditing(true);
+    }
+
+    public void ClearFocusedEditingClip(ESEditorTrackClip clip)
+    {
+        if (clip != null && FocusedEditingClip != clip)
+            return;
+
+        if (FocusedEditingClip != null)
+            FocusedEditingClip.SetFocusedEditing(false);
+
+        FocusedEditingClip = null;
+    }
+
+    public void SelectClip(ESEditorTrackClip clip, bool additive)
+    {
         if (SelectedClip == clip)
         {
+            if (additive)
+            {
+                RemoveClipFromSelection(clip);
+            }
+            else if (m_SelectedClips.Count > 1)
+            {
+                foreach (ESEditorTrackClip selected in m_SelectedClips)
+                {
+                    if (selected != null && selected != clip)
+                        selected.SetSelected(false);
+                }
+
+                m_SelectedClips.Clear();
+                m_SelectedClips.Add(clip);
+                RefreshClipSelectionVisuals();
+            }
+
             rootVisualElement?.Focus();
             return;
         }
 
-        if (SelectedClip != null)
-            SelectedClip.SetSelected(false);
+        if (!additive)
+            ClearClipSelection();
 
         SelectedClip = clip;
         if (SelectedClip != null)
-            SelectedClip.SetSelected(true);
+        {
+            m_SelectedClips.Add(SelectedClip);
+            RefreshClipSelectionVisuals();
+        }
 
         rootVisualElement?.Focus();
+    }
+
+    public bool IsClipSelected(ESEditorTrackClip clip)
+    {
+        return clip != null && m_SelectedClips.Contains(clip);
+    }
+
+    public int SelectedClipCount => m_SelectedClips.Count;
+
+    private void ClearClipSelection()
+    {
+        foreach (ESEditorTrackClip selected in m_SelectedClips)
+        {
+            if (selected != null)
+                selected.SetSelected(false);
+        }
+
+        m_SelectedClips.Clear();
+        SelectedClip = null;
+    }
+
+    private void RemoveClipFromSelection(ESEditorTrackClip clip)
+    {
+        if (clip == null)
+            return;
+
+        if (m_SelectedClips.Remove(clip))
+            clip.SetSelected(false);
+
+        if (SelectedClip == clip)
+            SelectedClip = m_SelectedClips.FirstOrDefault();
+
+        if (SelectedClip != null)
+            RefreshClipSelectionVisuals();
+    }
+
+    private void RefreshClipSelectionVisuals()
+    {
+        foreach (ESEditorTrackClip selected in m_SelectedClips)
+        {
+            if (selected != null)
+                selected.SetSelected(true, selected == SelectedClip);
+        }
+    }
+
+    private void SelectAllClips()
+    {
+        ClearClipSelection();
+        if (Items == null)
+            return;
+
+        for (int i = 0; i < Items.Count; i++)
+        {
+            ESEditorTrackItem item = Items[i];
+            if (item == null || item.TrackClips == null)
+                continue;
+
+            for (int j = 0; j < item.TrackClips.Count; j++)
+                SelectClip(item.TrackClips[j], true);
+        }
+    }
+
+    private void CopySelectedClipsToClipboard()
+    {
+        ESEditorTrackClip context = SelectedClip != null && m_SelectedClips.Contains(SelectedClip)
+            ? SelectedClip
+            : m_SelectedClips.FirstOrDefault();
+
+        if (context != null)
+            CopyClipToClipboard(context);
+    }
+
+    private void PasteFromShortcut()
+    {
+        if (CanPasteCopiedClipsToOriginalTracks())
+        {
+            PasteCopiedClipsToOriginalTracks(1f, true);
+            return;
+        }
+
+        if (SelectedTrackItem != null && CanPasteClipToTrack(SelectedTrackItem))
+            PasteClipToTrack(SelectedTrackItem, cursorTime, true);
+    }
+
+    private void DeleteSelectedClips()
+    {
+        if (m_SelectedClips.Count == 0)
+            return;
+
+        List<ESEditorTrackClip> clips = m_SelectedClips
+            .Where(i => i != null && i.trackClip != null)
+            .ToList();
+        if (clips.Count == 0)
+            return;
+
+        if (TrackContainer is UnityEngine.Object undoTarget)
+            Undo.RecordObject(undoTarget, clips.Count > 1 ? "删除选中片段" : "删除片段");
+
+        for (int i = 0; i < clips.Count; i++)
+            RemoveClipEditorFromSequence(clips[i]);
+
+        ClearClipSelection();
+        ESDesignUtility.SafeEditor.Wrap_SetDirty(TrackContainer as UnityEngine.Object);
+        SkillSequenceRuntimeCache.NotifySequenceChanged(Sequence);
+        SyncTotalTimeFromCurrentSequence(true);
+        RebuildActivePreviewPlayer();
+    }
+
+    private bool RemoveClipEditorFromSequence(ESEditorTrackClip clip)
+    {
+        if (clip == null || clip.trackClip == null || Items == null)
+            return false;
+
+        for (int i = 0; i < Items.Count; i++)
+        {
+            ESEditorTrackItem trackItemEditor = Items[i];
+            if (trackItemEditor == null || trackItemEditor.item == null)
+                continue;
+
+            if (!trackItemEditor.item.TryRemoveTrackClip(clip.trackClip))
+                continue;
+
+            trackItemEditor.RemoveClip(clip);
+            trackItemEditor.MarkVisibilityCacheDirty();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void AlignSelectedClipsToPlayhead()
+    {
+        if (m_SelectedClips.Count == 0)
+            return;
+
+        List<ESEditorTrackClip> clips = m_SelectedClips
+            .Where(i => i != null && i.trackClip != null)
+            .OrderBy(i => i.trackClip.StartTime)
+            .ToList();
+        if (clips.Count == 0)
+            return;
+
+        ESEditorTrackClip anchor = SelectedClip != null && clips.Contains(SelectedClip)
+            ? SelectedClip
+            : clips[0];
+        float delta = cursorTime - anchor.trackClip.StartTime;
+        if (Mathf.Approximately(delta, 0f))
+            return;
+
+        if (TrackContainer is UnityEngine.Object undoTarget)
+            Undo.RecordObject(undoTarget, clips.Count > 1 ? "对齐选中片段到播放头" : "对齐片段到播放头");
+
+        for (int i = 0; i < clips.Count; i++)
+        {
+            ESEditorTrackClip clip = clips[i];
+            clip.trackClip.StartTime = Mathf.Max(0f, clip.trackClip.StartTime + delta);
+            clip.SetTimeScaleAndStartShowCache();
+        }
+
+        RefreshEditedTracksAfterClipChanges();
+    }
+
+    public void BeginClipGroupDrag(ESEditorTrackClip anchor)
+    {
+        m_GroupDragStartTimes.Clear();
+        m_GroupDragAnchor = null;
+        if (anchor == null || !m_SelectedClips.Contains(anchor) || m_SelectedClips.Count <= 1)
+            return;
+
+        if (TrackContainer is UnityEngine.Object undoTarget)
+            Undo.RecordObject(undoTarget, "批量移动片段");
+
+        m_GroupDragAnchor = anchor;
+        m_GroupDragAnchorStartTime = anchor.StartTime;
+        foreach (ESEditorTrackClip clip in m_SelectedClips)
+        {
+            if (clip != null && clip.trackClip != null)
+                m_GroupDragStartTimes[clip] = clip.trackClip.StartTime;
+        }
+    }
+
+    public void ApplyClipGroupDrag(ESEditorTrackClip anchor, float anchorStartTime)
+    {
+        if (m_IsApplyingGroupDrag || anchor == null || anchor != m_GroupDragAnchor || m_GroupDragStartTimes.Count <= 1)
+            return;
+
+        float deltaTime = anchorStartTime - m_GroupDragAnchorStartTime;
+        if (Mathf.Approximately(deltaTime, 0f))
+            return;
+
+        m_IsApplyingGroupDrag = true;
+        try
+        {
+            foreach (KeyValuePair<ESEditorTrackClip, float> pair in m_GroupDragStartTimes)
+            {
+                ESEditorTrackClip clip = pair.Key;
+                if (clip == null || clip == anchor || clip.trackClip == null)
+                    continue;
+
+                clip.trackClip.StartTime = Mathf.Max(0f, pair.Value + deltaTime);
+                clip.SetTimeScaleAndStartShowCache();
+            }
+        }
+        finally
+        {
+            m_IsApplyingGroupDrag = false;
+        }
+    }
+
+    public void EndClipGroupDrag(ESEditorTrackClip anchor)
+    {
+        if (anchor != m_GroupDragAnchor)
+            return;
+
+        m_GroupDragStartTimes.Clear();
+        m_GroupDragAnchor = null;
+
+        RefreshEditedTracksAfterClipChanges();
+    }
+
+    private void RefreshEditedTracksAfterClipChanges()
+    {
+        foreach (ESEditorTrackItem item in Items)
+        {
+            if (item == null || item.item == null)
+                continue;
+
+            item.item.SortClipsByTime();
+            item.MarkVisibilityCacheDirty();
+            item.UpdateNodeMatchAndForeachUpdate(true);
+        }
+
+        ESDesignUtility.SafeEditor.Wrap_SetDirty(TrackContainer as UnityEngine.Object);
+        SkillSequenceRuntimeCache.NotifySequenceChanged(Sequence);
+        SyncTotalTimeFromCurrentSequence(true);
+        RebuildActivePreviewPlayer();
+    }
+
+    public void MarkAllTrackVisibilityCachesDirty()
+    {
+        if (Items == null)
+            return;
+
+        for (int i = 0; i < Items.Count; i++)
+            Items[i]?.MarkVisibilityCacheDirty();
+    }
+
+    public void ForceRefreshClipLayoutNow()
+    {
+        if (rootVisualElement == null || ruler == null || rightPanel == null || leftPanel == null)
+            return;
+
+        MarkAllTrackVisibilityCachesDirty();
+        UpdateClipsSimple();
+        MoveTimeCursor(cursorTime);
     }
 
     public void SetRenamingClip(ESEditorTrackClip clip)
@@ -818,6 +1187,50 @@ public class ESTrackViewWindow : OdinEditorWindow
     {
         if (IsTextInputEventTarget(evt))
             return;
+
+        bool command = evt.ctrlKey || evt.commandKey;
+        if (command)
+        {
+            if (evt.keyCode == KeyCode.C)
+            {
+                CopySelectedClipsToClipboard();
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
+                return;
+            }
+
+            if (evt.keyCode == KeyCode.V)
+            {
+                PasteFromShortcut();
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
+                return;
+            }
+
+            if (evt.keyCode == KeyCode.A)
+            {
+                SelectAllClips();
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
+                return;
+            }
+        }
+
+        if (evt.keyCode == KeyCode.Escape)
+        {
+            ClearClipSelection();
+            evt.PreventDefault();
+            evt.StopImmediatePropagation();
+            return;
+        }
+
+        if (evt.keyCode == KeyCode.Delete || evt.keyCode == KeyCode.Backspace)
+        {
+            DeleteSelectedClips();
+            evt.PreventDefault();
+            evt.StopImmediatePropagation();
+            return;
+        }
 
         bool up = evt.keyCode == KeyCode.UpArrow;
         bool down = evt.keyCode == KeyCode.DownArrow;
@@ -861,6 +1274,9 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         if (RenamingTrack != null)
             RenamingTrack.CommitRenameIfPointerOutsideRenameField(evt.position);
+
+        if (evt.button == 0 && !evt.ctrlKey && !evt.commandKey && !IsEventTargetInsideClip(evt))
+            ClearClipSelection();
     }
 
     private static bool IsTextInputEventTarget(EventBase evt)
@@ -1174,6 +1590,36 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     }
 
+    private void SetPlayheadTime(float time)
+    {
+        float duration = EditorTimelinePlayer.Instance.ActiveSequence?.Duration ?? TotalTime;
+        float newTime = Mathf.Clamp(time, 0f, Mathf.Max(0f, duration));
+        cursorTime = newTime;
+        EditorTimelinePlayer.Instance.SetTime(newTime);
+        MoveTimeCursor(newTime);
+    }
+
+    private void EnsureTimeVisible(float time)
+    {
+        if (TotalTime <= 0.0001f)
+            return;
+
+        float visibleStart = StartShow;
+        float visibleEnd = GetVisibleEndTime();
+        if (time >= visibleStart && time <= visibleEnd)
+            return;
+
+        float span = Mathf.Clamp(Mathf.Abs(endScale - startScale), MinHorizontalScaleSpan, 1f);
+        float centerScale = Mathf.Clamp01(time / TotalTime);
+        float newStart = centerScale - span * 0.5f;
+        float newEnd = centerScale + span * 0.5f;
+        ClampHorizontalScaleRange(newStart, newEnd, out startScale, out endScale);
+        showScale = 1 / Mathf.Abs(startScale - endScale);
+        pixelPerSecond = standPixelPerSecond * showScale;
+        ApplyStartEndToUISlider(startScale, endScale);
+        ScheduleViewRefresh();
+    }
+
     private void HighlightActiveClips(float currentTime)
     {
         if (window == null) return;
@@ -1255,8 +1701,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         showScale = 1 / Mathf.Abs(startScale - endScale);
         pixelPerSecond = standPixelPerSecond * showScale;
         //Debug.Log("更新V2");
-        UpdateClipsSimple();
-        MoveTimeCursor(cursorTime);   // 保持时间点，位置自动适配
+        ScheduleViewRefresh();
     }
 
     private void HandleVerStartEndScaleAndApply(float start, float end)
@@ -1673,12 +2118,18 @@ public class ESTrackViewWindow : OdinEditorWindow
 
 
            // EditorGUIUtility.ShowObjectPicker<VisualGUIDrawerSO>(drawerSO, false, "", 0);
-       });
+        });
         if (clip != null && clip.trackClip != null)
         {
+            if (!IsClipSelected(clip))
+                SelectClip(clip, false);
+
             string enabledText = clip.trackClip.Enabled ? "禁用片段" : "启用片段";
             menu.AddItem(new GUIContent(enabledText), false, clip.ToggleEnabled);
-            menu.AddItem(new GUIContent("复制片段"), false, () => CopyClipToClipboard(clip.trackClip));
+            int selectedCount = m_SelectedClips.Count;
+            string copyText = selectedCount > 1 ? $"复制选中片段 ({selectedCount})" : "复制片段";
+            menu.AddItem(new GUIContent(copyText), false, () => CopyClipToClipboard(clip));
+            menu.AddItem(new GUIContent("【更多功能】/对齐播放头"), false, AlignSelectedClipsToPlayhead);
         }
         menu.AddSeparator("");
 
@@ -1756,21 +2207,105 @@ public class ESTrackViewWindow : OdinEditorWindow
         if (menu == null || forItem == null || forItem.item == null)
             return;
 
-        if (!CanPasteClipToTrack(forItem))
+        if (!HasCopiedClips())
         {
             menu.AddDisabledItem(new GUIContent("【粘贴片段】/没有可粘贴片段"));
             return;
         }
 
-        menu.AddItem(new GUIContent("【粘贴片段】/粘贴到播放头"), false, () =>
+        if (CanPasteCopiedClipsToOriginalTracks())
         {
-            PasteClipToTrack(forItem, cursorTime, true);
+            menu.AddItem(new GUIContent("【粘贴片段】/按原轨道右移1秒"), false, () =>
+            {
+                PasteCopiedClipsToOriginalTracks(1f, true);
+            });
+        }
+        else
+        {
+            menu.AddDisabledItem(new GUIContent("【粘贴片段】/原轨道不可用"));
+        }
+
+        if (CanPasteClipToTrack(forItem))
+        {
+            menu.AddItem(new GUIContent("【粘贴片段】/粘贴到当前轨道播放头"), false, () =>
+            {
+                PasteClipToTrack(forItem, cursorTime, true);
+            });
+        }
+    }
+
+    private void CopyClipToClipboard(ESEditorTrackClip contextClip)
+    {
+        List<ESEditorTrackClip> sourceClips = CollectClipsForCopy(contextClip);
+        s_CopiedClips.Clear();
+
+        for (int i = 0; i < sourceClips.Count; i++)
+        {
+            ESEditorTrackClip editorClip = sourceClips[i];
+            if (editorClip == null || editorClip.trackClip == null)
+                continue;
+
+            ITrackClip clip = editorClip.trackClip;
+            s_CopiedClips.Add(new CopiedClipPayload
+            {
+                data = Sirenix.Serialization.SerializationUtility.SerializeValue(clip, Sirenix.Serialization.DataFormat.Binary),
+                clipType = clip.GetType(),
+                startTime = clip.StartTime,
+                trackIndex = GetTrackIndexForEditorClip(editorClip)
+            });
+        }
+
+        if (s_CopiedClips.Count > 0)
+        {
+            CopiedClipPayload first = s_CopiedClips[0];
+            s_CopiedClipData = first.data;
+            s_CopiedClipType = first.clipType;
+            s_CopiedClipStartTime = first.startTime;
+        }
+
+        Debug.Log($"[轨道编辑器] 已复制片段：{s_CopiedClips.Count}");
+    }
+
+    private List<ESEditorTrackClip> CollectClipsForCopy(ESEditorTrackClip contextClip)
+    {
+        List<ESEditorTrackClip> sourceClips = new List<ESEditorTrackClip>();
+        if (contextClip == null)
+            return sourceClips;
+
+        if (m_SelectedClips.Contains(contextClip) && m_SelectedClips.Count > 0)
+            sourceClips.AddRange(m_SelectedClips.Where(i => i != null && i.trackClip != null));
+        else if (contextClip.trackClip != null)
+            sourceClips.Add(contextClip);
+
+        sourceClips.Sort((a, b) =>
+        {
+            int aTrack = GetTrackIndexForEditorClip(a);
+            int bTrack = GetTrackIndexForEditorClip(b);
+            int trackCompare = aTrack.CompareTo(bTrack);
+            if (trackCompare != 0)
+                return trackCompare;
+
+            float aStart = a != null && a.trackClip != null ? a.trackClip.StartTime : float.MaxValue;
+            float bStart = b != null && b.trackClip != null ? b.trackClip.StartTime : float.MaxValue;
+            return aStart.CompareTo(bStart);
         });
 
-        menu.AddItem(new GUIContent("【粘贴片段】/按原时间粘贴"), false, () =>
+        return sourceClips;
+    }
+
+    private int GetTrackIndexForEditorClip(ESEditorTrackClip editorClip)
+    {
+        if (editorClip == null || Items == null)
+            return -1;
+
+        for (int i = 0; i < Items.Count; i++)
         {
-            PasteClipToTrack(forItem, s_CopiedClipStartTime, true);
-        });
+            ESEditorTrackItem item = Items[i];
+            if (item != null && item.TrackClips != null && item.TrackClips.Contains(editorClip))
+                return i;
+        }
+
+        return -1;
     }
 
     private static void CopyClipToClipboard(ITrackClip clip)
@@ -1778,10 +2313,23 @@ public class ESTrackViewWindow : OdinEditorWindow
         if (clip == null)
             return;
 
+        s_CopiedClips.Clear();
         s_CopiedClipType = clip.GetType();
         s_CopiedClipStartTime = clip.StartTime;
         s_CopiedClipData = Sirenix.Serialization.SerializationUtility.SerializeValue(clip, Sirenix.Serialization.DataFormat.Binary);
+        s_CopiedClips.Add(new CopiedClipPayload
+        {
+            data = s_CopiedClipData,
+            clipType = s_CopiedClipType,
+            startTime = s_CopiedClipStartTime,
+            trackIndex = -1
+        });
         Debug.Log($"[轨道编辑器] 已复制片段：{clip.DisplayName} ({s_CopiedClipType.Name})");
+    }
+
+    private static bool HasCopiedClips()
+    {
+        return s_CopiedClips.Count > 0 || (s_CopiedClipData != null && s_CopiedClipType != null);
     }
 
     private bool CanPasteClipToTrack(ESEditorTrackItem forItem)
@@ -1789,13 +2337,142 @@ public class ESTrackViewWindow : OdinEditorWindow
         if (forItem == null || forItem.item == null || s_CopiedClipData == null || s_CopiedClipType == null)
             return false;
 
+        return CanPasteClipTypeToTrack(forItem, s_CopiedClipType);
+    }
+
+    private static bool CanPasteClipTypeToTrack(ESEditorTrackItem forItem, Type clipType)
+    {
+        if (forItem == null || forItem.item == null || clipType == null)
+            return false;
+
         foreach (Type type in forItem.item.SupportedClipTypes())
         {
-            if (type != null && type.IsAssignableFrom(s_CopiedClipType))
+            if (type != null && type.IsAssignableFrom(clipType))
                 return true;
         }
 
         return false;
+    }
+
+    private static bool IsEventTargetInsideClip(EventBase evt)
+    {
+        var element = evt.target as VisualElement;
+        while (element != null)
+        {
+            if (element is ESEditorTrackClip)
+                return true;
+
+            element = element.parent;
+        }
+
+        return false;
+    }
+
+    private bool CanPasteCopiedClipsToOriginalTracks()
+    {
+        if (!HasCopiedClips())
+            return false;
+
+        for (int i = 0; i < s_CopiedClips.Count; i++)
+        {
+            CopiedClipPayload payload = s_CopiedClips[i];
+            if (payload == null || payload.data == null || payload.clipType == null)
+                continue;
+
+            ESEditorTrackItem targetTrack = GetTrackItemByIndex(payload.trackIndex);
+            if (CanPasteClipTypeToTrack(targetTrack, payload.clipType))
+                return true;
+        }
+
+        return false;
+    }
+
+    private ESEditorTrackItem GetTrackItemByIndex(int index)
+    {
+        if (Items == null || index < 0 || index >= Items.Count)
+            return null;
+
+        return Items[index];
+    }
+
+    private void PasteCopiedClipsToOriginalTracks(float timeOffset, bool recordUndo)
+    {
+        if (!HasCopiedClips())
+            return;
+
+        if (recordUndo && TrackContainer is UnityEngine.Object undoTarget)
+            Undo.RecordObject(undoTarget, "粘贴多轨片段");
+
+        List<ESEditorTrackItem> changedTracks = new List<ESEditorTrackItem>();
+        List<ESEditorTrackClip> pastedClips = new List<ESEditorTrackClip>();
+        int skippedCount = 0;
+
+        for (int i = 0; i < s_CopiedClips.Count; i++)
+        {
+            CopiedClipPayload payload = s_CopiedClips[i];
+            if (payload == null || payload.data == null || payload.clipType == null)
+            {
+                skippedCount++;
+                continue;
+            }
+
+            ESEditorTrackItem targetTrack = GetTrackItemByIndex(payload.trackIndex);
+            if (!CanPasteClipTypeToTrack(targetTrack, payload.clipType))
+            {
+                skippedCount++;
+                continue;
+            }
+
+            ITrackClip clip = Sirenix.Serialization.SerializationUtility.DeserializeValue<ITrackClip>(payload.data, Sirenix.Serialization.DataFormat.Binary);
+            if (clip == null)
+            {
+                skippedCount++;
+                continue;
+            }
+
+            clip.StartTime = Mathf.Max(0f, payload.startTime + timeOffset);
+            ESEditorTrackClip editorClip = targetTrack.AddClip(clip, false);
+            if (editorClip == null)
+            {
+                skippedCount++;
+                continue;
+            }
+
+            editorClip.SetTimeScaleAndStartShowCache();
+            pastedClips.Add(editorClip);
+            if (!changedTracks.Contains(targetTrack))
+                changedTracks.Add(targetTrack);
+        }
+
+        if (pastedClips.Count == 0)
+        {
+            if (skippedCount > 0)
+                Debug.LogWarning($"[轨道编辑器] 粘贴失败，跳过片段：{skippedCount}");
+            return;
+        }
+
+        ClearClipSelection();
+        for (int i = 0; i < pastedClips.Count; i++)
+            SelectClip(pastedClips[i], true);
+
+        for (int i = 0; i < changedTracks.Count; i++)
+        {
+            ESEditorTrackItem track = changedTracks[i];
+            if (track == null || track.item == null)
+                continue;
+
+            track.item.SortClipsByTime();
+            track.MarkVisibilityCacheDirty();
+            track.UpdateNodeMatchAndForeachUpdate(true);
+        }
+
+        ESDesignUtility.SafeEditor.Wrap_SetDirty(TrackContainer as UnityEngine.Object);
+        SkillSequenceRuntimeCache.NotifySequenceChanged(Sequence);
+        SyncTotalTimeFromCurrentSequence(true);
+        RebuildActivePreviewPlayer();
+
+        if (skippedCount > 0)
+            Debug.LogWarning($"[轨道编辑器] 已粘贴片段：{pastedClips.Count}，跳过：{skippedCount}");
     }
 
     private void PasteClipToTrack(ESEditorTrackItem forItem, float startTime, bool recordUndo)
@@ -1838,6 +2515,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         if (!changed)
             return;
 
+        trackItem.MarkVisibilityCacheDirty();
         trackItem.UpdateNodeMatchAndForeachUpdate(true);
         ESDesignUtility.SafeEditor.Wrap_SetDirty(TrackContainer as UnityEngine.Object);
         SkillSequenceRuntimeCache.NotifySequenceChanged(Sequence);
@@ -1860,6 +2538,8 @@ public class ESTrackViewWindow : OdinEditorWindow
         });
 
         GenericMenu.AddItem(new GUIContent("【校验】/检查当前技能序列"), false, ValidateCurrentSequenceAndReport);
+        GenericMenu.AddItem(new GUIContent("【更多功能】/定位首个错误"), false, LocateFirstValidationError);
+        GenericMenu.AddItem(new GUIContent("【更多功能】/定位下一个错误"), false, LocateNextValidationError);
 
         GenericMenu.AddSeparator("");
 
@@ -1872,6 +2552,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         Dictionary<ITrackClip, string> clipWarnings = new Dictionary<ITrackClip, string>();
         ValidateSequence(Sequence, warnings, infos, clipWarnings);
         ApplyClipValidationWarnings(clipWarnings);
+        RebuildValidationErrorList(clipWarnings);
 
         string sequenceName = Sequence != null ? Sequence.Name : "<空序列>";
         if (warnings.Count == 0)
@@ -1919,6 +2600,111 @@ public class ESTrackViewWindow : OdinEditorWindow
         }
     }
 
+    private void RebuildValidationErrorList(Dictionary<ITrackClip, string> clipWarnings)
+    {
+        m_ValidationErrorClips.Clear();
+        m_ValidationErrorCursor = -1;
+        if (clipWarnings == null || clipWarnings.Count == 0 || Items == null)
+            return;
+
+        for (int i = 0; i < Items.Count; i++)
+        {
+            ESEditorTrackItem item = Items[i];
+            if (item == null || item.TrackClips == null)
+                continue;
+
+            List<ESEditorTrackClip> orderedClips = item.TrackClips
+                .Where(clip => clip != null && clip.trackClip != null && clipWarnings.ContainsKey(clip.trackClip))
+                .OrderBy(clip => clip.trackClip.StartTime)
+                .ToList();
+
+            for (int j = 0; j < orderedClips.Count; j++)
+                m_ValidationErrorClips.Add(orderedClips[j].trackClip);
+        }
+    }
+
+    private void EnsureValidationErrorList()
+    {
+        if (m_ValidationErrorClips.Count > 0)
+            return;
+
+        List<string> warnings = new List<string>(32);
+        List<string> infos = new List<string>(16);
+        Dictionary<ITrackClip, string> clipWarnings = new Dictionary<ITrackClip, string>();
+        ValidateSequence(Sequence, warnings, infos, clipWarnings);
+        ApplyClipValidationWarnings(clipWarnings);
+        RebuildValidationErrorList(clipWarnings);
+    }
+
+    private void LocateFirstValidationError()
+    {
+        EnsureValidationErrorList();
+        if (m_ValidationErrorClips.Count == 0)
+        {
+            Debug.Log("[技能序列校验] 当前没有可定位的片段错误。");
+            return;
+        }
+
+        m_ValidationErrorCursor = 0;
+        LocateValidationErrorAt(m_ValidationErrorCursor);
+    }
+
+    private void LocateNextValidationError()
+    {
+        EnsureValidationErrorList();
+        if (m_ValidationErrorClips.Count == 0)
+        {
+            Debug.Log("[技能序列校验] 当前没有可定位的片段错误。");
+            return;
+        }
+
+        m_ValidationErrorCursor = (m_ValidationErrorCursor + 1 + m_ValidationErrorClips.Count) % m_ValidationErrorClips.Count;
+        LocateValidationErrorAt(m_ValidationErrorCursor);
+    }
+
+    private void LocateValidationErrorAt(int index)
+    {
+        if (index < 0 || index >= m_ValidationErrorClips.Count)
+            return;
+
+        ITrackClip targetClip = m_ValidationErrorClips[index];
+        ESEditorTrackClip editorClip = FindEditorClip(targetClip);
+        if (editorClip == null)
+        {
+            m_ValidationErrorClips.RemoveAt(index);
+            m_ValidationErrorCursor = -1;
+            Debug.LogWarning("[技能序列校验] 错误片段节点已失效，已刷新错误列表。");
+            return;
+        }
+
+        SelectClip(editorClip, false);
+        SetPlayheadTime(editorClip.trackClip.StartTime);
+        EnsureTimeVisible(editorClip.trackClip.StartTime);
+        Debug.Log($"[技能序列校验] 定位错误 {index + 1}/{m_ValidationErrorClips.Count}: {editorClip.trackClip.DisplayName}");
+    }
+
+    private ESEditorTrackClip FindEditorClip(ITrackClip clip)
+    {
+        if (clip == null || Items == null)
+            return null;
+
+        for (int i = 0; i < Items.Count; i++)
+        {
+            ESEditorTrackItem item = Items[i];
+            if (item == null || item.TrackClips == null)
+                continue;
+
+            for (int j = 0; j < item.TrackClips.Count; j++)
+            {
+                ESEditorTrackClip editorClip = item.TrackClips[j];
+                if (editorClip != null && ReferenceEquals(editorClip.trackClip, clip))
+                    return editorClip;
+            }
+        }
+
+        return null;
+    }
+
     private void ScheduleAutoValidateSequenceVisuals()
     {
         if (m_AutoValidationScheduled || rootVisualElement == null)
@@ -1942,6 +2728,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         Dictionary<ITrackClip, string> clipWarnings = new Dictionary<ITrackClip, string>();
         ValidateSequence(Sequence, warnings, infos, clipWarnings);
         ApplyClipValidationWarnings(clipWarnings);
+        RebuildValidationErrorList(clipWarnings);
     }
 
     private static void AddClipWarning(List<string> warnings, Dictionary<ITrackClip, string> clipWarnings, ITrackClip clip, string message)
@@ -2050,7 +2837,23 @@ public class ESTrackViewWindow : OdinEditorWindow
         if (clip is SkillTrackClip_Animation animationClip)
         {
             if (animationClip.AnimationClipName == null)
+            {
                 AddClipWarning(warnings, clipWarnings, clip, $"轨道[{trackIndex}] {trackName} / 片段[{clipIndex}] {clipName} 未指定 AnimationClip。");
+            }
+            else
+            {
+                float clipLength = animationClip.AnimationClipName.length;
+                if (animationClip.clipStartOffset >= clipLength)
+                    AddClipWarning(warnings, clipWarnings, clip, $"轨道[{trackIndex}] {trackName} / {clipName} 裁剪起点({animationClip.clipStartOffset:F2}s)超出动画长度({clipLength:F2}s)。");
+
+                if (animationClip.playbackSpeed <= 0.0001f)
+                    AddClipWarning(warnings, clipWarnings, clip, $"轨道[{trackIndex}] {trackName} / {clipName} 播放速度不能小于等于 0。");
+
+                float availableLength = Mathf.Max(0f, clipLength - Mathf.Max(0f, animationClip.clipStartOffset));
+                float requiredSourceTime = animationClip.DurationTime * Mathf.Max(0.01f, animationClip.playbackSpeed);
+                if (!animationClip.loopClip && requiredSourceTime > availableLength + 0.02f)
+                    AddClipWarning(warnings, clipWarnings, clip, $"轨道[{trackIndex}] {trackName} / {clipName} 非循环采样会在片段结束前停到动画末帧；可缩短持续时间、降低速度或开启循环。");
+            }
         }
         else if (clip is SkillTrackClip_Audio audioClip)
         {
@@ -2215,14 +3018,42 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     private void UpdateClipsSimple()
     {
+        if (ruler == null || ruler.TopRuler == null || Items == null)
+            return;
 
         ruler.TopRuler.MarkDirtyRepaint();
-        var items = rootVisualElement.Query<ESEditorTrackItem>().ToList();
-        foreach (var i in items)
+        float visibleStart = StartShow;
+        float visibleEnd = GetVisibleEndTime();
+        foreach (var i in Items)
         {
-            i.UpdateNodes();
+            if (i != null)
+                i.UpdateNodes(visibleStart, visibleEnd);
         }
         ScheduleAutoValidateSequenceVisuals();
+    }
+
+    private void ScheduleViewRefresh()
+    {
+        if (m_ViewRefreshScheduled)
+            return;
+
+        m_ViewRefreshScheduled = true;
+        EditorApplication.update -= FlushScheduledViewRefresh;
+        EditorApplication.update += FlushScheduledViewRefresh;
+    }
+
+    private void FlushScheduledViewRefresh()
+    {
+        EditorApplication.update -= FlushScheduledViewRefresh;
+        if (!m_ViewRefreshScheduled)
+            return;
+
+        m_ViewRefreshScheduled = false;
+        if (this == null || rootVisualElement == null)
+            return;
+
+        UpdateClipsSimple();
+        MoveTimeCursor(cursorTime);
     }
 }
 
@@ -2239,6 +3070,8 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
 
 {
     public static Dictionary<TrackItemType, List<(string name, Type type)>> AllTrackItemTypes = new Dictionary<TrackItemType, List<(string name, Type type)>>();
+    private static IEditorTrackSupport_GetSequence s_PendingSelectionTrackContainer;
+    private static bool s_SelectionTrackRefreshScheduled;
 
     public override void InitInvoke()
     {
@@ -2253,14 +3086,48 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
         if (Selection.activeObject is IEditorTrackSupport_GetSequence SupportSequence)
         {
             Debug.Log("已经选中了技能序列" + Selection.activeObject.name);
-            var se = SupportSequence.Sequence;
-            if (se != null)
-            {
-                if (ESTrackViewWindow.Sequence != se)
-                {
-                    ESTrackViewWindow.TryUpdateTrackSequence(SupportSequence);
-                }
-            }
+            if (SupportSequence.Sequence != null)
+                ScheduleOpenAndRefreshTrackWindow(SupportSequence);
+        }
+    }
+
+    private static void ScheduleOpenAndRefreshTrackWindow(IEditorTrackSupport_GetSequence supportSequence)
+    {
+        if (supportSequence == null || supportSequence.Sequence == null)
+            return;
+
+        s_PendingSelectionTrackContainer = supportSequence;
+        if (s_SelectionTrackRefreshScheduled)
+            return;
+
+        s_SelectionTrackRefreshScheduled = true;
+        EditorApplication.delayCall += FlushOpenAndRefreshTrackWindow;
+    }
+
+    public static void CancelPendingSelectionTrackRefresh()
+    {
+        if (s_SelectionTrackRefreshScheduled)
+            EditorApplication.delayCall -= FlushOpenAndRefreshTrackWindow;
+
+        s_PendingSelectionTrackContainer = null;
+        s_SelectionTrackRefreshScheduled = false;
+    }
+
+    private static void FlushOpenAndRefreshTrackWindow()
+    {
+        EditorApplication.delayCall -= FlushOpenAndRefreshTrackWindow;
+        s_SelectionTrackRefreshScheduled = false;
+
+        IEditorTrackSupport_GetSequence supportSequence = s_PendingSelectionTrackContainer;
+        s_PendingSelectionTrackContainer = null;
+        if (supportSequence == null || supportSequence.Sequence == null)
+            return;
+
+        ESTrackViewWindow.TryUpdateTrackSequence(supportSequence);
+        if (ESTrackViewWindow.window != null)
+        {
+            ESTrackViewWindow.window.ForceRefreshClipLayoutNow();
+            ESTrackViewWindow.window.Repaint();
         }
     }
 
@@ -2503,19 +3370,22 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
         if (clip == null || clip.trackClip == null || ESTrackViewWindow.window == null)
             return;
 
+        ESTrackViewWindow trackWindow = ESTrackViewWindow.window;
         if (ESTrackViewWindow.window.Last_EditorWindowForTrackClip != null &&
             ESTrackViewWindow.window.drawerSOForTrackClip != null &&
             ReferenceEquals(ESTrackViewWindow.window.drawerSOForTrackClip.drawerData, clip.trackClip))
         {
+            trackWindow.SetFocusedEditingClip(clip);
             ESTrackViewWindow.window.Last_EditorWindowForTrackClip.Focus();
             return;
         }
 
-        ESTrackViewWindow.window.drawerSOForTrackClip.drawerData = clip.trackClip;
+        trackWindow.SetFocusedEditingClip(clip);
         if (ESTrackViewWindow.window.Last_EditorWindowForTrackClip != null)
         {
             ESTrackViewWindow.window.Last_EditorWindowForTrackClip.Close();
         }
+        ESTrackViewWindow.window.drawerSOForTrackClip.drawerData = clip.trackClip;
         clip.SetTimeScaleAndStartShowCache();
         clip.UpdateNodeView();
         ESTrackViewWindow.window.Last_EditorWindowForTrackClip = ESTrackViewWindow.InspectObject(ESTrackViewWindow.window.drawerSOForTrackClip);
@@ -2525,7 +3395,12 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
         {
             clip.SetTimeScaleAndStartShowCache();
             clip.UpdateNodeView();
-            ESTrackViewWindow.window.drawerSOForTrackItem.drawerData = null;
+            if (trackWindow != null)
+            {
+                trackWindow.ClearFocusedEditingClip(clip);
+                if (trackWindow.drawerSOForTrackClip != null && ReferenceEquals(trackWindow.drawerSOForTrackClip.drawerData, clip.trackClip))
+                    trackWindow.drawerSOForTrackClip.drawerData = null;
+            }
             ESTrackViewWindowHelper.SaveContainerChanges();
         };
     }

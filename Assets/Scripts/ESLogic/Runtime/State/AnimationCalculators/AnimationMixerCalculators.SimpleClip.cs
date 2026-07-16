@@ -23,6 +23,8 @@ namespace ES
     public class StateAnimationMixCalculatorForSimpleClip : StateAnimationMixCalculator
     {
         public AnimationClip clip;
+        [LabelText("Clip标记")]
+        public string clipMarker = "Main";
 
         public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.SimpleClip;
 
@@ -70,12 +72,16 @@ namespace ES
                     return false;
                 }
 
-                // 创建Playable(可被任意Mixer连接)
+                // 单Clip也使用稳定的一输入Mixer作为输出，保证运行时OverrideClip时上层连接不丢失。
+                runtime.mixer = AnimationMixerPlayable.Create(graph, 1);
+                runtime.EnsureMixerInputWeightCache(1);
+                runtime.RegisterClipOverrideSlot(0, clip, clipMarker);
                 runtime.singlePlayable = AnimationClipPlayable.Create(graph, clip);
                 runtime.singlePlayable.SetSpeed(speed);
+                graph.Connect(runtime.singlePlayable, 0, runtime.mixer, 0);
+                runtime.SetMixerInputWeightIfChanged(runtime.mixer, 0, 1f);
 
-                // 单Clip直连输出，避免额外Mixer
-                output = runtime.singlePlayable;
+                output = runtime.mixer;
                 return true;
             }
 
@@ -131,13 +137,44 @@ namespace ES
                 var graph = runtime.singlePlayable.GetGraph();
                 var oldSpeed = runtime.singlePlayable.GetSpeed();
                 var oldTime = runtime.singlePlayable.GetTime();
-                
+                if (runtime.mixer.IsValid())
+                {
+                    runtime.mixer.DisconnectInput(0);
+                }
+
                 runtime.singlePlayable.Destroy();
                 runtime.singlePlayable = AnimationClipPlayable.Create(graph, newClip);
                 runtime.singlePlayable.SetSpeed(oldSpeed);
                 runtime.singlePlayable.SetTime(oldTime);
+                if (runtime.mixer.IsValid())
+                {
+                    graph.Connect(runtime.singlePlayable, 0, runtime.mixer, 0);
+                    runtime.SetMixerInputWeightIfChanged(runtime.mixer, 0, 1f);
+                }
+                runtime.UpdateClipOverrideSlot(0, newClip);
                 
                 return true;
+            }
+
+            public override bool OverrideClipBySource(AnimationCalculatorRuntime runtime, AnimationClip sourceClip, AnimationClip newClip)
+            {
+                if (sourceClip == null)
+                    return false;
+
+                int slotIndex = runtime != null ? runtime.FindClipSlotByOriginalOrCurrent(sourceClip) : -1;
+                return slotIndex >= 0 && OverrideClip(runtime, slotIndex, newClip);
+            }
+
+            public override bool OverrideClipByMarker(AnimationCalculatorRuntime runtime, string marker, AnimationClip newClip)
+            {
+                if (string.IsNullOrWhiteSpace(marker))
+                    return false;
+
+                int slotIndex = runtime != null ? runtime.FindClipSlotByMarker(marker) : -1;
+                if (slotIndex >= 0)
+                    return OverrideClip(runtime, slotIndex, newClip);
+
+                return string.Equals(clipMarker, marker, StringComparison.OrdinalIgnoreCase) && OverrideClip(runtime, 0, newClip);
             }
 
             public override float GetStandardDuration(AnimationCalculatorRuntime runtime)

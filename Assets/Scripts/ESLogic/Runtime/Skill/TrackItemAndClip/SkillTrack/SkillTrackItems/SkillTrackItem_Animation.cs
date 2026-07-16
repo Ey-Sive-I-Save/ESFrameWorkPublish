@@ -164,7 +164,70 @@ namespace ES
         [TitleGroup("动画片段")]
         [LabelText("动画剪辑")]
         [Required("动画片段需要指定 AnimationClip，否则不会进入采样器。")]
+        [OnValueChanged(nameof(OnAnimationClipChanged))]
         public AnimationClip AnimationClipName;
+
+        [TitleGroup("动画采样", "控制该片段在动画资源内部从哪里开始采样，以及片段时长内如何推进。")]
+        [HorizontalGroup("动画采样/采样参数", Width = 0.34f)]
+        [LabelText("裁剪起点")]
+        [MinValue(0f)]
+        [SuffixLabel("秒", true)]
+        public float clipStartOffset;
+
+        [HorizontalGroup("动画采样/采样参数", Width = 0.33f)]
+        [LabelText("播放速度")]
+        [MinValue(0.01f)]
+        public float playbackSpeed = 1f;
+
+        [HorizontalGroup("动画采样/采样参数", Width = 0.33f)]
+        [LabelText("循环采样")]
+        public bool loopClip;
+
+        [TitleGroup("动画采样")]
+        [ShowInInspector]
+        [ReadOnly]
+        [LabelText("可用长度")]
+        [SuffixLabel("秒", true)]
+        private float AvailableClipLengthPreview => GetAvailableClipLength();
+
+        [TitleGroup("动画采样")]
+        [Button("同步持续时间到动画长度", ButtonSizes.Small)]
+        [GUIColor(0.48f, 0.82f, 1f)]
+        public void SyncDurationToAnimationLength()
+        {
+            float available = GetAvailableClipLength();
+            durationTime = Mathf.Max(0.0001f, available / Mathf.Max(0.01f, playbackSpeed));
+        }
+
+        public float ResolveAnimationLocalTime(float sequenceTime)
+        {
+            if (AnimationClipName == null)
+                return 0f;
+
+            float local = clipStartOffset + Mathf.Max(0f, sequenceTime - startTime) * Mathf.Max(0.01f, playbackSpeed);
+            float clipLength = Mathf.Max(0f, AnimationClipName.length);
+            if (clipLength <= 0.0001f)
+                return 0f;
+
+            return loopClip ? Mathf.Repeat(local, clipLength) : Mathf.Clamp(local, 0f, clipLength);
+        }
+
+        private float GetAvailableClipLength()
+        {
+            if (AnimationClipName == null)
+                return 0f;
+
+            return Mathf.Max(0f, AnimationClipName.length - Mathf.Max(0f, clipStartOffset));
+        }
+
+        private void OnAnimationClipChanged()
+        {
+            if (string.IsNullOrWhiteSpace(name) || name == "动画片段")
+                name = AnimationClipName != null ? AnimationClipName.name : "动画片段";
+
+            if (AnimationClipName != null && durationTime <= 0.0001f)
+                SyncDurationToAnimationLength();
+        }
 
         public override IEditorTimeSampler CreateSampler(ITrackSequence sequence, ITrackItem track)
         {
@@ -193,7 +256,7 @@ namespace ES
             if (targetObject == null)
                 return null;
 
-            return new AnimationClipEditorSampler(targetObject, AnimationClipName, startTime, durationTime);
+            return new AnimationClipEditorSampler(targetObject, AnimationClipName, startTime, durationTime, clipStartOffset, playbackSpeed, loopClip);
         }
 
         public AdvancedAnimationClipEditorSampler CreateAdvancedAnimationClipEditorSampler(ITrackSequence sequence, ITrackItem track, ESRuntimeTargetPack runtimeTarget)
@@ -208,7 +271,7 @@ namespace ES
             if (targetObject == null)
                 return null;
 
-            return new AdvancedAnimationClipEditorSampler(targetObject, AnimationClipName, startTime, durationTime);
+            return new AdvancedAnimationClipEditorSampler(targetObject, AnimationClipName, startTime, durationTime, clipStartOffset, playbackSpeed, loopClip);
         }
 
         private bool CanCreateEditorAnimationSampler()

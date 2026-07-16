@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Sirenix.OdinInspector;
@@ -16,36 +16,46 @@ namespace ES
         [NonSerialized] public StateMachine stateMachine;
 
         // ---- 初始化配置（只读）----
+        [BoxGroup("基础信息", ShowLabel = true)]
         [LabelText("层级类型"), ReadOnly]
         public StateLayerType layerType;
 
+        [BoxGroup("基础信息")]
         [LabelText("AvatarMask"), ReadOnly]
         public AvatarMask avatarMask;
 
+        [BoxGroup("基础信息")]
         [LabelText("混合模式"), ReadOnly]
         public StateLayerBlendMode blendMode = StateLayerBlendMode.Override;
 
-        [LabelText("允许状态Mask覆盖"), ReadOnly]
+        [BoxGroup("基础信息")]
+        [LabelText("允许状态遮罩覆盖"), ReadOnly]
         public bool allowStateMaskOverride;
 
-        [LabelText("最大Playable槽位"), ReadOnly]
+        [BoxGroup("基础信息")]
+        [LabelText("最大动画槽位数"), ReadOnly]
         public int maxPlayableSlots = 32;
 
         // ---- 运行时权重/开关（由 StateMachine 控制，只读）----
+        [BoxGroup("运行状态", ShowLabel = true)]
         [LabelText("层级权重"), Range(0f, 1f), ReadOnly]
         public float weight = 1f;
 
+        [BoxGroup("运行状态")]
         [LabelText("是否启用"), ReadOnly]
         public bool isEnabled = true;
 
         // ---- 运行时状态（只读调试）----
-        [LabelText("空转反馈状态"), ShowInInspector, ReadOnly]
+        [BoxGroup("运行状态")]
+        [LabelText("回退状态"), ShowInInspector, ReadOnly]
         public StateBase feedbackState;
 
+        [FoldoutGroup("高级运行数据", expanded: false)]
         [LabelText("当前运行状态集合"), ShowInInspector, ReadOnly]
         [NonSerialized] public SwapBackSet<StateBase> runningStates = new SwapBackSet<StateBase>(16);
 
-        [LabelText("槽位映射"), ShowInInspector, ReadOnly]
+        [FoldoutGroup("高级运行数据", expanded: false)]
+        [LabelText("动画槽位映射"), ShowInInspector, ReadOnly]
         [NonSerialized] public Dictionary<StateBase, int> stateToSlotMap = new Dictionary<StateBase, int>(64);
 
         // ---- 内部 Playable / 淡入淡出（隐藏）----
@@ -136,3 +146,4 @@ namespace ES
         public bool HasActiveStates => runningStates.Count > 0;
     }
 }
+

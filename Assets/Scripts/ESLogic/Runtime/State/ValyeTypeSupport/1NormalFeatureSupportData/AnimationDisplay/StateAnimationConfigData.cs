@@ -289,6 +289,29 @@ namespace ES
         [Tooltip("旋转权重（0-1），最终旋转速度 = 逼近速度.Y * 旋转权重。\n0 = 不旋转。")]
         public float rotationWeight = 1f;
 
+        [LabelText("按剩余时间自动追赶"), ToggleLeft]
+        [Tooltip("开启后会根据当前位置到目标点的剩余距离和窗口剩余时间自动提高逼近速度，避免窗口结束时还没对齐。")]
+        public bool autoCatchUpByRemainingTime = true;
+
+        [LabelText("追赶安全倍率"), Range(1f, 3f)]
+        [ShowIf(nameof(autoCatchUpByRemainingTime))]
+        [Tooltip("自动追赶速度的安全倍率。1=刚好按剩余时间到达；1.1~1.3 通常更稳。")]
+        public float catchUpSafetyMultiplier = 1.15f;
+
+        [LabelText("结束帧强制吸附"), ToggleLeft]
+        [Tooltip("开启后，在时间窗口结束帧将根节点直接吸附到最终目标。适合攀爬、处决、骑乘落座等必须精确对点的动作。")]
+        public bool snapToTargetOnEnd = false;
+
+        [LabelText("吸附位置容差"), Min(0f)]
+        [ShowIf(nameof(snapToTargetOnEnd))]
+        [Tooltip("结束帧剩余距离小于该值时吸附。设为 0 表示只要开启就总是吸附。")]
+        public float snapPositionTolerance = 0f;
+
+        [LabelText("吸附旋转容差(度)"), Min(0f)]
+        [ShowIf(nameof(snapToTargetOnEnd))]
+        [Tooltip("结束帧剩余角度小于该值时吸附。设为 0 表示只要开启就总是吸附。")]
+        public float snapRotationTolerance = 0f;
+
         /// <summary>由 Odin OnValueChanged 回调：positionOffset 改变时自动同步 enablePositionOffset。
         /// 全零 → 关闭（偏移无意义）；非零 → 开启。</summary>
         private void SyncPosOffsetEnable() => enablePositionOffset = positionOffset != Vector3.zero;
@@ -311,6 +334,9 @@ namespace ES
             positionApproachSpeed = Mathf.Max(0f, positionApproachSpeed);
             rotationApproachSpeed = Mathf.Max(0f, rotationApproachSpeed);
             rotationWeight = Mathf.Clamp01(rotationWeight);
+            catchUpSafetyMultiplier = Mathf.Max(1f, catchUpSafetyMultiplier);
+            snapPositionTolerance = Mathf.Max(0f, snapPositionTolerance);
+            snapRotationTolerance = Mathf.Max(0f, snapRotationTolerance);
         }
 
         public static MatchTargetRequest Default => new MatchTargetRequest
@@ -323,7 +349,12 @@ namespace ES
             timeRange = new Vector2(0f, 0.35f),
             positionApproachSpeed = 4f,
             rotationApproachSpeed = 240f,
-            rotationWeight      = 1f
+            rotationWeight      = 1f,
+            autoCatchUpByRemainingTime = true,
+            catchUpSafetyMultiplier = 1.15f,
+            snapToTargetOnEnd = false,
+            snapPositionTolerance = 0f,
+            snapRotationTolerance = 0f
         };
     }
 
@@ -729,6 +760,11 @@ namespace ES
                 positionApproachSpeed = source.positionApproachSpeed,
                 rotationApproachSpeed = source.rotationApproachSpeed,
                 rotationWeight = source.rotationWeight,
+                autoCatchUpByRemainingTime = source.autoCatchUpByRemainingTime,
+                catchUpSafetyMultiplier = source.catchUpSafetyMultiplier,
+                snapToTargetOnEnd = source.snapToTargetOnEnd,
+                snapPositionTolerance = source.snapPositionTolerance,
+                snapRotationTolerance = source.snapRotationTolerance,
             };
         }
 

@@ -134,31 +134,25 @@ namespace ES
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (state == null) throw new System.ArgumentNullException(nameof(state));
             if (layer == null) throw new System.ArgumentNullException(nameof(layer));
-            if (state.stateSharedData == null) throw new System.InvalidOperationException("HotUnplugStateFromPlayable: state.stateSharedData 不能为空");
 #else
-            if (state == null || layer == null || state.stateSharedData == null) return;
+            if (state == null || layer == null) return;
 #endif
 
             layer.MarkDirty(PipelineDirtyFlags.MixerWeights);
 
-            var sharedData = state.stateSharedData;
-
-            if (!sharedData.hasAnimation)
-                return;
-
             if (!layer.stateToSlotMap.TryGetValue(state, out int slotIndex))
                 return;
 
-            if (!layer.mixer.IsValid())
-                return;
-
-            var inputPlayable = layer.mixer.GetInput(slotIndex);
-            if (inputPlayable.IsValid())
+            if (layer.mixer.IsValid())
             {
-                playableGraph.Disconnect(layer.mixer, slotIndex);
-            }
+                var inputPlayable = layer.mixer.GetInput(slotIndex);
+                if (inputPlayable.IsValid() && playableGraph.IsValid())
+                {
+                    playableGraph.Disconnect(layer.mixer, slotIndex);
+                }
 
-            layer.mixer.SetInputWeight(slotIndex, 0f);
+                layer.mixer.SetInputWeight(slotIndex, 0f);
+            }
 
             layer.stateToSlotMap.Remove(state);
             layer.InternalOnStateDisconnected(state);

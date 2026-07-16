@@ -13,14 +13,15 @@ namespace ES
         [LabelText("默认方案")]
         public string defaultSchemeId = ESInputSchemeIds.KeyboardMouse;
 
+
         [Title("输入方案")]
         [LabelText("方案列表")]
-        [ListDrawerSettings(ShowFoldout = true, DefaultExpandedState = true)]
+        [ESTwoPaneList("displayName", 220f, 240f, false, "输入方案", "方案详情")]
         public List<ESInputSchemeDefine> schemes = new List<ESInputSchemeDefine>();
 
         [Title("输入动作")]
         [LabelText("动作列表")]
-        [ListDrawerSettings(ShowFoldout = true, DefaultExpandedState = true)]
+        [ESTwoPaneList("displayName", 240f, 380f, false, "输入动作", "动作详情")]
         public List<ESInputActionDefine> actions = new List<ESInputActionDefine>();
 
         public int ActionCount
@@ -111,10 +112,53 @@ namespace ES
             AddDefaultActions(actions);
         }
 
+
         public ESInputRuntimeBuildResult BuildRuntime(ESInputBindingProfile profile = null)
         {
+            EnsureBindingIds();
             return ESInputRuntimeBuilder.Build(this, profile, defaultSchemeId);
         }
+
+        [Button("补齐绑定ID")]
+        public void EnsureBindingIds()
+        {
+            if (actions == null)
+                return;
+
+            for (int i = 0; i < actions.Count; i++)
+            {
+                ESInputActionDefine action = actions[i];
+                if (action == null || action.bindings == null)
+                    continue;
+
+                action.NormalizeTriggerSettings();
+
+                Dictionary<string, int> duplicateCounters = new Dictionary<string, int>();
+                for (int b = 0; b < action.bindings.Count; b++)
+                {
+                    ESInputBindingDefine binding = action.bindings[b];
+                    if (binding == null)
+                        continue;
+
+                    ESInputBindingKeyUtility.EnsureBindingName(binding);
+
+                    if (!string.IsNullOrEmpty(binding.bindingId))
+                        continue;
+
+                    string baseKey = ESInputBindingKeyUtility.MakeBindingBaseKey(action, binding);
+                    duplicateCounters.TryGetValue(baseKey, out int duplicateIndex);
+                    duplicateCounters[baseKey] = duplicateIndex + 1;
+                    binding.bindingId = ESInputBindingKeyUtility.MakeBindingId(action, binding, duplicateIndex);
+                }
+            }
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            EnsureBindingIds();
+        }
+#endif
 
         private static void AddDefaultActions(List<ESInputActionDefine> target)
         {
@@ -166,6 +210,7 @@ namespace ES
             return config;
         }
 
+
         private static ESInputActionDefine Button(
             ESInputActionId id,
             string name,
@@ -193,37 +238,46 @@ namespace ES
     {
         public static ESInputActionDefine WithBinding(this ESInputActionDefine config, string schemeId, string path, string interactions = "", string processors = "")
         {
-            config.bindings.Add(ESInputBindingDefine.InputSystem(schemeId, path, interactions, processors));
+            ESInputBindingDefine binding = ESInputBindingDefine.InputSystem(schemeId, path, interactions, processors);
+            AddBindingWithId(config, binding);
             return config;
         }
 
         public static ESInputActionDefine WithVirtualBinding(this ESInputActionDefine config, string schemeId, string controlId)
         {
-            config.bindings.Add(ESInputBindingDefine.VirtualControl(schemeId, controlId));
+            ESInputBindingDefine binding = ESInputBindingDefine.VirtualControl(schemeId, controlId);
+            AddBindingWithId(config, binding);
             return config;
         }
 
         public static ESInputActionDefine WithComposite2D(this ESInputActionDefine config, string schemeId, string compositeName, string up, string down, string left, string right)
         {
-            config.bindings.Add(Composite(schemeId, compositeName, "2DVector"));
-            config.bindings.Add(CompositePart(schemeId, "Up", up));
-            config.bindings.Add(CompositePart(schemeId, "Down", down));
-            config.bindings.Add(CompositePart(schemeId, "Left", left));
-            config.bindings.Add(CompositePart(schemeId, "Right", right));
+            AddBindingWithId(config, Composite(schemeId, compositeName, "2DVector"));
+            AddBindingWithId(config, CompositePart(schemeId, "Up", up));
+            AddBindingWithId(config, CompositePart(schemeId, "Down", down));
+            AddBindingWithId(config, CompositePart(schemeId, "Left", left));
+            AddBindingWithId(config, CompositePart(schemeId, "Right", right));
             return config;
         }
 
         public static ESInputActionDefine WithAxisComposite(this ESInputActionDefine config, string schemeId, string compositeName, string negative, string positive)
         {
-            config.bindings.Add(Composite(schemeId, compositeName, "1DAxis"));
-            config.bindings.Add(CompositePart(schemeId, "Negative", negative));
-            config.bindings.Add(CompositePart(schemeId, "Positive", positive));
+            AddBindingWithId(config, Composite(schemeId, compositeName, "1DAxis"));
+            AddBindingWithId(config, CompositePart(schemeId, "Negative", negative));
+            AddBindingWithId(config, CompositePart(schemeId, "Positive", positive));
             return config;
+        }
+
+        private static void AddBindingWithId(ESInputActionDefine config, ESInputBindingDefine binding)
+        {
+            ESInputBindingKeyUtility.EnsureBindingName(binding);
+            binding.bindingId = ESInputBindingKeyUtility.MakeBindingId(config, binding, CountExistingBaseBindings(config, binding));
+            config.bindings.Add(binding);
         }
 
         private static ESInputBindingDefine Composite(string schemeId, string name, string compositePath)
         {
-            return new ESInputBindingDefine
+            ESInputBindingDefine binding = new ESInputBindingDefine
             {
                 schemeId = schemeId,
                 source = ESInputBindingSource.InputSystem,
@@ -231,6 +285,7 @@ namespace ES
                 name = name,
                 path = compositePath
             };
+            return binding;
         }
 
         private static ESInputBindingDefine CompositePart(string schemeId, string name, string path)
@@ -243,6 +298,27 @@ namespace ES
                 name = name,
                 path = path
             };
+        }
+
+        private static int CountExistingBaseBindings(ESInputActionDefine config, ESInputBindingDefine binding)
+        {
+            if (config == null || config.bindings == null)
+                return 0;
+
+            string baseKey = ESInputBindingKeyUtility.MakeBindingBaseKey(config, binding);
+            int count = 0;
+            for (int i = 0; i < config.bindings.Count; i++)
+            {
+                ESInputBindingDefine item = config.bindings[i];
+                if (item == null)
+                    continue;
+
+                ESInputBindingKeyUtility.EnsureBindingName(item);
+                if (ESInputBindingKeyUtility.MakeBindingBaseKey(config, item) == baseKey)
+                    count++;
+            }
+
+            return count;
         }
     }
 }

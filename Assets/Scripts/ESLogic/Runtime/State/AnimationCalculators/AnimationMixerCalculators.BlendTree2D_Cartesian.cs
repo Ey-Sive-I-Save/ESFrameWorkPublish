@@ -67,33 +67,30 @@ namespace ES
                 bool found = TryGetCellIndices(input, out int i0, out int i1, out int i2, out int i3);
                 if (!found)
                 {
-                    FindClosestGridPoints(input, out i0, out i1, out i2, out i3);
-                }
-
-                if (i0 < 0)
-                {
-                    // 找最近的单点
-                    int nearest = FindNearestSample(input);
-                    runtime.weightTargetCache[nearest] = 1f;
+                    ApplyClosestPointWeights(runtime, input);
                 }
                 else
                 {
-                    // 双线性插值
                     Vector2 p0 = samples[i0].position;
                     Vector2 p1 = samples[i1].position;
                     Vector2 p2 = samples[i2].position;
-                    Vector2 p3 = samples[i3].position;
 
-                    // 计算插值权重
-                    float tx = (input.x - p0.x) / (p1.x - p0.x);
-                    float ty = (input.y - p0.y) / (p2.y - p0.y);
-                    tx = Mathf.Clamp01(tx);
-                    ty = Mathf.Clamp01(ty);
+                    float dx = p1.x - p0.x;
+                    float dy = p2.y - p0.y;
+                    if (Mathf.Abs(dx) <= 0.0001f || Mathf.Abs(dy) <= 0.0001f)
+                    {
+                        ApplyClosestPointWeights(runtime, input);
+                    }
+                    else
+                    {
+                        float tx = Mathf.Clamp01((input.x - p0.x) / dx);
+                        float ty = Mathf.Clamp01((input.y - p0.y) / dy);
 
-                    runtime.weightTargetCache[i0] = (1 - tx) * (1 - ty);
-                    runtime.weightTargetCache[i1] = tx * (1 - ty);
-                    runtime.weightTargetCache[i2] = (1 - tx) * ty;
-                    runtime.weightTargetCache[i3] = tx * ty;
+                        runtime.weightTargetCache[i0] = (1 - tx) * (1 - ty);
+                        runtime.weightTargetCache[i1] = tx * (1 - ty);
+                        runtime.weightTargetCache[i2] = (1 - tx) * ty;
+                        runtime.weightTargetCache[i3] = tx * ty;
+                    }
                 }
 
                 // 平滑过渡到目标权重
@@ -115,7 +112,7 @@ namespace ES
                     {
                         runtime.weightCache[i] = runtime.weightTargetCache[i];
                     }
-                    runtime.mixer.SetInputWeight(i, runtime.weightCache[i]);
+                    runtime.SetMixerInputWeightIfChanged(runtime.mixer, i, runtime.weightCache[i]);
                 }
             }
 
@@ -184,12 +181,26 @@ namespace ES
 
             private int FindGridIndex(float[] arr, float value)
             {
-                for (int i = 0; i < arr.Length - 1; i++)
+                int low = 0;
+                int high = arr.Length - 1;
+                if (value < arr[low] || value > arr[high])
+                    return -1;
+
+                while (low <= high)
                 {
-                    if (value >= arr[i] && value <= arr[i + 1])
-                        return i;
+                    int mid = (low + high) >> 1;
+                    if (arr[mid] <= value)
+                    {
+                        low = mid + 1;
+                    }
+                    else
+                    {
+                        high = mid - 1;
+                    }
                 }
-                return -1;
+
+                int index = Mathf.Clamp(high, 0, arr.Length - 2);
+                return value >= arr[index] && value <= arr[index + 1] ? index : -1;
             }
 
             private void FindClosestGridPoints(Vector2 input, out int i0, out int i1, out int i2, out int i3)
@@ -239,6 +250,53 @@ namespace ES
                         i3 = i;
                     }
                 }
+            }
+
+            private void ApplyClosestPointWeights(AnimationCalculatorRuntime runtime, Vector2 input)
+            {
+                FindClosestGridPoints(input, out int i0, out int i1, out int i2, out int i3);
+
+                const float exactDistance = 0.000001f;
+                const float weightEpsilon = 0.000001f;
+                float weightSum = 0f;
+
+                if (ApplyInverseDistanceWeight(runtime, input, i0, ref weightSum, exactDistance)) return;
+                if (ApplyInverseDistanceWeight(runtime, input, i1, ref weightSum, exactDistance)) return;
+                if (ApplyInverseDistanceWeight(runtime, input, i2, ref weightSum, exactDistance)) return;
+                if (ApplyInverseDistanceWeight(runtime, input, i3, ref weightSum, exactDistance)) return;
+
+                if (weightSum <= weightEpsilon)
+                {
+                    int nearest = FindNearestSample(input);
+                    runtime.weightTargetCache[nearest] = 1f;
+                    return;
+                }
+
+                float inv = 1f / weightSum;
+                for (int i = 0; i < samples.Length; i++)
+                    runtime.weightTargetCache[i] *= inv;
+            }
+
+            private bool ApplyInverseDistanceWeight(AnimationCalculatorRuntime runtime, Vector2 input, int sampleIndex, ref float weightSum, float exactDistance)
+            {
+                if (sampleIndex < 0 || sampleIndex >= samples.Length)
+                    return false;
+
+                float sqrDistance = Vector2.SqrMagnitude(input - samples[sampleIndex].position);
+                if (sqrDistance <= exactDistance)
+                {
+                    for (int i = 0; i < samples.Length; i++)
+                        runtime.weightTargetCache[i] = 0f;
+
+                    runtime.weightTargetCache[sampleIndex] = 1f;
+                    weightSum = 1f;
+                    return true;
+                }
+
+                float weight = 1f / sqrDistance;
+                runtime.weightTargetCache[sampleIndex] += weight;
+                weightSum += weight;
+                return false;
             }
 
             private int FindNearestSample(Vector2 input)

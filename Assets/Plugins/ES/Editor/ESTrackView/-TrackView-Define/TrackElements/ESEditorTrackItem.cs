@@ -26,6 +26,11 @@ namespace ES
         private bool m_CanStartSortDrag;
         private Vector2 m_SortDragStartPosition;
         private bool m_IsRenaming;
+        private readonly List<ESEditorTrackClip> m_VisibilitySortedClips = new List<ESEditorTrackClip>();
+        private readonly List<float> m_VisibilityPrefixMaxEnd = new List<float>();
+        private bool m_VisibilityCacheDirty = true;
+        private int m_LastVisibleStartIndex = -1;
+        private int m_LastVisibleEndIndexExclusive = -1;
 
 
         #region  运行时
@@ -731,6 +736,7 @@ namespace ES
 
             m_TrackClipsContainer.Add(node);
             TrackClips.Add(node);
+            MarkVisibilityCacheDirty();
 
             //  OnNodeAdded?.Invoke(this, node);
             return node;
@@ -771,11 +777,13 @@ namespace ES
 
             m_TrackClipsContainer.Add(clipEditor);
             TrackClips.Add(clipEditor);
+            MarkVisibilityCacheDirty();
             return clipEditor;
         }
         public void RemoveClip(ESEditorTrackClip clip)
         {
             TrackClips.Remove(clip);
+            MarkVisibilityCacheDirty();
 
             if (clip != null)
             {
@@ -789,14 +797,20 @@ namespace ES
         {
             m_TrackClipsContainer.Clear();
             TrackClips.Clear();
+            MarkVisibilityCacheDirty();
         }
 
         // 公共方法：时间轴相关
         public void SetTimeScaleAndStartShow(float pixelsPerSecond, float startShowTime)
         {
+            SetTimeScaleAndStartShowVisible(pixelsPerSecond, startShowTime, float.PositiveInfinity);
+        }
+
+        public void SetTimeScaleAndStartShowVisible(float pixelsPerSecond, float startShowTime, float endShowTime)
+        {
             foreach (var node in TrackClips)
             {
-                node.SetTimeScaleAndStartShow(pixelsPerSecond, startShowTime);
+                node.SetTimeScaleAndStartShowVisible(pixelsPerSecond, startShowTime, endShowTime);
             }
         }
 
@@ -824,12 +838,168 @@ namespace ES
 
         internal void UpdateNodes()
         {
-            SetTimeScaleAndStartShow(ESTrackViewWindow.window.pixelPerSecond, ESTrackViewWindow.window.StartShow);
-            foreach(var node in TrackClips)
+            float visibleStart = ESTrackViewWindow.window.StartShow;
+            float visibleEnd = ESTrackViewWindow.window.GetVisibleEndTime();
+            UpdateNodes(visibleStart, visibleEnd);
+        }
+
+        internal void UpdateNodes(float visibleStart, float visibleEnd)
+        {
+            EnsureVisibilityCache();
+
+            int visibleStartIndex = FindFirstClipPotentiallyVisibleAtOrAfter(visibleStart);
+            int visibleEndIndexExclusive = FindFirstClipStartingAfter(visibleEnd);
+            if (visibleStartIndex < 0 || visibleEndIndexExclusive < visibleStartIndex)
             {
-                node.UpdateNodeView();
+                visibleStartIndex = 0;
+                visibleEndIndexExclusive = 0;
             }
-       
+
+            HidePreviouslyVisibleOutsideRange(visibleStartIndex, visibleEndIndexExclusive);
+
+            for (int i = visibleStartIndex; i < visibleEndIndexExclusive; i++)
+            {
+                ESEditorTrackClip node = m_VisibilitySortedClips[i];
+                if (node == null)
+                    continue;
+
+                node.SetTimeScaleAndStartShowVisible(ESTrackViewWindow.window.pixelPerSecond, visibleStart, visibleEnd);
+                if (node.resolvedStyle.display != DisplayStyle.None)
+                    node.UpdateNodeView();
+            }
+
+            m_LastVisibleStartIndex = visibleStartIndex;
+            m_LastVisibleEndIndexExclusive = visibleEndIndexExclusive;
+        }
+
+        public void MarkVisibilityCacheDirty()
+        {
+            m_VisibilityCacheDirty = true;
+        }
+
+        private void EnsureVisibilityCache()
+        {
+            if (!m_VisibilityCacheDirty && m_VisibilitySortedClips.Count == TrackClips.Count)
+                return;
+
+            for (int i = 0; i < TrackClips.Count; i++)
+            {
+                ESEditorTrackClip clip = TrackClips[i];
+                if (clip != null)
+                    clip.ForceDisplayState(DisplayStyle.None);
+            }
+
+            m_VisibilitySortedClips.Clear();
+            m_VisibilityPrefixMaxEnd.Clear();
+
+            for (int i = 0; i < TrackClips.Count; i++)
+            {
+                ESEditorTrackClip clip = TrackClips[i];
+                if (clip != null && clip.trackClip != null)
+                    m_VisibilitySortedClips.Add(clip);
+            }
+
+            m_VisibilitySortedClips.Sort((a, b) =>
+            {
+                float aStart = a != null ? a.StartTime : float.MaxValue;
+                float bStart = b != null ? b.StartTime : float.MaxValue;
+                int startCompare = aStart.CompareTo(bStart);
+                if (startCompare != 0)
+                    return startCompare;
+
+                float aEnd = a != null ? a.StartTime + Mathf.Max(0f, a.Duration) : float.MaxValue;
+                float bEnd = b != null ? b.StartTime + Mathf.Max(0f, b.Duration) : float.MaxValue;
+                return aEnd.CompareTo(bEnd);
+            });
+
+            float maxEnd = float.NegativeInfinity;
+            for (int i = 0; i < m_VisibilitySortedClips.Count; i++)
+            {
+                ESEditorTrackClip clip = m_VisibilitySortedClips[i];
+                float clipEnd = clip != null ? clip.StartTime + Mathf.Max(0f, clip.Duration) : float.NegativeInfinity;
+                maxEnd = Mathf.Max(maxEnd, clipEnd);
+                m_VisibilityPrefixMaxEnd.Add(maxEnd);
+            }
+
+            m_LastVisibleStartIndex = -1;
+            m_LastVisibleEndIndexExclusive = -1;
+            m_VisibilityCacheDirty = false;
+        }
+
+        private int FindFirstClipPotentiallyVisibleAtOrAfter(float visibleStart)
+        {
+            int count = m_VisibilityPrefixMaxEnd.Count;
+            if (count == 0)
+                return 0;
+
+            int low = 0;
+            int high = count - 1;
+            int result = count;
+            while (low <= high)
+            {
+                int mid = low + ((high - low) >> 1);
+                if (m_VisibilityPrefixMaxEnd[mid] >= visibleStart)
+                {
+                    result = mid;
+                    high = mid - 1;
+                }
+                else
+                {
+                    low = mid + 1;
+                }
+            }
+
+            return result;
+        }
+
+        private int FindFirstClipStartingAfter(float visibleEnd)
+        {
+            int count = m_VisibilitySortedClips.Count;
+            if (count == 0)
+                return 0;
+
+            if (float.IsPositiveInfinity(visibleEnd))
+                return count;
+
+            int low = 0;
+            int high = count - 1;
+            int result = count;
+            while (low <= high)
+            {
+                int mid = low + ((high - low) >> 1);
+                ESEditorTrackClip clip = m_VisibilitySortedClips[mid];
+                float start = clip != null ? clip.StartTime : float.MaxValue;
+                if (start > visibleEnd)
+                {
+                    result = mid;
+                    high = mid - 1;
+                }
+                else
+                {
+                    low = mid + 1;
+                }
+            }
+
+            return result;
+        }
+
+        private void HidePreviouslyVisibleOutsideRange(int visibleStartIndex, int visibleEndIndexExclusive)
+        {
+            if (m_LastVisibleStartIndex < 0 || m_LastVisibleEndIndexExclusive < 0)
+                return;
+
+            int oldStart = Mathf.Clamp(m_LastVisibleStartIndex, 0, m_VisibilitySortedClips.Count);
+            int oldEnd = Mathf.Clamp(m_LastVisibleEndIndexExclusive, 0, m_VisibilitySortedClips.Count);
+
+            for (int i = oldStart; i < oldEnd; i++)
+            {
+                if (i >= visibleStartIndex && i < visibleEndIndexExclusive)
+                    continue;
+
+                ESEditorTrackClip node = m_VisibilitySortedClips[i];
+                if (node != null)
+                    node.ForceDisplayState(DisplayStyle.None);
+            }
         }
         //检查节点是否对其
         public void UpdateNodeMatchAndForeachUpdate(bool update = true)

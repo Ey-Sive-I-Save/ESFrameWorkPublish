@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 117b1e461bc671046aae78bbe00677c8, type: 3}
+  m_Name: reward_holder_005
+  m_EditorClassIdentifier: 
+  itemId: reward_holder_005
+  displayName: "\u7B2C5\u7EC4\u5956\u52B1"
+  enabledInGame: 1
+  rewards:
+  - rowKey: reward_001
+    rewardName: "\u901A\u5173\u91D1\u5E01"
+    amount: 6
+    quality: 2
+    tags: 0
+    nestedConfig:
+      growthMultiplier: 9999
+      note: "\u5D4C\u5957\u5B57\u6BB5\u6D4B\u8BD5"
+  - rowKey: reward_002
+    rewardName: "\u7A00\u6709\u5B9D\u7BB1"
+    amount: 6
+    quality: 1
+    tags: 1
+    nestedConfig:
+      growthMultiplier: 1.2
+      note: "\u5D4C\u5957\u5B57\u6BB5\u6D4B\u8BD5"
+  - rowKey: reward_041
+    rewardName: "\u901A\u5173\u91D1\u5E0141"
+    amount: 6
+    quality: 1
+    tags: 0
+    nestedConfig:
+      growthMultiplier: 3.05
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_005 #41"
+  - rowKey: reward_042
+    rewardName: "\u7A00\u6709\u5B9D\u7BB142"
+    amount: 6
+    quality: 2
+    tags: 2
+    nestedConfig:
+      growthMultiplier: 3.1
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_005 #42"

@@ -1,5 +1,280 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-9085301364692608400
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7422ebe64a1c0b49b3c7d5ba37cc654, type: 3}
+  m_Name: "\u4FE1\u606FSO\u5305\u542B\u4E32\u884CList"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "SO\u5305\u542B\u4E32\u884CList"
+  enabled: 1
+  ruleKey: ExampleNativeSoListTableSource
+  exampleOutputFolder: {fileID: 102900000, guid: 0a9cc3948a234454997581b7584ccf20,
+    type: 3}
+  description: 
+  typeBinding:
+    objectKind: 1
+    objectTypeName: ES.ExampleNativeSoListTableSource
+    packTypeName: 
+    groupTypeName: 
+    infoTypeName: 
+  buildStage:
+    sourceBinding:
+      sourceKind: 3
+      soAsset: {fileID: 0}
+      soFolder: {fileID: 0}
+      includeSubFolders: 1
+      monoScript: {fileID: 11500000, guid: 117b1e461bc671046aae78bbe00677c8, type: 3}
+      folderAssets: []
+      folderSyncMode: 1
+      createMissingAssetsInFolder: 1
+      updateExistingAssetsInFolder: 1
+      sourceGuid: 117b1e461bc671046aae78bbe00677c8
+      sourcePath: Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/01_Scripts/02_NativeSO_ListRow/ExampleNativeSoListTableSource.cs
+      sourceTypeName: ES.ExampleNativeSoListTableSource
+    tableFilePath: 
+    allowTableHeaderOverride: 1
+  useBatches:
+  - enabled: 1
+    batchName: ExampleNativeSoListTableSource
+    direction: 0
+    useSuperBatch: 0
+    superBatchTablePath: 
+    superBatchSkipInvalidRows: 1
+    sourceBinding:
+      sourceKind: 0
+      soAsset: {fileID: 0}
+      soFolder: {fileID: 102900000, guid: 76c1a9aa50770124983e3b5e931bba27, type: 3}
+      includeSubFolders: 1
+      monoScript: {fileID: 0}
+      folderAssets:
+      - {fileID: 11400000, guid: 413d765454308fd4e82eead351bcf8fc, type: 2}
+      - {fileID: 11400000, guid: 0fb34bb5c35d0b94bb092e07ba8a3fd9, type: 2}
+      - {fileID: 11400000, guid: 8042f1044098626458893c4057aada7f, type: 2}
+      - {fileID: 11400000, guid: 1619f4753d257d84ba5243ebdd1cf2a0, type: 2}
+      - {fileID: 11400000, guid: 72edb9a4bffe95846814a93f408b14e3, type: 2}
+      - {fileID: 11400000, guid: 6f92b92d48ea48846a2be8a05a3b4e5a, type: 2}
+      folderSyncMode: 1
+      createMissingAssetsInFolder: 1
+      updateExistingAssetsInFolder: 1
+      sourceGuid: 
+      sourcePath: 
+      sourceTypeName: 
+    fileKind: 1
+    columnNameMode: 0
+    fileName: ExampleNativeSoListTableSource_Example
+    sheetName: ExampleNativeSoListTableSource
+    outputRoot: Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/03_Tables
+    csvRelativePath: csv
+    xlsxRelativePath: xlsx
+    importConflictPolicy: 1
+    exportConflictPolicy: 1
+    exportWriteMode: 0
+    serialChildWriteMode: 0
+    serialChildImportSyncMode: 1
+    applyRangeMode: 0
+    sliceColumnName: 
+    sliceStartValue: 
+    sliceEndValue: 
+    includeSliceStart: 1
+    includeSliceEnd: 1
+    targetGroupKey: 
+    targetInfoKey: 
+  tableName: TbExampleNativeSoListTableSource
+  beanName: ExampleNativeSoListTableSource
+  infoExpandMode: 2
+  groupSliceMode: 0
+  packColumnName: pack
+  groupColumnName: group
+  infoKeyColumnName: key
+  nameMatchMode: 2
+  rowBinding:
+    targetMode: 1
+    rowKeyColumnName: rowKey
+    listFieldPath: rewards
+    containerKind: 1
+    elementKeyFieldPath: rowKey
+    createMissingElement: 1
+    allowEmptyRowKey: 0
+  nestedFieldRule:
+    expandNestedFields: 1
+    maxDepth: 1
+    columnSeparator: _
+  header:
+    varMark: '##var'
+    typeMark: '##type'
+    groupMark: '##group'
+    commentMark: '##'
+    defaultGroup: client,server,editor
+  columns:
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: itemId
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: SO ID
+    comment: 
+    columnName: itemId
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: displayName
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u663E\u793A\u540D"
+    comment: 
+    columnName: displayName
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: enabledInGame
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u542F\u7528"
+    comment: 
+    columnName: enabledInGame
+    tableType: bool
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].rowKey
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u884C Key"
+    comment: 
+    columnName: rowKey
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].rewardName
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5956\u52B1\u540D"
+    comment: 
+    columnName: rewardName
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].amount
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u6570\u91CF"
+    comment: 
+    columnName: amount
+    tableType: int
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].quality
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u54C1\u8D28"
+    comment: 
+    columnName: quality
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].tags
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u6807\u7B7E"
+    comment: 
+    columnName: tags
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].nestedConfig.growthMultiplier
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5D4C\u5957\u914D\u7F6E_\u6210\u957F\u500D\u7387"
+    comment: 
+    columnName: nestedConfig_growthMultiplier
+    tableType: float
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].nestedConfig.note
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5D4C\u5957\u914D\u7F6E_\u5907\u6CE8"
+    comment: 
+    columnName: nestedConfig_note
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  allowCreateInfoOnImport: 0
+  allowCreateGroupOnImport: 0
+  refreshPackBeforeExport: 1
 --- !u!114 &-7031916951403410217
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10,7 +285,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a7422ebe64a1c0b49b3c7d5ba37cc654, type: 3}
-  m_Name: "\u4FE1\u606F\u6570\u636E\u952E94193"
+  m_Name: "SO--\u884C"
   m_EditorClassIdentifier: 
   serializationData:
     SerializedFormat: 2
@@ -24,33 +299,37 @@ MonoBehaviour:
   KeyName: "\u6570\u636E\u952E"
   enabled: 1
   ruleKey: ESSoTableDataRule
+  exampleOutputFolder: {fileID: 0}
   description: 
   typeBinding:
-    objectKind: 0
-    objectTypeName: 
-    packTypeName: ES.ESSoTableDataRulePack
-    groupTypeName: ES.ESSoTableDataRuleGroup
-    infoTypeName: ES.ESSoTableDataRule
+    objectKind: 1
+    objectTypeName: ES.ExampleNativeSoTableSource
+    packTypeName: 
+    groupTypeName: 
+    infoTypeName: 
   buildStage:
     sourceBinding:
-      sourceKind: 0
+      sourceKind: 3
       soAsset: {fileID: 0}
       soFolder: {fileID: 0}
       includeSubFolders: 1
-      monoScript: {fileID: 0}
+      monoScript: {fileID: 11500000, guid: 4361ddd2db6a4eed870adb5e607e558e, type: 3}
       folderAssets: []
       folderSyncMode: 1
       createMissingAssetsInFolder: 1
       updateExistingAssetsInFolder: 1
-      sourceGuid: 
-      sourcePath: 
-      sourceTypeName: 
+      sourceGuid: 4361ddd2db6a4eed870adb5e607e558e
+      sourcePath: Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/01_Scripts/NativeSO/ExampleNativeSoTableSource.cs
+      sourceTypeName: ES.ExampleNativeSoTableSource
     tableFilePath: 
     allowTableHeaderOverride: 1
   useBatches:
-  - enabled: 1
-    batchName: ESSoTableDataRule
+  - enabled: 0
+    batchName: "\u751F\u6210\u8868\u683C\u6848\u4F8B"
     direction: 0
+    useSuperBatch: 0
+    superBatchTablePath: 
+    superBatchSkipInvalidRows: 1
     sourceBinding:
       sourceKind: 0
       soAsset: {fileID: 0}
@@ -64,19 +343,150 @@ MonoBehaviour:
       sourceGuid: 
       sourcePath: 
       sourceTypeName: 
-    fileKind: 2
+    fileKind: 1
     columnNameMode: 0
     fileName: ESSoTableDataRule
     sheetName: ESSoTableDataRule
-    outputRoot: SoTableConfig/Tables
+    outputRoot: Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/03_Tables
     csvRelativePath: csv
     xlsxRelativePath: xlsx
     importConflictPolicy: 1
     exportConflictPolicy: 1
+    exportWriteMode: 0
+    serialChildWriteMode: 0
+    serialChildImportSyncMode: 0
     applyRangeMode: 0
     sliceColumnName: 
     sliceStartValue: 
     sliceEndValue: 
+    includeSliceStart: 1
+    includeSliceEnd: 1
+    targetGroupKey: 
+    targetInfoKey: 
+  - enabled: 0
+    batchName: "\u5168\u91CF\u5BFC\u5165\u4E3ASO"
+    direction: 0
+    useSuperBatch: 0
+    superBatchTablePath: 
+    superBatchSkipInvalidRows: 1
+    sourceBinding:
+      sourceKind: 0
+      soAsset: {fileID: 0}
+      soFolder: {fileID: 102900000, guid: a8316603f8dad1f44af2aa9e62e1290c, type: 3}
+      includeSubFolders: 1
+      monoScript: {fileID: 0}
+      folderAssets:
+      - {fileID: 11400000, guid: 7a76ec97849b2374fbfd2ce44694649c, type: 2}
+      - {fileID: 11400000, guid: bed785e90d58ffc468e43d462621f8cb, type: 2}
+      - {fileID: 11400000, guid: 50f72cf6e6272b748b529237bcc9df31, type: 2}
+      - {fileID: 11400000, guid: 7609e2c5767ced2459ade7cc1432b094, type: 2}
+      - {fileID: 11400000, guid: 02d39c1599fbc744aa6b780181499fab, type: 2}
+      - {fileID: 11400000, guid: fde96e1123985d14f81985e969d7323b, type: 2}
+      - {fileID: 11400000, guid: f3ae4f63377666548844e73138e45dae, type: 2}
+      - {fileID: 11400000, guid: b092e59f1aa8f824e9cc097e6edcb2a0, type: 2}
+      - {fileID: 11400000, guid: f13972ad090b82843b4d3e108c1431f0, type: 2}
+      - {fileID: 11400000, guid: e7bc224557ceabc4da44935629980075, type: 2}
+      - {fileID: 11400000, guid: 5ff21a4097cbb884ebbb895dd81508a1, type: 2}
+      - {fileID: 11400000, guid: 6292ea550a8e0504caaf1862d2f0a25c, type: 2}
+      - {fileID: 11400000, guid: 8f06d5250f54ba941b6a002091a0e9c6, type: 2}
+      - {fileID: 11400000, guid: 1e3c1935de4b2e44bb3fe93f9dcb7481, type: 2}
+      - {fileID: 11400000, guid: d607d521c6155e943ba364453dcab5e0, type: 2}
+      - {fileID: 11400000, guid: def2197ee16886e44809d536cd4c5161, type: 2}
+      - {fileID: 11400000, guid: a256b2dd36f291041848c4a76b36ee82, type: 2}
+      - {fileID: 11400000, guid: 6dfa168c85a6dd641bdc6827ad33eac1, type: 2}
+      - {fileID: 11400000, guid: fcada060a0cdd1243bf668148b60f0ad, type: 2}
+      - {fileID: 11400000, guid: 0e50a92af2c14c744ae2423556b0b611, type: 2}
+      - {fileID: 11400000, guid: 478425a0e8aa37a4985c7d0612a2a398, type: 2}
+      - {fileID: 11400000, guid: 6afdf9276bf69f9449182d2190d65093, type: 2}
+      - {fileID: 11400000, guid: d13944562fc95444eab702b88ba55418, type: 2}
+      - {fileID: 11400000, guid: 18bd17878bfe0774bba464a7c442f31e, type: 2}
+      - {fileID: 11400000, guid: 6a335a586291f1244994de4883137d2b, type: 2}
+      - {fileID: 11400000, guid: ed3d26e4a6c62614d929017738519986, type: 2}
+      - {fileID: 11400000, guid: fc1d57f4767b90c419abcf408a25a0d2, type: 2}
+      - {fileID: 11400000, guid: 1c75ab4f68d3dd74d8b59f2762d05ce8, type: 2}
+      - {fileID: 11400000, guid: d022141c167b6ab49aca2f2a289d2e80, type: 2}
+      - {fileID: 11400000, guid: 0b70dd473ab49f944a5e14a8b2d4ab24, type: 2}
+      - {fileID: 11400000, guid: 8efd743bcd84ca84096aa4150a341dd6, type: 2}
+      - {fileID: 11400000, guid: 03d21b776b53efa45949ec1d10444ef7, type: 2}
+      - {fileID: 11400000, guid: f6e6782620dfc264e82185eb9801148f, type: 2}
+      - {fileID: 11400000, guid: 500e2bc1b5a093046ad3e3e999c0d079, type: 2}
+      - {fileID: 11400000, guid: 5814490bddd690649bb91fd4afc3d759, type: 2}
+      - {fileID: 11400000, guid: 201d736cd1bc04e49a3c7e86b00f8bec, type: 2}
+      - {fileID: 11400000, guid: 8f9bfb2fb4dcc174f9268ef0533b5e3f, type: 2}
+      - {fileID: 11400000, guid: 745402eb809f49a41b628b0ca55572ad, type: 2}
+      - {fileID: 11400000, guid: cc02eb3808913c74c934e1c61b2c7244, type: 2}
+      - {fileID: 11400000, guid: ff0057f8e31668b448bce4345a081ea3, type: 2}
+      - {fileID: 11400000, guid: 131c5e37fb12687488fdba5baea3c511, type: 2}
+      - {fileID: 11400000, guid: 4cf9e9680f5c5ba4885655de0513f0ab, type: 2}
+      - {fileID: 11400000, guid: 31ae8bd1a0638b14099e72d4a5499bc3, type: 2}
+      - {fileID: 11400000, guid: 10b6f82ed5983944f9d3f62a9f3a91cc, type: 2}
+      - {fileID: 11400000, guid: 957e68b4e925a16419602bdf0fd84367, type: 2}
+      - {fileID: 11400000, guid: 04b75460239560e428d64278f4df21f7, type: 2}
+      - {fileID: 11400000, guid: b41dd30310dafed48839d0b1035bfcbf, type: 2}
+      - {fileID: 11400000, guid: d253770a4cad8c24a915ac9f2bd54c22, type: 2}
+      - {fileID: 11400000, guid: 9f231b5d06909a84ea27063f5eb1d1f9, type: 2}
+      - {fileID: 11400000, guid: a1a759ef15e38cc42b3925628347071f, type: 2}
+      folderSyncMode: 1
+      createMissingAssetsInFolder: 1
+      updateExistingAssetsInFolder: 1
+      sourceGuid: 
+      sourcePath: 
+      sourceTypeName: 
+    fileKind: 1
+    columnNameMode: 0
+    fileName: ESSoTableDataRule
+    sheetName: ESSoTableDataRule
+    outputRoot: Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/03_Tables
+    csvRelativePath: csv
+    xlsxRelativePath: xlsx
+    importConflictPolicy: 1
+    exportConflictPolicy: 1
+    exportWriteMode: 0
+    serialChildWriteMode: 0
+    serialChildImportSyncMode: 0
+    applyRangeMode: 0
+    sliceColumnName: 
+    sliceStartValue: 
+    sliceEndValue: 
+    includeSliceStart: 1
+    includeSliceEnd: 1
+    targetGroupKey: 
+    targetInfoKey: 
+  - enabled: 1
+    batchName: "\u5BFC\u5165\u4E00\u90E8\u5206"
+    direction: 1
+    useSuperBatch: 0
+    superBatchTablePath: 
+    superBatchSkipInvalidRows: 1
+    sourceBinding:
+      sourceKind: 0
+      soAsset: {fileID: 0}
+      soFolder: {fileID: 102900000, guid: 5857a89bd29bfc742afecaec1114cc04, type: 3}
+      includeSubFolders: 1
+      monoScript: {fileID: 0}
+      folderAssets: []
+      folderSyncMode: 1
+      createMissingAssetsInFolder: 1
+      updateExistingAssetsInFolder: 1
+      sourceGuid: 
+      sourcePath: 
+      sourceTypeName: 
+    fileKind: 1
+    columnNameMode: 0
+    fileName: ESSoTableDataRule
+    sheetName: ESSoTableDataRule
+    outputRoot: Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/03_Tables
+    csvRelativePath: csv
+    xlsxRelativePath: xlsx
+    importConflictPolicy: 1
+    exportConflictPolicy: 1
+    exportWriteMode: 0
+    serialChildWriteMode: 0
+    serialChildImportSyncMode: 0
+    applyRangeMode: 1
+    sliceColumnName: 'displayName '
+    sliceStartValue: "\u6218\u9774028 "
+    sliceEndValue: "\u957F\u5251041 "
     includeSliceStart: 1
     includeSliceEnd: 1
     targetGroupKey: 
@@ -92,7 +502,8 @@ MonoBehaviour:
   rowBinding:
     targetMode: 0
     rowKeyColumnName: key
-    listFieldPath: 
+    listFieldPath: keywords
+    containerKind: 0
     elementKeyFieldPath: key
     createMissingElement: 1
     allowEmptyRowKey: 0
@@ -106,9 +517,479 @@ MonoBehaviour:
     groupMark: '##group'
     commentMark: '##'
     defaultGroup: client,server,editor
-  columns: []
+  columns:
+  - enabled: 1
+    locked: 1
+    authority: 1
+    showDetail: 0
+    soFieldPath: itemId
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u7269\u54C1ID"
+    comment: 
+    columnName: itemId
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: displayName
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u663E\u793A\u540D"
+    comment: 
+    columnName: displayName
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: level
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u7B49\u7EA7"
+    comment: 
+    columnName: level
+    tableType: int
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: price
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u4EF7\u683C"
+    comment: 
+    columnName: price
+    tableType: float
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: enabledInGame
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u542F\u7528"
+    comment: 
+    columnName: enabledInGame
+    tableType: bool
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: quality
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u54C1\u8D28"
+    comment: 
+    columnName: quality
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: tags
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u6807\u7B7E"
+    comment: 
+    columnName: tags
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: keywords
+    valueWriteMode: 3
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5173\u952E\u8BCD\u5217\u8868"
+    comment: 
+    columnName: keywords
+    tableType: list,string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: levelRewards
+    valueWriteMode: 3
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u7B49\u7EA7\u5956\u52B1\u5217\u8868"
+    comment: 
+    columnName: levelRewards
+    tableType: list,int
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: qualityOptions
+    valueWriteMode: 3
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u54C1\u8D28\u5019\u9009\u5217\u8868"
+    comment: 
+    columnName: qualityOptions
+    tableType: list,string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: internalWeight
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5185\u90E8\u6743\u91CD"
+    comment: 
+    columnName: internalWeight
+    tableType: int
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: nestedConfig.growthMultiplier
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5D4C\u5957\u914D\u7F6E_\u6210\u957F\u500D\u7387"
+    comment: 
+    columnName: nestedConfig_growthMultiplier
+    tableType: float
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: nestedConfig.note
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5D4C\u5957\u914D\u7F6E_\u5907\u6CE8"
+    comment: 
+    columnName: nestedConfig_note
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
   allowCreateInfoOnImport: 1
   allowCreateGroupOnImport: 1
+  refreshPackBeforeExport: 1
+--- !u!114 &-2186085960652700918
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7422ebe64a1c0b49b3c7d5ba37cc654, type: 3}
+  m_Name: "\u4FE1\u606FSOlist\u5316"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "SOlist\u5316"
+  enabled: 1
+  ruleKey: ExampleNativeSoListTableSource
+  exampleOutputFolder: {fileID: 102900000, guid: 6bdb165e00b1ac946bf2e92a020422ef,
+    type: 3}
+  description: 
+  typeBinding:
+    objectKind: 1
+    objectTypeName: ES.ExampleNativeSoListTableSource
+    packTypeName: 
+    groupTypeName: 
+    infoTypeName: 
+  buildStage:
+    sourceBinding:
+      sourceKind: 3
+      soAsset: {fileID: 0}
+      soFolder: {fileID: 0}
+      includeSubFolders: 1
+      monoScript: {fileID: 11500000, guid: 117b1e461bc671046aae78bbe00677c8, type: 3}
+      folderAssets: []
+      folderSyncMode: 1
+      createMissingAssetsInFolder: 1
+      updateExistingAssetsInFolder: 1
+      sourceGuid: 117b1e461bc671046aae78bbe00677c8
+      sourcePath: Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/01_Scripts/02_NativeSO_ListRow/ExampleNativeSoListTableSource.cs
+      sourceTypeName: ES.ExampleNativeSoListTableSource
+    tableFilePath: 
+    allowTableHeaderOverride: 1
+  useBatches:
+  - enabled: 1
+    batchName: ExampleNativeSoListTableSource
+    direction: 0
+    useSuperBatch: 0
+    superBatchTablePath: F:\aaProject\ESFrameWorkPublish\Assets\Plugins\ES\3_Examples\3_Data\Example_SOTableRule\03_Tables\xlsx\ExampleNativeSoListTableSource_Example.xlsx
+    superBatchSkipInvalidRows: 1
+    sourceBinding:
+      sourceKind: 0
+      soAsset: {fileID: 0}
+      soFolder: {fileID: 102900000, guid: 76c1a9aa50770124983e3b5e931bba27, type: 3}
+      includeSubFolders: 1
+      monoScript: {fileID: 0}
+      folderAssets:
+      - {fileID: 11400000, guid: 040061924e4673d4590279bd1aee70c7, type: 2}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      - {fileID: 0}
+      folderSyncMode: 1
+      createMissingAssetsInFolder: 1
+      updateExistingAssetsInFolder: 1
+      sourceGuid: 
+      sourcePath: 
+      sourceTypeName: 
+    fileKind: 1
+    columnNameMode: 0
+    fileName: ExampleNativeSoListTableSource_Example
+    sheetName: ExampleNativeSoListTableSource
+    outputRoot: Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/03_Tables
+    csvRelativePath: csv
+    xlsxRelativePath: xlsx
+    importConflictPolicy: 1
+    exportConflictPolicy: 1
+    exportWriteMode: 0
+    serialChildWriteMode: 0
+    serialChildImportSyncMode: 0
+    applyRangeMode: 0
+    sliceColumnName: 
+    sliceStartValue: 
+    sliceEndValue: 
+    includeSliceStart: 1
+    includeSliceEnd: 1
+    targetGroupKey: 
+    targetInfoKey: 
+  tableName: TbExampleNativeSoListTableSource
+  beanName: ExampleNativeSoListTableSource
+  infoExpandMode: 2
+  groupSliceMode: 0
+  packColumnName: pack
+  groupColumnName: group
+  infoKeyColumnName: key
+  nameMatchMode: 2
+  rowBinding:
+    targetMode: 1
+    rowKeyColumnName: rowKey
+    listFieldPath: rewards
+    containerKind: 0
+    elementKeyFieldPath: rowKey
+    createMissingElement: 1
+    allowEmptyRowKey: 0
+  nestedFieldRule:
+    expandNestedFields: 1
+    maxDepth: 1
+    columnSeparator: _
+  header:
+    varMark: '##var'
+    typeMark: '##type'
+    groupMark: '##group'
+    commentMark: '##'
+    defaultGroup: client,server,editor
+  columns:
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: itemId
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: SO ID
+    comment: 
+    columnName: itemId
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: displayName
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u663E\u793A\u540D"
+    comment: 
+    columnName: displayName
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: enabledInGame
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u542F\u7528"
+    comment: 
+    columnName: enabledInGame
+    tableType: bool
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].rowKey
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u884C Key"
+    comment: 
+    columnName: rowKey
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].rewardName
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5956\u52B1\u540D"
+    comment: 
+    columnName: rewardName
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].amount
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u6570\u91CF"
+    comment: 
+    columnName: amount
+    tableType: int
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].quality
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u54C1\u8D28"
+    comment: 
+    columnName: quality
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].tags
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u6807\u7B7E"
+    comment: 
+    columnName: tags
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].nestedConfig.growthMultiplier
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5D4C\u5957\u914D\u7F6E_\u6210\u957F\u500D\u7387"
+    comment: 
+    columnName: nestedConfig_growthMultiplier
+    tableType: float
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  - enabled: 1
+    locked: 0
+    authority: 1
+    showDetail: 0
+    soFieldPath: rewards[].nestedConfig.note
+    valueWriteMode: 0
+    isInfoKey: 0
+    isGroupKey: 0
+    displayName: "\u5D4C\u5957\u914D\u7F6E_\u5907\u6CE8"
+    comment: 
+    columnName: nestedConfig_note
+    tableType: string
+    direction: 0
+    availability: 0
+    allowPassThrough: 0
+  allowCreateInfoOnImport: 0
+  allowCreateGroupOnImport: 0
   refreshPackBeforeExport: 1
 --- !u!114 &11400000
 MonoBehaviour:
@@ -120,13 +1001,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 79b1a230e4cb6f740b7efa540c52ee07, type: 3}
-  m_Name: "\u65B0\u5EFASO表格\u89C4\u5219\u6570\u636E\u7EC445608"
+  m_Name: "\u65B0\u5EFASO\u8868\u683C\u89C4\u5219\u6570\u636E\u7EC445608"
   m_EditorClassIdentifier: 
   serializationData:
     SerializedFormat: 2
     SerializedBytes: 
     ReferencedUnityObjects:
     - {fileID: -7031916951403410217}
+    - {fileID: -2186085960652700918}
+    - {fileID: -9085301364692608400}
     SerializedBytesString: 
     Prefab: {fileID: 0}
     PrefabModificationsReferencedUnityObjects: []
@@ -145,7 +1028,7 @@ MonoBehaviour:
       Data: 
     - Name: 
       Entry: 12
-      Data: 1
+      Data: 3
     - Name: 
       Entry: 7
       Data: 
@@ -155,6 +1038,30 @@ MonoBehaviour:
     - Name: $v
       Entry: 10
       Data: 0
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "SOlist\u5316"
+    - Name: $v
+      Entry: 10
+      Data: 1
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "SO\u5305\u542B\u4E32\u884CList"
+    - Name: $v
+      Entry: 10
+      Data: 2
     - Name: 
       Entry: 8
       Data: 

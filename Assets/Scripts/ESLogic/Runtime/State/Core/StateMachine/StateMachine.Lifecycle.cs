@@ -39,10 +39,22 @@ namespace ES
 
         public void Initialize(Entity entity, Animator animator, PlayableGraph graph = default, AnimationLayerMixerPlayable root = default)
         {
+            if (this.isInitialized)
+            {
+                if (boundAnimator == null && animator != null)
+                {
+                    BindToAnimator(animator);
+                }
+                return;
+            }
+
             Initialize(entity, graph, root);
             BindToAnimator(animator);
-            playableGraph.Stop();
-            playableGraph.Play();
+            if (playableGraph.IsValid())
+            {
+                playableGraph.Stop();
+                playableGraph.Play();
+            }
         }
 
         private void InitializePipelines(PlayableGraph hanldegraph, AnimationLayerMixerPlayable root)
@@ -158,6 +170,11 @@ namespace ES
 
         public void Dispose()
         {
+            if (isRunning)
+            {
+                StopStateMachine();
+            }
+
             if (boundAnimator != null)
             {
                 var driver = boundAnimator.GetComponent<StateFinalIKDriver>();
@@ -177,6 +194,7 @@ namespace ES
             }
 
             runningStates.Clear();
+            ClearAllWeakInterruptions();
 
             if (_temporaryStates.Count > 0)
             {
@@ -185,7 +203,6 @@ namespace ES
                     if (kvp.Value != null)
                     {
                         kvp.Value.OnStateExit();
-                        kvp.Value.DestroyPlayable();
                         kvp.Value.TryAutoPushedToPool();
                     }
                 }
@@ -213,13 +230,14 @@ namespace ES
             animationOutput = default;
             boundAnimator = null;
 
+            ClearAllExitAutoActivations();
+
             stringToStateMap.Clear();
             intToStateMap.Clear();
             transitionCache.Clear();
             stateLayerMap.Clear();
+            _registeredStatesList.Clear();
             _activationCache.Clear();
-
-            ClearAllExitAutoActivations();
 
             if (stateContext != null)
             {
@@ -322,6 +340,7 @@ namespace ES
         private void ForceClearLayerFadesAndResidualPlayables(StateLayerRuntime layer)
         {
             if (layer == null) return;
+            ClearAllWeakInterruptions();
 
             if (layer.fadeInStates.Count > 0)
             {
@@ -339,6 +358,7 @@ namespace ES
                     if (kvp.Value != null) kvp.Value.TryAutoPushedToPool();
                 }
                 layer.fadeOutStates.Clear();
+                _fadeOutIKStates.Clear();
             }
 
             if (layer.stateToSlotMap.Count > 0)
@@ -400,10 +420,12 @@ namespace ES
 
                 if (state.ShouldAutoExit(Time.time))
                 {
+#if STATEMACHINEDEBUG
                     string autoExitLayerName = stateLayerMap.TryGetValue(state, out var autoExitLayer)
                         ? autoExitLayer.ToString()
                         : "<unknown>";
                     StateMachineDebug.Log($"[AutoExit] State={state.strKey} | Layer={autoExitLayerName} | ActivationTime={state.activationTime:F3} | Now={Time.time:F3}");
+#endif
                     statesToDeactivate.Add(state);
                 }
             }
@@ -465,7 +487,11 @@ namespace ES
 #if STATEMACHINEDEBUG
     if (enableContinuousStats)
     {
-        OutputContinuousStats();
+        var dbg = StateMachineDebugSettings.Instance;
+        if (dbg == null || !dbg.IsStressTestSilentMode)
+        {
+            OutputContinuousStats();
+        }
     }
 #endif
 #endif
@@ -651,6 +677,7 @@ namespace ES
             layer.InternalClearConnectedStates();
             layer.freeSlots.Clear();
             CleanupFadeDict(layer.fadeOutStates);
+            _fadeOutIKStates.Clear();
             CleanupFadeDict(layer.fadeInStates);
             if (layer.mixer.IsValid()) layer.mixer.Destroy();
         }

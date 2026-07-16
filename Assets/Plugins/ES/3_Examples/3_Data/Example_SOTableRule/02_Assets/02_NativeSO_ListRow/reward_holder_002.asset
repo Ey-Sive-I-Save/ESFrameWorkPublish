@@ -1,0 +1,114 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 117b1e461bc671046aae78bbe00677c8, type: 3}
+  m_Name: reward_holder_002
+  m_EditorClassIdentifier: 
+  itemId: reward_holder_002
+  displayName: "\u7B2C2\u7EC4\u5956\u52B1"
+  enabledInGame: 1
+  rewards:
+  - rowKey: reward_001
+    rewardName: "\u901A\u5173\u91D1\u5E01"
+    amount: 100
+    quality: 0
+    tags: 2
+    nestedConfig:
+      growthMultiplier: 1.2
+      note: "\u5D4C\u5957\u5B57\u6BB5\u6D4B\u8BD5"
+  - rowKey: reward_002
+    rewardName: "\u7A00\u6709\u5B9D\u7BB1"
+    amount: 1
+    quality: 1
+    tags: 1
+    nestedConfig:
+      growthMultiplier: 1.2
+      note: "\u5D4C\u5957\u5B57\u6BB5\u6D4B\u8BD5"
+  - rowKey: reward_011
+    rewardName: "\u901A\u5173\u91D1\u5E0111"
+    amount: 2
+    quality: 1
+    tags: 0
+    nestedConfig:
+      growthMultiplier: 1.55
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #11"
+  - rowKey: reward_012
+    rewardName: "\u7A00\u6709\u5B9D\u7BB112999"
+    amount: 1
+    quality: 2
+    tags: 2
+    nestedConfig:
+      growthMultiplier: 1.6
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #12"
+  - rowKey: reward_013
+    rewardName: "\u7ECF\u9A8C\u836F\u6C3413"
+    amount: 115
+    quality: 0
+    tags: 1
+    nestedConfig:
+      growthMultiplier: 1.65
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #13"
+  - rowKey: reward_014
+    rewardName: "\u5F3A\u5316\u77F314"
+    amount: 5
+    quality: 1
+    tags: 3
+    nestedConfig:
+      growthMultiplier: 1.7
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #14"
+  - rowKey: reward_015
+    rewardName: "\u4F53\u529B\u8865\u7ED915"
+    amount: 1
+    quality: 2
+    tags: 4
+    nestedConfig:
+      growthMultiplier: 1.75
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #15"
+  - rowKey: reward_016
+    rewardName: "\u94A5\u5319\u788E\u724716"
+    amount: 130
+    quality: 0
+    tags: 0
+    nestedConfig:
+      growthMultiplier: 1.8
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #16"
+  - rowKey: reward_017
+    rewardName: "\u6D3B\u52A8\u4EE3\u5E0117"
+    amount: 3
+    quality: 1
+    tags: 2
+    nestedConfig:
+      growthMultiplier: 1.85
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #17"
+  - rowKey: reward_018
+    rewardName: "\u88C5\u5907\u56FE\u7EB818"
+    amount: 1
+    quality: 2
+    tags: 1
+    nestedConfig:
+      growthMultiplier: 1.9
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #18"
+  - rowKey: reward_019
+    rewardName: "\u6280\u80FD\u4E6619"
+    amount: 145
+    quality: 0
+    tags: 3
+    nestedConfig:
+      growthMultiplier: 1.95
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #19"
+  - rowKey: reward_020
+    rewardName: "\u5B9D\u77F3\u793C\u530520"
+    amount: 1
+    quality: 1
+    tags: 4
+    nestedConfig:
+      growthMultiplier: 2
+      note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_002 #20"

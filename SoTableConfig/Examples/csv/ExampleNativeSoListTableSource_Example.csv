@@ -1,0 +1,7 @@
+﻿##rowDirective(行指令说明),空=正常导入；skip(跳过)/ignore(忽略)/disabled(停用)=跳过；comment:(备注)=备注；required(必填行)=整行和Key必填；patch(补丁)=只写非空；replace(强制覆盖)=强制覆盖；delete(删除)=删除普通SO,,,,,,
+##assert(列断言),required(必填);unique(唯一),,,enum:Normal|Rare|Epic(枚举),enum:None|Tradable|Stackable|TestOnly(枚举),,
+##var(字段名),rowKey,rewardName,amount,quality,tags,nestedConfig_growthMultiplier,nestedConfig_note
+##type(类型),string,string,int,string,string,float,string
+##group(分组),"client,server,editor","client,server,editor","client,server,editor","client,server,editor","client,server,editor","client,server,editor","client,server,editor"
+##(说明),Info Key,奖励名,数量,品质,标签,嵌套配置_成长倍率,嵌套配置_备注
+,item001,奖励名示例,3,Normal,None,6.5,嵌套配置_备注示例

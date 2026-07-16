@@ -37,6 +37,10 @@ namespace ES
             public AnimationClip entryClip;
 
             [BoxGroup("前置动画(Entry)")]
+            [LabelText("前置标记")]
+            public string entryMarker = "Entry";
+
+            [BoxGroup("前置动画(Entry)")]
             [LabelText("前置速度"), Range(0.1f, 5f), ShowIf("@entryClip != null")]
             public float entrySpeed = 1f;
 
@@ -46,6 +50,10 @@ namespace ES
             [BoxGroup("后置动画(Exit)")]
             [LabelText("后置Clip"), Tooltip("可选，在主动画后播放（如攻击收尾、技能后摇）")]
             public AnimationClip exitClip;
+
+            [BoxGroup("后置动画(Exit)")]
+            [LabelText("后置标记")]
+            public string exitMarker = "Exit";
 
             [BoxGroup("后置动画(Exit)")]
             [LabelText("后置速度"), Range(0.1f, 5f), ShowIf("@exitClip != null")]
@@ -81,6 +89,9 @@ namespace ES
                 [LabelText("主Clip"), Tooltip("必须，核心动画")]
                 public AnimationClip clip;
 
+                [LabelText("主标记")]
+                public string marker;
+
                 [LabelText("主速度"), Range(0.1f, 5f)]
                 public float speed;
 
@@ -88,6 +99,7 @@ namespace ES
                 {
                     this.clip = clip;
                     this.speed = speed;
+                    this.marker = "Main";
                 }
             }
 
@@ -130,6 +142,8 @@ namespace ES
 
                 // 创建Mixer（3个输入：Entry、Main、Exit）
                 runtime.mixer = AnimationMixerPlayable.Create(graph, 3);
+                runtime.EnsureMixerInputWeightCache(3);
+                runtime.EnsureClipOverrideSlots(3);
                 runtime.playables = new AnimationClipPlayable[3];
                 
                 // ★ 关键修复：分配weightCache，便于外部在需要时“从缓存回写内部Mixer权重”（不再乘 totalWeight）
@@ -144,6 +158,7 @@ namespace ES
                 if (entryClip != null)
                 {
                     runtime.playables[0] = AnimationClipPlayable.Create(graph, entryClip);
+                    runtime.RegisterClipOverrideSlot(0, entryClip, string.IsNullOrWhiteSpace(entryMarker) ? "Entry" : entryMarker);
                     runtime.playables[0].SetSpeed(entrySpeed);
                     // ★ 不使用SetDuration，避免PlayableGraph将Playable标记为Done导致冻结
                     // ★ 非当前阶段暂停（speed=0），防止时间提前推进
@@ -154,6 +169,7 @@ namespace ES
 
                 // 创建Main Playable（必须）
                 runtime.playables[1] = AnimationClipPlayable.Create(graph, mainConfig.clip);
+                runtime.RegisterClipOverrideSlot(1, mainConfig.clip, string.IsNullOrWhiteSpace(mainConfig.marker) ? "Main" : mainConfig.marker);
                 runtime.playables[1].SetSpeed(mainConfig.speed);
                 // ★ 非当前阶段暂停
                 if (runtime.sequencePhase != 1)
@@ -164,6 +180,7 @@ namespace ES
                 if (exitClip != null)
                 {
                     runtime.playables[2] = AnimationClipPlayable.Create(graph, exitClip);
+                    runtime.RegisterClipOverrideSlot(2, exitClip, string.IsNullOrWhiteSpace(exitMarker) ? "Exit" : exitMarker);
                     runtime.playables[2].SetSpeed(exitSpeed);
                     // ★ Exit始终先暂停（稍后激活时恢复）
                     runtime.playables[2].Pause();
@@ -196,7 +213,7 @@ namespace ES
                     case 0: // Entry阶段
                         if (entryClip != null && runtime.playables[0].IsValid())
                         {
-                            double duration = entryClip.length / entrySpeed;
+                            double duration = GetRuntimeClipLength(runtime, 0, entryClip) / entrySpeed;
                             if (runtime.phaseStartTime >= duration)
                             {
                                 phaseCompleted = true;
@@ -211,7 +228,7 @@ namespace ES
                     case 1: // Main阶段
                         if (!loopMainClip && mainConfig.clip != null)
                         {
-                            double duration = mainConfig.clip.length / mainConfig.speed;
+                            double duration = GetRuntimeClipLength(runtime, 1, mainConfig.clip) / mainConfig.speed;
                             if (runtime.phaseStartTime >= duration)
                             {
                                 phaseCompleted = true;
@@ -223,7 +240,7 @@ namespace ES
                     case 2: // Exit阶段
                         if (exitClip != null && runtime.playables[2].IsValid())
                         {
-                            double duration = exitClip.length / exitSpeed;
+                            double duration = GetRuntimeClipLength(runtime, 2, exitClip) / exitSpeed;
                             if (runtime.phaseStartTime >= duration)
                             {
                                 // Exit完成，整个序列结束
@@ -279,7 +296,7 @@ namespace ES
                 {
                     float internalWeight = (i == runtime.sequencePhase) ? 1f : 0f;
                     runtime.weightCache[i] = internalWeight;
-                    runtime.mixer.SetInputWeight(i, internalWeight);
+                    runtime.SetMixerInputWeightIfChanged(runtime.mixer, i, internalWeight);
                 }
             }
 
@@ -294,6 +311,20 @@ namespace ES
 
             public override AnimationClip GetCurrentClip(AnimationCalculatorRuntime runtime)
             {
+                if (runtime == null)
+                    return null;
+
+                if (runtime != null && runtime.playables != null)
+                {
+                    int phase = runtime.sequencePhase;
+                    if ((uint)phase < (uint)runtime.playables.Length && runtime.playables[phase].IsValid())
+                    {
+                        var runtimeClip = runtime.playables[phase].GetAnimationClip();
+                        if (runtimeClip != null)
+                            return runtimeClip;
+                    }
+                }
+
                 switch (runtime.sequencePhase)
                 {
                     case 0: return entryClip;
@@ -309,19 +340,34 @@ namespace ES
 
                 // Entry时长
                 if (entryClip != null)
-                    totalDuration += entryClip.length / entrySpeed;
+                    totalDuration += GetRuntimeClipLength(runtime, 0, entryClip) / entrySpeed;
 
                 // Main时长（循环模式返回无限）
                 if (loopMainClip)
                     return float.PositiveInfinity;
                 if (mainConfig.clip != null)
-                    totalDuration += mainConfig.clip.length / mainConfig.speed;
+                    totalDuration += GetRuntimeClipLength(runtime, 1, mainConfig.clip) / mainConfig.speed;
 
                 // Exit时长
                 if (exitClip != null)
-                    totalDuration += exitClip.length / exitSpeed;
+                    totalDuration += GetRuntimeClipLength(runtime, 2, exitClip) / exitSpeed;
 
                 return totalDuration > 0f ? totalDuration : 0f;
+            }
+
+            private static float GetRuntimeClipLength(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip fallbackClip)
+            {
+                if (runtime != null &&
+                    runtime.playables != null &&
+                    (uint)clipIndex < (uint)runtime.playables.Length &&
+                    runtime.playables[clipIndex].IsValid())
+                {
+                    var clip = runtime.playables[clipIndex].GetAnimationClip();
+                    if (clip != null)
+                        return clip.length;
+                }
+
+                return fallbackClip != null ? fallbackClip.length : 0f;
             }
 
             public override bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)
@@ -360,15 +406,56 @@ namespace ES
                     graph.Connect(runtime.playables[clipIndex], 0, runtime.mixer, clipIndex);
                 }
 
-                // 更新配置
-                switch (clipIndex)
-                {
-                    case 0: entryClip = newClip; break;
-                    case 1: mainConfig.clip = newClip; break;
-                    case 2: exitClip = newClip; break;
-                }
+                runtime.UpdateClipOverrideSlot(clipIndex, newClip);
 
                 return true;
+            }
+
+            public override bool OverrideClipBySource(AnimationCalculatorRuntime runtime, AnimationClip sourceClip, AnimationClip newClip)
+            {
+                if (sourceClip == null || runtime == null || runtime.playables == null)
+                    return false;
+
+                int mappedSlot = runtime.FindClipSlotByOriginalOrCurrent(sourceClip);
+                if (mappedSlot >= 0)
+                    return OverrideClip(runtime, mappedSlot, newClip);
+
+                bool changed = false;
+                for (int i = 0; i < runtime.playables.Length && i < 3; i++)
+                {
+                    if (runtime.playables[i].IsValid() && runtime.playables[i].GetAnimationClip() == sourceClip)
+                        changed |= OverrideClip(runtime, i, newClip);
+                }
+
+                return changed;
+            }
+
+            public override bool OverrideClipByMarker(AnimationCalculatorRuntime runtime, string marker, AnimationClip newClip)
+            {
+                if (string.IsNullOrWhiteSpace(marker))
+                    return false;
+
+                int mappedSlot = runtime != null ? runtime.FindClipSlotByMarker(marker) : -1;
+                if (mappedSlot >= 0)
+                    return OverrideClip(runtime, mappedSlot, newClip);
+
+                bool changed = false;
+                if (MarkerEquals(marker, entryMarker, "Entry"))
+                    changed |= OverrideClip(runtime, 0, newClip);
+
+                if (MarkerEquals(marker, mainConfig != null ? mainConfig.marker : null, "Main"))
+                    changed |= OverrideClip(runtime, 1, newClip);
+
+                if (MarkerEquals(marker, exitMarker, "Exit"))
+                    changed |= OverrideClip(runtime, 2, newClip);
+
+                return changed;
+            }
+
+            private static bool MarkerEquals(string input, string configured, string fallback)
+            {
+                return string.Equals(input, configured, StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(input, fallback, StringComparison.OrdinalIgnoreCase);
             }
 
             /// <summary>

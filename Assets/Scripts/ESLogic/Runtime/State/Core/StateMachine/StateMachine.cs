@@ -14,38 +14,45 @@ namespace ES
         [NonSerialized] private Entity hostEntity;
         public Entity HostEntity => hostEntity;
 
-        [TabGroup("SM_View", "⚙ 配置", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾蓝\")")]
-        [BoxGroup("SM_View/⚙ 配置/基础设置", ShowLabel = false)]
-        [LabelText("状态机键"), ShowInInspector]
+        [TabGroup("SM_View", "配置页面", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾蓝\")")]
+        [BoxGroup("SM_View/配置页面/基础配置", ShowLabel = true)]
+        [LabelText("状态机标识"), ShowInInspector]
         public string stateMachineKey;
 
-        [TabGroup("SM_View", "⚙ 配置")]
-        [BoxGroup("SM_View/⚙ 配置/基础设置", ShowLabel = false)]
+        [TabGroup("SM_View", "配置页面")]
+        [BoxGroup("SM_View/配置页面/基础配置")]
         [LabelText("状态机配置"), ShowInInspector]
         [SerializeField]
         private StateMachineConfig config;
         public StateMachineConfig Config { get => config; set => config = value; }
 
-        [TabGroup("SM_View", "▶ 运行时", Order = 1, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")")]
-        [LabelText("状态实时上下文"), ShowInInspector, ReadOnly]
+        [TabGroup("SM_View", "运行监控", Order = 1, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")")]
+        [BoxGroup("SM_View/运行监控/运行总览", ShowLabel = true)]
+        [LabelText("运行上下文"), ShowInInspector, ReadOnly]
         [NonSerialized]
         private StateMachineContext stateContext;
 
-        [TabGroup("SM_View", "⚙ 配置")]
-        [BoxGroup("SM_View/⚙ 配置/基础设置", ShowLabel = false), LabelText("默认状态键"), ValueDropdown("GetAllStateKeys")]
+        [TabGroup("SM_View", "配置页面")]
+        [BoxGroup("SM_View/配置页面/基础配置"), LabelText("默认状态"), ValueDropdown("GetAllStateKeys")]
         public string defaultStateKey;
 
-        [TabGroup("SM_View", "⚙ 配置")]
-        [BoxGroup("SM_View/⚙ 配置/层级遮罩", ShowLabel = false), LabelText("覆盖上半身遮罩配置"), AssetsOnly]
+        [TabGroup("SM_View", "配置页面")]
+        [BoxGroup("SM_View/配置页面/层级遮罩", ShowLabel = true), LabelText("上半身遮罩"), AssetsOnly]
         public AvatarMask upperBodyMask;
 
-        [BoxGroup("SM_View/⚙ 配置/层级遮罩", ShowLabel = false), LabelText("覆盖下半身遮罩配置"), AssetsOnly]
+        [BoxGroup("SM_View/配置页面/层级遮罩"), LabelText("下半身遮罩"), AssetsOnly]
         public AvatarMask lowerBodyMask;
 
-        [BoxGroup("SM_View/⚙ 配置/层级遮罩", ShowLabel = false), LabelText("参考姿态动画剪辑(防下陷)"), AssetsOnly, Tooltip("防止空状态时角色下陷到地面以下。建议设置为 1 帧的站立待机动画剪辑。")]
+        [BoxGroup("SM_View/配置页面/层级遮罩"), LabelText("参考姿态动画(防下陷)"), AssetsOnly, Tooltip("防止空状态时角色下陷到地面以下。建议设置为 1 帧的站立待机动画剪辑。")]
         public AnimationClip referencePoseClip;
 
-        [TabGroup("SM_View", "▶ 运行时")]
+        [TabGroup("SM_View", "配置页面")]
+        [BoxGroup("SM_View/配置页面/合并规则", ShowLabel = true)]
+        [LabelText("弱打断压制权重"), Range(0f, 1f), Tooltip("TryWeakInterrupt 生效时，被压制状态参与混合的权重系数。0 表示完全压住，1 表示只记录压制关系但不影响权重。")]
+        public float weakInterruptSuppressedWeightFactor = 0.35f;
+
+        [TabGroup("SM_View", "运行监控")]
+        [BoxGroup("SM_View/运行监控/运行总览")]
         [ShowInInspector, ReadOnly, LabelText("运行状态")]
         public bool isRunning { get; set; }
 
@@ -61,7 +68,7 @@ namespace ES
             return stringToStateMap.Keys;
         }
 
-        [TabGroup("SM_View", "▶ 运行时")]
+        [TabGroup("SM_View", "运行监控")]
         private SwapBackSet<StateBase> runningStates = new SwapBackSet<StateBase>(32);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -87,6 +94,16 @@ namespace ES
         [NonSerialized]
         public StateGeneralFinalIKDriverPose stateGeneralFinalIKDriverPose;
 
+        private struct FadeOutIKState
+        {
+            public StateBase state;
+            public StateLayerType layerType;
+            public int holdCount;
+        }
+
+        [NonSerialized]
+        private readonly List<FadeOutIKState> _fadeOutIKStates = new List<FadeOutIKState>(8);
+
         [NonSerialized]
         public string stateGeneralFinalIKContributionSummary = "未更新";
 
@@ -94,8 +111,9 @@ namespace ES
 
         public event StateGeneralFinalIKDriverPosePostProcessDelegate OnStateGeneralFinalIKDriverPosePostProcess;
 
-        [TabGroup("SM_View", "▶ 运行时")]
-        [ShowInInspector, ReadOnly, LabelText("支持标记")]
+        [TabGroup("SM_View", "运行监控")]
+        [BoxGroup("SM_View/运行监控/运行总览")]
+        [ShowInInspector, ReadOnly, LabelText("支持状态")]
         [NonSerialized]
         public StateSupportFlags currentSupportFlags = StateSupportFlags.Grounded;
 
@@ -104,15 +122,15 @@ namespace ES
         [NonSerialized]
         private Dictionary<StateSupportFlags, uint> _disableTransitionMasks;
 
-        [ShowInInspector, TabGroup("SM_View", "📋 状态字典", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾紫\")"), LabelText("String映射")]
+        [ShowInInspector, TabGroup("SM_View", "运行监控"), FoldoutGroup("SM_View/运行监控/状态索引（调试）", expanded: false), LabelText("名称索引")]
         [SerializeField, SerializeReference]
         private Dictionary<string, StateBase> stringToStateMap = new Dictionary<string, StateBase>();
 
-        [ShowInInspector, TabGroup("SM_View", "📋 状态字典"), LabelText("Int映射")]
+        [ShowInInspector, TabGroup("SM_View", "运行监控"), FoldoutGroup("SM_View/运行监控/状态索引（调试）", expanded: false), LabelText("ID索引")]
         [SerializeField, SerializeReference]
         private Dictionary<int, StateBase> intToStateMap = new Dictionary<int, StateBase>();
 
-        [ShowInInspector, TabGroup("SM_View", "📋 状态字典"), LabelText("状态层级映射")]
+        [ShowInInspector, TabGroup("SM_View", "运行监控"), FoldoutGroup("SM_View/运行监控/状态索引（调试）", expanded: false), LabelText("状态所在层级")]
         [NonSerialized]
         private Dictionary<StateBase, StateLayerType> stateLayerMap = new Dictionary<StateBase, StateLayerType>();
 
@@ -169,6 +187,7 @@ namespace ES
             public int[] versions;
             public StateActivationResult[] results;
             public List<StateBase>[] interruptLists;
+            public List<StateBase>[] weakInterruptLists;
 #if UNITY_EDITOR
             public List<StateBase>[] mergeLists;
 #endif
@@ -176,6 +195,9 @@ namespace ES
 
         [NonSerialized]
         private readonly List<StateBase> _tmpInterruptStates = new List<StateBase>(8);
+
+        [NonSerialized]
+        private readonly List<StateBase> _tmpWeakInterruptStates = new List<StateBase>(8);
 
         [NonSerialized]
         private readonly List<StateBase> _tmpMergeStates = new List<StateBase>(8);
@@ -197,6 +219,19 @@ namespace ES
 
         [NonSerialized]
         private readonly System.Text.StringBuilder _ikContributionBuilder = new System.Text.StringBuilder(1024);
+
+        private struct WeakInterruptRecord
+        {
+            public StateBase suppressed;
+            public StateBase suppressor;
+            public StateLayerType layerType;
+        }
+
+        [NonSerialized]
+        private readonly List<WeakInterruptRecord> _weakInterruptRecords = new List<WeakInterruptRecord>(16);
+
+        [NonSerialized]
+        private readonly Dictionary<StateBase, int> _weakInterruptSuppressionCounts = new Dictionary<StateBase, int>(16);
 
         public enum ActivationEventKind : byte
         {
@@ -284,7 +319,7 @@ namespace ES
         [NonSerialized]
         private int _cachedChannelMaskVersion = -1;
 
-        [TabGroup("SM_View", "▶ 运行时")]
+        [TabGroup("SM_View", "运行监控")]
         [NonSerialized]
         protected StateLayerRuntime baseLayer;
 
@@ -306,36 +341,42 @@ namespace ES
         /// </summary>
         [NonSerialized] private StateLayerRuntime[] _layerArray;
 
-        [TabGroup("SM_View", "▶ 运行时")]
-        [LabelText("Selected Layer")]
+        [TabGroup("SM_View", "运行监控")]
+        [BoxGroup("SM_View/运行监控/层级详情", ShowLabel = true)]
+        [LabelText("查看层级")]
         [EnumToggleButtons]
         public StateLayerType inspectorSelectedLayer = StateLayerType.Base;
 
-        [TabGroup("SM_View", "▶ 运行时")]
+        [TabGroup("SM_View", "运行监控")]
+        [BoxGroup("SM_View/运行监控/层级详情")]
         [ShowInInspector]
         [ShowIf(nameof(inspectorSelectedLayer), StateLayerType.Base)]
         [HideLabel]
         public StateLayerRuntime BaseLayer => baseLayer;
 
-        [TabGroup("SM_View", "▶ 运行时")]
+        [TabGroup("SM_View", "运行监控")]
+        [BoxGroup("SM_View/运行监控/层级详情")]
         [ShowInInspector]
         [ShowIf(nameof(inspectorSelectedLayer), StateLayerType.Main)]
         [HideLabel]
         public StateLayerRuntime MainLayer => mainLayer;
 
-        [TabGroup("SM_View", "▶ 运行时")]
+        [TabGroup("SM_View", "运行监控")]
+        [BoxGroup("SM_View/运行监控/层级详情")]
         [ShowInInspector]
         [ShowIf(nameof(inspectorSelectedLayer), StateLayerType.Buff)]
         [HideLabel]
         public StateLayerRuntime BuffLayer => buffLayer;
 
-        [TabGroup("SM_View", "▶ 运行时")]
+        [TabGroup("SM_View", "运行监控")]
+        [BoxGroup("SM_View/运行监控/层级详情")]
         [ShowIf(nameof(inspectorSelectedLayer), StateLayerType.UpperBody)]
         [HideLabel]
         [ShowInInspector]
         public StateLayerRuntime UpperBodyLayer => upperBodyLayer;
 
-        [TabGroup("SM_View", "▶ 运行时")]
+        [TabGroup("SM_View", "运行监控")]
+        [BoxGroup("SM_View/运行监控/层级详情")]
         [ShowInInspector]
         [ShowIf(nameof(inspectorSelectedLayer), StateLayerType.LowerBody)]
         [HideLabel]
@@ -476,11 +517,12 @@ namespace ES
                 _activationCache[targetState] = cache;
             }
             int layerCount = (int)StateLayerType.Count;
-            if (cache.versions == null || cache.versions.Length != layerCount)
+            if (cache.versions == null || cache.versions.Length != layerCount || cache.weakInterruptLists == null || cache.weakInterruptLists.Length != layerCount)
             {
                 cache.versions = new int[layerCount];
                 cache.results = new StateActivationResult[layerCount];
                 cache.interruptLists = new List<StateBase>[layerCount];
+                cache.weakInterruptLists = new List<StateBase>[layerCount];
 #if UNITY_EDITOR
                 cache.mergeLists = new List<StateBase>[layerCount];
 #endif
@@ -488,6 +530,7 @@ namespace ES
                 {
                     cache.versions[i] = -1;
                     cache.interruptLists[i] = new List<StateBase>(4);
+                    cache.weakInterruptLists[i] = new List<StateBase>(4);
 #if UNITY_EDITOR
                     cache.mergeLists[i] = new List<StateBase>(4);
 #endif
@@ -583,3 +626,4 @@ namespace ES
         }
     }
 }
+

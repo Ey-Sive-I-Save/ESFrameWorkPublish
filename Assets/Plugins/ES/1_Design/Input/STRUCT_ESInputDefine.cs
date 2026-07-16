@@ -45,11 +45,22 @@ namespace ES
         [LabelText("显示名称")]
         public string displayName;
 
+        [LabelText("旧触发方式")]
+        public ESInputTriggerType triggerType = ESInputTriggerType.Pressed;
+
+        [LabelText("触发标记")]
+        public ESInputTriggerFeature triggerFeatures = ESInputTriggerFeature.None;
+
+        [LabelText("短按策略")]
+        public ESInputPressPolicy pressPolicy = ESInputPressPolicy.PressedImmediate;
+
         [MinValue(0f)]
+        [ShowIf(nameof(UsesLongPress))]
         [LabelText("长按秒数")]
         public float longPressDuration = 0.5f;
 
         [MinValue(0f)]
+        [ShowIf(nameof(UsesDoublePress))]
         [LabelText("双击窗口")]
         public float doublePressWindow = 0.28f;
 
@@ -66,14 +77,59 @@ namespace ES
                 valueType = valueType,
                 category = ESInputDefineUtility.GuessCategory(id),
                 displayName = ESInputDefineUtility.GetDefaultChineseName(id),
+                triggerFeatures = ESInputTriggerFeature.Pressed,
+                pressPolicy = ESInputPressPolicy.PressedImmediate,
                 allowRebind = true
             };
+        }
+
+        public ESInputTriggerFeature GetEffectiveTriggerFeatures()
+        {
+            return triggerFeatures != ESInputTriggerFeature.None
+                ? triggerFeatures
+                : ConvertLegacyTriggerType(triggerType);
+        }
+
+        public void NormalizeTriggerSettings()
+        {
+            if (triggerFeatures == ESInputTriggerFeature.None)
+                triggerFeatures = ConvertLegacyTriggerType(triggerType);
+        }
+
+        public static ESInputTriggerFeature ConvertLegacyTriggerType(ESInputTriggerType type)
+        {
+            switch (type)
+            {
+                case ESInputTriggerType.Released:
+                    return ESInputTriggerFeature.Released;
+                case ESInputTriggerType.Held:
+                    return ESInputTriggerFeature.Held;
+                case ESInputTriggerType.LongPress:
+                    return ESInputTriggerFeature.LongPress;
+                case ESInputTriggerType.DoublePress:
+                    return ESInputTriggerFeature.DoublePress;
+                default:
+                    return ESInputTriggerFeature.Pressed;
+            }
+        }
+
+        private bool UsesLongPress()
+        {
+            return (GetEffectiveTriggerFeatures() & ESInputTriggerFeature.LongPress) != 0;
+        }
+
+        private bool UsesDoublePress()
+        {
+            return (GetEffectiveTriggerFeatures() & ESInputTriggerFeature.DoublePress) != 0;
         }
     }
 
     [Serializable]
     public sealed class ESInputBindingDefine
     {
+        [HideInInspector]
+        public string bindingId;
+
         [LabelText("方案ID")]
         public string schemeId;
 
@@ -101,10 +157,11 @@ namespace ES
         [LabelText("名称")]
         public string name;
 
-        public static ESInputBindingDefine InputSystem(string schemeId, string path, string interactions = "", string processors = "")
+        public static ESInputBindingDefine InputSystem(string schemeId, string path, string interactions = "", string processors = "", string bindingId = null)
         {
             return new ESInputBindingDefine
             {
+                bindingId = bindingId,
                 schemeId = schemeId,
                 source = ESInputBindingSource.InputSystem,
                 path = path,
@@ -113,10 +170,11 @@ namespace ES
             };
         }
 
-        public static ESInputBindingDefine VirtualControl(string schemeId, string controlId)
+        public static ESInputBindingDefine VirtualControl(string schemeId, string controlId, string bindingId = null)
         {
             return new ESInputBindingDefine
             {
+                bindingId = bindingId,
                 schemeId = schemeId,
                 source = ESInputBindingSource.VirtualControl,
                 virtualControlId = controlId

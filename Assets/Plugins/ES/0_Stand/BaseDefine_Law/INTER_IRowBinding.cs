@@ -11,8 +11,42 @@ namespace ES
         [InspectorName("一行 = 一个对象")]
         Object,
 
-        [InspectorName("一行 = 对象内 List 的一个元素")]
+        [InspectorName("一行 = 对象内列表的一个元素")]
         ObjectListElement
+    }
+
+    public enum ESRowContainerKind
+    {
+        [InspectorName("自动")]
+        Auto,
+
+        [InspectorName("List")]
+        List,
+
+        [InspectorName("Dictionary")]
+        Dictionary
+    }
+
+    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+    public sealed class ESRowContainerAttribute : Attribute
+    {
+        public string RowKeyColumnName { get; }
+        public string ElementKeyFieldPath { get; }
+        public ESRowContainerKind ContainerKind { get; }
+
+        public ESRowContainerAttribute(string rowKeyColumnName = "rowKey", string elementKeyFieldPath = "")
+        {
+            RowKeyColumnName = rowKeyColumnName;
+            ElementKeyFieldPath = elementKeyFieldPath;
+            ContainerKind = ESRowContainerKind.Auto;
+        }
+
+        public ESRowContainerAttribute(ESRowContainerKind containerKind, string rowKeyColumnName = "rowKey", string elementKeyFieldPath = "")
+        {
+            RowKeyColumnName = rowKeyColumnName;
+            ElementKeyFieldPath = elementKeyFieldPath;
+            ContainerKind = containerKind;
+        }
     }
 
     [Serializable]
@@ -24,8 +58,11 @@ namespace ES
         [InspectorName("行 Key 列名")]
         public string rowKeyColumnName = "key";
 
-        [InspectorName("List 字段路径")]
+        [InspectorName("列表字段路径")]
         public string listFieldPath;
+
+        [InspectorName("行容器类型")]
+        public ESRowContainerKind containerKind = ESRowContainerKind.Auto;
 
         [InspectorName("元素 Key 字段路径")]
         public string elementKeyFieldPath = "key";
@@ -33,7 +70,7 @@ namespace ES
         [InspectorName("导入时创建缺失元素")]
         public bool createMissingElement = true;
 
-        [InspectorName("空 Key 合法")]
+        [InspectorName("允许空 Key")]
         public bool allowEmptyRowKey;
 
         public bool IsObjectRow => targetMode == ESRowTargetMode.Object;
@@ -44,8 +81,14 @@ namespace ES
     {
         bool IsValidRowKey(string rowKey, ESRowBindingRule binding, out string reason);
         IList EnsureContainer(object owner, ESRowBindingRule binding);
+        IDictionary EnsureDictionary(object owner, ESRowBindingRule binding);
         IEnumerable<object> EnumerateRows(object owner, ESRowBindingRule binding);
         bool TryGetOrCreateRow(object owner, string rowKey, ESRowBindingRule binding, out object row, out string reason);
+    }
+
+    public interface IESRowBindingProvider
+    {
+        ESRowBindingRule GetRowBindingRule();
     }
 
     public sealed class ESReflectionRowBridge : IESRowBridge
@@ -69,6 +112,8 @@ namespace ES
                 return null;
 
             object container = ESRowBindingReflectionUtility.GetMemberValue(owner, binding.listFieldPath);
+            if (container is IDictionary)
+                return null;
             if (container is IList list)
                 return list;
 
@@ -84,6 +129,29 @@ namespace ES
             return created;
         }
 
+        public IDictionary EnsureDictionary(object owner, ESRowBindingRule binding)
+        {
+            if (owner == null || binding == null || !binding.IsListElementRow)
+                return null;
+
+            object container = ESRowBindingReflectionUtility.GetMemberValue(owner, binding.listFieldPath);
+            if (container is IDictionary dictionary)
+                return dictionary;
+            if (container is IList)
+                return null;
+
+            Type dictionaryType = ESRowBindingReflectionUtility.GetMemberType(owner.GetType(), binding.listFieldPath);
+            if (dictionaryType == null)
+                return null;
+
+            IDictionary created = ESRowBindingReflectionUtility.CreateDictionaryInstance(dictionaryType);
+            if (created == null)
+                return null;
+
+            ESRowBindingReflectionUtility.SetMemberValue(owner, binding.listFieldPath, created);
+            return created;
+        }
+
         public IEnumerable<object> EnumerateRows(object owner, ESRowBindingRule binding)
         {
             if (owner == null)
@@ -92,6 +160,24 @@ namespace ES
             if (binding == null || binding.IsObjectRow)
             {
                 yield return owner;
+                yield break;
+            }
+
+            IDictionary dictionary = EnsureDictionary(owner, binding);
+            if (dictionary != null)
+            {
+                var stringKeys = new List<string>();
+                foreach (DictionaryEntry entry in dictionary)
+                {
+                    if (entry.Key is string key)
+                        stringKeys.Add(key);
+                    else
+                        yield return entry.Value;
+                }
+
+                stringKeys.Sort(StringComparer.Ordinal);
+                for (int i = 0; i < stringKeys.Count; i++)
+                    yield return dictionary[stringKeys[i]];
                 yield break;
             }
 
@@ -123,10 +209,14 @@ namespace ES
                 return true;
             }
 
+            IDictionary dictionary = EnsureDictionary(owner, binding);
+            if (dictionary != null)
+                return TryGetOrCreateDictionaryRow(dictionary, rowKey, binding, out row, out reason);
+
             IList list = EnsureContainer(owner, binding);
             if (list == null)
             {
-                reason = "无法获取或创建 List 容器：" + binding.listFieldPath;
+                reason = "无法获取或创建列表容器：" + binding.listFieldPath;
                 return false;
             }
 
@@ -143,14 +233,14 @@ namespace ES
 
             if (!binding.createMissingElement)
             {
-                reason = "没有找到行 Key 对应的 List 元素：" + rowKey;
+                reason = "没有找到行 Key 对应的列表元素：" + rowKey;
                 return false;
             }
 
             Type elementType = ESRowBindingReflectionUtility.GetListElementType(list.GetType());
             if (elementType == null)
             {
-                reason = "无法推导 List 元素类型：" + binding.listFieldPath;
+                reason = "无法推导列表元素类型：" + binding.listFieldPath;
                 return false;
             }
 
@@ -159,16 +249,57 @@ namespace ES
             list.Add(row);
             return true;
         }
+
+        private static bool TryGetOrCreateDictionaryRow(IDictionary dictionary, string rowKey, ESRowBindingRule binding, out object row, out string reason)
+        {
+            row = null;
+            reason = string.Empty;
+
+            Type keyType = ESRowBindingReflectionUtility.GetDictionaryKeyType(dictionary.GetType());
+            if (keyType != null && keyType != typeof(string))
+            {
+                reason = "字典行容器只支持 string Key：" + binding.listFieldPath;
+                return false;
+            }
+
+            if (dictionary.Contains(rowKey))
+            {
+                row = dictionary[rowKey];
+                return true;
+            }
+
+            if (!binding.createMissingElement)
+            {
+                reason = "没有找到行 Key 对应的字典元素：" + rowKey;
+                return false;
+            }
+
+            Type valueType = ESRowBindingReflectionUtility.GetDictionaryValueType(dictionary.GetType());
+            if (valueType == null)
+            {
+                reason = "无法推导字典值类型：" + binding.listFieldPath;
+                return false;
+            }
+
+            row = Activator.CreateInstance(valueType);
+            ESRowBindingReflectionUtility.SetMemberValue(row, binding.elementKeyFieldPath, rowKey);
+            dictionary[rowKey] = row;
+            return true;
+        }
     }
 
     public static class ESRowBindingReflectionUtility
     {
+        public const string StringLawKeyPath = "$IString";
         private const BindingFlags MemberFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         private static readonly Dictionary<string, MemberInfo> MemberCache = new Dictionary<string, MemberInfo>(256);
         private static readonly Dictionary<string, ESMemberPath> MemberPathCache = new Dictionary<string, ESMemberPath>(256);
 
         public static Type GetMemberType(Type rootType, string memberPath)
         {
+            if (rootType != null && IsStringLawKeyPath(memberPath) && typeof(IString).IsAssignableFrom(rootType))
+                return typeof(string);
+
             ESMemberPath path = GetOrCreateMemberPath(rootType, memberPath);
             return path != null && path.IsValid ? path.ValueType : null;
         }
@@ -219,6 +350,8 @@ namespace ES
         {
             if (root == null || string.IsNullOrWhiteSpace(memberPath))
                 return null;
+            if (IsStringLawKeyPath(memberPath) && root is IString stringKey)
+                return stringKey.GetSTR();
 
             object current = root;
             ESMemberPath path = GetOrCreateMemberPath(root.GetType(), memberPath);
@@ -245,6 +378,11 @@ namespace ES
         {
             if (root == null || string.IsNullOrWhiteSpace(memberPath))
                 return false;
+            if (IsStringLawKeyPath(memberPath) && root is IString stringKey)
+            {
+                stringKey.SetSTR(value != null ? value.ToString() : string.Empty);
+                return true;
+            }
 
             object current = root;
             ESMemberPath path = GetOrCreateMemberPath(root.GetType(), memberPath);
@@ -308,6 +446,44 @@ namespace ES
             return null;
         }
 
+        public static Type GetDictionaryKeyType(Type dictionaryType)
+        {
+            if (dictionaryType == null)
+                return null;
+
+            if (dictionaryType.IsGenericType && dictionaryType.GetGenericArguments().Length == 2)
+                return dictionaryType.GetGenericArguments()[0];
+
+            Type[] interfaces = dictionaryType.GetInterfaces();
+            for (int i = 0; i < interfaces.Length; i++)
+            {
+                Type interfaceType = interfaces[i];
+                if (interfaceType.IsGenericType && interfaceType.GetGenericTypeDefinition() == typeof(IDictionary<,>))
+                    return interfaceType.GetGenericArguments()[0];
+            }
+
+            return null;
+        }
+
+        public static Type GetDictionaryValueType(Type dictionaryType)
+        {
+            if (dictionaryType == null)
+                return null;
+
+            if (dictionaryType.IsGenericType && dictionaryType.GetGenericArguments().Length == 2)
+                return dictionaryType.GetGenericArguments()[1];
+
+            Type[] interfaces = dictionaryType.GetInterfaces();
+            for (int i = 0; i < interfaces.Length; i++)
+            {
+                Type interfaceType = interfaces[i];
+                if (interfaceType.IsGenericType && interfaceType.GetGenericTypeDefinition() == typeof(IDictionary<,>))
+                    return interfaceType.GetGenericArguments()[1];
+            }
+
+            return null;
+        }
+
         public static IList CreateListInstance(Type listType)
         {
             if (listType == null || listType.IsArray)
@@ -322,6 +498,38 @@ namespace ES
 
             Type concreteType = typeof(List<>).MakeGenericType(elementType);
             return Activator.CreateInstance(concreteType) as IList;
+        }
+
+        public static IDictionary CreateDictionaryInstance(Type dictionaryType)
+        {
+            if (dictionaryType == null)
+                return null;
+
+            if (!dictionaryType.IsInterface && !dictionaryType.IsAbstract)
+                return Activator.CreateInstance(dictionaryType) as IDictionary;
+
+            Type[] arguments = null;
+            if (dictionaryType.IsGenericType && dictionaryType.GetGenericArguments().Length == 2)
+                arguments = dictionaryType.GetGenericArguments();
+            else
+            {
+                Type[] interfaces = dictionaryType.GetInterfaces();
+                for (int i = 0; i < interfaces.Length; i++)
+                {
+                    Type interfaceType = interfaces[i];
+                    if (interfaceType.IsGenericType && interfaceType.GetGenericTypeDefinition() == typeof(IDictionary<,>))
+                    {
+                        arguments = interfaceType.GetGenericArguments();
+                        break;
+                    }
+                }
+            }
+
+            if (arguments == null || arguments.Length != 2 || arguments[0] != typeof(string))
+                return null;
+
+            Type concreteType = typeof(Dictionary<,>).MakeGenericType(arguments[0], arguments[1]);
+            return Activator.CreateInstance(concreteType) as IDictionary;
         }
 
         public static object CreateObjectInstance(Type type)
@@ -340,6 +548,8 @@ namespace ES
 
             if (typeof(IList).IsAssignableFrom(type))
                 return CreateListInstance(type);
+            if (typeof(IDictionary).IsAssignableFrom(type))
+                return CreateDictionaryInstance(type);
 
             if (type.IsValueType)
                 return Activator.CreateInstance(type);
@@ -357,6 +567,11 @@ namespace ES
         private static string NormalizeMemberPath(string memberPath)
         {
             return memberPath.Replace("[]", string.Empty);
+        }
+
+        private static bool IsStringLawKeyPath(string memberPath)
+        {
+            return string.Equals(memberPath, StringLawKeyPath, StringComparison.Ordinal);
         }
 
         private static MemberInfo GetCachedFieldOrProperty(Type type, string memberName)

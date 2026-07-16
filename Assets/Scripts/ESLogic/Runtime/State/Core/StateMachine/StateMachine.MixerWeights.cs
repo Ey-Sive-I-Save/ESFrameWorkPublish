@@ -53,6 +53,7 @@ namespace ES
             // 有效性校验
             if (!layer.mixer.IsValid()) return;
 
+            bool topologyDirty = layer.HasDirtyFlag(PipelineDirtyFlags.HotPlug);
             var states = layer.connectedStates;
             var slots = layer.connectedSlots;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -69,7 +70,7 @@ namespace ES
                     layer.mixer.SetInputWeight(0, 1f);
                     layer.referencePoseWeightsNormalized = false;
                 }
-                layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
+                ClearMixerWeightDirty(layer, topologyDirty);
                 return;
             }
 
@@ -93,7 +94,7 @@ namespace ES
                 for (int i = 0; i < stateCount; i++)
                 {
                     var state = states[i];
-                    float w = Mathf.Clamp01(state.RequestedPlayableWeight);
+                    float w = Mathf.Clamp01(ApplyWeakInterruptWeightFactor(state, state.RequestedPlayableWeight));
                     _mixerEffectiveWeights[i] = w;
                 }
 
@@ -111,22 +112,12 @@ namespace ES
                     layer.referencePoseWeightsNormalized = false;
                 }
 
-                // 清理未使用槽位
+                if (topologyDirty)
                 {
-                    int inputCount = layer.mixer.GetInputCount();
-                    int start = layer.hasReferencePose ? 1 : 0;
-                    for (int slot = start; slot < inputCount; slot++)
-                    {
-                        bool used = false;
-                        for (int i = 0; i < stateCount; i++)
-                        {
-                            if (slots[i] == slot) { used = true; break; }
-                        }
-                        if (!used) layer.mixer.SetInputWeight(slot, 0f);
-                    }
+                    ClearUnusedMixerSlots(layer, slots, stateCount);
                 }
 
-                layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
+                ClearMixerWeightDirty(layer, topologyDirty);
                 return;
             }
 
@@ -155,8 +146,9 @@ namespace ES
                     var s = states[i];
                     if (i == dominantIdx)
                     {
-                        _mixerEffectiveWeights[i] = 1f;
-                        s.SetPlayableWeightAssumeBound(1f);
+                        float w = Mathf.Clamp01(ApplyWeakInterruptWeightFactor(s, 1f));
+                        _mixerEffectiveWeights[i] = w;
+                        s.SetPlayableWeightAssumeBound(w);
                     }
                     else
                     {
@@ -186,22 +178,12 @@ namespace ES
                     layer.referencePoseWeightsNormalized = false;
                 }
 
-                // 清理未使用槽位
+                if (topologyDirty)
                 {
-                    int inputCount = layer.mixer.GetInputCount();
-                    int start = layer.hasReferencePose ? 1 : 0;
-                    for (int slot = start; slot < inputCount; slot++)
-                    {
-                        bool used = false;
-                        for (int i = 0; i < stateCount; i++)
-                        {
-                            if (slots[i] == slot) { used = true; break; }
-                        }
-                        if (!used) layer.mixer.SetInputWeight(slot, 0f);
-                    }
+                    ClearUnusedMixerSlots(layer, slots, stateCount);
                 }
 
-                layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
+                ClearMixerWeightDirty(layer, topologyDirty);
                 return;
             }
 
@@ -218,7 +200,7 @@ namespace ES
                 if (state == null) throw new System.InvalidOperationException($"connectedStates 存在 null: {layer.layerType}");
 #endif
 
-                float req = state.RequestedPlayableWeight;
+                float req = ApplyWeakInterruptWeightFactor(state, state.RequestedPlayableWeight);
                 if (req <= 0f)
                 {
                     _mixerEffectiveWeights[i] = 0f;
@@ -268,19 +250,9 @@ namespace ES
                 layer.referencePoseWeightsNormalized = false;
             }
 
-            // 清理未使用槽位
+            if (topologyDirty)
             {
-                int inputCount = layer.mixer.GetInputCount();
-                int start = layer.hasReferencePose ? 1 : 0;
-                for (int slot = start; slot < inputCount; slot++)
-                {
-                    bool used = false;
-                    for (int i = 0; i < stateCount; i++)
-                    {
-                        if (slots[i] == slot) { used = true; break; }
-                    }
-                    if (!used) layer.mixer.SetInputWeight(slot, 0f);
-                }
+                ClearUnusedMixerSlots(layer, slots, stateCount);
             }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -301,8 +273,36 @@ namespace ES
             }
 #endif
 
-            layer.ClearDirty(PipelineDirtyFlags.MixerWeights);
+            ClearMixerWeightDirty(layer, topologyDirty);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ClearMixerWeightDirty(StateLayerRuntime layer, bool topologyDirty)
+        {
+            layer.ClearDirty(topologyDirty
+                ? PipelineDirtyFlags.MixerWeights | PipelineDirtyFlags.HotPlug
+                : PipelineDirtyFlags.MixerWeights);
+        }
+
+        private static void ClearUnusedMixerSlots(StateLayerRuntime layer, System.Collections.Generic.List<int> usedSlots, int usedCount)
+        {
+            int inputCount = layer.mixer.GetInputCount();
+            int start = layer.hasReferencePose ? 1 : 0;
+            for (int slot = start; slot < inputCount; slot++)
+            {
+                bool used = false;
+                for (int i = 0; i < usedCount; i++)
+                {
+                    if (usedSlots[i] == slot)
+                    {
+                        used = true;
+                        break;
+                    }
+                }
+                if (!used) layer.mixer.SetInputWeight(slot, 0f);
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void TryUpdateMixerWeightsImmediately(StateLayerRuntime layer)
         {

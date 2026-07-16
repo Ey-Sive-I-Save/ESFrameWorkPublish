@@ -53,6 +53,7 @@ namespace ES
         };
         public RulerLevel LevelLow = RulerLevel._005;
         public int MaxLevelGo = 2;
+        private static readonly Dictionary<int, string> s_TimeLabelCache = new Dictionary<int, string>(512);
 
         public ESRuler()
         {
@@ -150,7 +151,7 @@ namespace ES
                             
                             rec.Add(pixel);
                             painter.BeginPath();
-                            context.DrawText(FormatSecondsToMinuteSecond(realSecondPoint), vv, FontSize, new Color(0.86f, 0.89f, 0.94f, 0.92f));
+                            context.DrawText(FormatSecondsToMinuteSecondCached(realSecondPoint), vv, FontSize, new Color(0.86f, 0.89f, 0.94f, 0.92f));
                             painter.lineWidth = 1;
                             painter.strokeColor = off > 1 ? levelup_down2 : levelup_down1;
 
@@ -198,8 +199,22 @@ namespace ES
             painter.Stroke();
             painter.ClosePath();
 
-            context.DrawText(FormatSecondsToMinuteSecond(showEnd), new Vector2(labelX, height), fontSize, new Color(0.86f, 0.89f, 0.94f, 0.92f));
+            context.DrawText(FormatSecondsToMinuteSecondCached(showEnd), new Vector2(labelX, height), fontSize, new Color(0.86f, 0.89f, 0.94f, 0.92f));
         }
+        public static string FormatSecondsToMinuteSecondCached(float totalSeconds)
+        {
+            int key = Mathf.RoundToInt(Mathf.Max(0f, totalSeconds) * 60f);
+            if (s_TimeLabelCache.TryGetValue(key, out string value))
+                return value;
+
+            value = FormatSecondsToMinuteSecond(key / 60f);
+            if (s_TimeLabelCache.Count > 2048)
+                s_TimeLabelCache.Clear();
+
+            s_TimeLabelCache[key] = value;
+            return value;
+        }
+
         public static string FormatSecondsToMinuteSecond(float totalSeconds)
         {
             // 处理负数，假设时间非负

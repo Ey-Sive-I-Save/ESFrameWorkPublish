@@ -201,9 +201,12 @@ namespace ES
             }
 
             bool needsInterrupt = false;
+            bool needsWeakInterrupt = false;
             bool canMerge = false;
             var interruptList = cache?.interruptLists[layerIndex] ?? _tmpInterruptStates;
             interruptList.Clear();
+            var weakInterruptList = cache?.weakInterruptLists[layerIndex] ?? _tmpWeakInterruptStates;
+            weakInterruptList.Clear();
 #if UNITY_EDITOR
             var mergeList = cache?.mergeLists[layerIndex] ?? _tmpMergeStates;
             mergeList.Clear();
@@ -252,9 +255,12 @@ namespace ES
 #endif
                         break;
                     case StateMergeResult.HitAndReplace:
-                    case StateMergeResult.TryWeakInterrupt:
                         needsInterrupt = true;
                         interruptList.Add(existingState);
+                        break;
+                    case StateMergeResult.TryWeakInterrupt:
+                        needsWeakInterrupt = true;
+                        weakInterruptList.Add(existingState);
                         break;
                     default:
                         {
@@ -282,6 +288,10 @@ namespace ES
             {
                 code |= StateActivationCode.HasInterrupt;
             }
+            if (needsWeakInterrupt)
+            {
+                code |= StateActivationCode.HasWeakInterrupt;
+            }
             if (canMerge)
             {
                 code |= StateActivationCode.HasMerge;
@@ -292,7 +302,9 @@ namespace ES
                 code = code,
                 failureReason = string.Empty,
                 statesToInterrupt = interruptList,
-                interruptCount = interruptList.Count
+                interruptCount = interruptList.Count,
+                statesToWeakInterrupt = weakInterruptList,
+                weakInterruptCount = weakInterruptList.Count
 #if UNITY_EDITOR
                 ,
                 debugMergeStates = mergeList,
@@ -459,11 +471,21 @@ namespace ES
                     for (int i = 0; i < interruptStates.Count; i++)
                     {
                         var interruptedState = interruptStates[i];
-                        string interruptedLayerName = stateLayerMap.TryGetValue(interruptedState, out var interruptedLayer)
-                            ? interruptedLayer.ToString() : "<unknown>";
-                        string interruptedStateKey = interruptedState != null ? interruptedState.strKey : "<null>";
-                        StateMachineDebug.Log($"[Interrupt] Activating={targetState.strKey} | TargetLayer={layer} | Interrupting={interruptedStateKey} | InterruptStateLayer={interruptedLayerName}");
-                        var deactiveLayer = interruptedLayer;
+                        var deactiveLayer = layer;
+                        if (interruptedState != null && stateLayerMap.TryGetValue(interruptedState, out var interruptedLayer))
+                        {
+                            deactiveLayer = interruptedLayer;
+                        }
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        var dbg = StateMachineDebugSettings.Instance;
+                        if (dbg != null && dbg.IsStateTransitionEnabled)
+                        {
+                            string interruptedLayerName = interruptedState != null && stateLayerMap.TryGetValue(interruptedState, out var debugInterruptedLayer)
+                                ? debugInterruptedLayer.ToString() : "<unknown>";
+                            string interruptedStateKey = interruptedState != null ? interruptedState.strKey : "<null>";
+                            dbg.LogStateTransition($"[Interrupt] Activating={targetState.strKey} | TargetLayer={layer} | Interrupting={interruptedStateKey} | InterruptStateLayer={interruptedLayerName}");
+                        }
+#endif
                         if (interruptedState == null || !stateLayerMap.TryGetValue(interruptedState, out deactiveLayer))
                             deactiveLayer = layer;
                         TruelyDeactivateState(interruptedState, deactiveLayer);
@@ -517,6 +539,8 @@ namespace ES
                     targetState.ImmediateUpdateAnimationRuntime(stateContext);
                 }
 
+                ApplyWeakInterruptions(targetState, layerRuntime, result);
+
                 MarkDirty(StateDirtyReason.Enter);
 
                 PushActivationEvent(
@@ -545,6 +569,7 @@ namespace ES
                 {
                     fadeOutData.TryAutoPushedToPool();
                     layerRuntime.fadeOutStates.Remove(targetState);
+                    UntrackFadeOutIKState(targetState);
                 }
 
                 if (addedToLayerRunning)
@@ -555,6 +580,7 @@ namespace ES
                 {
                     runningStates.Remove(targetState);
                 }
+                ClearWeakInterruptionsForState(targetState);
 
                 if (entered && targetState.baseStatus == StateBaseStatus.Running)
                 {
@@ -620,10 +646,21 @@ namespace ES
         {
             if (state == null) return;
 
-            StateMachineDebug.Log($"[Deactivate] Begin | State={state.strKey} | RequestedLayer={layer} | BaseStatus={state.baseStatus}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+            var dbg = StateMachineDebugSettings.Instance;
+            if (dbg != null && dbg.IsStateTransitionEnabled)
+            {
+                dbg.LogStateTransition($"[Deactivate] Begin | State={state.strKey} | RequestedLayer={layer} | BaseStatus={state.baseStatus}");
+            }
+#endif
 
             var layerRuntime = ResolveConnectedLayerRuntimeForState(state, layer, out layer);
-            StateMachineDebug.Log($"[Deactivate] ResolvedLayer | State={state.strKey} | RequestedLayer={layer} | ResolvedRuntime={(layerRuntime != null ? layerRuntime.layerType.ToString() : "<null>")}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+            if (dbg != null && dbg.IsStateTransitionEnabled)
+            {
+                dbg.LogStateTransition($"[Deactivate] ResolvedLayer | State={state.strKey} | RequestedLayer={layer} | ResolvedRuntime={(layerRuntime != null ? layerRuntime.layerType.ToString() : "<null>")}");
+            }
+#endif
 
             if (layerRuntime != null)
             {
@@ -641,18 +678,27 @@ namespace ES
                 }
             }
 
-            if (layerRuntime != null && (!state.stateSharedData.enableFadeInOut || state.stateSharedData.fadeOutDuration <= 0f))
+            var fadeSharedData = state.stateSharedData;
+            bool shouldUnplugImmediately = fadeSharedData == null ||
+                                           !fadeSharedData.enableFadeInOut ||
+                                           fadeSharedData.fadeOutDuration <= 0f;
+            if (layerRuntime != null && shouldUnplugImmediately)
             {
-                HotUnplugStateFromPlayable(state, layerRuntime);
+                if (layerRuntime.stateToSlotMap.ContainsKey(state))
+                {
+                    HotUnplugStateFromPlayable(state, layerRuntime);
+                }
 
                 if (layerRuntime.fadeOutStates.TryGetValue(state, out var fadeData))
                 {
                     fadeData.TryAutoPushedToPool();
                     layerRuntime.fadeOutStates.Remove(state);
+                    UntrackFadeOutIKState(state);
                 }
             }
 
             state.OnStateExit();
+            ClearWeakInterruptionsForState(state);
 
             var stateSharedData = state.stateSharedData;
             var exitBasicConfig = stateSharedData != null ? stateSharedData.basicConfig : null;
@@ -675,7 +721,12 @@ namespace ES
 
             MarkDirty(StateDirtyReason.Exit);
 
-            StateMachineDebug.Log($"[Deactivate] End | State={state.strKey} | FinalLayer={layer} | BaseStatus={state.baseStatus} | RunningCount={runningStates.Count}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+            if (dbg != null && dbg.IsStateTransitionEnabled)
+            {
+                dbg.LogStateTransition($"[Deactivate] End | State={state.strKey} | FinalLayer={layer} | BaseStatus={state.baseStatus} | RunningCount={runningStates.Count}");
+            }
+#endif
 
             TryFireExitAutoActivation(state, layer, layerRuntime);
         }
@@ -685,9 +736,15 @@ namespace ES
             var state = GetStateByString(stateKey);
             if (state == null || state.baseStatus != StateBaseStatus.Running)
             {
-                bool foundState = state != null;
-                string baseStatusText = foundState ? state.baseStatus.ToString() : "<null>";
-                StateMachineDebug.LogWarning($"[Deactivate] Skip | Key={stateKey} | Found={foundState} | BaseStatus={baseStatusText}");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && !dbg.IsStressTestSilentMode)
+                {
+                    bool foundState = state != null;
+                    string baseStatusText = foundState ? state.baseStatus.ToString() : "<null>";
+                    dbg.LogWarning($"[Deactivate] Skip | Key={stateKey} | Found={foundState} | BaseStatus={baseStatusText}");
+                }
+#endif
                 return false;
             }
 
@@ -987,14 +1044,22 @@ namespace ES
 
                 if (onlyInterruptTest)
                 {
-                    string existingKey = existing != null ? existing.strKey : "<null>";
-                    string incomingKey = incoming != null ? incoming.strKey : "<null>";
-                    string interruptReason = $"[MergeCheckReason] Existing={existingKey} Incoming={incomingKey} | ChannelOverlap={channelOverlap} | CostTotals={totalMotionCost}/{totalAgilityCost}/{totalTargetCost} | ExistingStay={leftResolved.stayLevel} IncomingStay={rightResolved.stayLevel} | ExistingPriority={leftRule.EffectialPripority} IncomingPriority={rightRule.EffectialPripority} | ExistingEqualEffective={leftRule.EqualIsEffectial_} IncomingEqualEffective={rightRule.EqualIsEffectial_} | ExistingHitBy={leftRule.hitByLayerOption} IncomingHitBy={rightRule.hitByLayerOption}";
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                    var mergeDbg = StateMachineDebugSettings.Instance;
+                    bool logMergeDecision = mergeDbg != null && mergeDbg.IsStateTransitionEnabled;
+                    string interruptReason = null;
+                    if (logMergeDecision)
+                    {
+                        string existingKey = existing != null ? existing.strKey : "<null>";
+                        string incomingKey = incoming != null ? incoming.strKey : "<null>";
+                        interruptReason = $"[MergeCheckReason] Existing={existingKey} Incoming={incomingKey} | ChannelOverlap={channelOverlap} | CostTotals={totalMotionCost}/{totalAgilityCost}/{totalTargetCost} | ExistingStay={leftResolved.stayLevel} IncomingStay={rightResolved.stayLevel} | ExistingPriority={leftRule.EffectialPripority} IncomingPriority={rightRule.EffectialPripority} | ExistingEqualEffective={leftRule.EqualIsEffectial_} IncomingEqualEffective={rightRule.EqualIsEffectial_} | ExistingHitBy={leftRule.hitByLayerOption} IncomingHitBy={rightRule.hitByLayerOption}";
+                    }
+#endif
 
                     if (rightRule.hitByLayerOption == StateHitByLayerOption.Never)
                     {
-                        StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=IncomingNeverHits");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
+                        if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=MergeFail | Reason=IncomingNeverHits");
                         var dbg = StateMachineDebugSettings.Instance;
                         if (dbg != null) dbg.LogWarning("[MergeCheck] Fail: Right hitByLayer=Never");
 #endif
@@ -1002,8 +1067,8 @@ namespace ES
                     }
                     if (leftRule.hitByLayerOption == StateHitByLayerOption.Never)
                     {
-                        StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=ExistingNeverBeHit");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
+                        if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=MergeFail | Reason=ExistingNeverBeHit");
                         var dbg = StateMachineDebugSettings.Instance;
                         if (dbg != null) dbg.LogWarning("[MergeCheck] Fail: Left hitByLayer=Never");
 #endif
@@ -1011,22 +1076,43 @@ namespace ES
                     }
 
                     var levelOverlap = leftResolved.stayLevel & rightResolved.stayLevel;
+                    int existingStayRank = GetStayLevelRank(leftResolved.stayLevel);
+                    int incomingStayRank = GetStayLevelRank(rightResolved.stayLevel);
+                    bool incomingLayerCrush = incomingStayRank > existingStayRank;
+
+                    if (leftRule.hitByLayerOption == StateHitByLayerOption.OnlyLayerCrush ||
+                        rightRule.hitByLayerOption == StateHitByLayerOption.OnlyLayerCrush)
+                    {
+                        if (incomingLayerCrush)
+                        {
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                            if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=HitAndReplace | Reason=OnlyLayerCrush");
+#endif
+                            return StateMergeResult.HitAndReplace;
+                        }
+
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=MergeFail | Reason=OnlyLayerCrushRequiresHigherStayLevel");
+#endif
+                        return StateMergeResult.MergeFail;
+                    }
+
                     if (levelOverlap == StateStayLevel.Rubbish)
                     {
                         if (leftRule.hitByLayerOption == StateHitByLayerOption.SameLevelTest
                             && rightRule.hitByLayerOption == StateHitByLayerOption.SameLevelTest)
                         {
-                            StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=SameLevelTestButNoStayOverlap");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
+                            if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=MergeFail | Reason=SameLevelTestButNoStayOverlap");
                             var dbg = StateMachineDebugSettings.Instance;
                             if (dbg != null) dbg.LogWarning("[MergeCheck] Fail: SameLevelTest + Rubbish overlap");
 #endif
                             return StateMergeResult.MergeFail;
                         }
-                        else if (rightResolved.stayLevel > leftResolved.stayLevel)
+                        else if (incomingLayerCrush)
                         {
-                            StateMachineDebug.Log($"{interruptReason} | Decision=HitAndReplace | Reason=IncomingStayLevelHigher");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
+                            if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=HitAndReplace | Reason=IncomingStayLevelHigher");
                             var dbg = StateMachineDebugSettings.Instance;
                             if (dbg != null && dbg.IsStateTransitionEnabled) dbg.LogStateTransition("[MergeCheck] HitAndReplace: Right stayLevel higher");
 #endif
@@ -1041,20 +1127,22 @@ namespace ES
                     {
                         if (rightPriority < leftPriority)
                         {
-                            StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=IncomingPriorityLowerEqualAllowed");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
+                            if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=MergeFail | Reason=IncomingPriorityLowerEqualAllowed");
                             var dbg = StateMachineDebugSettings.Instance;
                             if (dbg != null && dbg.IsStateTransitionEnabled) dbg.LogStateTransition("[MergeCheck] Fail: Right priority lower (EqualIsEffectial)");
 #endif
                             return StateMergeResult.MergeFail;
                         }
-                        StateMachineDebug.Log($"{interruptReason} | Decision=HitAndReplace | Reason=PriorityEqualAndEqualIsEffective");
+#if STATEMACHINEDEBUG && UNITY_EDITOR
+                        if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=HitAndReplace | Reason=PriorityEqualAndEqualIsEffective");
+#endif
                         return StateMergeResult.HitAndReplace;
                     }
                     else if (rightPriority < leftPriority)
                     {
-                        StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=IncomingPriorityLower");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
+                        if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=MergeFail | Reason=IncomingPriorityLower");
                         var dbg = StateMachineDebugSettings.Instance;
                         if (dbg != null && dbg.IsStateTransitionEnabled) dbg.LogStateTransition("[MergeCheck] Fail: Right priority lower");
 #endif
@@ -1062,16 +1150,16 @@ namespace ES
                     }
                     else if (rightPriority > leftPriority)
                     {
-                        StateMachineDebug.Log($"{interruptReason} | Decision=HitAndReplace | Reason=IncomingPriorityHigher");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
+                        if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=HitAndReplace | Reason=IncomingPriorityHigher");
                         var dbg = StateMachineDebugSettings.Instance;
                         if (dbg != null && dbg.IsStateTransitionEnabled) dbg.LogStateTransition("[MergeCheck] HitAndReplace: Right priority higher");
 #endif
                         return StateMergeResult.HitAndReplace;
                     }
 
-                    StateMachineDebug.Log($"{interruptReason} | Decision=MergeFail | Reason=NoInterruptDirection");
 #if STATEMACHINEDEBUG && UNITY_EDITOR
+                    if (logMergeDecision) mergeDbg.LogStateTransition($"{interruptReason} | Decision=MergeFail | Reason=NoInterruptDirection");
                     var dbgFinal = StateMachineDebugSettings.Instance;
                     if (dbgFinal != null) dbgFinal.LogWarning("[MergeCheck] Fail: Unable to decide interrupt direction");
 #endif
@@ -1125,15 +1213,20 @@ namespace ES
                     case StateMergeResult.MergeComplete: return StateMergeResult.MergeComplete;
                     case StateMergeResult.MergeFail: return StateMergeResult.MergeFail;
                     case StateMergeResult.HitAndReplace: return StateMergeResult.HitAndReplace;
+                    case StateMergeResult.TryWeakInterrupt: return StateMergeResult.TryWeakInterrupt;
                 }
             }
 
             return null;
         }
 
-        private static float GetStayLevelValue(StateStayLevel level)
+        private static int GetStayLevelRank(StateStayLevel level)
         {
-            return (float)level;
+            if ((level & StateStayLevel.Super) != 0) return 4;
+            if ((level & StateStayLevel.High) != 0) return 3;
+            if ((level & StateStayLevel.Middle) != 0) return 2;
+            if ((level & StateStayLevel.Low) != 0) return 1;
+            return 0;
         }
     }
 }

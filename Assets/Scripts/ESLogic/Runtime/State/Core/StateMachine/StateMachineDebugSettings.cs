@@ -74,7 +74,7 @@ namespace ES
                 {
                     _runtimeFallbackInstance = CreateInstance<StateMachineDebugSettings>();
                     _runtimeFallbackInstance.hideFlags = HideFlags.HideAndDontSave;
-                    _runtimeFallbackInstance.enableDebug = true;
+                    _runtimeFallbackInstance.enableDebug = false;
                     _runtimeFallbackInstance.alwaysLogErrors = true;
                 }
 
@@ -84,6 +84,35 @@ namespace ES
         }
 
         [TitleGroup("调试开关", "控制状态机各模块的调试日志输出", BoldTitle = true, Indent = false)]
+        [LabelText("压力测试静默模式"), Tooltip("用于压测：强制关闭状态机诊断、日志、IK贡献明细、性能统计和警告输出。")]
+        public bool stressTestSilentMode = false;
+
+        [Button("一键进入压力测试静默", ButtonSizes.Medium)]
+        [GUIColor(0.35f, 0.65f, 1f)]
+        private void EnableStressTestSilentMode()
+        {
+            stressTestSilentMode = true;
+            enableDebug = false;
+            alwaysLogErrors = false;
+            logStateTransitions = false;
+            logAnimationBlending = false;
+            logTriangulation = false;
+            logRuntimeInit = false;
+            logFallback = false;
+            logDirtySystem = false;
+            logFadeEffects = false;
+            logPerformanceStats = false;
+            logWeightDetails = false;
+            debugIKContributionSummary = false;
+        }
+
+        [Button("退出压力测试静默", ButtonSizes.Medium)]
+        [GUIColor(0.7f, 0.7f, 0.7f)]
+        private void DisableStressTestSilentMode()
+        {
+            stressTestSilentMode = false;
+        }
+
         [LabelText("启用全局调试"), Tooltip("总开关，关闭后所有调试日志都不输出")]
         public bool enableDebug = false;
 
@@ -143,16 +172,17 @@ namespace ES
         public bool debugIKContributionSummary = false;
 
 
-        public bool IsStateTransitionEnabled => enableDebug && logStateTransitions;
-        public bool IsAnimationBlendEnabled => enableDebug && logAnimationBlending;
-        public bool IsTriangulationEnabled => enableDebug && logTriangulation;
-        public bool IsRuntimeInitEnabled => enableDebug && logRuntimeInit;
-        public bool IsFallbackEnabled => enableDebug && logFallback;
-        public bool IsDirtyEnabled => enableDebug && logDirtySystem;
-        public bool IsFadeEnabled => enableDebug && logFadeEffects;
-        public bool IsPerformanceEnabled => enableDebug && logPerformanceStats;
-        public bool IsWeightDetailEnabled => enableDebug && logWeightDetails;
-        public bool IsIKContributionSummaryEnabled => enableDebug && debugIKContributionSummary;
+        public bool IsStressTestSilentMode => stressTestSilentMode;
+        public bool IsStateTransitionEnabled => !stressTestSilentMode && enableDebug && logStateTransitions;
+        public bool IsAnimationBlendEnabled => !stressTestSilentMode && enableDebug && logAnimationBlending;
+        public bool IsTriangulationEnabled => !stressTestSilentMode && enableDebug && logTriangulation;
+        public bool IsRuntimeInitEnabled => !stressTestSilentMode && enableDebug && logRuntimeInit;
+        public bool IsFallbackEnabled => !stressTestSilentMode && enableDebug && logFallback;
+        public bool IsDirtyEnabled => !stressTestSilentMode && enableDebug && logDirtySystem;
+        public bool IsFadeEnabled => !stressTestSilentMode && enableDebug && logFadeEffects;
+        public bool IsPerformanceEnabled => !stressTestSilentMode && enableDebug && logPerformanceStats;
+        public bool IsWeightDetailEnabled => !stressTestSilentMode && enableDebug && logWeightDetails;
+        public bool IsIKContributionSummaryEnabled => !stressTestSilentMode && enableDebug && debugIKContributionSummary;
 
 
         /// <summary>
@@ -160,6 +190,7 @@ namespace ES
         /// </summary>
         public void LogStateTransition(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug && logStateTransitions)
                 Debug.Log($"[StateMachine] {message}");
         }
@@ -169,6 +200,7 @@ namespace ES
         /// </summary>
         public void LogAnimationBlend(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug && logAnimationBlending)
                 Debug.Log($"[Animation] {message}");
         }
@@ -178,6 +210,7 @@ namespace ES
         /// </summary>
         public void LogTriangulation(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug && logTriangulation)
                 Debug.Log($"[Triangulation] {message}");
         }
@@ -187,6 +220,7 @@ namespace ES
         /// </summary>
         public void LogRuntimeInit(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug && logRuntimeInit)
                 Debug.Log($"[Runtime] {message}");
         }
@@ -196,6 +230,7 @@ namespace ES
         /// </summary>
         public void LogFallback(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug && logFallback)
                 Debug.Log($"[FallBack] {message}");
         }
@@ -205,6 +240,7 @@ namespace ES
         /// </summary>
         public void LogDirty(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug && logDirtySystem)
                 Debug.Log($"[Dirty] {message}");
         }
@@ -214,6 +250,7 @@ namespace ES
         /// </summary>
         public void LogFade(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug && logFadeEffects)
                 Debug.Log($"[Fade] {message}");
         }
@@ -223,6 +260,7 @@ namespace ES
         /// </summary>
         public void LogPerformance(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug && logPerformanceStats)
                 Debug.Log($"[Performance] {message}");
         }
@@ -232,6 +270,7 @@ namespace ES
         /// </summary>
         public void LogWeightDetail(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug && logWeightDetails)
                 Debug.Log($"[Weight] {message}");
         }
@@ -241,6 +280,7 @@ namespace ES
         /// </summary>
         public void LogWarning(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug || alwaysLogErrors)
                 Debug.LogWarning($"[StateMachine Warning] {message}");
         }
@@ -250,6 +290,7 @@ namespace ES
         /// </summary>
         public void LogError(string message)
         {
+            if (stressTestSilentMode) return;
             if (enableDebug || alwaysLogErrors)
                 Debug.LogError($"[StateMachine Error] {message}");
         }

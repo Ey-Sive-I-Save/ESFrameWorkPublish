@@ -1,0 +1,1196 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3dc81d92daf800647887b3e208139e20, type: 3}
+  m_Name: "\u65B0\u5EFA\u8F93\u5165\u914D\u7F6E\u6570\u636E\u7EC436206"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects:
+    - {fileID: 1557402082806847675}
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes:
+    - Name: Infos
+      Entry: 7
+      Data: 0|System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[ES.ESInputConfig,
+        ES_Logic]], mscorlib
+    - Name: comparer
+      Entry: 7
+      Data: 1|System.Collections.Generic.GenericEqualityComparer`1[[System.String,
+        mscorlib]], mscorlib
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 12
+      Data: 1
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u6570\u636E\u952E"
+    - Name: $v
+      Entry: 10
+      Data: 0
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 13
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+--- !u!114 &1557402082806847675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48e34438c8ab0da46a9b2b21d889e3e1, type: 3}
+  m_Name: "\u4FE1\u606F\u6570\u636E\u952E9285"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u6570\u636E\u952E"
+  configId: Default
+  defaultSchemeId: KeyboardMouse
+  schemes:
+  - schemeId: Gamepad
+    displayName: "\u624B\u67C4"
+    deviceKind: 1
+    bindingGroup: Gamepad
+  - schemeId: KeyboardMouse
+    displayName: "\u952E\u76D8\u9F20\u6807"
+    deviceKind: 0
+    bindingGroup: KeyboardMouse
+  - schemeId: Touch
+    displayName: "\u89E6\u6478"
+    deviceKind: 2
+    bindingGroup: Touch
+  actions:
+  - id: 0
+    actionName: Move
+    valueType: 2
+    category: 1
+    allowRebind: 1
+    displayName: "\u79FB\u52A8"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: 2DVector
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 1
+      isPartOfComposite: 0
+      name: WASD
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/w
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 1
+      name: Up
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/s
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 1
+      name: Down
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/a
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 1
+      name: Left
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/d
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 1
+      name: Right
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/leftStick
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: MoveJoystick
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 1
+    actionName: Look
+    valueType: 2
+    category: 2
+    allowRebind: 1
+    displayName: "\u89C6\u89D2"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Mouse>/delta
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/rightStick
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: LookArea
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 2
+    actionName: Attack
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u653B\u51FB"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Mouse>/leftButton
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/rightTrigger
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: AttackButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 3
+    actionName: HeavyAttack
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u91CD\u51FB"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Mouse>/rightButton
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/leftTrigger
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: HeavyAttackButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 4
+    actionName: Block
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u683C\u6321"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/leftShift
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/leftShoulder
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: BlockButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 5
+    actionName: Slide
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6ED1\u884C"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/leftCtrl
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/rightShoulder
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: SlideButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 6
+    actionName: SwitchWeapon
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u5207\u6362\u6B66\u5668"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/tab
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/dpad/right
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: SwitchWeaponButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 7
+    actionName: EquipWeapon
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u88C5\u5907\u6B66\u5668"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/q
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/buttonWest
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: EquipWeaponButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 8
+    actionName: HolsterWeapon
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6536\u8D77\u6B66\u5668"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/t
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/start
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: HolsterWeaponButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 9
+    actionName: WeaponSlot1
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6B66\u5668\u69FD1"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/1
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/dpad/up
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: WeaponSlot1Button
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 10
+    actionName: WeaponSlot2
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6B66\u5668\u69FD2"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/2
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/dpad/right
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: WeaponSlot2Button
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 11
+    actionName: WeaponSlot3
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6B66\u5668\u69FD3"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/3
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/dpad/down
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: WeaponSlot3Button
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 12
+    actionName: WeaponSlot4
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6B66\u5668\u69FD4"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/4
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/dpad/left
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: WeaponSlot4Button
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 13
+    actionName: WeaponSlot5
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6B66\u5668\u69FD5"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/5
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/rightStickPress
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: WeaponSlot5Button
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 14
+    actionName: Aim
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u7784\u51C6"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Mouse>/rightButton
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/leftTrigger
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: AimButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 15
+    actionName: PeekLeft
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u5DE6\u63A2\u5934"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/z
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: PeekLeftButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 16
+    actionName: PeekRight
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u53F3\u63A2\u5934"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/x
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: PeekRightButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 17
+    actionName: Skill1
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6280\u80FD1"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/f1
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/dpad/up
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: Skill1Button
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 18
+    actionName: Skill2
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6280\u80FD2"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/f2
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/dpad/left
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: Skill2Button
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 19
+    actionName: Skill3
+    valueType: 0
+    category: 3
+    allowRebind: 1
+    displayName: "\u6280\u80FD3"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/f3
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/dpad/down
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: Skill3Button
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 20
+    actionName: Jump
+    valueType: 0
+    category: 1
+    allowRebind: 1
+    displayName: "\u8DF3\u8DC3"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/space
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/buttonSouth
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: JumpButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 21
+    actionName: Crouch
+    valueType: 0
+    category: 1
+    allowRebind: 1
+    displayName: "\u8E72\u4F0F"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/c
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/rightStickPress
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: CrouchButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 22
+    actionName: Fly
+    valueType: 0
+    category: 6
+    allowRebind: 1
+    displayName: "\u98DE\u884C"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/f
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/buttonNorth
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: FlyButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 23
+    actionName: Mount
+    valueType: 0
+    category: 6
+    allowRebind: 1
+    displayName: "\u9A91\u4E58"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/r
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/buttonWest
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: MountButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 25
+    actionName: Climb
+    valueType: 0
+    category: 6
+    allowRebind: 1
+    displayName: "\u6500\u722C"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/g
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/leftStickPress
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: ClimbButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 26
+    actionName: Interact
+    valueType: 0
+    category: 4
+    allowRebind: 1
+    displayName: "\u4EA4\u4E92"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/e
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/buttonEast
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: InteractButton
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 24
+    actionName: FlyVertical
+    valueType: 1
+    category: 6
+    allowRebind: 1
+    displayName: "\u98DE\u884C\u5782\u76F4"
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings:
+    - schemeId: KeyboardMouse
+      source: 0
+      path: 1DAxis
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 1
+      isPartOfComposite: 0
+      name: QE
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/q
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 1
+      name: Negative
+    - schemeId: KeyboardMouse
+      source: 0
+      path: <Keyboard>/e
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 1
+      name: Positive
+    - schemeId: Gamepad
+      source: 0
+      path: 1DAxis
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 1
+      isPartOfComposite: 0
+      name: Triggers
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/leftTrigger
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 1
+      name: Negative
+    - schemeId: Gamepad
+      source: 0
+      path: <Gamepad>/rightTrigger
+      virtualControlId: 
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 1
+      name: Positive
+    - schemeId: Touch
+      source: 1
+      path: 
+      virtualControlId: FlyVerticalSlider
+      interactions: 
+      processors: 
+      isComposite: 0
+      isPartOfComposite: 0
+      name: 
+  - id: 0
+    actionName: "\u53BB\u53BB\u53BB"
+    valueType: 0
+    category: 0
+    allowRebind: 1
+    displayName: 
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings: []
+  - id: 0
+    actionName: 
+    valueType: 0
+    category: 0
+    allowRebind: 1
+    displayName: 
+    triggerType: 0
+    triggerOptions: 0
+    longPressDuration: 0.5
+    doublePressWindow: 0.28
+    bindings: []

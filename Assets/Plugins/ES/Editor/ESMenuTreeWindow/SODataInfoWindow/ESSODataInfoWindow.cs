@@ -14,7 +14,7 @@ namespace ES
     namespace ES
     {
         //窗口总览
-        public class ESSODataInfoWindow : ESMenuTreeWindowAB<ESSODataInfoWindow> //OdinMenuEditorWindow
+        public partial class ESSODataInfoWindow : ESMenuTreeWindowAB<ESSODataInfoWindow> //OdinMenuEditorWindow
         {
             [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【SO】数据窗口", false, 5)]
             public static void TryOpenWindow()
@@ -81,9 +81,6 @@ namespace ES
             public string selectGroupTypeName_ = "Buff数据";
 
             public string selectNormalTypeName_ = "Normal_SO";
-            private const string PrefKeySelectedPackType = "ES.SODataInfoWindow.SelectedPackType";
-            private const string PrefKeySelectedGroupType = "ES.SODataInfoWindow.SelectedGroupType";
-            private const string PrefKeySelectedNormalType = "ES.SODataInfoWindow.SelectedNormalType";
             private bool HasDelegate = false;
 
             public static string guidForCopiedGroup = "";
@@ -111,61 +108,6 @@ namespace ES
                 ES_SaveData();
             }
             public string pathForDefaultSetting;
-            public override void ES_LoadData()
-            {
-                selectPackTypeName_ = EditorPrefs.GetString(PrefKeySelectedPackType, selectPackTypeName_);
-                selectGroupTypeName_ = EditorPrefs.GetString(PrefKeySelectedGroupType, selectGroupTypeName_);
-                selectNormalTypeName_ = EditorPrefs.GetString(PrefKeySelectedNormalType, selectNormalTypeName_);
-                if (EditorPrefs.HasKey("guidForCopiedGroup"))
-                {
-                    guidForCopiedGroup = EditorPrefs.GetString("guidForCopiedGroup");
-                    CopyGroup = ESDesignUtility.SafeEditor.LoadAssetByGUIDString<ScriptableObject>(guidForCopiedGroup) ?? CopyGroup;
-                }
-                if (EditorPrefs.HasKey("guidForCopiedInfoKey"))
-                {
-                    guidForCopiedInfoKey = EditorPrefs.GetString("guidForCopiedInfoKey");
-                }
-            }
-            public override void ES_SaveData()
-            {
-                EditorPrefs.SetString(PrefKeySelectedPackType, selectPackTypeName_ ?? "");
-                EditorPrefs.SetString(PrefKeySelectedGroupType, selectGroupTypeName_ ?? "");
-                EditorPrefs.SetString(PrefKeySelectedNormalType, selectNormalTypeName_ ?? "");
-                if (CopyGroup != null)
-                {
-                    guidForCopiedGroup = ESDesignUtility.SafeEditor.GetAssetGUID(CopyGroup) ?? guidForCopiedGroup;
-                    if (guidForCopiedGroup != null)
-                    {
-                        EditorPrefs.SetString("guidForCopiedGroup", guidForCopiedGroup);
-                        EditorPrefs.SetString("guidForCopiedInfoKey", guidForCopiedInfoKey);
-                    }
-                }
-            }
-
-            public void SaveSelectedDataTypeNames()
-            {
-                EditorPrefs.SetString(PrefKeySelectedPackType, selectPackTypeName_ ?? "");
-                EditorPrefs.SetString(PrefKeySelectedGroupType, selectGroupTypeName_ ?? "");
-                EditorPrefs.SetString(PrefKeySelectedNormalType, selectNormalTypeName_ ?? "");
-            }
-
-            public static string ResolveSavedSelection(string currentValue, string savedValue, IEnumerable<string> allNames)
-            {
-                string[] names = allNames?
-                    .Where(static name => !name.IsNullOrWhitespace())
-                    .ToArray();
-
-                if (names == null || names.Length == 0)
-                    return currentValue ?? "";
-
-                if (!currentValue.IsNullOrWhitespace() && names.Contains(currentValue))
-                    return currentValue;
-
-                if (!savedValue.IsNullOrWhitespace() && names.Contains(savedValue))
-                    return savedValue;
-
-                return names[0];
-            }
 
             #endregion
             protected override void ES_OnBuildMenuTree(OdinMenuTree tree)
@@ -188,7 +130,9 @@ namespace ES
                     Part_AboutPage(tree);
                 }
                 ES_LoadData();
+                ApplyPendingMenuExpansion();
             }
+
             #region 页面构建方法
             private void Part_BuildStartPage(OdinMenuTree tree)
             {
@@ -234,11 +178,13 @@ namespace ES
             public void Part_BuildSoDataGroupOnChooseAndInfos(OdinMenuTree tree)
             {
                 QuickBuildRootMenu(tree, PageName_DataGroupOnChooseEditInfo, ref pageForGroupOnChoose, SdfIconType.PinAngleFill);
+                RestoreLastEditingGroupPage();
 
                 if (Selection.activeObject is ISoDataGroup group_)
                 {
 
                     pageForGroupOnChoose.group = group_;
+                    SetLastEditingGroup(group_);
                 }
                 if (pageForGroupOnChoose.group != null)
                 {
@@ -455,7 +401,7 @@ namespace ES
 
 
             #region 按钮
-            [HorizontalGroup("总组", width: 100)]
+            [HorizontalGroup("总组", width: 96)]
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
             [Button(ButtonHeight = 30, Name = "新建数据包", IconAlignment = IconAlignment.RightEdge), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
@@ -509,7 +455,7 @@ namespace ES
 
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
-            [Button(ButtonHeight = 30, Name = "搜集数据组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_04")]
+            [Button(ButtonHeight = 30, Name = "查找匹配组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_04")]
             public void FindAInfoGroupAsset()
             {
                 //找到全部数据组
@@ -521,6 +467,7 @@ namespace ES
                 hasChange = false;
                 ESSODataInfoWindow.UsingWindow.selectPackTypeName_ = createPackType_;
                 ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
+                ESSODataInfoWindow.UsingWindow.RequestExpandMenuAfterRefresh(ESSODataInfoWindow.PageName_DataPackCreate);
                 ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
                 createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createPackType_, "DataPack");
             }
@@ -577,10 +524,10 @@ namespace ES
             }
 
             #region 按钮
-            [HorizontalGroup("总组", width: 100)]
+            [HorizontalGroup("总组", width: 96)]
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("搜集匹配数据组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("查找匹配组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void SearchAllGroup()
             {   //找到全部数据组
                 var GroupType = ESSODataWindowHelper.GetGroupTypeForPackType(pack.GetType());
@@ -588,7 +535,7 @@ namespace ES
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("载入数据组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            [Button("写入缓存组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
             public void PushInDataGroup()
             {
 
@@ -676,7 +623,7 @@ namespace ES
             public string createGroup_ = "";
 
             #region 按钮
-            [HorizontalGroup("总组", width: 100)]
+            [HorizontalGroup("总组", width: 96)]
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
             [Button(ButtonHeight = 30, Name = "新建数据组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_03")]
@@ -707,7 +654,7 @@ namespace ES
             }
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
-            [Button(ButtonHeight = 30, Name = "选中一个组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_04")]
+            [Button(ButtonHeight = 30, Name = "打开匹配组"), GUIColor("@ ESDesignUtility.ColorSelector.Color_04")]
             public void FindAInfoGroupAsset()
             {
                 //找到全部数据组
@@ -731,6 +678,7 @@ namespace ES
                 hasChange = false;
                 ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = createGroup_;
                 ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
+                ESSODataInfoWindow.UsingWindow.RequestExpandMenuAfterRefresh(ESSODataInfoWindow.PageName_DataGroupCreate);
                 ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
                 createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createGroup_, "DataGroup");
             }
@@ -748,9 +696,9 @@ namespace ES
             [InlineEditor(Expanded = true), ReadOnly, SerializeReference, LabelText("数据组")]
             public ScriptableObject group;
 
-            [HorizontalGroup("总组", width: 100)]
+            [HorizontalGroup("总组", width: 96)]
             [VerticalGroup("总组/按钮组")]
-            [Button("编辑", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("编辑此组", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             private void EditThisGroup()
             {
                 ESSODataWindowHelper.SelectSoGroup(group);
@@ -804,14 +752,13 @@ namespace ES
             }
 
             #region 按钮
-            [HorizontalGroup("总组", width: 100)]
+            [HorizontalGroup("总组", width: 96)]
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("前往【组】查询/新建", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            [Button("同类组", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
             public void CreateNewPage()
             {
-                ESSODataInfoWindow.UsingWindow.selectGroupTypeName_ = ESSODataWindowHelper.GetGroupName(group.GetType());
-                ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
+                ESSODataInfoWindow.UsingWindow.SetLastEditingGroup(group);
                 if (ESSODataInfoWindow.MenuItems.TryGetValue(ESSODataInfoWindow.PageName_DataGroupCreate, out var pageItem))
                 {
                     ESSODataInfoWindow.UsingWindow.MenuTree.Selection.Add(pageItem);
@@ -821,7 +768,7 @@ namespace ES
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("新建单元信息", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("新建Info", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void CreateNewSoDataInfo()
             {
                 Type type = group.GetSOInfoType();
@@ -851,7 +798,7 @@ namespace ES
 
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("拷贝选定信息", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("拷贝Info", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void CopyFromSoDataInfo()
             {
                 var from = group.GetInfoByKey(copyFrom) as ScriptableObject;
@@ -1070,7 +1017,7 @@ namespace ES
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
-            [Button("从列表载入子数据", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("重建索引", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void Collect()
             {
                 UnityEngine.Object ob = group as ScriptableObject;
@@ -1112,7 +1059,7 @@ namespace ES
 
             [VerticalGroup("总组/数据组"), SerializeReference]
             public ISoDataInfo data;
-            [HorizontalGroup("总组", width: 100)]
+            [HorizontalGroup("总组", width: 96)]
 
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]
@@ -1224,10 +1171,10 @@ namespace ES
             public string createNormal_ = "";
 
             #region 按钮
-            [HorizontalGroup("总组", width: 100)]
+            [HorizontalGroup("总组", width: 96)]
             [VerticalGroup("总组/按钮")]
             [PropertySpace(15)]
-            [Button(ButtonHeight = 30, Name = "新建一个"), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button(ButtonHeight = 30, Name = "新建SO"), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void CreateNormalSoAsset()
             {
 
@@ -1272,6 +1219,7 @@ namespace ES
                 hasChange = false;
                 ESSODataInfoWindow.UsingWindow.selectNormalTypeName_ = createNormal_;
                 ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
+                ESSODataInfoWindow.UsingWindow.RequestExpandMenuAfterRefresh(ESSODataInfoWindow.PageName_NormalSoDataCreate);
                 ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
                 createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createNormal_, "SO");
             }
@@ -1296,9 +1244,9 @@ namespace ES
             [InlineEditor(Expanded = true, DrawPreview = false), SerializeReference, LabelText("数据组")]
             public ScriptableObject normalSo;
 
-            [HorizontalGroup("总组", width: 100)]
+            [HorizontalGroup("总组", width: 96)]
             [VerticalGroup("总组/按钮组")]
-            [Button("选中", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+            [Button("定位", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             private void SelectThisSo()
             {
                 Selection.activeObject = normalSo;
@@ -1442,6 +1390,7 @@ namespace ES
                     if (page != null && ESSODataInfoWindow.menuTree != null)
                     {
                         page.group = group;
+                        ESSODataInfoWindow.UsingWindow.SetLastEditingGroup(group);
                         page.RefreshInfos();
                         SelectSoGroup(group as ScriptableObject);
 
@@ -1456,6 +1405,8 @@ namespace ES
             public static void SelectSoGroup(ScriptableObject so)
             {
                 Selection.activeObject = so;
+                if (so is ISoDataGroup group)
+                    ESSODataInfoWindow.UsingWindow?.SetLastEditingGroup(group);
 
                 if (ESSODataInfoWindow.UsingWindow == null || ESSODataInfoWindow.UsingWindow.MenuTree == null)
                 {

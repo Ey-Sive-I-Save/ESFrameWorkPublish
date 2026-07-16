@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text;
 using Sirenix.OdinInspector;
 using UnityEngine;
@@ -60,8 +60,8 @@ namespace ES
                 sm = MyCore.stateDomain.stateMachine;
                 _jumpState = sm.GetStateByString(JUMP_StateName);
                 _crouchState = sm.GetStateByString(Crouch_StateName);
-                _jumpLifecycle.Bind(sm, _jumpState, GetJumpStateKeyForLifecycle(_jumpState));
-                _crouchLifecycle.Bind(sm, _crouchState, GetCrouchStateKeyForLifecycle(_crouchState));
+                _jumpLifecycle.SetTarget(sm, _jumpState, GetJumpStateKeyForLifecycle(_jumpState));
+                _crouchLifecycle.SetTarget(sm, _crouchState, GetCrouchStateKeyForLifecycle(_crouchState));
             }
             _avgBufHead = 0;
             _avgBufCount = 0;
@@ -79,7 +79,7 @@ namespace ES
                 }
             }
 
-            _jumpLifecycle.Bind(sm, _jumpState, GetJumpStateKeyForLifecycle(_jumpState));
+            _jumpLifecycle.SetTarget(sm, _jumpState, GetJumpStateKeyForLifecycle(_jumpState));
             bool activated = _jumpState.baseStatus == StateBaseStatus.Running || sm.TryActivateState(_jumpState);
             if (_jumpLifecycle.TryEnter(activated))
             {
@@ -91,7 +91,7 @@ namespace ES
         {
             if (_crouchState == null) return;
 
-            _crouchLifecycle.Bind(sm, _crouchState, GetCrouchStateKeyForLifecycle(_crouchState));
+            _crouchLifecycle.SetTarget(sm, _crouchState, GetCrouchStateKeyForLifecycle(_crouchState));
             if (_crouchLifecycle.IsActive)
             {
                 _crouchLifecycle.RequestExit();
@@ -194,8 +194,8 @@ namespace ES
 
         public override void OnDestroy()
         {
-            _jumpLifecycle.Dispose();
-            _crouchLifecycle.Dispose();
+            _jumpLifecycle.Release();
+            _crouchLifecycle.Release();
             base.OnDestroy();
         }
     }
@@ -299,6 +299,14 @@ namespace ES
         [LabelText("阻止收枪挂到手臂链")]
         [Tooltip("开启后，如果 holsterMount 落在手臂/手腕骨链上，将自动回退到默认身上挂点或自动背挂点。")]
         public bool preventHolsterOnArmChain = true;
+
+        [LabelText("Refresh Parent Snapshot Every Frame")]
+        [Tooltip("Debug only. Builds transform path strings and can allocate heavily at runtime.")]
+        public bool refreshWeaponParentSnapshotEveryFrame = false;
+
+        [LabelText("Compare Mount By Hierarchy Path")]
+        [Tooltip("Debug/compatibility only. Builds transform path strings during mount checks.")]
+        public bool compareMountByHierarchyPath = false;
 
         [ShowInInspector, ReadOnly, LabelText("武器父节点快照")]
         [MultiLineProperty(8)]
@@ -422,8 +430,8 @@ namespace ES
             ValidateAndRepairMountConfiguration();
             ResolveAimState();
             ResolvePeekState();
-            _aimLifecycle.Bind(_sm, _aimState, GetAimStateKeyForLifecycle(_aimState));
-            _peekLifecycle.Bind(_sm, _peekState, GetPeekStateKeyForLifecycle(_peekState));
+            _aimLifecycle.SetTarget(_sm, _aimState, GetAimStateKeyForLifecycle(_aimState));
+            _peekLifecycle.SetTarget(_sm, _peekState, GetPeekStateKeyForLifecycle(_peekState));
             InitializeWeaponFusionRuntime();
         }
 
@@ -633,7 +641,7 @@ namespace ES
 
             if (aimState.baseStatus == StateBaseStatus.Running)
             {
-                _aimLifecycle.Bind(_sm, aimState, GetAimStateKeyForLifecycle(aimState));
+                _aimLifecycle.SetTarget(_sm, aimState, GetAimStateKeyForLifecycle(aimState));
                 if (_aimLifecycle.TryEnter(true))
                     OnAimEnter();
                 else
@@ -655,7 +663,7 @@ namespace ES
             }
 
             bool activated = aimState.baseStatus == StateBaseStatus.Running || _sm.TryActivateState(aimState);
-            _aimLifecycle.Bind(_sm, aimState, GetAimStateKeyForLifecycle(aimState));
+            _aimLifecycle.SetTarget(_sm, aimState, GetAimStateKeyForLifecycle(aimState));
 
             if (!_aimLifecycle.TryEnter(activated))
             {
@@ -1078,10 +1086,10 @@ namespace ES
         {
             UnbindSwitchAssistIKPostProcess();
 
-            if (_aimLifecycle.Dispose())
+            if (_aimLifecycle.Release())
                 OnAimExit();
 
-            if (_peekLifecycle.Dispose())
+            if (_peekLifecycle.Release())
                 OnPeekExit();
 
             base.OnDestroy();
@@ -1223,7 +1231,8 @@ namespace ES
 
             if (!isAiming || !_weaponInHand)
             {
-                RefreshWeaponParentSnapshot();
+                if (refreshWeaponParentSnapshotEveryFrame)
+                    RefreshWeaponParentSnapshot();
                 return;
             }
 
@@ -1237,7 +1246,8 @@ namespace ES
 
             ikDriver.HandleAim(1f);
             ikDriver.SetAimPeek(aimPeek);
-            RefreshWeaponParentSnapshot();
+            if (refreshWeaponParentSnapshotEveryFrame)
+                RefreshWeaponParentSnapshot();
         }
 
         private void EnsureWeaponAttachmentConsistency()
@@ -1304,6 +1314,9 @@ namespace ES
 
             Transform currentParent = weaponRoot.parent;
             if (currentParent == null)
+                return false;
+
+            if (!compareMountByHierarchyPath)
                 return false;
 
             // In some setups mounts are rebuilt/rebound and reference changes, but hierarchy path remains stable.
@@ -2113,12 +2126,12 @@ namespace ES
 
         private void RebindAimLifecycle(StateBase state)
         {
-            _aimLifecycle.Bind(_sm, state, GetAimStateKeyForLifecycle(state));
+            _aimLifecycle.SetTarget(_sm, state, GetAimStateKeyForLifecycle(state));
         }
 
         private void RebindPeekLifecycle(StateBase state)
         {
-            _peekLifecycle.Bind(_sm, state, GetPeekStateKeyForLifecycle(state));
+            _peekLifecycle.SetTarget(_sm, state, GetPeekStateKeyForLifecycle(state));
         }
 
         private string GetAimStateKeyForLifecycle(StateBase state)
@@ -2192,7 +2205,7 @@ namespace ES
 
             if (peekState.baseStatus == StateBaseStatus.Running)
             {
-                _peekLifecycle.Bind(_sm, peekState, GetPeekStateKeyForLifecycle(peekState));
+                _peekLifecycle.SetTarget(_sm, peekState, GetPeekStateKeyForLifecycle(peekState));
                 if (_peekLifecycle.TryEnter(true))
                     OnPeekEnter();
                 else
@@ -2213,7 +2226,7 @@ namespace ES
             }
 
             bool activated = peekState.baseStatus == StateBaseStatus.Running || _sm.TryActivateState(peekState);
-            _peekLifecycle.Bind(_sm, peekState, GetPeekStateKeyForLifecycle(peekState));
+            _peekLifecycle.SetTarget(_sm, peekState, GetPeekStateKeyForLifecycle(peekState));
 
             if (!_peekLifecycle.TryEnter(activated))
             {
@@ -2812,7 +2825,7 @@ namespace ES
                 _sm = MyCore.stateDomain.stateMachine;
                 _quickStopState = _sm.GetStateByString(QuickStop_StateName);
                 _initialized = _quickStopState != null;
-                _quickStopLifecycle.Bind(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
+                _quickStopLifecycle.SetTarget(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
 
                 if (debugLog)
                 {
@@ -2920,7 +2933,7 @@ namespace ES
             }
 
             // 满足条件，尝试激活
-            _quickStopLifecycle.Bind(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
+            _quickStopLifecycle.SetTarget(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
             bool activated = _quickStopState.baseStatus == StateBaseStatus.Running || _sm.TryActivateState(_quickStopState);
             if (_quickStopLifecycle.TryEnter(activated))
             {
@@ -2943,7 +2956,7 @@ namespace ES
         private void TryDeactivate()
         {
             if (_quickStopState == null) return;
-            _quickStopLifecycle.Bind(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
+            _quickStopLifecycle.SetTarget(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
             _quickStopLifecycle.RequestExit();
             isQuickStopping = _quickStopLifecycle.IsActive;
         }
@@ -2954,7 +2967,7 @@ namespace ES
         public void ForceExit()
         {
             if (_quickStopState == null || _sm == null) return;
-            _quickStopLifecycle.Bind(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
+            _quickStopLifecycle.SetTarget(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
             if (!_quickStopLifecycle.RequestExit() && _quickStopState.baseStatus == StateBaseStatus.Running)
             {
                 _sm.TryDeactivateState(QuickStop_StateName);
@@ -2977,7 +2990,7 @@ namespace ES
             if (isQuickStopping) return false;
             if (Time.time - _lastActivateTime < cooldown) return false;
 
-            _quickStopLifecycle.Bind(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
+            _quickStopLifecycle.SetTarget(_sm, _quickStopState, GetQuickStopStateKeyForLifecycle(_quickStopState));
             bool activated = _quickStopState.baseStatus == StateBaseStatus.Running || _sm.TryActivateState(_quickStopState);
             if (_quickStopLifecycle.TryEnter(activated))
             {
@@ -3000,7 +3013,7 @@ namespace ES
         public override void OnDestroy()
         {
             ForceExit();
-            _quickStopLifecycle.Dispose();
+            _quickStopLifecycle.Release();
             base.OnDestroy();
         }
     }

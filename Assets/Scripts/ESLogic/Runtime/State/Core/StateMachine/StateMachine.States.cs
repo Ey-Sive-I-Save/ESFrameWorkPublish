@@ -17,12 +17,19 @@ namespace ES
 
         public StateBase RegisterStateFromInfo(StateAniDataInfo info, string customStringKey, int? customIntKey, bool allowOverride = false)
         {
+            if (info == null)
+            {
+                StateMachineDebugSettings.Instance.LogError("注册状态失败: StateAniDataInfo为空");
+                return null;
+            }
+
+            StateBase state = null;
             try
             {
                 info.InitializeRuntime();
                 StateMachineDebugSettings.Instance.LogRuntimeInit($"✓ Info初始化完成: {info.sharedData.basicConfig.stateName}");
 
-                var state = CreateStateFromInfo(info);
+                state = CreateStateFromInfo(info);
                 string finalStringKey = customStringKey ?? info.sharedData.basicConfig.stateName;
                 int finalIntKey = customIntKey ?? info.sharedData.basicConfig.stateId;
 
@@ -51,12 +58,17 @@ namespace ES
                 else
                 {
                     StateMachineDebugSettings.Instance.LogWarning($"注册状态失败: {info.sharedData.basicConfig.stateName}");
+                    state.TryAutoPushedToPool();
                 }
                 return null;
             }
             catch (Exception e)
             {
-                StateMachineDebugSettings.Instance.LogError($"注册状态异常: {info.sharedData.basicConfig.stateName}\n{e}");
+                string stateName = info.sharedData != null && info.sharedData.basicConfig != null
+                    ? info.sharedData.basicConfig.stateName
+                    : "<unknown>";
+                StateMachineDebugSettings.Instance.LogError($"注册状态异常: {stateName}\n{e}");
+                state?.TryAutoPushedToPool();
                 return null;
             }
         }
@@ -180,31 +192,43 @@ namespace ES
             state.stateSharedData = sharedData;
             state.stateVariableData = new StateVariableData();
 
-            string finalStringKey = customStringKey ?? sharedData.basicConfig.stateName;
-            int finalIntKey = customIntKey ?? sharedData.basicConfig.stateId;
-            var layerType = sharedData.basicConfig.layerType;
-
-            bool registered;
-            if (customStringKey != null || customIntKey.HasValue)
+            try
             {
-                registered = RegisterStateCore(finalStringKey, finalIntKey, state, layerType);
-                if (!registered && !allowOverride)
+                string finalStringKey = customStringKey ?? sharedData.basicConfig.stateName;
+                int finalIntKey = customIntKey ?? sharedData.basicConfig.stateId;
+                var layerType = sharedData.basicConfig.layerType;
+
+                bool registered;
+                if (customStringKey != null || customIntKey.HasValue)
+                {
+                    registered = RegisterStateCore(finalStringKey, finalIntKey, state, layerType);
+                    if (!registered && !allowOverride)
+                    {
+                        registered = RegisterState(state, layerType, allowOverride);
+                    }
+                }
+                else
                 {
                     registered = RegisterState(state, layerType, allowOverride);
                 }
-            }
-            else
-            {
-                registered = RegisterState(state, layerType, allowOverride);
-            }
 
-            if (registered)
-            {
-                StateMachineDebugSettings.Instance.LogStateTransition(
-                    $"✓ 注册SharedData状态: [{layerType}] {state.strKey} (ID:{state.intKey})");
-            }
+                if (registered)
+                {
+                    StateMachineDebugSettings.Instance.LogStateTransition(
+                        $"✓ 注册SharedData状态: [{layerType}] {state.strKey} (ID:{state.intKey})");
+                    return true;
+                }
 
-            return registered;
+                state.TryAutoPushedToPool();
+                return false;
+            }
+            catch (Exception e)
+            {
+                string stateName = sharedData.basicConfig != null ? sharedData.basicConfig.stateName : "<unknown>";
+                StateMachineDebugSettings.Instance.LogError($"注册SharedData状态异常: {stateName}\n{e}");
+                state.TryAutoPushedToPool();
+                return false;
+            }
         }
 
         public bool UnregisterState(string stateKey)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -209,7 +209,7 @@ namespace ES
             if (_activeState != null)
             {
                 string stateKey = ResolveInteractionStateKey(target, _activeState);
-                _interactionLifecycle.Bind(_sm, _activeState, stateKey);
+                _interactionLifecycle.SetTarget(_sm, _activeState, stateKey);
                 bool activated = _activeState.baseStatus == StateBaseStatus.Running || _sm.TryActivateState(_activeState);
                 if (!_interactionLifecycle.TryEnter(activated))
                 {
@@ -345,7 +345,7 @@ namespace ES
 
                 if (_sm != null)
                 {
-                    _interactionLifecycle.Bind(_sm, _activeState, ResolveInteractionStateKey(activeInteractable, _activeState));
+                    _interactionLifecycle.SetTarget(_sm, _activeState, ResolveInteractionStateKey(activeInteractable, _activeState));
                     if (!_interactionLifecycle.RequestExit() && _activeState.baseStatus == StateBaseStatus.Running)
                         _sm.TryDeactivateState(_activeState.strKey);
                 }
@@ -416,7 +416,7 @@ namespace ES
 
         public override void OnDestroy()
         {
-            _interactionLifecycle.Dispose();
+            _interactionLifecycle.Release();
             base.OnDestroy();
         }
     }

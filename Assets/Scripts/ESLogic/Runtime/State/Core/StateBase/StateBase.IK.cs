@@ -74,6 +74,13 @@ namespace ES
             runtime.SetIKGoal(goal, position, rotation, weight, lerpingRate);
         }
 
+        public void SetIKGoal(IKGoal goal, Vector3 position, Quaternion rotation, float positionWeight, float rotationWeight, float lerpingRate)
+        {
+            var runtime = EnsureIKRuntimeContainer();
+            _ikActive = true;
+            runtime.SetIKGoal(goal, position, rotation, positionWeight, rotationWeight, lerpingRate);
+        }
+
         /// <summary>
         /// 设置 IK 目标（常用简化版：直接传目标 Transform）。
         /// </summary>
@@ -86,6 +93,57 @@ namespace ES
 
             if (hintTarget != null)
                 SetIKHintPosition(goal, hintTarget.position);
+        }
+
+        public void SetIKGoalWeights(IKGoal goal, Transform target, float positionWeight, float rotationWeight, float lerpingRate = 1f, Transform hintTarget = null, bool useTargetRotation = true)
+        {
+            if (target == null) return;
+
+            Quaternion rotation = useTargetRotation ? target.rotation : Quaternion.identity;
+            SetIKGoal(goal, target.position, rotation, positionWeight, rotationWeight, lerpingRate);
+
+            if (hintTarget != null)
+                SetIKHintPosition(goal, hintTarget.position);
+        }
+
+        public void SetLeftHandIK(Vector3 position, float positionWeight = 1f, float rotationWeight = 0f, float lerpingRate = 1f)
+        {
+            SetIKGoal(IKGoal.LeftHand, position, Quaternion.identity, positionWeight, rotationWeight, lerpingRate);
+        }
+
+        public void SetRightHandIK(Vector3 position, float positionWeight = 1f, float rotationWeight = 0f, float lerpingRate = 1f)
+        {
+            SetIKGoal(IKGoal.RightHand, position, Quaternion.identity, positionWeight, rotationWeight, lerpingRate);
+        }
+
+        public void SetLeftFootIK(Vector3 position, float positionWeight = 1f, float rotationWeight = 0f, float lerpingRate = 1f)
+        {
+            SetIKGoal(IKGoal.LeftFoot, position, Quaternion.identity, positionWeight, rotationWeight, lerpingRate);
+        }
+
+        public void SetRightFootIK(Vector3 position, float positionWeight = 1f, float rotationWeight = 0f, float lerpingRate = 1f)
+        {
+            SetIKGoal(IKGoal.RightFoot, position, Quaternion.identity, positionWeight, rotationWeight, lerpingRate);
+        }
+
+        public void SetLeftHandIK(Transform target, float positionWeight = 1f, float rotationWeight = 0f, float lerpingRate = 1f, Transform hintTarget = null, bool useTargetRotation = false)
+        {
+            SetIKGoalWeights(IKGoal.LeftHand, target, positionWeight, rotationWeight, lerpingRate, hintTarget, useTargetRotation);
+        }
+
+        public void SetRightHandIK(Transform target, float positionWeight = 1f, float rotationWeight = 0f, float lerpingRate = 1f, Transform hintTarget = null, bool useTargetRotation = false)
+        {
+            SetIKGoalWeights(IKGoal.RightHand, target, positionWeight, rotationWeight, lerpingRate, hintTarget, useTargetRotation);
+        }
+
+        public void SetLeftFootIK(Transform target, float positionWeight = 1f, float rotationWeight = 0f, float lerpingRate = 1f, Transform hintTarget = null, bool useTargetRotation = false)
+        {
+            SetIKGoalWeights(IKGoal.LeftFoot, target, positionWeight, rotationWeight, lerpingRate, hintTarget, useTargetRotation);
+        }
+
+        public void SetRightFootIK(Transform target, float positionWeight = 1f, float rotationWeight = 0f, float lerpingRate = 1f, Transform hintTarget = null, bool useTargetRotation = false)
+        {
+            SetIKGoalWeights(IKGoal.RightFoot, target, positionWeight, rotationWeight, lerpingRate, hintTarget, useTargetRotation);
         }
 
         /// <summary>

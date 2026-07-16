@@ -1,0 +1,17 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = false
+
+[*.cs]
+charset = utf-8-bom
+
+[*.{uxml,uss,json,asmdef,asmref}]
+charset = utf-8
+
+[*.{asset,meta,prefab,unity,controller,anim,mat,playable}]
+charset = utf-8
+

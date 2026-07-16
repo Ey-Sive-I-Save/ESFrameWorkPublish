@@ -24,7 +24,7 @@ namespace ES
     { 
         public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.Phase4;
 
-        public override bool NeedUpdateWhenFadingOut => true;
+        public override bool NeedUpdateWhenFadingOut => false;
 
         private const int PhaseCount = 4;
         private const float WeightEpsilon = 0.0001f;
@@ -34,7 +34,7 @@ namespace ES
 
         // 临时调试：固定开启，不暴露 Inspector（你现在测试用）。
         // 如需关闭：把下面常量改为 false。
-        private const bool DebugAutoTransitionOnAnimationEnd = true;
+        private const bool DebugAutoTransitionOnAnimationEnd = false;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool ShouldLogAutoEndThisFrame()
@@ -528,6 +528,7 @@ namespace ES
             runtime.phaseUsesCalculator = new bool[PhaseCount];
             runtime.phaseBlendWeights = new float[PhaseCount];
             runtime.phaseBlendVelocities = new float[PhaseCount];
+            runtime.EnsureClipOverrideSlots(PhaseCount * 2);
 
             InitPhaseRuntime(runtime, graph, 0, pre);
             InitPhaseRuntime(runtime, graph, 1, main);
@@ -614,9 +615,11 @@ namespace ES
                     runtime.phaseMixers[index].SetTime(0d);
 
                     runtime.phasePrimaryPlayables[index] = AnimationClipPlayable.Create(graph, phase.primaryClip);
+                    runtime.RegisterClipOverrideSlot(index * 2, phase.primaryClip, BuildPhaseMarker(phase.phaseName, index, "Primary"));
                     graph.Connect(runtime.phasePrimaryPlayables[index], 0, runtime.phaseMixers[index], 0);
 
                     runtime.phaseSecondaryPlayables[index] = AnimationClipPlayable.Create(graph, phase.secondaryClip);
+                    runtime.RegisterClipOverrideSlot(index * 2 + 1, phase.secondaryClip, BuildPhaseMarker(phase.phaseName, index, "Secondary"));
                     graph.Connect(runtime.phaseSecondaryPlayables[index], 0, runtime.phaseMixers[index], 1);
 
                     runtime.phaseMixers[index].SetInputWeight(0, 1f);
@@ -627,6 +630,7 @@ namespace ES
                 else
                 {
                     runtime.phasePrimaryPlayables[index] = AnimationClipPlayable.Create(graph, phase.primaryClip);
+                    runtime.RegisterClipOverrideSlot(index * 2, phase.primaryClip, BuildPhaseMarker(phase.phaseName, index, "Primary"));
                     runtime.phasePrimaryPlayables[index].SetTime(0d);
                     graph.Connect(runtime.phasePrimaryPlayables[index], 0, runtime.mixer, index);
                 }
@@ -634,6 +638,7 @@ namespace ES
             else if (phase.secondaryClip != null)
             {
                 runtime.phaseSecondaryPlayables[index] = AnimationClipPlayable.Create(graph, phase.secondaryClip);
+                runtime.RegisterClipOverrideSlot(index * 2 + 1, phase.secondaryClip, BuildPhaseMarker(phase.phaseName, index, "Secondary"));
                 runtime.phaseSecondaryPlayables[index].SetTime(0d);
                 graph.Connect(runtime.phaseSecondaryPlayables[index], 0, runtime.mixer, index);
             }
@@ -1045,6 +1050,7 @@ namespace ES
                     graph.Connect(runtime.phasePrimaryPlayables[phaseIndex], 0, runtime.mixer, phaseIndex);
                 }
 
+                runtime.UpdateClipOverrideSlot(clipIndex, newClip);
                 return true;
             }
 
@@ -1066,7 +1072,135 @@ namespace ES
             runtime.phaseSecondaryPlayables[phaseIndex].SetTime(ot2);
             g2.Connect(runtime.phaseSecondaryPlayables[phaseIndex], 0, runtime.phaseMixers[phaseIndex], 1);
 
+            runtime.UpdateClipOverrideSlot(clipIndex, newClip);
             return true;
+        }
+
+        public override bool OverrideClipBySource(AnimationCalculatorRuntime runtime, AnimationClip sourceClip, AnimationClip newClip)
+        {
+            if (runtime == null || sourceClip == null || newClip == null)
+                return false;
+
+            int mappedSlot = runtime.FindClipSlotByOriginalOrCurrent(sourceClip);
+            if (mappedSlot >= 0)
+                return OverrideClip(runtime, mappedSlot, newClip);
+
+            bool changed = false;
+            for (int i = 0; i < PhaseCount; i++)
+            {
+                var phase = GetPhaseConfig(i);
+                if (runtime.phaseUsesCalculator != null && runtime.phaseUsesCalculator[i])
+                {
+                    if (phase.phaseCalculator != null && runtime.phaseRuntimes != null && i < runtime.phaseRuntimes.Length)
+                        changed |= phase.phaseCalculator.OverrideClipBySource(runtime.phaseRuntimes[i], sourceClip, newClip);
+                    continue;
+                }
+
+                if (runtime.phasePrimaryPlayables != null && i < runtime.phasePrimaryPlayables.Length &&
+                    runtime.phasePrimaryPlayables[i].IsValid() &&
+                    runtime.phasePrimaryPlayables[i].GetAnimationClip() == sourceClip)
+                {
+                    changed |= OverrideClip(runtime, i * 2, newClip);
+                }
+
+                if (runtime.phaseSecondaryPlayables != null && i < runtime.phaseSecondaryPlayables.Length &&
+                    runtime.phaseSecondaryPlayables[i].IsValid() &&
+                    runtime.phaseSecondaryPlayables[i].GetAnimationClip() == sourceClip)
+                {
+                    changed |= OverrideClip(runtime, i * 2 + 1, newClip);
+                }
+            }
+
+            return changed;
+        }
+
+        public override bool OverrideClipByMarker(AnimationCalculatorRuntime runtime, string marker, AnimationClip newClip)
+        {
+            if (runtime == null || string.IsNullOrWhiteSpace(marker) || newClip == null)
+                return false;
+
+            int mappedSlot = runtime.FindClipSlotByMarker(marker);
+            if (mappedSlot >= 0)
+                return OverrideClip(runtime, mappedSlot, newClip);
+
+            bool changed = false;
+            for (int i = 0; i < PhaseCount; i++)
+            {
+                var phase = GetPhaseConfig(i);
+                if (runtime.phaseUsesCalculator != null && runtime.phaseUsesCalculator[i])
+                {
+                    if (phase.phaseCalculator != null && runtime.phaseRuntimes != null && i < runtime.phaseRuntimes.Length)
+                        changed |= phase.phaseCalculator.OverrideClipByMarker(runtime.phaseRuntimes[i], marker, newClip);
+                    continue;
+                }
+
+                string phaseName = string.IsNullOrWhiteSpace(phase.phaseName) ? GetDefaultPhaseMarker(i) : phase.phaseName;
+                if (MarkerMatches(marker, phaseName, GetDefaultPhaseMarker(i), "Primary"))
+                    changed |= OverrideClip(runtime, i * 2, newClip);
+
+                if (MarkerMatches(marker, phaseName, GetDefaultPhaseMarker(i), "Secondary"))
+                    changed |= OverrideClip(runtime, i * 2 + 1, newClip);
+            }
+
+            return changed;
+        }
+
+        public override int RestoreAllOverrideClips(AnimationCalculatorRuntime runtime)
+        {
+            if (runtime == null)
+                return 0;
+
+            int changed = runtime.RestoreAllOverrideClips(this);
+
+            for (int i = 0; i < PhaseCount; i++)
+            {
+                var phase = GetPhaseConfig(i);
+                if (runtime.phaseUsesCalculator == null || runtime.phaseRuntimes == null)
+                    break;
+
+                if (i >= runtime.phaseUsesCalculator.Length || i >= runtime.phaseRuntimes.Length)
+                    break;
+
+                if (!runtime.phaseUsesCalculator[i] || phase.phaseCalculator == null || runtime.phaseRuntimes[i] == null)
+                    continue;
+
+                changed += phase.phaseCalculator.RestoreAllOverrideClips(runtime.phaseRuntimes[i]);
+            }
+
+            return changed;
+        }
+
+        private static string GetDefaultPhaseMarker(int index)
+        {
+            switch (index)
+            {
+                case 0: return "Pre";
+                case 1: return "Main";
+                case 2: return "Wait";
+                default: return "Released";
+            }
+        }
+
+        private static string BuildPhaseMarker(string phaseName, int index, string localName)
+        {
+            string name = string.IsNullOrWhiteSpace(phaseName) ? GetDefaultPhaseMarker(index) : phaseName;
+            if (localName == "Primary")
+                return name;
+
+            return name + "." + localName;
+        }
+
+        private static bool MarkerMatches(string input, string phaseName, string fallbackPhaseName, string localName)
+        {
+            return (localName == "Primary" &&
+                    (string.Equals(input, phaseName, StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(input, fallbackPhaseName, StringComparison.OrdinalIgnoreCase))) ||
+                   string.Equals(input, phaseName + "." + localName, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(input, phaseName + "/" + localName, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(input, phaseName + ":" + localName, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(input, fallbackPhaseName + "." + localName, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(input, fallbackPhaseName + "/" + localName, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(input, fallbackPhaseName + ":" + localName, StringComparison.OrdinalIgnoreCase);
         }
 
         public override float GetStandardDuration(AnimationCalculatorRuntime runtime)

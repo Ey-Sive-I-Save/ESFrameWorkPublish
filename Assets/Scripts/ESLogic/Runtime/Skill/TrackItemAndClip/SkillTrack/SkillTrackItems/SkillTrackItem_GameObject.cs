@@ -192,9 +192,6 @@ namespace ES
     public sealed class GameObjectClipRuntimePlayer : ISkillRuntimeClipPlayer
     {
         private readonly SkillTrackClip_GameObject clip;
-        private GameObject activeTarget;
-        private bool originalActive;
-        private bool hasOriginalActive;
 
         public GameObjectClipRuntimePlayer(SkillTrackClip_GameObject clip)
         {
@@ -204,14 +201,16 @@ namespace ES
         public void OnClipEnter(EntityState_Skill state, ref SkillRuntimeClipState clipState)
         {
             GameObject target = ResolveTarget(state);
-            activeTarget = target;
-            hasOriginalActive = target != null;
             if (target == null)
                 return;
 
-            originalActive = target.activeSelf;
+            GameObjectClipRuntimeState runtimeState = GameObjectClipRuntimeState.Pool.GetInPool();
+            runtimeState.activeTarget = target;
+            runtimeState.originalActive = target.activeSelf;
+            runtimeState.hasOriginalActive = true;
+
             target.SetActive(clip == null || clip.Activate);
-            clipState.UserData = target;
+            clipState.UserData = runtimeState;
         }
 
         public void Tick(EntityState_Skill state, ref SkillRuntimeClipState clipState, float time, float deltaTime)
@@ -220,11 +219,14 @@ namespace ES
 
         public void OnClipExit(EntityState_Skill state, ref SkillRuntimeClipState clipState)
         {
-            if (activeTarget != null && hasOriginalActive)
-                activeTarget.SetActive(originalActive);
+            if (clipState.UserData is GameObjectClipRuntimeState runtimeState)
+            {
+                if (runtimeState.activeTarget != null && runtimeState.hasOriginalActive)
+                    runtimeState.activeTarget.SetActive(runtimeState.originalActive);
 
-            activeTarget = null;
-            hasOriginalActive = false;
+                runtimeState.TryAutoPushedToPool();
+            }
+
             clipState.UserData = null;
         }
 
@@ -237,6 +239,34 @@ namespace ES
                 return clip.targetExpression.Evaluate(state.SkillRuntimeTarget, state.OpSupporter);
 
             return state.SkillRuntimeTarget != null ? state.SkillRuntimeTarget.GetGameObject() : null;
+        }
+    }
+
+    internal sealed class GameObjectClipRuntimeState : IPoolableAuto
+    {
+        public static readonly ESSimplePool<GameObjectClipRuntimeState> Pool = new ESSimplePool<GameObjectClipRuntimeState>(
+            factoryMethod: () => new GameObjectClipRuntimeState(),
+            initCount: 16,
+            maxCount: 512,
+            poolDisplayName: "GameObjectClipRuntimeState Pool"
+        );
+
+        public bool IsRecycled { get; set; }
+        public GameObject activeTarget;
+        public bool originalActive;
+        public bool hasOriginalActive;
+
+        public void OnResetAsPoolable()
+        {
+            activeTarget = null;
+            originalActive = false;
+            hasOriginalActive = false;
+        }
+
+        public void TryAutoPushedToPool()
+        {
+            if (!IsRecycled)
+                Pool.PushToPool(this);
         }
     }
 }

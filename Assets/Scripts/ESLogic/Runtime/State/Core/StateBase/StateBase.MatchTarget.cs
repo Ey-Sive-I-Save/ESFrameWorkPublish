@@ -213,7 +213,7 @@ namespace ES
 
         // 重施加阈值已迁移到 StateMachineConfig.matchTargetReapply（全局），不再在 State 实例上维护。
 
-        public static bool debugMatchTarget = true;
+        public static bool debugMatchTarget = false;
         public static int debugMatchTargetFrameInterval = 1;
 
         /// <summary>
@@ -262,7 +262,12 @@ namespace ES
                 request.timeRange.y,
                 request.positionApproachSpeed,
                 request.rotationApproachSpeed,
-                request.rotationWeight);
+                request.rotationWeight,
+                request.autoCatchUpByRemainingTime,
+                request.catchUpSafetyMultiplier,
+                request.snapToTargetOnEnd,
+                request.snapPositionTolerance,
+                request.snapRotationTolerance);
             _matchTargetDbgStartPath = debugStartPath;
         }
 
@@ -279,7 +284,9 @@ namespace ES
         /// <param name="approachAngleSpeed">旋转逃近速度（度/秒），<=0 表示不旋转</param>
         /// <param name="rotationWeight">旋转权重（0-1），最终旋转速度=approachAngleSpeed*rotationWeight</param>
         public void StartMatchTarget(Vector3 targetPos, Quaternion targetRot, AvatarTarget bodyPart,
-            float startTime, float endTime, float approachSpeed, float approachAngleSpeed = 360f, float rotationWeight = 1f)
+            float startTime, float endTime, float approachSpeed, float approachAngleSpeed = 360f, float rotationWeight = 1f,
+            bool autoCatchUpByRemainingTime = true, float catchUpSafetyMultiplier = 1.15f,
+            bool snapToTargetOnEnd = false, float snapPositionTolerance = 0f, float snapRotationTolerance = 0f)
         {
             if (_animationRuntime == null)
             {
@@ -332,7 +339,9 @@ namespace ES
             _matchTargetSnapshotTaken    = false;          // 强制在窗口首帧重新快照
             _matchTargetDbgStartPath     = "Direct";      // 被高层 API 调用时会在后面立即覆盖
             _animationRuntime.StartMatchTarget(targetPos, targetRot, bodyPart, startTime, endTime,
-                approachSpeed, approachAngleSpeed, rotationWeight);
+                approachSpeed, approachAngleSpeed, rotationWeight,
+                autoCatchUpByRemainingTime, catchUpSafetyMultiplier,
+                snapToTargetOnEnd, snapPositionTolerance, snapRotationTolerance);
         }
 
         /// <summary>
@@ -428,6 +437,40 @@ namespace ES
         /// MatchTarget是否处于活跃状态
         /// </summary>
         public bool IsMatchTargetActive => _matchTargetActive && _animationRuntime != null && _animationRuntime.matchTarget.active;
+
+        public string GetMatchTargetDebugSummary()
+        {
+            if (_animationRuntime == null)
+                return $"{GetStateNameSafe()} | MatchTarget: Runtime 未创建";
+
+            ref var mt = ref _animationRuntime.matchTarget;
+            if (!mt.active)
+            {
+                string pending = _pendingCommand != null ? "有待执行指令" : "无待执行指令";
+                string autoSeq = _configMatchTargetSequenceActive ? $"配置时序激活 next={_configMatchTargetNextTimelineIndex}" : "配置时序未激活";
+                return $"{GetStateNameSafe()} | MatchTarget: 未激活 | {pending} | {autoSeq}";
+            }
+
+            float elapsed = hasEnterTime;
+            float duration = Mathf.Max(0.0001f, mt.endTime - mt.startTime);
+            float progress = Mathf.Clamp01((elapsed - mt.startTime) / duration);
+            float posErr = _matchTargetLastApplyTime > -900f
+                ? Vector3.Distance(_matchTargetLastAppliedPos, mt.position)
+                : -1f;
+            float rotErr = _matchTargetLastApplyTime > -900f
+                ? Quaternion.Angle(_matchTargetLastAppliedRot, mt.rotation)
+                : -1f;
+            string posErrText = posErr >= 0f ? posErr.ToString("F3") : "未写入";
+            string rotErrText = rotErr >= 0f ? rotErr.ToString("F1") + "°" : "未写入";
+            string posOffset = _matchTargetPosOffsetActive ? "位置偏移开" : "位置偏移关";
+            string rotOffset = _matchTargetRotOffsetActive ? "旋转偏移开" : "旋转偏移关";
+
+            return $"{GetStateNameSafe()} | MatchTarget: {(mt.completed ? "完成" : "进行中")} | 路径={_matchTargetDbgStartPath} | 部位={mt.bodyPart} | " +
+                   $"时间={elapsed:F2}s 窗口=[{mt.startTime:F2},{mt.endTime:F2}] 进度={progress:P0} | " +
+                   $"目标={mt.position:F3} | 误差 pos={posErrText} rot={rotErrText} | " +
+                   $"速度 pos={mt.positionApproachSpeed:F2} rot={mt.rotationApproachSpeed:F1} 权重={mt.rotationWeight:F2} | " +
+                   $"{posOffset}/{rotOffset} | 自动追赶={(mt.autoCatchUpByRemainingTime ? "开" : "关")} 吸附={(mt.snapToTargetOnEnd ? "开" : "关")}";
+        }
 
         // ================================================================
         // ★ 运行时独立目标点 API（优先于配置槽位）
@@ -613,7 +656,9 @@ namespace ES
                     rot = rawRotation * YawOffsetToQuaternion(activeRequest.rotationOffsetY);
             }
 
-            SetMatchTargetTarget(pos, rot);
+            ref var mt = ref _animationRuntime.matchTarget;
+            mt.position = pos;
+            mt.rotation = rot;
         }
 
         /// <summary>
@@ -890,6 +935,29 @@ namespace ES
 
             float posSpeed = mt.positionApproachSpeed;
             float rotSpeed = mt.rotationApproachSpeed * Mathf.Clamp01(mt.rotationWeight);
+            bool isEndFrame = elapsed >= mt.endTime;
+
+            if (!isEndFrame && mt.autoCatchUpByRemainingTime)
+            {
+                float remainingTime = Mathf.Max(0.0001f, mt.endTime - elapsed);
+                float safety = Mathf.Max(1f, mt.catchUpSafetyMultiplier);
+
+                if (posSpeed > 0f)
+                {
+                    float remainingDistance = Vector3.Distance(curPos, effectiveTargetPos);
+                    float requiredPosSpeed = remainingDistance / remainingTime / matchtargetTowardPosMultipler * safety;
+                    if (requiredPosSpeed > posSpeed)
+                        posSpeed = requiredPosSpeed;
+                }
+
+                if (rotSpeed > 0f)
+                {
+                    float remainingAngle = Quaternion.Angle(curRot, effectiveTargetRot);
+                    float requiredRotSpeed = remainingAngle / remainingTime / matchtargetTowardRotMultipler * safety;
+                    if (requiredRotSpeed > rotSpeed)
+                        rotSpeed = requiredRotSpeed;
+                }
+            }
 
             Vector3    newPos = posSpeed > 0f
                 ? Vector3.MoveTowards(curPos, effectiveTargetPos, posSpeed * matchtargetTowardPosMultipler * Time.deltaTime)
@@ -897,6 +965,16 @@ namespace ES
             Quaternion newRot = rotSpeed > 0f
                 ? Quaternion.RotateTowards(curRot, effectiveTargetRot, rotSpeed * matchtargetTowardRotMultipler * Time.deltaTime)
                 : curRot;
+
+            if (isEndFrame && mt.snapToTargetOnEnd)
+            {
+                float posErrBeforeSnap = Vector3.Distance(newPos, effectiveTargetPos);
+                float rotErrBeforeSnap = Quaternion.Angle(newRot, effectiveTargetRot);
+                if (mt.snapPositionTolerance <= 0f || posErrBeforeSnap <= mt.snapPositionTolerance)
+                    newPos = effectiveTargetPos;
+                if (rotSpeed > 0f && (mt.snapRotationTolerance <= 0f || rotErrBeforeSnap <= mt.snapRotationTolerance))
+                    newRot = effectiveTargetRot;
+            }
 
             motor.SetPositionAndRotation(newPos, newRot, bypassInterpolation: true);
 
@@ -981,7 +1059,7 @@ namespace ES
             // ★ 不在此处做强制终点 snap：snap 依赖骨骼偏移（liveOffset），
             //   endTime 帧骨骼可能还在动画中途，强制到位反而产生新的突变。
             //   残余误差由调用方（如 SyncRider MoveTowards）继续收尾，平滑过渡。
-            if (elapsed >= mt.endTime)
+            if (isEndFrame)
             {
                 mt.completed = true;
                 OnMatchTargetCompleted();

@@ -11,6 +11,7 @@ namespace ES
 
     public struct ESInputCompiledBinding
     {
+        public string bindingId;
         public ESInputActionId actionId;
         public ESInputBindingSource source;
         public string schemeId;
@@ -84,9 +85,13 @@ namespace ES
                     result.cache.metas[actionIndex] = new ESInputActionMeta
                     {
                         id = action.id,
+                        actionName = action.actionName,
                         valueType = action.valueType,
                         category = action.category,
                         allowRebind = action.allowRebind,
+                        triggerType = action.triggerType,
+                        triggerFeatures = action.GetEffectiveTriggerFeatures(),
+                        pressPolicy = action.pressPolicy,
                         longPressDuration = action.longPressDuration,
                         doublePressWindow = action.doublePressWindow,
                         displayName = string.IsNullOrEmpty(action.displayName)
@@ -98,13 +103,14 @@ namespace ES
                 if (action.bindings == null)
                     continue;
 
+                Dictionary<string, int> duplicateCounters = new Dictionary<string, int>();
                 for (int b = 0; b < action.bindings.Count; b++)
                 {
                     ESInputBindingDefine binding = action.bindings[b];
                     if (binding == null || bindingIndex >= result.bindings.Length)
                         continue;
 
-                    result.bindings[bindingIndex++] = CompileBinding(action, binding, profile);
+                    result.bindings[bindingIndex++] = CompileBinding(action, binding, profile, duplicateCounters);
                 }
             }
 
@@ -115,14 +121,16 @@ namespace ES
         private static ESInputCompiledBinding CompileBinding(
             ESInputActionDefine action,
             ESInputBindingDefine binding,
-            ESInputBindingProfile profile)
+            ESInputBindingProfile profile,
+            Dictionary<string, int> duplicateCounters)
         {
+            string bindingId = ResolveBindingId(action, binding, duplicateCounters);
             string effectivePath = binding.path;
             string virtualControlId = binding.virtualControlId;
 
             if (profile != null
                 && action.allowRebind
-                && profile.TryGetOverride(action.id, binding.schemeId, binding.name, binding.path, out ESInputBindingOverride overrideData))
+                && profile.TryGetOverride(bindingId, action.id, binding.schemeId, binding.name, binding.path, out ESInputBindingOverride overrideData))
             {
                 if (!string.IsNullOrEmpty(overrideData.overridePath))
                     effectivePath = overrideData.overridePath;
@@ -133,6 +141,7 @@ namespace ES
 
             return new ESInputCompiledBinding
             {
+                bindingId = bindingId,
                 actionId = action.id,
                 source = binding.source,
                 schemeId = binding.schemeId,
@@ -145,6 +154,26 @@ namespace ES
                 isComposite = binding.isComposite,
                 isPartOfComposite = binding.isPartOfComposite
             };
+        }
+
+        private static string ResolveBindingId(
+            ESInputActionDefine action,
+            ESInputBindingDefine binding,
+            Dictionary<string, int> duplicateCounters)
+        {
+            if (binding != null && !string.IsNullOrEmpty(binding.bindingId))
+                return binding.bindingId;
+
+            ESInputBindingKeyUtility.EnsureBindingName(binding);
+            string baseKey = ESInputBindingKeyUtility.MakeBindingBaseKey(action, binding);
+            int duplicateIndex = 0;
+            if (duplicateCounters != null)
+            {
+                duplicateCounters.TryGetValue(baseKey, out duplicateIndex);
+                duplicateCounters[baseKey] = duplicateIndex + 1;
+            }
+
+            return ESInputBindingKeyUtility.MakeBindingId(action, binding, duplicateIndex);
         }
     }
 

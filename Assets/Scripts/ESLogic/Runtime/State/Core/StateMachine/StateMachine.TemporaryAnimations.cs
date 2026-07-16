@@ -52,6 +52,7 @@ namespace ES
             if (!RegisterState(tempState.strKey, tempState, layer))
             {
                 StateMachineDebugSettings.Instance.LogError($"[TempAnim] register failed. Key={tempKey}");
+                tempState.TryAutoPushedToPool();
                 return false;
             }
 

@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4361ddd2db6a4eed870adb5e607e558e, type: 3}
+  m_Name: item_036
+  m_EditorClassIdentifier: 
+  itemId: item_036
+  displayName: "\u6CD5\u6756036"
+  level: 108
+  price: 495
+  enabledInGame: 1
+  quality: 2
+  tags: 7
+  keywords: []
+  levelRewards: e0010000
+  qualityOptions: 000000000100000002000000
+  internalWeight: 46
+  nestedConfig:
+    growthMultiplier: 114514
+    note: "\u6D4B\u8BD5\u6570\u636E\u7B2C036\u6761"

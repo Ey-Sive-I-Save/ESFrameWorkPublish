@@ -89,12 +89,12 @@ namespace ES
                     continue;
                 }
 
-                float master = 1f;
-
                 if (!stateLayerMap.TryGetValue(state, out var layerType))
                 {
                     layerType = state.stateSharedData != null ? state.stateSharedData.basicConfig.layerType : StateLayerType.Main;
                 }
+
+                float master = ResolveRunningIKMaster(state, layerType);
 
                 if (captureIKContributionSummary)
                 {
@@ -121,6 +121,40 @@ namespace ES
                 AccumulateFromRuntime(ref target, state, master);
             }
 
+            for (int i = 0; i < _fadeOutIKStates.Count; i++)
+            {
+                var item = _fadeOutIKStates[i];
+                var state = item.state;
+                if (state == null)
+                    continue;
+
+                var runtime = state.AnimationRuntime;
+                if (runtime == null || !runtime.ik.enabled || !runtime.ik.HasAnyTargetWeight)
+                    continue;
+
+                float master = Mathf.Clamp01(state.PlayableWeight);
+                if (master <= 0.001f)
+                    continue;
+
+                if (captureIKContributionSummary)
+                {
+                    string stateKey = string.IsNullOrEmpty(state.strKey) ? "<NoKey>" : state.strKey;
+                    _ikContributionBuilder.Append("[FadeOut] ").Append(stateKey)
+                        .Append(" | Layer=").Append(item.layerType)
+                        .Append(" | Master=").Append(master.ToString("F3"))
+                        .Append(" | Raw(lh/rh/lf/rf/look)=")
+                        .Append(runtime.ik.leftHand.targetWeight.ToString("F3")).Append('/')
+                        .Append(runtime.ik.rightHand.targetWeight.ToString("F3")).Append('/')
+                        .Append(runtime.ik.leftFoot.targetWeight.ToString("F3")).Append('/')
+                        .Append(runtime.ik.rightFoot.targetWeight.ToString("F3")).Append('/')
+                        .Append(runtime.ik.lookAt.targetWeight.ToString("F3"))
+                        .AppendLine();
+                }
+
+                ref var target = ref GetLayerPoseRef(item.layerType, ref upper, ref lower, ref buff, ref main, ref @base);
+                AccumulateFromRuntime(ref target, state, master);
+            }
+
             ComposeOverride(ref stateGeneralFinalIKDriverPose, ref upper);
             ComposeOverride(ref stateGeneralFinalIKDriverPose, ref lower);
             ComposeOverride(ref stateGeneralFinalIKDriverPose, ref buff);
@@ -136,9 +170,10 @@ namespace ES
                 ClampPoseWeights(ref stateGeneralFinalIKDriverPose);
             }
 
-            stateGeneralFinalIKContributionSummary = captureIKContributionSummary
-                ? _ikContributionBuilder.ToString()
-                : "IK贡献诊断已关闭（在 StateMachineDebugSettings 中开启 IK贡献明细）";
+            if (captureIKContributionSummary)
+            {
+                stateGeneralFinalIKContributionSummary = _ikContributionBuilder.ToString();
+            }
         }
 
         private static ref StateGeneralFinalIKDriverPose GetLayerPoseRef(
@@ -169,20 +204,29 @@ namespace ES
             bool runtimeDrivenIK = state.IsIKActive;
             bool useProceduralIKConfig = proceduralDriveConfig != null && !runtimeDrivenIK;
 
-            float leftHandWeight = (useProceduralIKConfig ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.LeftHand, normalizedProgress) : 1f) * ik.leftHand.targetWeight * master;
-            float rightHandWeight = (useProceduralIKConfig ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.RightHand, normalizedProgress) : 1f) * ik.rightHand.targetWeight * master;
-            float leftFootWeight = (useProceduralIKConfig ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.LeftFoot, normalizedProgress) : 1f) * ik.leftFoot.targetWeight * master;
-            float rightFootWeight = (useProceduralIKConfig ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.RightFoot, normalizedProgress) : 1f) * ik.rightFoot.targetWeight * master;
+            float leftHandConfigWeight = useProceduralIKConfig ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.LeftHand, normalizedProgress) : 1f;
+            float rightHandConfigWeight = useProceduralIKConfig ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.RightHand, normalizedProgress) : 1f;
+            float leftFootConfigWeight = useProceduralIKConfig ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.LeftFoot, normalizedProgress) : 1f;
+            float rightFootConfigWeight = useProceduralIKConfig ? proceduralDriveConfig.GetGoalTargetWeight(IKGoal.RightFoot, normalizedProgress) : 1f;
+
+            float leftHandWeight = leftHandConfigWeight * ik.leftHand.targetWeight * master;
+            float rightHandWeight = rightHandConfigWeight * ik.rightHand.targetWeight * master;
+            float leftFootWeight = leftFootConfigWeight * ik.leftFoot.targetWeight * master;
+            float rightFootWeight = rightFootConfigWeight * ik.rightFoot.targetWeight * master;
+            float leftHandRotationWeight = leftHandConfigWeight * ik.leftHand.rotationWeight * master;
+            float rightHandRotationWeight = rightHandConfigWeight * ik.rightHand.rotationWeight * master;
+            float leftFootRotationWeight = leftFootConfigWeight * ik.leftFoot.rotationWeight * master;
+            float rightFootRotationWeight = rightFootConfigWeight * ik.rightFoot.rotationWeight * master;
 
             float leftHandLerpingRate = (useProceduralIKConfig ? proceduralDriveConfig.GetGoalLerpingRate(IKGoal.LeftHand, normalizedProgress) : 1f) * ik.leftHand.lerpingRate;
             float rightHandLerpingRate = (useProceduralIKConfig ? proceduralDriveConfig.GetGoalLerpingRate(IKGoal.RightHand, normalizedProgress) : 1f) * ik.rightHand.lerpingRate;
             float leftFootLerpingRate = (useProceduralIKConfig ? proceduralDriveConfig.GetGoalLerpingRate(IKGoal.LeftFoot, normalizedProgress) : 1f) * ik.leftFoot.lerpingRate;
             float rightFootLerpingRate = (useProceduralIKConfig ? proceduralDriveConfig.GetGoalLerpingRate(IKGoal.RightFoot, normalizedProgress) : 1f) * ik.rightFoot.lerpingRate;
 
-            AccumulateGoal(ref pose.leftHand, leftHandWeight, leftHandLerpingRate, ik.leftHand.position, ik.leftHand.rotation, ik.leftHand.hintPosition);
-            AccumulateGoal(ref pose.rightHand, rightHandWeight, rightHandLerpingRate, ik.rightHand.position, ik.rightHand.rotation, ik.rightHand.hintPosition);
-            AccumulateGoal(ref pose.leftFoot, leftFootWeight, leftFootLerpingRate, ik.leftFoot.position, ik.leftFoot.rotation, ik.leftFoot.hintPosition);
-            AccumulateGoal(ref pose.rightFoot, rightFootWeight, rightFootLerpingRate, ik.rightFoot.position, ik.rightFoot.rotation, ik.rightFoot.hintPosition);
+            AccumulateGoal(ref pose.leftHand, leftHandWeight, leftHandRotationWeight, leftHandLerpingRate, ik.leftHand.position, ik.leftHand.rotation, ik.leftHand.hintPosition);
+            AccumulateGoal(ref pose.rightHand, rightHandWeight, rightHandRotationWeight, rightHandLerpingRate, ik.rightHand.position, ik.rightHand.rotation, ik.rightHand.hintPosition);
+            AccumulateGoal(ref pose.leftFoot, leftFootWeight, leftFootRotationWeight, leftFootLerpingRate, ik.leftFoot.position, ik.leftFoot.rotation, ik.leftFoot.hintPosition);
+            AccumulateGoal(ref pose.rightFoot, rightFootWeight, rightFootRotationWeight, rightFootLerpingRate, ik.rightFoot.position, ik.rightFoot.rotation, ik.rightFoot.hintPosition);
 
             var lookAtConfig = useProceduralIKConfig ? proceduralDriveConfig.GetResolvedLookAtConfig(normalizedProgress) : ResolvedIKLookAtConfig.Disabled;
             float lookConfigWeight = useProceduralIKConfig ? (lookAtConfig.enabled ? Mathf.Clamp01(lookAtConfig.targetWeight) : 0f) : 1f;
@@ -194,14 +238,16 @@ namespace ES
             }
         }
 
-        private static void AccumulateGoal(ref IKGoalPose goal, float w, float lerpingRate, Vector3 pos, Quaternion rot, Vector3 hintPos)
+        private static void AccumulateGoal(ref IKGoalPose goal, float w, float rotW, float lerpingRate, Vector3 pos, Quaternion rot, Vector3 hintPos)
         {
-            if (w <= 0.001f) return;
+            if (w <= 0.001f && rotW <= 0.001f) return;
             float normalizedLerpingRate = Mathf.Clamp(lerpingRate, 0.05f, 8f);
+            float influence = Mathf.Max(w, rotW);
 
-            if (goal.weight <= 0.001f)
+            if (!goal.HasAnyWeight)
             {
                 goal.weight = w;
+                goal.rotationWeight = rotW;
                 goal.lerpingRate = normalizedLerpingRate;
                 goal.position = pos;
                 goal.rotation = rot;
@@ -210,17 +256,28 @@ namespace ES
             }
 
             float newW = goal.weight + w;
-            float t = w / newW;
-            goal.lerpingRate = Mathf.Lerp(goal.lerpingRate, normalizedLerpingRate, t);
-            goal.position = Vector3.Lerp(goal.position, pos, t);
-            goal.rotation = Quaternion.Slerp(goal.rotation, rot, t);
+            float newRotW = goal.rotationWeight + rotW;
+            float rateT = influence / (Mathf.Max(goal.weight, goal.rotationWeight) + influence);
+            goal.lerpingRate = Mathf.Lerp(goal.lerpingRate, normalizedLerpingRate, rateT);
+            if (newW > 0.001f)
+            {
+                float t = w / newW;
+                goal.position = Vector3.Lerp(goal.position, pos, t);
+            }
+            if (newRotW > 0.001f)
+            {
+                float rt = rotW / newRotW;
+                goal.rotation = Quaternion.Slerp(goal.rotation, rot, rt);
+            }
 
             if (hintPos != Vector3.zero)
             {
-                goal.hintPosition = (goal.hintPosition == Vector3.zero) ? hintPos : Vector3.Lerp(goal.hintPosition, hintPos, t);
+                float hintT = newW > 0.001f ? w / newW : rateT;
+                goal.hintPosition = (goal.hintPosition == Vector3.zero) ? hintPos : Vector3.Lerp(goal.hintPosition, hintPos, hintT);
             }
 
             goal.weight = newW;
+            goal.rotationWeight = newRotW;
         }
 
         private static void AccumulateLookAt(ref StateGeneralFinalIKDriverPose pose, float w, float lerpingRate, Vector3 lookAtPos, StateBase state)
@@ -264,10 +321,10 @@ namespace ES
 
         private static void ComposeOverride(ref StateGeneralFinalIKDriverPose dst, ref StateGeneralFinalIKDriverPose src)
         {
-            if (dst.leftHand.weight <= 0.001f && src.leftHand.weight > 0.001f) dst.leftHand = src.leftHand;
-            if (dst.rightHand.weight <= 0.001f && src.rightHand.weight > 0.001f) dst.rightHand = src.rightHand;
-            if (dst.leftFoot.weight <= 0.001f && src.leftFoot.weight > 0.001f) dst.leftFoot = src.leftFoot;
-            if (dst.rightFoot.weight <= 0.001f && src.rightFoot.weight > 0.001f) dst.rightFoot = src.rightFoot;
+            if (!dst.leftHand.HasAnyWeight && src.leftHand.HasAnyWeight) dst.leftHand = src.leftHand;
+            if (!dst.rightHand.HasAnyWeight && src.rightHand.HasAnyWeight) dst.rightHand = src.rightHand;
+            if (!dst.leftFoot.HasAnyWeight && src.leftFoot.HasAnyWeight) dst.leftFoot = src.leftFoot;
+            if (!dst.rightFoot.HasAnyWeight && src.rightFoot.HasAnyWeight) dst.rightFoot = src.rightFoot;
 
             if (dst.lookAtWeight <= 0.001f && src.lookAtWeight > 0.001f)
             {
@@ -284,10 +341,68 @@ namespace ES
         private static void ClampPoseWeights(ref StateGeneralFinalIKDriverPose pose)
         {
             pose.leftHand.weight = Mathf.Clamp01(pose.leftHand.weight);
+            pose.leftHand.rotationWeight = Mathf.Clamp01(pose.leftHand.rotationWeight);
             pose.rightHand.weight = Mathf.Clamp01(pose.rightHand.weight);
+            pose.rightHand.rotationWeight = Mathf.Clamp01(pose.rightHand.rotationWeight);
             pose.leftFoot.weight = Mathf.Clamp01(pose.leftFoot.weight);
+            pose.leftFoot.rotationWeight = Mathf.Clamp01(pose.leftFoot.rotationWeight);
             pose.rightFoot.weight = Mathf.Clamp01(pose.rightFoot.weight);
+            pose.rightFoot.rotationWeight = Mathf.Clamp01(pose.rightFoot.rotationWeight);
             pose.lookAtWeight = Mathf.Clamp01(pose.lookAtWeight);
+        }
+
+        private float ResolveRunningIKMaster(StateBase state, StateLayerType layerType)
+        {
+            var layer = GetLayerByType(layerType);
+            if (layer != null && layer.fadeInStates != null && layer.fadeInStates.ContainsKey(state))
+                return Mathf.Clamp01(state.PlayableWeight);
+
+            return 1f;
+        }
+
+        private void TrackFadeOutIKState(StateBase state, StateLayerType layerType)
+        {
+            if (state == null)
+                return;
+
+            for (int i = 0; i < _fadeOutIKStates.Count; i++)
+            {
+                if (_fadeOutIKStates[i].state == state)
+                {
+                    var item = _fadeOutIKStates[i];
+                    item.layerType = layerType;
+                    item.holdCount++;
+                    _fadeOutIKStates[i] = item;
+                    return;
+                }
+            }
+
+            _fadeOutIKStates.Add(new FadeOutIKState { state = state, layerType = layerType, holdCount = 1 });
+        }
+
+        private void UntrackFadeOutIKState(StateBase state)
+        {
+            if (state == null)
+                return;
+
+            for (int i = _fadeOutIKStates.Count - 1; i >= 0; i--)
+            {
+                if (_fadeOutIKStates[i].state != state)
+                    continue;
+
+                var item = _fadeOutIKStates[i];
+                item.holdCount--;
+                if (item.holdCount > 0)
+                {
+                    _fadeOutIKStates[i] = item;
+                    return;
+                }
+
+                int last = _fadeOutIKStates.Count - 1;
+                _fadeOutIKStates[i] = _fadeOutIKStates[last];
+                _fadeOutIKStates.RemoveAt(last);
+                return;
+            }
         }
     }
 }

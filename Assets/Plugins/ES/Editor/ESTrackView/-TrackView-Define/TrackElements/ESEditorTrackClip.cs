@@ -21,6 +21,8 @@ namespace ES
         public ITrackClip trackClip;
 
         private VisualElement m_ClipContent;
+        private VisualElement m_EditingFocusFrame;
+        private VisualElement m_SelectionFrame;
 
         private VisualElement popup;
         private Label popLabel;
@@ -29,11 +31,16 @@ namespace ES
         private TextField m_RenameField;
         private bool isRenaming;
         private bool m_IsSelected;
+        private bool m_IsPrimarySelection;
         private bool m_IsHovering;
         private bool m_HasValidationWarning;
         private string m_ValidationWarning;
         private Color m_LastTrackAccentColor = new Color(0.42f, 0.46f, 0.52f, 1f);
         private double m_IgnoreRenameFocusOutUntil;
+        private float m_LastAppliedLeft = float.NaN;
+        private float m_LastAppliedWidth = float.NaN;
+        private DisplayStyle m_LastAppliedDisplay = (DisplayStyle)(-1);
+        private const float StylePixelEpsilon = 0.25f;
 
         public event Action<ESEditorTrackClip> OnClipClicked;
 #pragma warning disable CS0067
@@ -123,6 +130,8 @@ namespace ES
 
             m_ClipContent.Add(m_ClipNameLabel);
             Add(m_ClipContent);
+            CreateSelectionFrame();
+            CreateEditingFocusFrame();
             RefreshClipIcon();
             RefreshEnabledVisual();
 
@@ -142,7 +151,6 @@ namespace ES
                     return;
                 }
 
-                ESTrackViewWindow.window?.SelectClip(this);
                 OnClipClicked?.Invoke(this);
             });
 
@@ -223,8 +231,92 @@ namespace ES
 
         public void SetSelected(bool selected)
         {
+            SetSelected(selected, false);
+        }
+
+        public void SetSelected(bool selected, bool primarySelection)
+        {
             m_IsSelected = selected;
+            m_IsPrimarySelection = selected && primarySelection;
             RefreshInteractionVisual();
+        }
+
+        public void SetFocusedEditing(bool focused)
+        {
+            if (m_EditingFocusFrame == null)
+                CreateEditingFocusFrame();
+
+            if (m_EditingFocusFrame != null)
+            {
+                m_EditingFocusFrame.style.display = focused ? DisplayStyle.Flex : DisplayStyle.None;
+                if (focused)
+                    m_EditingFocusFrame.BringToFront();
+            }
+
+            if (focused)
+                tooltip = ClipName + "\n正在弹窗编辑";
+            else
+                RefreshEnabledVisual();
+        }
+
+        private void CreateEditingFocusFrame()
+        {
+            if (m_EditingFocusFrame != null)
+                return;
+
+            m_EditingFocusFrame = new VisualElement
+            {
+                pickingMode = PickingMode.Ignore,
+                name = "editing-focus-frame"
+            };
+            m_EditingFocusFrame.style.position = Position.Absolute;
+            m_EditingFocusFrame.style.left = 0;
+            m_EditingFocusFrame.style.right = 0;
+            m_EditingFocusFrame.style.top = 0;
+            m_EditingFocusFrame.style.bottom = 0;
+            m_EditingFocusFrame.style.borderLeftWidth = 3;
+            m_EditingFocusFrame.style.borderRightWidth = 3;
+            m_EditingFocusFrame.style.borderTopWidth = 3;
+            m_EditingFocusFrame.style.borderBottomWidth = 3;
+            Color gold = new Color(1f, 0.78f, 0.18f, 1f);
+            m_EditingFocusFrame.style.borderLeftColor = gold;
+            m_EditingFocusFrame.style.borderRightColor = gold;
+            m_EditingFocusFrame.style.borderTopColor = gold;
+            m_EditingFocusFrame.style.borderBottomColor = gold;
+            m_EditingFocusFrame.style.borderTopLeftRadius = 4;
+            m_EditingFocusFrame.style.borderTopRightRadius = 4;
+            m_EditingFocusFrame.style.borderBottomLeftRadius = 4;
+            m_EditingFocusFrame.style.borderBottomRightRadius = 4;
+            m_EditingFocusFrame.style.backgroundColor = new Color(1f, 0.72f, 0.12f, 0.06f);
+            m_EditingFocusFrame.style.display = DisplayStyle.None;
+            Add(m_EditingFocusFrame);
+        }
+
+        private void CreateSelectionFrame()
+        {
+            if (m_SelectionFrame != null)
+                return;
+
+            m_SelectionFrame = new VisualElement
+            {
+                pickingMode = PickingMode.Ignore,
+                name = "selection-frame"
+            };
+            m_SelectionFrame.style.position = Position.Absolute;
+            m_SelectionFrame.style.left = 0;
+            m_SelectionFrame.style.right = 0;
+            m_SelectionFrame.style.top = 0;
+            m_SelectionFrame.style.bottom = 0;
+            m_SelectionFrame.style.borderLeftWidth = 2;
+            m_SelectionFrame.style.borderRightWidth = 2;
+            m_SelectionFrame.style.borderTopWidth = 2;
+            m_SelectionFrame.style.borderBottomWidth = 2;
+            m_SelectionFrame.style.borderTopLeftRadius = 4;
+            m_SelectionFrame.style.borderTopRightRadius = 4;
+            m_SelectionFrame.style.borderBottomLeftRadius = 4;
+            m_SelectionFrame.style.borderBottomRightRadius = 4;
+            m_SelectionFrame.style.display = DisplayStyle.None;
+            Add(m_SelectionFrame);
         }
 
         private void RefreshInteractionVisual()
@@ -232,7 +324,7 @@ namespace ES
             if (m_ClipContent != null)
             {
                 m_ClipContent.style.backgroundColor = m_IsSelected
-                    ? new Color(0.35f, 0.52f, 0.76f, 0.16f)
+                    ? new Color(0.35f, 0.52f, 0.76f, 0.32f)
                     : m_IsHovering
                         ? new Color(1f, 1f, 1f, 0.035f)
                     : Color.clear;
@@ -242,6 +334,27 @@ namespace ES
             style.borderRightColor = m_IsSelected
                 ? new Color(0.48f, 0.68f, 0.95f, 0.72f)
                 : new Color(0.08f, 0.09f, 0.11f, 0.82f);
+
+            if (m_SelectionFrame != null)
+            {
+                m_SelectionFrame.style.display = m_IsSelected ? DisplayStyle.Flex : DisplayStyle.None;
+                if (m_IsSelected)
+                {
+                    Color frameColor = m_IsPrimarySelection
+                        ? new Color(0.18f, 0.62f, 1f, 1f)
+                        : new Color(0.22f, 1f, 0.86f, 1f);
+                    m_SelectionFrame.style.borderLeftColor = frameColor;
+                    m_SelectionFrame.style.borderRightColor = frameColor;
+                    m_SelectionFrame.style.borderTopColor = frameColor;
+                    m_SelectionFrame.style.borderBottomColor = frameColor;
+                    m_SelectionFrame.style.backgroundColor = m_IsPrimarySelection
+                        ? new Color(0.1f, 0.36f, 0.78f, 0.18f)
+                        : new Color(0.06f, 0.62f, 0.52f, 0.16f);
+                    m_SelectionFrame.BringToFront();
+                    if (m_EditingFocusFrame != null && m_EditingFocusFrame.style.display.value == DisplayStyle.Flex)
+                        m_EditingFocusFrame.BringToFront();
+                }
+            }
         }
 
         private void OnPointerDown(PointerDownEvent evt)
@@ -254,9 +367,24 @@ namespace ES
 
             this.BringToFront();
             if (evt.button == 0)
-                ESTrackViewWindow.window?.SelectClip(this);
+            {
+                bool additiveSelection = evt.ctrlKey || evt.commandKey;
+                bool keepGroupSelectionForDrag = !additiveSelection
+                    && ESTrackViewWindow.window != null
+                    && ESTrackViewWindow.window.SelectedClipCount > 1
+                    && ESTrackViewWindow.window.IsClipSelected(this);
 
-            if (evt.button == 0 && evt.shiftKey)
+                if (!keepGroupSelectionForDrag)
+                    ESTrackViewWindow.window?.SelectClip(this, additiveSelection);
+
+                if (additiveSelection)
+                {
+                    evt.StopPropagation();
+                    return;
+                }
+            }
+
+            if (evt.button == 1 && evt.shiftKey)
             {
                 ESTrackViewWindowHelper.EditClip(this);
                 evt.StopPropagation();
@@ -284,6 +412,7 @@ namespace ES
                     isDragging = true;
                     var mousePos = evt.position;
                     offsetPOSDragLeft = mousePos.x - this.resolvedStyle.left;
+                    ESTrackViewWindow.window?.BeginClipGroupDrag(this);
                     this.AddToClassList("dragging");
                     popup.style.display = DisplayStyle.Flex;
                     this.CapturePointer(evt.pointerId);
@@ -320,7 +449,9 @@ namespace ES
                 this.RemoveFromClassList("dragging");
                 popup.style.display = DisplayStyle.None;
                 this.ReleasePointer(evt.pointerId);
+                ESTrackViewWindow.window?.EndClipGroupDrag(this);
                 ESTrackViewWindow.window?.SyncTotalTimeFromCurrentSequence(true);
+                ESTrackViewWindow.window?.ForceRefreshClipLayoutNow();
                 evt.StopPropagation();
             }
 
@@ -330,6 +461,7 @@ namespace ES
                 popup.style.display = DisplayStyle.None;
                 this.ReleasePointer(evt.pointerId);
                 ESTrackViewWindow.window?.SyncTotalTimeFromCurrentSequence(true);
+                ESTrackViewWindow.window?.ForceRefreshClipLayoutNow();
                 evt.StopPropagation();
             }
         }
@@ -499,6 +631,7 @@ namespace ES
                 //Debug.Log("拖动位置：" + this.resolvedStyle.left);
                 // 计算对应的时间
                 MatchTimeFromDynamicPos();
+                ESTrackViewWindow.window?.ApplyClipGroupDrag(this, StartTime);
             }
             else if (isExpanding)
             {
@@ -531,7 +664,7 @@ namespace ES
                 newStartTime = nowLEFT / Cache_pixelsPerSecond + Cahce_ShowStart;
 
             }
-            style.width = w;
+            ApplyWidthIfChanged(w);
             StartTime = newStartTime;
             AdjustFontToFit();
             popLabel.text = $"[{StartTime:F2}s -- {StartTime + Duration:F2}]";
@@ -542,25 +675,76 @@ namespace ES
         #endregion
         public static float Cache_pixelsPerSecond = 100f;
         public static float Cahce_ShowStart = 0f;
+        public static float Cache_ShowEnd = float.PositiveInfinity;
         public void SetTimeScaleAndStartShow(float pixelsPerSecond, float ShowStart)
         {
+            SetTimeScaleAndStartShowVisible(pixelsPerSecond, ShowStart, float.PositiveInfinity);
+        }
+
+        public void SetTimeScaleAndStartShowVisible(float pixelsPerSecond, float showStart, float showEnd)
+        {
             Cache_pixelsPerSecond = pixelsPerSecond;
-            Cahce_ShowStart = ShowStart;
+            Cahce_ShowStart = showStart;
+            Cache_ShowEnd = showEnd;
             //Debug.Log("TRUE"+Cache_pixelsPerSecond);
             // 根据时间尺度和持续时间设置节点宽度
             var w = Duration * pixelsPerSecond;
-            var left = (StartTime - ShowStart) * pixelsPerSecond;
+            float clipEnd = StartTime + Mathf.Max(0f, Duration);
+            bool forceVisible = isDragging || isExpanding || isRenaming;
+            bool visible = forceVisible || clipEnd >= showStart && StartTime <= showEnd;
+            ApplyDisplayIfChanged(visible ? DisplayStyle.Flex : DisplayStyle.None);
+            if (!visible)
+                return;
+
+            var left = (StartTime - showStart) * pixelsPerSecond;
             // Debug.Log("WW"+w+" LL"+left+" START "+ShowStart);
-            style.width = w;
-            style.left = left;
+            bool widthChanged = ApplyWidthIfChanged(w);
+            ApplyLeftIfChanged(left);
             if (!isRenaming && m_ClipIcon != null)
                 m_ClipIcon.style.display = w >= 44f ? DisplayStyle.Flex : DisplayStyle.None;
-            AdjustFontToFit();
+            if (widthChanged)
+                AdjustFontToFit();
         }
 
         public void SetTimeScaleAndStartShowCache()
         {
-            SetTimeScaleAndStartShow(Cache_pixelsPerSecond, Cahce_ShowStart);
+            SetTimeScaleAndStartShowVisible(Cache_pixelsPerSecond, Cahce_ShowStart, Cache_ShowEnd);
+        }
+
+        private bool ApplyLeftIfChanged(float left)
+        {
+            if (!float.IsNaN(m_LastAppliedLeft) && Mathf.Abs(m_LastAppliedLeft - left) < StylePixelEpsilon)
+                return false;
+
+            style.left = left;
+            m_LastAppliedLeft = left;
+            return true;
+        }
+
+        private bool ApplyWidthIfChanged(float width)
+        {
+            if (!float.IsNaN(m_LastAppliedWidth) && Mathf.Abs(m_LastAppliedWidth - width) < StylePixelEpsilon)
+                return false;
+
+            style.width = width;
+            m_LastAppliedWidth = width;
+            return true;
+        }
+
+        private bool ApplyDisplayIfChanged(DisplayStyle display)
+        {
+            if (m_LastAppliedDisplay == display)
+                return false;
+
+            style.display = display;
+            m_LastAppliedDisplay = display;
+            return true;
+        }
+
+        public void ForceDisplayState(DisplayStyle display)
+        {
+            style.display = display;
+            m_LastAppliedDisplay = display;
         }
 
         public void SetClipColor(Color color)

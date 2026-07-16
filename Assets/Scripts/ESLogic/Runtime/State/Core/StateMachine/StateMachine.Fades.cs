@@ -7,13 +7,13 @@ namespace ES
     {
         private void ApplyFadeIn(StateBase state, StateLayerRuntime layer)
         {
-            if (!state.stateSharedData.enableFadeInOut) return;
+            var sharedData = state != null ? state.stateSharedData : null;
+            if (sharedData == null || !sharedData.enableFadeInOut) return;
 
-            float fadeInDuration = GetScaledFadeDuration(state.stateSharedData.fadeInDuration, state.stateSharedData);
-            if (fadeInDuration <= 0f || !layer.stateToSlotMap.ContainsKey(state))
+            float fadeInDuration = GetScaledFadeDuration(sharedData.fadeInDuration, sharedData);
+            if (fadeInDuration <= 0f || layer == null || !layer.stateToSlotMap.TryGetValue(state, out int slotIndex))
                 return;
 
-            int slotIndex = layer.stateToSlotMap[state];
             state.SetPlayableWeightAssumeBound(0f);
 
             if (!layer.fadeInStates.TryGetValue(state, out var fadeData))
@@ -25,23 +25,28 @@ namespace ES
                 fadeData.startWeight = 1f;
                 layer.fadeInStates[state] = fadeData;
 
-                StateMachineDebugSettings.Instance.LogFade(
-                    $"[淡入] 状态 {state.strKey} 开始淡入，时长 {fadeInDuration:F2}秒");
+#if STATEMACHINEDEBUG
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsFadeEnabled)
+                {
+                    dbg.LogFade($"[淡入] 状态 {state.strKey} 开始淡入，时长 {fadeInDuration:F2}秒");
+                }
+#endif
             }
         }
 
         private void ApplyFadeOut(StateBase state, StateLayerRuntime layer)
         {
-            if (!state.stateSharedData.enableFadeInOut) return;
+            var sharedData = state != null ? state.stateSharedData : null;
+            if (sharedData == null || !sharedData.enableFadeInOut) return;
 
-            float fadeOutDuration = GetScaledFadeDuration(state.stateSharedData.fadeOutDuration, state.stateSharedData);
+            float fadeOutDuration = GetScaledFadeDuration(sharedData.fadeOutDuration, sharedData);
             if (fadeOutDuration <= 0f)
                 return;
 
-            if (!layer.stateToSlotMap.ContainsKey(state))
+            if (layer == null || !layer.stateToSlotMap.TryGetValue(state, out int slotIndex))
                 return;
 
-            int slotIndex = layer.stateToSlotMap[state];
             float currentWeight = Mathf.Clamp01(state.PlayableWeight);
             state.SetPlayableWeightAssumeBound(currentWeight);
 
@@ -53,9 +58,15 @@ namespace ES
                 fadeData.slotIndex = slotIndex;
                 fadeData.startWeight = currentWeight;
                 layer.fadeOutStates[state] = fadeData;
+                TrackFadeOutIKState(state, layer.layerType);
 
-                StateMachineDebugSettings.Instance.LogFade(
-                    $"[淡出] 状态 {state.strKey} 开始淡出，时长 {fadeOutDuration:F2}秒，起始权重 {currentWeight:F2}");
+#if STATEMACHINEDEBUG
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsFadeEnabled)
+                {
+                    dbg.LogFade($"[淡出] 状态 {state.strKey} 开始淡出，时长 {fadeOutDuration:F2}秒，起始权重 {currentWeight:F2}");
+                }
+#endif
             }
         }
         private void UpdateLayerFades(StateLayerRuntime layer, float deltaTime)
@@ -69,6 +80,11 @@ namespace ES
             {
                 var state = kvp.Key;
                 var fadeData = kvp.Value;
+                if (state == null || fadeData == null || fadeData.duration <= 0f || !layer.stateToSlotMap.ContainsKey(state))
+                {
+                    fadeInToRemove.Add(state);
+                    continue;
+                }
 
                 fadeData.elapsedTime += deltaTime;
                 float t = Mathf.Clamp01(fadeData.elapsedTime / fadeData.duration);
@@ -80,8 +96,11 @@ namespace ES
                 {
                     fadeInToRemove.Add(state);
 #if STATEMACHINEDEBUG
-                    StateMachineDebugSettings.Instance.LogFade(
-                        $"[淡入完成] 状态 {state.strKey}");
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsFadeEnabled)
+                    {
+                        dbg.LogFade($"[淡入完成] 状态 {state.strKey}");
+                    }
 #endif
                 }
             }
@@ -101,6 +120,11 @@ namespace ES
             {
                 var state = kvp.Key;
                 var fadeData = kvp.Value;
+                if (state == null || fadeData == null || fadeData.duration <= 0f)
+                {
+                    fadeOutToRemove.Add(state);
+                    continue;
+                }
 
                 fadeData.elapsedTime += deltaTime;
                 float t = Mathf.Clamp01(fadeData.elapsedTime / fadeData.duration);
@@ -116,10 +140,16 @@ namespace ES
                 if (t >= 1f)
                 {
                     fadeOutToRemove.Add(state);
-                    HotUnplugStateFromPlayable(state, layer);
+                    if (layer.stateToSlotMap.ContainsKey(state))
+                    {
+                        HotUnplugStateFromPlayable(state, layer);
+                    }
 #if STATEMACHINEDEBUG
-                    StateMachineDebugSettings.Instance.LogFade(
-                        $"[淡出完成] 状态 {state.strKey}");
+                    var dbg = StateMachineDebugSettings.Instance;
+                    if (dbg != null && dbg.IsFadeEnabled)
+                    {
+                        dbg.LogFade($"[淡出完成] 状态 {state.strKey}");
+                    }
 #endif
                 }
             }
@@ -131,6 +161,7 @@ namespace ES
                     fadeData.TryAutoPushedToPool();
                 }
                 layer.fadeOutStates.Remove(state);
+                UntrackFadeOutIKState(state);
             }
         }
 
@@ -147,9 +178,10 @@ namespace ES
 
         private float EvaluateFadeCurve(StateBase state, float t, bool isFadeIn)
         {
-            if (!state.stateSharedData.useAdvancedFadeCurve) return t;
+            var sharedData = state != null ? state.stateSharedData : null;
+            if (sharedData == null || !sharedData.useAdvancedFadeCurve) return t;
 
-            var curve = isFadeIn ? state.stateSharedData.fadeInCurve : state.stateSharedData.fadeOutCurve;
+            var curve = isFadeIn ? sharedData.fadeInCurve : sharedData.fadeOutCurve;
             if (curve == null || curve.length == 0)
             {
                 return t;
@@ -168,9 +200,13 @@ namespace ES
                 HotUnplugStateFromPlayable(state, layer);
                 fadeOutData.TryAutoPushedToPool();
                 layer.fadeOutStates.Remove(state);
+                UntrackFadeOutIKState(state);
 #if STATEMACHINEDEBUG
-                StateMachineDebugSettings.Instance.LogFade(
-                    $"[Fade修复] 取消状态 {state.strKey} 的残留fadeOut（快速重入）");
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsFadeEnabled)
+                {
+                    dbg.LogFade($"[Fade修复] 取消状态 {state.strKey} 的残留fadeOut（快速重入）");
+                }
 #endif
             }
 
@@ -179,8 +215,11 @@ namespace ES
                 fadeInData.TryAutoPushedToPool();
                 layer.fadeInStates.Remove(state);
 #if STATEMACHINEDEBUG
-                StateMachineDebugSettings.Instance.LogFade(
-                    $"[Fade修复] 取消状态 {state.strKey} 的残留fadeIn（快速重入）");
+                var dbg = StateMachineDebugSettings.Instance;
+                if (dbg != null && dbg.IsFadeEnabled)
+                {
+                    dbg.LogFade($"[Fade修复] 取消状态 {state.strKey} 的残留fadeIn（快速重入）");
+                }
 #endif
             }
         }

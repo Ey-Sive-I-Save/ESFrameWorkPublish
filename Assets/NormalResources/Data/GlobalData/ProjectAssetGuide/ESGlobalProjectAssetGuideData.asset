@@ -84256,9 +84256,10 @@ MonoBehaviour:
   - sceneGuid: b4b75588872fe9740ab90f542b86ce3e
     scenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene
       1.unity
-    savedUtcTicks: 639195343818825045
+    savedUtcTicks: 639197749888674973
     expandedTransformPaths:
-    - '%E7%8E%A9%E5%AE%B6%E4%BA%92%E5%8A%A8%E7%BB%84#0@18'
+    - '%E7%8E%A9%E5%AE%B6%E4%BA%92%E5%8A%A8%E7%BB%84#0@19'
+    - '%E7%8E%A9%E5%AE%B6%E4%BA%92%E5%8A%A8%E7%BB%84#0@19/%E5%A4%A7%E9%BB%91%E5%A1%94#0@0'
   displayTitleFontSize: 22
   displayHintFontSize: 14
   displayTitleColor: {r: 1, g: 0.82, b: 0.28, a: 1}

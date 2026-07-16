@@ -135,6 +135,7 @@ namespace ES
         {
             // Grounder 需要显式关闭（OnDisable 会清零 BipedIK 脚步权重）
             if (_grounderBipedIK != null) _grounderBipedIK.enabled = false;
+            if (_refs.fullBodyBipedIK != null) _refs.fullBodyBipedIK.enabled = false;
 
             _bipedIKReady      = false;  _bipedIK      = null;
             _lookAtIKReady     = false;  _lookAtIK     = null;
@@ -145,6 +146,8 @@ namespace ES
             _grounderReady     = false;  _grounderBipedIK = null;
             _hitReactionReady  = false;  _hitReaction  = null;
             _recoilReady       = false;  _recoil       = null;
+            _fullBodyBipedIKReady = false;
+            _finalIKScheduleSummary = "未调度";
 
             _refs.Clear();
             _caps          = FinalIKCapabilityFlags.None;
@@ -195,6 +198,12 @@ namespace ES
                     SeedGoalTargetsFromCurrentRigPose();
             }
 
+            if (!_hintTargetsReady || !AreHintTargetTransformsAlive())
+            {
+                _hintTargetsReady = false;
+                EnsureHintTransforms();
+            }
+
             float now = Time.unscaledTime;
             _ikWeightSmoothDeltaTime = Time.deltaTime;
             UpdateLerpingRateRecovery();
@@ -208,6 +217,13 @@ namespace ES
                 }
             }
 
+            if (_grounderReady)
+                UpdateGrounderWeightSmoothing();
+
+            var pose = _stateMachine.stateGeneralFinalIKDriverPose;
+            if (enableRealtimeWeightTest)
+                ApplyRealtimeWeightTest(ref pose);
+
             if (_aimIKReady)
             {
                 _aimIK.solver.target = ResolveAimTarget(_aimSourceTarget);
@@ -215,12 +231,7 @@ namespace ES
                 UpdateAimIKWeightSmoothing();
             }
 
-            if (_grounderReady)
-                UpdateGrounderWeightSmoothing();
-
-            var pose = _stateMachine.stateGeneralFinalIKDriverPose;
-            if (enableRealtimeWeightTest)
-                ApplyRealtimeWeightTest(ref pose);
+            bool aimSolved = SolveAimIKManually();
 
             // Hint 是可选项：未提供 Hint 时仍允许 Biped 正常解算。
             bool bipedRuntimeReady = _bipedIKReady && _goalTargetsReady;
@@ -233,6 +244,9 @@ namespace ES
             if (!bipedRuntimeReady)
             {
                 ApplyLookAt(in pose);
+                bool lookAtSolvedWithoutBiped = SolveLookAtIKManually();
+                bool fullBodySolvedWithoutBiped = SolveFullBodyBipedIKManually();
+                UpdateFinalIKScheduleSummary(aimSolved, false, lookAtSolvedWithoutBiped, false, fullBodySolvedWithoutBiped);
 
                 if (warnWhenPoseHasWeightButNoIK && pose.HasLimbWeight
                     && (now - _lastWarnTime) >= WarnInterval)
@@ -255,10 +269,12 @@ namespace ES
                 ApplyLookAt(in pose);
                 if (_hasLastPose || HasActiveBipedWeightSmoothing())
                 {
-                    _bipedIK.SetToDefaults();
-                    ResetRuntimeLimbWeights();
+                    ApplyNoLimbGoals();
                     _hasLastPose = false;
                 }
+                bool lookAtSolvedWithoutBiped = SolveLookAtIKManually();
+                bool fullBodySolvedWithoutBiped = SolveFullBodyBipedIKManually();
+                UpdateFinalIKScheduleSummary(aimSolved, false, lookAtSolvedWithoutBiped, false, fullBodySolvedWithoutBiped);
                 return;
             }
 
@@ -292,10 +308,7 @@ namespace ES
                 }
                 else
                 {
-                    ApplyGoal(in pose.leftHand,  AvatarIKGoal.LeftHand,  _lhHint, _lhTarget);
-                    ApplyGoal(in pose.rightHand, AvatarIKGoal.RightHand, _rhHint, _rhTarget);
-                    ApplyGoal(in pose.leftFoot,  AvatarIKGoal.LeftFoot,  _lfHint, _lfTarget);
-                    ApplyGoal(in pose.rightFoot, AvatarIKGoal.RightFoot, _rfHint, _rfTarget);
+                    ApplyNoLimbGoals();
                 }
             }
             else
@@ -311,6 +324,145 @@ namespace ES
             _bipedIK.UpdateBipedIK();
             _solverUpdateCount++;
             _lastSolverUpdateTime = now;
+            bool lookAtSolved = SolveLookAtIKManually();
+            bool grounderActive = _grounderReady && _grounderBipedIK != null && _grounderBipedIK.enabled;
+            bool fullBodySolved = SolveFullBodyBipedIKManually();
+            UpdateFinalIKScheduleSummary(aimSolved, true, lookAtSolved, grounderActive, fullBodySolved);
+        }
+
+        private bool SolveAimIKManually()
+        {
+            if (!_aimIKReady || _aimIK == null)
+                return false;
+
+            _aimIK.enabled = false;
+
+            if (!HasActiveAimIKWeightSmoothing() || _aimIK.solver.target == null)
+                return false;
+
+            if (!_aimIK.solver.initiated)
+                _aimIK.solver.Initiate(_aimIK.transform);
+
+            if (!_aimIK.solver.initiated)
+                return false;
+
+            _aimIK.solver.Update();
+            _solverUpdateCount++;
+            _lastSolverUpdateTime = Time.unscaledTime;
+            return true;
+        }
+
+        private bool SolveLookAtIKManually()
+        {
+            if (!_lookAtIKReady || _lookAtIK == null)
+                return false;
+
+            _lookAtIK.enabled = false;
+
+            if (!HasActiveLookAtWeightSmoothing())
+                return false;
+
+            if (!_lookAtIK.solver.initiated)
+                _lookAtIK.solver.Initiate(_lookAtIK.transform);
+
+            if (!_lookAtIK.solver.initiated)
+                return false;
+
+            _lookAtIK.solver.Update();
+            _solverUpdateCount++;
+            _lastSolverUpdateTime = Time.unscaledTime;
+            return true;
+        }
+
+        private bool SolveFullBodyBipedIKManually()
+        {
+            var fullBodyBipedIK = _refs.fullBodyBipedIK;
+            if (!_fullBodyBipedIKReady || fullBodyBipedIK == null)
+                return false;
+
+            fullBodyBipedIK.enabled = false;
+
+            if (!fullBodyBipedIK.solver.initiated)
+                fullBodyBipedIK.solver.Initiate(fullBodyBipedIK.transform);
+
+            if (!fullBodyBipedIK.solver.initiated)
+                return false;
+
+            fullBodyBipedIK.solver.Update();
+            _solverUpdateCount++;
+            _lastSolverUpdateTime = Time.unscaledTime;
+            return true;
+        }
+
+        private void UpdateFinalIKScheduleSummary(bool aimSolved, bool bipedSolved, bool lookAtSolved, bool grounderLinked, bool fullBodySolved)
+        {
+            if (aimSolved && bipedSolved && lookAtSolved && grounderLinked && fullBodySolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：AimIK -> BipedIK(+Grounder委托) -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
+                return;
+            }
+
+            if (aimSolved && bipedSolved && lookAtSolved && fullBodySolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：AimIK -> BipedIK -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
+                return;
+            }
+
+            if (bipedSolved && lookAtSolved && fullBodySolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：BipedIK -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
+                return;
+            }
+
+            if (bipedSolved && fullBodySolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：BipedIK -> FBBIK(+HitReaction/Recoil委托)";
+                return;
+            }
+
+            if (fullBodySolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：FBBIK(+HitReaction/Recoil委托)";
+                return;
+            }
+
+            if (aimSolved && bipedSolved && lookAtSolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：AimIK -> BipedIK -> LookAtIK";
+                return;
+            }
+
+            if (bipedSolved && lookAtSolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：BipedIK -> LookAtIK";
+                return;
+            }
+
+            if (aimSolved && bipedSolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：AimIK -> BipedIK";
+                return;
+            }
+
+            if (lookAtSolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：LookAtIK";
+                return;
+            }
+
+            if (aimSolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：AimIK";
+                return;
+            }
+
+            if (bipedSolved)
+            {
+                _finalIKScheduleSummary = "Driver硬调度：BipedIK";
+                return;
+            }
+
+            _finalIKScheduleSummary = "本帧无IK求解";
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -429,6 +581,7 @@ namespace ES
                 if (s.spine != null)
                     for (int i = 0; i < s.spine.Length; i++)
                         s.spine[i].weight = _lookAtBodyWeightCurrent;
+                _lookAtIK.enabled = false;
             }
 
             if (_aimIKReady)
@@ -441,10 +594,12 @@ namespace ES
                 s.clampWeight = initAimClampWeight;
                 if (initAimAxis != Vector3.zero)
                     s.axis = initAimAxis.normalized;
+                _aimIK.enabled = false;
             }
 
             if (_grounderReady)
             {
+                _grounderBipedIK.ik = _bipedIK;
                 _grounderWeightCurrent = _grounderWeightTarget = Mathf.Clamp01(initGrounderWeight);
                 _grounderBipedIK.weight = _grounderWeightCurrent;
                 _grounderBipedIK.enabled = _grounderWeightCurrent > 0.001f;
@@ -536,8 +691,7 @@ namespace ES
             if (!_aimIKReady) return;
 
             bool shouldStayEnabled = _aimWeightCurrent > 0.001f || _aimWeightTarget > 0.001f || _aimPoleWeightCurrent > 0.001f || _aimPoleWeightTarget > 0.001f;
-            if (_aimIK.enabled != shouldStayEnabled)
-                _aimIK.enabled = shouldStayEnabled;
+            _aimIK.enabled = false;
 
             if (!shouldStayEnabled)
             {
@@ -713,6 +867,9 @@ namespace ES
             _lookAtIK.solver.head.weight = 0f;
             _lookAtIK.solver.eyesWeight = 0f;
             _lookAtIK.solver.clampWeight = 0f;
+            if (!_lookAtIK.solver.initiated)
+                _lookAtIK.solver.Initiate(_lookAtIK.transform);
+            _lookAtIK.enabled = false;
 
             _lookAtIKReady    = true;
             _lookAtSpineBones = _lookAtIK.solver.spine;
@@ -753,9 +910,11 @@ namespace ES
             RefreshAimPeekRuntimeReference();
             _aimWeightCurrent = _aimWeightTarget = ResolveInitialAimWeight();
             _aimPoleWeightCurrent = _aimPoleWeightTarget = ResolveAimPoleWeight(_aimWeightCurrent);
-            _aimIK.enabled = _aimWeightCurrent > 0.001f || _aimWeightTarget > 0.001f;
             _aimIK.solver.IKPositionWeight = _aimWeightCurrent;
             _aimIK.solver.poleWeight = _aimPoleWeightCurrent;
+            if (!_aimIK.solver.initiated)
+                _aimIK.solver.Initiate(_aimIK.transform);
+            _aimIK.enabled = false;
             _aimIKError = string.Empty;
             _aimIKReady = true;
             _caps      |= FinalIKCapabilityFlags.AimIK;
@@ -781,8 +940,10 @@ namespace ES
                 return;
             }
 
-            _grounderBipedIK.enabled = true;
+            _grounderBipedIK.ik = _bipedIK;
             _grounderWeightCurrent = _grounderWeightTarget = Mathf.Clamp01(initGrounderWeight);
+            _grounderBipedIK.weight = _grounderWeightCurrent;
+            _grounderBipedIK.enabled = _grounderWeightCurrent > 0.001f;
             _grounderReady = true;
             _caps         |= FinalIKCapabilityFlags.GrounderBipedIK;
         }
@@ -795,6 +956,7 @@ namespace ES
         {
             _hitReactionReady = false;
             _recoilReady      = false;
+            _fullBodyBipedIKReady = false;
 
             if (!enableFullBodyBipedIK) return;
 
@@ -803,13 +965,25 @@ namespace ES
 
             _refs.fullBodyBipedIK = _refs.fullBodyBipedIK ?? presetFullBodyBipedIK ?? GetComponent<FullBodyBipedIK>();
             bool fbbikOk = _refs.fullBodyBipedIK != null;
+            if (fbbikOk)
+            {
+                _refs.fullBodyBipedIK.enabled = false;
+                if (!_refs.fullBodyBipedIK.solver.initiated)
+                    _refs.fullBodyBipedIK.solver.Initiate(_refs.fullBodyBipedIK.transform);
+
+                _fullBodyBipedIKReady = _refs.fullBodyBipedIK.solver.initiated;
+                if (_fullBodyBipedIKReady)
+                    _caps |= FinalIKCapabilityFlags.FullBodyBipedIK;
+                else
+                    _presentButBad |= FinalIKCapabilityFlags.FullBodyBipedIK;
+            }
 
             if (_hitReaction != null)
             {
                 if (useDriverHitReactionSetup)
                     ApplyDriverHitReaction(_hitReaction);
 
-                if (fbbikOk) { _hitReactionReady = true; _caps |= FinalIKCapabilityFlags.HitReaction; }
+                if (_fullBodyBipedIKReady) { _hitReactionReady = true; _caps |= FinalIKCapabilityFlags.HitReaction; }
                 else Debug.LogWarning(
                     "[StateFinalIKDriver] HitReaction 已挂载，但缺少 FullBodyBipedIK，HitReaction 未激活。\n" +
                     "→ 在同 GameObject 上添加 RootMotion.FinalIK.FullBodyBipedIK 组件。", _animator);
@@ -820,7 +994,7 @@ namespace ES
                 if (useDriverRecoilSetup)
                     ApplyDriverRecoil(_recoil);
 
-                if (fbbikOk) { _recoilReady = true; _caps |= FinalIKCapabilityFlags.Recoil; }
+                if (_fullBodyBipedIKReady) { _recoilReady = true; _caps |= FinalIKCapabilityFlags.Recoil; }
                 else Debug.LogWarning(
                     "[StateFinalIKDriver] Recoil 已挂载，但缺少 FullBodyBipedIK，Recoil 未激活。\n" +
                     "→ 在同 GameObject 上添加 RootMotion.FinalIK.FullBodyBipedIK 组件。", _animator);
@@ -837,8 +1011,9 @@ namespace ES
                                 Transform hint, Transform target)
         {
             float w     = Mathf.Clamp01(goal.weight);
+            float rw    = Mathf.Clamp01(goal.rotationWeight);
             bool  isFoot = avatarGoal == AvatarIKGoal.LeftFoot || avatarGoal == AvatarIKGoal.RightFoot;
-            float rotW  = isFoot ? w * Mathf.Clamp01(footRotationWeightMultiplier) : w;
+            float rotW  = isFoot ? rw * Mathf.Clamp01(footRotationWeightMultiplier) : rw;
 
             ReadLimbRuntimeWeights(avatarGoal,
                 out float positionCurrent, out float positionTarget,
@@ -897,8 +1072,7 @@ namespace ES
 
             if (!pose.HasAnyWeight)
             {
-                _bipedIK.SetToDefaults();
-                ResetRuntimeLimbWeights();
+                ApplyNoLimbGoals();
                 ApplyLookAt(in pose);
                 _hasLastPose = false;
                 return;
@@ -919,15 +1093,30 @@ namespace ES
             CacheGoalTargetSnapshot();
         }
 
+        private void ApplyNoLimbGoals()
+        {
+            IKGoalPose noGoal = default;
+            noGoal.rotation = Quaternion.identity;
+            noGoal.lerpingRate = 1f;
+            ApplyGoal(in noGoal, AvatarIKGoal.LeftHand,  _lhHint, _lhTarget);
+            ApplyGoal(in noGoal, AvatarIKGoal.RightHand, _rhHint, _rhTarget);
+            ApplyGoal(in noGoal, AvatarIKGoal.LeftFoot,  _lfHint, _lfTarget);
+            ApplyGoal(in noGoal, AvatarIKGoal.RightFoot, _rfHint, _rfTarget);
+        }
+
         private void ApplyRealtimeWeightTest(ref StateGeneralFinalIKDriverPose pose)
         {
             SeedGoalTargetsFromCurrentRigPose();
             bool goalTargetsReady = _goalTargetsReady;
 
             pose.leftHand.weight = Mathf.Clamp01(realtimeLeftHandWeight);
+            pose.leftHand.rotationWeight = pose.leftHand.weight;
             pose.rightHand.weight = Mathf.Clamp01(realtimeRightHandWeight);
+            pose.rightHand.rotationWeight = pose.rightHand.weight;
             pose.leftFoot.weight = Mathf.Clamp01(realtimeLeftFootWeight);
+            pose.leftFoot.rotationWeight = pose.leftFoot.weight;
             pose.rightFoot.weight = Mathf.Clamp01(realtimeRightFootWeight);
+            pose.rightFoot.rotationWeight = pose.rightFoot.weight;
 
             if (goalTargetsReady && pose.leftHand.weight > 0.001f)
             {
@@ -1078,7 +1267,7 @@ namespace ES
 
             if (pose.lookAtWeight <= 0.001f && !HasActiveLookAtWeightSmoothing())
             {
-                if (_lookAtIKReady && _lookAtIK.enabled)
+                if (_lookAtIKReady)
                     _lookAtIK.enabled = false;
                 if (_bipedIKReady)
                     _bipedIK.SetLookAtWeight(0f, 0f, 0f, 0f, 0f, 0f, 0f);
@@ -1102,8 +1291,7 @@ namespace ES
 
             if (_lookAtIKReady)
             {
-                if (_lookAtIK.enabled != activeLookAt)
-                    _lookAtIK.enabled = activeLookAt;
+                _lookAtIK.enabled = false;
 
                 if (!activeLookAt)
                 {
@@ -1262,6 +1450,11 @@ namespace ES
             return _lhTarget != null && _rhTarget != null && _lfTarget != null && _rfTarget != null;
         }
 
+        private bool AreHintTargetTransformsAlive()
+        {
+            return _lhHint != null && _rhHint != null && _lfHint != null && _rfHint != null;
+        }
+
         private string GetMissingGoalTargetNames()
         {
             System.Text.StringBuilder sb = null;
@@ -1308,7 +1501,7 @@ namespace ES
 
             if (enableFullBodyBipedIK && _refs.fullBodyBipedIK != null)
             {
-                _refs.fullBodyBipedIK.enabled = true;
+                _refs.fullBodyBipedIK.enabled = false;
             }
 
             if (enableHitReaction && _hitReaction != null && _hitReactionReady)
@@ -1478,6 +1671,14 @@ namespace ES
                 || _lookAtClampWeightTarget > 0.001f;
         }
 
+        private bool HasActiveAimIKWeightSmoothing()
+        {
+            return _aimWeightCurrent > 0.001f
+                || _aimWeightTarget > 0.001f
+                || _aimPoleWeightCurrent > 0.001f
+                || _aimPoleWeightTarget > 0.001f;
+        }
+
         private static bool HasActiveLimbWeightSmoothing(LimbRuntimeWeights weights)
         {
             return weights.positionCurrent > 0.001f
@@ -1587,7 +1788,8 @@ namespace ES
                                              float wE, float pE, float rE)
         {
             if (Mathf.Abs(a.weight - b.weight) > wE) return false;
-            if (a.weight <= 0.001f && b.weight <= 0.001f)
+            if (Mathf.Abs(a.rotationWeight - b.rotationWeight) > wE) return false;
+            if (!a.HasAnyWeight && !b.HasAnyWeight)
             {
                 return (a.hintPosition - b.hintPosition).sqrMagnitude <= pE;
             }

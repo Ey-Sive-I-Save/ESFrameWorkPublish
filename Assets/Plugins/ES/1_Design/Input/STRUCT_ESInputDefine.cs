@@ -48,7 +48,7 @@ namespace ES
         [LabelText("旧触发方式")]
         public ESInputTriggerType triggerType = ESInputTriggerType.Pressed;
 
-        [LabelText("触发标记")]
+        [LabelText("触发方式")]
         public ESInputTriggerFeature triggerFeatures = ESInputTriggerFeature.None;
 
         [LabelText("短按策略")]

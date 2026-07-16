@@ -13,7 +13,6 @@ namespace ES
         [LabelText("默认方案")]
         public string defaultSchemeId = ESInputSchemeIds.KeyboardMouse;
 
-
         [Title("输入方案")]
         [LabelText("方案列表")]
         [ESTwoPaneList("displayName", 220f, 240f, false, "输入方案", "方案详情")]
@@ -112,11 +111,16 @@ namespace ES
             AddDefaultActions(actions);
         }
 
-
-        public ESInputRuntimeBuildResult BuildRuntime(ESInputBindingProfile profile = null)
+        public ESInputRuntimeBuildResult BuildRuntime(params ESInputBindingProfile[] profileLayers)
         {
             EnsureBindingIds();
-            return ESInputRuntimeBuilder.Build(this, profile, defaultSchemeId);
+            return ESInputUtility.BuildRuntime(this, defaultSchemeId, profileLayers);
+        }
+
+        public ESInputRuntimeBuildResult BuildRuntime(IList<ESInputBindingProfile> profileLayers)
+        {
+            EnsureBindingIds();
+            return ESInputUtility.BuildRuntime(this, defaultSchemeId, profileLayers);
         }
 
         [Button("补齐绑定ID")]
@@ -173,33 +177,32 @@ namespace ES
                 .WithVirtualBinding(ESInputSchemeIds.Touch, "LookArea"));
 
             target.Add(Button(ESInputActionId.Attack, "Attack", "攻击", "<Mouse>/leftButton", "<Gamepad>/rightTrigger", "AttackButton"));
-            target.Add(Button(ESInputActionId.HeavyAttack, "HeavyAttack", "重击", "<Mouse>/rightButton", "<Gamepad>/leftTrigger", "HeavyAttackButton"));
+            target.Add(Button(ESInputActionId.HeavyAttack, "HeavyAttack", "重击", "<Mouse>/middleButton", "<Gamepad>/rightShoulder", "HeavyAttackButton"));
             target.Add(Button(ESInputActionId.Block, "Block", "格挡", "<Keyboard>/leftShift", "<Gamepad>/leftShoulder", "BlockButton"));
-            target.Add(Button(ESInputActionId.Slide, "Slide", "滑行", "<Keyboard>/leftCtrl", "<Gamepad>/rightShoulder", "SlideButton"));
+            target.Add(Button(ESInputActionId.Slide, "Slide", "滑行", "<Keyboard>/leftCtrl", "<Gamepad>/buttonEast", "SlideButton"));
             target.Add(Button(ESInputActionId.SwitchWeapon, "SwitchWeapon", "切换武器", "<Keyboard>/tab", "<Gamepad>/dpad/right", "SwitchWeaponButton"));
-            target.Add(Button(ESInputActionId.EquipWeapon, "EquipWeapon", "装备武器", "<Keyboard>/q", "<Gamepad>/buttonWest", "EquipWeaponButton"));
-            target.Add(Button(ESInputActionId.HolsterWeapon, "HolsterWeapon", "收起武器", "<Keyboard>/t", "<Gamepad>/start", "HolsterWeaponButton"));
-            target.Add(Button(ESInputActionId.WeaponSlot1, "WeaponSlot1", "武器槽1", "<Keyboard>/1", "<Gamepad>/dpad/up", "WeaponSlot1Button"));
-            target.Add(Button(ESInputActionId.WeaponSlot2, "WeaponSlot2", "武器槽2", "<Keyboard>/2", "<Gamepad>/dpad/right", "WeaponSlot2Button"));
-            target.Add(Button(ESInputActionId.WeaponSlot3, "WeaponSlot3", "武器槽3", "<Keyboard>/3", "<Gamepad>/dpad/down", "WeaponSlot3Button"));
-            target.Add(Button(ESInputActionId.WeaponSlot4, "WeaponSlot4", "武器槽4", "<Keyboard>/4", "<Gamepad>/dpad/left", "WeaponSlot4Button"));
-            target.Add(Button(ESInputActionId.WeaponSlot5, "WeaponSlot5", "武器槽5", "<Keyboard>/5", "<Gamepad>/rightStickPress", "WeaponSlot5Button"));
+            target.Add(Button(ESInputActionId.EquipWeapon, "EquipWeapon", "装备武器", "<Keyboard>/v", "", "EquipWeaponButton"));
+            target.Add(Button(ESInputActionId.HolsterWeapon, "HolsterWeapon", "收起武器", "<Keyboard>/h", "", "HolsterWeaponButton"));
+            target.Add(Button(ESInputActionId.WeaponSlot1, "WeaponSlot1", "武器槽1", "<Keyboard>/1", "", "WeaponSlot1Button"));
+            target.Add(Button(ESInputActionId.WeaponSlot2, "WeaponSlot2", "武器槽2", "<Keyboard>/2", "", "WeaponSlot2Button"));
+            target.Add(Button(ESInputActionId.WeaponSlot3, "WeaponSlot3", "武器槽3", "<Keyboard>/3", "", "WeaponSlot3Button"));
+            target.Add(Button(ESInputActionId.WeaponSlot4, "WeaponSlot4", "武器槽4", "<Keyboard>/4", "", "WeaponSlot4Button"));
+            target.Add(Button(ESInputActionId.WeaponSlot5, "WeaponSlot5", "武器槽5", "<Keyboard>/5", "", "WeaponSlot5Button"));
             target.Add(Button(ESInputActionId.Aim, "Aim", "瞄准", "<Mouse>/rightButton", "<Gamepad>/leftTrigger", "AimButton"));
             target.Add(Button(ESInputActionId.PeekLeft, "PeekLeft", "左探头", "<Keyboard>/z", "", "PeekLeftButton"));
             target.Add(Button(ESInputActionId.PeekRight, "PeekRight", "右探头", "<Keyboard>/x", "", "PeekRightButton"));
-            target.Add(Button(ESInputActionId.Skill1, "Skill1", "技能1", "<Keyboard>/f1", "<Gamepad>/dpad/up", "Skill1Button"));
-            target.Add(Button(ESInputActionId.Skill2, "Skill2", "技能2", "<Keyboard>/f2", "<Gamepad>/dpad/left", "Skill2Button"));
-            target.Add(Button(ESInputActionId.Skill3, "Skill3", "技能3", "<Keyboard>/f3", "<Gamepad>/dpad/down", "Skill3Button"));
+            target.Add(Button(ESInputActionId.Skill1, "Skill1", "技能1", "<Keyboard>/q", "<Gamepad>/dpad/up", "Skill1Button"));
+            target.Add(Button(ESInputActionId.Skill2, "Skill2", "技能2", "<Keyboard>/r", "<Gamepad>/dpad/left", "Skill2Button"));
+            target.Add(Button(ESInputActionId.Skill3, "Skill3", "技能3", "<Keyboard>/t", "<Gamepad>/dpad/down", "Skill3Button"));
             target.Add(Button(ESInputActionId.Jump, "Jump", "跳跃", "<Keyboard>/space", "<Gamepad>/buttonSouth", "JumpButton"));
             target.Add(Button(ESInputActionId.Crouch, "Crouch", "蹲伏", "<Keyboard>/c", "<Gamepad>/rightStickPress", "CrouchButton"));
-            target.Add(Button(ESInputActionId.Fly, "Fly", "飞行", "<Keyboard>/f", "<Gamepad>/buttonNorth", "FlyButton"));
-            target.Add(Button(ESInputActionId.Mount, "Mount", "骑乘", "<Keyboard>/r", "<Gamepad>/buttonWest", "MountButton"));
+            target.Add(Button(ESInputActionId.Fly, "Fly", "飞行", "<Keyboard>/b", "<Gamepad>/buttonNorth", "FlyButton"));
+            target.Add(Button(ESInputActionId.Mount, "Mount", "骑乘", "<Keyboard>/y", "<Gamepad>/start", "MountButton"));
             target.Add(Button(ESInputActionId.Climb, "Climb", "攀爬", "<Keyboard>/g", "<Gamepad>/leftStickPress", "ClimbButton"));
-            target.Add(Button(ESInputActionId.Interact, "Interact", "交互", "<Keyboard>/e", "<Gamepad>/buttonEast", "InteractButton"));
+            target.Add(Button(ESInputActionId.Interact, "Interact", "交互", "<Keyboard>/e", "<Gamepad>/buttonWest", "InteractButton"));
 
             target.Add(Value(ESInputActionId.FlyVertical, "FlyVertical", ESInputValueType.Axis, "飞行垂直")
-                .WithAxisComposite(ESInputSchemeIds.KeyboardMouse, "QE", "<Keyboard>/q", "<Keyboard>/e")
-                .WithAxisComposite(ESInputSchemeIds.Gamepad, "Triggers", "<Gamepad>/leftTrigger", "<Gamepad>/rightTrigger")
+                .WithAxisComposite(ESInputSchemeIds.KeyboardMouse, "PageUpDown", "<Keyboard>/pageDown", "<Keyboard>/pageUp")
                 .WithVirtualBinding(ESInputSchemeIds.Touch, "FlyVerticalSlider"));
         }
 
@@ -209,7 +212,6 @@ namespace ES
             config.displayName = displayName;
             return config;
         }
-
 
         private static ESInputActionDefine Button(
             ESInputActionId id,
@@ -236,6 +238,69 @@ namespace ES
 
     public static class ESInputActionDefineExtensions
     {
+        public static ESInputActionDefine WithTrigger(
+            this ESInputActionDefine config,
+            ESInputTriggerFeature features,
+            ESInputPressPolicy pressPolicy = ESInputPressPolicy.PressedImmediate,
+            float longPressDuration = 0.5f,
+            float doublePressWindow = 0.28f)
+        {
+            if (config == null)
+                return null;
+
+            config.triggerFeatures = features;
+            config.pressPolicy = pressPolicy;
+            config.longPressDuration = longPressDuration;
+            config.doublePressWindow = doublePressWindow;
+            return config;
+        }
+
+        public static ESInputActionDefine WithClick(this ESInputActionDefine config)
+        {
+            return config.WithTrigger(ESInputTriggerFeature.Pressed, ESInputPressPolicy.PressedImmediate);
+        }
+
+        public static ESInputActionDefine WithClickAndRelease(this ESInputActionDefine config)
+        {
+            return config.WithTrigger(ESInputTriggerFeature.Pressed | ESInputTriggerFeature.Released, ESInputPressPolicy.PressedImmediate);
+        }
+
+        public static ESInputActionDefine WithClickAndLongPress(
+            this ESInputActionDefine config,
+            float longPressDuration = 0.5f,
+            ESInputPressPolicy pressPolicy = ESInputPressPolicy.PressedIfNotLongPress)
+        {
+            return config.WithTrigger(
+                ESInputTriggerFeature.Pressed | ESInputTriggerFeature.LongPress,
+                pressPolicy,
+                longPressDuration);
+        }
+
+        public static ESInputActionDefine WithClickAndDoublePress(
+            this ESInputActionDefine config,
+            float doublePressWindow = 0.28f,
+            ESInputPressPolicy pressPolicy = ESInputPressPolicy.PressedImmediate)
+        {
+            return config.WithTrigger(
+                ESInputTriggerFeature.Pressed | ESInputTriggerFeature.DoublePress,
+                pressPolicy,
+                0.5f,
+                doublePressWindow);
+        }
+
+        public static ESInputActionDefine WithClickLongAndDoublePress(
+            this ESInputActionDefine config,
+            float longPressDuration = 0.5f,
+            float doublePressWindow = 0.28f,
+            ESInputPressPolicy pressPolicy = ESInputPressPolicy.PressedIfNotLongPress)
+        {
+            return config.WithTrigger(
+                ESInputTriggerFeature.Pressed | ESInputTriggerFeature.LongPress | ESInputTriggerFeature.DoublePress,
+                pressPolicy,
+                longPressDuration,
+                doublePressWindow);
+        }
+
         public static ESInputActionDefine WithBinding(this ESInputActionDefine config, string schemeId, string path, string interactions = "", string processors = "")
         {
             ESInputBindingDefine binding = ESInputBindingDefine.InputSystem(schemeId, path, interactions, processors);
@@ -277,7 +342,7 @@ namespace ES
 
         private static ESInputBindingDefine Composite(string schemeId, string name, string compositePath)
         {
-            ESInputBindingDefine binding = new ESInputBindingDefine
+            return new ESInputBindingDefine
             {
                 schemeId = schemeId,
                 source = ESInputBindingSource.InputSystem,
@@ -285,7 +350,6 @@ namespace ES
                 name = name,
                 path = compositePath
             };
-            return binding;
         }
 
         private static ESInputBindingDefine CompositePart(string schemeId, string name, string path)

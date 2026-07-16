@@ -9,7 +9,7 @@ using UnityEditor;
 using UnityEngine;
 
 
-namespace ES {
+namespace ES.EditorInternal {
     #region ESGetOrAdd 
 
     public class ESGetOrAddDrawer : OdinAttributeDrawer<ESGetAdd>

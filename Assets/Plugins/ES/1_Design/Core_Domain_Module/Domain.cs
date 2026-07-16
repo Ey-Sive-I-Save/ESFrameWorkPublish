@@ -38,8 +38,40 @@ namespace ES
 
         public Core_ MyCore { get => myCore; }
 
-        [BoxGroup("扩展模块集"), OdinSerialize, HideLabel]
+        [OdinSerialize, HideInInspector]
         public SafeNormalList<Module_> MyModules = new SafeNormalList<Module_>();
+
+        [ShowInInspector, BoxGroup("扩展模块集"), HideLabel, LabelText("模块列表")]
+        [ListDrawerSettings(
+            ShowFoldout = true,
+            ListElementLabelName = "$type",
+            DefaultExpandedState = true,
+            DraggableItems = false,
+            ShowIndexLabels = false,
+            ShowPaging = true,
+            NumberOfItemsPerPage = 8)]
+        private List<Module_> Editor_Modules
+        {
+            get
+            {
+                EnsureModuleList();
+                return MyModules.ValuesNow;
+            }
+            set
+            {
+                EnsureModuleList();
+                MyModules.ValuesNow = value ?? new List<Module_>();
+            }
+        }
+
+        private void EnsureModuleList()
+        {
+            if (MyModules == null)
+                MyModules = new SafeNormalList<Module_>();
+
+            if (MyModules.ValuesNow == null)
+                MyModules.ValuesNow = new List<Module_>();
+        }
 
         #endregion
 

@@ -1,9 +1,10 @@
 using Sirenix.OdinInspector.Editor;
 using System.Collections;
+using ES;
 using UnityEditor;
 using UnityEngine;
 
-namespace ES
+namespace ES.EditorInternal
 {
     public sealed class ESTwoPaneListAttributeDrawer : OdinAttributeDrawer<ESTwoPaneListAttribute>
     {

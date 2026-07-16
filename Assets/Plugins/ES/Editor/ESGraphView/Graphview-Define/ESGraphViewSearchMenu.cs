@@ -7,7 +7,7 @@ using System.Linq;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
-namespace ES
+namespace ES.EditorInternal
 {
     public class ESGraphViewSearchMenu : ScriptableObject, ISearchWindowProvider
     {

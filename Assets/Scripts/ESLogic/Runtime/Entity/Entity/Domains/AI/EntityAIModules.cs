@@ -698,8 +698,6 @@ namespace ES
         private float _totalMoveTime;
         private float _last1sSpeedSum;
         private readonly Queue<SpeedSample> _speedSamples = new Queue<SpeedSample>(64);
-        private StateFinalIKDriver _ikDriver;
-        private Animator _ikDriverAnimator;
         private Transform _runtimeAimTarget;
 
         [ShowInInspector, ReadOnly, LabelText("总运动时长")]
@@ -878,42 +876,30 @@ namespace ES
 
         private StateFinalIKDriver ResolveIKDriver()
         {
-            if (MyCore == null)
-                return null;
-
-            var animator = MyCore.animator;
-            if (animator == null)
-                return null;
-
-            if (_ikDriver != null && _ikDriverAnimator == animator)
-                return _ikDriver;
-
-            _ikDriverAnimator = animator;
-            _ikDriver = animator.GetComponent<StateFinalIKDriver>();
-            return _ikDriver;
+            return MyCore != null ? MyCore.ResolveStateFinalIKDriver() : null;
         }
 
         private void ApplyCombatAimAndPeek(StateFinalIKDriver ikDriver, EntityBasicCombatModule combatModule, Transform cam)
         {
-            ikDriver.SetAimPeekViewReference(cam);
+            ikDriver.IKSetPeekViewReference(cam);
 
             if (!combatModule.isAiming)
             {
-                ikDriver.ClearAimPeek();
-                ikDriver.HandleStopAim();
+                ikDriver.IKClearPeek();
+                ikDriver.IKStopAim();
                 return;
             }
 
             if (!driveAimIK)
             {
-                ikDriver.HandleAim(aimIKWeight);
-                ikDriver.SetAimPeek(combatModule.aimPeek);
+                ikDriver.IKSetAimTargetWeight(aimIKWeight);
+                ikDriver.IKSetPeek(combatModule.aimPeek);
                 return;
             }
 
             var aimTarget = ResolveRuntimeAimTarget(cam);
-            ikDriver.HandleAim(aimTarget, aimIKWeight);
-            ikDriver.SetAimPeek(combatModule.aimPeek);
+            ikDriver.IKAimAt(aimTarget, aimIKWeight);
+            ikDriver.IKSetPeek(combatModule.aimPeek);
         }
 
         private Transform ResolveRuntimeAimTarget(Transform cam)

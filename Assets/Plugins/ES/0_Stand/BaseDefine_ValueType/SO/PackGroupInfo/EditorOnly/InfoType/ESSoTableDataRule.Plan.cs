@@ -14,6 +14,12 @@ namespace ES
 {
     public partial class ESSoTableDataRule
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private static readonly Unity.Profiling.ProfilerMarker BuildExecutionPlanMarker =
+            new Unity.Profiling.ProfilerMarker("【ES】SO表格执行计划");
+#endif
+
+        #region Execution Plan And Risk Report
         [Button("Debug 指定表格行")]
         public void DebugConfiguredTableRow()
         {
@@ -24,7 +30,7 @@ namespace ES
                 return;
             }
 
-            List<List<string>> table = ReadTableFileAuto(inputPath);
+            List<List<string>> table = ReadTableFileCached(inputPath);
             int rowIndex = Math.Max(1, debugRowNumber) - 1;
             if (rowIndex < 4 || rowIndex >= table.Count)
             {
@@ -67,11 +73,13 @@ namespace ES
             int rowKeyColumnIndex = FindTableColumnIndex(tableColumnMap, rowBinding != null ? rowBinding.rowKeyColumnName : null);
             bool tableHasObjectKey = HasObjectKeyColumn(tableColumnMap);
             int ownerCursor = 0;
+            var childRowsByOwner = new Dictionary<ScriptableObject, Dictionary<string, object>>();
+            var keylessChildCursorByOwner = new Dictionary<ScriptableObject, int>();
 
             List<string> row = table[rowIndex];
             ESTableRowDirectiveInfo directive = ParseRowDirective(row);
             builder.AppendLine("指令：" + FirstNotEmptyLocal(directive.rawText, "正常"));
-            builder.AppendLine("整行空：" + IsDataRowEmpty(row));
+            builder.AppendLine("整行为空：" + IsDataRowEmpty(row));
 
             ESTableBatchApplyFilter applyFilter = BuildApplyFilter(table, tableColumnMap);
             bool inRange = ShouldApplyTableRow(row, applyFilter);
@@ -86,7 +94,7 @@ namespace ES
             string createFolder = string.Empty;
             bool canCreateOwner = owner == null && CanCreateOwnerInActiveFolder(ownerType, out createFolder);
             builder.AppendLine("目标 SO：" + (owner != null ? DescribePlanObject(owner) : "(未找到)"));
-            builder.AppendLine("可创建缺失 SO：" + canCreateOwner + (canCreateOwner ? "，目录=" + createFolder : string.Empty));
+            builder.AppendLine("可创建缺失 SO：" + canCreateOwner + (canCreateOwner ? "，目录：" + createFolder : string.Empty));
 
             object rowObject = owner;
             if (rowBinding != null && rowBinding.IsListElementRow)
@@ -96,8 +104,12 @@ namespace ES
                 builder.AppendLine("子级 Key：" + FirstNotEmptyLocal(rowKey, "(空)"));
                 builder.AppendLine("允许空 Key 重建导入：" + CanImportEmptyChildKeyForRebuild(owner));
                 if (owner != null && directive.directive != ESTableRowDirective.Owner)
-                    rowObject = FindExistingChildRowReadOnly(owner, rowKey);
-                builder.AppendLine("目标子级：" + (rowObject != null && !ReferenceEquals(rowObject, owner) ? rowObject.GetType().Name : "(未找到/将新建/owner行)"));
+                {
+                    rowObject = string.IsNullOrWhiteSpace(rowKey) && CanImportEmptyChildKeyByOrder(owner)
+                        ? FindExistingKeylessChildRowReadOnly(owner, keylessChildCursorByOwner)
+                        : FindExistingChildRowReadOnly(owner, rowKey, childRowsByOwner);
+                }
+                builder.AppendLine("目标子级：" + (rowObject != null && !ReferenceEquals(rowObject, owner) ? rowObject.GetType().Name : "(未找到，将新建或作为 owner 行)"));
             }
 
             AppendFieldChangePlan(builder, row, compiledColumns, owner, rowObject, directive, summary, rowIndex);
@@ -147,6 +159,18 @@ namespace ES
         }
 
         private string BuildBatchExecutionPlanBody(ESSoTableRuleUseBatch batch, ESTablePlanRiskSummary summary)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            using (BuildExecutionPlanMarker.Auto())
+            {
+                return BuildBatchExecutionPlanBodyCore(batch, summary);
+            }
+#else
+            return BuildBatchExecutionPlanBodyCore(batch, summary);
+#endif
+        }
+
+        private string BuildBatchExecutionPlanBodyCore(ESSoTableRuleUseBatch batch, ESTablePlanRiskSummary summary)
         {
             if (batch != null && batch.useSuperBatch)
                 return BuildSuperBatchPlanReport(batch, summary);
@@ -340,7 +364,7 @@ namespace ES
                 return;
             }
 
-            List<List<string>> table = ReadTableFileAuto(inputPath);
+            List<List<string>> table = ReadTableFileCached(inputPath);
             if (table.Count < 5)
             {
                 AddPlanError(summary, "表格行数不足：至少需要 4 行表头和 1 行数据。");
@@ -361,6 +385,12 @@ namespace ES
             ESTableBatchApplyFilter applyFilter = BuildApplyFilter(table, tableColumnMap);
             ValidateColumnAssertions(table, compiledColumns, applyFilter, summary);
             int ownerCursor = 0;
+            Dictionary<ScriptableObject, Dictionary<string, object>> childRowsByOwner = serialChildRows
+                ? new Dictionary<ScriptableObject, Dictionary<string, object>>()
+                : null;
+            Dictionary<ScriptableObject, int> keylessChildCursorByOwner = serialChildRows
+                ? new Dictionary<ScriptableObject, int>()
+                : null;
 
             int dataStartRow = GetDataStartRowIndex(table);
             builder.AppendLine("数据行数：" + Math.Max(0, table.Count - dataStartRow));
@@ -373,6 +403,8 @@ namespace ES
 
             for (int rowIndex = dataStartRow; rowIndex < table.Count; rowIndex++)
             {
+                try
+                {
                 List<string> row = table[rowIndex];
                 ESTableRowDirectiveInfo directive = ParseRowDirective(row);
                 builder.AppendLine();
@@ -437,20 +469,33 @@ namespace ES
                 if (serialChildRows)
                 {
                     string rowKey = GetCell(row, rowKeyColumnIndex);
-                    if (string.IsNullOrWhiteSpace(rowKey) && !CanImportEmptyChildKeyForRebuild(owner))
+                    bool keylessChildByOrder = string.IsNullOrWhiteSpace(rowKey) && CanImportEmptyChildKeyByOrder(owner);
+                    if (string.IsNullOrWhiteSpace(rowKey) && !CanImportEmptyChildKeyForRebuild(owner) && !keylessChildByOrder)
                     {
                         AddPlanError(summary, "第 " + (rowIndex + 1) + " 行子级 Key 为空。只有启用允许空 Key 且使用按宿主重建模式时才允许。");
                         builder.AppendLine("目标子级：Key 为空，当前策略不允许。");
                         continue;
                     }
 
-                    rowObject = directive.directive == ESTableRowDirective.Owner ? owner : FindExistingChildRowReadOnly(owner, rowKey);
+                    rowObject = directive.directive == ESTableRowDirective.Owner
+                        ? owner
+                        : keylessChildByOrder
+                            ? FindExistingKeylessChildRowReadOnly(owner, keylessChildCursorByOwner)
+                            : FindExistingChildRowReadOnly(owner, rowKey, childRowsByOwner);
                     if (directive.directive != ESTableRowDirective.Owner && rowObject == null)
                         summary.addedChildren++;
                     builder.AppendLine("目标子级：" + (directive.directive == ESTableRowDirective.Owner ? "owner 行，只写 SO 本体字段" : FirstNotEmptyLocal(rowKey, "(空 Key 重建行)")));
                 }
 
                 AppendFieldChangePlan(builder, row, compiledColumns, owner, rowObject, directive, summary, rowIndex);
+                }
+                catch (Exception e)
+                {
+                    summary.skippedRows++;
+                    AddPlanError(summary, "第 " + (rowIndex + 1) + " 行计划失败，已跳过：" + e.Message);
+                    builder.AppendLine();
+                    builder.AppendLine("第 " + (rowIndex + 1) + " 行计划失败，已跳过：" + e.Message);
+                }
             }
 
             if (serialChildRows && GetActiveSerialChildImportSyncMode() == ESTableSerialChildImportSyncMode.PruneMissingByTable)
@@ -676,7 +721,7 @@ namespace ES
             }
         }
 
-        private object FindExistingChildRowReadOnly(ScriptableObject owner, string rowKey)
+        private object FindExistingChildRowReadOnly(ScriptableObject owner, string rowKey, Dictionary<ScriptableObject, Dictionary<string, object>> childRowsByOwner = null)
         {
             if (owner == null || rowBinding == null || !rowBinding.IsListElementRow || string.IsNullOrWhiteSpace(rowKey))
                 return null;
@@ -689,15 +734,29 @@ namespace ES
             if (list == null)
                 return null;
 
-            for (int i = 0; i < list.Count; i++)
-            {
-                object element = list[i];
-                string key = ESRowBindingReflectionUtility.GetMemberValue(element, rowBinding.elementKeyFieldPath)?.ToString();
-                if (string.Equals(key, rowKey, StringComparison.Ordinal))
-                    return element;
-            }
+            Dictionary<string, object> rowsByKey = GetOrBuildChildRowCache(owner, list, childRowsByOwner);
+            return rowsByKey.TryGetValue(rowKey, out object rowObject) ? rowObject : null;
+        }
 
-            return null;
+        private object FindExistingKeylessChildRowReadOnly(ScriptableObject owner, Dictionary<ScriptableObject, int> keylessChildCursorByOwner)
+        {
+            if (owner == null || rowBinding == null || !rowBinding.IsListElementRow || !rowBinding.allowEmptyRowKey)
+                return null;
+            if (RowBridge.EnsureDictionary(owner, rowBinding) != null)
+                return null;
+
+            IList list = RowBridge.EnsureContainer(owner, rowBinding);
+            if (list == null)
+                return null;
+
+            int index = 0;
+            if (keylessChildCursorByOwner != null)
+                keylessChildCursorByOwner.TryGetValue(owner, out index);
+
+            object rowObject = index >= 0 && index < list.Count ? list[index] : null;
+            if (keylessChildCursorByOwner != null)
+                keylessChildCursorByOwner[owner] = index + 1;
+            return rowObject;
         }
 
         private bool CanExportEmptyChildKeyForRebuild()
@@ -854,6 +913,7 @@ namespace ES
                 return "填写合法 JSON，例如对象用 {\"field\":1}，数组用 [1,2]。";
             return "检查单元格格式和目标字段类型。";
         }
+        #endregion
     }
 }
 #endif

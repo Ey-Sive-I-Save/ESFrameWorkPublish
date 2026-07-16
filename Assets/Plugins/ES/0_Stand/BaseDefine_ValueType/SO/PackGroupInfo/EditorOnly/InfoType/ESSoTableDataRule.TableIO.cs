@@ -6,11 +6,13 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Xml;
+using Sirenix.OdinInspector;
 
 namespace ES
 {
     public partial class ESSoTableDataRule
     {
+        #region CSV XLSX Table IO
         private static List<List<string>> ReadTableFileAuto(string path)
         {
             string extension = Path.GetExtension(path)?.ToLowerInvariant();
@@ -39,7 +41,7 @@ namespace ES
                 builder.AppendLine();
             }
 
-            File.WriteAllText(path, builder.ToString(), new UTF8Encoding(true));
+            WriteTextAtomic(path, builder.ToString(), new UTF8Encoding(true));
         }
 
         private static List<List<string>> ReadCsv(string path)
@@ -121,25 +123,91 @@ namespace ES
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
 
-        private static void WriteXlsx(string path, List<List<string>> table, string sheet)
+        private static void WriteXlsx(string path, List<List<string>> table, string sheet, Dictionary<int, string> dataDropdownsByColumn = null)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            if (File.Exists(path))
-                File.Delete(path);
+            string tempPath = BuildTempWritePath(path);
 
-            using (FileStream stream = File.Create(path))
-            using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
+            try
             {
-                AddZipText(archive, "[Content_Types].xml", BuildContentTypesXml());
-                AddZipText(archive, "_rels/.rels", BuildRootRelsXml());
-                AddZipText(archive, "xl/workbook.xml", BuildWorkbookXml(sheet));
-                AddZipText(archive, "xl/_rels/workbook.xml.rels", BuildWorkbookRelsXml());
-                AddZipText(archive, "xl/styles.xml", BuildStylesXml());
-                AddZipText(archive, "xl/worksheets/sheet1.xml", BuildWorksheetXml(table));
-                AddZipText(archive, "xl/worksheets/_rels/sheet1.xml.rels", BuildWorksheetRelsXml());
-                AddZipText(archive, "xl/comments1.xml", BuildCommentsXml(table));
-                AddZipText(archive, "xl/drawings/vmlDrawing1.vml", BuildVmlDrawingXml(table));
+                using (FileStream stream = File.Create(tempPath))
+                using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
+                {
+                    AddZipText(archive, "[Content_Types].xml", BuildContentTypesXml());
+                    AddZipText(archive, "_rels/.rels", BuildRootRelsXml());
+                    AddZipText(archive, "xl/workbook.xml", BuildWorkbookXml(sheet));
+                    AddZipText(archive, "xl/_rels/workbook.xml.rels", BuildWorkbookRelsXml());
+                    AddZipText(archive, "xl/styles.xml", BuildStylesXml());
+                    AddZipText(archive, "xl/worksheets/sheet1.xml", BuildWorksheetXml(table, dataDropdownsByColumn));
+                    AddZipText(archive, "xl/worksheets/_rels/sheet1.xml.rels", BuildWorksheetRelsXml());
+                    AddZipText(archive, "xl/comments1.xml", BuildCommentsXml(table));
+                    AddZipText(archive, "xl/drawings/vmlDrawing1.vml", BuildVmlDrawingXml(table));
+                }
+
+                ReplaceFileWithBackup(tempPath, path);
             }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+
+        private static void WriteTextAtomic(string path, string text, Encoding encoding)
+        {
+            string tempPath = BuildTempWritePath(path);
+            try
+            {
+                File.WriteAllText(tempPath, text, encoding);
+                ReplaceFileWithBackup(tempPath, path);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+
+        private static string BuildTempWritePath(string path)
+        {
+            string directory = Path.GetDirectoryName(path);
+            string fileName = Path.GetFileName(path);
+            return Path.Combine(directory, "." + fileName + "." + Guid.NewGuid().ToString("N") + ".tmp");
+        }
+
+        private static void ReplaceFileWithBackup(string tempPath, string targetPath)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(targetPath));
+            if (!File.Exists(targetPath))
+            {
+                File.Move(tempPath, targetPath);
+                return;
+            }
+
+            string backupPath = BuildBackupPath(targetPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(backupPath));
+            File.Replace(tempPath, targetPath, backupPath, true);
+        }
+
+        private static string BuildBackupPath(string targetPath)
+        {
+            string directory = Path.GetDirectoryName(targetPath);
+            string backupDirectory = Path.Combine(directory, "_backups");
+            string fileName = Path.GetFileNameWithoutExtension(targetPath);
+            string extension = Path.GetExtension(targetPath);
+            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string backupPath = Path.Combine(backupDirectory, fileName + "." + stamp + extension + ".bak");
+            if (!File.Exists(backupPath))
+                return backupPath;
+
+            for (int i = 1; i < 1000; i++)
+            {
+                backupPath = Path.Combine(backupDirectory, fileName + "." + stamp + "." + i.ToString(CultureInfo.InvariantCulture) + extension + ".bak");
+                if (!File.Exists(backupPath))
+                    return backupPath;
+            }
+
+            return Path.Combine(backupDirectory, fileName + "." + stamp + "." + Guid.NewGuid().ToString("N") + extension + ".bak");
         }
 
         private static List<List<string>> ReadXlsx(string path)
@@ -346,7 +414,7 @@ namespace ES
                    "</styleSheet>";
         }
 
-        private static string BuildWorksheetXml(List<List<string>> table)
+        private static string BuildWorksheetXml(List<List<string>> table, Dictionary<int, string> dataDropdownsByColumn = null)
         {
             var builder = new StringBuilder(8192);
             builder.Append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
@@ -373,7 +441,7 @@ namespace ES
             }
 
             builder.Append("</sheetData>");
-            builder.Append(BuildDataValidationsXml(table));
+            builder.Append(BuildDataValidationsXml(table, dataDropdownsByColumn));
             builder.Append("<legacyDrawing r:id=\"rId2\"/>");
             builder.Append("</worksheet>");
             return builder.ToString();
@@ -403,10 +471,11 @@ namespace ES
             return 0;
         }
 
-        private static string BuildDataValidationsXml(List<List<string>> table)
+        private static string BuildDataValidationsXml(List<List<string>> table, Dictionary<int, string> dataDropdownsByColumn = null)
         {
             int assertRowIndex = FindAssertRowIndex(table);
-            int validationCount = assertRowIndex >= 0 ? 2 : 1;
+            int enumDropdownCount = CountValidDataDropdowns(dataDropdownsByColumn);
+            int validationCount = (assertRowIndex >= 0 ? 2 : 1) + enumDropdownCount;
             int dataStartRow = GetDataStartRowIndex(table) + 1;
             var builder = new StringBuilder();
             builder.Append("<dataValidations count=\"").Append(validationCount).Append("\">");
@@ -419,8 +488,36 @@ namespace ES
                     .Append(row).Append(":").Append(lastColumn).Append(row)
                     .Append("\"><formula1>\"required,unique,required;unique,json,asset,range:1..99,regex:^[a-z0-9_]+$\"</formula1></dataValidation>");
             }
+            if (dataDropdownsByColumn != null)
+            {
+                foreach (KeyValuePair<int, string> pair in dataDropdownsByColumn)
+                {
+                    if (pair.Key < 0 || string.IsNullOrWhiteSpace(pair.Value))
+                        continue;
+
+                    string columnName = GetExcelColumnName(pair.Key + 1);
+                    builder.Append("<dataValidation type=\"list\" allowBlank=\"1\" showErrorMessage=\"1\" sqref=\"")
+                        .Append(columnName).Append(dataStartRow).Append(":").Append(columnName).Append("1048576")
+                        .Append("\"><formula1>\"").Append(EscapeXml(pair.Value)).Append("\"</formula1></dataValidation>");
+                }
+            }
             builder.Append("</dataValidations>");
             return builder.ToString();
+        }
+
+        private static int CountValidDataDropdowns(Dictionary<int, string> dataDropdownsByColumn)
+        {
+            if (dataDropdownsByColumn == null)
+                return 0;
+
+            int count = 0;
+            foreach (KeyValuePair<int, string> pair in dataDropdownsByColumn)
+            {
+                if (pair.Key >= 0 && !string.IsNullOrWhiteSpace(pair.Value))
+                    count++;
+            }
+
+            return count;
         }
 
         private static int FindAssertRowIndex(List<List<string>> table)
@@ -507,6 +604,7 @@ namespace ES
                 .Replace("\"", "&quot;")
                 .Replace("'", "&apos;");
         }
+        #endregion
     }
 }
 #endif

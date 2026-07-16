@@ -8,7 +8,7 @@ using UnityEditor;
 using UnityEngine;
 using Sirenix.Utilities.Editor;
 
-namespace ES
+namespace ES.EditorInternal
 {
     #region ESBoolOption-ESbool两级描述
     public class ESBoolOptionDrawer : OdinAttributeDrawer<ESBoolOption, bool>

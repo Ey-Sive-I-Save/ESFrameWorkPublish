@@ -83,7 +83,7 @@ namespace ES
 
         public void Update(float time, bool clearFrameState = true)
         {
-            if (!enabled || inputService == null || actionByIndex == null)
+            if (!enabled)
                 return;
 
             if (clearFrameState)
@@ -94,9 +94,6 @@ namespace ES
                 ESInputActionId id = enabledActionIds[i];
                 int index = (int)id;
                 InputAction action = actionByIndex[index];
-                if (action == null)
-                    continue;
-
                 ESInputValueType valueType = buildResult.cache.metas[index].valueType;
                 switch (valueType)
                 {
@@ -195,7 +192,10 @@ namespace ES
                 if (binding.isComposite)
                 {
                     InputActionSetupExtensions.CompositeSyntax composite =
-                        action.AddCompositeBinding(binding.effectivePath);
+                        action.AddCompositeBinding(
+                            binding.effectivePath,
+                            binding.interactions,
+                            binding.processors);
 
                     i = AddCompositeParts(action, composite, i + 1, binding.schemeId);
                     continue;
@@ -269,6 +269,8 @@ namespace ES
                 actionByIndex[i].Dispose();
                 actionByIndex[i] = null;
             }
+
+            actionByIndex = null;
         }
 
         private static InputActionType ToInputActionType(ESInputValueType valueType)

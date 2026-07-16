@@ -16,7 +16,7 @@ namespace ES
     internal static partial class ESStandUtility
     {
         //
-        public class SafeEditor
+        public partial class SafeEditor
         {
             private static string _NormalizeAssetPath(string path)
             {

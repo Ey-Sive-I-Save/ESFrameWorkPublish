@@ -5,6 +5,9 @@ using System.Collections;
 using UnityEngine.UIElements;
 using System.Collections.Generic;
 
+namespace ES.EditorInternal
+{
+
 public class ESGraphViewWindow : EditorWindow
 {
     [SerializeField]
@@ -92,4 +95,5 @@ public class ESGraphViewWindow : EditorWindow
         }
     }
 
+}
 }

@@ -18,23 +18,17 @@ namespace ES
 
         public bool IsValidIndex(int index)
         {
-            return values != null && index >= 0 && index < values.Length;
+            return index >= 0 && index < values.Length;
         }
 
         public void ClearFrameState()
         {
-            if (values == null)
-                return;
-
             for (int i = 0; i < values.Length; i++)
                 values[i].ClearFrameState();
         }
 
         public void ResetAll()
         {
-            if (values == null)
-                return;
-
             for (int i = 0; i < values.Length; i++)
                 values[i].ResetAll();
         }
@@ -60,9 +54,6 @@ namespace ES
 
         public void EndFrame(float time)
         {
-            if (cache == null || cache.values == null)
-                return;
-
             for (int i = 0; i < cache.values.Length; i++)
             {
                 ESInputActionMeta meta = cache.metas[i];
@@ -77,9 +68,6 @@ namespace ES
         public void WriteButton(ESInputActionId id, bool isHeld, float time)
         {
             int index = (int)id;
-            if (cache == null || !cache.IsValidIndex(index))
-                return;
-
             ref ESInputRuntimeValue value = ref cache.values[index];
             value.buttonHeldThisFrame |= isHeld;
         }
@@ -172,20 +160,12 @@ namespace ES
 
         public void WriteAxis(ESInputActionId id, float axis)
         {
-            int index = (int)id;
-            if (cache == null || !cache.IsValidIndex(index))
-                return;
-
-            cache.values[index].axis = axis;
+            cache.values[(int)id].axis = axis;
         }
 
         public void WriteVector2(ESInputActionId id, Vector2 vector2)
         {
-            int index = (int)id;
-            if (cache == null || !cache.IsValidIndex(index))
-                return;
-
-            cache.values[index].vector2 = vector2;
+            cache.values[(int)id].vector2 = vector2;
         }
 
         public bool WasPressed(ESInputActionId id)
@@ -194,9 +174,7 @@ namespace ES
                 return false;
 
             int index = (int)id;
-            return cache != null
-                   && cache.IsValidIndex(index)
-                   && cache.values[index].pressed
+            return cache.values[index].pressed
                    && !cache.values[index].pressedConsumed;
         }
 
@@ -215,9 +193,7 @@ namespace ES
                 return false;
 
             int index = (int)id;
-            return cache != null
-                   && cache.IsValidIndex(index)
-                   && cache.values[index].held;
+            return cache.values[index].held;
         }
 
         public bool WasReleased(ESInputActionId id)
@@ -226,9 +202,7 @@ namespace ES
                 return false;
 
             int index = (int)id;
-            return cache != null
-                   && cache.IsValidIndex(index)
-                   && cache.values[index].released
+            return cache.values[index].released
                    && !cache.values[index].releasedConsumed;
         }
 
@@ -247,9 +221,7 @@ namespace ES
                 return false;
 
             int index = (int)id;
-            return cache != null
-                   && cache.IsValidIndex(index)
-                   && cache.values[index].longPressed
+            return cache.values[index].longPressed
                    && !cache.values[index].longPressConsumed;
         }
 
@@ -259,9 +231,7 @@ namespace ES
                 return false;
 
             int index = (int)id;
-            return cache != null
-                   && cache.IsValidIndex(index)
-                   && cache.values[index].doublePressed
+            return cache.values[index].doublePressed
                    && !cache.values[index].doublePressConsumed;
         }
 
@@ -289,9 +259,6 @@ namespace ES
                 return false;
 
             int index = (int)id;
-            if (cache == null || !cache.IsValidIndex(index))
-                return false;
-
             ESInputTriggerFeature features = GetEffectiveTriggerFeatures(cache.metas[index]);
             if (HasFeature(features, ESInputTriggerFeature.Pressed) && WasPressed(id))
                 return true;
@@ -333,10 +300,7 @@ namespace ES
             if (!IsActionAllowed(id))
                 return 0f;
 
-            int index = (int)id;
-            return cache != null && cache.IsValidIndex(index)
-                ? cache.values[index].axis
-                : 0f;
+            return cache.values[(int)id].axis;
         }
 
         public Vector2 ReadVector2(ESInputActionId id)
@@ -344,30 +308,22 @@ namespace ES
             if (!IsActionAllowed(id))
                 return Vector2.zero;
 
-            int index = (int)id;
-            return cache != null && cache.IsValidIndex(index)
-                ? cache.values[index].vector2
-                : Vector2.zero;
+            return cache.values[(int)id].vector2;
         }
 
         public float GetHoldTime(ESInputActionId id)
         {
-            int index = (int)id;
-            return cache != null && cache.IsValidIndex(index)
-                ? cache.values[index].holdTime
-                : 0f;
+            return cache.values[(int)id].holdTime;
         }
 
         public void ClearFrameState()
         {
-            if (cache != null)
-                cache.ClearFrameState();
+            cache.ClearFrameState();
         }
 
         public void ResetAll()
         {
-            if (cache != null)
-                cache.ResetAll();
+            cache.ResetAll();
         }
 
         public bool IsActionAllowed(ESInputActionId id)
@@ -385,7 +341,7 @@ namespace ES
         private ESInputActionCategory GetActionCategory(ESInputActionId id)
         {
             int index = (int)id;
-            if (cache != null && cache.IsValidIndex(index))
+            if (cache.IsValidIndex(index))
             {
                 ESInputActionCategory category = cache.metas[index].category;
                 if (category != ESInputActionCategory.Common)

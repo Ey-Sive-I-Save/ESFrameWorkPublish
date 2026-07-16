@@ -538,8 +538,6 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("最近命中物")]
         public string lastFireHitName;
 
-        [NonSerialized] private StateFinalIKDriver _cachedIKDriver;
-        [NonSerialized] private Animator _cachedIKDriverAnimator;
         [NonSerialized] private float _lastRecoilWarnTime = -999f;
         [NonSerialized] private int _recoilBurstShotCount;
         [NonSerialized] private int _recoilBurstWeaponIndex = int.MinValue;
@@ -624,9 +622,9 @@ namespace ES
                     {
                         Transform aimTarget = GetCurrentWeaponAimTarget();
                         if (aimTarget != null)
-                            ikDriver.HandleAimTarget(aimTarget);
-                        ikDriver.HandleAim(1f);
-                        ikDriver.SetAimPeek(aimPeek);
+                            ikDriver.IKSetAimTargetTransform(aimTarget);
+                        ikDriver.IKSetAimTargetWeight(1f);
+                        ikDriver.IKSetPeek(aimPeek);
                     }
 
                     LogCombatState("SetAim fallback to IK-only mode because aim state is unavailable.");
@@ -950,19 +948,7 @@ namespace ES
 
         private StateFinalIKDriver ResolveIKDriver()
         {
-            if (MyCore == null)
-                return null;
-
-            var animator = MyCore.animator;
-            if (animator == null)
-                return null;
-
-            if (_cachedIKDriver != null && _cachedIKDriverAnimator == animator)
-                return _cachedIKDriver;
-
-            _cachedIKDriverAnimator = animator;
-            _cachedIKDriver = animator.GetComponent<StateFinalIKDriver>();
-            return _cachedIKDriver;
+            return MyCore != null ? MyCore.ResolveStateFinalIKDriver() : null;
         }
 
         private StateBase ResolveAimState()
@@ -1109,7 +1095,7 @@ namespace ES
             LogCombatState($"Aim exit | State={GetStateDebugName(_aimState)} | PeekActive={_peekLifecycle.IsActive} | IsAiming={isAiming}");
             var ikDriver = ResolveIKDriver();
             if (ikDriver != null)
-                ikDriver.HandleStopAim();
+                ikDriver.IKStopAim();
 
             if (_peekLifecycle.RequestExit())
                 OnPeekExit();
@@ -1242,10 +1228,10 @@ namespace ES
 
             Transform aimTarget = GetCurrentWeaponAimTarget();
             if (aimTarget != null)
-                ikDriver.HandleAimTarget(aimTarget);
+                ikDriver.IKSetAimTargetTransform(aimTarget);
 
-            ikDriver.HandleAim(1f);
-            ikDriver.SetAimPeek(aimPeek);
+            ikDriver.IKSetAimTargetWeight(1f);
+            ikDriver.IKSetPeek(aimPeek);
             if (refreshWeaponParentSnapshotEveryFrame)
                 RefreshWeaponParentSnapshot();
         }
@@ -2289,7 +2275,7 @@ namespace ES
             float recoilMagnitude = ResolveFireRecoilMagnitude();
             lastAppliedRecoilMagnitude = recoilMagnitude;
 
-            if (ikDriver.HandleRecoil(recoilMagnitude))
+            if (ikDriver.IKPlayRecoil(recoilMagnitude))
                 return;
 
             TryWarnRecoilUnavailable($"后坐力 IK 不可用: {ikDriver.RecoilAvailabilitySummary}");

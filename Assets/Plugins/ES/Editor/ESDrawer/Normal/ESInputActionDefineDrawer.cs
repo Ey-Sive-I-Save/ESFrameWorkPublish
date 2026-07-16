@@ -1,13 +1,17 @@
+using System;
+using System.IO;
+using ES;
 using UnityEditor;
 using UnityEngine;
 
-namespace ES
+namespace ES.EditorInternal
 {
     [CustomPropertyDrawer(typeof(ESInputActionDefine))]
     public sealed class ESInputActionDefineDrawer : PropertyDrawer
     {
         private const float Line = 18f;
         private const float Gap = 4f;
+        private const string ActionIdFilePath = "Assets/Plugins/ES/1_Design/Input/ENUM_ESInputActionId.cs";
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
@@ -18,15 +22,24 @@ namespace ES
             float height = Line * 4f + Gap * 5f;
             if (IsButton(valueType))
             {
-                height += (Line + Gap) * 2f;
+                height += Line + Gap;
+                height += Line + Gap;
                 if (HasTriggerFeature(triggerFeatures, ESInputTriggerFeature.LongPress))
+                {
                     height += Line + Gap;
+                }
+
                 if (HasTriggerFeature(triggerFeatures, ESInputTriggerFeature.DoublePress))
+                {
                     height += Line + Gap;
+                }
             }
 
             if (bindings != null)
+            {
                 height += EditorGUI.GetPropertyHeight(bindings, true) + Gap;
+            }
+
             return height;
         }
 
@@ -50,7 +63,7 @@ namespace ES
 
             Rect row = NextLine(ref position);
             DrawSplit(row, 0.28f, out Rect left, out Rect right);
-            EditorGUI.PropertyField(left, id, new GUIContent("动作"));
+            DrawActionIdField(left, id);
             EditorGUI.PropertyField(right, actionName, new GUIContent("内部名"));
 
             row = NextLine(ref position);
@@ -66,7 +79,7 @@ namespace ES
             if (IsButton(valueType))
             {
                 row = NextLine(ref position);
-                EditorGUI.PropertyField(row, triggerFeatures, new GUIContent("触发标记"));
+                DrawTriggerFeatures(row, triggerFeatures);
 
                 row = NextLine(ref position);
                 EditorGUI.PropertyField(row, pressPolicy, new GUIContent("短按策略"));
@@ -108,6 +121,76 @@ namespace ES
             right = new Rect(row.x + leftWidth + Gap * 0.5f, row.y, row.width - leftWidth - Gap * 0.5f, row.height);
         }
 
+        private static void DrawActionIdField(Rect rect, SerializedProperty id)
+        {
+            Rect fieldRect = new Rect(rect.x, rect.y, Mathf.Max(40f, rect.width - 44f), rect.height);
+            Rect jumpRect = new Rect(fieldRect.xMax + Gap, rect.y, 40f, rect.height);
+
+            EditorGUI.PropertyField(fieldRect, id, new GUIContent("动作"));
+            using (new EditorGUI.DisabledScope(id == null || id.enumValueIndex < 0 || id.enumValueIndex >= id.enumNames.Length))
+            {
+                if (GUI.Button(jumpRect, "定义", EditorStyles.miniButton))
+                {
+                    JumpToActionIdDefine(id);
+                }
+            }
+        }
+
+        private static void JumpToActionIdDefine(SerializedProperty id)
+        {
+            if (id == null || id.enumValueIndex < 0 || id.enumValueIndex >= id.enumNames.Length)
+            {
+                return;
+            }
+
+            string enumName = id.enumNames[id.enumValueIndex];
+            int line = FindEnumMemberLine(ActionIdFilePath, enumName);
+            ESDesignUtility.SafeEditor.OpenCodeAtLine(ActionIdFilePath, line);
+        }
+
+        private static int FindEnumMemberLine(string assetPath, string enumName)
+        {
+            if (string.IsNullOrEmpty(enumName))
+            {
+                return 1;
+            }
+
+            string fullPath = ToFullProjectPath(assetPath);
+            if (!File.Exists(fullPath))
+            {
+                return 1;
+            }
+
+            string[] lines = File.ReadAllLines(fullPath);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i].TrimStart();
+                if (line.StartsWith(enumName, StringComparison.Ordinal) &&
+                    (line.Length == enumName.Length || !IsIdentifierPart(line[enumName.Length])))
+                {
+                    return i + 1;
+                }
+            }
+
+            return 1;
+        }
+
+        private static bool IsIdentifierPart(char value)
+        {
+            return char.IsLetterOrDigit(value) || value == '_';
+        }
+
+        private static string ToFullProjectPath(string assetPath)
+        {
+            if (Path.IsPathRooted(assetPath))
+            {
+                return assetPath;
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+            return Path.GetFullPath(Path.Combine(projectRoot, assetPath));
+        }
+
         private static bool IsButton(SerializedProperty valueType)
         {
             return valueType != null && valueType.enumValueIndex == (int)ESInputValueType.Button;
@@ -116,6 +199,57 @@ namespace ES
         private static bool HasTriggerFeature(SerializedProperty triggerFeatures, ESInputTriggerFeature feature)
         {
             return triggerFeatures != null && (triggerFeatures.intValue & (int)feature) != 0;
+        }
+
+        private static void DrawTriggerFeatures(Rect row, SerializedProperty triggerFeatures)
+        {
+            Rect labelRect = new Rect(row.x, row.y, 56f, row.height);
+            Rect content = new Rect(row.x + 58f, row.y, row.width - 58f, row.height);
+            EditorGUI.LabelField(labelRect, "触发");
+
+            ESInputTriggerFeature current = triggerFeatures == null
+                ? ESInputTriggerFeature.None
+                : (ESInputTriggerFeature)triggerFeatures.intValue;
+
+            const int count = 5;
+            float itemWidth = Mathf.Max(52f, content.width / count);
+            DrawTriggerToggle(content, 0, itemWidth, current, triggerFeatures, ESInputTriggerFeature.Pressed, "点击");
+            DrawTriggerToggle(content, 1, itemWidth, current, triggerFeatures, ESInputTriggerFeature.Released, "松开");
+            DrawTriggerToggle(content, 2, itemWidth, current, triggerFeatures, ESInputTriggerFeature.Held, "按住");
+            DrawTriggerToggle(content, 3, itemWidth, current, triggerFeatures, ESInputTriggerFeature.LongPress, "长按");
+            DrawTriggerToggle(content, 4, itemWidth, current, triggerFeatures, ESInputTriggerFeature.DoublePress, "双击");
+        }
+
+        private static void DrawTriggerToggle(
+            Rect content,
+            int index,
+            float itemWidth,
+            ESInputTriggerFeature current,
+            SerializedProperty triggerFeatures,
+            ESInputTriggerFeature feature,
+            string text)
+        {
+            Rect rect = new Rect(content.x + itemWidth * index, content.y, itemWidth - 2f, content.height);
+            bool next = GUI.Toggle(rect, (current & feature) != 0, text, EditorStyles.miniButton);
+            if (triggerFeatures == null)
+            {
+                return;
+            }
+
+            if (next != ((current & feature) != 0))
+            {
+                int value = triggerFeatures.intValue;
+                if (next)
+                {
+                    value |= (int)feature;
+                }
+                else
+                {
+                    value &= ~(int)feature;
+                }
+
+                triggerFeatures.intValue = value;
+            }
         }
     }
 }

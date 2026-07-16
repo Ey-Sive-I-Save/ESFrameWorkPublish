@@ -36,6 +36,11 @@ namespace ES
 {
     public partial class StateBase
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private static readonly Unity.Profiling.ProfilerMarker UpdateAnimationRuntimeMarker =
+            new Unity.Profiling.ProfilerMarker("【ES】状态动画运行时更新");
+#endif
+
         #region 权重与外部管线
 
         [NonSerialized]
@@ -396,6 +401,18 @@ namespace ES
         }
 
         public void UpdateAnimationRuntime(StateMachineContext context, float deltaTime)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            using (UpdateAnimationRuntimeMarker.Auto())
+            {
+                UpdateAnimationRuntimeCore(context, deltaTime);
+            }
+#else
+            UpdateAnimationRuntimeCore(context, deltaTime);
+#endif
+        }
+
+        private void UpdateAnimationRuntimeCore(StateMachineContext context, float deltaTime)
         {
             // 更新运行时数据
             if (!_hasAnimationCached) return;

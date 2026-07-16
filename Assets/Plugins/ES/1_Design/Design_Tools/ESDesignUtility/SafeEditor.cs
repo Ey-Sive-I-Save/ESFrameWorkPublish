@@ -16,7 +16,7 @@ namespace ES
     public static partial class ESDesignUtility
     {
         //SafeEditor提供了一系列已经被#if UnityEditor包裹的安全编辑器功能，可以直接在任何地方使用并且不需要额外处理
-        public static class SafeEditor
+        public static partial class SafeEditor
         {
             private static string _NormalizeAssetPath(string path)
             {

@@ -6,6 +6,11 @@ namespace ES
 {
     public sealed partial class StateFinalIKDriver
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private static readonly Unity.Profiling.ProfilerMarker LateUpdateMarker =
+            new Unity.Profiling.ProfilerMarker("【ES】FinalIK驱动更新");
+#endif
+
         // ════════════════════════════════════════════════════════════════════════
         // 生命周期
         // ════════════════════════════════════════════════════════════════════════
@@ -147,7 +152,7 @@ namespace ES
             _hitReactionReady  = false;  _hitReaction  = null;
             _recoilReady       = false;  _recoil       = null;
             _fullBodyBipedIKReady = false;
-            _finalIKScheduleSummary = "未调度";
+            _finalIKScheduleFlags = IKScheduleFrameFlags.None;
 
             _refs.Clear();
             _caps          = FinalIKCapabilityFlags.None;
@@ -177,15 +182,27 @@ namespace ES
         //      LateUpdate 热路径不再做 StateMachine/Animator 判空。
         private void LateUpdate()
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            using (LateUpdateMarker.Auto())
+            {
+                LateUpdateCore();
+            }
+#else
+            LateUpdateCore();
+#endif
+        }
+
+        private void LateUpdateCore()
+        {
             if (!_runtimeBindingReady)
             {
-                _bipedRuntimeGateReason = "Driver 未完成运行时绑定（_runtimeBindingReady=false）";
+                _bipedRuntimeGateCode = BipedRuntimeGateCode.RuntimeBindingNotReady;
                 return;
             }
 
             if (!_stateMachine.isRunning)
             {
-                _bipedRuntimeGateReason = "StateMachine 未运行（isRunning=false）";
+                _bipedRuntimeGateCode = BipedRuntimeGateCode.StateMachineNotRunning;
                 return;
             }
 
@@ -226,9 +243,12 @@ namespace ES
 
             if (_aimIKReady)
             {
-                _aimIK.solver.target = ResolveAimTarget(_aimSourceTarget);
                 UpdateAimIKHeartbeat(now);
                 UpdateAimIKWeightSmoothing();
+
+                _aimIK.solver.target = HasActiveAimIKWeightSmoothing()
+                    ? ResolveCurrentAimTarget()
+                    : null;
             }
 
             bool aimSolved = SolveAimIKManually();
@@ -239,22 +259,20 @@ namespace ES
             bool requiresBipedFallbackLookAt = !_lookAtIKReady && hasActiveLookAt;
             bool requiresBipedSolve = bipedRuntimeReady && (pose.HasLimbWeight || HasActiveBipedWeightSmoothing() || requiresBipedFallbackLookAt);
 
-            _bipedRuntimeGateReason = BuildBipedRuntimeGateReason(in pose, bipedRuntimeReady, requiresBipedSolve, hasActiveLookAt, requiresBipedFallbackLookAt);
+            _bipedRuntimeGateCode = ResolveBipedRuntimeGateCode(in pose, bipedRuntimeReady, requiresBipedSolve, hasActiveLookAt, requiresBipedFallbackLookAt);
 
             if (!bipedRuntimeReady)
             {
                 ApplyLookAt(in pose);
                 bool lookAtSolvedWithoutBiped = SolveLookAtIKManually();
                 bool fullBodySolvedWithoutBiped = SolveFullBodyBipedIKManually();
-                UpdateFinalIKScheduleSummary(aimSolved, false, lookAtSolvedWithoutBiped, false, fullBodySolvedWithoutBiped);
+                UpdateFinalIKScheduleFlags(aimSolved, false, lookAtSolvedWithoutBiped, false, fullBodySolvedWithoutBiped);
 
                 if (warnWhenPoseHasWeightButNoIK && pose.HasLimbWeight
                     && (now - _lastWarnTime) >= WarnInterval)
                 {
                     _lastWarnTime = now;
-                    var err = string.IsNullOrEmpty(_bipedRuntimeGateReason)
-                        ? (string.IsNullOrEmpty(_bipedIKError) ? "原因未知" : _bipedIKError)
-                        : _bipedRuntimeGateReason;
+                    var err = BipedRuntimeGateReason;
                     Debug.LogWarning(
                         $"[StateFinalIKDriver] stateGeneralFinalIKDriverPose 有权重，但 Biped 运行条件未满足：{err}\n" +
                         "→ 检查 BipedIK 组件、References，以及运行时目标 Transform 是否已正确建立（Hint 非必需）。",
@@ -274,7 +292,7 @@ namespace ES
                 }
                 bool lookAtSolvedWithoutBiped = SolveLookAtIKManually();
                 bool fullBodySolvedWithoutBiped = SolveFullBodyBipedIKManually();
-                UpdateFinalIKScheduleSummary(aimSolved, false, lookAtSolvedWithoutBiped, false, fullBodySolvedWithoutBiped);
+                UpdateFinalIKScheduleFlags(aimSolved, false, lookAtSolvedWithoutBiped, false, fullBodySolvedWithoutBiped);
                 return;
             }
 
@@ -327,7 +345,7 @@ namespace ES
             bool lookAtSolved = SolveLookAtIKManually();
             bool grounderActive = _grounderReady && _grounderBipedIK != null && _grounderBipedIK.enabled;
             bool fullBodySolved = SolveFullBodyBipedIKManually();
-            UpdateFinalIKScheduleSummary(aimSolved, true, lookAtSolved, grounderActive, fullBodySolved);
+            UpdateFinalIKScheduleFlags(aimSolved, true, lookAtSolved, grounderActive, fullBodySolved);
         }
 
         private bool SolveAimIKManually()
@@ -394,117 +412,99 @@ namespace ES
             return true;
         }
 
-        private void UpdateFinalIKScheduleSummary(bool aimSolved, bool bipedSolved, bool lookAtSolved, bool grounderLinked, bool fullBodySolved)
+        private void UpdateFinalIKScheduleFlags(bool aimSolved, bool bipedSolved, bool lookAtSolved, bool grounderLinked, bool fullBodySolved)
         {
-            if (aimSolved && bipedSolved && lookAtSolved && grounderLinked && fullBodySolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：AimIK -> BipedIK(+Grounder委托) -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
-                return;
-            }
-
-            if (aimSolved && bipedSolved && lookAtSolved && fullBodySolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：AimIK -> BipedIK -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
-                return;
-            }
-
-            if (bipedSolved && lookAtSolved && fullBodySolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：BipedIK -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
-                return;
-            }
-
-            if (bipedSolved && fullBodySolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：BipedIK -> FBBIK(+HitReaction/Recoil委托)";
-                return;
-            }
-
-            if (fullBodySolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：FBBIK(+HitReaction/Recoil委托)";
-                return;
-            }
-
-            if (aimSolved && bipedSolved && lookAtSolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：AimIK -> BipedIK -> LookAtIK";
-                return;
-            }
-
-            if (bipedSolved && lookAtSolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：BipedIK -> LookAtIK";
-                return;
-            }
-
-            if (aimSolved && bipedSolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：AimIK -> BipedIK";
-                return;
-            }
-
-            if (lookAtSolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：LookAtIK";
-                return;
-            }
-
-            if (aimSolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：AimIK";
-                return;
-            }
-
-            if (bipedSolved)
-            {
-                _finalIKScheduleSummary = "Driver硬调度：BipedIK";
-                return;
-            }
-
-            _finalIKScheduleSummary = "本帧无IK求解";
+            IKScheduleFrameFlags flags = IKScheduleFrameFlags.None;
+            if (aimSolved) flags |= IKScheduleFrameFlags.Aim;
+            if (bipedSolved) flags |= IKScheduleFrameFlags.Biped;
+            if (lookAtSolved) flags |= IKScheduleFrameFlags.LookAt;
+            if (grounderLinked) flags |= IKScheduleFrameFlags.Grounder;
+            if (fullBodySolved) flags |= IKScheduleFrameFlags.FullBody;
+            _finalIKScheduleFlags = flags;
         }
 
         // ════════════════════════════════════════════════════════════════════════
         // 公共 API — 外部驱动入口
         // ════════════════════════════════════════════════════════════════════════
 
-        public bool HandleAim(Transform target, float weight = 1f)
+        public bool IKAimAt(Transform aimTarget, float targetWeight = 1f)
         {
             if (!_aimIKReady) return false;
-            _aimSourceTarget               = target;
-            _aimIK.solver.target           = ResolveAimTarget(target);
-            SetAimRuntimeWeights(target != null ? Mathf.Clamp01(weight) : 0f);
+            _aimSourceTarget = aimTarget;
+            _aimUsesWorldPositionTarget = false;
+            _aimIK.solver.target = ResolveAimTarget(aimTarget);
+            SetAimRuntimeTargetWeights(aimTarget != null ? Mathf.Clamp01(targetWeight) : 0f);
             RecordAimIKHeartbeat();
             return true;
         }
 
-        public bool HandleAim()
+        public bool IKAimAt(Vector3 worldPosition, float targetWeight = 1f)
         {
-            if (!_aimIKReady) return false;
-            _aimIK.solver.target = ResolveAimTarget(_aimSourceTarget);
+            if (!IKSetAimTargetPosition(worldPosition))
+                return false;
+
+            SetAimRuntimeTargetWeights(Mathf.Clamp01(targetWeight));
             RecordAimIKHeartbeat();
             return true;
         }
 
-        public bool HandleAim(float weight)
+        public bool IKAimAt(Vector3 worldPosition, Quaternion worldRotation, float targetWeight = 1f)
         {
-            if (!_aimIKReady) return false;
-            _aimIK.solver.target = ResolveAimTarget(_aimSourceTarget);
-            SetAimRuntimeWeights(Mathf.Clamp01(weight));
+            if (!IKSetAimTargetPosition(worldPosition, worldRotation))
+                return false;
+
+            SetAimRuntimeTargetWeights(Mathf.Clamp01(targetWeight));
             RecordAimIKHeartbeat();
             return true;
         }
 
-        public bool HandleAimTarget(Transform target)
+        public bool IKRefreshAim()
+        {
+            if (!_aimIKReady) return false;
+            _aimIK.solver.target = ResolveCurrentAimTarget();
+            RecordAimIKHeartbeat();
+            return true;
+        }
+
+        public bool IKSetAimTargetWeight(float targetWeight)
+        {
+            if (!_aimIKReady) return false;
+            _aimIK.solver.target = ResolveCurrentAimTarget();
+            SetAimRuntimeTargetWeights(Mathf.Clamp01(targetWeight));
+            RecordAimIKHeartbeat();
+            return true;
+        }
+
+        public bool IKSetAimTargetTransform(Transform target)
         {
             if (!_aimIKReady) return false;
             _aimSourceTarget = target;
+            _aimUsesWorldPositionTarget = false;
             _aimIK.solver.target = ResolveAimTarget(target);
             if (target == null)
-                SetAimRuntimeWeights(0f);
+                SetAimRuntimeTargetWeights(0f);
             else
-                SetAimRuntimeWeights(_aimWeightTarget);
+                SetAimRuntimeTargetWeights(_aimWeightTarget);
+            RecordAimIKHeartbeat();
+            return true;
+        }
+
+        public bool IKSetAimTargetPosition(Vector3 worldPosition)
+        {
+            Quaternion rotation = _aimSourceTarget != null
+                ? _aimSourceTarget.rotation
+                : (_animator != null ? _animator.transform.rotation : transform.rotation);
+            return IKSetAimTargetPosition(worldPosition, rotation);
+        }
+
+        public bool IKSetAimTargetPosition(Vector3 worldPosition, Quaternion worldRotation)
+        {
+            if (!_aimIKReady) return false;
+            _aimSourceTarget = null;
+            _aimUsesWorldPositionTarget = true;
+            _aimWorldTargetPosition = worldPosition;
+            _aimWorldTargetRotation = worldRotation;
+            _aimIK.solver.target = ResolveAimTarget(worldPosition, worldRotation);
             RecordAimIKHeartbeat();
             return true;
         }
@@ -514,7 +514,7 @@ namespace ES
             _aimLerpingRate = NormalizeLerpingRate(rate);
         }
 
-        public bool SetAimPeek(float normalizedPeek)
+        public bool IKSetPeek(float normalizedPeek)
         {
             if (!_aimIKReady) return false;
             float clampedPeek = Mathf.Clamp(normalizedPeek, -1f, 1f);
@@ -522,11 +522,11 @@ namespace ES
                 return true;
 
             _aimPeek = clampedPeek;
-            _aimIK.solver.target = ResolveAimTarget(_aimSourceTarget);
+            _aimIK.solver.target = ResolveCurrentAimTarget();
             return true;
         }
 
-        public bool SetAimPeekViewReference(Transform viewTransform)
+        public bool IKSetPeekViewReference(Transform viewTransform)
         {
             if (_aimPeekViewReference == viewTransform)
                 return _aimIKReady;
@@ -534,23 +534,23 @@ namespace ES
             _aimPeekViewReference = viewTransform;
             RefreshAimPeekRuntimeReference();
             if (!_aimIKReady) return false;
-            _aimIK.solver.target = ResolveAimTarget(_aimSourceTarget);
+            _aimIK.solver.target = ResolveCurrentAimTarget();
             return true;
         }
 
-        public bool SetAimPeekLeft(float intensity = 1f)
+        public bool IKPeekLeft(float intensity = 1f)
         {
-            return SetAimPeek(-Mathf.Clamp01(intensity));
+            return IKSetPeek(-Mathf.Clamp01(intensity));
         }
 
-        public bool SetAimPeekRight(float intensity = 1f)
+        public bool IKPeekRight(float intensity = 1f)
         {
-            return SetAimPeek(Mathf.Clamp01(intensity));
+            return IKSetPeek(Mathf.Clamp01(intensity));
         }
 
-        public bool ClearAimPeek()
+        public bool IKClearPeek()
         {
-            return SetAimPeek(0f);
+            return IKSetPeek(0f);
         }
 
         private float ResolveInitialAimWeight()
@@ -616,29 +616,31 @@ namespace ES
             }
         }
 
-        public void HandleStopAim()
+        public void IKStopAim()
         {
             if (!_aimIKReady) return;
-            SetAimRuntimeWeights(0f);
+            SetAimRuntimeTargetWeights(0f);
+            _aimUsesWorldPositionTarget = false;
+            _aimSourceTarget = null;
             _aimIKLastHeartbeatTime        = -1f;
             _aimIKDecaying                 = false;
         }
 
-        public bool HandleHit(Collider collider, Vector3 force, Vector3 point)
+        public bool IKHit(Collider collider, Vector3 force, Vector3 point)
         {
             if (!_hitReactionReady) return false;
             _hitReaction.Hit(collider, force, point);
             return true;
         }
 
-        public bool HandleRecoil(float magnitude = 1f)
+        public bool IKPlayRecoil(float magnitude = 1f)
         {
             if (!_recoilReady) return false;
             _recoil.Fire(magnitude);
             return true;
         }
 
-        public bool HandleGrounder(bool active)
+        public bool IKSetFootGrounding(bool active)
         {
             if (!_grounderReady) return false;
             _grounderWeightTarget = active ? Mathf.Clamp01(initGrounderWeight) : 0f;
@@ -674,12 +676,13 @@ namespace ES
                 _aimIKDecaying       = true;
                 _aimIKDecayStartTime = now;
                 SetAimLerpingRate(ResolveLerpingRateForDuration(aimIKDecayDuration));
-                SetAimRuntimeWeights(0f);
+                SetAimRuntimeTargetWeights(0f);
             }
 
             if (_aimWeightCurrent <= 0.001f && _aimWeightTarget <= 0.001f)
             {
                 _aimSourceTarget               = null;
+                _aimUsesWorldPositionTarget    = false;
                 _aimIK.solver.target           = null;
                 _aimIKLastHeartbeatTime        = -1f;
                 _aimIKDecaying                 = false;
@@ -1146,11 +1149,19 @@ namespace ES
             if (_aimIKReady)
             {
                 _aimSourceTarget = realtimeAimTarget;
+                _aimUsesWorldPositionTarget = false;
                 _aimIK.solver.target = ResolveAimTarget(realtimeAimTarget);
-                SetAimRuntimeWeights(realtimeAimTarget != null ? Mathf.Clamp01(realtimeAimWeight) : 0f);
+                SetAimRuntimeTargetWeights(realtimeAimTarget != null ? Mathf.Clamp01(realtimeAimWeight) : 0f);
                 if (realtimeAimTarget != null && realtimeAimWeight > 0.001f)
                     RecordAimIKHeartbeat();
             }
+        }
+
+        private Transform ResolveCurrentAimTarget()
+        {
+            return _aimUsesWorldPositionTarget
+                ? ResolveAimTarget(_aimWorldTargetPosition, _aimWorldTargetRotation)
+                : ResolveAimTarget(_aimSourceTarget);
         }
 
         private Transform ResolveAimTarget(Transform sourceTarget)
@@ -1172,7 +1183,27 @@ namespace ES
             return _aimTargetProxy;
         }
 
+        private Transform ResolveAimTarget(Vector3 sourcePosition, Quaternion sourceRotation)
+        {
+            EnsureAimTargetProxy();
+
+            if (TryResolveAimPeekAnchorTarget(sourcePosition, sourceRotation, out var anchorTarget))
+                return anchorTarget;
+
+            Vector3 localOffset = GetCurrentAimPeekLocalOffset();
+            Vector3 worldOffset = localOffset == Vector3.zero
+                ? Vector3.zero
+                : _aimPeekRuntimeReference.TransformVector(localOffset);
+            _aimTargetProxy.SetPositionAndRotation(sourcePosition + worldOffset, sourceRotation);
+            return _aimTargetProxy;
+        }
+
         private bool TryResolveAimPeekAnchorTarget(Transform sourceTarget, out Transform anchorTarget)
+        {
+            return TryResolveAimPeekAnchorTarget(sourceTarget.position, sourceTarget.rotation, out anchorTarget);
+        }
+
+        private bool TryResolveAimPeekAnchorTarget(Vector3 sourcePosition, Quaternion sourceRotation, out Transform anchorTarget)
         {
             anchorTarget = null;
 
@@ -1192,14 +1223,14 @@ namespace ES
 
             forward.Normalize();
 
-            float projectedDistance = Vector3.Dot(sourceTarget.position - viewReference.position, forward);
-            float distance = projectedDistance > 0.05f ? projectedDistance : Vector3.Distance(anchor.position, sourceTarget.position);
+            float projectedDistance = Vector3.Dot(sourcePosition - viewReference.position, forward);
+            float distance = projectedDistance > 0.05f ? projectedDistance : Vector3.Distance(anchor.position, sourcePosition);
             distance = Mathf.Max(distance, 0.5f);
 
             EnsureAimTargetProxy();
             _aimTargetProxy.SetPositionAndRotation(
                 anchor.position + forward * distance,
-                Quaternion.LookRotation(forward, viewReference.up));
+                forward.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(forward, viewReference.up) : sourceRotation);
 
             anchorTarget = _aimTargetProxy;
             return true;
@@ -1635,9 +1666,9 @@ namespace ES
             return Mathf.Clamp01(aimPoleWeight) * Mathf.Clamp01(aimWeight);
         }
 
-        private void SetAimRuntimeWeights(float aimWeight)
+        private void SetAimRuntimeTargetWeights(float targetWeight)
         {
-            _aimWeightTarget = Mathf.Clamp01(aimWeight);
+            _aimWeightTarget = Mathf.Clamp01(targetWeight);
             _aimPoleWeightTarget = ResolveAimPoleWeight(_aimWeightTarget);
         }
 
@@ -1799,7 +1830,7 @@ namespace ES
             return true;
         }
 
-        private string BuildBipedRuntimeGateReason(
+        private BipedRuntimeGateCode ResolveBipedRuntimeGateCode(
             in StateGeneralFinalIKDriverPose pose,
             bool bipedRuntimeReady,
             bool requiresBipedSolve,
@@ -1808,23 +1839,17 @@ namespace ES
         {
             if (!_bipedIKReady)
             {
-                return string.IsNullOrEmpty(_bipedIKError)
-                    ? "BipedIK 未就绪"
-                    : $"BipedIK 未就绪：{_bipedIKError}";
+                return BipedRuntimeGateCode.BipedIKNotReady;
             }
 
             if (!_goalTargetsReady)
             {
-                string missing = GetMissingGoalTargetNames();
-                if (string.IsNullOrEmpty(missing))
-                    return "运行时 Goal Target 未就绪（_goalTargetsReady=false）";
-
-                return $"运行时 Goal Target 未就绪（缺失：{missing}）";
+                return BipedRuntimeGateCode.GoalTargetsNotReady;
             }
 
             if (!bipedRuntimeReady)
             {
-                return "Biped 运行条件未满足（bipedRuntimeReady=false）";
+                return BipedRuntimeGateCode.BipedRuntimeNotReady;
             }
 
             if (!requiresBipedSolve)
@@ -1832,15 +1857,15 @@ namespace ES
                 if (!pose.HasLimbWeight && !HasActiveBipedWeightSmoothing())
                 {
                     if (hasActiveLookAt && !requiresBipedFallbackLookAt)
-                        return "仅存在 LookAt 权重（由 LookAtIK 处理，不走 Biped 四肢求解）";
+                        return BipedRuntimeGateCode.LookAtHandledByLookAtIK;
 
-                    return "当前无可求解四肢权重（pose.HasLimbWeight=false 且无平滑残留）";
+                    return BipedRuntimeGateCode.NoSolvableLimbWeight;
                 }
 
-                return "当前帧无需触发 Biped 求解（requiresBipedSolve=false）";
+                return BipedRuntimeGateCode.BipedSolveNotRequired;
             }
 
-            return "Biped 运行正常（可求解）";
+            return BipedRuntimeGateCode.ReadyToSolve;
         }
     }
 }

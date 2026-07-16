@@ -27,6 +27,31 @@ namespace ES
             }
         }
 
+        private enum BipedRuntimeGateCode : byte
+        {
+            NotEvaluated,
+            RuntimeBindingNotReady,
+            StateMachineNotRunning,
+            BipedIKNotReady,
+            GoalTargetsNotReady,
+            BipedRuntimeNotReady,
+            LookAtHandledByLookAtIK,
+            NoSolvableLimbWeight,
+            BipedSolveNotRequired,
+            ReadyToSolve
+        }
+
+        [System.Flags]
+        private enum IKScheduleFrameFlags : byte
+        {
+            None = 0,
+            Aim = 1 << 0,
+            Biped = 1 << 1,
+            LookAt = 1 << 2,
+            Grounder = 1 << 3,
+            FullBody = 1 << 4
+        }
+
         private StateMachine _stateMachine;
         private Animator _animator;
         private readonly FinalIKComponentRefs _refs = new FinalIKComponentRefs();
@@ -66,6 +91,9 @@ namespace ES
         private Transform _aimTargetProxy;
         private Transform _aimPeekViewReference;
         private Transform _aimPeekRuntimeReference;
+        private bool _aimUsesWorldPositionTarget;
+        private Vector3 _aimWorldTargetPosition;
+        private Quaternion _aimWorldTargetRotation = Quaternion.identity;
         private float _aimPeek;
         private float _aimWeightCurrent;
         private float _aimWeightTarget;
@@ -108,7 +136,7 @@ namespace ES
         private bool _fullBodyBipedIKReady;
 
         private bool _fullLookAtCompare = true;
-        private string _finalIKScheduleSummary = "未调度";
+        private IKScheduleFrameFlags _finalIKScheduleFlags = IKScheduleFrameFlags.None;
 
         private float _lastBindTryTime;
         private float _lastWarnTime;
@@ -118,7 +146,24 @@ namespace ES
         private int _solverUpdateCount;
         private float _lastApplyTime;
         private float _lastSolverUpdateTime;
-        private string _bipedRuntimeGateReason = "未评估";
+
+        public StateMachine BoundStateMachine => _stateMachine;
+
+        public Entity BoundEntity => _stateMachine != null ? _stateMachine.HostEntity : null;
+
+        public Animator BoundAnimator => _animator;
+
+        public string DriverRelationSummary
+        {
+            get
+            {
+                string entityName = BoundEntity != null ? BoundEntity.name : "未绑定Entity";
+                string animatorName = _animator != null ? _animator.name : "未绑定Animator";
+                string machineName = _stateMachine != null ? _stateMachine.stateMachineKey : "未绑定StateMachine";
+                return $"{entityName} / {animatorName} / {machineName}";
+            }
+        }
+        private BipedRuntimeGateCode _bipedRuntimeGateCode = BipedRuntimeGateCode.NotEvaluated;
 
         private const float WarnInterval = 2.0f;
     }

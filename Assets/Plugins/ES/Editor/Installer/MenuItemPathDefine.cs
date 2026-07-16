@@ -1,6 +1,6 @@
 using UnityEditor;
 
-namespace ES.ESInstaller
+namespace ES.EditorInternal.Installer
 {
     /// <summary>
     /// ES框架菜单路径定义常量类

@@ -20,6 +20,7 @@ namespace ES
 
         private enum Fold
         {
+            QuickStart,
             Runtime,
             Binding,
             Biped,
@@ -34,19 +35,21 @@ namespace ES
             DiagnosticsTargets,
             RealtimeTest,
             Gizmos,
-            AutoAdd
+            AutoAdd,
+            Presets
         }
 
         private static readonly Dictionary<string, MethodInfo> MethodCache = new Dictionary<string, MethodInfo>();
 
         private readonly Dictionary<Fold, bool> foldouts = new Dictionary<Fold, bool>
         {
-            { Fold.Runtime, true },
-            { Fold.Binding, true },
-            { Fold.Biped, true },
+            { Fold.QuickStart, true },
+            { Fold.Runtime, false },
+            { Fold.Binding, false },
+            { Fold.Biped, false },
             { Fold.Grounder, false },
             { Fold.LookAt, false },
-            { Fold.Aim, true },
+            { Fold.Aim, false },
             { Fold.FullBody, false },
             { Fold.HitReaction, false },
             { Fold.Recoil, false },
@@ -55,7 +58,8 @@ namespace ES
             { Fold.DiagnosticsTargets, false },
             { Fold.RealtimeTest, true },
             { Fold.Gizmos, false },
-            { Fold.AutoAdd, true }
+            { Fold.AutoAdd, true },
+            { Fold.Presets, false }
         };
 
         private Page selectedPage;
@@ -64,6 +68,7 @@ namespace ES
         private GUIStyle badgeStyle;
         private GUIStyle cardTitleStyle;
         private GUIStyle miniLabelStyle;
+        private bool initializedFoldouts;
 
         public override void OnInspectorGUI()
         {
@@ -71,6 +76,7 @@ namespace ES
             serializedObject.UpdateIfRequiredOrScript();
 
             var driver = (StateFinalIKDriver)target;
+            InitializeFoldoutsForCurrentView();
 
             DrawOuterFrame(() =>
             {
@@ -99,35 +105,70 @@ namespace ES
             serializedObject.ApplyModifiedProperties();
         }
 
+        private void InitializeFoldoutsForCurrentView()
+        {
+            if (initializedFoldouts)
+                return;
+
+            initializedFoldouts = true;
+            SetFold(Fold.QuickStart, true);
+            SetFold(Fold.Binding, false);
+        }
+
         private void DrawConfigPage(StateFinalIKDriver driver)
         {
+            DrawCard(Fold.QuickStart, "快速接入", "普通角色优先从这里开始，不需要理解 Final IK 组件细节。", () =>
+            {
+                EditorGUILayout.HelpBox("推荐流程：选择角色类型 -> 自动挂载需要的 IK 组件 -> 从 Animator 填充骨骼 -> 应用到驱动。失败时再展开下方细项排查。", MessageType.Info);
+                DrawInfoLine("当前关系", driver.DriverRelationSummary);
+                DrawInfoLine("组件状态", BuildSetupStatus(driver));
+                DrawButtons(
+                    ("通用角色一键接入", () => RunGeneralCharacterSetup(driver)),
+                    ("射击角色一键接入", () => RunShooterCharacterSetup(driver)),
+                    ("性能压测一键关闭", ApplyPerformanceTestPreset));
+            });
+
             DrawCard(Fold.Runtime, "运行控制", "初始化、重绑与全局保护开关。", () =>
             {
                 DrawRow("autoDetectReferencesIfMissing", "自动识别骨骼引用", "warnWhenPoseHasWeightButNoIK", "有权重但无 IK 时警告");
                 DrawProperty("rebindInterval", "热插拔重试间隔");
                 DrawButtons(
-                    ("重新绑定 BipedIK", () => InvokeDriver(driver, "ManualRebindBipedIK")),
+                    ("重新绑定四肢驱动", () => InvokeDriver(driver, "ManualRebindBipedIK")),
                     ("应用初始参数", () => InvokeDriver(driver, "ApplyIKInitialSettingsFromInspector")));
             });
 
-            DrawCard(Fold.Binding, "统一骨骼绑定", "总面板统一派生 Biped / FullBody / Aim / HitReaction / Recoil 的骨骼引用。", () =>
+            DrawCard(Fold.Presets, "初始化预设", "写入常用默认值，适合新角色搭建、射击角色和性能压测。", () =>
             {
+                EditorGUILayout.HelpBox("推荐流程：选预设 -> 自动填充骨骼 -> 应用到已挂载驱动 -> 只微调当前项目需要的卡片。预设只修改 Driver 配置，不删除组件。", MessageType.Info);
+                DrawButtons(
+                    ("通用角色默认", ApplyGeneralCharacterPreset),
+                    ("射击角色默认", ApplyShooterCharacterPreset),
+                    ("性能压测关闭", ApplyPerformanceTestPreset));
+            });
+
+            DrawCard(Fold.Binding, "统一骨骼绑定", "一次配置角色骨架，自动写入四肢、注视、瞄准、受击和后坐力驱动。", () =>
+            {
+                EditorGUILayout.HelpBox("可重复执行自动填充。检测到有效 Humanoid Animator 时会整体刷新绑定；未找到或 Avatar 不合法时保持旧绑定不变。", MessageType.Info);
                 DrawProperty("useDriverBoneBinding", "启用 Driver 骨骼绑定");
                 using (new EditorGUI.DisabledScope(!Bool("useDriverBoneBinding")))
                 {
                     DrawBindingGrid();
                     DrawSubCard("写入范围", () =>
                     {
-                        DrawRow("applyToBipedIKFromInspector", "写入 BipedIK", "applyToFullBodyBipedIKFromInspector", "写入 FullBody");
-                        DrawRow("applyToLookAtIKFromInspector", "写入 LookAt", "applyToAimIKFromInspector", "写入 AimIK");
-                        DrawRow("applyToHitReactionFromInspector", "写入 HitReaction", "applyToRecoilFromInspector", "写入 Recoil");
+                        DrawRow("applyToBipedIKFromInspector", "写入四肢定位", "applyToFullBodyBipedIKFromInspector", "写入全身反应");
+                        DrawRow("applyToLookAtIKFromInspector", "写入头眼注视", "applyToAimIKFromInspector", "写入武器瞄准");
+                        DrawRow("applyToHitReactionFromInspector", "写入受击反馈", "applyToRecoilFromInspector", "写入后坐力");
                     });
                 }
+                DrawButtons(
+                    ("从 Animator 自动填充", () => InvokeDriver(driver, "AutoFillDriverBoneBinding")),
+                    ("应用到已挂载驱动", () => InvokeDriver(driver, "ApplyDriverBoneBindingFromInspector")),
+                    ("清空骨骼绑定", () => InvokeDriver(driver, "ClearDriverBoneBinding")));
             });
 
-            DrawCard(Fold.Biped, "四肢 IK", "BipedIK 手脚目标、LookAt 兜底与四肢平滑。", () =>
+            DrawCard(Fold.Biped, "【四肢定位】", "驱动左右手脚目标，并提供基础头身跟随兜底。", () =>
             {
-                DrawProperty("enableBipedIK", "启用 BipedIK");
+                DrawProperty("enableBipedIK", "启用四肢定位");
                 using (new EditorGUI.DisabledScope(!Bool("enableBipedIK")))
                 {
                     DrawRow("limbWeightSmoothTime", "权重平滑", "limbLerpingRateRecoverTime", "速率恢复");
@@ -135,24 +176,24 @@ namespace ES
                     DrawRow("bipedLookAtDefaultBodyWeight", "身体注视权重", "bipedLookAtDefaultClampWeight", "注视限制");
                     DrawRow("bipedLookAtDefaultHeadWeight", "头部注视权重", "bipedLookAtDefaultEyesWeight", "眼部注视权重");
                 }
-                DrawButtons(("添加 BipedIK", () => InvokeDriver(driver, "QuickAddComp_BipedIK")));
+                DrawButtons(("添加【四肢定位】组件", () => InvokeDriver(driver, "QuickAddComp_BipedIK")));
             });
 
-            DrawCard(Fold.Grounder, "接地 IK", "GrounderBipedIK 地形脚步接地。", () =>
+            DrawCard(Fold.Grounder, "【脚步贴地】", "让脚步适应地形高度，依赖四肢定位。", () =>
             {
-                DrawProperty("enableGrounderBipedIK", "启用 GrounderBipedIK");
+                DrawProperty("enableGrounderBipedIK", "启用脚步贴地");
                 using (new EditorGUI.DisabledScope(!Bool("enableBipedIK") || !Bool("enableGrounderBipedIK")))
                 {
                     DrawRow("grounderWeightSmoothTime", "权重平滑", "grounderLerpingRateRecoverTime", "速率恢复");
                     DrawRow("initGrounderWeight", "整体权重", "initGrounderMaxStep", "最大台阶");
                     DrawProperty("initGrounderSpeed", "接地速度");
                 }
-                DrawButtons(("添加 GrounderBipedIK", () => InvokeDriver(driver, "QuickAddComp_GrounderBipedIK")));
+                DrawButtons(("添加【脚步贴地】组件", () => InvokeDriver(driver, "QuickAddComp_GrounderBipedIK")));
             });
 
-            DrawCard(Fold.LookAt, "注视 IK", "独立头部、眼部、脊柱注视。", () =>
+            DrawCard(Fold.LookAt, "【头眼注视】", "控制头部、眼睛和脊柱朝向目标。", () =>
             {
-                DrawProperty("enableLookAtIK", "启用 LookAtIK");
+                DrawProperty("enableLookAtIK", "启用头眼注视");
                 using (new EditorGUI.DisabledScope(!Bool("enableLookAtIK")))
                 {
                     DrawRow("lookAtWeightSmoothTime", "权重平滑", "lookAtLerpingRateRecoverTime", "速率恢复");
@@ -160,12 +201,12 @@ namespace ES
                     DrawRow("initLookAtHeadWeight", "头部权重", "initLookAtEyesWeight", "眼部权重");
                     DrawProperty("initLookAtSpineWeight", "脊柱权重");
                 }
-                DrawButtons(("添加 LookAtIK", () => InvokeDriver(driver, "QuickAddComp_LookAtIK")));
+                DrawButtons(("添加【头眼注视】组件", () => InvokeDriver(driver, "QuickAddComp_LookAtIK")));
             });
 
-            DrawCard(Fold.Aim, "瞄准 IK", "AimIK 骨链瞄准、极向与探头配置。", () =>
+            DrawCard(Fold.Aim, "【武器瞄准】", "配置瞄准方向、极向稳定和左右探头。", () =>
             {
-                DrawProperty("enableAimIK", "启用 AimIK");
+                DrawProperty("enableAimIK", "启用武器瞄准");
                 using (new EditorGUI.DisabledScope(!Bool("enableAimIK")))
                 {
                     DrawRow("aimIKHeartbeatTimeout", "心跳超时", "aimIKDecayDuration", "衰减时长");
@@ -173,7 +214,7 @@ namespace ES
                     DrawRow("useInitAimWeightOnBind", "绑定时使用初始权重", "initAimWeight", "初始权重");
                     DrawRow("initAimClampWeight", "限制权重", "initAimAxis", "瞄准轴");
 
-                    DrawSubCard("骨骼绑定", () =>
+                    DrawSubCard("瞄准节点", () =>
                     {
                         DrawProperty("aimControlledTransform", "瞄准方向节点");
                         DrawProperty("aimPoleTarget", "极向目标");
@@ -188,22 +229,22 @@ namespace ES
                     });
                 }
                 DrawButtons(
-                    ("添加 AimIK", () => InvokeDriver(driver, "QuickAddComp_AimIK")),
-                    ("应用 AimIK 配置", () => InvokeDriver(driver, "ApplyDriverAimChainFromInspector")));
+                    ("添加【武器瞄准】组件", () => InvokeDriver(driver, "QuickAddComp_AimIK")),
+                    ("应用瞄准配置", () => InvokeDriver(driver, "ApplyDriverAimChainFromInspector")));
             });
 
-            DrawCard(Fold.FullBody, "全身 IK", "FullBodyBipedIK 是受击反馈和后坐力的前提。", () =>
+            DrawCard(Fold.FullBody, "【全身反应】", "受击反馈和后坐力的全身骨骼基础。", () =>
             {
-                DrawProperty("enableFullBodyBipedIK", "启用 FullBodyBipedIK");
-                DrawButtons(("添加 FullBodyBipedIK", () => InvokeDriver(driver, "QuickAddComp_FullBodyBipedIK")));
+                DrawProperty("enableFullBodyBipedIK", "启用全身反应");
+                DrawButtons(("添加【全身反应】组件", () => InvokeDriver(driver, "QuickAddComp_FullBodyBipedIK")));
             });
 
-            DrawCard(Fold.HitReaction, "受击反馈", "基于 FullBodyBipedIK 的受击程序动画配置。", () =>
+            DrawCard(Fold.HitReaction, "【受击反馈】", "角色被击中后的身体反馈，依赖全身反应。", () =>
             {
-                DrawProperty("enableHitReaction", "启用 HitReaction");
+                DrawProperty("enableHitReaction", "启用受击反馈");
                 using (new EditorGUI.DisabledScope(!Bool("enableFullBodyBipedIK") || !Bool("enableHitReaction")))
                 {
-                    DrawProperty("useDriverHitReactionSetup", "使用 Driver 配置");
+                    DrawProperty("useDriverHitReactionSetup", "使用内置配置");
                     using (new EditorGUI.DisabledScope(!Bool("useDriverHitReactionSetup")))
                     {
                         DrawRow("driverHitReactionWeight", "整体权重", "driverHitReactionDuration", "持续时间");
@@ -214,18 +255,18 @@ namespace ES
                     }
                 }
                 DrawButtons(
-                    ("添加 HitReaction", () => InvokeDriver(driver, "QuickAddComp_HitReaction")),
+                    ("添加【受击反馈】组件", () => InvokeDriver(driver, "QuickAddComp_HitReaction")),
                     ("识别碰撞体", () => InvokeDriver(driver, "AutoFillDriverHitReactionColliders")),
                     ("应用配置", () => InvokeDriver(driver, "ApplyDriverHitReactionFromInspector")),
                     ("清空配置", () => InvokeDriver(driver, "ClearDriverHitReactionSetup")));
             });
 
-            DrawCard(Fold.Recoil, "后坐力", "基于 FullBodyBipedIK 的武器后坐力程序动画。", () =>
+            DrawCard(Fold.Recoil, "【后坐力】", "武器开火时的手部、身体和旋转反馈。", () =>
             {
-                DrawProperty("enableRecoil", "启用 Recoil");
+                DrawProperty("enableRecoil", "启用后坐力");
                 using (new EditorGUI.DisabledScope(!Bool("enableFullBodyBipedIK") || !Bool("enableRecoil")))
                 {
-                    DrawProperty("useDriverRecoilSetup", "使用 Driver 配置");
+                    DrawProperty("useDriverRecoilSetup", "使用内置配置");
                     using (new EditorGUI.DisabledScope(!Bool("useDriverRecoilSetup")))
                     {
                         DrawRow("driverRecoilWeight", "整体权重", "driverRecoilDuration", "脉冲时长");
@@ -237,7 +278,7 @@ namespace ES
                     }
                 }
                 DrawButtons(
-                    ("添加 Recoil", () => InvokeDriver(driver, "QuickAddComp_Recoil")),
+                    ("添加【后坐力】组件", () => InvokeDriver(driver, "QuickAddComp_Recoil")),
                     ("应用配置", () => InvokeDriver(driver, "ApplyDriverRecoilFromInspector")),
                     ("清空配置", () => InvokeDriver(driver, "ClearDriverRecoilSetup")));
             });
@@ -312,10 +353,10 @@ namespace ES
             DrawCard(Fold.AutoAdd, "自动添加组件", "高级兜底项，默认不建议全部开启。", () =>
             {
                 DrawProperty("logMissingComponentHints", "输出缺失组件提示");
-                DrawRow("autoAddBipedIK", "BipedIK", "autoAddGrounderBipedIK", "GrounderBipedIK");
-                DrawRow("autoAddLookAtIK", "LookAtIK", "autoAddAimIK", "AimIK");
-                DrawRow("autoAddFullBodyBipedIK", "FullBodyBipedIK", "autoAddHitReaction", "HitReaction");
-                DrawProperty("autoAddRecoil", "Recoil");
+                DrawRow("autoAddBipedIK", "四肢定位", "autoAddGrounderBipedIK", "脚步贴地");
+                DrawRow("autoAddLookAtIK", "头眼注视", "autoAddAimIK", "武器瞄准");
+                DrawRow("autoAddFullBodyBipedIK", "全身反应", "autoAddHitReaction", "受击反馈");
+                DrawProperty("autoAddRecoil", "后坐力");
                 DrawButtons(("补齐缺失组件", () => InvokeDriver(driver, "AutoAddMissingComponents")));
             });
         }
@@ -337,25 +378,29 @@ namespace ES
 
         private void DrawHeader(StateFinalIKDriver driver)
         {
-            float headerHeight = EditorGUIUtility.currentViewWidth < 780f ? 84f : 58f;
+            float headerHeight = EditorGUIUtility.currentViewWidth < 900f ? 84f : 58f;
             Rect rect = GUILayoutUtility.GetRect(0f, headerHeight, GUILayout.ExpandWidth(true));
             EditorGUI.DrawRect(rect, new Color(0.12f, 0.13f, 0.14f));
             EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width, 1f), new Color(0.35f, 0.66f, 0.92f));
             EditorGUI.DrawRect(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), new Color(0.08f, 0.08f, 0.08f));
             EditorGUI.DrawRect(new Rect(rect.x, rect.y, 5f, rect.height), new Color(0.35f, 0.66f, 0.92f));
 
-            bool compact = EditorGUIUtility.currentViewWidth < 780f;
+            bool compact = EditorGUIUtility.currentViewWidth < 900f;
             var titleRect = new Rect(rect.x + 14f, rect.y + 8f, compact ? rect.width - 28f : rect.width * 0.48f, 22f);
             var subRect = new Rect(rect.x + 14f, rect.y + 32f, compact ? rect.width - 28f : rect.width * 0.48f, 18f);
-            GUI.Label(titleRect, "Final IK 驱动器", headerTitleStyle);
-            GUI.Label(subRect, driver.name, subtitleStyle);
+            GUI.Label(titleRect, "角色动作驱动器", headerTitleStyle);
+            GUI.Label(subRect, driver.DriverRelationSummary, subtitleStyle);
 
             float chipY = compact ? rect.y + 52f : rect.y + 18f;
-            float x = compact ? rect.x + 14f : rect.xMax - 394f;
-            DrawBadge(ref x, chipY, Application.isPlaying ? "运行中" : "编辑态", Application.isPlaying ? new Color(0.20f, 0.54f, 0.32f) : new Color(0.38f, 0.38f, 0.38f));
-            DrawBadge(ref x, chipY, Bool("enableBipedIK") ? "四肢开" : "四肢关", Bool("enableBipedIK") ? new Color(0.18f, 0.48f, 0.72f) : new Color(0.30f, 0.30f, 0.30f));
+            float x = compact ? rect.x + 14f : rect.xMax - 520f;
+            DrawBadge(ref x, chipY, driver.BoundEntity != null ? "已连Entity" : "未连Entity", driver.BoundEntity != null ? new Color(0.20f, 0.54f, 0.32f) : new Color(0.38f, 0.38f, 0.38f));
+            DrawBadge(ref x, chipY, driver.BoundStateMachine != null ? "已连状态机" : "未连状态机", driver.BoundStateMachine != null ? new Color(0.18f, 0.48f, 0.72f) : new Color(0.30f, 0.30f, 0.30f));
             DrawBadge(ref x, chipY, Bool("enableAimIK") ? "瞄准开" : "瞄准关", Bool("enableAimIK") ? new Color(0.45f, 0.36f, 0.74f) : new Color(0.30f, 0.30f, 0.30f));
-            DrawBadge(ref x, chipY, Bool("enableFullBodyBipedIK") ? "全身开" : "全身关", Bool("enableFullBodyBipedIK") ? new Color(0.70f, 0.47f, 0.22f) : new Color(0.30f, 0.30f, 0.30f));
+            if (!compact)
+            {
+                DrawBadge(ref x, chipY, Bool("enableBipedIK") ? "四肢开" : "四肢关", Bool("enableBipedIK") ? new Color(0.18f, 0.48f, 0.72f) : new Color(0.30f, 0.30f, 0.30f));
+                DrawBadge(ref x, chipY, Bool("enableFullBodyBipedIK") ? "反应开" : "反应关", Bool("enableFullBodyBipedIK") ? new Color(0.70f, 0.47f, 0.22f) : new Color(0.30f, 0.30f, 0.30f));
+            }
         }
 
         private void DrawNavigation()
@@ -418,14 +463,17 @@ namespace ES
         private void DrawCard(Fold fold, string title, string summary, Action content)
         {
             bool open = GetFold(fold);
-            Rect head = GUILayoutUtility.GetRect(0f, 32f, GUILayout.ExpandWidth(true));
+            bool compact = EditorGUIUtility.currentViewWidth < 760f;
+            Rect head = GUILayoutUtility.GetRect(0f, compact ? 52f : 34f, GUILayout.ExpandWidth(true));
             head = EditorGUI.IndentedRect(head);
             EditorGUI.DrawRect(head, new Color(0.23f, 0.24f, 0.25f));
             EditorGUI.DrawRect(new Rect(head.x, head.yMax - 1f, head.width, 1f), new Color(0.13f, 0.13f, 0.13f));
 
             var foldRect = new Rect(head.x + 8f, head.y + 7f, 18f, 18f);
-            var titleRect = new Rect(head.x + 30f, head.y + 5f, 180f, 20f);
-            var summaryRect = new Rect(head.x + 210f, head.y + 7f, head.width - 218f, 18f);
+            var titleRect = new Rect(head.x + 30f, head.y + 5f, compact ? head.width - 42f : 180f, 20f);
+            var summaryRect = compact
+                ? new Rect(head.x + 30f, head.y + 27f, head.width - 42f, 18f)
+                : new Rect(head.x + 210f, head.y + 7f, head.width - 218f, 18f);
             EditorGUI.LabelField(foldRect, open ? "▼" : "▶", EditorStyles.miniLabel);
             GUI.Label(titleRect, title, cardTitleStyle);
             GUI.Label(summaryRect, summary, miniLabelStyle);
@@ -466,22 +514,51 @@ namespace ES
         private void DrawBindingGrid()
         {
             DrawProperty("bindingRoot", "Root");
-            DrawRow("bindingPelvis", "骨盆", "bindingSpine", "脊柱");
-            DrawRow("bindingChest", "胸腔", "bindingNeck", "颈部");
-            DrawRow("bindingHead", "头部", "bindingLeftEye", "左眼");
-            DrawProperty("bindingRightEye", "右眼");
+            DrawSubCard("身体", () =>
+            {
+                DrawProperty("bindingPelvis", "骨盆");
+                DrawProperty("bindingSpine", "脊柱");
+                DrawProperty("bindingChest", "胸腔");
+                DrawProperty("bindingNeck", "颈部");
+                DrawProperty("bindingHead", "头部");
+            });
+            DrawSubCard("眼睛", () =>
+            {
+                DrawProperty("bindingLeftEye", "左眼");
+                DrawProperty("bindingRightEye", "右眼");
+            });
 
-            DrawSubCard("左臂", () => DrawRow("bindingLeftUpperArm", "上臂", "bindingLeftForearm", "前臂", "bindingLeftHand", "手"));
-            DrawSubCard("右臂", () => DrawRow("bindingRightUpperArm", "上臂", "bindingRightForearm", "前臂", "bindingRightHand", "手"));
-            DrawSubCard("左腿", () => DrawRow("bindingLeftThigh", "大腿", "bindingLeftCalf", "小腿", "bindingLeftFoot", "脚"));
-            DrawSubCard("右腿", () => DrawRow("bindingRightThigh", "大腿", "bindingRightCalf", "小腿", "bindingRightFoot", "脚"));
+            DrawSubCard("左臂", () =>
+            {
+                DrawProperty("bindingLeftUpperArm", "上臂");
+                DrawProperty("bindingLeftForearm", "前臂");
+                DrawProperty("bindingLeftHand", "手");
+            });
+            DrawSubCard("右臂", () =>
+            {
+                DrawProperty("bindingRightUpperArm", "上臂");
+                DrawProperty("bindingRightForearm", "前臂");
+                DrawProperty("bindingRightHand", "手");
+            });
+            DrawSubCard("左腿", () =>
+            {
+                DrawProperty("bindingLeftThigh", "大腿");
+                DrawProperty("bindingLeftCalf", "小腿");
+                DrawProperty("bindingLeftFoot", "脚");
+            });
+            DrawSubCard("右腿", () =>
+            {
+                DrawProperty("bindingRightThigh", "大腿");
+                DrawProperty("bindingRightCalf", "小腿");
+                DrawProperty("bindingRightFoot", "脚");
+            });
         }
 
         private void DrawStatusGrid(StateFinalIKDriver driver)
         {
-            DrawRowText("BipedIK", Ready(driver.IsBipedIKReady), "Grounder", Ready(driver.IsGrounderReady), "LookAtIK", Ready(driver.IsLookAtIKReady));
-            DrawRowText("AimIK", Ready(driver.IsAimIKReady), "FullBody", Ready(driver.IsFullBodyBipedIKReady), "HitReaction", Ready(driver.IsHitReactionReady));
-            DrawRowText("Recoil", Ready(driver.IsRecoilReady));
+            DrawRowText("四肢定位", Ready(driver.IsBipedIKReady), "脚步贴地", Ready(driver.IsGrounderReady), "头眼注视", Ready(driver.IsLookAtIKReady));
+            DrawRowText("武器瞄准", Ready(driver.IsAimIKReady), "全身反应", Ready(driver.IsFullBodyBipedIKReady), "受击反馈", Ready(driver.IsHitReactionReady));
+            DrawRowText("后坐力", Ready(driver.IsRecoilReady));
         }
 
         private void DrawProperty(string propertyName, string label)
@@ -498,6 +575,13 @@ namespace ES
 
         private void DrawRow(params string[] propertyAndLabels)
         {
+            if (EditorGUIUtility.currentViewWidth < 760f)
+            {
+                for (int i = 0; i < propertyAndLabels.Length; i += 2)
+                    DrawProperty(propertyAndLabels[i], propertyAndLabels[i + 1]);
+                return;
+            }
+
             using (new EditorGUILayout.HorizontalScope())
             {
                 int pairCount = propertyAndLabels.Length / 2;
@@ -519,6 +603,208 @@ namespace ES
             {
                 EditorGUILayout.PropertyField(property, new GUIContent(label), true);
             }
+        }
+
+        private void ApplyGeneralCharacterPreset()
+        {
+            Undo.RecordObject(target, "Apply StateFinalIKDriver General Preset");
+
+            SetBool("enableBipedIK", true);
+            SetBool("enableGrounderBipedIK", true);
+            SetBool("enableLookAtIK", true);
+            SetBool("enableAimIK", false);
+            SetBool("enableFullBodyBipedIK", false);
+            SetBool("enableHitReaction", false);
+            SetBool("enableRecoil", false);
+
+            SetFloat("limbWeightSmoothTime", 0.12f);
+            SetFloat("limbLerpingRateRecoverTime", 0.2f);
+            SetFloat("footRotationWeightMultiplier", 0.2f);
+            SetBool("driveGoalTargetsFromPose", true);
+            SetFloat("grounderWeightSmoothTime", 0.12f);
+            SetFloat("grounderLerpingRateRecoverTime", 0.2f);
+            SetFloat("initGrounderWeight", 1f);
+            SetFloat("initGrounderMaxStep", 0.5f);
+            SetFloat("initGrounderSpeed", 3f);
+            SetFloat("lookAtWeightSmoothTime", 0.12f);
+            SetFloat("lookAtLerpingRateRecoverTime", 0.2f);
+            SetFloat("initLookAtWeight", 1f);
+            SetFloat("initLookAtHeadWeight", 1f);
+            SetFloat("initLookAtEyesWeight", 1f);
+            SetFloat("initLookAtSpineWeight", 0.5f);
+            SetFloat("initLookAtClampWeight", 0.5f);
+
+            SetCommonSafeDefaults();
+            CommitPreset("已应用通用角色默认。");
+        }
+
+        private void ApplyShooterCharacterPreset()
+        {
+            Undo.RecordObject(target, "Apply StateFinalIKDriver Shooter Preset");
+
+            SetBool("enableBipedIK", true);
+            SetBool("enableGrounderBipedIK", true);
+            SetBool("enableLookAtIK", true);
+            SetBool("enableAimIK", true);
+            SetBool("enableFullBodyBipedIK", true);
+            SetBool("enableHitReaction", true);
+            SetBool("enableRecoil", true);
+
+            SetBool("useInitAimWeightOnBind", false);
+            SetFloat("initAimWeight", 0f);
+            SetFloat("initAimClampWeight", 0.5f);
+            SetVector3("initAimAxis", Vector3.forward);
+            SetFloat("aimIKHeartbeatTimeout", 0.5f);
+            SetFloat("aimWeightSmoothTime", 0.10f);
+            SetFloat("aimLerpingRateRecoverTime", 0.18f);
+            SetFloat("aimIKDecayDuration", 0.28f);
+
+            SetBool("useDriverRecoilSetup", true);
+            SetFloat("driverRecoilWeight", 1f);
+            SetFloat("driverRecoilDuration", 0.18f);
+            SetFloat("driverRecoilBlendTime", 0.08f);
+            SetFloat("driverRecoilMagnitudeRandom", 0.08f);
+            SetBool("driverRecoilTwoHanded", true);
+            SetVector3("driverRecoilPrimaryOffset", new Vector3(0f, 0.02f, -0.06f));
+            SetVector3("driverRecoilSecondaryOffset", new Vector3(0f, 0.01f, -0.035f));
+            SetVector3("driverRecoilBodyOffset", new Vector3(0f, 0f, -0.015f));
+            SetVector3("driverRecoilHandRotationOffset", new Vector3(-8f, 0f, 0f));
+            SetVector3("driverRecoilRotationRandom", new Vector3(1.5f, 0.8f, 0.8f));
+
+            SetBool("useDriverHitReactionSetup", false);
+            SetCommonSafeDefaults();
+            CommitPreset("已应用射击角色默认。请继续填充统一骨骼绑定和瞄准方向节点。");
+        }
+
+        private void ApplyPerformanceTestPreset()
+        {
+            Undo.RecordObject(target, "Apply StateFinalIKDriver Performance Preset");
+
+            SetBool("enableBipedIK", false);
+            SetBool("enableGrounderBipedIK", false);
+            SetBool("enableLookAtIK", false);
+            SetBool("enableAimIK", false);
+            SetBool("enableFullBodyBipedIK", false);
+            SetBool("enableHitReaction", false);
+            SetBool("enableRecoil", false);
+            SetBool("enableRealtimeWeightTest", false);
+            SetBool("debugDrawIKGizmosInSceneAndGame", false);
+            SetBool("warnWhenPoseHasWeightButNoIK", false);
+            SetBool("logMissingComponentHints", false);
+            SetBool("useDriverHitReactionSetup", false);
+            SetBool("useDriverRecoilSetup", false);
+            SetFloat("rebindInterval", 1f);
+
+            SetAutoAddDefaults(false);
+            CommitPreset("已应用性能压测关闭预设。");
+        }
+
+        private void RunGeneralCharacterSetup(StateFinalIKDriver driver)
+        {
+            ApplyGeneralCharacterPreset();
+            InvokeDriver(driver, "QuickAddComp_BipedIK");
+            InvokeDriver(driver, "QuickAddComp_GrounderBipedIK");
+            InvokeDriver(driver, "QuickAddComp_LookAtIK");
+            InvokeDriver(driver, "AutoFillDriverBoneBinding");
+            InvokeDriver(driver, "ApplyDriverBoneBindingFromInspector");
+            Debug.Log("[StateFinalIKDriverEditor] 通用角色一键接入完成。", driver);
+        }
+
+        private void RunShooterCharacterSetup(StateFinalIKDriver driver)
+        {
+            ApplyShooterCharacterPreset();
+            InvokeDriver(driver, "QuickAddComp_BipedIK");
+            InvokeDriver(driver, "QuickAddComp_GrounderBipedIK");
+            InvokeDriver(driver, "QuickAddComp_LookAtIK");
+            InvokeDriver(driver, "QuickAddComp_AimIK");
+            InvokeDriver(driver, "QuickAddComp_FullBodyBipedIK");
+            InvokeDriver(driver, "QuickAddComp_HitReaction");
+            InvokeDriver(driver, "QuickAddComp_Recoil");
+            InvokeDriver(driver, "AutoFillDriverBoneBinding");
+            InvokeDriver(driver, "ApplyDriverBoneBindingFromInspector");
+            InvokeDriver(driver, "ApplyDriverAimChainFromInspector");
+            InvokeDriver(driver, "ApplyDriverHitReactionFromInspector");
+            InvokeDriver(driver, "ApplyDriverRecoilFromInspector");
+            Debug.Log("[StateFinalIKDriverEditor] 射击角色一键接入完成。若瞄准方向不正确，请展开“武器瞄准”微调瞄准方向节点和瞄准轴。", driver);
+        }
+
+        private string BuildSetupStatus(StateFinalIKDriver driver)
+        {
+            int ready = 0;
+            int enabled = 0;
+
+            CountFeature(Bool("enableBipedIK"), driver.IsBipedIKReady, ref enabled, ref ready);
+            CountFeature(Bool("enableGrounderBipedIK"), driver.IsGrounderReady, ref enabled, ref ready);
+            CountFeature(Bool("enableLookAtIK"), driver.IsLookAtIKReady, ref enabled, ref ready);
+            CountFeature(Bool("enableAimIK"), driver.IsAimIKReady, ref enabled, ref ready);
+            CountFeature(Bool("enableFullBodyBipedIK"), driver.IsFullBodyBipedIKReady, ref enabled, ref ready);
+            CountFeature(Bool("enableHitReaction"), driver.IsHitReactionReady, ref enabled, ref ready);
+            CountFeature(Bool("enableRecoil"), driver.IsRecoilReady, ref enabled, ref ready);
+
+            if (enabled == 0)
+                return "当前未启用 IK 功能";
+
+            return $"已启用 {enabled} 项，就绪 {ready} 项";
+        }
+
+        private static void CountFeature(bool isEnabled, bool isReady, ref int enabled, ref int ready)
+        {
+            if (!isEnabled)
+                return;
+
+            enabled++;
+            if (isReady)
+                ready++;
+        }
+
+        private void SetCommonSafeDefaults()
+        {
+            SetBool("autoDetectReferencesIfMissing", true);
+            SetBool("warnWhenPoseHasWeightButNoIK", true);
+            SetBool("enableRealtimeWeightTest", false);
+            SetBool("debugDrawIKGizmosInSceneAndGame", false);
+            SetFloat("rebindInterval", 0.5f);
+            SetAutoAddDefaults(false);
+        }
+
+        private void SetAutoAddDefaults(bool enabled)
+        {
+            SetBool("autoAddBipedIK", enabled);
+            SetBool("autoAddGrounderBipedIK", enabled);
+            SetBool("autoAddLookAtIK", enabled);
+            SetBool("autoAddAimIK", enabled);
+            SetBool("autoAddFullBodyBipedIK", enabled);
+            SetBool("autoAddHitReaction", enabled);
+            SetBool("autoAddRecoil", enabled);
+        }
+
+        private void CommitPreset(string message)
+        {
+            serializedObject.ApplyModifiedProperties();
+            EditorUtility.SetDirty(target);
+            Debug.Log("[StateFinalIKDriverEditor] " + message, target);
+            serializedObject.UpdateIfRequiredOrScript();
+        }
+
+        private void SetBool(string propertyName, bool value)
+        {
+            SerializedProperty property = serializedObject.FindProperty(propertyName);
+            if (property != null && property.propertyType == SerializedPropertyType.Boolean)
+                property.boolValue = value;
+        }
+
+        private void SetFloat(string propertyName, float value)
+        {
+            SerializedProperty property = serializedObject.FindProperty(propertyName);
+            if (property != null && property.propertyType == SerializedPropertyType.Float)
+                property.floatValue = value;
+        }
+
+        private void SetVector3(string propertyName, Vector3 value)
+        {
+            SerializedProperty property = serializedObject.FindProperty(propertyName);
+            if (property != null && property.propertyType == SerializedPropertyType.Vector3)
+                property.vector3Value = value;
         }
 
         private void DrawInfoLine(string label, string value)

@@ -9,24 +9,98 @@ namespace ES
     [Serializable, TypeRegistryItem("实体核心")]
     public class Entity : Core, ICharacterController
     {
+        [LabelText("主 Animator")]
         public Animator animator;
+
+        [NonSerialized] private Animator _cachedStateDriverAnimator;
+        [NonSerialized] private StateFinalIKDriver _cachedStateFinalIKDriver;
 
         #region Domains
 
-        [TabGroup("域", "基础域"), HideLabel, SerializeReference]
+        [TabGroup("生命体结构", "身体基础"), HideLabel, SerializeReference]
         public EntityBasicDomain basicDomain;
 
-        [TabGroup("域", "AI域"), HideLabel, SerializeReference]
+        [TabGroup("生命体结构", "意识AI"), HideLabel, SerializeReference]
         public EntityAIDomain aiDomain;
 
-        [TabGroup("域", "状态域"), HideLabel, SerializeReference]
+        [TabGroup("生命体结构", "Buff域"), HideLabel, SerializeReference]
+        public EntityBuffDomain buffDomain;
+
+        [TabGroup("生命体结构", "状态表现"), HideLabel, SerializeReference]
         public EntityStateDomain stateDomain;
+
+        #endregion
+
+        #region 生命体关系链
+
+        public StateMachine StateMachineOrNull => stateDomain != null ? stateDomain.stateMachine : null;
+
+        public Animator StateAnimatorOrNull
+        {
+            get
+            {
+                var stateMachine = StateMachineOrNull;
+                return stateMachine != null && stateMachine.BoundAnimator != null ? stateMachine.BoundAnimator : animator;
+            }
+        }
+
+        [ShowInInspector, Sirenix.OdinInspector.ReadOnly, PropertyOrder(-20), FoldoutGroup("生命体关系链", expanded: true), LabelText("动画器")]
+        private Animator InspectorStateAnimator => StateAnimatorOrNull;
+
+        [ShowInInspector, Sirenix.OdinInspector.ReadOnly, PropertyOrder(-19), FoldoutGroup("生命体关系链"), LabelText("状态机")]
+        private StateMachine InspectorStateMachine => StateMachineOrNull;
+
+        [ShowInInspector, Sirenix.OdinInspector.ReadOnly, PropertyOrder(-18), FoldoutGroup("生命体关系链"), LabelText("IK表现驱动")]
+        private StateFinalIKDriver InspectorStateFinalIKDriver => ResolveStateFinalIKDriver();
+
+        [ShowInInspector, Sirenix.OdinInspector.ReadOnly, PropertyOrder(-17), FoldoutGroup("生命体关系链"), LabelText("链路状态")]
+        private string InspectorStateDriverRelation
+        {
+            get
+            {
+                var stateMachine = StateMachineOrNull;
+                var stateAnimator = StateAnimatorOrNull;
+                var ikDriver = ResolveStateFinalIKDriver();
+
+                if (stateMachine == null) return "缺少 StateDomain/StateMachine";
+                if (stateAnimator == null) return "缺少 Animator，状态机无法输出动画";
+                if (ikDriver == null) return "缺少 StateFinalIKDriver，IK表现不会接收状态机贡献";
+                return stateMachine.isRunning ? "运行中：Entity -> StateDomain -> StateMachine -> StateFinalIKDriver" : "已绑定：等待状态机运行";
+            }
+        }
+
+        public StateFinalIKDriver ResolveStateFinalIKDriver(bool allowSearchChildren = false)
+        {
+            var stateAnimator = StateAnimatorOrNull;
+            if (stateAnimator == null)
+            {
+                _cachedStateDriverAnimator = null;
+                _cachedStateFinalIKDriver = null;
+                return null;
+            }
+
+            if (_cachedStateFinalIKDriver != null && _cachedStateDriverAnimator == stateAnimator)
+                return _cachedStateFinalIKDriver;
+
+            _cachedStateDriverAnimator = stateAnimator;
+            _cachedStateFinalIKDriver = stateAnimator.GetComponent<StateFinalIKDriver>();
+            if (_cachedStateFinalIKDriver == null && allowSearchChildren)
+                _cachedStateFinalIKDriver = stateAnimator.GetComponentInChildren<StateFinalIKDriver>(true);
+
+            return _cachedStateFinalIKDriver;
+        }
+
+        public void ClearStateDriverRelationCache()
+        {
+            _cachedStateDriverAnimator = null;
+            _cachedStateFinalIKDriver = null;
+        }
 
         #endregion
 
         #region KCC
 
-        [Title("KCC（不走模块，超高频）")]
+        [Title("身体运动核心（KCC，高频）")]
         [HideLabel]
         public EntityKCCData kcc = new EntityKCCData();
 
@@ -45,6 +119,7 @@ namespace ES
             // 统一注册：只注册需要参与当前实体运行的域
             RegisterDomain(basicDomain);
             RegisterDomain(aiDomain);
+            RegisterDomain(buffDomain);
             RegisterDomain(stateDomain);
         }
 

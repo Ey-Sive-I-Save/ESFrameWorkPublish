@@ -10,7 +10,7 @@ using UnityEditor.PackageManager.Requests;
 using UnityEngine;
 
 
-namespace ES.ESInstaller
+namespace ES.EditorInternal.Installer
 {
     /// <summary>
     /// ES框架安装器 - 商业级Unity插件安装管理工具

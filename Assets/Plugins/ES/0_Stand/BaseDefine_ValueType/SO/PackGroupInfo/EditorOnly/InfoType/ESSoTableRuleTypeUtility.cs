@@ -11,12 +11,13 @@ using System.Xml;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Sirenix.OdinInspector;
+using ES;
 using UnityEditor;
 using UnityEngine;
 
-namespace ES
+namespace ES.Internal
 {
-    public static class ESSoTableRuleTypeUtility
+    internal static class ESSoTableRuleTypeUtility
     {
         public static Type FindType(string typeName)
         {

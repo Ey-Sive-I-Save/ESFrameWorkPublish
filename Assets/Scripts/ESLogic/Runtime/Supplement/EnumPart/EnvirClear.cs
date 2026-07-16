@@ -15,7 +15,7 @@ namespace ES
         /// </summary>
         public static void ResolveDefault(this ref EnumCollect.Envir_LanguageType envir_)
         {
-            if (envir_ == EnumCollect.Envir_LanguageType.NotClear) envir_ = GameManager.Envir_Language;
+            if (envir_ == EnumCollect.Envir_LanguageType.NotClear) envir_ = ESGameManager.Envir_Language;
         }
 
         /// <summary>

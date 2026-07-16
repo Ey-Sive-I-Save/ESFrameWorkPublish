@@ -9,6 +9,11 @@ namespace ES
 {
     public partial class StateMachine
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private static readonly Unity.Profiling.ProfilerMarker UpdateStateMachineMarker =
+            new Unity.Profiling.ProfilerMarker("【ES】状态机更新");
+#endif
+
         public void Initialize(Entity entity, PlayableGraph graph = default, AnimationLayerMixerPlayable root = default)
         {
             if (this.isInitialized) return;
@@ -378,6 +383,18 @@ namespace ES
         }
 
         public void UpdateStateMachine()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            using (UpdateStateMachineMarker.Auto())
+            {
+                UpdateStateMachineCore();
+            }
+#else
+            UpdateStateMachineCore();
+#endif
+        }
+
+        private void UpdateStateMachineCore()
         {
             if (!isRunning) return;
 

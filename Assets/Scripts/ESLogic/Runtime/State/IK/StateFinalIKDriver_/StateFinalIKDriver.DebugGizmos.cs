@@ -116,7 +116,7 @@ namespace ES
                 DrawWeightBar(goal.position + Vector3.up * debugIKGizmoSize * 2.2f, influence, targetColor);
             }
 
-            DrawLabel(goal.position + Vector3.up * debugIKGizmoSize * 3.4f, $"{label} {influence:F2}");
+            DrawLabel(goal.position + Vector3.up * debugIKGizmoSize * 3.4f, label);
         }
 
         private void DrawWeightBar(Vector3 origin, float weight, Color color)

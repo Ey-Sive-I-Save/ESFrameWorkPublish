@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -11,10 +11,11 @@ using System.Xml;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Sirenix.OdinInspector;
+using ES;
 using UnityEditor;
 using UnityEngine;
 
-namespace ES
+namespace ES.EditorInternal
 {
     [CustomEditor(typeof(ESSoTableDataRule))]
     public sealed class ESSoTableDataRuleEditor : Editor
@@ -53,7 +54,7 @@ namespace ES
             string assetPath = editorTarget != null ? AssetDatabase.GetAssetPath(editorTarget) : string.Empty;
             string guid = string.IsNullOrEmpty(assetPath) ? string.Empty : AssetDatabase.AssetPathToGUID(assetPath);
             string identity = string.IsNullOrEmpty(guid) && editorTarget != null ? editorTarget.GetInstanceID().ToString(CultureInfo.InvariantCulture) : guid;
-            return "ES.ESSoTableDataRuleEditor." + identity + ".";
+            return "ES.EditorInternal.ESSoTableDataRuleEditor." + identity + ".";
         }
 
         private void LoadFoldoutPrefs()
@@ -185,51 +186,58 @@ namespace ES
                 ? FirstNotEmpty(GetBatchFileName(rule), rule.ruleKey, "\u672a\u8bbe\u7f6e\u8868\u540d")
                 : rule.tableName;
 
-            return "SO 表格 \u8868\u683c\u89c4\u5219  |  " + source + "  |  " + table;
+            return "SO 表格规则  |  " + source + "  |  " + table;
         }
 
         private void DrawQuickActions(ESSoTableDataRule rule)
         {
             using (new EditorGUILayout.VerticalScope(_cardStyle))
             {
-                EditorGUILayout.LabelField("Rule \u6784\u5efa\u64cd\u4f5c", _sectionTitleStyle);
+                EditorGUILayout.LabelField("构建规则", _sectionTitleStyle);
                 using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
                 {
-                    if (GUILayout.Button("\u4ece\u5f53\u524d\u9009\u62e9\u751f\u6210", EditorStyles.toolbarButton))
+                    if (GUILayout.Button("从当前选择生成", EditorStyles.toolbarButton, GUILayout.Width(118)))
                         ExecuteAndExit(rule, rule.BindAndGenerateFromSelection);
 
                     using (new EditorGUI.DisabledScope(!HasAnySource(rule)))
                     {
-                        if (GUILayout.Button("\u4ece\u7ed1\u5b9a\u6765\u6e90\u751f\u6210", EditorStyles.toolbarButton))
+                        if (GUILayout.Button("从绑定来源生成", EditorStyles.toolbarButton, GUILayout.Width(118)))
                             ExecuteAndExit(rule, () => BindPreferredSource(rule));
                     }
 
-                    if (GUILayout.Button("\u91cd\u5efa\u5b57\u6bb5\u6620\u5c04", EditorStyles.toolbarButton))
+                    if (GUILayout.Button("重建字段映射", EditorStyles.toolbarButton, GUILayout.Width(108)))
                         ExecuteAndExit(rule, rule.RebuildColumnsFromInfoFields);
 
-                    if (GUILayout.Button("\u9884\u70ed\u53cd\u5c04\u7f13\u5b58", EditorStyles.toolbarButton))
+                    if (GUILayout.Button("预热反射缓存", EditorStyles.toolbarButton, GUILayout.Width(108)))
                         ExecuteAndExit(rule, rule.PrewarmReflectionCache);
-                    if (GUILayout.Button("\u4ece\u8868\u683c\u8868\u5934\u6784\u5efa", EditorStyles.toolbarButton))
+
+                    GUILayout.FlexibleSpace();
+                }
+
+                EditorGUILayout.LabelField("表格辅助", _sectionTitleStyle);
+                using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+                {
+                    if (GUILayout.Button("从表格表头构建", EditorStyles.toolbarButton, GUILayout.Width(118)))
                         ExecuteAndExit(rule, rule.RebuildColumnsFromBuildTable);
                     if (GUILayout.Button("* 空表案例", EditorStyles.toolbarButton, GUILayout.Width(92)))
                         ExecuteAndExit(rule, rule.GenerateEmptyTableExample);
                     if (GUILayout.Button("* 超级批模板", EditorStyles.toolbarButton, GUILayout.Width(106)))
                         ExecuteAndExit(rule, rule.GenerateSuperBatchTemplate);
-                    if (GUILayout.Button("* 行Debug", EditorStyles.toolbarButton, GUILayout.Width(86)))
+                    if (GUILayout.Button("* 行 Debug", EditorStyles.toolbarButton, GUILayout.Width(86)))
                         ExecuteAndExit(rule, rule.DebugConfiguredTableRow);
 
                     GUILayout.FlexibleSpace();
                 }
 
-                EditorGUILayout.LabelField("Rule \u4f7f\u7528\u64cd\u4f5c", _sectionTitleStyle);
+                EditorGUILayout.LabelField("执行批次", _sectionTitleStyle);
                 using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
                 {
-                    if (GUILayout.Button("\u65b0\u589e\u6279\u6b21", EditorStyles.toolbarButton, GUILayout.Width(90)))
+                    if (GUILayout.Button("新增批次", EditorStyles.toolbarButton, GUILayout.Width(90)))
                         ExecuteAndExit(rule, rule.AddUseBatch);
 
                     using (new EditorGUI.DisabledScope(!HasColumns(rule)))
                     {
-                        if (GUILayout.Button("\u6267\u884c\u5168\u90e8\u542f\u7528\u6279\u6b21", EditorStyles.toolbarButton, GUILayout.Width(160)))
+                        if (GUILayout.Button("执行全部启用批次", EditorStyles.toolbarButton, GUILayout.Width(150)))
                             ExecuteAndExit(rule, rule.ExecuteAllEnabledBatches);
                     }
 
@@ -237,7 +245,6 @@ namespace ES
                 }
             }
         }
-
         private static void ExecuteAndExit(ESSoTableDataRule rule, Action action)
         {
             if (action == null)

@@ -7,6 +7,11 @@ namespace ES
     [Serializable, TypeRegistryItem("技能/轨道序列状态")]
     public class EntityState_Skill : StateBase
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private static readonly Unity.Profiling.ProfilerMarker TickRuntimeMarker =
+            new Unity.Profiling.ProfilerMarker("【ES】技能轨道运行时更新");
+#endif
+
         public static new readonly ESSimplePool<EntityState_Skill> Pool = new ESSimplePool<EntityState_Skill>(
             factoryMethod: () => new EntityState_Skill(),
             initCount: 0,
@@ -264,6 +269,18 @@ namespace ES
         }
 
         private void TickRuntime(float time, float deltaTime)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            using (TickRuntimeMarker.Auto())
+            {
+                TickRuntimeCore(time, deltaTime);
+            }
+#else
+            TickRuntimeCore(time, deltaTime);
+#endif
+        }
+
+        private void TickRuntimeCore(float time, float deltaTime)
         {
             var tracks = runtimeCache != null ? runtimeCache.Tracks : null;
             if (tracks == null)

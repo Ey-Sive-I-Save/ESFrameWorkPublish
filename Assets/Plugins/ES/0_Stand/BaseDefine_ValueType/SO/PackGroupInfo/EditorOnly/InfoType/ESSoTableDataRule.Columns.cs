@@ -2,12 +2,15 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using ES.Internal;
 using UnityEngine;
+using Sirenix.OdinInspector;
 
 namespace ES
 {
     public partial class ESSoTableDataRule
     {
+        #region Column Reflection Discovery
         private bool TryGetReflectionPathForColumn(string soFieldPath, Type rowOwnerType, Type listElementType, out Type ownerType, out string memberPath)
         {
             ownerType = rowOwnerType;
@@ -155,6 +158,7 @@ namespace ES
 
             return false;
         }
+        #endregion
     }
 }
 #endif

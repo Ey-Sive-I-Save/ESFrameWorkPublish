@@ -34,7 +34,7 @@ MonoBehaviour:
       Data: 
     - Name: 
       Entry: 12
-      Data: 1206
+      Data: 1207
     - Name: 
       Entry: 7
       Data: 
@@ -84243,6 +84243,63 @@ MonoBehaviour:
       Entry: 8
       Data: 
     - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: 9559e6e950ca62f4bbec8b7fd9f68fbe
+    - Name: $v
+      Entry: 7
+      Data: 2414|ES.ESGlobalProjectAssetGuideData+AssetGuideRecord, ES_Stand
+    - Name: roleTitle
+      Entry: 1
+      Data: "AI\u4E92\u76F8\u8B66\u544A\u548C\u603B\u7ED3"
+    - Name: ownerSystem
+      Entry: 1
+      Data: "AI\u534F\u4F5C"
+    - Name: guid
+      Entry: 1
+      Data: 9559e6e950ca62f4bbec8b7fd9f68fbe
+    - Name: assetPath
+      Entry: 1
+      Data: Assets/Plugins/ES/AIWarnings
+    - Name: assetName
+      Entry: 1
+      Data: AIWarnings
+    - Name: assetTypeName
+      Entry: 1
+      Data: UnityEditor.DefaultAsset
+    - Name: tags
+      Entry: 7
+      Data: 2415|System.Collections.Generic.List`1[[System.String, mscorlib]], mscorlib
+    - Name: 
+      Entry: 12
+      Data: 0
+    - Name: 
+      Entry: 13
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: responsibilityHint
+      Entry: 1
+      Data: "\u6B64\u5904\u5B58\u653E\u5176\u4ED6AI\u5BF9\u6574\u4E2A\u6846\u67B6\u7684\u7406\u89E3\u548C\u6CE8\u610F\u4E8B\u9879\uFF0C\u5E0C\u671B\u4F60\u4ED4\u7EC6\u9605\u8BFB\uFF0C\u5F53\u7136\u6709\u7684\u5185\u5BB9\u53EF\u80FD\u5DF2\u7ECF\u8FC7\u65F6\u5E0C\u671B\u4F60\u4E5F\u80FD\u6307\u51FA\uFF0C\u603B\u4E4B\u5E0C\u671B\u4F60\u7528\u5B83\u5FEB\u901F\u4E86\u89E3\u9879\u76EE\uFF0C\u6BD4\u4FBF\u4E8E\u66F4\u597D\u5730\u53C2\u4E0E\u534F\u4F5C\nAssets/Plugins/ES/AIWarnings"
+    - Name: readMe
+      Entry: 6
+      Data: 
+    - Name: isManuallyEdited
+      Entry: 5
+      Data: true
+    - Name: lastScanUtcTicks
+      Entry: 3
+      Data: 639198303696973036
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
       Entry: 13
       Data: 
     - Name: 
@@ -84256,10 +84313,8 @@ MonoBehaviour:
   - sceneGuid: b4b75588872fe9740ab90f542b86ce3e
     scenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene
       1.unity
-    savedUtcTicks: 639197749888674973
-    expandedTransformPaths:
-    - '%E7%8E%A9%E5%AE%B6%E4%BA%92%E5%8A%A8%E7%BB%84#0@19'
-    - '%E7%8E%A9%E5%AE%B6%E4%BA%92%E5%8A%A8%E7%BB%84#0@19/%E5%A4%A7%E9%BB%91%E5%A1%94#0@0'
+    savedUtcTicks: 639198316030846363
+    expandedTransformPaths: []
   displayTitleFontSize: 22
   displayHintFontSize: 14
   displayTitleColor: {r: 1, g: 0.82, b: 0.28, a: 1}

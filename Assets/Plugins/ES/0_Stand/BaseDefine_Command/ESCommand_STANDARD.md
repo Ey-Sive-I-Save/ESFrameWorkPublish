@@ -49,7 +49,7 @@ Assets/Plugins/ES/0_Stand/BaseDefine_Command/
 
 ```text
 Assets/Plugins/ES/1_Design/<模块名>/Command/
-Assets/Plugins/ES/2_Feature/<功能名>/Command/
+Assets/Scripts/ESLogic/Runtime/Features/<功能名>/Command/
 ```
 
 ## 分类常量

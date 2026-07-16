@@ -6,7 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ES
+namespace ES.EditorInternal
 {
     public class ESGlobalResSettingDrawer : OdinValueDrawer<ESGlobalResSetting>
     {

@@ -10,7 +10,7 @@ using UnityEditor;
 using UnityEngine;
 
 
-namespace ES {
+namespace ES.EditorInternal {
     public class ESBackGroundAttributeDrawer : OdinAttributeDrawer<ESBackGroundAttribute>
     {
        

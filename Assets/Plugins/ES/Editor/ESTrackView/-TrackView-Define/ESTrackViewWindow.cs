@@ -6,7 +6,6 @@ using System.Linq;
 using System.Reflection;
 using DG.Tweening;
 using ES;
-using ES.ES;
 using Sirenix.OdinInspector.Editor;
 using UnityEditor;
 using UnityEngine;

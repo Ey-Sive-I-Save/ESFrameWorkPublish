@@ -74,7 +74,7 @@ namespace ES
         Combat,
         [InspectorName("交互")]
         Interaction,
-        [InspectorName("界面")]
+        [InspectorName("UI")]
         UI,
         [InspectorName("载具/特殊移动")]
         SpecialMove
@@ -127,7 +127,7 @@ namespace ES
         PressedImmediate,
         [InspectorName("松开时判定短按")]
         PressedOnRelease,
-        [InspectorName("长按未触发才算短按")]
+        [InspectorName("长按未触发前算短按")]
         PressedIfNotLongPress,
         [InspectorName("长按触发后吞掉短按")]
         LongPressConsumesPressed

@@ -12,7 +12,7 @@ namespace ES
         public abstract void OnLink(Link link);
         public sealed override void Apply()
         {
-            GameManager.GlobalLinkPool.AddReceiver(this);
+            ESGameManager.GlobalLinkPool.AddReceiver(this);
         }
     }
 

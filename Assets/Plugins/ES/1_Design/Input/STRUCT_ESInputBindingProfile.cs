@@ -7,7 +7,7 @@ namespace ES
     [Serializable]
     public sealed class ESInputBindingProfile
     {
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
 
         [LabelText("档案版本")]
         public int schemaVersion = CurrentSchemaVersion;
@@ -51,14 +51,16 @@ namespace ES
             string originalPath,
             string overridePath)
         {
-            ESInputBindingOverride item = FindEditableOverride(bindingId, actionId, schemeId, bindingName, originalPath);
+            ESInputBindingOverride item = FindEditableOverride(bindingId);
             item.enabled = true;
             item.bindingId = bindingId;
             item.actionId = actionId;
             item.schemeId = schemeId;
             item.bindingName = bindingName;
             item.originalPath = originalPath;
+            item.overridePathEnabled = true;
             item.overridePath = overridePath;
+            item.overrideVirtualControlEnabled = false;
             item.overrideVirtualControlId = string.Empty;
             return item;
         }
@@ -70,15 +72,55 @@ namespace ES
             string bindingName,
             string overrideVirtualControlId)
         {
-            ESInputBindingOverride item = FindEditableOverride(bindingId, actionId, schemeId, bindingName, string.Empty);
+            ESInputBindingOverride item = FindEditableOverride(bindingId);
             item.enabled = true;
             item.bindingId = bindingId;
             item.actionId = actionId;
             item.schemeId = schemeId;
             item.bindingName = bindingName;
             item.originalPath = string.Empty;
+            item.overridePathEnabled = false;
             item.overridePath = string.Empty;
+            item.overrideVirtualControlEnabled = true;
             item.overrideVirtualControlId = overrideVirtualControlId;
+            return item;
+        }
+
+        public ESInputBindingOverride SetInputSystemBindingOverride(
+            string bindingId,
+            ESInputActionId actionId,
+            string schemeId,
+            string bindingName,
+            string originalPath,
+            string overridePath,
+            string overrideInteractions,
+            string overrideProcessors,
+            string overrideBindingName,
+            bool overrideIsComposite,
+            bool overrideIsPartOfComposite)
+        {
+            ESInputBindingOverride item = FindEditableOverride(bindingId);
+            item.enabled = true;
+            item.bindingId = bindingId;
+            item.actionId = actionId;
+            item.schemeId = schemeId;
+            item.bindingName = bindingName;
+            item.originalPath = originalPath;
+
+            item.overridePathEnabled = true;
+            item.overridePath = overridePath;
+            item.overrideVirtualControlEnabled = false;
+            item.overrideVirtualControlId = string.Empty;
+
+            item.overrideInteractionsEnabled = true;
+            item.overrideInteractions = overrideInteractions;
+            item.overrideProcessorsEnabled = true;
+            item.overrideProcessors = overrideProcessors;
+            item.overrideBindingNameEnabled = true;
+            item.overrideBindingName = overrideBindingName;
+            item.overrideCompositeFlagsEnabled = true;
+            item.overrideIsComposite = overrideIsComposite;
+            item.overrideIsPartOfComposite = overrideIsPartOfComposite;
             return item;
         }
 
@@ -100,70 +142,18 @@ namespace ES
             return false;
         }
 
-        public bool TryGetOverride(
-            string bindingId,
-            ESInputActionId actionId,
-            string schemeId,
-            string bindingName,
-            string originalPath,
-            out ESInputBindingOverride result)
+        private ESInputBindingOverride FindEditableOverride(string bindingId)
         {
-            if (overrides != null)
+            Normalize();
+
+            if (!string.IsNullOrEmpty(bindingId))
             {
                 for (int i = 0; i < overrides.Count; i++)
                 {
                     ESInputBindingOverride item = overrides[i];
-                    if (item == null || !item.enabled)
-                        continue;
-
-                    if (!string.IsNullOrEmpty(bindingId)
-                        && string.Equals(item.bindingId, bindingId, StringComparison.Ordinal))
-                    {
-                        result = item;
-                        return true;
-                    }
-
-                    if (string.IsNullOrEmpty(item.bindingId)
-                        && item.actionId == actionId
-                        && string.Equals(item.schemeId, schemeId, StringComparison.Ordinal)
-                        && string.Equals(item.bindingName, bindingName, StringComparison.Ordinal)
-                        && string.Equals(item.originalPath, originalPath, StringComparison.Ordinal))
-                    {
-                        result = item;
-                        return true;
-                    }
+                    if (item != null && string.Equals(item.bindingId, bindingId, StringComparison.Ordinal))
+                        return item;
                 }
-            }
-
-            result = null;
-            return false;
-        }
-
-        private ESInputBindingOverride FindEditableOverride(
-            string bindingId,
-            ESInputActionId actionId,
-            string schemeId,
-            string bindingName,
-            string originalPath)
-        {
-            Normalize();
-
-            for (int i = 0; i < overrides.Count; i++)
-            {
-                ESInputBindingOverride item = overrides[i];
-                if (item == null)
-                    continue;
-
-                if (!string.IsNullOrEmpty(bindingId)
-                    && string.Equals(item.bindingId, bindingId, StringComparison.Ordinal))
-                    return item;
-
-                if (string.IsNullOrEmpty(item.bindingId)
-                    && item.actionId == actionId
-                    && string.Equals(item.schemeId, schemeId, StringComparison.Ordinal)
-                    && string.Equals(item.bindingName, bindingName, StringComparison.Ordinal)
-                    && string.Equals(item.originalPath, originalPath, StringComparison.Ordinal))
-                    return item;
             }
 
             ESInputBindingOverride created = new ESInputBindingOverride();
@@ -194,9 +184,42 @@ namespace ES
         public string originalPath;
 
         [LabelText("覆盖路径")]
+        public bool overridePathEnabled;
+
+        [LabelText("覆盖路径")]
         public string overridePath;
 
         [LabelText("覆盖虚拟控件")]
+        public bool overrideVirtualControlEnabled;
+
+        [LabelText("覆盖虚拟控件")]
         public string overrideVirtualControlId;
+
+        [LabelText("覆盖交互参数")]
+        public bool overrideInteractionsEnabled;
+
+        [LabelText("交互参数")]
+        public string overrideInteractions;
+
+        [LabelText("覆盖处理器")]
+        public bool overrideProcessorsEnabled;
+
+        [LabelText("处理器")]
+        public string overrideProcessors;
+
+        [LabelText("覆盖绑定名称")]
+        public bool overrideBindingNameEnabled;
+
+        [LabelText("绑定名称")]
+        public string overrideBindingName;
+
+        [LabelText("覆盖组合标记")]
+        public bool overrideCompositeFlagsEnabled;
+
+        [LabelText("组合绑定")]
+        public bool overrideIsComposite;
+
+        [LabelText("组合部分")]
+        public bool overrideIsPartOfComposite;
     }
 }

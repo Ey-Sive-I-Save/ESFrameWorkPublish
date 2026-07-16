@@ -1,11 +1,12 @@
 using Sirenix.OdinInspector.Editor;
 using System.Collections;
 using System.Collections.Generic;
+using ES;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace ES
+namespace ES.EditorInternal
 {
     public class ESGraphView_Part_InspectorView : VisualElement
     {

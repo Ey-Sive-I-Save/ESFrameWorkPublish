@@ -64,6 +64,7 @@ namespace ES
         {
             schemeResolver.Dispose();
             inputSystemSource.Dispose();
+            virtualSource.Dispose();
             service.SetCache(null);
             service.SetModeService(null);
         }

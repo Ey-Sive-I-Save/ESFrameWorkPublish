@@ -1,5 +1,4 @@
 using ES;
-using ES.ES;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -13,7 +12,7 @@ using static UnityEditor.Experimental.GraphView.GraphView;
 using static UnityEditor.Rendering.FilterWindow;
 using static UnityEngine.Rendering.DebugUI;
 
-namespace ES
+namespace ES.EditorInternal
 {
 
 

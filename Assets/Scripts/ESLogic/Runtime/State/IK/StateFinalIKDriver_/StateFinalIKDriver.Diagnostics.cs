@@ -156,7 +156,7 @@ namespace ES
         [PropertyOrder(0)]
         [TitleGroup("DriverLayout/诊断/状态概览")]
         [ShowInInspector, ReadOnly, LabelText("FinalIK求解顺序")]
-        public string FinalIKScheduleSummary => _finalIKScheduleSummary;
+        public string FinalIKScheduleSummary => BuildFinalIKScheduleSummary();
 
         [PropertyOrder(1)]
         [TitleGroup("DriverLayout/诊断/状态概览")]
@@ -284,7 +284,7 @@ namespace ES
         [PropertyOrder(9)]
         [TitleGroup("DriverLayout/诊断/状态概览")]
         [ShowInInspector, ReadOnly, LabelText("Biped 运行门控原因")]
-        public string BipedRuntimeGateReason => _bipedRuntimeGateReason;
+        public string BipedRuntimeGateReason => BuildBipedRuntimeGateReason();
 
         [PropertyOrder(9)]
         [TitleGroup("DriverLayout/诊断/状态概览")]
@@ -429,5 +429,70 @@ namespace ES
         [HorizontalGroup("DriverLayout/诊断/已解析求解器/程序动画", LabelWidth = 100)]
         [ShowInInspector, ReadOnly, LabelText("后坐力 (Recoil)")]
         private Recoil DBG_Recoil => _recoil;
+
+        private string BuildFinalIKScheduleSummary()
+        {
+            bool aim = (_finalIKScheduleFlags & IKScheduleFrameFlags.Aim) != 0;
+            bool biped = (_finalIKScheduleFlags & IKScheduleFrameFlags.Biped) != 0;
+            bool lookAt = (_finalIKScheduleFlags & IKScheduleFrameFlags.LookAt) != 0;
+            bool grounder = (_finalIKScheduleFlags & IKScheduleFrameFlags.Grounder) != 0;
+            bool fullBody = (_finalIKScheduleFlags & IKScheduleFrameFlags.FullBody) != 0;
+
+            if (aim && biped && lookAt && grounder && fullBody)
+                return "Driver硬调度：AimIK -> BipedIK(+Grounder委托) -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
+            if (aim && biped && lookAt && fullBody)
+                return "Driver硬调度：AimIK -> BipedIK -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
+            if (biped && lookAt && fullBody)
+                return "Driver硬调度：BipedIK -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
+            if (biped && fullBody)
+                return "Driver硬调度：BipedIK -> FBBIK(+HitReaction/Recoil委托)";
+            if (fullBody)
+                return "Driver硬调度：FBBIK(+HitReaction/Recoil委托)";
+            if (aim && biped && lookAt)
+                return "Driver硬调度：AimIK -> BipedIK -> LookAtIK";
+            if (biped && lookAt)
+                return "Driver硬调度：BipedIK -> LookAtIK";
+            if (aim && biped)
+                return "Driver硬调度：AimIK -> BipedIK";
+            if (lookAt)
+                return "Driver硬调度：LookAtIK";
+            if (aim)
+                return "Driver硬调度：AimIK";
+            if (biped)
+                return "Driver硬调度：BipedIK";
+            return "本帧无IK求解";
+        }
+
+        private string BuildBipedRuntimeGateReason()
+        {
+            switch (_bipedRuntimeGateCode)
+            {
+                case BipedRuntimeGateCode.RuntimeBindingNotReady:
+                    return "Driver 未完成运行时绑定（_runtimeBindingReady=false）";
+                case BipedRuntimeGateCode.StateMachineNotRunning:
+                    return "StateMachine 未运行（isRunning=false）";
+                case BipedRuntimeGateCode.BipedIKNotReady:
+                    return string.IsNullOrEmpty(_bipedIKError) ? "BipedIK 未就绪" : $"BipedIK 未就绪：{_bipedIKError}";
+                case BipedRuntimeGateCode.GoalTargetsNotReady:
+                {
+                    string missing = GetMissingGoalTargetNames();
+                    return string.IsNullOrEmpty(missing)
+                        ? "运行时 Goal Target 未就绪（_goalTargetsReady=false）"
+                        : $"运行时 Goal Target 未就绪（缺失：{missing}）";
+                }
+                case BipedRuntimeGateCode.BipedRuntimeNotReady:
+                    return "Biped 运行条件未满足（bipedRuntimeReady=false）";
+                case BipedRuntimeGateCode.LookAtHandledByLookAtIK:
+                    return "仅存在 LookAt 权重（由 LookAtIK 处理，不走 Biped 四肢求解）";
+                case BipedRuntimeGateCode.NoSolvableLimbWeight:
+                    return "当前无可求解四肢权重（pose.HasLimbWeight=false 且无平滑残留）";
+                case BipedRuntimeGateCode.BipedSolveNotRequired:
+                    return "当前帧无需触发 Biped 求解（requiresBipedSolve=false）";
+                case BipedRuntimeGateCode.ReadyToSolve:
+                    return "Biped 运行正常（可求解）";
+                default:
+                    return "未评估";
+            }
+        }
     }
 }

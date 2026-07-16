@@ -6,7 +6,7 @@ using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace ES
+namespace ES.EditorInternal
 {
     //原始抽象版本
     public abstract class BaseNodeViewer : UnityEditor.Experimental.GraphView.Node

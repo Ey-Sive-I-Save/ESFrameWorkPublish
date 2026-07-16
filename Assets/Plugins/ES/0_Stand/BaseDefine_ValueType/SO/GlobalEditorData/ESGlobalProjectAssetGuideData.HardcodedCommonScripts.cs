@@ -157,7 +157,7 @@ namespace ES
             new HardcodedScriptGuideRule("Assets/Scripts/ESLogic/Runtime/Data/For_Info/GroupType/ActorDataGroup.cs", "Data/Group", "Actor 数据组", "组织多个 ActorDataInfo，提供批量索引、分组和数据包引用入口。", "Group 只负责组织和查找，不应复制 Info 的具体字段语义。", "Data", "Actor", "Group"),
             new HardcodedScriptGuideRule("Assets/Scripts/ESLogic/Runtime/Data/For_Info/PackType/ActorDataPack.cs", "Data/Pack", "Actor 数据包", "打包 Actor 数据组或数据集合，作为运行时加载、编辑器管理或发布资源的聚合单位。", "Pack 关注资源组织和加载边界，不要塞入运行状态。", "Data", "Actor", "Pack"),
 
-            new HardcodedScriptGuideRule("Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/GameManager.cs", "GameManager/Core", "游戏管理器核心", "提供游戏级主控入口，协调全局系统、领域对象、运行流程和跨系统访问。", "管理器只做协调，不要堆具体技能、状态、交互或战斗公式；能下沉到领域模块的逻辑应拆出去。", "GameManager", "Core"),
+            new HardcodedScriptGuideRule("Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.cs", "GameManager/Core", "游戏管理器核心", "提供游戏级主控入口，协调全局系统、领域对象、运行流程和跨系统访问。", "管理器只做协调，不要堆具体技能、状态、交互或战斗公式；能下沉到领域模块的逻辑应拆出去。", "GameManager", "Core"),
             new HardcodedScriptGuideRule("Assets/Scripts/ESLogic/Runtime/GameManager/Domains/GlobalDomain.cs", "GameManager/Domain", "全局领域", "承载跨场景或跨系统的全局领域数据与服务入口，供游戏管理器统一访问。", "GlobalDomain 要控制边界，避免变成万能数据袋；新增能力要确认是否真是全局。", "GameManager", "Domain", "Global"),
             new HardcodedScriptGuideRule("Assets/Scripts/ESLogic/Runtime/GameManager/Domains/GameRunDomain.cs", "GameManager/Domain", "游戏运行领域", "承载游戏运行期领域状态和流程控制，连接管理器与具体业务系统。", "运行领域应关注流程和协调，不直接替代 Entity、Skill、State 的内部实现。", "GameManager", "Domain", "Runtime"),
 

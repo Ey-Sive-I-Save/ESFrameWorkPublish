@@ -41,6 +41,11 @@ namespace ES
 
     public static class ESInputRuntimeBuilder
     {
+        private sealed class OverrideLookup
+        {
+            public readonly Dictionary<string, ESInputBindingOverride> byBindingId = new Dictionary<string, ESInputBindingOverride>(StringComparer.Ordinal);
+        }
+
         public static ESInputRuntimeBuildResult Build(
             IESInputRuntimeConfigSource source,
             ESInputBindingProfile profile,
@@ -73,6 +78,7 @@ namespace ES
             ESInputRuntimeBuildResult result = new ESInputRuntimeBuildResult(maxIndex + 1, bindingCapacity);
             result.activeSchemeId = activeSchemeId;
 
+            OverrideLookup overrideLookup = BuildOverrideLookup(profile);
             int bindingIndex = 0;
             for (int i = 0; i < actionCount; i++)
             {
@@ -110,7 +116,7 @@ namespace ES
                     if (binding == null || bindingIndex >= result.bindings.Length)
                         continue;
 
-                    result.bindings[bindingIndex++] = CompileBinding(action, binding, profile, duplicateCounters);
+                    result.bindings[bindingIndex++] = CompileBinding(action, binding, overrideLookup, duplicateCounters);
                 }
             }
 
@@ -121,22 +127,41 @@ namespace ES
         private static ESInputCompiledBinding CompileBinding(
             ESInputActionDefine action,
             ESInputBindingDefine binding,
-            ESInputBindingProfile profile,
+            OverrideLookup overrideLookup,
             Dictionary<string, int> duplicateCounters)
         {
             string bindingId = ResolveBindingId(action, binding, duplicateCounters);
             string effectivePath = binding.path;
             string virtualControlId = binding.virtualControlId;
+            string effectiveName = binding.name;
+            string interactions = binding.interactions;
+            string processors = binding.processors;
+            bool isComposite = binding.isComposite;
+            bool isPartOfComposite = binding.isPartOfComposite;
 
-            if (profile != null
-                && action.allowRebind
-                && profile.TryGetOverride(bindingId, action.id, binding.schemeId, binding.name, binding.path, out ESInputBindingOverride overrideData))
+            if (action.allowRebind
+                && TryGetOverride(overrideLookup, bindingId, out ESInputBindingOverride overrideData))
             {
-                if (!string.IsNullOrEmpty(overrideData.overridePath))
+                if (overrideData.overridePathEnabled)
                     effectivePath = overrideData.overridePath;
 
-                if (!string.IsNullOrEmpty(overrideData.overrideVirtualControlId))
+                if (overrideData.overrideVirtualControlEnabled)
                     virtualControlId = overrideData.overrideVirtualControlId;
+
+                if (overrideData.overrideInteractionsEnabled)
+                    interactions = overrideData.overrideInteractions;
+
+                if (overrideData.overrideProcessorsEnabled)
+                    processors = overrideData.overrideProcessors;
+
+                if (overrideData.overrideBindingNameEnabled)
+                    effectiveName = overrideData.overrideBindingName;
+
+                if (overrideData.overrideCompositeFlagsEnabled)
+                {
+                    isComposite = overrideData.overrideIsComposite;
+                    isPartOfComposite = overrideData.overrideIsPartOfComposite;
+                }
             }
 
             return new ESInputCompiledBinding
@@ -145,14 +170,14 @@ namespace ES
                 actionId = action.id,
                 source = binding.source,
                 schemeId = binding.schemeId,
-                name = binding.name,
+                name = effectiveName,
                 originalPath = binding.path,
                 effectivePath = effectivePath,
                 virtualControlId = virtualControlId,
-                interactions = binding.interactions,
-                processors = binding.processors,
-                isComposite = binding.isComposite,
-                isPartOfComposite = binding.isPartOfComposite
+                interactions = interactions,
+                processors = processors,
+                isComposite = isComposite,
+                isPartOfComposite = isPartOfComposite
             };
         }
 
@@ -174,6 +199,49 @@ namespace ES
             }
 
             return ESInputBindingKeyUtility.MakeBindingId(action, binding, duplicateIndex);
+        }
+
+        private static OverrideLookup BuildOverrideLookup(ESInputBindingProfile profile)
+        {
+            if (profile == null)
+            {
+                return null;
+            }
+
+            profile.Normalize();
+            if (profile.overrides == null || profile.overrides.Count == 0)
+            {
+                return null;
+            }
+
+            OverrideLookup lookup = new OverrideLookup();
+            for (int i = 0; i < profile.overrides.Count; i++)
+            {
+                ESInputBindingOverride item = profile.overrides[i];
+                if (item == null || !item.enabled)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(item.bindingId))
+                    continue;
+
+                lookup.byBindingId[item.bindingId] = item;
+            }
+
+            return lookup;
+        }
+
+        private static bool TryGetOverride(
+            OverrideLookup lookup,
+            string bindingId,
+            out ESInputBindingOverride result)
+        {
+            if (lookup != null && !string.IsNullOrEmpty(bindingId))
+                return lookup.byBindingId.TryGetValue(bindingId, out result);
+
+            result = null;
+            return false;
         }
     }
 

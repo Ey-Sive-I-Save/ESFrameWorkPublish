@@ -9,7 +9,7 @@ using UnityEditor;
 using UnityEngine;
 
 
-namespace ES {
+namespace ES.EditorInternal {
 
    public class ESDragAttributeDrawer : OdinAttributeDrawer<ESDragAttribute,int>
     {

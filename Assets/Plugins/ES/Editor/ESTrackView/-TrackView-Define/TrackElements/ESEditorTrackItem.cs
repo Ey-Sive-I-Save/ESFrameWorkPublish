@@ -41,8 +41,8 @@ namespace ES
         #endregion
         // 控制按钮
         private Button m_EnableButton;
-        private Button m_MuteButton;
-        private Button m_LockButton;
+        private Button m_MuteButton = null;
+        private Button m_LockButton = null;
         private Button m_DeleteButton;
         private Button m_CollapseButton;
 

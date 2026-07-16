@@ -56,7 +56,7 @@ namespace ES
         [TabGroup("DriverLayout", "公共部分")]
         [FoldoutGroup("DriverLayout/公共部分/瞄准IK", Expanded = false)]
         [LabelText("AimIK  |  骨链瞄准")]
-        [Tooltip("AimIK：将骨链末端对准目标点（武器持握/身体对准）。通过 HandleAim 系列接口外部驱动，权重 0 时不影响动画。骨链只从总面板统一骨骼绑定派生。")]
+        [Tooltip("AimIK：将骨链末端对准目标点（武器持握/身体对准）。通过 IKAimAt / IKSetAimTargetWeight 系列接口外部驱动，权重 0 时不影响动画。骨链只从总面板统一骨骼绑定派生。")]
         [InlineButton("QuickAddComp_AimIK", "添加组件")]
         [SerializeField] internal bool enableAimIK = true;
 
@@ -72,7 +72,7 @@ namespace ES
         [TabGroup("DriverLayout", "公共部分")]
         [FoldoutGroup("DriverLayout/公共部分/受击反馈", Expanded = false)]
         [LabelText("HitReaction  |  受击程序动画")]
-        [Tooltip("HitReaction：受击程序动画（需 FullBodyBipedIK）。禁用后 TriggerHitReaction() 调用无效。")]
+        [Tooltip("HitReaction：受击程序动画（需 FullBodyBipedIK）。禁用后 IKHit() 调用无效。")]
         [EnableIf("enableFullBodyBipedIK")]
         [InlineButton("QuickAddComp_HitReaction", "添加组件")]
         [SerializeField] internal bool enableHitReaction = true;
@@ -81,7 +81,7 @@ namespace ES
         [TabGroup("DriverLayout", "公共部分")]
         [FoldoutGroup("DriverLayout/公共部分/后坐力", Expanded = false)]
         [LabelText("Recoil  |  后坐力程序动画")]
-        [Tooltip("Recoil：武器后坐力程序动画（需 FullBodyBipedIK）。禁用后 TriggerRecoil() 调用无效。")]
+        [Tooltip("Recoil：武器后坐力程序动画（需 FullBodyBipedIK）。禁用后 IKPlayRecoil() 调用无效。")]
         [EnableIf("enableFullBodyBipedIK")]
         [InlineButton("QuickAddComp_Recoil", "添加组件")]
         [SerializeField] internal bool enableRecoil = true;

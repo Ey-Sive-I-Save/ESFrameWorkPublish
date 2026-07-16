@@ -40,8 +40,8 @@ namespace ES
                 RegisterStatesFromInfos(pack.Infos.Values, allowOverride: false);
             }
 
-            // 纭繚榛樿鐘舵€佸湪娉ㄥ唽瀹屾垚鍚庡彲琚縺娲?
-            if (!string.IsNullOrEmpty(defaultStateKey))
+            // 运行中热加载数据包时，补齐默认状态；首次启动交给 StartStateMachineAfterDataLoaded。
+            if (stateMachine.isRunning && !string.IsNullOrEmpty(defaultStateKey))
             {
                 var defaultState = stateMachine.GetStateByString(defaultStateKey);
                 if (defaultState != null && defaultState.baseStatus != StateBaseStatus.Running)
@@ -184,7 +184,6 @@ namespace ES
             stateMachine.stateMachineKey = string.IsNullOrEmpty(defaultStateKey) ? "Entity" : defaultStateKey;
             stateMachine.Initialize(MyCore, _cachedAnimator);
             stateMachine.defaultStateKey = defaultStateKey;
-            stateMachine.StartStateMachine();
             _stateMachineInitialized = true;
             _warnedMissingCoreForStateMachineInit = false;
             _warnedMissingAnimatorForStateMachineInit = false;

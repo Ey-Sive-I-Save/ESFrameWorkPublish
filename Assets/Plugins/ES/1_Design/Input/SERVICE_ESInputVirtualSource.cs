@@ -27,7 +27,7 @@ namespace ES
         }
     }
 
-    public sealed class ESInputVirtualSource
+    public sealed class ESInputVirtualSource : IDisposable
     {
         private ESInputService inputService;
         private Dictionary<string, ESInputVirtualControlHandle> virtualHandles;
@@ -46,6 +46,7 @@ namespace ES
 
         public void Initialize(ESInputRuntimeBuildResult build, ESInputService input)
         {
+            Dispose();
             inputService = input;
 
             int capacity = 0;
@@ -72,6 +73,25 @@ namespace ES
             activeCount = 0;
 
             BuildAllowedMask(build);
+        }
+
+        public void Dispose()
+        {
+            ClearAll();
+            inputService = null;
+            virtualHandles = null;
+            buttonEnabled = null;
+            buttonHeld = null;
+            axisEnabled = null;
+            axisValues = null;
+            vector2Enabled = null;
+            vector2Values = null;
+            buttonAllowed = null;
+            axisAllowed = null;
+            vector2Allowed = null;
+            activeIndices = null;
+            activePositions = null;
+            activeCount = 0;
         }
 
         public bool TryGetHandle(string virtualControlId, out ESInputVirtualControlHandle handle)
@@ -144,12 +164,15 @@ namespace ES
 
         public void SetButton(ESInputActionId id, bool held)
         {
-            SetButtonByIndex((int)id, held);
+            SetButtonByIndex((int)id, held, false);
         }
 
-        private void SetButtonByIndex(int index, bool held)
+        private void SetButtonByIndex(int index, bool held, bool requireAllowed = true)
         {
-            if (!IsValid(index, buttonHeld) || !buttonAllowed[index])
+            if (!IsValid(index, buttonHeld))
+                return;
+
+            if (requireAllowed && !buttonAllowed[index])
                 return;
 
             buttonEnabled[index] = true;
@@ -190,12 +213,15 @@ namespace ES
 
         public void SetAxis(ESInputActionId id, float value)
         {
-            SetAxisByIndex((int)id, value);
+            SetAxisByIndex((int)id, value, false);
         }
 
-        private void SetAxisByIndex(int index, float value)
+        private void SetAxisByIndex(int index, float value, bool requireAllowed = true)
         {
-            if (!IsValid(index, axisValues) || !axisAllowed[index])
+            if (!IsValid(index, axisValues))
+                return;
+
+            if (requireAllowed && !axisAllowed[index])
                 return;
 
             axisEnabled[index] = true;
@@ -236,12 +262,15 @@ namespace ES
 
         public void SetVector2(ESInputActionId id, Vector2 value)
         {
-            SetVector2ByIndex((int)id, value);
+            SetVector2ByIndex((int)id, value, false);
         }
 
-        private void SetVector2ByIndex(int index, Vector2 value)
+        private void SetVector2ByIndex(int index, Vector2 value, bool requireAllowed = true)
         {
-            if (!IsValid(index, vector2Values) || !vector2Allowed[index])
+            if (!IsValid(index, vector2Values))
+                return;
+
+            if (requireAllowed && !vector2Allowed[index])
                 return;
 
             vector2Enabled[index] = true;
@@ -266,9 +295,6 @@ namespace ES
 
         public void Update(float time)
         {
-            if (inputService == null || buttonHeld == null)
-                return;
-
             for (int i = 0; i < activeCount; i++)
             {
                 int index = activeIndices[i];
@@ -285,15 +311,27 @@ namespace ES
 
         public void ClearAll()
         {
+            if (activeIndices == null || activePositions == null)
+            {
+                activeCount = 0;
+                return;
+            }
+
             for (int i = 0; i < activeCount; i++)
             {
                 int index = activeIndices[i];
-                buttonEnabled[index] = false;
-                buttonHeld[index] = false;
-                axisEnabled[index] = false;
-                axisValues[index] = 0f;
-                vector2Enabled[index] = false;
-                vector2Values[index] = Vector2.zero;
+                if (IsValid(index, buttonEnabled))
+                    buttonEnabled[index] = false;
+                if (IsValid(index, buttonHeld))
+                    buttonHeld[index] = false;
+                if (IsValid(index, axisEnabled))
+                    axisEnabled[index] = false;
+                if (IsValid(index, axisValues))
+                    axisValues[index] = 0f;
+                if (IsValid(index, vector2Enabled))
+                    vector2Enabled[index] = false;
+                if (IsValid(index, vector2Values))
+                    vector2Values[index] = Vector2.zero;
                 activePositions[index] = -1;
                 activeIndices[i] = 0;
             }

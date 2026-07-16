@@ -103,31 +103,40 @@ namespace ES
                 return;
             }
 
+            if (!CanReadHumanoidBones(animator))
+            {
+                Debug.LogWarning("[StateFinalIKDriver] 自动填充需要 Humanoid Animator。当前 Animator 的 Avatar 无效或不是 Humanoid，已保持原绑定不变。", this);
+                return;
+            }
+
+            RecordDriverBeforeInspectorEdit("Auto Fill StateFinalIKDriver Bone Binding");
+
             useDriverBoneBinding = true;
             bindingRoot = animator.transform;
-            bindingPelvis = animator.GetBoneTransform(HumanBodyBones.Hips);
-            bindingSpine = animator.GetBoneTransform(HumanBodyBones.Spine);
-            var upperChest = animator.GetBoneTransform(HumanBodyBones.UpperChest);
-            var chest = animator.GetBoneTransform(HumanBodyBones.Chest);
+            bindingPelvis = GetHumanBoneTransform(animator, HumanBodyBones.Hips);
+            bindingSpine = GetHumanBoneTransform(animator, HumanBodyBones.Spine);
+            var upperChest = GetHumanBoneTransform(animator, HumanBodyBones.UpperChest);
+            var chest = GetHumanBoneTransform(animator, HumanBodyBones.Chest);
             bindingChest = upperChest != null ? upperChest : chest;
-            bindingNeck = animator.GetBoneTransform(HumanBodyBones.Neck);
-            bindingHead = animator.GetBoneTransform(HumanBodyBones.Head);
-            bindingLeftEye = animator.GetBoneTransform(HumanBodyBones.LeftEye);
-            bindingRightEye = animator.GetBoneTransform(HumanBodyBones.RightEye);
-            bindingLeftUpperArm = animator.GetBoneTransform(HumanBodyBones.LeftUpperArm);
-            bindingLeftForearm = animator.GetBoneTransform(HumanBodyBones.LeftLowerArm);
-            bindingLeftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
-            bindingRightUpperArm = animator.GetBoneTransform(HumanBodyBones.RightUpperArm);
-            bindingRightForearm = animator.GetBoneTransform(HumanBodyBones.RightLowerArm);
-            bindingRightHand = animator.GetBoneTransform(HumanBodyBones.RightHand);
-            bindingLeftThigh = animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
-            bindingLeftCalf = animator.GetBoneTransform(HumanBodyBones.LeftLowerLeg);
-            bindingLeftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
-            bindingRightThigh = animator.GetBoneTransform(HumanBodyBones.RightUpperLeg);
-            bindingRightCalf = animator.GetBoneTransform(HumanBodyBones.RightLowerLeg);
-            bindingRightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+            bindingNeck = GetHumanBoneTransform(animator, HumanBodyBones.Neck);
+            bindingHead = GetHumanBoneTransform(animator, HumanBodyBones.Head);
+            bindingLeftEye = GetHumanBoneTransform(animator, HumanBodyBones.LeftEye);
+            bindingRightEye = GetHumanBoneTransform(animator, HumanBodyBones.RightEye);
+            bindingLeftUpperArm = GetHumanBoneTransform(animator, HumanBodyBones.LeftUpperArm);
+            bindingLeftForearm = GetHumanBoneTransform(animator, HumanBodyBones.LeftLowerArm);
+            bindingLeftHand = GetHumanBoneTransform(animator, HumanBodyBones.LeftHand);
+            bindingRightUpperArm = GetHumanBoneTransform(animator, HumanBodyBones.RightUpperArm);
+            bindingRightForearm = GetHumanBoneTransform(animator, HumanBodyBones.RightLowerArm);
+            bindingRightHand = GetHumanBoneTransform(animator, HumanBodyBones.RightHand);
+            bindingLeftThigh = GetHumanBoneTransform(animator, HumanBodyBones.LeftUpperLeg);
+            bindingLeftCalf = GetHumanBoneTransform(animator, HumanBodyBones.LeftLowerLeg);
+            bindingLeftFoot = GetHumanBoneTransform(animator, HumanBodyBones.LeftFoot);
+            bindingRightThigh = GetHumanBoneTransform(animator, HumanBodyBones.RightUpperLeg);
+            bindingRightCalf = GetHumanBoneTransform(animator, HumanBodyBones.RightLowerLeg);
+            bindingRightFoot = GetHumanBoneTransform(animator, HumanBodyBones.RightFoot);
 
             SyncAimChainFromUnifiedBinding(animator);
+            FinalizeDriverInspectorEdit();
         }
 
         [TabGroup("DriverLayout", "公共部分")]
@@ -138,7 +147,11 @@ namespace ES
         [Button("应用到已挂载 IK", ButtonSizes.Medium)]
         private void ApplyDriverBoneBindingFromInspector()
         {
-            SyncAimChainFromUnifiedBinding(GetBindingAnimator());
+            if (useDriverBoneBinding)
+                SyncAimChainFromUnifiedBinding(GetBindingAnimator());
+            else
+                ClearAimChainDriverFields();
+
             ApplyDriverBoneBindingsToConfiguredIK();
 
             if (!Application.isPlaying) return;
@@ -164,6 +177,8 @@ namespace ES
         [Button("清空骨骼绑定", ButtonSizes.Medium)]
         private void ClearDriverBoneBinding()
         {
+            RecordDriverBeforeInspectorEdit("Clear StateFinalIKDriver Bone Binding");
+
             useDriverBoneBinding = false;
             bindingRoot = null;
             bindingPelvis = null;
@@ -185,6 +200,8 @@ namespace ES
             bindingRightThigh = null;
             bindingRightCalf = null;
             bindingRightFoot = null;
+            ClearAimChainDriverFields();
+            FinalizeDriverInspectorEdit();
         }
 
         [PropertyOrder(50)]
@@ -388,10 +405,57 @@ namespace ES
 #endif
     }
 
+        private void RecordDriverBeforeInspectorEdit(string undoLabel)
+        {
+#if UNITY_EDITOR
+            if (Application.isPlaying) return;
+            UnityEditor.Undo.RecordObject(this, undoLabel);
+#endif
+        }
+
+        private void FinalizeDriverInspectorEdit()
+        {
+#if UNITY_EDITOR
+            if (Application.isPlaying) return;
+
+            UnityEditor.EditorUtility.SetDirty(this);
+            UnityEditor.PrefabUtility.RecordPrefabInstancePropertyModifications(this);
+            if (gameObject.scene.IsValid())
+                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+#endif
+        }
+
         private Animator GetBindingAnimator()
         {
             if (_animator != null) return _animator;
-            return GetComponent<Animator>();
+
+            var animator = GetComponent<Animator>();
+            if (animator != null) return animator;
+
+            animator = GetComponentInParent<Animator>();
+            if (animator != null) return animator;
+
+            return GetComponentInChildren<Animator>();
+        }
+
+        private static bool CanReadHumanoidBones(Animator animator)
+        {
+            return animator != null && animator.avatar != null && animator.avatar.isValid && animator.isHuman;
+        }
+
+        private static Transform GetHumanBoneTransform(Animator animator, HumanBodyBones bone)
+        {
+            if (!CanReadHumanoidBones(animator))
+                return null;
+
+            try
+            {
+                return animator.GetBoneTransform(bone);
+            }
+            catch (System.Exception)
+            {
+                return null;
+            }
         }
 
         private Transform GetBindingRoot()
@@ -722,7 +786,7 @@ namespace ES
                 }
             }
 
-            if (applyToAimIKFromInspector)
+            if (useDriverBoneBinding && applyToAimIKFromInspector)
             {
                 var aimIK = _refs.aimIK ?? presetAimIK ?? GetComponent<AimIK>();
                 if (aimIK != null)
@@ -797,6 +861,7 @@ namespace ES
                 return false;
             }
 
+            ApplyAimChainToDriverFields(chain);
             RecordDrivenComponentBeforeEdit(aimIK, "Apply StateFinalIKDriver AimIK Chain");
 
             if (Application.isPlaying)
@@ -830,12 +895,17 @@ namespace ES
         private bool SyncAimChainFromUnifiedBinding(Animator animator)
         {
             if (!enableAimIK)
+            {
+                ClearAimChainDriverFields();
                 return false;
+            }
 
             if (!TryResolveValidatedAimChain(animator, out var chain, out _, out _))
+            {
+                ClearAimChainDriverFields();
                 return false;
+            }
 
-            useDriverAimBoneChain = true;
             ApplyAimChainToDriverFields(chain);
             return true;
         }
@@ -851,23 +921,23 @@ namespace ES
             if (animator != null)
             {
                 if (pelvis == null)
-                    pelvis = animator.GetBoneTransform(HumanBodyBones.Hips);
+                    pelvis = GetHumanBoneTransform(animator, HumanBodyBones.Hips);
 
                 if (spine == null)
-                    spine = animator.GetBoneTransform(HumanBodyBones.Spine);
+                    spine = GetHumanBoneTransform(animator, HumanBodyBones.Spine);
 
                 if (chest == null)
                 {
-                    var upperChest = animator.GetBoneTransform(HumanBodyBones.UpperChest);
-                    var chestBone = animator.GetBoneTransform(HumanBodyBones.Chest);
+                    var upperChest = GetHumanBoneTransform(animator, HumanBodyBones.UpperChest);
+                    var chestBone = GetHumanBoneTransform(animator, HumanBodyBones.Chest);
                     chest = upperChest != null ? upperChest : chestBone;
                 }
 
                 if (neck == null)
-                    neck = animator.GetBoneTransform(HumanBodyBones.Neck);
+                    neck = GetHumanBoneTransform(animator, HumanBodyBones.Neck);
 
                 if (head == null)
-                    head = animator.GetBoneTransform(HumanBodyBones.Head);
+                    head = GetHumanBoneTransform(animator, HumanBodyBones.Head);
             }
 
             var root = animator != null ? animator.transform : GetBindingRoot();
@@ -884,6 +954,15 @@ namespace ES
             aimChainBone4 = chain.Length > 3 ? chain[3] : null;
         }
 
+        private void ClearAimChainDriverFields()
+        {
+            useDriverAimBoneChain = false;
+            aimChainBone1 = null;
+            aimChainBone2 = null;
+            aimChainBone3 = null;
+            aimChainBone4 = null;
+        }
+
         private bool TryResolveValidatedAimChain(Animator animator, out Transform[] chain, out string validationError, out string reorderMessage)
         {
             chain = System.Array.Empty<Transform>();
@@ -892,8 +971,6 @@ namespace ES
 
             if (!useDriverBoneBinding)
             {
-                useDriverAimBoneChain = false;
-                ApplyAimChainToDriverFields(chain);
                 validationError = "AimIK 已收口到总面板统一骨骼绑定。请先启用“Driver 骨骼绑定”，再应用 AimIK。";
                 return false;
             }
@@ -901,7 +978,6 @@ namespace ES
             var rawChain = BuildPreferredAimBodyChain(animator);
             var normalizedChain = NormalizeAimChainParentToChild(rawChain);
             bool reordered = !AreSameOrderedTransforms(rawChain, normalizedChain);
-            ApplyAimChainToDriverFields(normalizedChain);
 
             Transform resolvedNeck = ResolveAimNeck(animator);
             if (resolvedNeck == null)
@@ -941,7 +1017,7 @@ namespace ES
         {
             Transform neck = bindingNeck;
             if (neck == null && animator != null)
-                neck = animator.GetBoneTransform(HumanBodyBones.Neck);
+                neck = GetHumanBoneTransform(animator, HumanBodyBones.Neck);
 
             if (neck != null)
                 return neck;

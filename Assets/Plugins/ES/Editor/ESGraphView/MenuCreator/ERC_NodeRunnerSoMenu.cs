@@ -1,8 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using ES;
 using UnityEngine;
-namespace ES
+namespace ES.EditorInternal
 {
     public class ERC_NodeRunnerSoMenu : EditorRegister_FOR_ClassAttribute<CreateNodeRunnerSoMenuAttribute>
     {

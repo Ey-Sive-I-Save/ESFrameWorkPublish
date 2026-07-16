@@ -16,7 +16,7 @@ namespace ES
         [FoldoutGroup("DriverLayout/公共部分/瞄准IK")]
         [InfoBox("外部 API 驱动的 AimIK 若长时间未收到心跳则自动将权重衰减到 0，防止状态切换后 IK 卡住。\n超时阈值 = 0 时禁用心跳。", InfoMessageType.None)]
         [LabelText("超时阈值 (秒)")]
-        [Tooltip("距上次 HandleAim / HandleAimTarget 调用超出此时长后开始衰减。0 = 禁用心跳。")]
+        [Tooltip("距上次 IKAimAt / IKSetAimTargetTransform / IKSetAimTargetPosition 调用超出此时长后开始衰减。0 = 禁用心跳。")]
         [Range(0f, 5f)]
         [ShowIf("enableAimIK")]
         [SerializeField] private float aimIKHeartbeatTimeout = 0.5f;
@@ -94,7 +94,7 @@ namespace ES
         [PropertyOrder(34)]
         [FoldoutGroup("DriverLayout/公共部分/瞄准IK")]
         [LabelText("允许初始就带权重")]
-        [Tooltip("关闭时，AimIK 在 Bind/初始化时强制从 0 权重开始，只有外部真正调用 HandleAim 后才会拉起。打开时才使用下方的初始权重。")]
+        [Tooltip("关闭时，AimIK 在 Bind/初始化时强制从 0 权重开始，只有外部真正调用 IKAimAt / IKSetAimTargetWeight 后才会拉起。打开时才使用下方的初始权重。")]
         [ShowIf("enableAimIK")]
         [SerializeField] private bool useInitAimWeightOnBind = false;
 

@@ -5,11 +5,13 @@ using System.Text;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using Sirenix.OdinInspector;
 
 namespace ES
 {
     public partial class ESSoTableDataRule
     {
+        #region Super Batch
         public void GenerateSuperBatchTemplate()
         {
             string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
@@ -168,7 +170,7 @@ namespace ES
                 return;
             }
 
-            List<List<string>> table = ReadTableFileAuto(path);
+            List<List<string>> table = ReadTableFileCached(path);
             if (!TryBuildSuperBatchHeader(table, out Dictionary<string, int> columns, out int dataStartRow, out string headerError))
             {
                 Debug.LogWarning("超级批关系表表头无效：" + headerError, this);
@@ -213,24 +215,24 @@ namespace ES
         {
             var builder = new StringBuilder();
             string path = ResolveProjectFullPath(superBatch != null ? superBatch.superBatchTablePath : null);
-            builder.AppendLine("========== Super Batch ==========");
-            builder.AppendLine("Relation table: " + FirstNotEmptyLocal(path, "(missing)"));
-            builder.AppendLine("Skip invalid rows: " + (superBatch != null && superBatch.superBatchSkipInvalidRows));
+            builder.AppendLine("========== 超级批计划 ==========");
+            builder.AppendLine("关系表：" + FirstNotEmptyLocal(path, "(未找到)"));
+            builder.AppendLine("跳过无效行：" + (superBatch != null && superBatch.superBatchSkipInvalidRows));
 
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             {
-                AddPlanError(summary, "Super batch relation table not found: " + (superBatch != null ? superBatch.superBatchTablePath : string.Empty));
+                AddPlanError(summary, "超级批关系表不存在：" + (superBatch != null ? superBatch.superBatchTablePath : string.Empty));
                 return builder.ToString();
             }
 
-            List<List<string>> table = ReadTableFileAuto(path);
+            List<List<string>> table = ReadTableFileCached(path);
             if (!TryBuildSuperBatchHeader(table, out Dictionary<string, int> columns, out int dataStartRow, out string headerError))
             {
-                AddPlanError(summary, "Super batch header invalid: " + headerError);
+                AddPlanError(summary, "超级批表头无效：" + headerError);
                 return builder.ToString();
             }
 
-            builder.AppendLine("Data rows: " + Math.Max(0, table.Count - dataStartRow));
+            builder.AppendLine("数据行数：" + Math.Max(0, table.Count - dataStartRow));
             int executed = 0;
             int skipped = 0;
             for (int rowIndex = dataStartRow; rowIndex < table.Count; rowIndex++)
@@ -247,7 +249,7 @@ namespace ES
                 if (!ApplySuperBatchRow(derived, row, columns, rowIndex + 1, out string reason))
                 {
                     skipped++;
-                    string message = "Super batch row " + (rowIndex + 1) + " skipped: " + reason;
+                    string message = "超级批第 " + (rowIndex + 1) + " 行跳过：" + reason;
                     if (superBatch != null && superBatch.superBatchSkipInvalidRows)
                     {
                         builder.AppendLine(message);
@@ -261,7 +263,7 @@ namespace ES
 
                 var rowSummary = new ESTablePlanRiskSummary();
                 builder.AppendLine();
-                builder.AppendLine("######## Super batch row " + (rowIndex + 1) + " ########");
+                builder.AppendLine("######## 超级批第 " + (rowIndex + 1) + " 行 ########");
                 ESSoTableRuleUseBatch oldBatch = activeUseBatch;
                 try
                 {
@@ -277,8 +279,8 @@ namespace ES
             }
 
             builder.AppendLine();
-            builder.AppendLine("Executed rows: " + executed);
-            builder.AppendLine("Skipped rows: " + skipped);
+            builder.AppendLine("执行行数：" + executed);
+            builder.AppendLine("跳过行数：" + skipped);
             return builder.ToString();
         }
         private static ESSoTableRuleUseBatch CloneUseBatch(ESSoTableRuleUseBatch source)
@@ -585,6 +587,7 @@ namespace ES
                 return Path.GetFullPath(path);
             return Path.GetFullPath(Path.Combine(Application.dataPath, "..", path));
         }
+        #endregion
     }
 }
 #endif

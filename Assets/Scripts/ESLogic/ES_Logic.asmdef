@@ -8,7 +8,8 @@
         "DOTween.Modules",
         "KCC",
         "Unity.InputSystem",
-        "RootMotion"
+        "RootMotion",
+        "EasySave3"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

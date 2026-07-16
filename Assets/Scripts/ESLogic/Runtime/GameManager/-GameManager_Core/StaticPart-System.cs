@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 namespace ES
 {
-    public partial class GameManager
+    public partial class ESGameManager
     {
         public static EnumCollect.Envir_LanguageType Envir_Language = EnumCollect.Envir_LanguageType.Chinese;
         #region 全局事件-GameCenterAwakeBefore

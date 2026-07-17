@@ -504,6 +504,7 @@ namespace ES.EditorInternal
                     DrawChild(batch, "xlsxRelativePath", "XLSX \u76f8\u5bf9\u8def\u5f84", "\u76f8\u5bf9\u8f93\u51fa\u6839\u76ee\u5f55\u7684 XLSX \u5b50\u76ee\u5f55\u3002");
                     if (GUILayout.Button("\u5e94\u7528\u9ed8\u8ba4\u8868\u683c\u8def\u5f84", EditorStyles.miniButton, GUILayout.Width(150)))
                         ApplyDefaultBatchPath(batch, (ESSoTableDataRule)target);
+                    DrawBatchTableOpenButtons(batch, (ESSoTableDataRule)target);
 
                     EditorGUILayout.LabelField("\u6279\u6b21\u7b56\u7565", _sectionTitleStyle);
                     DrawChildEnum(batch, "importConflictPolicy", "\u5bfc\u5165\u51b2\u7a81", "\u8868\u683c\u5199\u56de SO \u65f6\u9047\u5230\u5df2\u6709\u6570\u636e\u6216\u51b2\u7a81\u9879\u7684\u5904\u7406\u65b9\u5f0f\u3002", new[] { "\u8df3\u8fc7", "\u8986\u76d6", "\u521b\u5efa\u526f\u672c", "\u62a5\u9519" });
@@ -905,6 +906,60 @@ namespace ES.EditorInternal
             SetStringChild(batch, "outputRoot", FirstNotEmpty(GetStringChild(batch, "outputRoot"), "SoTableConfig/Tables"));
             SetStringChild(batch, "csvRelativePath", FirstNotEmpty(GetStringChild(batch, "csvRelativePath"), "csv"));
             SetStringChild(batch, "xlsxRelativePath", FirstNotEmpty(GetStringChild(batch, "xlsxRelativePath"), "xlsx"));
+        }
+
+        private void DrawBatchTableOpenButtons(SerializedProperty batch, ESSoTableDataRule rule)
+        {
+            if (batch == null || rule == null)
+                return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Space(EditorGUIUtility.labelWidth);
+                if (GUILayout.Button("打开 CSV", EditorStyles.miniButtonLeft, GUILayout.Width(86)))
+                    OpenBatchTablePath(batch, rule, ".csv");
+                if (GUILayout.Button("打开 XLSX", EditorStyles.miniButtonMid, GUILayout.Width(86)))
+                    OpenBatchTablePath(batch, rule, ".xlsx");
+                if (GUILayout.Button("打开输出文件夹", EditorStyles.miniButtonRight, GUILayout.Width(112)))
+                    OpenBatchOutputFolder(batch);
+            }
+        }
+
+        private static void OpenBatchTablePath(SerializedProperty batch, ESSoTableDataRule rule, string extension)
+        {
+            string path = BuildBatchTableFullPath(batch, rule, extension);
+            if (File.Exists(path))
+            {
+                EditorUtility.OpenWithDefaultApp(path);
+                return;
+            }
+
+            string folder = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(folder))
+            {
+                Directory.CreateDirectory(folder);
+                EditorUtility.OpenWithDefaultApp(folder);
+            }
+
+            Debug.LogWarning("表格文件不存在，已打开输出文件夹：" + path, rule);
+        }
+
+        private static void OpenBatchOutputFolder(SerializedProperty batch)
+        {
+            string root = FirstNotEmpty(GetStringChild(batch, "outputRoot"), "SoTableConfig/Tables");
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", root));
+            Directory.CreateDirectory(folder);
+            EditorUtility.OpenWithDefaultApp(folder);
+        }
+
+        private static string BuildBatchTableFullPath(SerializedProperty batch, ESSoTableDataRule rule, string extension)
+        {
+            string root = FirstNotEmpty(GetStringChild(batch, "outputRoot"), "SoTableConfig/Tables");
+            string relativeFolder = extension == ".xlsx"
+                ? FirstNotEmpty(GetStringChild(batch, "xlsxRelativePath"), "xlsx")
+                : FirstNotEmpty(GetStringChild(batch, "csvRelativePath"), "csv");
+            string file = FirstNotEmpty(GetStringChild(batch, "fileName"), rule != null ? rule.ruleKey : null, rule != null ? rule.tableName : null, rule != null ? rule.name : null, "NewTable");
+            return Path.GetFullPath(Path.Combine(Application.dataPath, "..", root, relativeFolder, file + extension));
         }
 
         private static void ApplyDefaultPathToAllBatches(SerializedProperty batches, ESSoTableDataRule rule)

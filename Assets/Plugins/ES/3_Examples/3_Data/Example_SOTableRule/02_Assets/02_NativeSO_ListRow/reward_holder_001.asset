@@ -18,7 +18,7 @@ MonoBehaviour:
   rewards:
   - rowKey: reward_005
     rewardName: "\u4F53\u529B\u8865\u7ED905"
-    amount: 9999
+    amount: -5
     quality: 1
     tags: 4
     nestedConfig:
@@ -26,7 +26,7 @@ MonoBehaviour:
       note: "\u4E32\u884CList\u884C\uFF0C\u5F52\u5C5E reward_holder_001 #05"
   - rowKey: reward_006
     rewardName: "\u94A5\u5319\u788E\u724706"
-    amount: 1
+    amount: -5
     quality: 2
     tags: 0
     nestedConfig:

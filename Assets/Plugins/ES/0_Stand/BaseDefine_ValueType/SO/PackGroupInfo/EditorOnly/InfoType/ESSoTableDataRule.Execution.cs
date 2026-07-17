@@ -230,7 +230,23 @@ namespace ES
             table.Add(BuildHeaderRow(header.groupMark, enabledColumns, c => string.IsNullOrEmpty(header.defaultGroup) ? "client" : header.defaultGroup));
             table.Add(BuildHeaderRow(header.commentMark, enabledColumns, c => string.IsNullOrEmpty(c.comment) ? c.displayName : c.comment));
 
+            table.Add(BuildAssertRow(enabledColumns));
+            table.Add(BuildRowDirectiveHelpRow(enabledColumns));
+
+            var demoRow = new List<string> { string.Empty };
+            for (int i = 0; i < enabledColumns.Count; i++)
+                demoRow.Add(BuildExampleCellValue(enabledColumns[i]));
+            table.Add(demoRow);
+
+            return table;
+        }
+
+        private List<string> BuildAssertRow(List<ESTableColumnNameMap> enabledColumns)
+        {
             var assertRow = new List<string> { "##assert" };
+            if (enabledColumns == null)
+                return assertRow;
+
             for (int i = 0; i < enabledColumns.Count; i++)
             {
                 ESTableColumnNameMap column = enabledColumns[i];
@@ -241,19 +257,17 @@ namespace ES
                 else
                     assertRow.Add(string.Empty);
             }
-            table.Add(assertRow);
 
+            return assertRow;
+        }
+
+        private static List<string> BuildRowDirectiveHelpRow(List<ESTableColumnNameMap> enabledColumns)
+        {
             var directiveRow = new List<string> { "##rowDirective | 空=正常导入；skip/ignore/disabled=跳过；comment:=备注；required=整行和Key必填；patch=只写非空；replace=强制覆盖；owner=只写SO本体；delete=删除；debug=打印本行追踪；debug:patch/debug:delete=按真实指令执行并打印" };
-            for (int i = 0; i < enabledColumns.Count; i++)
+            int count = enabledColumns != null ? enabledColumns.Count : 0;
+            for (int i = 0; i < count; i++)
                 directiveRow.Add(string.Empty);
-            table.Add(directiveRow);
-
-            var demoRow = new List<string> { string.Empty };
-            for (int i = 0; i < enabledColumns.Count; i++)
-                demoRow.Add(BuildExampleCellValue(enabledColumns[i]));
-            table.Add(demoRow);
-
-            return table;
+            return directiveRow;
         }
 
         private Dictionary<int, string> BuildXlsxDataDropdowns(List<List<string>> table)
@@ -559,6 +573,8 @@ namespace ES
             table.Add(BuildHeaderRow(header.typeMark, enabledColumns, c => string.IsNullOrEmpty(c.tableType) ? "string" : c.tableType));
             table.Add(BuildHeaderRow(header.groupMark, enabledColumns, c => string.IsNullOrEmpty(header.defaultGroup) ? "client" : header.defaultGroup));
             table.Add(BuildHeaderRow(header.commentMark, enabledColumns, c => string.IsNullOrEmpty(c.comment) ? c.displayName : c.comment));
+            table.Add(BuildAssertRow(enabledColumns));
+            table.Add(BuildRowDirectiveHelpRow(enabledColumns));
 
             List<ScriptableObject> owners = CollectExportOwners();
             Type ownerType = typeBinding.RowOwnerType;

@@ -167,6 +167,11 @@ namespace ES
         [OnValueChanged(nameof(OnAnimationClipChanged))]
         public AnimationClip AnimationClipName;
 
+        [TitleGroup("动画片段")]
+        [LabelText("动画标记")]
+        [Tooltip("用于运行时按标记替换动画。留空时使用动画资源名；资源名也为空时使用 Clip0/Clip1。")]
+        public string clipMarker;
+
         [TitleGroup("动画采样", "控制该片段在动画资源内部从哪里开始采样，以及片段时长内如何推进。")]
         [HorizontalGroup("动画采样/采样参数", Width = 0.34f)]
         [LabelText("裁剪起点")]

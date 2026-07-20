@@ -43,6 +43,14 @@ public abstract class RuntimeRegister_FOR_AsSubclass<ParentType> : ESAS_RuntimeR
         public abstract void Handle(ForAttribute attribute, FieldInfo fieldInfo);
     }
 /// <summary>
+/// 属性特性模式
+/// </summary>
+/// <typeparam name="ForAttribute"></typeparam>
+    public abstract class RuntimeRegister_FOR_PropertyAttribute<ForAttribute> : ESAS_RuntimeRegister_AB where ForAttribute : Attribute
+    {
+        public abstract void Handle(ForAttribute attribute, PropertyInfo propertyInfo);
+    }
+/// <summary>
 /// 方法特性模式
 /// </summary>
 /// <typeparam name="ForAttribute"></typeparam>

@@ -137,6 +137,9 @@ namespace ES
 
         private bool _fullLookAtCompare = true;
         private IKScheduleFrameFlags _finalIKScheduleFlags = IKScheduleFrameFlags.None;
+        [SerializeField]
+        private FinalIKDriverScheduleMode _scheduleMode = FinalIKDriverScheduleMode.DriverCoreManualProceduralDelegates;
+        private FinalIKDriverBlockFlags _scheduleBlockFlags = FinalIKDriverBlockFlags.None;
 
         private float _lastBindTryTime;
         private float _lastWarnTime;
@@ -166,5 +169,26 @@ namespace ES
         private BipedRuntimeGateCode _bipedRuntimeGateCode = BipedRuntimeGateCode.NotEvaluated;
 
         private const float WarnInterval = 2.0f;
+    }
+
+    public enum FinalIKDriverScheduleMode : byte
+    {
+        DriverCoreManualProceduralDelegates = 0,
+        DriverCoreManualOnly = 1
+    }
+
+    [System.Flags]
+    public enum FinalIKDriverBlockFlags : ushort
+    {
+        None = 0,
+        BipedAutoLateUpdateDisabled = 1 << 0,
+        AimAutoLateUpdateDisabled = 1 << 1,
+        LookAtAutoLateUpdateDisabled = 1 << 2,
+        FullBodyAutoLateUpdateDisabled = 1 << 3,
+        GrounderBlockedNoBiped = 1 << 4,
+        GrounderWaitingForWeight = 1 << 5,
+        HitReactionBlockedNoFullBody = 1 << 6,
+        RecoilBlockedNoFullBody = 1 << 7,
+        ProceduralDelegatesDisabledByMode = 1 << 8
     }
 }

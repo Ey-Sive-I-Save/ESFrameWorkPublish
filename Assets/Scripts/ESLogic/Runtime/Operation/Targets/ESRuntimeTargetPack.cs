@@ -8,7 +8,7 @@ namespace ES
     /// <summary>
     /// Operation 运行目标包。
     /// 这里不叫 Context：项目内已经有 ContextPool/ContextOperation，本类只保存一次 Skill/Track/Clip 执行时的实体目标信息。
-    /// 临时键值数据、缓存和运行期存储由 IOperationRuntimeServices 提供。
+    /// 临时键值数据、缓存和运行期存储由 ESOpSupport 提供。
     /// </summary>
     public sealed class ESRuntimeTargetPack : IPoolableAuto
     {

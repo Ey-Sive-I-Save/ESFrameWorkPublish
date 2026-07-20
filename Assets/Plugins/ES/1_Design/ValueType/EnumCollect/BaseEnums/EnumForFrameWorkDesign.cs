@@ -12,15 +12,6 @@ namespace ES
     {
         
         //支持本地化-多语言 ES全程支持
-        public enum Envir_LanguageType
-        {
-            [InspectorName("未指定")] NotClear= Chinese | Japan| English,
-            [InspectorName("中文")] Chinese=1,
-            [InspectorName("日文")] Japan=2,
-            [InspectorName("英文")] English=4
-        }
-
-           //支持本地化-多语言 ES全程支持
         public enum ValueEntryGetOrSet
         {
             [InspectorName("未指定")] NotClear= Get | Set,

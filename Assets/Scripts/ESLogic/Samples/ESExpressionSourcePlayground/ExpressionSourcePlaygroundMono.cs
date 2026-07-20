@@ -107,7 +107,7 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("AnimationClip")]
         public AnimationClip LastAnimationClip { get; private set; }
 
-        private readonly OpSupportProvider runtimeSupport = new OpSupportProvider();
+        private ESOpSupport runtimeSupport;
 
         [Button("填充直接值 Source", ButtonSizes.Medium)]
         [ContextMenu("ES Sample/ExpressionSource/填充直接值 Source")]
@@ -199,15 +199,16 @@ namespace ES
             ESRuntimeTargetPack target = CreateTargetPack();
             try
             {
-                LastFloat = damageMultiplier != null ? damageMultiplier.Evaluate(target, runtimeSupport) : 0f;
-                LastBool = canCast == null || canCast.Evaluate(target, runtimeSupport);
-                LastInt = comboIndex != null ? comboIndex.Evaluate(target, runtimeSupport) : 0;
-                LastString = debugText != null ? debugText.Evaluate(target, runtimeSupport) : string.Empty;
-                LastVector = sampleVector != null ? sampleVector.Evaluate(target, runtimeSupport) : Vector3.zero;
-                LastEntity = targetEntity != null ? targetEntity.Evaluate(target, runtimeSupport) : null;
-                LastGameObject = targetObject != null ? targetObject.Evaluate(target, runtimeSupport) : null;
-                LastAudioClip = audioClip != null ? audioClip.Evaluate(target, runtimeSupport) : null;
-                LastAnimationClip = animationClip != null ? animationClip.Evaluate(target, runtimeSupport) : null;
+                ESOpSupport support = GetSupport();
+                LastFloat = damageMultiplier != null ? damageMultiplier.Evaluate(target, support) : 0f;
+                LastBool = canCast == null || canCast.Evaluate(target, support);
+                LastInt = comboIndex != null ? comboIndex.Evaluate(target, support) : 0;
+                LastString = debugText != null ? debugText.Evaluate(target, support) : string.Empty;
+                LastVector = sampleVector != null ? sampleVector.Evaluate(target, support) : Vector3.zero;
+                LastEntity = targetEntity != null ? targetEntity.Evaluate(target, support) : null;
+                LastGameObject = targetObject != null ? targetObject.Evaluate(target, support) : null;
+                LastAudioClip = audioClip != null ? audioClip.Evaluate(target, support) : null;
+                LastAnimationClip = animationClip != null ? animationClip.Evaluate(target, support) : null;
                 LogResult("Source");
             }
             finally
@@ -223,15 +224,16 @@ namespace ES
             ESRuntimeTargetPack target = CreateTargetPack();
             try
             {
-                LastFloat = multiplierExpression != null ? multiplierExpression.Evaluate(target, runtimeSupport) : 0f;
-                LastBool = castConditionExpression == null || castConditionExpression.Evaluate(target, runtimeSupport);
-                LastInt = intExpression != null ? intExpression.Evaluate(target, runtimeSupport) : 0;
-                LastString = stringExpression != null ? stringExpression.Evaluate(target, runtimeSupport) : string.Empty;
-                LastVector = vectorExpression != null ? vectorExpression.Evaluate(target, runtimeSupport) : Vector3.zero;
-                LastEntity = entityExpression != null ? entityExpression.Evaluate(target, runtimeSupport) : null;
-                LastGameObject = targetExpression != null ? targetExpression.Evaluate(target, runtimeSupport) : null;
-                LastAudioClip = audioClipExpression != null ? audioClipExpression.Evaluate(target, runtimeSupport) : null;
-                LastAnimationClip = animationClipExpression != null ? animationClipExpression.Evaluate(target, runtimeSupport) : null;
+                ESOpSupport support = GetSupport();
+                LastFloat = multiplierExpression != null ? multiplierExpression.Evaluate(target, support) : 0f;
+                LastBool = castConditionExpression == null || castConditionExpression.Evaluate(target, support);
+                LastInt = intExpression != null ? intExpression.Evaluate(target, support) : 0;
+                LastString = stringExpression != null ? stringExpression.Evaluate(target, support) : string.Empty;
+                LastVector = vectorExpression != null ? vectorExpression.Evaluate(target, support) : Vector3.zero;
+                LastEntity = entityExpression != null ? entityExpression.Evaluate(target, support) : null;
+                LastGameObject = targetExpression != null ? targetExpression.Evaluate(target, support) : null;
+                LastAudioClip = audioClipExpression != null ? audioClipExpression.Evaluate(target, support) : null;
+                LastAnimationClip = animationClipExpression != null ? animationClipExpression.Evaluate(target, support) : null;
                 LogResult("Raw");
             }
             finally
@@ -254,6 +256,17 @@ namespace ES
             return target;
         }
 
+        private ESOpSupport GetSupport()
+        {
+            if (runtimeSupport == null || runtimeSupport.IsRecycled)
+            {
+                runtimeSupport = ESOpSupport.Pool.GetInPool();
+                runtimeSupport.BindCustom(this, userEntity, GetInstanceID(), null);
+            }
+
+            return runtimeSupport;
+        }
+
         private void LogResult(string sourceName)
         {
             Debug.Log(
@@ -265,6 +278,14 @@ namespace ES
         {
             if (target != null && !target.IsRecycled)
                 target.ForcePushToPool();
+        }
+
+        private void OnDestroy()
+        {
+            if (runtimeSupport != null && !runtimeSupport.IsRecycled)
+                runtimeSupport.TryAutoPushedToPool();
+
+            runtimeSupport = null;
         }
 
         private static Entity FindEntityInSelfOrParents(GameObject gameObject)

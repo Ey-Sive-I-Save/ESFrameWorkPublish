@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P1_CLazyMovement/Mvm_Dash_End/CLazy@Mvm_JogEnd_RH.FBX
+clipName=Mvm_JogEnd_RH
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=33
+pixels=117
+yaw=180

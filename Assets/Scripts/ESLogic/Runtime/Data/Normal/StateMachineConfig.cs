@@ -21,6 +21,21 @@ namespace ES
         [Tooltip("Used by Entity preview as the neutral base pose before track animation sampling.")]
         public AnimationClip previewIdleClip;
 
+        [TabGroup("Editor Preview")]
+        [LabelText("Preview Model"), AssetsOnly]
+        [Tooltip("Used by editor tools as the default visible humanoid model for animation preview.")]
+        public UnityEngine.Object previewModel;
+
+        [TabGroup("Editor Preview")]
+        [LabelText("Preview Avatar"), AssetsOnly]
+        [Tooltip("Used by editor tools to drive humanoid animation preview when the preview model has no Animator Avatar.")]
+        public Avatar previewAvatar;
+
+        [TabGroup("Editor Preview")]
+        [LabelText("Preview Fallback Material"), AssetsOnly]
+        [Tooltip("Used by editor preview when imported character materials are pink or incompatible with the active render pipeline.")]
+        public Material previewFallbackMaterial;
+
         [TabGroup("禁用跳转许可")]
         [HideLabel]
         public StateMachineDisableTransitionPermissionMap disableTransitionPermissionMap = new StateMachineDisableTransitionPermissionMap();

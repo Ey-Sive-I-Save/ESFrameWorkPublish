@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEditor.Animations;
 
@@ -19,8 +20,11 @@ namespace ES
     {
         [Title("批量重命名工具", "批量重命名选中的GameObject", bold: true, titleAlignment: TitleAlignments.Centered)]
 
-        [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选择层级中的GameObject，\n设置重命名规则，\n点击重命名按钮批量修改";
+
+        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        private string PanelSummary => $"当前选择: {(Selection.gameObjects != null ? Selection.gameObjects.Length : 0)} 个对象 | 模式: {renameMode}";
 
         [ShowInInspector, ReadOnly, LabelText("重命名预览（前10项）"), ListDrawerSettings(DraggableItems = false)]
         [PropertyTooltip("显示选中对象的示例预览：原名 -> 新名，最多显示前10项。")]
@@ -47,9 +51,9 @@ namespace ES
                             if (!string.IsNullOrEmpty(findText))
                             {
                                 if (replaceCaseSensitive)
-                                    newName = obj.name.Replace(findText, replaceText);
+                                    newName = obj.name.Replace(findText, replaceText ?? string.Empty);
                                 else
-                                    newName = System.Text.RegularExpressions.Regex.Replace(obj.name, System.Text.RegularExpressions.Regex.Escape(findText), replaceText, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                                    newName = System.Text.RegularExpressions.Regex.Replace(obj.name, System.Text.RegularExpressions.Regex.Escape(findText), replaceText ?? string.Empty, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                             }
                             break;
                         case RenameMode.Number:
@@ -130,8 +134,16 @@ namespace ES
         [ShowIf("renameMode", RenameMode.Number), LabelText("编号分隔符"), Space(5)]
         public string numberSeparator = "_";
 
+        private string lastResultSummary = "";
+        private string lastResultDetail = "";
 
-        [Button("批量重命名", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+        [OnInspectorGUI]
+        private void DrawResultPanel()
+        {
+            SimpleToolsPanelUtility.DrawResultSummary("最近重命名结果", lastResultSummary, lastResultDetail);
+        }
+
+        [Button("批量重命名", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void BatchRename()
         {
             var selectedObjects = Selection.gameObjects;
@@ -146,13 +158,41 @@ namespace ES
                 EditorUtility.DisplayDialog("错误", "替换模式下请输入要查找的文本。", "确定");
                 return;
             }
+            string safeReplaceText = replaceText ?? string.Empty;
+            string safePrefixText = prefixText ?? string.Empty;
+            string safeSuffixText = suffixText ?? string.Empty;
+            string safeBaseName = string.IsNullOrEmpty(baseName) ? "Object" : baseName;
+            string safeSeparator = numberSeparator ?? string.Empty;
 
             int group = Undo.GetCurrentGroup();
             Undo.SetCurrentGroupName("Batch Rename");
+            int changedCount = 0;
+            string preview = string.Empty;
 
             try
             {
                 var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var obj in selectedObjects)
+                {
+                    var parent = obj.transform.parent;
+                    if (parent != null)
+                    {
+                        for (int childIndex = 0; childIndex < parent.childCount; childIndex++)
+                        {
+                            var sibling = parent.GetChild(childIndex).gameObject;
+                            if (!selectedObjects.Contains(sibling))
+                                usedNames.Add(parent.GetInstanceID() + "|" + sibling.name);
+                        }
+                    }
+                    else if (obj.scene.IsValid())
+                    {
+                        foreach (var root in obj.scene.GetRootGameObjects())
+                        {
+                            if (!selectedObjects.Contains(root))
+                                usedNames.Add("root:" + obj.scene.handle + "|" + root.name);
+                        }
+                    }
+                }
                 var newNames = new string[selectedObjects.Length];
 
                 // 预计算新名称并检测冲突
@@ -163,29 +203,30 @@ namespace ES
                     switch (renameMode)
                     {
                         case RenameMode.Prefix:
-                            newName = prefixText + obj.name;
+                            newName = safePrefixText + obj.name;
                             break;
                         case RenameMode.Suffix:
-                            newName = obj.name + suffixText;
+                            newName = obj.name + safeSuffixText;
                             break;
 
                         case RenameMode.Replace:
                             if (replaceCaseSensitive)
-                                newName = obj.name.Replace(findText, replaceText);
+                                newName = obj.name.Replace(findText, safeReplaceText);
                             else
-                                newName = System.Text.RegularExpressions.Regex.Replace(obj.name, System.Text.RegularExpressions.Regex.Escape(findText), replaceText, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                                newName = System.Text.RegularExpressions.Regex.Replace(obj.name, System.Text.RegularExpressions.Regex.Escape(findText), safeReplaceText, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                             break;
                         case RenameMode.Number:
-                            newName = baseName + numberSeparator + (startNumber + i).ToString($"D{numberDigits}");
+                            newName = safeBaseName + safeSeparator + (startNumber + i).ToString($"D{numberDigits}");
                             break;
                     }
                     newNames[i] = newName;
-                    if (usedNames.Contains(newName))
+                    string parentKey = obj.transform.parent != null ? obj.transform.parent.GetInstanceID() + "|" : "root:" + obj.scene.handle + "|";
+                    if (usedNames.Contains(parentKey + newName))
                     {
                         // 冲突：追加索引以保证唯一
                         int suffix = 1;
                         var candidate = newName + "(" + suffix + ")";
-                        while (usedNames.Contains(candidate))
+                        while (usedNames.Contains(parentKey + candidate))
                         {
                             suffix++;
                             candidate = newName + "(" + suffix + ")";
@@ -193,12 +234,35 @@ namespace ES
                         newName = candidate;
                         newNames[i] = newName;
                     }
-                    usedNames.Add(newName);
+                    usedNames.Add(parentKey + newName);
                 }
+
+                var previewLines = new List<string>();
+                for (int i = 0; i < selectedObjects.Length; i++)
+                {
+                    if (selectedObjects[i].name == newNames[i])
+                        continue;
+
+                    changedCount++;
+                    previewLines.Add($"{selectedObjects[i].name} -> {newNames[i]}");
+                }
+
+                if (changedCount == 0)
+                {
+                    EditorUtility.DisplayDialog("没有需要修改的对象", "按当前规则计算后，所有对象名称都不会变化。", "知道了");
+                    return;
+                }
+
+                preview = SimpleToolsSafetyUtility.JoinPreview(previewLines, 12);
+                if (!EditorUtility.DisplayDialog("确认批量重命名",
+                    $"将重命名 {changedCount} / {selectedObjects.Length} 个对象。\n\n{preview}\n\n支持 Ctrl+Z 撤销。继续吗？",
+                    "开始重命名", "取消"))
+                    return;
 
                 EditorUtility.DisplayProgressBar("批量重命名", "准备重命名...", 0f);
 
                 // 应用修改
+                bool changedAny = false;
                 for (int i = 0; i < selectedObjects.Length; i++)
                 {
                     var obj = selectedObjects[i];
@@ -209,10 +273,15 @@ namespace ES
 
                     Undo.RecordObject(obj, "Rename Object");
                     obj.name = newName;
+                    EditorUtility.SetDirty(obj);
+                    changedAny = true;
 
                     if (i % 10 == 0)
                         EditorUtility.DisplayProgressBar("批量重命名", $"正在重命名: {i + 1}/{selectedObjects.Length}", (float)i / selectedObjects.Length);
                 }
+
+                if (changedAny)
+                    MarkScenesDirty(selectedObjects);
             }
             finally
             {
@@ -220,7 +289,23 @@ namespace ES
                 Undo.CollapseUndoOperations(group);
             }
 
-            EditorUtility.DisplayDialog("成功", $"已处理 {selectedObjects.Length} 个对象（跳过名称未改变的对象）。", "确定");
+            EditorUtility.DisplayDialog("成功", "批量重命名已完成。", "确定");
+            lastResultSummary = $"重命名完成: 修改 {changedCount} / {selectedObjects.Length} 个对象 | 模式: {renameMode}";
+            lastResultDetail = preview;
+        }
+
+        private void MarkScenesDirty(IEnumerable<GameObject> targets)
+        {
+            if (targets == null)
+                return;
+
+            foreach (var scene in targets
+                .Where(obj => obj != null && obj.scene.IsValid())
+                .Select(obj => obj.scene)
+                .Distinct())
+            {
+                EditorSceneManager.MarkSceneDirty(scene);
+            }
         }
     }
 

@@ -13,7 +13,7 @@ namespace ES
     /// </summary>
     public abstract class ESGetExpression<TOut>
     {
-        public abstract TOut Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support);
+        public abstract TOut Evaluate(ESRuntimeTargetPack target, ESOpSupport support);
     }
 
     /// <summary>Float 取值表达式基类。</summary>
@@ -73,7 +73,7 @@ namespace ES
         [LabelText("值")]
         public float value;
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
         }
@@ -89,7 +89,7 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetFloatExpression right;
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             float leftValue = left != null ? left.Evaluate(target, support) : 0f;
             float rightValue = right != null ? right.Evaluate(target, support) : 0f;
@@ -107,7 +107,7 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetFloatExpression right;
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             float leftValue = left != null ? left.Evaluate(target, support) : 0f;
             float rightValue = right != null ? right.Evaluate(target, support) : 0f;
@@ -124,7 +124,7 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetFloatExpression right;
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             float leftValue = left != null ? left.Evaluate(target, support) : 0f;
             float rightValue = right != null ? right.Evaluate(target, support) : 0f;
@@ -145,7 +145,7 @@ namespace ES
 
         public ESFloatDivideExpressionFallback fallback = new ESFloatDivideExpressionFallback();
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             float leftValue = left != null ? left.Evaluate(target, support) : 0f;
             float rightValue = right != null ? right.Evaluate(target, support) : 0f;
@@ -193,7 +193,7 @@ namespace ES
         [LabelText("最大值")]
         public float max = 1f;
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             float value = input != null ? input.Evaluate(target, support) : 0f;
             return Mathf.Clamp(value, min, max);
@@ -205,7 +205,7 @@ namespace ES
     {
         public float defaultValue = 1f;
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return target != null ? target.runtimeFloat : defaultValue;
         }
@@ -220,7 +220,7 @@ namespace ES
         [LabelText("默认值")]
         public float defaultValue;
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return support != null && support.Context != null
                 ? support.Context.GetFloat(key, defaultValue)
@@ -234,7 +234,7 @@ namespace ES
         public float min = 0f;
         public float max = 1f;
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return UnityEngine.Random.Range(min, max);
         }
@@ -245,7 +245,7 @@ namespace ES
     {
         public float defaultValue;
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             Entity user = target != null ? target.GetUserEntity() : null;
             Entity mainTarget = target != null ? target.GetMainTarget() : null;
@@ -267,7 +267,7 @@ namespace ES
         [LabelText("值")]
         public bool value = true;
 
-        public override bool Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
         }
@@ -283,7 +283,7 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetBoolExpression right;
 
-        public override bool Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return left != null
                    && right != null
@@ -302,7 +302,7 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetBoolExpression right;
 
-        public override bool Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return (left != null && left.Evaluate(target, support))
                    || (right != null && right.Evaluate(target, support));
@@ -332,7 +332,7 @@ namespace ES
         [LabelText("比较")]
         public CompareType compareType = CompareType.GreaterEqual;
 
-        public override bool Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             if (left == null || right == null)
                 return false;
@@ -370,7 +370,7 @@ namespace ES
         [LabelText("值")]
         public int value;
 
-        public override int Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override int Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
         }
@@ -382,7 +382,7 @@ namespace ES
         [LabelText("值")]
         public Vector3 value;
 
-        public override Vector3 Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override Vector3 Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
         }
@@ -394,7 +394,7 @@ namespace ES
         [LabelText("值")]
         public string value;
 
-        public override string Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override string Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
         }
@@ -406,7 +406,7 @@ namespace ES
         [LabelText("值")]
         public Entity value;
 
-        public override Entity Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override Entity Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
         }
@@ -418,7 +418,7 @@ namespace ES
         [LabelText("值")]
         public AnimationClip value;
 
-        public override AnimationClip Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override AnimationClip Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
         }
@@ -430,7 +430,7 @@ namespace ES
         [LabelText("值")]
         public AudioClip value;
 
-        public override AudioClip Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override AudioClip Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
         }

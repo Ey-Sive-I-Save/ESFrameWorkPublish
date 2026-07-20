@@ -15,9 +15,10 @@ namespace ES
 
         public EnumCollect.HandleTwoNumber function = EnumCollect.HandleTwoNumber.Set;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetFloat(key, expression != null ? expression.Evaluate(target, logic) : 0f, function);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetFloat(key, expression != null ? expression.Evaluate(target, support) : 0f, function, false);
         }
     }
 
@@ -32,9 +33,10 @@ namespace ES
 
         public EnumCollect.HandleTwoNumber function = EnumCollect.HandleTwoNumber.Set;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetInt(key, expression != null ? expression.Evaluate(target, logic) : 0, function);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetInt(key, expression != null ? expression.Evaluate(target, support) : 0, function, false);
         }
     }
 
@@ -49,9 +51,10 @@ namespace ES
 
         public EnumCollect.HandleTwoBool function = EnumCollect.HandleTwoBool.Set;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetBool(key, expression == null || expression.Evaluate(target, logic), function);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetBool(key, expression == null || expression.Evaluate(target, support), function, false);
         }
     }
 
@@ -64,9 +67,10 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("String 表达式"), ESCompactEdit("String 表达式")]
         public ESGetStringExpression expression;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetStringDirect(key, expression != null ? expression.Evaluate(target, logic) : string.Empty);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetStringDirect(key, expression != null ? expression.Evaluate(target, support) : string.Empty, false, false);
         }
     }
 
@@ -79,9 +83,10 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("Vector3 表达式"), ESCompactEdit("Vector3 表达式")]
         public ESGetVector3Expression expression;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetVectorDirect(key, expression != null ? expression.Evaluate(target, logic) : Vector3.zero);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetVectorDirect(key, expression != null ? expression.Evaluate(target, support) : Vector3.zero, false, false);
         }
     }
 
@@ -91,10 +96,13 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("Float 表达式"), ESCompactEdit("Float 表达式")]
         public ESGetFloatExpression expression;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target != null)
-                target.runtimeFloat = expression != null ? expression.Evaluate(target, logic) : 0f;
+            {
+                ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+                target.runtimeFloat = expression != null ? expression.Evaluate(target, support) : 0f;
+            }
         }
     }
 
@@ -104,10 +112,13 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("Bool 表达式"), ESCompactEdit("Bool 表达式")]
         public ESGetBoolExpression expression;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target != null)
-                target.runtimeBool = expression == null || expression.Evaluate(target, logic);
+            {
+                ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+                target.runtimeBool = expression == null || expression.Evaluate(target, support);
+            }
         }
     }
 }

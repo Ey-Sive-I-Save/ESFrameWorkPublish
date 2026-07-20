@@ -1,4 +1,6 @@
-namespace ES
+using ES;
+
+namespace ES.Internal
 {
     public static class ESRuntimeModeDefaults
     {

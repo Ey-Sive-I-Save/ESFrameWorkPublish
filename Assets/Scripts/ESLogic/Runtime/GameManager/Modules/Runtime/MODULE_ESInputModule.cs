@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ES.Internal;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -43,6 +44,12 @@ namespace ES
 
         [NonSerialized]
         private IESInputRuntimeConfigSource configSource;
+
+        [NonSerialized]
+        private ESInputConfig runtimeDefaultConfig;
+
+        [NonSerialized]
+        private ESInputRuntimeBuildResult currentBuild;
 
         [NonSerialized]
         private readonly List<ESInputBindingProfile> effectiveBuildLayers = new List<ESInputBindingProfile>(4);
@@ -138,6 +145,7 @@ namespace ES
         {
             configSource = config;
             inputConfig = config as ESInputConfig;
+            ReleaseRuntimeDefaultConfig();
             SetProfileLayers(profiles);
 
             if (externalModeService != null)
@@ -373,6 +381,7 @@ namespace ES
             ESInputUtility.EnsureConfigBindingIds(source);
             effectiveProfile = BuildEffectiveProfile();
             ESInputRuntimeBuildResult build = ESInputRuntimeBuilder.Build(source, effectiveProfile, GetDefaultSchemeId());
+            currentBuild = build;
 
             runtime.Initialize(build, EnsureModeService());
             runtimeBuilt = true;
@@ -415,6 +424,7 @@ namespace ES
         {
             DisableInput();
             runtime.Initialize(null, EnsureModeService());
+            currentBuild = null;
             effectiveProfile = null;
             runtimeBuilt = false;
             inputEnabled = false;
@@ -426,6 +436,8 @@ namespace ES
                 runtime.Disable();
 
             runtime.Dispose();
+            ReleaseRuntimeDefaultConfig();
+            currentBuild = null;
             effectiveProfile = null;
             runtimeBuilt = false;
             inputEnabled = false;
@@ -436,6 +448,96 @@ namespace ES
             modeService = service;
             if (runtimeBuilt)
                 RebuildRuntime();
+        }
+
+        public int GetRuntimeBindings(ESInputActionId id, List<ESInputCompiledBinding> results, bool activeSchemeOnly = true)
+        {
+            if (results == null)
+                return 0;
+
+            results.Clear();
+            if (currentBuild == null || currentBuild.bindings == null)
+                return 0;
+
+            string activeSchemeId = currentBuild.activeSchemeId;
+            for (int i = 0; i < currentBuild.bindingCount; i++)
+            {
+                ESInputCompiledBinding binding = currentBuild.bindings[i];
+                if (binding.actionId != id)
+                    continue;
+
+                if (activeSchemeOnly
+                    && !string.IsNullOrEmpty(activeSchemeId)
+                    && !string.Equals(binding.schemeId, activeSchemeId, StringComparison.Ordinal))
+                    continue;
+
+                results.Add(binding);
+            }
+
+            return results.Count;
+        }
+
+        public bool TryGetFirstRuntimeBinding(ESInputActionId id, out ESInputCompiledBinding binding, bool activeSchemeOnly = true)
+        {
+            if (currentBuild != null && currentBuild.bindings != null)
+            {
+                string activeSchemeId = currentBuild.activeSchemeId;
+                for (int i = 0; i < currentBuild.bindingCount; i++)
+                {
+                    ESInputCompiledBinding item = currentBuild.bindings[i];
+                    if (item.actionId != id)
+                        continue;
+
+                    if (activeSchemeOnly
+                        && !string.IsNullOrEmpty(activeSchemeId)
+                        && !string.Equals(item.schemeId, activeSchemeId, StringComparison.Ordinal))
+                        continue;
+
+                    binding = item;
+                    return true;
+                }
+            }
+
+            binding = default;
+            return false;
+        }
+
+        public ESInputBindingOverride ApplyPlayerPathOverride(
+            ESInputCompiledBinding binding,
+            string overridePath,
+            bool saveNow = false,
+            bool rebuildNow = true)
+        {
+            return ApplyPlayerPathOverride(
+                binding.bindingId,
+                binding.actionId,
+                binding.schemeId,
+                binding.name,
+                binding.originalPath,
+                overridePath,
+                saveNow,
+                rebuildNow);
+        }
+
+        public ESInputBindingOverride ApplyPlayerVirtualOverride(
+            ESInputCompiledBinding binding,
+            string virtualControlId,
+            bool saveNow = false,
+            bool rebuildNow = true)
+        {
+            return ApplyPlayerVirtualOverride(
+                binding.bindingId,
+                binding.actionId,
+                binding.schemeId,
+                binding.name,
+                virtualControlId,
+                saveNow,
+                rebuildNow);
+        }
+
+        public bool ResetPlayerBindingToDefault(ESInputCompiledBinding binding, bool saveNow = false, bool rebuildNow = true)
+        {
+            return ResetPlayerBindingToDefault(binding.bindingId, saveNow, rebuildNow);
         }
 
         public bool WasPressed(ESInputActionId id)
@@ -533,6 +635,21 @@ namespace ES
             runtime.VirtualSource.SetButton(id, false);
         }
 
+        public void UIPulseButton(ESInputActionId id)
+        {
+            runtime.VirtualSource.PulseButton(id);
+        }
+
+        public void UITriggerButton(ESInputActionId id)
+        {
+            runtime.VirtualSource.PulseButton(id);
+        }
+
+        public void UITriggerInteract()
+        {
+            runtime.VirtualSource.PulseButton(ESInputActionId.Interact);
+        }
+
         public void UIClearButton(ESInputActionId id)
         {
             runtime.VirtualSource.ClearButton(id);
@@ -561,6 +678,16 @@ namespace ES
         public void UISetButton(string virtualControlId, bool held)
         {
             runtime.VirtualSource.SetButton(virtualControlId, held);
+        }
+
+        public void UIPulseButton(string virtualControlId)
+        {
+            runtime.VirtualSource.PulseButton(virtualControlId);
+        }
+
+        public void UITriggerButton(string virtualControlId)
+        {
+            runtime.VirtualSource.PulseButton(virtualControlId);
         }
 
         public void UIClearButton(string virtualControlId)
@@ -604,6 +731,16 @@ namespace ES
                 return configSource;
 
             configSource = inputConfig;
+            if (configSource != null)
+                return configSource;
+
+            if (runtimeDefaultConfig == null)
+            {
+                runtimeDefaultConfig = CreateRuntimeDefaultConfig();
+                inputConfig = runtimeDefaultConfig;
+            }
+
+            configSource = runtimeDefaultConfig;
             return configSource;
         }
 
@@ -651,6 +788,31 @@ namespace ES
 
             if (rebuildNow)
                 RebuildRuntime();
+        }
+
+        private static ESInputConfig CreateRuntimeDefaultConfig()
+        {
+            ESInputConfig config = ScriptableObject.CreateInstance<ESInputConfig>();
+            config.ResetDefaultGameplayConfig();
+            config.hideFlags = HideFlags.DontSave;
+            return config;
+        }
+
+        private void ReleaseRuntimeDefaultConfig()
+        {
+            if (runtimeDefaultConfig == null)
+                return;
+
+            ESInputConfig config = runtimeDefaultConfig;
+            if (inputConfig == config)
+                inputConfig = null;
+
+            runtimeDefaultConfig = null;
+
+            if (Application.isPlaying)
+                UnityEngine.Object.Destroy(config);
+            else
+                UnityEngine.Object.DestroyImmediate(config);
         }
     }
 }

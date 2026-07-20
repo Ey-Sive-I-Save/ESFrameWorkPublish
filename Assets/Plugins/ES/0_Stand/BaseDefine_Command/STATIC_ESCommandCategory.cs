@@ -30,6 +30,8 @@ namespace ES
     {
         public const string Delay = ESCommandCategory.Play + "/\u5ef6\u65f6";
         public const string InputSetVirtualButton = ESCommandCategory.InputVirtual + "/\u8bbe\u7f6e\u6309\u94ae";
+        public const string InputPulseVirtualButton = ESCommandCategory.InputVirtual + "/\u89e6\u53d1\u6309\u94ae";
+        public const string InputPulseVirtualControlButton = ESCommandCategory.InputVirtual + "/\u89e6\u53d1\u865a\u62df\u63a7\u4ef6\u6309\u94ae";
         public const string InputClearVirtualButton = ESCommandCategory.InputVirtual + "/\u6e05\u9664\u6309\u94ae";
         public const string InputSetVirtualAxis = ESCommandCategory.InputVirtual + "/\u8bbe\u7f6e\u5355\u8f74";
         public const string InputClearVirtualAxis = ESCommandCategory.InputVirtual + "/\u6e05\u9664\u5355\u8f74";

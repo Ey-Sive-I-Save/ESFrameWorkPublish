@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Jump_Air/CLazy@JAttack_AirDrop_Start.FBX
+clipName=JAttack_AirDrop_Start
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=24
+pixels=117
+yaw=180

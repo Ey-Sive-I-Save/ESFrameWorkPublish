@@ -14,10 +14,10 @@ namespace ES
         private bool _expanded;
         private Vector2 _scroll;
 
-        [MenuItem("ES/Debug/Interaction Runtime Panel")]
+        [MenuItem(MenuItemPathDefine.INTERACTION_RUNTIME_PANEL_PATH, false, 0)]
         public static void Open()
         {
-            var window = GetWindow<EntityBasicInteractionDebugWindow>("Interaction Runtime");
+            var window = GetWindow<EntityBasicInteractionDebugWindow>("交互运行时面板");
             window.minSize = new Vector2(420f, 300f);
             window.Show();
         }

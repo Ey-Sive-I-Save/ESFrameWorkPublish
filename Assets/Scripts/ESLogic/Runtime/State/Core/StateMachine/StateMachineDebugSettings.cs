@@ -102,8 +102,12 @@ namespace ES
             logDirtySystem = false;
             logFadeEffects = false;
             logPerformanceStats = false;
+            continuousStatsOutput = false;
             logWeightDetails = false;
+#if UNITY_EDITOR
             debugIKContributionSummary = false;
+            ikContributionSummaryManualOnly = true;
+#endif
         }
 
         [Button("退出压力测试静默", ButtonSizes.Medium)]
@@ -163,13 +167,45 @@ namespace ES
 
         [ShowIf("enableDebug")]
         [BoxGroup("调试开关/性能监控")]
+        [LabelText("持续统计输出"), Tooltip("编辑器下持续输出 StateMachine 运行统计。正式构建不使用。")]
+        public bool continuousStatsOutput = false;
+
+        [ShowIf("enableDebug")]
+        [BoxGroup("调试开关/性能监控")]
         [LabelText("权重详细信息"), Tooltip("输出每个动画的详细权重值")]
         public bool logWeightDetails = false;
 
+#if UNITY_EDITOR
         [ShowIf("enableDebug")]
         [BoxGroup("调试开关/性能监控")]
         [LabelText("IK 贡献明细"), Tooltip("输出 StateGeneralFinalIKDriverPose 的逐状态贡献明细（热路径开销较高，仅建议调试期启用）")]
         public bool debugIKContributionSummary = false;
+
+        [ShowIf("@enableDebug && debugIKContributionSummary")]
+        [BoxGroup("调试开关/性能监控")]
+        [LabelText("IK贡献手动刷新"), Tooltip("开启后不会按时间采样，只在点击刷新按钮或代码请求时生成一次文本。")]
+        public bool ikContributionSummaryManualOnly = false;
+
+        [ShowIf("@enableDebug && debugIKContributionSummary && !ikContributionSummaryManualOnly")]
+        [BoxGroup("调试开关/性能监控")]
+        [LabelText("IK贡献采样间隔"), MinValue(0.02f), SuffixLabel("秒", Overlay = true)]
+        public float ikContributionSummarySampleInterval = 0.25f;
+
+        [ShowIf("@enableDebug && debugIKContributionSummary")]
+        [BoxGroup("调试开关/性能监控")]
+        [Button("手动刷新IK贡献明细", ButtonSizes.Medium)]
+        private void RequestIKContributionSummaryRefresh()
+        {
+            ikContributionSummaryRequestVersion++;
+        }
+
+        [NonSerialized]
+        private int ikContributionSummaryRequestVersion;
+
+        public int IKContributionSummaryRequestVersion => ikContributionSummaryRequestVersion;
+        public bool IsIKContributionSummaryManualOnly => ikContributionSummaryManualOnly;
+        public float IKContributionSummarySampleInterval => Mathf.Max(0.02f, ikContributionSummarySampleInterval);
+#endif
 
 
         public bool IsStressTestSilentMode => stressTestSilentMode;
@@ -181,8 +217,13 @@ namespace ES
         public bool IsDirtyEnabled => !stressTestSilentMode && enableDebug && logDirtySystem;
         public bool IsFadeEnabled => !stressTestSilentMode && enableDebug && logFadeEffects;
         public bool IsPerformanceEnabled => !stressTestSilentMode && enableDebug && logPerformanceStats;
+        public bool IsContinuousStatsEnabled => !stressTestSilentMode && enableDebug && continuousStatsOutput;
         public bool IsWeightDetailEnabled => !stressTestSilentMode && enableDebug && logWeightDetails;
+#if UNITY_EDITOR
         public bool IsIKContributionSummaryEnabled => !stressTestSilentMode && enableDebug && debugIKContributionSummary;
+#else
+        public bool IsIKContributionSummaryEnabled => false;
+#endif
 
 
         /// <summary>

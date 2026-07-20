@@ -6,17 +6,17 @@ namespace ES
 {
     public partial class StateMachine
     {
-        internal void HotPlugStateToPlayable(StateBase state, StateLayerRuntime layer)
+        internal bool HotPlugStateToPlayable(StateBase state, StateLayerRuntime layer)
         {
 #if STATEMACHINEDEBUG
             {
                 var dbg = StateMachineDebugSettings.Instance;
                 if (dbg != null && dbg.IsAnimationBlendEnabled)
                 {
-                    dbg.LogAnimationBlend("[HotPlug] === 开始热插拔状态到Playable ===");
+                    dbg.LogAnimationBlend("[HotPlug] 开始热插拔状态到 Playable");
                     string stateKey = state != null ? state.strKey : "<null>";
                     string layerType = layer != null ? layer.layerType.ToString() : "<null>";
-                    dbg.LogAnimationBlend($"[HotPlug] 状态: {stateKey} | 层级: {layerType}");
+                    dbg.LogAnimationBlend($"[HotPlug] 状态:{stateKey} | 层级:{layerType}");
                 }
             }
 #endif
@@ -25,19 +25,19 @@ namespace ES
             if (layer == null) throw new System.ArgumentNullException(nameof(layer));
             if (state.stateSharedData == null) throw new System.InvalidOperationException("HotPlugStateToPlayable: state.stateSharedData 不能为空");
 #else
-            if (state == null || layer == null || state.stateSharedData == null) return;
+            if (state == null || layer == null || state.stateSharedData == null) return false;
 #endif
 
             var sharedData = state.stateSharedData;
 
-            if (!sharedData.hasAnimation)
+            if (!sharedData.RequiresStateMachinePlayableAnimation)
             {
 #if STATEMACHINEDEBUG
                 var dbg = StateMachineDebugSettings.Instance;
                 if (dbg != null && dbg.IsAnimationBlendEnabled)
                     dbg.LogAnimationBlend("[HotPlug] 状态无动画，跳过热插拔");
 #endif
-                return;
+                return true;
             }
 
             layer.MarkDirty(PipelineDirtyFlags.MixerWeights);
@@ -49,32 +49,32 @@ namespace ES
                 if (dbg != null && dbg.IsAnimationBlendEnabled)
                     dbg.LogAnimationBlend("[HotPlug] 状态已在槽位映射中，跳过");
 #endif
-                return;
+                return true;
             }
 
             if (!playableGraph.IsValid() || !layer.mixer.IsValid())
             {
                 StateMachineDebugSettings.Instance.LogError(
-                    $"[HotPlug] 无法插入状态动画：PlayableGraph({playableGraph.IsValid()})或Mixer({layer.mixer.IsValid()})无效 | 层级:{layer.layerType} | 初始化:{isInitialized} | 运行:{isRunning}");
-                return;
+                    $"[HotPlug] 无法插入状态动画：PlayableGraph({playableGraph.IsValid()}) 或 Mixer({layer.mixer.IsValid()}) 无效 | 层级:{layer.layerType} | 初始化:{isInitialized} | 运行:{isRunning}");
+                return false;
             }
 
             var animConfig = sharedData.animationConfig;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (animConfig == null) throw new System.InvalidOperationException($"HotPlugStateToPlayable: hasAnimation=true 但 animationConfig 为空 | State={state.strKey}");
+            if (animConfig == null) throw new System.InvalidOperationException($"HotPlugStateToPlayable: animationSource={sharedData.animationSource} 但 animationConfig 为空 | State={state.strKey}");
 #else
             if (animConfig == null)
             {
-                StateMachineDebugSettings.Instance.LogWarning($"状态 {state.strKey} 标记了hasAnimation=true，但没有animationConfig");
-                return;
+                StateMachineDebugSettings.Instance.LogWarning($"状态 {state.strKey} 标记了 hasAnimation=true，但没有 animationConfig");
+                return false;
             }
 #endif
 
             var statePlayable = CreateStatePlayable(state, animConfig, layer);
             if (!statePlayable.IsValid())
             {
-                StateMachineDebugSettings.Instance.LogWarning($"无法为状态 {state.strKey} 创建有效的Playable节点");
-                return;
+                StateMachineDebugSettings.Instance.LogWarning($"无法为状态 {state.strKey} 创建有效的 Playable 节点");
+                return false;
             }
 
             int inputIndex;
@@ -99,9 +99,9 @@ namespace ES
                 int currentCount = layer.mixer.GetInputCount();
                 if (currentCount >= layer.maxPlayableSlots)
                 {
-                    StateMachineDebugSettings.Instance.LogWarning($"层级 {layer.layerType} 已达到最大Playable槽位限制 {layer.maxPlayableSlots}，无法添加新状态");
-                    statePlayable.Destroy();
-                    return;
+                    StateMachineDebugSettings.Instance.LogWarning($"层级 {layer.layerType} 已达到最大 Playable 槽位限制 {layer.maxPlayableSlots}，无法添加新状态");
+                    state.PauseCachedPlayableForReuse();
+                    return false;
                 }
 
                 inputIndex = currentCount;
@@ -110,7 +110,7 @@ namespace ES
 #if STATEMACHINEDEBUG
             var dbg2 = StateMachineDebugSettings.Instance;
             if (dbg2 != null && dbg2.IsAnimationBlendEnabled)
-                dbg2.LogAnimationBlend($"[HotPlug] 插入状态Playable到Mixer槽位 {inputIndex}");
+                dbg2.LogAnimationBlend($"[HotPlug] 插入状态 Playable 到 Mixer 槽位 {inputIndex}");
 #endif
 
             playableGraph.Connect(statePlayable, 0, layer.mixer, inputIndex);
@@ -119,6 +119,7 @@ namespace ES
             layer.stateToSlotMap[state] = inputIndex;
             state.BindLayerSlot(layer, inputIndex);
             layer.InternalOnStateConnected(state, inputIndex);
+            ApplyPendingAnimationClipOverrides(state);
 #if STATEMACHINEDEBUG
             var dbg3 = StateMachineDebugSettings.Instance;
             if (dbg3 != null && dbg3.IsAnimationBlendEnabled)
@@ -127,6 +128,7 @@ namespace ES
 
             layer.MarkDirty(PipelineDirtyFlags.HotPlug | PipelineDirtyFlags.MixerWeights);
             TryUpdateMixerWeightsImmediately(layer);
+            return true;
         }
 
         internal void HotUnplugStateFromPlayable(StateBase state, StateLayerRuntime layer)
@@ -165,7 +167,7 @@ namespace ES
 
             layer.MarkDirty(PipelineDirtyFlags.HotPlug);
             TryUpdateMixerWeightsImmediately(layer);
-            state.DestroyPlayable();
+            state.PauseCachedPlayableForReuse();
         }
 
         protected virtual Playable CreateStatePlayable(StateBase state, StateAnimationConfigData animConfig, StateLayerRuntime layer)
@@ -177,14 +179,14 @@ namespace ES
 #if STATEMACHINEDEBUG
                 var dbg = StateMachineDebugSettings.Instance;
                 if (dbg != null && dbg.IsAnimationBlendEnabled)
-                    dbg.LogAnimationBlend($"状态 {state.strKey} Playable创建成功 | Valid:{output.IsValid()}");
+                    dbg.LogAnimationBlend($"状态 {state.strKey} Playable 创建成功 | Valid:{output.IsValid()}");
 #endif
                 return output;
             }
 #if STATEMACHINEDEBUG
             var dbg2 = StateMachineDebugSettings.Instance;
             if (dbg2 != null)
-                dbg2.LogWarning($"状态 {state.strKey} Playable创建失败");
+                dbg2.LogWarning($"状态 {state.strKey} Playable 创建失败");
 #endif
             return Playable.Null;
         }

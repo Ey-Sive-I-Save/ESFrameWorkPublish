@@ -69,6 +69,70 @@ namespace ES
 #endif
             }
         }
+
+        private void BeginFadeOutOrUnplugImmediately(StateBase state, StateLayerRuntime layer)
+        {
+            if (state == null || layer == null)
+                return;
+
+            RemoveFadeInData(state, layer);
+
+            ApplyFadeOut(state, layer);
+
+            if (layer.fadeOutStates != null && layer.fadeOutStates.ContainsKey(state))
+            {
+                TryUpdateMixerWeightsImmediately(layer);
+            }
+
+            var fadeSharedData = state.stateSharedData;
+            bool shouldUnplugImmediately = fadeSharedData == null ||
+                                           !fadeSharedData.enableFadeInOut ||
+                                           fadeSharedData.fadeOutDuration <= 0f;
+            if (!shouldUnplugImmediately)
+                return;
+
+            if (layer.stateToSlotMap.ContainsKey(state))
+            {
+                HotUnplugStateFromPlayable(state, layer);
+            }
+
+            RemoveFadeOutData(state, layer);
+        }
+
+        private void CleanupFadeDataForActivationRollback(StateBase state, StateLayerRuntime layer)
+        {
+            if (state == null || layer == null)
+                return;
+
+            RemoveFadeInData(state, layer);
+            RemoveFadeOutData(state, layer);
+        }
+
+        private void RemoveFadeInData(StateBase state, StateLayerRuntime layer)
+        {
+            if (state == null || layer == null || layer.fadeInStates == null)
+                return;
+
+            if (layer.fadeInStates.TryGetValue(state, out var fadeInData))
+            {
+                fadeInData.TryAutoPushedToPool();
+                layer.fadeInStates.Remove(state);
+            }
+        }
+
+        private void RemoveFadeOutData(StateBase state, StateLayerRuntime layer)
+        {
+            if (state == null || layer == null || layer.fadeOutStates == null)
+                return;
+
+            if (layer.fadeOutStates.TryGetValue(state, out var fadeOutData))
+            {
+                fadeOutData.TryAutoPushedToPool();
+                layer.fadeOutStates.Remove(state);
+                UntrackFadeOutIKState(state);
+            }
+        }
+
         private void UpdateLayerFades(StateLayerRuntime layer, float deltaTime)
         {
             if (layer.fadeInStates.Count == 0 && layer.fadeOutStates.Count == 0)
@@ -222,6 +286,38 @@ namespace ES
                 }
 #endif
             }
+        }
+
+        private void ForceClearLayerFadesAndResidualPlayables(StateLayerRuntime layer)
+        {
+            if (layer == null) return;
+            ClearAllWeakInterruptions();
+
+            CleanupFadeDict(layer.fadeInStates);
+            CleanupFadeDict(layer.fadeOutStates);
+            _fadeOutIKStates.Clear();
+
+            if (layer.stateToSlotMap.Count > 0)
+            {
+                var buffer = _statesToDeactivateCache;
+                buffer.Clear();
+                foreach (var kvp in layer.stateToSlotMap)
+                {
+                    if (kvp.Key != null) buffer.Add(kvp.Key);
+                }
+                for (int i = 0; i < buffer.Count; i++)
+                {
+                    HotUnplugStateFromPlayable(buffer[i], layer);
+                }
+                buffer.Clear();
+            }
+        }
+
+        private void CleanupFadeDict(Dictionary<StateBase, StateFadeData> dict)
+        {
+            if (dict == null) return;
+            foreach (var kvp in dict) kvp.Value?.TryAutoPushedToPool();
+            dict.Clear();
         }
     }
 }

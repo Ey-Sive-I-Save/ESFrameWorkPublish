@@ -33,7 +33,7 @@ namespace ES
         {
         }
 
-        public override GameObject Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override GameObject Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             if (useDirectGameObject)
                 return directGameObject;

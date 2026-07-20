@@ -17,7 +17,7 @@ namespace ES
         private Vector2 scroll;
         private string lastMessage = "等待拖入对象";
 
-        [MenuItem("【ES】/测试案例/编辑器Solver/00 AreaDragAtSolver案例")]
+        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/00 AreaDragAtSolver 案例", false, 0)]
         private static void Open()
         {
             GetWindow<ESExample_AreaDragAtSolverWindow>("AreaDragAtSolver案例");

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
+using ES;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 
-namespace ES
+namespace ES.Internal
 {
     [Serializable]
     public struct ESInputControlOption
@@ -355,7 +355,7 @@ namespace ES
                 case "downArrow": return "方向键 下";
                 case "leftArrow": return "方向键 左";
                 case "rightArrow": return "方向键 右";
-                case "numpadEnter": return "小键盘回车";
+                case "numpadEnter": return "小键盘 回车";
                 case "numpadPlus": return "小键盘 +";
                 case "numpadMinus": return "小键盘 -";
                 case "numpadMultiply": return "小键盘 *";

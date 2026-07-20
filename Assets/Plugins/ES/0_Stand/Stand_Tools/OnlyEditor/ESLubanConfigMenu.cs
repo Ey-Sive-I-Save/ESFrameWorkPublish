@@ -8,9 +8,9 @@ namespace ES
 {
     public static class ESLubanConfigMenu
     {
-        private const string MenuRoot = "\u3010ES\u3011/\u914d\u7f6e/Luban/";
+        private const string MenuRoot = MenuItemPathDefine.CONFIG_PATH + "Luban/";
 
-        [MenuItem(MenuRoot + "\u751f\u6210 Json+CSharp")]
+        [MenuItem(MenuRoot + "\u751f\u6210 Json+CSharp", false, 0)]
         public static void GenerateJsonAndCSharp()
         {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
@@ -53,7 +53,7 @@ namespace ES
             UnityEngine.Debug.Log("Luban config generated.");
         }
 
-        [MenuItem(MenuRoot + "\u6253\u5f00 LubanConfig")]
+        [MenuItem(MenuRoot + "\u6253\u5f00 LubanConfig", false, 10)]
         public static void OpenLubanConfigFolder()
         {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;

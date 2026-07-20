@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v2_ViewAware
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Kick_Run/CLazy@Attack_Kick_C.FBX
+clipName=Attack_Kick_C
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=31
+pixels=117
+yaw=180

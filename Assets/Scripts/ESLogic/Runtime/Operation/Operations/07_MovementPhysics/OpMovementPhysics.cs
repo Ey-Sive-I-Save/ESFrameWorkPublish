@@ -11,11 +11,11 @@ namespace ES
         public Vector3ExpressionSource delta = new Vector3ExpressionSource { directVector3 = Vector3.forward };
         public Space space = Space.World;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             Transform transform = GetTransform(target, useMainTarget);
             if (transform != null)
-                transform.Translate(delta != null ? delta.Evaluate(target, logic) : Vector3.zero, space);
+                transform.Translate(delta != null ? delta.Evaluate(target, RuntimeSupport(scopeSupport, hostSupport)) : Vector3.zero, space);
         }
 
         private static Transform GetTransform(ESRuntimeTargetPack target, bool useMainTarget)
@@ -34,7 +34,7 @@ namespace ES
         [LabelText("保持Y轴")]
         public bool keepY = true;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             Transform self = rotateUser ? target?.userEntity?.transform : target?.entityMainTarget?.transform;
             Transform other = rotateUser ? target?.entityMainTarget?.transform : target?.userEntity?.transform;
@@ -55,12 +55,13 @@ namespace ES
         public Vector3ExpressionSource force = new Vector3ExpressionSource { directVector3 = Vector3.forward };
         public ForceMode forceMode = ForceMode.Impulse;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            GameObject obj = targetObject != null ? targetObject.Evaluate(target, logic) : null;
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            GameObject obj = targetObject != null ? targetObject.Evaluate(target, support) : null;
             Rigidbody body = obj != null ? obj.GetComponent<Rigidbody>() : null;
             if (body != null)
-                body.AddForce(force != null ? force.Evaluate(target, logic) : Vector3.zero, forceMode);
+                body.AddForce(force != null ? force.Evaluate(target, support) : Vector3.zero, forceMode);
         }
     }
 }

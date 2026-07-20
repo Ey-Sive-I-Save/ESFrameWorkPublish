@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ES;
+using ES.Internal;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -116,23 +117,23 @@ namespace ES.EditorInternal
                 Rect selectRect = new Rect(row.xMax - 128f, row.y, 40f, row.height);
                 Rect importRect = new Rect(row.xMax - 84f, row.y, 40f, row.height);
 
-                if (GUI.Button(listenRect, "听", EditorStyles.miniButton))
+                if (GUI.Button(listenRect, "监听", EditorStyles.miniButton))
                 {
                     StartListen(serializedObject, value.propertyPath);
                 }
 
-                if (GUI.Button(selectRect, "选", EditorStyles.miniButton))
+                if (GUI.Button(selectRect, "选择", EditorStyles.miniButton))
                 {
-                    ShowControlMenu(serializedObject, value.propertyPath, schemeId != null ? schemeId.stringValue : null);
+                    ShowControlMenu(serializedObject, value.propertyPath, schemeId != null ? schemeId.stringValue : null, bindingPropertyPath);
                 }
 
-                if (GUI.Button(importRect, "导", EditorStyles.miniButton))
+                if (GUI.Button(importRect, "导入", EditorStyles.miniButton))
                 {
                     ESInputActionBindingImportWindow.Open(serializedObject, bindingPropertyPath);
                 }
             }
 
-            if (GUI.Button(clearRect, "×", EditorStyles.miniButton))
+            if (GUI.Button(clearRect, "清", EditorStyles.miniButton))
             {
                 RecordUndo(serializedObject, "清空输入绑定");
                 serializedObject.Update();
@@ -144,20 +145,21 @@ namespace ES.EditorInternal
             DrawListenHint(new Rect(fieldRect.x, row.yMax + 1f, fieldRect.width, 14f), value.stringValue);
         }
 
-        private static void ShowControlMenu(SerializedObject serializedObject, string propertyPath, string schemeId)
+        private static void ShowControlMenu(SerializedObject serializedObject, string propertyPath, string schemeId, string bindingPropertyPath)
         {
             GenericMenu menu = new GenericMenu();
             bool any = false;
+            bool hasValueTypeFilter = TryGetExpectedValueType(serializedObject, bindingPropertyPath, out ESInputValueType expectedValueType);
 
             if (string.IsNullOrEmpty(schemeId) || schemeId == ESInputSchemeIds.KeyboardMouse)
             {
-                any |= AddControlOptions(menu, "键盘", ESInputControlCatalog.KeyboardOptions, serializedObject, propertyPath);
-                any |= AddControlOptions(menu, "鼠标", ESInputControlCatalog.MouseOptions, serializedObject, propertyPath);
+                any |= AddControlOptions(menu, "键盘", ESInputControlCatalog.KeyboardOptions, serializedObject, propertyPath, hasValueTypeFilter, expectedValueType);
+                any |= AddControlOptions(menu, "鼠标", ESInputControlCatalog.MouseOptions, serializedObject, propertyPath, hasValueTypeFilter, expectedValueType);
             }
 
             if (string.IsNullOrEmpty(schemeId) || schemeId == ESInputSchemeIds.Gamepad)
             {
-                any |= AddControlOptions(menu, "手柄", ESInputControlCatalog.GamepadOptions, serializedObject, propertyPath);
+                any |= AddControlOptions(menu, "手柄", ESInputControlCatalog.GamepadOptions, serializedObject, propertyPath, hasValueTypeFilter, expectedValueType);
             }
 
             if (!any)
@@ -173,7 +175,9 @@ namespace ES.EditorInternal
             string group,
             IReadOnlyList<ESInputControlOption> options,
             SerializedObject serializedObject,
-            string propertyPath)
+            string propertyPath,
+            bool hasValueTypeFilter,
+            ESInputValueType expectedValueType)
         {
             if (options == null || options.Count == 0)
             {
@@ -185,6 +189,9 @@ namespace ES.EditorInternal
             for (int i = 0; i < options.Count; i++)
             {
                 ESInputControlOption option = options[i];
+                if (hasValueTypeFilter && option.valueType != expectedValueType)
+                    continue;
+
                 if (option.valueType != currentType)
                 {
                     currentType = option.valueType;
@@ -202,6 +209,40 @@ namespace ES.EditorInternal
             }
 
             return added;
+        }
+
+        private static bool TryGetExpectedValueType(SerializedObject serializedObject, string bindingPropertyPath, out ESInputValueType valueType)
+        {
+            valueType = ESInputValueType.Button;
+            if (serializedObject == null || string.IsNullOrEmpty(bindingPropertyPath))
+                return false;
+
+            serializedObject.Update();
+            SerializedProperty bindingProperty = serializedObject.FindProperty(bindingPropertyPath);
+            if (bindingProperty != null)
+            {
+                SerializedProperty isPartOfComposite = bindingProperty.FindPropertyRelative("isPartOfComposite");
+                if (isPartOfComposite != null && isPartOfComposite.boolValue)
+                {
+                    valueType = ESInputValueType.Button;
+                    return true;
+                }
+            }
+
+            int markerIndex = bindingPropertyPath.LastIndexOf(".bindings.Array.data[", System.StringComparison.Ordinal);
+            if (markerIndex < 0)
+                return false;
+
+            string actionPath = bindingPropertyPath.Substring(0, markerIndex);
+            SerializedProperty actionProperty = serializedObject.FindProperty(actionPath);
+            SerializedProperty valueTypeProperty = actionProperty != null
+                ? actionProperty.FindPropertyRelative("valueType")
+                : null;
+            if (valueTypeProperty == null)
+                return false;
+
+            valueType = (ESInputValueType)valueTypeProperty.enumValueIndex;
+            return true;
         }
 
         private static string GetValueTypeMenuName(ESInputValueType valueType)
@@ -408,7 +449,7 @@ namespace ES.EditorInternal
                 }
 
                 EditorGUILayout.LabelField("临时 InputAction", EditorStyles.boldLabel);
-                EditorGUILayout.HelpBox("这个 InputAction 只用于配置辅助。用 Unity 自带的 InputAction 绑定界面添加 Binding，然后从下方选择一条导入到当前 ES 绑定。", MessageType.Info);
+                EditorGUILayout.HelpBox("这个 InputAction 只用于配置辅助。使用 Unity 自带的 InputAction 绑定界面添加 Binding，然后从下方选择一条导入到当前 ES 绑定。", MessageType.Info);
 
                 holderObject.Update();
                 EditorGUILayout.PropertyField(holderObject.FindProperty("action"), new GUIContent("InputAction"), true);

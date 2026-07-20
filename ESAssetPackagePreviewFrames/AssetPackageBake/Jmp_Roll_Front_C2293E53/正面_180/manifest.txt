@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P3_CLazyJump/Jmp_Roll_Front/CLazy@Jmp_Roll_Front.FBX
+clipName=Jmp_Roll_Front
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=37
+pixels=117
+yaw=180

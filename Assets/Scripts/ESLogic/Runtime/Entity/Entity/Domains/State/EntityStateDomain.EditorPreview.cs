@@ -114,7 +114,7 @@ namespace ES
                 CleanupLingeringPreviewObjects();
         }
 
-        [UnityEditor.MenuItem(MenuItemPathDefine.ROOT_PATH + "状态/清理实体预览残留对象", false, 2000)]
+        [UnityEditor.MenuItem(MenuItemPathDefine.PREVIEW_CLEANUP_PATH + "清理实体预览残留对象", false, 10)]
         private static void CleanupEntityPreviewObjectsMenu()
         {
             int removed = CleanupLingeringPreviewObjectsInternal();

@@ -10,7 +10,7 @@ namespace ES
         [LabelText("加入目标列表")]
         public bool addToTargets = true;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target == null)
                 return;
@@ -30,12 +30,12 @@ namespace ES
         [LabelText("加入目标列表")]
         public bool addToTargets = true;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target == null || expression == null)
                 return;
 
-            Entity entity = FindEntityInSelfOrParents(expression.Evaluate(target, logic));
+            Entity entity = FindEntityInSelfOrParents(expression.Evaluate(target, RuntimeSupport(scopeSupport, hostSupport)));
             target.SetEntityMainTarget(entity);
             if (addToTargets)
                 target.AddTarget(entity);
@@ -60,7 +60,7 @@ namespace ES
     [Serializable, TypeRegistryItem("主目标加入列表", OperationTypeRegistryNames.TargetingList)]
     public sealed class OpTarget_AddMainTargetToList : ESOutputOp
     {
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             target?.AddTarget(target.entityMainTarget);
         }
@@ -69,7 +69,7 @@ namespace ES
     [Serializable, TypeRegistryItem("清空目标列表", OperationTypeRegistryNames.TargetingList)]
     public sealed class OpTarget_ClearTargetList : ESOutputOp
     {
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             target?.ClearTargets();
         }
@@ -78,7 +78,7 @@ namespace ES
     [Serializable, TypeRegistryItem("首个列表目标设为主目标", OperationTypeRegistryNames.TargetingList)]
     public sealed class OpTarget_SetFirstListTargetAsMain : ESOutputOp
     {
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target == null || target.targetEntities.Count == 0)
                 return;

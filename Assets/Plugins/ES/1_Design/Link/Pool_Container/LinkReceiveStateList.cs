@@ -25,8 +25,8 @@ namespace ES
         /// 接收者列表，使用 SafeNormalList 支持派发期间安全增删。
         /// </summary>
         private SafeNormalList<IReceiveStateLink<LinkState>> _receivers = new SafeNormalList<IReceiveStateLink<LinkState>>();
-        private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>();
-        private readonly List<ReceiveStateLink<LinkState>> _actionReceivers = new List<ReceiveStateLink<LinkState>>();
+        private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>(4);
+        private readonly List<ReceiveStateLink<LinkState>> _actionReceivers = new List<ReceiveStateLink<LinkState>>(4);
 
         /// <summary>
         /// 上一次发送的状态值，用于检测状态变化。

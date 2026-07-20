@@ -33,7 +33,7 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("Context 摘要")]
         public string LastContextSummary { get; private set; }
 
-        private OpSupportProvider runtimeSupport;
+        private ESOpSupport runtimeSupport;
 
         [Button("填充常规 Op 链", ButtonSizes.Medium)]
         [ContextMenu("ES Sample/Operation/填充常规 Op 链")]
@@ -163,7 +163,8 @@ namespace ES
             ESRuntimeTargetPack target = CreateTargetPack();
             try
             {
-                singleOperation?._TryStartOp(target, GetSupport());
+                ESOpSupport support = GetSupport();
+                singleOperation?._TryStartOp(target, support, support);
                 RefreshContextSummary(target);
             }
             finally
@@ -179,7 +180,8 @@ namespace ES
             ESRuntimeTargetPack target = CreateTargetPack();
             try
             {
-                singleOperation?._TryStopOp(target, GetSupport());
+                ESOpSupport support = GetSupport();
+                singleOperation?._TryStopOp(target, support, support);
                 RefreshContextSummary(target);
             }
             finally
@@ -197,8 +199,9 @@ namespace ES
             {
                 if (operations != null)
                 {
+                    ESOpSupport support = GetSupport();
                     for (int i = 0; i < operations.Count; i++)
-                        operations[i]?._TryStartOp(target, GetSupport());
+                        operations[i]?._TryStartOp(target, support, support);
                 }
 
                 RefreshContextSummary(target);
@@ -218,8 +221,9 @@ namespace ES
             {
                 if (operations != null)
                 {
+                    ESOpSupport support = GetSupport();
                     for (int i = operations.Count - 1; i >= 0; i--)
-                        operations[i]?._TryStopOp(target, GetSupport());
+                        operations[i]?._TryStopOp(target, support, support);
                 }
 
                 RefreshContextSummary(target);
@@ -234,13 +238,22 @@ namespace ES
         [ContextMenu("ES Sample/Operation/重置运行 Context")]
         public void ResetRuntimeContext()
         {
-            runtimeSupport = new OpSupportProvider();
+            if (runtimeSupport != null && !runtimeSupport.IsRecycled)
+                runtimeSupport.TryAutoPushedToPool();
+
+            runtimeSupport = null;
             LastContextSummary = string.Empty;
         }
 
-        private OpSupportProvider GetSupport()
+        private ESOpSupport GetSupport()
         {
-            return runtimeSupport ??= new OpSupportProvider();
+            if (runtimeSupport == null || runtimeSupport.IsRecycled)
+            {
+                runtimeSupport = ESOpSupport.Pool.GetInPool();
+                runtimeSupport.BindCustom(this, userEntity, GetInstanceID(), null);
+            }
+
+            return runtimeSupport;
         }
 
         private ESRuntimeTargetPack CreateTargetPack()
@@ -259,7 +272,7 @@ namespace ES
 
         private void RefreshContextSummary(ESRuntimeTargetPack target)
         {
-            OpSupportProvider support = GetSupport();
+            ESOpSupport support = GetSupport();
             LastContextSummary =
                 $"damage={support.Context.GetFloat("damage", 0f)}, " +
                 $"combo={support.Context.GetInt("combo", 0)}, " +
@@ -364,6 +377,14 @@ namespace ES
         {
             if (target != null && !target.IsRecycled)
                 target.ForcePushToPool();
+        }
+
+        private void OnDestroy()
+        {
+            if (runtimeSupport != null && !runtimeSupport.IsRecycled)
+                runtimeSupport.TryAutoPushedToPool();
+
+            runtimeSupport = null;
         }
 
         private static Entity FindEntityInSelfOrParents(GameObject gameObject)

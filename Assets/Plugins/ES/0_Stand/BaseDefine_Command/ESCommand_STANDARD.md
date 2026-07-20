@@ -25,7 +25,7 @@
 3. 不使用 `object[]`、`object context`、多态参数树。
 4. 简单命令只实现 `Invoke()`。
 5. 运行时默认路径是 `for` 循环加虚调用，不做反射。
-6. 延时、顺序、并行播放以后放到 `Feature/ESCommandPlay`，不污染基础命令。
+6. 延时、顺序、并行播放以后放到 `Runtime/Command`，不污染基础命令。
 
 ## 文件分类
 
@@ -49,8 +49,11 @@ Assets/Plugins/ES/0_Stand/BaseDefine_Command/
 
 ```text
 Assets/Plugins/ES/1_Design/<模块名>/Command/
-Assets/Scripts/ESLogic/Runtime/Features/<功能名>/Command/
+Assets/Scripts/ESLogic/Runtime/Command/Commands/
 ```
+
+`Runtime/Command` 是项目运行时命令系统主目录，不再放回 `Runtime/Features`。
+`Features` 只保留偏 Mono、可挂载、相对独立的功能包。
 
 ## 分类常量
 
@@ -157,10 +160,10 @@ ESCommandEvent.Invoke()
 第二阶段：
 
 ```text
-Feature/ESCommandPlay
+Runtime/Command
     ESCommandPlayer
     ESCommandSequence
     ESCommandDelay
 ```
 
-播放层的帧数据命名使用 `ESCommandPlayFrame`，不要使用 `Context`。
+播放层的帧数据命名当前使用 `ESCommandPlayFrame`，不要使用 `Context`。

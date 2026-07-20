@@ -198,6 +198,15 @@ namespace ES
                 state.DestroyPlayable();
             }
 
+            for (int i = 0; i < _registeredStatesList.Count; i++)
+            {
+                var state = _registeredStatesList[i];
+                if (state != null)
+                {
+                    state.DestroyPlayable();
+                }
+            }
+
             runningStates.Clear();
             ClearAllWeakInterruptions();
 
@@ -208,6 +217,7 @@ namespace ES
                     if (kvp.Value != null)
                     {
                         kvp.Value.OnStateExit();
+                        kvp.Value.DestroyPlayable();
                         kvp.Value.TryAutoPushedToPool();
                     }
                 }
@@ -342,46 +352,6 @@ namespace ES
             }
         }
 
-        private void ForceClearLayerFadesAndResidualPlayables(StateLayerRuntime layer)
-        {
-            if (layer == null) return;
-            ClearAllWeakInterruptions();
-
-            if (layer.fadeInStates.Count > 0)
-            {
-                foreach (var kvp in layer.fadeInStates)
-                {
-                    if (kvp.Value != null) kvp.Value.TryAutoPushedToPool();
-                }
-                layer.fadeInStates.Clear();
-            }
-
-            if (layer.fadeOutStates.Count > 0)
-            {
-                foreach (var kvp in layer.fadeOutStates)
-                {
-                    if (kvp.Value != null) kvp.Value.TryAutoPushedToPool();
-                }
-                layer.fadeOutStates.Clear();
-                _fadeOutIKStates.Clear();
-            }
-
-            if (layer.stateToSlotMap.Count > 0)
-            {
-                var buffer = _statesToDeactivateCache;
-                buffer.Clear();
-                foreach (var kvp in layer.stateToSlotMap)
-                {
-                    if (kvp.Key != null) buffer.Add(kvp.Key);
-                }
-                for (int i = 0; i < buffer.Count; i++)
-                {
-                    HotUnplugStateFromPlayable(buffer[i], layer);
-                }
-                buffer.Clear();
-            }
-        }
-
         public void UpdateStateMachine()
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -502,13 +472,10 @@ namespace ES
 
 #if UNITY_EDITOR
 #if STATEMACHINEDEBUG
-    if (enableContinuousStats)
+    var statsDbg = StateMachineDebugSettings.Instance;
+    if (statsDbg != null && statsDbg.IsContinuousStatsEnabled)
     {
-        var dbg = StateMachineDebugSettings.Instance;
-        if (dbg == null || !dbg.IsStressTestSilentMode)
-        {
-            OutputContinuousStats();
-        }
+        OutputContinuousStats();
     }
 #endif
 #endif
@@ -697,13 +664,6 @@ namespace ES
             _fadeOutIKStates.Clear();
             CleanupFadeDict(layer.fadeInStates);
             if (layer.mixer.IsValid()) layer.mixer.Destroy();
-        }
-
-        private void CleanupFadeDict(Dictionary<StateBase, StateFadeData> dict)
-        {
-            if (dict == null) return;
-            foreach (var kvp in dict) kvp.Value?.TryAutoPushedToPool();
-            dict.Clear();
         }
 
     }

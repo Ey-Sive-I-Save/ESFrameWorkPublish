@@ -21,7 +21,7 @@ namespace ES
 
         public EntityExpressionSource() { }
 
-        public override Entity Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override Entity Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return useDirectEntity ? directEntity : (expression != null ? expression.Evaluate(target, support) : directEntity);
         }

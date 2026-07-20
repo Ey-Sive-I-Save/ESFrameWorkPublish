@@ -236,7 +236,7 @@ namespace ES
                 return null;
 
             if (clip.targetMode == TrackClipEditorTargetMode.OverrideClipTarget && clip.targetExpression != null)
-                return clip.targetExpression.Evaluate(state.SkillRuntimeTarget, state.OpSupporter);
+                return clip.targetExpression.Evaluate(state.SkillRuntimeTarget, state.OpSupport);
 
             return state.SkillRuntimeTarget != null ? state.SkillRuntimeTarget.GetGameObject() : null;
         }

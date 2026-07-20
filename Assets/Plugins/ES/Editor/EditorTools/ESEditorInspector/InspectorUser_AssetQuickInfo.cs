@@ -144,6 +144,12 @@ namespace ES
                 EditorGUIUtility.PingObject(data);
             }
 
+            if (hasRecord && GUILayout.Button("复制职责", EditorStyles.miniButton, GUILayout.Width(66)))
+            {
+                bool appendMode = EditorPrefs.GetBool(APPEND_PREF_KEY, false);
+                CopyToClipboard(BuildAssetGuideClipboardText(record), "资产职责", appendMode);
+            }
+
             EditorGUILayout.EndHorizontal();
 
             if (!hasRecord)
@@ -191,6 +197,38 @@ namespace ES
                 record.MarkManuallyEdited();
                 EditorUtility.SetDirty(data);
             }
+        }
+
+        private static string BuildAssetGuideClipboardText(ESGlobalProjectAssetGuideData.AssetGuideRecord record)
+        {
+            if (record == null)
+                return string.Empty;
+
+            StringBuilder builder = new StringBuilder(512);
+            builder.AppendLine("【资产职责】");
+            AppendClipboardLine(builder, "所属系统", record.ownerSystem);
+            AppendClipboardLine(builder, "职责标题", record.roleTitle);
+            AppendClipboardLine(builder, "职责提示", record.responsibilityHint);
+
+            if (!string.IsNullOrWhiteSpace(record.readMe))
+                AppendClipboardLine(builder, "ReadMe", record.readMe);
+
+            if (record.tags != null && record.tags.Count > 0)
+                AppendClipboardLine(builder, "标签", string.Join(", ", record.tags));
+
+            AppendClipboardLine(builder, "资源路径", record.assetPath);
+            AppendClipboardLine(builder, "资源名称", record.assetName);
+            AppendClipboardLine(builder, "资源类型", record.assetTypeName);
+            AppendClipboardLine(builder, "GUID", record.guid);
+
+            return builder.ToString().TrimEnd();
+        }
+
+        private static void AppendClipboardLine(StringBuilder builder, string label, string value)
+        {
+            builder.Append(label);
+            builder.Append("：");
+            builder.AppendLine(string.IsNullOrWhiteSpace(value) ? "<未填写>" : value.Trim());
         }
 
         private static void DrawAssetGuideDisplay(ESGlobalProjectAssetGuideData.AssetGuideRecord record, ESGlobalProjectAssetGuideData data)

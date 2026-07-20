@@ -243,6 +243,7 @@ namespace ES
 #endif
 
                 output = runtime.GetOutputPlayable();
+                (_calculatorCached ?? ResolveCalculatorForPlayableCreation())?.ResetRuntimeForReuse(runtime);
                 return output.IsValid();
             }
 
@@ -273,6 +274,7 @@ namespace ES
                 }
 #endif
                 output = runtime.GetOutputPlayable();
+                (_calculatorCached ?? ResolveCalculatorForPlayableCreation())?.ResetRuntimeForReuse(runtime);
                 return output.IsValid();
             }
 
@@ -599,6 +601,15 @@ namespace ES
             _matchTargetActive = false;
         }
 
+        internal void PauseCachedPlayableForReuse()
+        {
+            var runtime = _animationRuntime;
+            if (runtime != null && runtime.IsInitialized)
+            {
+                runtime.PauseCachedPlayableTree();
+            }
+        }
+
         /// <summary>
         /// 获取当前主动画Clip（调试用）
         /// </summary>
@@ -633,6 +644,9 @@ namespace ES
                 return false;
             }
 
+            if (runtime.TryGetClipOverrideSlot(clipIndex, out var slot) && slot.currentClip == newClip)
+                return false;
+
             var calculator = _calculatorCached ?? ResolveCalculatorForPlayableCreation();
             if (calculator == null)
             {
@@ -663,6 +677,9 @@ namespace ES
             if (!TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator))
                 return false;
 
+            if (runtime.TryGetClipOverrideSlot(runtime.FindClipSlotByOriginalOrCurrent(sourceClip), out var slot) && slot.currentClip == newClip)
+                return false;
+
             bool changed = calculator.OverrideClipBySource(runtime, sourceClip, newClip);
             if (changed)
                 MarkAnimationOverrideDirty();
@@ -679,6 +696,9 @@ namespace ES
             }
 
             if (!TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator))
+                return false;
+
+            if (runtime.TryGetClipOverrideSlot(runtime.FindClipSlotByMarker(marker), out var slot) && slot.currentClip == newClip)
                 return false;
 
             bool changed = calculator.OverrideClipByMarker(runtime, marker, newClip);
@@ -742,6 +762,64 @@ namespace ES
                 MarkAnimationOverrideDirty();
 
             return changedCount;
+        }
+
+        public bool RestoreAnimationClipOverride(int clipIndex)
+        {
+            if (!TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator))
+                return false;
+
+            bool changed = RestoreAnimationClipOverrideSlot(runtime, calculator, clipIndex);
+            if (changed)
+                MarkAnimationOverrideDirty();
+
+            return changed;
+        }
+
+        public bool RestoreAnimationClipOverride(AnimationClip sourceOrCurrentClip)
+        {
+            if (sourceOrCurrentClip == null)
+                return false;
+
+            if (!TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator))
+                return false;
+
+            int slotIndex = runtime.FindClipSlotByOriginalOrCurrent(sourceOrCurrentClip);
+            bool changed = RestoreAnimationClipOverrideSlot(runtime, calculator, slotIndex);
+            if (changed)
+                MarkAnimationOverrideDirty();
+
+            return changed;
+        }
+
+        public bool RestoreAnimationClipOverride(string marker)
+        {
+            if (string.IsNullOrWhiteSpace(marker))
+                return false;
+
+            if (!TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator))
+                return false;
+
+            int slotIndex = runtime.FindClipSlotByMarker(marker);
+            bool changed = RestoreAnimationClipOverrideSlot(runtime, calculator, slotIndex);
+            if (changed)
+                MarkAnimationOverrideDirty();
+
+            return changed;
+        }
+
+        private bool RestoreAnimationClipOverrideSlot(AnimationCalculatorRuntime runtime, StateAnimationMixCalculator calculator, int slotIndex)
+        {
+            if (runtime == null || calculator == null || slotIndex < 0)
+                return false;
+
+            if (!runtime.TryGetClipOverrideSlot(slotIndex, out var slot))
+                return false;
+
+            if (!slot.IsOverridden || slot.originalClip == null)
+                return false;
+
+            return calculator.OverrideClip(runtime, slot.slotIndex, slot.originalClip);
         }
 
         private bool TryGetAnimationOverrideContext(out AnimationCalculatorRuntime runtime, out StateAnimationMixCalculator calculator)

@@ -530,11 +530,14 @@ namespace ES
                 }
 
                 CancelStaleFadeData(targetState, layerRuntime);
-                HotPlugStateToPlayable(targetState, layerRuntime);
-                hotPlugged = true;
+                if (!HotPlugStateToPlayable(targetState, layerRuntime))
+                {
+                    throw new InvalidOperationException($"HotPlugStateToPlayable failed | State={targetState.strKey} | Layer={layerRuntime.layerType}");
+                }
+                hotPlugged = targetState.stateSharedData != null && targetState.stateSharedData.RequiresStateMachinePlayableAnimation;
                 ApplyFadeIn(targetState, layerRuntime);
 
-                if (targetState.stateSharedData.hasAnimation)
+                if (targetState._hasAnimationCached)
                 {
                     targetState.ImmediateUpdateAnimationRuntime(stateContext);
                 }
@@ -560,17 +563,7 @@ namespace ES
                     HotUnplugStateFromPlayable(targetState, layerRuntime);
                 }
 
-                if (layerRuntime.fadeInStates.TryGetValue(targetState, out var fadeInData))
-                {
-                    fadeInData.TryAutoPushedToPool();
-                    layerRuntime.fadeInStates.Remove(targetState);
-                }
-                if (layerRuntime.fadeOutStates.TryGetValue(targetState, out var fadeOutData))
-                {
-                    fadeOutData.TryAutoPushedToPool();
-                    layerRuntime.fadeOutStates.Remove(targetState);
-                    UntrackFadeOutIKState(targetState);
-                }
+                CleanupFadeDataForActivationRollback(targetState, layerRuntime);
 
                 if (addedToLayerRunning)
                 {
@@ -630,10 +623,18 @@ namespace ES
             layerData.runningStates.Add(targetState);
 
             CancelStaleFadeData(targetState, layerData);
-            HotPlugStateToPlayable(targetState, layerData);
+            if (!HotPlugStateToPlayable(targetState, layerData))
+            {
+                layerData.runningStates.Remove(targetState);
+                runningStates.Remove(targetState);
+                if (targetState.baseStatus == StateBaseStatus.Running)
+                    targetState.OnStateExit();
+                MarkDirty(StateDirtyReason.Exit);
+                return false;
+            }
             ApplyFadeIn(targetState, layerData);
 
-            if (targetState.stateSharedData.hasAnimation)
+            if (targetState._hasAnimationCached)
             {
                 targetState.ImmediateUpdateAnimationRuntime(stateContext);
             }
@@ -662,40 +663,7 @@ namespace ES
             }
 #endif
 
-            if (layerRuntime != null)
-            {
-                if (layerRuntime.fadeInStates != null && layerRuntime.fadeInStates.TryGetValue(state, out var fadeInData))
-                {
-                    fadeInData.TryAutoPushedToPool();
-                    layerRuntime.fadeInStates.Remove(state);
-                }
-
-                ApplyFadeOut(state, layerRuntime);
-
-                if (layerRuntime.fadeOutStates != null && layerRuntime.fadeOutStates.ContainsKey(state))
-                {
-                    TryUpdateMixerWeightsImmediately(layerRuntime);
-                }
-            }
-
-            var fadeSharedData = state.stateSharedData;
-            bool shouldUnplugImmediately = fadeSharedData == null ||
-                                           !fadeSharedData.enableFadeInOut ||
-                                           fadeSharedData.fadeOutDuration <= 0f;
-            if (layerRuntime != null && shouldUnplugImmediately)
-            {
-                if (layerRuntime.stateToSlotMap.ContainsKey(state))
-                {
-                    HotUnplugStateFromPlayable(state, layerRuntime);
-                }
-
-                if (layerRuntime.fadeOutStates.TryGetValue(state, out var fadeData))
-                {
-                    fadeData.TryAutoPushedToPool();
-                    layerRuntime.fadeOutStates.Remove(state);
-                    UntrackFadeOutIKState(state);
-                }
-            }
+            BeginFadeOutOrUnplugImmediately(state, layerRuntime);
 
             state.OnStateExit();
             ClearWeakInterruptionsForState(state);

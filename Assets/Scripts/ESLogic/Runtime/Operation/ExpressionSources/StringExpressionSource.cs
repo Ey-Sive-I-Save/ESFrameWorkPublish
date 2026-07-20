@@ -21,7 +21,7 @@ namespace ES
 
         public StringExpressionSource() { }
 
-        public override string Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override string Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return useDirectString ? directString : (expression != null ? expression.Evaluate(target, support) : directString);
         }

@@ -297,7 +297,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
 
     #region 初始化核心
-    [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【轨道】编辑器", false, 2)]
+    [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "轨道编辑器", false, -1000)]
     public static void OpenWindow()
     {
         window = GetWindow<ESTrackViewWindow>();
@@ -1461,7 +1461,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         ScheduleAutoValidateSequenceVisuals();
     }
 
-    [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "轨道/临时播放当前技能序列", false, 30)]
+    [MenuItem(MenuItemPathDefine.GAMEPLAY_BUILDING_PATH + "技能轨道/临时播放当前技能序列", false, 20)]
     public static void PlayCurrentSequenceAsTemporarySkillStateMenu()
     {
         PlayCurrentSequenceAsTemporarySkillState();
@@ -2065,16 +2065,17 @@ public class ESTrackViewWindow : OdinEditorWindow
 
             trackItem.UpdateNodeMatchAndForeachUpdate();
             trackItem.UpdateWhenEdit();
-            Last_EditorWindowForTrackItem = InspectObject(drawerSOForTrackItem);
-            Last_EditorWindowForTrackItem.titleContent = new GUIContent("编辑轨道<" + trackItem.item.DisplayName + ">");
-
-            Last_EditorWindowForTrackItem.OnClose += () =>
+            Last_EditorWindowForTrackItem = ESTrackItemTemporaryInspectorWindow.OpenFor(
+                drawerSOForTrackItem,
+                "编辑轨道<" + trackItem.item.DisplayName + ">",
+                "轨道项目",
+                () =>
             {
                 drawerSOForTrackItem.drawerData = null;
                 ESTrackViewWindowHelper.SaveContainerChanges();
                 trackItem.UpdateNodeMatchAndForeachUpdate();
                 trackItem.UpdateWhenEdit();
-            };
+            });
         });
         menu.AddSeparator("");
 
@@ -3387,10 +3388,11 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
         ESTrackViewWindow.window.drawerSOForTrackClip.drawerData = clip.trackClip;
         clip.SetTimeScaleAndStartShowCache();
         clip.UpdateNodeView();
-        ESTrackViewWindow.window.Last_EditorWindowForTrackClip = ESTrackViewWindow.InspectObject(ESTrackViewWindow.window.drawerSOForTrackClip);
-        ESTrackViewWindow.window.Last_EditorWindowForTrackClip.titleContent = new GUIContent("编辑片段<" + clip.trackClip.DisplayName);
-
-        ESTrackViewWindow.window.Last_EditorWindowForTrackClip.OnClose += () =>
+        ESTrackViewWindow.window.Last_EditorWindowForTrackClip = ESTrackClipTemporaryInspectorWindow.OpenFor(
+            ESTrackViewWindow.window.drawerSOForTrackClip,
+            "编辑片段<" + clip.trackClip.DisplayName,
+            "片段",
+            () =>
         {
             clip.SetTimeScaleAndStartShowCache();
             clip.UpdateNodeView();
@@ -3401,7 +3403,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
                     trackWindow.drawerSOForTrackClip.drawerData = null;
             }
             ESTrackViewWindowHelper.SaveContainerChanges();
-        };
+        });
     }
 
     public static void SaveContainerChanges()

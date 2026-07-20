@@ -13,7 +13,7 @@ namespace ES
         private int commandCount;
         private string lastCommand = "尚未执行命令";
 
-        [MenuItem("【ES】/测试案例/编辑器Solver/02 ContextMenuSolver案例")]
+        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/02 ContextMenuSolver 案例", false, 20)]
         private static void Open()
         {
             GetWindow<ESExample_ContextMenuSolverWindow>("ContextMenuSolver案例");
@@ -148,6 +148,7 @@ namespace ES
                 fontSize = 13
             };
         }
+
     }
 #endif
 }

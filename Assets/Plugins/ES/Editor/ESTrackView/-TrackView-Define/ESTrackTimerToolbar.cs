@@ -1,4 +1,3 @@
-using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities.Editor;
 using System.Collections.Generic;
 using UnityEditor;
@@ -392,16 +391,18 @@ namespace ES
             if (trackWindow != null && trackWindow.Last_EditorWindowForSkillDataInfo != null)
                 trackWindow.Last_EditorWindowForSkillDataInfo.Close();
 
-            var editorWindow = OdinEditorWindow.InspectObject(skillData);
-            editorWindow.titleContent = new GUIContent("编辑技能 <" + skillData.name + ">");
-            editorWindow.OnClose += () =>
+            var editorWindow = ESTrackSkillDataTemporaryInspectorWindow.OpenFor(
+                skillData,
+                "编辑技能 <" + skillData.name + ">",
+                "技能配置",
+                () =>
             {
                 EditorUtility.SetDirty(skillData);
                 if (trackWindow != null)
                     trackWindow.Last_EditorWindowForSkillDataInfo = null;
 
                 ESTrackViewWindowHelper.SaveContainerChanges();
-            };
+            });
 
             if (trackWindow != null)
                 trackWindow.Last_EditorWindowForSkillDataInfo = editorWindow;

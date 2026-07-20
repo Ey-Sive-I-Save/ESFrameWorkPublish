@@ -38,22 +38,55 @@ namespace ES
     {
         private ESInputRuntimeCache cache;
         private ESRuntimeModeService modeService;
+        private ESRuntimeModePolicy currentModePolicy;
+        private bool hasModePolicy;
 
         public ESInputService(ESInputRuntimeCache cache = null, ESRuntimeModeService modeService = null)
         {
             this.cache = cache;
-            this.modeService = modeService;
+            currentModePolicy = ESRuntimeModePolicy.Default;
+            SetModeService(modeService);
         }
 
         public ESInputRuntimeCache Cache => cache;
         public ESRuntimeModeService ModeService => modeService;
 
-        public void SetCache(ESInputRuntimeCache newCache) => cache = newCache;
-        public void SetModeService(ESRuntimeModeService service) => modeService = service;
+        public void SetCache(ESInputRuntimeCache newCache)
+        {
+            cache = newCache;
+            if (hasModePolicy)
+                ResetInputsBlockedByPolicy(currentModePolicy);
+        }
+
+        public void SetModeService(ESRuntimeModeService service)
+        {
+            if (ReferenceEquals(modeService, service))
+            {
+                if (service != null)
+                    HandleModePolicyChanged(service.CurrentPolicy);
+                return;
+            }
+
+            if (modeService != null)
+                modeService.OnPolicyChanged -= HandleModePolicyChanged;
+
+            modeService = service;
+            hasModePolicy = service != null;
+            currentModePolicy = hasModePolicy ? service.CurrentPolicy : ESRuntimeModePolicy.Default;
+
+            if (modeService != null)
+                modeService.OnPolicyChanged += HandleModePolicyChanged;
+
+            if (hasModePolicy)
+                ResetInputsBlockedByPolicy(currentModePolicy);
+        }
         public void BeginFrame() => ClearFrameState();
 
         public void EndFrame(float time)
         {
+            if (cache == null || cache.values == null || cache.metas == null)
+                return;
+
             for (int i = 0; i < cache.values.Length; i++)
             {
                 ESInputActionMeta meta = cache.metas[i];
@@ -61,6 +94,12 @@ namespace ES
                     continue;
 
                 ref ESInputRuntimeValue value = ref cache.values[i];
+                if (!IsActionAllowed((ESInputActionId)i))
+                {
+                    BlockButtonByPolicy(ref value, value.buttonHeldThisFrame || value.policyBlockedUntilRelease);
+                    continue;
+                }
+
                 CommitButton(ref value, meta, value.buttonHeldThisFrame, time);
             }
         }
@@ -68,7 +107,28 @@ namespace ES
         public void WriteButton(ESInputActionId id, bool isHeld, float time)
         {
             int index = (int)id;
+            if (!CanAccessIndex(index))
+                return;
+
             ref ESInputRuntimeValue value = ref cache.values[index];
+
+            if (!IsActionAllowed(id))
+            {
+                BlockButtonByPolicy(ref value, isHeld);
+                return;
+            }
+
+            if (value.policyBlockedUntilRelease)
+            {
+                if (isHeld)
+                {
+                    BlockButtonByPolicy(ref value, true);
+                    return;
+                }
+
+                value.policyBlockedUntilRelease = false;
+            }
+
             value.buttonHeldThisFrame |= isHeld;
         }
 
@@ -160,11 +220,29 @@ namespace ES
 
         public void WriteAxis(ESInputActionId id, float axis)
         {
+            if (!CanAccessIndex((int)id))
+                return;
+
+            if (!IsActionAllowed(id))
+            {
+                cache.values[(int)id].axis = 0f;
+                return;
+            }
+
             cache.values[(int)id].axis = axis;
         }
 
         public void WriteVector2(ESInputActionId id, Vector2 vector2)
         {
+            if (!CanAccessIndex((int)id))
+                return;
+
+            if (!IsActionAllowed(id))
+            {
+                cache.values[(int)id].vector2 = Vector2.zero;
+                return;
+            }
+
             cache.values[(int)id].vector2 = vector2;
         }
 
@@ -318,24 +396,29 @@ namespace ES
 
         public void ClearFrameState()
         {
+            if (cache == null)
+                return;
+
             cache.ClearFrameState();
         }
 
         public void ResetAll()
         {
+            if (cache == null)
+                return;
+
             cache.ResetAll();
         }
 
         public bool IsActionAllowed(ESInputActionId id)
         {
-            if (modeService == null)
-                return true;
-
-            ESRuntimeModePolicy policy = modeService.CurrentPolicy;
-            if (!policy.allowPlayerInput)
+            if (!CanAccessIndex((int)id))
                 return false;
 
-            return IsCategoryAllowed(GetActionCategory(id), policy);
+            if (!hasModePolicy)
+                return true;
+
+            return IsCategoryAllowed(GetActionCategory(id), currentModePolicy);
         }
 
         private ESInputActionCategory GetActionCategory(ESInputActionId id)
@@ -353,6 +436,12 @@ namespace ES
 
         private static bool IsCategoryAllowed(ESInputActionCategory category, ESRuntimeModePolicy policy)
         {
+            if (category == ESInputActionCategory.UI)
+                return policy.allowUIInput;
+
+            if (!policy.allowPlayerInput)
+                return false;
+
             switch (category)
             {
                 case ESInputActionCategory.Move:
@@ -364,11 +453,46 @@ namespace ES
                     return policy.allowCombatInput;
                 case ESInputActionCategory.Interaction:
                     return policy.allowInteractionInput;
-                case ESInputActionCategory.UI:
-                    return policy.allowUIInput;
                 default:
                     return true;
             }
+        }
+
+        private bool CanAccessIndex(int index)
+        {
+            return cache != null && cache.IsValidIndex(index);
+        }
+
+        private void HandleModePolicyChanged(ESRuntimeModePolicy policy)
+        {
+            currentModePolicy = policy;
+            hasModePolicy = modeService != null;
+            ResetInputsBlockedByPolicy(policy);
+        }
+
+        private void ResetInputsBlockedByPolicy(ESRuntimeModePolicy policy)
+        {
+            if (cache == null || cache.values == null || cache.metas == null)
+                return;
+
+            for (int i = 0; i < cache.values.Length; i++)
+            {
+                ESInputActionCategory category = GetActionCategory((ESInputActionId)i);
+                if (IsCategoryAllowed(category, policy))
+                    continue;
+
+                ref ESInputRuntimeValue value = ref cache.values[i];
+                bool waitRelease = cache.metas[i].valueType == ESInputValueType.Button
+                                   && (value.held || value.buttonHeldThisFrame);
+                value.ResetAll();
+                value.policyBlockedUntilRelease = waitRelease;
+            }
+        }
+
+        private static void BlockButtonByPolicy(ref ESInputRuntimeValue value, bool physicalHeld)
+        {
+            value.ResetAll();
+            value.policyBlockedUntilRelease = physicalHeld;
         }
     }
 }

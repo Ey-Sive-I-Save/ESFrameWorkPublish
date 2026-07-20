@@ -9,10 +9,13 @@ namespace ES
         public string key;
         public EnumCollect.HandleTwoNumber function = EnumCollect.HandleTwoNumber.Set;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target != null)
-                logic?.Context?.SetFloat(key, target.runtimeFloat, function);
+            {
+                ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+                support?.Context?.SetFloat(key, target.runtimeFloat, function, false);
+            }
         }
     }
 
@@ -22,10 +25,13 @@ namespace ES
         public string key;
         public EnumCollect.HandleTwoBool function = EnumCollect.HandleTwoBool.Set;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target != null)
-                logic?.Context?.SetBool(key, target.runtimeBool, function);
+            {
+                ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+                support?.Context?.SetBool(key, target.runtimeBool, function, false);
+            }
         }
     }
 
@@ -34,10 +40,13 @@ namespace ES
     {
         public FloatExpressionSource value = new FloatExpressionSource { directFloat = 1f };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target != null)
-                target.runtimeFloat = value != null ? value.Evaluate(target, logic) : 1f;
+            {
+                ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+                target.runtimeFloat = value != null ? value.Evaluate(target, support) : 1f;
+            }
         }
     }
 
@@ -46,10 +55,13 @@ namespace ES
     {
         public BoolExpressionSource value = new BoolExpressionSource { directBool = true };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target != null)
-                target.runtimeBool = value == null || value.Evaluate(target, logic);
+            {
+                ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+                target.runtimeBool = value == null || value.Evaluate(target, support);
+            }
         }
     }
 }

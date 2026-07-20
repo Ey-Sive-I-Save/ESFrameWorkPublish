@@ -34,7 +34,7 @@ MonoBehaviour:
       Data: 
     - Name: 
       Entry: 12
-      Data: 1207
+      Data: 1208
     - Name: 
       Entry: 7
       Data: 
@@ -5068,10 +5068,10 @@ MonoBehaviour:
       Data: ba4d12a893162dd4b88cd9c58e045e63
     - Name: assetPath
       Entry: 1
-      Data: Assets/Plugins/ES/1_Design/Define/0Define-ESEditorDraw
+      Data: Assets/Plugins/ES/0_Stand/Stand_Tools/ForMustEditor/EditorSolver/ESEditorDraw
     - Name: assetName
       Entry: 1
-      Data: 0Define-ESEditorDraw
+      Data: ESEditorDraw
     - Name: assetTypeName
       Entry: 1
       Data: UnityEditor.DefaultAsset
@@ -5131,7 +5131,7 @@ MonoBehaviour:
       Data: 1ccd01561399a4648a2f4de26dc521aa
     - Name: assetPath
       Entry: 1
-      Data: Assets/Plugins/ES/1_Design/Define/0Define-ESEditorDraw/PagedList
+      Data: Assets/Plugins/ES/0_Stand/Stand_Tools/ForMustEditor/EditorSolver/ESEditorDraw/PagedList
     - Name: assetName
       Entry: 1
       Data: PagedList
@@ -17165,13 +17165,15 @@ MonoBehaviour:
       Data: 
     - Name: responsibilityHint
       Entry: 1
-      Data: "\u5B58\u653E\u4E0A\u4E0B\u6587\u7279\u6027\u3001\u53EF\u7EC4\u5408\u80FD\u529B\u548C\u8FD0\u884C\u671F\u529F\u80FD\u6A21\u5757\u3002"
+      Data: "\uFF1A\u53EF\u590D\u7528\u73A9\u6CD5\u80FD\u529B\u5305\u3002\u5B83\u63D0\u4F9B\u67D0\u4E00\u7C7B\u901A\u7528\u80FD\u529B\uFF0C\u4F46\u4E0D\u76F4\u63A5\u627F\u62C5\u5168\u5C40\u751F\u547D\u5468\u671F\u3001\u4E3B\u6D41\u7A0B\u8C03\u5EA6\u6216\u5177\u4F53\u4E1A\u52A1\u89C4\u5219\u3002\u9700\u8981\u8FD0\u884C\r\n 
+        \u65F6\u8C03\u5EA6\u65F6\uFF0C\u7531 GameManager/Domain \u4E0B\u7684 Module
+        \u63A5\u5165\u3002\n"
     - Name: readMe
       Entry: 1
       Data: "Feature \u5E94\u4FDD\u6301\u8F7B\u91CF\u53EF\u590D\u7528\uFF0C\u4E0D\u5E94\u53CD\u5411\u4F9D\u8D56\u5177\u4F53\u7F16\u8F91\u5668\u6216\u5355\u4E2A\u4E1A\u52A1\u8D44\u4EA7\u3002"
     - Name: isManuallyEdited
       Entry: 5
-      Data: false
+      Data: true
     - Name: lastScanUtcTicks
       Entry: 3
       Data: 639194672721513497
@@ -19786,7 +19788,7 @@ MonoBehaviour:
       Data: be34a70ed370c1046bef2ac233a22ce1
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components
     - Name: assetName
       Entry: 1
       Data: Shared
@@ -19849,7 +19851,7 @@ MonoBehaviour:
       Data: 33f3ffe0b03d8a048bc5b4453c41d044
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Cacher
+      Data: Assets/Scripts/ESLogic/Runtime/Operation/Cache
     - Name: assetName
       Entry: 1
       Data: Cacher
@@ -19912,10 +19914,10 @@ MonoBehaviour:
       Data: d0d7e50abb10ef845b3f2287c3a79294
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Cacher/CacherPool-Define
+      Data: Assets/Scripts/ESLogic/Runtime/Operation/Cache
     - Name: assetName
       Entry: 1
-      Data: CacherPool-Define
+      Data: CacherPool
     - Name: assetTypeName
       Entry: 1
       Data: UnityEditor.DefaultAsset
@@ -19975,7 +19977,7 @@ MonoBehaviour:
       Data: 069ae461815678e4598362f01476228f
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Context
+      Data: Assets/Scripts/ESLogic/Runtime/Context
     - Name: assetName
       Entry: 1
       Data: Context
@@ -20038,10 +20040,10 @@ MonoBehaviour:
       Data: d0420ce901dcb324da9a65bee572b791
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Context/Context-Define
+      Data: Assets/Scripts/ESLogic/Runtime/Context/Core
     - Name: assetName
       Entry: 1
-      Data: Context-Define
+      Data: Context Core
     - Name: assetTypeName
       Entry: 1
       Data: UnityEditor.DefaultAsset
@@ -20101,7 +20103,7 @@ MonoBehaviour:
       Data: f90463bf2c4a8ee4d8958d4c403606f1
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Context/ContextOperations
+      Data: Assets/Scripts/ESLogic/Runtime/Context/Operations
     - Name: assetName
       Entry: 1
       Data: ContextOperations
@@ -20164,7 +20166,7 @@ MonoBehaviour:
       Data: b90974aff54756e489c1d64b2d7aa184
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Context/ContextValueSupports
+      Data: Assets/Scripts/ESLogic/Runtime/Context/Values
     - Name: assetName
       Entry: 1
       Data: ContextValueSupports
@@ -20227,7 +20229,7 @@ MonoBehaviour:
       Data: acb098fdc8181f6449ef704972bacfbe
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport
     - Name: assetName
       Entry: 1
       Data: ESMonoSupport
@@ -20290,7 +20292,7 @@ MonoBehaviour:
       Data: 0c0b4f033917c4c428936096f68edc44
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore
     - Name: assetName
       Entry: 1
       Data: UnityCore
@@ -20353,7 +20355,7 @@ MonoBehaviour:
       Data: 21a5a3417e63a60438162aa80f89c41e
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Anim
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Anim
     - Name: assetName
       Entry: 1
       Data: Anim
@@ -20416,7 +20418,7 @@ MonoBehaviour:
       Data: 49f4f1d9b82cdf74aa80ccd859b4cc97
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input
     - Name: assetName
       Entry: 1
       Data: Input
@@ -20479,7 +20481,7 @@ MonoBehaviour:
       Data: 1ee2a3048c3114242b97f464910e830b
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/0-Define
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/0-Define
     - Name: assetName
       Entry: 1
       Data: 0-Define
@@ -20542,7 +20544,7 @@ MonoBehaviour:
       Data: d385749598e128a40a59029361e8823d
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links
     - Name: assetName
       Entry: 1
       Data: Links
@@ -20605,7 +20607,7 @@ MonoBehaviour:
       Data: 794567b63d92a704e92626b0fed0a552
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad
     - Name: assetName
       Entry: 1
       Data: BaseAndKeyborad
@@ -20668,7 +20670,7 @@ MonoBehaviour:
       Data: 83b8dd204ec205b4e92a4b884bd6293c
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/PointerOnly
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/PointerOnly
     - Name: assetName
       Entry: 1
       Data: PointerOnly
@@ -20731,7 +20733,7 @@ MonoBehaviour:
       Data: be143359f6c2cd34ab53a8c41a89669c
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag
     - Name: assetName
       Entry: 1
       Data: Pointer_Drag
@@ -20794,7 +20796,7 @@ MonoBehaviour:
       Data: 58d18fc106bc0f44b84a083430890fd1
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle
     - Name: assetName
       Entry: 1
       Data: LinkSingle
@@ -20857,7 +20859,7 @@ MonoBehaviour:
       Data: b74a9fa087ded7043b0e0839f1840df8
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad
     - Name: assetName
       Entry: 1
       Data: BaseAndKeyborad
@@ -20920,7 +20922,7 @@ MonoBehaviour:
       Data: da1f13b18fd88684cbe347f9a70e8377
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly
     - Name: assetName
       Entry: 1
       Data: PointerOnly
@@ -20983,7 +20985,7 @@ MonoBehaviour:
       Data: 393064f9c49b746448bfe1581c18bcc6
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag
     - Name: assetName
       Entry: 1
       Data: Pointer_Drag
@@ -21046,7 +21048,7 @@ MonoBehaviour:
       Data: e262f4c52e08e084392d141b76c13476
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy
     - Name: assetName
       Entry: 1
       Data: Phy
@@ -21109,7 +21111,7 @@ MonoBehaviour:
       Data: a1bd89eeb9228124dbfcc3cd31550aaf
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/0-Define
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/0-Define
     - Name: assetName
       Entry: 1
       Data: 0-Define
@@ -21172,7 +21174,7 @@ MonoBehaviour:
       Data: 96cc097c7ba212e45b100b191160e878
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links
     - Name: assetName
       Entry: 1
       Data: Links
@@ -21235,7 +21237,7 @@ MonoBehaviour:
       Data: 2cc194bc303b3f54890f7f9831e05d1d
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/2D
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/2D
     - Name: assetName
       Entry: 1
       Data: 2D
@@ -21298,7 +21300,7 @@ MonoBehaviour:
       Data: ba88c9a086a3a6a4499b2946e3c26dae
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/3D
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/3D
     - Name: assetName
       Entry: 1
       Data: 3D
@@ -21361,7 +21363,7 @@ MonoBehaviour:
       Data: f95047eac2ffa0447b9a1c66a0a4dffa
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle
     - Name: assetName
       Entry: 1
       Data: LinkSingle
@@ -21424,7 +21426,7 @@ MonoBehaviour:
       Data: ed120ef3411a9014286d0b030a424500
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/2D
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/2D
     - Name: assetName
       Entry: 1
       Data: 2D
@@ -21487,7 +21489,7 @@ MonoBehaviour:
       Data: a7dafe4a6bafd314786740b757079f5d
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/3D
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/3D
     - Name: assetName
       Entry: 1
       Data: 3D
@@ -21550,7 +21552,7 @@ MonoBehaviour:
       Data: fd9d339d8e017834b912f1e4b71edddf
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Flag_Channel_Environment
+      Data: Assets/Plugins/ES/3_Examples/0_Foundation/StandLawExamples/Flag_Channel_Environment
     - Name: assetName
       Entry: 1
       Data: Flag_Channel_Environment
@@ -21613,7 +21615,7 @@ MonoBehaviour:
       Data: 8ea05a6a94cffe443b1d9be409b840c0
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/GameObjectRefer
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/References
     - Name: assetName
       Entry: 1
       Data: GameObjectRefer
@@ -21676,7 +21678,7 @@ MonoBehaviour:
       Data: f9da49be3a8496e45b2c7a42f7d080aa
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/IValueEntry
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/ValueEntry
     - Name: assetName
       Entry: 1
       Data: IValueEntry
@@ -21739,7 +21741,7 @@ MonoBehaviour:
       Data: 2b239950050e0234f9de90e77f66c072
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/IValueEntry/TypesIValueEntryContainer
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/ValueEntry/TypesIValueEntryContainer
     - Name: assetName
       Entry: 1
       Data: TypesIValueEntryContainer
@@ -21802,7 +21804,7 @@ MonoBehaviour:
       Data: 6164375542d15774aa4fedb2a0b8be02
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/IValueEntry/TypesValueEntry
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/ValueEntry/TypesValueEntry
     - Name: assetName
       Entry: 1
       Data: TypesValueEntry
@@ -34466,7 +34468,7 @@ MonoBehaviour:
       Data: 6628b3c432a321a459e5a97742205ee7
     - Name: assetPath
       Entry: 1
-      Data: Assets/Plugins/ES/1_Design/Define/0Define-ESEditorDraw/IDrawIMGUI.cs
+      Data: Assets/Plugins/ES/0_Stand/Stand_Tools/ForMustEditor/EditorSolver/ESEditorDraw/IDrawIMGUI.cs
     - Name: assetName
       Entry: 1
       Data: IDrawIMGUI
@@ -34541,7 +34543,7 @@ MonoBehaviour:
       Data: a66b81e33f17813449b12da5bdbf9a38
     - Name: assetPath
       Entry: 1
-      Data: Assets/Plugins/ES/1_Design/Define/0Define-ESEditorDraw/PagedList/PagedListDrawSolver.cs
+      Data: Assets/Plugins/ES/0_Stand/Stand_Tools/ForMustEditor/EditorSolver/ESEditorDraw/PagedList/PagedListDrawSolver.cs
     - Name: assetName
       Entry: 1
       Data: PagedListDrawSolver
@@ -61411,7 +61413,7 @@ MonoBehaviour:
     - Name: responsibilityHint
       Entry: 1
       Data: "class BufferDataFloat\uFF0C\u8D1F\u8D23\u5728\u8FD0\u884C\u4E0A\u4E0B\u6587\u4E2D\u8BA1\u7B97\u503C\uFF0C\u4E0D\u76F4\u63A5\u4EA7\u751F\u526F\u4F5C\u7528\u3002\u5B83\u901A\u8FC7
-        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001IOperationRuntimeServices\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
+        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001ESOpSupport\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
         Operation\u3001\u76EE\u6807\u9009\u62E9\u548C\u6280\u80FD\u53C2\u6570\u63D0\u4F9B\u53EF\u7EC4\u5408\u8F93\u5165\u3002"
     - Name: readMe
       Entry: 1
@@ -62157,7 +62159,7 @@ MonoBehaviour:
     - Name: responsibilityHint
       Entry: 1
       Data: "interface IBufferOperation : IPoolableAuto\uFF0C\u8D1F\u8D23\u5728\u8FD0\u884C\u4E0A\u4E0B\u6587\u4E2D\u8BA1\u7B97\u503C\uFF0C\u4E0D\u76F4\u63A5\u4EA7\u751F\u526F\u4F5C\u7528\u3002\u5B83\u901A\u8FC7
-        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001IOperationRuntimeServices\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
+        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001ESOpSupport\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
         Operation\u3001\u76EE\u6807\u9009\u62E9\u548C\u6280\u80FD\u53C2\u6570\u63D0\u4F9B\u53EF\u7EC4\u5408\u8F93\u5165\u3002"
     - Name: readMe
       Entry: 1
@@ -65862,7 +65864,7 @@ MonoBehaviour:
     - Name: responsibilityHint
       Entry: 1
       Data: "class EntityBasicModuleBase : Module<Entity, EntityBasicDomain>\uFF0C\u8D1F\u8D23\u5728\u8FD0\u884C\u4E0A\u4E0B\u6587\u4E2D\u8BA1\u7B97\u503C\uFF0C\u4E0D\u76F4\u63A5\u4EA7\u751F\u526F\u4F5C\u7528\u3002\u5B83\u901A\u8FC7
-        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001IOperationRuntimeServices\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
+        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001ESOpSupport\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
         Operation\u3001\u76EE\u6807\u9009\u62E9\u548C\u6280\u80FD\u53C2\u6570\u63D0\u4F9B\u53EF\u7EC4\u5408\u8F93\u5165\u3002"
     - Name: readMe
       Entry: 1
@@ -71030,10 +71032,10 @@ MonoBehaviour:
       Data: a0e68513d8f519444badc93a56961313
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Cacher/CacherPool-Define/CacherPool-Define.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Operation/Cache/CacherPool.cs
     - Name: assetName
       Entry: 1
-      Data: CacherPool-Define
+      Data: CacherPool
     - Name: assetTypeName
       Entry: 1
       Data: UnityEditor.MonoScript
@@ -71066,7 +71068,7 @@ MonoBehaviour:
       Data: "class CacherPool\uFF0C\u5C5E\u4E8E\u201CESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\u201D\u6A21\u5757\u4E0B\u7684\u72EC\u7ACB\u811A\u672C\u3002\u5B83\u8D1F\u8D23\u6587\u4EF6\u540D\u548C\u6E90\u7801\u58F0\u660E\u6240\u8868\u8FBE\u7684\u5C40\u90E8\u529F\u80FD\uFF0C\u7236\u6587\u4EF6\u5939\u53EA\u5B9A\u4E49\u6A21\u5757\u8FB9\u754C\uFF0C\u672C\u811A\u672C\u9700\u8981\u7EF4\u62A4\u81EA\u5DF1\u7684\u7C7B\u578B\u3001\u63A5\u53E3\u3001\u65B9\u6CD5\u548C\u6570\u636E\u5B57\u6BB5\u8BED\u4E49\u3002"
     - Name: readMe
       Entry: 1
-      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1ACacherPool-Define.cs\n\u4E3B\u58F0\u660E\uFF1Aclass
+      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1ACacherPool.cs\n\u4E3B\u58F0\u660E\uFF1Aclass
         CacherPool\n\u811A\u672C\u8BF4\u660E\uFF1A\u6E90\u7801\u672A\u63D0\u4F9B
         summary\uFF0C\u804C\u8D23\u7531\u58F0\u660E\u3001\u8DEF\u5F84\u548C\u5173\u952E\u65B9\u6CD5\u63A8\u65AD\u3002\n\u6E90\u7801\u7279\u5F81\uFF1ASerializable
         / TypeRegistryItem\n\u516C\u5F00\u6210\u5458\uFF1ACacherPool / IntValue /
@@ -71103,7 +71105,7 @@ MonoBehaviour:
       Data: e1cde1e30d3c00c4db23ae00ced366cb
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Context/Context-Define/ContextOperation_Abstract.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Context/Core/ContextOperation.cs
     - Name: assetName
       Entry: 1
       Data: ContextOperation_Abstract
@@ -71140,7 +71142,7 @@ MonoBehaviour:
         \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\u201D\u6A21\u5757\u4E0B\u7684\u72EC\u7ACB\u811A\u672C\u3002\u5B83\u8D1F\u8D23\u6587\u4EF6\u540D\u548C\u6E90\u7801\u58F0\u660E\u6240\u8868\u8FBE\u7684\u5C40\u90E8\u529F\u80FD\uFF0C\u7236\u6587\u4EF6\u5939\u53EA\u5B9A\u4E49\u6A21\u5757\u8FB9\u754C\uFF0C\u672C\u811A\u672C\u9700\u8981\u7EF4\u62A4\u81EA\u5DF1\u7684\u7C7B\u578B\u3001\u63A5\u53E3\u3001\u65B9\u6CD5\u548C\u6570\u636E\u5B57\u6BB5\u8BED\u4E49\u3002"
     - Name: readMe
       Entry: 1
-      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1AContextOperation_Abstract.cs\n\u4E3B\u58F0\u660E\uFF1Aclass
+      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1AContextOperation.cs\n\u4E3B\u58F0\u660E\uFF1Aclass
         ContextOperation_Abstract : IOperation<ContextPool,ContextKeyValue>\n\u811A\u672C\u8BF4\u660E\uFF1A\u6E90\u7801\u672A\u63D0\u4F9B
         summary\uFF0C\u804C\u8D23\u7531\u58F0\u660E\u3001\u8DEF\u5F84\u548C\u5173\u952E\u65B9\u6CD5\u63A8\u65AD\u3002\n\u6E90\u7801\u7279\u5F81\uFF1ASerializable\n\u516C\u5F00\u6210\u5458\uFF1AContextPoolGetterEasy\n\u7528\u9014\uFF1A\u8BE5\u811A\u672C\u6309\u81EA\u8EAB\u7C7B\u578B\u58F0\u660E\u627F\u62C5\u5C40\u90E8\u5B9E\u73B0\u804C\u8D23\u3002\n\u7EF4\u62A4\u8981\u6C42\uFF1A\u7EF4\u62A4\u524D\u5148\u786E\u8BA4\u5B83\u662F\u534F\u8BAE\u3001\u6570\u636E\u7ED3\u6784\u3001\u8FD0\u884C\u903B\u8F91\u3001\u7F16\u8F91\u5668\u5DE5\u5177\u8FD8\u662F\u793A\u4F8B\u4EE3\u7801\uFF1B\u4E0D\u8981\u56E0\u4E3A\u4F4D\u4E8E\u540C\u4E00\u76EE\u5F55\u5C31\u590D\u5236\u7236\u6587\u4EF6\u5939\u804C\u8D23\u3002"
     - Name: isManuallyEdited
@@ -71175,7 +71177,7 @@ MonoBehaviour:
       Data: 9790720d57b66db41b87b4837dbe87a0
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Context/Context-Define/ContextPool-Define.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Context/Core/ContextPool.cs
     - Name: assetName
       Entry: 1
       Data: ContextPool-Define
@@ -71211,7 +71213,7 @@ MonoBehaviour:
       Data: "struct Link_ContextEvent_TagChange\uFF0C\u5C5E\u4E8E\u201CESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\u201D\u6A21\u5757\u4E0B\u7684\u72EC\u7ACB\u811A\u672C\u3002\u5B83\u8D1F\u8D23\u6587\u4EF6\u540D\u548C\u6E90\u7801\u58F0\u660E\u6240\u8868\u8FBE\u7684\u5C40\u90E8\u529F\u80FD\uFF0C\u7236\u6587\u4EF6\u5939\u53EA\u5B9A\u4E49\u6A21\u5757\u8FB9\u754C\uFF0C\u672C\u811A\u672C\u9700\u8981\u7EF4\u62A4\u81EA\u5DF1\u7684\u7C7B\u578B\u3001\u63A5\u53E3\u3001\u65B9\u6CD5\u548C\u6570\u636E\u5B57\u6BB5\u8BED\u4E49\u3002"
     - Name: readMe
       Entry: 1
-      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1AContextPool-Define.cs\n\u4E3B\u58F0\u660E\uFF1Astruct
+      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1AContextPool.cs\n\u4E3B\u58F0\u660E\uFF1Astruct
         Link_ContextEvent_TagChange\n\u811A\u672C\u8BF4\u660E\uFF1A\u539F\u578B\u6C60
         Init ->Enable ->Disable \u90FD\u9700\u8981\u6267\u884C\n\u6E90\u7801\u7279\u5F81\uFF1ASerializable
         / TypeRegistryItem\n\u516C\u5F00\u6210\u5458\uFF1ALink_ContextEvent_TagChange
@@ -71249,7 +71251,7 @@ MonoBehaviour:
       Data: 8b9e32b4e94f9bf4b8a4381c0c2c8c0f
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Context/ContextOperations/ContextOperation_EasyValueSet.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Context/Operations/ContextOperation_EasyValueSet.cs
     - Name: assetName
       Entry: 1
       Data: ContextOperation_EasyValueSet
@@ -71323,7 +71325,7 @@ MonoBehaviour:
       Data: 652ee709b04e02847800efe62a6881ea
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Context/ContextValueSupports/SupportContextValue.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Context/Values/SupportContextValue.cs
     - Name: assetName
       Entry: 1
       Data: SupportContextValue
@@ -71397,7 +71399,7 @@ MonoBehaviour:
       Data: c083f7ce2d153ab4bb619ee175ae021c
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/0-Define/InputEMS_Abstract.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/0-Define/InputEMS_Abstract.cs
     - Name: assetName
       Entry: 1
       Data: InputEMS_Abstract
@@ -71470,7 +71472,7 @@ MonoBehaviour:
       Data: a7a04ca185b9b714287371fefb561513
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/0-Define/InputLinks.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/0-Define/InputLinks.cs
     - Name: assetName
       Entry: 1
       Data: InputLinks
@@ -71543,7 +71545,7 @@ MonoBehaviour:
       Data: 52781ceea3063a74bbb8d6a16b616cec
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_Cancel_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_Cancel_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Cancel_LinkList
@@ -71617,7 +71619,7 @@ MonoBehaviour:
       Data: 6892e3fd6a4befc4eb392b69e0c974d0
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_Move_ListList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_Move_ListList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Move_ListList
@@ -71690,7 +71692,7 @@ MonoBehaviour:
       Data: e69b3b1cc69b7d34b97849555f218fd3
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_Select_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_Select_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Select_LinkList
@@ -71763,7 +71765,7 @@ MonoBehaviour:
       Data: c51be9c07cb4b4549b2b0ca67a0e6f2e
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_Submit_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_Submit_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Submit_LinkList
@@ -71836,7 +71838,7 @@ MonoBehaviour:
       Data: 8bb503a34ca1ac243abb4ccb17366e66
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_UpdateSelected_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/BaseAndKeyborad/EMS_UpdateSelected_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_UpdateSelected_LinkList
@@ -71909,7 +71911,7 @@ MonoBehaviour:
       Data: 176c2aec6361e9741a8ce8add9dd9c06
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_BeginDrag_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_BeginDrag_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_BeginDrag_LinkList
@@ -71982,7 +71984,7 @@ MonoBehaviour:
       Data: 5526a65b9935e4143bd07455dd9580cc
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_Drag_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_Drag_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Drag_LinkList
@@ -72055,7 +72057,7 @@ MonoBehaviour:
       Data: e59cc950703413349bb267fee048c8d5
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_Drop_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_Drop_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Drop_LinkList
@@ -72128,7 +72130,7 @@ MonoBehaviour:
       Data: 17b3ba94090f450449b3b7bf3b4b5537
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_EndDrag_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_EndDrag_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_EndDrag_LinkList
@@ -72201,7 +72203,7 @@ MonoBehaviour:
       Data: d1c58463d2f9160468e136c56a52c2bc
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_InitializePotentialDrag_ListList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/Pointer_Drag/EMS_InitializePotentialDrag_ListList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_InitializePotentialDrag_ListList
@@ -72274,7 +72276,7 @@ MonoBehaviour:
       Data: 5704e21cf1899aa41b50f31c62f85cf7
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerClick_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerClick_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerClick_LinkList
@@ -72347,7 +72349,7 @@ MonoBehaviour:
       Data: 3177af126ff792245933f23a5b6bae41
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerDown_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerDown_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerDown_LinkList
@@ -72420,7 +72422,7 @@ MonoBehaviour:
       Data: 7a4367be438b30a4abeb67ba337091b3
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerEnter_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerEnter_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerEnter_LinkList
@@ -72493,7 +72495,7 @@ MonoBehaviour:
       Data: 789d9fa1c7a408e458b04f37c9120bc8
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerExit_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerExit_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerExit_LinkList
@@ -72566,7 +72568,7 @@ MonoBehaviour:
       Data: 0283c8c4b5006e64e8f9d729f59f9a07
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerUp_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_PointerUp_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerUp_LinkList
@@ -72639,7 +72641,7 @@ MonoBehaviour:
       Data: ce77de652da329d42bf51c34657159a2
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_Scroll_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/Links/PointerOnly/EMS_Scroll_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Scroll_LinkList
@@ -72713,7 +72715,7 @@ MonoBehaviour:
       Data: 19962237a6c1f5e448d4ea85cf4acd4f
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_Cancel_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_Cancel_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Cancel_LinkSingle
@@ -72787,7 +72789,7 @@ MonoBehaviour:
       Data: d47dc64ca9d0bb14f92f09e95fa8b5d1
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_Move_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_Move_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Move_LinkSingle
@@ -72860,7 +72862,7 @@ MonoBehaviour:
       Data: 4074aaaf1a217c542adadb09fdfc3dd9
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_Select_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_Select_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Select_LinkSingle
@@ -72933,7 +72935,7 @@ MonoBehaviour:
       Data: 4a008b98656c57e4a9693e2b10f100da
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_Submit_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_Submit_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Submit_LinkSingle
@@ -73006,7 +73008,7 @@ MonoBehaviour:
       Data: 32c21f05310bd5a4da7e0a23e96dcbfd
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_UpdateSelected_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/BaseAndKeyborad/EMS_UpdateSelected_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_UpdateSelected_LinkSingle
@@ -73079,7 +73081,7 @@ MonoBehaviour:
       Data: 93f07df6243c78f4ab5eb3e97c28f015
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_BeginDrag_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_BeginDrag_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_BeginDrag_ListSingle
@@ -73152,7 +73154,7 @@ MonoBehaviour:
       Data: 2f2cf487cdced5a46a7864376d50e509
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_Drag_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_Drag_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Drag_ListSingle
@@ -73225,7 +73227,7 @@ MonoBehaviour:
       Data: ffafebd0ebf40f148bcce65a4016175b
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_Drop_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_Drop_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Drop_LinkSingle
@@ -73298,7 +73300,7 @@ MonoBehaviour:
       Data: a9b4e9009d82d4542b3b9d688b14fde8
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_EndDrag_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_EndDrag_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_EndDrag_ListSingle
@@ -73371,7 +73373,7 @@ MonoBehaviour:
       Data: c948cfb250a257349aa3f716b4e107ae
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_InitializePotentialDrag_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/Pointer_Drag/EMS_InitializePotentialDrag_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_InitializePotentialDrag_ListSingle
@@ -73445,7 +73447,7 @@ MonoBehaviour:
       Data: a3271809c48839b4fbabd954fa4f1a2c
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerClick_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerClick_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerClick_ListSingle
@@ -73519,7 +73521,7 @@ MonoBehaviour:
       Data: a964d70ac32a4604580ffa0b2556b7a2
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerDown_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerDown_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerDown_ListSingle
@@ -73592,7 +73594,7 @@ MonoBehaviour:
       Data: 1615f909a235f8d488b185dfaa6342af
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerEnter_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerEnter_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerEnter_ListSingle
@@ -73666,7 +73668,7 @@ MonoBehaviour:
       Data: f7437e0efb2a5dc4e9cdf46dbf6e809e
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerExit_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerExit_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerExit_ListSingle
@@ -73739,7 +73741,7 @@ MonoBehaviour:
       Data: 0df0f6ca6509aca47a41ebc9d55a077d
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerUp_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_PointerUp_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_PointerUp_ListSingle
@@ -73812,7 +73814,7 @@ MonoBehaviour:
       Data: 4022f98c9d2a764409891ec4d059aebf
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_Scroll_ListSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Input/LinkSingle/PointerOnly/EMS_Scroll_ListSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Scroll_ListSingle
@@ -73886,7 +73888,7 @@ MonoBehaviour:
       Data: 7c4e6a52016051240bac6c810a1ded75
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/0-Define/PhyEMS_Abstract.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/0-Define/PhyEMS_Abstract.cs
     - Name: assetName
       Entry: 1
       Data: PhyEMS_Abstract
@@ -73960,7 +73962,7 @@ MonoBehaviour:
       Data: 7916424f3766d174f881df0e0647b285
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/0-Define/PhyLinks.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/0-Define/PhyLinks.cs
     - Name: assetName
       Entry: 1
       Data: PhyLinks
@@ -74033,7 +74035,7 @@ MonoBehaviour:
       Data: 225b3eb92694fa645b55eb6d6302dd73
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Collider2DEnter_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Collider2DEnter_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider2DEnter_LinkList
@@ -74106,7 +74108,7 @@ MonoBehaviour:
       Data: 7916213c4fe503b40bef1cf61b2ed91d
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Collider2DExit_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Collider2DExit_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider2DExit_LinkList
@@ -74179,7 +74181,7 @@ MonoBehaviour:
       Data: 05f1c32edcaa4fb4bb988d11cbfc6ec7
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Collider2DStay_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Collider2DStay_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider2DStay_LinkList
@@ -74252,7 +74254,7 @@ MonoBehaviour:
       Data: 38f7900b86fa98143b5418dfb7e585ff
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Trigger2DEnter_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Trigger2DEnter_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger2DEnter_LinkList
@@ -74325,7 +74327,7 @@ MonoBehaviour:
       Data: 0781e0d8ec1a3c54e8c9cfffbabb17c4
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Trigger2DExit_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Trigger2DExit_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger2DExit_LinkList
@@ -74398,7 +74400,7 @@ MonoBehaviour:
       Data: 292597956eab4d3439c7072a38180ec6
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Trigger2DStay_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/2D/EMS_Trigger2DStay_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger2DStay_LinkList
@@ -74471,7 +74473,7 @@ MonoBehaviour:
       Data: bc5d23b1fb023b54a8efd612befc7f64
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Collider3DEnter_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Collider3DEnter_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider3DEnter_LinkList
@@ -74544,7 +74546,7 @@ MonoBehaviour:
       Data: cb59304a741f7ec4ebac42ad7eb609e4
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Collider3DExit_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Collider3DExit_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider3DExit_LinkList
@@ -74617,7 +74619,7 @@ MonoBehaviour:
       Data: 85a6f22174770304c942a4aab3c83861
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Collider3DStay_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Collider3DStay_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider3DStay_LinkList
@@ -74690,7 +74692,7 @@ MonoBehaviour:
       Data: 7f72d539927fed14191d3b1b2dbb40ed
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Trigger3DEnter_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Trigger3DEnter_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger3DEnter_LinkList
@@ -74763,7 +74765,7 @@ MonoBehaviour:
       Data: 3187ecbc6b9a148478e77b6a213f010c
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Trigger3DExit_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Trigger3DExit_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger3DExit_LinkList
@@ -74836,7 +74838,7 @@ MonoBehaviour:
       Data: 0f559637010300c43bb06b4ed0f12e59
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Trigger3DStay_LinkList.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/Links/3D/EMS_Trigger3DStay_LinkList.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger3DStay_LinkList
@@ -74909,7 +74911,7 @@ MonoBehaviour:
       Data: d9bec7128b445ab49944ac7ba5a89f4e
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Collider2DEnter_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Collider2DEnter_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider2DEnter_LinkSingle
@@ -74982,7 +74984,7 @@ MonoBehaviour:
       Data: 98519498e15c6cc49b021957498a90ae
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Collider2DExit_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Collider2DExit_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider2DExit_LinkSingle
@@ -75055,7 +75057,7 @@ MonoBehaviour:
       Data: 86cdae7e00b907c4c959504a331d624f
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Collider2DStay_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Collider2DStay_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider2DStay_LinkSingle
@@ -75128,7 +75130,7 @@ MonoBehaviour:
       Data: 355070a541fd4fd4b95a28d6575e6fca
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Trigger2DEnter_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Trigger2DEnter_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger2DEnter_LinkSingle
@@ -75201,7 +75203,7 @@ MonoBehaviour:
       Data: 7f6686a1c3a00d849ab81af34b49881f
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Trigger2DExit_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_Trigger2DExit_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger2DExit_LinkSingle
@@ -75274,7 +75276,7 @@ MonoBehaviour:
       Data: cf342473d0fc5f044b6767f6f344a5a0
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_TriggerStay2D_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/2D/EMS_TriggerStay2D_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_TriggerStay2D_LinkSingle
@@ -75347,7 +75349,7 @@ MonoBehaviour:
       Data: 5929b4c1d5b200b42a886f4b0f19c101
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Collider3DEnter_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Collider3DEnter_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider3DEnter_LinkSingle
@@ -75420,7 +75422,7 @@ MonoBehaviour:
       Data: 120ce93afa26aa743aa71502d3a41fde
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Collider3DExit_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Collider3DExit_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider3DExit_LinkSingle
@@ -75493,7 +75495,7 @@ MonoBehaviour:
       Data: 5a3308616a654144686f339a39e4784c
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Collider3DStay_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Collider3DStay_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Collider3DStay_LinkSingle
@@ -75566,7 +75568,7 @@ MonoBehaviour:
       Data: 8609276e12c9ca642a6cc049364007a8
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Trigger3DEnter_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Trigger3DEnter_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger3DEnter_LinkSingle
@@ -75639,7 +75641,7 @@ MonoBehaviour:
       Data: 43681b49d6a5d7b4fb7ae1917adf96bf
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Trigger3DExit_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_Trigger3DExit_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_Trigger3DExit_LinkSingle
@@ -75712,7 +75714,7 @@ MonoBehaviour:
       Data: 842298fcc0826b242a2a0e27f1fb068e
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_TriggerStay3D_LinkSingle.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/ESMonoSupport/UnityCore/Phy/LinkSingle/3D/EMS_TriggerStay3D_LinkSingle.cs
     - Name: assetName
       Entry: 1
       Data: EMS_TriggerStay3D_LinkSingle
@@ -75785,7 +75787,7 @@ MonoBehaviour:
       Data: 294b86af918fbd64daed2cd6858a0494
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Flag_Channel_Environment/Channel.cs
+      Data: Assets/Plugins/ES/3_Examples/0_Foundation/StandLawExamples/Flag_Channel_Environment/Channel.cs
     - Name: assetName
       Entry: 1
       Data: Channel
@@ -75857,7 +75859,7 @@ MonoBehaviour:
       Data: 029c8398ad3f7264da0a756852c4e439
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Flag_Channel_Environment/Environment.cs
+      Data: Assets/Plugins/ES/3_Examples/0_Foundation/StandLawExamples/Flag_Channel_Environment/Environment.cs
     - Name: assetName
       Entry: 1
       Data: Environment
@@ -75929,7 +75931,7 @@ MonoBehaviour:
       Data: 9dcbbd5c05f717040b7f75abc12c5a44
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/Flag_Channel_Environment/OverLoadFlag.cs
+      Data: Assets/Plugins/ES/3_Examples/0_Foundation/StandLawExamples/Flag_Channel_Environment/OverLoadFlag.cs
     - Name: assetName
       Entry: 1
       Data: OverLoadFlag
@@ -76001,7 +76003,7 @@ MonoBehaviour:
       Data: 520773bf554895c458a9963560d17c9f
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/GameObjectRefer/GameObjectRefer.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/References/GameObjectRefer.cs
     - Name: assetName
       Entry: 1
       Data: GameObjectRefer
@@ -76075,7 +76077,7 @@ MonoBehaviour:
       Data: 4edf18d7d67de5f409d32ebe437a5e3d
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/GameObjectRefer/GameObjectRefer.Editor.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/Components/References/GameObjectRefer.Editor.cs
     - Name: assetName
       Entry: 1
       Data: GameObjectRefer.Editor
@@ -76148,10 +76150,10 @@ MonoBehaviour:
       Data: 573605553fe7ea545b9325e7f7f6191f
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/IValueEntry/0Define-IValueEntryAndEnumSupport.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/ValueEntry/IValueEntry.cs
     - Name: assetName
       Entry: 1
-      Data: 0Define-IValueEntryAndEnumSupport
+      Data: IValueEntry
     - Name: assetTypeName
       Entry: 1
       Data: UnityEditor.MonoScript
@@ -76184,7 +76186,7 @@ MonoBehaviour:
       Data: "interface IValueEntry\uFF0C\u5C5E\u4E8E\u201CESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\u201D\u6A21\u5757\u4E0B\u7684\u72EC\u7ACB\u811A\u672C\u3002\u5B83\u8D1F\u8D23\u6587\u4EF6\u540D\u548C\u6E90\u7801\u58F0\u660E\u6240\u8868\u8FBE\u7684\u5C40\u90E8\u529F\u80FD\uFF0C\u7236\u6587\u4EF6\u5939\u53EA\u5B9A\u4E49\u6A21\u5757\u8FB9\u754C\uFF0C\u672C\u811A\u672C\u9700\u8981\u7EF4\u62A4\u81EA\u5DF1\u7684\u7C7B\u578B\u3001\u63A5\u53E3\u3001\u65B9\u6CD5\u548C\u6570\u636E\u5B57\u6BB5\u8BED\u4E49\u3002"
     - Name: readMe
       Entry: 1
-      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1A0Define-IValueEntryAndEnumSupport.cs\n\u4E3B\u58F0\u660E\uFF1Ainterface
+      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1AIValueEntry.cs\n\u4E3B\u58F0\u660E\uFF1Ainterface
         IValueEntry\n\u811A\u672C\u8BF4\u660E\uFF1A\u6E90\u7801\u672A\u63D0\u4F9B
         summary\uFF0C\u804C\u8D23\u7531\u58F0\u660E\u3001\u8DEF\u5F84\u548C\u5173\u952E\u65B9\u6CD5\u63A8\u65AD\u3002\n\u6E90\u7801\u7279\u5F81\uFF1ASerializable
         / TypeRegistryItem\n\u516C\u5F00\u6210\u5458\uFF1AIValueEntry / IValueEntryContainer
@@ -76222,10 +76224,10 @@ MonoBehaviour:
       Data: 25d54651060333b4c910e84f8bce283a
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/IValueEntry/TypesIValueEntryContainer/Types-IValueEntryContainer.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/ValueEntry/TypesIValueEntryContainer/IValueEntryContainerTypes.cs
     - Name: assetName
       Entry: 1
-      Data: Types-IValueEntryContainer
+      Data: IValueEntryContainerTypes
     - Name: assetTypeName
       Entry: 1
       Data: UnityEditor.MonoScript
@@ -76259,7 +76261,7 @@ MonoBehaviour:
         \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\u201D\u6A21\u5757\u4E0B\u7684\u72EC\u7ACB\u811A\u672C\u3002\u5B83\u8D1F\u8D23\u6587\u4EF6\u540D\u548C\u6E90\u7801\u58F0\u660E\u6240\u8868\u8FBE\u7684\u5C40\u90E8\u529F\u80FD\uFF0C\u7236\u6587\u4EF6\u5939\u53EA\u5B9A\u4E49\u6A21\u5757\u8FB9\u754C\uFF0C\u672C\u811A\u672C\u9700\u8981\u7EF4\u62A4\u81EA\u5DF1\u7684\u7C7B\u578B\u3001\u63A5\u53E3\u3001\u65B9\u6CD5\u548C\u6570\u636E\u5B57\u6BB5\u8BED\u4E49\u3002"
     - Name: readMe
       Entry: 1
-      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1ATypes-IValueEntryContainer.cs\n\u4E3B\u58F0\u660E\uFF1Aclass
+      Data: "\u7236\u6A21\u5757\uFF1ARuntimeLogic / ESLogic \u8FD0\u884C\u65F6\u6839\u76EE\u5F55\n\u811A\u672C\uFF1AIValueEntryContainerTypes.cs\n\u4E3B\u58F0\u660E\uFF1Aclass
         MessagevalueEntry_Register_Actor : IValueEntryContainer\n\u811A\u672C\u8BF4\u660E\uFF1A\u6E90\u7801\u672A\u63D0\u4F9B
         summary\uFF0C\u804C\u8D23\u7531\u58F0\u660E\u3001\u8DEF\u5F84\u548C\u5173\u952E\u65B9\u6CD5\u63A8\u65AD\u3002\n\u6E90\u7801\u7279\u5F81\uFF1ASerializable
         / TypeRegistryItem\n\u516C\u5F00\u6210\u5458\uFF1AactorInfo / GetValueEntry\n\u7528\u9014\uFF1A\u8BE5\u811A\u672C\u6309\u81EA\u8EAB\u7C7B\u578B\u58F0\u660E\u627F\u62C5\u5C40\u90E8\u5B9E\u73B0\u804C\u8D23\u3002\n\u7EF4\u62A4\u8981\u6C42\uFF1A\u7EF4\u62A4\u524D\u5148\u786E\u8BA4\u5B83\u662F\u534F\u8BAE\u3001\u6570\u636E\u7ED3\u6784\u3001\u8FD0\u884C\u903B\u8F91\u3001\u7F16\u8F91\u5668\u5DE5\u5177\u8FD8\u662F\u793A\u4F8B\u4EE3\u7801\uFF1B\u4E0D\u8981\u56E0\u4E3A\u4F4D\u4E8E\u540C\u4E00\u76EE\u5F55\u5C31\u590D\u5236\u7236\u6587\u4EF6\u5939\u804C\u8D23\u3002"
@@ -76295,7 +76297,7 @@ MonoBehaviour:
       Data: 1421fec912fc7754c99c53beb47f0800
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/IValueEntry/TypesValueEntry/ISpriteValueEntry.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/ValueEntry/TypesValueEntry/ISpriteValueEntry.cs
     - Name: assetName
       Entry: 1
       Data: ISpriteValueEntry
@@ -76368,7 +76370,7 @@ MonoBehaviour:
       Data: fd2f5e4a6ab4fbd458315c6bb66b6614
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Shared/IValueEntry/TypesValueEntry/IStringValueEntry.cs
+      Data: Assets/Scripts/ESLogic/Runtime/Developer/ValueEntry/TypesValueEntry/IStringValueEntry.cs
     - Name: assetName
       Entry: 1
       Data: IStringValueEntry
@@ -77154,7 +77156,7 @@ MonoBehaviour:
     - Name: responsibilityHint
       Entry: 1
       Data: "class StateAnimationMixCalculatorForBlendTree1D : StateAnimationMixCalculator\uFF0C\u8D1F\u8D23\u5728\u8FD0\u884C\u4E0A\u4E0B\u6587\u4E2D\u8BA1\u7B97\u503C\uFF0C\u4E0D\u76F4\u63A5\u4EA7\u751F\u526F\u4F5C\u7528\u3002\u5B83\u901A\u8FC7
-        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001IOperationRuntimeServices\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
+        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001ESOpSupport\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
         Operation\u3001\u76EE\u6807\u9009\u62E9\u548C\u6280\u80FD\u53C2\u6570\u63D0\u4F9B\u53EF\u7EC4\u5408\u8F93\u5165\u3002"
     - Name: readMe
       Entry: 1
@@ -80114,7 +80116,7 @@ MonoBehaviour:
     - Name: responsibilityHint
       Entry: 1
       Data: "class StateMachine\uFF0C\u8D1F\u8D23\u5728\u8FD0\u884C\u4E0A\u4E0B\u6587\u4E2D\u8BA1\u7B97\u503C\uFF0C\u4E0D\u76F4\u63A5\u4EA7\u751F\u526F\u4F5C\u7528\u3002\u5B83\u901A\u8FC7
-        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001IOperationRuntimeServices\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
+        Evaluate \u8BFB\u53D6 ESRuntimeTargetPack\u3001ESOpSupport\u3001\u5E38\u91CF\u6216\u5B50\u8868\u8FBE\u5F0F\uFF0C\u4E3A
         Operation\u3001\u76EE\u6807\u9009\u62E9\u548C\u6280\u80FD\u53C2\u6570\u63D0\u4F9B\u53EF\u7EC4\u5408\u8F93\u5165\u3002"
     - Name: readMe
       Entry: 1
@@ -84190,7 +84192,7 @@ MonoBehaviour:
       Data: 2eac1407015b075409c05e79fe7d09bc
     - Name: assetPath
       Entry: 1
-      Data: Assets/Scripts/ESLogic/Runtime/Supplement/EnumPart/EnvirClear.cs
+      Data: Assets/Plugins/ES/0_Stand/BaseDefine_Law/EnvirClear.cs
     - Name: assetName
       Entry: 1
       Data: EnvirClear
@@ -84300,6 +84302,77 @@ MonoBehaviour:
       Entry: 8
       Data: 
     - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: c8e3b22f20ce021448e99a98b2387170
+    - Name: $v
+      Entry: 7
+      Data: 2416|ES.ESGlobalProjectAssetGuideData+AssetGuideRecord, ES_Stand
+    - Name: roleTitle
+      Entry: 1
+      Data: "AI\u5B9E\u65F6\u4EA4\u6D41"
+    - Name: ownerSystem
+      Entry: 1
+      Data: "AI\u534F\u4F5C"
+    - Name: guid
+      Entry: 1
+      Data: c8e3b22f20ce021448e99a98b2387170
+    - Name: assetPath
+      Entry: 1
+      Data: Assets/Plugins/ES/AITalk
+    - Name: assetName
+      Entry: 1
+      Data: AITalk
+    - Name: assetTypeName
+      Entry: 1
+      Data: UnityEditor.DefaultAsset
+    - Name: tags
+      Entry: 7
+      Data: 2417|System.Collections.Generic.List`1[[System.String, mscorlib]], mscorlib
+    - Name: 
+      Entry: 12
+      Data: 0
+    - Name: 
+      Entry: 13
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: responsibilityHint
+      Entry: 1
+      Data: "\u8BF7\u5148\u8FDB\u5165\u5E76\u9605\u8BFB\u8FD9\u4E2A\u529F\u80FD\u76EE\u5F55\uFF0C\u7406\u89E3
+        AITalk \u7684\u5168\u90E8\u51C6\u5219\u540E\uFF0C\u518D\u521B\u5EFA\u8FDE\u7EED\u4EA4\u6D41\u4F1A\u8BDD\uFF1A\r\n\r\n 
+        Assets/Plugins/ES/AITalk\r\n\r\n  \u4F60\u5FC5\u987B\u5148\u9605\u8BFB\u5E76\u8BB0\u4F4F\uFF1A\r\n 
+        Assets/Plugins/ES/AITalk/README_AI\u5BF9\u8BDD\u534F\u4F5C\u534F\u8BAE.md\r\n 
+        Assets/Plugins/ES/AITalk/AI\u52A0\u5165\u5BF9\u8BDD\u9080\u8BF7\u524D\u7F00.md\r\n\r\n 
+        \u7136\u540E\u521B\u5EFA\u552F\u4E00\u4F1A\u8BDD ID \u548C Session \u6587\u4EF6\u5939\u3002\r\n 
+        \u5199\u597D\u4F1A\u8BDD\u8BF4\u660E\u3001\u53C2\u4E0E\u8005\u3001\u7B2C\u4E00\u6761\u6D88\u606F\u3001\u5171\u8BC6\u3001\u5F85\u786E\u8BA4\u95EE\u9898\u3001\u6700\u7EC8\u7ED3\u8BBA\u6587\u4EF6\u3002\r\n 
+        \u542F\u7528\u8FDE\u7EED\u4EA4\u6D41\uFF1A\u7EA6 20 \u79D2\u8F6E\u8BE2\uFF0C15
+        \u5206\u949F\u4EE5\u5185\uFF0C\u5C3D\u91CF 3 \u8F6E\u4EE5\u4E0A\uFF0C\u4E0D\u8981\u63D0\u524D\u5B9A\u7A3F\u3002\r\n 
+        \u521B\u5EFA\u8005\u8981\u7ED9\u6211\u4E00\u4EFD\u53EF\u590D\u5236\u7ED9\u5176\u4ED6
+        AI \u7684\u9080\u8BF7\u6587\u672C\u3002\r\n  \u9080\u8BF7\u6587\u672C\u4E5F\u5FC5\u987B\u8981\u6C42\u5176\u4ED6
+        AI \u5148\u8BFB AITalk \u534F\u8BAE\u5E76\u8BB0\u4F4F\u51C6\u5219\u3002\r\n 
+        \u6700\u7EC8\u7ED3\u8BBA\u5B8C\u6210\u540E\uFF0C\u4E3B AI \u8981\u901A\u8FC7\u5BF9\u8BDD\u6846\u4E3B\u52A8\u544A\u8BC9\u6211\u3002\r\n\r\n 
+        \u4E3B\u9898\uFF1A\r\n  \u3010\u586B\u4E3B\u9898\u3011\r\n\r\n  \u76EE\u6807\uFF1A\r\n 
+        \u3010\u586B\u76EE\u6807\u3011\r\n"
+    - Name: readMe
+      Entry: 6
+      Data: 
+    - Name: isManuallyEdited
+      Entry: 5
+      Data: true
+    - Name: lastScanUtcTicks
+      Entry: 3
+      Data: 639198736613344650
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
       Entry: 13
       Data: 
     - Name: 
@@ -84313,8 +84386,11 @@ MonoBehaviour:
   - sceneGuid: b4b75588872fe9740ab90f542b86ce3e
     scenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene
       1.unity
-    savedUtcTicks: 639198581573411182
-    expandedTransformPaths: []
+    savedUtcTicks: 639201266554552880
+    expandedTransformPaths:
+    - '%E7%8E%A9%E5%AE%B6%E4%BA%92%E5%8A%A8%E7%BB%84#0@19'
+    - '%E9%A2%84%E8%A7%88%E4%B8%93%E7%94%A8#0@26'
+    - Demo_Grp#0@22
   displayTitleFontSize: 22
   displayHintFontSize: 14
   displayTitleColor: {r: 1, g: 0.82, b: 0.28, a: 1}

@@ -21,7 +21,7 @@ namespace ES
 
         public IntExpressionSource() { }
 
-        public override int Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override int Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return useDirectInt ? directInt : (expression != null ? expression.Evaluate(target, support) : directInt);
         }

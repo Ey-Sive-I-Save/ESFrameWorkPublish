@@ -1,9 +1,10 @@
-using ES;
+﻿using ES;
 using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace ES
@@ -20,8 +21,20 @@ namespace ES
         [Title("智能对齐与分布工具", "专业级对象对齐、分布、匹配工具", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         
-        [InfoBox("💡 支持3D对象、2D精灵、UI元素的智能对齐与分布\n⚡ 支持快捷键操作、实时预览、批量处理", InfoMessageType.None)]
+        [InfoBox("支持 3D / 2D / UI 对象的对齐、分布、尺寸匹配；执行前可确认，支持 Undo。", InfoMessageType.None)]
         [PropertySpace(10)]
+        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        private string PanelSummary =>
+            $"当前选择: {(Selection.transforms != null ? Selection.transforms.Length : 0)} 个对象 | 对齐: {alignMode} | 分布: {distributeMode} | 坐标: {coordinateMode} | 边界: {boundsMode}";
+
+        private string lastResultSummary = "";
+        private string lastResultDetail = "";
+
+        [OnInspectorGUI]
+        private void DrawResultPanel()
+        {
+            SimpleToolsPanelUtility.DrawResultSummary("最近对齐操作", lastResultSummary, lastResultDetail);
+        }
         #endregion
 
         #region 对齐模式枚举
@@ -92,6 +105,7 @@ namespace ES
         #region 预览系统字段
         private Dictionary<Transform, Vector3> originalPositions = new Dictionary<Transform, Vector3>();
         private bool isPreviewing = false;
+        private int previewUndoGroup = -1;
         #endregion
 
         #region 基础设置
@@ -116,86 +130,82 @@ namespace ES
         [TabGroup("对齐", "基础对齐")]
         [PropertySpace(10)]
         [HorizontalGroup("对齐/基础对齐/AlignButtons")]
-        [Button("← 左对齐", ButtonHeight = 35), GUIColor(0.3f, 0.8f, 0.8f)]
+        [Button("← 左对齐", ButtonHeight = 30), GUIColor(0.3f, 0.8f, 0.8f)]
         private void QuickAlignLeft() { alignMode = AlignMode.Left; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/AlignButtons")]
-        [Button("→ 右对齐", ButtonHeight = 35), GUIColor(0.3f, 0.8f, 0.8f)]
+        [Button("→ 右对齐", ButtonHeight = 30), GUIColor(0.3f, 0.8f, 0.8f)]
         private void QuickAlignRight() { alignMode = AlignMode.Right; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/AlignButtons")]
-        [Button("↑ 上对齐", ButtonHeight = 35), GUIColor(0.3f, 0.8f, 0.8f)]
+        [Button("↑ 上对齐", ButtonHeight = 30), GUIColor(0.3f, 0.8f, 0.8f)]
         private void QuickAlignTop() { alignMode = AlignMode.Top; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/AlignButtons")]
-        [Button("↓ 下对齐", ButtonHeight = 35), GUIColor(0.3f, 0.8f, 0.8f)]
+        [Button("↓ 下对齐", ButtonHeight = 30), GUIColor(0.3f, 0.8f, 0.8f)]
         private void QuickAlignBottom() { alignMode = AlignMode.Bottom; AlignObjects(); }
 
         [TabGroup("对齐", "基础对齐")]
         [HorizontalGroup("对齐/基础对齐/CenterButtons" )]
-        [Button("⊟ 水平居中", ButtonHeight = 35), GUIColor(0.5f, 0.7f, 0.9f)]
+        [Button("⊟ 水平居中", ButtonHeight = 30), GUIColor(0.5f, 0.7f, 0.9f)]
         private void QuickAlignHCenter() { alignMode = AlignMode.HorizontalCenter; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/CenterButtons")]
-        [Button("⊞ 垂直居中", ButtonHeight = 35), GUIColor(0.5f, 0.7f, 0.9f)]
+        [Button("⊞ 垂直居中", ButtonHeight = 30), GUIColor(0.5f, 0.7f, 0.9f)]
         private void QuickAlignVCenter() { alignMode = AlignMode.VerticalCenter; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/CenterButtons")]
-        [Button("◎ 深度居中", ButtonHeight = 35), GUIColor(0.5f, 0.7f, 0.9f)]
+        [Button("◎ 深度居中", ButtonHeight = 30), GUIColor(0.5f, 0.7f, 0.9f)]
         private void QuickAlignDepthCenter() { alignMode = AlignMode.DepthCenter; AlignObjects(); }
 
         [TabGroup("对齐", "基础对齐")]
         [InfoBox("📦 深度对齐（Z轴）：前后位置对齐控制", InfoMessageType.None)]
         [HorizontalGroup("对齐/基础对齐/DepthButtons")]
-        [Button("◀ 前对齐(近)", ButtonHeight = 35), GUIColor(0.6f, 0.8f, 0.6f)]
+        [Button("◀ 前对齐(近)", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.6f)]
         private void QuickAlignFront() { alignMode = AlignMode.Front; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/DepthButtons")]
-        [Button("▶ 后对齐(远)", ButtonHeight = 35), GUIColor(0.6f, 0.8f, 0.6f)]
+        [Button("▶ 后对齐(远)", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.6f)]
         private void QuickAlignBack() { alignMode = AlignMode.Back; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/DepthButtons")]
-        [Button("⬌ 深度居中", ButtonHeight = 35), GUIColor(0.6f, 0.8f, 0.6f)]
+        [Button("⬌ 深度居中", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.6f)]
         private void QuickAlignDepthCenter2() { alignMode = AlignMode.DepthCenter; AlignObjects(); }
 
         [TabGroup("对齐", "基础对齐")]
         [HorizontalGroup("对齐/基础对齐/CameraAlignButtons")]
-        [Button("⬅ 镜头左对齐", ButtonHeight = 35), GUIColor(0.4f, 0.6f, 0.8f)]
+        [Button("⬅ 镜头左对齐", ButtonHeight = 30), GUIColor(0.4f, 0.6f, 0.8f)]
         private void QuickAlignCameraLeft() { alignMode = AlignMode.CameraLeft; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/CameraAlignButtons")]
-        [Button("➡ 镜头右对齐", ButtonHeight = 35), GUIColor(0.4f, 0.6f, 0.8f)]
+        [Button("➡ 镜头右对齐", ButtonHeight = 30), GUIColor(0.4f, 0.6f, 0.8f)]
         private void QuickAlignCameraRight() { alignMode = AlignMode.CameraRight; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/CameraAlignButtons")]
-        [Button("⬆ 镜头上对齐", ButtonHeight = 35), GUIColor(0.4f, 0.6f, 0.8f)]
+        [Button("⬆ 镜头上对齐", ButtonHeight = 30), GUIColor(0.4f, 0.6f, 0.8f)]
         private void QuickAlignCameraTop() { alignMode = AlignMode.CameraTop; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/CameraAlignButtons")]
-        [Button("⬇ 镜头下对齐", ButtonHeight = 35), GUIColor(0.4f, 0.6f, 0.8f)]
+        [Button("⬇ 镜头下对齐", ButtonHeight = 30), GUIColor(0.4f, 0.6f, 0.8f)]
         private void QuickAlignCameraBottom() { alignMode = AlignMode.CameraBottom; AlignObjects(); }
 
         [TabGroup("对齐", "基础对齐")]
         [HorizontalGroup("对齐/基础对齐/CameraCenterButtons")]
-        [Button("⬌ 镜头水平居中", ButtonHeight = 35), GUIColor(0.5f, 0.7f, 0.8f)]
+        [Button("⬌ 镜头水平居中", ButtonHeight = 30), GUIColor(0.5f, 0.7f, 0.8f)]
         private void QuickAlignCameraHCenter() { alignMode = AlignMode.CameraHorizontalCenter; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/CameraCenterButtons")]
-        [Button("⬍ 镜头垂直居中", ButtonHeight = 35), GUIColor(0.5f, 0.7f, 0.8f)]
+        [Button("⬍ 镜头垂直居中", ButtonHeight = 30), GUIColor(0.5f, 0.7f, 0.8f)]
         private void QuickAlignCameraVCenter() { alignMode = AlignMode.CameraVerticalCenter; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/CameraCenterButtons")]
-        [Button("⬊ 镜头深度居中", ButtonHeight = 35), GUIColor(0.5f, 0.7f, 0.8f)]
+        [Button("⬊ 镜头深度居中", ButtonHeight = 30), GUIColor(0.5f, 0.7f, 0.8f)]
         private void QuickAlignCameraDepthCenter() { alignMode = AlignMode.CameraDepthCenter; AlignObjects(); }
         #endregion
 
         #region 分布设置
         [TabGroup("对齐", "智能分布")]
-        [InfoBox("📐 智能分布系统：人性化对象排列\n" +
-                "• 均匀分布：智能重新分布所有对象\n" +
-                "• 固定间距：精确控制对象间距\n" +
-                "• 预览功能：实时查看分布效果\n" +
-                "• 多种模式：适应不同场景需求", InfoMessageType.Info)]
+        [InfoBox("分布会按当前位置排序后移动对象；固定间距模式会使用下方间距值。", InfoMessageType.Info)]
 
         [TabGroup("对齐", "智能分布")]
         [HorizontalGroup("对齐/智能分布/Settings")]
@@ -222,12 +232,7 @@ namespace ES
         public bool previewMode = false;
 
         [TabGroup("对齐", "智能分布")]
-        [InfoBox("🎚️ 动态间距调整：实时控制对象间距\n" +
-                "• 启用后拖动滑条即可实时预览分布效果\n" +
-                "• 智能间距：自动计算基于对象尺寸的合适间距\n" +
-                "• 同步间距：与下方固定间距保持一致\n" +
-                "• 重置：快速清除额外间距\n" +
-                "• 仅在间距分布模式下工作", InfoMessageType.Info)]
+        [InfoBox("动态间距只影响间距分布模式；拖动时会刷新预览。", InfoMessageType.Info)]
 
         [TabGroup("对齐", "智能分布")]
         [HorizontalGroup("对齐/智能分布/DynamicSpacing")]
@@ -248,107 +253,95 @@ namespace ES
 
         [HorizontalGroup("对齐/智能分布/DynamicSpacing")]
         [VerticalGroup("对齐/智能分布/DynamicSpacing/Right"), LabelWidth(100)]
-        [Button("🔄 同步间距值", ButtonHeight = 35), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
+        [Button("🔄 同步间距值", ButtonHeight = 30), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
         private void SyncSpacingValues() { dynamicSpacing = distributionSpacing; }
 
         [HorizontalGroup("对齐/智能分布/DynamicSpacing")]
         [VerticalGroup("对齐/智能分布/DynamicSpacing/Right"), LabelWidth(100)]
-        [Button("🎯 智能间距", ButtonHeight = 35), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
+        [Button("🎯 智能间距", ButtonHeight = 30), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
         private void AutoCalculateSpacing() { dynamicSpacing = CalculateOptimalSpacing(); }
 
         [HorizontalGroup("对齐/智能分布/DynamicSpacing")]
         [VerticalGroup("对齐/智能分布/DynamicSpacing/Right"), LabelWidth(100)]
-        [Button("🔄 重置", ButtonHeight = 35), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
+        [Button("🔄 重置", ButtonHeight = 30), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
         private void ResetSpacing() { dynamicSpacing = 0f; }
         [HorizontalGroup("对齐/智能分布/PreviewButtons")]
-        [Button("👁 预览分布", ButtonHeight = 35), GUIColor(0.4f, 0.8f, 0.6f)]
+        [Button("👁 预览分布", ButtonHeight = 30), GUIColor(0.4f, 0.8f, 0.6f)]
         private void PreviewDistribution() { PreviewDistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/PreviewButtons")]
-        [Button("✓ 应用预览", ButtonHeight = 35), GUIColor(0.6f, 0.8f, 0.4f), ShowIf("@isPreviewing")]
+        [Button("✓ 应用预览", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.4f), ShowIf("@isPreviewing")]
         private void ApplyPreview() { ApplyDistributionPreview(); }
 
         [HorizontalGroup("对齐/智能分布/PreviewButtons")]
-        [Button("✖ 清除预览", ButtonHeight = 35), GUIColor(0.8f, 0.4f, 0.4f), ShowIf("@isPreviewing")]
+        [Button("✖ 清除预览", ButtonHeight = 30), GUIColor(0.8f, 0.4f, 0.4f), ShowIf("@isPreviewing")]
         private void ClearPreview() { ClearDistributionPreview(); }
 
         [TabGroup("对齐", "智能分布")]
         [HorizontalGroup("对齐/智能分布/DistributeButtons" )]
-        [Button("↔ 水平均匀", ButtonHeight = 35), GUIColor(0.7f, 0.5f, 0.9f)]
+        [Button("↔ 水平均匀", ButtonHeight = 30), GUIColor(0.7f, 0.5f, 0.9f)]
         private void QuickDistributeH() { distributeMode = DistributeMode.HorizontalEven; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/DistributeButtons")]
-        [Button("↕ 垂直均匀", ButtonHeight = 35), GUIColor(0.7f, 0.5f, 0.9f)]
+        [Button("↕ 垂直均匀", ButtonHeight = 30), GUIColor(0.7f, 0.5f, 0.9f)]
         private void QuickDistributeV() { distributeMode = DistributeMode.VerticalEven; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/DistributeButtons")]
-        [Button("⇿ 深度均匀", ButtonHeight = 35), GUIColor(0.7f, 0.5f, 0.9f)]
+        [Button("⇿ 深度均匀", ButtonHeight = 30), GUIColor(0.7f, 0.5f, 0.9f)]
         private void QuickDistributeD() { distributeMode = DistributeMode.DepthEven; DistributeObjects(); }
 
         [TabGroup("对齐", "智能分布")]
         [HorizontalGroup("对齐/智能分布/SpacingButtons")]
-        [Button("⟷ 水平间距", ButtonHeight = 35), GUIColor(0.9f, 0.6f, 0.4f)]
+        [Button("⟷ 水平间距", ButtonHeight = 30), GUIColor(0.9f, 0.6f, 0.4f)]
         private void QuickDistributeHS() { distributeMode = DistributeMode.HorizontalSpacing; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/SpacingButtons")]
-        [Button("⟺ 垂直间距", ButtonHeight = 35), GUIColor(0.9f, 0.6f, 0.4f)]
+        [Button("⟺ 垂直间距", ButtonHeight = 30), GUIColor(0.9f, 0.6f, 0.4f)]
         private void QuickDistributeVS() { distributeMode = DistributeMode.VerticalSpacing; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/SpacingButtons")]
-        [Button("⇆ 深度间距", ButtonHeight = 35), GUIColor(0.9f, 0.6f, 0.4f)]
+        [Button("⇆ 深度间距", ButtonHeight = 30), GUIColor(0.9f, 0.6f, 0.4f)]
         private void QuickDistributeDS() { distributeMode = DistributeMode.DepthSpacing; DistributeObjects(); }
 
         [TabGroup("对齐", "智能分布")]
         [HorizontalGroup("对齐/智能分布/CameraButtons")]
-        [Button("📷 镜头水平均匀", ButtonHeight = 35), GUIColor(0.4f, 0.7f, 0.9f)]
+        [Button("📷 镜头水平均匀", ButtonHeight = 30), GUIColor(0.4f, 0.7f, 0.9f)]
         private void QuickDistributeCH() { distributeMode = DistributeMode.CameraHorizontalEven; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/CameraButtons")]
-        [Button("📷 镜头垂直均匀", ButtonHeight = 35), GUIColor(0.4f, 0.7f, 0.9f)]
+        [Button("📷 镜头垂直均匀", ButtonHeight = 30), GUIColor(0.4f, 0.7f, 0.9f)]
         private void QuickDistributeCV() { distributeMode = DistributeMode.CameraVerticalEven; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/CameraButtons")]
-        [Button("📷 镜头深度均匀", ButtonHeight = 35), GUIColor(0.4f, 0.7f, 0.9f)]
+        [Button("📷 镜头深度均匀", ButtonHeight = 30), GUIColor(0.4f, 0.7f, 0.9f)]
         private void QuickDistributeCD() { distributeMode = DistributeMode.CameraDepthEven; DistributeObjects(); }
 
         [TabGroup("对齐", "智能分布")]
         [HorizontalGroup("对齐/智能分布/CameraSpacingButtons")]
-        [Button("📐 镜头水平间距", ButtonHeight = 35), GUIColor(0.6f, 0.8f, 0.7f)]
+        [Button("📐 镜头水平间距", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.7f)]
         private void QuickDistributeCHS() { distributeMode = DistributeMode.CameraHorizontalSpacing; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/CameraSpacingButtons")]
-        [Button("📐 镜头垂直间距", ButtonHeight = 35), GUIColor(0.6f, 0.8f, 0.7f)]
+        [Button("📐 镜头垂直间距", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.7f)]
         private void QuickDistributeCVS() { distributeMode = DistributeMode.CameraVerticalSpacing; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/CameraSpacingButtons")]
-        [Button("📐 镜头深度间距", ButtonHeight = 35), GUIColor(0.6f, 0.8f, 0.7f)]
+        [Button("📐 镜头深度间距", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.7f)]
         private void QuickDistributeCDS() { distributeMode = DistributeMode.CameraDepthSpacing; DistributeObjects(); }
         #endregion
 
         #region 匹配设置
         [TabGroup("对齐", "尺寸匹配")]
-        [InfoBox("🔄 商业级尺寸匹配系统\n" +
-                "✓ 完整支持：3D对象 / 2D精灵 / UI元素\n" +
-                "✓ 精确匹配：宽度 / 高度 / 深度（Z轴）\n" +
-                "✓ 变换匹配：旋转 / 整体缩放\n" +
-                "✓ 智能处理：自动识别对象类型和边界\n" +
-                "✓ 混合模式：支持UI与3D对象互相参考", InfoMessageType.Info)]
+        [InfoBox("尺寸匹配支持宽、高、深度、旋转和整体缩放；整体缩放优先级最高。", InfoMessageType.Info)]
         [PropertySpace(5)]
 
         [TabGroup("对齐", "尺寸匹配")]
         [LabelText("匹配参考对象"), LabelWidth(120)]
-        [InfoBox("📌 参考对象选择规则：\n" +
-                "• 第一个选中：使用首个选择的对象作为参考\n" +
-                "• 最后选中：使用最后选择的对象作为参考\n" +
-                "• 父对象中心：使用共同父对象作为参考", InfoMessageType.None)]
+        [InfoBox("参考对象按选择顺序或父对象规则确定。", InfoMessageType.None)]
         public AlignReference matchReference = AlignReference.FirstSelected;
 
         [TabGroup("对齐", "尺寸匹配")]
-        [InfoBox("📏 尺寸匹配选项（精确控制）：\n" +
-                "• 宽度(X)：水平尺寸，3D对象通过Scale调整，UI对象调整RectTransform\n" +
-                "• 高度(Y)：垂直尺寸，智能识别边界类型\n" +
-                "• 深度(Z)：纵深尺寸，支持3D对象和UI的Z轴缩放\n" +
-                "• 边界为零时自动使用Scale直接匹配", InfoMessageType.Info)]
+        [InfoBox("3D 对象通过 Scale 匹配，UI 对象优先调整 RectTransform 尺寸。", InfoMessageType.Info)]
         [HorizontalGroup("对齐/尺寸匹配/Options")]
         [VerticalGroup("对齐/尺寸匹配/Options/Left"), LabelWidth(120)]
         [LabelText("✓ 匹配宽度(X轴)"), PropertySpace(5)]
@@ -375,64 +368,87 @@ namespace ES
 
         [TabGroup("对齐", "尺寸匹配")]
         [PropertySpace(10)]
-        [Button("✓ 执行匹配", ButtonHeight = 45), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
+        [Button("✓ 执行匹配", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         private void MatchObjects() { ExecuteMatch(); }
         #endregion
 
         #region 高级选项
         [TabGroup("对齐", "高级选项")]
-        [InfoBox("⚙️ 高级选项：精细控制对齐行为\n" +
-                "• 边界计算：包含子对象边界\n" +
-                "• 对象过滤：活跃/锁定状态\n" +
-                "• 操作反馈：撤销和选中控制\n" +
-                "• 实时状态：当前选中信息", InfoMessageType.Info)]
+        [InfoBox("高级选项控制边界计算、对象过滤、确认弹窗和成功提示。", InfoMessageType.Info)]
 
         
         [TabGroup("对齐", "高级选项")]
         [LabelText("包含子对象"), PropertySpace(5)]
-        [InfoBox("边界计算时是否包含子对象：\n• 开启：计算所有子对象的组合边界\n• 关闭：仅使用父对象边界\n• 适合：复杂对象和预制件")]
+        [InfoBox("开启后计算子对象组合边界。")]
         public bool includeChildren = false;
 
         [TabGroup("对齐", "高级选项")]
         [LabelText("仅处理活跃对象"), PropertySpace(5)]
-        [InfoBox("是否只处理激活状态的对象：\n• 开启：跳过未激活的对象\n• 关闭：处理所有选中对象\n• 推荐：开启以避免意外操作")]
+        [InfoBox("开启后跳过未激活对象。")]
         public bool activeOnly = true;
 
         [TabGroup("对齐", "高级选项")]
         [LabelText("忽略锁定对象"), PropertySpace(5)]
-        [InfoBox("是否跳过锁定(HideFlags.NotEditable)的对象：\n• 开启：保护重要对象不被修改\n• 关闭：处理所有对象\n• 安全保护机制")]
+        [InfoBox("开启后跳过 HideFlags.NotEditable 对象。")]
         public bool ignoreLocked = true;
 
         [TabGroup("对齐", "高级选项")]
         [LabelText("对齐后选中"), PropertySpace(5)]
-        [InfoBox("操作完成后是否保持对象选中状态：\n• 开启：继续选中已对齐对象\n• 关闭：取消选中\n• 便于连续操作")]
+        [InfoBox("开启后操作完成仍保持目标选中。")]
         public bool selectAfterAlign = true;
 
         [TabGroup("对齐", "高级选项")]
         [LabelText("显示成功提示"), PropertySpace(5)]
-        [InfoBox("是否显示操作成功的提示对话框：\n• 开启：每次操作成功后显示提示\n• 关闭：静默执行，不显示成功提示\n• 减少弹窗干扰")]
+        [InfoBox("关闭可减少连续操作时的弹窗。")]
         public bool showSuccessDialogs = false;
 
         [TabGroup("对齐", "高级选项")]
+        [LabelText("执行前确认"), PropertySpace(5)]
+        [InfoBox("开启后，对齐、分布、尺寸匹配会先显示实际处理对象预览。建议商业项目保持开启，避免误改大量对象。")]
+        public bool confirmBeforeApply = true;
+
+        [TabGroup("对齐", "高级选项")]
         [PropertySpace(10)]
-        [InfoBox("🔄 撤销功能：\n• 撤销上次对齐/分布/匹配操作\n• 支持多次撤销\n• 快捷键：Ctrl+Z", InfoMessageType.Warning)]
-        [Button("⟲ 撤销上次操作", ButtonHeight = 35)]
+        [InfoBox("等同于执行一次 Unity Undo。", InfoMessageType.Warning)]
+        [Button("⟲ 撤销上次操作", ButtonHeight = 30)]
         private void UndoLastOperation() { Undo.PerformUndo(); }
 
         [TabGroup("对齐", "高级选项")]
         [PropertySpace(10)]
-        [InfoBox("📊 实时状态监控：\n• 显示当前选中对象数量\n• 首个对象信息和尺寸\n• 帮助判断操作范围", InfoMessageType.None)]
+        [InfoBox("实时显示当前有效选中和首个对象尺寸。", InfoMessageType.None)]
         [InfoBox("当前选中: @GetSelectionInfo()", InfoMessageType.None)]
         #endregion
 
+        private bool ConfirmTransformOperation(string title, string action, GameObject[] selectedObjects, int affectedCountOffset = 0)
+        {
+            if (!confirmBeforeApply)
+                return true;
+
+            int affectedCount = Mathf.Max(0, selectedObjects.Length - affectedCountOffset);
+            string preview = SimpleToolsSafetyUtility.JoinPreview(selectedObjects.Select(obj => obj != null ? obj.name : "<丢失对象>"), 10);
+            return EditorUtility.DisplayDialog(title,
+                $"将{action} {affectedCount} 个对象。\n\n实际选区：\n{preview}\n\n支持 Ctrl+Z 撤销。继续吗？",
+                "开始处理", "取消");
+        }
+
+        private void MarkScenesDirty(IEnumerable<GameObject> selectedObjects)
+        {
+            if (selectedObjects == null)
+                return;
+
+            foreach (var scene in selectedObjects
+                .Where(obj => obj != null && obj.scene.IsValid())
+                .Select(obj => obj.scene)
+                .Distinct())
+            {
+                EditorSceneManager.MarkSceneDirty(scene);
+            }
+        }
+
         #region 核心对齐功能
-        [InfoBox("🚀 主执行按钮：\n" +
-                "• 执行对齐：根据当前设置对齐选中对象\n" +
-                "• 智能验证：自动检查选中对象数量\n" +
-                "• 完整撤销：支持Ctrl+Z撤销操作\n" +
-                "• 实时反馈：操作结果和成功提示", InfoMessageType.Info)]
+        [InfoBox("按当前设置移动选中对象；写入前会记录 Undo。", InfoMessageType.Info)]
         
-        [Button("▶ 执行对齐", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+        [Button("▶ 执行对齐", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         [PropertyOrder(-1)]
         public void AlignObjects()
         {
@@ -445,6 +461,9 @@ namespace ES
                 EditorUtility.DisplayDialog("对齐功能提示", message, "确定");
                 return;
             }
+
+            if (!ConfirmTransformOperation("确认执行对齐", "对齐", selectedObjects))
+                return;
 
             Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Align Objects");
 
@@ -566,6 +585,10 @@ namespace ES
                 transform.position = worldPosition;
             }
 
+            MarkScenesDirty(selectedObjects);
+            lastResultSummary = $"对齐完成: {selectedObjects.Length} 个对象 | 模式 {alignMode} | 参考 {alignReference}";
+            lastResultDetail = BuildTransformResultDetail(selectedObjects);
+
             if (showSuccessDialogs)
                 EditorUtility.DisplayDialog("成功", $"✓ 成功对齐 {selectedObjects.Length} 个对象！", "确定");
             
@@ -575,11 +598,7 @@ namespace ES
         #endregion
 
         #region 分布功能
-        [InfoBox("📐 分布功能：均匀排列多个对象\n" +
-                "• 均匀分布：对象间距自动计算\n" +
-                "• 固定间距：自定义精确间距\n" +
-                "• 智能排序：保持相对位置关系\n" +
-                "• 至少需要3个对象", InfoMessageType.Info)]
+        [InfoBox("分布至少需要 2 个有效对象，3 个以上效果更直观。", InfoMessageType.Info)]
         [PropertySpace(5),HideLabel,ReadOnly]
         public string NULLSTR="";
         
@@ -594,6 +613,9 @@ namespace ES
                 EditorUtility.DisplayDialog("分布功能提示", message, "确定");
                 return;
             }
+
+            if (!ConfirmTransformOperation("确认执行分布", "分布", selectedObjects))
+                return;
 
             // 如果在预览模式，先清除预览
             if (isPreviewing)
@@ -628,6 +650,10 @@ namespace ES
                     DistributeWithSpacing(transforms);
                     break;
             }
+
+            MarkScenesDirty(selectedObjects);
+            lastResultSummary = $"分布完成: {selectedObjects.Length} 个对象 | 模式 {distributeMode} | 反向 {(reverseOrder ? "是" : "否")}";
+            lastResultDetail = BuildTransformResultDetail(selectedObjects);
 
             if (showSuccessDialogs)
                 EditorUtility.DisplayDialog("成功", $"✓ 成功分布 {selectedObjects.Length} 个对象！", "确定");
@@ -1064,7 +1090,7 @@ namespace ES
         #region 动态间距调整
         [InfoBox("🎚️ 动态间距调整：实时控制对象间距\n" +
                 "• 实时预览：拖动滑条即时看到效果\n" +
-                "• 自动应用：无需额外确认操作\n" +
+                "• 拖动会直接写入 Transform，并已记录 Undo\n" +
                 "• 仅间距模式：仅在间距分布模式下工作\n" +
                 "• 撤销支持：可通过Ctrl+Z撤销", InfoMessageType.Info)]
         [PropertySpace(5)]
@@ -1117,6 +1143,7 @@ namespace ES
             try
             {
                 DistributeWithSpacing(transforms);
+                MarkScenesDirty(selectedObjects);
             }
             catch (System.Exception e)
             {
@@ -1168,11 +1195,7 @@ namespace ES
         #endregion
 
         #region 预览功能
-        [InfoBox("👁 预览功能：安全查看分布效果\n" +
-                "• 临时预览：不影响实际对象\n" +
-                "• 实时调整：修改参数即时更新\n" +
-                "• 一键应用：确认效果后应用\n" +
-                "• 轻松取消：不满意可立即撤销", InfoMessageType.Info)]
+        [InfoBox("预览会临时移动 Transform，可应用或一键还原。", InfoMessageType.Info)]
         [PropertySpace(5)]
         
         private void PreviewDistributeObjects()
@@ -1197,6 +1220,10 @@ namespace ES
 
             // 执行预览分布
             var transforms = selectedObjects.Select(obj => obj.transform).ToList();
+            Undo.SetCurrentGroupName("Preview Distribution");
+            previewUndoGroup = Undo.GetCurrentGroup();
+            Undo.RecordObjects(transforms.Cast<UnityEngine.Object>().ToArray(), "Preview Distribution");
+
             SortTransformsByDistributionMode(transforms);
             
             if (reverseOrder)
@@ -1207,17 +1234,26 @@ namespace ES
                 case DistributeMode.HorizontalEven:
                 case DistributeMode.VerticalEven:
                 case DistributeMode.DepthEven:
+                case DistributeMode.CameraHorizontalEven:
+                case DistributeMode.CameraVerticalEven:
+                case DistributeMode.CameraDepthEven:
                     DistributeEvenly(transforms);
                     break;
                 case DistributeMode.HorizontalSpacing:
                 case DistributeMode.VerticalSpacing:
                 case DistributeMode.DepthSpacing:
+                case DistributeMode.CameraHorizontalSpacing:
+                case DistributeMode.CameraVerticalSpacing:
+                case DistributeMode.CameraDepthSpacing:
                     DistributeWithSpacing(transforms);
                     break;
             }
 
             isPreviewing = true;
-            EditorUtility.DisplayDialog("预览", "✓ 分布预览已启用\n• 修改参数可实时更新\n• 点击'应用预览'确认效果\n• 点击'清除预览'取消", "确定");
+            MarkScenesDirty(selectedObjects);
+            lastResultSummary = $"分布预览已生成: {selectedObjects.Length} 个对象 | 模式 {distributeMode}";
+            lastResultDetail = BuildTransformResultDetail(selectedObjects);
+            EditorUtility.DisplayDialog("预览已生成", "对象已临时移动用于预览。\n点击“应用预览”保留效果，点击“清除预览”还原位置。", "知道了");
         }
 
         private void ClearDistributionPreview()
@@ -1225,19 +1261,29 @@ namespace ES
             if (!isPreviewing) return;
 
             // 恢复原始位置
+            Undo.SetCurrentGroupName("Clear Distribution Preview");
             foreach (var kvp in originalPositions)
             {
                 if (kvp.Key != null)
                 {
+                    Undo.RecordObject(kvp.Key, "Clear Distribution Preview");
                     if (IsWorldSpace())
                         kvp.Key.position = kvp.Value;
                     else
                         kvp.Key.localPosition = kvp.Value;
+                    EditorUtility.SetDirty(kvp.Key);
                 }
             }
 
+            MarkScenesDirty(originalPositions.Keys
+                .Where(transform => transform != null)
+                .Select(transform => transform.gameObject));
+
             originalPositions.Clear();
             isPreviewing = false;
+            previewUndoGroup = -1;
+            lastResultSummary = "分布预览已清除";
+            lastResultDetail = "已还原预览前记录的位置。";
         }
 
         private void ApplyDistributionPreview()
@@ -1245,10 +1291,15 @@ namespace ES
             if (!isPreviewing) return;
 
             var selectedObjects = GetValidSelection();
-            Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Apply Distribution Preview");
+            if (previewUndoGroup >= 0)
+                Undo.CollapseUndoOperations(previewUndoGroup);
 
             originalPositions.Clear();
             isPreviewing = false;
+            previewUndoGroup = -1;
+            MarkScenesDirty(selectedObjects);
+            lastResultSummary = $"分布预览已应用: {selectedObjects.Length} 个对象 | 模式 {distributeMode}";
+            lastResultDetail = BuildTransformResultDetail(selectedObjects);
 
             if (showSuccessDialogs)
                 EditorUtility.DisplayDialog("成功", "✓ 预览效果已应用！", "确定");
@@ -1259,11 +1310,7 @@ namespace ES
         #endregion
 
         #region 匹配功能
-        [InfoBox("🔄 匹配功能：统一对象属性\n" +
-                "• 尺寸匹配：宽度/高度/深度\n" +
-                "• 变换匹配：旋转/缩放\n" +
-                "• 智能适配：UI和3D对象\n" +
-                "• 至少需要2个对象", InfoMessageType.Info)]
+        [InfoBox("匹配至少需要 2 个有效对象：1 个参考对象和 1 个以上目标。", InfoMessageType.Info)]
         [PropertySpace(5)]
         
         private void ExecuteMatch()
@@ -1290,6 +1337,9 @@ namespace ES
                     "• 匹配整体缩放", "确定");
                 return;
             }
+
+            if (!ConfirmTransformOperation("确认执行尺寸匹配", "匹配", selectedObjects, 1))
+                return;
 
             Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Match Objects");
 
@@ -1377,6 +1427,10 @@ namespace ES
                 }
             }
 
+            MarkScenesDirty(selectedObjects);
+            lastResultSummary = $"尺寸匹配完成: {selectedObjects.Length - 1} 个目标 | 参考 {referenceObject.name}";
+            lastResultDetail = BuildTransformResultDetail(selectedObjects);
+
             if (showSuccessDialogs)
                 EditorUtility.DisplayDialog("成功", $"✓ 成功匹配 {selectedObjects.Length - 1} 个对象到参考对象！", "确定");
             
@@ -1385,12 +1439,13 @@ namespace ES
         }
         #endregion
 
+        private string BuildTransformResultDetail(IEnumerable<GameObject> selectedObjects)
+        {
+            return "对象:\n" + SimpleToolsSafetyUtility.JoinPreview(selectedObjects?.Select(obj => obj != null ? obj.name : null), 12);
+        }
+
         #region 边界计算
-        [InfoBox("📏 边界计算系统：智能边界检测\n" +
-                "• 多模式支持：Renderer/Collider/RectTransform\n" +
-                "• 自动检测：智能选择最适合的边界\n" +
-                "• 子对象包含：可选计算子对象边界\n" +
-                "• 坐标系适配：世界/本地坐标", InfoMessageType.Info)]
+        [InfoBox("边界按当前模式从 Renderer、Collider、RectTransform 或 Transform 计算。", InfoMessageType.Info)]
         [PropertySpace(5)]
         
         private Bounds GetObjectBounds(Transform transform)

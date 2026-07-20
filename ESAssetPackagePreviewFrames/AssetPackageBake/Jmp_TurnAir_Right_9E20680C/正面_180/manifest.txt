@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P3_CLazyJump/Jmp_Turn_Air/CLazy@Jmp_TurnAir_Right.FBX
+clipName=Jmp_TurnAir_Right
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=37
+pixels=117
+yaw=180

@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v2_ViewAware
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P1_CLazyMovement/Mvm_Turn_Idle/CLazy@Mvm_Idle_A_TurnL_180.FBX
+clipName=Mvm_Idle_A_TurnL_180
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=40
+pixels=117
+yaw=180

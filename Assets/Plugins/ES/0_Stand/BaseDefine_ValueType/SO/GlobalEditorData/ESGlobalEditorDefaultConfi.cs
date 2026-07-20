@@ -42,6 +42,10 @@ namespace ES
     public string Path_ResourceParent;
 
     [TabGroup("文件夹管理")]
+    [FolderPath, LabelText("默认的资产包烘焙数据父文件夹")]
+    public string Path_AssetPackageBakeParent = "Assets/NormalResources/Data/AssetPackageBake";
+
+    [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的全局Global父文件夹")]
     public string Path_GlobalParent;
 
@@ -219,6 +223,7 @@ namespace ES
       ValidateFolderPath(Path_NormalScriptParent, nameof(Path_NormalScriptParent), false);
       ValidateFolderPath(Path_NormalParent, nameof(Path_NormalParent), false);
       ValidateFolderPath(Path_ResourceParent, nameof(Path_ResourceParent), false);
+      ValidateFolderPath(Path_AssetPackageBakeParent, nameof(Path_AssetPackageBakeParent), false);
       ValidateFolderPath(Path_GlobalParent, nameof(Path_GlobalParent), true);
       ValidateFolderPath(Path_AllLibraryFolder_, nameof(Path_AllLibraryFolder_), false);
     }

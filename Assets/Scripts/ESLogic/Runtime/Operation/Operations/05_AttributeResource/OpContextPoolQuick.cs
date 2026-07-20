@@ -9,9 +9,10 @@ namespace ES
         public string key;
         public FloatExpressionSource delta = new FloatExpressionSource { directFloat = 1f };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetFloatQuick_Add(key, delta != null ? delta.Evaluate(target, logic) : 1f);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetFloatQuick_Add(key, delta != null ? delta.Evaluate(target, support) : 1f, false);
         }
     }
 
@@ -21,9 +22,10 @@ namespace ES
         public string key;
         public IntExpressionSource delta = new IntExpressionSource { directInt = 1 };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetIntQuick_Add(key, delta != null ? delta.Evaluate(target, logic) : 1);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetIntQuick_Add(key, delta != null ? delta.Evaluate(target, support) : 1);
         }
     }
 
@@ -32,9 +34,10 @@ namespace ES
     {
         public string key;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetBoolQuick_Not(key);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetBoolQuick_Not(key);
         }
     }
 
@@ -45,9 +48,10 @@ namespace ES
         public string from;
         public string to;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetStringQuick_Replace(key, from, to);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetStringQuick_Replace(key, from, to);
         }
     }
 
@@ -56,9 +60,10 @@ namespace ES
     {
         public string key;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.EnableLink(key);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.EnableLink(key);
         }
     }
 
@@ -67,9 +72,10 @@ namespace ES
     {
         public string key;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.DisableLink(key);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.DisableLink(key);
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ES.Internal;
 using Sirenix.OdinInspector;
 
 namespace ES
@@ -7,7 +8,7 @@ namespace ES
     public sealed class ESInputConfig : SoDataInfo, IESInputRuntimeConfigSource
     {
         [Title("基础信息")]
-        [LabelText("配置ID")]
+        [LabelText("配置 ID")]
         public string configId = "Default";
 
         [LabelText("默认方案")]
@@ -102,7 +103,7 @@ namespace ES
             schemes.Add(new ESInputSchemeDefine
             {
                 schemeId = ESInputSchemeIds.Touch,
-                displayName = "触摸",
+                displayName = "触摸/UI",
                 deviceKind = ESInputDeviceKind.Touch,
                 bindingGroup = ESInputSchemeIds.Touch
             });
@@ -123,7 +124,7 @@ namespace ES
             return ESInputUtility.BuildRuntime(this, defaultSchemeId, profileLayers);
         }
 
-        [Button("补齐绑定ID")]
+        [Button("补齐绑定 ID")]
         public void EnsureBindingIds()
         {
             if (actions == null)
@@ -183,17 +184,17 @@ namespace ES
             target.Add(Button(ESInputActionId.SwitchWeapon, "SwitchWeapon", "切换武器", "<Keyboard>/tab", "<Gamepad>/dpad/right", "SwitchWeaponButton"));
             target.Add(Button(ESInputActionId.EquipWeapon, "EquipWeapon", "装备武器", "<Keyboard>/v", "", "EquipWeaponButton"));
             target.Add(Button(ESInputActionId.HolsterWeapon, "HolsterWeapon", "收起武器", "<Keyboard>/h", "", "HolsterWeaponButton"));
-            target.Add(Button(ESInputActionId.WeaponSlot1, "WeaponSlot1", "武器槽1", "<Keyboard>/1", "", "WeaponSlot1Button"));
-            target.Add(Button(ESInputActionId.WeaponSlot2, "WeaponSlot2", "武器槽2", "<Keyboard>/2", "", "WeaponSlot2Button"));
-            target.Add(Button(ESInputActionId.WeaponSlot3, "WeaponSlot3", "武器槽3", "<Keyboard>/3", "", "WeaponSlot3Button"));
-            target.Add(Button(ESInputActionId.WeaponSlot4, "WeaponSlot4", "武器槽4", "<Keyboard>/4", "", "WeaponSlot4Button"));
-            target.Add(Button(ESInputActionId.WeaponSlot5, "WeaponSlot5", "武器槽5", "<Keyboard>/5", "", "WeaponSlot5Button"));
+            target.Add(Button(ESInputActionId.WeaponSlot1, "WeaponSlot1", "武器槽 1", "<Keyboard>/1", "", "WeaponSlot1Button"));
+            target.Add(Button(ESInputActionId.WeaponSlot2, "WeaponSlot2", "武器槽 2", "<Keyboard>/2", "", "WeaponSlot2Button"));
+            target.Add(Button(ESInputActionId.WeaponSlot3, "WeaponSlot3", "武器槽 3", "<Keyboard>/3", "", "WeaponSlot3Button"));
+            target.Add(Button(ESInputActionId.WeaponSlot4, "WeaponSlot4", "武器槽 4", "<Keyboard>/4", "", "WeaponSlot4Button"));
+            target.Add(Button(ESInputActionId.WeaponSlot5, "WeaponSlot5", "武器槽 5", "<Keyboard>/5", "", "WeaponSlot5Button"));
             target.Add(Button(ESInputActionId.Aim, "Aim", "瞄准", "<Mouse>/rightButton", "<Gamepad>/leftTrigger", "AimButton"));
             target.Add(Button(ESInputActionId.PeekLeft, "PeekLeft", "左探头", "<Keyboard>/z", "", "PeekLeftButton"));
             target.Add(Button(ESInputActionId.PeekRight, "PeekRight", "右探头", "<Keyboard>/x", "", "PeekRightButton"));
-            target.Add(Button(ESInputActionId.Skill1, "Skill1", "技能1", "<Keyboard>/q", "<Gamepad>/dpad/up", "Skill1Button"));
-            target.Add(Button(ESInputActionId.Skill2, "Skill2", "技能2", "<Keyboard>/r", "<Gamepad>/dpad/left", "Skill2Button"));
-            target.Add(Button(ESInputActionId.Skill3, "Skill3", "技能3", "<Keyboard>/t", "<Gamepad>/dpad/down", "Skill3Button"));
+            target.Add(Button(ESInputActionId.Skill1, "Skill1", "技能 1", "<Keyboard>/q", "<Gamepad>/dpad/up", "Skill1Button"));
+            target.Add(Button(ESInputActionId.Skill2, "Skill2", "技能 2", "<Keyboard>/r", "<Gamepad>/dpad/left", "Skill2Button"));
+            target.Add(Button(ESInputActionId.Skill3, "Skill3", "技能 3", "<Keyboard>/t", "<Gamepad>/dpad/down", "Skill3Button"));
             target.Add(Button(ESInputActionId.Jump, "Jump", "跳跃", "<Keyboard>/space", "<Gamepad>/buttonSouth", "JumpButton"));
             target.Add(Button(ESInputActionId.Crouch, "Crouch", "蹲伏", "<Keyboard>/c", "<Gamepad>/rightStickPress", "CrouchButton"));
             target.Add(Button(ESInputActionId.Fly, "Fly", "飞行", "<Keyboard>/b", "<Gamepad>/buttonNorth", "FlyButton"));
@@ -201,7 +202,7 @@ namespace ES
             target.Add(Button(ESInputActionId.Climb, "Climb", "攀爬", "<Keyboard>/g", "<Gamepad>/leftStickPress", "ClimbButton"));
             target.Add(Button(ESInputActionId.Interact, "Interact", "交互", "<Keyboard>/e", "<Gamepad>/buttonWest", "InteractButton"));
 
-            target.Add(Value(ESInputActionId.FlyVertical, "FlyVertical", ESInputValueType.Axis, "飞行垂直")
+            target.Add(Value(ESInputActionId.FlyVertical, "FlyVertical", ESInputValueType.Axis, "飞行垂直轴")
                 .WithAxisComposite(ESInputSchemeIds.KeyboardMouse, "PageUpDown", "<Keyboard>/pageDown", "<Keyboard>/pageUp")
                 .WithVirtualBinding(ESInputSchemeIds.Touch, "FlyVerticalSlider"));
         }
@@ -313,6 +314,22 @@ namespace ES
             ESInputBindingDefine binding = ESInputBindingDefine.VirtualControl(schemeId, controlId);
             AddBindingWithId(config, binding);
             return config;
+        }
+
+        public static ESInputActionDefine WithUIOnlyVirtualBinding(
+            this ESInputActionDefine config,
+            string controlId,
+            string schemeId = ESInputSchemeIds.Touch)
+        {
+            if (config == null)
+                return null;
+
+            if (config.bindings == null)
+                config.bindings = new List<ESInputBindingDefine>();
+            else
+                config.bindings.Clear();
+
+            return config.WithVirtualBinding(schemeId, controlId);
         }
 
         public static ESInputActionDefine WithComposite2D(this ESInputActionDefine config, string schemeId, string compositeName, string up, string down, string left, string right)

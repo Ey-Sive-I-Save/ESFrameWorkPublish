@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v2_ViewAware
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Punch_Run/CLazy@Attack_Hand_1R.FBX
+clipName=Attack_Hand_1R
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=29
+pixels=117
+yaw=180

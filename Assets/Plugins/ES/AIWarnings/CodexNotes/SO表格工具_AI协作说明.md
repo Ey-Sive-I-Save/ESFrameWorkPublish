@@ -1,6 +1,6 @@
-# SO表格工具 AI 协作说明
+﻿# SO表格工具 AI 协作说明
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 
 Responsibility: this file is specifically for the SO table tool centered on `ESSoTableDataRule`.
 
@@ -88,6 +88,82 @@ Important safety behaviors currently expected:
 - Compile after any changes to import/export/plan logic.
 
 Do not remove these checks to simplify flow.
+
+## 2026-07-18 Corrections And Warnings
+
+These points correct stale assumptions from earlier work. Future AI agents should treat them as current requirements, not optional polish.
+
+### Do Not Make Users Hand-Type Discoverable Values
+
+Batch-level field filtering must not rely on developers typing comma-separated field names in normal UI. The UI should expose selectable fields from the current mapping.
+
+Current expectation:
+
+- Field filtering is checkbox/select based.
+- Slice column selection uses a dropdown from mapped table columns.
+- Row key column selection uses a dropdown from mapped table columns.
+- List field path uses a dropdown from reflected List/Dictionary fields on the current owner type.
+- Element key field path uses a dropdown from reflected key-like fields on the element type.
+- Target Group/Info selection uses dropdown candidates from the current batch source when available.
+
+The underlying string fields still exist for serialization and super-batch table compatibility. Do not present them as the primary workflow.
+
+### Serial Child Tables Should Be Sparse By Default
+
+For List-row serial tables, the user should not have to repeat parent/SO fields on every child row.
+
+Current expectation:
+
+- First child row of an owner writes parent columns.
+- Subsequent child rows under the same owner leave parent columns empty.
+- Import inherits the previous explicit owner when parent key columns are empty.
+- Inherited child rows must not write blank parent cells back to the SO owner.
+- The `owner` row directive still exists, but it is a special row for writing only owner fields; it is not the normal way to group child rows.
+
+Do not regress to the old dense-table behavior where every child row repeats full parent data.
+
+### Mapping Stability
+
+`soFieldPath` is the stable field identity. Table column names are display/matching entry points.
+
+Current import matching accepts aliases:
+
+- active exported table name
+- `columnName`
+- `displayName`
+- `soFieldPath`
+
+Export-to-existing-table should avoid creating duplicate columns when the user switches between English column names and Chinese display names. It should use header/comment compatibility where possible.
+
+Still unsafe:
+
+- duplicate aliases across different fields
+- changing `soFieldPath` to point at another field
+- manually replacing headers with unrelated names and removing matching comments
+
+### Error Reporting Must Be Structured
+
+Do not add new bare `Debug.LogWarning("some text")` for table import/export failures when row/column context is available.
+
+Current structured error format should include:
+
+- stage
+- batch
+- table path
+- row
+- column
+- column name
+- field path
+- target type
+- target asset
+- reason
+- suggestion
+
+Use the table error helpers in `ESSoTableDataRule.ErrorReport.cs` for new import/export/plan errors. Existing direct logs can be migrated gradually, but new work should not add more unstructured table errors.
+
+### Super Batch Is Not Yet Commercial-Complete
+
+Super batch is a useful direction, but do not claim it is fully commercial-grade yet. It still needs stronger visualized parsed results, relation-table validation, failure isolation, and a clearer preflight report for derived child batches.
 
 ## Table Format Facts
 
@@ -185,14 +261,9 @@ The table/owner/group read cache reduces repeated work across multiple batches u
 
 There were historical mojibake strings in table tool plan/report/UI text. Do not add non-readable fallback strings.
 
-After large text edits, scan the touched area for typical mojibake fragments:
+After large text edits, scan the touched area for common mojibake fragments and replacement characters. Keep the actual search pattern in command history or local notes; do not paste unreadable sample text into source-controlled documentation.
 
-```powershell
-rg -n "銆|鎵|琛|璁|垝|閿|鈥|€�|�|閸|閺|鐞|婵|濡|绱|娑|婢|鈧" "F:\aaProject\ESFrameWorkPublish\Assets\Plugins\ES" --glob "*.cs"
-```
-
-This pattern is intentionally broad and may need human review. It is a warning scan, not a proof.
-
+This scan is a warning check, not a proof. Human review is still required for UI labels, tooltips, logs, and plan reports.
 ## Editing Discipline
 
 - Do not revert unrelated dirty files.

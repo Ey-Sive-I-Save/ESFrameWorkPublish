@@ -16,6 +16,7 @@ namespace ES
         public bool doublePressed;
         public bool longPressFired;
         public bool pressBlockedByLongPress;
+        public bool policyBlockedUntilRelease;
         public bool buttonHeldThisFrame;
 
         public float axis;
@@ -52,6 +53,7 @@ namespace ES
             doublePressed = false;
             longPressFired = false;
             pressBlockedByLongPress = false;
+            policyBlockedUntilRelease = false;
             buttonHeldThisFrame = false;
             axis = 0f;
             vector2 = Vector2.zero;

@@ -1,0 +1,498 @@
+ESGameTag / ESTag 核心源码与设计说明
+====================================
+
+文档定位
+--------
+这份文档给后续协作 AI 和开发者快速理解 ESFramework 的核心 Tag 系统。
+
+Tag 系统不是普通字符串标签工具，它承担 Entity、StateMachine、Buff、AI、Interaction 等高频系统的“事实判断层”。
+核心目标是：
+1. 高频查询 O(1)。
+2. 游戏循环 0GC。
+3. 核心标签不走字符串、不查字典、不走模块。
+4. 支持引用计数，适合 Buff、状态、多来源叠加。
+5. 配置扩展仍保留 ESTagId / BakeTable，不堵死自定义标签。
+
+正式命名
+--------
+核心游戏标签枚举名称：ESGameTag
+
+不要再传播旧名：
+- ESGameCoreTag
+
+核心热路径
+----------
+核心热路径必须是：
+
+    ESGameTag -> ushort -> ESTagRefCountSet64 -> bit/counts
+
+不要在核心热路径中使用：
+- string
+- HashSet<string>
+- Dictionary<string, bool>
+- ESTagId.FromValue((ushort)tag)
+- ToTagId()
+- EntityBasicDomain 模块查找
+
+Entity 调用方式
+---------------
+推荐高频 API：
+
+    entity.AddGameTag(ESGameTag.控制类_眩晕);
+    entity.HasGameTag(ESGameTag.控制类_眩晕);
+    entity.RemoveGameTag(ESGameTag.控制类_眩晕);
+    entity.RemoveAllGameTag(ESGameTag.控制类_眩晕);
+    entity.SetGameTagCount(ESGameTag.控制类_眩晕, 0);
+
+完整源码位置
+------------
+核心源码：
+    Assets/Plugins/ES/1_Design/Tag/ESTag.cs
+
+核心游戏标签枚举：
+    Assets/Plugins/ES/1_Design/Tag/ESGameTag.cs
+
+Entity 接入：
+    Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
+
+核心源码摘录
+============
+
+1. ESGameTag 核心枚举
+--------------------
+说明：
+- 0 永远是 None / 无效。
+- 1-63 是 64 位核心标签容量。
+- 枚举原生值就是 bit 位编号，不能随意改已有值。
+- InspectorName 用中文分层显示，方便配置阅读。
+
+源码摘录：
+
+    using UnityEngine;
+
+    namespace ES
+    {
+        public enum ESGameTag : ushort
+        {
+            [InspectorName("无")]
+            None = 0,
+
+            [InspectorName("生命类/死亡")]
+            生命类_死亡 = 1,
+
+            [InspectorName("控制类/眩晕")]
+            控制类_眩晕 = 2,
+
+            [InspectorName("控制类/沉默")]
+            控制类_沉默 = 3,
+
+            [InspectorName("控制类/定身")]
+            控制类_定身 = 4,
+
+            [InspectorName("防御类/霸体")]
+            防御类_霸体 = 5,
+
+            [InspectorName("防御类/无敌")]
+            防御类_无敌 = 6,
+
+            [InspectorName("感知类/隐身")]
+            感知类_隐身 = 7,
+
+            [InspectorName("元素类/燃烧")]
+            元素类_燃烧 = 8,
+
+            [InspectorName("战斗类/战斗中")]
+            战斗类_战斗中 = 12,
+
+            [InspectorName("战斗类/瞄准中")]
+            战斗类_瞄准中 = 13,
+
+            [InspectorName("交互类/可锁定")]
+            交互类_可锁定 = 21,
+
+            [InspectorName("交互类/可交互")]
+            交互类_可交互 = 22,
+
+            [InspectorName("身份类/玩家")]
+            身份类_玩家 = 28,
+
+            [InspectorName("身份类/NPC")]
+            身份类_NPC = 29,
+
+            Reserved32 = 32,
+            Reserved63 = 63
+        }
+    }
+
+2. ESTagId 定位
+---------------
+说明：
+ESTagId 不是给核心 ESGameTag 热路径用的。
+它适合：
+- 字符串烘焙结果。
+- 配置表引用。
+- 自定义 Tag。
+- 序列化 Tag 引用。
+- 通用 Mask/Set API。
+
+源码摘录：
+
+    [Serializable]
+    public struct ESTagId : IEquatable<ESTagId>
+    {
+        public const ushort InvalidValue = 0;
+
+        [SerializeField]
+        private ushort value;
+
+        public ESTagId(ushort value)
+        {
+            this.value = value;
+        }
+
+        public ushort Value
+        {
+            get { return value; }
+        }
+
+        public bool IsValid
+        {
+            get { return value != InvalidValue; }
+        }
+
+        public static ESTagId FromValue(ushort value)
+        {
+            return new ESTagId(value);
+        }
+
+        public static readonly ESTagId Invalid = new ESTagId(InvalidValue);
+    }
+
+3. ESTagMask64 核心位图
+----------------------
+说明：
+ESTagMask64 用一个 ulong 存 64 位标签。
+组合查询只需要位运算：
+- Overlaps：任意包含。
+- ContainsAll：全部包含。
+
+源码摘录：
+
+    [Serializable]
+    public struct ESTagMask64
+    {
+        public const int MaxTagCount = 64;
+
+        [SerializeField] private ulong bits;
+
+        public bool IsEmpty
+        {
+            get { return bits == 0UL; }
+        }
+
+        public void Clear()
+        {
+            bits = 0UL;
+        }
+
+        public bool Add(ESTagId tag)
+        {
+            ushort value = tag.Value;
+            if (value == 0 || value >= MaxTagCount)
+                return false;
+
+            bits |= 1UL << value;
+            return true;
+        }
+
+        public bool Remove(ESTagId tag)
+        {
+            ushort value = tag.Value;
+            if (value == 0 || value >= MaxTagCount)
+                return false;
+
+            bits &= ~(1UL << value);
+            return true;
+        }
+
+        public bool Contains(ESTagId tag)
+        {
+            ushort value = tag.Value;
+            return value != 0
+                   && value < MaxTagCount
+                   && (bits & (1UL << value)) != 0UL;
+        }
+
+        public bool Overlaps(ESTagMask64 other)
+        {
+            return (bits & other.bits) != 0UL;
+        }
+
+        public bool ContainsAll(ESTagMask64 other)
+        {
+            return (bits & other.bits) == other.bits;
+        }
+
+        internal void AddRaw64(ushort value)
+        {
+            bits |= 1UL << value;
+        }
+
+        internal void RemoveRaw64(ushort value)
+        {
+            bits &= ~(1UL << value);
+        }
+
+        internal bool ContainsRaw64(ushort value)
+        {
+            return (bits & (1UL << value)) != 0UL;
+        }
+    }
+
+4. ESTagRefCountSet64 核心引用计数容器
+-------------------------------------
+说明：
+这是 Entity 核心标签的主要运行时容器。
+
+设计重点：
+- active：记录当前是否存在该 Tag。
+- counts：记录该 Tag 被添加了多少次。
+- Add 增加计数。
+- Remove 只减少一次计数。
+- 计数归零时才清掉 bit。
+- RemoveAll / SetCount(tag, 0) 用于强制清除。
+
+ESGameTag 重载必须直接走 ushort raw value，不绕 ESTagId。
+
+源码摘录：
+
+    [Serializable]
+    public struct ESTagRefCountSet64
+    {
+        [SerializeField] private ESTagMask64 active;
+        [SerializeField] private byte[] counts;
+
+        public void Warmup()
+        {
+            if (counts == null || counts.Length < ESTagMask64.MaxTagCount)
+                counts = new byte[ESTagMask64.MaxTagCount];
+        }
+
+        public bool Add(ESTagId tag)
+        {
+            ushort value = tag.Value;
+            if (value == 0 || value >= ESTagMask64.MaxTagCount)
+                return false;
+
+            Warmup();
+            if (counts[value] != byte.MaxValue)
+                counts[value]++;
+
+            return active.Add(tag);
+        }
+
+        public bool Add(ESGameTag tag)
+        {
+            ushort value = (ushort)tag;
+            if (value == 0 || value >= ESTagMask64.MaxTagCount)
+                return false;
+
+            Warmup();
+            if (counts[value] != byte.MaxValue)
+                counts[value]++;
+
+            active.AddRaw64(value);
+            return true;
+        }
+
+        public bool Remove(ESGameTag tag)
+        {
+            ushort value = (ushort)tag;
+            if (value == 0 || value >= ESTagMask64.MaxTagCount || counts == null)
+                return false;
+
+            if (counts[value] == 0)
+                return false;
+
+            counts[value]--;
+            if (counts[value] == 0)
+                active.RemoveRaw64(value);
+
+            return true;
+        }
+
+        public bool RemoveAll(ESGameTag tag)
+        {
+            return SetCount(tag, 0);
+        }
+
+        public bool SetCount(ESGameTag tag, byte count)
+        {
+            ushort value = (ushort)tag;
+            if (value == 0 || value >= ESTagMask64.MaxTagCount)
+                return false;
+
+            Warmup();
+            counts[value] = count;
+            if (count > 0)
+                active.AddRaw64(value);
+            else
+                active.RemoveRaw64(value);
+
+            return true;
+        }
+
+        public bool Has(ESGameTag tag)
+        {
+            ushort value = (ushort)tag;
+            return value != 0
+                   && value < ESTagMask64.MaxTagCount
+                   && active.ContainsRaw64(value);
+        }
+
+        public byte GetCount(ESGameTag tag)
+        {
+            ushort value = (ushort)tag;
+            if (value == 0 || value >= ESTagMask64.MaxTagCount || counts == null)
+                return 0;
+
+            return counts[value];
+        }
+
+        public void Clear()
+        {
+            active.Clear();
+            if (counts != null)
+                Array.Clear(counts, 0, counts.Length);
+        }
+
+        public bool Overlaps(ESTagMask64 mask)
+        {
+            return active.Overlaps(mask);
+        }
+
+        public bool HasAll(ESTagMask64 mask)
+        {
+            return active.ContainsAll(mask);
+        }
+    }
+
+5. Entity 核心接入
+------------------
+说明：
+Entity 直接持有核心标签容器。
+这是有意设计，不要改成 BasicDomain Module。
+
+原因：
+- 核心标签是高频事实。
+- 高频路径不能模块查找。
+- Entity 是生命体根，标签属于生命体事实层。
+
+源码摘录：
+
+    [ShowInInspector, Sirenix.OdinInspector.ReadOnly, LabelText("核心标签")]
+    private ESTagRefCountSet64 gameTags;
+
+    protected override void OnBeforeAwakeRegister()
+    {
+        EnsureEntityOpSupport();
+        gameTags.Warmup();
+        InitializeKCC();
+    }
+
+    public bool AddGameTag(ESGameTag tag)
+    {
+        gameTags.Warmup();
+        return gameTags.Add(tag);
+    }
+
+    public bool RemoveGameTag(ESGameTag tag)
+    {
+        return gameTags.Remove(tag);
+    }
+
+    public bool RemoveAllGameTag(ESGameTag tag)
+    {
+        return gameTags.RemoveAll(tag);
+    }
+
+    public bool SetGameTagCount(ESGameTag tag, byte count)
+    {
+        return gameTags.SetCount(tag, count);
+    }
+
+    public bool HasGameTag(ESGameTag tag)
+    {
+        return gameTags.Has(tag);
+    }
+
+    public byte GetGameTagCount(ESGameTag tag)
+    {
+        return gameTags.GetCount(tag);
+    }
+
+    public bool HasAnyGameTag(ESTagMask64 mask)
+    {
+        return gameTags.Overlaps(mask);
+    }
+
+    public bool HasAllGameTags(ESTagMask64 mask)
+    {
+        return gameTags.HasAll(mask);
+    }
+
+    public void ClearGameTags()
+    {
+        gameTags.Clear();
+    }
+
+性能结论
+========
+ESGameTag 核心路径：
+- 不分配托管对象。
+- 不拼字符串。
+- 不查字典。
+- 不走接口分发。
+- 不做模块查询。
+- 单标签查询是 bit 运算。
+- 计数查询是 byte 数组下标。
+- HasAny / HasAll 是 ulong 位运算。
+
+注意：
+Warmup 会在 counts 未初始化时分配 byte[64]。
+因此 Entity 初始化阶段会调用 gameTags.Warmup()。
+游戏循环中不要依赖首次 Add 时才分配。
+
+商业级价值
+==========
+这套 Tag 系统的商业级价值在于：
+1. 能支撑 StateMachine 高频门控。
+2. 能支撑 Buff 多来源叠加。
+3. 能支撑 AI 高频判断。
+4. 能支撑 Interaction 高频可交互/可锁定/可受击判断。
+5. 能支撑网络和存档中稳定的 ushort id。
+6. 能让配置扩展和运行时核心性能分离。
+
+当前未完成
+==========
+仍需补齐：
+1. Tag 烘焙资产。
+2. 字符串 Tag 配置窗口。
+3. Tag 冲突检测。
+4. 一键生成 Mask 的编辑器工具。
+5. 项目级核心标签治理文档。
+6. Buff 来源句柄，用于精确撤销某个来源施加的标签。
+
+禁止传播的旧理解
+================
+1. 高频 Tag 可以用 string。
+   错。高频核心必须用 ESGameTag / Mask。
+
+2. 核心标签应该做成 BasicDomain 模块。
+   错。核心标签直接属于 Entity。
+
+3. ESGameTag 应该先转 ESTagId 再 Add。
+   错。核心热路径直接 raw ushort。
+
+4. 引用计数 Set 等于完整 Buff 来源系统。
+   错。引用计数只解决轻量多次添加/移除；来源精确撤销应由 Buff 系统提供来源句柄。

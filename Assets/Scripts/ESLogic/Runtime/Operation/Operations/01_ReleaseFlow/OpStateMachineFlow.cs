@@ -15,7 +15,7 @@ namespace ES
         [LabelText("作用主目标")]
         public bool useMainTarget;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             StateMachine machine = GetStateMachine(target, useMainTarget);
             if (machine != null && !string.IsNullOrEmpty(stateKey))
@@ -35,7 +35,7 @@ namespace ES
         public string stateKey;
         public bool useMainTarget;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             StateMachine machine = GetStateMachine(target, useMainTarget);
             if (machine != null && !string.IsNullOrEmpty(stateKey))

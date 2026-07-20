@@ -11,7 +11,7 @@ namespace ES
         /// <summary>
         /// 测试延迟保存功能 - 在Console中查看Debug日志
         /// </summary>
-        [MenuItem("ES/Debug/测试窗口关闭保存机制", priority = 9999)]
+        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "菜单窗口/测试关闭保存机制", false, 9000)]
         public static void TestOnPageDisableFeature()
         {
             Debug.Log("=================================================");
@@ -42,7 +42,7 @@ namespace ES
         /// <summary>
         /// 清理Console日志
         /// </summary>
-        [MenuItem("ES/Debug/清理Console日志", priority = 10000)]
+        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "菜单窗口/清理 Console 日志", false, 9010)]
         public static void ClearConsole()
         {
             var assembly = System.Reflection.Assembly.GetAssembly(typeof(SceneView));
@@ -55,7 +55,7 @@ namespace ES
         /// <summary>
         /// 显示当前已注册的页面数量（需要修改ESMenuTreeWindowAB使registeredPages可访问）
         /// </summary>
-        [MenuItem("ES/Debug/显示调试信息", priority = 10001)]
+        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "菜单窗口/显示调试信息", false, 9020)]
         public static void ShowDebugInfo()
         {
             Debug.Log("=================================================");

@@ -24,8 +24,8 @@ namespace ES
     {
         [LabelText("正在更新", SdfIconType.ArrowRepeat), SerializeReference/*, GUIColor("@ESDesignUtility.ColorSelector.ColorForUpdating")*/]
         public List<T> ValuesNow = new List<T>(10);
-        [FoldoutGroup("缓冲")][LabelText("缓冲添加", SdfIconType.BoxArrowInLeft), SerializeReference] public List<T> ValuesBufferToAdd = new List<T>();
-        [FoldoutGroup("缓冲")][LabelText("缓冲移除", SdfIconType.BoxArrowRight), SerializeReference] public List<T> ValuesBufferToRemove = new List<T>();
+        [FoldoutGroup("缓冲")][LabelText("缓冲添加", SdfIconType.BoxArrowInLeft), SerializeReference] public List<T> ValuesBufferToAdd = new List<T>(4);
+        [FoldoutGroup("缓冲")][LabelText("缓冲移除", SdfIconType.BoxArrowRight), SerializeReference] public List<T> ValuesBufferToRemove = new List<T>(4);
         public Action<bool, T> OnChange = (Add, What) => { };
 
         protected override IEnumerable<T> _Internal_ValuesIEnumable
@@ -110,10 +110,10 @@ namespace ES
         public List<T> ValuesNow = new List<T>(10);
         [FoldoutGroup("缓冲中"),HideInEditorMode]
         [ShowInInspector, NonSerialized, LabelText("缓冲添加队列", SdfIconType.BoxArrowInLeft)]
-        private Queue<T> ValuesBufferToAdd = new Queue<T>();
+        private Queue<T> ValuesBufferToAdd = new Queue<T>(4);
         [FoldoutGroup("缓冲中"), HideInEditorMode]
         [ShowInInspector,NonSerialized,LabelText("缓冲移除队列", SdfIconType.BoxArrowRight)]
-        private Queue<T> ValuesBufferToRemove = new Queue<T>();
+        private Queue<T> ValuesBufferToRemove = new Queue<T>(4);
         private bool isDirty;
         [HideInInspector]
         public bool MayHasAddingElement = true;
@@ -236,8 +236,8 @@ namespace ES
     {
         [LabelText("正在更新", SdfIconType.ArrowRepeat), SerializeReference, GUIColor("@ESDesignUtility.ColorSelector.ColorForUpdating")]
         public List<T> ValuesNow = new List<T>(10);
-        [FoldoutGroup("缓冲")][LabelText("缓冲添加", SdfIconType.BoxArrowInLeft), SerializeReference] public List<T> ValuesBufferToAdd = new List<T>();
-        [FoldoutGroup("缓冲")][LabelText("缓冲移除", SdfIconType.BoxArrowRight), SerializeReference] public List<T> ValuesBufferToRemove = new List<T>();
+        [FoldoutGroup("缓冲")][LabelText("缓冲添加", SdfIconType.BoxArrowInLeft), SerializeReference] public List<T> ValuesBufferToAdd = new List<T>(4);
+        [FoldoutGroup("缓冲")][LabelText("缓冲移除", SdfIconType.BoxArrowRight), SerializeReference] public List<T> ValuesBufferToRemove = new List<T>(4);
         public Action<bool, T> OnChange = (Add, What) => { };
         /*private readonly object _lockObj = new object(); // 单一锁对象*/
         // AutoApplyBuffers provided by BaseSafeList
@@ -332,10 +332,10 @@ namespace ES
         public List<T> ValuesNow = new List<T>(10);
         [FoldoutGroup("缓冲")]
         [ShowInInspector, LabelText("缓冲添加队列", SdfIconType.BoxArrowInLeft)]
-        private Queue<T> ValuesBufferToAdd = new Queue<T>();
+        private Queue<T> ValuesBufferToAdd = new Queue<T>(4);
         [FoldoutGroup("缓冲")]
         [ShowInInspector, LabelText("缓冲移除队列", SdfIconType.BoxArrowRight)]
-        private Queue<T> ValuesBufferToRemove = new Queue<T>();
+        private Queue<T> ValuesBufferToRemove = new Queue<T>(4);
         private bool isDirty;
         // AutoApplyBuffers provided by BaseSafeList
         protected override IEnumerable<T> _Internal_ValuesIEnumable => ValuesNow;
@@ -474,10 +474,10 @@ namespace ES
         public HashSet<T> valuesNow_ = new HashSet<T>(10);
         [FoldoutGroup("缓冲")]
         [ShowInInspector, LabelText("缓冲添加队列", SdfIconType.BoxArrowInLeft)]
-        public Queue<T> valuesToAdd = new Queue<T>();
+        public Queue<T> valuesToAdd = new Queue<T>(4);
         [FoldoutGroup("缓冲")]
         [ShowInInspector, LabelText("缓冲移除队列", SdfIconType.BoxArrowRight)]
-        public Queue<T> valuesToRemove = new Queue<T>();
+        public Queue<T> valuesToRemove = new Queue<T>(4);
 
 
         public void Update()
@@ -499,10 +499,10 @@ namespace ES
         public HashSet<T> valuesNow_ = new HashSet<T>(10);
         [FoldoutGroup("缓冲")]
         [ShowInInspector, LabelText("缓冲添加队列", SdfIconType.BoxArrowInLeft)]
-        private Queue<T> valuesToAdd = new Queue<T>();
+        private Queue<T> valuesToAdd = new Queue<T>(4);
         [FoldoutGroup("缓冲")]
         [ShowInInspector, LabelText("缓冲移除队列", SdfIconType.BoxArrowRight)]
-        private Queue<T> valuesToRemove = new Queue<T>();
+        private Queue<T> valuesToRemove = new Queue<T>(4);
         private bool isDirty { get; set; }
         public void TryAdd(T add)
         {

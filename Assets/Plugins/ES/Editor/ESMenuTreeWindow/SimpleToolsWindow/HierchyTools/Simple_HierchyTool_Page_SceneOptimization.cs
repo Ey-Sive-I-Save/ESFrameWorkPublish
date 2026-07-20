@@ -9,12 +9,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEditor.Animations;
 using UnityEngine.SceneManagement;
 using UnityEngine.Rendering;
 using System.Diagnostics;
 using System.Text;
+using System.Globalization;
 
 namespace ES
 {
@@ -184,6 +186,36 @@ namespace ES
         public bool enableStaticBatching = true;
         public bool enableOcclusionCulling = false;
     }
+
+    [Serializable]
+    public class ImportSettingChangeRecord
+    {
+        [LabelText("资源路径"), ReadOnly]
+        public string assetPath;
+
+        [LabelText("资源类型"), ReadOnly]
+        public string importerType;
+
+        [LabelText("修改项"), ReadOnly]
+        public string changeSummary;
+
+        [LabelText("修改前"), TextArea(2, 5), ReadOnly]
+        public string beforeState;
+
+        [LabelText("修改后"), TextArea(2, 5), ReadOnly]
+        public string afterState;
+
+        [LabelText("时间"), ReadOnly]
+        public string changedAt;
+    }
+
+    [Serializable]
+    public class ImportSettingRollbackData
+    {
+        public string generatedAt;
+        public string sceneName;
+        public List<ImportSettingChangeRecord> changes = new List<ImportSettingChangeRecord>();
+    }
     #endregion
 
     #region 场景优化工具
@@ -191,16 +223,22 @@ namespace ES
     public class Page_SceneOptimization : ESWindowPageBase
     {
         [Title("场景优化系统", "性能分析与自动化优化解决方案", bold: true)]
-        [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "全面分析当前场景的性能瓶颈，\n提供优化建议并支持一键自动优化，\n生成详细的优化报告以供参考";
 
-        [BoxGroup("快速操作"), HorizontalGroup("快速操作/按钮"), Button("快速分析", ButtonHeight = 45), GUIColor(0.3f, 0.8f, 0.3f)]
+        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        private string PanelSummary =>
+            $"场景: {SceneManager.GetActiveScene().name} | 对象: {totalObjects} | 问题: {detectedIssues.Count} | " +
+            $"预览模式: {(previewOnly ? "开" : "关")} | 项目资产导入设置: {(allowProjectAssetImportChanges ? "允许修改" : "已保护")} | " +
+            $"已记录回滚: {importSettingChanges.Count}";
+
+        [BoxGroup("快速操作"), HorizontalGroup("快速操作/按钮"), Button("分析当前场景", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void QuickAnalyze() => AnalyzeScene();
 
-        [BoxGroup("快速操作"), HorizontalGroup("快速操作/按钮"), Button("一键优化", ButtonHeight = 45), GUIColor(0.8f, 0.5f, 0.2f)]
+        [BoxGroup("快速操作"), HorizontalGroup("快速操作/按钮"), Button("执行优化并确认", ButtonHeight = 34), GUIColor(0.75f, 0.58f, 0.25f)]
         public void QuickOptimize() => AutoOptimizeScene();
 
-        [BoxGroup("快速操作"), HorizontalGroup("快速操作/按钮"), Button("生成报告", ButtonHeight = 45), GUIColor(0.3f, 0.5f, 0.8f)]
+        [BoxGroup("快速操作"), HorizontalGroup("快速操作/按钮"), Button("导出优化报告", ButtonHeight = 34), GUIColor(0.48f, 0.48f, 0.48f)]
         public void QuickReport() => ExportDetailedReport();
 
         #region 配置管理
@@ -213,9 +251,16 @@ namespace ES
             string path = EditorUtility.SaveFilePanel("保存优化配置", "", "OptimizationConfig.json", "json");
             if (!string.IsNullOrEmpty(path))
             {
-                string json = JsonUtility.ToJson(currentConfig, true);
-                File.WriteAllText(path, json);
-                EditorUtility.DisplayDialog("成功", "配置已保存！", "确定");
+                try
+                {
+                    string json = JsonUtility.ToJson(currentConfig, true);
+                    File.WriteAllText(path, json, Encoding.UTF8);
+                    EditorUtility.DisplayDialog("成功", "配置已保存！", "确定");
+                }
+                catch (Exception ex)
+                {
+                    EditorUtility.DisplayDialog("保存失败", $"无法写入优化配置：\n{ex.Message}", "知道了");
+                }
             }
         }
 
@@ -225,9 +270,22 @@ namespace ES
             string path = EditorUtility.OpenFilePanel("加载优化配置", "", "json");
             if (!string.IsNullOrEmpty(path) && File.Exists(path))
             {
-                string json = File.ReadAllText(path);
-                currentConfig = JsonUtility.FromJson<OptimizationConfig>(json);
-                EditorUtility.DisplayDialog("成功", "配置已加载！", "确定");
+                try
+                {
+                    string json = File.ReadAllText(path, Encoding.UTF8);
+                    currentConfig = JsonUtility.FromJson<OptimizationConfig>(json);
+                    if (currentConfig == null)
+                    {
+                        currentConfig = new OptimizationConfig();
+                        EditorUtility.DisplayDialog("加载失败", "配置文件为空或格式无效。", "知道了");
+                        return;
+                    }
+                    EditorUtility.DisplayDialog("成功", "配置已加载！", "确定");
+                }
+                catch (Exception ex)
+                {
+                    EditorUtility.DisplayDialog("加载失败", $"无法读取优化配置：\n{ex.Message}", "知道了");
+                }
             }
         }
         #endregion
@@ -261,8 +319,115 @@ namespace ES
         public List<OptimizationIssue> DisplayedIssues = new List<OptimizationIssue>();
         #endregion
 
+        #region 项目资产导入设置变更
+        [FoldoutGroup("项目资产导入设置"), ShowInInspector, ReadOnly, LabelText("本次导入设置变更"), ListDrawerSettings(ShowPaging = true, NumberOfItemsPerPage = 6)]
+        public List<ImportSettingChangeRecord> importSettingChanges = new List<ImportSettingChangeRecord>();
+
+        [FoldoutGroup("项目资产导入设置"), ShowInInspector, ReadOnly, LabelText("待执行导入设置变更预览"), ListDrawerSettings(ShowPaging = true, NumberOfItemsPerPage = 6)]
+        public List<ImportSettingChangeRecord> pendingImportSettingChanges = new List<ImportSettingChangeRecord>();
+
+        [FoldoutGroup("项目资产导入设置"), Button("刷新导入设置预览", ButtonHeight = 32), GUIColor(0.35f, 0.75f, 0.9f)]
+        public void RefreshImportSettingPreview()
+        {
+            pendingImportSettingChanges = BuildPendingImportSettingChanges();
+            EditorUtility.DisplayDialog("导入设置预览已刷新", $"预计会修改 {pendingImportSettingChanges.Count} 个项目资产导入设置。", "完成");
+        }
+
+        [FoldoutGroup("项目资产导入设置"), Button("导出回滚JSON", ButtonHeight = 32), GUIColor(0.35f, 0.65f, 1f)]
+        public void ExportImportSettingRollback()
+        {
+            if (importSettingChanges.Count == 0)
+            {
+                EditorUtility.DisplayDialog("没有可导出的变更", "当前还没有记录到项目资产导入设置变更。", "知道了");
+                return;
+            }
+
+            string path = EditorUtility.SaveFilePanel("导出导入设置回滚文件", Application.dataPath, "SceneOptimization_ImporterRollback.json", "json");
+            if (string.IsNullOrEmpty(path))
+                return;
+
+            var data = new ImportSettingRollbackData
+            {
+                generatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                sceneName = SceneManager.GetActiveScene().name,
+                changes = new List<ImportSettingChangeRecord>(importSettingChanges)
+            };
+
+            try
+            {
+                File.WriteAllText(path, JsonUtility.ToJson(data, true), Encoding.UTF8);
+                EditorUtility.DisplayDialog("回滚文件已导出", $"已导出 {importSettingChanges.Count} 条导入设置变更。", "完成");
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.DisplayDialog("导出失败", $"无法写入回滚 JSON：\n{ex.Message}", "知道了");
+            }
+        }
+
+        [FoldoutGroup("项目资产导入设置"), Button("从JSON回滚导入设置", ButtonHeight = 32), GUIColor(0.95f, 0.55f, 0.35f)]
+        public void RollbackImportSettingsFromJson()
+        {
+            string path = EditorUtility.OpenFilePanel("选择导入设置回滚文件", Application.dataPath, "json");
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return;
+
+            ImportSettingRollbackData data;
+            try
+            {
+                data = JsonUtility.FromJson<ImportSettingRollbackData>(File.ReadAllText(path, Encoding.UTF8));
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.DisplayDialog("回滚文件读取失败", $"无法读取回滚 JSON：\n{ex.Message}", "知道了");
+                return;
+            }
+
+            if (data == null || data.changes == null || data.changes.Count == 0)
+            {
+                EditorUtility.DisplayDialog("回滚文件无效", "没有读取到可回滚的导入设置。", "知道了");
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog("确认回滚导入设置",
+                $"将按 JSON 中的修改前状态回滚 {data.changes.Count} 个资源导入设置。\n\n这会重新导入相关资产，建议先提交或备份项目。",
+                "开始回滚", "取消"))
+                return;
+
+            int restored = 0;
+            int failed = 0;
+            var errors = new List<string>();
+
+            SimpleToolsSafetyUtility.RunAssetEditing(() =>
+            {
+                foreach (var change in data.changes)
+                {
+                    try
+                    {
+                        if (RestoreImporterState(change))
+                            restored++;
+                        else
+                        {
+                            failed++;
+                            errors.Add($"{change.assetPath}: 不支持的导入器或资源不存在");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        errors.Add($"{change.assetPath}: {ex.Message}");
+                    }
+                }
+            });
+
+            AssetDatabase.Refresh();
+            string detail = errors.Count > 0 ? "\n\n失败项：\n" + SimpleToolsSafetyUtility.JoinPreview(errors, 8) : string.Empty;
+            EditorUtility.DisplayDialog("导入设置回滚完成", $"已回滚 {restored} 个，失败 {failed} 个。{detail}", "完成");
+        }
+        #endregion
+
         #region 性能指标(扩展)
         private OptimizationReport currentReport = new OptimizationReport();
+        private HashSet<string> approvedImporterChangePaths = null;
 
         // 对象统计
         private int totalObjects = 0;
@@ -403,13 +568,13 @@ namespace ES
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化", "纹理与内存优化")]
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("压缩纹理")]
-        public bool compressTextures = true;
+        public bool compressTextures = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("生成Mipmap")]
-        public bool generateMipmaps = true;
+        public bool generateMipmaps = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("禁用纹理读写")]
-        public bool disableTextureReadWrite = true;
+        public bool disableTextureReadWrite = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("纹理最大尺寸"), ValueDropdown("GetTextureSizeOptions")]
         public int maxTextureSize = 2048;
@@ -451,10 +616,10 @@ namespace ES
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/音频优化", "音频资源优化")]
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/音频优化"), LabelText("压缩音频")]
-        public bool compressAudio = true;
+        public bool compressAudio = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/音频优化"), LabelText("启用音频流式加载")]
-        public bool enableAudioStreaming = true;
+        public bool enableAudioStreaming = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化", "物理系统优化")]
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化"), LabelText("优化碰撞体")]
@@ -472,6 +637,10 @@ namespace ES
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("仅预览(不应用)")]
         public bool previewOnly = false;
+
+        [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("允许修改项目资产导入设置")]
+        [InfoBox("关闭时不会修改 Texture/Audio Importer。打开后会改项目资产导入设置，不只影响当前场景，请先提交或备份项目。", InfoMessageType.Warning)]
+        public bool allowProjectAssetImportChanges = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("优化级别"), ValueDropdown("GetOptimizationLevelOptions")]
         public string optimizationLevel = "中度";
@@ -492,7 +661,7 @@ namespace ES
         #endregion
 
         #region 分析功能(增强版)
-        [BoxGroup("分析操作"), Button("🔍 全面场景分析", ButtonHeight = 55), GUIColor(0.2f, 0.7f, 0.9f)]
+        [BoxGroup("分析操作"), Button("🔍 全面场景分析", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void AnalyzeScene()
         {
             Stopwatch stopwatch = new Stopwatch();
@@ -507,49 +676,54 @@ namespace ES
                 sceneName = SceneManager.GetActiveScene().name
             };
 
-            var allObjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
-            totalObjects = allObjects.Length;
+            var allObjects = GetActiveSceneGameObjects();
+            totalObjects = allObjects.Count;
 
-            // 阶段1: 对象分析
-            EditorUtility.DisplayProgressBar("场景分析 [1/6]", "分析GameObject...", 0.1f);
-            for (int i = 0; i < allObjects.Length; i++)
+            try
             {
-                AnalyzeGameObject(allObjects[i]);
-                if (i % 50 == 0)
+                // 阶段1: 对象分析
+                EditorUtility.DisplayProgressBar("场景分析 [1/6]", "分析GameObject...", 0.1f);
+                for (int i = 0; i < allObjects.Count; i++)
                 {
-                    EditorUtility.DisplayProgressBar("场景分析 [1/6]", $"分析GameObject... {i}/{allObjects.Length}", 0.1f + (float)i / allObjects.Length * 0.15f);
+                    AnalyzeGameObject(allObjects[i]);
+                    if (i % 50 == 0)
+                    {
+                        EditorUtility.DisplayProgressBar("场景分析 [1/6]", $"分析GameObject... {i}/{allObjects.Count}", 0.1f + (float)i / Mathf.Max(1, allObjects.Count) * 0.15f);
+                    }
                 }
+
+                // 阶段2: 材质与纹理分析
+                EditorUtility.DisplayProgressBar("场景分析 [2/6]", "分析材质与纹理...", 0.3f);
+                AnalyzeMaterials();
+                AnalyzeTextures();
+
+                // 阶段3: 网格分析
+                EditorUtility.DisplayProgressBar("场景分析 [3/6]", "分析网格资源...", 0.5f);
+                AnalyzeMeshes();
+
+                // 阶段4: 音频分析
+                EditorUtility.DisplayProgressBar("场景分析 [4/6]", "分析音频资源...", 0.65f);
+                AnalyzeAudio();
+
+                // 阶段5: 渲染与性能分析
+                EditorUtility.DisplayProgressBar("场景分析 [5/6]", "分析渲染性能...", 0.8f);
+                AnalyzeRendering();
+                AnalyzeShaders();
+                EstimateDrawCalls();
+
+                // 阶段6: 生成报告
+                EditorUtility.DisplayProgressBar("场景分析 [6/6]", "生成报告...", 0.95f);
+                stopwatch.Stop();
+                currentReport.analysisTime = (float)stopwatch.Elapsed.TotalSeconds;
+
+                GenerateComprehensiveReport();
+                SortIssuesByPriority();
+                UpdateDisplayedIssues();
             }
-
-            // 阶段2: 材质与纹理分析
-            EditorUtility.DisplayProgressBar("场景分析 [2/6]", "分析材质与纹理...", 0.3f);
-            AnalyzeMaterials();
-            AnalyzeTextures();
-
-            // 阶段3: 网格分析
-            EditorUtility.DisplayProgressBar("场景分析 [3/6]", "分析网格资源...", 0.5f);
-            AnalyzeMeshes();
-
-            // 阶段4: 音频分析
-            EditorUtility.DisplayProgressBar("场景分析 [4/6]", "分析音频资源...", 0.65f);
-            AnalyzeAudio();
-
-            // 阶段5: 渲染与性能分析
-            EditorUtility.DisplayProgressBar("场景分析 [5/6]", "分析渲染性能...", 0.8f);
-            AnalyzeRendering();
-            AnalyzeShaders();
-            EstimateDrawCalls();
-
-            // 阶段6: 生成报告
-            EditorUtility.DisplayProgressBar("场景分析 [6/6]", "生成报告...", 0.95f);
-            stopwatch.Stop();
-            currentReport.analysisTime = (float)stopwatch.Elapsed.TotalSeconds;
-
-            GenerateComprehensiveReport();
-            SortIssuesByPriority();
-            UpdateDisplayedIssues();
-
-            EditorUtility.ClearProgressBar();
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
 
             ShowAnalysisDialog();
         }
@@ -927,11 +1101,12 @@ namespace ES
 
         private void AnalyzeMaterials()
         {
-            var materials = Resources.FindObjectsOfTypeAll<Material>();
-            materialCount = materials.Length;
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+            var materials = LoadActiveSceneDependencyAssets<Material>(sceneDependencyPaths);
 
             var materialDict = new Dictionary<string, List<Material>>();
             uniqueMaterials = 0;
+            materialCount = 0;
 
             foreach (var mat in materials)
             {
@@ -941,6 +1116,11 @@ namespace ES
                 string assetPath = AssetDatabase.GetAssetPath(mat);
                 if (string.IsNullOrEmpty(assetPath))
                     continue;
+                assetPath = SimpleToolsSafetyUtility.NormalizeAssetPath(assetPath);
+                if (!sceneDependencyPaths.Contains(assetPath))
+                    continue;
+
+                materialCount++;
 
                 string matKey = $"{mat.shader.name}_{mat.name}";
                 if (!materialDict.ContainsKey(matKey))
@@ -966,8 +1146,9 @@ namespace ES
 
         private void AnalyzeTextures()
         {
-            var textures = Resources.FindObjectsOfTypeAll<Texture2D>();
-            textureCount = textures.Length;
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+            var textures = LoadActiveSceneDependencyAssets<Texture2D>(sceneDependencyPaths);
+            textureCount = 0;
 
             foreach (var texture in textures)
             {
@@ -977,6 +1158,11 @@ namespace ES
                 string path = AssetDatabase.GetAssetPath(texture);
                 if (string.IsNullOrEmpty(path))
                     continue;
+                path = SimpleToolsSafetyUtility.NormalizeAssetPath(path);
+                if (!sceneDependencyPaths.Contains(path))
+                    continue;
+
+                textureCount++;
 
                 long textureSize = EstimateTextureMemory(texture);
                 textureMemory += textureSize;
@@ -1023,8 +1209,9 @@ namespace ES
 
         private void AnalyzeMeshes()
         {
-            var meshes = Resources.FindObjectsOfTypeAll<Mesh>();
-            meshCount = meshes.Length;
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+            var meshes = LoadActiveSceneDependencyAssets<Mesh>(sceneDependencyPaths);
+            meshCount = 0;
 
             var meshDict = new Dictionary<string, List<Mesh>>();
 
@@ -1036,6 +1223,12 @@ namespace ES
                 string path = AssetDatabase.GetAssetPath(mesh);
                 if (!string.IsNullOrEmpty(path))
                 {
+                    path = SimpleToolsSafetyUtility.NormalizeAssetPath(path);
+                    if (!sceneDependencyPaths.Contains(path))
+                        continue;
+
+                    meshCount++;
+
                     if (!meshDict.ContainsKey(path))
                     {
                         meshDict[path] = new List<Mesh>();
@@ -1060,18 +1253,25 @@ namespace ES
 
         private void AnalyzeAudio()
         {
-            var audioClips = Resources.FindObjectsOfTypeAll<AudioClip>();
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+            var audioClips = LoadActiveSceneDependencyAssets<AudioClip>(sceneDependencyPaths);
 
             foreach (var clip in audioClips)
             {
                 if (clip == null)
                     continue;
 
+                string path = AssetDatabase.GetAssetPath(clip);
+                if (string.IsNullOrEmpty(path))
+                    continue;
+                path = SimpleToolsSafetyUtility.NormalizeAssetPath(path);
+                if (!sceneDependencyPaths.Contains(path))
+                    continue;
+
                 long clipSize = EstimateAudioMemory(clip);
                 audioMemory += clipSize;
                 totalMemoryUsage += clipSize;
 
-                string path = AssetDatabase.GetAssetPath(clip);
                 if (!string.IsNullOrEmpty(path))
                 {
                     var importer = AssetImporter.GetAtPath(path) as AudioImporter;
@@ -1091,11 +1291,14 @@ namespace ES
 
         private void AnalyzeRendering()
         {
-            var renderers = UnityEngine.Object.FindObjectsOfType<Renderer>();
+            var renderers = GetActiveSceneComponents<Renderer>();
             rendererCount = renderers.Length;
 
             foreach (var renderer in renderers)
             {
+                if (renderer == null || renderer.gameObject == null)
+                    continue;
+
                 // 检查批处理友好性
                 if (renderer.gameObject.isStatic)
                 {
@@ -1110,12 +1313,20 @@ namespace ES
 
         private void AnalyzeShaders()
         {
-            var materials = Resources.FindObjectsOfTypeAll<Material>();
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+            var materials = LoadActiveSceneDependencyAssets<Material>(sceneDependencyPaths);
             shaderUsage.Clear();
 
             foreach (var mat in materials)
             {
                 if (mat == null || mat.shader == null)
+                    continue;
+
+                string assetPath = AssetDatabase.GetAssetPath(mat);
+                if (string.IsNullOrEmpty(assetPath))
+                    continue;
+                assetPath = SimpleToolsSafetyUtility.NormalizeAssetPath(assetPath);
+                if (!sceneDependencyPaths.Contains(assetPath))
                     continue;
 
                 string shaderName = mat.shader.name;
@@ -1131,7 +1342,7 @@ namespace ES
 
         private void EstimateDrawCalls()
         {
-            var renderers = UnityEngine.Object.FindObjectsOfType<Renderer>();
+            var renderers = GetActiveSceneComponents<Renderer>();
             drawCallEstimate = renderers.Length;
 
             // 简单估算批处理减少
@@ -1435,7 +1646,7 @@ namespace ES
         #endregion
 
         #region 优化功能(增强版)
-        [BoxGroup("优化操作"), Button("⚡ 智能一键优化", ButtonHeight = 55), GUIColor(0.9f, 0.6f, 0.2f)]
+        [BoxGroup("优化操作"), Button("⚡ 按当前设置执行优化", ButtonHeight = 34), GUIColor(0.75f, 0.58f, 0.25f)]
         public void AutoOptimizeScene()
         {
             if (detectedIssues.Count == 0)
@@ -1444,9 +1655,40 @@ namespace ES
                 return;
             }
 
-            string confirmMessage = $"准备应用以下优化:\n\n";
+            bool wantsImporterChanges = !previewOnly && (compressTextures || generateMipmaps || disableTextureReadWrite || compressAudio || enableAudioStreaming);
+            if (wantsImporterChanges && !allowProjectAssetImportChanges)
+            {
+                EditorUtility.DisplayDialog("项目资产修改已拦截",
+                    "当前配置包含纹理或音频导入设置修改，这类操作会影响项目资产，不只影响当前场景。\n\n请先关闭这些选项，或明确开启“允许修改项目资产导入设置”。",
+                    "知道了");
+                return;
+            }
+
+            if (wantsImporterChanges)
+            {
+                pendingImportSettingChanges = BuildPendingImportSettingChanges();
+                if (pendingImportSettingChanges.Count == 0)
+                {
+                    approvedImporterChangePaths = new HashSet<string>();
+                }
+                else
+                {
+                    string preview = SimpleToolsSafetyUtility.JoinPreview(
+                        pendingImportSettingChanges.Select(c => $"{c.assetPath} | {c.changeSummary}"),
+                        10);
+                    if (!EditorUtility.DisplayDialog("确认项目资产导入设置变更",
+                        $"将修改 {pendingImportSettingChanges.Count} 个项目资产导入设置。\n\n{preview}\n\n这些修改不限于当前场景，执行后会重新导入资产。继续吗？",
+                        "确认修改", "取消"))
+                        return;
+
+                    approvedImporterChangePaths = new HashSet<string>(pendingImportSettingChanges.Select(c => c.assetPath));
+                }
+            }
+
+            string confirmMessage = $"准备按当前设置执行优化:\n\n";
             confirmMessage += $"• 发现 {detectedIssues.Count} 个优化项\n";
             confirmMessage += $"• 预计节省 {totalMemoryUsage / 1024 / 1024} MB 内存\n";
+            if (wantsImporterChanges) confirmMessage += "• 会修改项目资产导入设置，不限当前场景\n";
             if (previewOnly) confirmMessage += "\n⚠️ 当前为预览模式,不会实际应用\n";
             confirmMessage += "\n是否继续?";
 
@@ -1466,6 +1708,8 @@ namespace ES
 
             int optimizationsApplied = 0;
             List<string> optimizationLog = new List<string>();
+            if (wantsImporterChanges)
+                importSettingChanges.Clear();
 
             EditorUtility.DisplayProgressBar("智能优化", "准备优化...", 0f);
 
@@ -1523,6 +1767,7 @@ namespace ES
                     int optimized = OptimizeShadowSettings();
                     if (optimized > 0)
                     {
+                        optimizationsApplied += optimized;
                         optimizationLog.Add($"✓ 优化了 {optimized} 个阴影设置");
                     }
                 }
@@ -1545,6 +1790,7 @@ namespace ES
                     int generated = GenerateMipmaps();
                     if (generated > 0)
                     {
+                        optimizationsApplied += generated;
                         optimizationLog.Add($"✓ 为 {generated} 个纹理生成了Mipmap");
                     }
                 }
@@ -1555,6 +1801,7 @@ namespace ES
                     int disabled = DisableTextureReadWrite();
                     if (disabled > 0)
                     {
+                        optimizationsApplied += disabled;
                         optimizationLog.Add($"✓ 禁用了 {disabled} 个纹理的读写");
                     }
                 }
@@ -1578,6 +1825,7 @@ namespace ES
                     int compressedAudio = CompressAudio();
                     if (compressedAudio > 0)
                     {
+                        optimizationsApplied += compressedAudio;
                         optimizationLog.Add($"✓ 压缩了 {compressedAudio} 个音频文件");
                     }
                 }
@@ -1589,6 +1837,7 @@ namespace ES
                     int optimizedColliders = OptimizeColliders();
                     if (optimizedColliders > 0)
                     {
+                        optimizationsApplied += optimizedColliders;
                         optimizationLog.Add($"✓ 优化了 {optimizedColliders} 个碰撞体");
                     }
                 }
@@ -1598,6 +1847,7 @@ namespace ES
             finally
             {
                 EditorUtility.ClearProgressBar();
+                approvedImporterChangePaths = null;
             }
 
             // 显示优化结果
@@ -1611,7 +1861,20 @@ namespace ES
                 resultMessage.AppendLine(log);
             }
 
+            if (importSettingChanges.Count > 0)
+            {
+                resultMessage.AppendLine();
+                resultMessage.AppendLine($"已记录 {importSettingChanges.Count} 条项目资产导入设置变更。");
+                resultMessage.AppendLine("建议立刻导出回滚 JSON，方便验证后恢复。");
+            }
+
             EditorUtility.DisplayDialog("优化完成", resultMessage.ToString(), "确定");
+
+            if (importSettingChanges.Count > 0 &&
+                EditorUtility.DisplayDialog("导出回滚文件", "本次修改了项目资产导入设置。现在导出回滚 JSON 吗？", "导出", "稍后"))
+            {
+                ExportImportSettingRollback();
+            }
 
             // 重新分析以查看效果
             if (!previewOnly)
@@ -1620,20 +1883,21 @@ namespace ES
                 AssetDatabase.Refresh();
                 AnalyzeScene();
             }
+
         }
 
         private int CleanEmptyObjects()
         {
             if (previewOnly) return emptyObjectCount;
 
-            var allObjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
+            var allObjects = GetActiveSceneGameObjects();
             int cleanedCount = 0;
 
             try
             {
                 foreach (var obj in allObjects)
                 {
-                    if (obj == null || obj.scene != SceneManager.GetActiveScene())
+                    if (obj == null)
                         continue;
                         
                     var components = obj.GetComponents<Component>();
@@ -1652,6 +1916,7 @@ namespace ES
                 UnityEngine.Debug.LogError($"清理空对象时出错: {e.Message}");
             }
 
+            MarkActiveSceneDirtyIfChanged(cleanedCount);
             return cleanedCount;
         }
 
@@ -1659,14 +1924,14 @@ namespace ES
         {
             if (previewOnly) return missingScriptCount;
 
-            var allObjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
+            var allObjects = GetActiveSceneGameObjects();
             int cleanedCount = 0;
 
             try
             {
                 foreach (var obj in allObjects)
                 {
-                    if (obj == null || obj.scene != SceneManager.GetActiveScene())
+                    if (obj == null)
                         continue;
                         
                     var components = obj.GetComponents<Component>();
@@ -1690,6 +1955,7 @@ namespace ES
                     if (removed > 0)
                     {
                         serializedObject.ApplyModifiedProperties();
+                        EditorUtility.SetDirty(obj);
                     }
                 }
 
@@ -1701,6 +1967,7 @@ namespace ES
                 UnityEngine.Debug.LogError($"移除丢失脚本时出错: {e.Message}");
             }
 
+            MarkActiveSceneDirtyIfChanged(cleanedCount);
             return cleanedCount;
         }
 
@@ -1708,14 +1975,14 @@ namespace ES
         {
             if (previewOnly) return 0;
 
-            var allObjects = UnityEngine.Object.FindObjectsOfType<GameObject>();
+            var allObjects = GetActiveSceneGameObjects();
             int markedCount = 0;
 
             try
             {
                 foreach (var obj in allObjects)
                 {
-                    if (obj == null || obj.scene != SceneManager.GetActiveScene())
+                    if (obj == null)
                         continue;
                         
                     if (obj.isStatic) 
@@ -1731,6 +1998,7 @@ namespace ES
                     {
                         Undo.RecordObject(obj, "Mark Static");
                         obj.isStatic = true;
+                        EditorUtility.SetDirty(obj);
                         markedCount++;
                     }
                 }
@@ -1743,6 +2011,7 @@ namespace ES
                 UnityEngine.Debug.LogError($"标记静态对象时出错: {e.Message}");
             }
 
+            MarkActiveSceneDirtyIfChanged(markedCount);
             return markedCount;
         }
 
@@ -1750,7 +2019,7 @@ namespace ES
         {
             if (previewOnly) return 0;
 
-            var renderers = UnityEngine.Object.FindObjectsOfType<MeshRenderer>();
+            var renderers = GetActiveSceneComponents<MeshRenderer>();
             int lodCount = 0;
 
             try
@@ -1758,9 +2027,6 @@ namespace ES
                 foreach (var renderer in renderers)
                 {
                     if (renderer == null || renderer.gameObject == null)
-                        continue;
-                        
-                    if (renderer.gameObject.scene != SceneManager.GetActiveScene())
                         continue;
                         
                     if (renderer.gameObject.GetComponent<LODGroup>() != null)
@@ -1774,13 +2040,13 @@ namespace ES
                     if (triangleCount < highPolyThreshold)
                         continue;
 
-                Undo.AddComponent<LODGroup>(renderer.gameObject);
-                var lodGroup = renderer.gameObject.GetComponent<LODGroup>();
+                var lodGroup = Undo.AddComponent<LODGroup>(renderer.gameObject);
 
-                var lods = new LOD[lodLevelCount];
                 float[] lodScreenPercent = { 0.6f, 0.3f, 0.15f, 0.07f, 0.03f };
+                int safeLodLevelCount = Mathf.Clamp(lodLevelCount, 1, lodScreenPercent.Length);
+                var lods = new LOD[safeLodLevelCount];
 
-                for (int i = 0; i < lodLevelCount; i++)
+                for (int i = 0; i < safeLodLevelCount; i++)
                 {
                     lods[i] = new LOD(lodScreenPercent[i], new Renderer[] { renderer });
                 }
@@ -1798,6 +2064,7 @@ namespace ES
                 UnityEngine.Debug.LogError($"生成LOD系统时出错: {e.Message}");
             }
 
+            MarkActiveSceneDirtyIfChanged(lodCount);
             return lodCount;
         }
 
@@ -1805,11 +2072,14 @@ namespace ES
         {
             if (previewOnly) return 0;
 
-            var lights = UnityEngine.Object.FindObjectsOfType<Light>();
+            var lights = GetActiveSceneComponents<Light>();
             int optimizedCount = 0;
 
             foreach (var light in lights)
             {
+                if (light == null || light.gameObject == null)
+                    continue;
+
                 if (light.shadows == LightShadows.None)
                     continue;
 
@@ -1819,10 +2089,12 @@ namespace ES
                 {
                     Undo.RecordObject(light, "Optimize Shadow");
                     light.shadows = LightShadows.Hard;
+                    EditorUtility.SetDirty(light);
                     optimizedCount++;
                 }
             }
 
+            MarkActiveSceneDirtyIfChanged(optimizedCount);
             return optimizedCount;
         }
 
@@ -1830,42 +2102,56 @@ namespace ES
         {
             if (previewOnly) return oversizedTextureCount + uncompressedTextureCount;
 
-            var textures = Resources.FindObjectsOfTypeAll<Texture2D>();
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+            var textures = LoadActiveSceneDependencyAssets<Texture2D>(sceneDependencyPaths);
             int compressedCount = 0;
 
-            foreach (var texture in textures)
+            SimpleToolsSafetyUtility.RunAssetEditing(() =>
             {
-                if (texture == null)
-                    continue;
-
-                string path = AssetDatabase.GetAssetPath(texture);
-                if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
-                    continue;
-
-                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
-                if (importer == null)
-                    continue;
-
-                bool needsReimport = false;
-
-                if (importer.textureCompression != TextureImporterCompression.Compressed)
+                foreach (var texture in textures)
                 {
-                    importer.textureCompression = TextureImporterCompression.Compressed;
-                    needsReimport = true;
-                }
+                    if (texture == null)
+                        continue;
 
-                if (importer.maxTextureSize > maxTextureSize)
-                {
-                    importer.maxTextureSize = maxTextureSize;
-                    needsReimport = true;
-                }
+                    string path = AssetDatabase.GetAssetPath(texture);
+                    if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
+                        continue;
+                    if (!sceneDependencyPaths.Contains(SimpleToolsSafetyUtility.NormalizeAssetPath(path)))
+                        continue;
+                    if (!IsApprovedImporterChangePath(path))
+                        continue;
 
-                if (needsReimport)
-                {
-                    importer.SaveAndReimport();
-                    compressedCount++;
+                    var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                    if (importer == null)
+                        continue;
+
+                    bool needsReimport = false;
+                    string beforeState = CaptureTextureImporterState(importer);
+                    var changedFields = new List<string>();
+
+                    if (importer.textureCompression != TextureImporterCompression.Compressed)
+                    {
+                        importer.textureCompression = TextureImporterCompression.Compressed;
+                        needsReimport = true;
+                        changedFields.Add("压缩格式");
+                    }
+
+                    if (importer.maxTextureSize > maxTextureSize)
+                    {
+                        importer.maxTextureSize = maxTextureSize;
+                        needsReimport = true;
+                        changedFields.Add("最大尺寸");
+                    }
+
+                    if (needsReimport)
+                    {
+                        string afterState = CaptureTextureImporterState(importer);
+                        AddImportSettingChange(path, "TextureImporter", string.Join("、", changedFields), beforeState, afterState);
+                        importer.SaveAndReimport();
+                        compressedCount++;
+                    }
                 }
-            }
+            });
 
             if (verboseLogging && compressedCount > 0)
                 UnityEngine.Debug.Log($"压缩了 {compressedCount} 个纹理");
@@ -1877,26 +2163,37 @@ namespace ES
         {
             if (previewOnly) return mipmapDisabledTextures;
 
-            var textures = Resources.FindObjectsOfTypeAll<Texture2D>();
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+            var textures = LoadActiveSceneDependencyAssets<Texture2D>(sceneDependencyPaths);
             int generatedCount = 0;
 
-            foreach (var texture in textures)
+            SimpleToolsSafetyUtility.RunAssetEditing(() =>
             {
-                if (texture == null || texture.width <= 512)
-                    continue;
-
-                string path = AssetDatabase.GetAssetPath(texture);
-                if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
-                    continue;
-
-                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
-                if (importer != null && !importer.mipmapEnabled)
+                foreach (var texture in textures)
                 {
-                    importer.mipmapEnabled = true;
-                    importer.SaveAndReimport();
-                    generatedCount++;
+                    if (texture == null || texture.width <= 512)
+                        continue;
+
+                    string path = AssetDatabase.GetAssetPath(texture);
+                    if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
+                        continue;
+                    if (!sceneDependencyPaths.Contains(SimpleToolsSafetyUtility.NormalizeAssetPath(path)))
+                        continue;
+                    if (!IsApprovedImporterChangePath(path))
+                        continue;
+
+                    var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                    if (importer != null && !importer.mipmapEnabled)
+                    {
+                        string beforeState = CaptureTextureImporterState(importer);
+                        importer.mipmapEnabled = true;
+                        string afterState = CaptureTextureImporterState(importer);
+                        AddImportSettingChange(path, "TextureImporter", "生成Mipmap", beforeState, afterState);
+                        importer.SaveAndReimport();
+                        generatedCount++;
+                    }
                 }
-            }
+            });
 
             return generatedCount;
         }
@@ -1905,26 +2202,37 @@ namespace ES
         {
             if (previewOnly) return readableTextures;
 
-            var textures = Resources.FindObjectsOfTypeAll<Texture2D>();
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+            var textures = LoadActiveSceneDependencyAssets<Texture2D>(sceneDependencyPaths);
             int disabledCount = 0;
 
-            foreach (var texture in textures)
+            SimpleToolsSafetyUtility.RunAssetEditing(() =>
             {
-                if (texture == null)
-                    continue;
-
-                string path = AssetDatabase.GetAssetPath(texture);
-                if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
-                    continue;
-
-                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
-                if (importer != null && importer.isReadable)
+                foreach (var texture in textures)
                 {
-                    importer.isReadable = false;
-                    importer.SaveAndReimport();
-                    disabledCount++;
+                    if (texture == null)
+                        continue;
+
+                    string path = AssetDatabase.GetAssetPath(texture);
+                    if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
+                        continue;
+                    if (!sceneDependencyPaths.Contains(SimpleToolsSafetyUtility.NormalizeAssetPath(path)))
+                        continue;
+                    if (!IsApprovedImporterChangePath(path))
+                        continue;
+
+                    var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                    if (importer != null && importer.isReadable)
+                    {
+                        string beforeState = CaptureTextureImporterState(importer);
+                        importer.isReadable = false;
+                        string afterState = CaptureTextureImporterState(importer);
+                        AddImportSettingChange(path, "TextureImporter", "禁用读写", beforeState, afterState);
+                        importer.SaveAndReimport();
+                        disabledCount++;
+                    }
                 }
-            }
+            });
 
             return disabledCount;
         }
@@ -1933,15 +2241,19 @@ namespace ES
         {
             if (previewOnly) return inactiveParticleCount;
 
-            var particleSystems = UnityEngine.Object.FindObjectsOfType<ParticleSystem>();
+            var particleSystems = GetActiveSceneComponents<ParticleSystem>();
             int optimizedCount = 0;
 
             foreach (var ps in particleSystems)
             {
+                if (ps == null || ps.gameObject == null)
+                    continue;
+
                 if (!ps.isPlaying && !ps.isPaused && disableInactiveParticles)
                 {
                     Undo.RecordObject(ps.gameObject, "Disable Particle");
                     ps.gameObject.SetActive(false);
+                    EditorUtility.SetDirty(ps.gameObject);
                     optimizedCount++;
                 }
                 else if (reduceParticleCount)
@@ -1955,11 +2267,13 @@ namespace ES
                         var rate = emission.rateOverTime;
                         rate.constant = particleEmissionThreshold;
                         emission.rateOverTime = rate;
+                        EditorUtility.SetDirty(ps);
                         optimizedCount++;
                     }
                 }
             }
 
+            MarkActiveSceneDirtyIfChanged(optimizedCount);
             return optimizedCount;
         }
 
@@ -1967,45 +2281,59 @@ namespace ES
         {
             if (previewOnly) return uncompressedAudioCount;
 
-            var audioClips = Resources.FindObjectsOfTypeAll<AudioClip>();
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+            var audioClips = LoadActiveSceneDependencyAssets<AudioClip>(sceneDependencyPaths);
             int compressedCount = 0;
 
-            foreach (var clip in audioClips)
+            SimpleToolsSafetyUtility.RunAssetEditing(() =>
             {
-                if (clip == null)
-                    continue;
-
-                string path = AssetDatabase.GetAssetPath(clip);
-                if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
-                    continue;
-
-                var importer = AssetImporter.GetAtPath(path) as AudioImporter;
-                if (importer != null)
+                foreach (var clip in audioClips)
                 {
-                    var settings = importer.defaultSampleSettings;
-                    bool needsReimport = false;
+                    if (clip == null)
+                        continue;
 
-                    if (settings.compressionFormat == AudioCompressionFormat.PCM)
-                    {
-                        settings.compressionFormat = AudioCompressionFormat.Vorbis;
-                        settings.quality = 0.7f;
-                        needsReimport = true;
-                    }
+                    string path = AssetDatabase.GetAssetPath(clip);
+                    if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
+                        continue;
+                    if (!sceneDependencyPaths.Contains(SimpleToolsSafetyUtility.NormalizeAssetPath(path)))
+                        continue;
+                    if (!IsApprovedImporterChangePath(path))
+                        continue;
 
-                    if (enableAudioStreaming && settings.loadType != AudioClipLoadType.Streaming)
+                    var importer = AssetImporter.GetAtPath(path) as AudioImporter;
+                    if (importer != null)
                     {
-                        settings.loadType = AudioClipLoadType.Streaming;
-                        needsReimport = true;
-                    }
+                        var settings = importer.defaultSampleSettings;
+                        string beforeState = CaptureAudioImporterState(importer);
+                        bool needsReimport = false;
+                        var changedFields = new List<string>();
 
-                    if (needsReimport)
-                    {
-                        importer.defaultSampleSettings = settings;
-                        importer.SaveAndReimport();
-                        compressedCount++;
+                        if (settings.compressionFormat == AudioCompressionFormat.PCM)
+                        {
+                            settings.compressionFormat = AudioCompressionFormat.Vorbis;
+                            settings.quality = 0.7f;
+                            needsReimport = true;
+                            changedFields.Add("压缩格式");
+                        }
+
+                        if (enableAudioStreaming && settings.loadType != AudioClipLoadType.Streaming)
+                        {
+                            settings.loadType = AudioClipLoadType.Streaming;
+                            needsReimport = true;
+                            changedFields.Add("加载方式");
+                        }
+
+                        if (needsReimport)
+                        {
+                            importer.defaultSampleSettings = settings;
+                            string afterState = CaptureAudioImporterState(importer);
+                            AddImportSettingChange(path, "AudioImporter", string.Join("、", changedFields), beforeState, afterState);
+                            importer.SaveAndReimport();
+                            compressedCount++;
+                        }
                     }
                 }
-            }
+            });
 
             return compressedCount;
         }
@@ -2014,11 +2342,14 @@ namespace ES
         {
             if (previewOnly) return nonConvexMeshColliders;
 
-            var meshColliders = UnityEngine.Object.FindObjectsOfType<MeshCollider>();
+            var meshColliders = GetActiveSceneComponents<MeshCollider>();
             int optimizedCount = 0;
 
             foreach (var collider in meshColliders)
             {
+                if (collider == null || collider.gameObject == null || collider.gameObject.scene != SceneManager.GetActiveScene())
+                    continue;
+
                 if (!collider.convex && !collider.GetComponent<Rigidbody>())
                 {
                     // 如果没有刚体且不是凸的,尝试转换为简单碰撞体
@@ -2026,27 +2357,377 @@ namespace ES
                     {
                         Undo.RecordObject(collider.gameObject, "Simplify Collider");
                         Undo.DestroyObjectImmediate(collider);
-                        Undo.AddComponent<BoxCollider>(collider.gameObject);
+                        var boxCollider = Undo.AddComponent<BoxCollider>(collider.gameObject);
+                        EditorUtility.SetDirty(boxCollider);
                         optimizedCount++;
                     }
                     else if (!collider.convex)
                     {
                         Undo.RecordObject(collider, "Make Convex");
                         collider.convex = true;
+                        EditorUtility.SetDirty(collider);
                         optimizedCount++;
                     }
                 }
             }
 
+            MarkActiveSceneDirtyIfChanged(optimizedCount);
             return optimizedCount;
+        }
+
+        private void MarkActiveSceneDirtyIfChanged(int changedCount)
+        {
+            if (changedCount <= 0)
+                return;
+
+            var scene = SceneManager.GetActiveScene();
+            if (scene.IsValid())
+                EditorSceneManager.MarkSceneDirty(scene);
+        }
+
+        private List<GameObject> GetActiveSceneGameObjects()
+        {
+            var scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid())
+                return new List<GameObject>();
+
+            return scene.GetRootGameObjects()
+                .Where(root => root != null)
+                .SelectMany(root => root.GetComponentsInChildren<Transform>(true))
+                .Where(transform => transform != null)
+                .Select(transform => transform.gameObject)
+                .Where(obj => obj != null && obj.scene == scene)
+                .Distinct()
+                .ToList();
+        }
+
+        private T[] GetActiveSceneComponents<T>() where T : Component
+        {
+            return GetActiveSceneGameObjects()
+                .SelectMany(obj => obj != null ? obj.GetComponents<T>() : Array.Empty<T>())
+                .Where(component => component != null)
+                .ToArray();
+        }
+
+        private HashSet<string> GetActiveSceneDependencyAssetPaths()
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var scene = SceneManager.GetActiveScene();
+            if (scene.IsValid() && !string.IsNullOrEmpty(scene.path))
+            {
+                foreach (var path in AssetDatabase.GetDependencies(scene.path, true))
+                    AddAssetAndDependencies(path);
+            }
+
+            foreach (var renderer in GetActiveSceneComponents<Renderer>())
+            {
+                if (renderer == null)
+                    continue;
+
+                foreach (var material in renderer.sharedMaterials)
+                    AddAssetAndDependencies(AssetDatabase.GetAssetPath(material));
+            }
+
+            foreach (var meshFilter in GetActiveSceneComponents<MeshFilter>())
+                AddAssetAndDependencies(AssetDatabase.GetAssetPath(meshFilter != null ? meshFilter.sharedMesh : null));
+
+            foreach (var skinnedMesh in GetActiveSceneComponents<SkinnedMeshRenderer>())
+                AddAssetAndDependencies(AssetDatabase.GetAssetPath(skinnedMesh != null ? skinnedMesh.sharedMesh : null));
+
+            foreach (var source in GetActiveSceneComponents<AudioSource>())
+                AddAssetAndDependencies(AssetDatabase.GetAssetPath(source != null ? source.clip : null));
+
+            return result;
+
+            void AddAssetAndDependencies(string assetPath)
+            {
+                assetPath = SimpleToolsSafetyUtility.NormalizeAssetPath(assetPath);
+                if (string.IsNullOrEmpty(assetPath) || !SimpleToolsSafetyUtility.IsAssetPath(assetPath))
+                    return;
+
+                result.Add(assetPath);
+                foreach (var dependency in AssetDatabase.GetDependencies(assetPath, true))
+                {
+                    var normalized = SimpleToolsSafetyUtility.NormalizeAssetPath(dependency);
+                    if (!string.IsNullOrEmpty(normalized) && SimpleToolsSafetyUtility.IsAssetPath(normalized))
+                        result.Add(normalized);
+                }
+            }
+        }
+
+        private List<T> LoadActiveSceneDependencyAssets<T>(HashSet<string> sceneDependencyPaths = null) where T : UnityEngine.Object
+        {
+            sceneDependencyPaths ??= GetActiveSceneDependencyAssetPaths();
+
+            var assets = new List<T>();
+            var addedIds = new HashSet<int>();
+            foreach (var path in sceneDependencyPaths)
+            {
+                if (string.IsNullOrEmpty(path) || !SimpleToolsSafetyUtility.IsAssetPath(path))
+                    continue;
+
+                foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(path).OfType<T>())
+                {
+                    if (asset == null)
+                        continue;
+
+                    if (addedIds.Add(asset.GetInstanceID()))
+                        assets.Add(asset);
+                }
+            }
+
+            return assets;
+        }
+
+        private void AddImportSettingChange(string assetPath, string importerType, string changeSummary, string beforeState, string afterState)
+        {
+            importSettingChanges.Add(new ImportSettingChangeRecord
+            {
+                assetPath = assetPath,
+                importerType = importerType,
+                changeSummary = changeSummary,
+                beforeState = beforeState,
+                afterState = afterState,
+                changedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            });
+        }
+
+        private bool IsApprovedImporterChangePath(string assetPath)
+        {
+            return approvedImporterChangePaths == null || approvedImporterChangePaths.Contains(assetPath);
+        }
+
+        private List<ImportSettingChangeRecord> BuildPendingImportSettingChanges()
+        {
+            var changes = new Dictionary<string, ImportSettingChangeRecord>();
+            var sceneDependencyPaths = GetActiveSceneDependencyAssetPaths();
+
+            if (compressTextures || generateMipmaps || disableTextureReadWrite)
+            {
+                var textures = LoadActiveSceneDependencyAssets<Texture2D>(sceneDependencyPaths);
+                foreach (var texture in textures)
+                {
+                    if (texture == null)
+                        continue;
+
+                    string path = AssetDatabase.GetAssetPath(texture);
+                    if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
+                        continue;
+                    path = SimpleToolsSafetyUtility.NormalizeAssetPath(path);
+                    if (!sceneDependencyPaths.Contains(path))
+                        continue;
+
+                    var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                    if (importer == null)
+                        continue;
+
+                    string beforeState = CaptureTextureImporterState(importer);
+                    TextureImporterCompression newCompression = importer.textureCompression;
+                    int newMaxSize = importer.maxTextureSize;
+                    bool newMipmap = importer.mipmapEnabled;
+                    bool newReadable = importer.isReadable;
+                    var fields = new List<string>();
+
+                    if (compressTextures)
+                    {
+                        if (newCompression != TextureImporterCompression.Compressed)
+                        {
+                            newCompression = TextureImporterCompression.Compressed;
+                            fields.Add("压缩格式");
+                        }
+                        if (newMaxSize > maxTextureSize)
+                        {
+                            newMaxSize = maxTextureSize;
+                            fields.Add("最大尺寸");
+                        }
+                    }
+
+                    if (generateMipmaps && texture.width > 512 && !newMipmap)
+                    {
+                        newMipmap = true;
+                        fields.Add("生成Mipmap");
+                    }
+
+                    if (disableTextureReadWrite && newReadable)
+                    {
+                        newReadable = false;
+                        fields.Add("禁用读写");
+                    }
+
+                    if (fields.Count == 0)
+                        continue;
+
+                    string afterState = BuildTextureImporterState(newCompression, newMaxSize, newMipmap, newReadable);
+                    changes[path] = CreateImportSettingRecord(path, "TextureImporter", string.Join("、", fields), beforeState, afterState);
+                }
+            }
+
+            if (compressAudio || enableAudioStreaming)
+            {
+                var audioClips = LoadActiveSceneDependencyAssets<AudioClip>(sceneDependencyPaths);
+                foreach (var clip in audioClips)
+                {
+                    if (clip == null)
+                        continue;
+
+                    string path = AssetDatabase.GetAssetPath(clip);
+                    if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets"))
+                        continue;
+                    path = SimpleToolsSafetyUtility.NormalizeAssetPath(path);
+                    if (!sceneDependencyPaths.Contains(path))
+                        continue;
+
+                    var importer = AssetImporter.GetAtPath(path) as AudioImporter;
+                    if (importer == null)
+                        continue;
+
+                    AudioImporterSampleSettings settings = importer.defaultSampleSettings;
+                    string beforeState = CaptureAudioImporterState(importer);
+                    AudioCompressionFormat newFormat = settings.compressionFormat;
+                    float newQuality = settings.quality;
+                    AudioClipLoadType newLoadType = settings.loadType;
+                    var fields = new List<string>();
+
+                    if (compressAudio && newFormat == AudioCompressionFormat.PCM)
+                    {
+                        newFormat = AudioCompressionFormat.Vorbis;
+                        newQuality = 0.7f;
+                        fields.Add("压缩格式");
+                    }
+
+                    if (enableAudioStreaming && newLoadType != AudioClipLoadType.Streaming)
+                    {
+                        newLoadType = AudioClipLoadType.Streaming;
+                        fields.Add("加载方式");
+                    }
+
+                    if (fields.Count == 0)
+                        continue;
+
+                    string afterState = BuildAudioImporterState(newFormat, newQuality, newLoadType);
+                    changes[path] = CreateImportSettingRecord(path, "AudioImporter", string.Join("、", fields), beforeState, afterState);
+                }
+            }
+
+            return changes.Values.OrderBy(c => c.assetPath, StringComparer.Ordinal).ToList();
+        }
+
+        private ImportSettingChangeRecord CreateImportSettingRecord(string assetPath, string importerType, string summary, string beforeState, string afterState)
+        {
+            return new ImportSettingChangeRecord
+            {
+                assetPath = assetPath,
+                importerType = importerType,
+                changeSummary = summary,
+                beforeState = beforeState,
+                afterState = afterState,
+                changedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            };
+        }
+
+        private string CaptureTextureImporterState(TextureImporter importer)
+        {
+            return BuildTextureImporterState(importer.textureCompression, importer.maxTextureSize, importer.mipmapEnabled, importer.isReadable);
+        }
+
+        private string BuildTextureImporterState(TextureImporterCompression compression, int maxSize, bool mipmapEnabled, bool isReadable)
+        {
+            return string.Join("\n", new[]
+            {
+                $"textureCompression={(int)compression}",
+                $"maxTextureSize={maxSize}",
+                $"mipmapEnabled={mipmapEnabled}",
+                $"isReadable={isReadable}"
+            });
+        }
+
+        private string CaptureAudioImporterState(AudioImporter importer)
+        {
+            AudioImporterSampleSettings settings = importer.defaultSampleSettings;
+            return BuildAudioImporterState(settings.compressionFormat, settings.quality, settings.loadType);
+        }
+
+        private string BuildAudioImporterState(AudioCompressionFormat compressionFormat, float quality, AudioClipLoadType loadType)
+        {
+            return string.Join("\n", new[]
+            {
+                $"compressionFormat={(int)compressionFormat}",
+                $"quality={quality.ToString(CultureInfo.InvariantCulture)}",
+                $"loadType={(int)loadType}"
+            });
+        }
+
+        private bool RestoreImporterState(ImportSettingChangeRecord change)
+        {
+            if (change == null || string.IsNullOrEmpty(change.assetPath))
+                return false;
+
+            var importer = AssetImporter.GetAtPath(change.assetPath);
+            if (importer == null)
+                return false;
+
+            var state = ParseState(change.beforeState);
+            if (importer is TextureImporter textureImporter && change.importerType == "TextureImporter")
+            {
+                if (state.TryGetValue("textureCompression", out string compression))
+                    textureImporter.textureCompression = (TextureImporterCompression)int.Parse(compression, CultureInfo.InvariantCulture);
+                if (state.TryGetValue("maxTextureSize", out string maxSize))
+                    textureImporter.maxTextureSize = int.Parse(maxSize, CultureInfo.InvariantCulture);
+                if (state.TryGetValue("mipmapEnabled", out string mipmapEnabled))
+                    textureImporter.mipmapEnabled = bool.Parse(mipmapEnabled);
+                if (state.TryGetValue("isReadable", out string isReadable))
+                    textureImporter.isReadable = bool.Parse(isReadable);
+
+                textureImporter.SaveAndReimport();
+                return true;
+            }
+
+            if (importer is AudioImporter audioImporter && change.importerType == "AudioImporter")
+            {
+                AudioImporterSampleSettings settings = audioImporter.defaultSampleSettings;
+                if (state.TryGetValue("compressionFormat", out string compressionFormat))
+                    settings.compressionFormat = (AudioCompressionFormat)int.Parse(compressionFormat, CultureInfo.InvariantCulture);
+                if (state.TryGetValue("quality", out string quality))
+                    settings.quality = float.Parse(quality, CultureInfo.InvariantCulture);
+                if (state.TryGetValue("loadType", out string loadType))
+                    settings.loadType = (AudioClipLoadType)int.Parse(loadType, CultureInfo.InvariantCulture);
+
+                audioImporter.defaultSampleSettings = settings;
+                audioImporter.SaveAndReimport();
+                return true;
+            }
+
+            return false;
+        }
+
+        private Dictionary<string, string> ParseState(string state)
+        {
+            var result = new Dictionary<string, string>();
+            if (string.IsNullOrEmpty(state))
+                return result;
+
+            string[] lines = state.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string line in lines)
+            {
+                int index = line.IndexOf('=');
+                if (index <= 0)
+                    continue;
+
+                string key = line.Substring(0, index).Trim();
+                string value = line.Substring(index + 1).Trim();
+                if (!string.IsNullOrEmpty(key))
+                    result[key] = value;
+            }
+
+            return result;
         }
         #endregion
 
         #region 报告导出(增强版)
-        [BoxGroup("报告导出"), Button("📄 导出详细报告(TXT)", ButtonHeight = 40), GUIColor(0.5f, 0.8f, 0.5f)]
+        [BoxGroup("报告导出"), Button("📄 导出详细报告(TXT)", ButtonHeight = 34), GUIColor(0.5f, 0.8f, 0.5f)]
         public void ExportDetailedReport()
         {
-            string defaultFileName = $"SceneOptimization_{SceneManager.GetActiveScene().name}_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+            string defaultFileName = SanitizeFileName($"SceneOptimization_{SceneManager.GetActiveScene().name}_{DateTime.Now:yyyyMMdd_HHmmss}") + ".txt";
             string path = EditorUtility.SaveFilePanel("导出优化报告", "", defaultFileName, "txt");
 
             if (!string.IsNullOrEmpty(path))
@@ -2109,20 +2790,28 @@ namespace ES
                 report.AppendLine($"报告生成时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 report.AppendLine("═══════════════════════════════════════");
 
-                File.WriteAllText(path, report.ToString(), Encoding.UTF8);
-                EditorUtility.DisplayDialog("成功", $"详细报告已导出到:\n{path}", "确定");
+                try
+                {
+                    File.WriteAllText(path, report.ToString(), Encoding.UTF8);
+                    EditorUtility.DisplayDialog("成功", $"详细报告已导出到:\n{path}", "确定");
+                }
+                catch (Exception ex)
+                {
+                    EditorUtility.DisplayDialog("导出失败", $"无法写入详细报告：\n{ex.Message}", "知道了");
+                    return;
+                }
 
                 if (EditorUtility.DisplayDialog("打开文件", "是否打开导出的报告?", "打开", "取消"))
                 {
-                    System.Diagnostics.Process.Start(path);
+                    EditorUtility.OpenWithDefaultApp(path);
                 }
             }
         }
 
-        [BoxGroup("报告导出"), Button("📊 导出CSV数据", ButtonHeight = 40), GUIColor(0.5f, 0.7f, 0.9f)]
+        [BoxGroup("报告导出"), Button("📊 导出CSV数据", ButtonHeight = 34), GUIColor(0.5f, 0.7f, 0.9f)]
         public void ExportCSVData()
         {
-            string defaultFileName = $"SceneOptimization_{SceneManager.GetActiveScene().name}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            string defaultFileName = SanitizeFileName($"SceneOptimization_{SceneManager.GetActiveScene().name}_{DateTime.Now:yyyyMMdd_HHmmss}") + ".csv";
             string path = EditorUtility.SaveFilePanel("导出CSV数据", "", defaultFileName, "csv");
 
             if (!string.IsNullOrEmpty(path))
@@ -2135,11 +2824,24 @@ namespace ES
                 foreach (var issue in detectedIssues)
                 {
                     string objName = !string.IsNullOrEmpty(issue.targetObjectPath) ? issue.targetObjectPath : "N/A";
-                    csv.AppendLine($"\"{issue.category}\",\"{issue.severity}\",\"{issue.description}\",\"{objName}\",\"{issue.fixAction}\",{issue.estimatedImpact}");
+                    csv.AppendLine(string.Join(",",
+                        EscapeCsv(issue.category.ToString()),
+                        EscapeCsv(issue.severity.ToString()),
+                        EscapeCsv(issue.description),
+                        EscapeCsv(objName),
+                        EscapeCsv(issue.fixAction),
+                        issue.estimatedImpact.ToString(CultureInfo.InvariantCulture)));
                 }
 
-                File.WriteAllText(path, csv.ToString(), Encoding.UTF8);
-                EditorUtility.DisplayDialog("成功", $"CSV数据已导出到:\n{path}", "确定");
+                try
+                {
+                    File.WriteAllText(path, csv.ToString(), Encoding.UTF8);
+                    EditorUtility.DisplayDialog("成功", $"CSV数据已导出到:\n{path}", "确定");
+                }
+                catch (Exception ex)
+                {
+                    EditorUtility.DisplayDialog("导出失败", $"无法写入 CSV 数据：\n{ex.Message}", "知道了");
+                }
             }
         }
         #endregion
@@ -2154,12 +2856,30 @@ namespace ES
             ).ToList();
         }
 
+        private string SanitizeFileName(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return "SceneOptimization";
+
+            foreach (char invalidChar in Path.GetInvalidFileNameChars())
+                fileName = fileName.Replace(invalidChar, '_');
+
+            fileName = fileName.Trim();
+            return string.IsNullOrEmpty(fileName) ? "SceneOptimization" : fileName;
+        }
+
+        private string EscapeCsv(string value)
+        {
+            value = value ?? string.Empty;
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        }
+
         private GameObject FindGameObjectWithMaterial(Material mat)
         {
-            var renderers = UnityEngine.Object.FindObjectsOfType<Renderer>();
+            var renderers = GetActiveSceneComponents<Renderer>();
             foreach (var r in renderers)
             {
-                if (r.sharedMaterials.Contains(mat))
+                if (r != null && r.gameObject != null && r.sharedMaterials.Contains(mat))
                     return r.gameObject;
             }
             return null;
@@ -2167,18 +2887,22 @@ namespace ES
 
         private GameObject FindGameObjectWithTexture(Texture texture)
         {
-            var materials = Resources.FindObjectsOfTypeAll<Material>();
-            foreach (var mat in materials)
+            var renderers = GetActiveSceneComponents<Renderer>();
+            foreach (var renderer in renderers)
             {
-                if (mat.HasProperty("_MainTex"))
+                if (renderer == null || renderer.sharedMaterials == null)
+                    continue;
+
+                foreach (var mat in renderer.sharedMaterials)
                 {
+                    if (mat == null || !mat.HasProperty("_MainTex"))
+                        continue;
+
                     try
                     {
                         var tex = mat.GetTexture("_MainTex");
                         if (tex == texture)
-                        {
-                            return FindGameObjectWithMaterial(mat);
-                        }
+                            return renderer.gameObject;
                     }
                     catch
                     {
@@ -2191,10 +2915,10 @@ namespace ES
 
         private GameObject FindGameObjectWithAudioClip(AudioClip clip)
         {
-            var audioSources = UnityEngine.Object.FindObjectsOfType<AudioSource>();
+            var audioSources = GetActiveSceneComponents<AudioSource>();
             foreach (var source in audioSources)
             {
-                if (source != null && source.clip == clip && source.gameObject.scene == SceneManager.GetActiveScene())
+                if (source != null && source.clip == clip)
                     return source.gameObject;
             }
             return null;

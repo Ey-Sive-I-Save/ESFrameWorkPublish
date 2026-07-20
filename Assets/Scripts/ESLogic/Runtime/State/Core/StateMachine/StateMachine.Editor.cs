@@ -9,9 +9,6 @@ using UnityEngine;
 //
 // Public（本文件定义的对外成员；按模块分组，“先功能、后成员”，便于扫读）：
 //
-// 【持续统计输出】
-// - 是否持续输出：public bool enableContinuousStats
-//
 // 【临时动画测试（热拔插）】
 // - 临时状态标识：public string testTempKey
 // - 测试 Clip：public AnimationClip testClip
@@ -29,15 +26,6 @@ namespace ES
 {
     public partial class StateMachine
     {
-        /// <summary>
-        /// 是否持续输出统计信息（用于调试）
-        /// </summary>
-        [TabGroup("SM_View", "诊断", Order = 3, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾橙\")")]
-        [BoxGroup("SM_View/诊断/持续统计", ShowLabel = true)]
-        [LabelText("持续输出统计"), Tooltip("每帧在控制台输出状态机统计信息")]
-        [NonSerialized]
-        public bool enableContinuousStats = false;
-
         [OnInspectorInit]
         private void EditorInitConfig()
         {
@@ -331,15 +319,16 @@ namespace ES
         [TabGroup("SM_View", "诊断")]
         [BoxGroup("SM_View/诊断/持续统计")]
         [Button("切换持续统计输出", ButtonSizes.Medium)]
-        [GUIColor("@enableContinuousStats ? new Color(0.4f, 1f, 0.4f) : new Color(0.7f, 0.7f, 0.7f)")]
+        [GUIColor("@StateMachineDebugSettings.Instance != null && StateMachineDebugSettings.Instance.IsContinuousStatsEnabled ? new Color(0.4f, 1f, 0.4f) : new Color(0.7f, 0.7f, 0.7f)")]
         private void ToggleContinuousStats()
         {
-            enableContinuousStats = !enableContinuousStats;
             var dbg = StateMachineDebugSettings.Instance;
-            if (dbg != null && dbg.IsStressTestSilentMode)
+            if (dbg == null || dbg.IsStressTestSilentMode)
                 return;
 
-            Debug.Log($"[StateMachine] 持续统计输出: {(enableContinuousStats ? "开启" : "关闭")}");
+            dbg.enableDebug = true;
+            dbg.continuousStatsOutput = !dbg.continuousStatsOutput;
+            Debug.Log($"[StateMachine] 持续统计输出: {(dbg.continuousStatsOutput ? "开启" : "关闭")}");
         }
 
         [TabGroup("SM_View", "诊断")]

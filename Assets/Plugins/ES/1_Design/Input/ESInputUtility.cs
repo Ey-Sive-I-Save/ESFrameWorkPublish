@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using ES;
 
-namespace ES
+namespace ES.Internal
 {
     public static class ESInputUtility
     {

@@ -2,9 +2,11 @@ using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -21,29 +23,38 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("最近扫描结果"), MultiLineProperty(12)]
         private string lastReport = "尚未扫描。";
 
+        private string lastResultSummary = "";
+        private string lastResultDetail = "";
+
+        [OnInspectorGUI]
+        private void DrawResultPanel()
+        {
+            SimpleToolsPanelUtility.DrawResultSummary("最近场景文本修复", lastResultSummary, lastResultDetail);
+        }
+
         [HorizontalGroup("SelectedActions")]
-        [Button("扫描选中场景", ButtonHeight = 36), GUIColor(0.35f, 0.65f, 1f)]
+        [Button("扫描选中场景", ButtonHeight = 34), GUIColor(0.35f, 0.65f, 1f)]
         public void ScanSelectedScenes()
         {
             ScanPaths(GetSelectedScenePaths(), showDialog: true);
         }
 
         [HorizontalGroup("SelectedActions")]
-        [Button("修复选中场景", ButtonHeight = 36), GUIColor(0.95f, 0.65f, 0.25f)]
+        [Button("修复选中场景（会备份）", ButtonHeight = 34), GUIColor(0.95f, 0.65f, 0.25f)]
         public void FixSelectedScenes()
         {
             FixPathsWithConfirm(GetSelectedScenePaths());
         }
 
         [HorizontalGroup("OpenActions")]
-        [Button("扫描已打开场景", ButtonHeight = 36), GUIColor(0.35f, 0.75f, 0.55f)]
+        [Button("扫描已打开场景", ButtonHeight = 34), GUIColor(0.35f, 0.75f, 0.55f)]
         public void ScanOpenScenes()
         {
             ScanPaths(GetOpenScenePaths(), showDialog: true);
         }
 
         [HorizontalGroup("OpenActions")]
-        [Button("修复已打开场景", ButtonHeight = 36), GUIColor(0.95f, 0.55f, 0.35f)]
+        [Button("修复已打开场景（会备份）", ButtonHeight = 34), GUIColor(0.95f, 0.55f, 0.35f)]
         public void FixOpenScenes()
         {
             FixPathsWithConfirm(GetOpenScenePaths());
@@ -54,6 +65,8 @@ namespace ES
             if (assetPaths.Count == 0)
             {
                 lastReport = "没有找到可扫描的 .unity 场景。请选中场景资源，或先保存当前打开场景。";
+                lastResultSummary = "扫描取消: 没有可扫描场景";
+                lastResultDetail = lastReport;
                 if (showDialog)
                     EditorUtility.DisplayDialog("场景文本修复", lastReport, "确定");
                 return;
@@ -61,6 +74,8 @@ namespace ES
 
             var reports = AnalyzePaths(assetPaths, out int issueCount);
             lastReport = BuildReportText(reports, issueCount, fixedFile: false);
+            lastResultSummary = $"扫描完成: 场景 {reports.Count} 个 | 损坏条目 {issueCount} 个";
+            lastResultDetail = BuildResultDetail(reports, issueCount);
             Debug.Log(lastReport);
 
             if (showDialog)
@@ -74,9 +89,21 @@ namespace ES
 
         private void FixPathsWithConfirm(List<string> assetPaths)
         {
-            if (assetPaths.Count == 0)
+            if (EditorSettings.serializationMode != SerializationMode.ForceText)
+            {
+                lastResultSummary = "修复取消: 项目未启用 Force Text";
+                lastResultDetail = "请先在 Project Settings / Editor 中把 Asset Serialization 设置为 Force Text。";
+                EditorUtility.DisplayDialog("需要文本序列化",
+                    "这个工具只修复文本格式的 .unity 文件。\n请先在 Project Settings / Editor 中把 Asset Serialization 设置为 Force Text。",
+                    "知道了");
+                return;
+            }
+
+            if (assetPaths == null || assetPaths.Count == 0)
             {
                 lastReport = "没有找到可修复的 .unity 场景。请选中场景资源，或先保存当前打开场景。";
+                lastResultSummary = "修复取消: 没有可修复场景";
+                lastResultDetail = lastReport;
                 EditorUtility.DisplayDialog("场景文本修复", lastReport, "确定");
                 return;
             }
@@ -85,30 +112,62 @@ namespace ES
             if (issueCount == 0)
             {
                 lastReport = BuildReportText(reports, issueCount, fixedFile: false);
+                lastResultSummary = $"修复跳过: 场景 {reports.Count} 个 | 未发现损坏条目";
+                lastResultDetail = BuildResultDetail(reports, issueCount);
                 EditorUtility.DisplayDialog("场景文本修复", "没有发现损坏的 SceneRoots fileID 条目。", "确定");
                 return;
             }
 
             bool confirmed = EditorUtility.DisplayDialog(
                 "场景文本修复",
-                $"将从 {reports.Count} 个场景文件中移除 {issueCount} 个损坏的 SceneRoots fileID 条目。\n\n只会删除同一场景文本内不存在对象声明的根节点列表行。",
-                "修复",
+                $"将从 {reports.Count} 个场景文件中移除 {issueCount} 个损坏的 SceneRoots fileID 条目。\n\n执行前会在原文件旁生成 .bak 备份，只删除同一场景文本内不存在对象声明的根节点列表行。",
+                "备份并修复",
                 "取消");
 
             if (!confirmed)
+            {
+                lastResultSummary = $"修复取消: 待修复 {issueCount} 个条目";
+                lastResultDetail = BuildResultDetail(reports, issueCount);
                 return;
+            }
+
+            if (HasDirtyOpenTargetScene(reports.Select(report => report.AssetPath)) &&
+                !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
+                lastResultSummary = "修复取消: 目标场景有未保存改动";
+                lastResultDetail = "用户取消保存未保存场景，工具未写入任何场景文本。";
+                EditorUtility.DisplayDialog("场景文本修复", "已取消修复。目标场景有未保存改动，需先保存或放弃改动后再写入场景文件。", "知道了");
+                return;
+            }
 
             int fixedCount = 0;
+            int failedCount = 0;
+            var failedMessages = new List<string>();
             foreach (var report in reports)
             {
-                if (report.MissingRootFileIds.Count > 0)
+                if (report.MissingRootFileIds.Count == 0)
+                    continue;
+
+                try
+                {
                     fixedCount += FixScene(report);
+                }
+                catch (Exception ex)
+                {
+                    failedCount++;
+                    failedMessages.Add($"{report.AssetPath}: {ex.Message}");
+                }
             }
 
             AssetDatabase.Refresh();
             lastReport = BuildReportText(reports, fixedCount, fixedFile: true);
+            lastResultSummary = $"修复完成: 修复 {fixedCount} 个条目 | 失败 {failedCount} 个场景";
+            lastResultDetail = BuildResultDetail(reports, fixedCount);
+            if (failedMessages.Count > 0)
+                lastResultDetail += "\n\n失败项:\n" + SimpleToolsSafetyUtility.JoinPreview(failedMessages, 8);
             Debug.Log(lastReport);
-            EditorUtility.DisplayDialog("场景文本修复", $"已修复 {fixedCount} 个损坏条目。", "确定");
+            string detail = failedMessages.Count > 0 ? "\n\n失败项：\n" + SimpleToolsSafetyUtility.JoinPreview(failedMessages, 8) : string.Empty;
+            EditorUtility.DisplayDialog("场景文本修复", $"已修复 {fixedCount} 个损坏条目，失败 {failedCount} 个场景。{detail}", "确定");
         }
 
         private static List<SceneRootReferenceReport> AnalyzePaths(List<string> assetPaths, out int issueCount)
@@ -118,6 +177,9 @@ namespace ES
 
             foreach (string assetPath in assetPaths)
             {
+                if (!IsSafeSceneAssetPath(assetPath))
+                    continue;
+
                 var report = AnalyzeScene(assetPath);
                 reports.Add(report);
                 issueCount += report.MissingRootFileIds.Count;
@@ -187,6 +249,9 @@ namespace ES
         private static int FixScene(SceneRootReferenceReport report)
         {
             string text = File.ReadAllText(report.FullPath, Encoding.UTF8);
+            string backupPath = report.FullPath + "." + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".bak";
+            File.WriteAllText(backupPath, text, new UTF8Encoding(false));
+
             string newline = text.Contains("\r\n") ? "\r\n" : "\n";
             string[] lines = SplitLines(text);
 
@@ -236,6 +301,20 @@ namespace ES
             return sb.ToString();
         }
 
+        private static string BuildResultDetail(List<SceneRootReferenceReport> reports, int issueCount)
+        {
+            if (reports == null || reports.Count == 0)
+                return "无场景。";
+
+            var lines = reports.Select(report =>
+            {
+                int count = report.MissingRootFileIds != null ? report.MissingRootFileIds.Count : 0;
+                return count == 0 ? $"OK: {report.AssetPath}" : $"{report.AssetPath} | 损坏条目 {count}";
+            });
+
+            return $"条目数: {issueCount}\n" + SimpleToolsSafetyUtility.JoinPreview(lines, 12);
+        }
+
         private static List<string> GetSelectedScenePaths()
         {
             var paths = new List<string>();
@@ -262,10 +341,46 @@ namespace ES
             return paths;
         }
 
+        private static bool HasDirtyOpenTargetScene(IEnumerable<string> assetPaths)
+        {
+            var targetPaths = new HashSet<string>(
+                assetPaths.Select(SimpleToolsSafetyUtility.NormalizeAssetPath),
+                StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (scene.IsValid() &&
+                    scene.isDirty &&
+                    targetPaths.Contains(SimpleToolsSafetyUtility.NormalizeAssetPath(scene.path)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static string ToFullPath(string assetPath)
         {
+            if (!IsSafeSceneAssetPath(assetPath))
+                throw new ArgumentException("Scene path must be a .unity file under Assets: " + assetPath);
+
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            return Path.GetFullPath(Path.Combine(projectRoot, assetPath));
+            string fullPath = Path.GetFullPath(Path.Combine(projectRoot, assetPath));
+            string assetsRoot = Path.GetFullPath(Application.dataPath);
+            if (!fullPath.StartsWith(assetsRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Scene path resolved outside Assets: " + assetPath);
+
+            return fullPath;
+        }
+
+        private static bool IsSafeSceneAssetPath(string assetPath)
+        {
+            assetPath = SimpleToolsSafetyUtility.NormalizeAssetPath(assetPath);
+            return assetPath.StartsWith("Assets/", StringComparison.Ordinal) &&
+                   !assetPath.Contains("../", StringComparison.Ordinal) &&
+                   assetPath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string[] SplitLines(string text)

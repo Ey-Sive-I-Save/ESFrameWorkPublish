@@ -146,7 +146,7 @@ namespace ES
             _proceduralDriveConfigCached = proceduralDriveConfig;
             _calculatorCached = calculator;
 
-            bool hasAnim = shared.hasAnimation && animConfig != null && calculator != null;
+            bool hasAnim = shared.RequiresStateMachinePlayableAnimation && animConfig != null && calculator != null;
             _hasAnimationCached = hasAnim;
 
             // 保留原始标记（用于进度/阶段等逻辑 gating，保持旧语义）

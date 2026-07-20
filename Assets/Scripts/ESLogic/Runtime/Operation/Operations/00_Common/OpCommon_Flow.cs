@@ -8,7 +8,7 @@ namespace ES
     [Serializable, TypeRegistryItem("空操作", OperationTypeRegistryNames.Common)]
     public sealed class OpCommon_NoOp : ESOutputOp
     {
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic) { }
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport) { }
     }
 
     [Serializable, TypeRegistryItem("顺序执行", OperationTypeRegistryNames.Common)]
@@ -18,22 +18,22 @@ namespace ES
         [ESCompactEdit("操作列表")]
         public List<ESOutputOp> operations = new List<ESOutputOp>();
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (operations == null)
                 return;
 
             for (int i = 0; i < operations.Count; i++)
-                operations[i]?._TryStartOp(target, logic);
+                operations[i]?._TryStartOp(target, scopeSupport, hostSupport);
         }
 
-        protected override void StopOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (operations == null)
                 return;
 
             for (int i = operations.Count - 1; i >= 0; i--)
-                operations[i]?._TryStopOp(target, logic);
+                operations[i]?._TryStopOp(target, scopeSupport, hostSupport);
         }
     }
 
@@ -53,16 +53,16 @@ namespace ES
 
         private ESOutputOp runningOp;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            bool result = condition == null || condition.Evaluate(target, logic);
+            bool result = condition == null || condition.Evaluate(target, RuntimeSupport(scopeSupport, hostSupport));
             runningOp = result ? onTrue : onFalse;
-            runningOp?._TryStartOp(target, logic);
+            runningOp?._TryStartOp(target, scopeSupport, hostSupport);
         }
 
-        protected override void StopOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            runningOp?._TryStopOp(target, logic);
+            runningOp?._TryStopOp(target, scopeSupport, hostSupport);
             runningOp = null;
         }
     }
@@ -86,19 +86,20 @@ namespace ES
 
         private ESOutputOp runningOp;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            bool result = logic != null && logic.Context != null
-                ? logic.Context.GetBool(key, defaultValue)
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            bool result = support != null && support.Context != null
+                ? support.Context.GetBool(key, defaultValue)
                 : defaultValue;
 
             runningOp = result ? onTrue : onFalse;
-            runningOp?._TryStartOp(target, logic);
+            runningOp?._TryStartOp(target, scopeSupport, hostSupport);
         }
 
-        protected override void StopOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            runningOp?._TryStopOp(target, logic);
+            runningOp?._TryStopOp(target, scopeSupport, hostSupport);
             runningOp = null;
         }
     }

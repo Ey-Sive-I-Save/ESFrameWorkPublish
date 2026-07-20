@@ -162,15 +162,15 @@ namespace ES
 
             isInside = inside;
             if (isInside)
-                clip.op._TryStartOp(target, null);
+                clip.op._TryStartOp(target, null, null);
             else
-                clip.op._TryStopOp(target, null);
+                clip.op._TryStopOp(target, null, null);
         }
 
         public override void OnEditorPreviewStop()
         {
             if (clip != null && clip.op != null && isInside)
-                clip.op._TryStopOp(target, null);
+                clip.op._TryStopOp(target, null, null);
 
             isInside = false;
         }
@@ -194,7 +194,7 @@ namespace ES
                 track != null ? track.trackTargetSourceMode : TrackRuntimeTargetSourceMode.CopySkill,
                 state != null ? state.SkillRuntimeTarget : null,
                 track != null ? track.trackRuntimeTargetExpression : null,
-                state != null ? state.OpSupporter : null,
+                state != null ? state.OpSupport : null,
                 track != null && track.addExpressionResultToTargets,
                 out bool ownsTarget);
 
@@ -255,7 +255,7 @@ namespace ES
                 state != null ? state.SkillRuntimeTarget : null,
                 state != null ? state.GetTrackRuntimeTarget(trackIndex) : null,
                 clip.clipTargetExpression,
-                state != null ? state.OpSupporter : null,
+                state != null ? state.OpSupport : null,
                 clip.addExpressionResultToTargets,
                 out bool ownsTarget);
 
@@ -265,7 +265,7 @@ namespace ES
             clipState.UserData = runtimeState;
             ApplyRuntimeValues(target, state);
             WriteBackIfNeeded(state, target, RuntimeTargetWriteBackTiming.OnEnter);
-            clip.op._TryStartOp(target, state != null ? state.OpSupporter : null);
+            clip.op._TryStartOp(target, state != null ? state.OpSupport : null, state != null ? state.HostOpSupport : null);
         }
 
         public void Tick(EntityState_Skill state, ref SkillRuntimeClipState clipState, float time, float deltaTime)
@@ -277,7 +277,7 @@ namespace ES
             SkillOperationClipRuntimeState runtimeState = clipState.UserData as SkillOperationClipRuntimeState;
             ESRuntimeTargetPack target = runtimeState != null ? runtimeState.target : clipState.UserData as ESRuntimeTargetPack;
             if (clip != null && clip.op != null)
-                clip.op._TryStopOp(target, state != null ? state.OpSupporter : null);
+                clip.op._TryStopOp(target, state != null ? state.OpSupport : null, state != null ? state.HostOpSupport : null);
 
             WriteBackIfNeeded(state, target, RuntimeTargetWriteBackTiming.OnExit);
 
@@ -325,7 +325,7 @@ namespace ES
 
             target.runtimeBool = clip.conditionValue;
             target.runtimeFloat = clip.runtimeFloat != null
-                ? clip.runtimeFloat.Evaluate(target, state != null ? state.OpSupporter : null)
+                ? clip.runtimeFloat.Evaluate(target, state != null ? state.OpSupport : null)
                 : EvaluateLegacyRuntimeFloat(target, state);
         }
 
@@ -334,7 +334,7 @@ namespace ES
             return clip.useStaticFloat
                 ? clip.staticFloat
                 : (clip.dynamicFloatExpression != null
-                    ? clip.dynamicFloatExpression.Evaluate(target, state != null ? state.OpSupporter : null)
+                    ? clip.dynamicFloatExpression.Evaluate(target, state != null ? state.OpSupport : null)
                     : clip.staticFloat);
         }
     }
@@ -397,7 +397,7 @@ namespace ES
             TrackRuntimeTargetSourceMode mode,
             ESRuntimeTargetPack skillTarget,
             ESGetGameObjectExpression expression,
-            IOperationRuntimeServices support,
+            ESOpSupport support,
             bool addExpressionResultToTargets,
             out bool ownsTarget)
         {
@@ -440,7 +440,7 @@ namespace ES
             ESRuntimeTargetPack skillTarget,
             ESRuntimeTargetPack trackTarget,
             ESGetGameObjectExpression expression,
-            IOperationRuntimeServices support,
+            ESOpSupport support,
             bool addExpressionResultToTargets,
             out bool ownsTarget)
         {
@@ -500,7 +500,7 @@ namespace ES
             return target;
         }
 
-        private static void ApplyExpressionTarget(ESRuntimeTargetPack target, ESGetGameObjectExpression expression, IOperationRuntimeServices support, bool addToTargets)
+        private static void ApplyExpressionTarget(ESRuntimeTargetPack target, ESGetGameObjectExpression expression, ESOpSupport support, bool addToTargets)
         {
             if (target == null || expression == null)
                 return;

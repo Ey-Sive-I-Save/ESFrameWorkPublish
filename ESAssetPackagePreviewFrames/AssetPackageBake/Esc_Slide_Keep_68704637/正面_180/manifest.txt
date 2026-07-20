@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P2_CLazyEscape/Esc_Slide_Fwd/CLazy@Esc_Slide_Keep.FBX
+clipName=Esc_Slide_Keep
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=24
+pixels=117
+yaw=180

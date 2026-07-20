@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v2_ViewAware
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P1_CLazyMovement/Mvm_8way_JogStop/CLazy@Mvm_JogStop_Back.FBX
+clipName=Mvm_JogStop_Back
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=27
+pixels=117
+yaw=180

@@ -12,7 +12,7 @@ namespace ES
         [LabelText("档案版本")]
         public int schemaVersion = CurrentSchemaVersion;
 
-        [LabelText("档案ID")]
+        [LabelText("档案 ID")]
         public string profileId = "Default";
 
         [LabelText("显示名称")]
@@ -168,13 +168,13 @@ namespace ES
         [LabelText("启用")]
         public bool enabled = true;
 
-        [LabelText("绑定ID")]
+        [LabelText("绑定 ID")]
         public string bindingId;
 
-        [LabelText("动作ID")]
+        [LabelText("动作 ID")]
         public ESInputActionId actionId;
 
-        [LabelText("方案ID")]
+        [LabelText("方案 ID")]
         public string schemeId;
 
         [LabelText("绑定名称")]
@@ -186,13 +186,13 @@ namespace ES
         [LabelText("覆盖路径")]
         public bool overridePathEnabled;
 
-        [LabelText("覆盖路径")]
+        [LabelText("路径")]
         public string overridePath;
 
         [LabelText("覆盖虚拟控件")]
         public bool overrideVirtualControlEnabled;
 
-        [LabelText("覆盖虚拟控件")]
+        [LabelText("虚拟控件 ID")]
         public string overrideVirtualControlId;
 
         [LabelText("覆盖交互参数")]

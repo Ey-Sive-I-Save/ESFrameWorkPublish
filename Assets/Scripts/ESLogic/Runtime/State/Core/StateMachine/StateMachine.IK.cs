@@ -5,20 +5,66 @@ namespace ES
 {
     public partial class StateMachine
     {
+#if UNITY_EDITOR
+        public void RequestIKContributionSummaryRefresh()
+        {
+            _ikContributionSummaryLocalRequestVersion++;
+        }
+
+        private bool ShouldCaptureIKContributionSummary(StateMachineDebugSettings dbg)
+        {
+            if (dbg == null || !dbg.IsIKContributionSummaryEnabled)
+            {
+                if (_ikContributionSummaryWasEnabled)
+                {
+                    stateGeneralFinalIKContributionSummary = "IK贡献诊断已关闭";
+                    _ikContributionSummaryWasEnabled = false;
+                }
+                return false;
+            }
+
+            _ikContributionSummaryWasEnabled = true;
+
+            int settingsRequestVersion = dbg.IKContributionSummaryRequestVersion;
+            bool requestedBySettings = settingsRequestVersion != _lastIKContributionSummarySettingsRequestVersion;
+            bool requestedByLocal = _ikContributionSummaryLocalRequestVersion != _lastIKContributionSummaryLocalRequestVersion;
+
+            if (requestedBySettings || requestedByLocal)
+            {
+                _lastIKContributionSummarySettingsRequestVersion = settingsRequestVersion;
+                _lastIKContributionSummaryLocalRequestVersion = _ikContributionSummaryLocalRequestVersion;
+                _nextIKContributionSummarySampleTime = Time.unscaledTime + dbg.IKContributionSummarySampleInterval;
+                return true;
+            }
+
+            if (dbg.IsIKContributionSummaryManualOnly)
+                return false;
+
+            float now = Time.unscaledTime;
+            if (now < _nextIKContributionSummarySampleTime)
+                return false;
+
+            _nextIKContributionSummarySampleTime = now + dbg.IKContributionSummarySampleInterval;
+            return true;
+        }
+#endif
+
         private void UpdateStateGeneralFinalIKDriverPoseCache(float deltaTime)
         {
             stateGeneralFinalIKDriverPose.Reset();
 
             bool captureIKContributionSummary = false;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR
             var dbg = StateMachineDebugSettings.Instance;
-            captureIKContributionSummary = dbg != null && dbg.IsIKContributionSummaryEnabled;
+            captureIKContributionSummary = ShouldCaptureIKContributionSummary(dbg);
 #endif
 
+#if UNITY_EDITOR
             if (captureIKContributionSummary)
             {
                 _ikContributionBuilder.Length = 0;
             }
+#endif
 
             StateGeneralFinalIKDriverPose upper = default;
             StateGeneralFinalIKDriverPose lower = default;
@@ -32,42 +78,53 @@ namespace ES
             @base.Reset();
 
             var allRunningStates = GetRunningStatesList();
+#if UNITY_EDITOR
             if (captureIKContributionSummary)
             {
                 _ikContributionBuilder.Append("RunningStates=").Append(allRunningStates.Count).AppendLine();
             }
+#endif
 
             for (int i = 0; i < allRunningStates.Count; i++)
             {
                 var state = allRunningStates[i];
                 if (state == null)
                 {
+#if UNITY_EDITOR
                     if (captureIKContributionSummary)
                         _ikContributionBuilder.Append("#").Append(i).Append(" <null> Skip:state null").AppendLine();
+#endif
                     continue;
                 }
 
+#if UNITY_EDITOR
                 string stateKey = string.IsNullOrEmpty(state.strKey) ? "<NoKey>" : state.strKey;
+#endif
 
                 if (state.baseStatus != StateBaseStatus.Running)
                 {
+#if UNITY_EDITOR
                     if (captureIKContributionSummary)
                         _ikContributionBuilder.Append("#").Append(i).Append(' ').Append(stateKey)
                             .Append(" Skip:status=").Append(state.baseStatus).AppendLine();
+#endif
                     continue;
                 }
 
                 var runtime = state.AnimationRuntime;
                 if (runtime == null)
                 {
+#if UNITY_EDITOR
                     if (captureIKContributionSummary)
                         _ikContributionBuilder.Append("#").Append(i).Append(' ').Append(stateKey)
                             .Append(" Skip:runtime null").AppendLine();
+#endif
                     continue;
                 }
 
                 if (!runtime.ik.enabled)
                 {
+#if UNITY_EDITOR
                     if (captureIKContributionSummary)
                         _ikContributionBuilder.Append("#").Append(i).Append(' ').Append(stateKey)
                             .Append(" Skip:ik disabled")
@@ -78,14 +135,17 @@ namespace ES
                             .Append(runtime.ik.rightFoot.targetWeight.ToString("F3")).Append('/')
                             .Append(runtime.ik.lookAt.targetWeight.ToString("F3"))
                             .AppendLine();
+#endif
                     continue;
                 }
 
                 if (!runtime.ik.HasAnyTargetWeight)
                 {
+#if UNITY_EDITOR
                     if (captureIKContributionSummary)
                         _ikContributionBuilder.Append("#").Append(i).Append(' ').Append(stateKey)
                             .Append(" Skip:all target weights <= 0").AppendLine();
+#endif
                     continue;
                 }
 
@@ -96,6 +156,7 @@ namespace ES
 
                 float master = ResolveRunningIKMaster(state, layerType);
 
+#if UNITY_EDITOR
                 if (captureIKContributionSummary)
                 {
                     _ikContributionBuilder.Append("#").Append(i).Append(' ').Append(stateKey)
@@ -116,6 +177,7 @@ namespace ES
                         .Append((runtime.ik.lookAt.targetWeight * master).ToString("F3"))
                         .AppendLine();
                 }
+#endif
 
                 ref var target = ref GetLayerPoseRef(layerType, ref upper, ref lower, ref buff, ref main, ref @base);
                 AccumulateFromRuntime(ref target, state, master);
@@ -136,6 +198,7 @@ namespace ES
                 if (master <= 0.001f)
                     continue;
 
+#if UNITY_EDITOR
                 if (captureIKContributionSummary)
                 {
                     string stateKey = string.IsNullOrEmpty(state.strKey) ? "<NoKey>" : state.strKey;
@@ -150,6 +213,7 @@ namespace ES
                         .Append(runtime.ik.lookAt.targetWeight.ToString("F3"))
                         .AppendLine();
                 }
+#endif
 
                 ref var target = ref GetLayerPoseRef(item.layerType, ref upper, ref lower, ref buff, ref main, ref @base);
                 AccumulateFromRuntime(ref target, state, master);
@@ -170,10 +234,12 @@ namespace ES
                 ClampPoseWeights(ref stateGeneralFinalIKDriverPose);
             }
 
+#if UNITY_EDITOR
             if (captureIKContributionSummary)
             {
                 stateGeneralFinalIKContributionSummary = _ikContributionBuilder.ToString();
             }
+#endif
         }
 
         private static ref StateGeneralFinalIKDriverPose GetLayerPoseRef(

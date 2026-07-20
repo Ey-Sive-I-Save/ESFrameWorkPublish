@@ -828,38 +828,38 @@ namespace ES
             new StandardGuideRule("Assets/NormalResources/Data/GlobalData/ProjectAssetGuide", "GlobalData", "Project asset guide data folder", "Folder responsibility: stores global project asset guide data.", "Folder rule only. Script duties must be hardcoded separately.", "GlobalData", "AssetGuide")
         };
 
-        [MenuItem(MenuItemPathDefine.ROOT_PATH + "项目资产/打开职责提示数据")]
+        [MenuItem(MenuItemPathDefine.PROJECT_ASSETS_PATH + "打开职责提示数据", false, 0)]
         public static void OpenDataMenu()
         {
             Selection.activeObject = GetOrCreateData();
             EditorGUIUtility.PingObject(Selection.activeObject);
         }
 
-        [MenuItem(MenuItemPathDefine.ROOT_PATH + "项目资产/扫描项目资产索引")]
+        [MenuItem(MenuItemPathDefine.PROJECT_ASSETS_PATH + "扫描项目资产索引", false, 10)]
         public static void ScanProjectAssetsMenu()
         {
             GetOrCreateData().ScanProjectAssets();
         }
 
-        [MenuItem(MenuItemPathDefine.ROOT_PATH + "项目资产/填充标准职责提示")]
+        [MenuItem(MenuItemPathDefine.PROJECT_ASSETS_PATH + "填充标准职责提示", false, 20)]
         public static void FillStandardAssetGuideResponsibilitiesMenu()
         {
             GetOrCreateData().FillStandardAssetGuideResponsibilities();
         }
 
-        [MenuItem(MenuItemPathDefine.ROOT_PATH + "项目资产/重写标准职责提示")]
+        [MenuItem(MenuItemPathDefine.PROJECT_ASSETS_PATH + "重写标准职责提示", false, 30)]
         public static void RewriteStandardAssetGuideResponsibilitiesMenu()
         {
             GetOrCreateData().RewriteStandardAssetGuideResponsibilities();
         }
 
-        [MenuItem(MenuItemPathDefine.ROOT_PATH + "项目资产/清除全部人工编辑保护")]
+        [MenuItem(MenuItemPathDefine.PROJECT_ASSETS_PATH + "清除全部人工编辑保护", false, 40)]
         public static void ClearAllManualEditProtectionMenu()
         {
             GetOrCreateData().ClearAllManualEditProtection();
         }
 
-        [MenuItem(MenuItemPathDefine.ROOT_PATH + "项目资产/清理失效索引并刷新旧路径")]
+        [MenuItem(MenuItemPathDefine.PROJECT_ASSETS_PATH + "清理失效索引并刷新旧路径", false, 50)]
         public static void RemoveMissingAssetGuidesMenu()
         {
             GetOrCreateData().RemoveMissingAssetGuides();

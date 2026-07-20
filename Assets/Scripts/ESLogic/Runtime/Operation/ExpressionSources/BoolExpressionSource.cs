@@ -33,7 +33,7 @@ namespace ES
         {
         }
 
-        public override bool Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             if (useDirectBool)
                 return directBool;

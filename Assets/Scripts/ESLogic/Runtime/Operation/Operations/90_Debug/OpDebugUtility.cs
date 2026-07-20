@@ -10,9 +10,10 @@ namespace ES
         public string key;
         public string prefix = "Context";
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            object value = logic?.Context != null ? logic.Context.GetValue(key) : null;
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            object value = support?.Context != null ? support.Context.GetValue(key) : null;
             Debug.Log($"[{prefix}] {key} = {value}");
         }
     }
@@ -23,9 +24,9 @@ namespace ES
         public BoolExpressionSource condition = new BoolExpressionSource { directBool = true };
         public string message = "Operation assertion failed.";
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            bool result = condition == null || condition.Evaluate(target, logic);
+            bool result = condition == null || condition.Evaluate(target, RuntimeSupport(scopeSupport, hostSupport));
             if (!result)
                 Debug.LogError(message);
         }
@@ -39,13 +40,14 @@ namespace ES
         public Color color = Color.red;
         public FloatExpressionSource duration = new FloatExpressionSource { directFloat = 1f };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
             Debug.DrawRay(
-                origin != null ? origin.Evaluate(target, logic) : Vector3.zero,
-                direction != null ? direction.Evaluate(target, logic) : Vector3.forward,
+                origin != null ? origin.Evaluate(target, support) : Vector3.zero,
+                direction != null ? direction.Evaluate(target, support) : Vector3.forward,
                 color,
-                duration != null ? duration.Evaluate(target, logic) : 1f);
+                duration != null ? duration.Evaluate(target, support) : 1f);
         }
     }
 }

@@ -23,7 +23,7 @@ namespace ES
         [LabelText("打印 Stop 日志")]
         public bool logOnStop;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target == null)
             {
@@ -38,7 +38,7 @@ namespace ES
                 $"[{logPrefix}] Start | User={GetName(target.userEntity)} | Main={GetName(target.entityMainTarget)} | Targets={target.targetEntities.Count} | runtimeFloat={target.runtimeFloat}");
         }
 
-        protected override void StopOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (!logOnStop)
                 return;

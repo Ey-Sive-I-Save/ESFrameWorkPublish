@@ -10,7 +10,7 @@ namespace ES
         public string triggerName;
         public bool useMainTargetAnimator;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             Animator animator = OpAnimatorUtility.GetAnimator(target, useMainTargetAnimator);
             if (animator != null && !string.IsNullOrEmpty(triggerName))
@@ -25,11 +25,11 @@ namespace ES
         public BoolExpressionSource value = new BoolExpressionSource { directBool = true };
         public bool useMainTargetAnimator;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             Animator animator = OpAnimatorUtility.GetAnimator(target, useMainTargetAnimator);
             if (animator != null && !string.IsNullOrEmpty(parameterName))
-                animator.SetBool(parameterName, value == null || value.Evaluate(target, logic));
+                animator.SetBool(parameterName, value == null || value.Evaluate(target, RuntimeSupport(scopeSupport, hostSupport)));
         }
     }
 
@@ -40,11 +40,11 @@ namespace ES
         public FloatExpressionSource value = new FloatExpressionSource { directFloat = 0f };
         public bool useMainTargetAnimator;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             Animator animator = OpAnimatorUtility.GetAnimator(target, useMainTargetAnimator);
             if (animator != null && !string.IsNullOrEmpty(parameterName))
-                animator.SetFloat(parameterName, value != null ? value.Evaluate(target, logic) : 0f);
+                animator.SetFloat(parameterName, value != null ? value.Evaluate(target, RuntimeSupport(scopeSupport, hostSupport)) : 0f);
         }
     }
 
@@ -57,7 +57,7 @@ namespace ES
         public float normalizedTime = 0f;
         public bool useMainTargetAnimator;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             Animator animator = OpAnimatorUtility.GetAnimator(target, useMainTargetAnimator);
             if (animator != null && !string.IsNullOrEmpty(stateName))

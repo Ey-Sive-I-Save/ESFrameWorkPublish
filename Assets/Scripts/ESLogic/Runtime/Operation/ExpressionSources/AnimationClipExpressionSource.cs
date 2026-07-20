@@ -21,7 +21,7 @@ namespace ES
 
         public AnimationClipExpressionSource() { }
 
-        public override AnimationClip Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override AnimationClip Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return useDirectAnimationClip ? directAnimationClip : (expression != null ? expression.Evaluate(target, support) : directAnimationClip);
         }

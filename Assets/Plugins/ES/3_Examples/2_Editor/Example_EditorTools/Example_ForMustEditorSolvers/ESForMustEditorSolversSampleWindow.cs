@@ -19,7 +19,7 @@ namespace ES
         private string renameTo = string.Empty;
         private string lastDropMessage = "等待拖入资源";
 
-        [MenuItem("【ES】/测试案例/编辑器Solver/04 ForMustEditor Solver综合案例")]
+        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/04 ForMustEditor Solver 综合案例", false, 40)]
         private static void Open()
         {
             GetWindow<ESForMustEditorSolversSampleWindow>("ES编辑器Solver案例");
@@ -328,6 +328,7 @@ namespace ES
             if (PrefabUtility.IsPartOfPrefabInstance(asset))
                 PrefabUtility.RecordPrefabInstancePropertyModifications(asset);
         }
+
     }
 #endif
 }

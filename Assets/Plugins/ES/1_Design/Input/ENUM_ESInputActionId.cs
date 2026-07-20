@@ -22,15 +22,15 @@ namespace ES
         EquipWeapon = 7,
         [InspectorName("收起武器")]
         HolsterWeapon = 8,
-        [InspectorName("武器槽1")]
+        [InspectorName("武器槽 1")]
         WeaponSlot1 = 9,
-        [InspectorName("武器槽2")]
+        [InspectorName("武器槽 2")]
         WeaponSlot2 = 10,
-        [InspectorName("武器槽3")]
+        [InspectorName("武器槽 3")]
         WeaponSlot3 = 11,
-        [InspectorName("武器槽4")]
+        [InspectorName("武器槽 4")]
         WeaponSlot4 = 12,
-        [InspectorName("武器槽5")]
+        [InspectorName("武器槽 5")]
         WeaponSlot5 = 13,
         [InspectorName("瞄准")]
         Aim = 14,
@@ -38,11 +38,11 @@ namespace ES
         PeekLeft = 15,
         [InspectorName("右探头")]
         PeekRight = 16,
-        [InspectorName("技能1")]
+        [InspectorName("技能 1")]
         Skill1 = 17,
-        [InspectorName("技能2")]
+        [InspectorName("技能 2")]
         Skill2 = 18,
-        [InspectorName("技能3")]
+        [InspectorName("技能 3")]
         Skill3 = 19,
         [InspectorName("跳跃")]
         Jump = 20,
@@ -52,13 +52,13 @@ namespace ES
         Fly = 22,
         [InspectorName("骑乘")]
         Mount = 23,
-        [InspectorName("飞行垂直")]
+        [InspectorName("飞行垂直轴")]
         FlyVertical = 24,
         [InspectorName("攀爬")]
         Climb = 25,
         [InspectorName("交互")]
         Interact = 26,
-        [InspectorName("动态扩展")]
+        [InspectorName("动态动作")]
         Dynamic = 10000
     }
 
@@ -127,7 +127,7 @@ namespace ES
         PressedImmediate,
         [InspectorName("松开时判定短按")]
         PressedOnRelease,
-        [InspectorName("长按未触发前算短按")]
+        [InspectorName("未触发长按才算短按")]
         PressedIfNotLongPress,
         [InspectorName("长按触发后吞掉短按")]
         LongPressConsumesPressed

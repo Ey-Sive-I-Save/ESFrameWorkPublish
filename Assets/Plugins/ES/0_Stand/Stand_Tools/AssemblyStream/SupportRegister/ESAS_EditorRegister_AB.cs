@@ -57,6 +57,15 @@ public abstract class EditorRegister_FOR_FieldAttribute<ForAttribute> : global::
     public override int Order => 80;
 }
 /// <summary>
+/// 属性特性模式
+/// </summary>
+/// <typeparam name="ForAttribute"></typeparam>
+public abstract class EditorRegister_FOR_PropertyAttribute<ForAttribute> : global::ESAS_EditorRegister_AB where ForAttribute : Attribute
+{
+    public abstract void Handle(ForAttribute attribute, PropertyInfo propertyInfo);
+    public override int Order => 81;
+}
+/// <summary>
 /// 方法特性模式
 /// </summary>
 /// <typeparam name="ForAttribute"></typeparam>

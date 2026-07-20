@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEditor.Animations;
 
@@ -19,8 +20,19 @@ namespace ES
     {
         [Title("粒子系统批量调整工具", "批量调整粒子系统参数", bold: true, titleAlignment: TitleAlignments.Centered)]
 
-        [DisplayAsString(fontSize: 30), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
-        public string readMe = "选择带有ParticleSystem的GameObject，\n设置粒子参数，\n点击应用按钮批量修改";
+        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        public string readMe = "选择带 ParticleSystem 的对象，按需包含子对象。应用会修改参数；播放/停止只发送预览指令；清空会先确认。";
+
+        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-5)]
+        private string TargetSummary
+        {
+            get
+            {
+                int selectedCount = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
+                int targetCount = GetParticleTargets().Count;
+                return $"当前选择: {selectedCount} 个对象 | 命中粒子系统: {targetCount} 个 | 包含子对象: {(includeChildren ? "是" : "否")}";
+            }
+        }
 
         [LabelText("包含子对象"), Space(5)]
         public bool includeChildren = true;
@@ -49,7 +61,37 @@ namespace ES
         [LabelText("模拟空间"), Space(5)]
         public ParticleSystemSimulationSpace simulationSpace = ParticleSystemSimulationSpace.Local;
 
-        [Button("应用粒子系统设置", ButtonHeight = 50), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
+        private string lastResultSummary = "";
+        private string lastResultDetail = "";
+
+        [OnInspectorGUI]
+        private void DrawResultPanel()
+        {
+            SimpleToolsPanelUtility.DrawResultSummary("最近粒子操作", lastResultSummary, lastResultDetail);
+        }
+
+        private List<GameObject> GetParticleTargets()
+        {
+            return SimpleToolsSafetyUtility.CollectTargets(Selection.gameObjects, includeChildren)
+                .Where(obj => obj != null && obj.GetComponent<ParticleSystem>() != null)
+                .ToList();
+        }
+
+        private bool ConfirmParticleOperation(string title, string action, List<GameObject> targets)
+        {
+            if (targets.Count == 0)
+            {
+                EditorUtility.DisplayDialog("提示", "没有找到粒子系统！", "确定");
+                return false;
+            }
+
+            string preview = SimpleToolsSafetyUtility.JoinPreview(targets.Select(obj => obj.name), 10);
+            return EditorUtility.DisplayDialog(title,
+                $"将{action} {targets.Count} 个粒子系统。\n\n{preview}\n\n继续吗？",
+                "确认", "取消");
+        }
+
+        [Button("应用参数到选中粒子", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void ApplyParticleSystemSettings()
         {
             var selectedObjects = Selection.gameObjects;
@@ -59,33 +101,14 @@ namespace ES
                 return;
             }
 
-            var allObjects = new List<GameObject>();
-            foreach (var obj in selectedObjects)
-            {
-                allObjects.Add(obj);
-                if (includeChildren)
-                {
-                    allObjects.AddRange(obj.GetComponentsInChildren<Transform>().Select(t => t.gameObject));
-                }
-            }
+            var targets = GetParticleTargets();
 
             // 统计将被修改的粒子系统数量
-            int particleSystemCount = allObjects.Count(obj => obj.GetComponent<ParticleSystem>() != null);
-            if (particleSystemCount == 0)
-            {
-                EditorUtility.DisplayDialog("提示", "没有找到粒子系统！", "确定");
+            if (!ConfirmParticleOperation("确认应用粒子设置", "修改", targets))
                 return;
-            }
-
-            // 弹出确认面板
-            bool confirm = EditorUtility.DisplayDialog("确认应用", $"将修改 {particleSystemCount} 个粒子系统，确认应用？", "确认", "取消");
-            if (!confirm)
-            {
-                return;
-            }
 
             int modifiedCount = 0;
-            foreach (var obj in allObjects)
+            foreach (var obj in targets)
             {
                 var ps = obj.GetComponent<ParticleSystem>();
                 if (ps != null)
@@ -112,10 +135,13 @@ namespace ES
                 }
             }
 
-            // EditorUtility.DisplayDialog("成功", $"成功修改 {modifiedCount} 个粒子系统！", "确定");
+            MarkScenesDirty(targets);
+            lastResultSummary = $"已应用参数: {modifiedCount} 个粒子系统 | 目标: {targets.Count}";
+            lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(targets.Select(obj => obj.name), 10);
+            EditorUtility.DisplayDialog("粒子参数已应用", $"已修改 {modifiedCount} 个粒子系统。", "完成");
         }
 
-        [Button("批量播放粒子系统", ButtonHeight = 40), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+        [Button("播放选中粒子", ButtonHeight = 32), GUIColor(0.25f, 0.62f, 0.45f)]
         public void PlayAllParticleSystems()
         {
             var selectedObjects = Selection.gameObjects;
@@ -125,19 +151,19 @@ namespace ES
                 return;
             }
 
-            var allObjects = new List<GameObject>();
-            foreach (var obj in selectedObjects)
+            var allObjects = SimpleToolsSafetyUtility.CollectTargets(selectedObjects, includeChildren);
+            var targets = allObjects
+                .Where(obj => obj != null && obj.GetComponent<ParticleSystem>() != null)
+                .ToList();
+            if (targets.Count == 0)
             {
-                allObjects.Add(obj);
-                if (includeChildren)
-                {
-                    allObjects.AddRange(obj.GetComponentsInChildren<Transform>().Select(t => t.gameObject));
-                }
+                EditorUtility.DisplayDialog("提示", "没有找到粒子系统！", "确定");
+                return;
             }
 
             int playedCount = 0;
             var objectsToSelect = new List<GameObject>();
-            foreach (var obj in allObjects)
+            foreach (var obj in targets)
             {
                 var ps = obj.GetComponent<ParticleSystem>();
                 if (ps != null)
@@ -156,10 +182,12 @@ namespace ES
             // 刷新 Scene 视图以确保粒子播放可见
             UnityEditor.SceneView.RepaintAll();
 
-            // EditorUtility.DisplayDialog("成功", $"成功播放 {playedCount} 个粒子系统！", "确定");
+            lastResultSummary = $"已发送播放: {playedCount} 个粒子系统 | 目标: {targets.Count}";
+            lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(objectsToSelect.Select(obj => obj.name), 10);
+            EditorUtility.DisplayDialog("粒子播放已发送", $"已播放 {playedCount} 个粒子系统。", "完成");
         }
 
-        [Button("批量停止粒子系统", ButtonHeight = 40), GUIColor("@ESDesignUtility.ColorSelector.Color_05")]
+        [Button("停止选中粒子", ButtonHeight = 32), GUIColor(0.75f, 0.58f, 0.25f)]
         public void StopAllParticleSystems()
         {
             var selectedObjects = Selection.gameObjects;
@@ -169,18 +197,18 @@ namespace ES
                 return;
             }
 
-            var allObjects = new List<GameObject>();
-            foreach (var obj in selectedObjects)
+            var allObjects = SimpleToolsSafetyUtility.CollectTargets(selectedObjects, includeChildren);
+            var targets = allObjects
+                .Where(obj => obj != null && obj.GetComponent<ParticleSystem>() != null)
+                .ToList();
+            if (targets.Count == 0)
             {
-                allObjects.Add(obj);
-                if (includeChildren)
-                {
-                    allObjects.AddRange(obj.GetComponentsInChildren<Transform>().Select(t => t.gameObject));
-                }
+                EditorUtility.DisplayDialog("提示", "没有找到粒子系统！", "确定");
+                return;
             }
 
             int stoppedCount = 0;
-            foreach (var obj in allObjects)
+            foreach (var obj in targets)
             {
                 var ps = obj.GetComponent<ParticleSystem>();
                 if (ps != null)
@@ -190,10 +218,12 @@ namespace ES
                 }
             }
 
-            // EditorUtility.DisplayDialog("成功", $"成功停止 {stoppedCount} 个粒子系统！", "确定");
+            lastResultSummary = $"已发送停止: {stoppedCount} 个粒子系统 | 目标: {targets.Count}";
+            lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(targets.Select(obj => obj.name), 10);
+            EditorUtility.DisplayDialog("粒子停止已发送", $"已停止 {stoppedCount} 个粒子系统。", "完成");
         }
 
-        [Button("批量清空粒子", ButtonHeight = 40), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
+        [Button("清空选中粒子", ButtonHeight = 32), GUIColor(0.82f, 0.38f, 0.30f)]
         public void ClearAllParticleSystems()
         {
             var selectedObjects = Selection.gameObjects;
@@ -203,18 +233,12 @@ namespace ES
                 return;
             }
 
-            var allObjects = new List<GameObject>();
-            foreach (var obj in selectedObjects)
-            {
-                allObjects.Add(obj);
-                if (includeChildren)
-                {
-                    allObjects.AddRange(obj.GetComponentsInChildren<Transform>().Select(t => t.gameObject));
-                }
-            }
+            var targets = GetParticleTargets();
+            if (!ConfirmParticleOperation("确认清空粒子", "清空", targets))
+                return;
 
             int clearedCount = 0;
-            foreach (var obj in allObjects)
+            foreach (var obj in targets)
             {
                 var ps = obj.GetComponent<ParticleSystem>();
                 if (ps != null)
@@ -224,7 +248,24 @@ namespace ES
                 }
             }
 
-            // EditorUtility.DisplayDialog("成功", $"成功清空 {clearedCount} 个粒子系统！", "确定");
+            MarkScenesDirty(targets);
+            lastResultSummary = $"已清空: {clearedCount} 个粒子系统 | 目标: {targets.Count}";
+            lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(targets.Select(obj => obj.name), 10);
+            EditorUtility.DisplayDialog("粒子已清空", $"已清空 {clearedCount} 个粒子系统。", "完成");
+        }
+
+        private void MarkScenesDirty(IEnumerable<GameObject> targets)
+        {
+            if (targets == null)
+                return;
+
+            foreach (var scene in targets
+                .Where(obj => obj != null && obj.scene.IsValid())
+                .Select(obj => obj.scene)
+                .Distinct())
+            {
+                EditorSceneManager.MarkSceneDirty(scene);
+            }
         }
     }
     #endregion

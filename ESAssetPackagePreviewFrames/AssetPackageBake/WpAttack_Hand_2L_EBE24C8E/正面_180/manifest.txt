@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v2_ViewAware
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P4_CLazyAttack/Attack_Wp_Swing_Run/CLazy@WpAttack_Hand_2L.FBX
+clipName=WpAttack_Hand_2L
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=28
+pixels=117
+yaw=180

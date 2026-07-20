@@ -12,7 +12,7 @@ namespace ES
 {
     public class ESResWindow : ESMenuTreeWindowAB<ESResWindow> //OdinMenuEditorWindow
     {
-        [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【资源管理】窗口", false, -5)]
+        [MenuItem(MenuItemPathDefine.RESOURCE_WINDOW_PATH, false, 0)]
         public static void TryOpenWindow()
         {
             OpenWindow();

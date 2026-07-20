@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using ES.Internal;
 
 namespace ES
 {
@@ -9,6 +11,11 @@ namespace ES
         public bool IsValid
         {
             get { return id > 0; }
+        }
+
+        public static ESRuntimeModeHandle Invalid
+        {
+            get { return new ESRuntimeModeHandle { id = 0 }; }
         }
     }
 
@@ -29,6 +36,11 @@ namespace ES
         {
             get { return id > 0; }
         }
+
+        public static ESRuntimeModeTagHandle Invalid
+        {
+            get { return new ESRuntimeModeTagHandle { id = 0 }; }
+        }
     }
 
     public struct ESRuntimeModeTagEntry
@@ -42,11 +54,14 @@ namespace ES
 
     public sealed class ESRuntimeModeService
     {
+        private static readonly int RuntimeModeTagSlotCount = CalculateRuntimeModeTagSlotCount();
+
         public event System.Action<ESRuntimeModePolicy> OnPolicyChanged;
 
         private readonly List<ESRuntimeModeEntry> modeStack = new List<ESRuntimeModeEntry>(8);
         private readonly List<ESRuntimeModeTagEntry> tags = new List<ESRuntimeModeTagEntry>(8);
         private readonly List<ESPermitLawEntry> tempEntries = new List<ESPermitLawEntry>(16);
+        private readonly int[] tagUseCounts = new int[RuntimeModeTagSlotCount];
 
         private int nextHandleId = 1;
         private int nextStackIndex = 1;
@@ -78,6 +93,19 @@ namespace ES
             get { return tags.Count; }
         }
 
+        public void Warmup(int maxModes = 16, int maxTags = 32)
+        {
+            if (maxModes > modeStack.Capacity)
+                modeStack.Capacity = maxModes;
+
+            if (maxTags > tags.Capacity)
+                tags.Capacity = maxTags;
+
+            int maxPolicyEntries = maxModes + maxTags;
+            if (maxPolicyEntries > tempEntries.Capacity)
+                tempEntries.Capacity = maxPolicyEntries;
+        }
+
         public ESRuntimeMode CurrentMode
         {
             get
@@ -102,6 +130,30 @@ namespace ES
 
             RebuildPolicy();
             return handle;
+        }
+
+        public bool TryPushModeUnique(ESRuntimeMode mode, out ESRuntimeModeHandle handle, object owner = null, int? priorityOverride = null)
+        {
+            if (ContainsMode(mode))
+            {
+                handle = ESRuntimeModeHandle.Invalid;
+                return false;
+            }
+
+            handle = PushMode(mode, owner, priorityOverride);
+            return true;
+        }
+
+        public bool TryPushModeUniqueByOwner(ESRuntimeMode mode, object owner, out ESRuntimeModeHandle handle, int? priorityOverride = null)
+        {
+            if (ContainsModeByOwner(mode, owner))
+            {
+                handle = ESRuntimeModeHandle.Invalid;
+                return false;
+            }
+
+            handle = PushMode(mode, owner, priorityOverride);
+            return true;
         }
 
         public bool PopMode(ESRuntimeModeHandle handle)
@@ -168,8 +220,36 @@ namespace ES
                 owner = owner
             });
 
+            int tagIndex = (int)tag;
+            if (tagIndex >= 0 && tagIndex < tagUseCounts.Length)
+                tagUseCounts[tagIndex]++;
+
             RebuildPolicy();
             return handle;
+        }
+
+        public bool TryAddTagUnique(ESRuntimeModeTag tag, out ESRuntimeModeTagHandle handle, object owner = null, int? priorityOverride = null)
+        {
+            if (ContainsTag(tag))
+            {
+                handle = ESRuntimeModeTagHandle.Invalid;
+                return false;
+            }
+
+            handle = AddTag(tag, owner, priorityOverride);
+            return true;
+        }
+
+        public bool TryAddTagUniqueByOwner(ESRuntimeModeTag tag, object owner, out ESRuntimeModeTagHandle handle, int? priorityOverride = null)
+        {
+            if (ContainsTagByOwner(tag, owner))
+            {
+                handle = ESRuntimeModeTagHandle.Invalid;
+                return false;
+            }
+
+            handle = AddTag(tag, owner, priorityOverride);
+            return true;
         }
 
         public bool RemoveTag(ESRuntimeModeTagHandle handle)
@@ -181,6 +261,10 @@ namespace ES
             {
                 if (tags[i].handle.id != handle.id)
                     continue;
+
+                int tagIndex = (int)tags[i].tag;
+                if (tagIndex >= 0 && tagIndex < tagUseCounts.Length && tagUseCounts[tagIndex] > 0)
+                    tagUseCounts[tagIndex]--;
 
                 tags.RemoveAt(i);
                 RebuildPolicy();
@@ -203,13 +287,109 @@ namespace ES
 
         public bool ContainsTag(ESRuntimeModeTag tag)
         {
-            for (int i = 0; i < tags.Count; i++)
+            int tagIndex = (int)tag;
+            return tagIndex >= 0
+                   && tagIndex < tagUseCounts.Length
+                   && tagUseCounts[tagIndex] > 0;
+        }
+
+        public bool ContainsModeByOwner(ESRuntimeMode mode, object owner)
+        {
+            for (int i = 0; i < modeStack.Count; i++)
             {
-                if (tags[i].tag == tag)
+                ESRuntimeModeEntry entry = modeStack[i];
+                if (entry.mode == mode && OwnerEquals(entry.owner, owner))
                     return true;
             }
 
             return false;
+        }
+
+        public bool ContainsTagByOwner(ESRuntimeModeTag tag, object owner)
+        {
+            for (int i = 0; i < tags.Count; i++)
+            {
+                ESRuntimeModeTagEntry entry = tags[i];
+                if (entry.tag == tag && OwnerEquals(entry.owner, owner))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public int ReleaseModesByOwner(object owner)
+        {
+            int removed = 0;
+            for (int i = modeStack.Count - 1; i >= 0; i--)
+            {
+                if (!OwnerEquals(modeStack[i].owner, owner))
+                    continue;
+
+                modeStack.RemoveAt(i);
+                removed++;
+            }
+
+            if (removed > 0)
+                RebuildPolicy();
+
+            return removed;
+        }
+
+        public int ReleaseTagsByOwner(object owner)
+        {
+            int removed = 0;
+            for (int i = tags.Count - 1; i >= 0; i--)
+            {
+                if (!OwnerEquals(tags[i].owner, owner))
+                    continue;
+
+                int tagIndex = (int)tags[i].tag;
+                if (tagIndex >= 0 && tagIndex < tagUseCounts.Length && tagUseCounts[tagIndex] > 0)
+                    tagUseCounts[tagIndex]--;
+
+                tags.RemoveAt(i);
+                removed++;
+            }
+
+            if (removed > 0)
+                RebuildPolicy();
+
+            return removed;
+        }
+
+        public int ReleaseAllByOwner(object owner)
+        {
+            int removed = 0;
+            bool changed = false;
+
+            for (int i = modeStack.Count - 1; i >= 0; i--)
+            {
+                if (!OwnerEquals(modeStack[i].owner, owner))
+                    continue;
+
+                modeStack.RemoveAt(i);
+                removed++;
+                changed = true;
+            }
+
+            for (int i = tags.Count - 1; i >= 0; i--)
+            {
+                if (!OwnerEquals(tags[i].owner, owner))
+                    continue;
+
+                int tagIndex = (int)tags[i].tag;
+                if (tagIndex >= 0 && tagIndex < tagUseCounts.Length && tagUseCounts[tagIndex] > 0)
+                    tagUseCounts[tagIndex]--;
+
+                tags.RemoveAt(i);
+                removed++;
+                changed = true;
+            }
+
+            if (changed)
+                RebuildPolicy();
+
+            return removed;
         }
 
         public ESRuntimeModeEntry GetModeEntryAt(int index)
@@ -226,6 +406,7 @@ namespace ES
         {
             modeStack.Clear();
             tags.Clear();
+            System.Array.Clear(tagUseCounts, 0, tagUseCounts.Length);
             RebuildPolicy();
         }
 
@@ -237,6 +418,25 @@ namespace ES
         private ESRuntimeModeTagHandle NewTagHandle()
         {
             return new ESRuntimeModeTagHandle { id = nextHandleId++ };
+        }
+
+        private static bool OwnerEquals(object a, object b)
+        {
+            return ReferenceEquals(a, b) || (a != null && a.Equals(b));
+        }
+
+        private static int CalculateRuntimeModeTagSlotCount()
+        {
+            Array values = Enum.GetValues(typeof(ESRuntimeModeTag));
+            int max = -1;
+            for (int i = 0; i < values.Length; i++)
+            {
+                int value = (int)values.GetValue(i);
+                if (value > max)
+                    max = value;
+            }
+
+            return max + 1;
         }
 
         private void RebuildPolicy()

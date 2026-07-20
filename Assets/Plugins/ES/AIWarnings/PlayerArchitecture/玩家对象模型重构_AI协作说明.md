@@ -19,6 +19,10 @@ This note is for AI agents working on the player-object/model architecture rebui
 - 替代源码核查或编译验证。
 - 证明某个旧模块已经可以删除。
 
+配套必读：
+
+- `角色通用架构验证_MMO开放世界角色切换剧情RPG战斗_AI协作说明.md`：用 MMO、开放世界、角色切换、剧情和 RPG 战斗压力测试玩家/角色模型重构边界。
+
 ## Verified Project Shape
 
 - This is a Unity project. The requested workspace is `Assets/Plugins`, but the player/entity runtime is mostly outside it under `Assets/Scripts/ESLogic`.

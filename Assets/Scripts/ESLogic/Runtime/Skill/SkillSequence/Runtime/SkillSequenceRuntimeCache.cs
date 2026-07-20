@@ -135,6 +135,7 @@ namespace ES
         public readonly ITrackSequence Sequence;
         public readonly TrackRuntimeData[] Tracks;
         public readonly float Duration;
+        public readonly AnimationTimelineRuntimeData AnimationTimeline;
 
 #if UNITY_EDITOR
         public readonly int EditorVersion;
@@ -147,6 +148,7 @@ namespace ES
             EditorVersion = GetEditorVersion(sequence);
 #endif
             Tracks = BuildTracks(sequence, out Duration);
+            AnimationTimeline = AnimationTimelineRuntimeData.Build(sequence);
         }
 
         public static SkillSequenceRuntimeCache GetOrBuild(ITrackSequence sequence)
@@ -283,6 +285,164 @@ namespace ES
 
                 Array.Sort(enterEvents, ClipRuntimeEvent.Comparer);
                 Array.Sort(exitEvents, ClipRuntimeEvent.Comparer);
+            }
+        }
+
+        public sealed class AnimationTimelineRuntimeData
+        {
+            public static readonly AnimationTimelineRuntimeData Empty = new AnimationTimelineRuntimeData(
+                new AnimationClip[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new float[0],
+                new bool[0],
+                new string[0],
+                0f);
+
+            public readonly AnimationClip[] Clips;
+            public readonly float[] StartTimes;
+            public readonly float[] Durations;
+            public readonly float[] ClipStartOffsets;
+            public readonly float[] PlaybackSpeeds;
+            public readonly bool[] LoopClips;
+            public readonly string[] ClipMarkers;
+            public readonly float TotalDuration;
+            public bool HasClips => Clips != null && Clips.Length > 0;
+
+            private AnimationTimelineRuntimeData(
+                AnimationClip[] clips,
+                float[] startTimes,
+                float[] durations,
+                float[] clipStartOffsets,
+                float[] playbackSpeeds,
+                bool[] loopClips,
+                string[] clipMarkers,
+                float totalDuration)
+            {
+                Clips = clips;
+                StartTimes = startTimes;
+                Durations = durations;
+                ClipStartOffsets = clipStartOffsets;
+                PlaybackSpeeds = playbackSpeeds;
+                LoopClips = loopClips;
+                ClipMarkers = clipMarkers;
+                TotalDuration = totalDuration;
+            }
+
+            public static AnimationTimelineRuntimeData Build(ITrackSequence sequence)
+            {
+                if (sequence == null || sequence.Tracks == null)
+                    return Empty;
+
+                var entries = new List<TimelineClipEntry>(8);
+                float maxEndTime = 0f;
+
+                foreach (ITrackItem track in sequence.Tracks)
+                {
+                    if (track is not SkillTrackItem_Animation animationTrack || !animationTrack.Enabled || animationTrack.clips == null)
+                        continue;
+
+                    for (int i = 0; i < animationTrack.clips.Count; i++)
+                    {
+                        SkillTrackClip_Animation clip = animationTrack.clips[i];
+                        if (clip == null || !clip.Enabled || clip.AnimationClipName == null || clip.DurationTime <= 0.0001f)
+                            continue;
+
+                        float startTime = Mathf.Max(0f, clip.StartTime);
+                        float duration = Mathf.Max(0.0001f, clip.DurationTime);
+                        entries.Add(new TimelineClipEntry(
+                            clip.AnimationClipName,
+                            startTime,
+                            duration,
+                            Mathf.Max(0f, clip.clipStartOffset),
+                            Mathf.Max(0.01f, clip.playbackSpeed),
+                            clip.loopClip,
+                            clip.clipMarker,
+                            entries.Count));
+                        maxEndTime = Mathf.Max(maxEndTime, startTime + duration);
+                    }
+                }
+
+                if (entries.Count == 0)
+                    return Empty;
+
+                entries.Sort(TimelineClipEntryComparer.Instance);
+
+                int count = entries.Count;
+                AnimationClip[] clipArray = new AnimationClip[count];
+                float[] startArray = new float[count];
+                float[] durationArray = new float[count];
+                float[] offsetArray = new float[count];
+                float[] speedArray = new float[count];
+                bool[] loopArray = new bool[count];
+                string[] markerArray = new string[count];
+
+                for (int i = 0; i < count; i++)
+                {
+                    TimelineClipEntry entry = entries[i];
+                    clipArray[i] = entry.Clip;
+                    startArray[i] = entry.StartTime;
+                    durationArray[i] = entry.Duration;
+                    offsetArray[i] = entry.ClipStartOffset;
+                    speedArray[i] = entry.PlaybackSpeed;
+                    loopArray[i] = entry.LoopClip;
+                    markerArray[i] = !string.IsNullOrWhiteSpace(entry.Marker)
+                        ? entry.Marker
+                        : BuildClipMarker(entry.Clip, i);
+                }
+
+                return new AnimationTimelineRuntimeData(
+                    clipArray,
+                    startArray,
+                    durationArray,
+                    offsetArray,
+                    speedArray,
+                    loopArray,
+                    markerArray,
+                    maxEndTime);
+            }
+
+            private static string BuildClipMarker(AnimationClip clip, int index)
+            {
+                return clip != null && !string.IsNullOrWhiteSpace(clip.name)
+                    ? clip.name
+                    : "Clip" + index;
+            }
+
+            private readonly struct TimelineClipEntry
+            {
+                public readonly AnimationClip Clip;
+                public readonly float StartTime;
+                public readonly float Duration;
+                public readonly float ClipStartOffset;
+                public readonly float PlaybackSpeed;
+                public readonly bool LoopClip;
+                public readonly string Marker;
+                public readonly int SourceIndex;
+
+                public TimelineClipEntry(AnimationClip clip, float startTime, float duration, float clipStartOffset, float playbackSpeed, bool loopClip, string marker, int sourceIndex)
+                {
+                    Clip = clip;
+                    StartTime = startTime;
+                    Duration = duration;
+                    ClipStartOffset = clipStartOffset;
+                    PlaybackSpeed = playbackSpeed;
+                    LoopClip = loopClip;
+                    Marker = marker;
+                    SourceIndex = sourceIndex;
+                }
+            }
+
+            private sealed class TimelineClipEntryComparer : IComparer<TimelineClipEntry>
+            {
+                public static readonly TimelineClipEntryComparer Instance = new TimelineClipEntryComparer();
+
+                public int Compare(TimelineClipEntry x, TimelineClipEntry y)
+                {
+                    int startCompare = x.StartTime.CompareTo(y.StartTime);
+                    return startCompare != 0 ? startCompare : x.SourceIndex.CompareTo(y.SourceIndex);
+                }
             }
         }
 

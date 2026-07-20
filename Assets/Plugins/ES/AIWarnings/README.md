@@ -10,27 +10,43 @@
    - 适用：编辑器工具重写、商业级验证、小工具加固。
    - 重点：职责边界、插件结构、asmdef、菜单入口、脏工作区和验证优先级。
 
-2. `CodexNotes/SO表格工具_AI协作说明.md`
+2. `CodexNotes/编辑器窗口迁移_ESMenuTreeWindowAB适配_AI协作警告.md`
+   - 适用：普通 EditorWindow/OdinEditorWindow 迁移、ESMenuTreeWindowAB 适配、TrackView 临时弹窗统一外壳。
+   - 重点：哪些窗口已迁移，哪些临时弹窗可以迁，TrackView/GraphView/弹出菜单不要硬迁，迁移后必须保留关闭保存逻辑。
+
+3. `CodexNotes/SO表格工具_AI协作说明.md`
    - 适用：SO Table、命名空间迁移、表格导入导出、批处理计划。
    - 重点：高风险写入、计划只读、Group/Info 规则、CSV/XLSX 格式事实。
 
-3. `InputRuntime/输入与交互入口_AI协作警告.md`
+4. `InputRuntime/输入与交互入口_AI协作警告.md`
    - 适用：输入运行时、改键、虚拟输入、RuntimeMode 对输入的过滤。
    - 重点：`ESInputConfig`、`ESInputBindingProfile`、`ESInputRuntime`、`ESInputService` 的职责边界。
 
-4. `GameManager_SaveSystem/架构体系_ESGameManager_SaveSystem_AI协作警告.md`
+5. `GameManager_SaveSystem/架构体系_ESGameManager_SaveSystem_AI协作警告.md`
    - 适用：GameManager、三域结构、保存系统、模块 Inspector。
    - 重点：当前唯一 GameManager 位置、不要恢复旧 `ESGameCore`、保存系统静态门面。
 
-5. `PlayerArchitecture/玩家对象模型重构_AI协作说明.md`
+6. `通用架构理解_跨系统纠偏_AI协作警告.md`
+   - 适用：跨系统架构修改前的总览，尤其是 Entity、Item、Input、ValueChange、Buff、StateMachine、AITalk。
+   - 重点：不要用大外壳、大 Domain、大模块接管一切；配置、运行态、表现、桥接、高频路径必须分清。
+
+7. `PlayerArchitecture/玩家对象模型重构_AI协作说明.md`
    - 适用：玩家对象模型、Entity 与 Player facade 的边界。
    - 重点：玩家运行时主要在 `Assets/Scripts/ESLogic`，不要只看 `Assets/Plugins/ES`。
 
-6. `玩家运动_PlayerMotion_AI协作说明.md`
+8. `PlayerArchitecture/模型重构_插件依赖边界_AI协作说明.md`
+   - 适用：玩家/角色模型重构时判断插件依赖边界。
+   - 重点：KCC、InputSystem、FinalIK、Cinemachine、EasySave3、DOTween、Odin、Luban/MemoryPack/UniTask 等插件在角色体系中的可依赖层级。
+
+9. `PlayerArchitecture/模型重构_今日修正_CoreDomain与AI域控制_AI协作警告.md`
+   - 适用：玩家/角色/所有生命体模型重构时纠正过时理解。
+   - 重点：Core/Domain 具备逻辑能力；外壳只管结构和桥接；控制来源优先落在 AI 域/模块；不要一开始新增大量脚本。
+
+10. `玩家运动_PlayerMotion_AI协作说明.md`
    - 适用：玩家运动、KCC、交互物、攀爬/飞行/游泳/骑乘。
    - 重点：`EntityKCCData`、输入逐帧写入、`StateSupportFlags`、交互模块装配。
 
-7. `AI协作职责_状态机与IK上层_Buff边界说明.md`
+11. `AI协作职责_状态机与IK上层_Buff边界说明.md`
    - 适用：StateMachine、FinalIK Driver、BuffDomain 边界。
    - 重点：StateMachine 不直接操作 FinalIK solver，BuffDomain 当前不要误判为完整 Buff 系统。
 

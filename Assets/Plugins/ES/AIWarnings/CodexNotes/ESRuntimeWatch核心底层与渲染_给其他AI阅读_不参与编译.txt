@@ -1,0 +1,1876 @@
+ESRuntimeWatch 核心底层与渲染 - 给其他 AI 阅读，不参与 Unity 编译
+更新日期：2026-07-19
+职责：工具重写 / 商业级验证 / RuntimeWatch 架构协作说明
+
+本文件只整合 RuntimeWatch 自身核心代码：特性定义、注册表、编辑器程序集流注册入口、面板扫描与渲染。
+不包含 Domain、Hosting、Entity 示例、普通 Mono 示例等外部接入代码，避免阅读者把示例体系误当成工具底层。
+
+给其他 AI / 开发者的推介：
+ESRuntimeWatch 不是普通字段面板，而是一个无侵入 Runtime Observatory。它试图解决 Unity 项目里最常见、也最折磨的运行时黑盒问题：关键状态分散在 MonoBehaviour、普通嵌套数据、Domain、Module 甚至 Module 内部数据里，原生 Inspector 看不到，日志又噪声大、滞后、难以对齐实例。
+接入方式只需要在字段上加 ESRuntimeWatchAttribute，不要求业务模块写专门 Editor、不要求每个 Module 手动注册 UI、不要求把非 Unity 对象强行改造成 Component。工具通过编辑器程序集流收集字段元数据，通过反向字段图和 Core/Domain/Module 结构规则，把非 Mono 的运行时状态重新挂回当前场景里的真实 Mono/Core 实例。
+这套能力的创新点在于：它不是“递归反射全场景对象然后碰运气”，而是“从已标记字段出发，解析一条可解释、可诊断、可复制的宿主链路”。因此它能同时服务人类调试、商业级验收、AI 协作交接和框架架构校验。
+对 Core/Domain/Module 架构尤其重要：Module 通常不是 GameObject 上的 Component，但 RuntimeWatch 可以显示它来自哪个 Entity、哪个 Domain、哪个 Module、哪个嵌套字段，并通过 Tag/ShowIf 降低信息噪声。正确使用后，开发者可以少写大量临时 Debug.Log，少开断点查对象关系，更快判断“实例有没有、链路通不通、字段值对不对、过滤条件为什么没过”。
+商业化方向：继续强化值渲染、异常分组、扫描耗时、快照对比、收藏项、单项复制链路、无副作用模块解析策略后，它可以成为 ESFramework 的核心调试卖点，而不只是 SimpleTools 里的一个小工具。
+补充判断：即使完全不考虑 Core/Domain/Module，ESRuntimeWatch 只用于普通 MonoBehaviour 也很有价值。它提供的是无侵入、多对象、可分组、可搜索、可 Tag/ShowIf 过滤、可定位场景对象的运行时字段观察能力，不是把 Inspector 字段换个地方显示。多个对象同类字段的集中对比、嵌套普通数据类的实时观察、少写临时 Debug.Log 和少写自定义 Editor，本身就足够成为实用工具。
+性能创新点：这套设计不是 场景对象 -> 全组件 -> 全字段 -> 递归对象树 -> 找标记 的蛮力对象浏览器，而是 程序集流注册已标记字段 -> 从 FieldInfo.DeclaringType 反推可能宿主链路 -> 只扫描这些真实 Mono/Core Owner -> 按缓存路径读取当前值。反向字段图 ChildType -> ParentType + FieldInfo 只需按需构建，路径方案、OwnerType、EntryKey 都可缓存去重，因此核心性能路线是高效的。
+可以对外概括为：声明式字段观察 + 反向宿主链路解析 + 场景实例投影。它的创新点在于让运行时状态以可解释链路投影回真实场景实例，同时保持业务代码低侵入。
+
+核心边界：
+1. 普通 Mono 链路和 Core 链路是两套不同语义，不能混成一个 owner 字段递归。普通 Mono 是 Mono -> 普通字段/嵌套对象；Core 链路是 Core(Mono) -> Domain字段 -> Module解析 -> Module字段/嵌套对象。
+2. RuntimeWatch 支持所有可由注册表解析出宿主链路的观察字段，不只支持某个示例 Module。
+3. 反向字段图只允许正向持有链。必须跳过 Module.MyDomain、Module.MyCore、Domain.myCore 这类运行时回指字段；否则会产生 Entity.kcc.flyModule.MyDomain 这种错误绕路。
+4. 扫描类型字段时只接受 field.DeclaringType == 当前扫描 type，避免派生 Mono 因继承字段生成伪 owner 链。
+5. 反向图递归到 IESModule 后必须停住：Module 是内部宿主边界，不允许再从 Module 通过回指或运行时关系爬回 Domain/Core。
+6. Entry 入库前必须做安全校验：OwnerType 必须是 MonoBehaviour；Module Entry 的 OwnerPath 不允许包含任何 IESModule 字段；OwnerPath/ModulePath 不允许包含 MyDomain/MyCore/myCore 或 backing field。
+7. 单个 GameObject 可以承载多个 owner 脚本；单个 owner 脚本可以同时暴露直接字段、普通嵌套对象字段、Domain 字段、Module 字段和 Module 内部嵌套字段，多条 Entry 用 owner instance + 字段路径 key 去重，不能互相覆盖。
+8. 注册阶段轻量，只记录 Attribute + FieldInfo；重反射和路径方案构建延迟到面板访问。
+9. Module 解析通过反射执行：当前对象是目标 Module -> 反射 Core_Base/Core_Object 得到 Core 对象 -> 反射 ModuleTables -> 反射 GetMoudle<T>() 兜底 -> IESHosting<T>.ModulesIEnumable。不要在工具代码中直接写 Core/IDomain/IModule 强类型。
+   2026-07-19 修正：实际运行顺序应优先 ModuleTables，再查 ModulesIEnumable，最后才允许 GetMoudle<T>()。GetMoudle 可能创建缺失模块，属于高副作用兜底，默认应关闭，仅用于明确的链路验证。
+10. Entry 的 OwnerType 必须是真正的 MonoBehaviour/Core 类型；Domain/Module 只能出现在字段路径或 ModulePath 中，不能成为面板扫描 owner。
+11. 面板提供 生成链路报告/复制链路报告/清空报告 按钮，报告按 Core链路/普通Mono链路/异常链路分类，显示完整 OwnerPath、ModulePath、Field、Tag、ShowIf、EntryKey。
+12. 面板统计里 拒绝Owner 和 拒绝链路 是不同含义：前者是 OwnerType 不是 MonoBehaviour；后者是路径安全校验挡掉了错误所有权链。
+13. 性能边界：反向字段图可以一次建，但路径求解必须只从已注册观察字段的声明类型出发，找到 Mono/Module 宿主就停；不能对全项目所有类型预计算路径方案。
+14. ESAssemblyStream 的 Runtime 注册器已整体改成 Editor-only：Player / IL2CPP 下不再执行程序集流、热加载注册、时序注册器、字段/方法/类扫描，也不再维持对应的 RuntimeTypes/RuntimeRegisters 数据结构。需要时只在 Editor 侧用这条发现链。
+15. 代码内关于 AssemblyStream 的备注也应按 Editor-only 理解，不要再把它当成 Player/IL2CPP 可用的运行时注册系统。
+
+已知错误样例，必须拒绝：
+OwnerPath=Entity.kcc:EntityKCCData -> EntityKCCData.flyModule:EntityBasicFlyModule -> Module2.MyDomain:EntityBasicDomain
+原因：这是 Module 运行时回指，不是序列化/结构所有权。正确 Core Module 链路应类似 Entity.basicDomain -> [EntityBasicRuntimeWatchModule] -> watchModuleSubmitted。
+
+整合文件列表：
+- Assets/Plugins/ES/0_Stand/Attributes/FlagOrTag/ESRuntimeWatchAttribute.cs
+- Assets/Plugins/ES/0_Stand/Attributes/FlagOrTag/ESRuntimeWatchRegistry.cs
+- Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/ER_ESRuntimeWatch.cs
+- Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_RuntimeWatch.cs
+
+================================================================================
+FILE: Assets/Plugins/ES/0_Stand/Attributes/FlagOrTag/ESRuntimeWatchAttribute.cs
+================================================================================
+using System;
+
+namespace ES
+{
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
+    public class ESRuntimeWatchAttribute : Attribute
+    {
+        public string Group;
+        public string Label;
+        public string RequiredTag;
+        public string ShowIf;
+
+        public ESRuntimeWatchAttribute(string group = "Default", string label = null, string requiredTag = null, string showIf = null)
+        {
+            Group = string.IsNullOrEmpty(group) ? "Default" : group;
+            Label = label;
+            RequiredTag = requiredTag;
+            ShowIf = showIf;
+        }
+    }
+}
+
+================================================================================
+FILE: Assets/Plugins/ES/0_Stand/Attributes/FlagOrTag/ESRuntimeWatchRegistry.cs
+================================================================================
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using UnityEngine;
+
+namespace ES
+{
+    public static class ESRuntimeWatchRegistry
+    {
+        private const int MaxNestedDepth = 4;
+        private const int MaxSchemesPerTargetType = 1024;
+        private static readonly BindingFlags InstanceFieldFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        private static readonly List<WatchFieldRecord> watchFields = new List<WatchFieldRecord>();
+        private static readonly HashSet<FieldInfo> registeredWatchFields = new HashSet<FieldInfo>();
+        private static readonly List<Entry> entries = new List<Entry>();
+        private static readonly List<Type> ownerTypes = new List<Type>();
+        private static readonly HashSet<string> registeredEntryKeys = new HashSet<string>();
+        private static readonly Dictionary<Type, List<Entry>> entriesByOwnerType = new Dictionary<Type, List<Entry>>();
+        private static readonly Dictionary<Type, List<OwnerFieldPath>> nestedPathCache = new Dictionary<Type, List<OwnerFieldPath>>();
+        private static readonly Dictionary<Type, List<OwnerFieldPath>> modulePathCache = new Dictionary<Type, List<OwnerFieldPath>>();
+        private static readonly Dictionary<Type, List<FieldParentEdge>> parentEdgesByChildType = new Dictionary<Type, List<FieldParentEdge>>();
+        private static readonly Dictionary<Type, List<FieldParentEdge>> compatibleParentEdgesCache = new Dictionary<Type, List<FieldParentEdge>>();
+        private static readonly Dictionary<Type, List<OwnerFieldPath>> monoOwnerSchemesByTargetType = new Dictionary<Type, List<OwnerFieldPath>>();
+        private static readonly Dictionary<Type, List<OwnerFieldPath>> moduleOwnerSchemesByTargetType = new Dictionary<Type, List<OwnerFieldPath>>();
+        private static readonly Dictionary<Type, List<OwnerFieldPath>> moduleInnerSchemesByTargetType = new Dictionary<Type, List<OwnerFieldPath>>();
+        private static readonly List<HostingTypeInfo> hostingTypeInfos = new List<HostingTypeInfo>();
+        private static List<Type> candidateMonoTypeCache;
+        private static List<Type> candidateModuleTypeCache;
+        private static int fieldGraphEdgeCount;
+        private static int schemeLimitHitCount;
+        private static int rejectedNonMonoOwnerCount;
+        private static int rejectedInvalidPathCount;
+        private static bool fieldGraphBuilt;
+        private static bool entriesBuilt;
+
+        public static int RegisteredFieldCount => watchFields.Count;
+        public static bool IsEntriesBuilt => entriesBuilt;
+        public static bool IsFieldGraphBuilt => fieldGraphBuilt;
+        public static int FieldGraphTargetTypeCount => parentEdgesByChildType.Count;
+        public static int FieldGraphEdgeCount => fieldGraphEdgeCount;
+        public static int SchemeLimitHitCount => schemeLimitHitCount;
+        public static int RejectedNonMonoOwnerCount => rejectedNonMonoOwnerCount;
+        public static int RejectedInvalidPathCount => rejectedInvalidPathCount;
+        public static string OwnerTypeSummary => ownerTypes.Count == 0
+            ? "<无>"
+            : string.Join("\n", ownerTypes.Select(BuildTypeInfo));
+
+        public static string BuildTypeInfo(Type type)
+        {
+            if (type == null)
+                return "Type:<null>";
+
+            string assemblyName = type.Assembly != null ? type.Assembly.GetName().Name : "<no asm>";
+            return $"Type:{type.Name} | NS:{type.Namespace ?? "<global>"} | ASM:{assemblyName}";
+        }
+
+        public static IReadOnlyList<Entry> Entries
+        {
+            get
+            {
+                EnsureEntriesBuilt();
+                return entries;
+            }
+        }
+
+        public static IReadOnlyList<Type> OwnerTypes
+        {
+            get
+            {
+                EnsureEntriesBuilt();
+                return ownerTypes;
+            }
+        }
+
+        public static IReadOnlyList<Entry> GetEntriesForOwnerType(Type ownerType)
+        {
+            EnsureEntriesBuilt();
+
+            if (ownerType == null)
+                return Array.Empty<Entry>();
+
+            if (entriesByOwnerType.TryGetValue(ownerType, out var exact))
+                return exact;
+
+            var result = new List<Entry>();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                Entry entry = entries[i];
+                if (entry.OwnerType != null && entry.OwnerType.IsAssignableFrom(ownerType))
+                    result.Add(entry);
+            }
+
+            entriesByOwnerType[ownerType] = result;
+            return result;
+        }
+
+        public static void RegisterField(ESRuntimeWatchAttribute attribute, FieldInfo fieldInfo)
+        {
+            if (attribute == null || fieldInfo == null)
+                return;
+
+            if (fieldInfo.IsStatic || fieldInfo.IsLiteral)
+                return;
+
+            if (!registeredWatchFields.Add(fieldInfo))
+                return;
+
+            watchFields.Add(new WatchFieldRecord(attribute, fieldInfo));
+            InvalidateMaterializedData();
+        }
+
+        private static void InvalidateMaterializedData()
+        {
+            entriesBuilt = false;
+            fieldGraphBuilt = false;
+            nestedPathCache.Clear();
+            modulePathCache.Clear();
+            compatibleParentEdgesCache.Clear();
+            monoOwnerSchemesByTargetType.Clear();
+            moduleOwnerSchemesByTargetType.Clear();
+            moduleInnerSchemesByTargetType.Clear();
+            entriesByOwnerType.Clear();
+        }
+
+        private static void EnsureEntriesBuilt()
+        {
+            if (entriesBuilt)
+                return;
+
+            entriesBuilt = true;
+            entries.Clear();
+            ownerTypes.Clear();
+            registeredEntryKeys.Clear();
+            entriesByOwnerType.Clear();
+
+            for (int i = 0; i < watchFields.Count; i++)
+                BuildEntriesForField(watchFields[i].Attribute, watchFields[i].FieldInfo);
+        }
+
+        private static void BuildEntriesForField(ESRuntimeWatchAttribute attribute, FieldInfo fieldInfo)
+        {
+            if (attribute == null || fieldInfo == null)
+                return;
+
+            Type declaringType = fieldInfo.DeclaringType;
+            if (declaringType == null)
+                return;
+
+            if (typeof(MonoBehaviour).IsAssignableFrom(declaringType))
+            {
+                AddEntry(attribute, fieldInfo, declaringType, Array.Empty<FieldInfo>(), RuntimeWatchEntryKind.Field, null, Array.Empty<FieldInfo>());
+                return;
+            }
+
+            if (typeof(IESModule).IsAssignableFrom(declaringType))
+            {
+                foreach (var path in FindModuleOwnerPaths(declaringType))
+                    AddEntry(attribute, fieldInfo, path.OwnerType, path.Fields, RuntimeWatchEntryKind.Module, declaringType, Array.Empty<FieldInfo>());
+                return;
+            }
+
+            foreach (var path in FindMonoOwnerPaths(declaringType))
+                AddEntry(attribute, fieldInfo, path.OwnerType, path.Fields, RuntimeWatchEntryKind.Field, null, Array.Empty<FieldInfo>());
+
+            foreach (var path in FindNestedModuleOwnerPaths(declaringType))
+                AddEntry(attribute, fieldInfo, path.OwnerType, path.Fields, RuntimeWatchEntryKind.Module, path.ModuleType, path.ModulePath);
+        }
+
+        private static void AddEntry(ESRuntimeWatchAttribute attribute, FieldInfo fieldInfo, Type ownerType, FieldInfo[] ownerPath, RuntimeWatchEntryKind kind, Type moduleType, FieldInfo[] modulePath)
+        {
+            if (ownerType == null)
+                return;
+
+            if (!typeof(MonoBehaviour).IsAssignableFrom(ownerType))
+            {
+                rejectedNonMonoOwnerCount++;
+                return;
+            }
+
+            if (!IsValidRuntimeWatchPath(ownerPath, kind, modulePath))
+            {
+                rejectedInvalidPathCount++;
+                return;
+            }
+
+            string key = BuildEntryKey(ownerType, ownerPath, fieldInfo, kind, moduleType, modulePath);
+            if (!registeredEntryKeys.Add(key))
+                return;
+
+            if (!ownerTypes.Contains(ownerType))
+                ownerTypes.Add(ownerType);
+
+            var entry = new Entry(attribute, fieldInfo, ownerType, ownerPath, key, kind, moduleType, modulePath);
+            entries.Add(entry);
+            if (!entriesByOwnerType.TryGetValue(ownerType, out var indexedEntries))
+            {
+                indexedEntries = new List<Entry>();
+                entriesByOwnerType[ownerType] = indexedEntries;
+            }
+            indexedEntries.Add(entry);
+        }
+
+        private static IEnumerable<OwnerFieldPath> FindMonoOwnerPaths(Type targetDeclaringType)
+        {
+            if (nestedPathCache.TryGetValue(targetDeclaringType, out var cachedPaths))
+                return cachedPaths;
+
+            EnsureFieldGraphBuilt();
+            if (!monoOwnerSchemesByTargetType.TryGetValue(targetDeclaringType, out var result))
+            {
+                result = FindOwnerPathsByReverseGraph(targetDeclaringType, type => typeof(MonoBehaviour).IsAssignableFrom(type));
+                AddSchemes(monoOwnerSchemesByTargetType, targetDeclaringType, result);
+            }
+
+            nestedPathCache[targetDeclaringType] = result;
+            return result;
+        }
+
+        private static IEnumerable<ModuleOwnerFieldPath> FindNestedModuleOwnerPaths(Type targetDeclaringType)
+        {
+            EnsureFieldGraphBuilt();
+            if (!moduleInnerSchemesByTargetType.ContainsKey(targetDeclaringType))
+            {
+                var moduleInnerSchemes = FindOwnerPathsByReverseGraph(targetDeclaringType, type => typeof(IESModule).IsAssignableFrom(type));
+                AddSchemes(moduleInnerSchemesByTargetType, targetDeclaringType, moduleInnerSchemes);
+            }
+
+            if (!moduleInnerSchemesByTargetType.TryGetValue(targetDeclaringType, out var moduleInnerPaths))
+                yield break;
+
+            foreach (var moduleInnerPath in moduleInnerPaths)
+            {
+                Type moduleType = moduleInnerPath.OwnerType;
+                if (moduleType == null)
+                    continue;
+
+                foreach (var ownerPath in FindModuleOwnerPaths(moduleType))
+                    yield return new ModuleOwnerFieldPath(ownerPath.OwnerType, ownerPath.Fields, moduleType, moduleInnerPath.Fields);
+            }
+        }
+
+        private static IEnumerable<OwnerFieldPath> FindModuleOwnerPaths(Type targetModuleType)
+        {
+            if (modulePathCache.TryGetValue(targetModuleType, out var cachedPaths))
+                return cachedPaths;
+
+            EnsureFieldGraphBuilt();
+            if (!moduleOwnerSchemesByTargetType.TryGetValue(targetModuleType, out var schemes))
+            {
+                BuildModuleFastSchemes(targetModuleType);
+                moduleOwnerSchemesByTargetType.TryGetValue(targetModuleType, out schemes);
+            }
+
+            var result = schemes ?? new List<OwnerFieldPath>();
+            modulePathCache[targetModuleType] = result;
+            return result;
+        }
+
+        private static List<OwnerFieldPath> FindModuleInnerPaths(Type moduleType, Type targetDeclaringType)
+        {
+            EnsureFieldGraphBuilt();
+            if (!moduleInnerSchemesByTargetType.TryGetValue(targetDeclaringType, out var schemes))
+                return new List<OwnerFieldPath>();
+
+            return schemes.Where(path => path.OwnerType == moduleType).ToList();
+        }
+
+        private static IEnumerable<Type> GetCandidateMonoTypes()
+        {
+            EnsureFieldGraphBuilt();
+            if (candidateMonoTypeCache != null)
+                return candidateMonoTypeCache;
+
+            candidateMonoTypeCache = new List<Type>();
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    types = ex.Types.Where(t => t != null).ToArray();
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (Type type in types)
+                {
+                    if (type != null && !type.IsAbstract && typeof(MonoBehaviour).IsAssignableFrom(type))
+                        candidateMonoTypeCache.Add(type);
+                }
+            }
+
+            return candidateMonoTypeCache;
+        }
+
+        private static IEnumerable<Type> GetCandidateModuleTypes()
+        {
+            EnsureFieldGraphBuilt();
+            return candidateModuleTypeCache;
+        }
+
+        private static void EnsureFieldGraphBuilt()
+        {
+            if (fieldGraphBuilt)
+                return;
+
+            fieldGraphBuilt = true;
+            candidateMonoTypeCache = new List<Type>();
+            candidateModuleTypeCache = new List<Type>();
+            parentEdgesByChildType.Clear();
+            compatibleParentEdgesCache.Clear();
+            monoOwnerSchemesByTargetType.Clear();
+            moduleOwnerSchemesByTargetType.Clear();
+            moduleInnerSchemesByTargetType.Clear();
+            hostingTypeInfos.Clear();
+            fieldGraphEdgeCount = 0;
+            schemeLimitHitCount = 0;
+            rejectedNonMonoOwnerCount = 0;
+            rejectedInvalidPathCount = 0;
+
+            foreach (Type type in EnumerateRuntimeTypes())
+            {
+                if (type == null)
+                    continue;
+
+                if (!type.IsAbstract && typeof(MonoBehaviour).IsAssignableFrom(type))
+                    candidateMonoTypeCache.Add(type);
+
+                if (!type.IsAbstract && typeof(IESModule).IsAssignableFrom(type))
+                    candidateModuleTypeCache.Add(type);
+
+                if (!typeof(IESModule).IsAssignableFrom(type) && TryGetHostingModuleType(type, out Type hostedModuleType))
+                    hostingTypeInfos.Add(new HostingTypeInfo(type, hostedModuleType));
+
+                foreach (FieldInfo field in type.GetFields(InstanceFieldFlags))
+                {
+                    if (field.DeclaringType != type)
+                        continue;
+
+                    if (field.IsStatic || field.IsLiteral)
+                        continue;
+
+                    if (IsRuntimeBackReferenceField(field))
+                        continue;
+
+                    Type fieldType = NormalizeFieldType(field.FieldType);
+                    if (!CanTraverseFieldType(fieldType))
+                        continue;
+
+                    if (!parentEdgesByChildType.TryGetValue(fieldType, out var edges))
+                    {
+                        edges = new List<FieldParentEdge>();
+                        parentEdgesByChildType[fieldType] = edges;
+                    }
+                    edges.Add(new FieldParentEdge(type, fieldType, field));
+                    fieldGraphEdgeCount++;
+                }
+            }
+        }
+
+        private static bool IsRuntimeBackReferenceField(FieldInfo field)
+        {
+            if (field == null)
+                return true;
+
+            string fieldName = field.Name;
+            if (fieldName == "MyDomain" || fieldName == "MyCore" || fieldName == "myCore")
+                return true;
+
+            if (fieldName != null && fieldName.Contains("k__BackingField"))
+                return true;
+
+            return false;
+        }
+
+        private static void BuildModuleFastSchemes(Type moduleType)
+        {
+            if (moduleType == null)
+                return;
+
+            var schemes = new List<OwnerFieldPath>();
+            foreach (HostingTypeInfo hostingInfo in hostingTypeInfos)
+            {
+                if (hostingInfo.HostingType == null || hostingInfo.HostedModuleType == null)
+                    continue;
+
+                if (!hostingInfo.HostedModuleType.IsAssignableFrom(moduleType)
+                    && !moduleType.IsAssignableFrom(hostingInfo.HostedModuleType))
+                    continue;
+
+                if (typeof(MonoBehaviour).IsAssignableFrom(hostingInfo.HostingType))
+                {
+                    schemes.Add(new OwnerFieldPath(hostingInfo.HostingType, Array.Empty<FieldInfo>()));
+                }
+                else if (!monoOwnerSchemesByTargetType.TryGetValue(hostingInfo.HostingType, out var hostingOwnerSchemes))
+                {
+                    hostingOwnerSchemes = FindOwnerPathsByReverseGraph(hostingInfo.HostingType, type => typeof(MonoBehaviour).IsAssignableFrom(type));
+                    AddSchemes(monoOwnerSchemesByTargetType, hostingInfo.HostingType, hostingOwnerSchemes);
+                    schemes.AddRange(hostingOwnerSchemes);
+                }
+                else
+                {
+                    schemes.AddRange(hostingOwnerSchemes);
+                }
+            }
+
+            AddSchemes(moduleOwnerSchemesByTargetType, moduleType, schemes);
+        }
+
+        private static void AddSchemes(Dictionary<Type, List<OwnerFieldPath>> targetMap, Type targetType, List<OwnerFieldPath> schemes)
+        {
+            if (targetType == null)
+                return;
+
+            targetMap[targetType] = schemes ?? new List<OwnerFieldPath>();
+        }
+
+        private static IEnumerable<Type> EnumerateRuntimeTypes()
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!ShouldScanAssembly(assembly))
+                    continue;
+
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    types = ex.Types.Where(t => t != null).ToArray();
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (Type type in types)
+                {
+                    if (type != null && !type.IsGenericTypeDefinition)
+                        yield return type;
+                }
+            }
+        }
+
+        private static bool ShouldScanAssembly(Assembly assembly)
+        {
+            if (assembly == null)
+                return false;
+
+            string assemblyName = assembly.GetName().Name;
+            if (string.IsNullOrEmpty(assemblyName))
+                return false;
+
+            if (assemblyName == "Assembly-CSharp"
+                || assemblyName == "Assembly-CSharp-firstpass"
+                || assemblyName == "Assembly-CSharp-Editor"
+                || assemblyName == "Assembly-CSharp-Editor-firstpass"
+                || assemblyName.StartsWith("ES", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            for (int i = 0; i < watchFields.Count; i++)
+            {
+                Type declaringType = watchFields[i].FieldInfo != null ? watchFields[i].FieldInfo.DeclaringType : null;
+                if (declaringType != null && declaringType.Assembly == assembly)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static List<OwnerFieldPath> FindOwnerPathsByReverseGraph(Type targetType, Func<Type, bool> ownerPredicate)
+        {
+            var results = new List<OwnerFieldPath>();
+            WalkParents(targetType, new List<FieldInfo>(), new HashSet<Type>(), results, ownerPredicate, 0);
+            if (results.Count >= MaxSchemesPerTargetType)
+                schemeLimitHitCount++;
+
+            return results
+                .OrderBy(path => path.Fields != null ? path.Fields.Length : 0)
+                .ThenBy(path => path.OwnerType != null ? path.OwnerType.FullName : string.Empty, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        private static void WalkParents(Type currentType, List<FieldInfo> pathFromOwnerToCurrent, HashSet<Type> visiting, List<OwnerFieldPath> results, Func<Type, bool> ownerPredicate, int depth)
+        {
+            if (currentType == null || depth >= MaxNestedDepth || results.Count >= MaxSchemesPerTargetType || !visiting.Add(currentType))
+                return;
+
+            foreach (FieldParentEdge edge in GetCompatibleParentEdges(currentType))
+            {
+                if (results.Count >= MaxSchemesPerTargetType)
+                    break;
+
+                var nextPath = new List<FieldInfo>(pathFromOwnerToCurrent.Count + 1);
+                nextPath.Add(edge.Field);
+                nextPath.AddRange(pathFromOwnerToCurrent);
+
+                if (ownerPredicate(edge.ParentType))
+                    results.Add(new OwnerFieldPath(edge.ParentType, nextPath.ToArray()));
+
+                if (typeof(MonoBehaviour).IsAssignableFrom(edge.ParentType)
+                    || typeof(IESModule).IsAssignableFrom(edge.ParentType))
+                    continue;
+
+                WalkParents(edge.ParentType, nextPath, visiting, results, ownerPredicate, depth + 1);
+            }
+
+            visiting.Remove(currentType);
+        }
+
+        private static List<FieldParentEdge> GetCompatibleParentEdges(Type targetType)
+        {
+            if (compatibleParentEdgesCache.TryGetValue(targetType, out var cached))
+                return cached;
+
+            var result = new List<FieldParentEdge>();
+            foreach (var pair in parentEdgesByChildType)
+            {
+                Type fieldType = pair.Key;
+                if (fieldType.IsAssignableFrom(targetType))
+                    result.AddRange(pair.Value);
+            }
+
+            compatibleParentEdgesCache[targetType] = result;
+            return result;
+        }
+
+        private static Type NormalizeFieldType(Type type)
+        {
+            if (type == null)
+                return null;
+
+            if (type.IsArray)
+                return null;
+
+            return type;
+        }
+
+        private static bool CanTraverseFieldType(Type type)
+        {
+            if (type == null || type.IsPrimitive || type.IsEnum || type == typeof(string))
+                return false;
+
+            if (typeof(UnityEngine.Object).IsAssignableFrom(type))
+                return false;
+
+            if (type.IsPointer || type.IsGenericParameter || type.ContainsGenericParameters || type.IsInterface)
+                return false;
+
+            if (type.Namespace != null && type.Namespace.StartsWith("System", StringComparison.Ordinal))
+                return false;
+
+            if (typeof(Delegate).IsAssignableFrom(type))
+                return false;
+
+            return type.IsClass || (type.IsValueType && !type.IsPrimitive && !type.IsEnum);
+        }
+
+        private static bool IsValidRuntimeWatchPath(FieldInfo[] ownerPath, RuntimeWatchEntryKind kind, FieldInfo[] modulePath)
+        {
+            if (ContainsRuntimeBackReference(ownerPath) || ContainsRuntimeBackReference(modulePath))
+                return false;
+
+            if (kind != RuntimeWatchEntryKind.Module)
+                return true;
+
+            if (ownerPath == null)
+                return true;
+
+            for (int i = 0; i < ownerPath.Length; i++)
+            {
+                FieldInfo field = ownerPath[i];
+                if (field == null)
+                    return false;
+
+                Type declaringType = field.DeclaringType;
+                Type fieldType = NormalizeFieldType(field.FieldType);
+                if ((declaringType != null && typeof(IESModule).IsAssignableFrom(declaringType))
+                    || (fieldType != null && typeof(IESModule).IsAssignableFrom(fieldType)))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool ContainsRuntimeBackReference(FieldInfo[] path)
+        {
+            if (path == null)
+                return false;
+
+            for (int i = 0; i < path.Length; i++)
+            {
+                if (IsRuntimeBackReferenceField(path[i]))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetHostingModuleType(Type type, out Type hostedModuleType)
+        {
+            hostedModuleType = null;
+            if (type == null)
+                return false;
+
+            foreach (Type interfaceType in type.GetInterfaces())
+            {
+                if (!interfaceType.IsGenericType)
+                    continue;
+
+                if (interfaceType.GetGenericTypeDefinition() == typeof(IESHosting<>))
+                {
+                    hostedModuleType = interfaceType.GetGenericArguments()[0];
+                    return hostedModuleType != null;
+                }
+            }
+
+            return false;
+        }
+
+        private static string BuildEntryKey(Type ownerType, FieldInfo[] ownerPath, FieldInfo fieldInfo, RuntimeWatchEntryKind kind, Type moduleType, FieldInfo[] modulePath)
+        {
+            string pathKey = ownerPath == null || ownerPath.Length == 0
+                ? string.Empty
+                : string.Join("/", ownerPath.Select(GetFieldKey));
+            string modulePathKey = modulePath == null || modulePath.Length == 0
+                ? string.Empty
+                : string.Join("/", modulePath.Select(GetFieldKey));
+            return kind + "|" + ownerType.AssemblyQualifiedName + "|" + pathKey + "|" + (moduleType != null ? moduleType.AssemblyQualifiedName : string.Empty) + "|" + modulePathKey + "|" + GetFieldKey(fieldInfo);
+        }
+
+        private static string GetFieldKey(FieldInfo fieldInfo)
+        {
+            return fieldInfo.Module.ModuleVersionId + ":" + fieldInfo.MetadataToken;
+        }
+
+        private readonly struct OwnerFieldPath
+        {
+            private readonly Type ownerType;
+            public readonly FieldInfo[] Fields;
+            public Type OwnerType => ownerType ?? (Fields.Length > 0 ? Fields[0].DeclaringType : null);
+
+            public OwnerFieldPath(FieldInfo[] fields)
+            {
+                ownerType = fields != null && fields.Length > 0 ? fields[0].DeclaringType : null;
+                Fields = fields ?? Array.Empty<FieldInfo>();
+            }
+
+            public OwnerFieldPath(Type ownerType, FieldInfo[] fields)
+            {
+                this.ownerType = ownerType;
+                Fields = fields ?? Array.Empty<FieldInfo>();
+            }
+        }
+
+        private readonly struct WatchFieldRecord
+        {
+            public readonly ESRuntimeWatchAttribute Attribute;
+            public readonly FieldInfo FieldInfo;
+
+            public WatchFieldRecord(ESRuntimeWatchAttribute attribute, FieldInfo fieldInfo)
+            {
+                Attribute = attribute;
+                FieldInfo = fieldInfo;
+            }
+        }
+
+        private readonly struct FieldParentEdge
+        {
+            public readonly Type ParentType;
+            public readonly Type ChildType;
+            public readonly FieldInfo Field;
+
+            public FieldParentEdge(Type parentType, Type childType, FieldInfo field)
+            {
+                ParentType = parentType;
+                ChildType = childType;
+                Field = field;
+            }
+        }
+
+        private readonly struct HostingTypeInfo
+        {
+            public readonly Type HostingType;
+            public readonly Type HostedModuleType;
+
+            public HostingTypeInfo(Type hostingType, Type hostedModuleType)
+            {
+                HostingType = hostingType;
+                HostedModuleType = hostedModuleType;
+            }
+        }
+
+        private readonly struct ModuleOwnerFieldPath
+        {
+            private readonly Type ownerType;
+            public readonly FieldInfo[] Fields;
+            public readonly Type ModuleType;
+            public readonly FieldInfo[] ModulePath;
+            public Type OwnerType => ownerType ?? (Fields.Length > 0 ? Fields[0].DeclaringType : null);
+
+            public ModuleOwnerFieldPath(Type ownerType, FieldInfo[] fields, Type moduleType, FieldInfo[] modulePath)
+            {
+                this.ownerType = ownerType;
+                Fields = fields ?? Array.Empty<FieldInfo>();
+                ModuleType = moduleType;
+                ModulePath = modulePath ?? Array.Empty<FieldInfo>();
+            }
+        }
+
+        public enum RuntimeWatchEntryKind
+        {
+            Field,
+            Module
+        }
+
+        public readonly struct Entry
+        {
+            public readonly ESRuntimeWatchAttribute Attribute;
+            public readonly FieldInfo FieldInfo;
+            public readonly Type OwnerType;
+            public readonly FieldInfo[] OwnerPath;
+            public readonly string EntryKey;
+            public readonly RuntimeWatchEntryKind Kind;
+            public readonly Type ModuleType;
+            public readonly FieldInfo[] ModulePath;
+            public bool IsNested => OwnerPath != null && OwnerPath.Length > 0;
+            public string MemberPath => IsNested
+                ? string.Join(".", OwnerPath.Select(field => field.Name)) + (Kind == RuntimeWatchEntryKind.Module ? ".[" + (ModuleType != null ? ModuleType.Name : FieldInfo.DeclaringType.Name) + "]." + BuildModuleMemberPath() : "." + FieldInfo.Name)
+                : FieldInfo.Name;
+            public string RequiredTag => Attribute != null ? Attribute.RequiredTag : null;
+            public string ShowIf => Attribute != null ? Attribute.ShowIf : null;
+
+            public Entry(ESRuntimeWatchAttribute attribute, FieldInfo fieldInfo, Type ownerType, FieldInfo[] ownerPath, string entryKey, RuntimeWatchEntryKind kind, Type moduleType, FieldInfo[] modulePath)
+            {
+                Attribute = attribute;
+                FieldInfo = fieldInfo;
+                OwnerType = ownerType;
+                OwnerPath = ownerPath ?? Array.Empty<FieldInfo>();
+                EntryKey = entryKey;
+                Kind = kind;
+                ModuleType = moduleType;
+                ModulePath = modulePath ?? Array.Empty<FieldInfo>();
+            }
+
+            private string BuildModuleMemberPath()
+            {
+                if (ModulePath == null || ModulePath.Length == 0)
+                    return FieldInfo.Name;
+
+                return string.Join(".", ModulePath.Select(field => field.Name)) + "." + FieldInfo.Name;
+            }
+        }
+    }
+}
+
+================================================================================
+FILE: Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/ER_ESRuntimeWatch.cs
+================================================================================
+#if UNITY_EDITOR
+using System.Reflection;
+
+namespace ES
+{
+    public class ER_ESRuntimeWatch : EditorRegister_FOR_FieldAttribute<ESRuntimeWatchAttribute>
+    {
+        public override void Handle(ESRuntimeWatchAttribute attribute, FieldInfo fieldInfo)
+        {
+            ESRuntimeWatchRegistry.RegisterField(attribute, fieldInfo);
+        }
+    }
+}
+#endif
+
+================================================================================
+FILE: Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_RuntimeWatch.cs
+================================================================================
+using Sirenix.OdinInspector;
+using Sirenix.Utilities.Editor.Expressions;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace ES
+{
+    [Serializable]
+    public class Page_RuntimeWatch : ESWindowPageBase
+    {
+        private readonly Dictionary<string, bool> groupFoldouts = new Dictionary<string, bool>();
+        private readonly Dictionary<string, bool> ownerFoldouts = new Dictionary<string, bool>();
+        private readonly List<WatchEntry> entries = new List<WatchEntry>();
+        private static readonly Dictionary<Type, PropertyInfo> ModulesEnumerablePropertyCache = new Dictionary<Type, PropertyInfo>();
+        private static readonly Dictionary<string, ExpressionFunc<object, bool>> OdinBoolExpressionCache = new Dictionary<string, ExpressionFunc<object, bool>>();
+        private static readonly HashSet<string> FailedOdinBoolExpressions = new HashSet<string>();
+
+        [Title("运行时观察", "收集场景中带 ESRuntimeWatch 标记的字段", bold: true, titleAlignment: TitleAlignments.Centered)]
+        [InfoBox("给 MonoBehaviour 字段添加 [ESRuntimeWatch(\"分组\", \"显示名\")]，运行时可在这里按分组查看当前值。字段元数据由程序集流注册器收集。")]
+        [HorizontalGroup("Toolbar", Width = 0.55f)]
+        [ShowInInspector, LabelText("搜索")]
+        private string searchText = "";
+
+        [HorizontalGroup("Toolbar", Width = 90)]
+        [ShowInInspector, LabelText("自动刷新")]
+        private bool autoRefresh = true;
+
+        [HorizontalGroup("Toolbar", Width = 130)]
+        [ShowInInspector, LabelText("刷新间隔")]
+        [MinValue(0.1f)]
+        private float refreshInterval = 0.25f;
+
+        [HorizontalGroup("Toolbar", Width = 100)]
+        [ShowInInspector, LabelText("编辑器扫描")]
+        private bool refreshInEditMode = false;
+
+        [HorizontalGroup("Scope", Width = 130)]
+        [ShowInInspector, LabelText("只看选中对象")]
+        private bool onlySelectedGameObject = false;
+
+        [HorizontalGroup("Scope", Width = 130)]
+        [ShowInInspector, LabelText("包含子对象")]
+        private bool includeSelectedChildren = true;
+
+        [HorizontalGroup("Filters", Width = 120)]
+        [ShowInInspector, LabelText("启用Tag过滤")]
+        private bool enableTagFilter = true;
+
+        [HorizontalGroup("Filters", Width = 140)]
+        [ShowInInspector, LabelText("启用ShowIf")]
+        private bool enableShowIfFilter = true;
+
+        [HorizontalGroup("Filters", Width = 150)]
+        [ShowInInspector, LabelText("允许GetMoudle"), Tooltip("允许 RuntimeWatch 通过 Core.GetMoudle<T>() 补取模块。此开关可能创建缺失模块，用于 Entity/Core 链路验证。")]
+        private bool allowGetMoudleFallback = true;
+
+        private double nextRefreshTime;
+        private Vector2 scroll;
+        private string lastResultSummary = "";
+        private string lastResultDetail = "";
+        private string chainReport = "";
+        private int lastScannedOwnerTypeCount;
+        private int lastFoundOwnerCount;
+        private int lastCandidateEntryCount;
+        private int lastNoFilterCandidateCount;
+        private int lastTagFilteredCount;
+        private int lastShowIfFilteredCount;
+        private int lastContextMissingCount;
+        private int lastDuplicateSkippedCount;
+
+        [HorizontalGroup("Toolbar", Width = 110)]
+        [Button("立即刷新", ButtonHeight = 22), GUIColor(0.35f, 0.65f, 1f)]
+        public void RefreshNow()
+        {
+            CollectEntries(recordResult: true);
+        }
+
+        [HorizontalGroup("DebugButtons", Width = 140)]
+        [Button("生成链路报告", ButtonHeight = 22), GUIColor(0.75f, 0.85f, 1f)]
+        public void BuildChainReport()
+        {
+            chainReport = BuildRegistryChainReport();
+        }
+
+        [HorizontalGroup("DebugButtons", Width = 140)]
+        [Button("复制链路报告", ButtonHeight = 22)]
+        public void CopyChainReport()
+        {
+            if (string.IsNullOrEmpty(chainReport))
+                chainReport = BuildRegistryChainReport();
+
+            EditorGUIUtility.systemCopyBuffer = chainReport;
+            lastResultSummary = "已复制 RuntimeWatch 链路报告";
+            lastResultDetail = "报告已写入系统剪贴板。";
+        }
+
+        [HorizontalGroup("DebugButtons", Width = 120)]
+        [Button("清空报告", ButtonHeight = 22)]
+        public void ClearChainReport()
+        {
+            chainReport = "";
+        }
+
+        [FoldoutGroup("链路诊断", Expanded = false)]
+        [ShowInInspector, ReadOnly, HideLabel, MultiLineProperty(28)]
+        private string ChainReportView => string.IsNullOrEmpty(chainReport) ? "点击“生成链路报告”查看底层完整链路。" : chainReport;
+
+        [OnInspectorGUI]
+        private void DrawRuntimeWatch()
+        {
+            bool shouldAutoRefresh = autoRefresh && (EditorApplication.isPlaying || refreshInEditMode);
+
+            if (!EditorApplication.isPlaying)
+            {
+                EditorGUILayout.HelpBox("进入 Play Mode 后显示运行时观察数据。", MessageType.Info);
+                if (GUILayout.Button("编辑器下扫描一次"))
+                    CollectEntries(recordResult: true);
+            }
+
+            if (shouldAutoRefresh && EditorApplication.timeSinceStartup >= nextRefreshTime)
+            {
+                CollectEntries(recordResult: false);
+                nextRefreshTime = EditorApplication.timeSinceStartup + refreshInterval;
+            }
+
+            SimpleToolsPanelUtility.DrawSummary(
+                $"观察项: {entries.Count}",
+                $"注册字段: {ESRuntimeWatchRegistry.RegisteredFieldCount} / 展开 {ESRuntimeWatchRegistry.Entries.Count}",
+                $"Owner类型: {ESRuntimeWatchRegistry.OwnerTypes.Count}",
+                $"场景Owner: {lastFoundOwnerCount}",
+                $"候选项: {lastCandidateEntryCount}",
+                $"无条件候选: {lastNoFilterCandidateCount}",
+                $"Tag过滤: {lastTagFilteredCount}",
+                $"ShowIf过滤: {lastShowIfFilteredCount}",
+                $"上下文缺失: {lastContextMissingCount}",
+                $"范围: {BuildScopeLabel()}",
+                $"过滤器: Tag {(enableTagFilter ? "开" : "关")} / ShowIf {(enableShowIfFilter ? "开" : "关")}",
+                $"GetMoudle: {(allowGetMoudleFallback ? "开" : "关")}",
+                $"路径图: {(ESRuntimeWatchRegistry.IsFieldGraphBuilt ? ESRuntimeWatchRegistry.FieldGraphTargetTypeCount + "类/" + ESRuntimeWatchRegistry.FieldGraphEdgeCount + "边" : "未构建")}",
+                $"路径截断: {ESRuntimeWatchRegistry.SchemeLimitHitCount}",
+                $"拒绝Owner: {ESRuntimeWatchRegistry.RejectedNonMonoOwnerCount}",
+                $"拒绝链路: {ESRuntimeWatchRegistry.RejectedInvalidPathCount}",
+                $"自动刷新: {(shouldAutoRefresh ? "开" : "关")}");
+            SimpleToolsPanelUtility.DrawResultSummary("最近运行时观察刷新", lastResultSummary, lastResultDetail);
+
+            if (entries.Count == 0)
+            {
+                string emptyMessage = EditorApplication.isPlaying
+                    ? "当前没有找到可显示的观察项。请确认场景对象存在、字段已添加 ESRuntimeWatch 标记，并且搜索条件没有过滤掉结果。"
+                    : "编辑器下只显示注册信息。进入 Play Mode 后会读取场景实例；也可以点“编辑器下扫描一次”检查当前打开场景。";
+                EditorGUILayout.HelpBox(emptyMessage, MessageType.Info);
+            }
+
+            scroll = EditorGUILayout.BeginScrollView(scroll);
+            DrawEntries();
+            EditorGUILayout.EndScrollView();
+
+            if (shouldAutoRefresh && SimpleToolsWindow.UsingWindow != null)
+                SimpleToolsWindow.UsingWindow.Repaint();
+        }
+
+        private void DrawEntries()
+        {
+            string activeGroup = null;
+            string activeOwnerKey = null;
+            bool groupVisible = false;
+            bool ownerVisible = false;
+
+            foreach (WatchEntry entry in entries)
+            {
+                if (!MatchesSearch(entry))
+                    continue;
+
+                if (activeGroup != entry.Group)
+                {
+                    activeGroup = entry.Group;
+                    if (!groupFoldouts.ContainsKey(activeGroup))
+                        groupFoldouts[activeGroup] = true;
+
+                    EditorGUILayout.Space(4);
+                    groupFoldouts[activeGroup] = EditorGUILayout.Foldout(groupFoldouts[activeGroup], activeGroup, true);
+                    groupVisible = groupFoldouts[activeGroup];
+                    activeOwnerKey = null;
+                }
+
+                if (!groupVisible)
+                    continue;
+
+                string ownerFoldoutKey = entry.Group + "|" + entry.OwnerKey;
+                if (activeOwnerKey != ownerFoldoutKey)
+                {
+                    activeOwnerKey = ownerFoldoutKey;
+                    if (!ownerFoldouts.ContainsKey(activeOwnerKey))
+                        ownerFoldouts[activeOwnerKey] = true;
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        GUILayout.Space(14);
+                        ownerFoldouts[activeOwnerKey] = EditorGUILayout.Foldout(ownerFoldouts[activeOwnerKey], entry.OwnerName, true);
+                        if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(48)))
+                        {
+                            UnityEngine.Object target = entry.SceneObject != null ? entry.SceneObject : entry.Owner;
+                            Selection.activeObject = target;
+                            EditorGUIUtility.PingObject(target);
+                            lastResultSummary = $"已定位观察对象: {entry.OwnerName}";
+                            lastResultDetail = $"分组: {entry.Group}\n字段: {entry.Label}\n路径: {entry.MemberPath}\n类型: {entry.OwnerTypeName}";
+                        }
+                    }
+
+                    ownerVisible = ownerFoldouts[activeOwnerKey];
+                }
+
+                if (!ownerVisible)
+                    continue;
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Space(28);
+                    EditorGUILayout.LabelField(entry.Label, GUILayout.Width(180));
+                    EditorGUILayout.SelectableLabel(entry.ReadValue(), GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                }
+            }
+        }
+
+        private void CollectEntries(bool recordResult)
+        {
+            entries.Clear();
+            IReadOnlyList<ESRuntimeWatchRegistry.Entry> registeredEntries = ESRuntimeWatchRegistry.Entries;
+            IReadOnlyList<Type> ownerTypes = ESRuntimeWatchRegistry.OwnerTypes;
+            HashSet<string> addedKeys = new HashSet<string>();
+            List<string> ownerDiagnostics = recordResult ? new List<string>() : null;
+            List<string> filterDiagnostics = recordResult ? new List<string>() : null;
+            lastScannedOwnerTypeCount = ownerTypes.Count;
+            lastFoundOwnerCount = 0;
+            lastCandidateEntryCount = 0;
+            lastNoFilterCandidateCount = 0;
+            lastTagFilteredCount = 0;
+            lastShowIfFilteredCount = 0;
+            lastContextMissingCount = 0;
+            lastDuplicateSkippedCount = 0;
+
+            for (int typeIndex = 0; typeIndex < ownerTypes.Count; typeIndex++)
+            {
+                Type ownerType = ownerTypes[typeIndex];
+                UnityEngine.Object[] owners = FindOwners(ownerType);
+                IReadOnlyList<ESRuntimeWatchRegistry.Entry> ownerEntries = ESRuntimeWatchRegistry.GetEntriesForOwnerType(ownerType);
+                int noFilterEntryCount = CountNoFilterEntries(ownerEntries);
+                lastFoundOwnerCount += owners.Length;
+                lastCandidateEntryCount += owners.Length * ownerEntries.Count;
+                lastNoFilterCandidateCount += owners.Length * noFilterEntryCount;
+                if (recordResult)
+                    ownerDiagnostics.Add($"{ownerType.FullName}: 实例 {owners.Length} 个 / 注册项 {ownerEntries.Count} 个 / 无条件 {noFilterEntryCount} 个");
+
+                for (int ownerIndex = 0; ownerIndex < owners.Length; ownerIndex++)
+                {
+                    MonoBehaviour behaviour = owners[ownerIndex] as MonoBehaviour;
+                    if (behaviour == null)
+                        continue;
+
+                    Type behaviourType = behaviour.GetType();
+                    for (int entryIndex = 0; entryIndex < ownerEntries.Count; entryIndex++)
+                    {
+                        ESRuntimeWatchRegistry.Entry registeredEntry = ownerEntries[entryIndex];
+                        if (!registeredEntry.OwnerType.IsAssignableFrom(behaviourType))
+                            continue;
+
+                        if (enableTagFilter && !PassesRootTagFilter(behaviour, registeredEntry))
+                        {
+                            lastTagFilteredCount++;
+                            if (recordResult && filterDiagnostics.Count < 12)
+                                filterDiagnostics.Add($"Tag: {behaviour.name} | {registeredEntry.MemberPath} | 需要 {registeredEntry.RequiredTag}");
+                            continue;
+                        }
+
+                        if (enableShowIfFilter && !PassesOdinShowIf(behaviour, registeredEntry, allowGetMoudleFallback, out string showIfFailReason))
+                        {
+                            lastShowIfFilteredCount++;
+                            if (showIfFailReason == "ContextMissing")
+                                lastContextMissingCount++;
+                            if (recordResult && filterDiagnostics.Count < 12)
+                                filterDiagnostics.Add($"ShowIf: {behaviour.name} | {registeredEntry.MemberPath} | {registeredEntry.ShowIf} | {showIfFailReason}");
+                            continue;
+                        }
+
+                        string key = behaviour.GetInstanceID() + "|" + registeredEntry.EntryKey;
+                        if (!addedKeys.Add(key))
+                        {
+                            lastDuplicateSkippedCount++;
+                            continue;
+                        }
+
+                        entries.Add(WatchEntry.FromRegistryEntry(behaviour, registeredEntry, allowGetMoudleFallback));
+                    }
+                }
+            }
+
+            entries.Sort((a, b) =>
+            {
+                int group = string.Compare(a.Group, b.Group, StringComparison.Ordinal);
+                if (group != 0) return group;
+                int owner = string.Compare(a.OwnerName, b.OwnerName, StringComparison.Ordinal);
+                return owner != 0 ? owner : string.Compare(a.Label, b.Label, StringComparison.Ordinal);
+            });
+
+            if (recordResult)
+            {
+                lastResultSummary = $"运行时观察刷新完成: 观察项 {entries.Count} 个 | 展开注册项 {registeredEntries.Count} 个 | Owner类型 {lastScannedOwnerTypeCount} 个 | 当前场景Owner {lastFoundOwnerCount} 个";
+                string foundPreview = SimpleToolsSafetyUtility.JoinPreview(entries.Select(entry => $"{entry.Group} | {entry.OwnerName} | {entry.Label}"), 12);
+                string ownerPreview = SimpleToolsSafetyUtility.JoinPreview(ownerDiagnostics, 16);
+                string filterPreview = SimpleToolsSafetyUtility.JoinPreview(filterDiagnostics, 12);
+                lastResultDetail =
+                    $"当前场景: {SceneManager.GetActiveScene().name}\n" +
+                    $"候选项: {lastCandidateEntryCount}\n" +
+                    $"无条件候选: {lastNoFilterCandidateCount}\n" +
+                    $"Tag过滤: {lastTagFilteredCount}\n" +
+                    $"ShowIf过滤: {lastShowIfFilteredCount}\n" +
+                    $"上下文缺失: {lastContextMissingCount}\n" +
+                    $"范围: {BuildScopeLabel()}\n" +
+                    $"过滤器: Tag {(enableTagFilter ? "启用" : "忽略")} / ShowIf {(enableShowIfFilter ? "启用" : "忽略")} / GetMoudle {(allowGetMoudleFallback ? "允许" : "禁止")}\n" +
+                    $"重复跳过: {lastDuplicateSkippedCount}\n\n" +
+                    $"Owner类型:\n{ESRuntimeWatchRegistry.OwnerTypeSummary}\n\n" +
+                    $"Owner扫描:\n{ownerPreview}\n\n" +
+                    $"过滤样例:\n{filterPreview}\n\n" +
+                    $"显示项:\n{foundPreview}";
+            }
+        }
+
+        private static int CountNoFilterEntries(IReadOnlyList<ESRuntimeWatchRegistry.Entry> ownerEntries)
+        {
+            if (ownerEntries == null)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < ownerEntries.Count; i++)
+            {
+                ESRuntimeWatchRegistry.Entry entry = ownerEntries[i];
+                if (string.IsNullOrWhiteSpace(entry.RequiredTag) && string.IsNullOrWhiteSpace(entry.ShowIf))
+                    count++;
+            }
+
+            return count;
+        }
+
+        private string BuildScopeLabel()
+        {
+            if (!onlySelectedGameObject)
+                return "当前场景";
+
+            GameObject selected = Selection.activeGameObject;
+            if (selected == null)
+                return "选中对象:<空>";
+
+            return includeSelectedChildren
+                ? "选中对象+" + selected.name
+                : "选中对象:" + selected.name;
+        }
+
+        private static bool PassesRootTagFilter(MonoBehaviour owner, ESRuntimeWatchRegistry.Entry entry)
+        {
+            string requiredTag = entry.RequiredTag;
+            if (string.IsNullOrWhiteSpace(requiredTag))
+                return true;
+
+            if (owner == null || owner.transform == null)
+                return false;
+
+            GameObject root = owner.transform.root != null ? owner.transform.root.gameObject : owner.gameObject;
+            try
+            {
+                return root != null && root.CompareTag(requiredTag);
+            }
+            catch
+            {
+                return root != null && string.Equals(root.tag, requiredTag, StringComparison.Ordinal);
+            }
+        }
+
+        private static bool PassesOdinShowIf(MonoBehaviour owner, ESRuntimeWatchRegistry.Entry entry, bool allowGetMoudleFallback, out string failReason)
+        {
+            failReason = null;
+            string expression = entry.ShowIf;
+            if (string.IsNullOrWhiteSpace(expression))
+                return true;
+
+            object context = WatchEntry.ResolveEntryContext(owner, entry, allowGetMoudleFallback);
+            if (context == null)
+            {
+                failReason = "ContextMissing";
+                return false;
+            }
+
+            if (TryEvaluateSimpleBoolExpression(context, expression, out bool simpleResult))
+            {
+                if (!simpleResult)
+                    failReason = "SimpleFalse";
+                return simpleResult;
+            }
+
+            string cacheKey = context.GetType().AssemblyQualifiedName + "|" + expression;
+            if (FailedOdinBoolExpressions.Contains(cacheKey))
+            {
+                failReason = "OdinParseFailedCached";
+                return false;
+            }
+
+            if (!OdinBoolExpressionCache.TryGetValue(cacheKey, out var func))
+            {
+                string error;
+                func = ExpressionUtility.ParseFunc<object, bool>(expression, false, context.GetType(), out error, false);
+                if (func == null)
+                {
+                    FailedOdinBoolExpressions.Add(cacheKey);
+                    failReason = "OdinParseFailed";
+                    UnityEngine.Debug.LogWarning($"[RuntimeWatch] Odin ShowIf 表达式解析失败: {expression}\nContext: {context.GetType().Name}\n{error}");
+                    return false;
+                }
+
+                OdinBoolExpressionCache[cacheKey] = func;
+            }
+
+            try
+            {
+                bool result = func.Invoke(context);
+                if (!result)
+                    failReason = "OdinFalse";
+                return result;
+            }
+            catch (Exception ex)
+            {
+                failReason = "OdinInvokeFailed";
+                UnityEngine.Debug.LogWarning($"[RuntimeWatch] Odin ShowIf 表达式执行失败: {expression}\nContext: {context.GetType().Name}\n{ex.Message}");
+                return false;
+            }
+        }
+
+        private static bool TryEvaluateSimpleBoolExpression(object context, string expression, out bool result)
+        {
+            result = false;
+            if (context == null || string.IsNullOrWhiteSpace(expression))
+                return false;
+
+            string path = expression.Trim();
+            bool invert = false;
+            while (path.StartsWith("!", StringComparison.Ordinal))
+            {
+                invert = !invert;
+                path = path.Substring(1).TrimStart();
+            }
+
+            if (path.StartsWith("@this.", StringComparison.Ordinal))
+                path = path.Substring("@this.".Length);
+            else if (path.StartsWith("this.", StringComparison.Ordinal))
+                path = path.Substring("this.".Length);
+            else if (path == "@this" || path == "this")
+                return TryConvertToBool(context, invert, out result);
+            else if (path.StartsWith("@", StringComparison.Ordinal))
+                return false;
+
+            if (string.IsNullOrWhiteSpace(path))
+                return false;
+
+            object value = ReadSimpleMemberPath(context, path);
+            return TryConvertToBool(value, invert, out result);
+        }
+
+        private static object ReadSimpleMemberPath(object context, string memberPath)
+        {
+            object current = context;
+            string[] members = memberPath.Split('.');
+            for (int i = 0; i < members.Length; i++)
+            {
+                if (current == null)
+                    return null;
+
+                string member = members[i];
+                if (string.IsNullOrWhiteSpace(member))
+                    return null;
+
+                Type currentType = current.GetType();
+                FieldInfo field = currentType.GetField(member, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (field != null)
+                {
+                    current = field.GetValue(current);
+                    continue;
+                }
+
+                PropertyInfo property = currentType.GetProperty(member, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (property != null && property.GetIndexParameters().Length == 0)
+                {
+                    current = property.GetValue(current);
+                    continue;
+                }
+
+                return null;
+            }
+
+            return current;
+        }
+
+        private static bool TryConvertToBool(object value, bool invert, out bool result)
+        {
+            result = false;
+            if (value == null)
+                return false;
+
+            if (value is bool boolValue)
+            {
+                result = invert ? !boolValue : boolValue;
+                return true;
+            }
+
+            if (value is string stringValue && bool.TryParse(stringValue, out bool parsedBool))
+            {
+                result = invert ? !parsedBool : parsedBool;
+                return true;
+            }
+
+            return false;
+        }
+
+        private UnityEngine.Object[] FindOwners(Type ownerType)
+        {
+            if (ownerType == null || !typeof(Component).IsAssignableFrom(ownerType))
+                return Array.Empty<UnityEngine.Object>();
+
+            if (onlySelectedGameObject)
+                return FindOwnersInSelectedGameObject(ownerType);
+
+            Scene scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid())
+                return Array.Empty<UnityEngine.Object>();
+
+            var result = new List<UnityEngine.Object>();
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                if (root == null)
+                    continue;
+
+                foreach (var component in root.GetComponentsInChildren(ownerType, true))
+                {
+                    if (component != null
+                        && component.gameObject.scene == scene
+                        && (component.hideFlags & HideFlags.HideInHierarchy) == 0)
+                    {
+                        result.Add(component);
+                    }
+                }
+            }
+            return result.ToArray();
+        }
+
+        private UnityEngine.Object[] FindOwnersInSelectedGameObject(Type ownerType)
+        {
+            GameObject selected = Selection.activeGameObject;
+            if (selected == null)
+                return Array.Empty<UnityEngine.Object>();
+
+            if (!includeSelectedChildren)
+            {
+                Component component = selected.GetComponent(ownerType);
+                return component != null ? new UnityEngine.Object[] { component } : Array.Empty<UnityEngine.Object>();
+            }
+
+            return selected.GetComponentsInChildren(ownerType, true)
+                .Where(component => component != null && (component.hideFlags & HideFlags.HideInHierarchy) == 0)
+                .Cast<UnityEngine.Object>()
+                .ToArray();
+        }
+
+        private bool MatchesSearch(WatchEntry entry)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return true;
+
+            return ContainsIgnoreCase(entry.Group, searchText)
+                   || ContainsIgnoreCase(entry.OwnerName, searchText)
+                   || ContainsIgnoreCase(entry.Label, searchText)
+                   || ContainsIgnoreCase(entry.MemberPath, searchText)
+                   || ContainsIgnoreCase(entry.OwnerTypeName, searchText);
+        }
+
+        private static bool ContainsIgnoreCase(string value, string search)
+        {
+            return !string.IsNullOrEmpty(value)
+                   && !string.IsNullOrEmpty(search)
+                   && value.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private string BuildRegistryChainReport()
+        {
+            IReadOnlyList<ESRuntimeWatchRegistry.Entry> registryEntries = ESRuntimeWatchRegistry.Entries;
+            var groups = new Dictionary<string, List<string>>
+            {
+                { "Core链路 / Module字段", new List<string>() },
+                { "Core链路 / Domain或Core嵌套字段", new List<string>() },
+                { "普通Mono / 直接字段", new List<string>() },
+                { "普通Mono / 嵌套字段", new List<string>() },
+                { "异常或待确认链路", new List<string>() }
+            };
+
+            for (int i = 0; i < registryEntries.Count; i++)
+            {
+                ESRuntimeWatchRegistry.Entry entry = registryEntries[i];
+                string category = ClassifyEntry(entry);
+                if (!groups.TryGetValue(category, out var lines))
+                {
+                    lines = groups["异常或待确认链路"];
+                }
+
+                lines.Add(BuildEntryChainLine(i, entry));
+            }
+
+            var sb = new StringBuilder(4096);
+            sb.AppendLine("ESRuntimeWatch 底层完整链路报告");
+            sb.AppendLine("时间: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            sb.AppendLine("注册字段: " + ESRuntimeWatchRegistry.RegisteredFieldCount);
+            sb.AppendLine("展开Entry: " + registryEntries.Count);
+            sb.AppendLine("Owner类型: " + ESRuntimeWatchRegistry.OwnerTypes.Count);
+            sb.AppendLine("路径图: " + (ESRuntimeWatchRegistry.IsFieldGraphBuilt ? ESRuntimeWatchRegistry.FieldGraphTargetTypeCount + "类/" + ESRuntimeWatchRegistry.FieldGraphEdgeCount + "边" : "未构建"));
+            sb.AppendLine("路径截断: " + ESRuntimeWatchRegistry.SchemeLimitHitCount);
+            sb.AppendLine("非Mono Owner拒绝: " + ESRuntimeWatchRegistry.RejectedNonMonoOwnerCount);
+            sb.AppendLine("无效链路拒绝: " + ESRuntimeWatchRegistry.RejectedInvalidPathCount);
+            sb.AppendLine();
+            sb.AppendLine("Owner Type Info:");
+            sb.AppendLine(ESRuntimeWatchRegistry.OwnerTypeSummary);
+            sb.AppendLine();
+
+            foreach (var pair in groups)
+            {
+                sb.AppendLine("================================================================================");
+                sb.AppendLine(pair.Key + "  Count=" + pair.Value.Count);
+                sb.AppendLine("================================================================================");
+                if (pair.Value.Count == 0)
+                {
+                    sb.AppendLine("<无>");
+                }
+                else
+                {
+                    for (int i = 0; i < pair.Value.Count; i++)
+                        sb.AppendLine(pair.Value[i]);
+                }
+
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
+        }
+
+        private static string ClassifyEntry(ESRuntimeWatchRegistry.Entry entry)
+        {
+            if (entry.OwnerType == null || !typeof(MonoBehaviour).IsAssignableFrom(entry.OwnerType))
+                return "异常或待确认链路";
+
+            bool coreLike = IsCoreLikeType(entry.OwnerType) || PathContainsCoreDomainShape(entry.OwnerPath);
+
+            if (entry.Kind == ESRuntimeWatchRegistry.RuntimeWatchEntryKind.Module)
+                return "Core链路 / Module字段";
+
+            if (coreLike)
+                return "Core链路 / Domain或Core嵌套字段";
+
+            return entry.IsNested ? "普通Mono / 嵌套字段" : "普通Mono / 直接字段";
+        }
+
+        private static bool IsCoreLikeType(Type type)
+        {
+            for (Type current = type; current != null; current = current.BaseType)
+            {
+                if (current.Name == "Core")
+                    return true;
+            }
+
+            return type.GetField("ModuleTables", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) != null
+                   || type.GetMethods(BindingFlags.Instance | BindingFlags.Public).Any(method => method.Name == "GetMoudle" && method.IsGenericMethodDefinition);
+        }
+
+        private static bool PathContainsCoreDomainShape(FieldInfo[] path)
+        {
+            if (path == null)
+                return false;
+
+            for (int i = 0; i < path.Length; i++)
+            {
+                FieldInfo field = path[i];
+                if (field == null)
+                    continue;
+
+                Type fieldType = field.FieldType;
+                if (fieldType == null)
+                    continue;
+
+                if (fieldType.Name.Contains("Domain")
+                    || fieldType.GetProperty("Core_Base", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) != null
+                    || fieldType.GetProperty("ModulesIEnumable", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string BuildEntryChainLine(int index, ESRuntimeWatchRegistry.Entry entry)
+        {
+            var sb = new StringBuilder(512);
+            sb.Append("#").Append(index + 1).Append(' ');
+            sb.Append(entry.Kind).Append(" | ");
+            sb.Append("Owner=").Append(ESRuntimeWatchRegistry.BuildTypeInfo(entry.OwnerType)).Append(" | ");
+            sb.Append("OwnerPath=").Append(BuildFieldPathInfo(entry.OwnerPath)).Append(" | ");
+            if (entry.Kind == ESRuntimeWatchRegistry.RuntimeWatchEntryKind.Module)
+            {
+                sb.Append("Module=").Append(ESRuntimeWatchRegistry.BuildTypeInfo(entry.ModuleType)).Append(" | ");
+                sb.Append("ModulePath=").Append(BuildFieldPathInfo(entry.ModulePath)).Append(" | ");
+            }
+
+            sb.Append("Field=").Append(BuildFieldInfo(entry.FieldInfo)).Append(" | ");
+            sb.Append("MemberPath=").Append(entry.MemberPath).Append(" | ");
+            sb.Append("Group=").Append(entry.Attribute != null ? entry.Attribute.Group : "<null>").Append(" | ");
+            sb.Append("Label=").Append(entry.Attribute != null ? entry.Attribute.Label : "<null>").Append(" | ");
+            sb.Append("Tag=").Append(string.IsNullOrWhiteSpace(entry.RequiredTag) ? "<无>" : entry.RequiredTag).Append(" | ");
+            sb.Append("ShowIf=").Append(string.IsNullOrWhiteSpace(entry.ShowIf) ? "<无>" : entry.ShowIf).Append(" | ");
+            sb.Append("Key=").Append(entry.EntryKey);
+            return sb.ToString();
+        }
+
+        private static string BuildFieldPathInfo(FieldInfo[] path)
+        {
+            if (path == null || path.Length == 0)
+                return "<无>";
+
+            return string.Join(" -> ", path.Select(BuildFieldInfo));
+        }
+
+        private static string BuildFieldInfo(FieldInfo field)
+        {
+            if (field == null)
+                return "<null>";
+
+            string declaring = field.DeclaringType != null ? field.DeclaringType.Name : "<no declaring>";
+            string fieldType = field.FieldType != null ? field.FieldType.Name : "<no type>";
+            return declaring + "." + field.Name + ":" + fieldType;
+        }
+
+        private class WatchEntry
+        {
+            public UnityEngine.Object Owner;
+            public GameObject SceneObject;
+            public string OwnerName;
+            public string OwnerKey;
+            public string OwnerTypeName;
+            public string Group;
+            public string Label;
+            public string MemberPath;
+            private Func<string> readValue;
+
+            public static WatchEntry FromRegistryEntry(MonoBehaviour owner, ESRuntimeWatchRegistry.Entry entry, bool allowGetMoudleFallback)
+            {
+                return Create(owner, entry.MemberPath, ESRuntimeWatchRegistry.BuildTypeInfo(entry.OwnerType), entry.Attribute, () => ReadEntryValue(owner, entry, allowGetMoudleFallback));
+            }
+
+            private static WatchEntry Create(MonoBehaviour owner, string memberPath, string ownerTypeName, ESRuntimeWatchAttribute attribute, Func<object> getter)
+            {
+                return new WatchEntry
+                {
+                    Owner = owner,
+                    SceneObject = owner != null ? owner.gameObject : null,
+                    OwnerName = BuildOwnerPath(owner),
+                    OwnerKey = owner.GetInstanceID() + "|" + ownerTypeName,
+                    OwnerTypeName = ownerTypeName,
+                    Group = string.IsNullOrEmpty(attribute.Group) ? "Default" : attribute.Group,
+                    Label = string.IsNullOrEmpty(attribute.Label) ? memberPath : attribute.Label,
+                    MemberPath = memberPath,
+                    readValue = () =>
+                    {
+                        try
+                        {
+                            object value = getter();
+                            return value == null ? "null" : value.ToString();
+                        }
+                        catch (Exception e)
+                        {
+                            return "<读取失败: " + e.Message + ">";
+                        }
+                    }
+                };
+            }
+
+            private static object ReadEntryValue(MonoBehaviour owner, ESRuntimeWatchRegistry.Entry entry, bool allowGetMoudleFallback)
+            {
+                object current = ResolveEntryContext(owner, entry, allowGetMoudleFallback);
+
+                if (current == null)
+                    return "<空引用: " + entry.MemberPath + ">";
+
+                if (!entry.FieldInfo.DeclaringType.IsInstanceOfType(current))
+                    return "<类型不匹配: " + entry.MemberPath + ">";
+
+                return entry.FieldInfo.GetValue(current);
+            }
+
+            public static object ResolveEntryContext(MonoBehaviour owner, ESRuntimeWatchRegistry.Entry entry, bool allowGetMoudleFallback)
+            {
+                object current = owner;
+                if (entry.OwnerPath != null)
+                {
+                    for (int i = 0; i < entry.OwnerPath.Length; i++)
+                    {
+                        if (current == null)
+                            return null;
+
+                        var pathField = entry.OwnerPath[i];
+                        if (!pathField.DeclaringType.IsInstanceOfType(current))
+                            return null;
+
+                        current = pathField.GetValue(current);
+                    }
+                }
+
+                if (entry.Kind == ESRuntimeWatchRegistry.RuntimeWatchEntryKind.Module)
+                {
+                    current = ResolveModuleInstance(current, entry.ModuleType ?? entry.FieldInfo.DeclaringType, allowGetMoudleFallback);
+                    if (entry.ModulePath != null)
+                    {
+                        for (int i = 0; i < entry.ModulePath.Length; i++)
+                        {
+                            if (current == null)
+                                return null;
+
+                            FieldInfo modulePathField = entry.ModulePath[i];
+                            if (!modulePathField.DeclaringType.IsInstanceOfType(current))
+                                return null;
+
+                            current = modulePathField.GetValue(current);
+                        }
+                    }
+                }
+
+                return current;
+            }
+
+            private static object ResolveModuleInstance(object hostOrModule, Type moduleType, bool allowGetMoudleFallback)
+            {
+                if (hostOrModule == null || moduleType == null)
+                    return null;
+
+                if (moduleType.IsInstanceOfType(hostOrModule))
+                    return hostOrModule;
+
+                object core = ResolveCoreObject(hostOrModule);
+                object moduleFromCore = ResolveModuleFromCoreTable(core, moduleType);
+                if (moduleFromCore != null)
+                    return moduleFromCore;
+
+                if (allowGetMoudleFallback)
+                {
+                    object moduleFromGetter = ResolveModuleByGetMoudle(core, moduleType);
+                    if (moduleFromGetter != null)
+                        return moduleFromGetter;
+                }
+
+                if (!(hostOrModule is IESHosting))
+                    return null;
+
+                PropertyInfo modulesProperty = GetModulesEnumerableProperty(hostOrModule.GetType());
+                if (modulesProperty == null)
+                    return null;
+
+                IEnumerable modules = modulesProperty.GetValue(hostOrModule) as IEnumerable;
+                if (modules == null)
+                    return null;
+
+                foreach (object module in modules)
+                {
+                    if (module != null && moduleType.IsInstanceOfType(module))
+                        return module;
+                }
+
+                return null;
+            }
+
+            private static object ResolveModuleByGetMoudle(object core, Type moduleType)
+            {
+                if (core == null || moduleType == null)
+                    return null;
+
+                MethodInfo genericGetter = core.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                    .FirstOrDefault(method =>
+                        method.Name == "GetMoudle"
+                        && method.IsGenericMethodDefinition
+                        && method.GetGenericArguments().Length == 1
+                        && method.GetParameters().Length == 0);
+
+                if (genericGetter == null)
+                    return null;
+
+                try
+                {
+                    return genericGetter.MakeGenericMethod(moduleType).Invoke(core, null);
+                }
+                catch (Exception ex)
+                {
+                    UnityEngine.Debug.LogWarning($"[RuntimeWatch] GetMoudle<{moduleType.Name}> fallback failed: {ex.Message}");
+                    return null;
+                }
+            }
+
+            private static object ResolveCoreObject(object hostOrModule)
+            {
+                if (hostOrModule == null)
+                    return null;
+
+                if (hostOrModule is MonoBehaviour)
+                    return hostOrModule;
+
+                PropertyInfo coreBaseProperty = hostOrModule.GetType().GetProperty("Core_Base", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                object coreBase = coreBaseProperty != null && coreBaseProperty.GetIndexParameters().Length == 0
+                    ? coreBaseProperty.GetValue(hostOrModule)
+                    : null;
+                if (coreBase is MonoBehaviour)
+                    return coreBase;
+
+                PropertyInfo coreObjectProperty = hostOrModule.GetType().GetProperty("Core_Object", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                object coreObject = coreObjectProperty != null && coreObjectProperty.GetIndexParameters().Length == 0
+                    ? coreObjectProperty.GetValue(hostOrModule)
+                    : null;
+                if (coreObject is MonoBehaviour)
+                    return coreObject;
+
+                return null;
+            }
+
+            private static object ResolveModuleFromCoreTable(object core, Type moduleType)
+            {
+                if (core == null || moduleType == null)
+                    return null;
+
+                FieldInfo moduleTablesField = core.GetType().GetField("ModuleTables", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                object tableObject = moduleTablesField != null ? moduleTablesField.GetValue(core) : null;
+                if (!(tableObject is IDictionary moduleTable))
+                    return null;
+
+                if (moduleTable.Contains(moduleType))
+                {
+                    object exact = moduleTable[moduleType];
+                    if (exact != null)
+                        return exact;
+                }
+
+                foreach (DictionaryEntry pair in moduleTable)
+                {
+                    Type keyType = pair.Key as Type;
+                    object module = pair.Value;
+                    if (module == null)
+                        continue;
+
+                    if ((keyType != null && moduleType.IsAssignableFrom(keyType)) || moduleType.IsInstanceOfType(module))
+                        return module;
+                }
+
+                return null;
+            }
+
+            private static PropertyInfo GetModulesEnumerableProperty(Type hostType)
+            {
+                if (hostType == null)
+                    return null;
+
+                if (ModulesEnumerablePropertyCache.TryGetValue(hostType, out var cached))
+                    return cached;
+
+                PropertyInfo property = hostType.GetProperty("ModulesIEnumable", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                ModulesEnumerablePropertyCache[hostType] = property;
+                return property;
+            }
+
+            private static string BuildPathPrefix(ESRuntimeWatchRegistry.Entry entry, int length)
+            {
+                if (entry.OwnerPath == null || entry.OwnerPath.Length == 0)
+                    return entry.FieldInfo.Name;
+
+                length = Mathf.Clamp(length, 0, entry.OwnerPath.Length);
+                if (length == 0)
+                    return entry.OwnerPath[0].Name;
+
+                return string.Join(".", entry.OwnerPath.Take(length).Select(field => field.Name));
+            }
+
+            public string ReadValue()
+            {
+                return readValue == null ? "" : readValue();
+            }
+
+            private static string BuildOwnerPath(MonoBehaviour owner)
+            {
+                Transform current = owner.transform;
+                string path = current.name;
+                while (current.parent != null)
+                {
+                    current = current.parent;
+                    path = current.name + "/" + path;
+                }
+
+                return path + " (" + owner.GetType().Name + ")";
+            }
+        }
+    }
+}

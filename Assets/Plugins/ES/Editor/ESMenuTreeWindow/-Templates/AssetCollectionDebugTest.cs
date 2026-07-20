@@ -9,7 +9,7 @@ namespace ES.Editor
     /// </summary>
     public static class AssetCollectionDebugTest
     {
-        [MenuItem("ES/Debug/测试资产收集配置")]
+        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "资源收集/测试资源收集配置", false, 9100)]
         public static void TestAssetCollectionConfig()
         {
             Debug.Log("===== 资产收集配置测试 =====");
@@ -59,7 +59,7 @@ namespace ES.Editor
         }
         
         
-        [MenuItem("ES/Debug/测试Book去重功能")]
+        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "资源收集/测试 Book 去重功能", false, 9110)]
         public static void TestBookDuplication()
         {
             Debug.Log("===== Book去重功能测试 =====");
@@ -71,7 +71,7 @@ namespace ES.Editor
             Debug.Log("===== 测试说明完成 =====");
         }
         
-        [MenuItem("ES/Debug/测试DefaultBook类别匹配")]
+        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "资源收集/测试默认 Book 类别匹配", false, 9120)]
         public static void TestDefaultBookCategoryMatching()
         {
             Debug.Log("===== DefaultBook类别匹配测试 =====");
@@ -106,13 +106,13 @@ namespace ES.Editor
             Debug.Log("\n===== 测试完成 =====");
         }
         
-        [MenuItem("Assets/收集到推荐Library", true)]
+        [MenuItem("Assets/【ES】收集到推荐 Library", true)]
         public static bool ValidateCollectAsset()
         {
             return Selection.objects != null && Selection.objects.Length > 0;
         }
         
-        [MenuItem("Assets/收集到推荐Library")]
+        [MenuItem("Assets/【ES】收集到推荐 Library")]
         public static void CollectSelectedAsset()
         {
             var assets = Selection.objects;

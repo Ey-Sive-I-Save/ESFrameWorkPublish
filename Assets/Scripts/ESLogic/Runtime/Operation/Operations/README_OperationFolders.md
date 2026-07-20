@@ -26,4 +26,4 @@
 - 高频运行的 Operation 优先使用固定字段和 `ESRuntimeTargetPack` 原生字段，只有需要动态计算时才用表达式。
 - 持续性 Operation 必须考虑 Stop/Cancel，必要时使用 `MustTriggerStop`。
 - 只用于编辑器验证的 Operation 放入 `90_Debug`，不要混入正式分类。
-- 需要跨帧保存状态的 Operation 放入 `12_DurationChanneling` 或使用 `IOperationRuntimeServices` 的 Store。
+- 需要跨帧保存状态的 Operation 放入 `12_DurationChanneling` 或使用 `ESOpSupport` 的 Store。

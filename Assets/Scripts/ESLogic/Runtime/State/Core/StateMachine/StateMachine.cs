@@ -104,8 +104,25 @@ namespace ES
         [NonSerialized]
         private readonly List<FadeOutIKState> _fadeOutIKStates = new List<FadeOutIKState>(8);
 
+#if UNITY_EDITOR
         [NonSerialized]
         public string stateGeneralFinalIKContributionSummary = "未更新";
+
+        [NonSerialized]
+        private float _nextIKContributionSummarySampleTime;
+
+        [NonSerialized]
+        private int _lastIKContributionSummarySettingsRequestVersion = -1;
+
+        [NonSerialized]
+        private int _ikContributionSummaryLocalRequestVersion;
+
+        [NonSerialized]
+        private int _lastIKContributionSummaryLocalRequestVersion = -1;
+
+        [NonSerialized]
+        private bool _ikContributionSummaryWasEnabled;
+#endif
 
         public delegate void StateGeneralFinalIKDriverPosePostProcessDelegate(StateMachine machine, ref StateGeneralFinalIKDriverPose pose, float deltaTime);
 
@@ -217,8 +234,10 @@ namespace ES
         [NonSerialized]
         private readonly System.Text.StringBuilder _continuousStatsBuilder = new System.Text.StringBuilder(256);
 
+#if UNITY_EDITOR
         [NonSerialized]
         private readonly System.Text.StringBuilder _ikContributionBuilder = new System.Text.StringBuilder(1024);
+#endif
 
         private struct WeakInterruptRecord
         {

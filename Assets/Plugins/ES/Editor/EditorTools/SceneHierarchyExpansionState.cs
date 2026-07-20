@@ -38,7 +38,7 @@ public static class SceneHierarchyExpansionState
     private const bool AutoRestoreAfterPlayMode = true;
     private static readonly bool LogTiming = true;
 
-    private const string MenuRoot = MenuItemPathDefine.ROOT_PATH + "场景层级展开/";
+    private const string MenuRoot = MenuItemPathDefine.SCENE_TOOLS_PATH + "层级展开/";
     private const string StoragePrefix = "Standalone.SceneHierarchyExpansionState.";
 
     private static int restoreRetryCount;
@@ -66,7 +66,7 @@ public static class SceneHierarchyExpansionState
         EditorApplication.delayCall += () => ScheduleRestoreLoadedScenes(RestoreDelayTicks);
     }
 
-    [MenuItem(MenuRoot + "Save Loaded Scenes Expansion")]
+    [MenuItem(MenuRoot + "保存已加载场景展开状态", false, 0)]
     public static void SaveLoadedScenesExpansionState()
     {
         double totalStart = EditorApplication.timeSinceStartup;
@@ -117,14 +117,14 @@ public static class SceneHierarchyExpansionState
             ToMilliseconds(EditorApplication.timeSinceStartup - totalStart));
     }
 
-    [MenuItem(MenuRoot + "Load Loaded Scenes Expansion")]
+    [MenuItem(MenuRoot + "恢复已加载场景展开状态", false, 10)]
     public static void LoadLoadedScenesExpansionState()
     {
         restoreRetryCount = 0;
         ScheduleRestoreLoadedScenes(0);
     }
 
-    [MenuItem(MenuRoot + "Clear Loaded Scenes Saved State")]
+    [MenuItem(MenuRoot + "清除已加载场景展开记录", false, 20)]
     public static void ClearLoadedScenesSavedState()
     {
         for (int i = 0; i < SceneManager.sceneCount; i++)

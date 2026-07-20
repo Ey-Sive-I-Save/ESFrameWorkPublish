@@ -5,7 +5,7 @@ namespace ES
 {
     /// <summary>
     /// Operation 存储接口标记。
-    /// 由 IOperationRuntimeServices 提供具体存储，用于保存 Operation 运行期数据。
+    /// 由 ESOpSupport 提供具体存储，用于保存 Operation 运行期数据。
     /// </summary>
     public interface IOpStore
     {

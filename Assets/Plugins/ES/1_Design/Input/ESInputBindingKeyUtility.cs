@@ -1,7 +1,8 @@
 using System;
+using ES;
 using UnityEngine.InputSystem;
 
-namespace ES
+namespace ES.Internal
 {
     public static class ESInputBindingKeyUtility
     {

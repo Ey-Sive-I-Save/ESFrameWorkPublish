@@ -21,7 +21,7 @@ namespace ES
 
         public AudioClipExpressionSource() { }
 
-        public override AudioClip Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override AudioClip Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return useDirectAudioClip ? directAudioClip : (expression != null ? expression.Evaluate(target, support) : directAudioClip);
         }

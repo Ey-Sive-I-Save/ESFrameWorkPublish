@@ -16,7 +16,7 @@ namespace ES
         //窗口总览
         public partial class ESSODataInfoWindow : ESMenuTreeWindowAB<ESSODataInfoWindow> //OdinMenuEditorWindow
         {
-            [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【SO】数据窗口", false, 5)]
+            [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "SO 数据窗口", false, -970)]
             public static void TryOpenWindow()
             {
                 OpenWindow();

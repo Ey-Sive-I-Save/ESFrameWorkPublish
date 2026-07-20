@@ -1,113 +1,270 @@
-# Player Motion AI Brief
+# 玩家运动 / Item 飞行物 / Op 生命周期协作说明
 
-> 面向后续协作 AI：本文件记录“运动方向”协作上下文。我的职责是跑通玩家底层运动，并保证运动与场景交互能形成闭环。请优先用它建立索引，但不要把它当作最终事实；改动前仍需回读对应源码。
+> 负责 AI：Codex 运动方向。职责是跑通玩家底层运动、场景交互闭环，以及 Item/飞行物的运动与生命周期架构。本文给后续 AI 快速建立正确上下文；实现前仍必须回读源码。
 
-## Scope
+## 当前总判断
 
-- 项目路径：`F:\aaProject\ESFrameWorkPublish`
-- 当前职责：玩家底层运动优先，包括 KCC 位移、跳跃、下蹲、飞行/游泳/攀爬/骑乘分支、运动参数回灌状态机，以及运动触发的场景交互。
-- 交互只在“运动闭环”范围内处理：检测候选、靠近/面向限制、交互期间移动取消、MatchTarget、IK 写入、门/攀爬面这类场景对象协议。背包、任务、UI 流程等不属于本文件职责。
-- 重点源码不在 `Assets/Plugins/ES`，而在 `Assets/Scripts/ESLogic/Runtime`。`Plugins/ES` 更多是框架、编辑器和历史资料。
-- Unity 版本：`2022.3.57f1c1`。`Packages/manifest.json` 已包含 `com.unity.inputsystem`、Cinemachine、URP、Timeline、UniTask、MemoryPack。
+- 世界大型逻辑体只收敛为两类：`Entity` 与 `Item`。
+- `Entity` 负责生命体：玩家、NPC、怪物，当前高频运动主线仍是 KCC。
+- `Item` 负责非生命体世界逻辑体：飞行物、掉落物、机关、场景逻辑物、持续区域、召唤物表现体等。
+- `Item` 不应该只是“运动物体”。更准确地说，`Item` 是一个可拥有完整生命周期的世界逻辑体。
+- `Item` 的全生命周期可以融合 Expression + Op 系统，成为一个事件逻辑器；但高频运动 Tick 不能交给 Op。
 
-## Confirmed Architecture
+## 必须纠正的陈旧思想
 
-- 玩家实体入口：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs`
-  - `Entity : Core, KinematicCharacterController.ICharacterController`
-  - `Entity` 直接实现 KCC 回调，不是外部示例控制器。
-  - `EntityKCCData` 内嵌在同文件中，是当前高频运动核心。
+- 不要再引入 `ESMotionBody` 这类与 `Entity/Item` 并列的大根。
+- 不要恢复 `Assets/Scripts/ESLogic/Runtime/Movement` 下的 `IESMotionDriver / ESMotion*` 旧方案。
+- 不要把 `Item : Core, IESMotionDriver` 当正确方向。当前正确方向是 `Item : Core`，能力进入 Domain/Module。
+- 不要让飞行物成为散落的独立 `MonoBehaviour` 闭环。
+- 不要拆出一堆 `ItemMotionDomain / ItemCollisionDomain / ItemLifetimeDomain / ItemPresentationDomain`。Domain 是大边界，Module 才是能力点。
+- 不要把飞行物模块写成“技能、伤害、Buff、VFX、音效、对象池、全局调度”全包模块。
+- 不要把 OpSupport 当全局垃圾桶。谁拥有生命周期，谁持有并清理自己的 Support。
 
-- 运动内核：`EntityKCCData`
-  - 依赖 `KinematicCharacterMotor`。
-  - 已实现地面移动、空中移动、跳跃缓冲、下蹲胶囊高度切换、RootMotion 速度叠加、速度倍率、速度上限。
-  - `BeforeCharacterUpdate` 会清理未在本帧设置的 move/vertical 输入；输入必须逐帧写入。
-  - `AfterCharacterUpdate` 更新 `EntityKCCMonitor`，并包含静止上漂修正逻辑。
+## 当前 Item 结构
 
-- 支持状态：`Assets/Scripts/ESLogic/Runtime/State/BaseDefine/StateSupportFlags.cs`
-  - 重要枚举：`Grounded`、`Crouched`、`Swimming`、`Flying`、`Mounted`、`Climbing`、`SpecialInteraction`。
-  - KCC 分支通过 `stateDomain.stateMachine.currentSupportFlags` 判断飞行/游泳/攀爬/骑乘等运动模式。
-  - 不要只移动 Transform；正确链路应同步状态机支持状态与 KCC 监控数据。
+```text
+Item : Core
+└── ItemBasicDomain
+    ├── ItemMotionModule
+    ├── ItemProjectileModule / ItemShotModule
+    └── ItemLogicModule        // 规划方向：生命周期事件转 Op
+```
 
-- 基础移动模块：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityBasicModules.cs`
-  - `EntityBasicMoveRotateModule` 处理跳跃/下蹲状态触发。
-  - 它使用 `MyCore.kcc.monitor.velocity` 的实际速度，而不是输入意图，写回 `StateMachine.SetMotionSpeedXZ` 和 `SetAvgSpeedXZ`。
-  - 动画状态默认名称含中文：`跳跃`、`下蹲`。状态缺失时跳跃/下蹲生命周期可能不完整。
+当前源码位置：
 
-- 扩展运动模块：
-  - 攀爬：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/Modules/EntityBasicMotionModule_Climb.cs`
-  - 可攀爬表面：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/ClimbableSurface.cs`
-  - 飞行/游泳：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/Modules/EntityBasicMotionModules_FlySwim.cs`
-  - 骑乘：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/Modules/EntityBasicMotionModule_Mount.cs`
-  - 这些模块实现或配合 `IEntitySupportMotion`，由 `EntityKCCData` 在 KCC 回调中分发。
+- `Assets/Scripts/ESLogic/Runtime/Item/Item.cs`
+- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/_ItemBasicDomain.cs`
+- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ItemBasicModules.cs`
+- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ProjectileMotionTypes.cs`
+- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ProjectileMotionSolver.cs`
 
-## Input Chain
+## 飞行物职责边界
 
-- 输入采集和分发：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/EntityAIModules.cs`
-  - `EntityAIInputSystemModule` 采集 Unity Input System 输入并生成 `InputSnapshot`。
-  - `EntityAIInputDispatchModule` 把输入分发到移动、跳跃、下蹲、飞行、骑乘、攀爬、交互、战斗、技能。
-  - 默认快速绑定由 `EntityInputQuickInit` 生成：WASD、鼠标、Space、C、E、G、F、R 等已覆盖。
+飞行物运动层只负责：
 
-- 分发事实：
-  - 移动：`MyCore.SetMoveInput(moveWorld)`，逐帧调用。
-  - 朝向：`MyCore.SetLookInput(_lastLookWorld)`。
-  - 跳跃：`moveModule.RequestJump()`，再由基础移动模块调用 `MyCore.RequestJump()`。
-  - 下蹲：`moveModule.ToggleCrouch()`。
-  - 交互：`interactionModule.RequestInteract()`。
-  - 攀爬：`climbModule.ToggleClimb()`。
+- 怎么飞
+- 撞到谁或可能撞到谁
+- 什么时候到达
+- 什么时候过期
+- 什么时候停止
+- 输出运动事件和命中候选
 
-## Interaction Chain
+飞行物运动层不负责：
 
-- 交互模块：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/Modules/EntityBasicInteractionModule.cs`
-  - 通过 `Physics.OverlapSphereNonAlloc` 半径检测 `ESInteractable`。
-  - 可配置检测半径、最大数量、LayerMask、面向角限制、是否要求 grounded。
-  - `RequestInteract` 若正在交互则取消，否则选择候选并开始交互。
-  - `BeginInteraction` 会解析或注入交互状态、可选覆盖 `StateSupportFlags.SpecialInteraction`、可选 `MatchTarget`、调用 `target.OnInteractStarted`。
-  - `UpdateInteraction` 支持移动输入取消、持续时间完成、超时失败、逐帧 IK 写入和目标对象更新。
+- 伤害
+- Buff
+- 技能消费
+- VFX
+- 音效
+- 对象池回收
+- 全局调度策略
 
-- 交互物基类：`Assets/Scripts/ESLogic/Runtime/Entity/Interaction/ESInteractable.cs`
-  - 协议包括：`CanInteract`、`OnInteractStarted`、`OnInteractUpdate`、`OnInteractCompleted`。
-  - 支持可选状态注入、`stateKeyOverride`、IK 目标、IK hint、IK 权重、IK lerping、目标旋转、MatchTarget。
+一句话：飞行物层负责“飞、撞、停”；战斗、表现、回收由外部消费事件处理。
 
-- 门示例：`Assets/Scripts/ESLogic/Runtime/Entity/Interaction/ESInteractableDoor.cs`
-  - 交互成功时切换 `isOpen`。
-  - `Update` 中用 `Quaternion.RotateTowards` 朝开/关局部旋转移动。
+## Shot 命名建议
 
-## State Machine Relation
+后续如果继续扩展，建议逐步把飞行物业务命名简化为 `Shot`，比 `Projectile` 更短、更通用：
 
-- 状态机在 `EntityStateDomain` 中持有：`stateDomain.stateMachine`。
-- 初始化路径：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/State/EntityStateDomain.StateRegistration.cs`
-  - `InitializeStateMachine()` 调用 `stateMachine.Initialize(MyCore, _cachedAnimator)`。
-  - `StartStateMachineAfterDataLoaded()` 调用 `stateMachine.StartStateMachine()`。
-- `StateMachine.Utils.cs` 暴露运动参数快路径：
-  - `SetMotionSpeedXZ`
-  - `SetAvgSpeedXZ`
-  - `SetClimbInput`
-  - `SetFloat/SetInt/SetBool`
+```text
+Shot       // 一次飞行物实例或运行态
+ShotData   // 配置
+ShotState  // 当前状态
+ShotMove   // 运动配置
+ShotHit    // 命中配置
+ShotLife   // 生命周期配置
+ShotEvent  // 输出事件
+ShotSolver // 纯运动求解
+```
 
-## Common AI Pitfalls
+`Shot` 可覆盖子弹、箭、法球、导弹、投掷物、激光段、技能飞行体、必中表现体。
 
-- 不要从 `Assets/KinematicCharacterController/ExampleCharacter` 或 `Walkthrough` 复制示例控制器作为正式实现；项目已有 `Entity` 版 KCC 控制器。
-- 不要把 `OpMovement_Translate` 当作玩家底层运动主入口。`OpMovementPhysics.cs` 只是操作系统里的轻量 Transform/Rigidbody 操作，不是 KCC 主链路。
-- 不要只检查 `Assets/Plugins/ES`。玩家业务层主要在 `Assets/Scripts/ESLogic/Runtime/Entity` 与 `Assets/Scripts/ESLogic/Runtime/State`。
-- 不要绕过 `StateSupportFlags`。飞行/游泳/攀爬/骑乘依赖它切换 KCC 速度分支。
-- 不要假设输入会保持。`EntityKCCData.BeforeCharacterUpdate` 会在本帧未写入时把 `moveInput` 和 `verticalInput` 清零。
-- 不要忽视状态名。跳跃、下蹲、攀爬、交互若依赖中文状态名但状态机未注册，对应生命周期会失败或退化。
-- 不要在交互中直接操纵 IK Driver。当前交互模块通过 `StateBase.SetIKGoal` 写入，让状态机/FinalIK Driver 汇总。
+## 必中不是特例
 
-## Prefab And Scene Verification Points
+必须支持必中。必中不是碰撞系统的临时 hack，而是一种合法模式。
 
-后续要真正跑通时，优先验证场景或玩家 prefab 是否同时满足：
+推荐语义：
 
-- `Entity` 组件存在。
-- 同对象或可解析处存在 `KinematicCharacterMotor`，并在 `Entity.InitializeKCC()` 后绑定 `motor.CharacterController = owner`。
-- `basicDomain` 中有 `EntityBasicMoveRotateModule`；需要交互则有 `EntityBasicInteractionModule`；需要攀爬/飞行/骑乘则有对应模块。
-- `aiDomain` 中有 `EntityAIInputSystemModule` 和 `EntityAIInputDispatchModule`，输入 action 已启用或已使用 `InitBuiltin`/预设。
-- `stateDomain` 有可运行的 `StateMachine`、Animator、默认状态、跳跃/下蹲/交互/攀爬相关状态。
-- 场景交互物有 Collider，挂 `ESInteractable` 或派生类，并处于 `EntityBasicInteractionModule.interactableLayers` 可检测层。
-- 攀爬物有 Collider，挂 `ClimbableSurface`，且层级在攀爬模块 `climbableLayerMask` 内。
+```text
+Free      // 自由飞行，靠空间检测命中
+Target    // 锁定目标，朝目标飞
+MustHit   // 战斗层已决定必中，飞行只是表现
+Scan      // 瞬时扫描，如射线/激光
+```
 
-## Current Assessment
+阻挡规则也要独立：
 
-- 代码层已经具备玩家底层运动和场景交互的完整主干。
-- 更可能的风险点在装配层：Prefab/场景是否挂全模块、状态机是否注册所需状态、InputAction 是否启用、LayerMask 是否匹配。
-- 下一阶段应以最小验证场景为目标：地面移动、跳跃、下蹲、一个 `ESInteractableDoor`、一个 `ClimbableSurface`，逐项确认输入到 KCC、状态机、交互对象的闭环。
+```text
+None       // 不被阻挡
+WorldOnly  // 只被地形/墙阻挡
+AnyBlocker // 任意阻挡体可阻挡
+```
+
+示例：
+
+- 治疗飞弹：`MustHit + None`
+- 锁定火球：`MustHit + WorldOnly`
+- 真实箭矢：`Free + AnyBlocker`
+- FPS 子弹：`Scan + AnyBlocker`
+
+## 层级管理
+
+不要只依赖 Unity `LayerMask`。推荐分两层：
+
+```text
+Unity Layer：物理粗过滤
+Game Layer：阵营、归属、目标类型、可命中规则
+```
+
+飞行物可以读取轻量目标接口，例如：
+
+```text
+Id
+OwnerId
+Side
+Kind
+```
+
+但不要让飞行物直接理解完整阵营/仇恨/战斗系统。它只输出候选，上层系统最终裁决。
+
+## 随机性与网络
+
+影响逻辑的随机必须可重放，不允许直接用 `UnityEngine.Random`。
+
+每个 Shot 至少应能关联：
+
+```text
+shotId
+seed
+spawnTick
+ownerId
+targetId
+dataId
+```
+
+随机分两类：
+
+- `LogicRandom`：影响命中、散射、轨迹、反弹，必须由 seed 决定。
+- `ViewRandom`：只影响特效、音效、抖动，可不参与网络校验。
+
+目标是：同一个 seed + 同一组发射参数 + 同一个 tick，应得到同一个逻辑结果。
+
+## Expression + Op + Support 的结论
+
+可以把 `Item` 全生命周期当成一个 ESLogicer 风格的事件逻辑体。
+
+推荐关系：
+
+```text
+ItemShotModule：飞、撞、停，产生事件
+ItemLogicModule：消费事件，执行 Op
+Expression：发射时或事件时计算参数/条件
+OpSupport：跟随 Item 生命周期保存上下文
+```
+
+标准 Op 执行三件套：
+
+```text
+ESOutputOp
+ESRuntimeTargetPack
+ESOpSupport
+```
+
+标准入口：
+
+```text
+op._TryStartOp(targetPack, scopeSupport, hostSupport)
+op._TryStopOp(targetPack, scopeSupport, hostSupport)
+```
+
+一次性事件只 Start；持续型事件必须 Start/Stop 成对。
+
+## Support 生命周期原则
+
+`Entity`、`EntitySkill`、`Item`、`Buff` 都可以符合 OpSupport 使用场景，但身份语义必须分清：
+
+```text
+EntitySupport：角色长期逻辑
+SkillSupport：一次技能释放周期
+ItemSupport：Item 全生命周期、飞行物事件、持续区域
+BuffSupport：Buff 生命周期、周期触发、结束清理
+```
+
+硬规则：
+
+- 谁拥有生命周期，谁持有 Support。
+- 谁触发 Op，谁组装 `ESRuntimeTargetPack`。
+- 谁结束生命周期，谁 Stop 并清理 Op。
+- Support 可以切换，但必须显式切换。
+- 切换 Support 时，TargetPack 应复制或新建，不要原地污染旧上下文。
+
+典型链路：
+
+```text
+SkillSupport
+  -> 生成飞行物 Item
+  -> 切到 ItemSupport
+  -> Item OnHit
+  -> 可再切到 Target EntitySupport
+```
+
+这能形成跨生命周期逻辑流，但不能让高频运动进入 Op 链。
+
+## 性能警告
+
+高频 Tick 禁止：
+
+- LINQ
+- 反射
+- 字符串查找
+- 每帧 `GetComponent`
+- 每帧 new 数组
+- 每帧动态扩容 List
+- 每帧跑复杂 Expression
+- 每帧执行 Op 链
+
+推荐：
+
+- 发射时计算 Expression 并缓存结果。
+- Tick 时只跑纯 Solver 和 NonAlloc 命中检测。
+- 事件发生时才执行 Op。
+- 命中使用固定缓冲。
+- 位姿只由 `ItemMotionModule` 写回。
+
+## Entity 运动提醒
+
+- 玩家/生命体入口：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs`
+- `Entity : Core, KinematicCharacterController.ICharacterController`
+- `EntityKCCData` 是当前高频运动核心。
+- 不要绕过 `StateSupportFlags`。飞行、游泳、攀爬、骑乘依赖它切换 KCC 分支。
+- Item/Shot 体系不要替换 Entity KCC 热路径。
+
+## 当前实现状态
+
+已落地：
+
+- `Item : Core`
+- `ItemBasicDomain`
+- `ItemMotionModule`
+- `ItemProjectileModule`
+- `ProjectileMotionSolver`
+- `ProjectileMotionTypes`
+
+已验证：
+
+```text
+dotnet build ES_Logic.csproj --no-restore -v:minimal
+0 warning, 0 error
+```
+
+尚未落地但方向明确：
+
+- `ItemLogicModule`
+- Item 生命周期事件表
+- Shot 命名收敛
+- MustHit/Scan 等更完整命中模式
+- LogicRandom/ViewRandom 分离
+- Support 显式切换 Op
+
+## 给后续 AI 的一句话
+
+不要把 Item 飞行物做成“会动的技能特效”。正确方向是：`Item` 是世界逻辑体，`Shot` 是它的一类飞行能力，运动层只负责飞撞停，生命周期事件交给 Op/Expression/Support 编排。

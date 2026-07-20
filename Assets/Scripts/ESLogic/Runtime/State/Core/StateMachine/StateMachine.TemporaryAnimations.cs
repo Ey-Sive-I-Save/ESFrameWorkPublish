@@ -31,6 +31,7 @@ namespace ES
 
             tempState.stateSharedData = new StateSharedData();
             tempState.stateSharedData.hasAnimation = true;
+            tempState.stateSharedData.animationSource = StateAnimationSource.StateConfig;
 
             tempState.stateSharedData.basicConfig = new StateBasicConfig();
             tempState.stateSharedData.basicConfig.stateName = tempKey;
@@ -72,6 +73,32 @@ namespace ES
         public bool AddTemporarySkillSequence(string tempKey, ITrackSequence sequence, StateLayerType layer = StateLayerType.Main, bool forceEnter = false)
         {
             return AddTemporarySkillSequence(tempKey, sequence, null, layer, forceEnter);
+        }
+
+        public int PrewarmTemporarySkillSequence(ITrackSequence sequence, int count = 1)
+        {
+            if (sequence == null || count <= 0)
+                return 0;
+
+            SkillSequenceRuntimeCache.GetOrBuild(sequence);
+
+            int warmed = 0;
+            for (int i = 0; i < count; i++)
+            {
+                var state = EntityState_Skill.Pool.GetInPool();
+                state.PrewarmRuntimeForSequence(sequence);
+                if (EntityState_Skill.Pool.PushToPool(state))
+                    warmed++;
+            }
+            return warmed;
+        }
+
+        public int PrewarmTemporarySkillDefinition(SkillDefinitionDataInfo definition, int count = 1)
+        {
+            ITrackSequence sequence = definition != null && definition.trackProcess != null
+                ? definition.trackProcess.sequence
+                : null;
+            return PrewarmTemporarySkillSequence(sequence, count);
         }
 
         public bool AddTemporarySkillDefinition(string tempKey, SkillDefinitionDataInfo definition, StateLayerType layer = StateLayerType.NotClear, bool forceEnter = false, SkillRuntimePreparedValues prepared = null)
@@ -186,7 +213,7 @@ namespace ES
                 baseStateInfo.InitializeRuntime();
                 StateSharedData baseSharedData = baseStateInfo.sharedData;
                 StateAnimationConfigData baseAnimationConfig = baseSharedData != null ? baseSharedData.animationConfig : null;
-                baseAnimationCalculator = baseSharedData != null && baseSharedData.hasAnimation && baseAnimationConfig != null
+                baseAnimationCalculator = baseSharedData != null && baseSharedData.RequiresStateMachinePlayableAnimation && baseAnimationConfig != null
                     ? baseAnimationConfig.calculator
                     : null;
                 sharedData = CloneTemporarySkillSharedData(baseStateInfo.sharedData);
@@ -197,6 +224,7 @@ namespace ES
                 sharedData = new StateSharedData
                 {
                     hasAnimation = false,
+                    animationSource = StateAnimationSource.None,
                     basicConfig = new StateBasicConfig
                     {
                         ignoreSupportFlag = true,
@@ -223,6 +251,7 @@ namespace ES
             if (SkillTimelineAnimationCalculator.TryCreate(sequence, baseAnimationCalculator, out SkillTimelineAnimationCalculator animationCalculator))
             {
                 sharedData.hasAnimation = true;
+                sharedData.animationSource = StateAnimationSource.SkillTimeline;
                 sharedData.animationConfig = new StateAnimationConfigData
                 {
                     calculator = animationCalculator
@@ -231,6 +260,7 @@ namespace ES
             else if (baseAnimationCalculator != null)
             {
                 sharedData.hasAnimation = true;
+                sharedData.animationSource = StateAnimationSource.StateConfig;
                 sharedData.animationConfig = new StateAnimationConfigData
                 {
                     calculator = baseAnimationCalculator
@@ -240,6 +270,7 @@ namespace ES
             {
                 // Skill sequence logic is driven by EntityState_Skill. Without animation tracks, the state only provides state machine rules.
                 sharedData.hasAnimation = false;
+                sharedData.animationSource = StateAnimationSource.None;
             }
 
             return sharedData;
@@ -254,6 +285,7 @@ namespace ES
             {
                 basicConfig = CloneTemporarySkillBasicConfig(source.basicConfig),
                 hasAnimation = false,
+                animationSource = StateAnimationSource.None,
                 proceduralDriveConfig = source.proceduralDriveConfig,
                 tags = source.tags,
                 group = source.group,

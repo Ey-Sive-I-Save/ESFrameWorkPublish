@@ -8,7 +8,7 @@ namespace ES
     [Serializable]
     public sealed class ESInputSchemeDefine
     {
-        [LabelText("方案ID")]
+        [LabelText("方案 ID")]
         public string schemeId = ESInputSchemeIds.KeyboardMouse;
 
         [LabelText("显示名称")]
@@ -25,7 +25,7 @@ namespace ES
     public sealed class ESInputActionDefine
     {
         [HorizontalGroup("动作", Width = 120)]
-        [LabelText("动作ID")]
+        [LabelText("动作 ID")]
         public ESInputActionId id;
 
         [HorizontalGroup("动作")]
@@ -83,6 +83,21 @@ namespace ES
             };
         }
 
+        public static ESInputActionDefine Button(ESInputActionId id, string actionName)
+        {
+            return Value(id, actionName, ESInputValueType.Button);
+        }
+
+        public static ESInputActionDefine Axis(ESInputActionId id, string actionName)
+        {
+            return Value(id, actionName, ESInputValueType.Axis);
+        }
+
+        public static ESInputActionDefine Vector2(ESInputActionId id, string actionName)
+        {
+            return Value(id, actionName, ESInputValueType.Vector2);
+        }
+
         public ESInputTriggerFeature GetEffectiveTriggerFeatures()
         {
             return triggerFeatures != ESInputTriggerFeature.None
@@ -127,19 +142,19 @@ namespace ES
     [Serializable]
     public sealed class ESInputBindingDefine
     {
-        [HideInInspector]
+        [UnityEngine.HideInInspector]
         public string bindingId;
 
-        [LabelText("方案ID")]
+        [LabelText("方案 ID")]
         public string schemeId;
 
         [LabelText("来源")]
         public ESInputBindingSource source = ESInputBindingSource.InputSystem;
 
-        [LabelText("路径")]
+        [LabelText("InputSystem 路径")]
         public string path;
 
-        [LabelText("虚拟控件ID")]
+        [LabelText("虚拟控件 ID")]
         public string virtualControlId;
 
         [LabelText("交互参数")]
@@ -238,22 +253,22 @@ namespace ES
                 case ESInputActionId.SwitchWeapon: return "切换武器";
                 case ESInputActionId.EquipWeapon: return "装备武器";
                 case ESInputActionId.HolsterWeapon: return "收起武器";
-                case ESInputActionId.WeaponSlot1: return "武器槽1";
-                case ESInputActionId.WeaponSlot2: return "武器槽2";
-                case ESInputActionId.WeaponSlot3: return "武器槽3";
-                case ESInputActionId.WeaponSlot4: return "武器槽4";
-                case ESInputActionId.WeaponSlot5: return "武器槽5";
+                case ESInputActionId.WeaponSlot1: return "武器槽 1";
+                case ESInputActionId.WeaponSlot2: return "武器槽 2";
+                case ESInputActionId.WeaponSlot3: return "武器槽 3";
+                case ESInputActionId.WeaponSlot4: return "武器槽 4";
+                case ESInputActionId.WeaponSlot5: return "武器槽 5";
                 case ESInputActionId.Aim: return "瞄准";
                 case ESInputActionId.PeekLeft: return "左探头";
                 case ESInputActionId.PeekRight: return "右探头";
-                case ESInputActionId.Skill1: return "技能1";
-                case ESInputActionId.Skill2: return "技能2";
-                case ESInputActionId.Skill3: return "技能3";
+                case ESInputActionId.Skill1: return "技能 1";
+                case ESInputActionId.Skill2: return "技能 2";
+                case ESInputActionId.Skill3: return "技能 3";
                 case ESInputActionId.Jump: return "跳跃";
                 case ESInputActionId.Crouch: return "蹲伏";
                 case ESInputActionId.Fly: return "飞行";
                 case ESInputActionId.Mount: return "骑乘";
-                case ESInputActionId.FlyVertical: return "飞行垂直";
+                case ESInputActionId.FlyVertical: return "飞行垂直轴";
                 case ESInputActionId.Climb: return "攀爬";
                 case ESInputActionId.Interact: return "交互";
                 default: return id.ToString();

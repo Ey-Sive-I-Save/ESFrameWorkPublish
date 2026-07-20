@@ -767,7 +767,6 @@ namespace ES.EditorInternal.Installer
             if (installer == null)
             {
                 installer = GetWindow<ESInstaller>("ES 安装管理器");
-
             }
             installer.minSize = new Vector2(600, 500);
             installer.Show();

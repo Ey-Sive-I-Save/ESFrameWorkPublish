@@ -3298,7 +3298,8 @@ namespace ES
                 return false;
 
             ESRuntimeTargetPack target = ESRuntimeTargetPack.Pool.GetInPool();
-            OpSupportProvider support = new OpSupportProvider();
+            ESOpSupport support = ESOpSupport.Pool.GetInPool();
+            support.BindCustom(this, MyCore, MyCore != null ? MyCore.GetInstanceID() : 0, null);
             try
             {
                 if (definition.prefillUserFromStateHost)
@@ -3328,6 +3329,9 @@ namespace ES
             {
                 if (target != null && !target.IsRecycled)
                     target.ForcePushToPool();
+
+                if (support != null && !support.IsRecycled)
+                    support.TryAutoPushedToPool();
             }
         }
 

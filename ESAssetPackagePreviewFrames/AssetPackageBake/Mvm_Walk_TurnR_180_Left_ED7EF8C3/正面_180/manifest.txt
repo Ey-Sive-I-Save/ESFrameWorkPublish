@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P1_CLazyMovement/Mvm_Turn_Walk/CLazy@Mvm_Walk_TurnR_180_Left.FBX
+clipName=Mvm_Walk_TurnR_180_Left
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=47
+pixels=117
+yaw=180

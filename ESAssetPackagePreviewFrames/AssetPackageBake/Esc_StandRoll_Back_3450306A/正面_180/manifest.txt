@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P2_CLazyEscape/Esc_4way_Roll_Idle/CLazy@Esc_StandRoll_Back.FBX
+clipName=Esc_StandRoll_Back
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=29
+pixels=117
+yaw=180

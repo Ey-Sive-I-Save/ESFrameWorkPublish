@@ -129,6 +129,7 @@ namespace ES
 
             // ── 初始化收口：将已连接且启用的 IK 组件统一启用一次。
             EnableResolvedIKComponentsOnceAfterInit();
+            ApplyFinalIKExecutionPolicy();
 
             _wasBipedIKBound = _bipedIKReady;
             _hasLastPose     = false;
@@ -141,6 +142,8 @@ namespace ES
             // Grounder 需要显式关闭（OnDisable 会清零 BipedIK 脚步权重）
             if (_grounderBipedIK != null) _grounderBipedIK.enabled = false;
             if (_refs.fullBodyBipedIK != null) _refs.fullBodyBipedIK.enabled = false;
+            if (_hitReaction != null) _hitReaction.enabled = false;
+            if (_recoil != null) _recoil.enabled = false;
 
             _bipedIKReady      = false;  _bipedIK      = null;
             _lookAtIKReady     = false;  _lookAtIK     = null;
@@ -153,6 +156,7 @@ namespace ES
             _recoilReady       = false;  _recoil       = null;
             _fullBodyBipedIKReady = false;
             _finalIKScheduleFlags = IKScheduleFrameFlags.None;
+            _scheduleBlockFlags = FinalIKDriverBlockFlags.None;
 
             _refs.Clear();
             _caps          = FinalIKCapabilityFlags.None;
@@ -235,7 +239,9 @@ namespace ES
             }
 
             if (_grounderReady)
+            {
                 UpdateGrounderWeightSmoothing();
+            }
 
             var pose = _stateMachine.stateGeneralFinalIKDriverPose;
             if (enableRealtimeWeightTest)
@@ -343,14 +349,14 @@ namespace ES
             _solverUpdateCount++;
             _lastSolverUpdateTime = now;
             bool lookAtSolved = SolveLookAtIKManually();
-            bool grounderActive = _grounderReady && _grounderBipedIK != null && _grounderBipedIK.enabled;
+            bool grounderActive = _grounderReady && _grounderBipedIK.enabled;
             bool fullBodySolved = SolveFullBodyBipedIKManually();
             UpdateFinalIKScheduleFlags(aimSolved, true, lookAtSolved, grounderActive, fullBodySolved);
         }
 
         private bool SolveAimIKManually()
         {
-            if (!_aimIKReady || _aimIK == null)
+            if (!_aimIKReady)
                 return false;
 
             _aimIK.enabled = false;
@@ -372,7 +378,7 @@ namespace ES
 
         private bool SolveLookAtIKManually()
         {
-            if (!_lookAtIKReady || _lookAtIK == null)
+            if (!_lookAtIKReady)
                 return false;
 
             _lookAtIK.enabled = false;
@@ -394,10 +400,10 @@ namespace ES
 
         private bool SolveFullBodyBipedIKManually()
         {
-            var fullBodyBipedIK = _refs.fullBodyBipedIK;
-            if (!_fullBodyBipedIKReady || fullBodyBipedIK == null)
+            if (!_fullBodyBipedIKReady)
                 return false;
 
+            var fullBodyBipedIK = _refs.fullBodyBipedIK;
             fullBodyBipedIK.enabled = false;
 
             if (!fullBodyBipedIK.solver.initiated)

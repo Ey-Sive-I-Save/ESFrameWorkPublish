@@ -24,8 +24,8 @@ namespace ES
         /// 接收者列表，使用 SafeNormalList 支持派发期间安全增删。
         /// </summary>
         private SafeNormalList<IReceiveLinkNoParam> _receivers = new SafeNormalList<IReceiveLinkNoParam>();
-        private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>();
-        private readonly List<ReceiveLinkNoParam> _actionReceivers = new List<ReceiveLinkNoParam>();
+        private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>(4);
+        private readonly List<ReceiveLinkNoParam> _actionReceivers = new List<ReceiveLinkNoParam>(4);
 
         #endregion
 

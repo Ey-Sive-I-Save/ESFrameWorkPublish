@@ -15,7 +15,9 @@ using UnityEngine;
 
 
 /* 
- *   Editor的 和 RunTime 使用一套类似的标准，但是生命周期完全不同！
+ *   仅编辑器可用的程序集流工具。
+ *   运行时/IL2CPP 不再使用这条发现链；这里保留的是 Editor 注册、字段发现、类型扫描和工具协作逻辑。
+ *   Editor 的 和 RunTime 使用一套类似的标准，但是生命周期完全不同！
  *   
  * 第一类 标志特性 不需要继承性质，为特性和目标带目标执行一次即可
  * 第二类 一次继承类 ，父类定义好规范后，每个类型生成一个实例 即可4
@@ -67,6 +69,7 @@ namespace ES
             #region 支持的Define模板
             private static readonly Type Define_ClassAttribute = typeof(EditorRegister_FOR_ClassAttribute<>).GetGenericTypeDefinition();
             private static readonly Type Define_FieldAttribute = typeof(EditorRegister_FOR_FieldAttribute<>).GetGenericTypeDefinition();
+            private static readonly Type Define_PropertyAttribute = typeof(EditorRegister_FOR_PropertyAttribute<>).GetGenericTypeDefinition();
             private static readonly Type Define_MethodAttribute = typeof(EditorRegister_FOR_MethodAttribute<>).GetGenericTypeDefinition();
             private static readonly Type Define_Singleton = typeof(EditorRegister_FOR_Singleton<>).GetGenericTypeDefinition();
             private static readonly Type Define_AsSubClass = typeof(EditorRegister_FOR_AsSubclass<>).GetGenericTypeDefinition();
@@ -79,6 +82,7 @@ namespace ES
 
             private static KeyGroup<int, Func<MethodInfo, bool>> Handler_MethodAttribute = new();
             private static KeyGroup<int, Func<FieldInfo, bool>> Handler_FieldAttribute = new();
+            private static KeyGroup<int, Func<PropertyInfo, bool>> Handler_PropertyAttribute = new();
             private static KeyGroup<int, Func<Type, bool>> Handler_ClassAttribute = new();
             #endregion
 
@@ -104,6 +108,7 @@ namespace ES
                 Handler_SubClass.Clear();
                 Handler_MethodAttribute.Clear();
                 Handler_FieldAttribute.Clear();
+                Handler_PropertyAttribute.Clear();
                 Handler_ClassAttribute.Clear();
                 Editor_InitAssembiesAndRegisters();//初始化注册器
 
@@ -191,6 +196,11 @@ namespace ES
                                 Match_FieldAttribute(re, register, nowType);
                                 break;
                             }
+                            if (genericDefinition == Define_PropertyAttribute)
+                            {
+                                Match_PropertyAttribute(re, register, nowType);
+                                break;
+                            }
                             if (genericDefinition == Define_MethodAttribute)
                             {
                                 Match_MethodAttribute(re, register, nowType);
@@ -222,8 +232,9 @@ namespace ES
                     var Handler_SubClassPart = Handler_SubClass.GetGroupDirectly(orderIndex);
                     var Handler_ClassAttributePart = Handler_ClassAttribute.GetGroupDirectly(orderIndex);
                     var Handler_FieldAttributePart = Handler_FieldAttribute.GetGroupDirectly(orderIndex);
+                    var Handler_PropertyAttributePart = Handler_PropertyAttribute.GetGroupDirectly(orderIndex);
                     var Handler_MethodAttributePart = Handler_MethodAttribute.GetGroupDirectly(orderIndex);
-                    if (Handler_SingletonPart.Count == 0 && Handler_SubClassPart.Count == 0 && Handler_ClassAttributePart.Count == 0 && Handler_FieldAttributePart.Count == 0 && Handler_MethodAttributePart.Count == 0)
+                    if (Handler_SingletonPart.Count == 0 && Handler_SubClassPart.Count == 0 && Handler_ClassAttributePart.Count == 0 && Handler_FieldAttributePart.Count == 0 && Handler_PropertyAttributePart.Count == 0 && Handler_MethodAttributePart.Count == 0)
                     {
                         continue;
                     }
@@ -305,13 +316,32 @@ namespace ES
                                     #endregion
 
                                 {
-                                    #region 字段特性
-                                    var Methods = nowType.GetMethods();
-                                    for (int indexField = 0; indexField < Methods.Length; indexField++)
+                                    #region 属性特性
+                                    var Properties = nowType.GetProperties(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                                    for (int indexProperty = 0; indexProperty < Properties.Length; indexProperty++)
                                     {
-                                        var infoM = Methods[indexField];
-                                        int lenForFunc_FieldAttribute = Handler_MethodAttributePart.Count;
-                                        for (int indexAction = 0; indexAction < lenForFunc_FieldAttribute; indexAction++)
+                                        var infoP = Properties[indexProperty];
+                                        int lenForFunc_PropertyAttribute = Handler_PropertyAttributePart.Count;
+                                        for (int indexAction = 0; indexAction < lenForFunc_PropertyAttribute; indexAction++)
+                                        {
+                                            var func = Handler_PropertyAttributePart[indexAction];
+                                            if (func.Invoke(infoP))
+                                            {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                    #endregion
+
+                                {
+                                    #region 字段特性
+                                    var Methods = nowType.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                                    for (int indexMethod = 0; indexMethod < Methods.Length; indexMethod++)
+                                    {
+                                        var infoM = Methods[indexMethod];
+                                        int lenForFunc_MethodAttribute = Handler_MethodAttributePart.Count;
+                                        for (int indexAction = 0; indexAction < lenForFunc_MethodAttribute; indexAction++)
                                         {
                                             //可用的单例匹配
                                             var func = Handler_MethodAttributePart[indexAction];
@@ -423,6 +453,37 @@ namespace ES
                     catch (Exception ex) // 捕获其他未预料到的异常
                     {
                         Console.WriteLine($"EditorRegister捕获字段特性失败: 原始注册器类型{reType},泛型类型{geneType}, 支持特性{supportAttribute},信息{ex.Message}");
+                    }
+                }
+            }
+            private static void Match_PropertyAttribute(Type reType, ESAS_EditorRegister_AB register, Type geneType)
+            {
+                var types = geneType.GetGenericArguments();
+                if (types.Length > 0)
+                {
+                    Type supportAttribute = types[0];
+
+                    try
+                    {
+                        MethodInfo info = reType.GetMethod("Handle");
+                        Handler_PropertyAttribute.Add(register.Order, propertyInfo =>
+                        {
+                            if (propertyInfo == null || !propertyInfo.CanRead || propertyInfo.GetIndexParameters().Length > 0)
+                                return false;
+
+                            var at = propertyInfo.GetCustomAttribute(supportAttribute);
+                            if (at != null)
+                            {
+                                info.Invoke(register, new object[] { at, propertyInfo });
+                                return true;
+                            }
+
+                            return false;
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"EditorRegister捕获属性特性失败: 原始注册器类型{reType},泛型类型{geneType}, 支持特性{supportAttribute},信息{ex.Message}");
                     }
                 }
             }
@@ -618,6 +679,7 @@ namespace ES
 #endif
         public class RunTimePart
         {
+            #if UNITY_EDITOR
             private static Assembly[] InitRuntimeAssembies;
             private static List<Assembly> ValidRuntimeAssembiles = new List<Assembly>(25);
             private static Dictionary<Assembly, Type[]> RuntimeTypes = new Dictionary<Assembly, Type[]>(25);
@@ -654,6 +716,9 @@ namespace ES
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
             private static void RuntimeInitLoad_000_AfterAssembliesLoaded()
             {
+#if !UNITY_EDITOR
+                return;
+#endif
                 try
                 {
                 DateTime startEditorStreamTime = DateTime.Now;
@@ -708,6 +773,9 @@ namespace ES
             }   
             private static void HotRuntimeLoadNewAssembly(object sender, AssemblyLoadEventArgs args)
             {
+#if !UNITY_EDITOR
+                return;
+#endif
                 var asm = args.LoadedAssembly;
                 WaitHotLoadingAssembies.Enqueue(asm);
                 HotHandler_AsSubclass.Clear();
@@ -746,6 +814,9 @@ namespace ES
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
             private static void RuntimeInitLoad_111_BeforeSceneLoad()
             {
+#if !UNITY_EDITOR
+                return;
+#endif
                 try
                 {
                 DateTime startEditorStreamTime = DateTime.Now;
@@ -773,6 +844,9 @@ namespace ES
             [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
             private static void RuntimeInitLoad_222_AfterSceneLoad()
             { 
+#if !UNITY_EDITOR
+                return;
+#endif
                 try
                 {
                 DateTime startEditorStreamTime = DateTime.Now;
@@ -1489,6 +1563,8 @@ namespace ES
                 matchType = null;
                 return false;
             }
+
+#endif
 
 
         }

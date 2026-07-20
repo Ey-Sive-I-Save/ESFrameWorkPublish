@@ -16,9 +16,10 @@ namespace ES
         [LabelText("操作")]
         public EnumCollect.HandleTwoNumber function = EnumCollect.HandleTwoNumber.Set;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetFloat(key, value != null ? value.Evaluate(target, logic) : 0f, function);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetFloat(key, value != null ? value.Evaluate(target, support) : 0f, function, false);
         }
     }
 
@@ -29,9 +30,10 @@ namespace ES
         public IntExpressionSource value = new IntExpressionSource { directInt = 0 };
         public EnumCollect.HandleTwoNumber function = EnumCollect.HandleTwoNumber.Set;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetInt(key, value != null ? value.Evaluate(target, logic) : 0, function);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetInt(key, value != null ? value.Evaluate(target, support) : 0, function, false);
         }
     }
 
@@ -42,9 +44,10 @@ namespace ES
         public BoolExpressionSource value = new BoolExpressionSource { directBool = true };
         public EnumCollect.HandleTwoBool function = EnumCollect.HandleTwoBool.Set;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetBool(key, value == null || value.Evaluate(target, logic), function);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetBool(key, value == null || value.Evaluate(target, support), function, false);
         }
     }
 
@@ -54,9 +57,10 @@ namespace ES
         public string key;
         public StringExpressionSource value = new StringExpressionSource { directString = "" };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetStringDirect(key, value != null ? value.Evaluate(target, logic) : "");
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetStringDirect(key, value != null ? value.Evaluate(target, support) : "", false, false);
         }
     }
 
@@ -66,9 +70,10 @@ namespace ES
         public string key;
         public Vector3ExpressionSource value = new Vector3ExpressionSource { directVector3 = Vector3.zero };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetVectorDirect(key, value != null ? value.Evaluate(target, logic) : Vector3.zero);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetVectorDirect(key, value != null ? value.Evaluate(target, support) : Vector3.zero, false, false);
         }
     }
 
@@ -79,9 +84,10 @@ namespace ES
         [LabelText("有效时间")]
         public FloatExpressionSource duration = new FloatExpressionSource { directFloat = 5f };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetTagQuick_SetUseableAndEnable(key, duration != null ? duration.Evaluate(target, logic) : 5f);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetTagQuick_SetUseableAndEnable(key, duration != null ? duration.Evaluate(target, support) : 5f, false);
         }
     }
 
@@ -90,9 +96,10 @@ namespace ES
     {
         public string key;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            logic?.Context?.SetTagQuick_CancelUse(key);
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            support?.Context?.SetTagQuick_CancelUse(key, false);
         }
     }
 
@@ -102,10 +109,13 @@ namespace ES
         public string key;
         public float defaultValue;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target != null)
-                target.runtimeFloat = logic?.Context != null ? logic.Context.GetFloat(key, defaultValue) : defaultValue;
+            {
+                ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+                target.runtimeFloat = support?.Context != null ? support.Context.GetFloat(key, defaultValue) : defaultValue;
+            }
         }
     }
 
@@ -115,10 +125,13 @@ namespace ES
         public string key;
         public bool defaultValue;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (target != null)
-                target.runtimeBool = logic?.Context != null ? logic.Context.GetBool(key, defaultValue) : defaultValue;
+            {
+                ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+                target.runtimeBool = support?.Context != null ? support.Context.GetBool(key, defaultValue) : defaultValue;
+            }
         }
     }
 }

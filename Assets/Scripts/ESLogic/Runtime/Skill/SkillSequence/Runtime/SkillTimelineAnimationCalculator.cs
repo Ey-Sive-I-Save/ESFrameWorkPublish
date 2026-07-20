@@ -10,13 +10,8 @@ namespace ES
     [Serializable]
     public sealed class SkillTimelineAnimationCalculator : StateAnimationMixCalculator
     {
-        [NonSerialized] private AnimationClip[] clips;
-        [NonSerialized] private float[] startTimes;
-        [NonSerialized] private float[] durations;
-        [NonSerialized] private float[] clipStartOffsets;
-        [NonSerialized] private float[] playbackSpeeds;
-        [NonSerialized] private bool[] loopClips;
-        [NonSerialized] private float totalDuration;
+        [NonSerialized] private SkillSequenceRuntimeCache.AnimationTimelineRuntimeData timelineData;
+        [NonSerialized] private AnimationClip[] clipOverrides;
         [NonSerialized] private StateAnimationMixCalculator idleCalculator;
         [NonSerialized] private float idleBlendDuration;
 
@@ -32,67 +27,14 @@ namespace ES
         public static bool TryCreate(ITrackSequence sequence, StateAnimationMixCalculator idleCalculator, out SkillTimelineAnimationCalculator calculator)
         {
             calculator = null;
-            if (sequence == null || sequence.Tracks == null)
+            var cache = SkillSequenceRuntimeCache.GetOrBuild(sequence);
+            var timeline = cache != null ? cache.AnimationTimeline : null;
+            if (timeline == null || !timeline.HasClips)
                 return false;
-
-            var entries = new List<TimelineClipEntry>(8);
-            float maxEndTime = 0f;
-
-            foreach (ITrackItem track in sequence.Tracks)
-            {
-                if (track is not SkillTrackItem_Animation animationTrack || !animationTrack.Enabled || animationTrack.clips == null)
-                    continue;
-
-                for (int i = 0; i < animationTrack.clips.Count; i++)
-                {
-                    SkillTrackClip_Animation clip = animationTrack.clips[i];
-                    if (clip == null || !clip.Enabled || clip.AnimationClipName == null || clip.DurationTime <= 0.0001f)
-                        continue;
-
-                    entries.Add(new TimelineClipEntry(
-                        clip.AnimationClipName,
-                        Mathf.Max(0f, clip.StartTime),
-                        Mathf.Max(0.0001f, clip.DurationTime),
-                        Mathf.Max(0f, clip.clipStartOffset),
-                        Mathf.Max(0.01f, clip.playbackSpeed),
-                        clip.loopClip,
-                        entries.Count));
-                    maxEndTime = Mathf.Max(maxEndTime, clip.StartTime + clip.DurationTime);
-                }
-            }
-
-            if (entries.Count == 0)
-                return false;
-
-            entries.Sort(TimelineClipEntryComparer.Instance);
-
-            int count = entries.Count;
-            AnimationClip[] clipArray = new AnimationClip[count];
-            float[] startArray = new float[count];
-            float[] durationArray = new float[count];
-            float[] offsetArray = new float[count];
-            float[] speedArray = new float[count];
-            bool[] loopArray = new bool[count];
-            for (int i = 0; i < count; i++)
-            {
-                TimelineClipEntry entry = entries[i];
-                clipArray[i] = entry.Clip;
-                startArray[i] = entry.StartTime;
-                durationArray[i] = entry.Duration;
-                offsetArray[i] = entry.ClipStartOffset;
-                speedArray[i] = entry.PlaybackSpeed;
-                loopArray[i] = entry.LoopClip;
-            }
 
             calculator = new SkillTimelineAnimationCalculator
             {
-                clips = clipArray,
-                startTimes = startArray,
-                durations = durationArray,
-                clipStartOffsets = offsetArray,
-                playbackSpeeds = speedArray,
-                loopClips = loopArray,
-                totalDuration = maxEndTime,
+                timelineData = timeline,
                 idleCalculator = idleCalculator,
                 idleBlendDuration = 0.08f
             };
@@ -115,6 +57,7 @@ namespace ES
 
         protected override bool InitializeRuntimeInternal(AnimationCalculatorRuntime runtime, PlayableGraph graph, ref Playable output)
         {
+            var clips = GetClips();
             if (clips == null || clips.Length == 0)
                 return false;
 
@@ -127,6 +70,7 @@ namespace ES
             runtime.playables = new AnimationClipPlayable[count];
             runtime.weightCache = new float[count];
             runtime.sequencePhase = -1;
+            runtime.EnsureClipOverrideSlots(count);
 
             if (hasIdle)
             {
@@ -135,6 +79,8 @@ namespace ES
                 {
                     graph.Connect(idleOutput, 0, runtime.mixer, 0);
                     runtime.mixer.SetInputWeight(0, 1f);
+                    runtime.skillTimelineIdleWeightCache = 1f;
+                    runtime.skillTimelineIdleWeightCacheValid = true;
                 }
                 else
                 {
@@ -155,6 +101,7 @@ namespace ES
                 int mixerInputIndex = i + clipInputOffset;
                 graph.Connect(playable, 0, runtime.mixer, mixerInputIndex);
                 runtime.mixer.SetInputWeight(mixerInputIndex, 0f);
+                runtime.RegisterClipOverrideSlot(i, clip, GetClipMarker(i, clip));
             }
 
             output = runtime.mixer;
@@ -190,15 +137,17 @@ namespace ES
         {
             float sequenceTime = runtime != null && runtime.ownerState != null ? runtime.ownerState.hasEnterTime : 0f;
             int index = ResolveActiveClipIndex(sequenceTime, runtime != null ? runtime.sequencePhase : -1);
+            var clips = GetClips();
             return index >= 0 && clips != null && index < clips.Length ? clips[index] : null;
         }
 
         public override bool OverrideClip(AnimationCalculatorRuntime runtime, int clipIndex, AnimationClip newClip)
         {
+            var clips = GetClips();
             if (clips == null || clipIndex < 0 || clipIndex >= clips.Length || newClip == null)
                 return false;
 
-            clips[clipIndex] = newClip;
+            EnsureClipOverrideArray()[clipIndex] = newClip;
             if (runtime == null || runtime.playables == null || clipIndex >= runtime.playables.Length || !runtime.mixer.IsValid())
                 return true;
 
@@ -227,16 +176,49 @@ namespace ES
             if (runtime.sequencePhase == clipIndex && runtime.ownerState != null)
                 playable.SetTime(ResolveClipLocalTime(clipIndex, runtime.ownerState.hasEnterTime));
 
+            runtime.UpdateClipOverrideSlot(clipIndex, newClip);
             return true;
+        }
+
+        public override bool OverrideClipBySource(AnimationCalculatorRuntime runtime, AnimationClip sourceClip, AnimationClip newClip)
+        {
+            if (runtime == null || sourceClip == null || newClip == null)
+                return false;
+
+            int slotIndex = runtime.FindClipSlotByOriginalOrCurrent(sourceClip);
+            return slotIndex >= 0 && OverrideClip(runtime, slotIndex, newClip);
+        }
+
+        public override bool OverrideClipByMarker(AnimationCalculatorRuntime runtime, string marker, AnimationClip newClip)
+        {
+            if (runtime == null || string.IsNullOrWhiteSpace(marker) || newClip == null)
+                return false;
+
+            int slotIndex = runtime.FindClipSlotByMarker(marker);
+            if (slotIndex >= 0)
+                return OverrideClip(runtime, slotIndex, newClip);
+
+            if (int.TryParse(marker, out int numericIndex))
+                return OverrideClip(runtime, numericIndex, newClip);
+
+            if (marker.StartsWith("Clip", StringComparison.OrdinalIgnoreCase)
+                && int.TryParse(marker.Substring(4), out int clipIndex))
+            {
+                return OverrideClip(runtime, clipIndex, newClip);
+            }
+
+            return false;
         }
 
         public override float GetStandardDuration(AnimationCalculatorRuntime runtime)
         {
-            return totalDuration;
+            return timelineData != null ? timelineData.TotalDuration : 0f;
         }
 
         private int ResolveActiveClipIndex(float sequenceTime, int cachedIndex)
         {
+            var clips = GetClips();
+            var startTimes = timelineData != null ? timelineData.StartTimes : null;
             if (clips == null)
                 return -1;
 
@@ -303,7 +285,12 @@ namespace ES
             if (idleCalculator == null || runtime == null || runtime.childRuntime == null || !runtime.mixer.IsValid())
                 return;
 
+            if (runtime.skillTimelineIdleWeightCacheValid && Mathf.Approximately(runtime.skillTimelineIdleWeightCache, weight))
+                return;
+
             runtime.mixer.SetInputWeight(0, weight);
+            runtime.skillTimelineIdleWeightCache = weight;
+            runtime.skillTimelineIdleWeightCacheValid = true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -325,6 +312,7 @@ namespace ES
 
         private float ResolveSkillClipWeight(int index, float sequenceTime)
         {
+            var clips = GetClips();
             if (clips == null || index < 0 || index >= clips.Length)
                 return 0f;
 
@@ -332,8 +320,8 @@ namespace ES
             if (blend <= 0.0001f)
                 return 1f;
 
-            float localTime = sequenceTime - startTimes[index];
-            float remaining = durations[index] - localTime;
+            float localTime = sequenceTime - timelineData.StartTimes[index];
+            float remaining = timelineData.Durations[index] - localTime;
             float fadeIn = Mathf.Clamp01(localTime / blend);
             float fadeOut = Mathf.Clamp01(remaining / blend);
             return Mathf.Min(fadeIn, fadeOut);
@@ -342,58 +330,58 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsTimeInsideClip(int index, float sequenceTime)
         {
+            var clips = GetClips();
             if (clips == null || index < 0 || index >= clips.Length)
                 return false;
 
-            float start = startTimes[index];
-            return sequenceTime >= start && sequenceTime < start + durations[index];
+            float start = timelineData.StartTimes[index];
+            return sequenceTime >= start && sequenceTime < start + timelineData.Durations[index];
         }
 
         private double ResolveClipLocalTime(int index, float sequenceTime)
         {
+            var clips = GetClips();
             if (clips == null || index < 0 || index >= clips.Length || clips[index] == null)
                 return 0d;
 
-            float elapsed = Mathf.Clamp(sequenceTime - startTimes[index], 0f, durations[index]);
+            float elapsed = Mathf.Clamp(sequenceTime - timelineData.StartTimes[index], 0f, timelineData.Durations[index]);
             float clipLength = clips[index].length;
-            float offset = clipStartOffsets != null && index < clipStartOffsets.Length ? clipStartOffsets[index] : 0f;
-            float speed = playbackSpeeds != null && index < playbackSpeeds.Length ? Mathf.Max(0.01f, playbackSpeeds[index]) : 1f;
-            bool loop = loopClips != null && index < loopClips.Length && loopClips[index];
+            float offset = timelineData.ClipStartOffsets != null && index < timelineData.ClipStartOffsets.Length ? timelineData.ClipStartOffsets[index] : 0f;
+            float speed = timelineData.PlaybackSpeeds != null && index < timelineData.PlaybackSpeeds.Length ? Mathf.Max(0.01f, timelineData.PlaybackSpeeds[index]) : 1f;
+            bool loop = timelineData.LoopClips != null && index < timelineData.LoopClips.Length && timelineData.LoopClips[index];
             float localTime = offset + elapsed * speed;
             return loop ? Mathf.Repeat(localTime, clipLength) : Mathf.Clamp(localTime, 0f, clipLength);
         }
 
-        private readonly struct TimelineClipEntry
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private AnimationClip[] GetClips()
         {
-            public readonly AnimationClip Clip;
-            public readonly float StartTime;
-            public readonly float Duration;
-            public readonly float ClipStartOffset;
-            public readonly float PlaybackSpeed;
-            public readonly bool LoopClip;
-            public readonly int SourceIndex;
-
-            public TimelineClipEntry(AnimationClip clip, float startTime, float duration, float clipStartOffset, float playbackSpeed, bool loopClip, int sourceIndex)
-            {
-                Clip = clip;
-                StartTime = startTime;
-                Duration = duration;
-                ClipStartOffset = clipStartOffset;
-                PlaybackSpeed = playbackSpeed;
-                LoopClip = loopClip;
-                SourceIndex = sourceIndex;
-            }
+            return clipOverrides ?? timelineData?.Clips;
         }
 
-        private sealed class TimelineClipEntryComparer : IComparer<TimelineClipEntry>
+        private AnimationClip[] EnsureClipOverrideArray()
         {
-            public static readonly TimelineClipEntryComparer Instance = new TimelineClipEntryComparer();
+            if (clipOverrides != null)
+                return clipOverrides;
 
-            public int Compare(TimelineClipEntry x, TimelineClipEntry y)
-            {
-                int startCompare = x.StartTime.CompareTo(y.StartTime);
-                return startCompare != 0 ? startCompare : x.SourceIndex.CompareTo(y.SourceIndex);
-            }
+            var source = timelineData != null ? timelineData.Clips : null;
+            if (source == null)
+                return null;
+
+            clipOverrides = new AnimationClip[source.Length];
+            Array.Copy(source, clipOverrides, source.Length);
+            return clipOverrides;
+        }
+
+        private string GetClipMarker(int index, AnimationClip clip)
+        {
+            var markers = timelineData != null ? timelineData.ClipMarkers : null;
+            if (markers != null && index >= 0 && index < markers.Length && !string.IsNullOrWhiteSpace(markers[index]))
+                return markers[index];
+
+            return clip != null && !string.IsNullOrWhiteSpace(clip.name)
+                ? clip.name
+                : "Clip" + index;
         }
     }
 }

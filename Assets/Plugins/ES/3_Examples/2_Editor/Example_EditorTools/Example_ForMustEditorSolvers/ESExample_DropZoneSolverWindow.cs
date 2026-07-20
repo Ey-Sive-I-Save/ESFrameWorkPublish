@@ -15,7 +15,7 @@ namespace ES
         private Vector2 scroll;
         private string lastMessage = "等待拖入资源";
 
-        [MenuItem("【ES】/测试案例/编辑器Solver/01 DropZoneSolver案例")]
+        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/01 DropZoneSolver 案例", false, 10)]
         private static void Open()
         {
             GetWindow<ESExample_DropZoneSolverWindow>("DropZoneSolver案例");
@@ -146,6 +146,7 @@ namespace ES
             Selection.activeObject = asset;
             EditorGUIUtility.PingObject(asset);
         }
+
     }
 #endif
 }

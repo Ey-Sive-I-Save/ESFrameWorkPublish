@@ -11,6 +11,10 @@ namespace ES
         [LabelText("自动确保脚贴合模块"), Tooltip("开启后：运行时如果基础域没有添加‘基础台阶脚贴合模块’，会自动创建并加入（不需要额外脚本/组件）。\n注意：这会改变未配置该模块的实体的默认行为。")]
         public bool autoEnsureFootPlacementModule = false;
 
+        [Title("RuntimeWatch")]
+        [LabelText("自动确保RuntimeWatch验证模块"), Tooltip("开启后：运行时如果基础域没有添加 RuntimeWatch 验证模块，会自动创建并加入。建议仅在调试/验证链路时开启。")]
+        public bool autoEnsureRuntimeWatchModule = false;
+
         [Title("默认地面参数")]
         [LabelText("启用默认地面参数")]
         public bool applyGroundDefaults = true;
@@ -24,6 +28,12 @@ namespace ES
             {
                 EnsureFootPlacementModuleExists(applyRecommendedDefaults: true);
             }
+
+            if (autoEnsureRuntimeWatchModule)
+            {
+                EnsureRuntimeWatchModuleExists();
+            }
+
             base._AwakeRegisterAllModules();
             ApplyGroundDefaults();
         }
@@ -59,6 +69,18 @@ namespace ES
             module.ApplyRecommendedDefaults();
         }
 
+        [Button("确保RuntimeWatch验证模块存在"), PropertyOrder(-8)]
+        public void EnsureRuntimeWatchModuleExists()
+        {
+            var module = FindRuntimeWatchModule();
+            if (module != null)
+                return;
+
+            module = new EntityBasicRuntimeWatchModule();
+            MyModules.Add(module);
+            MyModules.ApplyBuffers(true);
+        }
+
         private EntityBasicFootPlacementModule FindFootPlacementModule()
         {
             if (MyModules == null || MyModules.ValuesNow == null) return null;
@@ -66,6 +88,21 @@ namespace ES
             for (int i = 0; i < count; i++)
             {
                 if (MyModules.ValuesNow[i] is EntityBasicFootPlacementModule m)
+                {
+                    return m;
+                }
+            }
+
+            return null;
+        }
+
+        private EntityBasicRuntimeWatchModule FindRuntimeWatchModule()
+        {
+            if (MyModules == null || MyModules.ValuesNow == null) return null;
+            int count = MyModules.ValuesNow.Count;
+            for (int i = 0; i < count; i++)
+            {
+                if (MyModules.ValuesNow[i] is EntityBasicRuntimeWatchModule m)
                 {
                     return m;
                 }

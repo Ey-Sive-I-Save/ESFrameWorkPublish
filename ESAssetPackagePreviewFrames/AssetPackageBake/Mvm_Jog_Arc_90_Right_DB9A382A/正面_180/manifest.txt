@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P1_CLazyMovement/Mvm_90Arc_Jog/CLazy@Mvm_Jog_Arc_90_Right.FBX
+clipName=Mvm_Jog_Arc_90_Right
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=24
+pixels=117
+yaw=180

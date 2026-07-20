@@ -21,7 +21,7 @@ namespace ES
 
         public Vector3ExpressionSource() { }
 
-        public override Vector3 Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override Vector3 Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return useDirectVector3 ? directVector3 : (expression != null ? expression.Evaluate(target, support) : directVector3);
         }

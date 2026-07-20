@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v2_ViewAware
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P3_CLazyJump/Jmp_Back_Air/CLazy@Jmp_BackAir.FBX
+clipName=Jmp_BackAir
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=30
+pixels=117
+yaw=180

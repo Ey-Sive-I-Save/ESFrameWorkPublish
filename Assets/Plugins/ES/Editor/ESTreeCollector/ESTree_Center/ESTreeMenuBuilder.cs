@@ -20,7 +20,7 @@ public class ESTreeMenuBuilder : EditorInvoker_Level1
     {
         //开始初始化
     }
-    [UnityEditor.MenuItem("Tools/A #Z")]
+    [UnityEditor.MenuItem(MenuItemPathDefine.DEBUG_PATH + "Tree Collector/打开快捷创建树 #Z")]
     public static void TEST()
     {
         ShowTree(ESTreeCollectorName.ESCreate);

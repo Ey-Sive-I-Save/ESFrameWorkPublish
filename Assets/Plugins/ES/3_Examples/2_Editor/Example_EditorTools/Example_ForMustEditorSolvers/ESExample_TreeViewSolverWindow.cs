@@ -15,7 +15,7 @@ namespace ES
         private Vector2 scroll;
         private ESTreeViewNode selectedNode;
 
-        [MenuItem("【ES】/测试案例/编辑器Solver/03 TreeViewSolver案例")]
+        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/03 TreeViewSolver 案例", false, 30)]
         private static void Open()
         {
             GetWindow<ESExample_TreeViewSolverWindow>("TreeViewSolver案例");
@@ -195,6 +195,7 @@ namespace ES
                 "tree.Draw(roots);\n\n" +
                 "说明：Target 为空的节点通常作为文件夹/分组；AllowFolderSelection=false 时文件夹只显示和折叠，不参与资源选择。");
         }
+
     }
 #endif
 }

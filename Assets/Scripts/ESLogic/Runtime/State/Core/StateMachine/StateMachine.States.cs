@@ -428,11 +428,11 @@ namespace ES
 
             CheckAndSetFallbackState(state, layer);
 
-            if (sharedData.hasAnimation)
+            if (sharedData.RequiresStateMachinePlayableAnimation)
             {
                 var animationConfig = sharedData.animationConfig;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                if (animationConfig == null) throw new InvalidOperationException($"RegisterStateCore: hasAnimation=true 但 animationConfig 为空 | State={stringKey}");
+                if (animationConfig == null) throw new InvalidOperationException($"RegisterStateCore: animationSource={sharedData.animationSource} 但 animationConfig 为空 | State={stringKey}");
 #endif
                 var calculator = state._calculatorCached;
                 if (calculator == null && animationConfig != null)

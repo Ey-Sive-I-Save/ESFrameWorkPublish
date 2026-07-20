@@ -3,7 +3,6 @@ using Sirenix.OdinInspector;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 #if UNITY_EDITOR
@@ -33,13 +32,18 @@ public class LinkReceiveChannelPool<Channel, Link>
     /// </summary>
     [HideLabel]
     private SafeKeyGroup<Channel, IReceiveChannelLink<Channel, Link>> _channelReceivers = new SafeKeyGroup<Channel, IReceiveChannelLink<Channel, Link>>();
-    private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>();
-    private readonly List<ActionReceiverRecord> _actionReceivers = new List<ActionReceiverRecord>();
+    private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>(4);
+    private readonly List<ActionReceiverRecord> _actionReceivers = new List<ActionReceiverRecord>(4);
 
     private struct ActionReceiverRecord
     {
         public Channel Channel;
         public ReceiveChannelLink<Channel, Link> Receiver;
+    }
+
+    public LinkReceiveChannelPool()
+    {
+        _channelReceivers.SetAutoCreateOnAccess(false);
     }
 
     #endregion
@@ -54,26 +58,21 @@ public class LinkReceiveChannelPool<Channel, Link>
     /// <param name="link">链接数据。</param>
     public void SendLink(Channel channel, Link link)
     {
-        _channelReceivers.ApplyBuffers();
-        RecyclePending();
-        if (_channelReceivers.Groups.TryGetValue(channel, out var receivers))
+        if (!_channelReceivers.Groups.TryGetValue(channel, out var receivers))
         {
-            int count = receivers.ValuesNow.Count;
-            for (int i = 0; i < count; i++)
+            RecyclePending();
+            return;
+        }
+
+        receivers.ApplyBuffers();
+        RecyclePending();
+        int count = receivers.ValuesNow.Count;
+        for (int i = 0; i < count; i++)
+        {
+            IReceiveChannelLink<Channel, Link> currentReceiver = receivers.ValuesNow[i];
+            if (currentReceiver is UnityEngine.Object ob)
             {
-                IReceiveChannelLink<Channel, Link> currentReceiver = receivers.ValuesNow[i];
-                if (currentReceiver is UnityEngine.Object ob)
-                {
-                    if (ob != null)
-                    {
-                        currentReceiver.OnLink(channel, link);
-                    }
-                    else
-                    {
-                        receivers.Remove(currentReceiver);
-                    }
-                }
-                else if (currentReceiver != null)
+                if (ob != null)
                 {
                     currentReceiver.OnLink(channel, link);
                 }
@@ -81,6 +80,14 @@ public class LinkReceiveChannelPool<Channel, Link>
                 {
                     receivers.Remove(currentReceiver);
                 }
+            }
+            else if (currentReceiver != null)
+            {
+                currentReceiver.OnLink(channel, link);
+            }
+            else
+            {
+                receivers.Remove(currentReceiver);
             }
         }
     }
@@ -142,7 +149,10 @@ public class LinkReceiveChannelPool<Channel, Link>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void RemoveReceiver(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
     {
-        _channelReceivers.Remove(channel, receiver);
+        if (_channelReceivers.Groups.TryGetValue(channel, out var receivers))
+        {
+            receivers.Remove(receiver);
+        }
         ScheduleRecycle(receiver);
     }
 

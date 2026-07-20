@@ -10,11 +10,12 @@ namespace ES
         public GameObjectExpressionSource targetObject = new GameObjectExpressionSource();
         public BoolExpressionSource active = new BoolExpressionSource { directBool = true };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            GameObject obj = targetObject != null ? targetObject.Evaluate(target, logic) : null;
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            GameObject obj = targetObject != null ? targetObject.Evaluate(target, support) : null;
             if (obj != null)
-                obj.SetActive(active == null || active.Evaluate(target, logic));
+                obj.SetActive(active == null || active.Evaluate(target, support));
         }
     }
 
@@ -39,20 +40,21 @@ namespace ES
         [LabelText("生成物加入目标列表")]
         public bool addCreatedEntityToTargets;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            GameObject prefabObject = prefab != null ? prefab.Evaluate(target, logic) : null;
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            GameObject prefabObject = prefab != null ? prefab.Evaluate(target, support) : null;
             if (prefabObject == null)
                 return;
 
             Transform parentTransform = null;
-            GameObject parentObject = parent != null ? parent.Evaluate(target, logic) : null;
+            GameObject parentObject = parent != null ? parent.Evaluate(target, support) : null;
             if (parentObject != null)
                 parentTransform = parentObject.transform;
 
             GameObject created = UnityEngine.Object.Instantiate(prefabObject, parentTransform);
-            Vector3 pos = position != null ? position.Evaluate(target, logic) : Vector3.zero;
-            Quaternion rot = Quaternion.Euler(euler != null ? euler.Evaluate(target, logic) : Vector3.zero);
+            Vector3 pos = position != null ? position.Evaluate(target, support) : Vector3.zero;
+            Quaternion rot = Quaternion.Euler(euler != null ? euler.Evaluate(target, support) : Vector3.zero);
 
             if (useLocalTransform)
             {
@@ -98,14 +100,15 @@ namespace ES
         public Vector3ExpressionSource position = new Vector3ExpressionSource { directVector3 = Vector3.zero };
         public Vector3ExpressionSource euler = new Vector3ExpressionSource { directVector3 = Vector3.zero };
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            GameObject obj = targetObject != null ? targetObject.Evaluate(target, logic) : null;
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            GameObject obj = targetObject != null ? targetObject.Evaluate(target, support) : null;
             if (obj == null)
                 return;
 
-            Vector3 pos = position != null ? position.Evaluate(target, logic) : Vector3.zero;
-            Quaternion rot = Quaternion.Euler(euler != null ? euler.Evaluate(target, logic) : Vector3.zero);
+            Vector3 pos = position != null ? position.Evaluate(target, support) : Vector3.zero;
+            Quaternion rot = Quaternion.Euler(euler != null ? euler.Evaluate(target, support) : Vector3.zero);
             if (useLocal)
             {
                 obj.transform.localPosition = pos;
@@ -124,9 +127,10 @@ namespace ES
         public GameObjectExpressionSource targetObject = new GameObjectExpressionSource();
         public bool withChildren = true;
 
-        protected override void StartOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            GameObject obj = targetObject != null ? targetObject.Evaluate(target, logic) : null;
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            GameObject obj = targetObject != null ? targetObject.Evaluate(target, support) : null;
             if (obj == null)
                 return;
 
@@ -138,9 +142,10 @@ namespace ES
                 particles[i].Play(true);
         }
 
-        protected override void StopOperation(ESRuntimeTargetPack target, IOperationRuntimeServices logic)
+        protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            GameObject obj = targetObject != null ? targetObject.Evaluate(target, logic) : null;
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            GameObject obj = targetObject != null ? targetObject.Evaluate(target, support) : null;
             if (obj == null)
                 return;
 

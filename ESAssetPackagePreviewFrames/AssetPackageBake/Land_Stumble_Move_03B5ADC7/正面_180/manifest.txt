@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P3_CLazyJump/Jmp_Land/CLazy@Land_Stumble_Move.FBX
+clipName=Land_Stumble_Move
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=28
+pixels=117
+yaw=180

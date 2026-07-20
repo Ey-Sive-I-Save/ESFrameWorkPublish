@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Animations;
@@ -51,6 +52,205 @@ namespace ES
             var state = GetStateByInt(stateId);
             return GetStateWeight(state);
         }
+
+        #region State Animation Override
+
+        public bool TryOverrideStateAnimationClip(StateBase state, int clipIndex, AnimationClip newClip)
+        {
+            return state != null && state.TryOverrideAnimationClip(clipIndex, newClip);
+        }
+
+        public bool TryOverrideStateAnimationClip(StateBase state, string marker, AnimationClip newClip)
+        {
+            return state != null && state.TryOverrideAnimationClip(marker, newClip);
+        }
+
+        public bool TryOverrideStateAnimationClip(StateBase state, AnimationClip sourceClip, AnimationClip newClip)
+        {
+            return state != null && state.TryOverrideAnimationClip(sourceClip, newClip);
+        }
+
+        public int TryOverrideStateAnimationClips(StateBase state, IList<StateAnimationClipOverrideRule> rules)
+        {
+            return state != null ? state.TryOverrideAnimationClips(rules) : 0;
+        }
+
+        public int RestoreStateAnimationClipOverrides(StateBase state)
+        {
+            return state != null ? state.RestoreAllAnimationClipOverrides() : 0;
+        }
+
+        public bool TryGetStateAnimationClipOverrideSlot(StateBase state, int clipIndex, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            slot = default;
+            return state != null && state.TryGetAnimationClipOverrideSlot(clipIndex, out slot);
+        }
+
+        public bool TryGetStateAnimationClipOverrideSlot(StateBase state, string marker, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            slot = default;
+            return state != null && state.TryGetAnimationClipOverrideSlot(marker, out slot);
+        }
+
+        public bool TryGetStateAnimationClipOverrideSlot(StateBase state, AnimationClip sourceOrCurrentClip, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            slot = default;
+            return state != null && state.TryGetAnimationClipOverrideSlot(sourceOrCurrentClip, out slot);
+        }
+
+        public int TryOverrideRunningStateAnimationClip(string marker, AnimationClip newClip)
+        {
+            if (string.IsNullOrWhiteSpace(marker) || newClip == null)
+                return 0;
+
+            int changedCount = 0;
+            var states = runningStates.Items;
+            for (int i = 0; i < states.Count; i++)
+            {
+                var state = states[i];
+                if (state != null && state.TryOverrideAnimationClip(marker, newClip))
+                {
+                    changedCount++;
+                }
+            }
+            return changedCount;
+        }
+
+        public int TryOverrideRunningStateAnimationClip(AnimationClip sourceClip, AnimationClip newClip)
+        {
+            if (sourceClip == null || newClip == null)
+                return 0;
+
+            int changedCount = 0;
+            var states = runningStates.Items;
+            for (int i = 0; i < states.Count; i++)
+            {
+                var state = states[i];
+                if (state != null && state.TryOverrideAnimationClip(sourceClip, newClip))
+                {
+                    changedCount++;
+                }
+            }
+            return changedCount;
+        }
+
+        public int RestoreRunningStateAnimationClipOverrides()
+        {
+            int changedCount = 0;
+            var states = runningStates.Items;
+            for (int i = 0; i < states.Count; i++)
+            {
+                var state = states[i];
+                if (state != null)
+                {
+                    changedCount += state.RestoreAllAnimationClipOverrides();
+                }
+            }
+            return changedCount;
+        }
+
+        public bool TryGetRunningStateAnimationClipOverrideSlot(string marker, out StateBase matchedState, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            matchedState = null;
+            slot = default;
+            if (string.IsNullOrWhiteSpace(marker))
+                return false;
+
+            var states = runningStates.Items;
+            for (int i = 0; i < states.Count; i++)
+            {
+                var state = states[i];
+                if (state != null && state.TryGetAnimationClipOverrideSlot(marker, out slot))
+                {
+                    matchedState = state;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool TryOverrideStateAnimationClip(string stateKey, int clipIndex, AnimationClip newClip)
+        {
+            return TryOverrideStateAnimationClip(GetStateByString(stateKey), clipIndex, newClip);
+        }
+
+        public bool TryOverrideStateAnimationClip(string stateKey, string marker, AnimationClip newClip)
+        {
+            return TryOverrideStateAnimationClip(GetStateByString(stateKey), marker, newClip);
+        }
+
+        public bool TryOverrideStateAnimationClip(string stateKey, AnimationClip sourceClip, AnimationClip newClip)
+        {
+            return TryOverrideStateAnimationClip(GetStateByString(stateKey), sourceClip, newClip);
+        }
+
+        public int TryOverrideStateAnimationClips(string stateKey, IList<StateAnimationClipOverrideRule> rules)
+        {
+            return TryOverrideStateAnimationClips(GetStateByString(stateKey), rules);
+        }
+
+        public int RestoreStateAnimationClipOverrides(string stateKey)
+        {
+            return RestoreStateAnimationClipOverrides(GetStateByString(stateKey));
+        }
+
+        public bool TryGetStateAnimationClipOverrideSlot(string stateKey, int clipIndex, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            return TryGetStateAnimationClipOverrideSlot(GetStateByString(stateKey), clipIndex, out slot);
+        }
+
+        public bool TryGetStateAnimationClipOverrideSlot(string stateKey, string marker, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            return TryGetStateAnimationClipOverrideSlot(GetStateByString(stateKey), marker, out slot);
+        }
+
+        public bool TryGetStateAnimationClipOverrideSlot(string stateKey, AnimationClip sourceOrCurrentClip, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            return TryGetStateAnimationClipOverrideSlot(GetStateByString(stateKey), sourceOrCurrentClip, out slot);
+        }
+
+        public bool TryOverrideStateAnimationClip(int stateId, int clipIndex, AnimationClip newClip)
+        {
+            return TryOverrideStateAnimationClip(GetStateByInt(stateId), clipIndex, newClip);
+        }
+
+        public bool TryOverrideStateAnimationClip(int stateId, string marker, AnimationClip newClip)
+        {
+            return TryOverrideStateAnimationClip(GetStateByInt(stateId), marker, newClip);
+        }
+
+        public bool TryOverrideStateAnimationClip(int stateId, AnimationClip sourceClip, AnimationClip newClip)
+        {
+            return TryOverrideStateAnimationClip(GetStateByInt(stateId), sourceClip, newClip);
+        }
+
+        public int TryOverrideStateAnimationClips(int stateId, IList<StateAnimationClipOverrideRule> rules)
+        {
+            return TryOverrideStateAnimationClips(GetStateByInt(stateId), rules);
+        }
+
+        public int RestoreStateAnimationClipOverrides(int stateId)
+        {
+            return RestoreStateAnimationClipOverrides(GetStateByInt(stateId));
+        }
+
+        public bool TryGetStateAnimationClipOverrideSlot(int stateId, int clipIndex, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            return TryGetStateAnimationClipOverrideSlot(GetStateByInt(stateId), clipIndex, out slot);
+        }
+
+        public bool TryGetStateAnimationClipOverrideSlot(int stateId, string marker, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            return TryGetStateAnimationClipOverrideSlot(GetStateByInt(stateId), marker, out slot);
+        }
+
+        public bool TryGetStateAnimationClipOverrideSlot(int stateId, AnimationClip sourceOrCurrentClip, out AnimationCalculatorRuntime.ClipOverrideSlot slot)
+        {
+            return TryGetStateAnimationClipOverrideSlot(GetStateByInt(stateId), sourceOrCurrentClip, out slot);
+        }
+
+        #endregion
 
         public string GetRootMixerDebugInfo()
         {

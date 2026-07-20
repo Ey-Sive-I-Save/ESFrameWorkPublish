@@ -33,7 +33,7 @@ namespace ES
         {
         }
 
-        public override float Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             if (useDirectFloat)
                 return directFloat;

@@ -8,7 +8,7 @@ namespace ES
     {
         private const string ConfigFolder = "Assets/NormalResources/Data/GlobalData/StateMachineConfig";
 
-        [MenuItem("ES/State/Open State Machine Config", false, 10)]
+        [MenuItem(MenuItemPathDefine.GAMEPLAY_BUILDING_PATH + "状态/打开状态机配置", false, 10)]
         public static void OpenStateMachineConfig()
         {
             StateMachineConfig config = FindStateMachineConfig();

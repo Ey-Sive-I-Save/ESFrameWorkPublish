@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P3_CLazyJump/Jmp_Move_Side/CLazy@Jmp_Move_Right_Keep.FBX
+clipName=Jmp_Move_Right_Keep
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=40
+pixels=117
+yaw=180

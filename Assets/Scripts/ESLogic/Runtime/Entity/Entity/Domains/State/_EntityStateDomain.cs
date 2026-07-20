@@ -13,7 +13,7 @@ using UnityEditor;
 
 namespace ES
 {
-    [Serializable, TypeRegistryItem("State Domain")]
+    [Serializable, TypeRegistryItem("状态表现域")]
     public partial class EntityStateDomain : Domain<Entity, EntityStateModuleBase>, IPreviewElement, IPreviewAreaModeProvider, IPreviewElementLifecycle, IPreviewElementEditorUpdate
     {
         private static readonly StateSupportFlags[] PreflightSupportFlags =
@@ -39,28 +39,33 @@ namespace ES
             }
         }
 
-        [Title("State Data")]
-        [LabelText("Animation State Data Pack")]
+        [TitleGroup("状态表现域/状态数据", "状态数据", Alignment = TitleAlignments.Left)]
+        [LabelText("动画状态数据包")]
         public StateAniDataPack stateAniDataPack;
 
-        [LabelText("Gun State Data Pack")]
+        [TitleGroup("状态表现域/状态数据")]
+        [LabelText("枪械状态数据包")]
         public GunStateAniDataPack gunStateAniDataPack;
 
-        [LabelText("Additional State Data Packs")]
+        [TitleGroup("状态表现域/状态数据")]
+        [LabelText("附加状态数据包")]
         public List<StateAniDataPack> additionalStateAniDataPacks = new List<StateAniDataPack>();
 
-        [Title("State Machine")]
-        [LabelText("State Machine")]
+        [TitleGroup("状态表现域/状态机", "状态机", Alignment = TitleAlignments.Left)]
+        [LabelText("状态机")]
+        [InlineProperty]
         public StateMachine stateMachine = new StateMachine();
 
-        [LabelText("Default State Key (Optional)")]
+        [TitleGroup("状态表现域/启动配置", "启动配置", Alignment = TitleAlignments.Left)]
+        [LabelText("默认状态Key（可选）")]
         public string defaultStateKey = "";
 
-        [LabelText("Initial Active State Name (Optional)")]
-        [Tooltip("State activated automatically after state machine startup. Empty means no auto activation.")]
+        [TitleGroup("状态表现域/启动配置")]
+        [LabelText("启动后激活状态名（可选）")]
+        [Tooltip("状态机启动后自动激活的状态名。留空表示不自动激活。")]
         public string initialStateName = "";
 
-        [Title("Skill Runtime Test")]
+        [TitleGroup("状态表现域/技能运行时测试", "技能运行时测试", Alignment = TitleAlignments.Left)]
         [Button("确保技能轨道运行时测试模块存在"), PropertyOrder(-10)]
         public void EnsureSkillRuntimeTestModuleExists()
         {

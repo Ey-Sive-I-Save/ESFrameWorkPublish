@@ -20,11 +20,11 @@ public class ESGraphViewWindow : EditorWindow
     public INodeContainer Container { get { return m_NodeContainer; } set { if (value != m_NodeContainer) { SContainer= m_NodeContainer = value; OnTargetContainerChanged();} } }
     private INodeContainer m_NodeContainer;
 
-    [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【图】编辑器", false, 3)]
+    [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "图编辑器", false, -980)]
     public static ESGraphViewWindow ShowWindow()
     {
         window = GetWindow<ESGraphViewWindow>();
-        window.titleContent = new GUIContent("ESGraphViewWindow");
+        window.titleContent = new GUIContent("ES 图编辑器");
         return window;
     }
     public void CreateGUI()

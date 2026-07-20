@@ -1,8 +1,9 @@
 using System.IO;
 using System.Text;
+using ES;
 using UnityEngine;
 
-namespace ES
+namespace ES.Internal
 {
     public static class ESInputProfileIO
     {

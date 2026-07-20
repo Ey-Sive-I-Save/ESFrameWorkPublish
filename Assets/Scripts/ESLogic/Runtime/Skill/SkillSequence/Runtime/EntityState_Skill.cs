@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -27,7 +27,7 @@ namespace ES
         [NonSerialized] private SkillRuntimeTrackState[] trackStates;
         [NonSerialized] private SkillRuntimeClipState[][] clipStates;
         [NonSerialized] private ESRuntimeTargetPack runtimeTarget;
-        [NonSerialized] private OpSupportProvider opSupportProvider;
+        [NonSerialized] private ESOpSupport opSupport;
         [NonSerialized] private SkillDefinitionDataInfo skillDefinition;
         [NonSerialized] private SkillRuntimePreparedValues preparedValues;
         [NonSerialized] private float skillTime;
@@ -35,8 +35,8 @@ namespace ES
 
         public ESRuntimeTargetPack RuntimeTarget => runtimeTarget;
         public ESRuntimeTargetPack SkillRuntimeTarget => runtimeTarget;
-        public IOperationRuntimeServices OpSupporter => opSupportProvider;
-        public OpSupportProvider OpSupportProvider => opSupportProvider;
+        public ESOpSupport OpSupport => opSupport;
+        public ESOpSupport HostOpSupport => HostEntity != null ? HostEntity.OpSupport : null;
         public Entity HostEntity => host != null ? host.HostEntity : null;
         public float SkillTime => skillTime;
         public SkillSequenceRuntimeCache RuntimeCache => runtimeCache;
@@ -56,6 +56,19 @@ namespace ES
             SetSkillSequence(definition != null && definition.trackProcess != null ? definition.trackProcess.sequence : null);
         }
 
+        public void PrewarmRuntimeForSequence(ITrackSequence sequence)
+        {
+            SetSkillSequence(sequence);
+            PrepareRuntimeIfNeeded();
+            ResetRuntimeStates();
+            skillSequence = null;
+            runtimeCache = null;
+            skillDefinition = null;
+            preparedValues = null;
+            skillTime = 0f;
+            runtimePrepared = false;
+        }
+
         protected override void OnStateEnterLogic()
         {
             PrepareRuntimeIfNeeded();
@@ -65,9 +78,10 @@ namespace ES
             if (runtimeTarget == null || runtimeTarget.IsRecycled)
                 runtimeTarget = ESRuntimeTargetPack.Pool.GetInPool();
 
-            if (opSupportProvider == null)
-                opSupportProvider = new OpSupportProvider();
-            opSupportProvider.SetCurrentSkillState(this);
+            if (opSupport == null || opSupport.IsRecycled)
+                opSupport = ESOpSupport.Pool.GetInPool();
+            opSupport.InitializeSkillOwner(this, HostOpSupport, GetHashCode());
+            opSupport.SetCurrentSkillState(this);
 
             FillInitialRuntimeTarget(runtimeTarget);
 
@@ -105,8 +119,11 @@ namespace ES
             if (runtimeTarget != null && !runtimeTarget.IsRecycled)
                 runtimeTarget.CompleteRecycle(null);
 
-            if (opSupportProvider != null)
-                opSupportProvider.SetCurrentSkillState(null);
+            if (opSupport != null)
+            {
+                opSupport.SetCurrentSkillState(null);
+                opSupport.ClearActivationRuntime();
+            }
 
             runtimeTarget = null;
             skillTime = 0f;
@@ -114,12 +131,13 @@ namespace ES
 
         protected override void OnStateResetAsPoolableLogic()
         {
+            ResetRuntimeStates();
             skillSequence = null;
             runtimeCache = null;
-            trackStates = null;
-            clipStates = null;
             runtimeTarget = null;
-            opSupportProvider = null;
+            if (opSupport != null && !opSupport.IsRecycled)
+                opSupport.TryAutoPushedToPool();
+            opSupport = null;
             skillDefinition = null;
             preparedValues = null;
             skillTime = 0f;
@@ -178,7 +196,7 @@ namespace ES
 
             if (skillDefinition != null && skillDefinition.initialTargetExpression != null)
             {
-                GameObject targetObject = skillDefinition.initialTargetExpression.Evaluate(target, opSupportProvider);
+                GameObject targetObject = skillDefinition.initialTargetExpression.Evaluate(target, opSupport);
                 Entity targetEntity = FindEntityInSelfOrParents(targetObject);
                 target.SetEntityMainTarget(targetEntity);
 
@@ -212,7 +230,7 @@ namespace ES
 
         private void EnsureTrackStateCapacity(int count)
         {
-            if (trackStates == null || trackStates.Length != count)
+            if (trackStates == null || trackStates.Length < count)
                 trackStates = new SkillRuntimeTrackState[count];
         }
 
@@ -234,14 +252,14 @@ namespace ES
         private void EnsureClipStateCapacity(SkillSequenceRuntimeCache cache)
         {
             int trackCount = cache != null && cache.Tracks != null ? cache.Tracks.Length : 0;
-            if (clipStates == null || clipStates.Length != trackCount)
+            if (clipStates == null || clipStates.Length < trackCount)
                 clipStates = new SkillRuntimeClipState[trackCount][];
 
             for (int i = 0; i < trackCount; i++)
             {
                 var clips = cache.Tracks[i].Clips;
                 int clipCount = clips != null ? clips.Length : 0;
-                if (clipStates[i] == null || clipStates[i].Length != clipCount)
+                if (clipStates[i] == null || clipStates[i].Length < clipCount)
                     clipStates[i] = new SkillRuntimeClipState[clipCount];
             }
         }

@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v2_ViewAware
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P5_CLazyCollision/Dam_Jumping_Die/CLazy@Dam_JumpDie_Over_Keep.FBX
+clipName=Dam_JumpDie_Over_Keep
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=40
+pixels=117
+yaw=180

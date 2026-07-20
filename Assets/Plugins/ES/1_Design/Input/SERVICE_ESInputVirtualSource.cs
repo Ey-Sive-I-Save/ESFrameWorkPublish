@@ -33,6 +33,7 @@ namespace ES
         private Dictionary<string, ESInputVirtualControlHandle> virtualHandles;
         private bool[] buttonEnabled;
         private bool[] buttonHeld;
+        private bool[] buttonPulse;
         private bool[] axisEnabled;
         private float[] axisValues;
         private bool[] vector2Enabled;
@@ -59,6 +60,7 @@ namespace ES
             virtualHandles = new Dictionary<string, ESInputVirtualControlHandle>(32, StringComparer.Ordinal);
             buttonEnabled = new bool[capacity];
             buttonHeld = new bool[capacity];
+            buttonPulse = new bool[capacity];
             axisEnabled = new bool[capacity];
             axisValues = new float[capacity];
             vector2Enabled = new bool[capacity];
@@ -82,6 +84,7 @@ namespace ES
             virtualHandles = null;
             buttonEnabled = null;
             buttonHeld = null;
+            buttonPulse = null;
             axisEnabled = null;
             axisValues = null;
             vector2Enabled = null;
@@ -114,6 +117,12 @@ namespace ES
         {
             if (TryGetHandle(virtualControlId, out ESInputVirtualControlHandle handle))
                 SetButton(handle, held);
+        }
+
+        public void PulseButton(string virtualControlId)
+        {
+            if (TryGetHandle(virtualControlId, out ESInputVirtualControlHandle handle))
+                PulseButton(handle);
         }
 
         public void ClearButton(string virtualControlId)
@@ -162,9 +171,28 @@ namespace ES
             ClearButtonByIndex(handle.index);
         }
 
+        public void PulseButton(ESInputVirtualControlHandle handle)
+        {
+            if (!handle.IsValid || handle.valueType != ESInputValueType.Button)
+                return;
+
+            PulseButtonByIndex(handle.index);
+        }
+
         public void SetButton(ESInputActionId id, bool held)
         {
+            if (!CanWriteAction(id, ESInputValueType.Button))
+                return;
+
             SetButtonByIndex((int)id, held, false);
+        }
+
+        public void PulseButton(ESInputActionId id)
+        {
+            if (!CanWriteAction(id, ESInputValueType.Button))
+                return;
+
+            PulseButtonByIndex((int)id, false);
         }
 
         private void SetButtonByIndex(int index, bool held, bool requireAllowed = true)
@@ -177,12 +205,27 @@ namespace ES
 
             buttonEnabled[index] = true;
             buttonHeld[index] = held;
+            buttonPulse[index] = false;
             MarkActive(index);
         }
 
         public void ClearButton(ESInputActionId id)
         {
             ClearButtonByIndex((int)id);
+        }
+
+        private void PulseButtonByIndex(int index, bool requireAllowed = true)
+        {
+            if (!IsValid(index, buttonHeld))
+                return;
+
+            if (requireAllowed && !buttonAllowed[index])
+                return;
+
+            buttonEnabled[index] = true;
+            buttonHeld[index] = true;
+            buttonPulse[index] = true;
+            MarkActive(index);
         }
 
         private void ClearButtonByIndex(int index)
@@ -192,6 +235,8 @@ namespace ES
 
             buttonEnabled[index] = false;
             buttonHeld[index] = false;
+            if (IsValid(index, buttonPulse))
+                buttonPulse[index] = false;
             TryRemoveActive(index);
         }
 
@@ -213,6 +258,9 @@ namespace ES
 
         public void SetAxis(ESInputActionId id, float value)
         {
+            if (!CanWriteAction(id, ESInputValueType.Axis))
+                return;
+
             SetAxisByIndex((int)id, value, false);
         }
 
@@ -262,6 +310,9 @@ namespace ES
 
         public void SetVector2(ESInputActionId id, Vector2 value)
         {
+            if (!CanWriteAction(id, ESInputValueType.Vector2))
+                return;
+
             SetVector2ByIndex((int)id, value, false);
         }
 
@@ -295,17 +346,35 @@ namespace ES
 
         public void Update(float time)
         {
-            for (int i = 0; i < activeCount; i++)
+            int i = 0;
+            while (i < activeCount)
             {
                 int index = activeIndices[i];
                 if (buttonEnabled[index])
+                {
                     inputService.WriteButton((ESInputActionId)index, buttonHeld[index], time);
+
+                    if (IsValid(index, buttonPulse) && buttonPulse[index])
+                    {
+                        buttonPulse[index] = false;
+                        buttonEnabled[index] = false;
+                        buttonHeld[index] = false;
+                    }
+                }
 
                 if (axisEnabled[index])
                     inputService.WriteAxis((ESInputActionId)index, axisValues[index]);
 
                 if (vector2Enabled[index])
                     inputService.WriteVector2((ESInputActionId)index, vector2Values[index]);
+
+                if (!buttonEnabled[index] && !axisEnabled[index] && !vector2Enabled[index])
+                {
+                    TryRemoveActive(index);
+                    continue;
+                }
+
+                i++;
             }
         }
 
@@ -324,6 +393,8 @@ namespace ES
                     buttonEnabled[index] = false;
                 if (IsValid(index, buttonHeld))
                     buttonHeld[index] = false;
+                if (IsValid(index, buttonPulse))
+                    buttonPulse[index] = false;
                 if (IsValid(index, axisEnabled))
                     axisEnabled[index] = false;
                 if (IsValid(index, axisValues))
@@ -342,6 +413,15 @@ namespace ES
         private static bool IsValid<T>(int index, T[] array)
         {
             return array != null && index >= 0 && index < array.Length;
+        }
+
+        private bool CanWriteAction(ESInputActionId id, ESInputValueType valueType)
+        {
+            int index = (int)id;
+            ESInputRuntimeCache cache = inputService.Cache;
+            return cache != null
+                   && cache.IsValidIndex(index)
+                   && cache.metas[index].valueType == valueType;
         }
 
         private void BuildAllowedMask(ESInputRuntimeBuildResult build)

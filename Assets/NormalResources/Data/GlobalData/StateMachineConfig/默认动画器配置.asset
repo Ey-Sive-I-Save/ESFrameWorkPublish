@@ -25,6 +25,10 @@ MonoBehaviour:
   upperBodyMask: {fileID: 31900000, guid: f748df921432c9a438ec18f6fdb170f3, type: 2}
   lowerBodyMask: {fileID: 31900000, guid: e4e335fe917ba284ea1da6748b090fe2, type: 2}
   previewIdleClip: {fileID: 7400000, guid: d556ab52e17604958b19876c5f242758, type: 3}
+  previewModel: {fileID: 6886175988468354606, guid: 4fa046071ab06b6489f8614e96c283fb,
+    type: 3}
+  previewAvatar: {fileID: 9000000, guid: a166f20cb1bba8b4780ce3e897fcc411, type: 3}
+  previewFallbackMaterial: {fileID: 0}
   disableTransitionPermissionMap:
     baseKeys: 000001000200040008001000200040008000000100020004
     relations:

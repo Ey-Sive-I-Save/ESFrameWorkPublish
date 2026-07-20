@@ -23,10 +23,10 @@ namespace ES
         [HideInInspector] public const int ItemsPerPage = 10;
 
         [Title("顶部工具栏管理器", "ES场景快捷访问与管理工具", bold: true, titleAlignment: TitleAlignments.Centered)]
-        [InfoBox("本页提供场景的快速跳转、自定义场景集合管理、资产快捷访问等功能。\n\n支持场景分组、颜色标记、批量操作等商业级特性。", InfoMessageType.Info)]
+        [InfoBox("管理常用场景和资产快捷入口；配置写入 ESSceneGlobalData，支持 Undo。", InfoMessageType.Info)]
 
         [FoldoutGroup("功能列表", expanded: false)]
-        [DisplayAsString(fontSize: 16), HideLabel]
+        [DisplayAsString(fontSize: 12), HideLabel]
         public string readMe = "功能列表:\n" +
             "● 自定义场景快捷方式\n" +
             "● 场景分组管理\n" +
@@ -38,6 +38,9 @@ namespace ES
             "● 场景列表分页显示\n" +
             "● Build Settings场景同步\n" +
             "● 批量操作支持";
+
+        private string lastResultSummary = "";
+        private string lastResultDetail = "";
 
         [OnInspectorGUI]
         public void DrawThisWindow()
@@ -52,6 +55,7 @@ namespace ES
             // 使用TabGroup分离场景和资产管理
             EditorGUILayout.BeginVertical();
             selectedTab = GUILayout.Toolbar(selectedTab, new string[] { "场景管理", "资产管理" });
+            DrawSummaryAndResult(dataInstance);
 
             // 撤销/重做按钮
             EditorGUILayout.BeginHorizontal();
@@ -91,6 +95,18 @@ namespace ES
             EditorGUILayout.EndVertical();
         }
 
+        private void DrawSummaryAndResult(ESSceneGlobalData data)
+        {
+            int sceneCount = data.GetEnabledScenes().Count;
+            int assetCount = data.GetEnabledAssets().Count;
+            SimpleToolsPanelUtility.DrawSummary(
+                $"场景快捷: {sceneCount} 个",
+                $"资产快捷: {assetCount} 个",
+                $"打开方式: {(data.UseAdditiveMode ? "叠加打开" : "单场景打开")}",
+                $"切换前保存: {(data.AutoSaveBeforeSwitch ? "自动保存" : "手动确认")}");
+            SimpleToolsPanelUtility.DrawResultSummary("最近场景/资产操作", lastResultSummary, lastResultDetail);
+        }
+
         private void DrawSceneManagementSection()
         {
             EditorGUILayout.LabelField("场景管理", EditorStyles.boldLabel);
@@ -114,16 +130,39 @@ namespace ES
                 else if (Event.current.type == EventType.DragPerform)
                 {
                     DragAndDrop.AcceptDrag();
+                    var scenePaths = new List<string>();
                     foreach (var draggedObject in DragAndDrop.objectReferences)
                     {
                         if (draggedObject is SceneAsset sceneAsset)
                         {
                             string scenePath = AssetDatabase.GetAssetPath(sceneAsset);
-                            if (!string.IsNullOrEmpty(scenePath))
+                            if (!string.IsNullOrEmpty(scenePath) &&
+                                !ESSceneGlobalData.Instance.CustomScenes.Exists(s => s.ScenePath == scenePath) &&
+                                !scenePaths.Contains(scenePath))
+                            {
+                                scenePaths.Add(scenePath);
+                            }
+                        }
+                    }
+
+                    if (scenePaths.Count > 0)
+                    {
+                        string preview = SimpleToolsSafetyUtility.JoinPreview(scenePaths, 8);
+                        if (EditorUtility.DisplayDialog("确认添加场景",
+                            $"将添加 {scenePaths.Count} 个场景到快捷列表。\n\n{preview}\n\n支持 Ctrl+Z 撤销。继续吗？",
+                            "添加", "取消"))
+                        {
+                            Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "拖拽添加快捷场景");
+                            foreach (string scenePath in scenePaths)
                             {
                                 ESSceneGlobalData.Instance.AddScene(scenePath);
-                                Debug.Log($"已添加场景: {sceneAsset.name}");
+                                Debug.Log($"已添加场景: {scenePath}");
                             }
+
+                            EditorUtility.SetDirty(ESSceneGlobalData.Instance);
+                            AssetDatabase.SaveAssets();
+                            lastResultSummary = $"拖拽添加场景完成: 新增 {scenePaths.Count} 个";
+                            lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(scenePaths, 12);
                         }
                     }
                     Event.current.Use();
@@ -231,14 +270,7 @@ namespace ES
             string displayName = string.IsNullOrEmpty(scene.DisplayName) ?
                 System.IO.Path.GetFileNameWithoutExtension(scene.ScenePath) : scene.DisplayName;
 
-            // 场景名称按钮
-            string buttonText = displayName;
-            if (ESSceneGlobalData.Instance.ShowScenePath)
-            {
-                buttonText += $"\n{scene.ScenePath}";
-            }
-
-            if (GUILayout.Button(buttonText, GUILayout.Height(35), GUILayout.MinWidth(200)))
+            if (GUILayout.Button(displayName, GUILayout.Height(26), GUILayout.MinWidth(200)))
             {
                 OpenScene(scene);
             }
@@ -246,27 +278,37 @@ namespace ES
             GUI.backgroundColor = originalColor;
 
             // Ping按钮
-            if (GUILayout.Button("定位", GUILayout.Width(50), GUILayout.Height(35)))
+            if (GUILayout.Button("定位", GUILayout.Width(44), GUILayout.Height(26)))
             {
                 PingSceneAsset(scene);
             }
 
             // 编辑按钮
-            if (GUILayout.Button("编辑", GUILayout.Width(50), GUILayout.Height(35)))
+            if (GUILayout.Button("编辑", GUILayout.Width(44), GUILayout.Height(26)))
             {
                 EditSceneProperties(scene);
             }
 
             // 移除按钮
-            if (GUILayout.Button("移除", GUILayout.Width(50), GUILayout.Height(35)))
+            if (GUILayout.Button("移除", GUILayout.Width(44), GUILayout.Height(26)))
             {
                 if (EditorUtility.DisplayDialog("确认", $"确定要移除场景 '{displayName}' 吗？", "确定", "取消"))
                 {
+                    Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "移除快捷场景");
                     ESSceneGlobalData.Instance.RemoveScene(scene.ScenePath);
+                    EditorUtility.SetDirty(ESSceneGlobalData.Instance);
+                    AssetDatabase.SaveAssets();
+                    lastResultSummary = $"移除快捷场景完成: {displayName}";
+                    lastResultDetail = scene.ScenePath;
                 }
             }
 
             EditorGUILayout.EndHorizontal();
+
+            if (ESSceneGlobalData.Instance.ShowScenePath && !string.IsNullOrEmpty(scene.ScenePath))
+            {
+                EditorGUILayout.LabelField(scene.ScenePath, EditorStyles.miniLabel);
+            }
 
             // 描述
             if (!string.IsNullOrEmpty(scene.Description))
@@ -360,11 +402,16 @@ namespace ES
             }
 
             // 移除按钮
-            if (GUILayout.Button("删除", GUILayout.Width(30), GUILayout.Height(25)))
+            if (GUILayout.Button("移除", GUILayout.Width(36), GUILayout.Height(25)))
             {
                 if (EditorUtility.DisplayDialog("确认", $"确定要移除资产 '{asset.DisplayName}' 吗？", "确定", "取消"))
                 {
+                    Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "移除快捷资产");
                     ESSceneGlobalData.Instance.RemoveAsset(asset.Asset);
+                    EditorUtility.SetDirty(ESSceneGlobalData.Instance);
+                    AssetDatabase.SaveAssets();
+                    lastResultSummary = $"移除快捷资产完成: {asset.DisplayName}";
+                    lastResultDetail = AssetDatabase.GetAssetPath(asset.Asset);
                 }
             }
 
@@ -384,11 +431,15 @@ namespace ES
             {
                 Selection.activeObject = ESSceneGlobalData.Instance;
                 EditorGUIUtility.PingObject(ESSceneGlobalData.Instance);
+                lastResultSummary = "已定位数据配置";
+                lastResultDetail = AssetDatabase.GetAssetPath(ESSceneGlobalData.Instance);
             }
 
             if (GUILayout.Button("刷新缓存", GUILayout.Height(30)))
             {
                 AssetDatabase.Refresh();
+                lastResultSummary = "AssetDatabase 刷新完成";
+                lastResultDetail = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 Debug.Log("缓存已刷新");
             }
 
@@ -402,12 +453,20 @@ namespace ES
         {
             if (scene == null || scene.SceneAsset == null)
             {
-                Debug.LogError("场景资产无效！");
+                EditorUtility.DisplayDialog("场景资产无效", "这个快捷场景已经丢失或不是有效的场景资产。", "知道了");
                 return;
             }
 
             try
             {
+                if (string.IsNullOrEmpty(scene.ScenePath) || !scene.ScenePath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
+                {
+                    EditorUtility.DisplayDialog("场景路径无效", $"场景路径无效：\n{scene.ScenePath}", "知道了");
+                    return;
+                }
+
+                OpenSceneMode mode = ESSceneGlobalData.Instance.UseAdditiveMode ? OpenSceneMode.Additive : OpenSceneMode.Single;
+
                 // 自动保存当前场景
                 if (ESSceneGlobalData.Instance.AutoSaveBeforeSwitch)
                 {
@@ -418,14 +477,23 @@ namespace ES
                         Debug.Log($"自动保存场景 {activeScene.name} {(saved ? "成功" : "失败")}");
                     }
                 }
+                else if (mode == OpenSceneMode.Single && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                {
+                    Debug.Log("[场景管理] 用户取消保存确认，已中止打开场景。");
+                    return;
+                }
 
                 // 打开场景
-                OpenSceneMode mode = ESSceneGlobalData.Instance.UseAdditiveMode ? OpenSceneMode.Additive : OpenSceneMode.Single;
                 EditorSceneManager.OpenScene(scene.ScenePath, mode);
+                lastResultSummary = $"打开场景完成: {scene.DisplayName}";
+                lastResultDetail = $"路径: {scene.ScenePath}\n模式: {mode}";
                 Debug.Log($"已打开场景: {scene.DisplayName}");
             }
             catch (Exception ex)
             {
+                lastResultSummary = $"打开场景失败: {scene.DisplayName}";
+                lastResultDetail = ex.Message;
+                EditorUtility.DisplayDialog("打开场景失败", ex.Message, "知道了");
                 Debug.LogError($"打开场景失败: {ex.Message}");
             }
         }
@@ -439,6 +507,8 @@ namespace ES
             {
                 Selection.activeObject = scene.SceneAsset;
                 EditorGUIUtility.PingObject(scene.SceneAsset);
+                lastResultSummary = $"已定位场景资产: {scene.DisplayName}";
+                lastResultDetail = scene.ScenePath;
             }
         }
 
@@ -458,6 +528,8 @@ namespace ES
                 {
                     EditorApplication.ExecuteMenuItem("Window/General/Project");
                 }
+                lastResultSummary = $"已定位快捷资产: {asset.DisplayName}";
+                lastResultDetail = assetPath;
             }
         }
 
@@ -473,7 +545,18 @@ namespace ES
                 return;
             }
 
+            if (ESSceneGlobalData.Instance.CustomScenes.Exists(s => string.Equals(s.ScenePath, activeScene.path, StringComparison.OrdinalIgnoreCase)))
+            {
+                EditorUtility.DisplayDialog("场景已存在", "当前场景已经在快捷场景列表里。", "知道了");
+                return;
+            }
+
+            Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "添加当前场景");
             ESSceneGlobalData.Instance.AddScene(activeScene.path);
+            EditorUtility.SetDirty(ESSceneGlobalData.Instance);
+            AssetDatabase.SaveAssets();
+            lastResultSummary = $"添加当前场景完成: {activeScene.name}";
+            lastResultDetail = activeScene.path;
         }
 
         /// <summary>
@@ -482,7 +565,7 @@ namespace ES
         private void SyncFromBuildSettings()
         {
             var buildScenes = EditorBuildSettings.scenes;
-            int addedCount = 0;
+            var scenesToAdd = new List<string>();
 
             foreach (var buildScene in buildScenes)
             {
@@ -491,13 +574,36 @@ namespace ES
                     // 检查是否已存在
                     if (!ESSceneGlobalData.Instance.CustomScenes.Exists(s => s.ScenePath == buildScene.path))
                     {
-                        ESSceneGlobalData.Instance.AddScene(buildScene.path);
-                        addedCount++;
+                        scenesToAdd.Add(buildScene.path);
                     }
                 }
             }
 
-            EditorUtility.DisplayDialog("同步完成", $"从Build Settings同步了 {addedCount} 个场景。", "确定");
+            if (scenesToAdd.Count == 0)
+            {
+                EditorUtility.DisplayDialog("同步完成", "Build Settings 中没有需要新增的场景。", "确定");
+                return;
+            }
+
+            string preview = SimpleToolsSafetyUtility.JoinPreview(scenesToAdd, 10);
+            if (!EditorUtility.DisplayDialog("确认同步Build Settings",
+                $"将向场景快捷数据中新增 {scenesToAdd.Count} 个场景。\n\n{preview}\n\n会修改 ESSceneGlobalData，支持 Ctrl+Z 撤销。继续吗？",
+                "开始同步", "取消"))
+                return;
+
+            Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "从Build Settings同步场景");
+            foreach (var scenePath in scenesToAdd)
+            {
+                ESSceneGlobalData.Instance.AddScene(scenePath);
+                EditorUtility.SetDirty(ESSceneGlobalData.Instance);
+            }
+
+            if (scenesToAdd.Count > 0)
+                AssetDatabase.SaveAssets();
+
+            lastResultSummary = $"Build Settings 同步完成: 新增 {scenesToAdd.Count} 个场景";
+            lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(scenesToAdd, 12);
+            EditorUtility.DisplayDialog("同步完成", $"从Build Settings同步了 {scenesToAdd.Count} 个场景。", "确定");
         }
 
         /// <summary>
@@ -508,6 +614,25 @@ namespace ES
             if (Selection.activeObject == null)
             {
                 EditorUtility.DisplayDialog("错误", "请先选择一个资产！", "确定");
+                return;
+            }
+
+            string assetPath = AssetDatabase.GetAssetPath(Selection.activeObject);
+            if (string.IsNullOrEmpty(assetPath))
+            {
+                EditorUtility.DisplayDialog("不能添加场景对象", "请在 Project 窗口选择项目资产。Hierarchy 中的场景对象不能作为持久快捷资产保存。", "知道了");
+                return;
+            }
+
+            if (AssetDatabase.IsValidFolder(assetPath))
+            {
+                EditorUtility.DisplayDialog("请选择添加文件夹", "当前选择的是文件夹，请使用“添加当前选中文件夹”按钮。", "知道了");
+                return;
+            }
+
+            if (ESSceneGlobalData.Instance.CustomAssets.Exists(a => a.Asset == Selection.activeObject))
+            {
+                EditorUtility.DisplayDialog("资产已存在", "当前资产已经在快捷资产列表里。", "知道了");
                 return;
             }
 
@@ -524,7 +649,12 @@ namespace ES
             else if (Selection.activeObject is ScriptableObject)
                 group = "配置";
 
+            Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "添加快捷资产");
             ESSceneGlobalData.Instance.AddAsset(name, Selection.activeObject, group);
+            EditorUtility.SetDirty(ESSceneGlobalData.Instance);
+            AssetDatabase.SaveAssets();
+            lastResultSummary = $"添加快捷资产完成: {name}";
+            lastResultDetail = $"分组: {group}\n路径: {assetPath}";
         }
 
         private void AddSelectedFolder()
@@ -543,10 +673,21 @@ namespace ES
                 return;
             }
 
+            if (ESSceneGlobalData.Instance.CustomAssets.Exists(a => a.Asset == Selection.activeObject))
+            {
+                EditorUtility.DisplayDialog("文件夹已存在", "当前文件夹已经在快捷资产列表里。", "知道了");
+                return;
+            }
+
             string name = Selection.activeObject.name;
             string group = "文件夹";
 
+            Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "添加快捷文件夹");
             ESSceneGlobalData.Instance.AddAsset($"📁 {name}", Selection.activeObject, group);
+            EditorUtility.SetDirty(ESSceneGlobalData.Instance);
+            AssetDatabase.SaveAssets();
+            lastResultSummary = $"添加快捷文件夹完成: {name}";
+            lastResultDetail = assetPath;
         }
 
         /// <summary>
@@ -576,6 +717,8 @@ namespace ES
                     scene.DisplayName = newDisplayName;
                     EditorUtility.SetDirty(ESSceneGlobalData.Instance);
                     AssetDatabase.SaveAssets();
+                    lastResultSummary = $"重命名快捷场景完成: {newDisplayName}";
+                    lastResultDetail = scene.ScenePath;
                 }
             }
             else if (result == 1) // 更改分组
@@ -595,6 +738,8 @@ namespace ES
                             scene.Group = group;
                             EditorUtility.SetDirty(ESSceneGlobalData.Instance);
                             AssetDatabase.SaveAssets();
+                            lastResultSummary = $"修改场景分组完成: {scene.DisplayName}";
+                            lastResultDetail = $"分组: {group}\n路径: {scene.ScenePath}";
                         });
                     }
                     menu.ShowAsContext();
@@ -628,6 +773,8 @@ namespace ES
                     asset.DisplayName = newDisplayName;
                     EditorUtility.SetDirty(ESSceneGlobalData.Instance);
                     AssetDatabase.SaveAssets();
+                    lastResultSummary = $"重命名快捷资产完成: {newDisplayName}";
+                    lastResultDetail = AssetDatabase.GetAssetPath(asset.Asset);
                 }
             }
             else if (result == 1) // 更改分组
@@ -647,6 +794,8 @@ namespace ES
                             asset.Group = group;
                             EditorUtility.SetDirty(ESSceneGlobalData.Instance);
                             AssetDatabase.SaveAssets();
+                            lastResultSummary = $"修改资产分组完成: {asset.DisplayName}";
+                            lastResultDetail = $"分组: {group}\n路径: {AssetDatabase.GetAssetPath(asset.Asset)}";
                         });
                     }
                     menu.ShowAsContext();

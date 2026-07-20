@@ -1,0 +1,7 @@
+﻿version=PersistentGridFrames_v1
+clipPath=Assets/CLazyRunnerActionAnimPack/Animations/P2_CLazyEscape/Esc_8way_BoostDash_Air/CLazy@Esc_BoostDash_Air_Back_R45.FBX
+clipName=Esc_BoostDash_Air_Back_R45
+modelPath=Assets/NormalResources/EditorTools/预览专用.prefab
+frameCount=24
+pixels=117
+yaw=180

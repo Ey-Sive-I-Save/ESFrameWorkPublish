@@ -242,12 +242,9 @@ namespace ES
                 
                 if (openEditor)
                 {
-                    if (!UnityEditor.EditorApplication.ExecuteMenuItem("ES/ResEditor"))
+                    if (!UnityEditor.EditorApplication.ExecuteMenuItem(MenuItemPathDefine.RESOURCE_WINDOW_PATH))
                     {
-                        if (!UnityEditor.EditorApplication.ExecuteMenuItem("Tools/ES/ResEditor"))
-                        {
-                            UnityEngine.Debug.LogWarning("[ESResReferSubAsset] 无法找到ES资源编辑器菜单项，请手动打开。");
-                        }
+                        UnityEngine.Debug.LogWarning("[ESResReferSubAsset] 无法找到 ES 资源管理窗口菜单项，请手动打开【ES】/框架/资源管线/资源管理窗口。");
                     }
                     
                     UnityEditor.Selection.activeObject = asset;

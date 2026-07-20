@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -13,7 +13,7 @@ namespace ES
         [LabelText("GameObject")]
         public GameObject gameObject;
 
-        public override GameObject Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override GameObject Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return gameObject;
         }
@@ -26,7 +26,7 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("来源")]
         private string Source => "target.userEntity.gameObject";
 
-        public override GameObject Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override GameObject Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return target != null && target.userEntity != null
                 ? target.userEntity.gameObject
@@ -41,7 +41,7 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("来源")]
         private string Source => "target.userEntity.animator.gameObject";
 
-        public override GameObject Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override GameObject Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             var animator = target != null && target.userEntity != null
                 ? target.userEntity.animator
@@ -63,7 +63,7 @@ namespace ES
         private string lastEditorDebugMessage;
 #endif
 
-        public override GameObject Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override GameObject Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             if (target == null)
             {
@@ -139,7 +139,7 @@ namespace ES
         [LabelText("包含非激活对象")]
         public bool includeInactive = true;
 
-        public override GameObject Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override GameObject Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             GameObject parent = parentExpression != null
                 ? parentExpression.Evaluate(target, support)
@@ -198,7 +198,7 @@ namespace ES
         [SerializeReference, InlineProperty]
         public ESGetGameObjectExpression childExpression;
 
-        public override GameObject Evaluate(ESRuntimeTargetPack target, IOperationRuntimeServices support)
+        public override GameObject Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             GameObject child = childExpression != null
                 ? childExpression.Evaluate(target, support)

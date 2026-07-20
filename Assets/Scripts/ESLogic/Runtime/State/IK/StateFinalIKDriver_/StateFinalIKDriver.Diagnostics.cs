@@ -158,6 +158,12 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("FinalIK求解顺序")]
         public string FinalIKScheduleSummary => BuildFinalIKScheduleSummary();
 
+        [ShowInInspector, ReadOnly, LabelText("Schedule Mode")]
+        public FinalIKDriverScheduleMode FinalIKScheduleMode => _scheduleMode;
+
+        [ShowInInspector, ReadOnly, LabelText("Schedule Blocks")]
+        public FinalIKDriverBlockFlags FinalIKScheduleBlockFlags => _scheduleBlockFlags;
+
         [PropertyOrder(1)]
         [TitleGroup("DriverLayout/诊断/状态概览")]
         [HorizontalGroup("DriverLayout/诊断/状态概览/四肢IK", LabelWidth = 100)]
@@ -303,7 +309,7 @@ namespace ES
         [Button("打开交互运行时面板", ButtonSizes.Medium)]
         private void OpenInteractionRuntimePanel()
         {
-            EditorApplication.ExecuteMenuItem("ES/Debug/Interaction Runtime Panel");
+            EditorApplication.ExecuteMenuItem(MenuItemPathDefine.INTERACTION_RUNTIME_PANEL_PATH);
         }
     #endif
 
@@ -353,10 +359,21 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("当前 Driver Pose")]
         public StateGeneralFinalIKDriverPose CurrentPose => _stateMachine != null ? _stateMachine.stateGeneralFinalIKDriverPose : default;
 
+#if UNITY_EDITOR
         [PropertyOrder(21)]
         [TitleGroup("DriverLayout/诊断/当前数据")]
         [ShowInInspector, ReadOnly, MultiLineProperty(8), LabelText("状态 IK 贡献明细")]
-        public string StateIKContributions => _stateMachine != null ? _stateMachine.stateGeneralFinalIKContributionSummary : "StateMachine 未绑定";
+        public string StateIKContributions => _stateMachine != null ? _stateMachine.stateGeneralFinalIKContributionSummary : "状态机未绑定";
+
+        [PropertyOrder(21)]
+        [TitleGroup("DriverLayout/诊断/当前数据")]
+        [Button("刷新IK贡献明细", ButtonSizes.Medium)]
+        private void RefreshStateIKContributions()
+        {
+            if (_stateMachine != null)
+                _stateMachine.RequestIKContributionSummaryRefresh();
+        }
+#endif
 
         [PropertyOrder(22)]
         [TitleGroup("DriverLayout/诊断/当前数据")]

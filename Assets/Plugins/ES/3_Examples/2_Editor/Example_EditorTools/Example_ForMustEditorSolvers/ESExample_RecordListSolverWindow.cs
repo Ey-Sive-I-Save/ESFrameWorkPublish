@@ -25,7 +25,7 @@ namespace ES
         private int createIndex = 1;
         private string lastMessage = "等待操作";
 
-        [MenuItem("【ES】/测试案例/编辑器Solver/05 RecordListSolver案例")]
+        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/05 RecordListSolver 案例", false, 50)]
         private static void Open()
         {
             GetWindow<ESExample_RecordListSolverWindow>("RecordListSolver案例");
@@ -205,6 +205,7 @@ namespace ES
             Selection.activeObject = asset;
             EditorGUIUtility.PingObject(asset);
         }
+
     }
 #endif
 }

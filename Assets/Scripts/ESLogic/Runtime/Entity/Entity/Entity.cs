@@ -12,8 +12,23 @@ namespace ES
         [LabelText("主 Animator")]
         public Animator animator;
 
+        [LabelText("Entity长期OpSupport"), SerializeReference]
+        public ESOpSupport opSupport = new ESOpSupport();
+
+        public ESOpSupport OpSupport
+        {
+            get
+            {
+                EnsureEntityOpSupport();
+                return opSupport;
+            }
+        }
+
         [NonSerialized] private Animator _cachedStateDriverAnimator;
         [NonSerialized] private StateFinalIKDriver _cachedStateFinalIKDriver;
+
+        [ShowInInspector, Sirenix.OdinInspector.ReadOnly, LabelText("游戏标签")]
+        private ESTagRefCountSet64 gameTags;
 
         #region Domains
 
@@ -110,6 +125,8 @@ namespace ES
 
         protected override void OnBeforeAwakeRegister()
         {
+            EnsureEntityOpSupport();
+            gameTags.Warmup();
             InitializeKCC();
         }
 
@@ -132,6 +149,16 @@ namespace ES
             base.Update();
         }
 
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+
+            if (opSupport != null && !opSupport.IsRecycled)
+                opSupport.TryAutoPushedToPool();
+
+            opSupport = null;
+        }
+
         #endregion
 
         #region KCC API
@@ -140,6 +167,100 @@ namespace ES
         {
             kcc.Initialize(this);
         }
+
+        public void EnsureEntityOpSupport()
+        {
+            if (opSupport == null || opSupport.IsRecycled)
+                opSupport = new ESOpSupport();
+
+            if (opSupport.Kind != ESOpSupportKind.Entity || opSupport.OwnerEntity != this)
+                opSupport.InitializeEntityOwner(this, GetInstanceID());
+        }
+
+        #endregion
+
+        #region 游戏标签 API
+
+        public bool AddGameTag(ESGameTag tag)
+        {
+            gameTags.Warmup();
+            return gameTags.Add(tag);
+        }
+
+        public bool AddGameTag(ESTagId tag)
+        {
+            gameTags.Warmup();
+            return gameTags.Add(tag);
+        }
+
+        public bool RemoveGameTag(ESGameTag tag)
+        {
+            return gameTags.Remove(tag);
+        }
+
+        public bool RemoveGameTag(ESTagId tag)
+        {
+            return gameTags.Remove(tag);
+        }
+
+        public bool RemoveAllGameTag(ESGameTag tag)
+        {
+            return gameTags.RemoveAll(tag);
+        }
+
+        public bool RemoveAllGameTag(ESTagId tag)
+        {
+            return gameTags.RemoveAll(tag);
+        }
+
+        public bool SetGameTagCount(ESGameTag tag, byte count)
+        {
+            return gameTags.SetCount(tag, count);
+        }
+
+        public bool SetGameTagCount(ESTagId tag, byte count)
+        {
+            return gameTags.SetCount(tag, count);
+        }
+
+        public bool HasGameTag(ESGameTag tag)
+        {
+            return gameTags.Has(tag);
+        }
+
+        public bool HasGameTag(ESTagId tag)
+        {
+            return gameTags.Has(tag);
+        }
+
+        public byte GetGameTagCount(ESGameTag tag)
+        {
+            return gameTags.GetCount(tag);
+        }
+
+        public byte GetGameTagCount(ESTagId tag)
+        {
+            return gameTags.GetCount(tag);
+        }
+
+        public bool HasAnyGameTag(ESTagMask64 mask)
+        {
+            return gameTags.Overlaps(mask);
+        }
+
+        public bool HasAllGameTags(ESTagMask64 mask)
+        {
+            return gameTags.HasAll(mask);
+        }
+
+        public void ClearGameTags()
+        {
+            gameTags.Clear();
+        }
+
+        #endregion
+
+        #region KCC API
 
         public void SetMoveInput(Vector3 moveInput)
         {

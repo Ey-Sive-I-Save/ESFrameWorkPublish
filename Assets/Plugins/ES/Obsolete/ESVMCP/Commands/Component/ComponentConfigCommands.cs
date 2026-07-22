@@ -2,7 +2,7 @@ using UnityEngine;
 using Newtonsoft.Json;
 using System;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 通用组件配置操作类型

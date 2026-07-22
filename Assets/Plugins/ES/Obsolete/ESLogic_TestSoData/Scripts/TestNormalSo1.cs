@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-namespace ES {
+namespace ES.Obsolete{
     [TypeRegistryItem("测试N1")]
     public class TestNormalSo1 : ESSO
     {

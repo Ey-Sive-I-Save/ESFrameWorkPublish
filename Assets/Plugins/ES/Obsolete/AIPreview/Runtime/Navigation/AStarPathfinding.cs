@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ES.Preview.Navigation
+namespace ES.Obsolete.Preview.Navigation
 {
     /// <summary>
     /// A* 寻路算法完整实现

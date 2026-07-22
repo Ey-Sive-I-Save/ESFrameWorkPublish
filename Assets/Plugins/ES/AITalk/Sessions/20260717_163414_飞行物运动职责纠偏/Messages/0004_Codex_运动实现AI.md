@@ -10,13 +10,13 @@
 
 下面把第一阶段最小结构具体化。
 
-## 1. ItemMotionModule 与 ItemProjectileModule 职责边界
+## 1. ItemMotionModule 与 ItemShotModule 职责边界
 
 ```text
 ItemMotionModule：
   提供 Item 的通用运动执行能力，负责消费运动意图/配置并推进位置、旋转、速度和基础到达/失效状态。
 
-ItemProjectileModule：
+ItemShotModule：
   提供飞行物语义，负责维护飞行物运行时状态，调用运动能力，执行命中候选检测，并产出运动/命中结果给上层消费。
 ```
 
@@ -24,7 +24,7 @@ ItemProjectileModule：
 
 ```text
 MotionModule 只关心“怎么动”。
-ProjectileModule 关心“作为飞行物，这次运动是否到达、超时或发现命中候选”。
+ShotModule 关心“作为飞行物，这次运动是否到达、超时或发现命中候选”。
 ```
 
 ## 2. MotionSolver 是否应为纯 C# 类/struct
@@ -48,25 +48,25 @@ MotionState + MotionConfig + deltaTime -> MotionStepResult
 
 `MotionSolver` 不直接写 Transform，不直接操作 Rigidbody，不做伤害，不做对象池回收。
 
-## 3. ProjectileModule 如何消费 MotionSolver 输出
+## 3. ShotModule 如何消费 MotionSolver 输出
 
 建议流程：
 
 ```text
-1. ProjectileModule 持有 ProjectileRuntimeState。
+1. ShotModule 持有 ShotRuntimeState。
 2. 每 Tick 构造或复用 MotionStepInput。
 3. 调用 MotionSolver.Step。
 4. 将 Step 输出交给 ItemMotionModule 或 Item 的低层驱动写回 Transform/Rigidbody。
 5. 如配置启用命中检测，则基于上一位置和新位置做 NonAlloc 查询。
-6. 生成 ProjectileMotionResult。
+6. 生成 ShotMotionResult。
 7. 上层系统读取/订阅结果，再决定伤害、Buff、VFX、音效、回收。
 ```
 
 关键点：
 
 ```text
-ProjectileModule 可以“发现命中候选”，但不“执行命中效果”。
-ProjectileModule 可以“标记过期”，但不“决定对象池全局策略”。
+ShotModule 可以“发现命中候选”，但不“执行命中效果”。
+ShotModule 可以“标记过期”，但不“决定对象池全局策略”。
 ```
 
 ## 4. MotionResult 至少需要哪些字段
@@ -146,12 +146,12 @@ targetObject / targetEntity / targetItem / hitSourceId
 Item : Core
 └── ItemBasicDomain
     ├── ItemMotionModule
-    └── ItemProjectileModule
+    └── ItemShotModule
 
 Pure C#:
 ├── MotionSolver
-├── MotionConfig / ProjectileMotionConfig
-├── MotionState / ProjectileRuntimeState
+├── MotionConfig / ShotMotionConfig
+├── MotionState / ShotRuntimeState
 ├── MotionResult
 └── HitCandidate
 ```
@@ -162,9 +162,9 @@ Pure C#:
 
 ```text
 ESMotionCore
-ProjectileCore
+ShotCore
 FlyingEntity
-ProjectileEntity
+ShotEntity
 ```
 
 建议使用：
@@ -173,11 +173,11 @@ ProjectileEntity
 Item
 ItemBasicDomain
 ItemMotionModule
-ItemProjectileModule
-ProjectileMotionConfig
-ProjectileRuntimeState
-ProjectileMotionResult
-ProjectileHitCandidate
+ItemShotModule
+ShotMotionConfig
+ShotRuntimeState
+ShotMotionResult
+ShotHitCandidate
 ```
 
 ## 本轮结论
@@ -185,10 +185,10 @@ ProjectileHitCandidate
 我建议第一阶段只定义并验证一条最小飞行物链路：
 
 ```text
-ItemProjectileModule
+ItemShotModule
   -> MotionSolver.Step
   -> ItemMotionModule 写回位姿
-  -> ProjectileMotionResult / HitCandidate
+  -> ShotMotionResult / HitCandidate
   -> 上层系统消费结果
 ```
 

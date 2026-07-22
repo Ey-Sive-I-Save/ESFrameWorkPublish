@@ -417,6 +417,9 @@ namespace ES
 
         private bool CanWriteAction(ESInputActionId id, ESInputValueType valueType)
         {
+            if (inputService == null)
+                return false;
+
             int index = (int)id;
             ESInputRuntimeCache cache = inputService.Cache;
             return cache != null

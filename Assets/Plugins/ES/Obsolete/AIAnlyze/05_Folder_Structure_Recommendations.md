@@ -30,7 +30,7 @@ Assets/
 ├── Gaskellgames/                # 第三方库（Folder System）
 ├── vFolders/                    # 第三方库（可视化文件夹）
 ├── vHierarchy/                  # 第三方库（可视化层级）
-├── NormalResources/             # 通用资源
+├── ESNormalAssets/             # 通用资源
 ├── Resources/                   # Unity特殊文件夹
 ├── StreamingAssets/             # Unity特殊文件夹
 ├── Scenes/                      # 场景
@@ -45,9 +45,9 @@ Assets/
 | 问题 | 严重性 | 说明 |
 |------|--------|------|
 | **Runtime/Editor代码混合** | 🔴 P0 | Plugins/ES 中未清晰分离，可能导致Runtime包含Editor代码 |
-| **框架与项目代码未分离** | 🟠 P1 | Assets/ES 与 Plugins/ES 职责重叠 |
+| **框架与项目代码未分离** | 🟠 P1 | Assets/Plugins/ES/Obsolete/Assets_ES_Legacy 与 Plugins/ES 职责重叠 |
 | **第三方库分散** | 🟡 P2 | Gaskellgames/vFolders/vHierarchy 未统一到 Plugins |
-| **特殊文件夹命名不一致** | 🟡 P2 | NormalResources 与 Resources 易混淆 |
+| **特殊文件夹命名不一致** | 🟡 P2 | ESNormalAssets 与 Resources 易混淆 |
 | **AIAnlyze/AIPreview 位置不当** | 🟡 P2 | 文档与临时代码不应在 Assets 根目录 |
 | **缺少Tests文件夹** | 🟢 P3 | 无单元测试结构 |
 
@@ -239,7 +239,7 @@ Assets/
 
 #### ✅ 改进5：文档与临时代码位置
 
-**问题**：`Assets/ES/AIAnlyze` 在打包时会被包含
+**问题**：`Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/AIAnlyze` 在打包时会被包含
 
 **解决方案**：
 ```
@@ -279,8 +279,8 @@ mkdir -p "Assets/Plugins/ESFramework/{Runtime,Editor,Tests}"
 mkdir -p "Assets/Plugins/ThirdParty"
 
 # 2. 移动文档与原型（避免打包）
-mv "Assets/ES/AIAnlyze" "Assets/_Project/_Docs/Analysis"
-mv "Assets/ES/AIPreview" "Assets/_Project/_Prototypes"
+mv "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/AIAnlyze" "Assets/_Project/_Docs/Analysis"
+mv "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/AIPreview" "Assets/_Project/_Prototypes"
 
 # 3. 移动第三方库
 mv "Assets/Gaskellgames" "Assets/Plugins/ThirdParty/Gaskellgames"
@@ -405,7 +405,7 @@ namespace ES
 
 ### 4.2 Resources 文件夹规范
 
-**问题**：当前有 `NormalResources` 和 `Resources`
+**问题**：当前有 `ESNormalAssets` 和 `Resources`
 
 **规范**：
 ```
@@ -423,7 +423,7 @@ Assets/
 │           └── ES/
 │               └── DefaultIcons.png
 │
-└── NormalResources/            # 【建议删除或重命名】
+└── ESNormalAssets/            # 【建议删除或重命名】
     └── ... (移动到 _Project/Art/)
 ```
 
@@ -483,12 +483,12 @@ public class FolderMigrationTool : EditorWindow
             
             // 2. 移动文件
             AssetDatabase.MoveAsset(
-                "Assets/ES/AIAnlyze",
+                "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/AIAnlyze",
                 "Assets/_Project/_Docs/Analysis"
             );
             
             AssetDatabase.MoveAsset(
-                "Assets/ES/AIPreview",
+                "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/AIPreview",
                 "Assets/_Project/_Prototypes"
             );
             

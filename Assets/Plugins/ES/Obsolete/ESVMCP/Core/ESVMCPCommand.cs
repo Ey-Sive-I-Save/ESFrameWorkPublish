@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// ESVMCP命令基类 - 使用多态设计

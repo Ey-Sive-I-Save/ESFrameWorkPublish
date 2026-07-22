@@ -39,7 +39,13 @@ namespace ES {
         protected override void Initialize()
         {
             base.Initialize();
+            if (blackTexture != null)
+            {
+                DestroyImmediate(blackTexture);
+                blackTexture = null;
+            }
             blackTexture = new Texture2D(1, 1);
+            blackTexture.hideFlags = HideFlags.HideAndDontSave;
             blackTexture.SetPixel(0, 0, Color.black + new Color(0.05f, 0.05f, 0.05f));
             blackTexture.Apply();
         }
@@ -58,8 +64,15 @@ namespace ES {
             UsingWindow.maximized = true;
             UsingWindow.MenuWidth = 200;
             UsingWindow.Show();
-            UsingWindow.OnClose += () => { UsingWindow.ES_SaveData(); };
+            UsingWindow.OnClose -= SaveUsingWindowDataOnClose;
+            UsingWindow.OnClose += SaveUsingWindowDataOnClose;
         }
+
+        private static void SaveUsingWindowDataOnClose()
+        {
+            UsingWindow?.ES_SaveData();
+        }
+
         protected sealed override OdinMenuTree BuildMenuTree()
         {
             OdinMenuTree tree = menuTree = new OdinMenuTree();
@@ -231,6 +244,11 @@ namespace ES {
             
             // 清理列表
             registeredPages.Clear();
+            if (blackTexture != null)
+            {
+                DestroyImmediate(blackTexture);
+                blackTexture = null;
+            }
         }
     }
 

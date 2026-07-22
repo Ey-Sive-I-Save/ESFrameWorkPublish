@@ -1,7 +1,6 @@
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Samples{
     public class RelationMaskMapTest : MonoBehaviour
     {
         public enum Team

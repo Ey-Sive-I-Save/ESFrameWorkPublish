@@ -1,9 +1,8 @@
-using System;
+﻿using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
-namespace ES.Examples
-{
+namespace ES.Samples{
     public class Example_RuntimeWatchActor : MonoBehaviour
     {
         [Header("Runtime Watch Demo")]
@@ -13,28 +12,28 @@ namespace ES.Examples
         [SerializeField] private float moveSpeed = 4.5f;
         [SerializeField] private Transform target;
 
-        [ESRuntimeWatch("战斗/角色", "生命值", showIf: "@this.autoAnimate")]
+        [ESRuntimeWatch("鎴樻枟/瑙掕壊", "鐢熷懡鍊?, showIf: "@this.autoAnimate")]
         public float Hp => hp;
 
-        [ESRuntimeWatch("战斗/角色", "移动速度", showIf: "@this.autoAnimate")]
+        [ESRuntimeWatch("鎴樻枟/瑙掕壊", "绉诲姩閫熷害", showIf: "@this.autoAnimate")]
         public float MoveSpeed => moveSpeed;
 
-        [ESRuntimeWatch("战斗/角色", "是否存活", showIf: "@this.autoAnimate")]
+        [ESRuntimeWatch("鎴樻枟/瑙掕壊", "鏄惁瀛樻椿", showIf: "@this.autoAnimate")]
         public bool IsAlive => hp > 0.1f;
 
-        [ESRuntimeWatch("战斗/角色", "目标对象", showIf: "@this.autoAnimate")]
+        [ESRuntimeWatch("鎴樻枟/瑙掕壊", "鐩爣瀵硅薄", showIf: "@this.autoAnimate")]
         public string TargetName => target != null ? target.name : "null";
 
-        [ESRuntimeWatch("战斗/AI", "当前状态", showIf: "@this.autoAnimate")]
+        [ESRuntimeWatch("鎴樻枟/AI", "褰撳墠鐘舵€?, showIf: "@this.autoAnimate")]
         public string CurrentState => stateName;
 
-        [ESRuntimeWatch("战斗/AI", "状态摘要", showIf: "@this.autoAnimate")]
+        [ESRuntimeWatch("鎴樻枟/AI", "鐘舵€佹憳瑕?, showIf: "@this.autoAnimate")]
         public string StateSummary => $"{stateName} | HP:{hp:0.0} | Speed:{moveSpeed:0.0}";
 
-        [ESRuntimeWatch("战斗/技能", "技能冷却", showIf: "@this.autoAnimate")]
+        [ESRuntimeWatch("鎴樻枟/鎶€鑳?, "鎶€鑳藉喎鍗?, showIf: "@this.autoAnimate")]
         private float skillCooldown;
 
-        [ESRuntimeWatch("战斗/技能", "连击数", showIf: "@this.autoAnimate")]
+        [ESRuntimeWatch("鎴樻枟/鎶€鑳?, "杩炲嚮鏁?, showIf: "@this.autoAnimate")]
         private int comboCount;
 
         private float stateTimer;
@@ -58,8 +57,8 @@ namespace ES.Examples
             }
         }
 
-        [ESRuntimeWatch("战斗/技能", "重置战斗状态", showIf: "@this.autoAnimate")]
-        [Button("重置战斗状态")]
+        [ESRuntimeWatch("鎴樻枟/鎶€鑳?, "閲嶇疆鎴樻枟鐘舵€?, showIf: "@this.autoAnimate")]
+        [Button("閲嶇疆鎴樻枟鐘舵€?)]
         public void SetField_ResetCombatState()
         {
             hp = 100f;
@@ -70,15 +69,15 @@ namespace ES.Examples
             stateTimer = 0f;
         }
 
-        [ESRuntimeWatch("战斗/角色", "设置生命值", showIf: "@this.autoAnimate")]
-        [Button("设置生命值")]
+        [ESRuntimeWatch("鎴樻枟/瑙掕壊", "璁剧疆鐢熷懡鍊?, showIf: "@this.autoAnimate")]
+        [Button("璁剧疆鐢熷懡鍊?)]
         public void SetField_SetHp(float value)
         {
             hp = Mathf.Clamp(value, 0f, 100f);
         }
 
-        [ESRuntimeWatch("战斗/角色", "设置目标", showIf: "@this.autoAnimate")]
-        [Button("设置目标名")]
+        [ESRuntimeWatch("鎴樻枟/瑙掕壊", "璁剧疆鐩爣", showIf: "@this.autoAnimate")]
+        [Button("璁剧疆鐩爣鍚?)]
         public void SetField_SetTargetName(string value)
         {
             if (target == null || string.IsNullOrWhiteSpace(value))
@@ -87,17 +86,18 @@ namespace ES.Examples
             target.name = value;
         }
 
-        [ESRuntimeWatch("战斗/角色", "切换自动演示", showIf: "@this.autoAnimate")]
-        [Button("切换自动演示")]
+        [ESRuntimeWatch("鎴樻枟/瑙掕壊", "鍒囨崲鑷姩婕旂ず", showIf: "@this.autoAnimate")]
+        [Button("鍒囨崲鑷姩婕旂ず")]
         public void ToggleAutoAnimate()
         {
             autoAnimate = !autoAnimate;
         }
 
-        [ESRuntimeWatch("战斗/AI", "战斗诊断文本", showIf: "@this.autoAnimate")]
+        [ESRuntimeWatch("鎴樻枟/AI", "鎴樻枟璇婃柇鏂囨湰", showIf: "@this.autoAnimate")]
         public string GetCombatDebugText()
         {
             return $"{stateName} | Alive:{IsAlive} | Hp:{hp:0.0} | Combo:{comboCount}";
         }
     }
 }
+

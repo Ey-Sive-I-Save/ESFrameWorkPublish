@@ -20,8 +20,10 @@ namespace ES
 
         private static Transform GetTransform(ESRuntimeTargetPack target, bool useMainTarget)
         {
-            Entity entity = useMainTarget ? target?.entityMainTarget : target?.userEntity;
-            return entity != null ? entity.transform : null;
+            if (target == null)
+                return null;
+
+            return useMainTarget ? target.GetMainTargetTransform() : target.GetTransform();
         }
     }
 
@@ -36,8 +38,11 @@ namespace ES
 
         protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            Transform self = rotateUser ? target?.userEntity?.transform : target?.entityMainTarget?.transform;
-            Transform other = rotateUser ? target?.entityMainTarget?.transform : target?.userEntity?.transform;
+            if (target == null)
+                return;
+
+            Transform self = rotateUser ? target.GetTransform() : target.GetMainTargetTransform();
+            Transform other = rotateUser ? target.GetMainTargetTransform() : target.GetTransform();
             if (self == null || other == null)
                 return;
 

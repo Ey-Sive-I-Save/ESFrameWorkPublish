@@ -9,7 +9,7 @@ namespace ES
         [InspectorName("射线检测")]
         HitScan,
         [InspectorName("投射物")]
-        Projectile,
+        Shot,
         [InspectorName("混合模式")]
         Hybrid,
         [InspectorName("自定义")]
@@ -70,7 +70,7 @@ namespace ES
             [LabelText("弹匣位置")] public Transform magazine;
             [LabelText("膛室位置")] public Transform chamber;
             [LabelText("射线起点")] public Transform rayOrigin;
-            [LabelText("投射物出生点")] public Transform projectileSpawn;
+            [LabelText("投射物出生点")] public Transform shotSpawn;
         }
 
         [Serializable]
@@ -131,7 +131,7 @@ namespace ES
             ballistic.magazine = FindDeepChild("Magazine");
             ballistic.chamber = FindDeepChild("Chamber");
             ballistic.rayOrigin = FindDeepChild("RayOrigin");
-            ballistic.projectileSpawn = FindDeepChild("ProjectileSpawn");
+            ballistic.shotSpawn = FindDeepChild("ShotSpawn");
 
             presentation.presentationRoot = FindDeepChild(PresentationRootName);
             presentation.modelRoot = FindDeepChild("ModelRoot");

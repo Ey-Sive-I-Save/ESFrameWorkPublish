@@ -120,6 +120,34 @@ namespace ES
     [Serializable]
     public class ESResKey : IPoolableAuto
     {
+        public int ConfigEnumKeyInt;
+        public string ConfigStringKey;
+        public int AssetRuntimeKey;
+        public long LocalFileId;
+        public string AssetTypeName;
+        public string Address;
+        public string GroupName;
+        public bool EditorOnly;
+        public bool AlwaysLoaded;
+
+        public bool HasConfigKey => ConfigEnumKeyInt != 0 || !string.IsNullOrEmpty(ConfigStringKey);
+        public bool HasAssetAuthority => !string.IsNullOrEmpty(GUID);
+        public bool IsSubAsset => LocalFileId != 0;
+
+        public void SetConfigKey(int enumKey, string stringKey, int runtimeKey = 0)
+        {
+            ConfigEnumKeyInt = enumKey;
+            ConfigStringKey = stringKey;
+            AssetRuntimeKey = runtimeKey;
+        }
+
+        public void SetAssetAuthority(string guid, long localFileId, string typeName, string path)
+        {
+            GUID = guid;
+            LocalFileId = localFileId;
+            AssetTypeName = typeName;
+            Path = path;
+        }
         #region 资源类型与来源信息
 
         /// <summary>

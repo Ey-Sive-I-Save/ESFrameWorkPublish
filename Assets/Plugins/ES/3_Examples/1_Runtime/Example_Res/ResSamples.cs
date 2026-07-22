@@ -4,12 +4,15 @@ using Sirenix.Serialization;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+#if UNITY_EDITOR
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
+#endif
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace ES
-{
+namespace ES.Samples{
 
     public class ResSamples : SerializedMonoBehaviour
     {
@@ -121,7 +124,6 @@ namespace ES
 #endif
         }
     }
-}
 [Serializable]
 public class QuestCore : IReceiveChannelLink_Context_Int
 {
@@ -194,4 +196,6 @@ public class QuestItem
     public string Key;
     public int target = 1;
 }
+}
 
+}

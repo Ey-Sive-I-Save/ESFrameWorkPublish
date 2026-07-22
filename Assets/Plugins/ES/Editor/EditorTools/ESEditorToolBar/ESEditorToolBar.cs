@@ -31,6 +31,7 @@ namespace ES
                 //左边
                 ToolbarExtender.LeftToolbarGUI.Add(OnQuickSelectionToolbarGUI);
                 ToolbarExtender.LeftToolbarGUI.Add(OnAssetQuickAccessToolbarGUI);
+                ToolbarExtender.LeftToolbarGUI.Add(OnCmdAgentToolbarGUI);
                 CacheScenes();
             }
 
@@ -250,6 +251,11 @@ namespace ES
             /// <summary>
             /// 资产快捷访问工具栏GUI
             /// </summary>
+            static void OnCmdAgentToolbarGUI()
+            {
+                if (GUILayout.Button(new GUIContent("AI", "打开【ES】Cmd Agent，并按配置自动恢复最近会话"), EditorStyles.toolbarButton, GUILayout.Width(42)))
+                    ESCmdAgentWindow.OpenAndResume();
+            }
             static void OnAssetQuickAccessToolbarGUI()
             {
                 if (EditorGUILayout.DropdownButton(

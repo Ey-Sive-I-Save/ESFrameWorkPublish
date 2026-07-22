@@ -1,24 +1,23 @@
-using UnityEngine;
+﻿using UnityEngine;
 using ES;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ES.Examples
-{
+namespace ES.Samples{
     /// <summary>
-    /// Function API 演示 - 数学/容器/字符串操作工具
-    /// 提供数值计算、列表操作、字符串处理等功能
+    /// Function API 婕旂ず - 鏁板/瀹瑰櫒/瀛楃涓叉搷浣滃伐鍏?
+    /// 鎻愪緵鏁板€艰绠椼€佸垪琛ㄦ搷浣溿€佸瓧绗︿覆澶勭悊绛夊姛鑳?
     /// </summary>
     public class Example_Function : MonoBehaviour
     {
         private void Start()
         {
-            Debug.Log("=== Function API 演示 ===");
+            Debug.Log("=== Function API 婕旂ず ===");
 
-            // ========== 数学运算 ==========
-            Debug.Log("--- 数学运算 ---");
+            // ========== 鏁板杩愮畻 ==========
+            Debug.Log("--- 鏁板杩愮畻 ---");
 
-            // 1. 两数运算
+            // 1. 涓ゆ暟杩愮畻
             float result1 = ESDesignUtility.Function.HandleTwoFloat(10f, 3f, EnumCollect.HandleTwoNumber.Add);
             Debug.Log($"10 + 3 = {result1}");
 
@@ -28,87 +27,88 @@ namespace ES.Examples
             float result3 = ESDesignUtility.Function.HandleTwoFloat(10f, 3f, EnumCollect.HandleTwoNumber.Model);
             Debug.Log($"10 % 3 = {result3}");
 
-            // 2. 两数比较
+            // 2. 涓ゆ暟姣旇緝
             bool isGreater = ESDesignUtility.Function.CompareTwoFloat(10f, 5f, EnumCollect.CompareTwoNumber.Greater);
             Debug.Log($"10 > 5 = {isGreater}");
 
             bool isEqual = ESDesignUtility.Function.CompareTwoFloat(5f, 5f, EnumCollect.CompareTwoNumber.Equal);
             Debug.Log($"5 == 5 = {isEqual}");
 
-            // ========== 容器操作 ==========
-            Debug.Log("--- 容器操作 ---");
+            // ========== 瀹瑰櫒鎿嶄綔 ==========
+            Debug.Log("--- 瀹瑰櫒鎿嶄綔 ---");
 
             List<int> numbers = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
-            // 3. 从列表选择几个（使用GetSome）
+            // 3. 浠庡垪琛ㄩ€夋嫨鍑犱釜锛堜娇鐢℅etSome锛?
             int lastIdx = 0;
             List<int> firstThree = ESDesignUtility.Function.GetSome(
                 values: numbers,
                 selectSomeType: EnumCollect.SelectSome.StartSome,
                 lastIndex: ref lastIdx
             );
-            Debug.Log($"前几个: {string.Join(", ", firstThree)}");
+            Debug.Log($"鍓嶅嚑涓? {string.Join(", ", firstThree)}");
 
-            // 4. 选择一个元素（使用GetOne）
+            // 4. 閫夋嫨涓€涓厓绱狅紙浣跨敤GetOne锛?
             lastIdx = 0;
             int selected = ESDesignUtility.Function.GetOne(
                 values: numbers,
                 selectOneType: EnumCollect.SelectOne.NotNullFirst,
                 lastIndex: ref lastIdx
             );
-            Debug.Log($"选择第一个: {selected}");
+            Debug.Log($"閫夋嫨绗竴涓? {selected}");
 
-            // 5. 随机选择
+            // 5. 闅忔満閫夋嫨
             lastIdx = 0;
             int randomOne = ESDesignUtility.Function.GetOne(
                 values: numbers,
                 selectOneType: EnumCollect.SelectOne.RandomOnly,
                 lastIndex: ref lastIdx
             );
-            Debug.Log($"随机选择: {randomOne}");
+            Debug.Log($"闅忔満閫夋嫨: {randomOne}");
 
-            // 6. 简单筛选示例
+            // 6. 绠€鍗曠瓫閫夌ず渚?
             List<int> filtered = numbers.Where(n => n > 5).ToList();
-            Debug.Log($"大于5的数: {string.Join(", ", filtered)}");
+            Debug.Log($"澶т簬5鐨勬暟: {string.Join(", ", filtered)}");
 
-            // ========== 字符串操作 ==========
-            Debug.Log("--- 字符串操作 ---");
+            // ========== 瀛楃涓叉搷浣?==========
+            Debug.Log("--- 瀛楃涓叉搷浣?---");
 
-            // 7. 字符串操作（直接使用C#内置功能演示）
+            // 7. 瀛楃涓叉搷浣滐紙鐩存帴浣跨敤C#鍐呯疆鍔熻兘婕旂ず锛?
             string str1 = "Hello";
             string str2 = " World";
             string combined = str1 + str2;
-            Debug.Log($"字符串拼接: {combined}");
+            Debug.Log($"瀛楃涓叉嫾鎺? {combined}");
 
-            // 8. 字符串规范化
+            // 8. 瀛楃涓茶鑼冨寲
             string input = "test_string_name";
             string normalized = ESDesignUtility.Function.NormalizeString(
                 input, 
                 trim: true, 
                 handleType: EnumCollect.HandleIndentStringName.StartToUpper
             );
-            Debug.Log($"字符串规范化: {input} -> {normalized}");
+            Debug.Log($"瀛楃涓茶鑼冨寲: {input} -> {normalized}");
 
-            // 9. 转换为合法标识符名
+            // 9. 杞崲涓哄悎娉曟爣璇嗙鍚?
             string identifier = ESDesignUtility.Function.HandleStringToIndentName(
                 "my variable name", 
                 EnumCollect.HandleIndentStringName.StartToUpper
             );
-            Debug.Log($"标识符转换: {identifier}");
+            Debug.Log($"鏍囪瘑绗﹁浆鎹? {identifier}");
 
-            // ========== 实用功能 ==========
-            Debug.Log("--- 实用功能 ---");
+            // ========== 瀹炵敤鍔熻兘 ==========
+            Debug.Log("--- 瀹炵敤鍔熻兘 ---");
 
-            // 10. 使用LINQ进行排序和选择（更直观）
+            // 10. 浣跨敤LINQ杩涜鎺掑簭鍜岄€夋嫨锛堟洿鐩磋锛?
             int maximum = numbers.Max();
             int minimum = numbers.Min();
-            Debug.Log($"最大值: {maximum}, 最小值: {minimum}");
+            Debug.Log($"鏈€澶у€? {maximum}, 鏈€灏忓€? {minimum}");
 
-            // 11. 列表操作实用示例
+            // 11. 鍒楄〃鎿嶄綔瀹炵敤绀轰緥
             var firstFive = numbers.Take(5).ToList();
             var lastFive = numbers.Skip(numbers.Count - 5).ToList();
-            Debug.Log($"前5个: {string.Join(", ", firstFive)}");
-            Debug.Log($"后5个: {string.Join(", ", lastFive)}");
+            Debug.Log($"鍓?涓? {string.Join(", ", firstFive)}");
+            Debug.Log($"鍚?涓? {string.Join(", ", lastFive)}");
         }
     }
 }
+

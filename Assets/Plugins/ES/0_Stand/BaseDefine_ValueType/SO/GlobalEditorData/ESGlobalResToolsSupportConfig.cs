@@ -32,15 +32,50 @@ namespace ES
         [InspectorName("全部资产")] All,
         [InspectorName("预制体")] Prefab,
         [InspectorName("场景")] Scene,
+        [InspectorName("精灵")] Sprite,
+        [InspectorName("图集")] SpriteAtlas,
         [InspectorName("材质")] Material,
         [InspectorName("贴图")] Texture,
         [InspectorName("模型")] Model,
+        [InspectorName("网格")] Mesh,
         [InspectorName("音频")] Audio,
         [InspectorName("动画")] Animation,
+        [InspectorName("动画控制器")] AnimatorController,
+        [InspectorName("角色骨架Avatar")] Avatar,
+        [InspectorName("Timeline")] Timeline,
+        [InspectorName("Playable")] Playable,
+        [InspectorName("地形数据")] TerrainData,
         [InspectorName("脚本化对象(SO)")] Script,
         [InspectorName("着色器")] Shader,
         [InspectorName("字体")] Font,
         [InspectorName("视频")] Video,
+        [InspectorName("文本")] TextAsset,
+        [InspectorName("其他")] Other
+    }
+
+    /// <summary>
+    /// ESAssetRefer 资产引用类型。
+    /// 用于 ESAssetPage / ConfigKey / 构建索引之间保持同一套类型语义。
+    /// </summary>
+    public enum ESAssetReferKind
+    {
+        [InspectorName("未指定")] None = 0,
+        [InspectorName("预制体")] Prefab,
+        [InspectorName("场景")] Scene,
+        [InspectorName("精灵")] Sprite,
+        [InspectorName("图集")] SpriteAtlas,
+        [InspectorName("贴图2D")] Texture2D,
+        [InspectorName("通用贴图")] Texture,
+        [InspectorName("材质")] Material,
+        [InspectorName("网格")] Mesh,
+        [InspectorName("动画片段")] AnimationClip,
+        [InspectorName("动画控制器")] AnimatorController,
+        [InspectorName("角色骨架Avatar")] Avatar,
+        [InspectorName("音频")] AudioClip,
+        [InspectorName("视频")] VideoClip,
+        [InspectorName("Timeline")] TimelineAsset,
+        [InspectorName("Playable")] PlayableAsset,
+        [InspectorName("地形数据")] TerrainData,
         [InspectorName("其他")] Other
     }
 
@@ -106,6 +141,7 @@ namespace ES
 
     [HideMonoScript]
     [CreateAssetMenu(fileName = "资产工具支持配置", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "资产工具支持配置")]
+    [ESOnlyEditorSO("资产工具支持配置只服务编辑器资产收集辅助，不应进入运行时构建或AB资源包。")]
     public class ESGlobalResToolsSupportConfig : ESEditorGlobalSo<ESGlobalResToolsSupportConfig>
     {
         [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
@@ -124,6 +160,45 @@ namespace ES
         [LabelText("收集时显示确认对话框")]
         public bool showConfirmDialog = true;
 
+        [ShowIf("enableAutoCollection")]
+        [LabelText("优先使用当前Library")]
+        [InfoBox("开启后，ESAssetRefer 等自动收集入口会优先收集到当前Library；当前Library为空时才按优先级规则自动选择。", InfoMessageType.Info)]
+        public bool preferActiveLibrary = true;
+
+        [ShowIf("@enableAutoCollection && preferActiveLibrary")]
+        [LabelText("当前收集Library")]
+        [AssetsOnly]
+        public ESAssetLibrary activeCollectLibrary;
+
+#if UNITY_EDITOR
+        [ShowIf("@enableAutoCollection && preferActiveLibrary")]
+        [Button("使用当前选中的Library", ButtonSizes.Medium)]
+        private void UseSelectionAsActiveLibrary()
+        {
+            if (Selection.activeObject is ESAssetLibrary library)
+            {
+                SetActiveCollectLibrary(library);
+                Debug.Log($"[资产收集] 当前收集Library已设置为: {library.Name}", library);
+            }
+            else
+            {
+                Debug.LogWarning("[资产收集] 当前选中的对象不是 ESAssetLibrary，无法设置为当前收集Library。");
+            }
+        }
+#endif
+
+        public static ESAssetLibrary ActiveCollectLibrary => Instance != null ? Instance.activeCollectLibrary : null;
+
+        public static void SetActiveCollectLibrary(ESAssetLibrary library)
+        {
+#if UNITY_EDITOR
+            var config = Instance;
+            Undo.RecordObject(config, "Set Active Collect Library");
+            config.activeCollectLibrary = library;
+            EditorUtility.SetDirty(config);
+#endif
+        }
+
         /// <summary>
         /// 判断资产类型
         /// </summary>
@@ -139,16 +214,30 @@ namespace ES
             }
             else if (asset is SceneAsset)
                 return ESAssetCategory.Scene;
+            else if (asset is Sprite)
+                return ESAssetCategory.Sprite;
+            else if (asset is UnityEngine.U2D.SpriteAtlas)
+                return ESAssetCategory.SpriteAtlas;
             else if (asset is Material)
                 return ESAssetCategory.Material;
             else if (asset is Texture || asset is Texture2D || asset is RenderTexture)
                 return ESAssetCategory.Texture;
             else if (asset is Mesh)
-                return ESAssetCategory.Model;
+                return ESAssetCategory.Mesh;
             else if (asset is AudioClip)
                 return ESAssetCategory.Audio;
-            else if (asset is AnimationClip || asset is RuntimeAnimatorController)
+            else if (asset is AnimationClip)
                 return ESAssetCategory.Animation;
+            else if (asset is RuntimeAnimatorController)
+                return ESAssetCategory.AnimatorController;
+            else if (asset is Avatar)
+                return ESAssetCategory.Avatar;
+            else if (asset is UnityEngine.Timeline.TimelineAsset)
+                return ESAssetCategory.Timeline;
+            else if (asset is UnityEngine.Playables.PlayableAsset)
+                return ESAssetCategory.Playable;
+            else if (asset is TerrainData)
+                return ESAssetCategory.TerrainData;
             else if (asset is MonoScript)
                 return ESAssetCategory.Other; // .cs脚本文件不支持收集预编译掉
             else if (asset is ScriptableObject)
@@ -159,6 +248,8 @@ namespace ES
                 return ESAssetCategory.Font;
             else if (asset is UnityEngine.Video.VideoClip)
                 return ESAssetCategory.Video;
+            else if (asset is TextAsset)
+                return ESAssetCategory.TextAsset;
 
             return ESAssetCategory.Other;
         }
@@ -195,7 +286,7 @@ namespace ES
         /// 高性能查找资产在所有Library中的位置
         /// </summary>
         /// <returns>包含Library和Book的元组，如果未找到则两者都为null</returns>
-        private static (ResLibrary library, ResBook book) FindAssetInLibraries(UnityEngine.Object asset, List<ResLibrary> libraries)
+        private static (ESAssetLibrary library, ESAssetBook book) FindAssetInLibraries(UnityEngine.Object asset, List<ESAssetLibrary> libraries)
         {
 #if UNITY_EDITOR
             if (asset == null || libraries == null) 
@@ -221,7 +312,7 @@ namespace ES
         /// <summary>
         /// 在指定Library中查找包含资产的Book
         /// </summary>
-        private static ResBook FindBookContainingAsset(ResLibrary library, UnityEngine.Object asset)
+        private static ESAssetBook FindBookContainingAsset(ESAssetLibrary library, UnityEngine.Object asset)
         {
 #if UNITY_EDITOR
             if (library == null || asset == null)
@@ -249,7 +340,7 @@ namespace ES
         /// <summary>
         /// 高性能检查Book是否包含指定资产
         /// </summary>
-        private static bool ContainsAsset(ResBook book, UnityEngine.Object asset)
+        private static bool ContainsAsset(ESAssetBook book, UnityEngine.Object asset)
         {
 #if UNITY_EDITOR
             if (book?.pages == null || asset == null)
@@ -258,7 +349,7 @@ namespace ES
             // 直接遍历pages，使用强类型避免反射
             foreach (var page in book.pages)
             {
-                if (page is ResPage resPage && resPage.OB == asset)
+                if (page is ESAssetPage resPage && resPage.OB == asset)
                 {
                     return true;
                 }
@@ -277,7 +368,7 @@ namespace ES
         /// <param name="showConfirmDialog">是否显示确认对话框（null则使用全局配置）</param>
         /// <param name="silent">静默模式，不输出日志</param>
         /// <returns>成功收集的Library，失败返回null</returns>
-        public static ResLibrary CollectAssetToRecommendedLibrary(UnityEngine.Object asset, bool? showConfirmDialog = null, bool silent = false)
+        public static ESAssetLibrary CollectAssetToRecommendedLibrary(UnityEngine.Object asset, bool? showConfirmDialog = null, bool silent = false)
         {
 #if UNITY_EDITOR
             if (asset == null)
@@ -294,7 +385,7 @@ namespace ES
                 // 弹窗告知用户
                 EditorUtility.DisplayDialog(
                     "⚠️ 禁止收集子资产",
-                    $"资产 '{asset.name}' 是子资产，不能直接使用 ESResRefer！\n\n"
+                    $"资产 '{asset.name}' 是子资产，不能直接使用 ESAssetRefer！\n\n"
                     + $"主资产: {mainAsset?.name}\n"
                     + $"路径: {assetPath}\n\n"
                     + "请使用以下方式：\n"
@@ -330,11 +421,11 @@ namespace ES
             var category = DetermineAssetCategory(asset);
             if (!silent) Debug.Log($"[资产收集] 资产 [{asset.name}] 类型判断为: {category}");
 
-            // 2. 查找所有 ResLibrary
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            // 2. 查找所有 ESAssetLibrary
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             if (libraries == null || libraries.Count == 0)
             {
-                if (!silent) Debug.LogWarning("[资产收集] 未找到任何 ResLibrary");
+                if (!silent) Debug.LogWarning("[资产收集] 未找到任何 ESAssetLibrary");
                 return null;
             }
 
@@ -353,49 +444,12 @@ namespace ES
                 }
             }
 
-            // 3. 查找该类型优先级最高的 Library
-            ResLibrary bestLibrary = null;
-            ESAssetCollectionPriority bestPriority = ESAssetCollectionPriority.Disabled;
-            ESAssetCollectionPriority bestOverallPriority = ESAssetCollectionPriority.Disabled;
-
-            foreach (var lib in libraries)
-            {
-                var priority = lib.collectionConfig.GetPriority(category);
-                var overallPriority = lib.collectionConfig.overallPriority;
-
-                // 跳过禁用的
-                if (priority == ESAssetCollectionPriority.Disabled && overallPriority == ESAssetCollectionPriority.Disabled)
-                    continue;
-
-                // 比较优先级
-                if (bestLibrary == null)
-                {
-                    bestLibrary = lib;
-                    bestPriority = priority;
-                    bestOverallPriority = overallPriority;
-                }
-                else
-                {
-                    // 先比较类型优先级
-                    if (priority > bestPriority)
-                    {
-                        bestLibrary = lib;
-                        bestPriority = priority;
-                        bestOverallPriority = overallPriority;
-                    }
-                    else if (priority == bestPriority)
-                    {
-                        // 类型优先级相同，比较总体优先级
-                        if (overallPriority > bestOverallPriority)
-                        {
-                            bestLibrary = lib;
-                            bestPriority = priority;
-                            bestOverallPriority = overallPriority;
-                        }
-                        // 总体优先级也相同，保持第一个
-                    }
-                }
-            }
+            // 3. 查找目标 Library：当前Library优先，否则按优先级规则选择
+            var resolveResult = ResolveTargetLibrary(category, libraries, config, silent);
+            ESAssetLibrary bestLibrary = resolveResult.library;
+            ESAssetCollectionPriority bestPriority = resolveResult.categoryPriority;
+            ESAssetCollectionPriority bestOverallPriority = resolveResult.overallPriority;
+            bool useActiveLibrary = resolveResult.useActiveLibrary;
 
             if (bestLibrary == null)
             {
@@ -403,7 +457,11 @@ namespace ES
                 return null;
             }
 
-            if (!silent) Debug.Log($"[资产收集] 推荐 Library: {bestLibrary.Name} (类型优先级: {bestPriority}, 总体优先级: {bestOverallPriority})");
+            if (!silent)
+            {
+                string source = useActiveLibrary ? "当前Library" : "优先级推荐";
+                Debug.Log($"[资产收集] 目标 Library: {bestLibrary.Name} ({source}, 类型优先级: {bestPriority}, 总体优先级: {bestOverallPriority})");
+            }
 
             // 4. 查找对应的 DefaultBook
             var targetBook = bestLibrary.GetDefaultBookByCategory(category);
@@ -475,10 +533,10 @@ namespace ES
             }
 
             // 获取所有Library
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             if (libraries == null || libraries.Count == 0)
             {
-                Debug.LogWarning("[资产收集] 未找到任何 ResLibrary");
+                Debug.LogWarning("[资产收集] 未找到任何 ESAssetLibrary");
                 return 0;
             }
 
@@ -547,9 +605,9 @@ namespace ES
         /// <summary>
         /// 内部收集方法，支持控制是否重建缓存
         /// </summary>
-        private static (bool success, bool skipped, ResLibrary library) CollectAssetToRecommendedLibraryInternal(
+        private static (bool success, bool skipped, ESAssetLibrary library) CollectAssetToRecommendedLibraryInternal(
             UnityEngine.Object asset, 
-            List<ResLibrary> libraries, 
+            List<ESAssetLibrary> libraries, 
             bool? showConfirmDialog, 
             bool silent, 
             bool rebuildCache)
@@ -582,44 +640,9 @@ namespace ES
                 }
             }
 
-            // 3. 查找优先级最高的Library
-            ResLibrary bestLibrary = null;
-            ESAssetCollectionPriority bestPriority = ESAssetCollectionPriority.Disabled;
-            ESAssetCollectionPriority bestOverallPriority = ESAssetCollectionPriority.Disabled;
-
-            foreach (var lib in libraries)
-            {
-                var priority = lib.collectionConfig.GetPriority(category);
-                var overallPriority = lib.collectionConfig.overallPriority;
-
-                if (priority == ESAssetCollectionPriority.Disabled && overallPriority == ESAssetCollectionPriority.Disabled)
-                    continue;
-
-                if (bestLibrary == null)
-                {
-                    bestLibrary = lib;
-                    bestPriority = priority;
-                    bestOverallPriority = overallPriority;
-                }
-                else
-                {
-                    if (priority > bestPriority)
-                    {
-                        bestLibrary = lib;
-                        bestPriority = priority;
-                        bestOverallPriority = overallPriority;
-                    }
-                    else if (priority == bestPriority)
-                    {
-                        if (overallPriority > bestOverallPriority)
-                        {
-                            bestLibrary = lib;
-                            bestPriority = priority;
-                            bestOverallPriority = overallPriority;
-                        }
-                    }
-                }
-            }
+            // 3. 查找目标Library：当前Library优先，否则按优先级规则选择
+            var resolveResult = ResolveTargetLibrary(category, libraries, config, silent);
+            ESAssetLibrary bestLibrary = resolveResult.library;
 
             if (bestLibrary == null)
             {
@@ -669,10 +692,61 @@ namespace ES
 #endif
         }
 
+        private static (ESAssetLibrary library, ESAssetCollectionPriority categoryPriority, ESAssetCollectionPriority overallPriority, bool useActiveLibrary)
+            ResolveTargetLibrary(ESAssetCategory category, List<ESAssetLibrary> libraries, ESGlobalResToolsSupportConfig config, bool silent)
+        {
+#if UNITY_EDITOR
+            if (config != null && config.enableAutoCollection && config.preferActiveLibrary && config.activeCollectLibrary != null)
+            {
+                var active = config.activeCollectLibrary;
+                if (libraries != null && libraries.Contains(active))
+                {
+                    return (active, active.collectionConfig.GetPriority(category), active.collectionConfig.overallPriority, true);
+                }
+
+                if (!silent)
+                {
+                    Debug.LogWarning($"[资产收集] 当前收集Library [{active.Name}] 不在已扫描的 ESAssetLibrary 列表中，将退回优先级选择。", active);
+                }
+            }
+
+            ESAssetLibrary bestLibrary = null;
+            ESAssetCollectionPriority bestPriority = ESAssetCollectionPriority.Disabled;
+            ESAssetCollectionPriority bestOverallPriority = ESAssetCollectionPriority.Disabled;
+
+            foreach (var lib in libraries)
+            {
+                if (lib == null)
+                {
+                    continue;
+                }
+
+                var priority = lib.collectionConfig.GetPriority(category);
+                var overallPriority = lib.collectionConfig.overallPriority;
+
+                if (priority == ESAssetCollectionPriority.Disabled && overallPriority == ESAssetCollectionPriority.Disabled)
+                {
+                    continue;
+                }
+
+                if (bestLibrary == null || priority > bestPriority || (priority == bestPriority && overallPriority > bestOverallPriority))
+                {
+                    bestLibrary = lib;
+                    bestPriority = priority;
+                    bestOverallPriority = overallPriority;
+                }
+            }
+
+            return (bestLibrary, bestPriority, bestOverallPriority, false);
+#else
+            return (null, ESAssetCollectionPriority.Disabled, ESAssetCollectionPriority.Disabled, false);
+#endif
+        }
+
         /// <summary>
         /// 实时查找资产（用于批量操作，无缓存依赖）
         /// </summary>
-        private static (ResLibrary library, ResBook book) FindAssetInLibrariesWithoutRebuild(UnityEngine.Object asset, List<ResLibrary> libraries)
+        private static (ESAssetLibrary library, ESAssetBook book) FindAssetInLibrariesWithoutRebuild(UnityEngine.Object asset, List<ESAssetLibrary> libraries)
         {
 #if UNITY_EDITOR
             if (asset == null || libraries == null) 

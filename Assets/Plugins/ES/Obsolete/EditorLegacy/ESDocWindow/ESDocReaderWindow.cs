@@ -12,8 +12,7 @@ using Sirenix.Utilities;
 // 抑制无法访问的代码警告（提前return）
 #pragma warning disable CS0162
 
-namespace ES
-{
+namespace ES.Obsolete{
     /// <summary>
     /// ESDocReaderWindow - ES文档专属阅读器
     /// 高性能渲染、完整层级结构、专业视觉效果
@@ -188,7 +187,7 @@ namespace ES
         {
             tree.Add("📘 阅读首页", new Page_ReaderHome());
 
-            string docPath = "Assets/ES/Documentation";
+            string docPath = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Documentation";
             if (!AssetDatabase.IsValidFolder(docPath))
             {
                 tree.Add("📚 文档库/⚠️ 路径不存在", null);
@@ -1411,7 +1410,7 @@ namespace ES
         {
             [Title("📭 暂无文档", titleAlignment: TitleAlignments.Centered)]
 
-            [InfoBox("Assets/ES/Documentation 目录下尚未创建文档。", InfoMessageType.Warning)]
+            [InfoBox("Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Documentation 目录下尚未创建文档。", InfoMessageType.Warning)]
 
             [DisplayAsString(fontSize: 13), HideLabel]
             public string hint = "💡 建议:\n\n1. 使用「ES文档创建窗口」创建新文档\n2. 或将现有文档资产移动到此目录";

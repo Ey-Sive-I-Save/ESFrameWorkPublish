@@ -1,6 +1,6 @@
-﻿
+
 using UnityEngine;
- namespace ES{ 
+ namespace ES.Obsolete{ 
      [ESCreatePath("数据包", "测试SO数据包")]
      public class TestSoDataPack : SoDataPack<TestSoDataInfo>
      {

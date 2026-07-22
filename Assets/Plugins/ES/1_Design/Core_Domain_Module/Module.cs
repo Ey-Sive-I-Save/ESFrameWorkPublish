@@ -31,6 +31,7 @@ namespace ES
         #region 只读便捷属性
         public Type DomainType => typeof(Domain_);
         public abstract Type TableKeyType { get; }
+        public string InspectorModuleLabel => GetType().Name;
         public Core Core_Object => MyCore;
         public sealed override Domain_ GetHost //重写-还是获取核心
         {

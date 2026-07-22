@@ -9,6 +9,7 @@ public class EditorInitAndUpdater : EditorInvoker_Level0
 
     public override void InitInvoke()
     {
+        EditorApplication.update -= Update;
         EditorApplication.update += Update;
     }
 
@@ -30,6 +31,7 @@ public class EditorInit1 : EditorInvoker_Level1
 {
     public override void InitInvoke()
     {
+        EditorApplication.update -= Update;
         EditorApplication.update += Update;
     }
 
@@ -42,6 +44,7 @@ public class EditorInit2 : EditorInvoker_Level2
 {
     public override void InitInvoke()
     {
+        EditorApplication.update -= Update;
         EditorApplication.update += Update;
     }
 

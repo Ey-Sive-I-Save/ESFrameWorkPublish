@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace ES.AIPreview.Utils
+namespace ES.Obsolete.AIPreview.Utils
 {
     /// <summary>
     /// 小工具脚本合集原型：

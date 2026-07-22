@@ -8,8 +8,7 @@ using UnityEngine;
 using static UnityEngine.UIElements.UxmlAttributeDescription;
 
 
-namespace ES
-{
+namespace ES.Obsolete{
     
     public class DeleAndCount
     {

@@ -1,4 +1,4 @@
-ManifestFileVersion: 0
+﻿ManifestFileVersion: 0
 CRC: 2875513379
 Hashes:
   AssetFileHash:
@@ -22,7 +22,7 @@ ClassTypes:
   Script: {instanceID: 0}
 SerializeReferenceClassIdentifiers:
 - AssemblyName: ES_Stand
-  ClassName: ES.ESResRefer
+  ClassName: ES.ESAssetRefer
 Assets:
 - Assets/Plugins/ES/3_Examples/Example_Res/GameObject (3).prefab
 Dependencies: []

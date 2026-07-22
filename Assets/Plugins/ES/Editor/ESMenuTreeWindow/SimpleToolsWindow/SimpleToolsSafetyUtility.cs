@@ -10,14 +10,25 @@ namespace ES
     internal static class SimpleToolsSafetyUtility
     {
         public const string QuarantineFolder = "Assets/_ESToolQuarantine";
+        public const int DefaultCollectSoftLimit = 5000;
 
         public static List<GameObject> CollectTargets(GameObject[] roots, bool includeChildren, bool includeInactive = true)
         {
+            return CollectTargets(roots, includeChildren, includeInactive, DefaultCollectSoftLimit, out _);
+        }
+
+        public static List<GameObject> CollectTargets(GameObject[] roots, bool includeChildren, bool includeInactive, int maxCount, out bool truncated)
+        {
             if (roots == null || roots.Length == 0)
+            {
+                truncated = false;
                 return new List<GameObject>();
+            }
 
             var set = new HashSet<GameObject>();
             var result = new List<GameObject>();
+            maxCount = Math.Max(1, maxCount);
+            bool localTruncated = false;
 
             foreach (var root in roots)
             {
@@ -27,21 +38,54 @@ namespace ES
                 if (includeChildren)
                 {
                     foreach (var transform in root.GetComponentsInChildren<Transform>(includeInactive))
+                    {
                         AddUnique(transform.gameObject);
+                        if (localTruncated)
+                            break;
+                    }
                 }
                 else
                 {
                     AddUnique(root);
                 }
+
+                if (localTruncated)
+                    break;
             }
 
+            truncated = localTruncated;
             return result;
 
             void AddUnique(GameObject obj)
             {
-                if (obj != null && set.Add(obj))
-                    result.Add(obj);
+                if (obj == null || !set.Add(obj))
+                    return;
+
+                if (result.Count >= maxCount)
+                {
+                    localTruncated = true;
+                    return;
+                }
+
+                result.Add(obj);
             }
+        }
+
+        public static List<T> PageSlice<T>(IList<T> items, int pageIndex, int pageSize)
+        {
+            if (items == null || items.Count == 0)
+                return new List<T>();
+
+            pageSize = Math.Max(1, pageSize);
+            int totalPages = Math.Max(1, Mathf.CeilToInt(items.Count / (float)pageSize));
+            pageIndex = Mathf.Clamp(pageIndex, 0, totalPages - 1);
+            int start = pageIndex * pageSize;
+            int count = Math.Min(pageSize, items.Count - start);
+
+            var result = new List<T>(count);
+            for (int i = 0; i < count; i++)
+                result.Add(items[start + i]);
+            return result;
         }
 
         public static bool EnsureAssetFolder(string assetFolder, out string error)
@@ -175,6 +219,22 @@ namespace ES
                 list.RemoveAt(limit);
 
             return string.Join("\n", list) + (overflow ? "\n..." : string.Empty);
+        }
+
+        public static string GetHierarchyPath(GameObject obj)
+        {
+            if (obj == null)
+                return "<null>";
+
+            var names = new Stack<string>();
+            Transform current = obj.transform;
+            while (current != null)
+            {
+                names.Push(current.name);
+                current = current.parent;
+            }
+
+            return string.Join("/", names);
         }
     }
 }

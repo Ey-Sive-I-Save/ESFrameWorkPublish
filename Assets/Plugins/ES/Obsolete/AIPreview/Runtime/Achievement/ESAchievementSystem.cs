@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ES.AIPreview.Achievement
+namespace ES.Obsolete.AIPreview.Achievement
 {
     /// <summary>
     /// 成就定义资产：

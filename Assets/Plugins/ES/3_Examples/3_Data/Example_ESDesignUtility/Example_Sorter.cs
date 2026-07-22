@@ -1,12 +1,11 @@
-using UnityEngine;
+﻿using UnityEngine;
 using ES;
 using System.Collections.Generic;
 
-namespace ES.Examples
-{
+namespace ES.Samples{
     /// <summary>
-    /// Sorter API 演示 - 排序工具
-    /// 提供Vector3路径排序、自定义对象排序等功能
+    /// Sorter API 婕旂ず - 鎺掑簭宸ュ叿
+    /// 鎻愪緵Vector3璺緞鎺掑簭銆佽嚜瀹氫箟瀵硅薄鎺掑簭绛夊姛鑳?
     /// </summary>
     public class Example_Sorter : MonoBehaviour
     {
@@ -24,9 +23,9 @@ namespace ES.Examples
 
         private void Start()
         {
-            Debug.Log("=== Sorter API 演示 ===");
+            Debug.Log("=== Sorter API 婕旂ず ===");
 
-            // 准备测试数据
+            // 鍑嗗娴嬭瘯鏁版嵁
             List<Vector3> points = new List<Vector3>
             {
                 new Vector3(10, 0, 5),
@@ -38,52 +37,52 @@ namespace ES.Examples
 
             Vector3 startPos = Vector3.zero;
 
-            // 1. 按距离从近到远排序
+            // 1. 鎸夎窛绂讳粠杩戝埌杩滄帓搴?
             List<Vector3> nearToFar = ESDesignUtility.Sorter.SortVectorPath(
                 vectors: points,
                 sortType: EnumCollect.PathSort.StartFromNearToFar,
                 pos: startPos
             );
-            Debug.Log($"从近到远: {string.Join(", ", nearToFar)}");
+            Debug.Log($"浠庤繎鍒拌繙: {string.Join(", ", nearToFar)}");
 
-            // 2. 按距离从远到近排序
+            // 2. 鎸夎窛绂讳粠杩滃埌杩戞帓搴?
             List<Vector3> farToNear = ESDesignUtility.Sorter.SortVectorPath(
                 vectors: points,
                 sortType: EnumCollect.PathSort.StartFromFarToNear,
                 pos: startPos
             );
-            Debug.Log($"从远到近: 第一个点={farToNear[0]}");
+            Debug.Log($"浠庤繙鍒拌繎: 绗竴涓偣={farToNear[0]}");
 
-            // 3. 按Y轴升序排序
+            // 3. 鎸塝杞村崌搴忔帓搴?
             List<Vector3> yUp = ESDesignUtility.Sorter.SortVectorPath(
                 vectors: points,
                 sortType: EnumCollect.PathSort.Yup
             );
-            Debug.Log($"Y轴升序: 最低点={yUp[0].y}, 最高点={yUp[yUp.Count - 1].y}");
+            Debug.Log($"Y杞村崌搴? 鏈€浣庣偣={yUp[0].y}, 鏈€楂樼偣={yUp[yUp.Count - 1].y}");
 
-            // 4. 按X轴降序排序
+            // 4. 鎸塜杞撮檷搴忔帓搴?
             List<Vector3> xDown = ESDesignUtility.Sorter.SortVectorPath(
                 vectors: points,
                 sortType: EnumCollect.PathSort.Xdown
             );
-            Debug.Log($"X轴降序: {string.Join(", ", xDown)}");
+            Debug.Log($"X杞撮檷搴? {string.Join(", ", xDown)}");
 
-            // 5. 随机排序
+            // 5. 闅忔満鎺掑簭
             List<Vector3> random = ESDesignUtility.Sorter.SortVectorPath(
                 vectors: points,
                 sortType: EnumCollect.PathSort.Random
             );
-            Debug.Log($"随机排序: {string.Join(", ", random)}");
+            Debug.Log($"闅忔満鎺掑簭: {string.Join(", ", random)}");
 
-            // 6. 总是选择最近的点（贪心最短路径）
+            // 6. 鎬绘槸閫夋嫨鏈€杩戠殑鐐癸紙璐績鏈€鐭矾寰勶級
             List<Vector3> alwaysNear = ESDesignUtility.Sorter.SortVectorPath(
                 vectors: points,
                 sortType: EnumCollect.PathSort.AlwaysFirstNear,
                 pos: startPos
             );
-            Debug.Log($"贪心最近: 第一个点={alwaysNear[0]}, 第二个点={alwaysNear[1]}");
+            Debug.Log($"璐績鏈€杩? 绗竴涓偣={alwaysNear[0]}, 绗簩涓偣={alwaysNear[1]}");
 
-            // 7. 使用Transform的forward方向排序
+            // 7. 浣跨敤Transform鐨刦orward鏂瑰悜鎺掑簭
             GameObject obj = new GameObject("SorterObject");
             obj.transform.position = Vector3.zero;
             obj.transform.rotation = Quaternion.Euler(0, 45, 0);
@@ -94,9 +93,9 @@ namespace ES.Examples
                 pos: startPos,
                 transform: obj.transform
             );
-            Debug.Log($"按forward方向排序完成");
+            Debug.Log($"鎸塮orward鏂瑰悜鎺掑簭瀹屾垚");
 
-            // 8. 自定义对象排序（使用SortVectorPathFromUser）
+            // 8. 鑷畾涔夊璞℃帓搴忥紙浣跨敤SortVectorPathFromUser锛?
             List<Waypoint> waypoints = new List<Waypoint>
             {
                 new Waypoint("A", new Vector3(5, 0, 0)),
@@ -112,20 +111,21 @@ namespace ES.Examples
                 pos: Vector3.zero
             );
 
-            Debug.Log("自定义对象排序结果:");
+            Debug.Log("鑷畾涔夊璞℃帓搴忕粨鏋?");
             foreach (var wp in sortedWaypoints)
             {
                 Debug.Log($"  {wp.name}: {wp.position}");
             }
 
-            // 9. 不排序（保持原序）
+            // 9. 涓嶆帓搴忥紙淇濇寔鍘熷簭锛?
             List<Vector3> noSort = ESDesignUtility.Sorter.SortVectorPath(
                 vectors: points,
                 sortType: EnumCollect.PathSort.NoneSort
             );
-            Debug.Log($"不排序: 数量={noSort.Count}");
+            Debug.Log($"涓嶆帓搴? 鏁伴噺={noSort.Count}");
 
             Destroy(obj);
         }
     }
 }
+

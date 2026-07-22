@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 按标签批量操作命令

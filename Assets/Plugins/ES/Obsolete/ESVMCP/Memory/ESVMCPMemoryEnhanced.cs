@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Sirenix.OdinInspector;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 增强的场景记忆组件 - 基于ESVMCPMemoryItem的运行时记忆

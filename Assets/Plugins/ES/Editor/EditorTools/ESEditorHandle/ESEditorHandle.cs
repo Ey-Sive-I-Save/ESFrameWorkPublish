@@ -12,8 +12,7 @@ namespace ES
     using UnityEngine;
 
 
-    [InitializeOnLoad]
-    public class ESEditorHandle
+    public class ESEditorHandle : EditorInvoker_Level0
     {
         public static ESSimplePool<ESEditorHandleTask> TaskPool = new ESSimplePool<ESEditorHandleTask>(
             () => new ESEditorHandleTask(),
@@ -23,10 +22,17 @@ namespace ES
         public static Dictionary<string, int> singleKeys = new Dictionary<string, int>();
         public static Queue<ESEditorHandleTask> RunningTasks = new Queue<ESEditorHandleTask>();
         static bool registered = false;
-        static ESEditorHandle()
+
+        public override void InitInvoke()
+        {
+            RegisterUpdate();
+        }
+
+        private static void RegisterUpdate()
         {
             if (!registered)
             {
+                EditorApplication.update -= Update;
                 EditorApplication.update += Update;
                 registered = true;
             }
@@ -86,6 +92,7 @@ namespace ES
         public static void AddSimpleHandleTask(Action c, int waitframe = 3, string key = "")
         {
             if (c == null) return; // ✨ 极简的非空保护，加在最前面
+            RegisterUpdate();
             if (!key.IsNullOrWhitespace())
             {
                 if (singleKeys.TryGetValue(key, out var flag))
@@ -107,6 +114,7 @@ namespace ES
         public static void AddRunningHandleTask(Action c, Func<bool> toExit, int MaxFrame = 1000, int waitframe = 3)
         {
             if (c == null) return; // ✨ 极简的非空保护，加在最前面
+            RegisterUpdate();
             var use = TaskPool.GetInPool();
             use.waitFrame = waitframe;
             use.action = c;

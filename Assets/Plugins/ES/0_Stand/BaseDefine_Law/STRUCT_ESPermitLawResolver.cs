@@ -10,7 +10,7 @@ namespace ES
     {
         public ESPermitLaw decision;
         public int priority;
-        public int stackIndex;
+        public int stackIndex; 
 
         public ESPermitLawEntry(ESPermitLaw decision, int priority, int stackIndex)
         {

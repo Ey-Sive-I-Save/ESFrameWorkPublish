@@ -5,6 +5,7 @@ namespace ES
     public static class ESCommandPlayerRunner
     {
         private static readonly List<ESCommandPlayer> ActivePlayers = new List<ESCommandPlayer>(16);
+        private static readonly Dictionary<ESCommandPlayer, int> ActiveIndexMap = new Dictionary<ESCommandPlayer, int>(16);
 
         public static int ActiveCount
         {
@@ -16,8 +17,11 @@ namespace ES
             if (player == null)
                 return;
 
-            if (!ActivePlayers.Contains(player))
-                ActivePlayers.Add(player);
+            if (ActiveIndexMap.ContainsKey(player))
+                return;
+
+            ActiveIndexMap.Add(player, ActivePlayers.Count);
+            ActivePlayers.Add(player);
         }
 
         public static void Unregister(ESCommandPlayer player)
@@ -25,14 +29,8 @@ namespace ES
             if (player == null)
                 return;
 
-            for (int i = ActivePlayers.Count - 1; i >= 0; i--)
-            {
-                if (ActivePlayers[i] == player)
-                {
-                    ActivePlayers.RemoveAt(i);
-                    return;
-                }
-            }
+            if (ActiveIndexMap.TryGetValue(player, out int index))
+                RemoveAtSwapBack(index);
         }
 
         public static void TickAll(float time, float deltaTime)
@@ -45,19 +43,49 @@ namespace ES
                 ESCommandPlayer player = ActivePlayers[i];
                 if (player == null || !player.IsPlaying)
                 {
-                    ActivePlayers.RemoveAt(i);
+                    RemoveAtSwapBack(i);
                     continue;
                 }
 
-                ESRunState state = player.Tick(time, deltaTime);
+                ESRunState state = player.Tick(TimeFrame.Now, time, deltaTime);
                 if (state != ESRunState.Running)
-                    ActivePlayers.RemoveAt(i);
+                    RemoveAtSwapBack(i);
             }
+        }
+
+        public static ESRunState TickPlayerNow(ESCommandPlayer player, float time, float deltaTime)
+        {
+            return player == null ? ESRunState.Skipped : player.Tick(TimeFrame.Now, time, deltaTime);
         }
 
         public static void Clear()
         {
             ActivePlayers.Clear();
+            ActiveIndexMap.Clear();
+        }
+
+        private static void RemoveAtSwapBack(int index)
+        {
+            int lastIndex = ActivePlayers.Count - 1;
+            ESCommandPlayer removed = ActivePlayers[index];
+            ActiveIndexMap.Remove(removed);
+
+            if (index != lastIndex)
+            {
+                ESCommandPlayer moved = ActivePlayers[lastIndex];
+                ActivePlayers[index] = moved;
+                ActiveIndexMap[moved] = index;
+            }
+
+            ActivePlayers.RemoveAt(lastIndex);
+        }
+
+        private static class TimeFrame
+        {
+            public static int Now
+            {
+                get { return UnityEngine.Time.frameCount; }
+            }
         }
     }
 }

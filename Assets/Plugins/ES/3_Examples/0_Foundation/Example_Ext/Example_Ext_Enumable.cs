@@ -4,8 +4,7 @@ using UnityEngine;
 
 // 示例：演示 ExtForEnumable.cs 中集合/枚举扩展
 // 来源：Assets/Plugins/ES/1_Design/Extension/EX_SimpleExtension/ExtForEnumable.cs
-namespace ES
-{
+namespace ES.Samples{
     public class Example_Ext_Enumable : MonoBehaviour
     {
         void Start()

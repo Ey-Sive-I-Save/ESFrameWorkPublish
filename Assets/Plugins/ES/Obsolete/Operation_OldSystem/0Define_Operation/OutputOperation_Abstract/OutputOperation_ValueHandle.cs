@@ -8,8 +8,7 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
-namespace ES
-{
+namespace ES.Obsolete{
     只是想操作一个�?可以�?(Support+Target) 也可以为了性能直接去ValueEntry
     [Serializable]
     public abstract class OutputOperationValue<Target,Logic, ValueType, OperationType, HandleOptions> : IOutputOperation<Target,Logic>

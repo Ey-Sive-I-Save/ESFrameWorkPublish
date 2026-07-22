@@ -387,7 +387,7 @@ namespace ES
 
 
         #region  验证器
-        public static bool TrySetResLibFolderName(ResLibrary resLibrary, string preLibFolderName, int attemptCount = 0)
+        public static bool TrySetResLibFolderName(ESAssetLibrary resLibrary, string preLibFolderName, int attemptCount = 0)
         {
             const int maxAttempts = 10; // 防止无限递归
             if (attemptCount >= maxAttempts)
@@ -400,7 +400,7 @@ namespace ES
                 return false;
             }
 
-            var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             var validName = GetSafeFolderName(preLibFolderName._ToValidIdentName());
 
             foreach (var lib in allLibraries)

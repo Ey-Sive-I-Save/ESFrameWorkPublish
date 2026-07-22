@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace ES.EditorOnly
+namespace ES.Editor
 {
     public static class ESWeaponSceneTemplateCreator
     {
@@ -34,7 +34,7 @@ namespace ES.EditorOnly
             Transform magazine = CreateChild(ballisticRoot, "Magazine", new Vector3(0f, -0.12f, 0.02f));
             Transform chamber = CreateChild(ballisticRoot, "Chamber", new Vector3(0f, 0.02f, 0.08f));
             Transform rayOrigin = CreateChild(ballisticRoot, "RayOrigin", new Vector3(0f, 0.05f, 0.35f));
-            Transform projectileSpawn = CreateChild(ballisticRoot, "ProjectileSpawn", new Vector3(0f, 0.03f, 0.55f));
+            Transform shotSpawn = CreateChild(ballisticRoot, "ShotSpawn", new Vector3(0f, 0.03f, 0.55f));
 
             Transform modelRoot = CreateChild(presentationRoot, "ModelRoot");
             Transform colliderRoot = CreateChild(presentationRoot, "ColliderRoot");
@@ -61,7 +61,7 @@ namespace ES.EditorOnly
             template.ballistic.magazine = magazine;
             template.ballistic.chamber = chamber;
             template.ballistic.rayOrigin = rayOrigin;
-            template.ballistic.projectileSpawn = projectileSpawn;
+            template.ballistic.shotSpawn = shotSpawn;
             template.presentation.presentationRoot = presentationRoot;
             template.presentation.modelRoot = modelRoot;
             template.presentation.colliderRoot = colliderRoot;

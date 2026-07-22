@@ -2,8 +2,7 @@ using System;
 using UnityEngine;
 
 // 示例：演示 ExtForString_Main.cs 中部分字符串扩展
-namespace ES
-{
+namespace ES.Samples{
     public class Example_Ext_String : MonoBehaviour
     {
         void Start()

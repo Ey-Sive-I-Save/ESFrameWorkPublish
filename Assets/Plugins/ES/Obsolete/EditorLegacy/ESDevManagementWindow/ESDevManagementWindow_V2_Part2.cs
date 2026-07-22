@@ -8,8 +8,7 @@ using UnityEngine;
 using UnityEditor;
 using Sirenix.OdinInspector;
 
-namespace ES
-{
+namespace ES.Obsolete{
     // ==================== 任务列表视图 ====================
     public partial class ESDevManagementWindow_V2
     {

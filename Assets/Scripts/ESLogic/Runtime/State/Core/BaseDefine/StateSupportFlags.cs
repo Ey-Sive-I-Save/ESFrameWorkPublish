@@ -4,17 +4,16 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
-    /// 实体/状态支持标记（位标记）。
-    /// 由StateMachine统一维护，KCC与状态系统共同读取：Grounded/Swimming/Flying/Climbing。
+    /// 实体主运动环境。状态机只保留一个主环境，控制限制/战斗姿态应走 Tag 或专用运行变量。
     /// </summary>
     [Flags]
     public enum StateSupportFlags : ushort
     {
-        [InspectorName("站立于地面(默认)")]
-        Grounded = 1 << 0,
-
         [InspectorName("无")]
         None = 0,
+
+        [InspectorName("地面")]
+        Grounded = 1 << 0,
 
         [InspectorName("下蹲")]
         Crouched = 1 << 1,
@@ -34,7 +33,7 @@ namespace ES
         [InspectorName("死亡")]
         Dead = 1 << 6,
 
-        [InspectorName("过场")]
+        [InspectorName("过渡")]
         Transition = 1 << 7,
 
         [InspectorName("攀爬")]

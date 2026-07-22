@@ -23,7 +23,7 @@ MonoBehaviour:
     SerializationNodes: []
   HasConfirm: 1
   RootFolder: Assets/Plugins/ES/Editor/Part/ESVMCP
-  ResourcesRootPath: Assets/NormalResources
+  ResourcesRootPath: Assets/ESNormalAssets
   MaterialsFolderName: Materials
   PrefabsFolderName: Prefabs
   TexturesFolderName: Textures

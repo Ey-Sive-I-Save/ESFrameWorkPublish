@@ -1,8 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-namespace ES
-{
+namespace ES.Samples{
     [CreateAssetMenu(menuName = "ESFrameWork/Examples/Res/CircleDenpendceSamples")]
     public class CircleDenpendceSamples : ScriptableObject
     {

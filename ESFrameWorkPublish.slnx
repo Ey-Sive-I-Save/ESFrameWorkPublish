@@ -1,21 +1,23 @@
 ﻿<Solution>
   <Project Path="EasySave3.csproj" />
-  <Project Path="Assembly-CSharp-firstpass.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="ES_Logic.csproj" />
-  <Project Path="ES_Stand.csproj" />
   <Project Path="Gaskellgames.csproj" />
   <Project Path="VFolders.csproj" />
   <Project Path="RootMotion.csproj" />
+  <Project Path="ES_Stand.csproj" />
   <Project Path="ES_Design.csproj" />
-  <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
+  <Project Path="ES_Editor.csproj" />
+  <Project Path="Assembly-CSharp-firstpass.csproj" />
   <Project Path="RootMotionEditor.csproj" />
   <Project Path="Gaskellgames.FolderSystem.csproj" />
   <Project Path="DOTween.Modules.csproj" />
   <Project Path="VHierarchy.csproj" />
+  <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="KCC.csproj" />
   <Project Path="ESInstaller.csproj" />
+  <Project Path="KCC.Editor.csproj" />
   <Project Path="AimingRig.csproj" />
   <Project Path="ESPlayer.csproj" />
   <Project Path="Sirenix.OdinInspector.Modules.UnityMathematics.csproj" />

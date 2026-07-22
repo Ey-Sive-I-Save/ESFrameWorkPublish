@@ -9,11 +9,11 @@
 0006 已经把关键分歧处理掉了。我接受以下结论进入“候选共识”：
 
 ```text
-1. ItemProjectileModule 生成 ProjectileMotionResult。
+1. ItemShotModule 生成 ShotMotionResult。
 2. ItemMotionModule 是第一阶段唯一位姿写回者。
 3. MotionResultKind 只表达主运动状态。
 4. HitCandidate 作为伴随信息，不挤占主状态。
-5. NonAlloc 查询缓冲由 ProjectileModule 自持，Tick 中不扩容。
+5. NonAlloc 查询缓冲由 ShotModule 自持，Tick 中不扩容。
 6. 第一阶段只验证直线飞行 + 超时 + 到达 + 命中候选。
 ```
 
@@ -50,7 +50,7 @@ Assets/Scripts/ESLogic/Runtime/Movement/
 
 ```text
 Assets/Scripts/ESLogic/Runtime/Item/Motion/
-Assets/Scripts/ESLogic/Runtime/Item/Projectile/
+Assets/Scripts/ESLogic/Runtime/Item/Shot/
 ```
 
 我的倾向：第一阶段先用方案 B，除非扫描代码后发现已经存在通用 Movement/Motion 层，或多个系统马上要复用。
@@ -61,7 +61,7 @@ Assets/Scripts/ESLogic/Runtime/Item/Projectile/
 
 ```text
 1. 是否已经存在 Item / ItemDomain / ItemModule。
-2. 是否已经存在 Motion / Movement / Projectile 相关代码。
+2. 是否已经存在 Motion / Movement / Shot 相关代码。
 3. 是否已有命名规范：Domain 文件、Module 文件、Core 宿主文件放在哪里。
 4. Entity 的 Domain/Module 是怎么注册的，Item 应尽量贴近既有模式。
 5. 是否有现成对象池、Hit、Target、Operation 结构可后续连接，但第一阶段不依赖。
@@ -79,12 +79,12 @@ _ItemBasicDomain.cs
   Item 基础能力域，收纳运动、飞行物、生命周期等基础模块；不承载技能/伤害业务。
 
 ItemBasicModules.cs
-  第一阶段放 ItemMotionModule 与 ItemProjectileModule；稳定后可拆分。
+  第一阶段放 ItemMotionModule 与 ItemShotModule；稳定后可拆分。
 
-ProjectileMotionTypes.cs
+ShotMotionTypes.cs
   飞行物运动配置、运行时状态、结果、候选命中数据，只做数据定义。
 
-ProjectileMotionSolver.cs
+ShotMotionSolver.cs
   纯 C# 运动求解，不触碰 Transform/Rigidbody，不做命中效果。
 ```
 

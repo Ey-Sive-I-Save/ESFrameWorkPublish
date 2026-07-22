@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-namespace ES {
+namespace ES.Obsolete{
     
     public class TestNormalSo333 : ScriptableObject
     {

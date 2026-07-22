@@ -300,6 +300,9 @@ namespace ES
         {
             if (domain != null)
             {
+                if (domains.Contains(domain))
+                    return;
+
                 domain._RegisterThisDomainToCore(this);
                 if (domain.Core_Base != this)
                 {

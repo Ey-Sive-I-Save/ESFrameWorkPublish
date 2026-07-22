@@ -4,8 +4,7 @@ using UnityEngine;
 using System;
 using Sirenix.OdinInspector; // 添加 Odin Inspector 命名空间
 
-namespace ES
-{
+namespace ES.Samples{
     /// <summary>
     /// 示例池化对象：敌人
     /// 用于演示对象池中敌人的创建、重置和管理

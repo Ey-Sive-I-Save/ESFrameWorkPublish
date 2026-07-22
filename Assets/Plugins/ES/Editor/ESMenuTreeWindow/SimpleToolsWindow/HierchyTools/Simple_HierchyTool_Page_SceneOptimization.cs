@@ -232,13 +232,79 @@ namespace ES
             $"预览模式: {(previewOnly ? "开" : "关")} | 项目资产导入设置: {(allowProjectAssetImportChanges ? "允许修改" : "已保护")} | " +
             $"已记录回滚: {importSettingChanges.Count}";
 
-        [BoxGroup("快速操作"), HorizontalGroup("快速操作/按钮"), Button("分析当前场景", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
+        [OnInspectorGUI, PropertyOrder(-200)]
+        private void DrawSceneOptimizationWorkbench()
+        {
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "场景优化分析与执行台",
+                "用于扫描当前加载场景的对象、渲染、灯光、网格、材质、纹理、音频、粒子和物理问题，再按当前策略执行可回退的优化。",
+                SimpleToolsMaturity.Upgrading,
+                "这是 SimpleTools 中风险最高的工具之一。场景对象优化支持 Undo/备份；项目资产导入设置会影响全项目，默认已保护，必须显式开启。");
+
+            SimpleToolsPanelUtility.DrawSummary(
+                "当前场景: " + SceneManager.GetActiveScene().name,
+                "分析对象: " + totalObjects,
+                "发现问题: " + detectedIssues.Count,
+                "显示问题: " + DisplayedIssues.Count,
+                "导入设置预览: " + pendingImportSettingChanges.Count,
+                "回滚记录: " + importSettingChanges.Count);
+
+            if (!previewOnly)
+                SimpleToolsPanelUtility.DrawWarning("当前不是预览模式。执行优化会真实修改场景对象；如果允许项目资产导入设置，还会重新导入纹理/音频等资产。");
+
+            if (allowProjectAssetImportChanges)
+                SimpleToolsPanelUtility.DrawWarning("已允许修改项目资产导入设置。建议先刷新导入设置预览并导出回滚 JSON。");
+
+            DrawSceneOptimizationRiskLadder();
+            DrawSceneOptimizationActionPanel();
+        }
+
+        private void DrawSceneOptimizationRiskLadder()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("风险分层", "这页功能很大，先按风险判断是否应该执行。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("低风险：分析当前场景、导出报告、刷新导入设置预览。只读或只生成文件。", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("中风险：清理空对象、移除丢失脚本、标记静态、调整灯光/粒子/碰撞体。会改当前场景，依赖 Undo 和场景备份。", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("高风险：修改纹理/音频导入设置、生成 LOD、网格/材质类结构性优化。可能影响全项目资源，必须保留回滚记录。", EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+
+        private void DrawSceneOptimizationActionPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("核心流程", "先分析当前场景，再复核问题和导入设置预览，最后执行优化或导出报告。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("分析当前场景", SimpleToolsActionTone.Primary, 34, GUILayout.MinWidth(120)))
+                        AnalyzeScene();
+
+                    if (SimpleToolsPanelUtility.DrawActionButton("刷新导入预览", SimpleToolsActionTone.Neutral, 34, GUILayout.MinWidth(120)))
+                        RefreshImportSettingPreview();
+
+                    GUI.enabled = detectedIssues.Count > 0;
+                    if (SimpleToolsPanelUtility.DrawActionButton(previewOnly ? "预览优化流程" : "执行优化", SimpleToolsActionTone.Warning, 34, GUILayout.MinWidth(110)))
+                        AutoOptimizeScene();
+                    GUI.enabled = true;
+
+                    if (SimpleToolsPanelUtility.DrawActionButton("导出报告", SimpleToolsActionTone.Success, 34, GUILayout.MinWidth(95)))
+                        ExportDetailedReport();
+                    GUILayout.FlexibleSpace();
+                }
+
+                EditorGUILayout.LabelField(
+                    previewOnly
+                        ? "当前是预览模式：执行优化只计算结果，不写入场景。"
+                        : "当前会真实修改场景对象；需要改 Texture/Audio Importer 时必须额外开启项目资产导入设置。",
+                    EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+
         public void QuickAnalyze() => AnalyzeScene();
 
-        [BoxGroup("快速操作"), HorizontalGroup("快速操作/按钮"), Button("执行优化并确认", ButtonHeight = 34), GUIColor(0.75f, 0.58f, 0.25f)]
         public void QuickOptimize() => AutoOptimizeScene();
 
-        [BoxGroup("快速操作"), HorizontalGroup("快速操作/按钮"), Button("导出优化报告", ButtonHeight = 34), GUIColor(0.48f, 0.48f, 0.48f)]
         public void QuickReport() => ExportDetailedReport();
 
         #region 配置管理
@@ -661,9 +727,11 @@ namespace ES
         #endregion
 
         #region 分析功能(增强版)
-        [BoxGroup("分析操作"), Button("🔍 全面场景分析", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void AnalyzeScene()
         {
+            if (!HasUsableActiveScene("分析"))
+                return;
+
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
 
@@ -1646,9 +1714,11 @@ namespace ES
         #endregion
 
         #region 优化功能(增强版)
-        [BoxGroup("优化操作"), Button("⚡ 按当前设置执行优化", ButtonHeight = 34), GUIColor(0.75f, 0.58f, 0.25f)]
         public void AutoOptimizeScene()
         {
+            if (!HasUsableActiveScene("优化"))
+                return;
+
             if (detectedIssues.Count == 0)
             {
                 EditorUtility.DisplayDialog("提示", "请先执行场景分析！", "确定");
@@ -1676,9 +1746,11 @@ namespace ES
                     string preview = SimpleToolsSafetyUtility.JoinPreview(
                         pendingImportSettingChanges.Select(c => $"{c.assetPath} | {c.changeSummary}"),
                         10);
-                    if (!EditorUtility.DisplayDialog("确认项目资产导入设置变更",
-                        $"将修改 {pendingImportSettingChanges.Count} 个项目资产导入设置。\n\n{preview}\n\n这些修改不限于当前场景，执行后会重新导入资产。继续吗？",
-                        "确认修改", "取消"))
+                    if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                        "确认项目资产导入设置变更",
+                        pendingImportSettingChanges.Count,
+                        $"修改 {pendingImportSettingChanges.Count} 个项目资产导入设置。\n\n{preview}",
+                        "这些修改不限于当前场景，执行后会重新导入资产。建议先导出回滚 JSON，并确认版本控制状态。"))
                         return;
 
                     approvedImporterChangePaths = new HashSet<string>(pendingImportSettingChanges.Select(c => c.assetPath));
@@ -1692,7 +1764,11 @@ namespace ES
             if (previewOnly) confirmMessage += "\n⚠️ 当前为预览模式,不会实际应用\n";
             confirmMessage += "\n是否继续?";
 
-            if (!EditorUtility.DisplayDialog("确认优化", confirmMessage, "开始优化", "取消"))
+            if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                "确认执行场景优化",
+                detectedIssues.Count,
+                confirmMessage,
+                "会按当前勾选项修改场景对象；如果允许项目资产导入设置，还会修改项目资产并触发重新导入。"))
                 return;
 
             bool shouldBackup = false;
@@ -2383,6 +2459,18 @@ namespace ES
             var scene = SceneManager.GetActiveScene();
             if (scene.IsValid())
                 EditorSceneManager.MarkSceneDirty(scene);
+        }
+
+        private bool HasUsableActiveScene(string actionName)
+        {
+            var scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid() || !scene.isLoaded)
+            {
+                EditorUtility.DisplayDialog("当前场景不可用", $"无法执行{actionName}：当前没有已加载的有效活动场景。", "知道了");
+                return false;
+            }
+
+            return true;
         }
 
         private List<GameObject> GetActiveSceneGameObjects()

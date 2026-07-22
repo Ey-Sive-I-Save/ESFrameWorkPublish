@@ -134,9 +134,14 @@ namespace ES
         private Recoil _recoil;
         private bool _recoilReady;
         private bool _fullBodyBipedIKReady;
+        private Vector3 _fullBodyBodyOffsetLocal;
+        private float _fullBodyBodyOffsetWeight;
 
         private bool _fullLookAtCompare = true;
         private IKScheduleFrameFlags _finalIKScheduleFlags = IKScheduleFrameFlags.None;
+        private string _finalIKScheduleSummaryCache = "未评估";
+        private string _finalIKCommercialOrderSummaryCache = "Grounder -> Aim -> LookAt -> FBBIK -> Recoil -> HitReaction";
+        private string _finalIKScheduleBlockSummaryCache = "无阻断";
         [SerializeField]
         private FinalIKDriverScheduleMode _scheduleMode = FinalIKDriverScheduleMode.DriverCoreManualProceduralDelegates;
         private FinalIKDriverBlockFlags _scheduleBlockFlags = FinalIKDriverBlockFlags.None;

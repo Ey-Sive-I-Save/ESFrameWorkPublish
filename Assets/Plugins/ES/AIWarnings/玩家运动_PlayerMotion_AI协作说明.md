@@ -26,7 +26,7 @@
 Item : Core
 └── ItemBasicDomain
     ├── ItemMotionModule
-    ├── ItemProjectileModule / ItemShotModule
+    ├── ItemShotModule / ItemShotModule
     └── ItemLogicModule        // 规划方向：生命周期事件转 Op
 ```
 
@@ -35,8 +35,8 @@ Item : Core
 - `Assets/Scripts/ESLogic/Runtime/Item/Item.cs`
 - `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/_ItemBasicDomain.cs`
 - `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ItemBasicModules.cs`
-- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ProjectileMotionTypes.cs`
-- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ProjectileMotionSolver.cs`
+- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ShotMotionTypes.cs`
+- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ShotMotionSolver.cs`
 
 ## 飞行物职责边界
 
@@ -63,7 +63,7 @@ Item : Core
 
 ## Shot 命名建议
 
-后续如果继续扩展，建议逐步把飞行物业务命名简化为 `Shot`，比 `Projectile` 更短、更通用：
+后续如果继续扩展，建议逐步把飞行物业务命名简化为 `Shot`，比 `Shot` 更短、更通用：
 
 ```text
 Shot       // 一次飞行物实例或运行态
@@ -245,9 +245,9 @@ SkillSupport
 - `Item : Core`
 - `ItemBasicDomain`
 - `ItemMotionModule`
-- `ItemProjectileModule`
-- `ProjectileMotionSolver`
-- `ProjectileMotionTypes`
+- `ItemShotModule`
+- `ShotMotionSolver`
+- `ShotMotionTypes`
 
 已验证：
 

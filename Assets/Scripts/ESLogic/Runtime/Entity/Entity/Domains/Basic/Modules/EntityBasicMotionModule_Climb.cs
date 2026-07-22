@@ -52,7 +52,7 @@ namespace ES
     /// 6. 每帧设置 SupportFlags = Climbing，驱动 KCC 使用攀爬速度分支
     /// </summary>
     [Serializable, TypeRegistryItem("基础攀爬模块")]
-    public class EntityBasicClimbModule : EntityBasicModuleBase, IEntitySupportMotion
+    public class EntityBasicClimbModule : EntityBasicModuleBase, IEntityKCCBeforeMotion, IEntityKCCRotationMotion, IEntityKCCVelocityMotion
     {
         // ===== 开关 =====
         [Title("开关")]
@@ -85,7 +85,7 @@ namespace ES
         public bool useRawClimbInput = true;
 
         [LabelText("调试日志"), Tooltip("启用后在Console输出攀爬全流程日志")]
-        public bool debugClimb_ = true;
+        public bool debugClimb_ = false;
 
         // ===== 检测配置 =====
         [Title("检测")]
@@ -458,6 +458,7 @@ namespace ES
             if (MyCore != null)
             {
                 MyCore.kcc.climbModule = this;
+                MyCore.kcc.RebuildMotionSchedulers();
             }
         }
 
@@ -685,10 +686,9 @@ namespace ES
             hitNormal = Vector3.zero;
             hitPoint = Vector3.zero;
 
-            if (MyCore.kcc.motor == null) return false;
-
-            Vector3 charPos = MyCore.kcc.motor.TransientPosition;
-            Vector3 charFwd = MyCore.kcc.motor.CharacterForward;
+            var motor = MyCore.kcc.motor;
+            Vector3 charPos = motor.TransientPosition;
+            Vector3 charFwd = motor.CharacterForward;
 
             for (int i = 0; i < verticalRayCount; i++)
             {
@@ -733,10 +733,10 @@ namespace ES
         private bool TryDetectVault()
         {
             if (disableVault) return false;
-            if (MyCore.kcc.motor == null) return false;
 
-            Vector3 charPos = MyCore.kcc.motor.TransientPosition;
-            Vector3 charFwd = MyCore.kcc.motor.CharacterForward;
+            var motor = MyCore.kcc.motor;
+            Vector3 charPos = motor.TransientPosition;
+            Vector3 charFwd = motor.CharacterForward;
 
             Vector3 lowRayOrigin = charPos + Vector3.up * 0.3f;
             if (!Physics.Raycast(lowRayOrigin, charFwd, out RaycastHit lowHit, forwardDetectDistance, climbableLayerMask))
@@ -869,13 +869,14 @@ namespace ES
             }
 
             currentSurface = surface;
-            Vector3 charPos = MyCore.kcc.motor.TransientPosition;
+            var motor = MyCore.kcc.motor;
+            Vector3 charPos = motor.TransientPosition;
             Vector3 entryNormal = surface.GetDynamicNormal(charPos);
             if (entryNormal.sqrMagnitude < 0.0001f)
             {
                 entryNormal = wallNormal.sqrMagnitude > 0.0001f ? wallNormal.normalized : Vector3.back;
             }
-            Vector3 up = (MyCore?.kcc?.motor != null) ? MyCore.kcc.motor.CharacterUp : Vector3.up;
+            Vector3 up = motor.CharacterUp;
             Vector3 planarEntryNormal = Vector3.ProjectOnPlane(entryNormal, up);
             if (planarEntryNormal.sqrMagnitude > 0.0001f)
             {
@@ -1147,9 +1148,9 @@ namespace ES
             float horizontal = 0f;
             float vertical = 0f;
             bool hasRawAxis = false;
-            if (!disableClimbInputVelocity && useRawClimbInput && TryGetModule(out EntityAIInputSystemModule inputModule))
+            if (!disableClimbInputVelocity && useRawClimbInput && MyCore.aiDomain?.inputState != null)
             {
-                Vector2 rawMove = inputModule.Move;
+                Vector2 rawMove = MyCore.aiDomain.inputState.Move;
                 if (rawMove.sqrMagnitude > 0.0001f)
                 {
                     horizontal = Mathf.Clamp(rawMove.x, -1f, 1f);
@@ -1680,7 +1681,7 @@ namespace ES
 
         private void RefreshWallContact(bool allowExit, bool forceRaycast)
         {
-            if (MyCore.kcc.motor == null) return;
+            var motor = MyCore.kcc.motor;
 
             _wallContactFrameCounter++;
             if (!forceRaycast && !allowExit && _wallContactFrameCounter < wallContactCheckInterval)
@@ -1689,7 +1690,7 @@ namespace ES
             }
             _wallContactFrameCounter = 0;
 
-            Vector3 charPos = MyCore.kcc.motor.TransientPosition;
+            Vector3 charPos = motor.TransientPosition;
             Vector3 baseNormal = (currentSurface != null) ? currentSurface.GetDynamicNormal(charPos) : currentWallNormal;
             Vector3 dirToWall = -baseNormal;
 
@@ -1860,53 +1861,40 @@ namespace ES
 
         private bool CheckClimbOverGroundProbe(Vector3 characterPosition)
         {
-            if (MyCore?.kcc?.motor == null)
-            {
-                return false;
-            }
-
-            Vector3 up = MyCore.kcc.motor.CharacterUp;
-            Vector3 fwd = MyCore.kcc.motor.CharacterForward;
+            var motor = MyCore.kcc.motor;
+            Vector3 up = motor.CharacterUp;
+            Vector3 fwd = motor.CharacterForward;
             Vector3 right = Vector3.Cross(up, fwd).normalized;
             Vector3 originBase = characterPosition + up * climbOverGroundProbeHeightOffset;
             float r = Mathf.Max(0.01f, climbOverGroundProbeRadius);
-            LayerMask mask = MyCore.kcc.motor.StableGroundLayers;
+            LayerMask mask = motor.StableGroundLayers;
 
-            Vector3[] offsets =
-            {
-                Vector3.zero,
-                fwd * r,
-                -fwd * r,
-                right * r,
-                -right * r
-            };
-
-            for (int i = 0; i < offsets.Length; i++)
-            {
-                Vector3 origin = originBase + offsets[i];
-                if (Physics.Raycast(origin, -up, out _, climbOverGroundProbeDistance, mask))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return Physics.Raycast(originBase, -up, out _, climbOverGroundProbeDistance, mask)
+                || Physics.Raycast(originBase + fwd * r, -up, out _, climbOverGroundProbeDistance, mask)
+                || Physics.Raycast(originBase - fwd * r, -up, out _, climbOverGroundProbeDistance, mask)
+                || Physics.Raycast(originBase + right * r, -up, out _, climbOverGroundProbeDistance, mask)
+                || Physics.Raycast(originBase - right * r, -up, out _, climbOverGroundProbeDistance, mask);
         }
 
-        public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, float deltaTime)
+        public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, Vector3 initialPosition, float deltaTime)
         {
-            if (!enableClimb || kcc == null || kcc.motor == null)
+            if (!enableClimb || kcc.CurrentSupportFlags != StateSupportFlags.Climbing)
             {
                 return false;
             }
+            if (kcc.workWorld < 20)
+            {
+                return false;
+            }
+            kcc.workWorld -= 20;
 
             kcc.motor.ForceUnground(0.1f);
             return true;
         }
 
-        public bool UpdateRotation(Entity owner, EntityKCCData kcc, ref Quaternion currentRotation, float deltaTime)
+        public bool UpdateRotation(Entity owner, EntityKCCData kcc, Quaternion initialRotation, ref Quaternion currentRotation, float deltaTime)
         {
-            if (!enableClimb || kcc == null || kcc.motor == null)
+            if (!enableClimb || kcc.CurrentSupportFlags != StateSupportFlags.Climbing)
             {
                 return false;
             }
@@ -1916,6 +1904,11 @@ namespace ES
             {
                 return false;
             }
+            if (kcc.workSelf < 100)
+            {
+                return false;
+            }
+            kcc.workSelf -= 100;
 
             Vector3 wallNormal = currentWallNormal;
             if (currentSurface != null)
@@ -1954,12 +1947,22 @@ namespace ES
             return true;
         }
 
-        public bool UpdateVelocity(Entity owner, EntityKCCData kcc, ref Vector3 currentVelocity, float deltaTime)
+        public bool UpdateVelocity(Entity owner, EntityKCCData kcc, Vector3 initialVelocity, ref Vector3 currentVelocity, float deltaTime)
         {
-            if (!enableClimb || kcc == null || kcc.motor == null)
+            if (!enableClimb)
             {
                 return false;
             }
+
+            if (kcc.CurrentSupportFlags != StateSupportFlags.Climbing && subState != ClimbSubState.ClimbJump)
+            {
+                return false;
+            }
+            if (kcc.workSelf < 100)
+            {
+                return false;
+            }
+            kcc.workSelf -= 100;
 
             if (subState == ClimbSubState.ClimbJump)
             {

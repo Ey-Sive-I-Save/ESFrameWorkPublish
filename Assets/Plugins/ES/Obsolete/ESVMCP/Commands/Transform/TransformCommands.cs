@@ -1,8 +1,8 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 通用Transform操作类型（基础操作）

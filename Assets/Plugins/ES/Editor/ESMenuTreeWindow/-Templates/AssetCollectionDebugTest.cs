@@ -14,11 +14,11 @@ namespace ES.Editor
         {
             Debug.Log("===== 资产收集配置测试 =====");
             
-            // 查找第一个ResLibrary进行测试
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            // 查找第一个ESAssetLibrary进行测试
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             if (libraries == null || libraries.Count == 0)
             {
-                Debug.LogWarning("未找到任何ResLibrary资产");
+                Debug.LogWarning("未找到任何ESAssetLibrary资产");
                 return;
             }
             
@@ -26,7 +26,7 @@ namespace ES.Editor
             
             if (testLibrary == null)
             {
-                Debug.LogError("无法加载ResLibrary");
+                Debug.LogError("无法加载ESAssetLibrary");
                 return;
             }
             
@@ -64,7 +64,7 @@ namespace ES.Editor
         {
             Debug.Log("===== Book去重功能测试 =====");
             Debug.Log("请手动测试：");
-            Debug.Log("1. 打开任意 ResLibrary 编辑窗口");
+            Debug.Log("1. 打开任意 ESAssetLibrary 编辑窗口");
             Debug.Log("2. 拖拽一个资产到某个 Book 中");
             Debug.Log("3. 再次拖拽同一个资产");
             Debug.Log("4. 查看 Console 是否输出警告：'资源 [xxx] 已存在于Book [xxx] 中，跳过添加'");
@@ -76,11 +76,11 @@ namespace ES.Editor
         {
             Debug.Log("===== DefaultBook类别匹配测试 =====");
             
-            // 查找所有 ResLibrary 资产
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            // 查找所有 ESAssetLibrary 资产
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             if (libraries == null || libraries.Count == 0)
             {
-                Debug.LogWarning("未找到任何 ResLibrary 资产");
+                Debug.LogWarning("未找到任何 ESAssetLibrary 资产");
                 return;
             }
             

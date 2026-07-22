@@ -15,7 +15,6 @@ using UnityEngine.SceneManagement;
 /// 保存并恢复已加载场景中 GameObject 在 Hierarchy 面板里的展开状态。
 /// 项目级持久化数据归属 ESGlobalProjectAssetGuideData；EditorPrefs 仅用于读取旧数据并迁移。
 /// </summary>
-[InitializeOnLoad]
 public static class SceneHierarchyExpansionState
 {
     // 最大记录层级。默认 5 层可以覆盖多数编辑需求，同时避免深层大场景产生过多路径。
@@ -45,25 +44,55 @@ public static class SceneHierarchyExpansionState
     private static int pendingRestoreDelayTicks;
     private static bool restoreScheduled;
 
-    static SceneHierarchyExpansionState()
+    internal static void RegisterEditorCallbacks()
     {
         if (AutoSaveOnSceneSaving)
+        {
+            EditorSceneManager.sceneSaving -= OnSceneSaving;
             EditorSceneManager.sceneSaving += OnSceneSaving;
+        }
 
         if (AutoLoadOnSceneOpened)
+        {
+            EditorSceneManager.sceneOpened -= OnSceneOpened;
             EditorSceneManager.sceneOpened += OnSceneOpened;
+        }
 
         if (AutoSaveBeforeSceneClosing)
+        {
+            EditorSceneManager.sceneClosing -= OnSceneClosing;
             EditorSceneManager.sceneClosing += OnSceneClosing;
+        }
 
         if (AutoSaveBeforeAssemblyReload)
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= SaveLoadedScenesExpansionState;
             AssemblyReloadEvents.beforeAssemblyReload += SaveLoadedScenesExpansionState;
+        }
 
         if (AutoRestoreAfterPlayMode)
+        {
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+        }
 
+        EditorApplication.quitting -= SaveLoadedScenesExpansionState;
         EditorApplication.quitting += SaveLoadedScenesExpansionState;
-        EditorApplication.delayCall += () => ScheduleRestoreLoadedScenes(RestoreDelayTicks);
+        EditorApplication.delayCall -= ScheduleInitialRestoreLoadedScenes;
+        EditorApplication.delayCall += ScheduleInitialRestoreLoadedScenes;
+    }
+
+    private static void ScheduleInitialRestoreLoadedScenes()
+    {
+        ScheduleRestoreLoadedScenes(RestoreDelayTicks);
+    }
+
+    public class SceneHierarchyExpansionStateInitializer : EditorInvoker_Level2
+    {
+        public override void InitInvoke()
+        {
+            RegisterEditorCallbacks();
+        }
     }
 
     [MenuItem(MenuRoot + "保存已加载场景展开状态", false, 0)]

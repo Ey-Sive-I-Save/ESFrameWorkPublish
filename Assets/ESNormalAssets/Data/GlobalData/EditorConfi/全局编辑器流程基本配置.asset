@@ -1,0 +1,97 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 34f1d7036a746aa4ab7c46e64b777093, type: 3}
+  m_Name: "\u5168\u5C40\u7F16\u8F91\u5668\u6D41\u7A0B\u57FA\u672C\u914D\u7F6E"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  HasConfirm: 1
+  Path_SoInfoParent: Assets/Scripts/ESLogic/Runtime/Data/For_Info
+  Path_PackParent: Assets/ESNormalAssets/Data/Pack
+  Path_GroupParent: Assets/ESNormalAssets/Data/Group
+  Path_NormalScriptParent: Assets/Scripts/ESLogic/Runtime/Data/Normal
+  Path_NormalParent: Assets/ESNormalAssets/Data/Normal
+  Path_ResourceParent: Assets/ESNormalAssets
+  Path_GlobalParent: 
+  Path_AllLibraryFolder_: Assets/ESNormalAssets/Data/AssetLibrary
+  ExcludePackGroupInfo: 1
+  ExcludeWindow: 1
+  ExcludeNodeRunner: 1
+  ExcludeGlobal: 1
+  ExcludeNameList:
+  - ESGraphViewWindow
+  - ESTrackViewWindow
+  - ESTreeMenuShower
+  ExcludeHandle: ESTreeMenuShower
+  PackageOutputPathForPublish: Assets/../ESOutput/UnityPackage
+  PackageSelfPathForMain: Assets/Plugins/ES/Editor/Installer/Downloads/Main
+  PackageName: ESPackage0.35_
+  PackageCollectPath:
+  - Assets/Plugins/ES
+  - Assets/Scripts/ESLogic
+  - Assets/ESNormalAssets/Data/GlobalData
+  - Assets/NuGet
+  - Assets/Settings
+  - Assets/ScriptTemplates
+  - Assets/Packages
+  IncludeDependencies_: 0
+  PackagePublishPath: Assets\Plugins\ES\Editor\Installer
+  ExtendedPackageConfigs:
+  - ConfigName: "Whisper\u652F\u6301"
+    OutputPath: Assets/Plugins/ES/Editor/Installer/Downloads/Whisper
+    PackageName: ESPackage_Ext_1_Whisper
+    CollectPaths:
+    - Assets/StreamingAssets/OUT/Whisper
+    ExcludeFolders: []
+    IsEnabled: 1
+    IncludeDependencies_: 0
+  - ConfigName: ES ETX Only Sample
+    OutputPath: Assets/Plugins/ES/Editor/Installer/Downloads/OnlySamples
+    PackageName: ESPackage_Ext_Only Sample
+    CollectPaths:
+    - 
+    ExcludeFolders: []
+    IsEnabled: 0
+    IncludeDependencies_: 0
+  - ConfigName: "\u914D\u7F6E 3"
+    OutputPath: Assets/Plugins/ES/Editor/Installer/Downloads/Main
+    PackageName: ESPackage_Ext_3_
+    CollectPaths:
+    - Assets/Plugins/ES
+    - Assets/Scripts/ESLogic
+    - Assets/ESNormalAssets/Data/GlobalData
+    - Assets/NuGet
+    - Assets/Settings
+    - Assets/ScriptTemplates
+    ExcludeFolders: []
+    IsEnabled: 1
+    IncludeDependencies_: 0
+  - ConfigName: "\u914D\u7F6E 4"
+    OutputPath: 
+    PackageName: ESPackage_Ext_4_
+    CollectPaths:
+    - 
+    - 
+    - 
+    - 
+    ExcludeFolders: []
+    IsEnabled: 0
+    IncludeDependencies_: 0
+  audioPlayer: {fileID: 6562891526412292501, guid: aa000403673e85a42a63700344521f6d,
+    type: 3}

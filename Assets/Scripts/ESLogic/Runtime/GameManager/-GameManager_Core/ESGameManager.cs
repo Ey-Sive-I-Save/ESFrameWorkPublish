@@ -24,6 +24,22 @@ namespace ES
         public bool autoCreateInputModule = true;
 
         [TabGroup("设置")]
+        [LabelText("自动创建RuntimeData模块")]
+        public bool autoCreateRuntimeDataModule = true;
+
+        [TabGroup("配置")]
+        [LabelText("自动创建对象池模块")]
+        public bool autoCreateGameObjectPoolModule = true;
+
+        [TabGroup("配置")]
+        [LabelText("自动创建物理查询模块")]
+        public bool autoCreatePhysicsQueryModule = true;
+
+        [TabGroup("配置")]
+        [LabelText("自动创建LOD模块")]
+        public bool autoCreateLODModule = true;
+
+        [TabGroup("设置")]
         [LabelText("跨场景不销毁")]
         public bool dontDestroyOnLoad = true;
 
@@ -59,6 +75,18 @@ namespace ES
 
             if (autoCreateInputModule)
                 GetMoudle<ESInputModule>();
+
+            if (autoCreateRuntimeDataModule)
+                GetMoudle<ESRuntimeDataModule>();
+
+            if (autoCreateGameObjectPoolModule)
+                GetMoudle<ESGameObjectPoolModule>();
+
+            if (autoCreatePhysicsQueryModule)
+                GetMoudle<ESPhysicsQueryModule>();
+
+            if (autoCreateLODModule)
+                GetMoudle<ESLODModule>();
 
             CacheStaticReferences();
         }

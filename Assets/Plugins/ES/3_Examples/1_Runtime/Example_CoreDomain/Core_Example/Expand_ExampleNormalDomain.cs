@@ -4,8 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Samples{
     [Serializable, TypeRegistryItem("攻击模块")]
     public class ExampleNormal_Attack : ExampleNormalModule
     {

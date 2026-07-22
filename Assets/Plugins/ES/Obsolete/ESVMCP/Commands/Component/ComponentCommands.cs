@@ -1,10 +1,10 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 通用Component操作类型(基础操作)

@@ -5,8 +5,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Obsolete{
     public class ESMENU : PopupWindowContent
     {
 #pragma warning disable CS0414

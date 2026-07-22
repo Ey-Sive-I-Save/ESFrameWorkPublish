@@ -4,15 +4,9 @@ using System;
 using System.Reflection;
 using System.Linq;
 
-[InitializeOnLoad]
 public class FullHierarchyOverlay
 {
-    static FullHierarchyOverlay()
-    {
-        // 延迟调用以确保编辑器完全启动
-        EditorApplication.delayCall += InitializeOverlay;
-    }
-
+    [MenuItem("ES/Obsolete/Initialize Full Hierarchy Overlay")]
     static void InitializeOverlay()
     {
         // 获取所有已打开的 Hierarchy 窗口

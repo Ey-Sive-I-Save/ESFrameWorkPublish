@@ -1,13 +1,12 @@
-using UnityEngine;
+﻿using UnityEngine;
 
-namespace ES
-{
+namespace ES.Samples{
     public class CircleDependenceSamplePrefabRef : MonoBehaviour
     {
         [Header("Circular Dependency Test")]
         public CircleDenpendceSamples SampleSO;
 
-        public ESResRefer refer;
+        public ESAssetReferPrefab refer;
 
         [TextArea]
         public string Note;

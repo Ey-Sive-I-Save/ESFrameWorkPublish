@@ -91,7 +91,7 @@ PrefabInstance:
     - target: {fileID: 1093453824360451666, guid: a3e72f4b5b0e4e94fa5215183e439fd1,
         type: 3}
       propertyPath: m_Name
-      value: FX_Shoot_04_projectile
+      value: FX_Shoot_04_shot
       objectReference: {fileID: 0}
     - target: {fileID: 1093453824360451671, guid: a3e72f4b5b0e4e94fa5215183e439fd1,
         type: 3}

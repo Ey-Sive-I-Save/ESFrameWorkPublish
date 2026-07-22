@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ES.Preview.InputSystem
+namespace ES.Obsolete.Preview.InputSystem
 {
     /// <summary>
     /// 通用输入系统

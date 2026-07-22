@@ -4,7 +4,7 @@ using Sirenix.OdinInspector.Editor;
 using UnityEditor;
 using UnityEngine;
 
-namespace ES.EditorTools
+namespace ES.Editor
 {
     /// <summary>
     /// 泛型预览编辑器基类。可实现任意 UnityEngine.Object 的模块化预览。

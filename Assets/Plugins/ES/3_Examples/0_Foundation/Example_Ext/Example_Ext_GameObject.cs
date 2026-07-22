@@ -5,8 +5,7 @@ using UnityEngine;
 // 示例：演示 ExtForGameObject.cs 中常用 API 的用法
 // 来源：Assets/Plugins/ES/1_Design/Extension/EX_SimpleExtension/ExtForGameObject.cs
 // 把此脚本挂到场景中的任意 GameObject 上，Start 会执行一系列安全示例。
-namespace ES
-{
+namespace ES.Samples{
     public class Example_Ext_GameObject : MonoBehaviour
     {
         void Start()

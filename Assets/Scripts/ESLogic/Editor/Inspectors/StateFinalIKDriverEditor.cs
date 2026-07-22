@@ -8,7 +8,7 @@ using UnityEngine;
 namespace ES
 {
     [CustomEditor(typeof(StateFinalIKDriver))]
-    public sealed class StateFinalIKDriverEditor : Editor
+    public sealed class StateFinalIKDriverEditor : UnityEditor.Editor
     {
         private enum Page
         {
@@ -290,7 +290,10 @@ namespace ES
             {
                 DrawInfoLine("能力集", driver.Capabilities.ToString());
                 DrawInfoLine("启用状态", driver.DriverEnableStateSummary);
+                DrawInfoLine("调度模式", driver.FinalIKScheduleMode.ToString());
+                DrawInfoLine("商业顺序契约", driver.FinalIKCommercialOrderSummary);
                 DrawInfoLine("求解顺序", driver.FinalIKScheduleSummary);
+                DrawInfoLine("阻断说明", driver.FinalIKScheduleBlockSummary);
                 DrawStatusGrid(driver);
             });
 

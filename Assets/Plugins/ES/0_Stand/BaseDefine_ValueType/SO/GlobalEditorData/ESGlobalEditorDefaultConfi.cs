@@ -13,6 +13,7 @@ using UnityEngine;
 namespace ES
 {
   [CreateAssetMenu(fileName = "全局编辑器流程基本配置", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "全局编辑器流程基本配置")]
+  [ESOnlyEditorSO("全局编辑器默认配置只服务编辑器流程和路径，不应进入运行时构建或AB资源包。")]
   public class ESGlobalEditorDefaultConfi : ESEditorGlobalSo<ESGlobalEditorDefaultConfi>
   {
     #region 文件夹管理
@@ -43,7 +44,7 @@ namespace ES
 
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的资产包烘焙数据父文件夹")]
-    public string Path_AssetPackageBakeParent = "Assets/NormalResources/Data/AssetPackageBake";
+    public string Path_AssetPackageBakeParent = "Assets/ESNormalAssets/Data/AssetPackageBake";
 
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认的全局Global父文件夹")]
@@ -52,7 +53,7 @@ namespace ES
     [TabGroup("文件夹管理")]
     [FolderPath, LabelText("默认Library库放置文件夹")]
     [InlineButton("Ping_", "<*>")]
-    public string Path_AllLibraryFolder_ = "Assets/NormalResources/Data/Library";
+    public string Path_AllLibraryFolder_ = "Assets/ESNormalAssets/Data/AssetLibrary";
 
     private void Ping_(string path)
     {

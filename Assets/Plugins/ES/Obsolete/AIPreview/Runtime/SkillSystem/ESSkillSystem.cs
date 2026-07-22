@@ -2,7 +2,7 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 
-namespace ES.Preview.SkillSystem
+namespace ES.Obsolete.Preview.SkillSystem
 {
     /// <summary>
     /// 技能系统核心设计

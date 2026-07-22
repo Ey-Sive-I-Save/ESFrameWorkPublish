@@ -3,8 +3,7 @@
 // using System.Collections.Generic;
 // using System.Reflection;
 // using UnityEngine;
-// namespace ES
-// {
+// namespace ES.Samples// {
 //     //类特性
 //     public class QuickInvokeAttribute : Attribute
 //     {

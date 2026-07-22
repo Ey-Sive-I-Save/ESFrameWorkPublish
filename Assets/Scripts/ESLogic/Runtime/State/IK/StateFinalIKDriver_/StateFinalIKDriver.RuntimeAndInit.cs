@@ -134,6 +134,7 @@ namespace ES
             _wasBipedIKBound = _bipedIKReady;
             _hasLastPose     = false;
             _runtimeBindingReady = true;
+            RefreshFinalIKScheduleDiagnosticsCache();
             SetDriverEnabled(true, $"Bind 完成 | Animator={animator.name} | StateMachineKey={machine.stateMachineKey}");
         }
 
@@ -157,6 +158,7 @@ namespace ES
             _fullBodyBipedIKReady = false;
             _finalIKScheduleFlags = IKScheduleFrameFlags.None;
             _scheduleBlockFlags = FinalIKDriverBlockFlags.None;
+            RefreshFinalIKScheduleDiagnosticsCache();
 
             _refs.Clear();
             _caps          = FinalIKCapabilityFlags.None;
@@ -244,8 +246,10 @@ namespace ES
             }
 
             var pose = _stateMachine.stateGeneralFinalIKDriverPose;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (enableRealtimeWeightTest)
                 ApplyRealtimeWeightTest(ref pose);
+#endif
 
             if (_aimIKReady)
             {
@@ -412,6 +416,7 @@ namespace ES
             if (!fullBodyBipedIK.solver.initiated)
                 return false;
 
+            ApplyRuntimeFullBodyBipedIKOffsets(fullBodyBipedIK.solver);
             fullBodyBipedIK.solver.Update();
             _solverUpdateCount++;
             _lastSolverUpdateTime = Time.unscaledTime;
@@ -426,7 +431,12 @@ namespace ES
             if (lookAtSolved) flags |= IKScheduleFrameFlags.LookAt;
             if (grounderLinked) flags |= IKScheduleFrameFlags.Grounder;
             if (fullBodySolved) flags |= IKScheduleFrameFlags.FullBody;
+
+            if (_finalIKScheduleFlags == flags)
+                return;
+
             _finalIKScheduleFlags = flags;
+            RefreshFinalIKScheduleDiagnosticsCache();
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -614,6 +624,9 @@ namespace ES
                 s.footSpeed = initGrounderSpeed;
             }
 
+            if (_fullBodyBipedIKReady)
+                ApplyDriverFullBodyBipedIKSettings(_refs.fullBodyBipedIK);
+
             if (_bipedIKReady)
             {
                 ResetRuntimeLimbWeights();
@@ -635,6 +648,7 @@ namespace ES
         public bool IKHit(Collider collider, Vector3 force, Vector3 point)
         {
             if (!_hitReactionReady) return false;
+            if (!_hitReaction.enabled) return false;
             _hitReaction.Hit(collider, force, point);
             return true;
         }
@@ -642,6 +656,7 @@ namespace ES
         public bool IKPlayRecoil(float magnitude = 1f)
         {
             if (!_recoilReady) return false;
+            if (!_recoil.enabled) return false;
             _recoil.Fire(magnitude);
             return true;
         }
@@ -650,7 +665,7 @@ namespace ES
         {
             if (!_grounderReady) return false;
             _grounderWeightTarget = active ? Mathf.Clamp01(initGrounderWeight) : 0f;
-            _grounderBipedIK.enabled = active || _grounderWeightCurrent > 0.001f;
+            RefreshGrounderExecutionPolicyAfterRuntimeSwitch();
             return true;
         }
 
@@ -737,8 +752,10 @@ namespace ES
             _grounderBipedIK.weight = _grounderWeightCurrent;
 
             bool shouldStayEnabled = _grounderWeightCurrent > 0.001f || _grounderWeightTarget > 0.001f;
-            if (_grounderBipedIK.enabled != shouldStayEnabled)
-                _grounderBipedIK.enabled = shouldStayEnabled;
+            bool allowProceduralDelegates = _scheduleMode == FinalIKDriverScheduleMode.DriverCoreManualProceduralDelegates;
+            bool shouldRun = allowProceduralDelegates && shouldStayEnabled;
+            if (_grounderBipedIK.enabled != shouldRun)
+                _grounderBipedIK.enabled = shouldRun;
         }
 
         private float SmoothIKWeight(float current, float target, float smoothTime, float lerpingRate = 1f)
@@ -963,11 +980,20 @@ namespace ES
 
         private void InitHitReactionAndRecoil()
         {
+            if (_hitReaction != null)
+                _hitReaction.enabled = false;
+            if (_recoil != null)
+                _recoil.enabled = false;
+
             _hitReactionReady = false;
             _recoilReady      = false;
             _fullBodyBipedIKReady = false;
 
-            if (!enableFullBodyBipedIK) return;
+            if (!enableFullBodyBipedIK)
+            {
+                RefreshProceduralExecutionPolicyAfterRuntimeSwitch();
+                return;
+            }
 
             _hitReaction = enableHitReaction ? _refs.hitReaction : null;
             _recoil      = enableRecoil      ? _refs.recoil      : null;
@@ -982,7 +1008,10 @@ namespace ES
 
                 _fullBodyBipedIKReady = _refs.fullBodyBipedIK.solver.initiated;
                 if (_fullBodyBipedIKReady)
+                {
                     _caps |= FinalIKCapabilityFlags.FullBodyBipedIK;
+                    ApplyDriverFullBodyBipedIKSettings(_refs.fullBodyBipedIK);
+                }
                 else
                     _presentButBad |= FinalIKCapabilityFlags.FullBodyBipedIK;
             }
@@ -992,6 +1021,7 @@ namespace ES
                 if (useDriverHitReactionSetup)
                     ApplyDriverHitReaction(_hitReaction);
 
+                _hitReaction.ik = _refs.fullBodyBipedIK;
                 if (_fullBodyBipedIKReady) { _hitReactionReady = true; _caps |= FinalIKCapabilityFlags.HitReaction; }
                 else Debug.LogWarning(
                     "[StateFinalIKDriver] HitReaction 已挂载，但缺少 FullBodyBipedIK，HitReaction 未激活。\n" +
@@ -1003,6 +1033,10 @@ namespace ES
                 if (useDriverRecoilSetup)
                     ApplyDriverRecoil(_recoil);
 
+                _recoil.ik = _refs.fullBodyBipedIK;
+                if (_aimIKReady)
+                    _recoil.aimIK = _aimIK;
+                _recoil.aimIKSolvedLast = false;
                 if (_fullBodyBipedIKReady) { _recoilReady = true; _caps |= FinalIKCapabilityFlags.Recoil; }
                 else Debug.LogWarning(
                     "[StateFinalIKDriver] Recoil 已挂载，但缺少 FullBodyBipedIK，Recoil 未激活。\n" +

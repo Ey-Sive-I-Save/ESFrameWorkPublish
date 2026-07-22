@@ -3,7 +3,7 @@ using UnityEditor;
 using System.IO;
 using ES.VMCP.Editor;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// ESVMCP测试工具 - 在Unity编辑器中测试JSON命令

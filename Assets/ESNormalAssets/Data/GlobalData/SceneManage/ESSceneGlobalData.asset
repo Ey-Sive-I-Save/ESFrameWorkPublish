@@ -1,0 +1,108 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eddd4633ea10ba344ba02c393deccffe, type: 3}
+  m_Name: ESSceneGlobalData
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  HasConfirm: 1
+  CustomScenes:
+  - DisplayName: SampleScene
+    ScenePath: Assets/Scenes/SampleScene.unity
+    SceneAsset: {fileID: 102900000, guid: 99c9720ab356a0642a771bea13969a05, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "UI\u573A\u666F"
+    Enabled: 1
+  - DisplayName: 2 - Microphone
+    ScenePath: 
+    SceneAsset: {fileID: 0}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u6838\u5FC3\u573A\u666F"
+    Enabled: 0
+  - DisplayName: SampleScene_GgCore
+    ScenePath: Assets/Gaskellgames/GgCore/Editor/Scenes/SampleScene_GgCore.unity
+    SceneAsset: {fileID: 102900000, guid: a56d4590da976e043ad16449b33b45fa, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u6D4B\u8BD5\u573A\u666F"
+    Enabled: 1
+  - DisplayName: NullScene
+    ScenePath: Assets/Scenes/NullScene.unity
+    SceneAsset: {fileID: 102900000, guid: abe9eb92e1fa8cb4a9ae52b3a515e684, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u6838\u5FC3\u573A\u666F"
+    Enabled: 1
+  - DisplayName: New Scene 1
+    ScenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene 1.unity
+    SceneAsset: {fileID: 102900000, guid: b4b75588872fe9740ab90f542b86ce3e, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
+  - DisplayName: AimingRig
+    ScenePath: Assets/Samples/Cinemachine/2.10.5/Cinemachine Example Scenes/Scenes/AimingRig/AimingRig.unity
+    SceneAsset: {fileID: 102900000, guid: 8ad62c20b502850419e9fbe043d2d6f8, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
+  - DisplayName: AimIK Pole
+    ScenePath: Assets/Plugins/RootMotion/FinalIK/_DEMOS/Aim IK/AimIK Pole.unity
+    SceneAsset: {fileID: 102900000, guid: 4cb81a7ab90c447829d4d26f8ca89245, type: 3}
+    Color: {r: 1, g: 1, b: 1, a: 1}
+    Description: 
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
+  SceneGroups:
+  - "\u9ED8\u8BA4"
+  - "\u6838\u5FC3\u573A\u666F"
+  - "\u6D4B\u8BD5\u573A\u666F"
+  - "UI\u573A\u666F"
+  CustomAssets:
+  - DisplayName: SampleScene
+    Asset: {fileID: 102900000, guid: 99c9720ab356a0642a771bea13969a05, type: 3}
+    Group: "\u9ED8\u8BA4"
+    Enabled: 1
+  - DisplayName: "\U0001F4C1 OBSOLUTE"
+    Asset: {fileID: 102900000, guid: 63b50f818d503904fa3c39903080c36b, type: 3}
+    Group: "\u6587\u4EF6\u5939"
+    Enabled: 0
+  - DisplayName: AutodeskInteractiveTransparent
+    Asset: {fileID: -876546973899608171, guid: 5c81372d981403744adbdda4433c9c11, type: 3}
+    Group: "\u811A\u672C"
+    Enabled: 1
+  - DisplayName: "\u4FE1\u606F\u72B6\u60011"
+    Asset: {fileID: -4032791083603288687, guid: 3bbbfb0eae070104295366fdaf88f52a,
+      type: 2}
+    Group: "\u914D\u7F6E"
+    Enabled: 1
+  AssetGroups:
+  - "\u9ED8\u8BA4"
+  - "\u811A\u672C"
+  - "\u9884\u5236\u4F53"
+  - "\u914D\u7F6E"
+  - "\u6750\u8D28"
+  AutoSaveBeforeSwitch: 1
+  UseAdditiveMode: 0
+  ShowScenePath: 0
+  IncludeBuildScenes: 1
+  IncludeAllScenes: 0

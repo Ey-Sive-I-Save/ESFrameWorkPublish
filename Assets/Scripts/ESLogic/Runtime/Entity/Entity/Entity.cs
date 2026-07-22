@@ -1,19 +1,21 @@
 using System;
+using KinematicCharacterController;
 using Sirenix.OdinInspector;
 using UnityEngine;
-using KinematicCharacterController;
+using ReadOnlyAttribute = Sirenix.OdinInspector.ReadOnlyAttribute;
 
 namespace ES
 {
     // Entity：直接接入 KCC 的角色核心（不走模块，超高频）
     [Serializable, TypeRegistryItem("实体核心")]
+    [RequireComponent(typeof(KinematicCharacterMotor))]
     public class Entity : Core, ICharacterController
     {
         [LabelText("主 Animator")]
         public Animator animator;
 
-        [LabelText("Entity长期OpSupport"), SerializeReference]
-        public ESOpSupport opSupport = new ESOpSupport();
+        [NonSerialized, ShowInInspector, Sirenix.OdinInspector.ReadOnly, LabelText("Entity长期OpSupport")]
+        public ESOpSupport opSupport;
 
         public ESOpSupport OpSupport
         {
@@ -24,92 +26,27 @@ namespace ES
             }
         }
 
-        [NonSerialized] private Animator _cachedStateDriverAnimator;
-        [NonSerialized] private StateFinalIKDriver _cachedStateFinalIKDriver;
-
         [ShowInInspector, Sirenix.OdinInspector.ReadOnly, LabelText("游戏标签")]
         private ESTagRefCountSet64 gameTags;
 
+        [NonSerialized, ShowInInspector, Sirenix.OdinInspector.ReadOnly, LabelText("LOD缓存索引")]
+        private int lodCacheIndex = -1;
+
+        public int LODCacheIndex => lodCacheIndex;
+
         #region Domains
 
-        [TabGroup("生命体结构", "身体基础"), HideLabel, SerializeReference]
-        public EntityBasicDomain basicDomain;
+        [TabGroup("生命体结构", "身体基础"), HideLabel, HideReferenceObjectPicker, SerializeReference]
+        public EntityBasicDomain basicDomain = new EntityBasicDomain();
 
-        [TabGroup("生命体结构", "意识AI"), HideLabel, SerializeReference]
-        public EntityAIDomain aiDomain;
+        [TabGroup("生命体结构", "意识AI"), HideLabel, HideReferenceObjectPicker, SerializeReference]
+        public EntityAIDomain aiDomain = new EntityAIDomain();
 
-        [TabGroup("生命体结构", "Buff域"), HideLabel, SerializeReference]
-        public EntityBuffDomain buffDomain;
+        [TabGroup("生命体结构", "Buff域"), HideLabel, HideReferenceObjectPicker, SerializeReference]
+        public EntityBuffDomain buffDomain = new EntityBuffDomain();
 
-        [TabGroup("生命体结构", "状态表现"), HideLabel, SerializeReference]
-        public EntityStateDomain stateDomain;
-
-        #endregion
-
-        #region 生命体关系链
-
-        public StateMachine StateMachineOrNull => stateDomain != null ? stateDomain.stateMachine : null;
-
-        public Animator StateAnimatorOrNull
-        {
-            get
-            {
-                var stateMachine = StateMachineOrNull;
-                return stateMachine != null && stateMachine.BoundAnimator != null ? stateMachine.BoundAnimator : animator;
-            }
-        }
-
-        [ShowInInspector, Sirenix.OdinInspector.ReadOnly, PropertyOrder(-20), FoldoutGroup("生命体关系链", expanded: true), LabelText("动画器")]
-        private Animator InspectorStateAnimator => StateAnimatorOrNull;
-
-        [ShowInInspector, Sirenix.OdinInspector.ReadOnly, PropertyOrder(-19), FoldoutGroup("生命体关系链"), LabelText("状态机")]
-        private StateMachine InspectorStateMachine => StateMachineOrNull;
-
-        [ShowInInspector, Sirenix.OdinInspector.ReadOnly, PropertyOrder(-18), FoldoutGroup("生命体关系链"), LabelText("IK表现驱动")]
-        private StateFinalIKDriver InspectorStateFinalIKDriver => ResolveStateFinalIKDriver();
-
-        [ShowInInspector, Sirenix.OdinInspector.ReadOnly, PropertyOrder(-17), FoldoutGroup("生命体关系链"), LabelText("链路状态")]
-        private string InspectorStateDriverRelation
-        {
-            get
-            {
-                var stateMachine = StateMachineOrNull;
-                var stateAnimator = StateAnimatorOrNull;
-                var ikDriver = ResolveStateFinalIKDriver();
-
-                if (stateMachine == null) return "缺少 StateDomain/StateMachine";
-                if (stateAnimator == null) return "缺少 Animator，状态机无法输出动画";
-                if (ikDriver == null) return "缺少 StateFinalIKDriver，IK表现不会接收状态机贡献";
-                return stateMachine.isRunning ? "运行中：Entity -> StateDomain -> StateMachine -> StateFinalIKDriver" : "已绑定：等待状态机运行";
-            }
-        }
-
-        public StateFinalIKDriver ResolveStateFinalIKDriver(bool allowSearchChildren = false)
-        {
-            var stateAnimator = StateAnimatorOrNull;
-            if (stateAnimator == null)
-            {
-                _cachedStateDriverAnimator = null;
-                _cachedStateFinalIKDriver = null;
-                return null;
-            }
-
-            if (_cachedStateFinalIKDriver != null && _cachedStateDriverAnimator == stateAnimator)
-                return _cachedStateFinalIKDriver;
-
-            _cachedStateDriverAnimator = stateAnimator;
-            _cachedStateFinalIKDriver = stateAnimator.GetComponent<StateFinalIKDriver>();
-            if (_cachedStateFinalIKDriver == null && allowSearchChildren)
-                _cachedStateFinalIKDriver = stateAnimator.GetComponentInChildren<StateFinalIKDriver>(true);
-
-            return _cachedStateFinalIKDriver;
-        }
-
-        public void ClearStateDriverRelationCache()
-        {
-            _cachedStateDriverAnimator = null;
-            _cachedStateFinalIKDriver = null;
-        }
+        [TabGroup("生命体结构", "状态表现"), HideLabel, HideReferenceObjectPicker, SerializeReference]
+        public EntityStateDomain stateDomain = new EntityStateDomain();
 
         #endregion
 
@@ -125,9 +62,21 @@ namespace ES
 
         protected override void OnBeforeAwakeRegister()
         {
+            EnsureEntityStructure();
             EnsureEntityOpSupport();
             gameTags.Warmup();
+            RegisterLODCache();
             InitializeKCC();
+        }
+
+        private void Reset()
+        {
+            EnsureEntityStructure();
+        }
+
+        private void OnValidate()
+        {
+            EnsureEntityStructure();
         }
 
         protected override void OnAwakeRegisterOnly()
@@ -153,8 +102,8 @@ namespace ES
         {
             base.OnDestroy();
 
-            if (opSupport != null && !opSupport.IsRecycled)
-                opSupport.TryAutoPushedToPool();
+            UnregisterLODCache();
+            opSupport?.Dispose();
 
             opSupport = null;
         }
@@ -168,13 +117,97 @@ namespace ES
             kcc.Initialize(this);
         }
 
+        public void EnsureEntityStructure()
+        {
+            basicDomain ??= new EntityBasicDomain();
+            aiDomain ??= new EntityAIDomain();
+            buffDomain ??= new EntityBuffDomain();
+            stateDomain ??= new EntityStateDomain();
+            stateDomain.stateMachine ??= new StateMachine();
+            kcc ??= new EntityKCCData();
+        }
+
         public void EnsureEntityOpSupport()
         {
             if (opSupport == null || opSupport.IsRecycled)
-                opSupport = new ESOpSupport();
+                opSupport = ESOpSupport.CreateStandalone();
 
             if (opSupport.Kind != ESOpSupportKind.Entity || opSupport.OwnerEntity != this)
                 opSupport.InitializeEntityOwner(this, GetInstanceID());
+        }
+
+        public void RegisterLODCache()
+        {
+            ESLODModule lodModule = ESGameManager.LODModule;
+            if (lodModule == null)
+                return;
+
+            lodCacheIndex = lodModule.RegisterEntity(this);
+        }
+
+        public void UnregisterLODCache()
+        {
+            ESLODModule lodModule = ESGameManager.LODModule;
+            if (lodModule == null)
+            {
+                lodCacheIndex = -1;
+                return;
+            }
+
+            lodModule.UnregisterEntity(this);
+            lodCacheIndex = -1;
+        }
+
+        public bool TryGetLODCache(out ESLODCacheEntry cache)
+        {
+            ESLODModule lodModule = ESGameManager.LODModule;
+            if (lodModule != null && !lodModule.IsValidCacheIndex(lodCacheIndex))
+                lodCacheIndex = lodModule.RegisterEntity(this);
+
+            if (lodModule != null && lodModule.IsValidCacheIndex(lodCacheIndex))
+            {
+                cache = lodModule.GetCacheReadOnly(lodCacheIndex);
+                return true;
+            }
+
+            cache = default;
+            return false;
+        }
+
+        public void SetEntityLODLevel(ESEntityLODLevel level)
+        {
+            ESLODModule lodModule = ESGameManager.LODModule;
+            if (lodModule == null)
+                return;
+
+            if (!lodModule.IsValidCacheIndex(lodCacheIndex))
+                lodCacheIndex = lodModule.RegisterEntity(this);
+
+            lodModule.SetEntityLevel(lodCacheIndex, level);
+        }
+
+        public void AddEntityLODGate(ESEntityLODGate gate)
+        {
+            ESLODModule lodModule = ESGameManager.LODModule;
+            if (lodModule == null)
+                return;
+
+            if (!lodModule.IsValidCacheIndex(lodCacheIndex))
+                lodCacheIndex = lodModule.RegisterEntity(this);
+
+            lodModule.AddEntityGate(lodCacheIndex, gate);
+        }
+
+        public void RemoveEntityLODGate(ESEntityLODGate gate)
+        {
+            ESLODModule lodModule = ESGameManager.LODModule;
+            if (lodModule == null)
+                return;
+
+            if (!lodModule.IsValidCacheIndex(lodCacheIndex))
+                lodCacheIndex = lodModule.RegisterEntity(this);
+
+            lodModule.RemoveEntityGate(lodCacheIndex, gate);
         }
 
         #endregion
@@ -466,6 +499,18 @@ namespace ES
         private bool _verticalInputSetThisFrame;
         private Vector3 _lastTransientPosition;
 
+        [ShowInInspector, ReadOnly, LabelText("跳跃请求中")]
+        public bool JumpRequested => _jumpRequested;
+
+        [ShowInInspector, ReadOnly, LabelText("最近KCC跳跃请求帧")]
+        public int lastKccJumpRequestFrame;
+
+        [ShowInInspector, ReadOnly, LabelText("最近KCC起跳帧")]
+        public int lastKccJumpApplyFrame;
+
+        [ShowInInspector, ReadOnly, LabelText("最近KCC跳跃过期帧")]
+        public int lastKccJumpExpiredFrame;
+
         [NonSerialized]
         public EntityBasicFlyModule flyModule;
 
@@ -478,13 +523,54 @@ namespace ES
         [NonSerialized]
         public EntityBasicMountModule mountModule;
 
+        [NonSerialized] private ESWorkScheduler<IEntityKCCBeforeMotion> _beforeScheduler;
+        [NonSerialized] private ESWorkScheduler<IEntityKCCRotationMotion> _rotationScheduler;
+        [NonSerialized] private ESWorkScheduler<IEntityKCCVelocityMotion> _velocityScheduler;
+        [NonSerialized] private StateMachine _stateMachine;
+        [NonSerialized] private StateSupportFlags _currentSupportFlags;
+        [NonSerialized] private bool _motionSchedulersReady;
+
+        [NonSerialized] public int workSelf;
+        [NonSerialized] public int workWorld;
+        [NonSerialized] public int workOther;
+
+        public StateSupportFlags CurrentSupportFlags => _currentSupportFlags;
+
+        public bool HasWork => workSelf > 0 || workWorld > 0 || workOther > 0;
+
+        private void ResetWork()
+        {
+            workSelf = 100;
+            workWorld = 100;
+            workOther = 100;
+        }
+
+        public void StopWork()
+        {
+            workSelf = 0;
+            workWorld = 0;
+            workOther = 0;
+        }
+
         public void Initialize(Entity owner)
         {
-            if (owner == null) return;
+            if (owner == null)
+            {
+                Debug.Assert(false, "EntityKCCData.Initialize 失败：owner 为空。");
+                return;
+            }
             if (motor == null)
             {
                 motor = owner.GetComponent<KinematicCharacterMotor>();
+                if (motor == null)
+                {
+                    motor = owner.gameObject.AddComponent<KinematicCharacterMotor>();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.LogWarning($"[EntityKCCData] {owner.name} 缺少 KinematicCharacterMotor，已自动补齐。建议在预制体上固定配置 KCC 参数。", owner);
+#endif
+                }
             }
+            _stateMachine = owner.stateDomain != null ? owner.stateDomain.stateMachine : null;
             if (motor != null)
             {
                 motor.CharacterController = owner;
@@ -501,6 +587,19 @@ namespace ES
             {
                 _lastTransientPosition = motor.TransientPosition;
             }
+            else
+            {
+                Debug.Assert(false, "EntityKCCData.Initialize 失败：缺少 KinematicCharacterMotor。");
+                return;
+            }
+
+            if (_stateMachine == null)
+            {
+                Debug.Assert(false, "EntityKCCData.Initialize 失败：缺少 StateMachine。");
+                return;
+            }
+
+            EnsureMotionSchedulers();
         }
 
         public void SetMoveInput(Vector3 input)
@@ -536,6 +635,7 @@ namespace ES
         {
             _jumpRequested = true;
             _jumpRequestTime = Time.time;
+            lastKccJumpRequestFrame = Time.frameCount;
         }
 
         public void SetCrouch(bool enable)
@@ -571,88 +671,54 @@ namespace ES
 
         public void BeforeCharacterUpdate(Entity owner, float deltaTime)
         {
-            // ★ 在 Simulate 开始前记录位置快照（而非 AfterCharacterUpdate 末尾）。
-            //   这样 posDelta 只反映本次 KCC Simulate 内部产生的真实漂移；
-            //   Update 里 SetPositionAndRotation 的外部位移在 PreSimulation 已写入
-            //   TransientPosition，此时快照即可将其吸收，AfterCharacterUpdate 算出的
-            //   delta 始终接近零，防漂逻辑天然不会误触发。
-            if (motor != null)
-                _lastTransientPosition = motor.TransientPosition;
+            _lastTransientPosition = motor.TransientPosition;
 
             if (!_moveInputSetThisFrame)
-            {
                 moveInput = Vector3.zero;
-            }
             if (!_verticalInputSetThisFrame)
-            {
                 verticalInput = 0f;
-            }
+
             _moveInputSetThisFrame = false;
             _verticalInputSetThisFrame = false;
             ApplyCrouch();
 
-            if (owner != null && owner.stateDomain != null && owner.stateDomain.stateMachine != null)
+            EnsureMotionSchedulers();
+            _currentSupportFlags = _stateMachine.currentSupportFlags;
+            _beforeScheduler.Reset();
+            ResetWork();
+            if (!HasWork)
+                return;
+
+            Vector3 initialPosition = motor.TransientPosition;
+            for (int i = 0; i < _beforeScheduler.Count && HasWork; i++)
             {
-                var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
-                if (supportFlags == StateSupportFlags.Flying && flyModule != null)
-                {
-                    flyModule.BeforeCharacterUpdate(owner, this, deltaTime);
-                }
-                if (supportFlags == StateSupportFlags.Swimming && swimModule != null)
-                {
-                    swimModule.BeforeCharacterUpdate(owner, this, deltaTime);
-                }
-                if (supportFlags == StateSupportFlags.Climbing && climbModule != null)
-                {
-                    climbModule.BeforeCharacterUpdate(owner, this, deltaTime);
-                }
-                if (mountModule != null && (supportFlags == StateSupportFlags.Mounted || mountModule.mountHold))
-                {
-                    // ★ mountHold 兜底：即便 Inspector 未配置 StateSupportFlags.Mounted，
-                    //   骑乘期间仍确保 ForceUnground 被调用，防止 KCC 接地系统将角色压回地面，
-                    //   对抗 MatchTarget 向上对齐的位移。
-                    mountModule.BeforeCharacterUpdate(owner, this, deltaTime);
-                }
+                if (_beforeScheduler.Get(i).BeforeCharacterUpdate(owner, this, initialPosition, deltaTime))
+                    StopWork();
             }
         }
 
         public void UpdateRotation(Entity owner, ref Quaternion currentRotation, float deltaTime)
         {
-            if (owner != null && owner.stateDomain != null && owner.stateDomain.stateMachine != null)
+            EnsureMotionSchedulers();
+            _currentSupportFlags = _stateMachine.currentSupportFlags;
+            _rotationScheduler.Reset();
+            ResetWork();
+            if (HasWork)
             {
-                var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
-                if (supportFlags == StateSupportFlags.Mounted)
+                Quaternion initialRotation = currentRotation;
+                for (int i = 0; i < _rotationScheduler.Count && HasWork; i++)
                 {
-                    if (mountModule != null)
+                    if (_rotationScheduler.Get(i).UpdateRotation(owner, this, initialRotation, ref currentRotation, deltaTime))
                     {
-                        mountModule.UpdateRotation(owner, this, ref currentRotation, deltaTime);
-                    }
-                    return;
-                }
-                if (supportFlags == StateSupportFlags.Climbing)
-                {
-                    if (climbModule != null)
-                    {
-                        climbModule.UpdateRotation(owner, this, ref currentRotation, deltaTime);
-                    }
-                    return;
-                }
-                if (supportFlags == StateSupportFlags.Flying && flyModule != null)
-                {
-                    if (flyModule.UpdateRotation(owner, this, ref currentRotation, deltaTime))
-                    {
-                        return;
-                    }
-                }
-                if (supportFlags == StateSupportFlags.Swimming && swimModule != null)
-                {
-                    if (swimModule.UpdateRotation(owner, this, ref currentRotation, deltaTime))
-                    {
+                        StopWork();
                         return;
                     }
                 }
             }
-            if (lookInput.sqrMagnitude <= 0f || orientationSharpness <= 0f) return;
+
+            if (lookInput.sqrMagnitude <= 0f || orientationSharpness <= 0f)
+                return;
+
             Vector3 smoothedLookInputDirection = Vector3.Slerp(motor.CharacterForward, lookInput, 1f - Mathf.Exp(-orientationSharpness * deltaTime)).normalized;
             currentRotation = Quaternion.LookRotation(smoothedLookInputDirection, motor.CharacterUp);
         }
@@ -663,9 +729,7 @@ namespace ES
             float stableMaxSpeed = maxStableMoveSpeed * multiplier;
             float airMaxSpeed = maxAirMoveSpeed * multiplier;
             if (_isCrouched)
-            {
                 stableMaxSpeed *= Mathf.Clamp01(crouchSpeedMultiplier);
-            }
             if (speedLimit > 0f)
             {
                 stableMaxSpeed = Mathf.Min(stableMaxSpeed, speedLimit);
@@ -673,66 +737,32 @@ namespace ES
             }
 
             Vector3 targetMovementVelocity = Vector3.zero;
-            if (owner == null || owner.stateDomain == null || owner.stateDomain.stateMachine == null || motor == null)
-            {
-                _lastVelocity = currentVelocity;
-                return;
-            }
-            var supportFlags = owner.stateDomain.stateMachine.currentSupportFlags;
-            if (supportFlags == StateSupportFlags.Mounted || (mountModule != null && mountModule.mountHold))
-            {
-                // ★ mountHold 兜底：即便 Inspector 未配置 StateSupportFlags.Mounted，
-                //   骑乘期间仍保证把速度归零，防止重力在 MatchTarget 窗口内持续积累，
-                //   MatchTarget 结束时一次性释放导致角色飞回地面。
-                if (mountModule != null)
-                {
-                    mountModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
-                }
-                else
-                {
-                    currentVelocity = Vector3.zero;
-                }
-                _lastVelocity = currentVelocity;
-                return;
-            }
             bool handled = false;
-            if (supportFlags != StateSupportFlags.Climbing && climbModule != null && climbModule.subState == ClimbSubState.ClimbJump)
+            _currentSupportFlags = _stateMachine.currentSupportFlags;
+            EnsureMotionSchedulers();
+            _velocityScheduler.Reset();
+            ResetWork();
+            if (HasWork)
             {
-                handled = climbModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
-            }
-            if (supportFlags == StateSupportFlags.Climbing)
-            {
-                handled = true;
-                if (climbModule != null)
+                Vector3 initialVelocity = currentVelocity;
+                for (int i = 0; i < _velocityScheduler.Count && HasWork; i++)
                 {
-                    climbModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
-                }
-                else
-                {
-                    currentVelocity = Vector3.zero;
-                }
-            }
-            else if (supportFlags == StateSupportFlags.Flying)
-            {
-                handled = true;
-                if (flyModule != null)
-                {
-                    flyModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
+                    if (_velocityScheduler.Get(i).UpdateVelocity(owner, this, initialVelocity, ref currentVelocity, deltaTime))
+                    {
+                        handled = true;
+                        StopWork();
+                        _lastVelocity = currentVelocity;
+                        return;
+                    }
                 }
             }
-            else if (supportFlags == StateSupportFlags.Swimming)
-            {
-                handled = true;
-                if (swimModule != null)
-                {
-                    swimModule.UpdateVelocity(owner, this, ref currentVelocity, deltaTime);
-                }
-            }
+
             if (!handled && motor.GroundingStatus.IsStableOnGround)
             {
                 if (_jumpRequested && jumpRequestBufferTime > 0f && Time.time - _jumpRequestTime > jumpRequestBufferTime)
                 {
                     _jumpRequested = false;
+                    lastKccJumpExpiredFrame = Time.frameCount;
                 }
 
                 currentVelocity = motor.GetDirectionTangentToSurface(currentVelocity, motor.GroundingStatus.GroundNormal) * currentVelocity.magnitude;
@@ -747,6 +777,7 @@ namespace ES
                 {
                     _jumpRequested = false;
                     _jumpRequestTime = -999f;
+                    lastKccJumpApplyFrame = Time.frameCount;
                     motor.ForceUnground(0.1f);
                     float finalJumpSpeed = jumpSpeed * Mathf.Max(0f, jumpSpeedMultiplier);
                     currentVelocity = Vector3.ProjectOnPlane(currentVelocity, motor.CharacterUp) + (motor.CharacterUp * finalJumpSpeed);
@@ -758,6 +789,7 @@ namespace ES
                 {
                     _jumpRequested = false;
                     _jumpRequestTime = -999f;
+                    lastKccJumpExpiredFrame = Time.frameCount;
                 }
 
                 if (moveInput.sqrMagnitude > 0f)
@@ -777,13 +809,10 @@ namespace ES
                 float gravityScale = 1f;
                 float upVel = Vector3.Dot(currentVelocity, motor.CharacterUp);
                 if (upVel > 0.01f)
-                {
                     gravityScale = Mathf.Max(0f, jumpApexGravityMultiplier);
-                }
                 else if (upVel < -0.01f)
-                {
                     gravityScale = Mathf.Max(0f, jumpFallGravityMultiplier);
-                }
+
                 currentVelocity += gravity_ * (gravityScale * deltaTime);
                 currentVelocity *= (1f / (1f + (drag * deltaTime)));
             }
@@ -792,12 +821,8 @@ namespace ES
             {
                 bool canApply = !rootMotionGroundOnly || motor.GroundingStatus.IsStableOnGround;
                 if (canApply)
-                {
                     currentVelocity += _rootMotionVelocity * rootMotionScale;
-                }
             }
-
-            
 
             if (speedLimit > 0f)
             {
@@ -812,6 +837,70 @@ namespace ES
             }
 
             _lastVelocity = currentVelocity;
+        }
+
+        public void RebuildMotionSchedulers()
+        {
+            _motionSchedulersReady = false;
+        }
+
+        private void EnsureMotionSchedulers()
+        {
+            if (_motionSchedulersReady)
+                return;
+
+            if (_beforeScheduler == null)
+                _beforeScheduler = new ESWorkScheduler<IEntityKCCBeforeMotion>();
+            else
+                _beforeScheduler.Clear();
+            _beforeScheduler.Warmup(4, 2);
+            RegisterBefore(flyModule, 100);
+            RegisterBefore(swimModule, 110);
+            RegisterBefore(climbModule, 120);
+            RegisterBefore(mountModule, 130);
+            _beforeScheduler.Reset();
+
+            if (_rotationScheduler == null)
+                _rotationScheduler = new ESWorkScheduler<IEntityKCCRotationMotion>();
+            else
+                _rotationScheduler.Clear();
+            _rotationScheduler.Warmup(4, 2);
+            RegisterRotation(mountModule, 100);
+            RegisterRotation(climbModule, 110);
+            RegisterRotation(flyModule, 120);
+            RegisterRotation(swimModule, 130);
+            _rotationScheduler.Reset();
+
+            if (_velocityScheduler == null)
+                _velocityScheduler = new ESWorkScheduler<IEntityKCCVelocityMotion>();
+            else
+                _velocityScheduler.Clear();
+            _velocityScheduler.Warmup(4, 2);
+            RegisterVelocity(mountModule, 100);
+            RegisterVelocity(climbModule, 110);
+            RegisterVelocity(flyModule, 120);
+            RegisterVelocity(swimModule, 130);
+            _velocityScheduler.Reset();
+
+            _motionSchedulersReady = true;
+        }
+
+        private void RegisterBefore(IEntityKCCBeforeMotion task, int order)
+        {
+            if (task != null)
+                _beforeScheduler.Register(task, order);
+        }
+
+        private void RegisterRotation(IEntityKCCRotationMotion task, int order)
+        {
+            if (task != null)
+                _rotationScheduler.Register(task, order);
+        }
+
+        private void RegisterVelocity(IEntityKCCVelocityMotion task, int order)
+        {
+            if (task != null)
+                _velocityScheduler.Register(task, order);
         }
 
         private void ApplyCrouch()

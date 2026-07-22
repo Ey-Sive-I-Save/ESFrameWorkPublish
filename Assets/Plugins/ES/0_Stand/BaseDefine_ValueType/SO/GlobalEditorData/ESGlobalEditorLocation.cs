@@ -9,6 +9,7 @@ using UnityEngine;
 namespace ES {
     //为快速定位准备的匹配信息
     [CreateAssetMenu(fileName = "全局资产定位",menuName = "资产定位")]
+    [ESOnlyEditorSO("全局资产定位数据只服务编辑器快速跳转，不应进入运行时构建或AB资源包。")]
     public class ESGlobalEditorLocation : ESEditorGlobalSo<ESGlobalEditorLocation>
     {
         [LabelText("快速定位资产")]

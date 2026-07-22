@@ -210,5 +210,27 @@ namespace ES
         }
     }
 
+    [Serializable, TypeRegistryItem("Expression/对象/运行目标/使用者对象")]
+    public class ESGetGameObjectExpression_RuntimeTargetUserObject : ESGetGameObjectExpression
+    {
+        [ShowInInspector, ReadOnly, LabelText("来源")]
+        private string Source => "target.userEntity 或 target.userItem";
 
+        public override GameObject Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
+        {
+            return target != null ? target.GetGameObject() : null;
+        }
+    }
+
+    [Serializable, TypeRegistryItem("Expression/对象/运行目标/主目标对象")]
+    public class ESGetGameObjectExpression_RuntimeTargetMainObject : ESGetGameObjectExpression
+    {
+        [ShowInInspector, ReadOnly, LabelText("来源")]
+        private string Source => "target.entityMainTarget 或 target.itemMainTarget";
+
+        public override GameObject Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
+        {
+            return target != null ? target.GetMainTargetGameObject() : null;
+        }
+    }
 }

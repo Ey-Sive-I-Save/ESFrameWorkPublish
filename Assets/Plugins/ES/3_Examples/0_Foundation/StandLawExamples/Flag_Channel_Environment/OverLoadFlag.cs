@@ -4,8 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Samples{
     /*OverLoadFlag 
      * 重载辨识
      * 的作用非常简单，只是为了创建避免同名不依赖参数的重载

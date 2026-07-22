@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ES.AIPreview.Input
+namespace ES.Obsolete.AIPreview.Input
 {
     /// <summary>
     /// 高层输入系统原型：

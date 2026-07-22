@@ -11,23 +11,23 @@
 ```text
 1. 同一帧只能有一个权威位姿写回者。
 2. HitCandidate 不应挤占 MotionResultKind。
-3. 第一阶段 NonAlloc 缓冲由 ProjectileModule 自持，Tick 中不扩容。
+3. 第一阶段 NonAlloc 缓冲由 ShotModule 自持，Tick 中不扩容。
 ```
 
 这些约束能明显降低后续实现混乱。
 
-## 1. 是否接受“ProjectileModule 生成结果，ItemMotionModule 统一写回位姿”
+## 1. 是否接受“ShotModule 生成结果，ItemMotionModule 统一写回位姿”
 
 接受。
 
 第一阶段建议采用这个职责链：
 
 ```text
-ItemProjectileModule
+ItemShotModule
   读取飞行物配置和运行时状态
   调用 MotionSolver
   执行可选 NonAlloc 命中候选检测
-  生成 ProjectileMotionResult
+  生成 ShotMotionResult
   把待应用的运动结果提交给 ItemMotionModule
 
 ItemMotionModule
@@ -39,12 +39,12 @@ ItemMotionModule
 这样可以避免：
 
 ```text
-ProjectileModule 写一次 Transform
+ShotModule 写一次 Transform
 MotionModule 又写一次 Transform
 Rigidbody 速度和 Transform 位姿互相打架
 ```
 
-如果未来需要极致性能，可以让 ProjectileModule 直接持有底层驱动引用，但那应是优化阶段，不是第一阶段默认结构。
+如果未来需要极致性能，可以让 ShotModule 直接持有底层驱动引用，但那应是优化阶段，不是第一阶段默认结构。
 
 ## 2. 是否接受 HitCandidate 从 MotionResultKind 中拆出
 
@@ -64,7 +64,7 @@ Blocked
 
 ```text
 hasHitCandidate
-ProjectileHitCandidate hitCandidate
+ShotHitCandidate hitCandidate
 ```
 
 这样允许：
@@ -78,14 +78,14 @@ Expired + no hit
 
 不会把“运动状态”和“命中候选”混成互斥枚举。
 
-## 3. 是否接受 ProjectileModule 自持 NonAlloc 缓冲，Tick 中不扩容
+## 3. 是否接受 ShotModule 自持 NonAlloc 缓冲，Tick 中不扩容
 
 接受。
 
 第一阶段建议：
 
 ```text
-ItemProjectileModule 持有 RaycastHit[] 或 Collider[] 缓冲。
+ItemShotModule 持有 RaycastHit[] 或 Collider[] 缓冲。
 默认容量 8 或 16。
 Inspector 可配置容量，但运行 Tick 中不扩容。
 超过容量时截断，记录 overflowCount/debug 标记。
@@ -111,13 +111,13 @@ Inspector 可配置容量，但运行 Tick 中不扩容。
 建议用 7 步验证：
 
 ```text
-1. 场景中创建一个 Item 对象，挂 ItemBasicDomain、ItemMotionModule、ItemProjectileModule。
-2. 给 ProjectileModule 设置直线运动配置：速度、最大时间、检测半径或射线检测。
-3. 调用 ProjectileModule.Launch(origin, direction, speed) 或等价启动入口。
-4. ProjectileModule 每帧调用 MotionSolver.Step 得到下一位置、速度、旋转。
-5. ProjectileModule 做上一位置到下一位置的 NonAlloc 查询，生成 ProjectileMotionResult。
+1. 场景中创建一个 Item 对象，挂 ItemBasicDomain、ItemMotionModule、ItemShotModule。
+2. 给 ShotModule 设置直线运动配置：速度、最大时间、检测半径或射线检测。
+3. 调用 ShotModule.Launch(origin, direction, speed) 或等价启动入口。
+4. ShotModule 每帧调用 MotionSolver.Step 得到下一位置、速度、旋转。
+5. ShotModule 做上一位置到下一位置的 NonAlloc 查询，生成 ShotMotionResult。
 6. ItemMotionModule 统一应用结果到 Transform 或 Rigidbody。
-7. 外部测试脚本只读取 ProjectileMotionResult，确认 Moving / Arrived / Expired / hasHitCandidate，不执行伤害和 VFX。
+7. 外部测试脚本只读取 ShotMotionResult，确认 Moving / Arrived / Expired / hasHitCandidate，不执行伤害和 VFX。
 ```
 
 最小验证标准：
@@ -141,7 +141,7 @@ Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ItemBasicModules.cs
 
 Assets/Scripts/ESLogic/Runtime/Movement/ESMotionTypes.cs
 Assets/Scripts/ESLogic/Runtime/Movement/ESMotionSolver.cs
-Assets/Scripts/ESLogic/Runtime/Movement/ProjectileMotionTypes.cs
+Assets/Scripts/ESLogic/Runtime/Movement/ShotMotionTypes.cs
 ```
 
 其中：
@@ -154,13 +154,13 @@ _ItemBasicDomain.cs：
   Item 基础域。
 
 ItemBasicModules.cs：
-  ItemMotionModule、ItemProjectileModule，第一阶段可以先同文件，稳定后再拆类文件。
+  ItemMotionModule、ItemShotModule，第一阶段可以先同文件，稳定后再拆类文件。
 
 ESMotionTypes / ESMotionSolver：
   通用运动协议与纯 C# 求解。
 
-ProjectileMotionTypes：
-  ProjectileMotionResult、ProjectileHitCandidate、ProjectileExpireReason 等飞行物运动结果结构。
+ShotMotionTypes：
+  ShotMotionResult、ShotHitCandidate、ShotExpireReason 等飞行物运动结果结构。
 ```
 
 不建议放在：
@@ -178,8 +178,8 @@ Assets/Scripts/ESLogic/Runtime/Skill
 
 ```text
 1. ItemMotionModule 统一写回位姿。
-2. ItemProjectileModule 不直接 ApplyDamage / SpawnVfx / ReturnToPool。
-3. ProjectileHitCandidate 第一阶段只保留 Collider 级信息，不解析 Entity/Item。
+2. ItemShotModule 不直接 ApplyDamage / SpawnVfx / ReturnToPool。
+3. ShotHitCandidate 第一阶段只保留 Collider 级信息，不解析 Entity/Item。
 4. MotionSolver 保持纯函数，不触碰 Unity 组件。
 5. 第一阶段只做一条直线飞行 + 超时 + 命中候选链路。
 ```

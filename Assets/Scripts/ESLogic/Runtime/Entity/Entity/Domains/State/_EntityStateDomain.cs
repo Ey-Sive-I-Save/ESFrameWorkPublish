@@ -39,33 +39,33 @@ namespace ES
             }
         }
 
-        [TitleGroup("状态表现域/状态数据", "状态数据", Alignment = TitleAlignments.Left)]
+        [TitleGroup("状态数据", Alignment = TitleAlignments.Left)]
         [LabelText("动画状态数据包")]
         public StateAniDataPack stateAniDataPack;
 
-        [TitleGroup("状态表现域/状态数据")]
+        [TitleGroup("状态数据")]
         [LabelText("枪械状态数据包")]
         public GunStateAniDataPack gunStateAniDataPack;
 
-        [TitleGroup("状态表现域/状态数据")]
+        [TitleGroup("状态数据")]
         [LabelText("附加状态数据包")]
         public List<StateAniDataPack> additionalStateAniDataPacks = new List<StateAniDataPack>();
 
-        [TitleGroup("状态表现域/状态机", "状态机", Alignment = TitleAlignments.Left)]
+        [TitleGroup("状态机", Alignment = TitleAlignments.Left)]
         [LabelText("状态机")]
         [InlineProperty]
         public StateMachine stateMachine = new StateMachine();
 
-        [TitleGroup("状态表现域/启动配置", "启动配置", Alignment = TitleAlignments.Left)]
+        [TitleGroup("启动配置", Alignment = TitleAlignments.Left)]
         [LabelText("默认状态Key（可选）")]
         public string defaultStateKey = "";
 
-        [TitleGroup("状态表现域/启动配置")]
+        [TitleGroup("启动配置")]
         [LabelText("启动后激活状态名（可选）")]
         [Tooltip("状态机启动后自动激活的状态名。留空表示不自动激活。")]
         public string initialStateName = "";
 
-        [TitleGroup("状态表现域/技能运行时测试", "技能运行时测试", Alignment = TitleAlignments.Left)]
+        [TitleGroup("技能运行时测试", Alignment = TitleAlignments.Left)]
         [Button("确保技能轨道运行时测试模块存在"), PropertyOrder(-10)]
         public void EnsureSkillRuntimeTestModuleExists()
         {

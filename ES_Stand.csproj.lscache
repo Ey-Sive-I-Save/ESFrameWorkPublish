@@ -1,4 +1,4 @@
-version=1
+﻿version=1
 
 # This file caches language service data to improve the performance of C# Dev Kit.
 # It is not intended for manual editing. It can safely be deleted and will be
@@ -181,9 +181,9 @@ Assets/Plugins/ES/0_Stand/
  _Res/ResUse/
   ESResKey.cs
   ESResLoader.cs
-  ESResRefer.cs
-  ESResReferSubAsset.cs
-  ESResRefer_Example.cs
+  ESAssetRefer.cs
+  ESAssetReferSubAsset.cs
+  ESAssetRefer_Example.cs
   ESResSource.cs
   ESResSourceFactory.cs
   ESResTable.cs

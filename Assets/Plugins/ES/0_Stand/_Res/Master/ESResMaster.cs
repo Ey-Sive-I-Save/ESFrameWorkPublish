@@ -19,7 +19,7 @@ namespace ES
     {
         #region 全局资源加载器
         /// <summary>
-        /// 全局默认资源加载器 - 用于 ESResRefer 等辅助工具
+        /// 全局默认资源加载器 - 用于 ESAssetRefer 等辅助工具
         /// </summary>
         private static ESResLoader _globalResLoader;
         public static ESResLoader GlobalResLoader

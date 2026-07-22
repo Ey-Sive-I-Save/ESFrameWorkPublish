@@ -6,8 +6,7 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-namespace ES
-{
+namespace ES.Samples.Editor{
 #if UNITY_EDITOR
     public class ESExample_RecordListSolverWindow : EditorWindow
     {

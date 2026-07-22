@@ -12,6 +12,29 @@ namespace ES
         public static ESRuntimeModeService RuntimeMode { get; private set; } = new ESRuntimeModeService();
         public static ESCommandModule CommandModule { get; private set; }
         public static ESInputModule InputModule { get; private set; }
+        public static ESRuntimeDataModule RuntimeData { get; private set; }
+        public static ESGameObjectPoolModule PoolModule { get; private set; }
+        public static ESPhysicsQueryModule PhysicsQueryModule { get; private set; }
+        public static ESLODModule LODModule { get; private set; }
+        public static ESAssetTable AssetTable { get; private set; } = ESAssetRegistry.Table;
+        public static ESConfigKeyTable<ESBuffRuntimeData> BuffData => ESRuntimeDataModule.BuffTable;
+        public static ESConfigKeyTable<ESShotRuntimeData> ShotData => ESRuntimeDataModule.ShotTable;
+        public static ESConfigKeyTable<ESMonsterRuntimeData> MonsterData => ESRuntimeDataModule.MonsterTable;
+        public static ESConfigKeyTable<ESNpcRuntimeData> NpcData => ESRuntimeDataModule.NpcTable;
+        public static ESConfigKeyTable<ESWeaponRuntimeData> WeaponData => ESRuntimeDataModule.WeaponTable;
+        public static ESConfigKeyTable<ESSkillRuntimeData> SkillData => ESRuntimeDataModule.SkillTable;
+        public static ESConfigKeyTable<ESBuffRuntimeData> RuntimeBuffData => ESRuntimeDataGameCore.Buffs;
+        public static ESConfigKeyTable<ESShotRuntimeData> RuntimeShotData => ESRuntimeDataGameCore.Shots;
+        public static ESConfigKeyTable<ESMonsterRuntimeData> RuntimeMonsterData => ESRuntimeDataGameCore.Monsters;
+        public static ESConfigKeyTable<ESNpcRuntimeData> RuntimeNpcData => ESRuntimeDataGameCore.Npcs;
+        public static ESConfigKeyTable<ESWeaponRuntimeData> RuntimeWeaponData => ESRuntimeDataGameCore.Weapons;
+        public static ESConfigKeyTable<ESSkillRuntimeData> RuntimeSkillData => ESRuntimeDataGameCore.Skills;
+        public static ESConfigKeyTable<ESAssetReferPrefabConfigData> RuntimePrefabAssets => ESRuntimeDataAsset.Prefabs;
+        public static ESConfigKeyTable<ESAssetReferSpriteConfigData> RuntimeSpriteAssets => ESRuntimeDataAsset.Sprites;
+        public static ESConfigKeyTable<ESAssetReferAudioClipConfigData> RuntimeAudioClipAssets => ESRuntimeDataAsset.AudioClips;
+        public static ESConfigKeyTable<ESAssetReferAnimationClipConfigData> RuntimeAnimationClipAssets => ESRuntimeDataAsset.AnimationClips;
+        public static ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffRuntimeInstances => ESRuntimeDataModule.BuffInstanceIndex;
+        public static ESRuntimeInstanceIndex<Item> ShotRuntimeInstances => ESRuntimeDataModule.ShotInstanceIndex;
 
         public static bool IsReady
         {
@@ -58,8 +81,29 @@ namespace ES
             else
                 InputModule = null;
 
+            if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESRuntimeDataModule), out IModule runtimeDataModule))
+                RuntimeData = runtimeDataModule as ESRuntimeDataModule;
+            else
+                RuntimeData = null;
+
+            if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESGameObjectPoolModule), out IModule poolModule))
+                PoolModule = poolModule as ESGameObjectPoolModule;
+            else
+                PoolModule = null;
+
+            if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESPhysicsQueryModule), out IModule physicsQueryModule))
+                PhysicsQueryModule = physicsQueryModule as ESPhysicsQueryModule;
+            else
+                PhysicsQueryModule = null;
+
+            if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESLODModule), out IModule lodModule))
+                LODModule = lodModule as ESLODModule;
+            else
+                LODModule = null;
+
             ESCommandServices.SetRuntimeMode(RuntimeMode);
-            ESCommandServices.SetInputRuntime(InputModule != null ? InputModule.RuntimeInstance : null);
+            ESCommandServices.SetInputModule(InputModule);
+            AssetTable = ESAssetRegistry.Table;
         }
 
         private void EnsureDefaultDomains()
@@ -82,6 +126,11 @@ namespace ES
             RuntimeMode = null;
             CommandModule = null;
             InputModule = null;
+            AssetTable = ESAssetRegistry.Table;
+            RuntimeData = null;
+            PoolModule = null;
+            PhysicsQueryModule = null;
+            LODModule = null;
             ESCommandServices.Clear();
         }
     }

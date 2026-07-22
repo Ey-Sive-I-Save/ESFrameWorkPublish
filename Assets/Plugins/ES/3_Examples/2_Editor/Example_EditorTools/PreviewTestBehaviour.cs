@@ -1,54 +1,53 @@
-using UnityEngine;
+﻿using UnityEngine;
 using ES;
 
-namespace ES.EditorTools
-{
+namespace ES.Samples.Editor{
     /// <summary>
-    /// 测试预览面板的 Mono 案例脚本。
-    /// 挂载到场景物体后，无需任何额外配置，即可在 Inspector 底部看到预览效果。
-    /// 此脚本可安全放置在普通（非 Editor）文件夹下运行。
+    /// 娴嬭瘯棰勮闈㈡澘鐨?Mono 妗堜緥鑴氭湰銆?
+    /// 鎸傝浇鍒板満鏅墿浣撳悗锛屾棤闇€浠讳綍棰濆閰嶇疆锛屽嵆鍙湪 Inspector 搴曢儴鐪嬪埌棰勮鏁堟灉銆?
+    /// 姝よ剼鏈彲瀹夊叏鏀剧疆鍦ㄦ櫘閫氾紙闈?Editor锛夋枃浠跺す涓嬭繍琛屻€?
     /// </summary>
     public class PreviewTestBehaviour : MonoBehaviour, IPreviewElement
     {
-        // ----- 实现 IPreviewElement 接口 -----
+        // ----- 瀹炵幇 IPreviewElement 鎺ュ彛 -----
 
-        /// <summary> 是否允许预览 </summary>
+        /// <summary> 鏄惁鍏佽棰勮 </summary>
         public bool CanPreview => true;
 
-        /// <summary> 是否独占预览区域（设为 false，使其进入常规折叠区） </summary>
+        /// <summary> 鏄惁鐙崰棰勮鍖哄煙锛堣涓?false锛屼娇鍏惰繘鍏ュ父瑙勬姌鍙犲尯锛?</summary>
         public bool IsSingleArea => false;
 
         /// <summary>
-        /// 游戏运行时的预览 GUI 绘制
+        /// 娓告垙杩愯鏃剁殑棰勮 GUI 缁樺埗
         /// </summary>
         public void DrawPreviewGUIPlaying()
         {
-            // 使用 #if 包裹仅存在于 Unity Editor 中的类型（如 EditorStyles）
+            // 浣跨敤 #if 鍖呰９浠呭瓨鍦ㄤ簬 Unity Editor 涓殑绫诲瀷锛堝 EditorStyles锛?
 #if UNITY_EDITOR
-            GUILayout.Label($"<b>[ 运行时测试 ]</b>", UnityEditor.EditorStyles.boldLabel);
+            GUILayout.Label($"<b>[ 杩愯鏃舵祴璇?]</b>", UnityEditor.EditorStyles.boldLabel);
 #else
-            GUILayout.Label("[ 运行时测试 ]");
+            GUILayout.Label("[ 杩愯鏃舵祴璇?]");
 #endif
             
-            GUILayout.Label($"当前运行时间: {Time.time:F2} 秒");
+            GUILayout.Label($"褰撳墠杩愯鏃堕棿: {Time.time:F2} 绉?);
 
-            if (GUILayout.Button("点我触发测试日志"))
+            if (GUILayout.Button("鐐规垜瑙﹀彂娴嬭瘯鏃ュ織"))
             {
-                Debug.Log("✅ 预览面板的运行时按钮被点击了！");
+                Debug.Log("鉁?棰勮闈㈡澘鐨勮繍琛屾椂鎸夐挳琚偣鍑讳簡锛?);
             }
         }
 
         /// <summary>
-        /// 编辑器非运行时的预览 GUI 绘制
+        /// 缂栬緫鍣ㄩ潪杩愯鏃剁殑棰勮 GUI 缁樺埗
         /// </summary>
         public void EditorPreviewDrawPreviewGUINonPlay()
         {
 #if UNITY_EDITOR
-            GUILayout.Label($"<b>[ 编辑器测试 ]</b>", UnityEditor.EditorStyles.boldLabel);
+            GUILayout.Label($"<b>[ 缂栬緫鍣ㄦ祴璇?]</b>", UnityEditor.EditorStyles.boldLabel);
 #else
-            GUILayout.Label("[ 编辑器测试 ]");
+            GUILayout.Label("[ 缂栬緫鍣ㄦ祴璇?]");
 #endif
-            GUILayout.Label("此时游戏未运行，你可以在这里展示配置信息或静态数据。");
+            GUILayout.Label("姝ゆ椂娓告垙鏈繍琛岋紝浣犲彲浠ュ湪杩欓噷灞曠ず閰嶇疆淇℃伅鎴栭潤鎬佹暟鎹€?);
         }
     }
 }

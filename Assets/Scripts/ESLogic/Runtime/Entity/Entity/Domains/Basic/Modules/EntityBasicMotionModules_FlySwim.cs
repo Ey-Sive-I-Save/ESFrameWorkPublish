@@ -5,7 +5,7 @@ using UnityEngine;
 namespace ES
 {
     [Serializable, TypeRegistryItem("基础飞行模块")]
-    public class EntityBasicFlyModule : EntityBasicModuleBase, IEntitySupportMotion
+    public class EntityBasicFlyModule : EntityBasicModuleBase, IEntityKCCBeforeMotion, IEntityKCCRotationMotion, IEntityKCCVelocityMotion
     {
         [Title("开关")]
         public bool enableFly = true;
@@ -121,6 +121,7 @@ namespace ES
             if (MyCore != null)
             {
                 MyCore.kcc.flyModule = this;
+                MyCore.kcc.RebuildMotionSchedulers();
             }
         }
 
@@ -157,9 +158,11 @@ namespace ES
             if (MyCore == null) return;
         }
 
-        public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, float deltaTime)
+        public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, Vector3 initialPosition, float deltaTime)
         {
-            if (!enableFly || !flyHold || kcc == null || kcc.motor == null) return false;
+            if (!enableFly || !flyHold || kcc.CurrentSupportFlags != StateSupportFlags.Flying) return false;
+            if (kcc.workWorld < 20) return false;
+            kcc.workWorld -= 20;
             if (flyUngroundTime > 0f)
             {
                 kcc.motor.ForceUnground(flyUngroundTime);
@@ -167,14 +170,17 @@ namespace ES
             return true;
         }
 
-        public bool UpdateRotation(Entity owner, EntityKCCData kcc, ref Quaternion currentRotation, float deltaTime)
+        public bool UpdateRotation(Entity owner, EntityKCCData kcc, Quaternion initialRotation, ref Quaternion currentRotation, float deltaTime)
         {
             return false;
         }
 
-        public bool UpdateVelocity(Entity owner, EntityKCCData kcc, ref Vector3 currentVelocity, float deltaTime)
+        public bool UpdateVelocity(Entity owner, EntityKCCData kcc, Vector3 initialVelocity, ref Vector3 currentVelocity, float deltaTime)
         {
-            if (!enableFly || kcc == null || kcc.motor == null) return false;
+            if (!enableFly || !flyHold || kcc.CurrentSupportFlags != StateSupportFlags.Flying) return false;
+            if (kcc.workSelf < 100) return false;
+            kcc.workSelf -= 100;
+            kcc.workWorld -= kcc.workWorld < 40 ? kcc.workWorld : 40;
 
             Vector3 up = kcc.motor.CharacterUp;
             float vertical = kcc.verticalInput;
@@ -222,7 +228,7 @@ namespace ES
     }
 
     [Serializable, TypeRegistryItem("基础游泳模块")]
-    public class EntityBasicSwimModule : EntityBasicModuleBase, IEntitySupportMotion
+    public class EntityBasicSwimModule : EntityBasicModuleBase, IEntityKCCBeforeMotion, IEntityKCCRotationMotion, IEntityKCCVelocityMotion
     {
         [Title("开关")]
         public bool enableSwim = true;
@@ -253,6 +259,7 @@ namespace ES
             if (MyCore != null)
             {
                 MyCore.kcc.swimModule = this;
+                MyCore.kcc.RebuildMotionSchedulers();
             }
         }
 
@@ -284,19 +291,22 @@ namespace ES
             if (MyCore == null) return;
         }
 
-        public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, float deltaTime)
+        public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, Vector3 initialPosition, float deltaTime)
         {
             return false;
         }
 
-        public bool UpdateRotation(Entity owner, EntityKCCData kcc, ref Quaternion currentRotation, float deltaTime)
+        public bool UpdateRotation(Entity owner, EntityKCCData kcc, Quaternion initialRotation, ref Quaternion currentRotation, float deltaTime)
         {
             return false;
         }
 
-        public bool UpdateVelocity(Entity owner, EntityKCCData kcc, ref Vector3 currentVelocity, float deltaTime)
+        public bool UpdateVelocity(Entity owner, EntityKCCData kcc, Vector3 initialVelocity, ref Vector3 currentVelocity, float deltaTime)
         {
-            if (!enableSwim || kcc == null || kcc.motor == null) return false;
+            if (!enableSwim || kcc.CurrentSupportFlags != StateSupportFlags.Swimming) return false;
+            if (kcc.workSelf < 100) return false;
+            kcc.workSelf -= 100;
+            kcc.workWorld -= kcc.workWorld < 60 ? kcc.workWorld : 60;
 
             Vector3 up = kcc.motor.CharacterUp;
             Vector3 input = kcc.moveInput + up * kcc.verticalInput;

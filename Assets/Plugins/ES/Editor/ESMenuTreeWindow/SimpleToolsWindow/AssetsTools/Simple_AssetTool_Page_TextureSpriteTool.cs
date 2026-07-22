@@ -19,6 +19,7 @@ namespace ES
     {
         [Title("纹理精灵生成工具", "批量处理纹理并生成Sprite", bold: true, titleAlignment: TitleAlignments.Centered)]
 
+        [HideInInspector]
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选中纹理或 Sprite，设置导入参数后批量处理。\n生成文件会自动避开重名，失败项会统一汇总。";
 
@@ -36,54 +37,282 @@ namespace ES
             }
         }
 
-        [LabelText("操作纹理文件夹"), FolderPath, Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("操作纹理文件夹"), FolderPath, Space(5)]
         public string textureFolder;
 
-        [LabelText("输出文件夹"), FolderPath, Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("输出文件夹"), FolderPath, Space(5)]
         public string outputFolder;
 
-        [LabelText("Sprite模式"), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("Sprite模式"), Space(5)]
         public SpriteImportMode spriteMode = SpriteImportMode.Single;
 
-        [LabelText("像素每单位"), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("像素每单位"), Space(5)]
         public float pixelsPerUnit = 100f;
 
-        [LabelText("过滤模式"), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("过滤模式"), Space(5)]
         public FilterMode filterMode = FilterMode.Point;
 
-        [LabelText("压缩质量 (0: 最低质量, 100: 最高质量)"), Range(0, 100), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("压缩质量 (0: 最低质量, 100: 最高质量)"), Range(0, 100), Space(5)]
         public int compressionQuality = 50;
 
-        [LabelText("最大纹理尺寸"), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("最大纹理尺寸"), Space(5)]
         public int maxTextureSize = 2048;
 
-        [LabelText("生成可读写纹理"), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("生成可读写纹理"), Space(5)]
         public bool isReadable = false;
 
-        [LabelText("生成MipMaps"), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("生成MipMaps"), Space(5)]
         public bool generateMipMaps = false;
 
-        [LabelText("生成的可读写纹理"), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("生成的可读写纹理"), Space(5)]
         public bool generatedReadable = false;
 
-        [LabelText("输出格式"), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("输出格式"), Space(5)]
         public TextureFormat outputFormat = TextureFormat.PNG;
 
-        [LabelText("JPG质量"), Range(0, 100), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("JPG质量"), Range(0, 100), Space(5)]
         [ShowIf("@outputFormat == TextureFormat.JPG")]
         public int jpgQuality = 75;
 
-        [LabelText("同名文件自动改名"), Space(5)]
+        [FoldoutGroup("参数设置"), LabelText("同名文件自动改名"), Space(5)]
         [InfoBox("开启后不会覆盖已有文件，会自动生成 _1、_2 这类安全文件名。关闭时遇到同名文件会跳过。", InfoMessageType.Info)]
         public bool autoRenameOnConflict = true;
 
         private string lastResultSummary = "";
         private string lastResultDetail = "";
+        private string texturePreviewSearch = "";
+        private int texturePreviewPageIndex;
+        private const int TexturePreviewPageSize = 12;
+        private readonly List<string> cachedTextureFolderPaths = new List<string>();
+        private string cachedTextureFolderSignature = "";
 
-        [OnInspectorGUI]
+        [OnInspectorGUI, PropertyOrder(-200)]
         private void DrawResultPanel()
         {
+            var previewRows = BuildTexturePreviewRows();
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "纹理与 Sprite 批处理",
+                "用于批量修改 TextureImporter 为 Sprite 设置，或从 Sprite 裁切生成独立纹理文件。",
+                SimpleToolsMaturity.Upgrading,
+                "修改导入设置会影响项目资产并触发重新导入；从 Sprite 生成纹理会写入新文件。执行前请确认输出目录和同名处理策略。");
+            SimpleToolsPanelUtility.DrawLargeListGuard(previewRows.Count, "纹理/Sprite");
+            DrawTexturePreviewPanel(previewRows);
+            DrawTextureActionPanel(previewRows);
             SimpleToolsPanelUtility.DrawResultSummary("最近贴图处理结果", lastResultSummary, lastResultDetail);
+        }
+
+        private void DrawTextureActionPanel(List<TexturePreviewRow> rows)
+        {
+            int textureCount = rows?.Count(row => row != null && row.Kind == "Texture" && SimpleToolsSafetyUtility.IsAssetPath(row.Path)) ?? 0;
+            int spriteCount = rows?.Count(row => row != null && row.Kind == "Sprite") ?? 0;
+
+            SimpleToolsPanelUtility.DrawSectionTitle("执行操作", "导入设置只处理 Texture；Sprite 裁切只处理当前 Project 选中的 Sprite。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField($"可处理纹理: {textureCount} | 可生成 Sprite: {spriteCount} | 输出目录: {SimpleToolsSafetyUtility.NormalizeAssetPath(outputFolder)}", EditorStyles.wordWrappedMiniLabel);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUI.enabled = textureCount > 0;
+                    if (SimpleToolsPanelUtility.DrawActionButton("应用导入设置", SimpleToolsActionTone.Primary, 34, GUILayout.MinWidth(140)))
+                        ProcessSelectedTextures();
+
+                    GUI.enabled = spriteCount > 0;
+                    if (SimpleToolsPanelUtility.DrawActionButton("从 Sprite 生成纹理", SimpleToolsActionTone.Warning, 34, GUILayout.MinWidth(150)))
+                        GenerateTexturesFromSprites();
+
+                    GUI.enabled = true;
+                    if (SimpleToolsPanelUtility.DrawActionButton("重置参数", SimpleToolsActionTone.Neutral, 34, GUILayout.Width(90)))
+                        ResetToDefaults();
+                    GUILayout.FlexibleSpace();
+                }
+            }
+        }
+
+        private void DrawTexturePreviewPanel(List<TexturePreviewRow> rows)
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("选中/文件夹资源预览", "按资源名、路径、类型和来源搜索；Project 选区与纹理文件夹会合并去重。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                string normalizedOutput = SimpleToolsSafetyUtility.NormalizeAssetPath(outputFolder);
+                EditorGUILayout.LabelField($"输出目录: {(SimpleToolsSafetyUtility.IsAssetPath(normalizedOutput) ? normalizedOutput : "不可用，必须在 Assets 下")}", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField($"导入设置: SpriteMode={spriteMode} | PPU={pixelsPerUnit:0.##} | Filter={filterMode} | MaxSize={maxTextureSize} | MipMaps={(generateMipMaps ? "开" : "关")}", EditorStyles.wordWrappedMiniLabel);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("搜索", EditorStyles.miniBoldLabel, GUILayout.Width(36));
+                    texturePreviewSearch = EditorGUILayout.TextField(texturePreviewSearch);
+                    if (GUILayout.Button("刷新文件夹", EditorStyles.miniButton, GUILayout.Width(76)))
+                    {
+                        RefreshTextureFolderCache(true);
+                        texturePreviewPageIndex = 0;
+                    }
+                    if (GUILayout.Button("清空", EditorStyles.miniButton, GUILayout.Width(48)))
+                    {
+                        texturePreviewSearch = string.Empty;
+                        texturePreviewPageIndex = 0;
+                    }
+                }
+
+                rows = FilterTexturePreviewRows(rows);
+                if (rows.Count == 0)
+                {
+                    SimpleToolsPanelUtility.DrawEmptyState("当前 Project 选区没有 Texture2D 或 Sprite，或搜索条件没有命中。");
+                    return;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("资源路径", EditorStyles.miniBoldLabel, GUILayout.MinWidth(200));
+                    EditorGUILayout.LabelField("类型", EditorStyles.miniBoldLabel, GUILayout.Width(58));
+                    EditorGUILayout.LabelField("尺寸", EditorStyles.miniBoldLabel, GUILayout.Width(72));
+                    EditorGUILayout.LabelField("状态", EditorStyles.miniBoldLabel, GUILayout.Width(120));
+                    EditorGUILayout.LabelField("来源", EditorStyles.miniBoldLabel, GUILayout.Width(58));
+                    GUILayout.Space(48);
+                }
+
+                foreach (var row in SimpleToolsPanelUtility.PageItems(rows, ref texturePreviewPageIndex, TexturePreviewPageSize, out _))
+                    DrawTexturePreviewRow(row);
+
+                SimpleToolsPanelUtility.DrawPager(ref texturePreviewPageIndex, rows.Count, TexturePreviewPageSize);
+            }
+        }
+
+        private List<TexturePreviewRow> BuildTexturePreviewRows()
+        {
+            var rows = new List<TexturePreviewRow>();
+            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var obj in Selection.objects ?? Array.Empty<UnityEngine.Object>())
+            {
+                if (obj is Texture2D texture)
+                {
+                    string path = SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GetAssetPath(texture));
+                    if (!seenPaths.Add(path))
+                        continue;
+                    rows.Add(new TexturePreviewRow
+                    {
+                        Asset = texture,
+                        Path = path,
+                        Kind = "Texture",
+                        Size = $"{texture.width}x{texture.height}",
+                        State = SimpleToolsSafetyUtility.IsAssetPath(path) ? "可改导入设置" : "非Assets资源",
+                        Source = "选中"
+                    });
+                }
+                else if (obj is Sprite sprite)
+                {
+                    string path = SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GetAssetPath(sprite));
+                    if (!seenPaths.Add(path + "#" + sprite.name))
+                        continue;
+                    rows.Add(new TexturePreviewRow
+                    {
+                        Asset = sprite,
+                        Path = path,
+                        Kind = "Sprite",
+                        Size = $"{Mathf.RoundToInt(sprite.rect.width)}x{Mathf.RoundToInt(sprite.rect.height)}",
+                        State = sprite.texture != null && sprite.texture.isReadable ? "可生成" : "源纹理不可读",
+                        Source = "选中"
+                    });
+                }
+            }
+
+            foreach (var path in RefreshTextureFolderCache(false))
+            {
+                if (!seenPaths.Add(path))
+                    continue;
+
+                var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (texture == null)
+                    continue;
+
+                rows.Add(new TexturePreviewRow
+                {
+                    Asset = texture,
+                    Path = path,
+                    Kind = "Texture",
+                    Size = $"{texture.width}x{texture.height}",
+                    State = "可改导入设置",
+                    Source = "文件夹"
+                });
+            }
+
+            return rows;
+        }
+
+        private List<TexturePreviewRow> FilterTexturePreviewRows(List<TexturePreviewRow> rows)
+        {
+            if (rows == null)
+                return new List<TexturePreviewRow>();
+
+            if (string.IsNullOrWhiteSpace(texturePreviewSearch))
+                return rows;
+
+            string keyword = texturePreviewSearch.Trim();
+            return rows.Where(row =>
+                ContainsIgnoreCase(row.Path, keyword) ||
+                ContainsIgnoreCase(row.Kind, keyword) ||
+                ContainsIgnoreCase(row.State, keyword) ||
+                ContainsIgnoreCase(row.Source, keyword)).ToList();
+        }
+
+        private static bool ContainsIgnoreCase(string source, string keyword)
+        {
+            return !string.IsNullOrEmpty(source) &&
+                   !string.IsNullOrEmpty(keyword) &&
+                   source.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static void DrawTexturePreviewRow(TexturePreviewRow row)
+        {
+            if (row == null)
+                return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(row.Path, EditorStyles.miniLabel, GUILayout.MinWidth(200));
+                EditorGUILayout.LabelField(row.Kind, EditorStyles.miniLabel, GUILayout.Width(58));
+                EditorGUILayout.LabelField(row.Size, EditorStyles.miniLabel, GUILayout.Width(72));
+                EditorGUILayout.LabelField(row.State, EditorStyles.miniLabel, GUILayout.Width(120));
+                EditorGUILayout.LabelField(row.Source, EditorStyles.miniLabel, GUILayout.Width(58));
+                if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(44)))
+                {
+                    Selection.activeObject = row.Asset;
+                    EditorGUIUtility.PingObject(row.Asset);
+                }
+            }
+        }
+
+        private class TexturePreviewRow
+        {
+            public UnityEngine.Object Asset;
+            public string Path;
+            public string Kind;
+            public string Size;
+            public string State;
+            public string Source;
+        }
+
+        private List<string> RefreshTextureFolderCache(bool forceRefresh)
+        {
+            string normalizedFolder = SimpleToolsSafetyUtility.NormalizeAssetPath(textureFolder);
+            string signature = AssetDatabase.IsValidFolder(normalizedFolder) ? normalizedFolder : string.Empty;
+            if (!forceRefresh && signature == cachedTextureFolderSignature)
+                return new List<string>(cachedTextureFolderPaths);
+
+            cachedTextureFolderPaths.Clear();
+            cachedTextureFolderSignature = signature;
+            if (string.IsNullOrEmpty(signature))
+                return new List<string>();
+
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { signature }))
+            {
+                string path = SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GUIDToAssetPath(guid));
+                if (SimpleToolsSafetyUtility.IsAssetPath(path))
+                    cachedTextureFolderPaths.Add(path);
+            }
+
+            cachedTextureFolderPaths.Sort(StringComparer.OrdinalIgnoreCase);
+            return new List<string>(cachedTextureFolderPaths);
         }
 
         public override ESWindowPageBase ES_Refresh()
@@ -96,36 +325,42 @@ namespace ES
         }
 
 
-        [Button("处理选中纹理", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void ProcessSelectedTextures()
         {
-            var selectedTextures = Selection.objects.OfType<Texture2D>().ToArray();
-            if (selectedTextures.Length == 0)
-            {
-                EditorUtility.DisplayDialog("需要选择纹理", "先在 Project 窗口选中一个或多个 Texture2D。", "知道了");
-                return;
-            }
-
-            var texturePaths = selectedTextures
-                .Select(t => SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GetAssetPath(t)))
-                .Where(SimpleToolsSafetyUtility.IsAssetPath)
-                .ToArray();
+            var texturePaths = CollectTextureImporterPaths().ToArray();
             if (texturePaths.Length == 0)
             {
-                EditorUtility.DisplayDialog("没有可处理的项目纹理", "选中的 Texture2D 不在 Assets 目录下，不能修改导入设置。", "知道了");
+                EditorUtility.DisplayDialog("没有可处理的纹理", "请先在 Project 窗口选中 Texture2D，或设置一个 Assets 下的纹理文件夹。", "知道了");
                 return;
             }
 
             string preview = SimpleToolsSafetyUtility.JoinPreview(texturePaths.Select(Path.GetFileName), 10);
-            if (!EditorUtility.DisplayDialog("确认处理选中纹理",
-                $"将修改 {texturePaths.Length} 个纹理的 TextureImporter 设置，并重新导入资源。\n\n{preview}\n\n这会改变项目资产导入设置，建议确认已提交或备份。继续吗？",
-                "开始处理", "取消"))
+            if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                "确认处理选中纹理",
+                texturePaths.Length,
+                $"修改 {texturePaths.Length} 个纹理的 TextureImporter 设置，并重新导入资源。\n\n{preview}",
+                "会改变项目资产导入设置，影响所有引用这些纹理的地方。建议先确认版本控制或备份。"))
                 return;
 
             ProcessTextures(texturePaths);
         }
 
-        [Button("从选中 Sprite 生成纹理", ButtonHeight = 34), GUIColor(0.75f, 0.58f, 0.25f)]
+        private List<string> CollectTextureImporterPaths()
+        {
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var texture in Selection.objects.OfType<Texture2D>())
+            {
+                string path = SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GetAssetPath(texture));
+                if (SimpleToolsSafetyUtility.IsAssetPath(path))
+                    paths.Add(path);
+            }
+
+            foreach (var path in RefreshTextureFolderCache(false))
+                paths.Add(path);
+
+            return paths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
         public void GenerateTexturesFromSprites()
         {
             var selectedSprites = Selection.objects.OfType<Sprite>().ToArray();
@@ -143,9 +378,11 @@ namespace ES
             }
 
             string preview = SimpleToolsSafetyUtility.JoinPreview(selectedSprites.Select(sprite => sprite.name), 10);
-            if (!EditorUtility.DisplayDialog("确认从Sprite生成纹理",
-                $"将从 {selectedSprites.Length} 个 Sprite 生成纹理文件。\n\n输出目录：{outputFolder}\n格式：{outputFormat}\n同名处理：{(autoRenameOnConflict ? "自动改名" : "跳过")}\n\n{preview}\n\n会写入新文件并导入为 Unity 资产。继续吗？",
-                "开始生成", "取消"))
+            if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                "确认从 Sprite 生成纹理",
+                selectedSprites.Length,
+                $"从 {selectedSprites.Length} 个 Sprite 生成纹理文件。\n\n输出目录：{outputFolder}\n格式：{outputFormat}\n同名处理：{(autoRenameOnConflict ? "自动改名" : "跳过")}\n\n{preview}",
+                "会在项目中写入新文件并导入为 Unity 资产。源纹理不可读的 Sprite 会被跳过。"))
                 return;
 
             int generatedCount = 0;
@@ -356,7 +593,6 @@ namespace ES
             return string.IsNullOrEmpty(fileName) ? "SpriteTexture" : fileName;
         }
 
-        [Button("重置为默认设置", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
         public void ResetToDefaults()
         {
             spriteMode = SpriteImportMode.Single;

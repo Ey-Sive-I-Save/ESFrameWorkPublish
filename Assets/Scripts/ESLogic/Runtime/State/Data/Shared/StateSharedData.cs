@@ -42,6 +42,67 @@ namespace ES
         [NonSerialized] private bool _isRuntimeInitialized;
         public bool IsRuntimeInitialized => _isRuntimeInitialized;
 
+        [PropertyOrder(-80)]
+        [BoxGroup("共享数据概览", ShowLabel = false)]
+        [ShowInInspector, ReadOnly, LabelText("状态身份")]
+        private string InspectorStateIdentity => BuildInspectorStateIdentity();
+
+        [PropertyOrder(-79)]
+        [BoxGroup("共享数据概览", ShowLabel = false)]
+        [ShowInInspector, ReadOnly, LabelText("动画链路")]
+        private string InspectorAnimationSummary => BuildInspectorAnimationSummary();
+
+        [PropertyOrder(-78)]
+        [BoxGroup("共享数据概览", ShowLabel = false)]
+        [ShowInInspector, ReadOnly, LabelText("运行特性")]
+        private string InspectorRuntimeSummary => BuildInspectorRuntimeSummary();
+
+        [PropertyOrder(-77)]
+        [BoxGroup("共享数据概览/风险提示", ShowLabel = true)]
+        [ShowInInspector, ReadOnly, MultiLineProperty(2), LabelText("配置检查")]
+        private string InspectorValidationSummary => BuildInspectorValidationSummary();
+
+        [PropertyOrder(-76)]
+        [BoxGroup("共享数据概览/操作", ShowLabel = true)]
+        [HorizontalGroup("共享数据概览/操作/按钮")]
+        [Button("规整共享数据", ButtonSizes.Medium)]
+        [GUIColor(0.75f, 0.95f, 1f)]
+        private void NormalizeSharedDataForInspector()
+        {
+            basicConfig ??= new StateBasicConfig();
+            animationConfig ??= new StateAnimationConfigData();
+            proceduralDriveConfig ??= new StateProceduralDriveData();
+            mergeData ??= new StateMergeData();
+            costData ??= new StateCostData();
+            tags ??= new List<string>();
+
+            if (!hasAnimation)
+            {
+                animationSource = StateAnimationSource.None;
+                enableFadeInOut = false;
+            }
+            else if (animationSource == StateAnimationSource.None)
+            {
+                animationSource = StateAnimationSource.StateConfig;
+            }
+
+            fadeInDuration = Mathf.Max(0f, fadeInDuration);
+            fadeOutDuration = Mathf.Max(0f, fadeOutDuration);
+            fadeSpeedMultiplier = Mathf.Max(0.1f, fadeSpeedMultiplier);
+        }
+
+        [PropertyOrder(-75)]
+        [BoxGroup("共享数据概览/操作", ShowLabel = true)]
+        [HorizontalGroup("共享数据概览/操作/按钮")]
+        [Button("设为纯逻辑状态", ButtonSizes.Medium)]
+        [GUIColor(0.9f, 0.9f, 0.9f)]
+        private void SetAsLogicOnlyState()
+        {
+            hasAnimation = false;
+            animationSource = StateAnimationSource.None;
+            enableFadeInOut = false;
+        }
+
         #region 基础
         // ========================================
         // 基础配置（必填）
@@ -60,6 +121,7 @@ namespace ES
         //  [HorizontalGroup("状态配置/动画资源/开关/切换")]
         [LabelText("启用动画"), ToggleLeft, GUIColor(0.6f, 1f, 0.8f)]
         [InfoBox("步骤4：需要动画时先勾选启用动画", InfoMessageType.Info)]
+        [OnValueChanged("NormalizeAnimationSourceSelection")]
         public bool hasAnimation = false;
 
         [TabGroup("状态配置", "动画资源", Order = 2, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾绿\")"), PropertyOrder(1)]
@@ -67,6 +129,7 @@ namespace ES
         [ShowIf("hasAnimation")]
         [LabelText("动画来源")]
         [Tooltip("None=纯逻辑；StateConfig=状态动画配置；SkillTimeline=技能编辑器轨道；External=外部系统表现")]
+        [OnValueChanged("NormalizeAnimationSourceSelection")]
         public StateAnimationSource animationSource = StateAnimationSource.StateConfig;
 
         public bool RequiresStateMachinePlayableAnimation =>
@@ -268,6 +331,81 @@ namespace ES
         public Color debugGizmoColor = Color.white;
 
         #endregion
+
+        private string BuildInspectorStateIdentity()
+        {
+            if (basicConfig == null)
+                return "基础配置缺失";
+
+            string name = string.IsNullOrWhiteSpace(basicConfig.stateName) ? "未命名状态" : basicConfig.stateName;
+            return $"{name} | ID={basicConfig.stateId} | 层={basicConfig.layerType}";
+        }
+
+        private string BuildInspectorAnimationSummary()
+        {
+            if (!hasAnimation || animationSource == StateAnimationSource.None)
+                return "纯逻辑状态：不创建状态机动画 Playable";
+
+            if (animationSource == StateAnimationSource.StateConfig)
+                return RequiresStateMachinePlayableAnimation ? "状态配置动画：由 StateAnimationConfigData 构建 Playable" : "状态配置动画：当前不会进入 Playable";
+
+            if (animationSource == StateAnimationSource.SkillTimeline)
+                return "技能时间线：由技能轨道注入动画，可参与状态机混合";
+
+            if (animationSource == StateAnimationSource.External)
+                return "外部系统表现：状态机只管理逻辑，不创建动画节点";
+
+            return animationSource.ToString();
+        }
+
+        private string BuildInspectorRuntimeSummary()
+        {
+            string temp = canBeTemporary ? "临时状态" : "常规状态";
+            string remove = autoRemoveWhenDone ? "完成后自动移除" : "完成后保留";
+            string replace = canReplaceAtRuntime ? "允许运行时替换" : "不允许运行时替换";
+            string ik = proceduralDriveConfig != null && proceduralDriveConfig.enableIK ? "IK启用" : "IK关闭";
+            string matchTarget = proceduralDriveConfig != null && proceduralDriveConfig.enableMatchTarget ? "MatchTarget启用" : "MatchTarget关闭";
+            return $"{temp} | {remove} | {replace} | {ik} | {matchTarget}";
+        }
+
+        private string BuildInspectorValidationSummary()
+        {
+            if (basicConfig == null)
+                return "严重：缺少基础配置，无法可靠注册状态。";
+
+            if (string.IsNullOrWhiteSpace(basicConfig.stateName))
+                return "警告：状态名为空，建议填写稳定的状态名。";
+
+            if (!hasAnimation && animationSource != StateAnimationSource.None)
+                return "警告：未启用动画，但动画来源不是“无动画”。可点击“规整共享数据”。";
+
+            if (hasAnimation && animationSource == StateAnimationSource.None)
+                return "警告：已启用动画，但动画来源是“无动画”。可点击“规整共享数据”。";
+
+            if (RequiresStateMachinePlayableAnimation && animationConfig == null)
+                return "严重：该动画来源需要状态机创建 Playable，但 animationConfig 为空。";
+
+            if (!RequiresStateMachinePlayableAnimation && enableFadeInOut)
+                return "提示：当前不会创建状态机动画 Playable，淡入淡出配置不会生效。";
+
+            if (fadeInDuration < 0f || fadeOutDuration < 0f || fadeSpeedMultiplier <= 0f)
+                return "警告：淡入淡出参数存在非法值。可点击“规整共享数据”。";
+
+            return "通过：共享数据关键配置一致。";
+        }
+
+        private void NormalizeAnimationSourceSelection()
+        {
+            if (!hasAnimation)
+            {
+                animationSource = StateAnimationSource.None;
+                enableFadeInOut = false;
+                return;
+            }
+
+            if (animationSource == StateAnimationSource.None)
+                animationSource = StateAnimationSource.StateConfig;
+        }
 
         /// <summary>
         /// 初始化运行数据

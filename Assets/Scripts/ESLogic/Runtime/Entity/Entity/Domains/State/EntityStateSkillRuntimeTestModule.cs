@@ -9,10 +9,6 @@ namespace ES
     public sealed class EntityStateSkillRuntimeTestModule : EntityStateModuleBase
     {
         [TitleGroup("技能轨道运行时测试", "只测试 SkillTrackProcessInfo.sequence 注册为临时状态，不经过完整 SkillDefinitionDataInfo。")]
-        [LabelText("启用按键测试")]
-        public bool enableKeyRelease = true;
-
-        [TitleGroup("技能轨道运行时测试")]
         [LabelText("测试技能轨道流程")]
         [ListDrawerSettings(DefaultExpandedState = true, ShowIndexLabels = true)]
         public List<SkillTrackProcessInfo> trackProcesses = new List<SkillTrackProcessInfo>();
@@ -29,25 +25,6 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("上次临时状态Key")]
         public string lastTemporaryKey;
 
-        protected override void Update()
-        {
-            base.Update();
-
-            if (!enableKeyRelease || trackProcesses == null)
-                return;
-
-            int count = trackProcesses.Count;
-            for (int i = 0; i < count; i++)
-            {
-                SkillTrackProcessInfo trackProcess = trackProcesses[i];
-                if (trackProcess == null || trackProcess.releaseKey == KeyCode.None)
-                    continue;
-
-                if (Input.GetKeyDown(trackProcess.releaseKey))
-                    PlayTrackProcess(i);
-            }
-        }
-
         [TitleGroup("调试操作")]
         [Button("播放第一个轨道流程", ButtonSizes.Medium)]
         [GUIColor(0.45f, 0.85f, 1f)]
@@ -63,7 +40,7 @@ namespace ES
         {
             if (string.IsNullOrEmpty(lastTemporaryKey))
             {
-                Debug.LogWarning("[SkillRuntimeTestModule] 没有上次临时状态Key。");
+                Debug.LogWarning("[SkillRuntimeTestModule] 没有上次临时状态 Key。");
                 return false;
             }
 

@@ -155,13 +155,23 @@ namespace ES
 
         [PropertyOrder(0)]
         [TitleGroup("DriverLayout/诊断/状态概览")]
-        [ShowInInspector, ReadOnly, LabelText("FinalIK求解顺序")]
-        public string FinalIKScheduleSummary => BuildFinalIKScheduleSummary();
+        [ShowInInspector, ReadOnly, LabelText("IK 求解顺序")]
+        public string FinalIKScheduleSummary => _finalIKScheduleSummaryCache;
 
-        [ShowInInspector, ReadOnly, LabelText("Schedule Mode")]
+        [PropertyOrder(0)]
+        [TitleGroup("DriverLayout/诊断/状态概览")]
+        [ShowInInspector, ReadOnly, LabelText("商业顺序契约")]
+        public string FinalIKCommercialOrderSummary => _finalIKCommercialOrderSummaryCache;
+
+        [PropertyOrder(0)]
+        [TitleGroup("DriverLayout/诊断/状态概览")]
+        [ShowInInspector, ReadOnly, LabelText("调度阻断")]
+        public string FinalIKScheduleBlockSummary => _finalIKScheduleBlockSummaryCache;
+
+        [ShowInInspector, ReadOnly, LabelText("调度模式")]
         public FinalIKDriverScheduleMode FinalIKScheduleMode => _scheduleMode;
 
-        [ShowInInspector, ReadOnly, LabelText("Schedule Blocks")]
+        [ShowInInspector, ReadOnly, LabelText("调度阻断标记")]
         public FinalIKDriverBlockFlags FinalIKScheduleBlockFlags => _scheduleBlockFlags;
 
         [PropertyOrder(1)]
@@ -455,29 +465,106 @@ namespace ES
             bool grounder = (_finalIKScheduleFlags & IKScheduleFrameFlags.Grounder) != 0;
             bool fullBody = (_finalIKScheduleFlags & IKScheduleFrameFlags.FullBody) != 0;
 
-            if (aim && biped && lookAt && grounder && fullBody)
-                return "Driver硬调度：AimIK -> BipedIK(+Grounder委托) -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
+            string mode = _scheduleMode == FinalIKDriverScheduleMode.DriverCoreManualProceduralDelegates
+                ? "核心手动 + 程序委托"
+                : "仅核心手动";
+
+            if (!_runtimeBindingReady)
+                return $"{mode}：等待运行时绑定";
+
+            if (!aim && !biped && !lookAt && !grounder && !fullBody)
+                return $"{mode}：本帧无 IK 求解";
+
+            string grounderNode = grounder ? "BipedIK(+Grounder)" : "BipedIK";
+            string fullBodyNode = _scheduleMode == FinalIKDriverScheduleMode.DriverCoreManualProceduralDelegates
+                ? "FBBIK(+HitReaction/Recoil)"
+                : "FBBIK";
+
             if (aim && biped && lookAt && fullBody)
-                return "Driver硬调度：AimIK -> BipedIK -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
-            if (biped && lookAt && fullBody)
-                return "Driver硬调度：BipedIK -> LookAtIK -> FBBIK(+HitReaction/Recoil委托)";
-            if (biped && fullBody)
-                return "Driver硬调度：BipedIK -> FBBIK(+HitReaction/Recoil委托)";
-            if (fullBody)
-                return "Driver硬调度：FBBIK(+HitReaction/Recoil委托)";
+                return $"{mode}：AimIK -> {grounderNode} -> LookAtIK -> {fullBodyNode}";
             if (aim && biped && lookAt)
-                return "Driver硬调度：AimIK -> BipedIK -> LookAtIK";
-            if (biped && lookAt)
-                return "Driver硬调度：BipedIK -> LookAtIK";
+                return $"{mode}：AimIK -> {grounderNode} -> LookAtIK";
+            if (aim && biped && fullBody)
+                return $"{mode}：AimIK -> {grounderNode} -> {fullBodyNode}";
+            if (biped && lookAt && fullBody)
+                return $"{mode}：{grounderNode} -> LookAtIK -> {fullBodyNode}";
+            if (biped && fullBody)
+                return $"{mode}：{grounderNode} -> {fullBodyNode}";
+            if (lookAt && fullBody)
+                return $"{mode}：LookAtIK -> {fullBodyNode}";
             if (aim && biped)
-                return "Driver硬调度：AimIK -> BipedIK";
+                return $"{mode}：AimIK -> {grounderNode}";
+            if (biped && lookAt)
+                return $"{mode}：{grounderNode} -> LookAtIK";
+            if (aim && fullBody)
+                return $"{mode}：AimIK -> {fullBodyNode}";
+            if (fullBody)
+                return $"{mode}：{fullBodyNode}";
             if (lookAt)
-                return "Driver硬调度：LookAtIK";
+                return $"{mode}：LookAtIK";
             if (aim)
-                return "Driver硬调度：AimIK";
+                return $"{mode}：AimIK";
             if (biped)
-                return "Driver硬调度：BipedIK";
-            return "本帧无IK求解";
+                return $"{mode}：{grounderNode}";
+            return $"{mode}：本帧无 IK 求解";
+        }
+
+        private string BuildFinalIKScheduleBlockSummary()
+        {
+            if (_scheduleBlockFlags == FinalIKDriverBlockFlags.None)
+                return "无阻断";
+
+            var flags = _scheduleBlockFlags;
+            string manualOff = string.Empty;
+            string dependency = string.Empty;
+            string mode = string.Empty;
+
+            AppendScheduleBlock(ref manualOff, flags, FinalIKDriverBlockFlags.BipedAutoLateUpdateDisabled, "BipedIK");
+            AppendScheduleBlock(ref manualOff, flags, FinalIKDriverBlockFlags.AimAutoLateUpdateDisabled, "AimIK");
+            AppendScheduleBlock(ref manualOff, flags, FinalIKDriverBlockFlags.LookAtAutoLateUpdateDisabled, "LookAtIK");
+            AppendScheduleBlock(ref manualOff, flags, FinalIKDriverBlockFlags.FullBodyAutoLateUpdateDisabled, "FBBIK");
+
+            AppendScheduleBlock(ref dependency, flags, FinalIKDriverBlockFlags.GrounderBlockedNoBiped, "Grounder 依赖 BipedIK");
+            AppendScheduleBlock(ref dependency, flags, FinalIKDriverBlockFlags.GrounderWaitingForWeight, "Grounder 等待权重");
+            AppendScheduleBlock(ref dependency, flags, FinalIKDriverBlockFlags.HitReactionBlockedNoFullBody, "HitReaction 依赖 FBBIK");
+            AppendScheduleBlock(ref dependency, flags, FinalIKDriverBlockFlags.RecoilBlockedNoFullBody, "Recoil 依赖 FBBIK");
+
+            if ((flags & FinalIKDriverBlockFlags.ProceduralDelegatesDisabledByMode) != 0)
+                mode = "程序委托已关闭";
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder(128);
+            if (!string.IsNullOrEmpty(manualOff))
+                sb.Append("自动求解已关: ").Append(manualOff);
+            if (!string.IsNullOrEmpty(dependency))
+            {
+                if (sb.Length > 0) sb.Append(" | ");
+                sb.Append("依赖/等待: ").Append(dependency);
+            }
+            if (!string.IsNullOrEmpty(mode))
+            {
+                if (sb.Length > 0) sb.Append(" | ");
+                sb.Append(mode);
+            }
+            return sb.ToString();
+        }
+
+        private static void AppendScheduleBlock(ref string summary, FinalIKDriverBlockFlags flags, FinalIKDriverBlockFlags target, string text)
+        {
+            if ((flags & target) == 0)
+                return;
+
+            if (!string.IsNullOrEmpty(summary))
+                summary += "；";
+            summary += text;
+        }
+
+        private void RefreshFinalIKScheduleDiagnosticsCache()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            _finalIKScheduleSummaryCache = BuildFinalIKScheduleSummary();
+            _finalIKCommercialOrderSummaryCache = "Grounder -> Aim -> LookAt -> FBBIK -> Recoil -> HitReaction";
+            _finalIKScheduleBlockSummaryCache = BuildFinalIKScheduleBlockSummary();
+#endif
         }
 
         private string BuildBipedRuntimeGateReason()

@@ -1,3 +1,6 @@
 {
-	"name": "ES_Stand"
+    "name": "ES_Stand",
+    "references": [
+        "Unity.Timeline"
+    ]
 }

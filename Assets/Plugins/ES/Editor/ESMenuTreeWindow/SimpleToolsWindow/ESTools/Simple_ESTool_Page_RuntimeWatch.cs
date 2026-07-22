@@ -22,11 +22,11 @@ namespace ES
         private static readonly Dictionary<Type, PropertyInfo> ModulesEnumerablePropertyCache = new Dictionary<Type, PropertyInfo>();
         private static readonly Dictionary<string, Delegate> OdinBoolExpressionCache = new Dictionary<string, Delegate>();
         private static readonly HashSet<string> FailedOdinBoolExpressions = new HashSet<string>();
+        private static readonly HashSet<string> LoggedRuntimeWatchWarnings = new HashSet<string>();
         private readonly Dictionary<string, string> inlineInputDrafts = new Dictionary<string, string>();
         private bool defaultFoldoutExpanded = true;
 
         [Title("运行时观察", "收集场景中带 ESRuntimeWatch 标记的字段、属性和方法", bold: true, titleAlignment: TitleAlignments.Centered)]
-        [InfoBox("给 MonoBehaviour、Module 或其嵌套数据添加 [ESRuntimeWatch(\"分组\", \"显示名\")]。面板只在编辑器读取当前场景实例，支持分类、搜索、Odin ShowIf、属性 getter、方法调用和常规值设定；点击按钮会直接生效。")]
         [HorizontalGroup("Toolbar", Width = 0.42f)]
         [ShowInInspector, LabelText("搜索")]
         private string searchText = "";
@@ -101,14 +101,16 @@ namespace ES
             CollectEntries(recordResult: true);
         }
 
-        [HorizontalGroup("DebugButtons", Width = 140)]
+        [FoldoutGroup("链路诊断", Expanded = false)]
+        [HorizontalGroup("链路诊断/Buttons", Width = 140)]
         [Button("生成链路报告", ButtonHeight = 22), GUIColor(0.75f, 0.85f, 1f)]
         public void BuildChainReport()
         {
             chainReport = BuildRegistryChainReport();
         }
 
-        [HorizontalGroup("DebugButtons", Width = 140)]
+        [FoldoutGroup("链路诊断")]
+        [HorizontalGroup("链路诊断/Buttons", Width = 140)]
         [Button("复制链路报告", ButtonHeight = 22)]
         public void CopyChainReport()
         {
@@ -120,7 +122,8 @@ namespace ES
             lastResultDetail = "报告已写入系统剪贴板。";
         }
 
-        [HorizontalGroup("DebugButtons", Width = 120)]
+        [FoldoutGroup("链路诊断")]
+        [HorizontalGroup("链路诊断/Buttons", Width = 120)]
         [Button("清空报告", ButtonHeight = 22)]
         public void ClearChainReport()
         {
@@ -162,9 +165,15 @@ namespace ES
         [ShowInInspector, ReadOnly, HideLabel, MultiLineProperty(28)]
         private string ChainReportView => string.IsNullOrEmpty(chainReport) ? "点击“生成链路报告”查看底层完整链路。" : chainReport;
 
-        [OnInspectorGUI]
+        [OnInspectorGUI, PropertyOrder(-200)]
         private void DrawRuntimeWatch()
         {
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "运行时观察与轻量调试台",
+                "给 MonoBehaviour、Module 或其嵌套数据添加 ESRuntimeWatch 后，可在当前场景按对象、脚本、分类查看字段、属性和方法。",
+                SimpleToolsMaturity.Upgrading,
+                "面板读取当前场景实例；字段/可写属性设值、方法按钮点击都会直接生效。GetMoudle 兜底默认关闭，避免意外创建缺失模块。");
+
             bool shouldAutoRefresh = autoRefresh && (EditorApplication.isPlaying || refreshInEditMode);
 
             if (!EditorApplication.isPlaying)
@@ -552,7 +561,7 @@ namespace ES
                     {
                         FailedOdinBoolExpressions.Add(cacheKey);
                         if (!TryEvaluateSimpleBoolExpression(context, expression, out _))
-                        UnityEngine.Debug.LogWarning($"[RuntimeWatch] Odin ShowIf 表达式解析失败，尝试简单布尔兜底: {expression}\nContext: {context.GetType().Name}\n{error}");
+                            LogRuntimeWatchWarningOnce("ShowIfParse|" + cacheKey, $"[RuntimeWatch] Odin ShowIf 表达式解析失败，尝试简单布尔兜底: {expression}\nContext: {context.GetType().Name}\n{error}");
                     }
                     else
                     {
@@ -573,7 +582,7 @@ namespace ES
                     catch (Exception ex)
                     {
                         failReason = "OdinInvokeFailed";
-                        UnityEngine.Debug.LogWarning($"[RuntimeWatch] Odin ShowIf 表达式执行失败: {expression}\nContext: {context.GetType().Name}\n{ex.Message}");
+                        LogRuntimeWatchWarningOnce("ShowIfInvoke|" + cacheKey, $"[RuntimeWatch] Odin ShowIf 表达式执行失败: {expression}\nContext: {context.GetType().Name}\n{ex.Message}");
                         return false;
                     }
                 }
@@ -1153,6 +1162,15 @@ namespace ES
             {
                 try
                 {
+                    if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out long enumNumber))
+                    {
+                        if (!IsValidEnumNumber(targetType, enumNumber))
+                        {
+                            error = "枚举值不在定义范围内";
+                            return false;
+                        }
+                    }
+
                     value = Enum.Parse(targetType, text, true);
                     return true;
                 }
@@ -1162,6 +1180,17 @@ namespace ES
                     return false;
                 }
             }
+
+            if (targetType == typeof(byte)) return TryParseInteger<byte>(text, byte.MinValue, byte.MaxValue, v => (byte)v, out value, out error);
+            if (targetType == typeof(sbyte)) return TryParseInteger<sbyte>(text, sbyte.MinValue, sbyte.MaxValue, v => (sbyte)v, out value, out error);
+            if (targetType == typeof(short)) return TryParseInteger<short>(text, short.MinValue, short.MaxValue, v => (short)v, out value, out error);
+            if (targetType == typeof(ushort)) return TryParseInteger<ushort>(text, ushort.MinValue, ushort.MaxValue, v => (ushort)v, out value, out error);
+            if (targetType == typeof(int)) return TryParseInteger<int>(text, int.MinValue, int.MaxValue, v => (int)v, out value, out error);
+            if (targetType == typeof(uint)) return TryParseUnsignedInteger<uint>(text, uint.MinValue, uint.MaxValue, v => (uint)v, out value, out error);
+            if (targetType == typeof(long)) return TryParseInteger<long>(text, long.MinValue, long.MaxValue, v => v, out value, out error);
+            if (targetType == typeof(ulong)) return TryParseUnsignedInteger<ulong>(text, ulong.MinValue, ulong.MaxValue, v => v, out value, out error);
+            if (targetType == typeof(float)) return TryParseFloat(text, out value, out error);
+            if (targetType == typeof(double)) return TryParseDouble(text, out value, out error);
 
             try
             {
@@ -1173,6 +1202,99 @@ namespace ES
                 error = ex.Message;
                 return false;
             }
+        }
+
+        private static bool TryParseInteger<T>(string text, long min, long max, Func<long, T> convert, out object value, out string error)
+        {
+            value = null;
+            error = null;
+            if (!long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsed))
+            {
+                error = "请输入整数";
+                return false;
+            }
+
+            if (parsed < min || parsed > max)
+            {
+                error = $"数值超出范围 [{min}, {max}]";
+                return false;
+            }
+
+            value = convert(parsed);
+            return true;
+        }
+
+        private static bool TryParseUnsignedInteger<T>(string text, ulong min, ulong max, Func<ulong, T> convert, out object value, out string error)
+        {
+            value = null;
+            error = null;
+            if (!ulong.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out ulong parsed))
+            {
+                error = "请输入非负整数";
+                return false;
+            }
+
+            if (parsed < min || parsed > max)
+            {
+                error = $"数值超出范围 [{min}, {max}]";
+                return false;
+            }
+
+            value = convert(parsed);
+            return true;
+        }
+
+        private static bool IsValidEnumNumber(Type enumType, long value)
+        {
+            if (Enum.IsDefined(enumType, Enum.ToObject(enumType, value)))
+                return true;
+
+            bool isFlags = enumType.GetCustomAttributes(typeof(FlagsAttribute), false).Length > 0;
+            if (!isFlags || value < 0)
+                return false;
+
+            ulong mask = 0;
+            foreach (var defined in Enum.GetValues(enumType))
+                mask |= Convert.ToUInt64(defined, CultureInfo.InvariantCulture);
+
+            ulong unsignedValue = Convert.ToUInt64(value, CultureInfo.InvariantCulture);
+            return (unsignedValue & ~mask) == 0;
+        }
+
+        private static bool TryParseFloat(string text, out object value, out string error)
+        {
+            value = null;
+            error = null;
+            if (!float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed) || float.IsNaN(parsed) || float.IsInfinity(parsed))
+            {
+                error = "请输入有限 float 数值";
+                return false;
+            }
+
+            value = parsed;
+            return true;
+        }
+
+        private static bool TryParseDouble(string text, out object value, out string error)
+        {
+            value = null;
+            error = null;
+            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) || double.IsNaN(parsed) || double.IsInfinity(parsed))
+            {
+                error = "请输入有限 double 数值";
+                return false;
+            }
+
+            value = parsed;
+            return true;
+        }
+
+        private static void LogRuntimeWatchWarningOnce(string key, string message)
+        {
+            if (string.IsNullOrWhiteSpace(key) || !LoggedRuntimeWatchWarnings.Add(key))
+                return;
+
+            UnityEngine.Debug.LogWarning(message);
         }
 
         private string BuildRegistryChainReport()
@@ -1734,12 +1856,14 @@ namespace ES
                 catch (TargetInvocationException ex)
                 {
                     Exception inner = ex.InnerException ?? ex;
-                    UnityEngine.Debug.LogWarning($"[RuntimeWatch] GetMoudle<{moduleType.Name}> fallback failed: {inner.GetType().Name}: {inner.Message}");
+                    LogRuntimeWatchWarningOnce("GetMoudle|" + core.GetType().FullName + "|" + moduleType.FullName,
+                        $"[RuntimeWatch] GetMoudle<{moduleType.Name}> fallback failed: {inner.GetType().Name}: {inner.Message}");
                     return null;
                 }
                 catch (Exception ex)
                 {
-                    UnityEngine.Debug.LogWarning($"[RuntimeWatch] GetMoudle<{moduleType.Name}> fallback failed: {ex.Message}");
+                    LogRuntimeWatchWarningOnce("GetMoudle|" + core.GetType().FullName + "|" + moduleType.FullName,
+                        $"[RuntimeWatch] GetMoudle<{moduleType.Name}> fallback failed: {ex.Message}");
                     return null;
                 }
             }

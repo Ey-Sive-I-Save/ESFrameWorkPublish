@@ -3,7 +3,7 @@ using UnityEditor;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ES.Preview.Editor
+namespace ES.Obsolete.Preview.Editor
 {
     /// <summary>
     /// ResLibrary 管理面板

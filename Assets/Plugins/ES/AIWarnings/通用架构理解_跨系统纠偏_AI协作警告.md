@@ -120,7 +120,7 @@ Domain 是大边界，不是能力点。能力点优先放 Module。
 Item : Core
   ItemBasicDomain
     ItemMotionModule
-    ItemProjectileModule / ItemShotModule
+    ItemShotModule / ItemShotModule
     ItemLogicModule
 ```
 

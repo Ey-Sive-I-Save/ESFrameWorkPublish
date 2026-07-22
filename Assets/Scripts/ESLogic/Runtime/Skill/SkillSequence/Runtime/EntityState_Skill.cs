@@ -79,7 +79,7 @@ namespace ES
                 runtimeTarget = ESRuntimeTargetPack.Pool.GetInPool();
 
             if (opSupport == null || opSupport.IsRecycled)
-                opSupport = ESOpSupport.Pool.GetInPool();
+                opSupport = ESOpSupport.Rent();
             opSupport.InitializeSkillOwner(this, HostOpSupport, GetHashCode());
             opSupport.SetCurrentSkillState(this);
 

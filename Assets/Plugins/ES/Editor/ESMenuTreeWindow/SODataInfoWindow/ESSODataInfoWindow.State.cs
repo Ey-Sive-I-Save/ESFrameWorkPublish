@@ -6,12 +6,11 @@ using UnityEngine;
 
 namespace ES
 {
-    namespace ES
+    public partial class ESSODataInfoWindow
     {
-        public partial class ESSODataInfoWindow
-        {
             private const string PrefKeySelectedPackType = "ES.SODataInfoWindow.SelectedPackType";
             private const string PrefKeySelectedGroupType = "ES.SODataInfoWindow.SelectedGroupType";
+            private const string PrefKeySelectedNormalCategory = "ES.SODataInfoWindow.SelectedNormalCategory";
             private const string PrefKeySelectedNormalType = "ES.SODataInfoWindow.SelectedNormalType";
             private const string PrefKeyLastEditingGroupGuid = "ES.SODataInfoWindow.LastEditingGroupGuid";
 
@@ -21,6 +20,7 @@ namespace ES
             {
                 selectPackTypeName_ = EditorPrefs.GetString(PrefKeySelectedPackType, selectPackTypeName_);
                 selectGroupTypeName_ = EditorPrefs.GetString(PrefKeySelectedGroupType, selectGroupTypeName_);
+                selectNormalCategoryName_ = EditorPrefs.GetString(PrefKeySelectedNormalCategory, selectNormalCategoryName_);
                 selectNormalTypeName_ = EditorPrefs.GetString(PrefKeySelectedNormalType, selectNormalTypeName_);
                 lastEditingGroupGuid_ = EditorPrefs.GetString(PrefKeyLastEditingGroupGuid, lastEditingGroupGuid_);
                 RestoreLastEditingGroupPage();
@@ -39,6 +39,7 @@ namespace ES
             {
                 EditorPrefs.SetString(PrefKeySelectedPackType, selectPackTypeName_ ?? "");
                 EditorPrefs.SetString(PrefKeySelectedGroupType, selectGroupTypeName_ ?? "");
+                EditorPrefs.SetString(PrefKeySelectedNormalCategory, selectNormalCategoryName_ ?? "");
                 EditorPrefs.SetString(PrefKeySelectedNormalType, selectNormalTypeName_ ?? "");
                 SaveLastEditingGroupGuidFromPage();
                 EditorPrefs.SetString(PrefKeyLastEditingGroupGuid, lastEditingGroupGuid_ ?? "");
@@ -58,6 +59,7 @@ namespace ES
             {
                 EditorPrefs.SetString(PrefKeySelectedPackType, selectPackTypeName_ ?? "");
                 EditorPrefs.SetString(PrefKeySelectedGroupType, selectGroupTypeName_ ?? "");
+                EditorPrefs.SetString(PrefKeySelectedNormalCategory, selectNormalCategoryName_ ?? "");
                 EditorPrefs.SetString(PrefKeySelectedNormalType, selectNormalTypeName_ ?? "");
                 SaveLastEditingGroupGuidFromPage();
                 EditorPrefs.SetString(PrefKeyLastEditingGroupGuid, lastEditingGroupGuid_ ?? "");
@@ -112,6 +114,5 @@ namespace ES
 
                 return names[0];
             }
-        }
     }
 }

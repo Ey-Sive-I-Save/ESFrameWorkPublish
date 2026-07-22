@@ -262,6 +262,10 @@ namespace ES
             {
                 List<T> values = new List<T>(3);
 #if UNITY_EDITOR
+                List<T> indexedValues = FindRegisteredESSOAssets<T>(typeof(T));
+                if (indexedValues.Count > 0)
+                    return indexedValues;
+
                 var all = AssetDatabase.FindAssets("t:ScriptableObject");
                 foreach (var i in all)
                 {
@@ -290,6 +294,10 @@ namespace ES
                 List<T> values = new List<T>(3);
 #if UNITY_EDITOR
                 if (typeUse == null) { UnityEngine.Debug.LogWarning("查询NULL类型"); return values; }
+                List<T> indexedValues = FindRegisteredESSOAssets<T>(typeUse);
+                if (indexedValues.Count > 0)
+                    return indexedValues;
+
                 var all = AssetDatabase.FindAssets("t:ScriptableObject");
                 foreach (var i in all)
                 {
@@ -317,6 +325,13 @@ namespace ES
             public static List<T> FindAllSOAssetsQuickly<T>() where T : ScriptableObject
             {
 #if UNITY_EDITOR
+                if (typeof(ESSO).IsAssignableFrom(typeof(T)))
+                {
+                    var indexed = ESEditorSO.SOS.GetNewGroupOfType<T>();
+                    if (indexed != null && indexed.Count > 0)
+                        return indexed;
+                }
+
                 var guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}");
                 List<T> assets = new List<T>();
                 foreach (var guid in guids)
@@ -332,6 +347,36 @@ namespace ES
 #else
                 return  new List<T>();
 #endif
+            }
+
+            private static List<T> FindRegisteredESSOAssets<T>(Type targetType) where T : class
+            {
+                List<T> values = new List<T>(3);
+#if UNITY_EDITOR
+                if (targetType == null)
+                    return values;
+
+                if (!typeof(ESSO).IsAssignableFrom(targetType))
+                    return values;
+
+                foreach (var pair in ESEditorSO.SOS.Groups)
+                {
+                    var group = pair.Value;
+                    if (group == null)
+                        continue;
+
+                    for (int i = 0; i < group.Count; i++)
+                    {
+                        ESSO so = group[i];
+                        if (so == null || !targetType.IsAssignableFrom(so.GetType()))
+                            continue;
+
+                        if (so is T t && !values.Contains(t))
+                            values.Add(t);
+                    }
+                }
+#endif
+                return values;
             }
             public static T LoadAssetByGUIDString<T>(string s) where T : class
             {

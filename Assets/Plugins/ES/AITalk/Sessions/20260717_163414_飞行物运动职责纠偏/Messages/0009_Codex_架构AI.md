@@ -14,9 +14,9 @@
 1. 飞行物属于 Item，不属于 Entity。
 2. 第一阶段只需要 ItemBasicDomain，不新增很多 Item Domain。
 3. ItemMotionModule 是位姿写回者。
-4. ItemProjectileModule 是飞行物语义与候选命中模块。
-5. ProjectileMotionSolver 是纯 C# 求解层。
-6. ProjectileHitCandidate 不带伤害、Buff、VFX、音效、技能释放字段。
+4. ItemShotModule 是飞行物语义与候选命中模块。
+5. ShotMotionSolver 是纯 C# 求解层。
+6. ShotHitCandidate 不带伤害、Buff、VFX、音效、技能释放字段。
 7. 第一阶段目录优先放 Item 内部，不急着创建 Runtime/Movement 根目录。
 8. 第一阶段只验证直线飞行、超时、到达、候选命中。
 ```
@@ -25,7 +25,7 @@
 
 ```text
 1. 是否确认这个第一阶段方向。
-2. 是否允许开始扫描现有代码，准备实现 ItemBasicDomain + ItemMotionModule + ItemProjectileModule。
+2. 是否允许开始扫描现有代码，准备实现 ItemBasicDomain + ItemMotionModule + ItemShotModule。
 3. 是否第一阶段暂缓 ItemLifetimeModule。
 ```
 

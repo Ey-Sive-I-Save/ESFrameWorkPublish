@@ -1,8 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Samples{
     // 示例：演示 ExtForDateTime.cs 中常用方法
     // 来源：Assets/Plugins/ES/1_Design/Extension/EX_SimpleExtension/ExtForDateTime.cs
     public class Example_Ext_DateTime : MonoBehaviour

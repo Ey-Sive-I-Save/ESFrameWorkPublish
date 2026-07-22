@@ -52,13 +52,30 @@ namespace ES
             [DisplayAsString, LabelText("来源")]
             public string source;
         }
+
+        [Serializable]
+        public class AnimatorBatchPreviewRecord
+        {
+            public bool Enabled = true;
+            public GameObject TargetObject;
+            public string ObjectPath;
+            public bool HasAnimator;
+            public string CurrentController;
+            public string ControllerStrategy;
+            public string ClipStrategy;
+            public string Risk;
+
+            public string ToOneLine()
+            {
+                return $"{ObjectPath} | Animator:{(HasAnimator ? "有" : "无")} | Controller:{CurrentController} | {ControllerStrategy} | {ClipStrategy} | {Risk}";
+            }
+        }
         #region 公共设置
         [Title("动画器批量设置工具", "批量设置Animator属性", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选择带有Animator的GameObject，\n设置动画属性，\n点击应用按钮批量修改";
 
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
         private string PanelSummary
         {
             get
@@ -71,20 +88,24 @@ namespace ES
             }
         }
 
+        [HideInInspector]
         [LabelText("包含子对象"), Space(5)]
         [PropertyTooltip("启用后，批量操作将递归应用到选中对象的子对象。")]
         public bool includeChildren = true;
 
+        [HideInInspector]
         [LabelText("如果没有Animator则添加"), Space(5)]
         [PropertyTooltip("如果对象没有 Animator 组件，自动添加一个。")]
         public bool addAnimatorIfMissing = true;
 
 
 
+        [HideInInspector]
         [LabelText("动画控制器"), AssetsOnly, Space(5)]
         [PropertyTooltip("指定要应用的 AnimatorController。如果为空，根据下方选项处理。")]
         public RuntimeAnimatorController animatorController;
 
+        [HideInInspector]
         [LabelText("默认动画剪辑"), AssetsOnly, Space(5)]
         [PropertyTooltip("默认的 AnimationClip，用于创建新的 Controller。")]
         public AnimationClip defaultAnimationClip;
@@ -99,6 +120,7 @@ namespace ES
             CreateIndividual
         }
 
+        [HideInInspector]
         [LabelText("Controller为空时"), Space(5)]
         [PropertyTooltip("当 AnimatorController 为空时，选择如何处理：忽略、创建共享或独立的新 Controller。")]
         public ControllerNullAction controllerNullAction = ControllerNullAction.CreateShared;
@@ -113,31 +135,520 @@ namespace ES
             CreateIndividual
         }
 
+        [HideInInspector]
         [LabelText("AnimationClip为空时"), Space(5)]
         [PropertyTooltip("当 AnimationClip 为空时，选择如何处理：忽略、创建共享或独立的 Clip。")]
         public ClipNullAction clipNullAction = ClipNullAction.CreateShared;
 
+        [HideInInspector]
         [LabelText("资产分组"), Space(5)]
         [PropertyTooltip("新创建的资产将分组到此文件夹下，避免资源混乱。")]
         public string assetGroupName = "默认";
 
+        [HideInInspector]
         [ShowInInspector, ReadOnly, LabelText("预览将应用的对象"), ListDrawerSettings(DraggableItems = false)]
         [PropertyTooltip("显示将要应用设置的对象列表（包括添加 Animator 的对象）。")]
         public List<string> previewObjects = new List<string>();
 
+        [HideInInspector]
         [FoldoutGroup("资产创建记录"), ShowInInspector, ReadOnly, LabelText("最近创建"), ListDrawerSettings(DraggableItems = false, NumberOfItemsPerPage = 6)]
         public List<CreatedAnimationAssetRecord> createdAssetRecords = new List<CreatedAnimationAssetRecord>();
 
         private string lastResultSummary = "";
         private string lastResultDetail = "";
+        private string animatorSearch = "";
+        private int animatorStatusFilter = 0;
+        private int animatorSortIndex = 1;
+        private int animatorPageIndex = 0;
+        private const int animatorPageSize = 12;
+        private readonly List<AnimatorBatchPreviewRecord> animatorPreview = new List<AnimatorBatchPreviewRecord>();
+        private static readonly string[] ControllerNullActionLabels = { "忽略", "共享Controller", "独立Controller" };
+        private static readonly string[] ClipNullActionLabels = { "忽略", "共享Clip", "独立Clip" };
+        private static readonly string[] AnimatorStatusFilterLabels = { "全部", "缺Animator", "空Controller", "会建资产", "高风险" };
+        private static readonly string[] AnimatorSortLabels = { "路径", "风险", "Controller", "策略" };
 
-        [OnInspectorGUI]
+        [OnInspectorGUI, PropertyOrder(-200)]
         private void DrawResultPanel()
         {
-            SimpleToolsPanelUtility.DrawResultSummary("最近 Animator 操作", lastResultSummary, lastResultDetail);
+            DrawAnimatorWorkbench();
+        }
+
+        private void DrawAnimatorWorkbench()
+        {
+            DrawAnimatorHeader();
+            DrawAnimatorTargetPanel();
+            DrawAnimatorControllerPanel();
+            DrawAnimatorClipPanel();
+            DrawAnimatorPropertyPanel();
+            DrawAnimatorPreviewActions();
+            DrawAnimatorInsightPanel();
+            DrawAnimatorFilters();
+            DrawAnimatorPreviewTable();
+            DrawAnimatorAssetRecords();
+            DrawAnimatorReportPanel();
+        }
+
+        private void DrawAnimatorHeader()
+        {
+            var targets = GetSelectedTargets();
+            int animatorCount = targets.Count(obj => obj != null && obj.GetComponent<Animator>() != null);
+            int noAnimator = targets.Count - animatorCount;
+            int nullController = targets.Count(obj =>
+            {
+                var animator = obj != null ? obj.GetComponent<Animator>() : null;
+                return animator != null && animator.runtimeAnimatorController == null;
+            });
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("Animator 批量配置与资产生成台", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("用于批量添加 Animator、配置 Controller、创建 Controller/Clip，并在执行前复核对象、策略和风险。", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.Space(4);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawMetric("目标对象", targets.Count.ToString());
+                    DrawMetric("已有Animator", animatorCount.ToString());
+                    DrawMetric("缺Animator", noAnimator.ToString());
+                    DrawMetric("空Controller", nullController.ToString());
+                    DrawMetric("新建资产", createdAssetRecords.Count.ToString());
+                }
+            }
+        }
+
+        private void DrawAnimatorTargetPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("目标范围", "从当前 Hierarchy 选中对象收集目标，可递归子对象。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                includeChildren = GUILayout.Toggle(includeChildren, "包含子对象", EditorStyles.miniButtonLeft, GUILayout.Height(24));
+                addAnimatorIfMissing = GUILayout.Toggle(addAnimatorIfMissing, "缺少 Animator 时自动添加", EditorStyles.miniButtonRight, GUILayout.Height(24));
+                DrawInfoRow("当前选择", Selection.gameObjects == null || Selection.gameObjects.Length == 0 ? "未选择对象" : $"{Selection.gameObjects.Length} 个对象");
+                DrawInfoRow("实际目标", $"{GetSelectedTargets().Count} 个对象");
+            }
+        }
+
+        private void DrawAnimatorControllerPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("Controller 策略", "决定对象没有 Controller 时如何处理。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                animatorController = (RuntimeAnimatorController)EditorGUILayout.ObjectField("指定 Controller", animatorController, typeof(RuntimeAnimatorController), false);
+                controllerNullAction = (ControllerNullAction)GUILayout.Toolbar((int)controllerNullAction, ControllerNullActionLabels, EditorStyles.miniButton, GUILayout.Height(24));
+                assetGroupName = EditorGUILayout.TextField("资产分组", assetGroupName);
+            }
+        }
+
+        private void DrawAnimatorClipPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("Clip 策略", "创建新 Controller 时，可选择忽略、共享 Clip 或为对象创建独立 Clip。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                defaultAnimationClip = (AnimationClip)EditorGUILayout.ObjectField("默认 Clip", defaultAnimationClip, typeof(AnimationClip), false);
+                clipNullAction = (ClipNullAction)GUILayout.Toolbar((int)clipNullAction, ClipNullActionLabels, EditorStyles.miniButton, GUILayout.Height(24));
+                if (clipNullAction != ClipNullAction.Ignore)
+                    newClipName = EditorGUILayout.TextField("新 Clip 名称", newClipName);
+            }
+        }
+
+        private void DrawAnimatorPropertyPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("Animator 属性", "仅在启用后批量修改 UpdateMode、CullingMode 和 RootMotion。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                enableApplySettings = GUILayout.Toggle(enableApplySettings, "启用属性批量设置", EditorStyles.miniButton, GUILayout.Height(24));
+                GUI.enabled = enableApplySettings;
+                updateMode = (AnimatorUpdateMode)EditorGUILayout.EnumPopup("更新模式", updateMode);
+                cullingMode = (AnimatorCullingMode)EditorGUILayout.EnumPopup("剔除模式", cullingMode);
+                applyRootMotion = EditorGUILayout.Toggle("应用 Root Motion", applyRootMotion);
+                GUI.enabled = true;
+            }
+        }
+
+        private void DrawAnimatorPreviewActions()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("预览与执行", "高风险操作都先生成预览，再按当前选择执行。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("刷新预览", SimpleToolsActionTone.Primary, 32))
+                        RefreshAnimatorPreview();
+                    if (SimpleToolsPanelUtility.DrawActionButton("应用完整设置", SimpleToolsActionTone.Primary, 32))
+                        ApplyAnimatorSettings();
+                    if (SimpleToolsPanelUtility.DrawActionButton("创建并应用 Clip", SimpleToolsActionTone.Success, 32))
+                        CreateAndApplyAnimationClip();
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("添加 Animator", SimpleToolsActionTone.Success, 28))
+                        AddAnimatorComponents();
+                    if (SimpleToolsPanelUtility.DrawActionButton("替换空 Controller", SimpleToolsActionTone.Warning, 28))
+                        ReplaceAnimatorControllers();
+                    if (SimpleToolsPanelUtility.DrawActionButton("移除 Animator", SimpleToolsActionTone.Danger, 28))
+                        RemoveAnimatorComponents();
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("选中筛选结果", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                        SelectFilteredAnimatorPreview();
+                    if (GUILayout.Button("导出设置", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                        ExportSettings();
+                    if (GUILayout.Button("导入设置", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                        ImportSettings();
+                    if (GUILayout.Button("重置设置", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                        ResetToDefaultSettings();
+                }
+            }
+        }
+
+        private void DrawAnimatorInsightPanel()
+        {
+            if (animatorPreview.Count == 0)
+                return;
+
+            var rows = GetFilteredAnimatorPreview(false);
+            SimpleToolsPanelUtility.DrawSectionTitle("预览统计", "按 Animator 状态、Controller 状态和风险聚类。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                DrawInfoRow("Animator", $"已有 {rows.Count(r => r.HasAnimator)} | 缺少 {rows.Count(r => !r.HasAnimator)}");
+                DrawInfoRow("Controller", $"已有 {rows.Count(r => r.CurrentController != "<空>")} | 空 {rows.Count(r => r.CurrentController == "<空>")}");
+                DrawInfoRow("策略", BuildControllerStrategySummary(rows));
+                DrawInfoRow("风险", BuildRiskSummary(rows));
+            }
+        }
+
+        private void DrawAnimatorFilters()
+        {
+            if (animatorPreview.Count == 0)
+                return;
+
+            SimpleToolsPanelUtility.DrawSectionTitle("结果筛选", "搜索对象路径、当前 Controller、策略和风险。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("搜索", EditorStyles.miniBoldLabel, GUILayout.Width(42));
+                    animatorSearch = EditorGUILayout.TextField(animatorSearch);
+                    if (GUILayout.Button("清空", EditorStyles.miniButton, GUILayout.Width(48)))
+                        animatorSearch = string.Empty;
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("状态", EditorStyles.miniBoldLabel, GUILayout.Width(34));
+                    animatorStatusFilter = GUILayout.Toolbar(animatorStatusFilter, AnimatorStatusFilterLabels, EditorStyles.miniButton, GUILayout.Width(210), GUILayout.Height(22));
+                    GUILayout.Space(8);
+                    EditorGUILayout.LabelField("排序", EditorStyles.miniBoldLabel, GUILayout.Width(34));
+                    animatorSortIndex = GUILayout.Toolbar(animatorSortIndex, AnimatorSortLabels, EditorStyles.miniButton, GUILayout.Width(168), GUILayout.Height(22));
+                }
+            }
+        }
+
+        private void DrawAnimatorPreviewTable()
+        {
+            if (animatorPreview.Count == 0)
+                return;
+
+            var rows = GetFilteredAnimatorPreview(true);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField($"Animator 预览表  ({rows.Count}/{animatorPreview.Count})", EditorStyles.boldLabel);
+                if (rows.Count == 0)
+                {
+                    EditorGUILayout.LabelField("当前筛选条件下没有对象。", EditorStyles.wordWrappedMiniLabel);
+                    return;
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("对象路径", EditorStyles.miniBoldLabel, GUILayout.MinWidth(180));
+                    EditorGUILayout.LabelField("Animator", EditorStyles.miniBoldLabel, GUILayout.Width(70));
+                    EditorGUILayout.LabelField("当前Controller", EditorStyles.miniBoldLabel, GUILayout.Width(140));
+                    EditorGUILayout.LabelField("Controller策略", EditorStyles.miniBoldLabel, GUILayout.Width(128));
+                    EditorGUILayout.LabelField("Clip策略", EditorStyles.miniBoldLabel, GUILayout.Width(104));
+                    EditorGUILayout.LabelField("风险", EditorStyles.miniBoldLabel, GUILayout.Width(120));
+                    GUILayout.Space(48);
+                }
+
+                int totalPages = Mathf.Max(1, Mathf.CeilToInt((float)rows.Count / animatorPageSize));
+                animatorPageIndex = Mathf.Clamp(animatorPageIndex, 0, totalPages - 1);
+                int start = animatorPageIndex * animatorPageSize;
+                int end = Mathf.Min(start + animatorPageSize, rows.Count);
+                for (int i = start; i < end; i++)
+                    DrawAnimatorPreviewRow(rows[i]);
+                DrawPager(ref animatorPageIndex, totalPages);
+            }
+        }
+
+        private void DrawAnimatorPreviewRow(AnimatorBatchPreviewRecord row)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(row.ObjectPath, EditorStyles.miniLabel, GUILayout.MinWidth(180));
+                EditorGUILayout.LabelField(row.HasAnimator ? "已有" : "缺少", EditorStyles.miniLabel, GUILayout.Width(70));
+                EditorGUILayout.LabelField(row.CurrentController, EditorStyles.miniLabel, GUILayout.Width(140));
+                EditorGUILayout.LabelField(row.ControllerStrategy, EditorStyles.miniLabel, GUILayout.Width(128));
+                EditorGUILayout.LabelField(row.ClipStrategy, EditorStyles.miniLabel, GUILayout.Width(104));
+                EditorGUILayout.LabelField(row.Risk, EditorStyles.miniLabel, GUILayout.Width(120));
+                if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(44)))
+                {
+                    Selection.activeGameObject = row.TargetObject;
+                    EditorGUIUtility.PingObject(row.TargetObject);
+                }
+            }
+        }
+
+        private void DrawAnimatorAssetRecords()
+        {
+            if (createdAssetRecords.Count == 0)
+                return;
+
+            SimpleToolsPanelUtility.DrawSectionTitle("资产创建记录", "记录 Controller / Clip 创建路径和来源策略。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                foreach (var record in createdAssetRecords.Take(10))
+                    DrawInfoRow(record.assetType, $"{record.assetPath} | {record.source}");
+            }
+        }
+
+        private void DrawAnimatorReportPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("报告", "记录修改对象、创建资产和失败项。");
+            if (string.IsNullOrWhiteSpace(lastResultSummary) && string.IsNullOrWhiteSpace(lastResultDetail))
+            {
+                SimpleToolsPanelUtility.DrawEmptyState("还没有执行结果。刷新预览或执行一次操作后，这里会显示报告。");
+                return;
+            }
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
+                if (!string.IsNullOrWhiteSpace(lastResultDetail))
+                    EditorGUILayout.TextArea(lastResultDetail, GUILayout.MinHeight(46), GUILayout.MaxHeight(120));
+            }
         }
         #endregion
         #region 辅助方法
+        private void RefreshAnimatorPreview()
+        {
+            animatorPreview.Clear();
+            var targets = GetSelectedTargets();
+            foreach (var obj in targets.Where(obj => obj != null).Distinct())
+                animatorPreview.Add(BuildAnimatorPreviewRecord(obj));
+
+            previewObjects.Clear();
+            previewObjects.AddRange(animatorPreview.Select(r => r.ObjectPath));
+            animatorPageIndex = 0;
+            lastResultSummary = $"Animator 预览完成: {animatorPreview.Count} 个对象";
+            lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(animatorPreview.Select(r => r.ToOneLine()), 16);
+        }
+
+        private AnimatorBatchPreviewRecord BuildAnimatorPreviewRecord(GameObject obj)
+        {
+            var animator = obj.GetComponent<Animator>();
+            bool hasAnimator = animator != null;
+            bool controllerEmpty = animator == null || animator.runtimeAnimatorController == null;
+
+            return new AnimatorBatchPreviewRecord
+            {
+                TargetObject = obj,
+                ObjectPath = GetObjectPath(obj),
+                HasAnimator = hasAnimator,
+                CurrentController = animator != null && animator.runtimeAnimatorController != null ? animator.runtimeAnimatorController.name : "<空>",
+                ControllerStrategy = BuildControllerStrategy(hasAnimator, controllerEmpty),
+                ClipStrategy = BuildClipStrategy(controllerEmpty),
+                Risk = BuildAnimatorRisk(hasAnimator, controllerEmpty)
+            };
+        }
+
+        private string BuildControllerStrategy(bool hasAnimator, bool controllerEmpty)
+        {
+            if (!hasAnimator && !addAnimatorIfMissing)
+                return "跳过";
+            if (!controllerEmpty)
+                return "保留现有";
+            if (animatorController != null)
+                return "使用指定";
+            switch (controllerNullAction)
+            {
+                case ControllerNullAction.CreateShared: return "创建共享";
+                case ControllerNullAction.CreateIndividual: return "创建独立";
+                default: return "忽略空Controller";
+            }
+        }
+
+        private string BuildClipStrategy(bool controllerEmpty)
+        {
+            if (!controllerEmpty)
+                return "不处理";
+            if (animatorController != null)
+                return defaultAnimationClip != null ? "已有Clip参考" : "不创建";
+            switch (clipNullAction)
+            {
+                case ClipNullAction.CreateShared: return defaultAnimationClip != null ? "使用默认Clip" : "创建共享Clip";
+                case ClipNullAction.CreateIndividual: return defaultAnimationClip != null ? "复用默认Clip" : "创建独立Clip";
+                default: return "忽略Clip";
+            }
+        }
+
+        private string BuildAnimatorRisk(bool hasAnimator, bool controllerEmpty)
+        {
+            var risks = new List<string>();
+            if (!hasAnimator && addAnimatorIfMissing) risks.Add("新增组件");
+            if (!hasAnimator && !addAnimatorIfMissing) risks.Add("跳过");
+            if (controllerEmpty && animatorController == null && controllerNullAction != ControllerNullAction.Ignore) risks.Add("创建资产");
+            if (clipNullAction == ClipNullAction.CreateIndividual && controllerEmpty) risks.Add("多Clip");
+            if (enableApplySettings) risks.Add("改属性");
+            return risks.Count == 0 ? "低" : string.Join("/", risks);
+        }
+
+        private List<AnimatorBatchPreviewRecord> GetFilteredAnimatorPreview(bool sorted)
+        {
+            IEnumerable<AnimatorBatchPreviewRecord> rows = animatorPreview.Where(PassesAnimatorFilter);
+            if (sorted)
+                rows = SortAnimatorPreview(rows);
+            return rows.ToList();
+        }
+
+        private bool PassesAnimatorFilter(AnimatorBatchPreviewRecord row)
+        {
+            if (row == null)
+                return false;
+
+            switch (animatorStatusFilter)
+            {
+                case 1:
+                    if (row.HasAnimator) return false;
+                    break;
+                case 2:
+                    if (row.CurrentController != "<空>") return false;
+                    break;
+                case 3:
+                    if (!row.Risk.Contains("创建资产")) return false;
+                    break;
+                case 4:
+                    if (row.Risk == "低") return false;
+                    break;
+            }
+
+            if (string.IsNullOrWhiteSpace(animatorSearch))
+                return true;
+
+            string keyword = animatorSearch.Trim();
+            return ContainsIgnoreCase(row.ObjectPath, keyword) ||
+                   ContainsIgnoreCase(row.CurrentController, keyword) ||
+                   ContainsIgnoreCase(row.ControllerStrategy, keyword) ||
+                   ContainsIgnoreCase(row.ClipStrategy, keyword) ||
+                   ContainsIgnoreCase(row.Risk, keyword);
+        }
+
+        private IEnumerable<AnimatorBatchPreviewRecord> SortAnimatorPreview(IEnumerable<AnimatorBatchPreviewRecord> rows)
+        {
+            switch (animatorSortIndex)
+            {
+                case 1:
+                    return rows.OrderByDescending(GetAnimatorRiskScore).ThenBy(r => r.ObjectPath, StringComparer.Ordinal);
+                case 2:
+                    return rows.OrderBy(r => r.CurrentController, StringComparer.Ordinal).ThenBy(r => r.ObjectPath, StringComparer.Ordinal);
+                case 3:
+                    return rows.OrderBy(r => r.ControllerStrategy, StringComparer.Ordinal).ThenBy(r => r.ObjectPath, StringComparer.Ordinal);
+                default:
+                    return rows.OrderBy(r => r.ObjectPath, StringComparer.Ordinal);
+            }
+        }
+
+        private int GetAnimatorRiskScore(AnimatorBatchPreviewRecord row)
+        {
+            int score = 0;
+            if (row == null) return score;
+            if (row.Risk.Contains("创建资产")) score += 40;
+            if (row.Risk.Contains("新增组件")) score += 30;
+            if (row.Risk.Contains("多Clip")) score += 20;
+            if (row.Risk.Contains("改属性")) score += 10;
+            if (row.Risk.Contains("跳过")) score += 5;
+            return score;
+        }
+
+        private void SelectFilteredAnimatorPreview()
+        {
+            var objects = GetFilteredAnimatorPreview(true)
+                .Select(r => r.TargetObject)
+                .Where(obj => obj != null)
+                .Cast<UnityEngine.Object>()
+                .ToArray();
+
+            if (objects.Length == 0)
+            {
+                lastResultSummary = "选中失败";
+                lastResultDetail = "当前筛选条件下没有对象。";
+                return;
+            }
+
+            Selection.objects = objects;
+            EditorGUIUtility.PingObject(objects[0]);
+            lastResultSummary = $"已选中筛选结果: {objects.Length} 个";
+            lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(objects.OfType<GameObject>().Select(GetObjectPath), 12);
+        }
+
+        private string BuildControllerStrategySummary(IEnumerable<AnimatorBatchPreviewRecord> rows)
+        {
+            return string.Join("  |  ", rows.GroupBy(r => r.ControllerStrategy).OrderByDescending(g => g.Count()).Select(g => $"{g.Key} {g.Count()}"));
+        }
+
+        private string BuildRiskSummary(IEnumerable<AnimatorBatchPreviewRecord> rows)
+        {
+            return string.Join("  |  ", rows.GroupBy(r => r.Risk).OrderByDescending(g => g.Count()).Take(6).Select(g => $"{g.Key} {g.Count()}"));
+        }
+
+        private string GetObjectPath(GameObject obj)
+        {
+            if (obj == null) return "<丢失对象>";
+            var stack = new Stack<string>();
+            var current = obj.transform;
+            while (current != null)
+            {
+                stack.Push(current.name);
+                current = current.parent;
+            }
+            return string.Join("/", stack);
+        }
+
+        private bool ContainsIgnoreCase(string source, string keyword)
+        {
+            return !string.IsNullOrEmpty(source) && source.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private void DrawMetric(string label, string value)
+        {
+            using (new EditorGUILayout.VerticalScope(GUILayout.MinWidth(72)))
+            {
+                EditorGUILayout.LabelField(label, EditorStyles.centeredGreyMiniLabel);
+                EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(value) ? "-" : value, EditorStyles.boldLabel);
+            }
+        }
+
+        private void DrawInfoRow(string label, string value)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel, GUILayout.Width(72));
+                EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(value) ? "-" : value, EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+
+        private void DrawPager(ref int pageIndex, int totalPages)
+        {
+            if (totalPages <= 1) return;
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("上一页", EditorStyles.miniButtonLeft, GUILayout.Width(64)) && pageIndex > 0)
+                    pageIndex--;
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.LabelField($"第 {pageIndex + 1} / {totalPages} 页", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(90));
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("下一页", EditorStyles.miniButtonRight, GUILayout.Width(64)) && pageIndex < totalPages - 1)
+                    pageIndex++;
+            }
+        }
+
         private string GetAnimationAssetFolder(string subFolder)
         {
             string root = ESGlobalEditorDefaultConfi.Instance?.Path_ResourceParent;
@@ -233,34 +744,24 @@ namespace ES
         #endregion
 
         #region 应用Animator设置
-        [BoxGroup("应用Animator设置", ShowLabel = false)]
-        [Title("应用Animator设置", titleAlignment: TitleAlignments.Centered, bold: true)]
+        [HideInInspector]
         [ToggleLeft, LabelText("启用"), LabelWidth(120)]
         public bool enableApplySettings = false;
 
-        [HorizontalGroup("应用Animator设置/ApplySettings1"), EnableIf("enableApplySettings"), LabelText("更新模式"), LabelWidth(120)]
+        [HideInInspector]
         public AnimatorUpdateMode updateMode = AnimatorUpdateMode.Normal;
 
-        [HorizontalGroup("应用Animator设置/ApplySettings1"), EnableIf("enableApplySettings"), LabelText("剔除模式"), LabelWidth(120)]
+        [HideInInspector]
         public AnimatorCullingMode cullingMode = AnimatorCullingMode.AlwaysAnimate;
 
-        [HorizontalGroup("应用Animator设置/ApplySettings2"), ToggleLeft, LabelText("应用根运动"), LabelWidth(120)]
+        [HideInInspector]
         public bool applyRootMotion = false;
 
 
 
-        [Space(10)]
-        [BoxGroup("配套AnimationClip", ShowLabel = false)]
-        [Title("配套AnimationClip", titleAlignment: TitleAlignments.Centered, bold: true)]
-
-
-
-        [HorizontalGroup("配套AnimationClip/CreateClip1"), ShowIf("@clipNullAction != ClipNullAction.Ignore"), LabelText("Clip名称"), LabelWidth(120)]
+        [HideInInspector]
         public string newClipName = "NewAnimation";
 
-        [BoxGroup("按钮组", showLabel: false)]
-        [HorizontalGroup("按钮组/Row1")]
-        [Button("应用 Animator 设置", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void ApplyAnimatorSettings()
         {
             createdAssetRecords.Clear();
@@ -450,8 +951,6 @@ namespace ES
             EditorUtility.DisplayDialog("成功", $"成功修改 {modifiedCount} 个Animator组件！", "确定");
         }
 
-        [HorizontalGroup("按钮组/Row1")]
-        [Button("添加 Animator 组件", ButtonHeight = 34), GUIColor(0.25f, 0.62f, 0.45f)]
         public void AddAnimatorComponents()
         {
             var selectedObjects = Selection.gameObjects;
@@ -484,8 +983,6 @@ namespace ES
             EditorUtility.DisplayDialog("成功", $"成功添加 {addedCount} 个Animator组件！", "确定");
         }
 
-        [HorizontalGroup("按钮组/Row2")]
-        [Button("移除 Animator 组件", ButtonHeight = 34), GUIColor(0.82f, 0.38f, 0.30f)]
         public void RemoveAnimatorComponents()
         {
             var selectedObjects = Selection.gameObjects;
@@ -531,8 +1028,6 @@ namespace ES
             }
         }
 
-        [HorizontalGroup("按钮组/Row2")]
-        [Button("替换 AnimatorController", ButtonHeight = 34), GUIColor(0.75f, 0.58f, 0.25f)]
         public void ReplaceAnimatorControllers()
         {
             createdAssetRecords.Clear();
@@ -597,8 +1092,6 @@ namespace ES
             EditorUtility.DisplayDialog("成功", $"成功替换 {replacedCount} 个空的AnimatorController！", "确定");
         }
 
-        [HorizontalGroup("按钮组/Row3")]
-        [Button("重置为默认设置", ButtonHeight = 34), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
         public void ResetToDefaultSettings()
         {
             includeChildren = true;
@@ -615,8 +1108,6 @@ namespace ES
             assetGroupName = "默认";
         }
 
-        [HorizontalGroup("按钮组/Row4")]
-        [Button("导出设置", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
         public void ExportSettings()
         {
             string path = EditorUtility.SaveFilePanel("导出设置", "", "AnimationBatchSettings.json", "json");
@@ -658,8 +1149,6 @@ namespace ES
             }
         }
 
-        [HorizontalGroup("按钮组/Row4")]
-        [Button("导入设置", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
         public void ImportSettings()
         {
             string path = EditorUtility.OpenFilePanel("导入设置", "", "json");
@@ -721,9 +1210,6 @@ namespace ES
         #endregion
 
         #region 创建AnimationClip
-        [ShowIf("@clipNullAction != ClipNullAction.Ignore")]
-        [HorizontalGroup("按钮组/Row3")]
-        [Button("创建并应用 AnimationClip", ButtonHeight = 34), GUIColor(0.25f, 0.62f, 0.45f)]
         public void CreateAndApplyAnimationClip()
         {
             createdAssetRecords.Clear();

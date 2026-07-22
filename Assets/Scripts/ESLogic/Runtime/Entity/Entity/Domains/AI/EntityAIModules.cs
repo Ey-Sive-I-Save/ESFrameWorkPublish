@@ -2,9 +2,6 @@ using System;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 namespace ES
 {
@@ -14,561 +11,159 @@ namespace ES
         public sealed override Type TableKeyType => GetType();
     }
 
-    // =================================================================================================
-    // InputSystem 输入采集模块（AI 域）
-    // - 只采集输入并生成快照
-    // - 触发类输入通过 Consume 清空，避免一直为 true
-    // =================================================================================================
-    [Serializable, TypeRegistryItem("AI输入采集模块")]
-    public class EntityAIInputSystemModule : EntityAIModuleBase
+    [Serializable]
+    public sealed class EntityInputState
     {
         [Title("开关")]
         [LabelText("是否启用输入")]
         public bool enableInput = true;
 
-#if ENABLE_INPUT_SYSTEM
-        [Title("输入绑定（支持直接配置或引用）")]
-        [LabelText("移动")]
-        public InputActionProperty moveAction;
-
-        [LabelText("视角")]
-        public InputActionProperty lookAction;
-
-        [LabelText("攻击")]
-        public InputActionProperty attackAction;
-
-        [LabelText("重击")]
-        public InputActionProperty heavyAttackAction;
-
-        [LabelText("格挡")]
-        public InputActionProperty blockAction;
-
-        [LabelText("滑行")]
-        public InputActionProperty slideAction;
-
-        [LabelText("切换武器")]
-        public InputActionProperty switchWeaponAction;
-
-        [LabelText("拿枪")]
-        public InputActionProperty equipWeaponAction;
-
-        [LabelText("收枪")]
-        public InputActionProperty holsterWeaponAction;
-
-        [LabelText("切到武器槽1")]
-        public InputActionProperty weaponSlot1Action;
-
-        [LabelText("切到武器槽2")]
-        public InputActionProperty weaponSlot2Action;
-
-        [LabelText("切到武器槽3")]
-        public InputActionProperty weaponSlot3Action;
-
-        [LabelText("切到武器槽4")]
-        public InputActionProperty weaponSlot4Action;
-
-        [LabelText("切到武器槽5")]
-        public InputActionProperty weaponSlot5Action;
-
-        [LabelText("瞄准")]
-        public InputActionProperty aimAction;
-
-        [LabelText("左探头")]
-        public InputActionProperty peekLeftAction;
-
-        [LabelText("右探头")]
-        public InputActionProperty peekRightAction;
-
-        [LabelText("技能1")]
-        public InputActionProperty skill1Action;
-
-        [LabelText("技能2")]
-        public InputActionProperty skill2Action;
-
-        [LabelText("技能3")]
-        public InputActionProperty skill3Action;
-
-        [LabelText("跳跃")]
-        public InputActionProperty jumpAction;
-
-        [LabelText("下蹲")]
-        public InputActionProperty crouchAction;
-
-        [LabelText("飞行切换")]
-        public InputActionProperty flyAction;
-
-        [LabelText("飞行垂直")]
-        public InputActionProperty flyVerticalAction;
-
-        [LabelText("骑乘切换")]
-        public InputActionProperty mountAction;
-
-        [LabelText("攀爬切换")]
-        public InputActionProperty climbAction;
-
-        [LabelText("交互")]
-        public InputActionProperty interactAction;
-
-        [LabelText("小眼睛(视角附加)")]
-        public InputActionProperty eyeAction;
-
-        [Title("快速初始化")]
-        [LabelText("快捷初始化预设")]
-        public InputQuickPreset quickPreset = InputQuickPreset.Default;
-
-        [LabelText("按键方案")]
-        public InputSchemeKey schemeKey = InputSchemeKey.Default;
-
-        [LabelText("单项内置键")]
-        public InputActionKey singleKey = InputActionKey.Move;
-
-        [Button("一键清空全部输入"), GUIColor(0.6f, 0.6f, 0.6f)]
-        public void InitEmpty()
-        {
-            moveAction = default;
-            lookAction = default;
-            attackAction = default;
-            heavyAttackAction = default;
-            blockAction = default;
-            slideAction = default;
-            switchWeaponAction = default;
-            equipWeaponAction = default;
-            holsterWeaponAction = default;
-            weaponSlot1Action = default;
-            weaponSlot2Action = default;
-            weaponSlot3Action = default;
-            weaponSlot4Action = default;
-            weaponSlot5Action = default;
-            aimAction = default;
-            peekLeftAction = default;
-            peekRightAction = default;
-            skill1Action = default;
-            skill2Action = default;
-            skill3Action = default;
-            jumpAction = default;
-            crouchAction = default;
-            flyAction = default;
-            mountAction = default;
-            climbAction = default;
-            flyVerticalAction = default;
-            interactAction = default;
-        }
-
-        [Button("一键内置默认输入"), GUIColor(0.3f, 0.8f, 0.3f)]
-        public void InitBuiltin()
-        {
-            EntityInputQuickInit.ApplyPreset(this, quickPreset, schemeKey);
-        }
-
-        [Button("内置单项输入"), GUIColor(0.2f, 0.6f, 0.9f)]
-        public void InitSingle()
-        {
-            EntityInputQuickInit.ApplySingle(this, singleKey, schemeKey);
-        }
-#else
-        [InfoBox("未启用 Unity Input System。请在 Project Settings > Player > Active Input Handling 中启用。")]
-        [LabelText("占位")]
-        public bool inputSystemNotEnabled;
-#endif
-
         [Title("输出状态")]
         [ShowInInspector, ReadOnly]
-        public InputSnapshot snapshot;
+        public EntityMotionInputState motion;
 
-        public Vector2 Move => snapshot.move;
-        public Vector2 Look => snapshot.look;
+        [ShowInInspector, ReadOnly]
+        public EntityActionInputPulse action;
 
-        public bool ConsumeAttack() => snapshot.ConsumeAttack();
-        public bool ConsumeHeavyAttack() => snapshot.ConsumeHeavyAttack();
-        public bool ConsumeBlock() => snapshot.ConsumeBlock();
-        public bool ConsumeSlide() => snapshot.ConsumeSlide();
-        public bool ConsumeSwitchWeapon() => snapshot.ConsumeSwitchWeapon();
-        public bool ConsumeEquipWeapon() => snapshot.ConsumeEquipWeapon();
-        public bool ConsumeHolsterWeapon() => snapshot.ConsumeHolsterWeapon();
-        public bool ConsumeWeaponSlot1() => snapshot.ConsumeWeaponSlot1();
-        public bool ConsumeWeaponSlot2() => snapshot.ConsumeWeaponSlot2();
-        public bool ConsumeWeaponSlot3() => snapshot.ConsumeWeaponSlot3();
-        public bool ConsumeWeaponSlot4() => snapshot.ConsumeWeaponSlot4();
-        public bool ConsumeWeaponSlot5() => snapshot.ConsumeWeaponSlot5();
-        public bool ConsumeAim() => snapshot.ConsumeAim();
-        public bool ConsumeSkill1() => snapshot.ConsumeSkill1();
-        public bool ConsumeSkill2() => snapshot.ConsumeSkill2();
-        public bool ConsumeSkill3() => snapshot.ConsumeSkill3();
-        public bool ConsumeJump() => snapshot.ConsumeJump();
-        public bool ConsumeCrouchToggle() => snapshot.ConsumeCrouchToggle();
-        public bool ConsumeFlyToggle() => snapshot.ConsumeFlyToggle();
-        public bool ConsumeMountToggle() => snapshot.ConsumeMountToggle();
-        public bool ConsumeClimbToggle() => snapshot.ConsumeClimbToggle();
-        public bool ConsumeInteract() => snapshot.ConsumeInteract();
-        public void ClearOneShot() => snapshot.ClearOneShot();
-        public bool EyeHold => snapshot.eyeHold;
-        public bool PeekLeftHold => snapshot.peekLeftHold;
-        public bool PeekRightHold => snapshot.peekRightHold;
-        public float AimPeek => snapshot.AimPeek;
-        public float FlyVertical => snapshot.flyVertical;
+        public Vector2 Move => motion.move;
+        public Vector2 Look => motion.look;
 
-#if ENABLE_INPUT_SYSTEM
-        private InputAction _move;
-        private InputAction _look;
-        private InputAction _attack;
-        private InputAction _heavyAttack;
-        private InputAction _block;
-        private InputAction _slide;
-        private InputAction _switchWeapon;
-        private InputAction _equipWeapon;
-        private InputAction _holsterWeapon;
-        private InputAction _weaponSlot1;
-        private InputAction _weaponSlot2;
-        private InputAction _weaponSlot3;
-        private InputAction _weaponSlot4;
-        private InputAction _weaponSlot5;
-        private InputAction _aim;
-        private InputAction _peekLeft;
-        private InputAction _peekRight;
-        private InputAction _skill1;
-        private InputAction _skill2;
-        private InputAction _skill3;
-        private InputAction _jump;
-        private InputAction _crouch;
-        private InputAction _fly;
-        private InputAction _flyVertical;
-        private InputAction _mount;
-        private InputAction _climb;
-        private InputAction _eye;
-        private InputAction _interact;
-#endif
+        public bool ConsumeAttack() => action.ConsumeAttack();
+        public bool ConsumeHeavyAttack() => action.ConsumeHeavyAttack();
+        public bool ConsumeBlock() => action.ConsumeBlock();
+        public bool ConsumeSlide() => action.ConsumeSlide();
+        public bool ConsumeSwitchWeapon() => action.ConsumeSwitchWeapon();
+        public bool ConsumeEquipWeapon() => action.ConsumeEquipWeapon();
+        public bool ConsumeHolsterWeapon() => action.ConsumeHolsterWeapon();
+        public bool ConsumeWeaponSlot1() => action.ConsumeWeaponSlot1();
+        public bool ConsumeWeaponSlot2() => action.ConsumeWeaponSlot2();
+        public bool ConsumeWeaponSlot3() => action.ConsumeWeaponSlot3();
+        public bool ConsumeWeaponSlot4() => action.ConsumeWeaponSlot4();
+        public bool ConsumeWeaponSlot5() => action.ConsumeWeaponSlot5();
+        public bool ConsumeAim() => action.ConsumeAim();
+        public bool ConsumeSkill1() => action.ConsumeSkill1();
+        public bool ConsumeSkill2() => action.ConsumeSkill2();
+        public bool ConsumeSkill3() => action.ConsumeSkill3();
+        public bool ConsumeJump() => action.ConsumeJump();
+        public bool ConsumeCrouchToggle() => action.ConsumeCrouchToggle();
+        public bool ConsumeFlyToggle() => action.ConsumeFlyToggle();
+        public bool ConsumeMountToggle() => action.ConsumeMountToggle();
+        public bool ConsumeClimbToggle() => action.ConsumeClimbToggle();
+        public bool ConsumeInteract() => action.ConsumeInteract();
+        public void ClearOneShot() => action.Clear();
+        public bool EyeHold => motion.eyeHold;
+        public bool PeekLeftHold => motion.peekLeftHold;
+        public bool PeekRightHold => motion.peekRightHold;
+        public float AimPeek => motion.AimPeek;
+        public float FlyVertical => motion.flyVertical;
 
-        protected override void OnEnable()
+        public void ClearAll()
         {
-            base.OnEnable();
-            BindActions();
+            motion.Clear();
+            action.Clear();
         }
 
-        protected override void OnDisable()
+        public void SetMotion(Vector2 move, Vector2 look, float flyVertical = 0f)
         {
-            UnbindActions();
-            ClearSnapshot();
-            base.OnDisable();
+            motion.move = move;
+            motion.look = look;
+            motion.flyVertical = flyVertical;
+            motion.frameIndex = Time.frameCount;
         }
+
+        public void SetMotionHold(bool eyeHold, bool peekLeftHold, bool peekRightHold)
+        {
+            motion.eyeHold = eyeHold;
+            motion.peekLeftHold = peekLeftHold;
+            motion.peekRightHold = peekRightHold;
+            motion.frameIndex = Time.frameCount;
+        }
+
+        public void PulseAttack()
+        {
+            action.PulseAttack(Time.frameCount);
+        }
+
+        public void PulseInteract()
+        {
+            action.PulseInteract(Time.frameCount);
+        }
+
+        public void PulseSkill(int slot)
+        {
+            switch (slot)
+            {
+                case 1:
+                    action.PulseSkill1(Time.frameCount);
+                    break;
+                case 2:
+                    action.PulseSkill2(Time.frameCount);
+                    break;
+                case 3:
+                    action.PulseSkill3(Time.frameCount);
+                    break;
+            }
+        }
+    }
+
+    [Serializable, TypeRegistryItem("Entity玩家输入写入模块")]
+    public class EntityPlayerInputWriteModule : EntityAIModuleBase
+    {
+        [LabelText("启用玩家输入写入")]
+        public bool enablePlayerInput = true;
 
         protected override void Update()
         {
-            if (!enableInput)
+            if (!enablePlayerInput)
+                return;
+
+            EntityInputState state = MyDomain.inputState;
+            if (state == null || !state.enableInput)
+                return;
+
+            ESInputModule input = ESGameManager.InputModule;
+            if (input == null)
             {
-                ClearSnapshot();
+                state.ClearAll();
                 return;
             }
-            snapshot.frameIndex = Time.frameCount;
+
+            state.motion.frameIndex = Time.frameCount;
+            state.motion.move = input.ReadVector2(ESInputActionId.Move);
+            state.motion.look = input.ReadVector2(ESInputActionId.Look);
+            state.motion.flyVertical = input.ReadAxis(ESInputActionId.FlyVertical);
+            state.motion.peekLeftHold = input.IsHeld(ESInputActionId.PeekLeft);
+            state.motion.peekRightHold = input.IsHeld(ESInputActionId.PeekRight);
+
+            int frame = Time.frameCount;
+            if (input.ConsumePressed(ESInputActionId.Attack)) state.action.PulseAttack(frame);
+            if (input.ConsumePressed(ESInputActionId.HeavyAttack)) state.action.PulseHeavyAttack(frame);
+            if (input.ConsumePressed(ESInputActionId.Block)) state.action.PulseBlock(frame);
+            if (input.ConsumePressed(ESInputActionId.Slide)) state.action.PulseSlide(frame);
+            if (input.ConsumePressed(ESInputActionId.SwitchWeapon)) state.action.PulseSwitchWeapon(frame);
+            if (input.ConsumePressed(ESInputActionId.EquipWeapon)) state.action.PulseEquipWeapon(frame);
+            if (input.ConsumePressed(ESInputActionId.HolsterWeapon)) state.action.PulseHolsterWeapon(frame);
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot1)) state.action.PulseWeaponSlot1(frame);
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot2)) state.action.PulseWeaponSlot2(frame);
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot3)) state.action.PulseWeaponSlot3(frame);
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot4)) state.action.PulseWeaponSlot4(frame);
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot5)) state.action.PulseWeaponSlot5(frame);
+            if (input.ConsumePressed(ESInputActionId.Aim)) state.action.PulseAim(frame);
+            if (input.ConsumePressed(ESInputActionId.Skill1)) state.action.PulseSkill1(frame);
+            if (input.ConsumePressed(ESInputActionId.Skill2)) state.action.PulseSkill2(frame);
+            if (input.ConsumePressed(ESInputActionId.Skill3)) state.action.PulseSkill3(frame);
+            if (input.ConsumePressed(ESInputActionId.Jump)) state.action.PulseJump(frame);
+            if (input.ConsumePressed(ESInputActionId.Crouch)) state.action.PulseCrouchToggle(frame);
+            if (input.ConsumePressed(ESInputActionId.Fly)) state.action.PulseFlyToggle(frame);
+            if (input.ConsumePressed(ESInputActionId.Mount)) state.action.PulseMountToggle(frame);
+            if (input.ConsumePressed(ESInputActionId.Climb)) state.action.PulseClimbToggle(frame);
+            if (input.ConsumePressed(ESInputActionId.Interact)) state.action.PulseInteract(frame);
         }
-
-        private void ClearSnapshot()
-        {
-            snapshot = default;
-        }
-
-        private void BindActions()
-        {
-#if ENABLE_INPUT_SYSTEM
-            _move = moveAction.action;
-            _look = lookAction.action;
-            _attack = attackAction.action;
-            _heavyAttack = heavyAttackAction.action;
-            _block = blockAction.action;
-            _slide = slideAction.action;
-            _switchWeapon = switchWeaponAction.action;
-            _equipWeapon = equipWeaponAction.action;
-            _holsterWeapon = holsterWeaponAction.action;
-            _weaponSlot1 = weaponSlot1Action.action;
-            _weaponSlot2 = weaponSlot2Action.action;
-            _weaponSlot3 = weaponSlot3Action.action;
-            _weaponSlot4 = weaponSlot4Action.action;
-            _weaponSlot5 = weaponSlot5Action.action;
-            _aim = aimAction.action;
-            _peekLeft = peekLeftAction.action;
-            _peekRight = peekRightAction.action;
-            _skill1 = skill1Action.action;
-            _skill2 = skill2Action.action;
-            _skill3 = skill3Action.action;
-            _jump = jumpAction.action;
-            _crouch = crouchAction.action;
-            _fly = flyAction.action;
-            _flyVertical = flyVerticalAction.action;
-            _mount = mountAction.action;
-            _climb = climbAction.action;
-            _eye = eyeAction.action;
-            _interact = interactAction.action;
-
-            RegisterAxis(_move, OnMove);
-            RegisterAxis(_look, OnLook);
-
-            RegisterButton(_attack, OnAttack);
-            RegisterButton(_heavyAttack, OnHeavyAttack);
-            RegisterButton(_block, OnBlock);
-            RegisterButton(_slide, OnSlide);
-            RegisterButton(_switchWeapon, OnSwitchWeapon);
-            RegisterButton(_equipWeapon, OnEquipWeapon);
-            RegisterButton(_holsterWeapon, OnHolsterWeapon);
-            RegisterButton(_weaponSlot1, OnWeaponSlot1);
-            RegisterButton(_weaponSlot2, OnWeaponSlot2);
-            RegisterButton(_weaponSlot3, OnWeaponSlot3);
-            RegisterButton(_weaponSlot4, OnWeaponSlot4);
-            RegisterButton(_weaponSlot5, OnWeaponSlot5);
-            RegisterButton(_aim, OnAim);
-            RegisterHoldButton(_peekLeft, OnPeekLeft);
-            RegisterHoldButton(_peekRight, OnPeekRight);
-            RegisterButton(_skill1, OnSkill1);
-            RegisterButton(_skill2, OnSkill2);
-            RegisterButton(_skill3, OnSkill3);
-            RegisterButton(_jump, OnJump);
-            RegisterButton(_crouch, OnCrouch);
-            RegisterButton(_fly, OnFly);
-            RegisterAxis(_flyVertical, OnFlyVertical);
-            RegisterButton(_mount, OnMount);
-            RegisterButton(_climb, OnClimb);
-            RegisterAxis(_eye, OnEye);
-            RegisterButton(_interact, OnInteract);
-#endif
-        }
-
-        private void UnbindActions()
-        {
-#if ENABLE_INPUT_SYSTEM
-            UnregisterAxis(_move, OnMove);
-            UnregisterAxis(_look, OnLook);
-
-            UnregisterButton(_attack, OnAttack);
-            UnregisterButton(_heavyAttack, OnHeavyAttack);
-            UnregisterButton(_block, OnBlock);
-            UnregisterButton(_slide, OnSlide);
-            UnregisterButton(_switchWeapon, OnSwitchWeapon);
-            UnregisterButton(_equipWeapon, OnEquipWeapon);
-            UnregisterButton(_holsterWeapon, OnHolsterWeapon);
-            UnregisterButton(_weaponSlot1, OnWeaponSlot1);
-            UnregisterButton(_weaponSlot2, OnWeaponSlot2);
-            UnregisterButton(_weaponSlot3, OnWeaponSlot3);
-            UnregisterButton(_weaponSlot4, OnWeaponSlot4);
-            UnregisterButton(_weaponSlot5, OnWeaponSlot5);
-            UnregisterButton(_aim, OnAim);
-            UnregisterHoldButton(_peekLeft, OnPeekLeft);
-            UnregisterHoldButton(_peekRight, OnPeekRight);
-            UnregisterButton(_skill1, OnSkill1);
-            UnregisterButton(_skill2, OnSkill2);
-            UnregisterButton(_skill3, OnSkill3);
-            UnregisterButton(_jump, OnJump);
-            UnregisterButton(_crouch, OnCrouch);
-            UnregisterButton(_fly, OnFly);
-            UnregisterAxis(_flyVertical, OnFlyVertical);
-            UnregisterButton(_mount, OnMount);
-            UnregisterButton(_climb, OnClimb);
-            UnregisterAxis(_eye, OnEye);
-            UnregisterButton(_interact, OnInteract);
-#endif
-        }
-
-#if ENABLE_INPUT_SYSTEM
-        private static void RegisterAxis(InputAction action, Action<InputAction.CallbackContext> callback)
-        {
-            if (action == null) return;
-            action.performed += callback;
-            action.canceled += callback;
-            if (!action.enabled) action.Enable();
-        }
-
-        private static void RegisterButton(InputAction action, Action<InputAction.CallbackContext> callback)
-        {
-            if (action == null) return;
-            action.performed += callback;
-            if (!action.enabled) action.Enable();
-        }
-
-        private static void RegisterHoldButton(InputAction action, Action<InputAction.CallbackContext> callback)
-        {
-            if (action == null) return;
-            action.performed += callback;
-            action.canceled += callback;
-            if (!action.enabled) action.Enable();
-        }
-
-        private static void UnregisterAxis(InputAction action, Action<InputAction.CallbackContext> callback)
-        {
-            if (action == null) return;
-            action.performed -= callback;
-            action.canceled -= callback;
-        }
-
-        private static void UnregisterButton(InputAction action, Action<InputAction.CallbackContext> callback)
-        {
-            if (action == null) return;
-            action.performed -= callback;
-        }
-
-        private static void UnregisterHoldButton(InputAction action, Action<InputAction.CallbackContext> callback)
-        {
-            if (action == null) return;
-            action.performed -= callback;
-            action.canceled -= callback;
-        }
-
-        private void OnMove(InputAction.CallbackContext ctx)
-        {
-            snapshot.move = ctx.ReadValue<Vector2>();
-        }
-
-        private void OnLook(InputAction.CallbackContext ctx)
-        {
-            snapshot.look = ctx.ReadValue<Vector2>();
-        }
-
-        private void OnAttack(InputAction.CallbackContext ctx)
-        {
-            snapshot.attack = true;
-        }
-
-        private void OnHeavyAttack(InputAction.CallbackContext ctx)
-        {
-            snapshot.heavyAttack = true;
-        }
-
-        private void OnBlock(InputAction.CallbackContext ctx)
-        {
-            snapshot.block = true;
-        }
-
-        private void OnSlide(InputAction.CallbackContext ctx)
-        {
-            snapshot.slide = true;
-        }
-
-        private void OnSwitchWeapon(InputAction.CallbackContext ctx)
-        {
-            snapshot.switchWeapon = true;
-        }
-
-        private void OnEquipWeapon(InputAction.CallbackContext ctx)
-        {
-            snapshot.equipWeapon = true;
-        }
-
-        private void OnHolsterWeapon(InputAction.CallbackContext ctx)
-        {
-            snapshot.holsterWeapon = true;
-        }
-
-        private void OnWeaponSlot1(InputAction.CallbackContext ctx)
-        {
-            snapshot.weaponSlot1 = true;
-        }
-
-        private void OnWeaponSlot2(InputAction.CallbackContext ctx)
-        {
-            snapshot.weaponSlot2 = true;
-        }
-
-        private void OnWeaponSlot3(InputAction.CallbackContext ctx)
-        {
-            snapshot.weaponSlot3 = true;
-        }
-
-        private void OnWeaponSlot4(InputAction.CallbackContext ctx)
-        {
-            snapshot.weaponSlot4 = true;
-        }
-
-        private void OnWeaponSlot5(InputAction.CallbackContext ctx)
-        {
-            snapshot.weaponSlot5 = true;
-        }
-
-        private void OnAim(InputAction.CallbackContext ctx)
-        {
-            snapshot.aim = true;
-        }
-
-        private void OnPeekLeft(InputAction.CallbackContext ctx)
-        {
-            snapshot.peekLeftHold = ctx.ReadValue<float>() > 0.5f;
-        }
-
-        private void OnPeekRight(InputAction.CallbackContext ctx)
-        {
-            snapshot.peekRightHold = ctx.ReadValue<float>() > 0.5f;
-        }
-
-        private void OnSkill1(InputAction.CallbackContext ctx)
-        {
-            snapshot.skill1 = true;
-        }
-
-        private void OnSkill2(InputAction.CallbackContext ctx)
-        {
-            snapshot.skill2 = true;
-        }
-
-        private void OnSkill3(InputAction.CallbackContext ctx)
-        {
-            snapshot.skill3 = true;
-        }
-
-        private void OnJump(InputAction.CallbackContext ctx)
-        {
-            snapshot.jump = true;
-        }
-
-        private void OnCrouch(InputAction.CallbackContext ctx)
-        {
-            if (ctx.performed)
-            {
-                snapshot.crouchToggle = true;
-            }
-        }
-
-        private void OnFly(InputAction.CallbackContext ctx)
-        {
-            if (ctx.performed)
-            {
-                snapshot.flyToggle = true;
-            }
-        }
-
-        private void OnFlyVertical(InputAction.CallbackContext ctx)
-        {
-            snapshot.flyVertical = ctx.ReadValue<float>();
-        }
-
-        private void OnMount(InputAction.CallbackContext ctx)
-        {
-            if (ctx.performed)
-            {
-                snapshot.mountToggle = true;
-            }
-        }
-
-        private void OnClimb(InputAction.CallbackContext ctx)
-        {
-            if (ctx.performed)
-            {
-                snapshot.climbToggle = true;
-            }
-        }
-
-        private void OnEye(InputAction.CallbackContext ctx)
-        {
-            snapshot.eyeHold = ctx.ReadValue<float>() > 0.5f;
-        }
-
-        private void OnInteract(InputAction.CallbackContext ctx)
-        {
-            if (ctx.performed)
-            {
-                snapshot.interact = true;
-            }
-        }
-#endif
     }
 
     // =================================================================================================
     // 输入调度模块（AI 域）
-    // - 读取 InputSystem 快照
+    // - 读取 Entity 输入状态
     // - 驱动 Basic 域的“实际生效模块”
     // =================================================================================================
     [Serializable, TypeRegistryItem("AI输入调度模块")]
@@ -706,162 +301,188 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("最近1秒平均速率")]
         public float avgSpeedLast1s;
 
+        [ShowInInspector, ReadOnly, LabelText("最近跳跃输入帧")]
+        public int lastJumpInputFrame;
+
         protected override void Update()
         {
             if (MyCore == null || MyDomain == null) return;
 
-            var input = MyDomain.FindMyModule<EntityAIInputSystemModule>();
-            if (input == null) return;
+            var input = MyDomain.inputState;
+            if (input == null || !input.enableInput) return;
 
             var cam = ResolveCameraTransform();
 
             bool hasClimbModule = TryGetModule(out EntityBasicClimbModule climbModule);
             bool isClimbing = hasClimbModule && climbModule.subState != ClimbSubState.None;
-            if (isClimbing && !_wasClimbing)
-            {
-                _smoothedMoveWorld = Vector3.zero;
-                MyCore.SetMoveInput(Vector3.zero);
-            }
 
-            if (enableCameraLook)
-            {
-                ApplyCameraLook(input.Look, input.EyeHold ? eyeLookScale : 1f, cam, input.EyeHold);
-            }
-
-            bool hasMoveModule = TryGetModule(out EntityBasicMoveRotateModule moveModule);
-            if (hasMoveModule)
-            {
-                Vector3 moveWorld = GetMoveWorld(input.Move, cam, _lastLookWorld) * moveScale;
-                if (stopMoveWhenNoInput && input.Move.sqrMagnitude <= moveDeadZone * moveDeadZone)
-                {
-                    _smoothedMoveWorld = Vector3.zero;
-                    moveWorld = Vector3.zero;
-                }
-                if (disableMoveSmoothWhileClimbing && isClimbing)
-                {
-                    _smoothedMoveWorld = moveWorld;
-                    MyCore.SetMoveInput(moveWorld);
-                }
-                else
-                {
-                    _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
-                    MyCore.SetMoveInput(_smoothedMoveWorld);
-                }
-
-                if (!input.EyeHold)
-                {
-                    Vector3 targetLook = GetLookWorld(input.Look, cam, _smoothedMoveWorld, turnMode);
-                    _lastLookWorld = SmoothLook(_lastLookWorld, targetLook, lookSmooth);
-                    MyCore.SetLookInput(_lastLookWorld);
-                }
-
-                if (input.ConsumeJump()) moveModule.RequestJump();
-                if (input.ConsumeCrouchToggle()) moveModule.ToggleCrouch();
-            }
-
-            if (TryGetModule(out EntityBasicFlyModule flyModule))
-            {
-                if (input.ConsumeFlyToggle()) flyModule.ToggleFly();
-                flyModule.SetVerticalInput(input.FlyVertical);
-            }
-
-            if (TryGetModule(out global::ES.EntityBasicMountModule mountModule))
-            {
-                if (!hasMoveModule)
-                {
-                    Vector3 moveWorld = GetMoveWorld(input.Move, cam, _lastLookWorld) * moveScale;
-                    if (stopMoveWhenNoInput && input.Move.sqrMagnitude <= moveDeadZone * moveDeadZone)
-                    {
-                        _smoothedMoveWorld = Vector3.zero;
-                        moveWorld = Vector3.zero;
-                    }
-                    if (disableMoveSmoothWhileClimbing && isClimbing)
-                    {
-                        _smoothedMoveWorld = moveWorld;
-                        MyCore.SetMoveInput(moveWorld);
-                    }
-                    else
-                    {
-                        _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
-                        MyCore.SetMoveInput(_smoothedMoveWorld);
-                    }
-
-                    if (!input.EyeHold)
-                    {
-                        Vector3 targetLook = GetLookWorld(input.Look, cam, _smoothedMoveWorld, turnMode);
-                        _lastLookWorld = SmoothLook(_lastLookWorld, targetLook, lookSmooth);
-                        MyCore.SetLookInput(_lastLookWorld);
-                    }
-                }
-                if (input.ConsumeMountToggle())
-                {
-                    if (debugMount)
-                    {
-                        Debug.Log($"[EntityAIInputDispatch] MountToggle consumed | module={(mountModule != null ? mountModule.GetType().Name : "null")}");
-                    }
-                    mountModule.ToggleMount();
-                }
-                else if (debugMount)
-                {
-                    Debug.Log("[EntityAIInputDispatch] MountToggle not triggered");
-                }
-            }
-
+            HandleClimbEnter(isClimbing);
+            DispatchCameraLook(input, cam);
+            bool hasMoveModule = DispatchGroundMove(input, cam, isClimbing);
+            DispatchFly(input);
+            DispatchMount(input, cam, isClimbing, hasMoveModule);
             UpdateMoveStats(_smoothedMoveWorld);
-
-            // ===== 攀爬 =====
-            if (hasClimbModule)
-            {
-                if (input.ConsumeClimbToggle())
-                {
-                    climbModule.ToggleClimb();
-                }
-            }
-
-            if (TryGetModule(out EntityBasicInteractionModule interactionModule))
-            {
-                if (input.ConsumeInteract())
-                {
-                    interactionModule.RequestInteract();
-                }
-            }
-
-            if (TryGetModule(out EntityBasicCombatModule combatModule))
-            {
-                if (input.ConsumeAttack()) combatModule.TriggerAttack();
-                if (input.ConsumeHeavyAttack()) combatModule.TriggerHeavyAttack();
-                if (input.ConsumeBlock()) combatModule.SetBlock(true);
-                if (input.ConsumeSlide()) combatModule.SetSlide(true);
-                bool weaponActionHandled = false;
-                if (!weaponActionHandled && input.ConsumeWeaponSlot1()) { combatModule.SwitchWeaponTo(0); weaponActionHandled = true; }
-                if (!weaponActionHandled && input.ConsumeWeaponSlot2()) { combatModule.SwitchWeaponTo(1); weaponActionHandled = true; }
-                if (!weaponActionHandled && input.ConsumeWeaponSlot3()) { combatModule.SwitchWeaponTo(2); weaponActionHandled = true; }
-                if (!weaponActionHandled && input.ConsumeWeaponSlot4()) { combatModule.SwitchWeaponTo(3); weaponActionHandled = true; }
-                if (!weaponActionHandled && input.ConsumeWeaponSlot5()) { combatModule.SwitchWeaponTo(4); weaponActionHandled = true; }
-                if (!weaponActionHandled && input.ConsumeSwitchWeapon()) { combatModule.SwitchWeaponNext(); weaponActionHandled = true; }
-                if (!weaponActionHandled && input.ConsumeEquipWeapon()) { combatModule.EquipCurrentWeapon(); weaponActionHandled = true; }
-                if (!weaponActionHandled && input.ConsumeHolsterWeapon()) { combatModule.HolsterCurrentWeapon(); weaponActionHandled = true; }
-                if (input.ConsumeAim()) combatModule.SetAim(!combatModule.isAiming);
-
-                combatModule.SetAimPeek(input.AimPeek);
-
-                var ikDriver = ResolveIKDriver();
-                if (ikDriver != null)
-                {
-                    ApplyCombatAimAndPeek(ikDriver, combatModule, cam);
-                }
-            }
-
-            if (TryGetModule(out EntityBasicSkillModule skillModule))
-            {
-                if (input.ConsumeSkill1()) skillModule.TriggerSkill(1);
-                if (input.ConsumeSkill2()) skillModule.TriggerSkill(2);
-                if (input.ConsumeSkill3()) skillModule.TriggerSkill(3);
-            }
+            DispatchClimb(input, climbModule, hasClimbModule);
+            DispatchInteraction(input);
+            DispatchCombat(input, cam);
+            DispatchSkill(input);
 
             input.ClearOneShot();
             _wasClimbing = isClimbing;
         }
+
+        #region 调度流程
+
+        private void HandleClimbEnter(bool isClimbing)
+        {
+            if (!isClimbing || _wasClimbing)
+                return;
+
+            _smoothedMoveWorld = Vector3.zero;
+            MyCore.SetMoveInput(Vector3.zero);
+        }
+
+        private void DispatchCameraLook(EntityInputState input, Transform cam)
+        {
+            if (enableCameraLook)
+                ApplyCameraLook(input.Look, input.EyeHold ? eyeLookScale : 1f, cam, input.EyeHold);
+        }
+
+        private bool DispatchGroundMove(EntityInputState input, Transform cam, bool isClimbing)
+        {
+            if (!TryGetModule(out EntityBasicMoveRotateModule moveModule))
+                return false;
+
+            ApplyMoveAndLook(input, cam, isClimbing);
+
+            if (input.ConsumeJump())
+            {
+                lastJumpInputFrame = Time.frameCount;
+                moveModule.RequestJump();
+            }
+
+            if (input.ConsumeCrouchToggle())
+                moveModule.ToggleCrouch();
+
+            return true;
+        }
+
+        private void DispatchFly(EntityInputState input)
+        {
+            if (!TryGetModule(out EntityBasicFlyModule flyModule))
+                return;
+
+            if (input.ConsumeFlyToggle())
+                flyModule.ToggleFly();
+
+            flyModule.SetVerticalInput(input.FlyVertical);
+        }
+
+        private void DispatchMount(EntityInputState input, Transform cam, bool isClimbing, bool hasMoveModule)
+        {
+            if (!TryGetModule(out global::ES.EntityBasicMountModule mountModule))
+                return;
+
+            if (!hasMoveModule)
+                ApplyMoveAndLook(input, cam, isClimbing);
+
+            if (input.ConsumeMountToggle())
+            {
+                if (debugMount)
+                    Debug.Log($"[EntityAIInputDispatch] MountToggle consumed | module={mountModule.GetType().Name}");
+
+                mountModule.ToggleMount();
+            }
+            else if (debugMount)
+            {
+                Debug.Log("[EntityAIInputDispatch] MountToggle not triggered");
+            }
+        }
+
+        private void DispatchClimb(EntityInputState input, EntityBasicClimbModule climbModule, bool hasClimbModule)
+        {
+            if (hasClimbModule && input.ConsumeClimbToggle())
+                climbModule.ToggleClimb();
+        }
+
+        private void DispatchInteraction(EntityInputState input)
+        {
+            if (TryGetModule(out EntityBasicInteractionModule interactionModule) && input.ConsumeInteract())
+                interactionModule.RequestInteract();
+        }
+
+        private void DispatchCombat(EntityInputState input, Transform cam)
+        {
+            if (!TryGetModule(out EntityBasicCombatModule combatModule))
+                return;
+
+            if (input.ConsumeAttack()) combatModule.TriggerAttack();
+            if (input.ConsumeHeavyAttack()) combatModule.TriggerHeavyAttack();
+            if (input.ConsumeBlock()) combatModule.SetBlock(true);
+            if (input.ConsumeSlide()) combatModule.SetSlide(true);
+            DispatchWeaponAction(input, combatModule);
+
+            if (input.ConsumeAim())
+                combatModule.SetAim(!combatModule.isAiming);
+
+            combatModule.SetAimPeek(input.AimPeek);
+
+            var ikDriver = ResolveIKDriver();
+            if (ikDriver != null)
+                ApplyCombatAimAndPeek(ikDriver, combatModule, cam);
+        }
+
+        private void DispatchWeaponAction(EntityInputState input, EntityBasicCombatModule combatModule)
+        {
+            if (input.ConsumeWeaponSlot1()) { combatModule.SwitchWeaponTo(0); return; }
+            if (input.ConsumeWeaponSlot2()) { combatModule.SwitchWeaponTo(1); return; }
+            if (input.ConsumeWeaponSlot3()) { combatModule.SwitchWeaponTo(2); return; }
+            if (input.ConsumeWeaponSlot4()) { combatModule.SwitchWeaponTo(3); return; }
+            if (input.ConsumeWeaponSlot5()) { combatModule.SwitchWeaponTo(4); return; }
+            if (input.ConsumeSwitchWeapon()) { combatModule.SwitchWeaponNext(); return; }
+            if (input.ConsumeEquipWeapon()) { combatModule.EquipCurrentWeapon(); return; }
+            if (input.ConsumeHolsterWeapon()) combatModule.HolsterCurrentWeapon();
+        }
+
+        private void DispatchSkill(EntityInputState input)
+        {
+            if (!TryGetModule(out EntityBasicSkillModule skillModule))
+                return;
+
+            if (input.ConsumeSkill1()) skillModule.TriggerSkill(1);
+            if (input.ConsumeSkill2()) skillModule.TriggerSkill(2);
+            if (input.ConsumeSkill3()) skillModule.TriggerSkill(3);
+        }
+
+        private void ApplyMoveAndLook(EntityInputState input, Transform cam, bool isClimbing)
+        {
+            Vector3 moveWorld = GetMoveWorld(input.Move, cam, _lastLookWorld) * moveScale;
+            if (stopMoveWhenNoInput && input.Move.sqrMagnitude <= moveDeadZone * moveDeadZone)
+            {
+                _smoothedMoveWorld = Vector3.zero;
+                moveWorld = Vector3.zero;
+            }
+
+            if (disableMoveSmoothWhileClimbing && isClimbing)
+            {
+                _smoothedMoveWorld = moveWorld;
+                MyCore.SetMoveInput(moveWorld);
+            }
+            else
+            {
+                _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
+                MyCore.SetMoveInput(_smoothedMoveWorld);
+            }
+
+            if (input.EyeHold)
+                return;
+
+            Vector3 targetLook = GetLookWorld(input.Look, cam, _smoothedMoveWorld, turnMode);
+            _lastLookWorld = SmoothLook(_lastLookWorld, targetLook, lookSmooth);
+            MyCore.SetLookInput(_lastLookWorld);
+        }
+
+        #endregion
 
         private bool TryGetModule<T>(out T module) where T : class
         {
@@ -876,7 +497,12 @@ namespace ES
 
         private StateFinalIKDriver ResolveIKDriver()
         {
-            return MyCore != null ? MyCore.ResolveStateFinalIKDriver() : null;
+            if (MyCore == null)
+                return null;
+
+            StateMachine stateMachine = MyCore.stateDomain != null ? MyCore.stateDomain.stateMachine : null;
+            Animator stateAnimator = stateMachine != null && stateMachine.BoundAnimator != null ? stateMachine.BoundAnimator : MyCore.animator;
+            return stateAnimator != null ? stateAnimator.GetComponent<StateFinalIKDriver>() : null;
         }
 
         private void ApplyCombatAimAndPeek(StateFinalIKDriver ikDriver, EntityBasicCombatModule combatModule, Transform cam)
@@ -1349,7 +975,7 @@ namespace ES
     }
 
     [Serializable]
-    public struct InputSnapshot
+    public struct EntityMotionInputState
     {
         [LabelText("帧")]
         public int frameIndex;
@@ -1359,6 +985,38 @@ namespace ES
 
         [LabelText("视角")]
         public Vector2 look;
+
+        [LabelText("飞行垂直")]
+        public float flyVertical;
+
+        [LabelText("小眼睛(按住)")]
+        public bool eyeHold;
+
+        [LabelText("左探头(按住)")]
+        public bool peekLeftHold;
+
+        [LabelText("右探头(按住)")]
+        public bool peekRightHold;
+
+        public float AimPeek => peekLeftHold == peekRightHold ? 0f : (peekRightHold ? 1f : -1f);
+
+        public void Clear()
+        {
+            frameIndex = 0;
+            move = Vector2.zero;
+            look = Vector2.zero;
+            flyVertical = 0f;
+            eyeHold = false;
+            peekLeftHold = false;
+            peekRightHold = false;
+        }
+    }
+
+    [Serializable]
+    public struct EntityActionInputPulse
+    {
+        [LabelText("帧")]
+        public int frameIndex;
 
         [LabelText("攻击")]
         public bool attack;
@@ -1399,12 +1057,6 @@ namespace ES
         [LabelText("瞄准")]
         public bool aim;
 
-        [LabelText("左探头(按住)")]
-        public bool peekLeftHold;
-
-        [LabelText("右探头(按住)")]
-        public bool peekRightHold;
-
         [LabelText("技能1")]
         public bool skill1;
 
@@ -1423,9 +1075,6 @@ namespace ES
         [LabelText("飞行(切换指令)")]
         public bool flyToggle;
 
-        [LabelText("飞行垂直")]
-        public float flyVertical;
-
         [LabelText("骑乘(切换指令)")]
         public bool mountToggle;
 
@@ -1435,33 +1084,9 @@ namespace ES
         [LabelText("交互")]
         public bool interact;
 
-        [LabelText("小眼睛(按住)")]
-        public bool eyeHold;
-
-        public void ClearOneShot()
+        public void Clear()
         {
-            attack = false;
-            heavyAttack = false;
-            block = false;
-            slide = false;
-            switchWeapon = false;
-            equipWeapon = false;
-            holsterWeapon = false;
-            weaponSlot1 = false;
-            weaponSlot2 = false;
-            weaponSlot3 = false;
-            weaponSlot4 = false;
-            weaponSlot5 = false;
-            aim = false;
-            skill1 = false;
-            skill2 = false;
-            skill3 = false;
-            jump = false;
-            crouchToggle = false;
-            flyToggle = false;
-            mountToggle = false;
-            climbToggle = false;
-            interact = false;
+            this = default;
         }
 
         public bool ConsumeAttack() => Consume(ref attack);
@@ -1481,20 +1106,46 @@ namespace ES
         public bool ConsumeSkill2() => Consume(ref skill2);
         public bool ConsumeSkill3() => Consume(ref skill3);
         public bool ConsumeJump() => Consume(ref jump);
-
-        public bool EyeHold => eyeHold;
-        public float AimPeek => peekLeftHold == peekRightHold ? 0f : (peekRightHold ? 1f : -1f);
         public bool ConsumeCrouchToggle() => Consume(ref crouchToggle);
         public bool ConsumeFlyToggle() => Consume(ref flyToggle);
         public bool ConsumeMountToggle() => Consume(ref mountToggle);
         public bool ConsumeClimbToggle() => Consume(ref climbToggle);
         public bool ConsumeInteract() => Consume(ref interact);
 
+        public void PulseAttack(int frame) => Pulse(ref attack, frame);
+        public void PulseHeavyAttack(int frame) => Pulse(ref heavyAttack, frame);
+        public void PulseBlock(int frame) => Pulse(ref block, frame);
+        public void PulseSlide(int frame) => Pulse(ref slide, frame);
+        public void PulseSwitchWeapon(int frame) => Pulse(ref switchWeapon, frame);
+        public void PulseEquipWeapon(int frame) => Pulse(ref equipWeapon, frame);
+        public void PulseHolsterWeapon(int frame) => Pulse(ref holsterWeapon, frame);
+        public void PulseWeaponSlot1(int frame) => Pulse(ref weaponSlot1, frame);
+        public void PulseWeaponSlot2(int frame) => Pulse(ref weaponSlot2, frame);
+        public void PulseWeaponSlot3(int frame) => Pulse(ref weaponSlot3, frame);
+        public void PulseWeaponSlot4(int frame) => Pulse(ref weaponSlot4, frame);
+        public void PulseWeaponSlot5(int frame) => Pulse(ref weaponSlot5, frame);
+        public void PulseAim(int frame) => Pulse(ref aim, frame);
+        public void PulseSkill1(int frame) => Pulse(ref skill1, frame);
+        public void PulseSkill2(int frame) => Pulse(ref skill2, frame);
+        public void PulseSkill3(int frame) => Pulse(ref skill3, frame);
+        public void PulseJump(int frame) => Pulse(ref jump, frame);
+        public void PulseCrouchToggle(int frame) => Pulse(ref crouchToggle, frame);
+        public void PulseFlyToggle(int frame) => Pulse(ref flyToggle, frame);
+        public void PulseMountToggle(int frame) => Pulse(ref mountToggle, frame);
+        public void PulseClimbToggle(int frame) => Pulse(ref climbToggle, frame);
+        public void PulseInteract(int frame) => Pulse(ref interact, frame);
+
         private static bool Consume(ref bool value)
         {
             if (!value) return false;
             value = false;
             return true;
+        }
+
+        private void Pulse(ref bool value, int frame)
+        {
+            value = true;
+            frameIndex = frame;
         }
     }
 
@@ -1510,321 +1161,4 @@ namespace ES
         }
     }
 
-    public enum InputQuickPreset
-    {
-        Default,
-        Empty
-    }
-
-    public enum InputSchemeKey
-    {
-        Default,
-        KeyboardMouse,
-        Gamepad,
-        Both
-    }
-
-    public enum InputActionKey
-    {
-        Move,
-        Look,
-        Attack,
-        HeavyAttack,
-        Block,
-        Slide,
-        SwitchWeapon,
-        EquipWeapon,
-        HolsterWeapon,
-        WeaponSlot1,
-        WeaponSlot2,
-        WeaponSlot3,
-        WeaponSlot4,
-        WeaponSlot5,
-        Aim,
-        PeekLeft,
-        PeekRight,
-        Skill1,
-        Skill2,
-        Skill3,
-        Jump,
-        Crouch,
-        Fly,
-        Mount,
-        FlyVertical,
-        Climb,
-        Interact
-    }
-
-#if ENABLE_INPUT_SYSTEM
-    public static class EntityInputQuickInit
-    {
-        public static void ApplyPreset(EntityAIInputSystemModule module, InputQuickPreset preset, InputSchemeKey schemeKey)
-        {
-            if (module == null) return;
-
-            if (preset == InputQuickPreset.Empty)
-            {
-                module.InitEmpty();
-                return;
-            }
-
-            ApplySingle(module, InputActionKey.Move, schemeKey);
-            ApplySingle(module, InputActionKey.Look, schemeKey);
-            ApplySingle(module, InputActionKey.Attack, schemeKey);
-            ApplySingle(module, InputActionKey.HeavyAttack, schemeKey);
-            ApplySingle(module, InputActionKey.Block, schemeKey);
-            ApplySingle(module, InputActionKey.Slide, schemeKey);
-            ApplySingle(module, InputActionKey.SwitchWeapon, schemeKey);
-            ApplySingle(module, InputActionKey.EquipWeapon, schemeKey);
-            ApplySingle(module, InputActionKey.HolsterWeapon, schemeKey);
-            ApplySingle(module, InputActionKey.WeaponSlot1, schemeKey);
-            ApplySingle(module, InputActionKey.WeaponSlot2, schemeKey);
-            ApplySingle(module, InputActionKey.WeaponSlot3, schemeKey);
-            ApplySingle(module, InputActionKey.WeaponSlot4, schemeKey);
-            ApplySingle(module, InputActionKey.WeaponSlot5, schemeKey);
-            ApplySingle(module, InputActionKey.Aim, schemeKey);
-            ApplySingle(module, InputActionKey.PeekLeft, schemeKey);
-            ApplySingle(module, InputActionKey.PeekRight, schemeKey);
-            ApplySingle(module, InputActionKey.Skill1, schemeKey);
-            ApplySingle(module, InputActionKey.Skill2, schemeKey);
-            ApplySingle(module, InputActionKey.Skill3, schemeKey);
-            ApplySingle(module, InputActionKey.Jump, schemeKey);
-            ApplySingle(module, InputActionKey.Crouch, schemeKey);
-            ApplySingle(module, InputActionKey.Fly, schemeKey);
-            ApplySingle(module, InputActionKey.Mount, schemeKey);
-            ApplySingle(module, InputActionKey.FlyVertical, schemeKey);
-            ApplySingle(module, InputActionKey.Climb, schemeKey);
-            ApplySingle(module, InputActionKey.Interact, schemeKey);
-        }
-
-        public static void ApplySingle(EntityAIInputSystemModule module, InputActionKey key, InputSchemeKey schemeKey)
-        {
-            if (module == null) return;
-
-            switch (key)
-            {
-                case InputActionKey.Move:
-                    module.moveAction = CreateMoveAction(key.ToString(), schemeKey);
-                    break;
-                case InputActionKey.Look:
-                    module.lookAction = CreateLookAction(key.ToString(), schemeKey);
-                    break;
-                case InputActionKey.Attack:
-                    module.attackAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.HeavyAttack:
-                    module.heavyAttackAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Block:
-                    module.blockAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Slide:
-                    module.slideAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.SwitchWeapon:
-                    module.switchWeaponAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.EquipWeapon:
-                    module.equipWeaponAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.HolsterWeapon:
-                    module.holsterWeaponAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.WeaponSlot1:
-                    module.weaponSlot1Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.WeaponSlot2:
-                    module.weaponSlot2Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.WeaponSlot3:
-                    module.weaponSlot3Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.WeaponSlot4:
-                    module.weaponSlot4Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.WeaponSlot5:
-                    module.weaponSlot5Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Aim:
-                    module.aimAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.PeekLeft:
-                    module.peekLeftAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.PeekRight:
-                    module.peekRightAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Skill1:
-                    module.skill1Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Skill2:
-                    module.skill2Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Skill3:
-                    module.skill3Action = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Jump:
-                    module.jumpAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Crouch:
-                    module.crouchAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Fly:
-                    module.flyAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Mount:
-                    module.mountAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Climb:
-                    module.climbAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.Interact:
-                    module.interactAction = CreateButtonAction(key.ToString(), GetBindings(key, schemeKey));
-                    break;
-                case InputActionKey.FlyVertical:
-                    module.flyVerticalAction = CreateAxisAction(key.ToString(), schemeKey);
-                    break;
-            }
-        }
-
-        private static InputActionProperty CreateAxisAction(string name, InputSchemeKey schemeKey)
-        {
-            var action = new InputAction(name, InputActionType.Value) { expectedControlType = "Axis" };
-
-            if (schemeKey == InputSchemeKey.KeyboardMouse || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default)
-            {
-                action.AddCompositeBinding("1DAxis")
-                    .With("Negative", "<Keyboard>/q")
-                    .With("Positive", "<Keyboard>/e");
-            }
-
-            if (schemeKey == InputSchemeKey.Gamepad || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default)
-            {
-                action.AddCompositeBinding("1DAxis")
-                    .With("Negative", "<Gamepad>/leftTrigger")
-                    .With("Positive", "<Gamepad>/rightTrigger");
-            }
-
-            return new InputActionProperty(action);
-        }
-
-        private static InputActionProperty CreateMoveAction(string name, InputSchemeKey schemeKey)
-        {
-            var action = new InputAction(name, InputActionType.Value) { expectedControlType = "Vector2" };
-
-            if (schemeKey == InputSchemeKey.KeyboardMouse || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default)
-            {
-                action.AddCompositeBinding("2DVector")
-                    .With("Up", "<Keyboard>/w")
-                    .With("Down", "<Keyboard>/s")
-                    .With("Left", "<Keyboard>/a")
-                    .With("Right", "<Keyboard>/d");
-            }
-
-            if (schemeKey == InputSchemeKey.Gamepad || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default)
-            {
-                action.AddBinding("<Gamepad>/leftStick");
-            }
-
-            return new InputActionProperty(action);
-        }
-
-        private static InputActionProperty CreateLookAction(string name, InputSchemeKey schemeKey)
-        {
-            var action = new InputAction(name, InputActionType.Value) { expectedControlType = "Vector2" };
-
-            if (schemeKey == InputSchemeKey.KeyboardMouse || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default)
-            {
-                action.AddBinding("<Mouse>/delta");
-            }
-
-            if (schemeKey == InputSchemeKey.Gamepad || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default)
-            {
-                action.AddBinding("<Gamepad>/rightStick");
-            }
-
-            return new InputActionProperty(action);
-        }
-
-        private static string[] GetBindings(InputActionKey key, InputSchemeKey schemeKey)
-        {
-            var list = new List<string>(4);
-
-            bool useKbm = schemeKey == InputSchemeKey.KeyboardMouse || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default;
-            bool usePad = schemeKey == InputSchemeKey.Gamepad || schemeKey == InputSchemeKey.Both || schemeKey == InputSchemeKey.Default;
-
-            if (useKbm)
-            {
-                switch (key)
-                {
-                    case InputActionKey.Attack: list.Add("<Mouse>/leftButton"); break;
-                    case InputActionKey.HeavyAttack: list.Add("<Mouse>/rightButton"); break;
-                    case InputActionKey.Block: list.Add("<Keyboard>/leftShift"); break;
-                    case InputActionKey.Slide: list.Add("<Keyboard>/leftCtrl"); break;
-                    case InputActionKey.SwitchWeapon: list.Add("<Keyboard>/tab"); break;
-                    case InputActionKey.EquipWeapon: list.Add("<Keyboard>/q"); break;
-                    case InputActionKey.HolsterWeapon: list.Add("<Keyboard>/t"); break;
-                    case InputActionKey.WeaponSlot1: list.Add("<Keyboard>/1"); break;
-                    case InputActionKey.WeaponSlot2: list.Add("<Keyboard>/2"); break;
-                    case InputActionKey.WeaponSlot3: list.Add("<Keyboard>/3"); break;
-                    case InputActionKey.WeaponSlot4: list.Add("<Keyboard>/4"); break;
-                    case InputActionKey.WeaponSlot5: list.Add("<Keyboard>/5"); break;
-                    case InputActionKey.Aim: list.Add("<Mouse>/rightButton"); break;
-                    case InputActionKey.PeekLeft: list.Add("<Keyboard>/z"); break;
-                    case InputActionKey.PeekRight: list.Add("<Keyboard>/x"); break;
-                    case InputActionKey.Skill1: list.Add("<Keyboard>/f1"); break;
-                    case InputActionKey.Skill2: list.Add("<Keyboard>/f2"); break;
-                    case InputActionKey.Skill3: list.Add("<Keyboard>/f3"); break;
-                    case InputActionKey.Jump: list.Add("<Keyboard>/space"); break;
-                    case InputActionKey.Crouch: list.Add("<Keyboard>/c"); break;
-                    case InputActionKey.Fly: list.Add("<Keyboard>/f"); break;
-                    case InputActionKey.Mount: list.Add("<Keyboard>/r"); break;
-                    case InputActionKey.Climb: list.Add("<Keyboard>/g"); break;
-                    case InputActionKey.Interact: list.Add("<Keyboard>/e"); break;
-                }
-            }
-
-            if (usePad)
-            {
-                switch (key)
-                {
-                    case InputActionKey.Attack: list.Add("<Gamepad>/rightTrigger"); break;
-                    case InputActionKey.HeavyAttack: list.Add("<Gamepad>/leftTrigger"); break;
-                    case InputActionKey.Block: list.Add("<Gamepad>/leftShoulder"); break;
-                    case InputActionKey.Slide: list.Add("<Gamepad>/rightShoulder"); break;
-                    case InputActionKey.SwitchWeapon: list.Add("<Gamepad>/dpad/right"); break;
-                    case InputActionKey.EquipWeapon: list.Add("<Gamepad>/buttonWest"); break;
-                    case InputActionKey.HolsterWeapon: list.Add("<Gamepad>/start"); break;
-                    case InputActionKey.WeaponSlot1: list.Add("<Gamepad>/dpad/up"); break;
-                    case InputActionKey.WeaponSlot2: list.Add("<Gamepad>/dpad/right"); break;
-                    case InputActionKey.WeaponSlot3: list.Add("<Gamepad>/dpad/down"); break;
-                    case InputActionKey.WeaponSlot4: list.Add("<Gamepad>/dpad/left"); break;
-                    case InputActionKey.WeaponSlot5: list.Add("<Gamepad>/rightStickPress"); break;
-                    case InputActionKey.Aim: list.Add("<Gamepad>/leftTrigger"); break;
-                    case InputActionKey.Skill1: list.Add("<Gamepad>/dpad/up"); break;
-                    case InputActionKey.Skill2: list.Add("<Gamepad>/dpad/left"); break;
-                    case InputActionKey.Skill3: list.Add("<Gamepad>/dpad/down"); break;
-                    case InputActionKey.Jump: list.Add("<Gamepad>/buttonSouth"); break;
-                    case InputActionKey.Crouch: list.Add("<Gamepad>/rightStickPress"); break;
-                    case InputActionKey.Fly: list.Add("<Gamepad>/buttonNorth"); break;
-                    case InputActionKey.Mount: list.Add("<Gamepad>/buttonWest"); break;
-                    case InputActionKey.Climb: list.Add("<Gamepad>/leftStickPress"); break;
-                    case InputActionKey.Interact: list.Add("<Gamepad>/buttonEast"); break;
-                }
-            }
-
-            return list.ToArray();
-        }
-
-        private static InputActionProperty CreateButtonAction(string name, params string[] bindings)
-        {
-            var action = new InputAction(name, InputActionType.Button);
-            for (int i = 0; i < bindings.Length; i++)
-            {
-                action.AddBinding(bindings[i]);
-            }
-            return new InputActionProperty(action);
-        }
-    }
-#endif
 }

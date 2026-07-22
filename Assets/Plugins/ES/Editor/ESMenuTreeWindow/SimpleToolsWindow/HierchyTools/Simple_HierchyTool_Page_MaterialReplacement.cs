@@ -72,70 +72,68 @@ namespace ES
             MatchByShader
         }
 
-        [FoldoutGroup("1. 扫描范围", Expanded = true)]
+        [HideInInspector]
         [LabelText("目标范围"), EnumToggleButtons]
         public TargetScope targetScope = TargetScope.SelectedWithChildren;
 
-        [FoldoutGroup("1. 扫描范围")]
+        [HideInInspector]
         [LabelText("处理组件"), EnumToggleButtons]
         public ComponentType componentTypes = ComponentType.Renderer | ComponentType.ParticleSystemRenderer;
 
-        [FoldoutGroup("1. 扫描范围")]
+        [HideInInspector]
         [LabelText("包含未激活对象")]
         public bool includeInactive = true;
 
-        [FoldoutGroup("1. 扫描范围")]
+        [HideInInspector]
         [LabelText("扫描脚本字段"), GUIColor(0.95f, 0.78f, 0.35f)]
         [ShowIf("@(this.componentTypes & ES.Page_MaterialReplacement.ComponentType.MonoBehaviour) != 0")]
         public bool scanSerializedScriptFields = false;
 
-        [FoldoutGroup("1. 扫描范围")]
+        [HideInInspector]
         [LabelText("跳过隐藏对象")]
         public bool skipHideFlagsObjects = true;
 
-        [FoldoutGroup("2. 匹配规则", Expanded = true)]
+        [HideInInspector]
         [LabelText("替换模式"), EnumToggleButtons]
         public ReplacementMode replacementMode = ReplacementMode.ReplaceSpecific;
 
-        [FoldoutGroup("2. 匹配规则")]
+        [HideInInspector]
         [LabelText("源材质"), AssetsOnly]
         [ShowIf("replacementMode", ReplacementMode.ReplaceSpecific)]
         public Material sourceMaterial;
 
-        [FoldoutGroup("2. 匹配规则")]
+        [HideInInspector]
         [LabelText("名称关键字")]
         [ShowIf("replacementMode", ReplacementMode.MatchByName)]
         public string matchName = "";
 
-        [FoldoutGroup("2. 匹配规则")]
+        [HideInInspector]
         [LabelText("忽略大小写")]
         [ShowIf("@this.replacementMode == ES.Page_MaterialReplacement.ReplacementMode.MatchByName || this.replacementMode == ES.Page_MaterialReplacement.ReplacementMode.MatchByRegex")]
         public bool ignoreCase = true;
 
-        [FoldoutGroup("2. 匹配规则")]
+        [HideInInspector]
         [LabelText("正则表达式")]
         [ShowIf("replacementMode", ReplacementMode.MatchByRegex)]
         public string regexPattern = "";
 
-        [FoldoutGroup("2. 匹配规则")]
+        [HideInInspector]
         [LabelText("源 Shader")]
         [ShowIf("replacementMode", ReplacementMode.MatchByShader)]
         public Shader sourceShader;
 
-        [FoldoutGroup("2. 匹配规则")]
+        [HideInInspector]
         [LabelText("空材质也填充")]
         public bool setDefaultWhenNull = false;
 
-        [FoldoutGroup("3. 替换目标", Expanded = true)]
+        [HideInInspector]
         [LabelText("目标材质"), AssetsOnly, Required]
         public Material targetMaterial;
 
-        [FoldoutGroup("3. 替换目标")]
+        [HideInInspector]
         [LabelText("允许替换成相同材质")]
         public bool allowSameMaterial = false;
 
-        [FoldoutGroup("4. 预览与执行", Expanded = true)]
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-20)]
         private string PanelSummary
         {
             get
@@ -146,9 +144,6 @@ namespace ES
             }
         }
 
-        [FoldoutGroup("4. 预览与执行")]
-        [HorizontalGroup("4. 预览与执行/Actions")]
-        [Button("刷新预览", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void RefreshReplacementPreview()
         {
             if (!TryValidateScanSettings(out var message))
@@ -169,31 +164,21 @@ namespace ES
             EditorUtility.DisplayDialog("预览已刷新", $"预计可替换 {replacementPreview.Count} 处材质引用。\n\n{preview}", "完成");
         }
 
-        [FoldoutGroup("4. 预览与执行")]
-        [HorizontalGroup("4. 预览与执行/Actions")]
-        [Button("全选预览项", ButtonHeight = 34), GUIColor(0.25f, 0.62f, 0.45f)]
         public void EnableAllPreviewItems()
         {
             foreach (var item in replacementPreview)
                 item.Enabled = true;
         }
 
-        [FoldoutGroup("4. 预览与执行")]
-        [HorizontalGroup("4. 预览与执行/Actions")]
-        [Button("取消全选", ButtonHeight = 34), GUIColor(0.48f, 0.48f, 0.48f)]
         public void DisableAllPreviewItems()
         {
             foreach (var item in replacementPreview)
                 item.Enabled = false;
         }
 
-        [FoldoutGroup("4. 预览与执行")]
-        [ShowInInspector, LabelText("替换预览"), TableList(AlwaysExpanded = true, DrawScrollView = true, MaxScrollViewHeight = 360)]
+        [HideInInspector]
         public List<MaterialReferenceRecord> replacementPreview = new List<MaterialReferenceRecord>();
 
-        [FoldoutGroup("5. 材质审计", Expanded = false)]
-        [HorizontalGroup("5. 材质审计/Actions")]
-        [Button("查询材质使用", ButtonHeight = 32), GUIColor(0.35f, 0.68f, 0.9f)]
         public void QueryMaterialUsage()
         {
             if (!TryValidateScanSettings(out var message, requireTargetMaterial: false))
@@ -209,34 +194,27 @@ namespace ES
             EditorUtility.DisplayDialog("查询完成", $"找到 {usedMaterials.Count} 处材质引用。", "完成");
         }
 
-        [FoldoutGroup("5. 材质审计")]
-        [ShowInInspector, LabelText("材质使用列表"), TableList(AlwaysExpanded = true, DrawScrollView = true, MaxScrollViewHeight = 320)]
+        [HideInInspector]
         public List<MaterialUsage> usedMaterials = new List<MaterialUsage>();
 
-        [FoldoutGroup("7. Prefab 资产批处理", Expanded = true)]
+        [HideInInspector]
         [LabelText("启用资产批处理")]
         public bool enablePrefabAssetBatch = false;
 
-        [FoldoutGroup("7. Prefab 资产批处理")]
+        [HideInInspector]
         [LabelText("优先处理选中 Prefab 资产")]
         public bool useSelectedPrefabAssets = true;
 
-        [FoldoutGroup("7. Prefab 资产批处理")]
+        [HideInInspector]
         [FolderPath(AbsolutePath = false)]
         [LabelText("Prefab 搜索文件夹")]
         [ShowIf("enablePrefabAssetBatch")]
         [HideIf("useSelectedPrefabAssets")]
         public string prefabAssetFolder = "Assets";
 
-        [FoldoutGroup("7. Prefab 资产批处理")]
-        [ShowIf("enablePrefabAssetBatch")]
-        [ShowInInspector, LabelText("Prefab 资产预览"), TableList(AlwaysExpanded = true, DrawScrollView = true, MaxScrollViewHeight = 300)]
+        [HideInInspector]
         public List<PrefabAssetBatchRecord> prefabAssetPreview = new List<PrefabAssetBatchRecord>();
 
-        [FoldoutGroup("7. Prefab 资产批处理")]
-        [ShowIf("enablePrefabAssetBatch")]
-        [HorizontalGroup("7. Prefab 资产批处理/Actions")]
-        [Button("扫描 Prefab 资产", ButtonHeight = 32), GUIColor(0.35f, 0.68f, 0.9f)]
         public void RefreshPrefabAssetPreview()
         {
             if (!TryValidateScanSettings(out var message))
@@ -260,10 +238,6 @@ namespace ES
             EditorUtility.DisplayDialog("Prefab 资产预览已刷新", $"命中 {prefabAssetPreview.Count} 个 prefab 资产。", "完成");
         }
 
-        [FoldoutGroup("7. Prefab 资产批处理")]
-        [ShowIf("enablePrefabAssetBatch")]
-        [HorizontalGroup("7. Prefab 资产批处理/Actions")]
-        [Button("执行 Prefab 资产替换", ButtonHeight = 34), GUIColor(0.82f, 0.52f, 0.24f)]
         public void ReplacePrefabAssets()
         {
             if (!TryValidateScanSettings(out var message))
@@ -300,8 +274,6 @@ namespace ES
             ExecutePrefabAssetReplacement(enabledEntries);
         }
 
-        [FoldoutGroup("6. 执行结果", Expanded = true)]
-        [Button("执行材质替换", ButtonHeight = 38), GUIColor(0.82f, 0.52f, 0.24f)]
         public void ReplaceMaterials()
         {
             if (!TryValidateScanSettings(out var message))
@@ -332,15 +304,390 @@ namespace ES
             ExecuteReplacement(enabledRecords);
         }
 
-        [FoldoutGroup("6. 执行结果")]
-        [OnInspectorGUI]
+        [OnInspectorGUI, PropertyOrder(-200)]
         private void DrawResultPanel()
         {
-            SimpleToolsPanelUtility.DrawResultSummary("最近材质工具结果", lastResultSummary, lastResultDetail);
+            DrawMaterialWorkbench();
         }
 
-        [FoldoutGroup("6. 执行结果")]
-        [Button("复制最近报告", ButtonHeight = 28), GUIColor(0.48f, 0.48f, 0.48f)]
+        private void DrawMaterialWorkbench()
+        {
+            DrawMaterialHeader();
+            DrawMaterialModeTabs();
+            DrawMaterialScopePanel();
+            DrawMaterialRulePanel();
+            DrawMaterialTargetPanel();
+
+            if (materialToolMode == 0)
+            {
+                DrawScenePreviewActions();
+                DrawReplacementInsightPanel();
+                DrawReplacementFilters();
+                DrawReplacementTable();
+            }
+            else
+            {
+                DrawPrefabAssetModePanel();
+                DrawPrefabAssetInsightPanel();
+                DrawPrefabAssetTable();
+            }
+
+            DrawMaterialReportPanel();
+        }
+
+        private void DrawMaterialHeader()
+        {
+            int targetCount = CollectTargets().Count;
+            int enabledPreview = replacementPreview.Count(item => item.Enabled);
+            int writablePreview = replacementPreview.Count(item => item.Enabled && item.CanWrite);
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("材质引用审计与替换台", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("先扫描材质引用，再按预览结果执行替换。场景实例和 Prefab 资产分开处理，避免资产级修改混入场景操作。", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.Space(4);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawMetric("目标对象", targetCount.ToString());
+                    DrawMetric("预览命中", replacementPreview.Count.ToString());
+                    DrawMetric("已勾选", enabledPreview.ToString());
+                    DrawMetric("可写", writablePreview.ToString());
+                    DrawMetric("资产命中", prefabAssetPreview.Count.ToString());
+                }
+            }
+        }
+
+        private void DrawMaterialModeTabs()
+        {
+            materialToolMode = GUILayout.Toolbar(materialToolMode, MaterialToolModeLabels, GUILayout.Height(28));
+        }
+
+        private void DrawMaterialScopePanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("扫描范围", "选择扫描场景对象、当前选择，或在资产模式中扫描 Prefab 文件。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("目标范围", EditorStyles.miniBoldLabel, GUILayout.Width(58));
+                    targetScope = (TargetScope)GUILayout.Toolbar((int)targetScope, TargetScopeLabels, EditorStyles.miniButton, GUILayout.Height(24));
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    includeInactive = GUILayout.Toggle(includeInactive, "包含未激活", EditorStyles.miniButtonLeft, GUILayout.Height(22));
+                    skipHideFlagsObjects = GUILayout.Toggle(skipHideFlagsObjects, "跳过隐藏对象", EditorStyles.miniButtonMid, GUILayout.Height(22));
+                    scanSerializedScriptFields = GUILayout.Toggle(scanSerializedScriptFields, "扫描脚本材质字段", EditorStyles.miniButtonRight, GUILayout.Height(22));
+                }
+
+                componentTypes = DrawComponentMask(componentTypes);
+                DrawInfoRow("当前来源", GetEditingSourceLabel());
+                DrawInfoRow("当前选择", Selection.gameObjects == null || Selection.gameObjects.Length == 0 ? "未选择对象" : $"{Selection.gameObjects.Length} 个对象");
+            }
+        }
+
+        private void DrawMaterialRulePanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("匹配规则", "定义哪些材质引用会进入替换预览。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("模式", EditorStyles.miniBoldLabel, GUILayout.Width(34));
+                    replacementMode = (ReplacementMode)GUILayout.Toolbar((int)replacementMode, ReplacementModeLabels, EditorStyles.miniButton, GUILayout.Height(24));
+                }
+
+                switch (replacementMode)
+                {
+                    case ReplacementMode.ReplaceSpecific:
+                        sourceMaterial = (Material)EditorGUILayout.ObjectField("源材质", sourceMaterial, typeof(Material), false);
+                        break;
+                    case ReplacementMode.MatchByName:
+                        matchName = EditorGUILayout.TextField("名称包含", matchName);
+                        ignoreCase = EditorGUILayout.Toggle("忽略大小写", ignoreCase);
+                        break;
+                    case ReplacementMode.MatchByRegex:
+                        regexPattern = EditorGUILayout.TextField("正则表达式", regexPattern);
+                        ignoreCase = EditorGUILayout.Toggle("忽略大小写", ignoreCase);
+                        break;
+                    case ReplacementMode.MatchByShader:
+                        sourceShader = (Shader)EditorGUILayout.ObjectField("源 Shader", sourceShader, typeof(Shader), false);
+                        break;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    setDefaultWhenNull = GUILayout.Toggle(setDefaultWhenNull, "空材质也填充", EditorStyles.miniButtonLeft, GUILayout.Height(22));
+                    allowSameMaterial = GUILayout.Toggle(allowSameMaterial, "允许替换成相同材质", EditorStyles.miniButtonRight, GUILayout.Height(22));
+                }
+            }
+        }
+
+        private void DrawMaterialTargetPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("替换目标", "所有命中的引用会被替换为这个目标材质。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                targetMaterial = (Material)EditorGUILayout.ObjectField("目标材质", targetMaterial, typeof(Material), false);
+                DrawInfoRow("目标 Shader", targetMaterial != null && targetMaterial.shader != null ? targetMaterial.shader.name : "未设置");
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("使用当前选中材质作为源", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                        UseSelectionAsSourceMaterial();
+                    if (GUILayout.Button("使用当前选中材质作为目标", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                        UseSelectionAsTargetMaterial();
+                    if (GUILayout.Button("交换源和目标", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                        SwapSourceAndTargetMaterial();
+                }
+            }
+        }
+
+        private void DrawScenePreviewActions()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("预览与执行", "场景模式只处理场景或 Prefab Mode 中的实例引用，执行前会检查预览签名。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                if (IsPreviewStale(replacementPreview.Count))
+                    SimpleToolsPanelUtility.DrawWarning("设置已变化，当前预览可能不是最新。执行时会自动重建预览，建议先手动刷新确认。");
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("刷新替换预览", SimpleToolsActionTone.Primary, 32))
+                        RefreshReplacementPreview();
+                    if (SimpleToolsPanelUtility.DrawActionButton("查询材质使用", SimpleToolsActionTone.Neutral, 32))
+                        QueryMaterialUsage();
+                    if (SimpleToolsPanelUtility.DrawActionButton("执行勾选替换", SimpleToolsActionTone.Warning, 32))
+                        ReplaceMaterials();
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("全选当前预览", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                        EnableFilteredPreviewItems(true);
+                    if (GUILayout.Button("取消当前预览", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                        EnableFilteredPreviewItems(false);
+                    if (GUILayout.Button("选中命中对象", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                        SelectFilteredPreviewObjects();
+                }
+            }
+        }
+
+        private void DrawReplacementInsightPanel()
+        {
+            var rows = GetFilteredPreviewRecords(false);
+            if (replacementPreview.Count == 0 && usedMaterials.Count == 0)
+                return;
+
+            SimpleToolsPanelUtility.DrawSectionTitle("预览统计", "用于快速判断命中是否集中在某些材质、Shader、组件或 Prefab 实例。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                DrawInfoRow("材质分布", BuildMaterialSummary(rows, 6));
+                DrawInfoRow("Shader分布", BuildShaderSummary(rows, 6));
+                DrawInfoRow("组件分布", BuildComponentSummary(rows));
+                DrawInfoRow("来源分布", BuildSourceSummary(rows));
+            }
+        }
+
+        private void DrawReplacementFilters()
+        {
+            if (replacementPreview.Count == 0 && usedMaterials.Count == 0)
+                return;
+
+            SimpleToolsPanelUtility.DrawSectionTitle("结果筛选", "搜索对象路径、材质名、Shader、组件类型、槽位和来源。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("搜索", EditorStyles.miniBoldLabel, GUILayout.Width(42));
+                    materialSearch = EditorGUILayout.TextField(materialSearch);
+                    if (GUILayout.Button("清空", EditorStyles.miniButton, GUILayout.Width(48)))
+                        materialSearch = string.Empty;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("可写", EditorStyles.miniBoldLabel, GUILayout.Width(34));
+                    materialWritableFilter = GUILayout.Toolbar(materialWritableFilter, WritableFilterLabels, EditorStyles.miniButton, GUILayout.Width(118), GUILayout.Height(22));
+                    GUILayout.Space(8);
+                    EditorGUILayout.LabelField("来源", EditorStyles.miniBoldLabel, GUILayout.Width(34));
+                    materialSourceFilter = GUILayout.Toolbar(materialSourceFilter, SourceFilterLabels, EditorStyles.miniButton, GUILayout.Width(160), GUILayout.Height(22));
+                    GUILayout.Space(8);
+                    EditorGUILayout.LabelField("排序", EditorStyles.miniBoldLabel, GUILayout.Width(34));
+                    materialSortIndex = GUILayout.Toolbar(materialSortIndex, MaterialSortLabels, EditorStyles.miniButton, GUILayout.Width(210), GUILayout.Height(22));
+                }
+            }
+        }
+
+        private void DrawReplacementTable()
+        {
+            var rows = GetFilteredPreviewRecords(true);
+            if (replacementPreview.Count == 0)
+                return;
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField($"替换预览表  ({rows.Count}/{replacementPreview.Count})", EditorStyles.boldLabel);
+                if (rows.Count == 0)
+                {
+                    EditorGUILayout.LabelField("当前筛选条件下没有预览项。", EditorStyles.wordWrappedMiniLabel);
+                    return;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("选", EditorStyles.miniBoldLabel, GUILayout.Width(28));
+                    EditorGUILayout.LabelField("对象路径", EditorStyles.miniBoldLabel, GUILayout.MinWidth(170));
+                    EditorGUILayout.LabelField("组件/槽位", EditorStyles.miniBoldLabel, GUILayout.Width(150));
+                    EditorGUILayout.LabelField("当前 -> 目标", EditorStyles.miniBoldLabel, GUILayout.Width(180));
+                    EditorGUILayout.LabelField("状态", EditorStyles.miniBoldLabel, GUILayout.Width(92));
+                    GUILayout.Space(96);
+                }
+
+                int totalPages = Mathf.Max(1, Mathf.CeilToInt((float)rows.Count / materialPageSize));
+                materialPageIndex = Mathf.Clamp(materialPageIndex, 0, totalPages - 1);
+                int start = materialPageIndex * materialPageSize;
+                int end = Mathf.Min(start + materialPageSize, rows.Count);
+                for (int i = start; i < end; i++)
+                    DrawReplacementRow(rows[i]);
+
+                DrawPager(ref materialPageIndex, totalPages);
+            }
+        }
+
+        private void DrawReplacementRow(MaterialReferenceRecord record)
+        {
+            if (record == null)
+                return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                record.Enabled = EditorGUILayout.Toggle(record.Enabled, GUILayout.Width(28));
+                EditorGUILayout.LabelField(record.TargetPath, EditorStyles.miniLabel, GUILayout.MinWidth(170));
+                EditorGUILayout.LabelField($"{record.ComponentType}.{record.Location}", EditorStyles.miniLabel, GUILayout.Width(150));
+                EditorGUILayout.LabelField($"{GetMaterialName(record.CurrentMaterial)} -> {GetMaterialName(record.TargetMaterial)}", EditorStyles.miniLabel, GUILayout.Width(180));
+                EditorGUILayout.LabelField($"{(record.CanWrite ? "可写" : "不可写")} | {record.Source}", EditorStyles.miniLabel, GUILayout.Width(92));
+                if (GUILayout.Button("对象", EditorStyles.miniButtonLeft, GUILayout.Width(44)))
+                    record.PingObject();
+                if (GUILayout.Button("当前", EditorStyles.miniButtonMid, GUILayout.Width(44)))
+                    record.PingCurrentMaterial();
+                if (GUILayout.Button("目标", EditorStyles.miniButtonRight, GUILayout.Width(44)))
+                    record.PingTargetMaterial();
+            }
+        }
+
+        private void DrawPrefabAssetModePanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("Prefab 资产模式", "资产模式会 LoadPrefabContents 并保存 Prefab 文件，适合批量修正资源库中的预制件。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                enablePrefabAssetBatch = true;
+                useSelectedPrefabAssets = GUILayout.Toggle(useSelectedPrefabAssets, "优先处理 Project 中选中的 Prefab 资产", EditorStyles.miniButton, GUILayout.Height(24));
+                if (!useSelectedPrefabAssets)
+                    prefabAssetFolder = EditorGUILayout.TextField("Prefab 搜索文件夹", prefabAssetFolder);
+
+                if (IsPreviewStale(prefabAssetPreview.Count))
+                    SimpleToolsPanelUtility.DrawWarning("设置已变化，当前 Prefab 资产预览可能不是最新。执行前建议刷新。");
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("扫描 Prefab 资产", SimpleToolsActionTone.Primary, 32))
+                        RefreshPrefabAssetPreview();
+                    if (SimpleToolsPanelUtility.DrawActionButton("执行资产替换", SimpleToolsActionTone.Warning, 32))
+                        ReplacePrefabAssets();
+                    if (SimpleToolsPanelUtility.DrawActionButton("导出报告", SimpleToolsActionTone.Neutral, 32))
+                        ExportLastReportTxt();
+                }
+            }
+        }
+
+        private void DrawPrefabAssetInsightPanel()
+        {
+            if (prefabAssetPreview.Count == 0)
+                return;
+
+            var rows = GetFilteredPrefabAssetRecords(false);
+            SimpleToolsPanelUtility.DrawSectionTitle("资产预览统计", "按 Prefab 文件统计命中和可写引用。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                DrawInfoRow("命中资产", $"{rows.Count}/{prefabAssetPreview.Count}");
+                DrawInfoRow("引用统计", $"命中 {rows.Sum(r => r.MatchedCount)} | 可写 {rows.Sum(r => r.WritableCount)}");
+                DrawInfoRow("组件分布", BuildPrefabAssetComponentSummary(rows));
+            }
+        }
+
+        private void DrawPrefabAssetTable()
+        {
+            if (prefabAssetPreview.Count == 0)
+                return;
+
+            var rows = GetFilteredPrefabAssetRecords(true);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField($"Prefab 资产预览表  ({rows.Count}/{prefabAssetPreview.Count})", EditorStyles.boldLabel);
+                if (rows.Count == 0)
+                {
+                    EditorGUILayout.LabelField("当前筛选条件下没有 Prefab 资产。", EditorStyles.wordWrappedMiniLabel);
+                    return;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("选", EditorStyles.miniBoldLabel, GUILayout.Width(28));
+                    EditorGUILayout.LabelField("Prefab路径", EditorStyles.miniBoldLabel, GUILayout.MinWidth(240));
+                    EditorGUILayout.LabelField("命中", EditorStyles.miniBoldLabel, GUILayout.Width(52));
+                    EditorGUILayout.LabelField("可写", EditorStyles.miniBoldLabel, GUILayout.Width(52));
+                    EditorGUILayout.LabelField("组件分布", EditorStyles.miniBoldLabel, GUILayout.Width(160));
+                    GUILayout.Space(52);
+                }
+
+                int totalPages = Mathf.Max(1, Mathf.CeilToInt((float)rows.Count / materialPageSize));
+                materialPrefabPageIndex = Mathf.Clamp(materialPrefabPageIndex, 0, totalPages - 1);
+                int start = materialPrefabPageIndex * materialPageSize;
+                int end = Mathf.Min(start + materialPageSize, rows.Count);
+                for (int i = start; i < end; i++)
+                {
+                    var record = rows[i];
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        record.Enabled = EditorGUILayout.Toggle(record.Enabled, GUILayout.Width(28));
+                        EditorGUILayout.LabelField(record.AssetPath, EditorStyles.miniLabel, GUILayout.MinWidth(240));
+                        EditorGUILayout.LabelField(record.MatchedCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(52));
+                        EditorGUILayout.LabelField(record.WritableCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(52));
+                        EditorGUILayout.LabelField(record.ComponentSummary, EditorStyles.miniLabel, GUILayout.Width(160));
+                        if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(48)))
+                            record.PingAsset();
+                    }
+                }
+
+                DrawPager(ref materialPrefabPageIndex, totalPages);
+            }
+        }
+
+        private void DrawMaterialReportPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("报告", "复制或导出最近一次扫描、预览或执行结果。");
+            if (string.IsNullOrWhiteSpace(lastResultSummary) && string.IsNullOrWhiteSpace(lastResultDetail))
+            {
+                SimpleToolsPanelUtility.DrawEmptyState("还没有报告。刷新预览、查询使用或执行替换后，这里会显示结果。");
+                return;
+            }
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
+                if (!string.IsNullOrWhiteSpace(lastResultDetail))
+                    EditorGUILayout.TextArea(lastResultDetail, GUILayout.MinHeight(46), GUILayout.MaxHeight(120));
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("复制报告", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                        CopyLastReport();
+                    if (GUILayout.Button("导出 TXT", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                        ExportLastReportTxt();
+                }
+            }
+        }
+
         public void CopyLastReport()
         {
             if (string.IsNullOrWhiteSpace(lastResultSummary) && string.IsNullOrWhiteSpace(lastResultDetail))
@@ -354,8 +701,6 @@ namespace ES
                 : lastResultSummary + "\n\n" + lastResultDetail;
         }
 
-        [FoldoutGroup("6. 执行结果")]
-        [Button("导出报告 TXT", ButtonHeight = 28), GUIColor(0.35f, 0.68f, 0.9f)]
         public void ExportLastReportTxt()
         {
             if (string.IsNullOrWhiteSpace(lastResultSummary) && string.IsNullOrWhiteSpace(lastResultDetail))
@@ -385,6 +730,20 @@ namespace ES
         private string lastResultSummary = "";
         private string lastResultDetail = "";
         private string previewSettingsSignature = "";
+        private int materialToolMode = 0;
+        private int materialWritableFilter = 0;
+        private int materialSourceFilter = 0;
+        private int materialSortIndex = 0;
+        private int materialPageIndex = 0;
+        private int materialPrefabPageIndex = 0;
+        private string materialSearch = "";
+        private const int materialPageSize = 12;
+        private static readonly string[] MaterialToolModeLabels = { "场景/Prefab Mode", "Prefab 资产" };
+        private static readonly string[] TargetScopeLabels = { "只选中", "选中+子物体", "当前场景" };
+        private static readonly string[] ReplacementModeLabels = { "指定材质", "全部非空", "名称包含", "正则", "Shader" };
+        private static readonly string[] WritableFilterLabels = { "全部", "可写", "不可写" };
+        private static readonly string[] SourceFilterLabels = { "全部", "Scene", "PrefabMode", "PrefabAsset" };
+        private static readonly string[] MaterialSortLabels = { "对象", "材质", "Shader", "组件", "风险" };
 
         [Serializable]
         public class MaterialReferenceRecord
@@ -892,7 +1251,7 @@ namespace ES
             }
 
             MarkScenesDirty(changedObjects);
-            lastResultSummary = $"替换完成: 替换 {replaced} 处引用 | 影响 {changedObjects.Count} 个对象 | 影响 {changedComponents.Count} 个组件 | 失败 {failedMessages.Count} 项";
+            lastResultSummary = $"替换完成: 已执行勾选可写项 {records.Count} 个 | 实际替换 {replaced} 处 | 影响 {changedObjects.Count} 个对象 | 失败 {failedMessages.Count} 项";
             lastResultDetail = BuildExecutionReport(changedObjects, failedMessages);
 
             string failed = failedMessages.Count > 0 ? "\n\n失败项:\n" + SimpleToolsSafetyUtility.JoinPreview(failedMessages, 8) : string.Empty;
@@ -1020,7 +1379,7 @@ namespace ES
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            lastResultSummary = $"Prefab 资产替换完成: 修改 {changedAssetCount} 个资产 | 替换 {replacedReferenceCount} 处引用 | 跳过 {skippedReferenceCount} 处 | 失败 {failedMessages.Count} 项";
+            lastResultSummary = $"Prefab 资产替换完成: 已执行勾选资产 {entries.Count} 个 | 修改 {changedAssetCount} 个资产 | 替换 {replacedReferenceCount} 处引用 | 跳过 {skippedReferenceCount} 处 | 失败 {failedMessages.Count} 项";
             lastResultDetail = BuildPrefabExecutionReport(changedAssetPaths, failedMessages, scanWarnings);
             EditorUtility.DisplayDialog("Prefab 资产替换完成",
                 $"已修改 {changedAssetCount} 个 Prefab 资产，替换 {replacedReferenceCount} 处材质引用。",
@@ -1215,6 +1574,291 @@ namespace ES
                 setDefaultWhenNull,
                 targetMaterial != null ? targetMaterial.GetInstanceID().ToString() : "null",
                 allowSameMaterial);
+        }
+
+        private ComponentType DrawComponentMask(ComponentType value)
+        {
+            bool renderer = (value & ComponentType.Renderer) != 0;
+            bool particle = (value & ComponentType.ParticleSystemRenderer) != 0;
+            bool script = (value & ComponentType.MonoBehaviour) != 0;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("组件", EditorStyles.miniBoldLabel, GUILayout.Width(34));
+                renderer = GUILayout.Toggle(renderer, "Renderer", EditorStyles.miniButtonLeft, GUILayout.Height(22));
+                particle = GUILayout.Toggle(particle, "ParticleRenderer", EditorStyles.miniButtonMid, GUILayout.Height(22));
+                script = GUILayout.Toggle(script, "脚本字段", EditorStyles.miniButtonRight, GUILayout.Height(22));
+            }
+
+            var result = ComponentType.None;
+            if (renderer) result |= ComponentType.Renderer;
+            if (particle) result |= ComponentType.ParticleSystemRenderer;
+            if (script) result |= ComponentType.MonoBehaviour;
+            return result;
+        }
+
+        private bool IsPreviewStale(int count)
+        {
+            return count > 0 && previewSettingsSignature != BuildSettingsSignature();
+        }
+
+        private List<MaterialReferenceRecord> GetFilteredPreviewRecords(bool sorted)
+        {
+            IEnumerable<MaterialReferenceRecord> rows = replacementPreview.Where(PassesPreviewFilter);
+            if (sorted)
+                rows = SortPreviewRecords(rows);
+            return rows.ToList();
+        }
+
+        private List<PrefabAssetBatchRecord> GetFilteredPrefabAssetRecords(bool sorted)
+        {
+            IEnumerable<PrefabAssetBatchRecord> rows = prefabAssetPreview.Where(PassesPrefabAssetFilter);
+            if (sorted)
+                rows = rows.OrderByDescending(r => r.WritableCount).ThenBy(r => r.AssetPath, StringComparer.Ordinal);
+            return rows.ToList();
+        }
+
+        private bool PassesPreviewFilter(MaterialReferenceRecord record)
+        {
+            if (record == null)
+                return false;
+
+            if (materialWritableFilter == 1 && !record.CanWrite)
+                return false;
+            if (materialWritableFilter == 2 && record.CanWrite)
+                return false;
+
+            if (materialSourceFilter > 0)
+            {
+                string expected = SourceFilterLabels[materialSourceFilter];
+                if (!string.Equals(record.Source, expected, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(materialSearch))
+                return true;
+
+            string keyword = materialSearch.Trim();
+            return ContainsIgnoreCase(record.TargetPath, keyword) ||
+                   ContainsIgnoreCase(record.ComponentType, keyword) ||
+                   ContainsIgnoreCase(record.Location, keyword) ||
+                   ContainsIgnoreCase(record.Source, keyword) ||
+                   ContainsIgnoreCase(record.Risk, keyword) ||
+                   ContainsIgnoreCase(GetMaterialName(record.CurrentMaterial), keyword) ||
+                   ContainsIgnoreCase(GetMaterialName(record.TargetMaterial), keyword) ||
+                   ContainsIgnoreCase(GetShaderName(record.CurrentMaterial), keyword) ||
+                   ContainsIgnoreCase(GetShaderName(record.TargetMaterial), keyword) ||
+                   ContainsIgnoreCase(record.AssetPath, keyword);
+        }
+
+        private bool PassesPrefabAssetFilter(PrefabAssetBatchRecord record)
+        {
+            if (record == null)
+                return false;
+
+            if (materialWritableFilter == 1 && record.WritableCount <= 0)
+                return false;
+            if (materialWritableFilter == 2 && record.WritableCount > 0)
+                return false;
+
+            if (string.IsNullOrWhiteSpace(materialSearch))
+                return true;
+
+            string keyword = materialSearch.Trim();
+            return ContainsIgnoreCase(record.AssetPath, keyword) ||
+                   ContainsIgnoreCase(record.ComponentSummary, keyword) ||
+                   ContainsIgnoreCase(record.Preview, keyword);
+        }
+
+        private IEnumerable<MaterialReferenceRecord> SortPreviewRecords(IEnumerable<MaterialReferenceRecord> records)
+        {
+            switch (materialSortIndex)
+            {
+                case 1:
+                    return records.OrderBy(r => GetMaterialName(r.CurrentMaterial), StringComparer.Ordinal).ThenBy(r => r.TargetPath, StringComparer.Ordinal);
+                case 2:
+                    return records.OrderBy(r => GetShaderName(r.CurrentMaterial), StringComparer.Ordinal).ThenBy(r => r.TargetPath, StringComparer.Ordinal);
+                case 3:
+                    return records.OrderBy(r => r.ComponentType, StringComparer.Ordinal).ThenBy(r => r.TargetPath, StringComparer.Ordinal);
+                case 4:
+                    return records.OrderByDescending(GetRecordRiskScore).ThenBy(r => r.TargetPath, StringComparer.Ordinal);
+                default:
+                    return records.OrderBy(r => r.TargetPath, StringComparer.Ordinal);
+            }
+        }
+
+        private int GetRecordRiskScore(MaterialReferenceRecord record)
+        {
+            if (record == null)
+                return 0;
+
+            int score = 0;
+            if (!record.CanWrite) score += 100;
+            if (record.TargetComponent is MonoBehaviour) score += 40;
+            if (record.TargetObject != null && PrefabUtility.IsPartOfPrefabInstance(record.TargetObject)) score += 25;
+            if (record.CurrentMaterial == null) score += 10;
+            return score;
+        }
+
+        private void EnableFilteredPreviewItems(bool enabled)
+        {
+            foreach (var record in GetFilteredPreviewRecords(false))
+                record.Enabled = enabled;
+        }
+
+        private void SelectFilteredPreviewObjects()
+        {
+            var objects = GetFilteredPreviewRecords(true)
+                .Select(r => r.TargetObject)
+                .Where(obj => obj != null)
+                .Distinct()
+                .Cast<UnityEngine.Object>()
+                .ToArray();
+
+            if (objects.Length == 0)
+            {
+                lastResultSummary = "选中失败";
+                lastResultDetail = "当前筛选条件下没有可选中的对象。";
+                return;
+            }
+
+            Selection.objects = objects;
+            EditorGUIUtility.PingObject(objects[0]);
+            lastResultSummary = $"已选中命中对象: {objects.Length} 个";
+            lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(objects.OfType<GameObject>().Select(GetTransformPath), 12);
+        }
+
+        private void UseSelectionAsSourceMaterial()
+        {
+            if (Selection.activeObject is Material material)
+            {
+                sourceMaterial = material;
+                replacementMode = ReplacementMode.ReplaceSpecific;
+                lastResultSummary = "已设置源材质";
+                lastResultDetail = material.name;
+            }
+        }
+
+        private void UseSelectionAsTargetMaterial()
+        {
+            if (Selection.activeObject is Material material)
+            {
+                targetMaterial = material;
+                lastResultSummary = "已设置目标材质";
+                lastResultDetail = material.name;
+            }
+        }
+
+        private void SwapSourceAndTargetMaterial()
+        {
+            var oldSource = sourceMaterial;
+            sourceMaterial = targetMaterial;
+            targetMaterial = oldSource;
+            replacementMode = ReplacementMode.ReplaceSpecific;
+            lastResultSummary = "已交换源材质和目标材质";
+            lastResultDetail = $"源: {GetMaterialName(sourceMaterial)} | 目标: {GetMaterialName(targetMaterial)}";
+        }
+
+        private string BuildMaterialSummary(IEnumerable<MaterialReferenceRecord> records, int limit)
+        {
+            var list = records?.Where(r => r != null).ToList() ?? new List<MaterialReferenceRecord>();
+            if (list.Count == 0)
+                return "无";
+
+            return string.Join("  |  ", list
+                .GroupBy(r => GetMaterialName(r.CurrentMaterial))
+                .OrderByDescending(g => g.Count())
+                .ThenBy(g => g.Key)
+                .Take(limit)
+                .Select(g => $"{g.Key} {g.Count()}"));
+        }
+
+        private string BuildShaderSummary(IEnumerable<MaterialReferenceRecord> records, int limit)
+        {
+            var list = records?.Where(r => r != null).ToList() ?? new List<MaterialReferenceRecord>();
+            if (list.Count == 0)
+                return "无";
+
+            return string.Join("  |  ", list
+                .GroupBy(r => GetShaderName(r.CurrentMaterial))
+                .OrderByDescending(g => g.Count())
+                .ThenBy(g => g.Key)
+                .Take(limit)
+                .Select(g => $"{g.Key} {g.Count()}"));
+        }
+
+        private string BuildSourceSummary(IEnumerable<MaterialReferenceRecord> records)
+        {
+            var list = records?.Where(r => r != null).ToList() ?? new List<MaterialReferenceRecord>();
+            if (list.Count == 0)
+                return "无";
+
+            return string.Join("  |  ", list.GroupBy(r => r.Source).OrderByDescending(g => g.Count()).Select(g => $"{g.Key} {g.Count()}"));
+        }
+
+        private string BuildPrefabAssetComponentSummary(IEnumerable<PrefabAssetBatchRecord> records)
+        {
+            var list = records?.Where(r => r != null).ToList() ?? new List<PrefabAssetBatchRecord>();
+            if (list.Count == 0)
+                return "无";
+
+            var totals = list
+                .SelectMany(record => SplitSummary(record.ComponentSummary))
+                .GroupBy(pair => pair.Key)
+                .OrderByDescending(g => g.Sum(x => x.Value))
+                .Select(g => $"{g.Key}:{g.Sum(x => x.Value)}");
+
+            return string.Join("  |  ", totals);
+        }
+
+        private string GetMaterialName(Material material)
+        {
+            return material != null ? material.name : "<空>";
+        }
+
+        private string GetShaderName(Material material)
+        {
+            return material != null && material.shader != null ? material.shader.name : "<无Shader>";
+        }
+
+        private bool ContainsIgnoreCase(string source, string keyword)
+        {
+            return !string.IsNullOrEmpty(source) && source.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private void DrawMetric(string label, string value)
+        {
+            using (new EditorGUILayout.VerticalScope(GUILayout.MinWidth(72)))
+            {
+                EditorGUILayout.LabelField(label, EditorStyles.centeredGreyMiniLabel);
+                EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(value) ? "-" : value, EditorStyles.boldLabel);
+            }
+        }
+
+        private void DrawInfoRow(string label, string value)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel, GUILayout.Width(72));
+                EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(value) ? "-" : value, EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+
+        private void DrawPager(ref int pageIndex, int totalPages)
+        {
+            if (totalPages <= 1)
+                return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("上一页", EditorStyles.miniButtonLeft, GUILayout.Width(64)) && pageIndex > 0)
+                    pageIndex--;
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.LabelField($"第 {pageIndex + 1} / {totalPages} 页", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(90));
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("下一页", EditorStyles.miniButtonRight, GUILayout.Width(64)) && pageIndex < totalPages - 1)
+                    pageIndex++;
+            }
         }
 
         private string BuildRiskLabel(MaterialReferenceRecord record)

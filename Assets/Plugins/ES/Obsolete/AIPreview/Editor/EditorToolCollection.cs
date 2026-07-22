@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 
-namespace ES.Preview.Editor
+namespace ES.Obsolete.Preview.Editor
 {
     /// <summary>
     /// 通用工具脚本集合
@@ -74,15 +74,27 @@ namespace ES.Preview.Editor
     /// <summary>
     /// Scene视图调试绘制工具
     /// </summary>
-    [InitializeOnLoad]
     public class SceneViewDebugDrawer
     {
         private static bool enableLinkVisualization = false;
         private static bool enableModuleBounds = false;
+        private static bool registered;
         
-        static SceneViewDebugDrawer()
+        [MenuItem("ES/Obsolete/Toggle Scene View Debug Drawer")]
+        private static void ToggleSceneViewDebugDrawer()
         {
+            if (registered)
+            {
+                SceneView.duringSceneGui -= OnSceneGUI;
+                registered = false;
+                Debug.Log("[Obsolete AIPreview] Scene View Debug Drawer disabled.");
+                return;
+            }
+
+            SceneView.duringSceneGui -= OnSceneGUI;
             SceneView.duringSceneGui += OnSceneGUI;
+            registered = true;
+            Debug.Log("[Obsolete AIPreview] Scene View Debug Drawer enabled.");
         }
         
         private static void OnSceneGUI(SceneView sceneView)

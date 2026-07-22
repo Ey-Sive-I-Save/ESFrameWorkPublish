@@ -3,8 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-namespace ES
-{
+namespace ES.Samples{
     public partial class ExampleCore : Core
     {
         #region 域

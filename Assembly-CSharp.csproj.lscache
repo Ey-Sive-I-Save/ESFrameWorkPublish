@@ -191,9 +191,9 @@ Assets/
   ThirdPersonFollowDistanceModifier.cs
  TutorialInfo/Scripts/Readme.cs
  VFX_Klaus/Scripts/
-  ProjectileMove.cs
+  ShotMove.cs
   RotateToMouse.cs
-  SpawnProjectiles.cs
+  SpawnShots.cs
 Temp/obj/Assembly-CSharp/.NETStandard,Version=v2.1.AssemblyAttributes.cs
 
 [metadataReferences]

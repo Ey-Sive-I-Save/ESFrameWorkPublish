@@ -38,11 +38,8 @@ namespace ES
         [NonSerialized] private IEditorTrackSupport_GetSequence _previewTrackContainer;
         [NonSerialized] private float _previewTrackTime;
         [NonSerialized] private bool _previewTrackAutoScanned;
-        [NonSerialized] private GameObject _previewCameraRoot;
-        [NonSerialized] private Camera _previewCamera;
-        [NonSerialized] private Light _previewKeyLight;
-        [NonSerialized] private Light _previewFillLight;
-        [NonSerialized] private RenderTexture _previewRenderTexture;
+        [NonSerialized] private ESEditorPreviewRenderContext _previewRenderContext;
+        [NonSerialized] private ESEditorPreviewModelHandle _previewModelHandle;
         [NonSerialized] private GameObject _previewRenderRoot;
         [NonSerialized] private Entity _previewRenderEntity;
         [NonSerialized] private EditorSequencePlayer _previewRenderPlayer;
@@ -94,30 +91,10 @@ namespace ES
             UpdatePreviewPlayback(deltaTime, repaintAllViews: false);
         }
 
-        [UnityEditor.InitializeOnLoadMethod]
-        private static void CleanupEntityPreviewObjectsOnEditorLoad()
-        {
-            UnityEditor.EditorApplication.delayCall -= CleanupLingeringPreviewObjects;
-            UnityEditor.EditorApplication.delayCall += CleanupLingeringPreviewObjects;
-            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload -= CleanupLingeringPreviewObjects;
-            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += CleanupLingeringPreviewObjects;
-            UnityEditor.EditorApplication.playModeStateChanged -= CleanupPreviewObjectsOnPlayModeChange;
-            UnityEditor.EditorApplication.playModeStateChanged += CleanupPreviewObjectsOnPlayModeChange;
-            UnityEditor.EditorApplication.quitting -= CleanupLingeringPreviewObjects;
-            UnityEditor.EditorApplication.quitting += CleanupLingeringPreviewObjects;
-        }
-
-        private static void CleanupPreviewObjectsOnPlayModeChange(UnityEditor.PlayModeStateChange state)
-        {
-            if (state == UnityEditor.PlayModeStateChange.ExitingEditMode
-                || state == UnityEditor.PlayModeStateChange.ExitingPlayMode)
-                CleanupLingeringPreviewObjects();
-        }
-
         [UnityEditor.MenuItem(MenuItemPathDefine.PREVIEW_CLEANUP_PATH + "清理实体预览残留对象", false, 10)]
         private static void CleanupEntityPreviewObjectsMenu()
         {
-            int removed = CleanupLingeringPreviewObjectsInternal();
+            int removed = ESEditorPreviewLifecycleHub.CleanupAll("EntityStateDomain preview menu cleanup", includeMarkedObjects: true);
             _suppressAutoPreviewRebuildAfterManualCleanup = true;
             Debug.Log($"[EntityStateDomain Preview] 已清理实体预览残留对象：{removed}");
         }
@@ -390,7 +367,9 @@ namespace ES
             if (_suppressAutoPreviewRebuildAfterManualCleanup)
                 return;
 
-            if (_previewCamera != null
+            if (_previewRenderContext != null
+                && _previewRenderContext.IsReady
+                && _previewModelHandle != null
                 && _previewRenderRoot != null
                 && _previewRenderEntity != null
                 && _previewRenderPlayer != null)
@@ -404,29 +383,30 @@ namespace ES
             _suppressAutoPreviewRebuildAfterManualCleanup = false;
             StopPreviewPlaybackState();
             DisposePreviewRender();
-            CleanupLingeringPreviewObjects();
 
             if (sourceEntity == null || _previewTrackContainer == null || _previewTrackContainer.Sequence == null)
                 return;
 
             _previewResourceScope = new ESEditorPreviewResourceScope(PreviewResourceOwner, "Entity editor preview temporary resource.");
-            CreateUrpPreviewCameraRig();
-
-            _previewRenderRoot = UnityEngine.Object.Instantiate(sourceEntity.gameObject);
-            _previewRenderRoot.name = $"{sourceEntity.name}{PreviewRootSuffix}";
-            _previewResourceScope.RegisterGameObject(_previewRenderRoot, recursiveHideFlags: true);
-            _previewRenderRoot.SetActive(true);
-            NormalizePreviewRootTransform(_previewRenderRoot.transform);
-            SetLayerRecursive(_previewRenderRoot.transform, PreviewRenderLayer);
+            _previewRenderContext = new ESEditorPreviewRenderContext(
+                PreviewResourceOwner,
+                ESEditorPreviewSceneMode.HiddenObjectsInActiveScene,
+                PreviewRenderLayer);
+            _previewModelHandle = _previewRenderContext.CreateModelGroup(
+                sourceEntity.gameObject,
+                $"{sourceEntity.name}{PreviewRootSuffix}",
+                samplingTarget: true,
+                copyRendererState: true,
+                disableRuntimeBehaviours: true);
+            _previewRenderRoot = _previewModelHandle?.Instance;
+            if (_previewRenderRoot == null)
+                return;
 
             _previewRenderEntity = _previewRenderRoot.GetComponent<Entity>();
             if (_previewRenderEntity == null)
                 _previewRenderEntity = _previewRenderRoot.GetComponentInChildren<Entity>(true);
 
-            CopyPreviewRendererState(sourceEntity.gameObject, _previewRenderRoot);
-            DisablePreviewBehaviours(_previewRenderRoot);
             EnsurePreviewAnimatorEnabled(_previewRenderRoot);
-            EnsurePreviewRenderers(_previewRenderRoot);
             ApplyPreviewIdlePose(_previewRenderRoot);
             AlignPreviewRootToGround(_previewRenderRoot);
 
@@ -442,9 +422,9 @@ namespace ES
         private void DrawPreviewRenderArea(Entity sourceEntity)
         {
             Rect rect = GUILayoutUtility.GetRect(10f, PreviewRenderHeight, GUILayout.ExpandWidth(true));
-            if (_previewCamera == null || _previewRenderRoot == null || _previewRenderEntity == null)
+            if (_previewRenderContext == null || !_previewRenderContext.IsReady || _previewModelHandle == null || _previewRenderRoot == null || _previewRenderEntity == null)
             {
-                UnityEditor.EditorGUI.HelpBox(rect, "URP 预览相机没有创建。请点击“重建”。", UnityEditor.MessageType.Info);
+                UnityEditor.EditorGUI.HelpBox(rect, "ES 预览上下文没有创建。请点击“重建”。", UnityEditor.MessageType.Info);
                 return;
             }
 
@@ -452,7 +432,7 @@ namespace ES
                 MaintainPreviewIdlePlayable();
 
             HandlePreviewInput(rect);
-            Bounds bounds = CalculatePreviewBounds(_previewRenderRoot);
+            Bounds bounds = _previewModelHandle.RefreshBounds();
             if (_previewAutoFitView)
                 CachePreviewViewBounds(bounds);
             DrawPreviewTexture(rect, bounds);
@@ -642,35 +622,12 @@ namespace ES
                 return;
             }
 
-            Camera camera = _previewCamera;
-            if (camera == null)
-                return;
-
-            if (!EnsurePreviewRenderTexture(renderRect))
-            {
-                UnityEditor.EditorGUI.HelpBox(displayRect, "URP 预览 RenderTexture 创建失败。", UnityEditor.MessageType.Warning);
-                return;
-            }
-
             Vector3 center = _previewAutoFitView ? bounds.center : _previewViewCenter;
             float radius = _previewAutoFitView ? Mathf.Max(0.5f, bounds.extents.magnitude) : Mathf.Max(0.5f, _previewViewRadius);
-            Quaternion rotation = Quaternion.Euler(_previewRenderOrbit.x, _previewRenderOrbit.y, 0f);
-            float halfFov = Mathf.Max(1f, camera.fieldOfView) * 0.5f * Mathf.Deg2Rad;
-            float fitDistance = radius / Mathf.Sin(halfFov);
-            float distance = fitDistance * 1.15f * Mathf.Clamp(_previewZoom, 0.25f, 4f);
-            Vector3 cameraOffset = rotation * (Vector3.back * distance);
-
-            camera.transform.position = center + cameraOffset;
-            camera.transform.LookAt(center, Vector3.up);
-            camera.nearClipPlane = Mathf.Max(0.001f, distance - radius * 2.2f);
-            camera.farClipPlane = distance + radius * 2.2f;
-            camera.cullingMask = 1 << PreviewRenderLayer;
-            camera.clearFlags = CameraClearFlags.Color;
-            camera.backgroundColor = new Color(0.18f, 0.18f, 0.18f, 1f);
-            camera.targetTexture = _previewRenderTexture;
-
-            camera.Render();
-            GUI.DrawTexture(displayRect, _previewRenderTexture, ScaleMode.StretchToFill, false);
+            var pose = new ESEditorPreviewCameraPose(center, radius, _previewRenderOrbit.y, _previewRenderOrbit.x, _previewZoom);
+            var options = new ESEditorPreviewRenderOptions(ESEditorPreviewQuality.High, PreviewRenderScale);
+            if (!_previewRenderContext.RenderGUI(displayRect, pose, options))
+                UnityEditor.EditorGUI.HelpBox(displayRect, "ES 预览渲染失败。", UnityEditor.MessageType.Warning);
         }
 
         private static bool TryBuildPreviewRects(Rect layoutRect, out Rect displayRect, out Rect renderRect)
@@ -698,153 +655,6 @@ namespace ES
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
-
-        private void CreateUrpPreviewCameraRig()
-        {
-            if (_previewCameraRoot != null && _previewCamera != null)
-                return;
-
-            _previewCameraRoot = new GameObject(PreviewCameraName);
-            if (_previewResourceScope == null)
-                _previewResourceScope = new ESEditorPreviewResourceScope(PreviewResourceOwner, "Entity editor preview camera rig.");
-
-            _previewResourceScope.RegisterGameObject(_previewCameraRoot);
-
-            _previewCamera = _previewCameraRoot.AddComponent<Camera>();
-            _previewCamera.enabled = false;
-            _previewCamera.fieldOfView = 30f;
-            _previewCamera.nearClipPlane = 0.01f;
-            _previewCamera.farClipPlane = 1000f;
-            _previewCamera.clearFlags = CameraClearFlags.Color;
-            _previewCamera.backgroundColor = new Color(0.18f, 0.18f, 0.18f, 1f);
-            _previewCamera.cullingMask = 1 << PreviewRenderLayer;
-            _previewCamera.allowHDR = true;
-            _previewCamera.allowMSAA = true;
-            _previewCamera.renderingPath = RenderingPath.Forward;
-
-            AddAndConfigureUniversalCameraData(_previewCamera);
-
-            _previewKeyLight = CreatePreviewDirectionalLight(PreviewKeyLightName, 1.8f, Quaternion.Euler(35f, 35f, 0f));
-            _previewFillLight = CreatePreviewDirectionalLight(PreviewFillLightName, 1.0f, Quaternion.Euler(340f, 218f, 177f));
-        }
-
-        private static void AddAndConfigureUniversalCameraData(Camera camera)
-        {
-            if (camera == null)
-                return;
-
-            Type cameraDataType = Type.GetType("UnityEngine.Rendering.Universal.UniversalAdditionalCameraData, Unity.RenderPipelines.Universal.Runtime");
-            if (cameraDataType == null)
-            {
-                Debug.LogWarning("[EntityStateDomain Preview] URP package is required for this preview camera.");
-                return;
-            }
-
-            Component cameraData = camera.GetComponent(cameraDataType);
-            if (cameraData == null)
-                cameraData = camera.gameObject.AddComponent(cameraDataType);
-
-            SetBoolPropertyIfExists(cameraData, "renderPostProcessing", false);
-            SetBoolPropertyIfExists(cameraData, "renderShadows", true);
-            SetEnumPropertyIfExists(cameraData, "renderType", "Base");
-            SetEnumPropertyIfExists(cameraData, "requiresDepthOption", "Off");
-            SetEnumPropertyIfExists(cameraData, "requiresColorOption", "Off");
-            SetEnumPropertyIfExists(cameraData, "antialiasing", "None");
-        }
-
-        private static void SetBoolPropertyIfExists(object target, string propertyName, bool value)
-        {
-            if (target == null)
-                return;
-
-            var property = target.GetType().GetProperty(propertyName);
-            if (property == null || !property.CanWrite || property.PropertyType != typeof(bool))
-                return;
-
-            property.SetValue(target, value, null);
-        }
-
-        private static void SetEnumPropertyIfExists(object target, string propertyName, string enumName)
-        {
-            if (target == null)
-                return;
-
-            var property = target.GetType().GetProperty(propertyName);
-            if (property == null || !property.CanWrite || !property.PropertyType.IsEnum)
-                return;
-
-            try
-            {
-                property.SetValue(target, Enum.Parse(property.PropertyType, enumName), null);
-            }
-            catch
-            {
-                // URP enum names can vary by version. Keep the package default if a value is missing.
-            }
-        }
-
-        private Light CreatePreviewDirectionalLight(string name, float intensity, Quaternion rotation)
-        {
-            GameObject lightRoot = new GameObject(name);
-            if (_previewResourceScope == null)
-                _previewResourceScope = new ESEditorPreviewResourceScope(PreviewResourceOwner, "Entity editor preview light.");
-
-            _previewResourceScope.RegisterGameObject(lightRoot);
-            lightRoot.transform.rotation = rotation;
-
-            Light light = lightRoot.AddComponent<Light>();
-            light.type = LightType.Directional;
-            light.intensity = intensity;
-            light.shadows = LightShadows.Soft;
-            return light;
-        }
-
-        private bool EnsurePreviewRenderTexture(Rect renderRect)
-        {
-            int width = Mathf.Clamp(Mathf.CeilToInt(renderRect.width * PreviewRenderScale), 16, (int)PreviewRenderTextureMaxSize);
-            int height = Mathf.Clamp(Mathf.CeilToInt(renderRect.height * PreviewRenderScale), 16, (int)PreviewRenderTextureMaxSize);
-            if (_previewRenderTexture != null
-                && _previewRenderTexture.width == width
-                && _previewRenderTexture.height == height)
-                return _previewRenderTexture.IsCreated() || _previewRenderTexture.Create();
-
-            ReleasePreviewRenderTexture();
-
-            _previewRenderTexture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32)
-            {
-                name = "ES_URP_EntityPreviewRT",
-                hideFlags = HideFlags.HideAndDontSave,
-                antiAliasing = 4,
-                filterMode = FilterMode.Bilinear,
-                useMipMap = false,
-                autoGenerateMips = false
-            };
-            _previewResourceScope?.RegisterRenderTexture(_previewRenderTexture);
-            return _previewRenderTexture.Create();
-        }
-
-        private void ReleasePreviewRenderTexture()
-        {
-            if (_previewRenderTexture == null)
-                return;
-
-            if (_previewCamera != null && _previewCamera.targetTexture == _previewRenderTexture)
-                _previewCamera.targetTexture = null;
-
-            _previewRenderTexture.Release();
-            UnityEngine.Object.DestroyImmediate(_previewRenderTexture);
-            _previewRenderTexture = null;
-        }
-
-        private static void SetLayerRecursive(Transform root, int layer)
-        {
-            if (root == null)
-                return;
-
-            root.gameObject.layer = layer;
-            for (int i = 0; i < root.childCount; i++)
-                SetLayerRecursive(root.GetChild(i), layer);
         }
 
         private void HandlePreviewInput(Rect rect)
@@ -950,122 +760,14 @@ namespace ES
                 _previewRenderPlayer = null;
             }
 
-            if (_previewCamera != null && _previewCamera.targetTexture == _previewRenderTexture)
-                _previewCamera.targetTexture = null;
-
+            _previewModelHandle?.Dispose();
+            _previewModelHandle = null;
+            _previewRenderContext?.Dispose();
+            _previewRenderContext = null;
             _previewResourceScope?.Dispose();
             _previewResourceScope = null;
             _previewRenderRoot = null;
             _previewRenderEntity = null;
-            _previewRenderTexture = null;
-            _previewCameraRoot = null;
-            _previewCamera = null;
-            _previewKeyLight = null;
-            _previewFillLight = null;
-
-            CleanupLingeringPreviewObjects();
-        }
-
-        private static void CleanupLingeringPreviewObjects()
-        {
-            CleanupLingeringPreviewObjectsInternal();
-        }
-
-        private static int CleanupLingeringPreviewObjectsInternal()
-        {
-            int removed = 0;
-            var objects = Resources.FindObjectsOfTypeAll<GameObject>();
-            for (int i = 0; i < objects.Length; i++)
-            {
-                GameObject obj = objects[i];
-                if (!IsLingeringPreviewObject(obj))
-                    continue;
-
-                if (DestroyPreviewObjectImmediate(obj))
-                    removed++;
-            }
-
-            return removed;
-        }
-
-        private static bool IsLingeringPreviewObject(GameObject obj)
-        {
-            if (obj == null || UnityEditor.EditorUtility.IsPersistent(obj))
-                return false;
-
-            if (obj.GetComponent<EditorPreviewGameObjectSign>() != null)
-                return true;
-
-            string objectName = obj.name;
-            if (IsPreviewObjectName(objectName))
-                return true;
-
-            return obj.layer == PreviewRenderLayer && HasPreviewHideFlags(obj.hideFlags);
-        }
-
-        private static bool DestroyPreviewObjectImmediate(GameObject obj)
-        {
-            if (obj == null)
-                return false;
-
-            Transform root = obj.transform;
-            while (root.parent != null && IsLingeringPreviewObject(root.parent.gameObject))
-                root = root.parent;
-
-            if (root == null || root.gameObject == null)
-                return false;
-
-            UnityEngine.Object.DestroyImmediate(root.gameObject);
-            return true;
-        }
-
-        private static bool IsPreviewObjectName(string objectName)
-        {
-            if (string.IsNullOrEmpty(objectName))
-                return false;
-
-            return objectName == PreviewCameraName
-                   || objectName == PreviewKeyLightName
-                   || objectName == PreviewFillLightName
-                   || objectName.StartsWith(PreviewCameraName + " ", StringComparison.Ordinal)
-                   || objectName.StartsWith(PreviewKeyLightName + " ", StringComparison.Ordinal)
-                   || objectName.StartsWith(PreviewFillLightName + " ", StringComparison.Ordinal)
-                   || objectName.Contains(PreviewRootSuffix);
-        }
-
-        private static bool HasPreviewHideFlags(HideFlags hideFlags)
-        {
-            return (hideFlags & HideFlags.HideInHierarchy) != 0
-                   || (hideFlags & HideFlags.HideInInspector) != 0
-                   || (hideFlags & HideFlags.DontSaveInEditor) != 0
-                   || (hideFlags & HideFlags.DontSaveInBuild) != 0
-                   || (hideFlags & HideFlags.DontUnloadUnusedAsset) != 0;
-        }
-
-        private static void MarkPreviewObject(GameObject obj)
-        {
-            if (obj == null)
-                return;
-
-            ESEditorPreviewResourceScope.MarkPreviewObject(obj, PreviewResourceOwner, "Entity editor preview temporary object.");
-        }
-
-        private static void SetHideFlagsRecursive(Transform root, HideFlags flags)
-        {
-            if (root == null)
-                return;
-
-            root.gameObject.hideFlags = flags;
-            for (int i = 0; i < root.childCount; i++)
-                SetHideFlagsRecursive(root.GetChild(i), flags);
-        }
-
-        private static void NormalizePreviewRootTransform(Transform root)
-        {
-            if (root == null)
-                return;
-
-            root.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
         }
 
         private static void AlignPreviewRootToGround(GameObject root)
@@ -1123,22 +825,6 @@ namespace ES
             }
         }
 
-        private static void DisablePreviewBehaviours(GameObject root)
-        {
-            if (root == null)
-                return;
-
-            var behaviours = root.GetComponentsInChildren<Behaviour>(true);
-            for (int i = 0; i < behaviours.Length; i++)
-            {
-                var behaviour = behaviours[i];
-                if (behaviour == null || behaviour is Animator)
-                    continue;
-
-                behaviour.enabled = false;
-            }
-        }
-
         private static void EnsurePreviewAnimatorEnabled(GameObject root)
         {
             if (root == null)
@@ -1153,86 +839,6 @@ namespace ES
                 animators[i].enabled = true;
                 animators[i].cullingMode = AnimatorCullingMode.AlwaysAnimate;
             }
-        }
-
-        private static void EnsurePreviewRenderers(GameObject root)
-        {
-            if (root == null)
-                return;
-
-            var renderers = root.GetComponentsInChildren<Renderer>(true);
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                Renderer renderer = renderers[i];
-                if (renderer == null)
-                    continue;
-
-                Material[] sharedMaterials = renderer.sharedMaterials;
-                if (sharedMaterials != null && sharedMaterials.Length > 0)
-                    renderer.sharedMaterials = sharedMaterials;
-            }
-        }
-
-        private static void CopyPreviewRendererState(GameObject sourceRoot, GameObject previewRoot)
-        {
-            if (sourceRoot == null || previewRoot == null)
-                return;
-
-            var sourceRenderers = sourceRoot.GetComponentsInChildren<Renderer>(true);
-            var previewRenderers = previewRoot.GetComponentsInChildren<Renderer>(true);
-            if (sourceRenderers == null || previewRenderers == null)
-                return;
-
-            var previewMap = new Dictionary<string, Renderer>(previewRenderers.Length);
-            for (int i = 0; i < previewRenderers.Length; i++)
-            {
-                Renderer previewRenderer = previewRenderers[i];
-                if (previewRenderer == null)
-                    continue;
-
-                string key = GetRendererPathKey(previewRoot.transform, previewRenderer);
-                if (!previewMap.ContainsKey(key))
-                    previewMap.Add(key, previewRenderer);
-            }
-
-            var propertyBlock = new MaterialPropertyBlock();
-            for (int i = 0; i < sourceRenderers.Length; i++)
-            {
-                Renderer sourceRenderer = sourceRenderers[i];
-                if (sourceRenderer == null)
-                    continue;
-
-                string key = GetRendererPathKey(sourceRoot.transform, sourceRenderer);
-                if (!previewMap.TryGetValue(key, out Renderer previewRenderer) || previewRenderer == null)
-                    continue;
-
-                previewRenderer.enabled = sourceRenderer.enabled;
-                previewRenderer.shadowCastingMode = sourceRenderer.shadowCastingMode;
-                previewRenderer.receiveShadows = sourceRenderer.receiveShadows;
-                previewRenderer.lightProbeUsage = sourceRenderer.lightProbeUsage;
-                previewRenderer.reflectionProbeUsage = sourceRenderer.reflectionProbeUsage;
-                previewRenderer.sharedMaterials = sourceRenderer.sharedMaterials;
-
-                sourceRenderer.GetPropertyBlock(propertyBlock);
-                previewRenderer.SetPropertyBlock(propertyBlock);
-                propertyBlock.Clear();
-            }
-        }
-
-        private static string GetRendererPathKey(Transform root, Renderer renderer)
-        {
-            if (root == null || renderer == null)
-                return string.Empty;
-
-            Transform current = renderer.transform;
-            string path = renderer.GetType().FullName;
-            while (current != null && current != root)
-            {
-                path = current.GetSiblingIndex() + "/" + current.name + "/" + path;
-                current = current.parent;
-            }
-
-            return path;
         }
 
         private static float GetSequenceDuration(ITrackSequence sequence)
@@ -1262,13 +868,13 @@ namespace ES
             var sm = stateMachine;
             if (sm == null)
             {
-                UnityEditor.EditorGUILayout.HelpBox("没有 StateMachine", UnityEditor.MessageType.Warning);
+                UnityEditor.EditorGUILayout.HelpBox("未绑定 StateMachine。", UnityEditor.MessageType.Warning);
                 return;
             }
 
             double now = UnityEditor.EditorApplication.timeSinceStartup;
             CleanupPreviewStateTraces(now);
-            UnityEditor.EditorGUILayout.LabelField("状态机运行时预览", UnityEditor.EditorStyles.boldLabel);
+            UnityEditor.EditorGUILayout.LabelField("状态机预览 / 运行态", UnityEditor.EditorStyles.boldLabel);
             var layers = sm.LayerRuntimes;
             if (layers == null) return;
 
@@ -1287,28 +893,31 @@ namespace ES
 
             UnityEditor.EditorGUILayout.BeginVertical(UnityEditor.EditorStyles.helpBox);
             UnityEditor.EditorGUILayout.BeginHorizontal();
-            GUILayout.Label($"注册状态: {sm.RegisteredStateCount}", UnityEditor.EditorStyles.miniBoldLabel, GUILayout.Width(95));
-            GUILayout.Label($"运行状态: {totalRunningCount}", UnityEditor.EditorStyles.miniBoldLabel, GUILayout.Width(95));
-            GUILayout.Label($"动画节点: {totalConnectedCount}", UnityEditor.EditorStyles.miniBoldLabel, GUILayout.Width(95));
-            GUILayout.Label($"启用层级: {enabledLayerCount}/{layerCount}", UnityEditor.EditorStyles.miniBoldLabel, GUILayout.Width(105));
-            GUILayout.Label($"压制关系: {sm.WeakInterruptRelationCount}", UnityEditor.EditorStyles.miniBoldLabel);
+            GUILayout.Label($"注册 {sm.RegisteredStateCount}", UnityEditor.EditorStyles.miniBoldLabel, GUILayout.Width(72));
+            GUILayout.Label($"运行 {totalRunningCount}", UnityEditor.EditorStyles.miniBoldLabel, GUILayout.Width(72));
+            GUILayout.Label($"节点 {totalConnectedCount}", UnityEditor.EditorStyles.miniBoldLabel, GUILayout.Width(72));
+            GUILayout.Label($"层级 {enabledLayerCount}/{layerCount}", UnityEditor.EditorStyles.miniBoldLabel, GUILayout.Width(84));
+            GUILayout.Label($"压制 {sm.WeakInterruptRelationCount}", UnityEditor.EditorStyles.miniBoldLabel);
             UnityEditor.EditorGUILayout.EndHorizontal();
             UnityEditor.EditorGUILayout.BeginHorizontal();
             bool traceEnabled = UnityEditor.EditorGUILayout.ToggleLeft(
-                $"状态留痕 {PreviewStateTraceHoldSeconds:F1}s",
+                $"留痕 {PreviewStateTraceHoldSeconds:F1}s",
                 _previewStateTraceEnabled,
-                GUILayout.Width(120));
+                GUILayout.Width(100));
             if (traceEnabled != _previewStateTraceEnabled)
             {
                 _previewStateTraceEnabled = traceEnabled;
                 if (!_previewStateTraceEnabled)
                     _previewStateTraces.Clear();
             }
-            GUILayout.Label($"留痕缓存: {(_previewStateTraceEnabled ? _previewStateTraces.Count : 0)}/{PreviewStateTraceMaxCount}", UnityEditor.EditorStyles.miniLabel);
+            GUILayout.Label($"缓存 {(_previewStateTraceEnabled ? _previewStateTraces.Count : 0)}/{PreviewStateTraceMaxCount}", UnityEditor.EditorStyles.miniLabel);
             UnityEditor.EditorGUILayout.EndHorizontal();
             if (sm.WeakInterruptRelationCount > 0)
                 UnityEditor.EditorGUILayout.HelpBox(sm.GetWeakInterruptSummary(), UnityEditor.MessageType.None);
             UnityEditor.EditorGUILayout.EndVertical();
+
+            UnityEditor.EditorGUILayout.Space(2f);
+            UnityEditor.EditorGUILayout.LabelField("层级明细", UnityEditor.EditorStyles.boldLabel);
 
             foreach (var layer in layers)
             {
@@ -1321,7 +930,7 @@ namespace ES
                 int slotCount = layer.stateToSlotMap.Count;
                 bool foldout = UnityEditor.EditorGUILayout.Foldout(
                     layerFoldouts[layer.layerType],
-                    $"层级: {layer.layerType}    层权重: {layer.weight:F2}    运行: {runningCount}/{slotCount}",
+                    $"【{layer.layerType}】 权重 {layer.weight:F2} | 运行 {runningCount}/{slotCount}",
                     true);
                 layerFoldouts[layer.layerType] = foldout;
                 if (!foldout) continue;
@@ -1330,7 +939,7 @@ namespace ES
 
                 if (slotCount == 0)
                 {
-                    UnityEditor.EditorGUILayout.LabelField("当前层级没有已连接状态", UnityEditor.EditorStyles.miniLabel);
+                    UnityEditor.EditorGUILayout.LabelField("当前层级没有已连接状态。", UnityEditor.EditorStyles.miniLabel);
                     UnityEditor.EditorGUILayout.EndVertical();
                     continue;
                 }
@@ -1589,7 +1198,7 @@ namespace ES
             else if (isSuppressed)
             {
                 badgeStyle.normal.textColor = new Color(0.58f, 0.78f, 1f);
-                GUILayout.Label("被压制", badgeStyle, GUILayout.Width(48));
+                GUILayout.Label("压制", badgeStyle, GUILayout.Width(40));
             }
             else if (isActive)
             {

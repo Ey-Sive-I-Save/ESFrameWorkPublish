@@ -4,8 +4,7 @@ using UnityEngine;
 
 // 示例：演示 ExtNormal.cs 中的通用工具方法
 // 来源：Assets/Plugins/ES/1_Design/Extension/EX_SimpleExtension/ExtNormal.cs
-namespace ES
-{
+namespace ES.Samples{
     public class Example_Ext_Normal : MonoBehaviour
     {
         void Start()

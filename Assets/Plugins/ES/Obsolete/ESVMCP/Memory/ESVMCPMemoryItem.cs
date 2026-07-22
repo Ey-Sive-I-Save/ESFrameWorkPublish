@@ -5,7 +5,7 @@ using Sirenix.OdinInspector;
 using UnityEditor;
 #endif
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 记忆项类型

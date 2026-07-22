@@ -3,8 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-namespace ES
-{
+namespace ES.Obsolete{
     [Serializable]
     public abstract class ESRuntimeOpSupport_OutputOperation : IOutputOperation<ESRuntimeTarget,IOpSupporter>
     {

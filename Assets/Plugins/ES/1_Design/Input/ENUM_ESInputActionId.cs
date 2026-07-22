@@ -58,6 +58,20 @@ namespace ES
         Climb = 25,
         [InspectorName("交互")]
         Interact = 26,
+
+        [InspectorName("UI 提交")]
+        UISubmit = 100,
+        [InspectorName("UI 取消")]
+        UICancel = 101,
+        [InspectorName("UI 导航")]
+        UINavigate = 102,
+        [InspectorName("UI 指针")]
+        UIPoint = 103,
+        [InspectorName("UI 点击")]
+        UIClick = 104,
+        [InspectorName("UI 滚动")]
+        UIScroll = 105,
+
         [InspectorName("动态动作")]
         Dynamic = 10000
     }
@@ -127,7 +141,7 @@ namespace ES
         PressedImmediate,
         [InspectorName("松开时判定短按")]
         PressedOnRelease,
-        [InspectorName("未触发长按才算短按")]
+        [InspectorName("未触发长按前算短按")]
         PressedIfNotLongPress,
         [InspectorName("长按触发后吞掉短按")]
         LongPressConsumesPressed

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ES.AIPreview.Mod
+namespace ES.Obsolete.AIPreview.Mod
 {
     /// <summary>
     /// Mod 定义资产：

@@ -1,7 +1,9 @@
 {
     "name": "ESInstaller",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "ES_Stand"
+    ],
     "includePlatforms": [
         "Editor"
     ],

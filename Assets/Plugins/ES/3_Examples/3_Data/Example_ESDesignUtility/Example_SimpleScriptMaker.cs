@@ -1,32 +1,31 @@
-using UnityEngine;
+﻿using UnityEngine;
 using ES;
 
-namespace ES.Examples
-{
+namespace ES.Samples{
     /// <summary>
-    /// SimpleScriptMaker API 演示 - 脚本生成工具
-    /// 提供动态生成C#代码片段和文件的功能
-    /// 注意：主要用于Editor模式下的代码生成
+    /// SimpleScriptMaker API 婕旂ず - 鑴氭湰鐢熸垚宸ュ叿
+    /// 鎻愪緵鍔ㄦ€佺敓鎴怌#浠ｇ爜鐗囨鍜屾枃浠剁殑鍔熻兘
+    /// 娉ㄦ剰锛氫富瑕佺敤浜嶦ditor妯″紡涓嬬殑浠ｇ爜鐢熸垚
     /// </summary>
     public class Example_SimpleScriptMaker : MonoBehaviour
     {
         private void Start()
         {
-            Debug.Log("=== SimpleScriptMaker API 演示 ===");
-            Debug.Log("注意：此工具主要在Editor模式下使用");
+            Debug.Log("=== SimpleScriptMaker API 婕旂ず ===");
+            Debug.Log("娉ㄦ剰锛氭宸ュ叿涓昏鍦‥ditor妯″紡涓嬩娇鐢?);
 
-            // ========== 创建类内容 ==========
-            Debug.Log("--- 创建类内容 ---");
+            // ========== 鍒涘缓绫诲唴瀹?==========
+            Debug.Log("--- 鍒涘缓绫诲唴瀹?---");
 
-            // 1. 创建简单类定义
+            // 1. 鍒涘缓绠€鍗曠被瀹氫箟
             string classContent = ESDesignUtility.SimpleScriptMaker.CreateClassContentByString(
                 className: "MyTestClass",
                 parent: ": MonoBehaviour",
                 Attribute: "[RequireComponent(typeof(Rigidbody))]"
             );
-            Debug.Log($"类定义:\n{classContent}");
+            Debug.Log($"绫诲畾涔?\n{classContent}");
 
-            // 2. 创建带内容的类
+            // 2. 鍒涘缓甯﹀唴瀹圭殑绫?
             string insideClass = @"
     void Start()
     {
@@ -44,12 +43,12 @@ namespace ES.Examples
                 Attribute: "",
                 beforeClassName: "// Generated class\n"
             );
-            Debug.Log($"完整类:\n{fullClass}");
+            Debug.Log($"瀹屾暣绫?\n{fullClass}");
 
-            // ========== 创建字段 ==========
-            Debug.Log("--- 创建字段 ---");
+            // ========== 鍒涘缓瀛楁 ==========
+            Debug.Log("--- 鍒涘缓瀛楁 ---");
 
-            // 3. 创建公开字段
+            // 3. 鍒涘缓鍏紑瀛楁
             string field1 = ESDesignUtility.SimpleScriptMaker.CreateFieldContent(
                 typeName: "int",
                 fieldName: "score",
@@ -57,9 +56,9 @@ namespace ES.Examples
                 valueDefine: " = 0",
                 attribute: "[SerializeField]"
             );
-            Debug.Log($"字段1: {field1}");
+            Debug.Log($"瀛楁1: {field1}");
 
-            // 4. 创建私有字段
+            // 4. 鍒涘缓绉佹湁瀛楁
             string field2 = ESDesignUtility.SimpleScriptMaker.CreateFieldContent(
                 typeName: "string",
                 fieldName: "_playerName",
@@ -67,12 +66,12 @@ namespace ES.Examples
                 valueDefine: " = \"Default\"",
                 attribute: ""
             );
-            Debug.Log($"字段2: {field2}");
+            Debug.Log($"瀛楁2: {field2}");
 
-            // ========== 创建参数 ==========
-            Debug.Log("--- 创建参数 ---");
+            // ========== 鍒涘缓鍙傛暟 ==========
+            Debug.Log("--- 鍒涘缓鍙傛暟 ---");
 
-            // 5. 创建方法参数
+            // 5. 鍒涘缓鏂规硶鍙傛暟
             string param = ESDesignUtility.SimpleScriptMaker.CreateParaOrDefineContent(
                 typeName: "float",
                 itName: "damage",
@@ -80,9 +79,9 @@ namespace ES.Examples
                 valueDefine: " = 10f",
                 isDefine: false
             );
-            Debug.Log($"参数: {param}");
+            Debug.Log($"鍙傛暟: {param}");
 
-            // 6. 创建变量定义
+            // 6. 鍒涘缓鍙橀噺瀹氫箟
             string define = ESDesignUtility.SimpleScriptMaker.CreateParaOrDefineContent(
                 typeName: "Vector3",
                 itName: "position",
@@ -90,20 +89,20 @@ namespace ES.Examples
                 valueDefine: " = Vector3.zero",
                 isDefine: true
             );
-            Debug.Log($"定义: {define}");
+            Debug.Log($"瀹氫箟: {define}");
 
-            // ========== 创建方法 ==========
-            Debug.Log("--- 创建方法 ---");
+            // ========== 鍒涘缓鏂规硶 ==========
+            Debug.Log("--- 鍒涘缓鏂规硶 ---");
 
-            // 7. 创建简单方法（手动拼接）
+            // 7. 鍒涘缓绠€鍗曟柟娉曪紙鎵嬪姩鎷兼帴锛?
             string methodCode = @"
     public void Attack()
     {
         Debug.Log(""Attack!""  );
     }";
-            Debug.Log($"方法代码:\n{methodCode}");
+            Debug.Log($"鏂规硶浠ｇ爜:\n{methodCode}");
 
-            // 8. 创建带参数的方法（手动拼接）
+            // 8. 鍒涘缓甯﹀弬鏁扮殑鏂规硶锛堟墜鍔ㄦ嫾鎺ワ級
             string complexMethodCode = @"
     public void TakeDamage(int damage, bool isCritical)
     {
@@ -111,25 +110,25 @@ namespace ES.Examples
             damage *= 2;
         health -= damage;
     }";
-            Debug.Log($"复杂方法:\n{complexMethodCode}");
+            Debug.Log($"澶嶆潅鏂规硶:\n{complexMethodCode}");
 
-            // ========== 创建完整脚本 ==========
-            Debug.Log("--- 创建完整脚本 ---");
+            // ========== 鍒涘缓瀹屾暣鑴氭湰 ==========
+            Debug.Log("--- 鍒涘缓瀹屾暣鑴氭湰 ---");
 
-            // 9. 生成完整脚本（不实际创建文件）
+            // 9. 鐢熸垚瀹屾暣鑴氭湰锛堜笉瀹為檯鍒涘缓鏂囦欢锛?
             string scriptCode = ESDesignUtility.SimpleScriptMaker.CreateScriptBounds(
                 Folderpath: "Assets/Scripts",
                 fileName: "GeneratedScript.cs",
                 using_: "using System.Collections.Generic;",
                 nameSpace: "ES.Generated",
                 content: fullClass,
-                TruelyCreate: false  // 仅生成代码，不创建文件
+                TruelyCreate: false  // 浠呯敓鎴愪唬鐮侊紝涓嶅垱寤烘枃浠?
             );
-            Debug.Log($"完整脚本预览:\n{scriptCode}");
+            Debug.Log($"瀹屾暣鑴氭湰棰勮:\n{scriptCode}");
 
 #if UNITY_EDITOR
-            // 10. 实际创建脚本文件（仅Editor模式）
-            // 注意：这会在项目中实际创建文件
+            // 10. 瀹為檯鍒涘缓鑴氭湰鏂囦欢锛堜粎Editor妯″紡锛?
+            // 娉ㄦ剰锛氳繖浼氬湪椤圭洰涓疄闄呭垱寤烘枃浠?
             /*
             ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(
                 Folderpath: "Assets/Scripts/Generated",
@@ -138,14 +137,14 @@ namespace ES.Examples
                 Attribute: "",
                 nameSpace: "ES.Generated"
             );
-            Debug.Log("已创建脚本文件（仅Editor有效）");
+            Debug.Log("宸插垱寤鸿剼鏈枃浠讹紙浠匛ditor鏈夋晥锛?);
             */
 #endif
 
-            // ========== 实用示例：生成数据类 ==========
-            Debug.Log("--- 生成数据类示例 ---");
+            // ========== 瀹炵敤绀轰緥锛氱敓鎴愭暟鎹被 ==========
+            Debug.Log("--- 鐢熸垚鏁版嵁绫荤ず渚?---");
 
-            // 11. 生成一个数据类
+            // 11. 鐢熸垚涓€涓暟鎹被
             string dataFields = @"
     public string itemName;
     public int itemID;
@@ -177,14 +176,15 @@ namespace ES.Examples
                 TruelyCreate: false
             );
 
-            Debug.Log($"数据类脚本:\n{dataScript}");
+            Debug.Log($"鏁版嵁绫昏剼鏈?\n{dataScript}");
 
-            // ========== 使用提示 ==========
-            Debug.Log("\n=== 使用提示 ===");
-            Debug.Log("• SimpleScriptMaker主要用于Editor工具中动态生成代码");
-            Debug.Log("• TruelyCreate=false 可以先预览代码，确认无误后再创建");
-            Debug.Log("• 适合生成重复性代码、数据类、配置类等");
-            Debug.Log("• 记得设置正确的命名空间和using语句");
+            // ========== 浣跨敤鎻愮ず ==========
+            Debug.Log("\n=== 浣跨敤鎻愮ず ===");
+            Debug.Log("鈥?SimpleScriptMaker涓昏鐢ㄤ簬Editor宸ュ叿涓姩鎬佺敓鎴愪唬鐮?);
+            Debug.Log("鈥?TruelyCreate=false 鍙互鍏堥瑙堜唬鐮侊紝纭鏃犺鍚庡啀鍒涘缓");
+            Debug.Log("鈥?閫傚悎鐢熸垚閲嶅鎬т唬鐮併€佹暟鎹被銆侀厤缃被绛?);
+            Debug.Log("鈥?璁板緱璁剧疆姝ｇ‘鐨勫懡鍚嶇┖闂村拰using璇彞");
         }
     }
 }
+

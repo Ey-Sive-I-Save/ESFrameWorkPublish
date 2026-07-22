@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
-using UnityEngine;
 
 namespace ES
 {
@@ -207,15 +206,27 @@ namespace ES
                 case ESInputActionId.Jump:
                 case ESInputActionId.Crouch:
                     return ESInputActionCategory.Move;
+
                 case ESInputActionId.Look:
                     return ESInputActionCategory.CameraLook;
+
                 case ESInputActionId.Interact:
                     return ESInputActionCategory.Interaction;
+
                 case ESInputActionId.Fly:
                 case ESInputActionId.FlyVertical:
                 case ESInputActionId.Mount:
                 case ESInputActionId.Climb:
                     return ESInputActionCategory.SpecialMove;
+
+                case ESInputActionId.UISubmit:
+                case ESInputActionId.UICancel:
+                case ESInputActionId.UINavigate:
+                case ESInputActionId.UIPoint:
+                case ESInputActionId.UIClick:
+                case ESInputActionId.UIScroll:
+                    return ESInputActionCategory.UI;
+
                 case ESInputActionId.Attack:
                 case ESInputActionId.HeavyAttack:
                 case ESInputActionId.Block:
@@ -235,6 +246,7 @@ namespace ES
                 case ESInputActionId.Skill2:
                 case ESInputActionId.Skill3:
                     return ESInputActionCategory.Combat;
+
                 default:
                     return ESInputActionCategory.Common;
             }
@@ -271,6 +283,12 @@ namespace ES
                 case ESInputActionId.FlyVertical: return "飞行垂直轴";
                 case ESInputActionId.Climb: return "攀爬";
                 case ESInputActionId.Interact: return "交互";
+                case ESInputActionId.UISubmit: return "UI 提交";
+                case ESInputActionId.UICancel: return "UI 取消";
+                case ESInputActionId.UINavigate: return "UI 导航";
+                case ESInputActionId.UIPoint: return "UI 指针";
+                case ESInputActionId.UIClick: return "UI 点击";
+                case ESInputActionId.UIScroll: return "UI 滚动";
                 default: return id.ToString();
             }
         }

@@ -14,6 +14,10 @@ namespace ES
         [LabelText("\u7981\u7528\u65f6\u505c\u6b62\u64ad\u653e")]
         public bool stopOnDisable = true;
 
+        [LabelText("播放时立即推进")]
+        [PropertyTooltip("启用后，Play 当帧会用 deltaTime=0 推进到第一个等待点，保证按钮/事件触发跟手，同时不会让延时命令多扣时间。")]
+        public bool tickImmediatelyOnPlay = true;
+
         [LabelText("\u64ad\u653e\u4e8b\u4ef6")]
         public ESCommandEvent eventToPlay = new ESCommandEvent();
 
@@ -22,6 +26,7 @@ namespace ES
         private ESRunState state = ESRunState.None;
         private bool cancelRequested;
         private IESCommandPlayable currentPlayable;
+        private int lastTickFrame = -1;
 
         public ESRunState State
         {
@@ -65,12 +70,22 @@ namespace ES
             playingIndex = 0;
             cancelRequested = false;
             currentPlayable = null;
+            lastTickFrame = -1;
             state = commandEvent == null || commandEvent.Count == 0
                 ? ESRunState.Skipped
                 : ESRunState.Running;
 
             if (state == ESRunState.Running)
+            {
                 ESCommandPlayerRunner.Register(this);
+
+                if (tickImmediatelyOnPlay)
+                {
+                    ESRunState immediateState = ESCommandPlayerRunner.TickPlayerNow(this, Time.time, 0f);
+                    if (immediateState != ESRunState.Running)
+                        ESCommandPlayerRunner.Unregister(this);
+                }
+            }
         }
 
         [Button("\u53d6\u6d88")]
@@ -95,8 +110,18 @@ namespace ES
 
         public ESRunState Tick(float time, float deltaTime)
         {
+            return Tick(Time.frameCount, time, deltaTime);
+        }
+
+        public ESRunState Tick(int frameIndex, float time, float deltaTime)
+        {
             if (state != ESRunState.Running)
                 return state;
+
+            if (frameIndex >= 0 && lastTickFrame == frameIndex)
+                return state;
+
+            lastTickFrame = frameIndex;
 
             ESCommandPlayFrame frame = new ESCommandPlayFrame(time, deltaTime, cancelRequested);
             if (frame.cancelRequested)

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 namespace ES
@@ -9,12 +9,11 @@ namespace ES
     using System;
     using System.IO;
     using System.Linq;
+    using System.Reflection;
     using Sirenix.Utilities;
 
-    namespace ES
-    {
-        //窗口总览
-        public partial class ESSODataInfoWindow : ESMenuTreeWindowAB<ESSODataInfoWindow> //OdinMenuEditorWindow
+    //窗口总览
+    public partial class ESSODataInfoWindow : ESMenuTreeWindowAB<ESSODataInfoWindow> //OdinMenuEditorWindow
         {
             [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "SO 数据窗口", false, -970)]
             public static void TryOpenWindow()
@@ -81,6 +80,7 @@ namespace ES
             public string selectGroupTypeName_ = "Buff数据";
 
             public string selectNormalTypeName_ = "Normal_SO";
+            public string selectNormalCategoryName_ = ESSODataWindowHelper.NormalCategoryAll;
             private bool HasDelegate = false;
 
             public static string guidForCopiedGroup = "";
@@ -289,6 +289,11 @@ namespace ES
             public string ChineseDisplayName = "数据名";
             [LabelText("启用按类分组So")]
             public bool EnableEnglishGroupCodeName = false;
+            [Button("Agent：打开并恢复记忆", ButtonHeight = 26), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+            public void OpenCmdAgent()
+            {
+                ESCmdAgentWindow.OpenAndResume();
+            }
             [LabelText("英文分组代码名(如\"GameCore\")"), ShowIf("EnableEnglishGroupCodeName")]
             public string EnglishGroupCodeName = "NewGroup";
             [LabelText("中文分组显示名(如\"游戏核心类\")"), ShowIf("EnableEnglishGroupCodeName")]
@@ -1144,17 +1149,24 @@ namespace ES
             {
                 AssetDatabase.Refresh();
                 if (ESSODataInfoWindow.UsingWindow != null)
+                {
+                    ESSODataInfoWindow.UsingWindow.selectNormalCategoryName_ = createNormalCategory_;
                     ESSODataInfoWindow.UsingWindow.selectNormalTypeName_ = createNormal_;
+                }
                 createText = $"--新建【{ESSODataWindowHelper.GetTypePathDisplayName(createNormal_, "SO")}】--";
             }
             public override ESWindowPageBase ES_Refresh()
             {
 
                 FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_NormalParent;
+                createNormalCategory_ = ESSODataInfoWindow.ResolveSavedSelection(
+                    createNormalCategory_,
+                    ESSODataInfoWindow.UsingWindow?.selectNormalCategoryName_,
+                    ESSODataWindowHelper.GetNormalSOCategories());
                 createNormal_ = ESSODataInfoWindow.ResolveSavedSelection(
                     createNormal_,
                     ESSODataInfoWindow.UsingWindow?.selectNormalTypeName_,
-                    ESGlobalEditorDefaultConfi.GetUseableNormalSoNames());
+                    ESSODataWindowHelper.GetNormalSONamesByCategory(createNormalCategory_));
                 Refresh();
                 createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createNormal_, "SO");
                 return base.ES_Refresh();
@@ -1165,8 +1177,13 @@ namespace ES
             public string createTypeText = "--筛选常规数据类型--";
 
 
+            [OnValueChanged("OnNormalCategoryChanged")]
+            [VerticalGroup("总组/数据"), Space(5), LabelText("普通SO分类")]
+            [ValueDropdown("GetNormalCategoryDropdownItems", AppendNextDrawer = false)]
+            public string createNormalCategory_ = ESSODataWindowHelper.NormalCategoryAll;
+
             [OnValueChanged("OnValueChanged_ResetConfigure"), InfoBox("建议选择一个预设类型的常规SO配置,或者自己创建支持,默认类型无法直接使用", infoMessageType: InfoMessageType.Warning/*, VisibleIf = "@createGroup_==EvWindowDataAndTool.DataType.None"*/)]
-            [VerticalGroup("总组/数据"), Space(5), LabelText("预定义类型")]
+            [VerticalGroup("总组/数据"), Space(5), LabelText("普通SO类型")]
             [ValueDropdown("GetNormalSoDropdownItems", AppendNextDrawer = false)]
             public string createNormal_ = "";
 
@@ -1217,16 +1234,35 @@ namespace ES
             private void OnValueChanged_ResetConfigure()
             {
                 hasChange = false;
-                ESSODataInfoWindow.UsingWindow.selectNormalTypeName_ = createNormal_;
-                ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
-                ESSODataInfoWindow.UsingWindow.RequestExpandMenuAfterRefresh(ESSODataInfoWindow.PageName_NormalSoDataCreate);
-                ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
+                if (ESSODataInfoWindow.UsingWindow != null)
+                {
+                    ESSODataInfoWindow.UsingWindow.selectNormalCategoryName_ = createNormalCategory_;
+                    ESSODataInfoWindow.UsingWindow.selectNormalTypeName_ = createNormal_;
+                    ESSODataInfoWindow.UsingWindow.SaveSelectedDataTypeNames();
+                    ESSODataInfoWindow.UsingWindow.RequestExpandMenuAfterRefresh(ESSODataInfoWindow.PageName_NormalSoDataCreate);
+                    ESSODataInfoWindow.UsingWindow.ESWindow_RefreshWindow();
+                }
                 createName_ = "新建" + ESSODataWindowHelper.GetTypeLeafDisplayName(createNormal_, "SO");
+            }
+
+            private void OnNormalCategoryChanged()
+            {
+                var names = ESSODataWindowHelper.GetNormalSONamesByCategory(createNormalCategory_);
+                if (!names.Contains(createNormal_))
+                    createNormal_ = names.FirstOrDefault() ?? "";
+
+                OnValueChanged_ResetConfigure();
+            }
+
+            private IEnumerable<ValueDropdownItem<string>> GetNormalCategoryDropdownItems()
+            {
+                return ESSODataWindowHelper.GetNormalSOCategories()
+                    .Select(static category => new ValueDropdownItem<string>(category, category));
             }
 
             private IEnumerable<ValueDropdownItem<string>> GetNormalSoDropdownItems()
             {
-                return ESGlobalEditorDefaultConfi.GetUseableNormalSoNames()
+                return ESSODataWindowHelper.GetNormalSONamesByCategory(createNormalCategory_)
                     .Select(static name => new ValueDropdownItem<string>(ESSODataWindowHelper.GetTypePathDisplayName(name, "SO"), name));
             }
             #endregion
@@ -1370,6 +1406,33 @@ namespace ES
         [InitializeOnLoad]
         public static class ESSODataWindowHelper
         {
+            public const string NormalCategoryAll = "全部";
+            public const string NormalCategoryUncategorized = "无分类";
+
+            private static readonly Dictionary<string, string> BuiltInNormalSoCategories = new Dictionary<string, string>
+            {
+                { "ESSoTableDataRule", "玩法搭建/表格管理" },
+                { "ESAssetPackageBakeData", "资源管理/资产包复制" },
+                { "ESGlobalResSetting", "资源管理/资源配置" },
+                { "ESGlobalResToolsSupportConfig", "资源管理/资源工具配置" },
+                { "AssetJumper", "资源管理/资源选择与定位" },
+                { "ESGlobalEditorLocation", "资源管理/资源选择与定位" },
+                { "ESInputConfig", "玩法搭建/输入配置" },
+                { "GameCoreGlobalData", "玩法搭建/GameCore配置" },
+                { "ESSceneGlobalData", "玩法搭建/场景配置" },
+                { "StateMachineConfig", "玩法搭建/状态机" },
+                { "StateMachineDebugSettings", "玩法搭建/状态机" },
+                { "StateDefaultNumericParameterProfile", "玩法搭建/状态机" },
+                { "AdvancedStateMachineData", "玩法搭建/状态机" },
+                { "VisualGUIDrawerSO", "编辑器支持/界面绘制" },
+                { "ESGlobalEditorDefaultConfi", "插件级/全局设置" },
+                { "ESGlobalProjectAssetGuideData", "插件级/项目资产职责" },
+                { "TrackSequenceEditorSettings", "编辑器支持/轨道编辑" },
+            };
+
+            private static Dictionary<string, string> normalCategoryByNameCache;
+            private static Dictionary<string, List<string>> normalNamesByCategoryCache;
+
             static ESSODataWindowHelper()
             {
                 Selection.selectionChanged -= ForDataWindowSelection;
@@ -1453,22 +1516,177 @@ namespace ES
                         !x.StartsWith("</summary", StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
             }
 
+            private static string[] GetVisibleCreatePathKeys(string groupName)
+            {
+                var dic = ESDesignUtility.Creator.CreatePaths.GetDic(groupName);
+                if (dic == null)
+                    return Array.Empty<string>();
+
+                return dic
+                    .Where(static pair => !IsHiddenFromMainSoDataWindow(pair.Value))
+                    .Select(static pair => pair.Key)
+                    .ToArray();
+            }
+
+            private static bool IsHiddenFromMainSoDataWindow(Type type)
+            {
+                if (type == null)
+                    return true;
+
+                return false;
+            }
+
             public static string[] GetInfoNames()
             {
-                return ESDesignUtility.Creator.CreatePaths.GetKeys("数据信息");
+                return GetVisibleCreatePathKeys("数据信息");
             }
             public static string[] GetGroupNames()
             {
-                return ESDesignUtility.Creator.CreatePaths.GetKeys("数据组");
+                return GetVisibleCreatePathKeys("数据组");
             }
             public static string[] GetPackNames()
             {
-                return ESDesignUtility.Creator.CreatePaths.GetKeys("数据包");
+                return GetVisibleCreatePathKeys("数据包");
             }
             public static string[] GetNormalSONames()
             {
                 return ESEditorSO.AllSoNames.Keys.ToArray();//.Groups.Keys.Select((n)=>n.Name).ToArray();//..Creator.CreatePaths.GetKeys("数据组");
             }
+
+            public static string[] GetNormalSOCategories()
+            {
+                EnsureNormalCategoryCache();
+
+                var categories = normalNamesByCategoryCache.Keys
+                    .Where(static category => category != NormalCategoryAll)
+                    .OrderBy(static category => category == NormalCategoryUncategorized ? 1 : 0)
+                    .ThenBy(static category => category)
+                    .ToList();
+
+                categories.Insert(0, NormalCategoryAll);
+                return categories.ToArray();
+            }
+
+            public static string[] GetNormalSONamesByCategory(string category)
+            {
+                EnsureNormalCategoryCache();
+
+                if (category.IsNullOrWhitespace() || category == NormalCategoryAll)
+                    return normalNamesByCategoryCache.TryGetValue(NormalCategoryAll, out var allNames)
+                        ? allNames.ToArray()
+                        : Array.Empty<string>();
+
+                return normalNamesByCategoryCache.TryGetValue(category, out var names)
+                    ? names.ToArray()
+                    : Array.Empty<string>();
+            }
+
+            public static string GetNormalSOCategory(string normalName)
+            {
+                EnsureNormalCategoryCache();
+                return !normalName.IsNullOrWhitespace() && normalCategoryByNameCache.TryGetValue(normalName, out var category)
+                    ? category
+                    : NormalCategoryUncategorized;
+            }
+
+            private static void EnsureNormalCategoryCache()
+            {
+                if (normalCategoryByNameCache != null && normalNamesByCategoryCache != null)
+                    return;
+
+                normalCategoryByNameCache = new Dictionary<string, string>();
+                normalNamesByCategoryCache = new Dictionary<string, List<string>>();
+                normalNamesByCategoryCache[NormalCategoryAll] = new List<string>();
+                normalNamesByCategoryCache[NormalCategoryUncategorized] = new List<string>();
+
+                foreach (string name in ESGlobalEditorDefaultConfi.GetUseableNormalSoNames())
+                {
+                    if (name.IsNullOrWhitespace())
+                        continue;
+
+                    Type type = GetNormalType(name);
+                    if (type == null || IsHiddenFromMainSoDataWindow(type))
+                        continue;
+
+                    string category = ResolveNormalSOCategory(type);
+                    normalCategoryByNameCache[name] = category;
+                    normalNamesByCategoryCache[NormalCategoryAll].Add(name);
+
+                    if (!normalNamesByCategoryCache.TryGetValue(category, out var list))
+                    {
+                        list = new List<string>();
+                        normalNamesByCategoryCache[category] = list;
+                    }
+
+                    list.Add(name);
+                }
+
+                foreach (var pair in normalNamesByCategoryCache)
+                    pair.Value.Sort(StringComparer.Ordinal);
+            }
+
+            private static string ResolveNormalSOCategory(Type type)
+            {
+                if (type == null)
+                    return NormalCategoryUncategorized;
+
+                if (BuiltInNormalSoCategories.TryGetValue(type.Name, out string builtInCategory))
+                    return builtInCategory;
+
+                if (type.Name.StartsWith("Example", StringComparison.Ordinal))
+                    return "示例";
+
+                var createPath = type.GetCustomAttribute<ESCreatePathAttribute>();
+                if (createPath != null && !createPath.GroupName.IsNullOrWhitespace())
+                    return NormalizeNormalCategory(createPath.GroupName);
+
+                var createMenu = type.GetCustomAttribute<CreateAssetMenuAttribute>();
+                if (createMenu != null && !createMenu.menuName.IsNullOrWhitespace())
+                {
+                    string menuName = createMenu.menuName.Replace('\\', '/').Trim('/');
+                    int lastSlash = menuName.LastIndexOf('/');
+                    if (lastSlash > 0)
+                        return NormalizeNormalCategory(menuName.Substring(0, lastSlash));
+                }
+
+                return ResolveNormalSOCategoryByNamespace(type);
+            }
+
+            private static string ResolveNormalSOCategoryByNamespace(Type type)
+            {
+                string namespaceName = type.Namespace ?? string.Empty;
+                string typeName = type.Name;
+
+                if (namespaceName.Contains(".Input") || typeName.Contains("Input"))
+                    return "玩法搭建/输入配置";
+
+                if (namespaceName.Contains(".State") || typeName.Contains("StateMachine") || typeName.Contains("State"))
+                    return "玩法搭建/状态机";
+
+                if (typeName.Contains("Res") || typeName.Contains("Asset"))
+                    return "资源管理";
+
+                if (typeName.Contains("Table"))
+                    return "玩法搭建/表格管理";
+
+                if (namespaceName.Contains(".Editor"))
+                    return "编辑器支持";
+
+                if (namespaceName.IsNullOrWhitespace())
+                    return NormalCategoryUncategorized;
+
+                return namespaceName.StartsWith("ES", StringComparison.Ordinal) ? "ES其它配置" : NormalCategoryUncategorized;
+            }
+
+            private static string NormalizeNormalCategory(string category)
+            {
+                if (category.IsNullOrWhitespace())
+                    return NormalCategoryUncategorized;
+
+                string normalized = category.Replace('\\', '/').Trim().Trim('/');
+                return normalized.IsNullOrWhitespace() ? NormalCategoryUncategorized : normalized;
+            }
+
             public static Type GetInfoType(string name)
             {
                 return GetCreatePathTypeOrNull("数据信息", name);
@@ -1659,6 +1877,4 @@ namespace ES
 
         #endregion
     }
-
-}
 

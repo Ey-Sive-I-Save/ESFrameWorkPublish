@@ -167,6 +167,7 @@ namespace ES
             InitAimIK();
             InitHitReactionAndRecoil();
             ApplyIKInitialSettings();
+            ApplyFinalIKExecutionPolicy();
         }
 
         [TabGroup("DriverLayout", "公共部分")]
@@ -298,6 +299,7 @@ namespace ES
             if (!Application.isPlaying) return;
 
             InitHitReactionAndRecoil();
+            RefreshProceduralExecutionPolicyAfterRuntimeSwitch();
         }
 
         [PropertyOrder(43)]
@@ -334,6 +336,7 @@ namespace ES
             if (!Application.isPlaying) return;
 
             InitHitReactionAndRecoil();
+            RefreshProceduralExecutionPolicyAfterRuntimeSwitch();
         }
 
         [PropertyOrder(42)]

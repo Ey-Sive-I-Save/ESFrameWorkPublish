@@ -3,8 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
-namespace ES
-{
+namespace ES.Samples{
     public class Sample_Ext : MonoBehaviour
     {
         public enum SampleEnum : short

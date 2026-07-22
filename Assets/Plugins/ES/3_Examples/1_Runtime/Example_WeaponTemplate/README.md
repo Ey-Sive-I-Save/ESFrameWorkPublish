@@ -26,7 +26,7 @@ WeaponTemplate_通用武器
 │   ├── Magazine
 │   ├── Chamber
 │   ├── RayOrigin
-│   └── ProjectileSpawn
+│   └── ShotSpawn
 ├── 30_表现资源
 │   ├── ModelRoot
 │   ├── ColliderRoot
@@ -48,7 +48,7 @@ WeaponTemplate_通用武器
 - `ShellEject`：弹壳抛出点。
 - `Magazine` / `Chamber`：换弹、上膛动画 marker 对齐参考。
 - `RayOrigin`：Hitscan 检测起点。
-- `ProjectileSpawn`：Projectile 出生点。
+- `ShotSpawn`：Shot 出生点。
 - `ModelRoot`：放武器模型。
 - `ColliderRoot`：放拾取、碰撞、命中体积。
 - `VFXRoot` / `AudioRoot`：表现资源挂点。

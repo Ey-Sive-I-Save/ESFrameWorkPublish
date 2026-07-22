@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 using Newtonsoft.Json;
 using System;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 通用环境操作类型

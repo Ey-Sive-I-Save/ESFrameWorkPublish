@@ -2130,25 +2130,28 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   systemDomain:
-    myCore: {fileID: 0}
+    myCore: {fileID: 734535055}
     MyModules:
       ValuesNow:
       - rid: 23628885721612296
       - rid: 23628885721612297
       MayHasAddingElement: 1
   flowDomain:
-    myCore: {fileID: 0}
+    myCore: {fileID: 734535055}
     MyModules:
       ValuesNow:
       - rid: 23628885721612298
       MayHasAddingElement: 1
   worldDomain:
-    myCore: {fileID: 0}
+    myCore: {fileID: 734535055}
     MyModules:
       ValuesNow: []
       MayHasAddingElement: 1
   autoCreateCommandModule: 1
   autoCreateInputModule: 1
+  autoCreateRuntimeDataModule: 1
+  autoCreateGameObjectPoolModule: 1
+  autoCreatePhysicsQueryModule: 1
   dontDestroyOnLoad: 1
   references:
     version: 2
@@ -2182,7 +2185,8 @@ MonoBehaviour:
       type: {class: ESInputModule, ns: ES, asm: ES_Logic}
       data:
         _enableSelf: 1
-        inputConfig: {fileID: 0}
+        inputConfig: {fileID: 1557402082806847675, guid: 630f96d5312a78f4ea377cda8b87c055,
+          type: 2}
         profileLayers: []
         loadPlayerProfileOnInitialize: 1
         playerProfilePath: 
@@ -2250,6 +2254,8 @@ GameObject:
   - component: {fileID: 837284912}
   - component: {fileID: 837284911}
   - component: {fileID: 837284913}
+  - component: {fileID: 837284915}
+  - component: {fileID: 837284914}
   m_Layer: 0
   m_Name: GameObject
   m_TagString: Untagged
@@ -2269,42 +2275,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ab733f30950a9f94396b121fd6fff9a5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  stringMap:
-    baseKeys:
-    - AAA
-    - CCC
-    - DD
-    - 
-    relations:
-    - key: AAA
-      relatedKeys:
-      - AAA
-      - CCC
-    - key: CCC
-      relatedKeys:
-      - AAA
-      - DD
-    - key: DD
-      relatedKeys:
-      - AAA
-    editorSymmetricMode: 0
-  intMap:
-    baseKeys: 00000000000000000000000000000000
-    relations: []
-    editorSymmetricMode: 0
-  enumMap:
-    baseKeys: 01000000030000000400000005000000
-    relations:
-    - key: 1
-      relatedKeys: 01000000
-    - key: 3
-      relatedKeys: 03000000
-    - key: 4
-      relatedKeys: 01000000
-    - key: 5
-      relatedKeys: 0100000003000000
-    editorSymmetricMode: 0
-  runOnStart: 1
 --- !u!4 &837284912
 Transform:
   m_ObjectHideFlags: 0
@@ -2333,16 +2303,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   animator: {fileID: 0}
-  opSupport:
-    rid: 23628927934398464
   basicDomain:
     rid: 23628927934398465
   aiDomain:
-    rid: -2
+    rid: 23628974699577353
   buffDomain:
-    rid: -2
+    rid: 23628974699577354
   stateDomain:
-    rid: -2
+    rid: 23628974699577355
   kcc:
     motor: {fileID: 0}
     maxStableMoveSpeed: 8
@@ -2377,14 +2345,12 @@ MonoBehaviour:
     debugMonitor: 0
     preventUpwardDriftWhenIdle: 1
     upwardDriftThreshold: 0.005
+    lastKccJumpRequestFrame: 0
+    lastKccJumpApplyFrame: 0
+    lastKccJumpExpiredFrame: 0
   references:
     version: 2
     RefIds:
-    - rid: -2
-      type: {class: , ns: , asm: }
-    - rid: 23628927934398464
-      type: {class: ESOpSupport, ns: ES, asm: ES_Logic}
-      data: 
     - rid: 23628927934398465
       type: {class: EntityBasicDomain, ns: ES, asm: ES_Logic}
       data:
@@ -2419,6 +2385,146 @@ MonoBehaviour:
           domainLinked: 0
           moduleEnabled: 0
           sampleCount: 0
+    - rid: 23628974699577353
+      type: {class: EntityAIDomain, ns: ES, asm: ES_Logic}
+      data:
+        myCore: {fileID: 0}
+        MyModules:
+          ValuesNow: []
+          MayHasAddingElement: 1
+        inputState:
+          enableInput: 1
+          motion:
+            frameIndex: 0
+            move: {x: 0, y: 0}
+            look: {x: 0, y: 0}
+            flyVertical: 0
+            eyeHold: 0
+            peekLeftHold: 0
+            peekRightHold: 0
+          action:
+            frameIndex: 0
+            attack: 0
+            heavyAttack: 0
+            block: 0
+            slide: 0
+            switchWeapon: 0
+            equipWeapon: 0
+            holsterWeapon: 0
+            weaponSlot1: 0
+            weaponSlot2: 0
+            weaponSlot3: 0
+            weaponSlot4: 0
+            weaponSlot5: 0
+            aim: 0
+            skill1: 0
+            skill2: 0
+            skill3: 0
+            jump: 0
+            crouchToggle: 0
+            flyToggle: 0
+            mountToggle: 0
+            climbToggle: 0
+            interact: 0
+        autoEnsurePlayerInputModules: 0
+    - rid: 23628974699577354
+      type: {class: EntityBuffDomain, ns: ES, asm: ES_Logic}
+      data:
+        myCore: {fileID: 0}
+        MyModules:
+          ValuesNow: []
+          MayHasAddingElement: 1
+    - rid: 23628974699577355
+      type: {class: EntityStateDomain, ns: ES, asm: ES_Logic}
+      data:
+        myCore: {fileID: 0}
+        MyModules:
+          ValuesNow: []
+          MayHasAddingElement: 1
+        stateAniDataPack: {fileID: 0}
+        gunStateAniDataPack: {fileID: 0}
+        additionalStateAniDataPacks: []
+        stateMachine:
+          stateMachineKey: 
+          config: {fileID: 0}
+          defaultStateKey: 
+          upperBodyMask: {fileID: 0}
+          lowerBodyMask: {fileID: 0}
+          referencePoseClip: {fileID: 0}
+          weakInterruptSuppressedWeightFactor: 0.35
+          inspectorSelectedLayer: 0
+          testTempKey: "\u6D4B\u8BD5\u52A8\u753B"
+          testClip: {fileID: 0}
+          testLayer: 1
+          testSpeed: 1
+          testLoopable: 0
+        defaultStateKey: 
+        initialStateName: 
+--- !u!114 &837284914
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 837284910}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d1bc5515e3ab954e80599c538834774, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Capsule: {fileID: 837284915}
+  CapsuleRadius: 0.5
+  CapsuleHeight: 2
+  CapsuleYOffset: 1
+  CapsulePhysicsMaterial: {fileID: 0}
+  GroundDetectionExtraDistance: 0
+  MaxStableSlopeAngle: 60
+  StableGroundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  DiscreteCollisionEvents: 0
+  StepHandling: 1
+  MaxStepHeight: 0.5
+  AllowSteppingWithoutStableGrounding: 0
+  MinRequiredStepDepth: 0.1
+  LedgeAndDenivelationHandling: 1
+  MaxStableDistanceFromLedge: 0.5
+  MaxVelocityForLedgeSnap: 0
+  MaxStableDenivelationAngle: 180
+  InteractiveRigidbodyHandling: 1
+  RigidbodyInteractionType: 0
+  SimulatedCharacterMass: 1
+  PreserveAttachedRigidbodyMomentum: 1
+  HasPlanarConstraint: 0
+  PlanarConstraintAxis: {x: 0, y: 0, z: 1}
+  MaxMovementIterations: 5
+  MaxDecollisionIterations: 1
+  CheckMovementInitialOverlaps: 1
+  KillVelocityWhenExceedMaxMovementIterations: 1
+  KillRemainingMovementWhenExceedMaxMovementIterations: 1
+--- !u!136 &837284915
+CapsuleCollider:
+  m_ObjectHideFlags: 8
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 837284910}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 2
+  m_Direction: 1
+  m_Center: {x: 0, y: 1, z: 0}
 --- !u!1 &851290612
 GameObject:
   m_ObjectHideFlags: 0
@@ -7375,14 +7481,384 @@ PrefabInstance:
       objectReference: {fileID: 992245608}
     - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
         type: 3}
+      propertyPath: managedReferences[23628974699577347]
+      value: ES_Logic ES.EntityPlayerInputWriteModule
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352]
+      value: ES_Logic ES.EntityInputStateModule
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.aim
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577347]._enableSelf
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352]._enableSelf
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.jump
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].enableInput
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.block
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.slide
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
       propertyPath: managedReferences[3128555942915604487].mainCamera
       value: 
       objectReference: {fileID: 672649522}
     - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
         type: 3}
+      propertyPath: managedReferences[23628974699577352].action.attack
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.skill1
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.skill2
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.skill3
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].motion.look.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].motion.look.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].motion.move.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].motion.move.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].motion.eyeHold
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.interact
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.flyToggle
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.aim
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577347].enablePlayerInput
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.frameIndex
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].motion.frameIndex
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.jump
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.enableInput
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.climbToggle
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.equipWeapon
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.heavyAttack
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.mountToggle
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.weaponSlot1
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.weaponSlot2
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.weaponSlot3
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.weaponSlot4
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.weaponSlot5
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].motion.flyVertical
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.block
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.slide
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.crouchToggle
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.switchWeapon
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].motion.peekLeftHold
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.attack
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.skill1
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.skill2
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.skill3
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.motion.look.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.motion.look.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.motion.move.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.motion.move.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].action.holsterWeapon
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].motion.peekRightHold
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.motion.eyeHold
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.interact
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.flyToggle
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.frameIndex
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.motion.frameIndex
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.climbToggle
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.equipWeapon
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.heavyAttack
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.mountToggle
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.weaponSlot1
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.weaponSlot2
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.weaponSlot3
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.weaponSlot4
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.weaponSlot5
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.motion.flyVertical
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.crouchToggle
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.switchWeapon
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.motion.peekLeftHold
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.action.holsterWeapon
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[23628974699577352].state.motion.peekRightHold
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[3128555942915604481].MyModules.ValuesNow.Array.size
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
       propertyPath: managedReferences[3128555942915604490].thirdPerson.main.virtualCamera
       value: 
       objectReference: {fileID: 1356301868}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[3128555942915604481].MyModules.ValuesNow.Array.data[1]
+      value: 23628974699577347
+      objectReference: {fileID: 0}
+    - target: {fileID: 5530766647553067439, guid: 1166f46daac4d6a44aa30d5899165209,
+        type: 3}
+      propertyPath: managedReferences[3128555942915604481].MyModules.ValuesNow.Array.data[2]
+      value: 23628974699577352
+      objectReference: {fileID: 0}
     - target: {fileID: 7083215460966619533, guid: 1166f46daac4d6a44aa30d5899165209,
         type: 3}
       propertyPath: solver.target

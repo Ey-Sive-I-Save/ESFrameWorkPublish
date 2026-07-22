@@ -1,8 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Samples{
     // 示例：演示 ExtForCompoent.cs 中方法
     public class Example_Ext_Compoent : MonoBehaviour
     {

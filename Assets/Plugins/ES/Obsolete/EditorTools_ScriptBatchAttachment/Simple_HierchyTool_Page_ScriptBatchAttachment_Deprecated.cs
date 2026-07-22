@@ -10,8 +10,7 @@ using UnityEngine;
 using UnityEditor.Animations;
 
 
-namespace ES
-{
+namespace ES.Obsolete{
 
     #region 脚本批量挂载工具
     [Serializable]

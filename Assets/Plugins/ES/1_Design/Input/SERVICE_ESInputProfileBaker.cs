@@ -88,7 +88,6 @@ namespace ES.Internal
             target.schemeId = source.schemeId;
             target.bindingName = source.bindingName;
             target.originalPath = source.originalPath;
-
             target.overridePathEnabled = source.overridePathEnabled;
             target.overridePath = source.overridePath;
             target.overrideVirtualControlEnabled = source.overrideVirtualControlEnabled;

@@ -2,12 +2,12 @@ namespace ES
 {
     public static class ESCommandServices
     {
-        public static ESInputRuntime InputRuntime { get; private set; }
+        public static ESInputModule InputModule { get; private set; }
         public static ESRuntimeModeService RuntimeMode { get; private set; }
 
-        public static void SetInputRuntime(ESInputRuntime inputRuntime)
+        public static void SetInputModule(ESInputModule inputModule)
         {
-            InputRuntime = inputRuntime;
+            InputModule = inputModule;
         }
 
         public static void SetRuntimeMode(ESRuntimeModeService runtimeMode)
@@ -17,7 +17,7 @@ namespace ES
 
         public static void Clear()
         {
-            InputRuntime = null;
+            InputModule = null;
             RuntimeMode = null;
         }
     }

@@ -17,6 +17,7 @@ namespace ES
 
         [Title("UnityPackage打包工具", "支持多个打包配置管理", bold: true, titleAlignment: TitleAlignments.Centered)]
 
+        [HideInInspector]
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选择或创建打包配置，\n设置要打包的资源，\n点击打包按钮生成UnityPackage";
 
@@ -42,11 +43,242 @@ namespace ES
 
         private string lastResultSummary = "";
         private string lastResultDetail = "";
+        private string packagePreviewSearch = "";
+        private int packagePreviewPageIndex;
+        private const int PackagePreviewPageSize = 14;
+        private readonly List<string> cachedPackagePreviewPaths = new List<string>();
+        private string cachedPackagePreviewSignature = "";
+        private bool cachedPackagePreviewConfigValid;
+        private string cachedPackagePreviewConfigName = "";
+        private string cachedPackagePreviewOutputPath = "";
+        private string cachedPackagePreviewPackageName = "";
+        private bool cachedPackagePreviewIncludeDependencies;
 
-        [OnInspectorGUI]
+        [OnInspectorGUI, PropertyOrder(-200)]
         private void DrawResultPanel()
         {
+            var previewPaths = EnsurePackagePreviewCache(false, out var configName, out var outputPath, out var packageName, out var includeDependencies, out var configValid);
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "UnityPackage 打包工作台",
+                "用于把明确的资源路径导出为 .unitypackage，适合框架发布、演示包、局部模块交付和版本归档。",
+                SimpleToolsMaturity.Upgrading,
+                "导出会递归展开文件夹并可选择包含依赖；请确认收集路径、输出路径和排除规则，避免把临时资源或内部工具打进包里。");
+            SimpleToolsPanelUtility.DrawLargeListGuard(previewPaths.Count, "待导出资源");
+            DrawPackagePreviewPanel(previewPaths, configName, outputPath, packageName, includeDependencies);
+            if (!configValid)
+                SimpleToolsPanelUtility.DrawWarning("当前打包配置无效，预览和导出会保持空结果。请检查全局配置对象或扩展配置索引。");
+            DrawPackageActionPanel(previewPaths.Count, configValid);
             SimpleToolsPanelUtility.DrawResultSummary("最近打包结果", lastResultSummary, lastResultDetail);
+        }
+
+        private void DrawPackageActionPanel(int previewCount, bool configValid)
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("执行操作", "先刷新/确认资源清单，再选择普通导出或发布打包。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("使用当前选中资源", SimpleToolsActionTone.Neutral, 30, GUILayout.MinWidth(120)))
+                        GetSelectedAssets();
+                    if (SimpleToolsPanelUtility.DrawActionButton("应用到全局设置", SimpleToolsActionTone.Warning, 30, GUILayout.MinWidth(120)))
+                        ApplyToGlobalConfig();
+                    GUILayout.FlexibleSpace();
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUI.enabled = configValid && previewCount > 0;
+                    if (SimpleToolsPanelUtility.DrawActionButton("导出 UnityPackage", SimpleToolsActionTone.Primary, 34, GUILayout.MinWidth(150)))
+                        ExportPackage();
+                    if (SimpleToolsPanelUtility.DrawActionButton("发布打包", SimpleToolsActionTone.Success, 34, GUILayout.MinWidth(110)))
+                        PublishPackage();
+                    GUI.enabled = true;
+                    GUILayout.FlexibleSpace();
+                }
+            }
+        }
+
+        private void DrawPackagePreviewPanel(List<string> previewPaths, string configName, string outputPath, string packageName, bool includeDependencies)
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("导出预览", "按资源路径搜索；开始打包前先确认展开后的真实资源清单。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                string finalOutputPath = Path.Combine(outputPath ?? string.Empty, SanitizeFileName(packageName) + ".unitypackage").Replace("\\", "/");
+                EditorGUILayout.LabelField($"配置: {configName} | 资源: {previewPaths.Count} | 依赖: {(includeDependencies ? "包含" : "不包含")}", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("输出: " + finalOutputPath, EditorStyles.wordWrappedMiniLabel);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("搜索", EditorStyles.miniBoldLabel, GUILayout.Width(36));
+                    packagePreviewSearch = EditorGUILayout.TextField(packagePreviewSearch);
+                    if (GUILayout.Button("刷新预览", EditorStyles.miniButton, GUILayout.Width(68)))
+                    {
+                        previewPaths = EnsurePackagePreviewCache(true, out configName, out outputPath, out packageName, out includeDependencies, out _);
+                        packagePreviewPageIndex = 0;
+                    }
+                    if (GUILayout.Button("清空", EditorStyles.miniButton, GUILayout.Width(48)))
+                    {
+                        packagePreviewSearch = string.Empty;
+                        packagePreviewPageIndex = 0;
+                    }
+                }
+
+                var rows = FilterPackagePreview(previewPaths);
+                if (rows.Count == 0)
+                {
+                    SimpleToolsPanelUtility.DrawEmptyState("当前配置没有可导出的资源，或搜索条件没有命中。");
+                    return;
+                }
+
+                foreach (string path in SimpleToolsPanelUtility.PageItems(rows, ref packagePreviewPageIndex, PackagePreviewPageSize, out _))
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.LabelField(path, EditorStyles.miniLabel);
+                        if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(44)))
+                        {
+                            var obj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
+                            if (obj != null)
+                            {
+                                Selection.activeObject = obj;
+                                EditorGUIUtility.PingObject(obj);
+                            }
+                        }
+                    }
+                }
+
+                SimpleToolsPanelUtility.DrawPager(ref packagePreviewPageIndex, rows.Count, PackagePreviewPageSize);
+            }
+        }
+
+        private List<string> FilterPackagePreview(List<string> paths)
+        {
+            if (paths == null)
+                return new List<string>();
+
+            if (string.IsNullOrWhiteSpace(packagePreviewSearch))
+                return paths;
+
+            string keyword = packagePreviewSearch.Trim();
+            return paths.Where(path => path != null && path.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+        }
+
+        private List<string> BuildExpandedPackageAssetPaths(out string configName, out string outputPath, out string packageName, out bool includeDependencies)
+        {
+            List<string> selectedAssets;
+            if (!ResolveCurrentPackageConfig(out selectedAssets, out outputPath, out packageName, out includeDependencies, out configName))
+                return new List<string>();
+            return ExpandPackageAssetPaths(selectedAssets);
+        }
+
+        private List<string> EnsurePackagePreviewCache(bool forceRefresh, out string configName, out string outputPath, out string packageName, out bool includeDependencies, out bool configValid)
+        {
+            string signature = BuildPackagePreviewSignature(out configValid, out configName, out outputPath, out packageName, out includeDependencies);
+            if (forceRefresh || signature != cachedPackagePreviewSignature)
+            {
+                cachedPackagePreviewPaths.Clear();
+                if (configValid)
+                    cachedPackagePreviewPaths.AddRange(BuildExpandedPackageAssetPaths(out configName, out outputPath, out packageName, out includeDependencies));
+
+                cachedPackagePreviewSignature = signature;
+                cachedPackagePreviewConfigValid = configValid;
+                cachedPackagePreviewConfigName = configName;
+                cachedPackagePreviewOutputPath = outputPath;
+                cachedPackagePreviewPackageName = packageName;
+                cachedPackagePreviewIncludeDependencies = includeDependencies;
+            }
+
+            configValid = cachedPackagePreviewConfigValid;
+            configName = cachedPackagePreviewConfigName;
+            outputPath = cachedPackagePreviewOutputPath;
+            packageName = cachedPackagePreviewPackageName;
+            includeDependencies = cachedPackagePreviewIncludeDependencies;
+            return new List<string>(cachedPackagePreviewPaths);
+        }
+
+        private string BuildPackagePreviewSignature(out bool configValid, out string configName, out string outputPath, out string packageName, out bool includeDependencies)
+        {
+            configValid = ResolveCurrentPackageConfig(out var selectedAssets, out outputPath, out packageName, out includeDependencies, out configName);
+            string pathPart = selectedAssets == null ? "<null>" : string.Join("|", selectedAssets.Select(SimpleToolsSafetyUtility.NormalizeAssetPath));
+            return $"{currentConfigIndex}|{configValid}|{configName}|{outputPath}|{packageName}|{includeDependencies}|{pathPart}";
+        }
+
+        private bool ResolveCurrentPackageConfig(out List<string> selectedAssets, out string outputPath, out string packageName, out bool includeDependencies, out string configName)
+        {
+            selectedAssets = null;
+            outputPath = "Assets/../ESOutput/UnityPackage";
+            packageName = "ESPackage";
+            includeDependencies = true;
+            configName = "默认配置";
+
+            if (currentConfigIndex == -1)
+            {
+                var globalConfig = ESGlobalEditorDefaultConfi.Instance;
+                if (globalConfig == null)
+                    return false;
+
+                selectedAssets = globalConfig.PackageCollectPath;
+                outputPath = globalConfig.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage";
+                packageName = globalConfig.PackageName ?? "ESPackage0.35_";
+                includeDependencies = globalConfig.IncludeDependencies_;
+                configName = "默认配置";
+                return true;
+            }
+
+            var globalConfigs = GlobalPackageConfigs;
+            if (currentConfigIndex < 0 || currentConfigIndex >= globalConfigs.Count)
+                return false;
+
+            var currentConfig = globalConfigs[currentConfigIndex];
+            selectedAssets = currentConfig.CollectPaths;
+            outputPath = currentConfig.OutputPath;
+            packageName = currentConfig.PackageName;
+            includeDependencies = currentConfig.IncludeDependencies_;
+            configName = currentConfig.ConfigName;
+            return true;
+        }
+
+        private List<string> ExpandPackageAssetPaths(IEnumerable<string> selectedAssets)
+        {
+            var expandedPaths = new List<string>();
+            var expandedPathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (selectedAssets == null)
+                return expandedPaths;
+
+            foreach (var path in selectedAssets)
+            {
+                var normalizedPath = SimpleToolsSafetyUtility.NormalizeAssetPath(path);
+                if (string.IsNullOrWhiteSpace(normalizedPath))
+                    continue;
+
+                if (AssetDatabase.IsValidFolder(normalizedPath))
+                {
+                    var guids = AssetDatabase.FindAssets("", new[] { normalizedPath });
+                    foreach (var guid in guids)
+                    {
+                        var assetPath = SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GUIDToAssetPath(guid));
+                        if (CanExportPackageAsset(assetPath) && expandedPathSet.Add(assetPath))
+                            expandedPaths.Add(assetPath);
+                    }
+                }
+                else if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(normalizedPath) != null)
+                {
+                    if (CanExportPackageAsset(normalizedPath) && expandedPathSet.Add(normalizedPath))
+                        expandedPaths.Add(normalizedPath);
+                }
+            }
+
+            expandedPaths.Sort(StringComparer.OrdinalIgnoreCase);
+            return expandedPaths;
+        }
+
+        private static bool CanExportPackageAsset(string assetPath)
+        {
+            if (!SimpleToolsSafetyUtility.IsAssetPath(assetPath))
+                return false;
+
+            return !assetPath.StartsWith("Assets/Plugins/ES/Editor/Installer/", StringComparison.OrdinalIgnoreCase) &&
+                   !assetPath.Equals("Assets/Plugins/ES/Editor/Installer", StringComparison.OrdinalIgnoreCase);
         }
 
         #region 配置管理
@@ -604,7 +836,6 @@ namespace ES
             return base.ES_Refresh();
         }
 
-        [Button("仅获取选中资源", ButtonHeight = 15), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
         public void GetSelectedAssets()
         {
             var selected = Selection.objects;
@@ -660,7 +891,6 @@ namespace ES
             }
         }
 
-        [Button("应用到全局设置", ButtonHeight = 34), GUIColor("@ESDesignUtility.ColorSelector.Color_05")]
         public void ApplyToGlobalConfig()
         {
             if (currentConfigIndex == -1)
@@ -707,7 +937,6 @@ namespace ES
             EditorUtility.DisplayDialog("成功", "已将设置应用到全局配置！", "确定");
         }
 
-        [Button("开始打包", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void ExportPackage()
         {
             List<string> selectedAssets;
@@ -716,38 +945,10 @@ namespace ES
             bool includeDependencies;
             string configName;
 
-            if (currentConfigIndex == -1)
+            if (!ResolveCurrentPackageConfig(out selectedAssets, out outputPath, out packageName, out includeDependencies, out configName))
             {
-                // 处理默认配置
-                var globalConfig = ESGlobalEditorDefaultConfi.Instance;
-                if (globalConfig == null)
-                {
-                    EditorUtility.DisplayDialog("错误", "未找到全局配置对象！", "确定");
-                    return;
-                }
-
-                selectedAssets = globalConfig.PackageCollectPath;
-                outputPath = globalConfig.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage";
-                packageName = globalConfig.PackageName ?? "ESPackage0.35_";
-                includeDependencies = globalConfig.IncludeDependencies_;
-                configName = "默认配置";
-            }
-            else
-            {
-                // 处理扩展配置
-                var globalConfigs = GlobalPackageConfigs;
-                if (currentConfigIndex < 0 || currentConfigIndex >= globalConfigs.Count)
-                {
-                    EditorUtility.DisplayDialog("错误", "无效的配置索引！", "确定");
-                    return;
-                }
-
-                var currentConfig = globalConfigs[currentConfigIndex];
-                selectedAssets = currentConfig.CollectPaths;
-                outputPath = currentConfig.OutputPath;
-                packageName = currentConfig.PackageName;
-                includeDependencies = currentConfig.IncludeDependencies_;
-                configName = currentConfig.ConfigName;
+                EditorUtility.DisplayDialog("错误", "当前打包配置无效或全局配置不存在。", "确定");
+                return;
             }
 
             if (selectedAssets == null || selectedAssets.Count == 0)
@@ -756,39 +957,7 @@ namespace ES
                 return;
             }
 
-            // 将文件夹路径递归展开为所有资源文件路径
-            var expandedPaths = new List<string>();
-            var expandedPathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var path in selectedAssets)
-            {
-                var normalizedPath = SimpleToolsSafetyUtility.NormalizeAssetPath(path);
-                if (AssetDatabase.IsValidFolder(normalizedPath))
-                {
-                    // 文件夹，递归收集所有资源
-                    var guids = AssetDatabase.FindAssets("", new[] { normalizedPath });
-                    foreach (var guid in guids)
-                    {
-                        var assetPath = SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GUIDToAssetPath(guid));
-                        // 排除Assets/Plugins/ES/Editor/Installer下的文件
-                        if (!assetPath.StartsWith("Assets/Plugins/ES/Editor/Installer/", StringComparison.OrdinalIgnoreCase) &&
-                            !assetPath.Equals("Assets/Plugins/ES/Editor/Installer", StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (expandedPathSet.Add(assetPath))
-                                expandedPaths.Add(assetPath);
-                        }
-                    }
-                }
-                else if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(normalizedPath) != null)
-                {
-                    // 单个资源，排除Assets/Plugins/ES/Editor/Installer下的文件
-                    if (!normalizedPath.StartsWith("Assets/Plugins/ES/Editor/Installer/", StringComparison.OrdinalIgnoreCase) &&
-                        !normalizedPath.Equals("Assets/Plugins/ES/Editor/Installer", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (expandedPathSet.Add(normalizedPath))
-                            expandedPaths.Add(normalizedPath);
-                    }
-                }
-            }
+            var expandedPaths = ExpandPackageAssetPaths(selectedAssets);
             var assetPaths = expandedPaths.ToArray();
             if (assetPaths.Length == 0)
             {
@@ -799,9 +968,11 @@ namespace ES
             var finalOutputPath = Path.Combine(outputPath, SanitizeFileName(packageName) + ".unitypackage");
 
             string exportPreview = SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
-            if (!EditorUtility.DisplayDialog("确认导出UnityPackage",
-                $"配置：{configName}\n将导出 {assetPaths.Length} 个资源。\n\n输出：{finalOutputPath}\n包含依赖：{(includeDependencies ? "是" : "否")}\n\n{exportPreview}\n\n继续吗？",
-                "开始导出", "取消"))
+            if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                "确认导出 UnityPackage",
+                assetPaths.Length,
+                $"配置：{configName}\n输出：{finalOutputPath}\n包含依赖：{(includeDependencies ? "是" : "否")}\n\n{exportPreview}",
+                "会把展开后的资源写入 unitypackage 文件。包含依赖时包体可能明显变大，请确认没有把临时文件或内部工具打进去。"))
                 return;
 
             try
@@ -825,7 +996,6 @@ namespace ES
             }
         }
 
-        [Button("发布打包", ButtonHeight = 34), GUIColor(0.25f, 0.62f, 0.45f)]
         public void PublishPackage()
         {
             var config = ESGlobalEditorDefaultConfi.Instance;
@@ -857,7 +1027,7 @@ namespace ES
             foreach (var guid in guids)
             {
                 var assetPath = SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GUIDToAssetPath(guid));
-                if (assetPathSet.Add(assetPath))
+                if (CanExportPackageAsset(assetPath) && assetPathSet.Add(assetPath))
                     assetPaths.Add(assetPath);
             }
 
@@ -884,9 +1054,11 @@ namespace ES
             var outputPath = Path.Combine(outputDir, $"{SanitizeFileName(packageName)}_{timestamp}.unitypackage");
 
             string publishPreview = SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
-            if (!EditorUtility.DisplayDialog("确认发布打包",
-                $"将从发布路径导出 {assetPaths.Count} 个资源。\n\n发布路径：{publishPath}\n输出：{outputPath}\n包含依赖：否\n\n{publishPreview}\n\n继续吗？",
-                "开始发布", "取消"))
+            if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                "确认发布打包",
+                assetPaths.Count,
+                $"从发布路径导出 {assetPaths.Count} 个资源。\n\n发布路径：{publishPath}\n输出：{outputPath}\n包含依赖：否\n\n{publishPreview}",
+                "发布打包不会包含依赖，适合明确发布目录已经完整的情况。请确认发布目录没有临时文件。"))
                 return;
 
             try

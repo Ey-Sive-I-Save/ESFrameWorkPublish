@@ -8,8 +8,7 @@ using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
 
 
-namespace ES
-{
+namespace ES.Obsolete{
     public abstract class OutputOperationBuffer<Target,Logic, ValueType, Buffer, BufferSource, This> : IOutputOperation<Target,Logic>
         where Logic : IOpStoreKeyGroup<This, Buffer, OutputOperationBufferFlag>
         where Buffer : BufferOperationAbstract, new()

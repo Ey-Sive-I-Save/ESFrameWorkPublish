@@ -249,7 +249,7 @@ namespace ES
         {
             if (runtimeSupport == null || runtimeSupport.IsRecycled)
             {
-                runtimeSupport = ESOpSupport.Pool.GetInPool();
+                runtimeSupport = ESOpSupport.Rent();
                 runtimeSupport.BindCustom(this, userEntity, GetInstanceID(), null);
             }
 

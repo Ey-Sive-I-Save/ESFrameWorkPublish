@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -16,8 +16,9 @@ using UnityEngine;
 
 namespace ES
 {
-    [ESCreatePath("数据信息", "SO表格规则数据信息")]
-    public partial class ESSoTableDataRule : SoDataInfo
+    [ESOnlyEditorSO("SO表格规则是编辑器导入导出工具配置，不应进入运行时构建或AB资源包。")]
+    [CreateAssetMenu(fileName = "ESSoTableDataRule", menuName = "【ES】/玩法搭建/SO表格规则")]
+    public partial class ESSoTableDataRule : ESSO
     {
         #region Serialized State And Inspector Configuration
         private static readonly ESReflectionRowBridge RowBridge = new ESReflectionRowBridge();

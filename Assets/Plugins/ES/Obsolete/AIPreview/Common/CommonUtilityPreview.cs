@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace ES.AIPreview.Common
+namespace ES.Obsolete.AIPreview.Common
 {
     /// <summary>
     /// 预览用通用方法草案：

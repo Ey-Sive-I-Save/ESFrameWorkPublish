@@ -39,21 +39,31 @@ namespace ES
         private ESInputRuntimeCache cache;
         private ESRuntimeModeService modeService;
         private ESRuntimeModePolicy currentModePolicy;
+        private int[] activeValueIndices;
+        private bool[] activeValueMarks;
+        private int activeValueCount;
         private bool hasModePolicy;
 
         public ESInputService(ESInputRuntimeCache cache = null, ESRuntimeModeService modeService = null)
         {
-            this.cache = cache;
             currentModePolicy = ESRuntimeModePolicy.Default;
+            SetCache(cache);
             SetModeService(modeService);
         }
 
         public ESInputRuntimeCache Cache => cache;
         public ESRuntimeModeService ModeService => modeService;
+        public ESRuntimeModePolicy CurrentModePolicy => currentModePolicy;
+        public event System.Action<ESRuntimeModePolicy> OnInputPolicyChanged;
+
+        #region 初始化
 
         public void SetCache(ESInputRuntimeCache newCache)
         {
             cache = newCache;
+            EnsureActiveValueCapacity(cache != null && cache.values != null ? cache.values.Length : 0);
+            ClearActiveValues();
+
             if (hasModePolicy)
                 ResetInputsBlockedByPolicy(currentModePolicy);
         }
@@ -80,29 +90,48 @@ namespace ES
             if (hasModePolicy)
                 ResetInputsBlockedByPolicy(currentModePolicy);
         }
-        public void BeginFrame() => ClearFrameState();
+
+        #endregion
+
+        #region 帧流程
+
+        public void BeginFrame()
+        {
+            ClearFrameState();
+            ClearInputsBlockedByCurrentPolicy();
+        }
 
         public void EndFrame(float time)
         {
             if (cache == null || cache.values == null || cache.metas == null)
                 return;
 
-            for (int i = 0; i < cache.values.Length; i++)
+            for (int activeIndex = activeValueCount - 1; activeIndex >= 0; activeIndex--)
             {
+                int i = activeValueIndices[activeIndex];
                 ESInputActionMeta meta = cache.metas[i];
-                if (meta.valueType != ESInputValueType.Button)
-                    continue;
-
                 ref ESInputRuntimeValue value = ref cache.values[i];
-                if (!IsActionAllowed((ESInputActionId)i))
+
+                if (meta.valueType == ESInputValueType.Button)
                 {
-                    BlockButtonByPolicy(ref value, value.buttonHeldThisFrame || value.policyBlockedUntilRelease);
-                    continue;
+                    if (!IsActionAllowed((ESInputActionId)i))
+                    {
+                        BlockButtonByPolicy(ref value, value.buttonHeldThisFrame || value.policyBlockedUntilRelease);
+                    }
+                    else
+                    {
+                        CommitButton(ref value, meta, value.buttonHeldThisFrame, time);
+                    }
                 }
 
-                CommitButton(ref value, meta, value.buttonHeldThisFrame, time);
+                if (!value.HasRuntimeState())
+                    RemoveActiveValueAtSwapBack(activeIndex);
             }
         }
+
+        #endregion
+
+        #region 写入输入
 
         public void WriteButton(ESInputActionId id, bool isHeld, float time)
         {
@@ -114,6 +143,9 @@ namespace ES
 
             if (!IsActionAllowed(id))
             {
+                if (isHeld || value.HasRuntimeState())
+                    MarkValueActive(index);
+
                 BlockButtonByPolicy(ref value, isHeld);
                 return;
             }
@@ -122,129 +154,66 @@ namespace ES
             {
                 if (isHeld)
                 {
+                    MarkValueActive(index);
                     BlockButtonByPolicy(ref value, true);
                     return;
                 }
 
+                MarkValueActive(index);
                 value.policyBlockedUntilRelease = false;
             }
+
+            if (isHeld || value.HasRuntimeState())
+                MarkValueActive(index);
 
             value.buttonHeldThisFrame |= isHeld;
         }
 
-        private static void CommitButton(ref ESInputRuntimeValue value, ESInputActionMeta meta, bool isHeld, float time)
-        {
-            ESInputTriggerFeature features = GetEffectiveTriggerFeatures(meta);
-            bool usePressed = HasFeature(features, ESInputTriggerFeature.Pressed);
-            bool useReleased = HasFeature(features, ESInputTriggerFeature.Released);
-            bool useLongPress = HasFeature(features, ESInputTriggerFeature.LongPress);
-            bool useDoublePress = HasFeature(features, ESInputTriggerFeature.DoublePress);
-
-            if (isHeld)
-            {
-                if (!value.held)
-                {
-                    value.pressStartTime = time;
-                    value.pressBlockedByLongPress = false;
-
-                    if (usePressed && meta.pressPolicy == ESInputPressPolicy.PressedImmediate)
-                        value.pressed = true;
-
-                    if (useDoublePress)
-                    {
-                        float doublePressWindow = meta.doublePressWindow > 0f ? meta.doublePressWindow : 0.28f;
-                        value.doublePressed = value.lastPressedTime > 0f && time - value.lastPressedTime <= doublePressWindow;
-                    }
-
-                    value.lastPressedTime = time;
-                    value.longPressFired = false;
-                }
-
-                value.held = true;
-
-                if (useLongPress)
-                {
-                    value.holdTime = time - value.pressStartTime;
-                    float longPressDuration = meta.longPressDuration > 0f ? meta.longPressDuration : 0.5f;
-                    if (!value.longPressFired && value.holdTime >= longPressDuration)
-                    {
-                        value.longPressed = true;
-                        value.longPressFired = true;
-                        if (meta.pressPolicy == ESInputPressPolicy.LongPressConsumesPressed)
-                            value.pressBlockedByLongPress = true;
-                    }
-                }
-            }
-            else
-            {
-                if (value.held)
-                {
-                    if (useReleased)
-                        value.released = true;
-
-                    if (usePressed && ShouldFirePressedOnRelease(value, meta))
-                        value.pressed = true;
-                }
-
-                value.held = false;
-                value.holdTime = 0f;
-                value.longPressFired = false;
-            }
-        }
-
-        private static bool ShouldFirePressedOnRelease(ESInputRuntimeValue value, ESInputActionMeta meta)
-        {
-            switch (meta.pressPolicy)
-            {
-                case ESInputPressPolicy.PressedOnRelease:
-                    return true;
-                case ESInputPressPolicy.PressedIfNotLongPress:
-                case ESInputPressPolicy.LongPressConsumesPressed:
-                    return !value.longPressFired && !value.pressBlockedByLongPress;
-                default:
-                    return false;
-            }
-        }
-
-        private static ESInputTriggerFeature GetEffectiveTriggerFeatures(ESInputActionMeta meta)
-        {
-            return meta.triggerFeatures != ESInputTriggerFeature.None
-                ? meta.triggerFeatures
-                : ESInputActionDefine.ConvertLegacyTriggerType(meta.triggerType);
-        }
-
-        private static bool HasFeature(ESInputTriggerFeature features, ESInputTriggerFeature feature)
-        {
-            return (features & feature) != 0;
-        }
-
         public void WriteAxis(ESInputActionId id, float axis)
         {
-            if (!CanAccessIndex((int)id))
+            int index = (int)id;
+            if (!CanAccessIndex(index))
                 return;
 
             if (!IsActionAllowed(id))
             {
-                cache.values[(int)id].axis = 0f;
+                if (cache.values[index].axis != 0f)
+                    MarkValueActive(index);
+
+                cache.values[index].axis = 0f;
                 return;
             }
 
-            cache.values[(int)id].axis = axis;
+            if (axis != 0f || cache.values[index].axis != 0f)
+                MarkValueActive(index);
+
+            cache.values[index].axis = axis;
         }
 
         public void WriteVector2(ESInputActionId id, Vector2 vector2)
         {
-            if (!CanAccessIndex((int)id))
+            int index = (int)id;
+            if (!CanAccessIndex(index))
                 return;
 
             if (!IsActionAllowed(id))
             {
-                cache.values[(int)id].vector2 = Vector2.zero;
+                if (cache.values[index].vector2 != Vector2.zero)
+                    MarkValueActive(index);
+
+                cache.values[index].vector2 = Vector2.zero;
                 return;
             }
 
-            cache.values[(int)id].vector2 = vector2;
+            if (vector2 != Vector2.zero || cache.values[index].vector2 != Vector2.zero)
+                MarkValueActive(index);
+
+            cache.values[index].vector2 = vector2;
         }
+
+        #endregion
+
+        #region 读取与消费
 
         public bool WasPressed(ESInputActionId id)
         {
@@ -394,12 +363,17 @@ namespace ES
             return cache.values[(int)id].holdTime;
         }
 
+        #endregion
+
+        #region 清理
+
         public void ClearFrameState()
         {
-            if (cache == null)
+            if (cache == null || cache.values == null)
                 return;
 
-            cache.ClearFrameState();
+            for (int i = 0; i < activeValueCount; i++)
+                cache.values[activeValueIndices[i]].ClearFrameState();
         }
 
         public void ResetAll()
@@ -408,7 +382,12 @@ namespace ES
                 return;
 
             cache.ResetAll();
+            ClearActiveValues();
         }
+
+        #endregion
+
+        #region 模式过滤
 
         public bool IsActionAllowed(ESInputActionId id)
         {
@@ -433,6 +412,164 @@ namespace ES
 
             return ESInputDefineUtility.GuessCategory(id);
         }
+
+        private void HandleModePolicyChanged(ESRuntimeModePolicy policy)
+        {
+            currentModePolicy = policy;
+            hasModePolicy = modeService != null;
+            ResetInputsBlockedByPolicy(policy);
+            OnInputPolicyChanged?.Invoke(policy);
+        }
+
+        private void ResetInputsBlockedByPolicy(ESRuntimeModePolicy policy)
+        {
+            if (cache == null || cache.values == null || cache.metas == null)
+                return;
+
+            for (int i = 0; i < cache.values.Length; i++)
+            {
+                ESInputActionCategory category = GetActionCategory((ESInputActionId)i);
+                if (IsCategoryAllowed(category, policy))
+                    continue;
+
+                ref ESInputRuntimeValue value = ref cache.values[i];
+                bool waitRelease = cache.metas[i].valueType == ESInputValueType.Button
+                                   && (value.held || value.buttonHeldThisFrame);
+                value.ResetAll();
+                value.policyBlockedUntilRelease = waitRelease;
+
+                if (waitRelease)
+                    MarkValueActive(i);
+            }
+        }
+
+        private void ClearInputsBlockedByCurrentPolicy()
+        {
+            if (!hasModePolicy || cache == null || cache.values == null || cache.metas == null)
+                return;
+
+            for (int activeIndex = activeValueCount - 1; activeIndex >= 0; activeIndex--)
+            {
+                int i = activeValueIndices[activeIndex];
+                ESInputActionCategory category = GetActionCategory((ESInputActionId)i);
+                if (IsCategoryAllowed(category, currentModePolicy))
+                {
+                    if (!cache.values[i].HasRuntimeState())
+                        RemoveActiveValueAtSwapBack(activeIndex);
+
+                    continue;
+                }
+
+                ref ESInputRuntimeValue value = ref cache.values[i];
+                bool waitRelease = cache.metas[i].valueType == ESInputValueType.Button
+                                   && (value.held || value.buttonHeldThisFrame || value.policyBlockedUntilRelease);
+                value.ResetAll();
+                value.policyBlockedUntilRelease = waitRelease;
+
+                if (!value.HasRuntimeState())
+                    RemoveActiveValueAtSwapBack(activeIndex);
+            }
+        }
+
+        private static void BlockButtonByPolicy(ref ESInputRuntimeValue value, bool physicalHeld)
+        {
+            value.ResetAll();
+            value.policyBlockedUntilRelease = physicalHeld;
+        }
+
+        #endregion
+
+        #region 按钮触发计算
+
+        private static void CommitButton(ref ESInputRuntimeValue value, ESInputActionMeta meta, bool isHeld, float time)
+        {
+            ESInputTriggerFeature features = GetEffectiveTriggerFeatures(meta);
+            bool usePressed = HasFeature(features, ESInputTriggerFeature.Pressed);
+            bool useReleased = HasFeature(features, ESInputTriggerFeature.Released);
+            bool useLongPress = HasFeature(features, ESInputTriggerFeature.LongPress);
+            bool useDoublePress = HasFeature(features, ESInputTriggerFeature.DoublePress);
+
+            if (isHeld)
+            {
+                if (!value.held)
+                {
+                    value.pressStartTime = time;
+                    value.pressBlockedByLongPress = false;
+
+                    if (usePressed && meta.pressPolicy == ESInputPressPolicy.PressedImmediate)
+                        value.pressed = true;
+
+                    if (useDoublePress)
+                    {
+                        float doublePressWindow = meta.doublePressWindow > 0f ? meta.doublePressWindow : 0.28f;
+                        value.doublePressed = value.lastPressedTime > 0f && time - value.lastPressedTime <= doublePressWindow;
+                    }
+
+                    value.lastPressedTime = time;
+                    value.longPressFired = false;
+                }
+
+                value.held = true;
+
+                if (useLongPress)
+                {
+                    value.holdTime = time - value.pressStartTime;
+                    float longPressDuration = meta.longPressDuration > 0f ? meta.longPressDuration : 0.5f;
+                    if (!value.longPressFired && value.holdTime >= longPressDuration)
+                    {
+                        value.longPressed = true;
+                        value.longPressFired = true;
+                        if (meta.pressPolicy == ESInputPressPolicy.LongPressConsumesPressed)
+                            value.pressBlockedByLongPress = true;
+                    }
+                }
+            }
+            else
+            {
+                if (value.held)
+                {
+                    if (useReleased)
+                        value.released = true;
+
+                    if (usePressed && ShouldFirePressedOnRelease(value, meta))
+                        value.pressed = true;
+                }
+
+                value.held = false;
+                value.holdTime = 0f;
+                value.longPressFired = false;
+            }
+        }
+
+        private static bool ShouldFirePressedOnRelease(ESInputRuntimeValue value, ESInputActionMeta meta)
+        {
+            switch (meta.pressPolicy)
+            {
+                case ESInputPressPolicy.PressedOnRelease:
+                    return true;
+                case ESInputPressPolicy.PressedIfNotLongPress:
+                case ESInputPressPolicy.LongPressConsumesPressed:
+                    return !value.longPressFired && !value.pressBlockedByLongPress;
+                default:
+                    return false;
+            }
+        }
+
+        private static ESInputTriggerFeature GetEffectiveTriggerFeatures(ESInputActionMeta meta)
+        {
+            return meta.triggerFeatures != ESInputTriggerFeature.None
+                ? meta.triggerFeatures
+                : ESInputActionDefine.ConvertLegacyTriggerType(meta.triggerType);
+        }
+
+        private static bool HasFeature(ESInputTriggerFeature features, ESInputTriggerFeature feature)
+        {
+            return (features & feature) != 0;
+        }
+
+        #endregion
+
+        #region 内部工具
 
         private static bool IsCategoryAllowed(ESInputActionCategory category, ESRuntimeModePolicy policy)
         {
@@ -463,36 +600,59 @@ namespace ES
             return cache != null && cache.IsValidIndex(index);
         }
 
-        private void HandleModePolicyChanged(ESRuntimeModePolicy policy)
+        private void EnsureActiveValueCapacity(int capacity)
         {
-            currentModePolicy = policy;
-            hasModePolicy = modeService != null;
-            ResetInputsBlockedByPolicy(policy);
+            if (capacity <= 0)
+            {
+                activeValueIndices = null;
+                activeValueMarks = null;
+                return;
+            }
+
+            if (activeValueIndices == null || activeValueIndices.Length != capacity)
+                activeValueIndices = new int[capacity];
+
+            if (activeValueMarks == null || activeValueMarks.Length != capacity)
+                activeValueMarks = new bool[capacity];
         }
 
-        private void ResetInputsBlockedByPolicy(ESRuntimeModePolicy policy)
+        private void MarkValueActive(int index)
         {
-            if (cache == null || cache.values == null || cache.metas == null)
+            if (activeValueMarks == null || index < 0 || index >= activeValueMarks.Length)
                 return;
 
-            for (int i = 0; i < cache.values.Length; i++)
-            {
-                ESInputActionCategory category = GetActionCategory((ESInputActionId)i);
-                if (IsCategoryAllowed(category, policy))
-                    continue;
+            if (activeValueMarks[index])
+                return;
 
-                ref ESInputRuntimeValue value = ref cache.values[i];
-                bool waitRelease = cache.metas[i].valueType == ESInputValueType.Button
-                                   && (value.held || value.buttonHeldThisFrame);
-                value.ResetAll();
-                value.policyBlockedUntilRelease = waitRelease;
-            }
+            activeValueMarks[index] = true;
+            activeValueIndices[activeValueCount++] = index;
         }
 
-        private static void BlockButtonByPolicy(ref ESInputRuntimeValue value, bool physicalHeld)
+        private void RemoveActiveValueAtSwapBack(int activeIndex)
         {
-            value.ResetAll();
-            value.policyBlockedUntilRelease = physicalHeld;
+            int removedIndex = activeValueIndices[activeIndex];
+            int lastActiveIndex = activeValueCount - 1;
+
+            activeValueMarks[removedIndex] = false;
+
+            if (activeIndex != lastActiveIndex)
+                activeValueIndices[activeIndex] = activeValueIndices[lastActiveIndex];
+
+            activeValueIndices[lastActiveIndex] = 0;
+            activeValueCount--;
         }
+
+        private void ClearActiveValues()
+        {
+            if (activeValueMarks != null)
+            {
+                for (int i = 0; i < activeValueCount; i++)
+                    activeValueMarks[activeValueIndices[i]] = false;
+            }
+
+            activeValueCount = 0;
+        }
+
+        #endregion
     }
 }

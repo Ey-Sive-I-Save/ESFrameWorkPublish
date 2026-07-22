@@ -52,6 +52,11 @@ namespace ES
     {
     }
 
+    [Serializable]
+    public abstract class ESGetItemExpression : ESGetExpression<Item>
+    {
+    }
+
     /// <summary>AnimationClip 取值表达式基类。</summary>
     [Serializable]
     public abstract class ESGetAnimationClipExpression : ESGetExpression<AnimationClip>

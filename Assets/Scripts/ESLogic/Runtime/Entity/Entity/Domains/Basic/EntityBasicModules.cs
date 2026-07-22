@@ -29,6 +29,15 @@ namespace ES
         [ReadOnly] public bool crouchHold;
         [ReadOnly] public bool jumpRequested;
 
+        [ShowInInspector, ReadOnly, LabelText("最近收到跳跃帧")]
+        public int lastJumpRequestFrame;
+
+        [ShowInInspector, ReadOnly, LabelText("最近提交KCC跳跃帧")]
+        public int lastSubmitKccJumpFrame;
+
+        [ShowInInspector, ReadOnly, LabelText("最近跳跃失败原因")]
+        public string lastJumpFailReason;
+
         public string JUMP_StateName = "跳跃";
         public string Crouch_StateName = "下蹲";
         private StateBase _jumpState;
@@ -68,6 +77,9 @@ namespace ES
         }
         public void RequestJump()
         {
+            lastJumpRequestFrame = Time.frameCount;
+            lastJumpFailReason = string.Empty;
+
             // ★ 攀爬中跳跃 → 攀爬跳跃（同一个键，不同行为）
             if (MyCore != null && MyCore.kcc.climbModule != null)
             {
@@ -79,11 +91,30 @@ namespace ES
                 }
             }
 
+            if (sm == null)
+                sm = MyCore != null && MyCore.stateDomain != null ? MyCore.stateDomain.stateMachine : null;
+
+            if (sm == null)
+            {
+                lastJumpFailReason = "缺少状态机";
+                jumpRequested = true;
+                return;
+            }
+
             _jumpLifecycle.SetTarget(sm, _jumpState, GetJumpStateKeyForLifecycle(_jumpState));
-            bool activated = _jumpState.baseStatus == StateBaseStatus.Running || sm.TryActivateState(_jumpState);
-            if (_jumpLifecycle.TryEnter(activated))
+            bool activated = _jumpState == null || _jumpState.baseStatus == StateBaseStatus.Running || sm.TryActivateState(_jumpState);
+            if (_jumpState == null)
+            {
+                lastJumpFailReason = "缺少跳跃状态，已直接提交KCC跳跃";
+                jumpRequested = true;
+            }
+            else if (_jumpLifecycle.TryEnter(activated))
             {
                 jumpRequested = true;
+            }
+            else
+            {
+                lastJumpFailReason = "跳跃状态未进入";
             }
         }
 
@@ -118,6 +149,7 @@ namespace ES
             if (jumpRequested)
             {
                 MyCore.RequestJump();
+                lastSubmitKccJumpFrame = Time.frameCount;
                 jumpRequested = false;
             }
             else if (_jumpState != null
@@ -948,7 +980,12 @@ namespace ES
 
         private StateFinalIKDriver ResolveIKDriver()
         {
-            return MyCore != null ? MyCore.ResolveStateFinalIKDriver() : null;
+            if (MyCore == null)
+                return null;
+
+            StateMachine stateMachine = MyCore.stateDomain != null ? MyCore.stateDomain.stateMachine : null;
+            Animator stateAnimator = stateMachine != null && stateMachine.BoundAnimator != null ? stateMachine.BoundAnimator : MyCore.animator;
+            return stateAnimator != null ? stateAnimator.GetComponent<StateFinalIKDriver>() : null;
         }
 
         private StateBase ResolveAimState()
@@ -3150,9 +3187,6 @@ namespace ES
     [Serializable, TypeRegistryItem("基础简易技能测试模块")]
     public class EntityBasicSimpleSkillTestModule : EntityBasicModuleBase
     {
-        [LabelText("启用按键释放")]
-        public bool enableKeyRelease = true;
-
         [LabelText("技能列表")]
         public System.Collections.Generic.List<SkillTrackProcessInfo> skills = new System.Collections.Generic.List<SkillTrackProcessInfo>();
 
@@ -3167,43 +3201,6 @@ namespace ES
 
         [ShowInInspector, ReadOnly, LabelText("上次释放完整技能体")]
         public SkillDefinitionDataInfo lastReleasedDefinition;
-
-        protected override void Update()
-        {
-            base.Update();
-
-            if (!enableKeyRelease)
-                return;
-
-            if (skillDefinitions != null)
-            {
-                int definitionCount = skillDefinitions.Count;
-                for (int i = 0; i < definitionCount; i++)
-                {
-                    var definition = skillDefinitions[i];
-                    var trackProcess = definition != null ? definition.trackProcess : null;
-                    if (trackProcess == null || trackProcess.releaseKey == KeyCode.None)
-                        continue;
-
-                    if (Input.GetKeyDown(trackProcess.releaseKey))
-                        ReleaseSkillDefinition(i);
-                }
-            }
-
-            if (skills != null)
-            {
-                int count = skills.Count;
-                for (int i = 0; i < count; i++)
-                {
-                    var skill = skills[i];
-                    if (skill == null || skill.releaseKey == KeyCode.None)
-                        continue;
-
-                    if (Input.GetKeyDown(skill.releaseKey))
-                        ReleaseSkill(i);
-                }
-            }
-        }
 
         public bool ReleaseSkillDefinition(int index)
         {
@@ -3298,7 +3295,7 @@ namespace ES
                 return false;
 
             ESRuntimeTargetPack target = ESRuntimeTargetPack.Pool.GetInPool();
-            ESOpSupport support = ESOpSupport.Pool.GetInPool();
+            ESOpSupport support = ESOpSupport.Rent();
             support.BindCustom(this, MyCore, MyCore != null ? MyCore.GetInstanceID() : 0, null);
             try
             {

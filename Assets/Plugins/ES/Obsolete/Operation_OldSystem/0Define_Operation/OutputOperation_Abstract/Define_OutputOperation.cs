@@ -6,8 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Obsolete{
     /// <summary>
     /// ES框架 - 输出操作系统(Output Operation System)定义
     /// 

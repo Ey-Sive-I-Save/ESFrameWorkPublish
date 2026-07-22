@@ -18,9 +18,9 @@ namespace ES
 
         public override void Invoke()
         {
-            ESInputRuntime input = ESCommandServices.InputRuntime;
+            ESInputModule input = ESCommandServices.InputModule;
             if (input != null)
-                input.VirtualSource.PulseButton(actionId);
+                input.UIPulseButton(actionId);
         }
     }
 
@@ -38,9 +38,9 @@ namespace ES
 
         public override void Invoke()
         {
-            ESInputRuntime input = ESCommandServices.InputRuntime;
+            ESInputModule input = ESCommandServices.InputModule;
             if (input != null)
-                input.VirtualSource.PulseButton(virtualControlId);
+                input.UIPulseButton(virtualControlId);
         }
     }
 
@@ -61,9 +61,9 @@ namespace ES
 
         public override void Invoke()
         {
-            ESInputRuntime input = ESCommandServices.InputRuntime;
+            ESInputModule input = ESCommandServices.InputModule;
             if (input != null)
-                input.VirtualSource.SetButton(actionId, held);
+                input.UISetButton(actionId, held);
         }
     }
 
@@ -81,9 +81,9 @@ namespace ES
 
         public override void Invoke()
         {
-            ESInputRuntime input = ESCommandServices.InputRuntime;
+            ESInputModule input = ESCommandServices.InputModule;
             if (input != null)
-                input.VirtualSource.ClearButton(actionId);
+                input.UIClearButton(actionId);
         }
     }
 
@@ -104,9 +104,9 @@ namespace ES
 
         public override void Invoke()
         {
-            ESInputRuntime input = ESCommandServices.InputRuntime;
+            ESInputModule input = ESCommandServices.InputModule;
             if (input != null)
-                input.VirtualSource.SetVector2(actionId, value);
+                input.UISetVector2(actionId, value);
         }
     }
 
@@ -127,9 +127,9 @@ namespace ES
 
         public override void Invoke()
         {
-            ESInputRuntime input = ESCommandServices.InputRuntime;
+            ESInputModule input = ESCommandServices.InputModule;
             if (input != null)
-                input.VirtualSource.SetAxis(actionId, value);
+                input.UISetAxis(actionId, value);
         }
     }
 
@@ -147,9 +147,9 @@ namespace ES
 
         public override void Invoke()
         {
-            ESInputRuntime input = ESCommandServices.InputRuntime;
+            ESInputModule input = ESCommandServices.InputModule;
             if (input != null)
-                input.VirtualSource.ClearAxis(actionId);
+                input.UIClearAxis(actionId);
         }
     }
 
@@ -167,9 +167,9 @@ namespace ES
 
         public override void Invoke()
         {
-            ESInputRuntime input = ESCommandServices.InputRuntime;
+            ESInputModule input = ESCommandServices.InputModule;
             if (input != null)
-                input.VirtualSource.ClearVector2(actionId);
+                input.UIClearVector2(actionId);
         }
     }
 
@@ -184,9 +184,9 @@ namespace ES
 
         public override void Invoke()
         {
-            ESInputRuntime input = ESCommandServices.InputRuntime;
+            ESInputModule input = ESCommandServices.InputModule;
             if (input != null)
-                input.VirtualSource.ClearAll();
+                input.UIClearAll();
         }
     }
 }

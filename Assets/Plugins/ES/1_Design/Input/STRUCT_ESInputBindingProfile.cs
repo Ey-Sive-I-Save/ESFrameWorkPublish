@@ -106,12 +106,10 @@ namespace ES
             item.schemeId = schemeId;
             item.bindingName = bindingName;
             item.originalPath = originalPath;
-
             item.overridePathEnabled = true;
             item.overridePath = overridePath;
             item.overrideVirtualControlEnabled = false;
             item.overrideVirtualControlId = string.Empty;
-
             item.overrideInteractionsEnabled = true;
             item.overrideInteractions = overrideInteractions;
             item.overrideProcessorsEnabled = true;

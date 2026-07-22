@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-namespace ES {
+namespace ES.Obsolete{
     /*
       一次性存储最常可能需要的作用目标，来达到通用的技能构筑功�?
     

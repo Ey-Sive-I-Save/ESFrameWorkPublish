@@ -5,5 +5,3 @@ namespace ES
     {
     }
 }
-
-// ES已修正

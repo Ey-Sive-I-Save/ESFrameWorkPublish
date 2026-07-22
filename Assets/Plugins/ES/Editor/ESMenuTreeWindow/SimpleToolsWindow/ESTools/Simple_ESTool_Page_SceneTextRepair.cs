@@ -19,42 +19,64 @@ namespace ES
         private static readonly Regex FileIdOnlyLineRegex = new Regex(@"^\s*-\s*\{fileID:\s*(-?\d+)\}\s*$", RegexOptions.Compiled);
 
         [Title("场景文本修复", "修复 .unity 文本中 SceneRoots 残留的无效本地 fileID 引用", bold: true, titleAlignment: TitleAlignments.Centered)]
-        [InfoBox("只处理 SceneRoots.m_Roots 里指向不存在对象声明的根节点 fileID。不会扫描或修改组件字段、Prefab Override、资源引用。")]
-        [ShowInInspector, ReadOnly, LabelText("最近扫描结果"), MultiLineProperty(12)]
+        [FoldoutGroup("扫描报告"), ShowInInspector, ReadOnly, LabelText("最近扫描结果"), MultiLineProperty(12)]
         private string lastReport = "尚未扫描。";
 
         private string lastResultSummary = "";
         private string lastResultDetail = "";
 
-        [OnInspectorGUI]
+        [OnInspectorGUI, PropertyOrder(-200)]
         private void DrawResultPanel()
         {
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "场景文本修复工作台",
+                "用于扫描 .unity 文本里 SceneRoots.m_Roots 中已经失效的本地 fileID，并在确认后生成备份再修复。",
+                SimpleToolsMaturity.Upgrading,
+                "只处理 SceneRoots 根节点列表，不扫描组件字段、Prefab Override 或资源引用。修复要求项目启用 Force Text，并会直接写入场景文件。");
+            DrawSceneTextRepairActions();
             SimpleToolsPanelUtility.DrawResultSummary("最近场景文本修复", lastResultSummary, lastResultDetail);
         }
 
-        [HorizontalGroup("SelectedActions")]
-        [Button("扫描选中场景", ButtonHeight = 34), GUIColor(0.35f, 0.65f, 1f)]
+        private void DrawSceneTextRepairActions()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("扫描与修复", "选中场景适合定点处理；已打开场景适合修当前工作区。修复前会再次扫描并备份。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("扫描选中场景", SimpleToolsActionTone.Primary, 32, GUILayout.MinWidth(120)))
+                        ScanSelectedScenes();
+                    if (SimpleToolsPanelUtility.DrawActionButton("修复选中场景", SimpleToolsActionTone.Warning, 32, GUILayout.MinWidth(120)))
+                        FixSelectedScenes();
+                    GUILayout.FlexibleSpace();
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("扫描已打开场景", SimpleToolsActionTone.Success, 30, GUILayout.MinWidth(120)))
+                        ScanOpenScenes();
+                    if (SimpleToolsPanelUtility.DrawActionButton("修复已打开场景", SimpleToolsActionTone.Danger, 30, GUILayout.MinWidth(120)))
+                        FixOpenScenes();
+                    GUILayout.FlexibleSpace();
+                }
+            }
+        }
+
         public void ScanSelectedScenes()
         {
             ScanPaths(GetSelectedScenePaths(), showDialog: true);
         }
 
-        [HorizontalGroup("SelectedActions")]
-        [Button("修复选中场景（会备份）", ButtonHeight = 34), GUIColor(0.95f, 0.65f, 0.25f)]
         public void FixSelectedScenes()
         {
             FixPathsWithConfirm(GetSelectedScenePaths());
         }
 
-        [HorizontalGroup("OpenActions")]
-        [Button("扫描已打开场景", ButtonHeight = 34), GUIColor(0.35f, 0.75f, 0.55f)]
         public void ScanOpenScenes()
         {
             ScanPaths(GetOpenScenePaths(), showDialog: true);
         }
 
-        [HorizontalGroup("OpenActions")]
-        [Button("修复已打开场景（会备份）", ButtonHeight = 34), GUIColor(0.95f, 0.55f, 0.35f)]
         public void FixOpenScenes()
         {
             FixPathsWithConfirm(GetOpenScenePaths());

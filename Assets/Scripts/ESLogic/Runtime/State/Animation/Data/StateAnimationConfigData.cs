@@ -45,7 +45,7 @@ namespace ES
         public float targetWeight;
 
         [HorizontalGroup("行")]
-        [LabelText("LerpingRate"), Range(0.05f, 8f), ShowIf("enabled")]
+        [LabelText("响应速度倍率"), Range(0.05f, 8f), ShowIf("enabled")]
         [Tooltip("该节点写入 Driver 的 lerping 速度倍率。它不是权重。1 = 默认速度；小于 1 更慢，大于 1 更快。")]
         public float lerpingRate = 1f;
 
@@ -73,24 +73,24 @@ namespace ES
         public float targetWeight;
 
         [HorizontalGroup("基础行")]
-        [LabelText("LerpingRate"), Range(0.05f, 8f), ShowIf("enabled")]
+        [LabelText("响应速度倍率"), Range(0.05f, 8f), ShowIf("enabled")]
         [Tooltip("该 LookAt 写入 Driver 的 lerping 速度倍率。它不是权重。1 = 默认速度；小于 1 更慢，大于 1 更快。")]
         public float lerpingRate = 1f;
 
         [HorizontalGroup("细分行")]
-        [LabelText("Body"), Range(0f, 1f), ShowIf("enabled")]
+        [LabelText("身体权重"), Range(0f, 1f), ShowIf("enabled")]
         public float bodyWeight;
 
         [HorizontalGroup("细分行")]
-        [LabelText("Head"), Range(0f, 1f), ShowIf("enabled")]
+        [LabelText("头部权重"), Range(0f, 1f), ShowIf("enabled")]
         public float headWeight;
 
         [HorizontalGroup("细分行")]
-        [LabelText("Eyes"), Range(0f, 1f), ShowIf("enabled")]
+        [LabelText("眼睛权重"), Range(0f, 1f), ShowIf("enabled")]
         public float eyesWeight;
 
         [HorizontalGroup("细分行")]
-        [LabelText("Clamp"), Range(0f, 1f), ShowIf("enabled")]
+        [LabelText("转动限制"), Range(0f, 1f), ShowIf("enabled")]
         public float clampWeight;
 
         public static IKLookAtConfig Default => new IKLookAtConfig
@@ -122,7 +122,7 @@ namespace ES
         public Vector2 normalizedRange = new Vector2(0f, 1f);
 
         [HorizontalGroup("段头")]
-        [LabelText("羽化")]
+        [LabelText("边缘柔化")]
         [Range(0f, 0.5f)]
         [Tooltip("段首尾的软过渡区间。0 = 进入区间即全量生效；大于 0 时会在边缘自然渐入渐出。")]
         public float feather = 0.08f;
@@ -424,12 +424,12 @@ namespace ES
 
         [BoxGroup("IK配置", ShowLabel = false)]
         [BoxGroup("IK配置/基础", ShowLabel = true)]
-        [LabelText("启用IK"), Tooltip("是否允许对此状态进行IK控制")]
+        [LabelText("启用 IK 驱动"), Tooltip("是否允许对此状态进行 IK 控制")]
         public bool enableIK = false;
 
         [BoxGroup("IK配置", ShowLabel = false)]
         [BoxGroup("IK配置/基础", ShowLabel = true)]
-        [LabelText("状态退出时禁用IK"), ShowIf("enableIK")]
+        [LabelText("退出时清空 IK"), ShowIf("enableIK")]
         [Tooltip("当状态退出时是否自动禁用IK")]
         public bool disableIKOnExit = true;
 
@@ -473,7 +473,7 @@ namespace ES
 
         [BoxGroup("MatchTarget配置", ShowLabel = false)]
         [BoxGroup("MatchTarget配置/基础", ShowLabel = true)]
-        [LabelText("启用MatchTarget"), Tooltip("是否允许此状态使用MatchTarget对齐")]
+        [LabelText("启用目标对齐"), Tooltip("是否允许此状态使用 MatchTarget 对齐")]
         public bool enableMatchTarget = false;
 
         [BoxGroup("MatchTarget配置", ShowLabel = false)]
@@ -484,13 +484,13 @@ namespace ES
 
         [BoxGroup("MatchTarget配置", ShowLabel = false)]
         [BoxGroup("MatchTarget配置/初始预设", ShowLabel = true)]
-        [Title("MatchTarget预设", bold: false)]
+        [Title("目标对齐预设", bold: false)]
         [ShowIf("enableMatchTarget"), HideLabel]
         public MatchTargetRequest matchTargetPreset = MatchTargetRequest.Default;
 
         [BoxGroup("MatchTarget配置", ShowLabel = false)]
         [BoxGroup("MatchTarget配置/时序步骤", ShowLabel = true)]
-        [LabelText("后续步骤"), ShowIf("enableMatchTarget")]
+        [LabelText("时序步骤"), ShowIf("enableMatchTarget")]
         [Tooltip("按 triggerAt 秒依次覆盖当前 MatchTarget。列表为空时仅使用上方初始预设。\n适合商业项目里的抓取收口、攀爬跨越、挂载对位等多段对齐。")]
         [ListDrawerSettings(ShowFoldout = true, DefaultExpandedState = true, DraggableItems = true, ShowPaging = false)]
         public List<MatchTargetPendingCommand> matchTargetTimeline = new List<MatchTargetPendingCommand>();
@@ -504,21 +504,21 @@ namespace ES
 
         [BoxGroup("MatchTarget配置", ShowLabel = false)]
         [FoldoutGroup("MatchTarget配置/高级-独立目标点(不推荐)", Expanded = false)]
-        [LabelText("ForIndex0")]
+        [LabelText("独立目标点 0")]
         [ShowIf("@enableMatchTarget && showIndependentTargetPointEditors")]
         [InlineProperty, HideReferenceObjectPicker]
         public MatchTargetIndependentTargetSlot matchTargetForIndex0 = new MatchTargetIndependentTargetSlot();
 
         [BoxGroup("MatchTarget配置", ShowLabel = false)]
         [FoldoutGroup("MatchTarget配置/高级-独立目标点(不推荐)", Expanded = false)]
-        [LabelText("ForIndex1")]
+        [LabelText("独立目标点 1")]
         [ShowIf("@enableMatchTarget && showIndependentTargetPointEditors")]
         [InlineProperty, HideReferenceObjectPicker]
         public MatchTargetIndependentTargetSlot matchTargetForIndex1 = new MatchTargetIndependentTargetSlot();
 
         [BoxGroup("MatchTarget配置", ShowLabel = false)]
         [FoldoutGroup("MatchTarget配置/高级-独立目标点(不推荐)", Expanded = false)]
-        [LabelText("ForIndex2")]
+        [LabelText("独立目标点 2")]
         [ShowIf("@enableMatchTarget && showIndependentTargetPointEditors")]
         [InlineProperty, HideReferenceObjectPicker]
         public MatchTargetIndependentTargetSlot matchTargetForIndex2 = new MatchTargetIndependentTargetSlot();
@@ -851,7 +851,7 @@ namespace ES
         public bool IsRuntimeInitialized => _isRuntimeInitialized;
 
         
-        [SerializeReference,LabelText("动画混合计算器")]
+        [SerializeReference,LabelText("动画播放方案")]
         public StateAnimationMixCalculator calculator = new StateAnimationMixCalculatorForSimpleClip();
 
         /// <summary>

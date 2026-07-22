@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 环境数据描述详细等级
@@ -30,13 +30,14 @@ namespace ES.VMCP
     /// ESVMCP配置文件
     /// </summary>
     [CreateAssetMenu(fileName = "ESVMCPConfig", menuName = MenuItemPathDefine.VMCP_ASSET_CREATION_PATH + "配置文件")]
+    [ESOnlyEditorSO("旧 VMCP 配置只服务编辑器 AI 辅助流程，不应进入运行时构建或AB资源包。")]
     public class ESVMCPConfig : ESEditorGlobalSo<ESVMCPConfig>
     {
         [Title("文件路径配置")]
         [FolderPath]
         [LabelText("ESVMCP根文件夹")]
         [InfoBox("ESVMCP主文件夹的位置，所有其他路径都相对于此文件夹")]
-        public string RootFolder = "Assets/ES/ESVMCP";
+        public string RootFolder = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/ESVMCP";
 
         [ReadOnly]
         [LabelText("基础文件夹")]

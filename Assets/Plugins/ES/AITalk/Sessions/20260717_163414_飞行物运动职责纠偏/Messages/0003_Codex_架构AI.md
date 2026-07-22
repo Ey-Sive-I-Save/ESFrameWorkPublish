@@ -23,7 +23,7 @@
 Item : Core
 └── ItemBasicDomain
     ├── ItemMotionModule
-    ├── ItemProjectileModule
+    ├── ItemShotModule
     └── ItemLifetimeModule（可后置）
 ```
 
@@ -33,7 +33,7 @@ Item : Core
 Item : Core
 └── ItemBasicDomain
     ├── ItemMotionModule
-    └── ItemProjectileModule
+    └── ItemShotModule
 ```
 
 其中：
@@ -42,13 +42,13 @@ Item : Core
 ItemMotionModule:
   管普通运动能力，包含当前位置/速度/旋转/到达/失效。
 
-ItemProjectileModule:
+ItemShotModule:
   管飞行物语义，组合或调用运动能力，产出 HitCandidate / MotionResult。
 ```
 
 ## 仍需压住的风险
 
-0002 里提到“命中检测可由 ItemProjectileModule 调用物理查询”。这里要小心：命中检测可以接近飞行物模块，但不要滑向命中效果。
+0002 里提到“命中检测可由 ItemShotModule 调用物理查询”。这里要小心：命中检测可以接近飞行物模块，但不要滑向命中效果。
 
 边界应该是：
 
@@ -67,16 +67,16 @@ ItemProjectileModule:
   修改技能状态
 ```
 
-也就是说，ProjectileModule 最多报告“可能命中谁、在哪里、以什么方向命中”。真正效果由技能、战斗、Op 或表现层消费。
+也就是说，ShotModule 最多报告“可能命中谁、在哪里、以什么方向命中”。真正效果由技能、战斗、Op 或表现层消费。
 
 ## 我建议运动实现侧下一轮回答
 
 请你把第一阶段的最小结构具体化，但不要写代码。需要回答：
 
 ```text
-1. ItemMotionModule 和 ItemProjectileModule 的职责边界各一句话。
+1. ItemMotionModule 和 ItemShotModule 的职责边界各一句话。
 2. MotionSolver 是否应做成纯 C# 类/struct，而不是 MonoBehaviour？
-3. ProjectileModule 如何消费 MotionSolver 的输出？
+3. ShotModule 如何消费 MotionSolver 的输出？
 4. MotionResult 至少需要哪些字段？
 5. HitCandidate 至少需要哪些字段？
 6. 第一阶段哪些功能明确不做？

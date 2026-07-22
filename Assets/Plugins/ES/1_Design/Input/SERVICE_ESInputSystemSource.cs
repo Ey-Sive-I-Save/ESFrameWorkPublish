@@ -12,6 +12,11 @@ namespace ES
         private InputAction[] actionByIndex;
         private ESInputActionId[] enabledActionIds;
         private int enabledActionCount;
+        private ESInputActionId[] pollActionIds;
+        private int pollActionCount;
+        private bool[] pollActionMarks;
+        private bool[] releaseGateByIndex;
+        private bool pollListBuilt;
         private bool enabled;
 
         public bool Enabled
@@ -19,19 +24,36 @@ namespace ES
             get { return enabled; }
         }
 
+        public int EnabledActionCount
+        {
+            get { return enabledActionCount; }
+        }
+
+        public int PollActionCount
+        {
+            get { return pollActionCount; }
+        }
+
         public void Initialize(ESInputRuntimeBuildResult build, ESInputService input)
         {
             Disable();
             DisposeActions();
+            UnbindInputService();
 
             buildResult = build;
             inputService = input;
+            BindInputService();
 
             if (build == null || build.cache == null || build.cache.values == null)
             {
                 actionByIndex = null;
                 enabledActionIds = null;
                 enabledActionCount = 0;
+                pollActionIds = null;
+                pollActionCount = 0;
+                pollActionMarks = null;
+                releaseGateByIndex = null;
+                pollListBuilt = false;
                 return;
             }
 
@@ -39,11 +61,17 @@ namespace ES
             actionByIndex = new InputAction[actionCapacity];
             enabledActionIds = new ESInputActionId[actionCapacity];
             enabledActionCount = 0;
+            pollActionIds = new ESInputActionId[actionCapacity];
+            pollActionCount = 0;
+            pollActionMarks = new bool[actionCapacity];
+            releaseGateByIndex = new bool[actionCapacity];
+            pollListBuilt = false;
 
             bool[] activeInputActions = BuildActiveInputActionMask(actionCapacity);
             CreateActions(actionCapacity, activeInputActions);
             AddBindings();
             BuildEnabledActionList(actionCapacity);
+            RebuildPollActionList();
         }
 
         public void Enable()
@@ -89,16 +117,25 @@ namespace ES
             if (clearFrameState)
                 inputService.BeginFrame();
 
-            for (int i = 0; i < enabledActionCount; i++)
+            for (int i = 0; i < pollActionCount; i++)
             {
-                ESInputActionId id = enabledActionIds[i];
+                ESInputActionId id = pollActionIds[i];
                 int index = (int)id;
                 InputAction action = actionByIndex[index];
                 ESInputValueType valueType = buildResult.cache.metas[index].valueType;
                 switch (valueType)
                 {
                     case ESInputValueType.Button:
-                        inputService.WriteButton(id, action.IsPressed(), time);
+                        bool isHeld = action.IsPressed();
+                        if (releaseGateByIndex != null && releaseGateByIndex[index])
+                        {
+                            if (isHeld)
+                                continue;
+
+                            releaseGateByIndex[index] = false;
+                        }
+
+                        inputService.WriteButton(id, isHeld, time);
                         break;
                     case ESInputValueType.Axis:
                         inputService.WriteAxis(id, action.ReadValue<float>());
@@ -117,10 +154,16 @@ namespace ES
         {
             Disable();
             DisposeActions();
+            UnbindInputService();
             inputService = null;
             buildResult = null;
             enabledActionIds = null;
             enabledActionCount = 0;
+            pollActionIds = null;
+            pollActionCount = 0;
+            pollActionMarks = null;
+            releaseGateByIndex = null;
+            pollListBuilt = false;
         }
 
         private bool[] BuildActiveInputActionMask(int actionCapacity)
@@ -254,6 +297,77 @@ namespace ES
 
                 enabledActionIds[enabledActionCount++] = (ESInputActionId)i;
             }
+        }
+
+        private void RebuildPollActionList()
+        {
+            pollActionCount = 0;
+            if (enabledActionIds == null || pollActionIds == null)
+                return;
+
+            for (int i = 0; i < enabledActionCount; i++)
+            {
+                ESInputActionId id = enabledActionIds[i];
+                int index = (int)id;
+                bool allowed = inputService == null || inputService.IsActionAllowed(id);
+                bool wasPolling = pollActionMarks != null
+                                  && index >= 0
+                                  && index < pollActionMarks.Length
+                                  && pollActionMarks[index];
+
+                if (!allowed)
+                {
+                    SetPollMark(index, false);
+                    continue;
+                }
+
+                if (pollListBuilt && !wasPolling && IsButtonAction(index))
+                    SetReleaseGate(index, true);
+
+                pollActionIds[pollActionCount++] = id;
+                SetPollMark(index, true);
+            }
+
+            pollListBuilt = true;
+        }
+
+        private void HandleInputPolicyChanged(ESRuntimeModePolicy policy)
+        {
+            RebuildPollActionList();
+        }
+
+        private void BindInputService()
+        {
+            if (inputService != null)
+                inputService.OnInputPolicyChanged += HandleInputPolicyChanged;
+        }
+
+        private void UnbindInputService()
+        {
+            if (inputService != null)
+                inputService.OnInputPolicyChanged -= HandleInputPolicyChanged;
+        }
+
+        private bool IsButtonAction(int index)
+        {
+            return buildResult != null
+                   && buildResult.cache != null
+                   && buildResult.cache.metas != null
+                   && index >= 0
+                   && index < buildResult.cache.metas.Length
+                   && buildResult.cache.metas[index].valueType == ESInputValueType.Button;
+        }
+
+        private void SetPollMark(int index, bool value)
+        {
+            if (pollActionMarks != null && index >= 0 && index < pollActionMarks.Length)
+                pollActionMarks[index] = value;
+        }
+
+        private void SetReleaseGate(int index, bool value)
+        {
+            if (releaseGateByIndex != null && index >= 0 && index < releaseGateByIndex.Length)
+                releaseGateByIndex[index] = value;
         }
 
         private void DisposeActions()

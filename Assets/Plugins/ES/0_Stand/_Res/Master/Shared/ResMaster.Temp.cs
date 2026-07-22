@@ -16,8 +16,11 @@ namespace ES
         /// 临时资源库数据结构，用于在构建时和加载资源时存储和管理资源信息，用后就销毁。
         /// </summary>
         [NonSerialized]
-        public static SafeDictionary<string, ESBuildTempResLibrary>
-        TempResLibrarys = new(() => new ESBuildTempResLibrary() { });
+        public static SafeDictionary<string, ESBuildTempAssetLibrary>
+        TempAssetLibraries = new(() => new ESBuildTempAssetLibrary() { });
+
+        [Obsolete("Use TempAssetLibraries.")]
+        public static SafeDictionary<string, ESBuildTempAssetLibrary> TempResLibrarys => TempAssetLibraries;
 #endif
 
     }

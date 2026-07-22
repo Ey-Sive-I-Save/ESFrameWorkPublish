@@ -4,12 +4,12 @@ using System.Linq;
 using UnityEngine;
 using Sirenix.OdinInspector;
 
-namespace ES
-{
+namespace ES.Obsolete{
     /// <summary>
     /// 开发管理数据 V2 - 增强版
     /// </summary>
     [CreateAssetMenu(fileName = "DevManagementDataV2", menuName = MenuItemPathDefine.ASSET_DEV_MANAGEMENT_PATH + "开发管理数据 V2")]
+    [ESOnlyEditorSO("旧开发管理数据只服务编辑器管理窗口，不应进入运行时构建或AB资源包。")]
     public class DevManagementDataV2 : ScriptableObject
     {
         [Title("元数据")]

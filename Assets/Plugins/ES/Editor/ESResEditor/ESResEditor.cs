@@ -23,7 +23,7 @@ namespace ES
 
         #region 库英文路径的唯一性验证
 
-        public bool TrySetResLibFolderName(ResLibrary resLibrary, string preLibFolderName, int attemptCount = 0)
+        public bool TrySetResLibFolderName(ESAssetLibrary resLibrary, string preLibFolderName, int attemptCount = 0)
         {
             const int maxAttempts = 10; // 防止无限递归
             if (attemptCount >= maxAttempts)
@@ -34,7 +34,7 @@ namespace ES
                 return false;
             }
 
-            var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             var validName = preLibFolderName._ToValidIdentName();
             foreach (var lib in allLibraries)
             {
@@ -63,7 +63,7 @@ namespace ES
             // 初始化总结信息收集
             System.Text.StringBuilder summary = new System.Text.StringBuilder();
             summary.AppendLine("构建准备分析资产键总结：");
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             int totalLibraries = libraries.Count;
             try
             {
@@ -71,7 +71,7 @@ namespace ES
 
 
                 //清空信息
-                ESResMaster.TempResLibrarys.Clear();
+                ESResMaster.TempAssetLibraries.Clear();
                 AssetToDependencies.Clear(); // 清空依赖映射
                 AssetToABName.Clear(); // 清空AB名映射
                 foreach (var library in libraries)
@@ -103,9 +103,9 @@ namespace ES
                         if (library != null)
                         {
                             // 如果同名库不存在，添加；如果存在，合并资源
-                            if (!ESResMaster.TempResLibrarys.ContainsKey(library.Name))
+                            if (!ESResMaster.TempAssetLibraries.ContainsKey(library.Name))
                             {
-                                var newTempLib = new ESBuildTempResLibrary()
+                                var newTempLib = new ESBuildTempAssetLibrary()
                                 {
                                     LibNameDisPlay = library.Name,
                                     LibFolderName = library.LibFolderName,
@@ -113,10 +113,10 @@ namespace ES
                                     IsNet = library.IsNet
                                 };
 
-                                ESResMaster.TempResLibrarys.Add(library.Name, newTempLib);
+                                ESResMaster.TempAssetLibraries.Add(library.Name, newTempLib);
                             }
 
-                            var tempLib = ESResMaster.TempResLibrarys[library.Name];
+                            var tempLib = ESResMaster.TempAssetLibraries[library.Name];
 
                             // 使用GetAllUseableBooks统一获取普通Books和DefaultBooks
                             foreach (var book in library.GetAllUseableBooks())
@@ -221,7 +221,7 @@ namespace ES
 
         #region  资源分析部分辅助
 
-        private static void HandleOnePage(ESBuildTempResLibrary tempLibrary, string libraryDisPlayName, string libraryFolderName, string assetPath, UnityEngine.Object assetObject, ResPage page, System.Text.StringBuilder summary)
+        private static void HandleOnePage(ESBuildTempAssetLibrary tempLibrary, string libraryDisPlayName, string libraryFolderName, string assetPath, UnityEngine.Object assetObject, ESAssetPage page, System.Text.StringBuilder summary)
         {
             bool isFolder = ESDesignUtility.SafeEditor.Wrap_IsValidFolder(assetPath);
             if (isFolder)
@@ -237,7 +237,7 @@ namespace ES
                 HandleAsset(tempLibrary, libraryDisPlayName, libraryFolderName, assetPath, assetObject, page, false, null, summary);
             }
         }
-        private static void HandleAsset(ESBuildTempResLibrary tempLibrary, string libraryDisPlayName, string libraryFolderName, string assetPath, UnityEngine.Object assetObject, ResPage page, bool inFolder, string folderPath, System.Text.StringBuilder summary)
+        private static void HandleAsset(ESBuildTempAssetLibrary tempLibrary, string libraryDisPlayName, string libraryFolderName, string assetPath, UnityEngine.Object assetObject, ESAssetPage page, bool inFolder, string folderPath, System.Text.StringBuilder summary)
         {
             // 排除不适用文件：.meta, .cs, .asmdef 等
             string extension = Path.GetExtension(assetPath).ToLowerInvariant();
@@ -259,7 +259,7 @@ namespace ES
                 return;
             }
 
-            GetABNameForAssetAtResPage(assetPath, page, out var unsafeABName, out var safeABName);
+            GetABNameForAssetAtESAssetPage(assetPath, page, out var unsafeABName, out var safeABName);
 
             var assetImporter = AssetImporter.GetAtPath(assetPath);
             if (assetImporter == null)
@@ -317,7 +317,7 @@ namespace ES
 
         #region AB 收集辅助方法
 
-        private static void GetABNameForAssetAtResPage(string assetPath, ResPage page, out string unsafeABName, out string safeABName)
+        private static void GetABNameForAssetAtESAssetPage(string assetPath, ESAssetPage page, out string unsafeABName, out string safeABName)
         {
             bool isFolder = ESDesignUtility.SafeEditor.Wrap_IsValidFolder(assetPath);
             unsafeABName = assetPath;
@@ -351,7 +351,7 @@ namespace ES
 
             // 若仍为空，再从AssetDatabase重建兜底
             EnsureAssetToABNameCache();
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             var result = new Dictionary<string, HashSet<string>>();
             foreach (var library in libraries.OrderBy(l => l?.Name, StringComparer.Ordinal))
             {
@@ -380,7 +380,7 @@ namespace ES
                                         string abName;
                                         if (!AssetToABName.TryGetValue(assetPath, out abName))
                                         {
-                                            GetABNameForAssetAtResPage(assetPath, page, out _, out abName);
+                                            GetABNameForAssetAtESAssetPage(assetPath, page, out _, out abName);
                                         }
                                         abNames.Add(abName);
 
@@ -430,17 +430,17 @@ namespace ES
             AssetToABName.Clear();
             Caching_ReAsset.Clear();
 
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             if (libraries == null || libraries.Count == 0)
             {
                 Debug.LogWarning("[EnsureCircularDependencyProcessedForLibraryScan] 未找到任何库，终止重建");
                 return;
             }
 
-            if (ESResMaster.TempResLibrarys == null)
-                ESResMaster.TempResLibrarys = new SafeDictionary<string, ESBuildTempResLibrary>(() => new ESBuildTempResLibrary());
+            if (ESResMaster.TempAssetLibraries == null)
+                ESResMaster.TempAssetLibraries = new SafeDictionary<string, ESBuildTempAssetLibrary>(() => new ESBuildTempAssetLibrary());
             else
-                ESResMaster.TempResLibrarys.Clear();
+                ESResMaster.TempAssetLibraries.Clear();
 
             // 重新扫描资源构建依赖
             var summary = new System.Text.StringBuilder();
@@ -451,9 +451,9 @@ namespace ES
 
                 Debug.Log($"[EnsureCircularDependencyProcessedForLibraryScan] 扫描库: {library.Name}");
 
-                if (!ESResMaster.TempResLibrarys.ContainsKey(library.Name))
+                if (!ESResMaster.TempAssetLibraries.ContainsKey(library.Name))
                 {
-                    ESResMaster.TempResLibrarys[library.Name] = new ESBuildTempResLibrary
+                    ESResMaster.TempAssetLibraries[library.Name] = new ESBuildTempAssetLibrary
                     {
                         LibNameDisPlay = library.Name,
                         LibFolderName = library.LibFolderName,
@@ -462,7 +462,7 @@ namespace ES
                     };
                 }
 
-                var tempLib = ESResMaster.TempResLibrarys[library.Name];
+                var tempLib = ESResMaster.TempAssetLibraries[library.Name];
                 var useableBooks = library.GetAllUseableBooks();
                 if (useableBooks == null)
                     continue;
@@ -522,7 +522,7 @@ namespace ES
 
         private static Dictionary<string, HashSet<string>> GetLibraryActualABNames()
         {
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
             var result = new Dictionary<string, HashSet<string>>();
             var globalSettings = ESGlobalResSetting.Instance;
             string platformFolderName = ESResMaster.GetParentFolderNameByRuntimePlatform(globalSettings.applyPlatform);
@@ -578,7 +578,7 @@ namespace ES
         private static void CreateJsonData_AssetKeys(System.Text.StringBuilder summary)
         {
 
-            foreach (var tempLib in ESResMaster.TempResLibrarys.Values)
+            foreach (var tempLib in ESResMaster.TempAssetLibraries.Values)
             {
                 // 过滤：只处理需要构建的库
                 if (!tempLib.ContainsBuild)
@@ -745,7 +745,7 @@ namespace ES
 
             try
             {
-                var libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+                var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
                 var libraryABNames = CollectLibraryABNames();
                 var actualLibraryABNames = GetLibraryActualABNames();
 
@@ -1046,7 +1046,7 @@ namespace ES
 
                     // 在本地和远程都生成这个Indentity文件，顺便为全部的Conumsers生成单独的，并且放在ExpandConsumers文件夹下
                     string[] basePaths = { ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_, ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath };
-                    var consumers = ESEditorSO.SOS.GetNewGroupOfType<ResLibConsumer>();
+                    var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>();
 
                     foreach (var basePath in basePaths)
                     {
@@ -1068,8 +1068,8 @@ namespace ES
 
                         if (consumers == null || consumers.Count == 0)
                         {
-                            summary.AppendLine($"警告: 未找到任何 ResLibConsumer，跳过生成 ConsumerIdentity JSON");
-                            Debug.LogWarning("未找到任何 ResLibConsumer，跳过生成 ConsumerIdentity JSON");
+                            summary.AppendLine($"警告: 未找到任何 ESAssetLibraryConsumer，跳过生成 ConsumerIdentity JSON");
+                            Debug.LogWarning("未找到任何 ESAssetLibraryConsumer，跳过生成 ConsumerIdentity JSON");
                             continue;
                         }
                         foreach (var consumer in consumers)
@@ -1204,10 +1204,10 @@ namespace ES
 
         private static void SyncUpdatedABNamesToResKeys()
         {
-            if (ESResMaster.TempResLibrarys == null || ESResMaster.TempResLibrarys.Count == 0)
+            if (ESResMaster.TempAssetLibraries == null || ESResMaster.TempAssetLibraries.Count == 0)
                 return;
 
-            foreach (var tempLib in ESResMaster.TempResLibrarys.Values)
+            foreach (var tempLib in ESResMaster.TempAssetLibraries.Values)
             {
                 if (tempLib?.ESResData_AssetKeys?.AssetKeys == null)
                     continue;

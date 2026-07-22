@@ -4,8 +4,7 @@ using UnityEngine;
 
 // 示例：演示 ExtForEnum.cs 中常用方法
 // 来源：Assets/Plugins/ES/1_Design/Extension/EX_SimpleExtension/ExtForEnum.cs
-namespace ES
-{
+namespace ES.Samples{
     [Flags]
     public enum ExampleFlags {[Description("Flag A")] A = 1, [Description("Flag B")] B = 2, [Description("Flag C")] C = 4 }
 

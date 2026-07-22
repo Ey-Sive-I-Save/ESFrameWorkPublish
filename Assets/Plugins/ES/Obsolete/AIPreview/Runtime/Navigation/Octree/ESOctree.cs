@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ES.AIPreview.Navigation
+namespace ES.Obsolete.AIPreview.Navigation
 {
     /// <summary>
     /// 简单的八叉树空间划分原型：

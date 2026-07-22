@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c06da9fe4544a99954fd36db03c8c8f, type: 3}
+  m_Name: GameCoreGlobalData
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  HasConfirm: 1
+  description: "GameCoreGlobalData \u662F\u9879\u76EE\u6838\u5FC3\u8BED\u4E49\u5165\u53E3\uFF1A\u96C6\u4E2D\u8BF4\u660E GameMode\u3001ModeTag\u3001GameTag\u3001Input \u5206\u7C7B\u3001\u7269\u7406\u5C42\u8BED\u4E49\u548C AI Command \u6A21\u677F\u3002\u4E0D\u6302 StateMachineConfig\uFF0C\u4E0D\u505A\u4EE3\u7801\u751F\u6210\uFF0C\u4E0D\u66FF\u4EE3\u5177\u4F53\u4E1A\u52A1\u6570\u636E\u3002"
+  gameModes: []
+  gameModeTags: []
+  gameTags: []
+  inputCategories: []
+  physicsLayers: []
+  aiCommandTemplates: []

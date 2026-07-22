@@ -20,7 +20,7 @@ public class ESGraphViewWindow : EditorWindow
     public INodeContainer Container { get { return m_NodeContainer; } set { if (value != m_NodeContainer) { SContainer= m_NodeContainer = value; OnTargetContainerChanged();} } }
     private INodeContainer m_NodeContainer;
 
-    [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "图编辑器", false, -980)]
+    [MenuItem(MenuItemPathDefine.GAMEPLAY_BUILDING_PATH + "图编辑器", false, 30)]
     public static ESGraphViewWindow ShowWindow()
     {
         window = GetWindow<ESGraphViewWindow>();
@@ -48,13 +48,8 @@ public class ESGraphViewWindow : EditorWindow
         Part_FlowChart.OnSelectNodeViewer = OnNodeSelectionChanged;
        /* Part_FlowChart.userSeletionGo = userSeletionGo;*/
         Part_FlowChart.window = this;
-        Selection.selectionChanged += () => {
-        
-            if(Selection.activeObject is INodeContainer container)
-            {
-                SContainer= Container = container;
-            }
-        };
+        Selection.selectionChanged -= OnSelectionChanged;
+        Selection.selectionChanged += OnSelectionChanged;
         if (Selection.activeObject is INodeContainer container)
         {
             SContainer= Container = container;
@@ -71,6 +66,20 @@ public class ESGraphViewWindow : EditorWindow
         //进行检查器更新
         Part_Inspector.UpdateSelectionNode(nodeView);
     }
+
+    private void OnDisable()
+    {
+        Selection.selectionChanged -= OnSelectionChanged;
+    }
+
+    private void OnSelectionChanged()
+    {
+        if (Selection.activeObject is INodeContainer container)
+        {
+            SContainer = Container = container;
+        }
+    }
+
     void OnTargetContainerChanged()
     {
         if (m_NodeContainer != null)
@@ -84,14 +93,17 @@ public class ESGraphViewWindow : EditorWindow
     {
         public override void InitInvoke()
         {
-            Selection.selectionChanged += () => {
+            Selection.selectionChanged -= OnGlobalSelectionChanged;
+            Selection.selectionChanged += OnGlobalSelectionChanged;
+        }
 
-                if (Selection.activeObject is INodeContainer container)
-                {
-                    var w= ESGraphViewWindow.ShowWindow();
-                    w.Container = container;
-                }
-            };
+        private static void OnGlobalSelectionChanged()
+        {
+            if (Selection.activeObject is INodeContainer container)
+            {
+                var w = ESGraphViewWindow.ShowWindow();
+                w.Container = container;
+            }
         }
     }
 

@@ -1,4 +1,4 @@
-using ES;
+﻿using ES;
 using Sirenix.OdinInspector;
 #if UNITY_EDITOR
 using Sirenix.OdinInspector.Editor;
@@ -13,10 +13,10 @@ using UnityEngine.Events;
 
 public class exa : SerializedMonoBehaviour 
 {
-    public ESResRefer refer;
-    public ESResReferPrefab prefab;
-    public ESResReferAudioClip clip;
-    public ESResReferMat mat;
+    public ESAssetReferPrefab refer;
+    public ESAssetReferPrefab prefab;
+    public ESAssetReferAudioClip clip;
+    public ESAssetReferMaterial mat;
 
     public Dictionary<string, string> keyValues = new Dictionary<string, string>();
 

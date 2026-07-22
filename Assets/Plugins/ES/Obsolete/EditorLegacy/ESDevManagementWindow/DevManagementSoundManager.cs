@@ -1,8 +1,7 @@
 using UnityEngine;
 using UnityEditor;
 
-namespace ES
-{
+namespace ES.Obsolete{
     /// <summary>
     /// 音效管理器 - 为操作提供声音反馈
     /// </summary>

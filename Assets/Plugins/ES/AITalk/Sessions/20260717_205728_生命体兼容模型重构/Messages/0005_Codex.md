@@ -28,8 +28,8 @@ ExternalAdapters
 - `ControlAuthorityResolver` 属于 Actor facade 控制权仲裁层，不属于 `EntityStateDomain`。
 - `EntityStateDomain` 和 `StateMachine` 消费仲裁后的状态/能力约束，不决定谁控制角色。
 - `StateMachine` 可作为迁移期 `StateAdapter`，但 `Entity hostEntity` 是中期解耦点。
-- `Projectile/Item` 不使用完整 `Root_Actor`，只接 Owner/Camp/MotionBody/HitCandidate/DamageSource/Target 共享协议。
-- Unity 层级使用“基础生命体模板 + Humanoid/Monster/Boss/Vehicle variant 增量 + Projectile/Item 简化模板”。
+- `Shot/Item` 不使用完整 `Root_Actor`，只接 Owner/Camp/MotionBody/HitCandidate/DamageSource/Target 共享协议。
+- Unity 层级使用“基础生命体模板 + Humanoid/Monster/Boss/Vehicle variant 增量 + Shot/Item 简化模板”。
 - 热路径禁止每帧 `GetMoudle<T>()`、`Find`、反射、字符串查找和临时分配。
 
 ## 可以结束

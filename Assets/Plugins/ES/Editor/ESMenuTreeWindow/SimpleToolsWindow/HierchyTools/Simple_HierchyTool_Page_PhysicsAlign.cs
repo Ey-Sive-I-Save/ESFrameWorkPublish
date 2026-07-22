@@ -6,6 +6,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace ES
 {
@@ -21,7 +22,6 @@ namespace ES
         [Title("智能对齐与分布工具", "专业级对象对齐、分布、匹配工具", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         
-        [InfoBox("支持 3D / 2D / UI 对象的对齐、分布、尺寸匹配；执行前可确认，支持 Undo。", InfoMessageType.None)]
         [PropertySpace(10)]
         [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
         private string PanelSummary =>
@@ -29,11 +29,113 @@ namespace ES
 
         private string lastResultSummary = "";
         private string lastResultDetail = "";
+        private string auditSearch = "";
+        private bool showOnlyRisks = false;
+        private List<TransformAuditRecord> auditRecords = new List<TransformAuditRecord>();
+        private const int LargeTransformOperationThreshold = 200;
 
-        [OnInspectorGUI]
+        [OnInspectorGUI, PropertyOrder(-200)]
         private void DrawResultPanel()
         {
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "对齐、分布与布景微调工作台",
+                "用于 3D / 2D / UI 对象的批量对齐、均匀分布、尺寸匹配、落地吸附、网格吸附和轻微随机化。",
+                SimpleToolsMaturity.Upgrading,
+                "会直接修改 Transform 或 RectTransform。建议开启执行前确认；父子对象同时选中时保持“跳过重复子级”，避免重复位移。");
+            SimpleToolsPanelUtility.DrawSummary(
+                "有效选区: " + GetValidSelection().Length,
+                "审计项: " + auditRecords.Count,
+                "预览中: " + (isPreviewing ? "是" : "否"),
+                "确认: " + (confirmBeforeApply ? "开" : "关"),
+                "Prefab资产保护: " + (protectPrefabAssets ? "开" : "关"));
+            SimpleToolsPanelUtility.DrawSectionTitle("使用顺序", "先刷新选区审计，再选择对齐/分布/匹配/落地类动作；分布预览满意后再应用。");
+            DrawWorkflowShortcuts();
+            if (GetValidSelection().Length >= LargeTransformOperationThreshold)
+                SimpleToolsPanelUtility.DrawWarning($"当前有效选区超过 {LargeTransformOperationThreshold} 个对象，大批量 Transform 操作会强制二次确认，并建议先刷新审计。");
             SimpleToolsPanelUtility.DrawResultSummary("最近对齐操作", lastResultSummary, lastResultDetail);
+        }
+
+        private void DrawWorkflowShortcuts()
+        {
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("快捷工作流", EditorStyles.boldLabel);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("刷新审计", SimpleToolsActionTone.Primary, 28, GUILayout.Width(88)))
+                        RefreshSelectionAudit();
+                    if (SimpleToolsPanelUtility.DrawActionButton("吸附到表面", SimpleToolsActionTone.Success, 28, GUILayout.Width(96)))
+                        ExecuteSnapToSurface();
+                    if (SimpleToolsPanelUtility.DrawActionButton("网格吸附", SimpleToolsActionTone.Success, 28, GUILayout.Width(88)))
+                        ExecuteGridSnap();
+                    if (SimpleToolsPanelUtility.DrawActionButton("随机错落", SimpleToolsActionTone.Warning, 28, GUILayout.Width(88)))
+                        ExecuteRandomDressing();
+                    GUILayout.FlexibleSpace();
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("执行对齐", SimpleToolsActionTone.Warning, 28, GUILayout.Width(88)))
+                        AlignObjects();
+                    if (SimpleToolsPanelUtility.DrawActionButton("预览分布", SimpleToolsActionTone.Primary, 28, GUILayout.Width(88)))
+                        PreviewDistributeObjects();
+                    if (SimpleToolsPanelUtility.DrawActionButton("应用预览", SimpleToolsActionTone.Success, 28, GUILayout.Width(88)))
+                        ApplyDistributionPreview();
+                    if (SimpleToolsPanelUtility.DrawActionButton("清除预览", SimpleToolsActionTone.Neutral, 28, GUILayout.Width(88)))
+                        ClearDistributionPreview();
+                    GUILayout.FlexibleSpace();
+                }
+
+                EditorGUILayout.LabelField("下方标签页保留完整高级按钮。首屏快捷区只放高频动作，减少找按钮成本。", EditorStyles.wordWrappedMiniLabel);
+            }
+        }
+        #endregion
+
+        #region 审计数据
+        [Serializable]
+        private class TransformAuditRecord
+        {
+            [ReadOnly, TableColumnWidth(170, false), LabelText("对象")]
+            public GameObject Object;
+
+            [ReadOnly, TableColumnWidth(220, false), LabelText("路径")]
+            public string Path;
+
+            [ReadOnly, TableColumnWidth(90, false), LabelText("类型")]
+            public string Kind;
+
+            [ReadOnly, TableColumnWidth(90, false), LabelText("边界")]
+            public string BoundsSource;
+
+            [ReadOnly, TableColumnWidth(120, false), LabelText("尺寸")]
+            public string Size;
+
+            [ReadOnly, TableColumnWidth(70, false), LabelText("Prefab")]
+            public string PrefabState;
+
+            [ReadOnly, TableColumnWidth(70, false), LabelText("风险")]
+            public string RiskLevel;
+
+            [ReadOnly, TableColumnWidth(260, false), LabelText("提示")]
+            public string Note;
+
+            [Button("定位", ButtonSizes.Small), TableColumnWidth(48, false)]
+            private void Ping()
+            {
+                if (Object == null) return;
+                Selection.activeGameObject = Object;
+                EditorGUIUtility.PingObject(Object);
+            }
+        }
+
+        private struct TransformChangeSnapshot
+        {
+            public Vector3 Position;
+            public Vector3 LocalPosition;
+            public Vector3 LocalScale;
+            public Quaternion Rotation;
+            public Vector2 RectSize;
+            public bool IsRectTransform;
         }
         #endregion
 
@@ -100,12 +202,20 @@ namespace ES
             [LabelText("局部坐标")] LocalSpace,
             [LabelText("相对镜头")] CameraRelative,
         }
+
+        public enum MatchReferenceMode
+        {
+            [LabelText("第一个选中对象")] FirstSelected,
+            [LabelText("最后选中对象")] LastSelected,
+            [LabelText("父对象")] Parent,
+        }
         #endregion
 
         #region 预览系统字段
         private Dictionary<Transform, Vector3> originalPositions = new Dictionary<Transform, Vector3>();
         private bool isPreviewing = false;
         private int previewUndoGroup = -1;
+        private const float ProjectionEpsilon = 0.0001f;
         #endregion
 
         #region 基础设置
@@ -337,8 +447,8 @@ namespace ES
 
         [TabGroup("对齐", "尺寸匹配")]
         [LabelText("匹配参考对象"), LabelWidth(120)]
-        [InfoBox("参考对象按选择顺序或父对象规则确定。", InfoMessageType.None)]
-        public AlignReference matchReference = AlignReference.FirstSelected;
+        [InfoBox("尺寸匹配必须有一个明确参考对象；不会使用“所有对象边界”或“世界中心”这类对齐参考。", InfoMessageType.None)]
+        public MatchReferenceMode matchReference = MatchReferenceMode.FirstSelected;
 
         [TabGroup("对齐", "尺寸匹配")]
         [InfoBox("3D 对象通过 Scale 匹配，UI 对象优先调整 RectTransform 尺寸。", InfoMessageType.Info)]
@@ -372,6 +482,92 @@ namespace ES
         private void MatchObjects() { ExecuteMatch(); }
         #endregion
 
+        #region 布景整理
+        [TabGroup("对齐", "布景整理")]
+        [InfoBox("面向场景布置：落地/贴表面、网格归整、轻微随机错落。所有操作都有确认、Undo 和变更报告。", InfoMessageType.Info)]
+
+        [TabGroup("对齐", "布景整理")]
+        [HorizontalGroup("对齐/布景整理/Surface")]
+        [VerticalGroup("对齐/布景整理/Surface/Left"), LabelWidth(120)]
+        [LabelText("射线层"), PropertySpace(5)]
+        public LayerMask surfaceLayerMask = ~0;
+
+        [VerticalGroup("对齐/布景整理/Surface/Left"), LabelWidth(120)]
+        [LabelText("上方起点"), MinValue(0.1f)]
+        public float surfaceCastHeight = 50f;
+
+        [VerticalGroup("对齐/布景整理/Surface/Left"), LabelWidth(120)]
+        [LabelText("检测距离"), MinValue(0.1f)]
+        public float surfaceCastDistance = 200f;
+
+        [VerticalGroup("对齐/布景整理/Surface/Right"), LabelWidth(120)]
+        [LabelText("表面偏移")]
+        public float surfaceOffset = 0f;
+
+        [VerticalGroup("对齐/布景整理/Surface/Right"), LabelWidth(120)]
+        [LabelText("对齐法线")]
+        public bool alignToSurfaceNormal = false;
+
+        [VerticalGroup("对齐/布景整理/Surface/Right"), LabelWidth(120)]
+        [LabelText("忽略自身碰撞")]
+        public bool ignoreSelfColliders = true;
+
+        [VerticalGroup("对齐/布景整理/Surface/Right"), LabelWidth(120)]
+        [LabelText("忽略选区碰撞")]
+        public bool ignoreSelectionColliders = true;
+
+        [TabGroup("对齐", "布景整理")]
+        [HorizontalGroup("对齐/布景整理/Grid")]
+        [VerticalGroup("对齐/布景整理/Grid/Left"), LabelWidth(120)]
+        [LabelText("网格尺寸")]
+        public Vector3 gridSize = Vector3.one;
+
+        [VerticalGroup("对齐/布景整理/Grid/Right"), LabelWidth(80)]
+        [LabelText("吸附X")]
+        public bool snapGridX = true;
+
+        [VerticalGroup("对齐/布景整理/Grid/Right"), LabelWidth(80)]
+        [LabelText("吸附Y")]
+        public bool snapGridY = false;
+
+        [VerticalGroup("对齐/布景整理/Grid/Right"), LabelWidth(80)]
+        [LabelText("吸附Z")]
+        public bool snapGridZ = true;
+
+        [TabGroup("对齐", "布景整理")]
+        [HorizontalGroup("对齐/布景整理/Random")]
+        [VerticalGroup("对齐/布景整理/Random/Left"), LabelWidth(120)]
+        [LabelText("随机种子")]
+        public int randomSeed = 2026;
+
+        [VerticalGroup("对齐/布景整理/Random/Left"), LabelWidth(120)]
+        [LabelText("位置扰动")]
+        public Vector3 randomPositionRange = new Vector3(0.25f, 0f, 0.25f);
+
+        [VerticalGroup("对齐/布景整理/Random/Right"), LabelWidth(120)]
+        [LabelText("Y旋转范围")]
+        [MinMaxSlider(-180f, 180f, true)]
+        public Vector2 randomYawRange = new Vector2(-8f, 8f);
+
+        [VerticalGroup("对齐/布景整理/Random/Right"), LabelWidth(120)]
+        [LabelText("统一缩放范围")]
+        [MinMaxSlider(0.01f, 3f, true)]
+        public Vector2 randomUniformScaleRange = new Vector2(1f, 1f);
+
+        [TabGroup("对齐", "布景整理")]
+        [HorizontalGroup("对齐/布景整理/Buttons")]
+        [Button("吸附到表面", ButtonHeight = 32), GUIColor(0.35f, 0.65f, 0.42f)]
+        private void SnapSelectionToSurface() { ExecuteSnapToSurface(); }
+
+        [HorizontalGroup("对齐/布景整理/Buttons")]
+        [Button("网格吸附", ButtonHeight = 32), GUIColor(0.35f, 0.55f, 0.78f)]
+        private void SnapSelectionToGrid() { ExecuteGridSnap(); }
+
+        [HorizontalGroup("对齐/布景整理/Buttons")]
+        [Button("随机错落", ButtonHeight = 32), GUIColor(0.72f, 0.55f, 0.32f)]
+        private void RandomizeSelectionDressing() { ExecuteRandomDressing(); }
+        #endregion
+
         #region 高级选项
         [TabGroup("对齐", "高级选项")]
         [InfoBox("高级选项控制边界计算、对象过滤、确认弹窗和成功提示。", InfoMessageType.Info)]
@@ -391,6 +587,16 @@ namespace ES
         [LabelText("忽略锁定对象"), PropertySpace(5)]
         [InfoBox("开启后跳过 HideFlags.NotEditable 对象。")]
         public bool ignoreLocked = true;
+
+        [TabGroup("对齐", "高级选项")]
+        [LabelText("跳过重复子级"), PropertySpace(5)]
+        [InfoBox("开启后，如果父对象和子对象同时选中，只处理父对象，避免子对象被父级带动后又单独移动一次。")]
+        public bool skipNestedSelection = true;
+
+        [TabGroup("对齐", "高级选项")]
+        [LabelText("保护Prefab资产"), PropertySpace(5)]
+        [InfoBox("开启后跳过 Project 窗口里选中的 Prefab 资产，只处理场景实例和 Prefab Mode 中的对象。")]
+        public bool protectPrefabAssets = true;
 
         [TabGroup("对齐", "高级选项")]
         [LabelText("对齐后选中"), PropertySpace(5)]
@@ -419,16 +625,82 @@ namespace ES
         [InfoBox("当前选中: @GetSelectionInfo()", InfoMessageType.None)]
         #endregion
 
+        #region 选区审计
+        [TabGroup("对齐", "选区审计")]
+        [InfoBox("执行前先看有效对象、边界来源、Prefab 状态和 UI 布局风险。这里不修改场景。", InfoMessageType.Info)]
+        [HorizontalGroup("对齐/选区审计/Toolbar")]
+        [Button("刷新选区审计", ButtonHeight = 30), GUIColor(0.28f, 0.52f, 0.85f)]
+        private void RefreshSelectionAudit()
+        {
+            RebuildAuditRecords(GetValidSelection());
+        }
+
+        [HorizontalGroup("对齐/选区审计/Toolbar")]
+        [Button("清空审计", ButtonHeight = 30)]
+        private void ClearSelectionAudit()
+        {
+            auditRecords.Clear();
+        }
+
+        [TabGroup("对齐", "选区审计")]
+        [HorizontalGroup("对齐/选区审计/Filters")]
+        [LabelText("搜索"), LabelWidth(40)]
+        public string AuditSearch
+        {
+            get => auditSearch;
+            set => auditSearch = value ?? "";
+        }
+
+        [HorizontalGroup("对齐/选区审计/Filters")]
+        [LabelText("只看风险"), LabelWidth(70)]
+        public bool ShowOnlyRisks
+        {
+            get => showOnlyRisks;
+            set => showOnlyRisks = value;
+        }
+
+        [TabGroup("对齐", "选区审计")]
+        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel]
+        private string AuditSummary => BuildAuditSummary();
+
+        [TabGroup("对齐", "选区审计")]
+        [ShowInInspector, ReadOnly, TableList(IsReadOnly = true, AlwaysExpanded = true), LabelText("当前审计清单")]
+        private List<TransformAuditRecord> FilteredAuditRecords => GetFilteredAuditRecords();
+        #endregion
+
         private bool ConfirmTransformOperation(string title, string action, GameObject[] selectedObjects, int affectedCountOffset = 0)
         {
-            if (!confirmBeforeApply)
-                return true;
+            if (selectedObjects == null)
+                selectedObjects = Array.Empty<GameObject>();
 
             int affectedCount = Mathf.Max(0, selectedObjects.Length - affectedCountOffset);
+            bool forceConfirm = affectedCount >= LargeTransformOperationThreshold;
+            if (!confirmBeforeApply && !forceConfirm)
+                return true;
+
             string preview = SimpleToolsSafetyUtility.JoinPreview(selectedObjects.Select(obj => obj != null ? obj.name : "<丢失对象>"), 10);
+            string riskSummary = BuildRiskSummary(selectedObjects);
+            string impactSummary = BuildTransformImpactSummary(action);
+            string forceHint = forceConfirm && !confirmBeforeApply
+                ? "\n\n当前目标数量较大，即使关闭了执行前确认，也会强制确认一次。"
+                : string.Empty;
             return EditorUtility.DisplayDialog(title,
-                $"将{action} {affectedCount} 个对象。\n\n实际选区：\n{preview}\n\n支持 Ctrl+Z 撤销。继续吗？",
+                $"将{action} {affectedCount} 个对象。\n\n会修改：{impactSummary}\n\n实际选区：\n{preview}\n\n{riskSummary}{forceHint}\n\n支持 Ctrl+Z 撤销。继续吗？",
                 "开始处理", "取消");
+        }
+
+        private string BuildTransformImpactSummary(string action)
+        {
+            if (string.IsNullOrWhiteSpace(action))
+                return "Transform/RectTransform";
+
+            if (action.Contains("尺寸") || action.Contains("匹配"))
+                return "Transform.localScale；UI 对象可能修改 RectTransform 尺寸";
+
+            if (action.Contains("随机"))
+                return "Transform.position / rotation / localScale 中已启用的随机项";
+
+            return "Transform.position；UI 对象按 RectTransform/边界计算后移动";
         }
 
         private void MarkScenesDirty(IEnumerable<GameObject> selectedObjects)
@@ -443,6 +715,222 @@ namespace ES
             {
                 EditorSceneManager.MarkSceneDirty(scene);
             }
+        }
+
+        private void RebuildAuditRecords(GameObject[] selectedObjects)
+        {
+            auditRecords.Clear();
+            if (selectedObjects == null)
+                return;
+
+            foreach (var obj in selectedObjects)
+            {
+                if (obj == null)
+                    continue;
+
+                var bounds = GetObjectBounds(obj.transform);
+                var notes = new List<string>();
+                string risk = "低";
+
+                if (HasUILayoutRisk(obj.transform, out var layoutNote))
+                {
+                    risk = "高";
+                    notes.Add(layoutNote);
+                }
+
+                if (PrefabUtility.IsPartOfPrefabInstance(obj))
+                {
+                    if (risk != "高") risk = "中";
+                    notes.Add("会写入 Prefab 实例 Override");
+                }
+
+                if (obj.transform is RectTransform && boundsMode != BoundsCalculationMode.RectTransform && boundsMode != BoundsCalculationMode.Auto)
+                {
+                    if (risk != "高") risk = "中";
+                    notes.Add("UI 对象未使用 RectTransform 边界模式");
+                }
+
+                if (bounds.size.sqrMagnitude <= ProjectionEpsilon)
+                {
+                    if (risk != "高") risk = "中";
+                    notes.Add("边界接近零，可能只按 Transform 点处理");
+                }
+
+                auditRecords.Add(new TransformAuditRecord
+                {
+                    Object = obj,
+                    Path = GetHierarchyPath(obj.transform),
+                    Kind = GetObjectKind(obj.transform),
+                    BoundsSource = GetBoundsSourceName(obj.transform),
+                    Size = bounds.size.ToString("F2"),
+                    PrefabState = PrefabUtility.IsPartOfPrefabInstance(obj) ? "实例" : "场景",
+                    RiskLevel = risk,
+                    Note = notes.Count == 0 ? "可处理" : string.Join("；", notes)
+                });
+            }
+
+            lastResultSummary = $"选区审计完成: {auditRecords.Count} 个有效对象 | 风险 {auditRecords.Count(item => item.RiskLevel != "低")} 项";
+            lastResultDetail = BuildAuditSummary();
+        }
+
+        private List<TransformAuditRecord> GetFilteredAuditRecords()
+        {
+            IEnumerable<TransformAuditRecord> query = auditRecords;
+            if (showOnlyRisks)
+                query = query.Where(item => item.RiskLevel != "低");
+
+            if (!string.IsNullOrWhiteSpace(auditSearch))
+            {
+                string keyword = auditSearch.Trim();
+                query = query.Where(item =>
+                    ContainsIgnoreCase(item.Object != null ? item.Object.name : "", keyword) ||
+                    ContainsIgnoreCase(item.Path, keyword) ||
+                    ContainsIgnoreCase(item.Kind, keyword) ||
+                    ContainsIgnoreCase(item.BoundsSource, keyword) ||
+                    ContainsIgnoreCase(item.Note, keyword));
+            }
+
+            return query.ToList();
+        }
+
+        private string BuildAuditSummary()
+        {
+            if (auditRecords.Count == 0)
+                return "尚未生成审计。点击“刷新选区审计”查看当前有效选区。";
+
+            int prefabCount = auditRecords.Count(item => item.PrefabState == "实例");
+            int highRisk = auditRecords.Count(item => item.RiskLevel == "高");
+            int mediumRisk = auditRecords.Count(item => item.RiskLevel == "中");
+            int uiCount = auditRecords.Count(item => item.Kind.Contains("UI"));
+            return $"对象 {auditRecords.Count} | Prefab实例 {prefabCount} | UI {uiCount} | 高风险 {highRisk} | 中风险 {mediumRisk} | 搜索后 {GetFilteredAuditRecords().Count}";
+        }
+
+        private string BuildRiskSummary(GameObject[] selectedObjects)
+        {
+            if (selectedObjects == null || selectedObjects.Length == 0)
+                return "风险: 无有效对象。";
+
+            int prefabCount = 0;
+            int layoutRisk = 0;
+            int zeroBounds = 0;
+
+            foreach (var obj in selectedObjects)
+            {
+                if (obj == null) continue;
+                if (PrefabUtility.IsPartOfPrefabInstance(obj)) prefabCount++;
+                if (HasUILayoutRisk(obj.transform, out _)) layoutRisk++;
+                if (GetObjectBounds(obj.transform).size.sqrMagnitude <= ProjectionEpsilon) zeroBounds++;
+            }
+
+            var parts = new List<string>();
+            if (prefabCount > 0) parts.Add($"Prefab实例 {prefabCount} 个会记录 Override");
+            if (layoutRisk > 0) parts.Add($"UI布局驱动风险 {layoutRisk} 个");
+            if (zeroBounds > 0) parts.Add($"零尺寸边界 {zeroBounds} 个");
+            return parts.Count == 0 ? "风险: 未发现明显风险。" : "风险: " + string.Join("；", parts);
+        }
+
+        private bool ContainsIgnoreCase(string source, string keyword)
+        {
+            if (string.IsNullOrEmpty(keyword))
+                return true;
+            return (source ?? "").IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private string GetHierarchyPath(Transform transform)
+        {
+            if (transform == null)
+                return "<丢失>";
+
+            var names = new Stack<string>();
+            var current = transform;
+            while (current != null)
+            {
+                names.Push(current.name);
+                current = current.parent;
+            }
+            return string.Join("/", names);
+        }
+
+        private string GetObjectKind(Transform transform)
+        {
+            if (transform is RectTransform) return "UI";
+            if (transform.GetComponent<Renderer>() != null || transform.GetComponentInChildren<Renderer>() != null) return "Renderer";
+            if (transform.GetComponent<Collider>() != null || transform.GetComponentInChildren<Collider>() != null) return "Collider3D";
+            if (transform.GetComponent<Collider2D>() != null || transform.GetComponentInChildren<Collider2D>() != null) return "Collider2D";
+            return "Transform";
+        }
+
+        private string GetBoundsSourceName(Transform transform)
+        {
+            if (transform == null) return "无";
+            if (boundsMode == BoundsCalculationMode.TransformOnly) return "Transform";
+            if (boundsMode == BoundsCalculationMode.RectTransform || (boundsMode == BoundsCalculationMode.Auto && transform is RectTransform)) return "RectTransform";
+            if (boundsMode == BoundsCalculationMode.Renderer || boundsMode == BoundsCalculationMode.Auto)
+            {
+                bool hasRenderer = includeChildren
+                    ? transform.GetComponentsInChildren<Renderer>().Any(renderer => renderer != null && (!activeOnly || renderer.gameObject.activeInHierarchy))
+                    : transform.GetComponent<Renderer>() != null;
+                if (hasRenderer) return "Renderer";
+            }
+            if (boundsMode == BoundsCalculationMode.Collider || boundsMode == BoundsCalculationMode.Auto)
+            {
+                bool hasCollider = includeChildren
+                    ? transform.GetComponentsInChildren<Collider>().Any(collider => collider != null && (!activeOnly || collider.gameObject.activeInHierarchy)) ||
+                      transform.GetComponentsInChildren<Collider2D>().Any(collider => collider != null && (!activeOnly || collider.gameObject.activeInHierarchy))
+                    : transform.GetComponent<Collider>() != null || transform.GetComponent<Collider2D>() != null;
+                if (hasCollider) return "Collider";
+            }
+            return "Transform";
+        }
+
+        private bool HasUILayoutRisk(Transform transform, out string note)
+        {
+            note = "";
+            var rect = transform as RectTransform;
+            if (rect == null)
+                return false;
+
+            if (rect.GetComponent<ContentSizeFitter>() != null || rect.GetComponent<AspectRatioFitter>() != null)
+            {
+                note = "自身带 UI 尺寸驱动组件";
+                return true;
+            }
+
+            var parent = rect.parent;
+            while (parent != null)
+            {
+                if (parent.GetComponent<LayoutGroup>() != null)
+                {
+                    note = $"受父级布局组件驱动: {parent.name}";
+                    return true;
+                }
+                parent = parent.parent;
+            }
+
+            return false;
+        }
+
+        private void FinalizeTransformChanges(IEnumerable<GameObject> selectedObjects)
+        {
+            if (selectedObjects == null)
+                return;
+
+            foreach (var obj in selectedObjects)
+            {
+                if (obj == null)
+                    continue;
+
+                var transform = obj.transform;
+                EditorUtility.SetDirty(transform);
+
+                if (PrefabUtility.IsPartOfPrefabInstance(transform))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(transform);
+
+                if (transform is RectTransform rectTransform && PrefabUtility.IsPartOfPrefabInstance(rectTransform))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(rectTransform);
+            }
+
+            MarkScenesDirty(selectedObjects);
         }
 
         #region 核心对齐功能
@@ -462,132 +950,67 @@ namespace ES
                 return;
             }
 
+            if (!ValidateCoordinateMode(selectedObjects, IsCameraAlignMode(alignMode)))
+                return;
+
+            if (!ValidateAlignReference(selectedObjects))
+                return;
+
             if (!ConfirmTransformOperation("确认执行对齐", "对齐", selectedObjects))
                 return;
 
             Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Align Objects");
+            var beforeSnapshots = CaptureTransformSnapshots(selectedObjects);
 
             var transforms = selectedObjects.Select(obj => obj.transform).ToArray();
-            var referencePosition = GetReferencePosition(transforms);
             var referenceBounds = GetReferenceBounds(transforms);
+            Vector3 axis = GetAlignAxis(alignMode, transforms);
+            axis.Normalize();
+            GetBoundsProjection(referenceBounds, axis, out float refMin, out float refMax);
+            float refCenter = (refMin + refMax) * 0.5f;
 
             foreach (var transform in transforms)
             {
                 var objectBounds = GetObjectBounds(transform);
-                // 始终在世界坐标系中计算
-                var worldPosition = transform.position;
-                Vector3 boundsOffset = objectBounds.center - worldPosition;
-
-                // 获取相机相对向量
-                Vector3 cameraRight = GetCameraRightVector();
-                Vector3 cameraUp = GetCameraUpVector();
-                Vector3 cameraForward = GetCameraForwardVector();
+                GetBoundsProjection(objectBounds, axis, out float objMin, out float objMax);
+                float objCenter = (objMin + objMax) * 0.5f;
+                float moveDistance = 0f;
 
                 switch (alignMode)
                 {
                     case AlignMode.Left:
-                        worldPosition.x = referenceBounds.min.x - boundsOffset.x;
+                    case AlignMode.Bottom:
+                    case AlignMode.Front:
+                    case AlignMode.CameraLeft:
+                    case AlignMode.CameraBottom:
+                    case AlignMode.CameraFront:
+                        moveDistance = refMin - objMin;
                         break;
                     case AlignMode.Right:
-                        worldPosition.x = referenceBounds.max.x - boundsOffset.x;
-                        break;
                     case AlignMode.Top:
-                        worldPosition.y = referenceBounds.max.y - boundsOffset.y;
-                        break;
-                    case AlignMode.Bottom:
-                        worldPosition.y = referenceBounds.min.y - boundsOffset.y;
-                        break;
-                    case AlignMode.Front:
-                        worldPosition.z = referenceBounds.min.z - boundsOffset.z;
-                        break;
                     case AlignMode.Back:
-                        worldPosition.z = referenceBounds.max.z - boundsOffset.z;
+                    case AlignMode.CameraRight:
+                    case AlignMode.CameraTop:
+                    case AlignMode.CameraBack:
+                        moveDistance = refMax - objMax;
                         break;
                     case AlignMode.HorizontalCenter:
-                        worldPosition.x = referenceBounds.center.x - boundsOffset.x;
-                        break;
                     case AlignMode.VerticalCenter:
-                        worldPosition.y = referenceBounds.center.y - boundsOffset.y;
-                        break;
                     case AlignMode.DepthCenter:
-                        worldPosition.z = referenceBounds.center.z - boundsOffset.z;
-                        break;
-
-                    // 相机相对对齐模式
-                    case AlignMode.CameraLeft:
-                        {
-                            // 计算对象中心在相机右方向上的投影
-                            float objProjection = Vector3.Dot(objectBounds.center, cameraRight);
-                            float refProjection = Vector3.Dot(referenceBounds.min, cameraRight);
-                            // 沿相机右方向移动对象
-                            worldPosition += cameraRight * (refProjection - objProjection);
-                        }
-                        break;
-                    case AlignMode.CameraRight:
-                        {
-                            float objProjection = Vector3.Dot(objectBounds.center, cameraRight);
-                            float refProjection = Vector3.Dot(referenceBounds.max, cameraRight);
-                            worldPosition += cameraRight * (refProjection - objProjection);
-                        }
-                        break;
-                    case AlignMode.CameraTop:
-                        {
-                            float objProjection = Vector3.Dot(objectBounds.center, cameraUp);
-                            float refProjection = Vector3.Dot(referenceBounds.max, cameraUp);
-                            worldPosition += cameraUp * (refProjection - objProjection);
-                        }
-                        break;
-                    case AlignMode.CameraBottom:
-                        {
-                            float objProjection = Vector3.Dot(objectBounds.center, cameraUp);
-                            float refProjection = Vector3.Dot(referenceBounds.min, cameraUp);
-                            worldPosition += cameraUp * (refProjection - objProjection);
-                        }
-                        break;
-                    case AlignMode.CameraFront:
-                        {
-                            float objProjection = Vector3.Dot(objectBounds.center, cameraForward);
-                            float refProjection = Vector3.Dot(referenceBounds.min, cameraForward);
-                            worldPosition += cameraForward * (refProjection - objProjection);
-                        }
-                        break;
-                    case AlignMode.CameraBack:
-                        {
-                            float objProjection = Vector3.Dot(objectBounds.center, cameraForward);
-                            float refProjection = Vector3.Dot(referenceBounds.max, cameraForward);
-                            worldPosition += cameraForward * (refProjection - objProjection);
-                        }
-                        break;
                     case AlignMode.CameraHorizontalCenter:
-                        {
-                            float objProjection = Vector3.Dot(objectBounds.center, cameraRight);
-                            float refProjection = Vector3.Dot(referenceBounds.center, cameraRight);
-                            worldPosition += cameraRight * (refProjection - objProjection);
-                        }
-                        break;
                     case AlignMode.CameraVerticalCenter:
-                        {
-                            float objProjection = Vector3.Dot(objectBounds.center, cameraUp);
-                            float refProjection = Vector3.Dot(referenceBounds.center, cameraUp);
-                            worldPosition += cameraUp * (refProjection - objProjection);
-                        }
-                        break;
                     case AlignMode.CameraDepthCenter:
-                        {
-                            float objProjection = Vector3.Dot(objectBounds.center, cameraForward);
-                            float refProjection = Vector3.Dot(referenceBounds.center, cameraForward);
-                            worldPosition += cameraForward * (refProjection - objProjection);
-                        }
+                        moveDistance = refCenter - objCenter;
                         break;
                 }
 
-                // 始终设置世界坐标，Unity会自动处理局部坐标转换
-                transform.position = worldPosition;
+                if (Mathf.Abs(moveDistance) > ProjectionEpsilon)
+                    transform.position += axis * moveDistance;
             }
 
-            MarkScenesDirty(selectedObjects);
+            FinalizeTransformChanges(selectedObjects);
             lastResultSummary = $"对齐完成: {selectedObjects.Length} 个对象 | 模式 {alignMode} | 参考 {alignReference}";
-            lastResultDetail = BuildTransformResultDetail(selectedObjects);
+            lastResultDetail = BuildTransformChangeReport(selectedObjects, beforeSnapshots);
 
             if (showSuccessDialogs)
                 EditorUtility.DisplayDialog("成功", $"✓ 成功对齐 {selectedObjects.Length} 个对象！", "确定");
@@ -614,6 +1037,15 @@ namespace ES
                 return;
             }
 
+            if (!ValidateCoordinateMode(selectedObjects, IsCameraDistributeMode(distributeMode)))
+                return;
+
+            if (previewMode)
+            {
+                PreviewDistributeObjects();
+                return;
+            }
+
             if (!ConfirmTransformOperation("确认执行分布", "分布", selectedObjects))
                 return;
 
@@ -622,6 +1054,7 @@ namespace ES
                 ClearDistributionPreview();
 
             Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Distribute Objects");
+            var beforeSnapshots = CaptureTransformSnapshots(selectedObjects);
 
             var transforms = selectedObjects.Select(obj => obj.transform).ToList();
             
@@ -651,9 +1084,9 @@ namespace ES
                     break;
             }
 
-            MarkScenesDirty(selectedObjects);
+            FinalizeTransformChanges(selectedObjects);
             lastResultSummary = $"分布完成: {selectedObjects.Length} 个对象 | 模式 {distributeMode} | 反向 {(reverseOrder ? "是" : "否")}";
-            lastResultDetail = BuildTransformResultDetail(selectedObjects);
+            lastResultDetail = BuildTransformChangeReport(selectedObjects, beforeSnapshots);
 
             if (showSuccessDialogs)
                 EditorUtility.DisplayDialog("成功", $"✓ 成功分布 {selectedObjects.Length} 个对象！", "确定");
@@ -673,97 +1106,9 @@ namespace ES
                 totalBounds.Encapsulate(GetObjectBounds(transform));
             }
 
-            float startPos = 0f, endPos = 0f;
-            Vector3 axis = Vector3.zero;
-
-            switch (distributeMode)
-            {
-                case DistributeMode.HorizontalEven:
-                    startPos = totalBounds.min.x;
-                    endPos = totalBounds.max.x;
-                    axis = Vector3.right;
-                    break;
-                case DistributeMode.VerticalEven:
-                    startPos = totalBounds.min.y;
-                    endPos = totalBounds.max.y;
-                    axis = Vector3.up;
-                    break;
-                case DistributeMode.DepthEven:
-                    startPos = totalBounds.min.z;
-                    endPos = totalBounds.max.z;
-                    axis = Vector3.forward;
-                    break;
-                case DistributeMode.CameraHorizontalEven:
-                    {
-                        Vector3 cameraRight = GetCameraRightVector();
-                        axis = cameraRight;
-                        // 计算边界在相机轴上的投影
-                        Vector3[] corners = new Vector3[8];
-                        corners[0] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[1] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[2] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[3] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[4] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[5] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[6] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.max.z);
-                        corners[7] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.max.z);
-                        startPos = float.MaxValue;
-                        endPos = float.MinValue;
-                        foreach (var corner in corners)
-                        {
-                            float proj = Vector3.Dot(corner, axis);
-                            startPos = Mathf.Min(startPos, proj);
-                            endPos = Mathf.Max(endPos, proj);
-                        }
-                    }
-                    break;
-                case DistributeMode.CameraVerticalEven:
-                    {
-                        Vector3 cameraUp = GetCameraUpVector();
-                        axis = cameraUp;
-                        Vector3[] corners = new Vector3[8];
-                        corners[0] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[1] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[2] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[3] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[4] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[5] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[6] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.max.z);
-                        corners[7] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.max.z);
-                        startPos = float.MaxValue;
-                        endPos = float.MinValue;
-                        foreach (var corner in corners)
-                        {
-                            float proj = Vector3.Dot(corner, axis);
-                            startPos = Mathf.Min(startPos, proj);
-                            endPos = Mathf.Max(endPos, proj);
-                        }
-                    }
-                    break;
-                case DistributeMode.CameraDepthEven:
-                    {
-                        Vector3 cameraForward = GetCameraForwardVector();
-                        axis = cameraForward;
-                        Vector3[] corners = new Vector3[8];
-                        corners[0] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[1] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[2] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[3] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[4] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[5] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[6] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.max.z);
-                        corners[7] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.max.z);
-                        startPos = float.MaxValue;
-                        endPos = float.MinValue;
-                        foreach (var corner in corners)
-                        {
-                            float proj = Vector3.Dot(corner, axis);
-                            startPos = Mathf.Min(startPos, proj);
-                            endPos = Mathf.Max(endPos, proj);
-                        }
-                    }
-                    break;
-            }
+            Vector3 axis = GetDistributeAxis(distributeMode, transforms);
+            axis.Normalize();
+            GetBoundsProjection(totalBounds, axis, out float startPos, out float endPos);
 
             float totalDistance = endPos - startPos;
             if (totalDistance <= 0 || transforms.Count <= 1) return;
@@ -775,26 +1120,7 @@ namespace ES
             foreach (var t in transforms)
             {
                 var bounds = GetObjectBounds(t);
-                // 计算该对象在指定轴上的投影尺寸
-                Vector3[] corners = new Vector3[8];
-                corners[0] = new Vector3(bounds.min.x, bounds.min.y, bounds.min.z);
-                corners[1] = new Vector3(bounds.max.x, bounds.min.y, bounds.min.z);
-                corners[2] = new Vector3(bounds.min.x, bounds.max.y, bounds.min.z);
-                corners[3] = new Vector3(bounds.max.x, bounds.max.y, bounds.min.z);
-                corners[4] = new Vector3(bounds.min.x, bounds.min.y, bounds.max.z);
-                corners[5] = new Vector3(bounds.max.x, bounds.min.y, bounds.max.z);
-                corners[6] = new Vector3(bounds.min.x, bounds.max.y, bounds.max.z);
-                corners[7] = new Vector3(bounds.max.x, bounds.max.y, bounds.max.z);
-                
-                float minProj = float.MaxValue;
-                float maxProj = float.MinValue;
-                foreach (var corner in corners)
-                {
-                    float proj = Vector3.Dot(corner, axis);
-                    minProj = Mathf.Min(minProj, proj);
-                    maxProj = Mathf.Max(maxProj, proj);
-                }
-                
+                GetBoundsProjection(bounds, axis, out float minProj, out float maxProj);
                 float size = maxProj - minProj;
                 objectSizesOnAxis.Add(size);
                 totalObjectSize += size;
@@ -805,56 +1131,21 @@ namespace ES
             if (availableSpace < 0) availableSpace = 0;
             
             float spacing = (transforms.Count > 1) ? availableSpace / (transforms.Count - 1) : 0;
-            
-            // 找到当前所有对象在轴上的投影范围
-            float currentMinProj = float.MaxValue;
-            float currentMaxProj = float.MinValue;
-            foreach (var t in transforms)
-            {
-                var bounds = GetObjectBounds(t);
-                Vector3[] corners = new Vector3[8];
-                corners[0] = new Vector3(bounds.min.x, bounds.min.y, bounds.min.z);
-                corners[1] = new Vector3(bounds.max.x, bounds.min.y, bounds.min.z);
-                corners[2] = new Vector3(bounds.min.x, bounds.max.y, bounds.min.z);
-                corners[3] = new Vector3(bounds.max.x, bounds.max.y, bounds.min.z);
-                corners[4] = new Vector3(bounds.min.x, bounds.min.y, bounds.max.z);
-                corners[5] = new Vector3(bounds.max.x, bounds.min.y, bounds.max.z);
-                corners[6] = new Vector3(bounds.min.x, bounds.max.y, bounds.max.z);
-                corners[7] = new Vector3(bounds.max.x, bounds.max.y, bounds.max.z);
-                foreach (var corner in corners)
-                {
-                    float proj = Vector3.Dot(corner, axis);
-                    currentMinProj = Mathf.Min(currentMinProj, proj);
-                    currentMaxProj = Mathf.Max(currentMaxProj, proj);
-                }
-            }
-            
-            // 计算需要的总体偏移（保持对象组的中心位置）
-            float currentCenter = (currentMinProj + currentMaxProj) * 0.5f;
-            float targetCenter = (startPos + endPos) * 0.5f;
-            float globalOffset = targetCenter - currentCenter;
-            
+
             // 在目标范围内分布对象
             float currentPos = startPos;
             for (int i = 0; i < transforms.Count; i++)
             {
                 var transform = transforms[i];
                 var bounds = GetObjectBounds(transform);
-                
-                // 计算对象中心应该在的投影位置
                 float halfSize = objectSizesOnAxis[i] * 0.5f;
                 float targetCenterProj = currentPos + halfSize;
-                
-                // 计算当前对象中心在轴上的投影
-                float currentCenterProj = Vector3.Dot(bounds.center, axis);
-                
-                // 计算移动距离（目标投影位置 - 当前投影位置）
+                GetBoundsProjection(bounds, axis, out float objMin, out float objMax);
+                float currentCenterProj = (objMin + objMax) * 0.5f;
                 float moveDistance = targetCenterProj - currentCenterProj;
-                
-                // 移动对象
-                transform.position += axis * moveDistance;
-                
-                // 更新下一个对象的起始位置
+                if (Mathf.Abs(moveDistance) > ProjectionEpsilon)
+                    transform.position += axis * moveDistance;
+
                 currentPos += objectSizesOnAxis[i] + spacing;
             }
         }
@@ -870,177 +1161,38 @@ namespace ES
                 totalBounds.Encapsulate(GetObjectBounds(transform));
             }
 
-            float startPos = 0f;
-            Vector3 axis = Vector3.zero;
-
-            switch (distributeMode)
-            {
-                case DistributeMode.HorizontalSpacing:
-                    startPos = totalBounds.min.x;
-                    axis = Vector3.right;
-                    break;
-                case DistributeMode.VerticalSpacing:
-                    startPos = totalBounds.max.y; // 从上往下分布
-                    axis = -Vector3.up;
-                    break;
-                case DistributeMode.DepthSpacing:
-                    startPos = totalBounds.min.z;
-                    axis = Vector3.forward;
-                    break;
-                case DistributeMode.CameraHorizontalSpacing:
-                    {
-                        Vector3 cameraRight = GetCameraRightVector();
-                        axis = cameraRight;
-                        // 计算边界在相机轴上的投影范围
-                        Vector3[] corners = new Vector3[8];
-                        corners[0] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[1] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[2] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[3] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[4] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[5] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[6] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.max.z);
-                        corners[7] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.max.z);
-                        startPos = float.MaxValue;
-                        foreach (var corner in corners)
-                        {
-                            startPos = Mathf.Min(startPos, Vector3.Dot(corner, axis));
-                        }
-                    }
-                    break;
-                case DistributeMode.CameraVerticalSpacing:
-                    {
-                        Vector3 cameraUp = GetCameraUpVector();
-                        axis = cameraUp;
-                        Vector3[] corners = new Vector3[8];
-                        corners[0] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[1] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[2] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[3] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[4] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[5] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[6] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.max.z);
-                        corners[7] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.max.z);
-                        startPos = float.MinValue;
-                        foreach (var corner in corners)
-                        {
-                            startPos = Mathf.Max(startPos, Vector3.Dot(corner, axis));
-                        }
-                        axis = -cameraUp; // 垂直方向从上往下
-                    }
-                    break;
-                case DistributeMode.CameraDepthSpacing:
-                    {
-                        Vector3 cameraForward = GetCameraForwardVector();
-                        axis = cameraForward;
-                        Vector3[] corners = new Vector3[8];
-                        corners[0] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[1] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.min.z);
-                        corners[2] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[3] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.min.z);
-                        corners[4] = new Vector3(totalBounds.min.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[5] = new Vector3(totalBounds.max.x, totalBounds.min.y, totalBounds.max.z);
-                        corners[6] = new Vector3(totalBounds.min.x, totalBounds.max.y, totalBounds.max.z);
-                        corners[7] = new Vector3(totalBounds.max.x, totalBounds.max.y, totalBounds.max.z);
-                        startPos = float.MaxValue;
-                        foreach (var corner in corners)
-                        {
-                            startPos = Mathf.Min(startPos, Vector3.Dot(corner, axis));
-                        }
-                    }
-                    break;
-            }
+            Vector3 axis = GetDistributeAxis(distributeMode, transforms);
+            axis.Normalize();
+            GetBoundsProjection(totalBounds, axis, out float startPos, out _);
 
             // 计算每个对象在指定轴上的投影尺寸
             List<float> objectSizes = new List<float>();
-            float totalObjectSize = 0f;
 
             foreach (var transform in transforms)
             {
                 var bounds = GetObjectBounds(transform);
-                // 计算边界框在指定轴上的投影长度
-                Vector3[] corners = new Vector3[8];
-                corners[0] = new Vector3(bounds.min.x, bounds.min.y, bounds.min.z);
-                corners[1] = new Vector3(bounds.max.x, bounds.min.y, bounds.min.z);
-                corners[2] = new Vector3(bounds.min.x, bounds.max.y, bounds.min.z);
-                corners[3] = new Vector3(bounds.max.x, bounds.max.y, bounds.min.z);
-                corners[4] = new Vector3(bounds.min.x, bounds.min.y, bounds.max.z);
-                corners[5] = new Vector3(bounds.max.x, bounds.min.y, bounds.max.z);
-                corners[6] = new Vector3(bounds.min.x, bounds.max.y, bounds.max.z);
-                corners[7] = new Vector3(bounds.max.x, bounds.max.y, bounds.max.z);
-                
-                float minProj = float.MaxValue;
-                float maxProj = float.MinValue;
-                foreach (var corner in corners)
-                {
-                    float proj = Vector3.Dot(corner, axis);
-                    minProj = Mathf.Min(minProj, proj);
-                    maxProj = Mathf.Max(maxProj, proj);
-                }
-                
+                GetBoundsProjection(bounds, axis, out float minProj, out float maxProj);
                 float size = maxProj - minProj;
                 objectSizes.Add(size);
-                totalObjectSize += size;
             }
 
             // 计算间距：直接使用用户设定的间距值
             float spacing = distributionSpacing;
 
-            // 从第一个对象开始分布，基于实际世界位置
-            if (transforms.Count == 0) return;
-            
-            // 获取第一个对象的边界和中心
-            var firstBounds = GetObjectBounds(transforms[0]);
-            Vector3 firstCenter = firstBounds.center;
-            
-            // 检查是否为反向轴（垂直向下的情况）
-            bool isReverseAxis = (distributeMode == DistributeMode.VerticalSpacing || 
-                                  distributeMode == DistributeMode.CameraVerticalSpacing);
-            
-            // 计算第一个对象在轴上的边缘位置作为起点
-            float firstEdgeOffset;
-            if (isReverseAxis)
-            {
-                // 垂直模式：从对象上边缘开始
-                firstEdgeOffset = objectSizes[0] * 0.5f;
-            }
-            else
-            {
-                // 水平/深度模式：从对象左/前边缘开始
-                firstEdgeOffset = -objectSizes[0] * 0.5f;
-            }
-            
-            // 起始参考点
-            Vector3 startReference = firstCenter + axis * firstEdgeOffset;
-            float accumulatedOffset = 0f;
+            float currentPos = startPos;
 
             for (int i = 0; i < transforms.Count; i++)
             {
                 var transform = transforms[i];
                 var bounds = GetObjectBounds(transform);
-                
-                // 计算该对象应该的中心位置偏移
-                float centerOffset;
-                if (isReverseAxis)
-                {
-                    // 垂直：从上往下排列
-                    centerOffset = -(accumulatedOffset + objectSizes[i] * 0.5f);
-                }
-                else
-                {
-                    // 水平/深度：从左往右/从前往后排列  
-                    centerOffset = accumulatedOffset + objectSizes[i] * 0.5f;
-                }
-                
-                // 计算目标位置
-                Vector3 targetCenter = startReference + axis * centerOffset;
-                
-                // 移动对象到目标位置
-                Vector3 moveOffset = targetCenter - bounds.center;
-                transform.position += moveOffset;
-                
-                // 累计偏移（对象尺寸 + 间距）
-                accumulatedOffset += objectSizes[i] + spacing;
+                GetBoundsProjection(bounds, axis, out float objMin, out float objMax);
+                float targetCenterProj = currentPos + objectSizes[i] * 0.5f;
+                float currentCenterProj = (objMin + objMax) * 0.5f;
+                float moveDistance = targetCenterProj - currentCenterProj;
+                if (Mathf.Abs(moveDistance) > ProjectionEpsilon)
+                    transform.position += axis * moveDistance;
+
+                currentPos += objectSizes[i] + spacing;
             }
         }
 
@@ -1048,51 +1200,19 @@ namespace ES
         {
             if (!maintainOrder) return;
 
-            switch (distributeMode)
-            {
-                case DistributeMode.HorizontalEven:
-                case DistributeMode.HorizontalSpacing:
-                    transforms.Sort((a, b) => a.position.x.CompareTo(b.position.x));
-                    break;
-                case DistributeMode.VerticalEven:
-                case DistributeMode.VerticalSpacing:
-                    transforms.Sort((a, b) => b.position.y.CompareTo(a.position.y));
-                    break;
-                case DistributeMode.DepthEven:
-                case DistributeMode.DepthSpacing:
-                    transforms.Sort((a, b) => a.position.z.CompareTo(b.position.z));
-                    break;
-                case DistributeMode.CameraHorizontalEven:
-                case DistributeMode.CameraHorizontalSpacing:
-                    {
-                        Vector3 cameraRight = GetCameraRightVector();
-                        transforms.Sort((a, b) => Vector3.Dot(a.position, cameraRight).CompareTo(Vector3.Dot(b.position, cameraRight)));
-                    }
-                    break;
-                case DistributeMode.CameraVerticalEven:
-                case DistributeMode.CameraVerticalSpacing:
-                    {
-                        Vector3 cameraUp = GetCameraUpVector();
-                        transforms.Sort((a, b) => Vector3.Dot(b.position, cameraUp).CompareTo(Vector3.Dot(a.position, cameraUp)));
-                    }
-                    break;
-                case DistributeMode.CameraDepthEven:
-                case DistributeMode.CameraDepthSpacing:
-                    {
-                        Vector3 cameraForward = GetCameraForwardVector();
-                        transforms.Sort((a, b) => Vector3.Dot(a.position, cameraForward).CompareTo(Vector3.Dot(b.position, cameraForward)));
-                    }
-                    break;
-            }
+            Vector3 axis = GetDistributeAxis(distributeMode, transforms);
+            axis.Normalize();
+            transforms.Sort((a, b) =>
+                Vector3.Dot(GetObjectBounds(a).center, axis).CompareTo(Vector3.Dot(GetObjectBounds(b).center, axis)));
         }
         #endregion
 
         #region 动态间距调整
         [InfoBox("🎚️ 动态间距调整：实时控制对象间距\n" +
                 "• 实时预览：拖动滑条即时看到效果\n" +
-                "• 拖动会直接写入 Transform，并已记录 Undo\n" +
+                "• 拖动会基于预览前位置重算，不会叠加漂移\n" +
                 "• 仅间距模式：仅在间距分布模式下工作\n" +
-                "• 撤销支持：可通过Ctrl+Z撤销", InfoMessageType.Info)]
+                "• 满意后应用预览，不满意可一键清除", InfoMessageType.Info)]
         [PropertySpace(5)]
         
         private void OnDistributeModeChanged()
@@ -1123,12 +1243,27 @@ namespace ES
             var selectedObjects = GetValidSelection();
             if (selectedObjects.Length < 2) return;
 
-            // 清除之前的预览
-            if (isPreviewing)
+            if (!ValidateCoordinateMode(selectedObjects, IsCameraDistributeMode(distributeMode)))
+                return;
+
+            if (isPreviewing && !IsSamePreviewSelection(selectedObjects))
                 ClearDistributionPreview();
 
-            // 记录撤销操作（仅在值真正改变时）
-            Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Dynamic Spacing Adjustment");
+            if (!isPreviewing)
+            {
+                originalPositions.Clear();
+                foreach (var obj in selectedObjects)
+                    originalPositions[obj.transform] = obj.transform.position;
+
+                Undo.SetCurrentGroupName("Dynamic Spacing Preview");
+                previewUndoGroup = Undo.GetCurrentGroup();
+                Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Dynamic Spacing Preview");
+                isPreviewing = true;
+            }
+            else
+            {
+                RestorePreviewPositions(false);
+            }
 
             // 更新distributionSpacing为当前滑条值
             distributionSpacing = dynamicSpacing;
@@ -1143,13 +1278,13 @@ namespace ES
             try
             {
                 DistributeWithSpacing(transforms);
-                MarkScenesDirty(selectedObjects);
+                lastResultSummary = $"动态间距预览: {selectedObjects.Length} 个对象 | 间距 {distributionSpacing:F2}";
+                lastResultDetail = "拖动只刷新预览；满意后点击“应用预览”，否则点击“清除预览”。\n" + BuildTransformResultDetail(selectedObjects);
             }
             catch (System.Exception e)
             {
                 Debug.LogWarning($"动态间距调整出错: {e.Message}");
-                // 出错时恢复原始位置
-                Undo.PerformUndo();
+                RestorePreviewPositions(false);
             }
         }
 
@@ -1158,32 +1293,18 @@ namespace ES
             var selectedObjects = GetValidSelection();
             if (selectedObjects.Length < 2) return 1f;
 
-            // 计算所有对象的平均尺寸
+            // 计算所有对象在当前分布轴上的平均尺寸
             float totalSize = 0f;
             int axisCount = 0;
+            Vector3 axis = GetDistributeAxis(distributeMode, selectedObjects.Select(obj => obj.transform).ToArray());
+            axis.Normalize();
 
             foreach (var obj in selectedObjects)
             {
                 var bounds = GetObjectBounds(obj.transform);
-                
-                switch (distributeMode)
-                {
-                    case DistributeMode.HorizontalSpacing:
-                    case DistributeMode.CameraHorizontalSpacing:
-                        totalSize += bounds.size.x;
-                        axisCount++;
-                        break;
-                    case DistributeMode.VerticalSpacing:
-                    case DistributeMode.CameraVerticalSpacing:
-                        totalSize += bounds.size.y;
-                        axisCount++;
-                        break;
-                    case DistributeMode.DepthSpacing:
-                    case DistributeMode.CameraDepthSpacing:
-                        totalSize += bounds.size.z;
-                        axisCount++;
-                        break;
-                }
+                GetBoundsProjection(bounds, axis, out float minProj, out float maxProj);
+                totalSize += maxProj - minProj;
+                axisCount++;
             }
 
             if (axisCount == 0) return 1f;
@@ -1207,6 +1328,9 @@ namespace ES
                 return;
             }
 
+            if (!ValidateCoordinateMode(selectedObjects, IsCameraDistributeMode(distributeMode)))
+                return;
+
             // 如果已经在预览，先清除
             if (isPreviewing)
                 ClearDistributionPreview();
@@ -1215,7 +1339,7 @@ namespace ES
             originalPositions.Clear();
             foreach (var obj in selectedObjects)
             {
-                originalPositions[obj.transform] = IsWorldSpace() ? obj.transform.position : obj.transform.localPosition;
+                originalPositions[obj.transform] = obj.transform.position;
             }
 
             // 执行预览分布
@@ -1250,7 +1374,6 @@ namespace ES
             }
 
             isPreviewing = true;
-            MarkScenesDirty(selectedObjects);
             lastResultSummary = $"分布预览已生成: {selectedObjects.Length} 个对象 | 模式 {distributeMode}";
             lastResultDetail = BuildTransformResultDetail(selectedObjects);
             EditorUtility.DisplayDialog("预览已生成", "对象已临时移动用于预览。\n点击“应用预览”保留效果，点击“清除预览”还原位置。", "知道了");
@@ -1262,20 +1385,9 @@ namespace ES
 
             // 恢复原始位置
             Undo.SetCurrentGroupName("Clear Distribution Preview");
-            foreach (var kvp in originalPositions)
-            {
-                if (kvp.Key != null)
-                {
-                    Undo.RecordObject(kvp.Key, "Clear Distribution Preview");
-                    if (IsWorldSpace())
-                        kvp.Key.position = kvp.Value;
-                    else
-                        kvp.Key.localPosition = kvp.Value;
-                    EditorUtility.SetDirty(kvp.Key);
-                }
-            }
+            RestorePreviewPositions(true);
 
-            MarkScenesDirty(originalPositions.Keys
+            FinalizeTransformChanges(originalPositions.Keys
                 .Where(transform => transform != null)
                 .Select(transform => transform.gameObject));
 
@@ -1290,16 +1402,31 @@ namespace ES
         {
             if (!isPreviewing) return;
 
-            var selectedObjects = GetValidSelection();
+            var selectedObjects = originalPositions.Keys
+                .Where(transform => transform != null)
+                .Select(transform => transform.gameObject)
+                .ToArray();
             if (previewUndoGroup >= 0)
                 Undo.CollapseUndoOperations(previewUndoGroup);
+
+            var beforeSnapshots = originalPositions
+                .Where(kvp => kvp.Key != null)
+                .ToDictionary(kvp => kvp.Key, kvp => new TransformChangeSnapshot
+                {
+                    Position = kvp.Value,
+                    LocalPosition = kvp.Key.localPosition,
+                    LocalScale = kvp.Key.localScale,
+                    Rotation = kvp.Key.rotation,
+                    RectSize = kvp.Key is RectTransform rect ? rect.rect.size : Vector2.zero,
+                    IsRectTransform = kvp.Key is RectTransform
+                });
 
             originalPositions.Clear();
             isPreviewing = false;
             previewUndoGroup = -1;
-            MarkScenesDirty(selectedObjects);
+            FinalizeTransformChanges(selectedObjects);
             lastResultSummary = $"分布预览已应用: {selectedObjects.Length} 个对象 | 模式 {distributeMode}";
-            lastResultDetail = BuildTransformResultDetail(selectedObjects);
+            lastResultDetail = BuildTransformChangeReport(selectedObjects, beforeSnapshots);
 
             if (showSuccessDialogs)
                 EditorUtility.DisplayDialog("成功", "✓ 预览效果已应用！", "确定");
@@ -1338,11 +1465,6 @@ namespace ES
                 return;
             }
 
-            if (!ConfirmTransformOperation("确认执行尺寸匹配", "匹配", selectedObjects, 1))
-                return;
-
-            Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Match Objects");
-
             GameObject referenceObject = GetReferenceObject(selectedObjects);
             if (referenceObject == null)
             {
@@ -1350,13 +1472,29 @@ namespace ES
                 return;
             }
 
+            var targetObjects = selectedObjects
+                .Where(obj => obj != null && obj != referenceObject)
+                .ToArray();
+
+            if (targetObjects.Length == 0)
+            {
+                EditorUtility.DisplayDialog("尺寸匹配提示",
+                    "❌ 没有可处理的目标对象\n\n当前参考对象占用了全部有效选区，请再选择至少一个目标对象。",
+                    "确定");
+                return;
+            }
+
+            if (!ConfirmTransformOperation("确认执行尺寸匹配", $"匹配到参考对象 {referenceObject.name}", targetObjects))
+                return;
+
+            Undo.RecordObjects(targetObjects.Select(obj => obj.transform).ToArray(), "Match Objects");
+            var beforeSnapshots = CaptureTransformSnapshots(targetObjects);
+
             var referenceBounds = GetObjectBounds(referenceObject.transform);
             var referenceTransform = referenceObject.transform;
 
-            foreach (var obj in selectedObjects)
+            foreach (var obj in targetObjects)
             {
-                if (obj == referenceObject) continue;
-
                 var transform = obj.transform;
                 var rectTransform = transform as RectTransform;
                 var referenceRect = referenceTransform as RectTransform;
@@ -1427,21 +1565,371 @@ namespace ES
                 }
             }
 
-            MarkScenesDirty(selectedObjects);
-            lastResultSummary = $"尺寸匹配完成: {selectedObjects.Length - 1} 个目标 | 参考 {referenceObject.name}";
-            lastResultDetail = BuildTransformResultDetail(selectedObjects);
+            FinalizeTransformChanges(targetObjects);
+            lastResultSummary = $"尺寸匹配完成: {targetObjects.Length} 个目标 | 参考 {referenceObject.name}";
+            lastResultDetail = $"参考对象: {referenceObject.name}\n" + BuildTransformChangeReport(targetObjects, beforeSnapshots);
 
             if (showSuccessDialogs)
-                EditorUtility.DisplayDialog("成功", $"✓ 成功匹配 {selectedObjects.Length - 1} 个对象到参考对象！", "确定");
+                EditorUtility.DisplayDialog("成功", $"✓ 成功匹配 {targetObjects.Length} 个对象到参考对象！", "确定");
             
             if (selectAfterAlign)
                 Selection.objects = selectedObjects;
         }
         #endregion
 
+        #region 布景整理执行
+        private void ExecuteSnapToSurface()
+        {
+            var selectedObjects = GetValidSelection();
+            if (selectedObjects.Length == 0)
+            {
+                EditorUtility.DisplayDialog("表面吸附提示", "请先选择至少一个要吸附的对象。", "确定");
+                return;
+            }
+
+            if (!ValidateSurfaceSettings())
+                return;
+
+            var hittableObjects = selectedObjects
+                .Where(obj => obj != null && TryFindSurfaceHit(obj, selectedObjects, out _))
+                .ToArray();
+
+            if (hittableObjects.Length == 0)
+            {
+                EditorUtility.DisplayDialog("表面吸附提示",
+                    "当前选区没有对象能命中表面。\n\n请检查射线层、检测距离，或确认目标表面带有 3D Collider。\n当前表面吸附使用 Physics.RaycastAll，不处理 Collider2D。",
+                    "确定");
+                return;
+            }
+
+            if (!ConfirmTransformOperation("确认吸附到表面", "吸附到表面", hittableObjects))
+                return;
+
+            Undo.RecordObjects(hittableObjects.Select(obj => obj.transform).ToArray(), "Snap Selection To Surface");
+            var beforeSnapshots = CaptureTransformSnapshots(hittableObjects);
+
+            var failed = new List<string>();
+            foreach (var obj in hittableObjects)
+            {
+                if (!TryFindSurfaceHit(obj, selectedObjects, out var hit))
+                {
+                    failed.Add(obj.name);
+                    continue;
+                }
+
+                var transform = obj.transform;
+                var bounds = GetObjectBounds(transform);
+                GetBoundsProjection(bounds, Vector3.up, out float bottom, out _);
+                float bottomOffset = Vector3.Dot(transform.position, Vector3.up) - bottom;
+                var targetPosition = transform.position;
+                targetPosition.y = hit.point.y + bottomOffset + surfaceOffset;
+                transform.position = targetPosition;
+
+                if (alignToSurfaceNormal && hit.normal.sqrMagnitude > ProjectionEpsilon)
+                    transform.rotation = Quaternion.FromToRotation(transform.up, hit.normal.normalized) * transform.rotation;
+            }
+
+            FinalizeTransformChanges(hittableObjects);
+            lastResultSummary = $"表面吸附完成: {hittableObjects.Length - failed.Count}/{hittableObjects.Length} 个对象";
+            lastResultDetail = BuildTransformChangeReport(hittableObjects, beforeSnapshots) +
+                               (failed.Count > 0 ? "\n\n失败:\n" + string.Join("\n", failed) : "");
+        }
+
+        private void ExecuteGridSnap()
+        {
+            var selectedObjects = GetValidSelection();
+            if (selectedObjects.Length == 0)
+            {
+                EditorUtility.DisplayDialog("网格吸附提示", "请先选择至少一个对象。", "确定");
+                return;
+            }
+
+            if (!IsFinite(gridSize) || gridSize.x <= 0f || gridSize.y <= 0f || gridSize.z <= 0f)
+            {
+                EditorUtility.DisplayDialog("网格吸附提示", "网格尺寸必须大于 0。", "确定");
+                return;
+            }
+
+            if (!snapGridX && !snapGridY && !snapGridZ)
+            {
+                EditorUtility.DisplayDialog("网格吸附提示", "请至少勾选一个吸附轴。", "确定");
+                return;
+            }
+
+            if (!ConfirmTransformOperation("确认网格吸附", "网格吸附", selectedObjects))
+                return;
+
+            Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Snap Selection To Grid");
+            var beforeSnapshots = CaptureTransformSnapshots(selectedObjects);
+
+            foreach (var obj in selectedObjects)
+            {
+                var position = obj.transform.position;
+                if (snapGridX) position.x = SnapValue(position.x, gridSize.x);
+                if (snapGridY) position.y = SnapValue(position.y, gridSize.y);
+                if (snapGridZ) position.z = SnapValue(position.z, gridSize.z);
+                obj.transform.position = position;
+            }
+
+            FinalizeTransformChanges(selectedObjects);
+            lastResultSummary = $"网格吸附完成: {selectedObjects.Length} 个对象 | 网格 {gridSize}";
+            lastResultDetail = BuildTransformChangeReport(selectedObjects, beforeSnapshots);
+        }
+
+        private void ExecuteRandomDressing()
+        {
+            var selectedObjects = GetValidSelection();
+            if (selectedObjects.Length == 0)
+            {
+                EditorUtility.DisplayDialog("随机错落提示", "请先选择至少一个对象。", "确定");
+                return;
+            }
+
+            if (!ValidateRandomSettings())
+                return;
+
+            if (randomUniformScaleRange.x <= 0f || randomUniformScaleRange.y <= 0f || randomUniformScaleRange.x > randomUniformScaleRange.y)
+            {
+                EditorUtility.DisplayDialog("随机错落提示", "统一缩放范围必须大于 0，且最小值不能超过最大值。", "确定");
+                return;
+            }
+
+            if (!ConfirmTransformOperation("确认随机错落", "随机错落", selectedObjects))
+                return;
+
+            Undo.RecordObjects(selectedObjects.Select(obj => obj.transform).ToArray(), "Randomize Selection Dressing");
+            var beforeSnapshots = CaptureTransformSnapshots(selectedObjects);
+            var random = new System.Random(randomSeed);
+
+            foreach (var obj in selectedObjects)
+            {
+                var transform = obj.transform;
+                var offset = new Vector3(
+                    NextRange(random, -Mathf.Abs(randomPositionRange.x), Mathf.Abs(randomPositionRange.x)),
+                    NextRange(random, -Mathf.Abs(randomPositionRange.y), Mathf.Abs(randomPositionRange.y)),
+                    NextRange(random, -Mathf.Abs(randomPositionRange.z), Mathf.Abs(randomPositionRange.z)));
+
+                transform.position += offset;
+
+                float yaw = NextRange(random, randomYawRange.x, randomYawRange.y);
+                if (Mathf.Abs(yaw) > ProjectionEpsilon)
+                    transform.rotation = Quaternion.AngleAxis(yaw, Vector3.up) * transform.rotation;
+
+                float scaleMultiplier = NextRange(random, randomUniformScaleRange.x, randomUniformScaleRange.y);
+                if (!Mathf.Approximately(scaleMultiplier, 1f))
+                    transform.localScale *= scaleMultiplier;
+            }
+
+            FinalizeTransformChanges(selectedObjects);
+            lastResultSummary = $"随机错落完成: {selectedObjects.Length} 个对象 | 种子 {randomSeed}";
+            lastResultDetail = BuildTransformChangeReport(selectedObjects, beforeSnapshots);
+        }
+        #endregion
+
         private string BuildTransformResultDetail(IEnumerable<GameObject> selectedObjects)
         {
             return "对象:\n" + SimpleToolsSafetyUtility.JoinPreview(selectedObjects?.Select(obj => obj != null ? obj.name : null), 12);
+        }
+
+        private Dictionary<Transform, TransformChangeSnapshot> CaptureTransformSnapshots(IEnumerable<GameObject> objects)
+        {
+            var snapshots = new Dictionary<Transform, TransformChangeSnapshot>();
+            if (objects == null)
+                return snapshots;
+
+            foreach (var obj in objects)
+            {
+                if (obj == null || obj.transform == null)
+                    continue;
+
+                snapshots[obj.transform] = CaptureTransformSnapshot(obj.transform);
+            }
+            return snapshots;
+        }
+
+        private TransformChangeSnapshot CaptureTransformSnapshot(Transform transform)
+        {
+            var rect = transform as RectTransform;
+            return new TransformChangeSnapshot
+            {
+                Position = transform.position,
+                LocalPosition = transform.localPosition,
+                LocalScale = transform.localScale,
+                Rotation = transform.rotation,
+                RectSize = rect != null ? rect.rect.size : Vector2.zero,
+                IsRectTransform = rect != null
+            };
+        }
+
+        private string BuildTransformChangeReport(IEnumerable<GameObject> objects, Dictionary<Transform, TransformChangeSnapshot> beforeSnapshots)
+        {
+            if (objects == null)
+                return "没有对象。";
+
+            var detailLines = new List<string>();
+            int total = 0;
+            int moved = 0;
+            int scaled = 0;
+            int rotated = 0;
+            int resized = 0;
+            int unchanged = 0;
+
+            foreach (var obj in objects)
+            {
+                if (obj == null || obj.transform == null)
+                    continue;
+
+                total++;
+                if (beforeSnapshots == null || !beforeSnapshots.TryGetValue(obj.transform, out var before))
+                    continue;
+
+                var after = CaptureTransformSnapshot(obj.transform);
+                bool positionChanged = (after.Position - before.Position).sqrMagnitude > ProjectionEpsilon;
+                bool scaleChanged = (after.LocalScale - before.LocalScale).sqrMagnitude > ProjectionEpsilon;
+                bool rotationChanged = Quaternion.Angle(after.Rotation, before.Rotation) > 0.01f;
+                bool rectChanged = after.IsRectTransform && (after.RectSize - before.RectSize).sqrMagnitude > ProjectionEpsilon;
+
+                if (positionChanged) moved++;
+                if (scaleChanged) scaled++;
+                if (rotationChanged) rotated++;
+                if (rectChanged) resized++;
+                if (!positionChanged && !scaleChanged && !rotationChanged && !rectChanged)
+                {
+                    unchanged++;
+                    continue;
+                }
+
+                if (detailLines.Count < 12)
+                {
+                    var changes = new List<string>();
+                    if (positionChanged) changes.Add($"Pos {before.Position.ToString("F2")} -> {after.Position.ToString("F2")}");
+                    if (scaleChanged) changes.Add($"Scale {before.LocalScale.ToString("F2")} -> {after.LocalScale.ToString("F2")}");
+                    if (rotationChanged) changes.Add($"Rot {before.Rotation.eulerAngles.ToString("F1")} -> {after.Rotation.eulerAngles.ToString("F1")}");
+                    if (rectChanged) changes.Add($"Size {before.RectSize.ToString("F1")} -> {after.RectSize.ToString("F1")}");
+                    detailLines.Add($"{GetHierarchyPath(obj.transform)} | {string.Join("；", changes)}");
+                }
+            }
+
+            string summary = $"变更统计: 对象 {total} | 移动 {moved} | 缩放 {scaled} | 旋转 {rotated} | UI尺寸 {resized} | 未变化 {unchanged}";
+            if (detailLines.Count == 0)
+                return summary + "\n没有检测到 Transform 变化。";
+
+            return summary + "\n\n变更明细:\n" + string.Join("\n", detailLines);
+        }
+
+        private bool TryFindSurfaceHit(GameObject obj, IReadOnlyCollection<GameObject> currentSelection, out RaycastHit hit)
+        {
+            hit = default;
+            if (obj == null)
+                return false;
+
+            var bounds = GetObjectBounds(obj.transform);
+            var origin = bounds.center + Vector3.up * surfaceCastHeight;
+            var ray = new Ray(origin, Vector3.down);
+            var hits = Physics.RaycastAll(ray, surfaceCastHeight + surfaceCastDistance, surfaceLayerMask, QueryTriggerInteraction.Ignore)
+                .OrderBy(item => item.distance);
+
+            foreach (var candidate in hits)
+            {
+                if (candidate.collider == null)
+                    continue;
+
+                if (ignoreSelfColliders && IsSameObjectHierarchy(candidate.collider.transform, obj.transform))
+                    continue;
+
+                if (ignoreSelectionColliders && IsColliderInsideSelection(candidate.collider.transform, currentSelection, obj))
+                    continue;
+
+                hit = candidate;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool IsColliderInsideSelection(Transform colliderTransform, IReadOnlyCollection<GameObject> currentSelection, GameObject owner)
+        {
+            if (colliderTransform == null || currentSelection == null)
+                return false;
+
+            foreach (var selected in currentSelection)
+            {
+                if (selected == null || selected == owner)
+                    continue;
+
+                if (colliderTransform.IsChildOf(selected.transform))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool IsSameObjectHierarchy(Transform colliderTransform, Transform objectTransform)
+        {
+            if (colliderTransform == null || objectTransform == null)
+                return false;
+
+            return colliderTransform == objectTransform ||
+                   colliderTransform.IsChildOf(objectTransform) ||
+                   objectTransform.IsChildOf(colliderTransform);
+        }
+
+        private float SnapValue(float value, float grid)
+        {
+            if (grid <= 0f)
+                return value;
+            return Mathf.Round(value / grid) * grid;
+        }
+
+        private float NextRange(System.Random random, float min, float max)
+        {
+            if (random == null)
+                return min;
+            if (max < min)
+            {
+                float temp = min;
+                min = max;
+                max = temp;
+            }
+            return min + (float)random.NextDouble() * (max - min);
+        }
+
+        private bool ValidateSurfaceSettings()
+        {
+            if (!IsFinite(surfaceCastHeight) || !IsFinite(surfaceCastDistance) || !IsFinite(surfaceOffset) ||
+                surfaceCastHeight <= 0f || surfaceCastDistance <= 0f)
+            {
+                EditorUtility.DisplayDialog("表面吸附提示", "上方起点、检测距离必须是大于 0 的有效数字，表面偏移也必须是有效数字。", "确定");
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool ValidateRandomSettings()
+        {
+            if (!IsFinite(randomPositionRange) || !IsFinite(randomYawRange) || !IsFinite(randomUniformScaleRange))
+            {
+                EditorUtility.DisplayDialog("随机错落提示", "随机参数里存在无效数字，请检查位置扰动、旋转范围和缩放范围。", "确定");
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsFinite(Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        private bool IsFinite(Vector2 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y);
+        }
+
+        private bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         #region 边界计算
@@ -1496,48 +1984,57 @@ namespace ES
             // Renderer
             if (boundsMode == BoundsCalculationMode.Renderer || boundsMode == BoundsCalculationMode.Auto)
             {
-                var renderer = transform.GetComponent<Renderer>();
-                if (renderer != null)
+                var renderers = includeChildren
+                    ? transform.GetComponentsInChildren<Renderer>()
+                    : new[] { transform.GetComponent<Renderer>() };
+
+                Bounds? rendererBounds = null;
+                foreach (var renderer in renderers)
                 {
-                    bounds = renderer.bounds;
-                    
-                    if (includeChildren)
-                    {
-                        var childRenderers = transform.GetComponentsInChildren<Renderer>();
-                        foreach (var childRenderer in childRenderers)
-                        {
-                            if (activeOnly && !childRenderer.gameObject.activeInHierarchy) continue;
-                            bounds.Encapsulate(childRenderer.bounds);
-                        }
-                    }
-                    return bounds;
+                    if (renderer == null) continue;
+                    if (activeOnly && !renderer.gameObject.activeInHierarchy) continue;
+
+                    EncapsulateBounds(ref rendererBounds, renderer.bounds);
                 }
+
+                if (rendererBounds.HasValue)
+                    return rendererBounds.Value;
             }
 
             // Collider
             if (boundsMode == BoundsCalculationMode.Collider || boundsMode == BoundsCalculationMode.Auto)
             {
-                var collider = transform.GetComponent<Collider>();
-                if (collider != null)
+                var colliders = includeChildren
+                    ? transform.GetComponentsInChildren<Collider>()
+                    : new[] { transform.GetComponent<Collider>() };
+
+                Bounds? colliderBounds = null;
+                foreach (var collider in colliders)
                 {
-                    bounds = collider.bounds;
-                    
-                    if (includeChildren)
-                    {
-                        var childColliders = transform.GetComponentsInChildren<Collider>();
-                        foreach (var childCollider in childColliders)
-                        {
-                            if (activeOnly && !childCollider.gameObject.activeInHierarchy) continue;
-                            bounds.Encapsulate(childCollider.bounds);
-                        }
-                    }
-                    return bounds;
+                    if (collider == null) continue;
+                    if (activeOnly && !collider.gameObject.activeInHierarchy) continue;
+
+                    EncapsulateBounds(ref colliderBounds, collider.bounds);
                 }
+
+                var colliders2D = includeChildren
+                    ? transform.GetComponentsInChildren<Collider2D>()
+                    : new[] { transform.GetComponent<Collider2D>() };
+
+                foreach (var collider2D in colliders2D)
+                {
+                    if (collider2D == null) continue;
+                    if (activeOnly && !collider2D.gameObject.activeInHierarchy) continue;
+
+                    EncapsulateBounds(ref colliderBounds, collider2D.bounds);
+                }
+
+                if (colliderBounds.HasValue)
+                    return colliderBounds.Value;
             }
 
             // Transform位置
-            var position = IsWorldSpace() ? transform.position : transform.localPosition;
-            return new Bounds(position, Vector3.zero);
+            return new Bounds(transform.position, Vector3.zero);
         }
 
         private Bounds GetReferenceBounds(Transform[] transforms)
@@ -1553,6 +2050,8 @@ namespace ES
                         return GetObjectBounds(transforms[0].parent);
                     break;
                 case AlignReference.WorldCenter:
+                    if (IsLocalSpace() && TryGetCommonParent(transforms, out var parent) && parent != null)
+                        return new Bounds(parent.TransformPoint(Vector3.zero), Vector3.zero);
                     return new Bounds(Vector3.zero, Vector3.zero);
             }
 
@@ -1561,12 +2060,22 @@ namespace ES
             foreach (var transform in transforms)
             {
                 var bounds = GetObjectBounds(transform);
-                if (combinedBounds == null)
-                    combinedBounds = bounds;
-                else
-                    combinedBounds.Value.Encapsulate(bounds);
+                EncapsulateBounds(ref combinedBounds, bounds);
             }
             return combinedBounds ?? new Bounds();
+        }
+
+        private void EncapsulateBounds(ref Bounds? combinedBounds, Bounds bounds)
+        {
+            if (combinedBounds == null)
+            {
+                combinedBounds = bounds;
+                return;
+            }
+
+            var combined = combinedBounds.Value;
+            combined.Encapsulate(bounds);
+            combinedBounds = combined;
         }
 
         private Vector3 GetReferencePosition(Transform[] transforms)
@@ -1578,16 +2087,227 @@ namespace ES
         {
             switch (matchReference)
             {
-                case AlignReference.FirstSelected:
+                case MatchReferenceMode.FirstSelected:
                     return objects[0];
-                case AlignReference.LastSelected:
+                case MatchReferenceMode.LastSelected:
                     return objects[objects.Length - 1];
-                case AlignReference.ParentCenter:
+                case MatchReferenceMode.Parent:
                     if (objects[0].transform.parent != null)
                         return objects[0].transform.parent.gameObject;
-                    break;
+                    return null;
             }
             return objects[0];
+        }
+
+        private Vector3 GetAlignAxis(AlignMode mode, Transform[] transforms)
+        {
+            switch (mode)
+            {
+                case AlignMode.Left:
+                case AlignMode.Right:
+                case AlignMode.HorizontalCenter:
+                    return GetSpaceAxis(Vector3.right, transforms);
+                case AlignMode.Top:
+                case AlignMode.Bottom:
+                case AlignMode.VerticalCenter:
+                    return GetSpaceAxis(Vector3.up, transforms);
+                case AlignMode.Front:
+                case AlignMode.Back:
+                case AlignMode.DepthCenter:
+                    return GetSpaceAxis(Vector3.forward, transforms);
+                case AlignMode.CameraLeft:
+                case AlignMode.CameraRight:
+                case AlignMode.CameraHorizontalCenter:
+                    return GetCameraRightVector();
+                case AlignMode.CameraTop:
+                case AlignMode.CameraBottom:
+                case AlignMode.CameraVerticalCenter:
+                    return GetCameraUpVector();
+                case AlignMode.CameraFront:
+                case AlignMode.CameraBack:
+                case AlignMode.CameraDepthCenter:
+                    return GetCameraForwardVector();
+                default:
+                    return Vector3.right;
+            }
+        }
+
+        private Vector3 GetDistributeAxis(DistributeMode mode, List<Transform> transforms)
+        {
+            return GetDistributeAxis(mode, transforms != null ? transforms.ToArray() : null);
+        }
+
+        private Vector3 GetDistributeAxis(DistributeMode mode, Transform[] transforms)
+        {
+            switch (mode)
+            {
+                case DistributeMode.HorizontalEven:
+                case DistributeMode.HorizontalSpacing:
+                    return GetSpaceAxis(Vector3.right, transforms);
+                case DistributeMode.VerticalEven:
+                case DistributeMode.VerticalSpacing:
+                    return GetSpaceAxis(Vector3.up, transforms);
+                case DistributeMode.DepthEven:
+                case DistributeMode.DepthSpacing:
+                    return GetSpaceAxis(Vector3.forward, transforms);
+                case DistributeMode.CameraHorizontalEven:
+                case DistributeMode.CameraHorizontalSpacing:
+                    return GetCameraRightVector();
+                case DistributeMode.CameraVerticalEven:
+                case DistributeMode.CameraVerticalSpacing:
+                    return GetCameraUpVector();
+                case DistributeMode.CameraDepthEven:
+                case DistributeMode.CameraDepthSpacing:
+                    return GetCameraForwardVector();
+                default:
+                    return Vector3.right;
+            }
+        }
+
+        private Vector3 GetSpaceAxis(Vector3 worldAxis, Transform[] transforms)
+        {
+            if (IsCameraRelativeMode())
+            {
+                if (worldAxis == Vector3.right)
+                    return GetCameraRightVector();
+                if (worldAxis == Vector3.up)
+                    return GetCameraUpVector();
+                if (worldAxis == Vector3.forward)
+                    return GetCameraForwardVector();
+            }
+
+            if (!IsLocalSpace())
+                return worldAxis;
+
+            if (TryGetCommonParent(transforms, out var parent) && parent != null)
+                return parent.TransformDirection(worldAxis);
+
+            return worldAxis;
+        }
+
+        private void GetBoundsProjection(Bounds bounds, Vector3 axis, out float min, out float max)
+        {
+            axis = axis.sqrMagnitude > ProjectionEpsilon ? axis.normalized : Vector3.right;
+            min = float.MaxValue;
+            max = float.MinValue;
+
+            var center = bounds.center;
+            var extents = bounds.extents;
+            for (int x = -1; x <= 1; x += 2)
+            for (int y = -1; y <= 1; y += 2)
+            for (int z = -1; z <= 1; z += 2)
+            {
+                var corner = center + new Vector3(extents.x * x, extents.y * y, extents.z * z);
+                float projection = Vector3.Dot(corner, axis);
+                min = Mathf.Min(min, projection);
+                max = Mathf.Max(max, projection);
+            }
+
+            if (min == float.MaxValue)
+                min = max = Vector3.Dot(bounds.center, axis);
+        }
+
+        private bool ValidateCoordinateMode(GameObject[] selectedObjects, bool isCameraOperation)
+        {
+            if (!IsLocalSpace() || isCameraOperation)
+                return true;
+
+            var transforms = selectedObjects
+                .Where(obj => obj != null)
+                .Select(obj => obj.transform)
+                .ToArray();
+
+            if (TryGetCommonParent(transforms, out _))
+                return true;
+
+            EditorUtility.DisplayDialog("局部坐标模式不可用",
+                "局部坐标模式要求本次处理的对象处在同一个父对象下。\n\n" +
+                "当前选区存在多个父级，继续处理会让边界轴向和局部轴向不一致。\n" +
+                "请改用世界坐标，或只选择同一父级下的对象。",
+                "知道了");
+            return false;
+        }
+
+        private bool ValidateAlignReference(GameObject[] selectedObjects)
+        {
+            if (alignReference != AlignReference.ParentCenter)
+                return true;
+
+            var first = selectedObjects != null && selectedObjects.Length > 0 ? selectedObjects[0] : null;
+            if (first != null && first.transform.parent != null)
+                return true;
+
+            EditorUtility.DisplayDialog("参考对象不可用",
+                "当前对齐参考设置为“父对象中心”，但第一个有效选中对象没有父对象。\n\n" +
+                "请改用“所有对象边界 / 第一个选中对象 / 世界中心”，或选择带父级的对象。",
+                "知道了");
+            return false;
+        }
+
+        private bool TryGetCommonParent(Transform[] transforms, out Transform parent)
+        {
+            parent = null;
+            if (transforms == null || transforms.Length == 0)
+                return false;
+
+            parent = transforms[0] != null ? transforms[0].parent : null;
+            foreach (var transform in transforms)
+            {
+                if (transform == null || transform.parent != parent)
+                    return false;
+            }
+            return true;
+        }
+
+        private bool IsCameraAlignMode(AlignMode mode)
+        {
+            return mode == AlignMode.CameraLeft ||
+                   mode == AlignMode.CameraRight ||
+                   mode == AlignMode.CameraTop ||
+                   mode == AlignMode.CameraBottom ||
+                   mode == AlignMode.CameraFront ||
+                   mode == AlignMode.CameraBack ||
+                   mode == AlignMode.CameraHorizontalCenter ||
+                   mode == AlignMode.CameraVerticalCenter ||
+                   mode == AlignMode.CameraDepthCenter;
+        }
+
+        private bool IsCameraDistributeMode(DistributeMode mode)
+        {
+            return mode == DistributeMode.CameraHorizontalEven ||
+                   mode == DistributeMode.CameraVerticalEven ||
+                   mode == DistributeMode.CameraDepthEven ||
+                   mode == DistributeMode.CameraHorizontalSpacing ||
+                   mode == DistributeMode.CameraVerticalSpacing ||
+                   mode == DistributeMode.CameraDepthSpacing;
+        }
+
+        private bool IsSamePreviewSelection(GameObject[] selectedObjects)
+        {
+            if (selectedObjects == null || selectedObjects.Length != originalPositions.Count)
+                return false;
+
+            foreach (var obj in selectedObjects)
+            {
+                if (obj == null || !originalPositions.ContainsKey(obj.transform))
+                    return false;
+            }
+            return true;
+        }
+
+        private void RestorePreviewPositions(bool recordUndo)
+        {
+            foreach (var kvp in originalPositions)
+            {
+                if (kvp.Key == null)
+                    continue;
+
+                if (recordUndo)
+                    Undo.RecordObject(kvp.Key, "Clear Distribution Preview");
+
+                kvp.Key.position = kvp.Value;
+                EditorUtility.SetDirty(kvp.Key);
+            }
         }
 
         private Vector3 GetCameraRightVector()
@@ -1654,10 +2374,34 @@ namespace ES
                 if (obj == null) return false;
                 if (activeOnly && !obj.activeInHierarchy) return false;
                 if (ignoreLocked && (obj.hideFlags & HideFlags.NotEditable) != 0) return false;
+                if (protectPrefabAssets && PrefabUtility.IsPartOfPrefabAsset(obj)) return false;
                 return true;
             }).ToArray();
 
+            if (skipNestedSelection && validObjects.Length > 1)
+            {
+                var selectedTransforms = new HashSet<Transform>(validObjects.Select(obj => obj.transform));
+                validObjects = validObjects
+                    .Where(obj => !HasSelectedAncestor(obj.transform, selectedTransforms))
+                    .ToArray();
+            }
+
             return validObjects;
+        }
+
+        private bool HasSelectedAncestor(Transform transform, HashSet<Transform> selectedTransforms)
+        {
+            if (transform == null || selectedTransforms == null)
+                return false;
+
+            var parent = transform.parent;
+            while (parent != null)
+            {
+                if (selectedTransforms.Contains(parent))
+                    return true;
+                parent = parent.parent;
+            }
+            return false;
         }
 
         private bool IsSpacingDistribute()
@@ -1676,6 +2420,11 @@ namespace ES
             if (selected.Length == 0) return "未选中任何对象";
             
             var info = $"{selected.Length} 个对象";
+            var rawSelection = Selection.gameObjects;
+            int filtered = rawSelection != null ? Mathf.Max(0, rawSelection.Length - selected.Length) : 0;
+            if (filtered > 0)
+                info += $" | 已过滤 {filtered} 个";
+
             if (selected.Length > 0)
             {
                 var firstObj = selected[0];

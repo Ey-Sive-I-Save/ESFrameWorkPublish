@@ -86,4 +86,73 @@ namespace ES
             target.SetEntityMainTarget(target.targetEntities[0]);
         }
     }
+
+    [Serializable, TypeRegistryItem("使用者Item设为主目标", OperationTypeRegistryNames.TargetingUser)]
+    public sealed class OpTarget_SetUserItemAsMainTarget : ESOutputOp
+    {
+        [LabelText("加入Item目标列表")]
+        public bool addToTargets = true;
+
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+        {
+            if (target == null)
+                return;
+
+            target.SetItemMainTarget(target.userItem);
+            if (addToTargets)
+                target.AddTarget(target.userItem);
+        }
+    }
+
+    [Serializable, TypeRegistryItem("表达式设主Item目标", OperationTypeRegistryNames.TargetingMain)]
+    public sealed class OpTarget_SetMainItemTargetByExpression : ESOutputOp
+    {
+        [SerializeReference, LabelText("Item表达式"), ESCompactEdit("Item表达式")]
+        public ESGetItemExpression expression;
+
+        [LabelText("加入Item目标列表")]
+        public bool addToTargets = true;
+
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+        {
+            if (target == null || expression == null)
+                return;
+
+            Item item = expression.Evaluate(target, RuntimeSupport(scopeSupport, hostSupport));
+            target.SetItemMainTarget(item);
+            if (addToTargets)
+                target.AddTarget(item);
+        }
+    }
+
+    [Serializable, TypeRegistryItem("主Item目标加入列表", OperationTypeRegistryNames.TargetingList)]
+    public sealed class OpTarget_AddMainItemTargetToList : ESOutputOp
+    {
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+        {
+            if (target != null)
+                target.AddTarget(target.itemMainTarget);
+        }
+    }
+
+    [Serializable, TypeRegistryItem("清空Item目标列表", OperationTypeRegistryNames.TargetingList)]
+    public sealed class OpTarget_ClearItemTargetList : ESOutputOp
+    {
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+        {
+            target?.ClearItemTargets();
+        }
+    }
+
+    [Serializable, TypeRegistryItem("首个Item列表目标设为主目标", OperationTypeRegistryNames.TargetingList)]
+    public sealed class OpTarget_SetFirstItemListTargetAsMain : ESOutputOp
+    {
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+        {
+            if (target == null || target.targetItems.Count == 0)
+                return;
+
+            target.SetItemMainTarget(target.targetItems[0]);
+        }
+    }
 }

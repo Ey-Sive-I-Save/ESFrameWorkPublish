@@ -232,6 +232,10 @@ namespace ES
             {
                 List<T> values = new List<T>(3);
 #if UNITY_EDITOR
+                List<T> indexedValues = FindRegisteredESSOAssets<T>(typeof(T), includeGroupInfos);
+                if (indexedValues.Count > 0)
+                    return indexedValues;
+
                 // 优先用更窄的 filter，避免全库扫描 ScriptableObject。
                 // 注意：Unity 的 FindAssets("t:...") 仅支持具体类型（class），不支持接口。
                 // 因此当 T 为接口/非 ScriptableObject 类型时，必须回退到全库扫描再用 IsAssignableFrom 过滤。
@@ -313,6 +317,10 @@ namespace ES
 #if UNITY_EDITOR
                 if (typeUse == null) { UnityEngine.Debug.LogWarning("查询NULL类型"); return values; }
 
+                List<T> indexedValues = FindRegisteredESSOAssets<T>(typeUse, includeGroupInfos: true);
+                if (indexedValues.Count > 0)
+                    return indexedValues;
+
                 // 注意：Unity 的 FindAssets("t:...") 仅支持具体类型（class），不支持接口。
                 // 因此当 typeUse 为接口/非 ScriptableObject 类型时，必须回退到全库扫描再用 IsAssignableFrom 过滤。
                 if (!typeUse.IsInterface && typeof(ScriptableObject).IsAssignableFrom(typeUse))
@@ -356,6 +364,13 @@ namespace ES
             public static List<T> FindAllSOAssetsQuickly<T>() where T : ScriptableObject
             {
 #if UNITY_EDITOR
+                if (typeof(ESSO).IsAssignableFrom(typeof(T)))
+                {
+                    var indexed = ESEditorSO.SOS.GetNewGroupOfType<T>();
+                    if (indexed != null && indexed.Count > 0)
+                        return indexed;
+                }
+
                 var guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}");
                 List<T> assets = new List<T>();
                 foreach (var guid in guids)
@@ -371,6 +386,63 @@ namespace ES
 #else
                 return  new List<T>();
 #endif
+            }
+
+            private static List<T> FindRegisteredESSOAssets<T>(Type targetType, bool includeGroupInfos) where T : class
+            {
+                List<T> values = new List<T>(3);
+#if UNITY_EDITOR
+                if (targetType == null)
+                    return values;
+
+                if (!typeof(ESSO).IsAssignableFrom(targetType))
+                    return values;
+
+                foreach (var pair in ESEditorSO.SOS.Groups)
+                {
+                    var group = pair.Value;
+                    if (group == null)
+                        continue;
+
+                    for (int i = 0; i < group.Count; i++)
+                    {
+                        ESSO so = group[i];
+                        if (so == null || !targetType.IsAssignableFrom(so.GetType()))
+                            continue;
+
+                        if (so is T t && !values.Contains(t))
+                            values.Add(t);
+                    }
+                }
+
+                if (includeGroupInfos)
+                {
+                    foreach (var pair in ESEditorSO.SOS.Groups)
+                    {
+                        var group = pair.Value;
+                        if (group == null)
+                            continue;
+
+                        for (int i = 0; i < group.Count; i++)
+                        {
+                            ISoDataGroup dataGroup = group[i] as ISoDataGroup;
+                            if (dataGroup == null)
+                                continue;
+
+                            Type infoType = dataGroup.GetSOInfoType();
+                            if (infoType == null || !targetType.IsAssignableFrom(infoType))
+                                continue;
+
+                            foreach (var info in dataGroup.AllInfos)
+                            {
+                                if (info is T t && !values.Contains(t))
+                                    values.Add(t);
+                            }
+                        }
+                    }
+                }
+#endif
+                return values;
             }
             /// <summary>
             /// 通过GUID（string）加载出资产(泛型)

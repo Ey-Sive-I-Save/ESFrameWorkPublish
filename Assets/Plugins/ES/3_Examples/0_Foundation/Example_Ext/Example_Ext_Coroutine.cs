@@ -4,8 +4,7 @@ using UnityEngine;
 
 // 示例：演示 ExtForCouroutine.cs 中常用用法
 // 来源：Assets/Plugins/ES/1_Design/Extension/EX_SimpleExtension/ExtForCouroutine.cs
-namespace ES
-{
+namespace ES.Samples{
     public class Example_Ext_Coroutine : MonoBehaviour
     {
         void Start()

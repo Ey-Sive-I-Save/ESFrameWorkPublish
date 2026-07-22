@@ -12,6 +12,14 @@ using UnityEngine;
 
 namespace ES.EditorInternal.Installer
 {
+    public class ESInstallerStartupInitializer : ES.EditorInvoker_Level2
+    {
+        public override void InitInvoke()
+        {
+            ESInstaller.RegisterStartupCheck();
+        }
+    }
+
     /// <summary>
     /// ES框架安装器 - 商业级Unity插件安装管理工具
     /// </summary>
@@ -19,10 +27,10 @@ namespace ES.EditorInternal.Installer
     {
         #region 静态初始化
 
-        [InitializeOnLoadMethod]
-        private static void InitializeOnEditorLoad()
+        internal static void RegisterStartupCheck()
         {
             // 延迟执行，避免在编辑器启动时立即检查
+            EditorApplication.delayCall -= CheckDependenciesOnStartup;
             EditorApplication.delayCall += CheckDependenciesOnStartup;
         }
 

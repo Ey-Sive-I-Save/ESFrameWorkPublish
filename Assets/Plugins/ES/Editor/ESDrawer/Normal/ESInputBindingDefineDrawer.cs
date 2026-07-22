@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ES;
 using ES.Internal;
@@ -11,6 +12,7 @@ namespace ES.EditorInternal
     public sealed class ESInputBindingDefineDrawer : PropertyDrawer
     {
         private const float Line = 18f;
+        private const float HintLine = 14f;
         private const float Gap = 4f;
 
         private static InputActionRebindingExtensions.RebindingOperation listenOperation;
@@ -23,19 +25,19 @@ namespace ES.EditorInternal
             SerializedProperty isComposite = property.FindPropertyRelative("isComposite");
             SerializedProperty isPartOfComposite = property.FindPropertyRelative("isPartOfComposite");
 
-            int rows = 3;
+            int rows = 5;
             bool isVirtual = source != null && source.enumValueIndex == (int)ESInputBindingSource.VirtualControl;
             bool showAdvancedInputSystem = !isVirtual
                                            && isComposite != null
                                            && isPartOfComposite != null
                                            && !isComposite.boolValue
                                            && !isPartOfComposite.boolValue;
-            if (showAdvancedInputSystem)
+            if (property.isExpanded)
             {
-                rows++;
+                rows += showAdvancedInputSystem ? 1 : 0;
             }
 
-            return Line * rows + Gap * (rows + 1);
+            return Line * rows + HintLine + Gap * (rows + 2);
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -52,43 +54,58 @@ namespace ES.EditorInternal
             SerializedProperty isPartOfComposite = property.FindPropertyRelative("isPartOfComposite");
             SerializedProperty name = property.FindPropertyRelative("name");
 
-            EditorGUI.LabelField(NextLine(ref position), label, EditorStyles.boldLabel);
-
-            Rect row = NextLine(ref position);
-            DrawSplit(row, 0.36f, out Rect left, out Rect right);
-            EditorGUI.PropertyField(left, schemeId, new GUIContent("方案"));
-            EditorGUI.PropertyField(right, source, new GUIContent("来源"));
-
-            row = NextLine(ref position);
             bool isVirtual = (ESInputBindingSource)source.enumValueIndex == ESInputBindingSource.VirtualControl;
             bool showAdvancedInputSystem = !isVirtual && !isComposite.boolValue && !isPartOfComposite.boolValue;
 
-            DrawSplit(row, 0.5f, out left, out right);
-            EditorGUI.PropertyField(left, name, new GUIContent("名称"));
-            if (!isVirtual)
-            {
-                Rect compositeRect = new Rect(right.x, right.y, right.width * 0.5f - Gap * 0.5f, right.height);
-                Rect partRect = new Rect(compositeRect.xMax + Gap, right.y, right.width * 0.5f - Gap * 0.5f, right.height);
-                EditorGUI.PropertyField(compositeRect, isComposite, new GUIContent("组合"));
-                EditorGUI.PropertyField(partRect, isPartOfComposite, new GUIContent("部分"));
-            }
+            Rect titleRow = NextLine(ref position);
+            property.isExpanded = EditorGUI.Foldout(
+                new Rect(titleRow.x, titleRow.y, 14f, titleRow.height),
+                property.isExpanded,
+                GUIContent.none,
+                true);
+            EditorGUI.LabelField(
+                new Rect(titleRow.x + 18f, titleRow.y, titleRow.width - 18f, titleRow.height),
+                BuildBindingTitle(schemeId, source, path, virtualControlId, name, isComposite, isPartOfComposite),
+                EditorStyles.boldLabel);
+
+            Rect row = NextLine(ref position);
+            DrawSplit(row, 0.42f, out Rect left, out Rect right);
+            EditorGUI.PropertyField(left, schemeId, new GUIContent("输入方案"));
+            EditorGUI.PropertyField(right, source, new GUIContent("输入来源"));
 
             row = NextLine(ref position);
+            Rect hintRow = NextHintLine(ref position);
             if (isVirtual)
             {
-                DrawPathRow(row, virtualControlId, "虚拟控件", property.serializedObject, false);
+                DrawPathRow(row, hintRow, virtualControlId, "虚拟控件", property.serializedObject, false);
             }
             else
             {
-                DrawPathRow(row, path, isComposite.boolValue ? "组合类型" : "路径", property.serializedObject, !isComposite.boolValue, schemeId, property.propertyPath);
+                bool allowPathTools = !isComposite.boolValue;
+                DrawPathRow(row, hintRow, path, isComposite.boolValue ? "组合类型" : "按键/控件", property.serializedObject, allowPathTools, schemeId, property.propertyPath);
             }
 
-            if (showAdvancedInputSystem)
+            row = NextLine(ref position);
+            DrawSplit(row, 0.42f, out left, out right);
+            EditorGUI.PropertyField(left, name, new GUIContent("绑定名称"));
+            if (!isVirtual)
+            {
+                DrawBindingKindButtons(right, isComposite, isPartOfComposite);
+            }
+            else
+            {
+                EditorGUI.LabelField(right, "UI/触摸等虚拟输入入口", EditorStyles.miniLabel);
+            }
+
+            row = NextLine(ref position);
+            EditorGUI.LabelField(row, GetBindingHelpText(isVirtual, isComposite.boolValue, isPartOfComposite.boolValue), EditorStyles.miniLabel);
+
+            if (property.isExpanded && showAdvancedInputSystem)
             {
                 row = NextLine(ref position);
                 DrawSplit(row, 0.5f, out left, out right);
-                EditorGUI.PropertyField(left, interactions, new GUIContent("交互"));
-                EditorGUI.PropertyField(right, processors, new GUIContent("处理器"));
+                EditorGUI.PropertyField(left, interactions, new GUIContent("InputSystem 交互"));
+                EditorGUI.PropertyField(right, processors, new GUIContent("InputSystem 处理器"));
             }
 
             EditorGUI.EndProperty();
@@ -96,6 +113,7 @@ namespace ES.EditorInternal
 
         private static void DrawPathRow(
             Rect row,
+            Rect hintRow,
             SerializedProperty value,
             string title,
             SerializedObject serializedObject,
@@ -142,7 +160,102 @@ namespace ES.EditorInternal
                 MarkDirty(serializedObject);
             }
 
-            DrawListenHint(new Rect(fieldRect.x, row.yMax + 1f, fieldRect.width, 14f), value.stringValue);
+            DrawListenHint(hintRow, value.stringValue);
+        }
+
+        private static void DrawBindingKindButtons(Rect row, SerializedProperty isComposite, SerializedProperty isPartOfComposite)
+        {
+            float labelWidth = 58f;
+            float buttonWidth = Mathf.Max(50f, (row.width - labelWidth - Gap * 3f) / 3f);
+            Rect labelRect = new Rect(row.x, row.y, labelWidth, row.height);
+            Rect normalRect = new Rect(labelRect.xMax + Gap, row.y, buttonWidth, row.height);
+            Rect compositeRect = new Rect(normalRect.xMax + Gap, row.y, buttonWidth, row.height);
+            Rect partRect = new Rect(compositeRect.xMax + Gap, row.y, row.xMax - compositeRect.xMax - Gap, row.height);
+
+            EditorGUI.LabelField(labelRect, "绑定结构");
+            bool normal = !isComposite.boolValue && !isPartOfComposite.boolValue;
+            if (GUI.Toggle(normalRect, normal, "普通", EditorStyles.miniButtonLeft))
+            {
+                isComposite.boolValue = false;
+                isPartOfComposite.boolValue = false;
+            }
+
+            if (GUI.Toggle(compositeRect, isComposite.boolValue, "组合", EditorStyles.miniButtonMid))
+            {
+                isComposite.boolValue = true;
+                isPartOfComposite.boolValue = false;
+            }
+
+            if (GUI.Toggle(partRect, isPartOfComposite.boolValue, "子项", EditorStyles.miniButtonRight))
+            {
+                isComposite.boolValue = false;
+                isPartOfComposite.boolValue = true;
+            }
+        }
+
+        private static string BuildBindingTitle(
+            SerializedProperty schemeId,
+            SerializedProperty source,
+            SerializedProperty path,
+            SerializedProperty virtualControlId,
+            SerializedProperty name,
+            SerializedProperty isComposite,
+            SerializedProperty isPartOfComposite)
+        {
+            string schemeName = GetSchemeDisplayName(schemeId != null ? schemeId.stringValue : string.Empty);
+            string bindName = name != null ? name.stringValue : string.Empty;
+            ESInputBindingSource bindingSource = source != null
+                ? (ESInputBindingSource)source.enumValueIndex
+                : ESInputBindingSource.InputSystem;
+
+            if (bindingSource == ESInputBindingSource.VirtualControl)
+            {
+                string virtualId = virtualControlId != null ? virtualControlId.stringValue : string.Empty;
+                return schemeName + "：虚拟控件 " + (string.IsNullOrEmpty(virtualId) ? "未设置" : virtualId);
+            }
+
+            string rawPath = path != null ? path.stringValue : string.Empty;
+            string controlName = GetControlDisplayName(rawPath);
+            if (isComposite != null && isComposite.boolValue)
+                return schemeName + "：组合 " + (string.IsNullOrEmpty(bindName) ? controlName : bindName) + "（" + controlName + "）";
+
+            if (isPartOfComposite != null && isPartOfComposite.boolValue)
+                return schemeName + "：" + (string.IsNullOrEmpty(bindName) ? "组合子项" : bindName) + " = " + controlName;
+
+            return schemeName + "：" + controlName;
+        }
+
+        private static string GetSchemeDisplayName(string schemeId)
+        {
+            if (schemeId == ESInputSchemeIds.KeyboardMouse)
+                return "键鼠";
+            if (schemeId == ESInputSchemeIds.Gamepad)
+                return "手柄";
+            if (schemeId == ESInputSchemeIds.Touch)
+                return "触摸";
+            return string.IsNullOrEmpty(schemeId) ? "默认方案" : schemeId;
+        }
+
+        private static string GetControlDisplayName(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return "未设置";
+
+            if (ESInputControlCatalog.TryFindByPath(path, out ESInputControlOption option))
+                return string.IsNullOrEmpty(option.displayName) ? path : option.displayName;
+
+            return path;
+        }
+
+        private static string GetBindingHelpText(bool isVirtual, bool isComposite, bool isPartOfComposite)
+        {
+            if (isVirtual)
+                return "用于 UI 按钮、虚拟摇杆、触摸区域等代码或组件主动写入输入。";
+            if (isComposite)
+                return "组合父项只定义组合类型，例如 2DVector；下面的 Up/Down/Left/Right 才绑定具体按键。";
+            if (isPartOfComposite)
+                return "组合子项绑定具体按键，例如 WASD 的 Up = W。";
+            return "普通绑定：一个动作直接对应一个键、鼠标键、手柄键或轴。";
         }
 
         private static void ShowControlMenu(SerializedObject serializedObject, string propertyPath, string schemeId, string bindingPropertyPath)
@@ -366,10 +479,22 @@ namespace ES.EditorInternal
             listenPropertyPath = null;
         }
 
+        internal static void CleanupGlobalListenState()
+        {
+            StopListen();
+        }
+
         private static Rect NextLine(ref Rect position)
         {
             Rect row = new Rect(position.x, position.y, position.width, Line);
             position.y += Line + Gap;
+            return row;
+        }
+
+        private static Rect NextHintLine(ref Rect position)
+        {
+            Rect row = new Rect(position.x + 50f, position.y - Gap, Mathf.Max(0f, position.width - 54f), HintLine);
+            position.y += HintLine + Gap;
             return row;
         }
 
@@ -504,7 +629,7 @@ namespace ES.EditorInternal
                     return;
                 }
 
-                Object undoTarget = targetObject.targetObject;
+                UnityEngine.Object undoTarget = targetObject.targetObject;
                 if (undoTarget != null)
                 {
                     Undo.RecordObject(undoTarget, "导入 InputAction 绑定");
@@ -518,6 +643,9 @@ namespace ES.EditorInternal
                 }
 
                 SetRelativeString(bindingProperty, "path", path);
+                SetRelativeString(bindingProperty, "schemeId", string.IsNullOrEmpty(binding.groups) ? GetRelativeString(bindingProperty, "schemeId") : binding.groups);
+                SetRelativeEnum(bindingProperty, "source", ESInputBindingSource.InputSystem);
+                SetRelativeString(bindingProperty, "virtualControlId", string.Empty);
                 SetRelativeString(bindingProperty, "interactions", binding.interactions);
                 SetRelativeString(bindingProperty, "processors", binding.processors);
                 SetRelativeString(bindingProperty, "name", binding.name);
@@ -630,6 +758,7 @@ namespace ES.EditorInternal
                 string path = GetRelativeString(bindingProperty, "path");
                 string interactions = GetRelativeString(bindingProperty, "interactions");
                 string processors = GetRelativeString(bindingProperty, "processors");
+                string schemeId = GetRelativeString(bindingProperty, "schemeId");
                 string name = GetRelativeString(bindingProperty, "name");
                 bool isComposite = GetRelativeBool(bindingProperty, "isComposite");
                 bool isPartOfComposite = GetRelativeBool(bindingProperty, "isPartOfComposite");
@@ -652,11 +781,11 @@ namespace ES.EditorInternal
                         hasComposite = true;
                     }
 
-                    composite.With(string.IsNullOrEmpty(name) ? "Part" : name, path, interactions, processors);
+                    composite.With(string.IsNullOrEmpty(name) ? "Part" : name, path, schemeId, processors);
                 }
                 else
                 {
-                    InputActionSetupExtensions.BindingSyntax binding = action.AddBinding(path, interactions, processors);
+                    InputActionSetupExtensions.BindingSyntax binding = action.AddBinding(path, interactions, processors, schemeId);
                     if (!string.IsNullOrEmpty(name))
                     {
                         binding.WithName(name);
@@ -677,10 +806,53 @@ namespace ES.EditorInternal
                 return property != null && property.boolValue;
             }
 
+            private static void SetRelativeEnum<T>(SerializedProperty root, string relativePath, T value) where T : Enum
+            {
+                SerializedProperty property = root.FindPropertyRelative(relativePath);
+                if (property != null)
+                    property.enumValueIndex = Convert.ToInt32(value);
+            }
+
             private sealed class Holder : ScriptableObject
             {
                 public InputAction action;
             }
+        }
+    }
+
+    public sealed class ESInputBindingDefineDrawerLifecycleInitializer : EditorInvoker_Level2
+    {
+        private static bool registered;
+
+        public override void InitInvoke()
+        {
+            if (registered)
+            {
+                AssemblyReloadEvents.beforeAssemblyReload -= CleanupBeforeAssemblyReload;
+                EditorApplication.quitting -= CleanupBeforeEditorQuit;
+                EditorApplication.playModeStateChanged -= CleanupOnPlayModeChanged;
+            }
+
+            registered = true;
+            AssemblyReloadEvents.beforeAssemblyReload += CleanupBeforeAssemblyReload;
+            EditorApplication.quitting += CleanupBeforeEditorQuit;
+            EditorApplication.playModeStateChanged += CleanupOnPlayModeChanged;
+        }
+
+        private static void CleanupBeforeAssemblyReload()
+        {
+            ESInputBindingDefineDrawer.CleanupGlobalListenState();
+        }
+
+        private static void CleanupBeforeEditorQuit()
+        {
+            ESInputBindingDefineDrawer.CleanupGlobalListenState();
+        }
+
+        private static void CleanupOnPlayModeChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingEditMode || state == PlayModeStateChange.ExitingPlayMode)
+                ESInputBindingDefineDrawer.CleanupGlobalListenState();
         }
     }
 }

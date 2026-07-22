@@ -5,10 +5,8 @@ using UnityEditor;
 
 namespace ES
 {
-    namespace ES
+    public partial class ESSODataInfoWindow
     {
-        public partial class ESSODataInfoWindow
-        {
             private string pendingExpandMenuPath_ = "";
 
             public void RequestExpandMenuAfterRefresh(string menuPath)
@@ -59,6 +57,5 @@ namespace ES
                 if (field != null && field.FieldType == typeof(bool))
                     field.SetValue(item, expanded);
             }
-        }
     }
 }

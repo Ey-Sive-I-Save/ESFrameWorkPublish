@@ -42,6 +42,7 @@ namespace ES
             ApplyProceduralExecutionPolicy(allowProceduralDelegates, ref flags);
 
             _scheduleBlockFlags = flags;
+            RefreshFinalIKScheduleDiagnosticsCache();
         }
 
         private void ApplyGrounderExecutionPolicy(bool allowProceduralDelegates, ref FinalIKDriverBlockFlags flags)
@@ -75,24 +76,36 @@ namespace ES
                 flags |= FinalIKDriverBlockFlags.GrounderWaitingForWeight;
         }
 
+        private void RefreshGrounderExecutionPolicyAfterRuntimeSwitch()
+        {
+            if (!_grounderReady)
+                return;
+
+            FinalIKDriverBlockFlags flags = _scheduleBlockFlags & ~(FinalIKDriverBlockFlags.GrounderBlockedNoBiped | FinalIKDriverBlockFlags.GrounderWaitingForWeight);
+            bool allowProceduralDelegates = _scheduleMode == FinalIKDriverScheduleMode.DriverCoreManualProceduralDelegates;
+            ApplyGrounderExecutionPolicy(allowProceduralDelegates, ref flags);
+            _scheduleBlockFlags = flags;
+            RefreshFinalIKScheduleDiagnosticsCache();
+        }
+
         private void ApplyProceduralExecutionPolicy(bool allowProceduralDelegates, ref FinalIKDriverBlockFlags flags)
         {
             bool fullBodyReady = _fullBodyBipedIKReady;
 
-            if (enableHitReaction)
+            if (_hitReactionReady)
             {
                 bool enable = allowProceduralDelegates && enableHitReaction && _hitReactionReady && fullBodyReady;
-                if (_hitReactionReady && _hitReaction.enabled != enable)
+                if (_hitReaction.enabled != enable)
                     _hitReaction.enabled = enable;
 
                 if (!fullBodyReady && enableHitReaction)
                     flags |= FinalIKDriverBlockFlags.HitReactionBlockedNoFullBody;
             }
 
-            if (enableRecoil)
+            if (_recoilReady)
             {
                 bool enable = allowProceduralDelegates && enableRecoil && _recoilReady && fullBodyReady;
-                if (_recoilReady && _recoil.enabled != enable)
+                if (_recoil.enabled != enable)
                     _recoil.enabled = enable;
 
                 if (!fullBodyReady && enableRecoil)
@@ -101,6 +114,15 @@ namespace ES
 
             if (!allowProceduralDelegates)
                 flags |= FinalIKDriverBlockFlags.ProceduralDelegatesDisabledByMode;
+        }
+
+        private void RefreshProceduralExecutionPolicyAfterRuntimeSwitch()
+        {
+            FinalIKDriverBlockFlags flags = _scheduleBlockFlags & ~(FinalIKDriverBlockFlags.HitReactionBlockedNoFullBody | FinalIKDriverBlockFlags.RecoilBlockedNoFullBody);
+            bool allowProceduralDelegates = _scheduleMode == FinalIKDriverScheduleMode.DriverCoreManualProceduralDelegates;
+            ApplyProceduralExecutionPolicy(allowProceduralDelegates, ref flags);
+            _scheduleBlockFlags = flags;
+            RefreshFinalIKScheduleDiagnosticsCache();
         }
 
         private void SetFinalIKScheduleMode(FinalIKDriverScheduleMode mode)

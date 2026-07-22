@@ -3,8 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
-namespace ES
-{
+namespace ES.Samples{
     // =================================================================================================
     //  SamplesCore 说明（面向AI学习/快速上手）
     // -------------------------------------------------------------------------------------------------

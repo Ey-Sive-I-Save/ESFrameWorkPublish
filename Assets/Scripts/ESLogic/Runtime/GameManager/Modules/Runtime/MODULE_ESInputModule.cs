@@ -31,7 +31,16 @@ namespace ES
         public bool enableAfterBuild = true;
 
         [NonSerialized]
-        private readonly ESInputRuntime runtime = new ESInputRuntime();
+        private readonly ESInputService service = new ESInputService();
+
+        [NonSerialized]
+        private readonly ESInputSystemSource inputSystemSource = new ESInputSystemSource();
+
+        [NonSerialized]
+        private readonly ESInputVirtualSource virtualSource = new ESInputVirtualSource();
+
+        [NonSerialized]
+        private readonly ESInputSchemeResolver schemeResolver = new ESInputSchemeResolver();
 
         [NonSerialized]
         private ESInputBindingProfile effectiveProfile;
@@ -72,24 +81,19 @@ namespace ES
             get { return inputEnabled; }
         }
 
-        public ESInputRuntime RuntimeInstance
-        {
-            get { return runtime; }
-        }
-
         public ESInputService Service
         {
-            get { return runtime.Service; }
+            get { return service; }
         }
 
         public ESInputVirtualSource VirtualSource
         {
-            get { return runtime.VirtualSource; }
+            get { return virtualSource; }
         }
 
         public ESInputSchemeResolver SchemeResolver
         {
-            get { return runtime.SchemeResolver; }
+            get { return schemeResolver; }
         }
 
         public ESRuntimeModeService ModeService
@@ -128,7 +132,7 @@ namespace ES
             if (!inputEnabled)
                 return;
 
-            runtime.Update(Time.time);
+            UpdateInputRuntime(Time.time);
         }
 
         public override void OnDestroy()
@@ -383,7 +387,7 @@ namespace ES
             ESInputRuntimeBuildResult build = ESInputRuntimeBuilder.Build(source, effectiveProfile, GetDefaultSchemeId());
             currentBuild = build;
 
-            runtime.Initialize(build, EnsureModeService());
+            InitializeInputRuntime(build, EnsureModeService());
             runtimeBuilt = true;
             inputEnabled = false;
 
@@ -407,7 +411,7 @@ namespace ES
             if (inputEnabled)
                 return;
 
-            runtime.Enable();
+            EnableInputRuntime();
             inputEnabled = true;
         }
 
@@ -416,14 +420,14 @@ namespace ES
             if (!inputEnabled)
                 return;
 
-            runtime.Disable();
+            DisableInputRuntime();
             inputEnabled = false;
         }
 
         public void ClearRuntimeBuild()
         {
             DisableInput();
-            runtime.Initialize(null, EnsureModeService());
+            InitializeInputRuntime(null, EnsureModeService());
             currentBuild = null;
             effectiveProfile = null;
             runtimeBuilt = false;
@@ -433,9 +437,9 @@ namespace ES
         public void DisposeRuntime()
         {
             if (runtimeBuilt || inputEnabled)
-                runtime.Disable();
+                DisableInputRuntime();
 
-            runtime.Dispose();
+            DisposeInputRuntime();
             ReleaseRuntimeDefaultConfig();
             currentBuild = null;
             effectiveProfile = null;
@@ -542,182 +546,222 @@ namespace ES
 
         public bool WasPressed(ESInputActionId id)
         {
-            return runtime.Service.WasPressed(id);
+            return service.WasPressed(id);
         }
 
         public bool ConsumePressed(ESInputActionId id)
         {
-            return runtime.Service.ConsumePressed(id);
+            return service.ConsumePressed(id);
         }
 
         public bool ConsumeClick(ESInputActionId id)
         {
-            return runtime.Service.ConsumePressed(id);
+            return service.ConsumePressed(id);
         }
 
         public bool IsHeld(ESInputActionId id)
         {
-            return runtime.Service.IsHeld(id);
+            return service.IsHeld(id);
         }
 
         public bool WasReleased(ESInputActionId id)
         {
-            return runtime.Service.WasReleased(id);
+            return service.WasReleased(id);
         }
 
         public bool ConsumeReleased(ESInputActionId id)
         {
-            return runtime.Service.ConsumeReleased(id);
+            return service.ConsumeReleased(id);
         }
 
         public bool WasLongPressed(ESInputActionId id)
         {
-            return runtime.Service.WasLongPressed(id);
+            return service.WasLongPressed(id);
         }
 
         public bool ConsumeLongPressed(ESInputActionId id)
         {
-            return runtime.Service.ConsumeLongPressed(id);
+            return service.ConsumeLongPressed(id);
         }
 
         public bool ConsumeLongPress(ESInputActionId id)
         {
-            return runtime.Service.ConsumeLongPressed(id);
+            return service.ConsumeLongPressed(id);
         }
 
         public bool WasDoublePressed(ESInputActionId id)
         {
-            return runtime.Service.WasDoublePressed(id);
+            return service.WasDoublePressed(id);
         }
 
         public bool ConsumeDoublePressed(ESInputActionId id)
         {
-            return runtime.Service.ConsumeDoublePressed(id);
+            return service.ConsumeDoublePressed(id);
         }
 
         public bool WasTriggered(ESInputActionId id)
         {
-            return runtime.Service.WasTriggered(id);
+            return service.WasTriggered(id);
         }
 
         public bool ConsumeTrigger(ESInputActionId id)
         {
-            return runtime.Service.ConsumeTrigger(id);
+            return service.ConsumeTrigger(id);
         }
 
         public float ReadAxis(ESInputActionId id)
         {
-            return runtime.Service.ReadAxis(id);
+            return service.ReadAxis(id);
         }
 
         public Vector2 ReadVector2(ESInputActionId id)
         {
-            return runtime.Service.ReadVector2(id);
+            return service.ReadVector2(id);
         }
 
         public float GetHoldTime(ESInputActionId id)
         {
-            return runtime.Service.GetHoldTime(id);
+            return service.GetHoldTime(id);
         }
 
         public void UISetButton(ESInputActionId id, bool held)
         {
-            runtime.VirtualSource.SetButton(id, held);
+            virtualSource.SetButton(id, held);
         }
 
         public void UIPressButton(ESInputActionId id)
         {
-            runtime.VirtualSource.SetButton(id, true);
+            virtualSource.SetButton(id, true);
         }
 
         public void UIReleaseButton(ESInputActionId id)
         {
-            runtime.VirtualSource.SetButton(id, false);
+            virtualSource.SetButton(id, false);
         }
 
         public void UIPulseButton(ESInputActionId id)
         {
-            runtime.VirtualSource.PulseButton(id);
+            virtualSource.PulseButton(id);
         }
 
         public void UITriggerButton(ESInputActionId id)
         {
-            runtime.VirtualSource.PulseButton(id);
+            virtualSource.PulseButton(id);
         }
 
         public void UITriggerInteract()
         {
-            runtime.VirtualSource.PulseButton(ESInputActionId.Interact);
+            virtualSource.PulseButton(ESInputActionId.Interact);
         }
 
         public void UIClearButton(ESInputActionId id)
         {
-            runtime.VirtualSource.ClearButton(id);
+            virtualSource.ClearButton(id);
         }
 
         public void UISetAxis(ESInputActionId id, float value)
         {
-            runtime.VirtualSource.SetAxis(id, value);
+            virtualSource.SetAxis(id, value);
         }
 
         public void UIClearAxis(ESInputActionId id)
         {
-            runtime.VirtualSource.ClearAxis(id);
+            virtualSource.ClearAxis(id);
         }
 
         public void UISetVector2(ESInputActionId id, Vector2 value)
         {
-            runtime.VirtualSource.SetVector2(id, value);
+            virtualSource.SetVector2(id, value);
         }
 
         public void UIClearVector2(ESInputActionId id)
         {
-            runtime.VirtualSource.ClearVector2(id);
+            virtualSource.ClearVector2(id);
         }
 
         public void UISetButton(string virtualControlId, bool held)
         {
-            runtime.VirtualSource.SetButton(virtualControlId, held);
+            virtualSource.SetButton(virtualControlId, held);
         }
 
         public void UIPulseButton(string virtualControlId)
         {
-            runtime.VirtualSource.PulseButton(virtualControlId);
+            virtualSource.PulseButton(virtualControlId);
         }
 
         public void UITriggerButton(string virtualControlId)
         {
-            runtime.VirtualSource.PulseButton(virtualControlId);
+            virtualSource.PulseButton(virtualControlId);
         }
 
         public void UIClearButton(string virtualControlId)
         {
-            runtime.VirtualSource.ClearButton(virtualControlId);
+            virtualSource.ClearButton(virtualControlId);
         }
 
         public void UISetAxis(string virtualControlId, float value)
         {
-            runtime.VirtualSource.SetAxis(virtualControlId, value);
+            virtualSource.SetAxis(virtualControlId, value);
         }
 
         public void UIClearAxis(string virtualControlId)
         {
-            runtime.VirtualSource.ClearAxis(virtualControlId);
+            virtualSource.ClearAxis(virtualControlId);
         }
 
         public void UISetVector2(string virtualControlId, Vector2 value)
         {
-            runtime.VirtualSource.SetVector2(virtualControlId, value);
+            virtualSource.SetVector2(virtualControlId, value);
         }
 
         public void UIClearVector2(string virtualControlId)
         {
-            runtime.VirtualSource.ClearVector2(virtualControlId);
+            virtualSource.ClearVector2(virtualControlId);
         }
 
         public void UIClearAll()
         {
-            runtime.VirtualSource.ClearAll();
+            virtualSource.ClearAll();
+        }
+
+        private void InitializeInputRuntime(ESInputRuntimeBuildResult build, ESRuntimeModeService runtimeMode)
+        {
+            service.SetModeService(runtimeMode);
+            service.SetCache(build != null ? build.cache : null);
+            inputSystemSource.Initialize(build, service);
+            virtualSource.Initialize(build, service);
+            schemeResolver.Initialize(build != null ? build.activeSchemeId : ESInputSchemeIds.KeyboardMouse);
+        }
+
+        private void EnableInputRuntime()
+        {
+            inputSystemSource.Enable();
+            schemeResolver.Enable();
+        }
+
+        private void DisableInputRuntime()
+        {
+            schemeResolver.Disable();
+            inputSystemSource.Disable();
+            virtualSource.ClearAll();
+            service.ResetAll();
+        }
+
+        private void UpdateInputRuntime(float time)
+        {
+            service.BeginFrame();
+            inputSystemSource.Update(time, false);
+            virtualSource.Update(time);
+            service.EndFrame(time);
+        }
+
+        private void DisposeInputRuntime()
+        {
+            schemeResolver.Dispose();
+            inputSystemSource.Dispose();
+            virtualSource.Dispose();
+            service.SetCache(null);
+            service.SetModeService(null);
         }
 
         private ESRuntimeModeService EnsureModeService()
@@ -793,7 +837,7 @@ namespace ES
         private static ESInputConfig CreateRuntimeDefaultConfig()
         {
             ESInputConfig config = ScriptableObject.CreateInstance<ESInputConfig>();
-            config.ResetDefaultGameplayConfig();
+            config.ApplyDefaultGameplayConfig();
             config.hideFlags = HideFlags.DontSave;
             return config;
         }

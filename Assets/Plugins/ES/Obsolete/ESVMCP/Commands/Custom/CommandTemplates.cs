@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 using System.Collections.Generic;
 using System;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     // ==================== 模板 1: 基础命令模板 ====================
     // 适用于：固定参数的标准命令

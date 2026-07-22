@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Samples{
     [ESCreatePath("数据信息", "SO表格示例数据信息")]
     public sealed class ExampleSoTableInfo : SoDataInfo
     {

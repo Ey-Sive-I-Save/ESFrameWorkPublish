@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ES.Common
+namespace ES.Obsolete.Common
 {
     /// <summary>
     /// ES框架通用工具方法集合

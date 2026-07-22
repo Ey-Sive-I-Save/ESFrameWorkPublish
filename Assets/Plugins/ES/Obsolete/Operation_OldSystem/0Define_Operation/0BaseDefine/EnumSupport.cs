@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-namespace ES {
+namespace ES.Obsolete{
     //浮点值操�?
     public enum FloatValueEntryType
     {

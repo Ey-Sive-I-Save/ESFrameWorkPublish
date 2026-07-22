@@ -18,7 +18,7 @@ Tools > ES工具 > ES开发管理
 ```
 
 ### 首次使用
-1. 窗口会自动创建数据资产文件在：`Assets/ES/DevManagement/DevManagementData.asset`
+1. 窗口会自动创建数据资产文件在：`Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/DevManagement/DevManagementData.asset`
 2. 系统会生成示例数据帮助您快速上手
 3. 所有数据自动保存，无需手动操作
 
@@ -143,7 +143,7 @@ Tools > ES工具 > ES开发管理
 - 支持版本控制（可提交到 Git）
 
 ### 数据位置
-默认数据文件：`Assets/ES/DevManagement/DevManagementData.asset`
+默认数据文件：`Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/DevManagement/DevManagementData.asset`
 
 ### 手动备份
 1. 在 Project 窗口中找到数据文件

@@ -9,8 +9,7 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 
 
-namespace ES
-{ 
+namespace ES.Obsolete{ 
     BufferOperation是一个可执行的对值的缓冲处理，他是动态生成和销毁的，类似于
 
     public interface IBufferOperation:IPoolableAuto

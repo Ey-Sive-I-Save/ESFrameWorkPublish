@@ -1,8 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Samples{
     // 示例：演示 ExtForNum.cs 中常用数值扩展
     public class Example_Ext_Num : MonoBehaviour
     {

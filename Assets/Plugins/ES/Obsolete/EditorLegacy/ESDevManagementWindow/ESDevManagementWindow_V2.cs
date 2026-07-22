@@ -8,8 +8,7 @@ using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities;
 using Sirenix.Utilities.Editor;
 
-namespace ES
-{
+namespace ES.Obsolete{
     /// <summary>
     /// ES开发管理窗口 V2.0 - Notion风格
     /// 功能完善的团队协作开发管理系统
@@ -32,7 +31,7 @@ namespace ES
         }
 
         #region 常量定义
-        private const string DataSavePath = "Assets/ES/DevManagement/DevManagementDataV2.asset";
+        private const string DataSavePath = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/DevManagement/DevManagementDataV2.asset";
         private const string EditorPrefKey = "ESDevManagement_V2_DataGUID";
         private const string CurrentUserKey = "ESDevManagement_V2_CurrentUser";
 

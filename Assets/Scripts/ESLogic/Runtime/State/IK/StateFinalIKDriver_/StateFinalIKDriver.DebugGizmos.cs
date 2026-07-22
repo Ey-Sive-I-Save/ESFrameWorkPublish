@@ -37,6 +37,13 @@ namespace ES
         [TabGroup("DriverLayout", "测试工具")]
         [PropertyOrder(4)]
         [BoxGroup("DriverLayout/测试工具/IK调试可视化", ShowLabel = false)]
+        [TitleGroup("DriverLayout/测试工具/IK调试可视化/Grounder 接地", BoldTitle = true)]
+        [LabelText("Grounder 接地范围")]
+        [SerializeField] private bool debugDrawGrounderProbe = true;
+
+        [TabGroup("DriverLayout", "测试工具")]
+        [PropertyOrder(4)]
+        [BoxGroup("DriverLayout/测试工具/IK调试可视化", ShowLabel = false)]
         [TitleGroup("DriverLayout/测试工具/IK调试可视化/Scene 可视化")]
         [LabelText("显示尺寸")]
         [SerializeField, Range(0.01f, 0.25f)] private float debugIKGizmoSize = 0.045f;
@@ -50,7 +57,8 @@ namespace ES
                 ? _stateMachine.stateGeneralFinalIKDriverPose
                 : _lastPose;
 
-            if (!pose.HasAnyWeight)
+            bool hasGrounder = _grounderReady && (_grounderBipedIK.enabled || _grounderWeightCurrent > 0.001f || _grounderWeightTarget > 0.001f);
+            if (!pose.HasAnyWeight && !hasGrounder)
                 return;
 
             DrawIKGoalGizmos("LH", in pose.leftHand, ResolveGoalBone(HumanBodyBones.LeftHand, bindingLeftHand, _bipedIKReady ? _bipedIK.references.leftHand : null), Color.green);
@@ -67,6 +75,9 @@ namespace ES
                 if (debugDrawIKWeightBars)
                     DrawWeightBar(pose.lookAtPosition + Vector3.up * debugIKGizmoSize * 2.2f, pose.lookAtWeight, Gizmos.color);
             }
+
+            if (hasGrounder && debugDrawGrounderProbe)
+                DrawGrounderGizmos();
         }
 
         private Transform ResolveGoalBone(HumanBodyBones humanBone, Transform binding, Transform bipedReference)
@@ -136,6 +147,41 @@ namespace ES
         private static void DrawLabel(Vector3 worldPos, string text)
         {
             UnityEditor.Handles.Label(worldPos, text, UnityEditor.EditorStyles.whiteMiniLabel);
+        }
+
+        private void DrawGrounderGizmos()
+        {
+            Transform leftFoot = ResolveGoalBone(HumanBodyBones.LeftFoot, bindingLeftFoot, _bipedIKReady ? _bipedIK.references.leftFoot : null);
+            Transform rightFoot = ResolveGoalBone(HumanBodyBones.RightFoot, bindingRightFoot, _bipedIKReady ? _bipedIK.references.rightFoot : null);
+            Transform pelvis = ResolveGoalBone(HumanBodyBones.Hips, bindingPelvis, _bipedIKReady ? _bipedIK.references.pelvis : null);
+
+            Color grounderColor = new Color(0.25f, 0.85f, 0.55f, 0.9f);
+            if (leftFoot != null)
+                DrawGrounderFootProbe("GL", leftFoot, grounderColor);
+            if (rightFoot != null)
+                DrawGrounderFootProbe("GR", rightFoot, grounderColor);
+
+            if (pelvis != null)
+            {
+                Gizmos.color = new Color(0.75f, 0.95f, 1f, 0.85f);
+                Gizmos.DrawWireSphere(pelvis.position, debugIKGizmoSize * 1.35f);
+                if (debugDrawIKWeightBars)
+                    DrawWeightBar(pelvis.position + Vector3.up * debugIKGizmoSize * 2.5f, _grounderWeightCurrent, grounderColor);
+                DrawLabel(pelvis.position + Vector3.up * debugIKGizmoSize * 4f, "Grounder");
+            }
+        }
+
+        private void DrawGrounderFootProbe(string label, Transform foot, Color color)
+        {
+            float maxStep = _grounderReady ? Mathf.Max(0.05f, _grounderBipedIK.solver.maxStep) : Mathf.Max(0.05f, initGrounderMaxStep);
+            Vector3 top = foot.position + Vector3.up * debugIKGizmoSize;
+            Vector3 bottom = foot.position + Vector3.down * maxStep;
+
+            Gizmos.color = color;
+            Gizmos.DrawWireSphere(foot.position, debugIKGizmoSize * 1.1f);
+            Gizmos.DrawLine(top, bottom);
+            Gizmos.DrawWireCube(bottom, Vector3.one * debugIKGizmoSize * 0.9f);
+            DrawLabel(foot.position + Vector3.up * debugIKGizmoSize * 2.4f, label);
         }
 #endif
     }

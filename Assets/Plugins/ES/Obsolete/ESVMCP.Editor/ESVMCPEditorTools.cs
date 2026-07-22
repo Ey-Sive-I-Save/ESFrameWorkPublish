@@ -3,7 +3,7 @@ using UnityEditor;
 using System.IO;
 using ES.VMCP;
 
-namespace ES.VMCP.Editor
+namespace ES.Obsolete.VMCP.Editor
 {
     /// <summary>
     /// ESVMCP编辑器工具
@@ -11,8 +11,8 @@ namespace ES.VMCP.Editor
     public static class ESVMCPEditorTools
     {
         public const string MenuRoot = MenuItemPathDefine.VMCP_SYSTEM_PATH;
-        private const string DefaultDataFolderRoot = "Assets/ES/ESVMCP/RunningData";
-        private const string DefaultRootFolder = "Assets/ES/ESVMCP";
+        private const string DefaultDataFolderRoot = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/ESVMCP/RunningData";
+        private const string DefaultRootFolder = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/ESVMCP";
 
         /// <summary>
         /// 获取数据文件夹根路径
@@ -32,7 +32,7 @@ namespace ES.VMCP.Editor
         /// <remarks>
         /// 查找全局资产：ESVMCP的资源文件夹路径，从配置中获取或使用默认路径
         /// </remarks>
-        private static string ResourcesPath => GetConfig()?.ResourcesFolder ?? "Assets/ES/ESVMCP/Resources";
+        private static string ResourcesPath => GetConfig()?.ResourcesFolder ?? "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/ESVMCP/Resources";
 
         /// <summary>
         /// 获取配置文件路径

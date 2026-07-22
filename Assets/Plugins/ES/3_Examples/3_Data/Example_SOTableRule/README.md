@@ -16,9 +16,9 @@
 
 测试 SO 资产单独放在：
 
-- `Assets/NormalResources/Data/Example_SOTableRule/NativeSO`：可直接拖到构建阶段的普通 SO 资产。
-- `Assets/NormalResources/Data/Example_SOTableRule/SoData/Info`：可直接拖到构建阶段的 Info 资产。
-- `Assets/NormalResources/Data/Example_SOTableRule/SoData/Group`：空 Group 资产，用于测试 Group 类型识别。
+- `Assets/ESNormalAssets/Data/Example_SOTableRule/NativeSO`：可直接拖到构建阶段的普通 SO 资产。
+- `Assets/ESNormalAssets/Data/Example_SOTableRule/SoData/Info`：可直接拖到构建阶段的 Info 资产。
+- `Assets/ESNormalAssets/Data/Example_SOTableRule/SoData/Group`：空 Group 资产，用于测试 Group 类型识别。
 Pack 已不作为 SoTableRule 支持目标。
 
 ## 当前案例脚本
@@ -50,7 +50,7 @@ Pack 已不作为 SoTableRule 支持目标。
 
 ## 第二轮测试
 
-1. 构建阶段拖入 `Assets/NormalResources/Data/Example_SOTableRule/SoData/Info/Example_Info_A.asset`。
+1. 构建阶段拖入 `Assets/ESNormalAssets/Data/Example_SOTableRule/SoData/Info/Example_Info_A.asset`。
 2. 绑定并构建字段映射。
 3. 确认 `KeyName`、普通字段、枚举字段、列表字段能被扫描。
 4. Group 脚本和资产可用于测试类型识别；Pack 不作为当前工具目标。

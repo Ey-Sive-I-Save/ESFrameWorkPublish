@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -6,7 +7,7 @@ namespace ES
 {
     public static class StateMachineConfigEditorMenu
     {
-        private const string ConfigFolder = "Assets/NormalResources/Data/GlobalData/StateMachineConfig";
+        private const string ConfigFolder = "Assets/ESNormalAssets/Data/GlobalData/StateMachineConfig";
 
         [MenuItem(MenuItemPathDefine.GAMEPLAY_BUILDING_PATH + "状态/打开状态机配置", false, 10)]
         public static void OpenStateMachineConfig()
@@ -32,13 +33,12 @@ namespace ES
 
         private static StateMachineConfig FindStateMachineConfig()
         {
-            string[] guids = AssetDatabase.FindAssets("t:StateMachineConfig");
+            List<StateMachineConfig> configs = ESEditorSO.SOS.GetNewGroupOfType<StateMachineConfig>() ?? new List<StateMachineConfig>(0);
             StateMachineConfig fallback = null;
 
-            for (int i = 0; i < guids.Length; i++)
+            for (int i = 0; i < configs.Count; i++)
             {
-                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-                StateMachineConfig config = AssetDatabase.LoadAssetAtPath<StateMachineConfig>(path);
+                StateMachineConfig config = configs[i];
                 if (config == null)
                     continue;
 

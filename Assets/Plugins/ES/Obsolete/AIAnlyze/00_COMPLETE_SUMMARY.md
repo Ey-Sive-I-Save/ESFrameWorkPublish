@@ -50,7 +50,7 @@
 ## 📁 文件结构总览
 
 ```
-Assets/ES/
+Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/
 ├── AIAnlyze/                          # 分析文档目录
 │   ├── 00_MasterDocument_DeepAnalysis.md
 │   ├── 01_Link_Scientific_Evaluation.md

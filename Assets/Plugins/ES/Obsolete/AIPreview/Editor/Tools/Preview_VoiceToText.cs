@@ -13,8 +13,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace ES
-{
+namespace ES.Obsolete{
     public class Preview_VoiceToText : EditorWindow
     {
         private AudioClip recordedClip;

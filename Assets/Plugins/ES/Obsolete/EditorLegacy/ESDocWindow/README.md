@@ -197,7 +197,7 @@ public class ESDocCustomElement : ESDocContentBase
 ## 常见问题
 
 ### Q: 文档保存在哪里?
-A: 默认保存在 `Assets/ES/Documentation/` 目录下，可在创建时自定义路径。
+A: 默认保存在 `Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Documentation/` 目录下，可在创建时自定义路径。
 
 ### Q: 如何批量管理文档?
 A: 文档作为ScriptableObject资产存储，可以使用Unity的资产管理工具批量操作。

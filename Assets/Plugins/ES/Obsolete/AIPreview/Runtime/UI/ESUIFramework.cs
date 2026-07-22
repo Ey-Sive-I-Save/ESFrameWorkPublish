@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ES.AIPreview.UI
+namespace ES.Obsolete.AIPreview.UI
 {
     /// <summary>
     /// 运行时 UI 视图基类：

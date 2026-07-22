@@ -146,7 +146,7 @@ PrefabInstance:
     - target: {fileID: 4999344153515423595, guid: 0dea8b38c307f224fb2e0e0664629dd2,
         type: 3}
       propertyPath: m_Name
-      value: FX_Shoot_03_projectile
+      value: FX_Shoot_03_shot
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0dea8b38c307f224fb2e0e0664629dd2, type: 3}

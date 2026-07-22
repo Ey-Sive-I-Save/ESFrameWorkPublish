@@ -4,12 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using Sirenix.OdinInspector;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 增强的持久记忆资产 - 支持多种引用方式和智能衰减
     /// </summary>
     [CreateAssetMenu(fileName = "ESVMCPMemoryAssetEnhanced", menuName = MenuItemPathDefine.VMCP_ASSET_CREATION_PATH + "增强记忆资产")]
+    [ESOnlyEditorSO("旧 VMCP 记忆资产只服务编辑器 AI 辅助流程，不应进入运行时构建或AB资源包。")]
     public class ESVMCPMemoryAssetEnhanced : ScriptableObject
     {
         [Title("持久记忆系统")]

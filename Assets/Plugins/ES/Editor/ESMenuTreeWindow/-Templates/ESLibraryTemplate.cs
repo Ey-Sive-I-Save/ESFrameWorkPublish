@@ -58,7 +58,7 @@ namespace ES
             public override ESWindowPageBase ES_Refresh()
             {
                 LibName = GetLibTypeName_NewCreate();
-                FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_ + "/" + typeof(TLib).Name;
+                FolderPath_ = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_;
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
                 return base.ES_Refresh();
@@ -171,6 +171,8 @@ namespace ES
             private static TLib cutBookSourceLibrary;
             private static TBook cutPageSourceBook;
             private static TLib cutPageSourceLibrary;
+            private static TBook copiedBook;
+            private static TPage copiedPage;
 
             private ReorderableList REForBooks_SelfDefine;
             private ReorderableList REForPages;
@@ -231,6 +233,9 @@ namespace ES
                     library.Refresh();
                     SaveAssetsImmediate();  // 文件夹改名需立即保存
                 }
+
+                DrawActiveCollectLibraryPanel();
+
                 EditorGUILayout.LabelField("↓库描述↓");
                 var newDesc = EditorGUILayout.TextArea(library.Desc, GUILayout.Height(50));
                 if (newDesc != library.Desc)
@@ -272,6 +277,57 @@ namespace ES
                 }
                 area.UpdateAtLast();
             }
+
+            private void DrawActiveCollectLibraryPanel()
+            {
+                if (library is not ESAssetLibrary resLibrary)
+                {
+                    return;
+                }
+
+                var config = ESGlobalResToolsSupportConfig.Instance;
+                bool isActive = ESGlobalResToolsSupportConfig.ActiveCollectLibrary == resLibrary;
+
+                SirenixEditorGUI.BeginBox();
+                SirenixEditorGUI.BeginBoxHeader();
+                EditorGUILayout.LabelField("自动收集目标", EditorStyles.boldLabel);
+                SirenixEditorGUI.EndBoxHeader();
+
+                EditorGUILayout.BeginHorizontal(GUILayout.Height(24));
+                EditorGUILayout.LabelField("当前收集Library", GUILayout.Width(110), GUILayout.Height(22));
+
+                var previousColor = GUI.color;
+                GUI.color = isActive ? new Color(0.25f, 1f, 0.45f, 1f) : new Color(1f, 0.45f, 0.3f, 1f);
+                GUILayout.Box(isActive ? "是" : "否", GUILayout.Width(42), GUILayout.Height(22));
+                GUI.color = previousColor;
+
+                GUILayout.FlexibleSpace();
+
+                using (new EditorGUI.DisabledScope(isActive))
+                {
+                    if (GUILayout.Button(isActive ? "已是当前" : "设为当前", GUILayout.Width(90), GUILayout.Height(20)))
+                    {
+                        ESGlobalResToolsSupportConfig.SetActiveCollectLibrary(resLibrary);
+                        config.preferActiveLibrary = true;
+                        EditorUtility.SetDirty(config);
+                        Debug.Log($"[资产收集] 当前收集Library已设置为: {resLibrary.Name}", resLibrary);
+                    }
+                }
+
+                EditorGUILayout.EndHorizontal();
+
+                if (isActive)
+                {
+                    SirenixEditorGUI.InfoMessageBox("ESAssetRefer 自动收集会优先进入此 Library。");
+                }
+                else if (config != null && config.preferActiveLibrary && config.activeCollectLibrary != null)
+                {
+                    EditorGUILayout.LabelField("当前目标", config.activeCollectLibrary.Name);
+                }
+
+                SirenixEditorGUI.EndBox();
+            }
+
             [HorizontalGroup("水平布局")]
             [OnInspectorGUI]
             public void DrawBookAndPages()
@@ -387,7 +443,7 @@ namespace ES
                 }
 
                 // 在Draw之后显示缩略图预览
-                if (page is ResPage resPage && resPage.OB != null)
+                if (page is ESAssetPage resPage && resPage.OB != null)
                 {
                     EditorGUILayout.Space(10);
                     SirenixEditorGUI.BeginBox();
@@ -443,6 +499,7 @@ namespace ES
                         if (buttonBackground == null)
                         {
                             buttonBackground = new Texture2D(1, 1);
+                            buttonBackground.hideFlags = HideFlags.HideAndDontSave;
                             buttonBackground.SetPixel(0, 0, Color.black);
                             buttonBackground.Apply();
                         }
@@ -481,6 +538,11 @@ namespace ES
                         // 默认Book不能被剪切，但可以接受粘贴
                         menu.AddDisabledItem(new GUIContent("剪切（默认Book不可剪切）"));
 
+                        menu.AddItem(new GUIContent("复制Book"), false, () =>
+                        {
+                            CopyBookToClipboard(b);
+                        });
+
                         if (cutBook != null)
                         {
                             menu.AddItem(new GUIContent("粘贴Book到Library此位置"), false, () =>
@@ -494,6 +556,18 @@ namespace ES
                         }
 
                         // 添加"全部Pages移动到"子菜单
+                        if (copiedBook != null)
+                        {
+                            menu.AddItem(new GUIContent("粘贴复制Book到Library末尾"), false, () =>
+                            {
+                                PasteCopiedBookToLibrary(library, library.Books.Count);
+                            });
+                        }
+                        else
+                        {
+                            menu.AddDisabledItem(new GUIContent("粘贴复制Book到Library末尾"));
+                        }
+
                         var allTargetBooks = new List<TBook>();
                         // 收集自定义Books
                         if (library.Books != null)
@@ -583,6 +657,17 @@ namespace ES
                         {
                             menu.AddDisabledItem(new GUIContent("粘贴到末尾"));
                         }
+                        if (copiedBook != null)
+                        {
+                            menu.AddItem(new GUIContent("粘贴复制Book到末尾"), false, () =>
+                            {
+                                PasteCopiedBookToLibrary(library, library.Books.Count);
+                            });
+                        }
+                        else
+                        {
+                            menu.AddDisabledItem(new GUIContent("粘贴复制Book到末尾"));
+                        }
                         menu.ShowAsContext();
                         Event.current.Use();
                     }
@@ -616,6 +701,10 @@ namespace ES
                                 cutPage = null;
                                 cutPageSourceBook = null;
                             });
+                            menu.AddItem(new GUIContent("复制"), false, () =>
+                            {
+                                CopyBookToClipboard(book_);
+                            });
 
                             if (cutBook != null)
                             {
@@ -630,6 +719,18 @@ namespace ES
                             }
 
                             // 添加"全部Pages移动到"子菜单
+                            if (copiedBook != null)
+                            {
+                                menu.AddItem(new GUIContent("粘贴复制到此处"), false, () =>
+                                {
+                                    PasteCopiedBookToLibrary(library, index);
+                                });
+                            }
+                            else
+                            {
+                                menu.AddDisabledItem(new GUIContent("粘贴复制到此处"));
+                            }
+
                             var allTargetBooks = new List<TBook>();
                             // 收集自定义Books
                             if (library.Books != null)
@@ -758,6 +859,18 @@ namespace ES
                             menu.AddDisabledItem(new GUIContent("粘贴到末尾"));
                         }
 
+                        if (copiedPage != null && book != null)
+                        {
+                            menu.AddItem(new GUIContent("粘贴复制Page到末尾"), false, () =>
+                            {
+                                PasteCopiedPageToBook(book, book.pages.Count);
+                            });
+                        }
+                        else
+                        {
+                            menu.AddDisabledItem(new GUIContent("粘贴复制Page到末尾"));
+                        }
+
                         menu.AddSeparator("");
 
                         // 批量操作
@@ -788,7 +901,7 @@ namespace ES
 
                     // 获取Page关联的资源对象
                     UnityEngine.Object pageAsset = null;
-                    if (page_ is ResPage resPage)
+                    if (page_ is ESAssetPage resPage)
                     {
                         pageAsset = resPage.OB;
                     }
@@ -807,6 +920,10 @@ namespace ES
                             cutBook = null;
                             cutBookSourceLibrary = null;
                         });
+                        menu.AddItem(new GUIContent("复制"), false, () =>
+                        {
+                            CopyPageToClipboard(page_);
+                        });
 
                         if (cutPage != null)
                         {
@@ -823,6 +940,18 @@ namespace ES
                         menu.AddSeparator("");
 
                         // 在Project中定位
+                        if (copiedPage != null)
+                        {
+                            menu.AddItem(new GUIContent("粘贴复制Page到此处"), false, () =>
+                            {
+                                PasteCopiedPageToBook(book, index);
+                            });
+                        }
+                        else
+                        {
+                            menu.AddDisabledItem(new GUIContent("粘贴复制Page到此处"));
+                        }
+
                         if (pageAsset != null)
                         {
                             menu.AddItem(new GUIContent("在Project中定位"), false, () =>
@@ -952,6 +1081,133 @@ namespace ES
                     MarkDirtyDeferred();  // 使用延迟保存
                 };
             }
+
+            #region Book/Page复制粘贴
+
+            private void CopyBookToClipboard(TBook sourceBook)
+            {
+                copiedBook = CloneBookForPaste(sourceBook);
+                if (copiedBook == null)
+                {
+                    Debug.LogWarning("[CopyBook] 当前Book类型暂不支持复制。");
+                    return;
+                }
+
+                cutBook = null;
+                cutBookSourceLibrary = null;
+            }
+
+            private void CopyPageToClipboard(TPage sourcePage)
+            {
+                copiedPage = ClonePageForPaste(sourcePage);
+                if (copiedPage == null)
+                {
+                    Debug.LogWarning("[CopyPage] 当前Page类型暂不支持复制。");
+                    return;
+                }
+
+                cutPage = null;
+                cutPageSourceBook = null;
+                cutPageSourceLibrary = null;
+            }
+
+            private void PasteCopiedBookToLibrary(TLib targetLibrary, int insertIndex)
+            {
+                if (copiedBook == null || targetLibrary?.Books == null)
+                {
+                    Debug.LogWarning("[PasteCopiedBook] 复制板或目标Library为空。");
+                    return;
+                }
+
+                var clonedBook = CloneBookForPaste(copiedBook);
+                if (clonedBook == null)
+                {
+                    Debug.LogWarning("[PasteCopiedBook] 当前Book类型暂不支持粘贴复制。");
+                    return;
+                }
+
+                Undo.RecordObject(targetLibrary, "Paste Copied Book");
+                insertIndex = Mathf.Clamp(insertIndex, 0, targetLibrary.Books.Count);
+                targetLibrary.Books.Insert(insertIndex, clonedBook);
+                SaveAssetsImmediate();
+            }
+
+            private void PasteCopiedPageToBook(TBook targetBook, int insertIndex)
+            {
+                if (copiedPage == null || targetBook?.pages == null)
+                {
+                    Debug.LogWarning("[PasteCopiedPage] 复制板或目标Book为空。");
+                    return;
+                }
+
+                var clonedPage = ClonePageForPaste(copiedPage);
+                if (clonedPage == null)
+                {
+                    Debug.LogWarning("[PasteCopiedPage] 当前Page类型暂不支持粘贴复制。");
+                    return;
+                }
+
+                Undo.RecordObject(library, "Paste Copied Page");
+                insertIndex = Mathf.Clamp(insertIndex, 0, targetBook.pages.Count);
+                targetBook.pages.Insert(insertIndex, clonedPage);
+                SaveAssetsImmediate();
+            }
+
+            private static TBook CloneBookForPaste(TBook sourceBook)
+            {
+                if (sourceBook == null)
+                {
+                    return null;
+                }
+
+                if (sourceBook is ESAssetBook sourceESAssetBook)
+                {
+                    var cloned = new ESAssetBook
+                    {
+                        Name = sourceESAssetBook.Name,
+                        WritableDefaultMessageOnEditor = sourceESAssetBook.WritableDefaultMessageOnEditor,
+                        PreferredAssetCategory = sourceESAssetBook.PreferredAssetCategory,
+                        CustomIcon = sourceESAssetBook.CustomIcon,
+                        ColorTag = sourceESAssetBook.ColorTag,
+                        Desc = sourceESAssetBook.Desc,
+                        pages = new List<ESAssetPage>()
+                    };
+
+                    if (sourceESAssetBook.pages != null)
+                    {
+                        for (int i = 0; i < sourceESAssetBook.pages.Count; i++)
+                        {
+                            var sourcePage = sourceESAssetBook.pages[i];
+                            cloned.pages.Add(sourcePage != null ? sourcePage.CloneForPaste() : null);
+                        }
+                    }
+
+                    return cloned as TBook;
+                }
+
+                return null;
+            }
+
+            private static TPage ClonePageForPaste(TPage sourcePage)
+            {
+                if (sourcePage == null)
+                {
+                    return null;
+                }
+
+                if (sourcePage is ESAssetPage sourceESAssetPage)
+                {
+                    return sourceESAssetPage.CloneForPaste() as TPage;
+                }
+
+                return new TPage
+                {
+                    Name = sourcePage.Name,
+                    ColorTag = sourcePage.ColorTag
+                };
+            }
+
+            #endregion
 
             // 封装Book粘贴逻辑
             private void PasteBookToLibrary(TLib targetLibrary, int insertIndex)
@@ -1309,7 +1565,7 @@ namespace ES
                     if (book?.pages == null) continue;
                     foreach (var page in book.pages)
                     {
-                        if (page is ResPage resPage && resPage.OB != null)
+                        if (page is ESAssetPage resPage && resPage.OB != null)
                         {
                             var pagePath = AssetDatabase.GetAssetPath(resPage.OB);
                             if (pagePath == assetPath)
@@ -1341,7 +1597,7 @@ namespace ES
                     if (book?.pages == null) continue;
                     foreach (var page in book.pages)
                     {
-                        if (page is ResPage resPage && resPage.OB != null)
+                        if (page is ESAssetPage resPage && resPage.OB != null)
                         {
                             var pagePath = AssetDatabase.GetAssetPath(resPage.OB);
                             if (pagePath == assetPath)
@@ -1417,7 +1673,7 @@ namespace ES
                             if (book?.pages == null) continue;
                             foreach (var page in book.pages)
                             {
-                                if (page is ResPage resPage && resPage.OB != null)
+                                if (page is ESAssetPage resPage && resPage.OB != null)
                                 {
                                     var path = AssetDatabase.GetAssetPath(resPage.OB);
                                     if (!string.IsNullOrEmpty(path))
@@ -1483,7 +1739,7 @@ namespace ES
                 for (int i = book.pages.Count - 1; i >= 0; i--)
                 {
                     var page = book.pages[i];
-                    if (page is ResPage resPage && resPage.OB == null)
+                    if (page is ESAssetPage resPage && resPage.OB == null)
                     {
                         book.pages.RemoveAt(i);
                         removedCount++;
@@ -1606,10 +1862,10 @@ namespace ES
                 consumer.Desc = ConsumerDesc;
                 consumer.ConsumerLibFolders.AddRange(selectedLibraries);
 
-                string basePath = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_ + "/" + typeof(TLib).Name;
+                string basePath = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_;
                 if (!AssetDatabase.IsValidFolder(basePath))
                 {
-                    AssetDatabase.CreateFolder(ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_, typeof(TLib).Name);
+                    ESDesignUtility.SafeEditor.Quick_CreateAssetFolder(basePath);
                 }
                 string consumerFolder = basePath + "/Consumer";
                 if (!AssetDatabase.IsValidFolder(consumerFolder))

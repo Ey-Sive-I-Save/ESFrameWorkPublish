@@ -29,6 +29,7 @@ namespace ES
     {
         public static readonly ESSimplePool<ESOpSupport> Pool = new ESSimplePool<ESOpSupport>(
             factoryMethod: () => new ESOpSupport(),
+            onCreate: support => support.MarkPoolOwned(),
             initCount: 16,
             maxCount: 1024,
             poolDisplayName: "ESOpSupport Pool"
@@ -62,6 +63,9 @@ namespace ES
 
         [ShowInInspector, ReadOnly, LabelText("池化回收")]
         public bool IsRecycled { get; set; }
+
+        [ShowInInspector, ReadOnly, LabelText("池创建")]
+        public bool IsPoolOwned { get; private set; }
 
         [ShowInInspector, ReadOnly, LabelText("已释放")]
         public bool IsDisposed { get; private set; }
@@ -101,6 +105,30 @@ namespace ES
         public EntityState_Skill CurrentSkillState { get; private set; }
 
         public Entity CurrentEntity => CurrentSkillState != null ? CurrentSkillState.HostEntity : OwnerEntity;
+
+        public static ESOpSupport CreateStandalone()
+        {
+            ESOpSupport support = new ESOpSupport();
+            support.IsPoolOwned = false;
+            support.IsRecycled = false;
+            support.IsDisposed = false;
+            support.EnsureRuntimeServices();
+            return support;
+        }
+
+        public static ESOpSupport Rent()
+        {
+            ESOpSupport support = Pool.GetInPool();
+            support.MarkPoolOwned();
+            support.IsDisposed = false;
+            support.EnsureRuntimeServices();
+            return support;
+        }
+
+        private void MarkPoolOwned()
+        {
+            IsPoolOwned = true;
+        }
 
         public void EnsureRuntimeServices()
         {
@@ -286,6 +314,12 @@ namespace ES
             ClearActivationRuntime();
         }
 
+        public void ClearOwnerRuntime()
+        {
+            ClearActivationRuntime();
+            contextPool?.ClearAllRuntimeValues();
+        }
+
         public void ClearActivationRuntime()
         {
             DisposeChildren();
@@ -314,6 +348,12 @@ namespace ES
         {
             if (IsRecycled)
                 return;
+
+            if (!IsPoolOwned)
+            {
+                Dispose();
+                return;
+            }
 
             Dispose();
             Pool.PushToPool(this);

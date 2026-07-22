@@ -1,7 +1,7 @@
 using UnityEditor;
 using ES;
 
-namespace ES.EditorTools
+namespace ES.Editor
 {
     [CustomEditor(typeof(Core), true)]
     public class CorePreviewEditor : BasePreviewEditor<Core>

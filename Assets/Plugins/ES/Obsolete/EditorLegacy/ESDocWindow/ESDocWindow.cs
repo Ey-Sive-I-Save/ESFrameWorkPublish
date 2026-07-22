@@ -8,8 +8,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
-namespace ES
-{
+namespace ES.Obsolete{
         /// <summary>
         /// ES文档窗口 - 专门用于制作文档界面的窗口
         /// 支持表格、代码块、网址、图片等高级特性
@@ -97,7 +96,7 @@ namespace ES
                 documentPages.Clear();
 
                 // 从指定路径加载所有文档SO资产
-                string docPath = "Assets/ES/Documentation";
+                string docPath = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Documentation";
                 if (AssetDatabase.IsValidFolder(docPath))
                 {
                     var guids = AssetDatabase.FindAssets("t:ESDocumentPageBase", new[] { docPath });
@@ -745,7 +744,7 @@ foreach (var agent in inactiveAgents)
                 doc.sections.Add(resourceSection);
 
                 // 保存文档
-                string savePath = "Assets/ES/Documentation";
+                string savePath = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Documentation";
                 if (!AssetDatabase.IsValidFolder(savePath))
                 {
                     string[] folders = savePath.Split('/');
@@ -802,7 +801,7 @@ foreach (var agent in inactiveAgents)
 
             [BoxGroup("创建选项")]
             [LabelText("保存路径"), FolderPath]
-            public string savePath = "Assets/ES/Documentation";
+            public string savePath = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Documentation";
 
             private IEnumerable<string> GetCategoryOptions()
             {
@@ -1243,7 +1242,7 @@ foreach (var agent in inactiveAgents)
                 doc.sections.Add(linkSection);
 
                 // 保存资产
-                string path = "Assets/ES/Documentation/内容元素示例.asset";
+                string path = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Documentation/内容元素示例.asset";
                 string dir = System.IO.Path.GetDirectoryName(path);
                 if (!AssetDatabase.IsValidFolder(dir))
                 {

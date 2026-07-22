@@ -1,0 +1,18 @@
+{
+    "name": "ES_Samples.Data",
+    "rootNamespace": "",
+    "references": [
+        "ES_Logic"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "ES_ENABLE_SAMPLES"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

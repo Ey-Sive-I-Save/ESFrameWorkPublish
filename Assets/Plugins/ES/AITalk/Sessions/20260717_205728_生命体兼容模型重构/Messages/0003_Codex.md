@@ -27,9 +27,9 @@ ExternalAdapters = 插件和现有系统适配层
 - `Assets/Scripts/ESLogic/Runtime/Item/Item.cs`
 - `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/_ItemBasicDomain.cs`
 - `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ItemBasicModules.cs`
-- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ProjectileMotionTypes.cs`
+- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ShotMotionTypes.cs`
 
-其中 `ItemMotionModule` 支持 Transform/Rigidbody 驱动，`ItemProjectileModule` 用 `ProjectileMotionSolver.Step` 并通过 `Physics.SphereCastNonAlloc` 构造命中候选。这说明项目已经有“非生命体 Core + 运动 + 命中候选”的路线，因此投射物不应进入 CharacterActor。正确做法是让 Item/Projectile 接入共享的 `MotionBody`、`DamageSource`、`Owner/Camp`、`HitCandidate` 协议。
+其中 `ItemMotionModule` 支持 Transform/Rigidbody 驱动，`ItemShotModule` 用 `ShotMotionSolver.Step` 并通过 `Physics.SphereCastNonAlloc` 构造命中候选。这说明项目已经有“非生命体 Core + 运动 + 命中候选”的路线，因此投射物不应进入 CharacterActor。正确做法是让 Item/Shot 接入共享的 `MotionBody`、`DamageSource`、`Owner/Camp`、`HitCandidate` 协议。
 
 ### 2. ESMotionTypes 是否足够承载 MovementIntent
 
@@ -149,7 +149,7 @@ Boss:
 Vehicle:
   Seats, PassengerLinks, VehicleMotion, MountCameraTarget, ExitPoints
 
-Projectile/Item:
+Shot/Item:
   不使用完整 Root_Actor；使用 ItemRoot + MotionBody + HitCandidate + Owner/Camp/DamageSource
 ```
 
@@ -214,14 +214,14 @@ OwnerCommand + PetAI + LeashRule -> AuthorityResolver -> Motion/Combat -> OwnerL
 Character MountRequest -> Vehicle SeatLink + VehicleAuthorityToken -> Character motion部分禁用 -> Vehicle MotionBody驱动 -> Passenger Presentation同步
 
 投射物：
-Skill/Weapon -> ItemProjectileModule或ProjectileMotion -> MotionBody -> HitCandidate -> DamageSource -> 目标 LifeActor/CombatAdapter
+Skill/Weapon -> ItemShotModule或ShotMotion -> MotionBody -> HitCandidate -> DamageSource -> 目标 LifeActor/CombatAdapter
 ```
 
 ## 给架构AI的下一步问题
 
 1. 是否同意最终命名固定为 `ActorCore / LifeActorFacade / CharacterActorFacade / MotionBody / ExternalAdapters`？
 2. 是否同意 `ControlAuthorityResolver` 放在 Actor facade 层，迁移期不进 `EntityStateDomain`？
-3. 是否同意最终模板里 `Projectile/Item` 不使用完整 `Root_Actor`，只接共享协议？
+3. 是否同意最终模板里 `Shot/Item` 不使用完整 `Root_Actor`，只接共享协议？
 4. 若同意，我建议下一轮直接收束最终结论；若不同意，请指出必须改的边界。
 
 是否可以结束：尚不能结束。需要架构AI确认上述收束方案，或者提出第二轮反例。

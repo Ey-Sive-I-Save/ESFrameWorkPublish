@@ -1,80 +1,80 @@
-using UnityEngine;
+﻿using UnityEngine;
 using ES;
 
-namespace ES.Examples
-{
+namespace ES.Samples{
     /// <summary>
-    /// ColorSelector API 演示 - 颜色选择器工具
-    /// 提供100+种预定义颜色和便捷的颜色访问方式
+    /// ColorSelector API 婕旂ず - 棰滆壊閫夋嫨鍣ㄥ伐鍏?
+    /// 鎻愪緵100+绉嶉瀹氫箟棰滆壊鍜屼究鎹风殑棰滆壊璁块棶鏂瑰紡
     /// </summary>
     public class Example_ColorSelector : MonoBehaviour
     {
         private void Start()
         {
-            Debug.Log("=== ColorSelector API 演示 ===");
+            Debug.Log("=== ColorSelector API 婕旂ず ===");
 
-            // 1. 通过枚举获取颜色
-            Color red = ESDesignUtility.ColorSelector.GetColor(ESDesignUtility.ColorSelector.ColorName.红);
-            Debug.Log($"红色 RGB: {red}");
+            // 1. 閫氳繃鏋氫妇鑾峰彇棰滆壊
+            Color red = ESDesignUtility.ColorSelector.GetColor(ESDesignUtility.ColorSelector.ColorName.绾?;
+            Debug.Log($"绾㈣壊 RGB: {red}");
 
-            Color skyBlue = ESDesignUtility.ColorSelector.GetColor(ESDesignUtility.ColorSelector.ColorName.天蓝);
-            Debug.Log($"天蓝色 RGB: {skyBlue}");
+            Color skyBlue = ESDesignUtility.ColorSelector.GetColor(ESDesignUtility.ColorSelector.ColorName.澶╄摑);
+            Debug.Log($"澶╄摑鑹?RGB: {skyBlue}");
 
-            // 2. 通过字符串名称获取颜色（支持中文）
-            Color colorByName = ESDesignUtility.ColorSelector.GetColor("红");
-            Debug.Log($"通过中文名称获取: {colorByName}");
+            // 2. 閫氳繃瀛楃涓插悕绉拌幏鍙栭鑹诧紙鏀寔涓枃锛?
+            Color colorByName = ESDesignUtility.ColorSelector.GetColor("绾?);
+            Debug.Log($"閫氳繃涓枃鍚嶇О鑾峰彇: {colorByName}");
 
-            Color colorByString = ESDesignUtility.ColorSelector.GetColor("天蓝");
-            Debug.Log($"通过字符串获取天蓝: {colorByString}");
+            Color colorByString = ESDesignUtility.ColorSelector.GetColor("澶╄摑");
+            Debug.Log($"閫氳繃瀛楃涓茶幏鍙栧ぉ钃? {colorByString}");
 
-            // 3. 尝试获取颜色（安全方式）
-            if (ESDesignUtility.ColorSelector.TryGetColor(ESDesignUtility.ColorSelector.ColorName.金, out Color gold))
+            // 3. 灏濊瘯鑾峰彇棰滆壊锛堝畨鍏ㄦ柟寮忥級
+            if (ESDesignUtility.ColorSelector.TryGetColor(ESDesignUtility.ColorSelector.ColorName.閲? out Color gold))
             {
-                Debug.Log($"安全获取金色: {gold}");
+                Debug.Log($"瀹夊叏鑾峰彇閲戣壊: {gold}");
             }
 
-            // 4. 快捷访问预定义颜色
+            // 4. 蹇嵎璁块棶棰勫畾涔夐鑹?
             Color color01 = ESDesignUtility.ColorSelector.Color_01;
             Color color02 = ESDesignUtility.ColorSelector.Color_02;
             Color color03 = ESDesignUtility.ColorSelector.Color_03;
-            Debug.Log($"预定义颜色: Color_01={color01}, Color_02={color02}");
+            Debug.Log($"棰勫畾涔夐鑹? Color_01={color01}, Color_02={color02}");
 
-            // 5. 获取所有可用颜色名称
+            // 5. 鑾峰彇鎵€鏈夊彲鐢ㄩ鑹插悕绉?
             var allColorNames = ESDesignUtility.ColorSelector.GetAllColorName();
-            Debug.Log($"总共有 {allColorNames.Count} 种颜色可用");
-            Debug.Log($"前5个颜色: {string.Join(", ", allColorNames.GetRange(0, System.Math.Min(5, allColorNames.Count)))}");
+            Debug.Log($"鎬诲叡鏈?{allColorNames.Count} 绉嶉鑹插彲鐢?);
+            Debug.Log($"鍓?涓鑹? {string.Join(", ", allColorNames.GetRange(0, System.Math.Min(5, allColorNames.Count)))}");
 
-            // 6. 实际应用示例：给GameObject设置材质颜色
+            // 6. 瀹為檯搴旂敤绀轰緥锛氱粰GameObject璁剧疆鏉愯川棰滆壊
             GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
             cube.name = "ColoredCube";
             Renderer renderer = cube.GetComponent<Renderer>();
-            renderer.material.color = ESDesignUtility.ColorSelector.GetColor(ESDesignUtility.ColorSelector.ColorName.金黄);
-            Debug.Log("创建了一个金黄色立方体");
+            renderer.material.color = ESDesignUtility.ColorSelector.GetColor(ESDesignUtility.ColorSelector.ColorName.閲戦粍);
+            Debug.Log("鍒涘缓浜嗕竴涓噾榛勮壊绔嬫柟浣?);
 
-            // 7. 随机颜色
+            // 7. 闅忔満棰滆壊
             Color randomColor = ESDesignUtility.ColorSelector.GetRandomColor();
-            Debug.Log($"随机颜色: {randomColor}");
+            Debug.Log($"闅忔満棰滆壊: {randomColor}");
 
-            // 8. 颜色调整：亮度
+            // 8. 棰滆壊璋冩暣锛氫寒搴?
             Color brightRed = ESDesignUtility.ColorSelector.AdjustBrightness(red, 1.5f);
-            Debug.Log($"变亮的红色: {brightRed}");
+            Debug.Log($"鍙樹寒鐨勭孩鑹? {brightRed}");
 
-            // 9. 互补色
+            // 9. 浜掕ˉ鑹?
             Color complementary = ESDesignUtility.ColorSelector.GetComplementaryColor(red);
-            Debug.Log($"红色的互补色: {complementary}");
+            Debug.Log($"绾㈣壊鐨勪簰琛ヨ壊: {complementary}");
 
-            // 10. 混合颜色
+            // 10. 娣峰悎棰滆壊
             Color blended = ESDesignUtility.ColorSelector.BlendColors(red, skyBlue, 0.5f);
-            Debug.Log($"红色和天蓝混合: {blended}");
+            Debug.Log($"绾㈣壊鍜屽ぉ钃濇贩鍚? {blended}");
 
-            // 11. 生成调色板
+            // 11. 鐢熸垚璋冭壊鏉?
             Color[] palette = ESDesignUtility.ColorSelector.GenerateColorPalette(red, 5);
-            Debug.Log($"生成了 {palette.Length} 色调色板");
+            Debug.Log($"鐢熸垚浜?{palette.Length} 鑹茶皟鑹叉澘");
 
-            // 12. 使用编辑器专用颜色
+            // 12. 浣跨敤缂栬緫鍣ㄤ笓鐢ㄩ鑹?
             Color colorForDes = ESDesignUtility.ColorSelector.ColorForDes;
             Color colorForBinding = ESDesignUtility.ColorSelector.ColorForBinding;
-            Debug.Log($"编辑器备注色: {colorForDes}, 绑定色: {colorForBinding}");
+            Debug.Log($"缂栬緫鍣ㄥ娉ㄨ壊: {colorForDes}, 缁戝畾鑹? {colorForBinding}");
         }
     }
 }
+

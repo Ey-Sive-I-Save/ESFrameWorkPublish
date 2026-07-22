@@ -4,6 +4,38 @@ namespace ES.Internal
 {
     public static class ESRuntimeModeDefaults
     {
+        private const int ModePatchCapacity = (int)ESRuntimeMode.Spectator + 1;
+        private const int TagPatchCapacity = (int)ESRuntimeModeTag.NetworkBusy + 1;
+
+        private static readonly ESRuntimeModePolicyPatch[] ModePatches = new ESRuntimeModePolicyPatch[ModePatchCapacity];
+        private static readonly ESRuntimeModePolicyPatch[] TagPatches = new ESRuntimeModePolicyPatch[TagPatchCapacity];
+
+        static ESRuntimeModeDefaults()
+        {
+            ModePatches[(int)ESRuntimeMode.Gameplay] = CreateModePatch(ESRuntimeMode.Gameplay);
+            ModePatches[(int)ESRuntimeMode.MainMenu] = CreateModePatch(ESRuntimeMode.MainMenu);
+            ModePatches[(int)ESRuntimeMode.PauseMenu] = CreateModePatch(ESRuntimeMode.PauseMenu);
+            ModePatches[(int)ESRuntimeMode.Loading] = CreateModePatch(ESRuntimeMode.Loading);
+            ModePatches[(int)ESRuntimeMode.SceneTransition] = CreateModePatch(ESRuntimeMode.SceneTransition);
+            ModePatches[(int)ESRuntimeMode.Cutscene] = CreateModePatch(ESRuntimeMode.Cutscene);
+            ModePatches[(int)ESRuntimeMode.Dialogue] = CreateModePatch(ESRuntimeMode.Dialogue);
+            ModePatches[(int)ESRuntimeMode.Inventory] = CreateModePatch(ESRuntimeMode.Inventory);
+            ModePatches[(int)ESRuntimeMode.Map] = CreateModePatch(ESRuntimeMode.Map);
+            ModePatches[(int)ESRuntimeMode.Settings] = CreateModePatch(ESRuntimeMode.Settings);
+            ModePatches[(int)ESRuntimeMode.RebindInput] = CreateModePatch(ESRuntimeMode.RebindInput);
+            ModePatches[(int)ESRuntimeMode.ConfirmDialog] = CreateModePatch(ESRuntimeMode.ConfirmDialog);
+            ModePatches[(int)ESRuntimeMode.PhotoMode] = CreateModePatch(ESRuntimeMode.PhotoMode);
+            ModePatches[(int)ESRuntimeMode.Spectator] = CreateModePatch(ESRuntimeMode.Spectator);
+
+            TagPatches[(int)ESRuntimeModeTag.Combat] = CreateTagPatch(ESRuntimeModeTag.Combat);
+            TagPatches[(int)ESRuntimeModeTag.Aiming] = CreateTagPatch(ESRuntimeModeTag.Aiming);
+            TagPatches[(int)ESRuntimeModeTag.Mounted] = CreateTagPatch(ESRuntimeModeTag.Mounted);
+            TagPatches[(int)ESRuntimeModeTag.Climbing] = CreateTagPatch(ESRuntimeModeTag.Climbing);
+            TagPatches[(int)ESRuntimeModeTag.Dead] = CreateTagPatch(ESRuntimeModeTag.Dead);
+            TagPatches[(int)ESRuntimeModeTag.Stunned] = CreateTagPatch(ESRuntimeModeTag.Stunned);
+            TagPatches[(int)ESRuntimeModeTag.NetworkBusy] = CreateTagPatch(ESRuntimeModeTag.NetworkBusy);
+        }
+
         public static int GetModePriority(ESRuntimeMode mode)
         {
             switch (mode)
@@ -60,8 +92,23 @@ namespace ES.Internal
 
         public static ESRuntimeModePolicyPatch GetModePatch(ESRuntimeMode mode)
         {
-            ESRuntimeModePolicyPatch patch = ESRuntimeModePolicyPatch.IgnoreAll;
+            int index = (int)mode;
+            return index >= 0 && index < ModePatches.Length
+                ? ModePatches[index]
+                : ESRuntimeModePolicyPatch.IgnoreAll;
+        }
 
+        public static ESRuntimeModePolicyPatch GetTagPatch(ESRuntimeModeTag tag)
+        {
+            int index = (int)tag;
+            return index >= 0 && index < TagPatches.Length
+                ? TagPatches[index]
+                : ESRuntimeModePolicyPatch.IgnoreAll;
+        }
+
+        private static ESRuntimeModePolicyPatch CreateModePatch(ESRuntimeMode mode)
+        {
+            ESRuntimeModePolicyPatch patch = ESRuntimeModePolicyPatch.IgnoreAll;
             switch (mode)
             {
                 case ESRuntimeMode.Gameplay:
@@ -182,10 +229,9 @@ namespace ES.Internal
             return patch;
         }
 
-        public static ESRuntimeModePolicyPatch GetTagPatch(ESRuntimeModeTag tag)
+        private static ESRuntimeModePolicyPatch CreateTagPatch(ESRuntimeModeTag tag)
         {
             ESRuntimeModePolicyPatch patch = ESRuntimeModePolicyPatch.IgnoreAll;
-
             switch (tag)
             {
                 case ESRuntimeModeTag.Combat:
@@ -231,5 +277,6 @@ namespace ES.Internal
 
             return patch;
         }
+
     }
 }

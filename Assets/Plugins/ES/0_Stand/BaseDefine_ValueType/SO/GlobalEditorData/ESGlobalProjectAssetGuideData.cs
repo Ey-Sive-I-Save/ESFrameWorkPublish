@@ -3,6 +3,7 @@ using Sirenix.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 #if UNITY_EDITOR
@@ -17,9 +18,10 @@ namespace ES
     /// Serialized storage is GUID-keyed through Odin dictionary serialization.
     /// </summary>
     [CreateAssetMenu(fileName = "ESGlobalProjectAssetGuideData", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "项目资产职责提示数据")]
+    [ESOnlyEditorSO("项目资产职责提示数据只服务编辑器协作和资产说明，不应进入运行时构建或AB资源包。")]
     public partial class ESGlobalProjectAssetGuideData : ESEditorGlobalSo<ESGlobalProjectAssetGuideData>
     {
-        public const string DefaultAssetPath = "Assets/NormalResources/Data/GlobalData/ProjectAssetGuide/ESGlobalProjectAssetGuideData.asset";
+        public const string DefaultAssetPath = "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide/ESGlobalProjectAssetGuideData.asset";
 
         [TabGroup("职责提示")]
         [DisplayAsString(FontSize = 28, Alignment = TextAlignment.Center)]
@@ -320,11 +322,10 @@ namespace ES
             if (data != null)
                 return true;
 
-            string[] guids = AssetDatabase.FindAssets("t:ESGlobalProjectAssetGuideData");
-            if (guids != null && guids.Length > 0)
+            List<ESGlobalProjectAssetGuideData> indexedData = ESEditorSO.SOS.GetNewGroupOfType<ESGlobalProjectAssetGuideData>();
+            if (indexedData != null && indexedData.Count > 0)
             {
-                string path = AssetDatabase.GUIDToAssetPath(guids[0]);
-                data = AssetDatabase.LoadAssetAtPath<ESGlobalProjectAssetGuideData>(path);
+                data = indexedData.FirstOrDefault(item => item != null && item.HasConfirm) ?? indexedData.FirstOrDefault(item => item != null);
                 if (data != null)
                 {
                     data.TryConfirmSwitchThis();
@@ -559,7 +560,7 @@ namespace ES
                 "Assets/Scripts/ESLogic/Runtime/Data/For_Info",
                 "Assets/Scripts/ESLogic/Runtime/EditorPreview",
                 "Assets/Scripts/ESLogic/Editor",
-                "Assets/NormalResources/Data/GlobalData/ProjectAssetGuide/ESGlobalProjectAssetGuideData.asset"
+                "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide/ESGlobalProjectAssetGuideData.asset"
             };
 
             for (int i = 0; i < importantPaths.Length; i++)
@@ -576,7 +577,7 @@ namespace ES
             {
                 "Assets/Plugins/ES",
                 "Assets/Scripts/ESLogic",
-                "Assets/NormalResources/Data/GlobalData/ProjectAssetGuide"
+                "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide"
             };
 
             for (int i = 0; i < searchRoots.Length; i++)
@@ -825,7 +826,7 @@ namespace ES
             new StandardGuideRule("Assets/Plugins/ES/3_Examples", "Examples", "ES examples folder", "Folder responsibility: stores examples and demonstrations.", "Folder rule only. Script duties must be hardcoded separately.", "Example"),
             new StandardGuideRule("Assets/Plugins/ES/Obsolete", "Obsolete", "Obsolete systems folder", "Folder responsibility: stores deprecated systems kept for reference and migration.", "Folder rule only. Script duties must be hardcoded separately.", "Obsolete"),
             new StandardGuideRule("Assets/Plugins/ES", "ES Framework", "ES framework plugin root", "Folder responsibility: root of ES framework plugin assets.", "Folder rule only. Script duties must be hardcoded separately.", "Framework"),
-            new StandardGuideRule("Assets/NormalResources/Data/GlobalData/ProjectAssetGuide", "GlobalData", "Project asset guide data folder", "Folder responsibility: stores global project asset guide data.", "Folder rule only. Script duties must be hardcoded separately.", "GlobalData", "AssetGuide")
+            new StandardGuideRule("Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide", "GlobalData", "Project asset guide data folder", "Folder responsibility: stores global project asset guide data.", "Folder rule only. Script duties must be hardcoded separately.", "GlobalData", "AssetGuide")
         };
 
         [MenuItem(MenuItemPathDefine.PROJECT_ASSETS_PATH + "打开职责提示数据", false, 0)]

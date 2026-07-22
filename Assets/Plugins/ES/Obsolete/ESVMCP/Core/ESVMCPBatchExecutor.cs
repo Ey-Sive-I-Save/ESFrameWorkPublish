@@ -6,7 +6,7 @@ using System.Linq;
 using Newtonsoft.Json;
 using Sirenix.OdinInspector;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// ESVMCP批量执行器 - 批量处理Input文件夹中的JSON文件

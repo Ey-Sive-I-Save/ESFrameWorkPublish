@@ -26,6 +26,7 @@ namespace ES
 
         private object[] extras;
         private int extraCount;
+        private bool extrasEnabled;
         private object recycleToken;
         private bool recycleRequested;
 
@@ -41,6 +42,12 @@ namespace ES
 
         /// <summary>多目标列表。保留 targetEntities 命名，因为它表达的是目标 Entity 列表，不是上下文容器。</summary>
         public readonly List<Entity> targetEntities = new List<Entity>(8);
+
+        public Item userItem;
+
+        public Item itemMainTarget;
+
+        public readonly List<Item> targetItems = new List<Item>(8);
 
         /// <summary>运行时轻量数值槽位。高频 Op 优先读取原生值，必要时再由表达式写入。</summary>
         public float runtimeFloat = 1f;
@@ -75,6 +82,23 @@ namespace ES
             get { return recycleToken; }
         }
 
+        public bool ExtrasEnabled
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return extrasEnabled; }
+        }
+
+        public ESRuntimeTargetPack EnsureListCapacity(int entityTargetCapacity = 8, int itemTargetCapacity = 8)
+        {
+            if (targetEntities.Capacity < entityTargetCapacity)
+                targetEntities.Capacity = entityTargetCapacity;
+
+            if (targetItems.Capacity < itemTargetCapacity)
+                targetItems.Capacity = itemTargetCapacity;
+
+            return this;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ESRuntimeTargetPack SetEntity(Entity entity)
         {
@@ -83,9 +107,23 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ESRuntimeTargetPack SetItem(Item item)
+        {
+            userItem = item;
+            return this;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ESRuntimeTargetPack SetUser(Entity entity)
         {
             userEntity = entity;
+            return this;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ESRuntimeTargetPack SetUser(Item item)
+        {
+            userItem = item;
             return this;
         }
 
@@ -104,6 +142,13 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ESRuntimeTargetPack SetItemMainTarget(Item item)
+        {
+            itemMainTarget = item;
+            return this;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ESRuntimeTargetPack SetMainTarget(Entity entity)
         {
             entityMainTarget = entity;
@@ -111,9 +156,22 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ESRuntimeTargetPack SetMainTarget(Item item)
+        {
+            itemMainTarget = item;
+            return this;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entity GetUserEntity()
         {
             return userEntity;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Item GetUserItem()
+        {
+            return userItem;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -129,22 +187,72 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Item GetItemMainTarget()
+        {
+            return itemMainTarget;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Entity GetMainTarget()
         {
             return entityMainTarget;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Item GetMainItemTarget()
+        {
+            return itemMainTarget;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ClearTargets()
+        {
+            targetEntities.Clear();
+            targetItems.Clear();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ClearEntityTargets()
         {
             targetEntities.Clear();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ClearItemTargets()
+        {
+            targetItems.Clear();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddTarget(Entity entity)
         {
-            if (entity != null)
-                targetEntities.Add(entity);
+            TryAddTarget(entity);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddTarget(Item item)
+        {
+            TryAddTarget(item);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryAddTarget(Entity entity)
+        {
+            if (entity == null || targetEntities.Count >= targetEntities.Capacity)
+                return false;
+
+            targetEntities.Add(entity);
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryAddTarget(Item item)
+        {
+            if (item == null || targetItems.Count >= targetItems.Capacity)
+                return false;
+
+            targetItems.Add(item);
+            return true;
         }
 
         public ESRuntimeTargetPack CopyFrom(ESRuntimeTargetPack source, bool copyTargets = true, bool copyExtras = false)
@@ -154,18 +262,35 @@ namespace ES
 
             userEntity = source.userEntity;
             entityMainTarget = source.entityMainTarget;
+            userItem = source.userItem;
+            itemMainTarget = source.itemMainTarget;
 
             if (copyTargets)
             {
                 targetEntities.Clear();
-                targetEntities.AddRange(source.targetEntities);
+                targetItems.Clear();
+
+                int entityCount = source.targetEntities.Count;
+                int maxEntityCount = targetEntities.Capacity;
+                for (int i = 0; i < entityCount && i < maxEntityCount; i++)
+                    targetEntities.Add(source.targetEntities[i]);
+
+                int itemCount = source.targetItems.Count;
+                int maxItemCount = targetItems.Capacity;
+                for (int i = 0; i < itemCount && i < maxItemCount; i++)
+                    targetItems.Add(source.targetItems[i]);
             }
 
-            if (copyExtras)
+            if (copyExtras && source.extrasEnabled && source.extraCount > 0)
             {
+                EnableExtras(source.extras != null ? source.extras.Length : InitialExtraCapacity);
                 ResetAllExtras();
                 for (int i = 0; i < source.extraCount; i++)
                     AddExtra(source.extras[i]);
+            }
+            else if (!copyExtras)
+            {
+                ResetAllExtras();
             }
 
             return this;
@@ -182,13 +307,19 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public GameObject GetGameObject()
         {
-            return userEntity != null ? userEntity.gameObject : null;
+            if (userEntity != null)
+                return userEntity.gameObject;
+
+            return userItem != null ? userItem.gameObject : null;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Transform GetTransform()
         {
-            return userEntity != null ? userEntity.transform : null;
+            if (userEntity != null)
+                return userEntity.transform;
+
+            return userItem != null ? userItem.transform : null;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -198,13 +329,52 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public GameObject GetMainTargetGameObject()
+        {
+            if (entityMainTarget != null)
+                return entityMainTarget.gameObject;
+
+            return itemMainTarget != null ? itemMainTarget.gameObject : null;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Transform GetMainTargetTransform()
+        {
+            if (entityMainTarget != null)
+                return entityMainTarget.transform;
+
+            return itemMainTarget != null ? itemMainTarget.transform : null;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddExtra(object extra)
         {
-            if (extra == null)
-                return;
+            TryAddExtra(extra);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryAddExtra(object extra)
+        {
+            if (extra == null || !extrasEnabled)
+                return false;
 
             EnsureExtraCapacity(extraCount + 1);
             extras[extraCount++] = extra;
+            return true;
+        }
+
+        public ESRuntimeTargetPack EnableExtras(int capacity = InitialExtraCapacity)
+        {
+            extrasEnabled = true;
+            EnsureExtraCapacity(Mathf.Max(InitialExtraCapacity, capacity));
+            return this;
+        }
+
+        public ESRuntimeTargetPack DisableExtras()
+        {
+            ResetAllExtras();
+            extrasEnabled = false;
+            return this;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -267,6 +437,7 @@ namespace ES
         {
             ResetAllFields();
             ResetAllExtras();
+            extrasEnabled = false;
             recycleToken = null;
             recycleRequested = false;
             Version++;
@@ -316,7 +487,10 @@ namespace ES
         {
             userEntity = null;
             entityMainTarget = null;
+            userItem = null;
+            itemMainTarget = null;
             targetEntities.Clear();
+            targetItems.Clear();
             runtimeFloat = 1f;
             runtimeBool = true;
         }

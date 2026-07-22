@@ -23,8 +23,8 @@
 Assets/Scripts/ESLogic/Runtime/Item/Item.cs
 Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/_ItemBasicDomain.cs
 Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ItemBasicModules.cs
-Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ProjectileMotionTypes.cs
-Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ProjectileMotionSolver.cs
+Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ShotMotionTypes.cs
+Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ShotMotionSolver.cs
 ```
 
 如果未来确实出现跨 `Entity / Item / Skill / Operation` 的复用，再把纯 C# 的 `MotionSolver` 和通用类型上提到：
@@ -43,10 +43,10 @@ Assets/Scripts/ESLogic/Runtime/Shared/Motion/
 1. 是否创建了新的 Item Domain？
    - 如果是，停止。第一阶段只允许 ItemBasicDomain。
 
-2. ItemProjectileModule 是否直接写 Transform / Rigidbody？
+2. ItemShotModule 是否直接写 Transform / Rigidbody？
    - 如果是，停止。第一阶段由 ItemMotionModule 统一写回。
 
-3. ProjectileMotionSolver 是否继承 MonoBehaviour 或访问 Unity 组件？
+3. ShotMotionSolver 是否继承 MonoBehaviour 或访问 Unity 组件？
    - 如果是，停止。Solver 必须是纯 C# 计算层。
 
 4. Tick 中是否使用 LINQ、反射、字符串查找、GetComponent、Transform.Find？
@@ -58,7 +58,7 @@ Assets/Scripts/ESLogic/Runtime/Shared/Motion/
 6. HitCandidate 是否包含伤害、Buff、技能释放、VFX、音效字段？
    - 如果是，停止。HitCandidate 只描述候选命中事实。
 
-7. ProjectileModule 是否调用 ApplyDamage / AddBuff / SpawnVfx / PlayAudio / ReturnToPool？
+7. ShotModule 是否调用 ApplyDamage / AddBuff / SpawnVfx / PlayAudio / ReturnToPool？
    - 如果是，停止。这些属于上层消费者。
 
 8. ItemMotionModule 是否开始处理技能释放、输入或目标选择？
@@ -82,19 +82,19 @@ ItemBasicDomain:
 
 ItemMotionModule:
   唯一位姿写回者。
-  接收 Motion/Projectile 结果，写 Transform 或 Rigidbody。
+  接收 Motion/Shot 结果，写 Transform 或 Rigidbody。
 
-ItemProjectileModule:
+ItemShotModule:
   飞行物语义模块。
-  管启动、运行状态、调用 Solver、NonAlloc 候选检测、产出 ProjectileMotionResult。
+  管启动、运行状态、调用 Solver、NonAlloc 候选检测、产出 ShotMotionResult。
 
-ProjectileMotionSolver:
+ShotMotionSolver:
   纯 C# 运动求解。
 
-ProjectileMotionResult:
+ShotMotionResult:
   主运动状态 + 当前位置/速度/剩余距离 + 可选 HitCandidate。
 
-ProjectileHitCandidate:
+ShotHitCandidate:
   Collider、point、normal、incomingVelocity、distance、layer、isTrigger。
 ```
 

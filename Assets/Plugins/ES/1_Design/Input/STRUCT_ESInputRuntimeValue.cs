@@ -61,6 +61,27 @@ namespace ES
             pressStartTime = 0f;
             lastPressedTime = 0f;
         }
+
+        public bool HasRuntimeState()
+        {
+            return pressed
+                   || held
+                   || released
+                   || pressedConsumed
+                   || releasedConsumed
+                   || heldConsumed
+                   || longPressConsumed
+                   || doublePressConsumed
+                   || longPressed
+                   || doublePressed
+                   || longPressFired
+                   || pressBlockedByLongPress
+                   || policyBlockedUntilRelease
+                   || buttonHeldThisFrame
+                   || axis != 0f
+                   || vector2 != Vector2.zero
+                   || holdTime != 0f;
+        }
     }
 
     public struct ESInputActionMeta

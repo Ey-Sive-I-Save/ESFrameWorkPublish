@@ -52,12 +52,17 @@ namespace ES
                 return;
             }
 
-            // 使用TabGroup分离场景和资产管理
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "场景与资产快捷入口",
+                "用于维护常用场景和资产入口，支持拖拽添加、Build Settings 同步、分组、定位和打开。",
+                SimpleToolsMaturity.Upgrading,
+                "场景切换可能触发保存确认；快捷数据写入 ESSceneGlobalData。添加、删除、重命名和分组修改会记录 Undo。");
+
             EditorGUILayout.BeginVertical();
             selectedTab = GUILayout.Toolbar(selectedTab, new string[] { "场景管理", "资产管理" });
             DrawSummaryAndResult(dataInstance);
 
-            // 撤销/重做按钮
+            SimpleToolsPanelUtility.DrawSectionTitle("编辑操作", "用于撤销或重做快捷列表配置变更。");
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("↶ 撤销 (Ctrl+Z)", GUILayout.Width(120), GUILayout.Height(25)))
             {
@@ -443,6 +448,12 @@ namespace ES
                 Debug.Log("缓存已刷新");
             }
 
+            if (GUILayout.Button("Agent：新页签恢复", GUILayout.Height(30)))
+            {
+                ESCmdAgentWindow.OpenAndResume();
+                lastResultSummary = "已打开 Cmd Agent 页签";
+                lastResultDetail = "已创建页签，并优先使用 codex resume 恢复最近会话。";
+            }
             EditorGUILayout.EndHorizontal();
         }
 

@@ -1,0 +1,20 @@
+{
+    "name": "ES_Samples.Editor",
+    "rootNamespace": "",
+    "references": [
+        "ES_Logic"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "ES_ENABLE_SAMPLES"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

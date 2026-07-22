@@ -2,8 +2,7 @@ using System;
 using UnityEngine;
 
 // 示例：演示 ExtForUnityObject.cs 中常用方法
-namespace ES
-{
+namespace ES.Samples{
     public class Example_Ext_UnityObject : MonoBehaviour
     {
         public UnityEngine.Object exampleAsset;

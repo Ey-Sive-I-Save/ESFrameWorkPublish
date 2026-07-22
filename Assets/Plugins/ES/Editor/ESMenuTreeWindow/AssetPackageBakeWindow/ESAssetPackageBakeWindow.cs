@@ -16,11 +16,19 @@ using UnityEngine.SceneManagement;
 
 namespace ES
 {
+    public class ESAssetPackageBakeWindowLifecycleInitializer : EditorInvoker_Level2
+    {
+        public override void InitInvoke()
+        {
+            ESAssetPackagePreviewWorkflow.RegisterLifecycle();
+        }
+    }
+
     public class ESAssetPackageBakeWindow : ESMenuTreeWindowAB<ESAssetPackageBakeWindow>
     {
-        internal const string CodeVersion = "ESAssetBakePreview_20260720_0227_ExportChainPreflight";
-        private const string PageNameHome = "资产包烘焙";
-        private const string PageNameCurrent = "当前烘焙";
+        internal const string CodeVersion = "ESAssetBakePreview_20260721_0310_PreviewWorkflow";
+        private const string PageNameHome = "资产包分离";
+        private const string PageNameCurrent = "当前分离配置";
         private const string PrefKeySelectedBakeGuid = "ES.AssetPackageBakeWindow.SelectedBakeGuid";
         private const string PrefKeyLastPageKind = "ES.AssetPackageBakeWindow.LastPageKind";
         private const string PrefKeyLastCategory = "ES.AssetPackageBakeWindow.LastCategory";
@@ -31,21 +39,27 @@ namespace ES
         [NonSerialized] public Page_AssetPackageBakeHome homePage;
         private static ESAssetPackageBakeData selectedBake;
 
-        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "资产包分离窗口", false, -960)]
+        [MenuItem(MenuItemPathDefine.RESOURCE_PIPELINE_PATH + "资产包分离窗口", false, 20)]
         public static void TryOpenWindow()
         {
             OpenWindow();
         }
 
-        [InitializeOnLoadMethod]
-        private static void LogAssetBakePreviewCodeVersion()
-        {
-            Debug.Log("[ESAssetBakePreview CodeVersion] " + CodeVersion);
-        }
-
         public override GUIContent ESWindow_GetWindowGUIContent()
         {
-            return new GUIContent("ES资产包分离 [" + CodeVersion + "]", "按资源包烘焙数据管理导入资产、分类预览和使用选择");
+            return new GUIContent("ES 资产包分离 [" + CodeVersion + "]", "按资源包分离数据管理资产复制、分类预览和使用选择");
+        }
+
+        internal void ReleaseInstancePreviewResources()
+        {
+            if (MenuTree == null)
+                return;
+
+            foreach (OdinMenuItem item in MenuTree.EnumerateTree())
+            {
+                if (item?.Value is Page_AssetPackageBakeCategory categoryPage)
+                    categoryPage.ReleasePreviewResources();
+            }
         }
 
         public static void SelectBake(ESAssetPackageBakeData bake, bool refreshWindow)
@@ -291,6 +305,15 @@ namespace ES
         [InspectorName("动作时长从长到短")] AnimationLengthLongToShort
     }
 
+    internal enum ESAssetPackageCopyFilter
+    {
+        All,
+        Used,
+        Copied,
+        NotCopied,
+        MissingTarget
+    }
+
     internal enum ESAssetPackageAnimationClass
     {
         [InspectorName("全部")] All,
@@ -526,15 +549,7 @@ namespace ES
 
         private static List<ESAssetPackageBakeData> FindAllBakes()
         {
-            string[] guids = AssetDatabase.FindAssets("t:ESAssetPackageBakeData");
-            var result = new List<ESAssetPackageBakeData>(guids.Length);
-            for (int i = 0; i < guids.Length; i++)
-            {
-                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-                var bake = AssetDatabase.LoadAssetAtPath<ESAssetPackageBakeData>(path);
-                if (bake != null)
-                    result.Add(bake);
-            }
+            var result = ESEditorSO.SOS.GetNewGroupOfType<ESAssetPackageBakeData>() ?? new List<ESAssetPackageBakeData>(0);
 
             result.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
             return result;
@@ -546,7 +561,7 @@ namespace ES
                 ? ESGlobalEditorDefaultConfi.Instance.Path_AssetPackageBakeParent
                 : string.Empty;
 
-            return string.IsNullOrWhiteSpace(path) ? "Assets/NormalResources/Data/AssetPackageBake" : NormalizeAssetPath(path);
+            return string.IsNullOrWhiteSpace(path) ? "Assets/ESNormalAssets/Data/AssetPackageBake" : NormalizeAssetPath(path);
         }
 
         private static void EnsureAssetFolder(string folder)
@@ -634,7 +649,7 @@ namespace ES
                         ESAssetPackageBakeUtility.Bake(bake);
                         ESAssetPackageBakeWindow.SelectBake(bake, true);
                     }
-                    if (GUILayout.Button("导出已使用", GUILayout.Width(88)))
+                    if (GUILayout.Button("复制勾选资产", GUILayout.Width(96)))
                     {
                         ESAssetPackageBakeUtility.ExportSelectedAssetsByCategory(bake);
                         ESAssetPackageBakeWindow.SelectBake(bake, true);
@@ -669,6 +684,7 @@ namespace ES
             {
                 EditorGUILayout.LabelField("导出配置", EditorStyles.boldLabel);
                 DrawFolderPathRow("导出根目录", ref bake.exportRootPath);
+                bake.exportFileNamePrefix = EditorGUILayout.TextField("导出文件名前缀", string.IsNullOrWhiteSpace(bake.exportFileNamePrefix) ? "ES选用_" : bake.exportFileNamePrefix);
                 bake.previewFallbackMaterial = (Material)EditorGUILayout.ObjectField("坏材质预览兜底", bake.previewFallbackMaterial, typeof(Material), false);
                 StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
                 using (new EditorGUI.DisabledScope(true))
@@ -843,7 +859,7 @@ namespace ES
         private const int MaxPreviewSize = 220;
         private const string PrefPrefix = "ES.AssetPackageBakeWindow.Category.";
         private const string PrefKeyRecordPreviewModelGuid = "ES.AssetPackageRecordPreviewWindow.ModelGuid";
-        private const int GridAnimationPreviewHardLimit = 512;
+        private const int GridAnimationPreviewHardLimit = 48;
         private const double GridAnimationPlayerKeepAliveSeconds = 30d;
         private static readonly bool GridAnimationPreviewEnabled = true;
 
@@ -851,6 +867,7 @@ namespace ES
         [NonSerialized] private int currentPage;
         [NonSerialized] private string searchText = string.Empty;
         [NonSerialized] private bool onlyUsed;
+        [NonSerialized] private ESAssetPackageCopyFilter copyFilter = ESAssetPackageCopyFilter.All;
         [NonSerialized] private ESAssetPackageSortMode assetSortMode = ESAssetPackageSortMode.Name;
         [NonSerialized] private ESAssetPackageAnimationClass animationClassFilter = ESAssetPackageAnimationClass.All;
         [NonSerialized] private int previewSize = 150;
@@ -860,7 +877,7 @@ namespace ES
         [NonSerialized] private bool stateLoaded;
         [NonSerialized] private bool gridAnimationSlowPreview = false;
         [NonSerialized] private float gridAnimationSlowSpeed = 0.5f;
-        [NonSerialized] private int gridAnimationMaxActive = GridAnimationPreviewHardLimit;
+        [NonSerialized] private int gridAnimationMaxActive = 24;
         [NonSerialized] private int gridAnimationViewIndex = 0;
         [NonSerialized] private string gridAnimationPriorityScope = string.Empty;
         [NonSerialized] private int gridAnimationPriorityGeneration;
@@ -876,7 +893,7 @@ namespace ES
 
         private string Summary => bake == null
             ? "未选择烘焙"
-            : $"{ESAssetPackageBakeWindow.GetCategoryDisplayName(category)} | 总数 {CategoryRecords.Count} | 当前筛选 {FilteredRecords.Count} | 已使用 {CategoryRecords.Count(r => r.selectedForUse)}";
+            : BuildSummary();
 
         private List<ESAssetPackageBakeRecord> CategoryRecords
         {
@@ -895,8 +912,7 @@ namespace ES
             {
                 IEnumerable<ESAssetPackageBakeRecord> query = CategoryRecords;
 
-                if (onlyUsed)
-                    query = query.Where(r => r.selectedForUse);
+                query = ApplyCopyFilter(query);
 
                 if (!string.IsNullOrWhiteSpace(searchText))
                 {
@@ -913,6 +929,44 @@ namespace ES
 
                 return SortRecords(query).ToList();
             }
+        }
+
+        private string BuildSummary()
+        {
+            List<ESAssetPackageBakeRecord> records = CategoryRecords;
+            int used = records.Count(r => r != null && r.selectedForUse);
+            int copied = records.Count(IsCopiedRecord);
+            int missing = records.Count(HasMissingCopyTarget);
+            return $"{ESAssetPackageBakeWindow.GetCategoryDisplayName(category)} | 总数 {records.Count} | 当前筛选 {FilteredRecords.Count} | 勾选 {used} | 已复制 {copied} | 目标丢失 {missing}";
+        }
+
+        private IEnumerable<ESAssetPackageBakeRecord> ApplyCopyFilter(IEnumerable<ESAssetPackageBakeRecord> query)
+        {
+            switch (copyFilter)
+            {
+                case ESAssetPackageCopyFilter.Used:
+                    return query.Where(r => r != null && r.selectedForUse);
+                case ESAssetPackageCopyFilter.Copied:
+                    return query.Where(IsCopiedRecord);
+                case ESAssetPackageCopyFilter.NotCopied:
+                    return query.Where(r => r != null && FindExportLink(r) == null);
+                case ESAssetPackageCopyFilter.MissingTarget:
+                    return query.Where(HasMissingCopyTarget);
+                default:
+                    return query;
+            }
+        }
+
+        private bool IsCopiedRecord(ESAssetPackageBakeRecord record)
+        {
+            ESAssetPackageExportLink link = FindExportLink(record);
+            return link != null && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(link.targetAssetPath) != null;
+        }
+
+        private bool HasMissingCopyTarget(ESAssetPackageBakeRecord record)
+        {
+            ESAssetPackageExportLink link = FindExportLink(record);
+            return link != null && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(link.targetAssetPath) == null;
         }
 
         public Page_AssetPackageBakeCategory(ESAssetPackageBakeData bake, ESAssetPackageCategory category)
@@ -998,13 +1052,30 @@ namespace ES
                 if (record != null && record.category == category)
                     record.selectedForUse = value;
             }
-
             SaveBake();
+        }
+
+        private void DrawCopyFilterButton(string label, ESAssetPackageCopyFilter filter, float width)
+        {
+            bool selected = copyFilter == filter;
+            bool newSelected = GUILayout.Toggle(selected, label, EditorStyles.toolbarButton, GUILayout.Width(width));
+            if (newSelected && copyFilter != filter)
+            {
+                copyFilter = filter;
+                onlyUsed = false;
+                currentPage = 0;
+                SaveState();
+            }
         }
 
         public override void OnPageDisable()
         {
             SuspendGridAnimationPlayers();
+        }
+
+        public void ReleasePreviewResources()
+        {
+            ClearGridAnimationPlayers();
         }
 
         private void DrawToolbar(float pageWidth)
@@ -1018,13 +1089,13 @@ namespace ES
 
                     if (GUILayout.Button("本类全用", EditorStyles.toolbarButton, GUILayout.Width(74)))
                         MarkAllUsed();
-                    if (GUILayout.Button("本类全不用", EditorStyles.toolbarButton, GUILayout.Width(86)))
+                    if (GUILayout.Button("本类全不使用", EditorStyles.toolbarButton, GUILayout.Width(90)))
                         UnmarkAllUsed();
                     if (GUILayout.Button("选中已使用", EditorStyles.toolbarButton, GUILayout.Width(86)))
                         SelectUsedInCategory();
                     if (GUILayout.Button("保存", EditorStyles.toolbarButton, GUILayout.Width(52)))
                         SaveBake();
-                    if (GUILayout.Button("导出已使用", EditorStyles.toolbarButton, GUILayout.Width(86)))
+                    if (GUILayout.Button("复制勾选资产", EditorStyles.toolbarButton, GUILayout.Width(96)))
                     {
                         ESAssetPackageBakeUtility.ExportSelectedAssetsByCategory(bake);
                         ESAssetPackageBakeWindow.SelectBake(bake, true);
@@ -1050,19 +1121,17 @@ namespace ES
                         SaveState();
                     }
 
-                    bool newOnlyUsed = GUILayout.Toggle(onlyUsed, "只看已使用", EditorStyles.toolbarButton, GUILayout.Width(86));
-                    if (newOnlyUsed != onlyUsed)
-                    {
-                        onlyUsed = newOnlyUsed;
-                        currentPage = 0;
-                        SaveState();
-                    }
+                    DrawCopyFilterButton("全部", ESAssetPackageCopyFilter.All, 46);
+                    DrawCopyFilterButton("勾选", ESAssetPackageCopyFilter.Used, 46);
+                    DrawCopyFilterButton("已复制", ESAssetPackageCopyFilter.Copied, 58);
+                    DrawCopyFilterButton("未复制", ESAssetPackageCopyFilter.NotCopied, 58);
+                    DrawCopyFilterButton("目标丢失", ESAssetPackageCopyFilter.MissingTarget, 70);
+
 
                     if (GUILayout.Button("刷新预览", GUILayout.Width(76)))
                     {
                         ClearGridAnimationPlayers();
-                        ESAssetPackagePreviewUtility.ClearPreviewCache();
-                        AssetPreview.SetPreviewTextureCacheSize(Mathf.Max(256, itemsPerPage * 4));
+                        ESAssetPackagePreviewWorkflow.RefreshStaticPreviewCache(Mathf.Max(256, itemsPerPage * 4));
                         ESAssetPackageBakeWindow.UsingWindow?.Repaint();
                     }
                 }
@@ -1155,7 +1224,7 @@ namespace ES
 
                 if (GUILayout.Button("清内存帧", EditorStyles.toolbarButton, GUILayout.Width(78)))
                 {
-                    ESAssetPackageGridAnimationFrameCache.Clear();
+                    ESAssetPackagePreviewWorkflow.ClearGridFrameMemory();
                     ESAssetPackageBakeWindow.UsingWindow?.Repaint();
                 }
 
@@ -1173,6 +1242,10 @@ namespace ES
                 GUILayout.FlexibleSpace();
                 EditorGUILayout.LabelField("帧缓存预览：允许Root位移，当前可见格异步生成", EditorStyles.miniLabel, GUILayout.Width(260));
             }
+
+            string cacheStatus = ESAssetPackagePreviewWorkflow.GetGridFrameLoadingStatus();
+            if (!string.IsNullOrEmpty(cacheStatus))
+                EditorGUILayout.HelpBox(cacheStatus, MessageType.Info);
         }
 
         private void RebuildVisibleGridAnimationFrames()
@@ -1197,7 +1270,7 @@ namespace ES
                 ESAssetPackageGridAnimationFrameCache.DeletePersistentFrames(clip, model, yaw);
             }
 
-            ESAssetPackageGridAnimationFrameCache.Clear();
+            ESAssetPackagePreviewWorkflow.ClearGridFrameMemory();
         }
 
         private void DrawGridAnimationViewButton(string label, int index)
@@ -1210,7 +1283,7 @@ namespace ES
             gridAnimationViewIndex = index;
             gridAnimationPriorityScope = string.Empty;
             RebuildVisibleGridAnimationFrames();
-            ESAssetPackageGridAnimationFrameCache.Clear();
+            ESAssetPackagePreviewWorkflow.ClearGridFrameMemory();
             SaveState();
             ESAssetPackageBakeWindow.UsingWindow?.Repaint();
         }
@@ -1338,7 +1411,7 @@ namespace ES
             {
                 Rect exportedRect = new Rect(cardRect.x + cardRect.width - 62f, cardRect.y + 10f, 54f, 18f);
                 EditorGUI.DrawRect(exportedRect, new Color(0.16f, 0.34f, 0.22f, 0.92f));
-                GUI.Label(exportedRect, "已导出", EditorStyles.centeredGreyMiniLabel);
+                GUI.Label(exportedRect, "已复制", EditorStyles.centeredGreyMiniLabel);
             }
 
             Rect nameRect = new Rect(cardRect.x + 8f, useRect.yMax + 3f, cardRect.width - 16f, 18f);
@@ -1392,9 +1465,7 @@ namespace ES
                 GameObject go = ResolveGridPreviewGameObject(model);
                 if (go != null)
                 {
-                    Texture preview = AssetPreview.GetAssetPreview(go);
-                    if (preview == null && AssetPreview.IsLoadingAssetPreview(go.GetInstanceID()))
-                        ESAssetPackageBakeWindow.UsingWindow?.Repaint();
+                    Texture preview = ESEditorPreviewUtility.GetAssetPreviewOrMini(go, () => ESAssetPackageBakeWindow.UsingWindow?.Repaint());
                     return preview;
                 }
 
@@ -1586,46 +1657,25 @@ namespace ES
 
         private UnityEngine.Object ResolveGridAnimationPreviewModel(UnityEngine.Object currentAsset)
         {
-            if (bake != null && bake.animationPreviewModel != null)
-                return bake.animationPreviewModel;
+            UnityEngine.Object configuredModel = ESAssetPackagePreviewWorkflow.ResolveConfiguredAnimationPreviewModel(bake);
+            if (configuredModel != null)
+                return configuredModel;
 
-            UnityEngine.Object rememberedModel = LoadRememberedPreviewModel();
+            UnityEngine.Object rememberedModel = ESAssetPackagePreviewWorkflow.LoadRememberedPreviewModel(PrefKeyRecordPreviewModelGuid);
             if (rememberedModel != null)
                 return rememberedModel;
-
-            StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
-            if (stateMachineConfig != null && stateMachineConfig.previewModel != null)
-                return stateMachineConfig.previewModel;
 
             return null;
         }
 
-        private static UnityEngine.Object LoadRememberedPreviewModel()
-        {
-            string guid = EditorPrefs.GetString(PrefKeyRecordPreviewModelGuid, string.Empty);
-            if (string.IsNullOrEmpty(guid))
-                return null;
-
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            return string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<GameObject>(path);
-        }
-
         private Avatar ResolveGridAnimationPreviewAvatar()
         {
-            if (bake != null && bake.animationPreviewAvatar != null)
-                return bake.animationPreviewAvatar;
-
-            StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
-            return stateMachineConfig != null ? stateMachineConfig.previewAvatar : null;
+            return ESAssetPackagePreviewWorkflow.ResolveAnimationPreviewAvatar(bake);
         }
 
         private Material ResolveGridAnimationPreviewFallbackMaterial()
         {
-            if (bake != null && bake.previewFallbackMaterial != null)
-                return bake.previewFallbackMaterial;
-
-            StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
-            return stateMachineConfig != null ? stateMachineConfig.previewFallbackMaterial : null;
+            return ESAssetPackagePreviewWorkflow.ResolveAnimationPreviewFallbackMaterial(bake);
         }
 
         private ESAssetPackageExportLink FindExportLink(ESAssetPackageBakeRecord record)
@@ -1871,6 +1921,12 @@ namespace ES
             currentPage = Mathf.Max(0, EditorPrefs.GetInt(GetStateKey("Page"), currentPage));
             onlyUsed = EditorPrefs.GetBool(GetStateKey("OnlyUsed"), onlyUsed);
             searchText = EditorPrefs.GetString(GetStateKey("Search"), searchText ?? string.Empty);
+            copyFilter = (ESAssetPackageCopyFilter)Mathf.Clamp(EditorPrefs.GetInt(GetStateKey("CopyFilter"), (int)copyFilter), 0, Enum.GetValues(typeof(ESAssetPackageCopyFilter)).Length - 1);
+            if (onlyUsed && copyFilter == ESAssetPackageCopyFilter.All)
+            {
+                copyFilter = ESAssetPackageCopyFilter.Used;
+                onlyUsed = false;
+            }
             assetSortMode = (ESAssetPackageSortMode)Mathf.Clamp(EditorPrefs.GetInt(GetStateKey("SortMode"), (int)assetSortMode), 0, Enum.GetValues(typeof(ESAssetPackageSortMode)).Length - 1);
             animationClassFilter = (ESAssetPackageAnimationClass)Mathf.Clamp(EditorPrefs.GetInt(GetStateKey("AnimationClassFilter"), (int)animationClassFilter), 0, Enum.GetValues(typeof(ESAssetPackageAnimationClass)).Length - 1);
             gridAnimationSlowPreview = EditorPrefs.GetBool(GetStateKey("GridAnimationSlowPreview"), gridAnimationSlowPreview);
@@ -1878,8 +1934,6 @@ namespace ES
             if (gridAnimationSlowSpeed < 0.5f)
                 gridAnimationSlowSpeed = 0.5f;
             gridAnimationMaxActive = Mathf.Clamp(EditorPrefs.GetInt(GetStateKey("GridAnimationMaxActive"), gridAnimationMaxActive), 1, GridAnimationPreviewHardLimit);
-            if (GridAnimationPreviewEnabled && gridAnimationMaxActive <= 12)
-                gridAnimationMaxActive = GridAnimationPreviewHardLimit;
             gridAnimationViewIndex = Mathf.Clamp(EditorPrefs.GetInt(GetStateKey("GridAnimationViewIndex"), gridAnimationViewIndex), 0, 2);
 
             string selectedId = EditorPrefs.GetString(GetStateKey("SelectedRecord"), string.Empty);
@@ -1903,6 +1957,7 @@ namespace ES
             EditorPrefs.SetInt(GetStateKey("Page"), currentPage);
             EditorPrefs.SetBool(GetStateKey("OnlyUsed"), onlyUsed);
             EditorPrefs.SetString(GetStateKey("Search"), searchText ?? string.Empty);
+            EditorPrefs.SetInt(GetStateKey("CopyFilter"), (int)copyFilter);
             EditorPrefs.SetInt(GetStateKey("SortMode"), (int)assetSortMode);
             EditorPrefs.SetInt(GetStateKey("AnimationClassFilter"), (int)animationClassFilter);
             EditorPrefs.SetBool(GetStateKey("GridAnimationSlowPreview"), gridAnimationSlowPreview);
@@ -1939,7 +1994,9 @@ namespace ES
         private Vector2 scroll;
         private UnityEngine.Object animationPreviewModel;
         private int animationClipIndex;
-        private bool showAnimationDebug = true;
+        private bool showAnimationDebug;
+        private bool showAnimationClipInfo;
+        private bool showAnimationHeaderInfo;
         private Vector2 animationDebugScroll;
         private readonly ESAssetPackageAnimationPreviewPlayer animationPreview = new ESAssetPackageAnimationPreviewPlayer();
 
@@ -1952,6 +2009,10 @@ namespace ES
             window.bake = bake;
             window.record = record;
             window.RestoreWindowState();
+            window.scroll = Vector2.zero;
+            window.animationDebugScroll = Vector2.zero;
+            window.showAnimationClipInfo = false;
+            window.showAnimationDebug = false;
             window.SaveWindowState();
             window.titleContent = new GUIContent("预览: " + record.assetName);
             window.minSize = new Vector2(520f, 640f);
@@ -1970,6 +2031,11 @@ namespace ES
         private void OnDisable() 
         {
             SaveWindowState();
+            ReleasePreviewResources();
+        }
+
+        public void ReleasePreviewResources()
+        {
             animationPreview.Dispose();
         }
 
@@ -2030,17 +2096,18 @@ namespace ES
             ESAssetPackageExportLink link = FindExportLink(record);
             if (link == null)
             {
-                EditorGUILayout.LabelField("导出状态", "未导出");
+                EditorGUILayout.LabelField("复制状态", "未复制");
+                EditorGUILayout.LabelField("源路径", record != null ? record.assetPath : string.Empty, EditorStyles.wordWrappedMiniLabel);
                 return;
             }
 
             bool exists = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(link.targetAssetPath) != null;
             using (new EditorGUILayout.HorizontalScope())
             {
-                EditorGUILayout.LabelField("导出状态", exists ? "已导出" : "链路存在但目标缺失");
+                EditorGUILayout.LabelField("复制状态", exists ? "已复制" : "链路存在但目标丢失");
                 using (new EditorGUI.DisabledScope(!exists))
                 {
-                    if (GUILayout.Button("Ping 导出目标", GUILayout.Width(96)))
+                    if (GUILayout.Button("Ping 复制目标", GUILayout.Width(96)))
                     {
                         UnityEngine.Object target = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(link.targetAssetPath);
                         Selection.activeObject = target;
@@ -2048,7 +2115,12 @@ namespace ES
                     }
                 }
             }
-            EditorGUILayout.LabelField("导出路径", link.targetAssetPath, EditorStyles.wordWrappedMiniLabel);
+
+            EditorGUILayout.LabelField("目标存在", exists ? "是" : "否");
+            EditorGUILayout.LabelField("复制次数", link.exportCount.ToString());
+            EditorGUILayout.LabelField("最近复制时间", string.IsNullOrEmpty(link.lastExportTime) ? "无" : link.lastExportTime);
+            EditorGUILayout.LabelField("源路径", link.sourceAssetPath, EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.LabelField("复制目标", link.targetAssetPath, EditorStyles.wordWrappedMiniLabel);
         }
 
         private ESAssetPackageExportLink FindExportLink(ESAssetPackageBakeRecord targetRecord)
@@ -2113,8 +2185,12 @@ namespace ES
         {
             AnimationClip clip = ResolveAnimationClip(asset);
             AnimationClip previewClip = ESAssetPackagePreviewUtility.ResolveVisualMotionClip(clip);
-            DrawAnimationClipReferencePanel(asset, clip, previewClip);
-            ESAssetPackagePreviewUtility.DrawAnimationClipInfo(previewClip != null ? previewClip : clip);
+            showAnimationClipInfo = EditorGUILayout.Foldout(showAnimationClipInfo, "Clip 信息与引用", true);
+            if (showAnimationClipInfo)
+            {
+                DrawAnimationClipReferencePanel(asset, clip, previewClip);
+                ESAssetPackagePreviewUtility.DrawAnimationClipInfo(previewClip != null ? previewClip : clip);
+            }
             if (previewClip != clip && previewClip != null)
                 EditorGUILayout.HelpBox("当前 Clip 更像 RootMotion/IK 数据，预览已自动切换到同名视觉动作 Clip：" + previewClip.name, MessageType.Info);
             animationPreview.RepaintOwner = Repaint;
@@ -2150,7 +2226,7 @@ namespace ES
                 if (GUILayout.Button("停止"))
                     animationPreview.Stop(true);
 
-                using (new EditorGUI.DisabledScope(!CanUseAsAnimationPreviewModel(asset)))
+                using (new EditorGUI.DisabledScope(!ESAssetPackagePreviewWorkflow.CanUseAsAnimationPreviewModel(asset)))
                 {
                     if (GUILayout.Button("用当前资源作模型"))
                     {
@@ -2169,7 +2245,7 @@ namespace ES
                     SaveWindowState();
                 }
 
-                using (new EditorGUI.DisabledScope(StateMachineConfig.Instance == null || ResolvePreviewGameObject(animationPreviewModel) == null))
+                using (new EditorGUI.DisabledScope(StateMachineConfig.Instance == null || ESAssetPackagePreviewWorkflow.ResolvePreviewGameObject(animationPreviewModel) == null))
                 {
                     if (GUILayout.Button("保存到状态机预览"))
                     {
@@ -2344,50 +2420,31 @@ namespace ES
 
         private UnityEngine.Object ResolveDefaultAnimationPreviewModel(UnityEngine.Object currentAsset)
         {
-            if (bake != null && bake.animationPreviewModel != null)
-                return bake.animationPreviewModel;
-
-            StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
-            if (stateMachineConfig != null && stateMachineConfig.previewModel != null)
-                return ResolvePreviewGameObject(stateMachineConfig.previewModel) ?? stateMachineConfig.previewModel;
+            UnityEngine.Object configuredModel = ESAssetPackagePreviewWorkflow.ResolveConfiguredAnimationPreviewModel(bake);
+            if (configuredModel != null)
+                return configuredModel;
 
             return FindDefaultPreviewModel(currentAsset);
         }
 
         private static GameObject ResolvePreviewGameObject(UnityEngine.Object source)
         {
-            if (source is GameObject go)
-                return go;
-
-            string path = source == null ? string.Empty : AssetDatabase.GetAssetPath(source);
-            if (string.IsNullOrEmpty(path))
-                return null;
-
-            return AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            return ESAssetPackagePreviewWorkflow.ResolvePreviewGameObject(source);
         }
 
         private static bool CanUseAsAnimationPreviewModel(UnityEngine.Object source)
         {
-            GameObject go = ResolvePreviewGameObject(source);
-            return go != null && go.GetComponentInChildren<Animator>(true) != null;
+            return ESAssetPackagePreviewWorkflow.CanUseAsAnimationPreviewModel(source);
         }
 
         private Avatar ResolveAnimationPreviewAvatar()
         {
-            if (bake != null && bake.animationPreviewAvatar != null)
-                return bake.animationPreviewAvatar;
-
-            StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
-            return stateMachineConfig != null ? stateMachineConfig.previewAvatar : null;
+            return ESAssetPackagePreviewWorkflow.ResolveAnimationPreviewAvatar(bake);
         }
 
         private Material ResolveAnimationPreviewFallbackMaterial()
         {
-            if (bake != null && bake.previewFallbackMaterial != null)
-                return bake.previewFallbackMaterial;
-
-            StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
-            return stateMachineConfig != null ? stateMachineConfig.previewFallbackMaterial : null;
+            return ESAssetPackagePreviewWorkflow.ResolveAnimationPreviewFallbackMaterial(bake);
         }
 
         private void RestoreWindowState()
@@ -2476,11 +2533,16 @@ namespace ES
             foreach (Texture2D texture in ModelPreviewCache.Values)
             {
                 if (texture != null)
-                    UnityEngine.Object.DestroyImmediate(texture);
+                    ESEditorPreviewUtility.DestroyObject(texture);
             }
             ModelPreviewCache.Clear();
             PreviewMissCounts.Clear();
             ShaderMaterialCache.Clear();
+            if (previewFallbackMaterial != null)
+            {
+                ESEditorPreviewUtility.DestroyObject(previewFallbackMaterial);
+                previewFallbackMaterial = null;
+            }
         }
 
         public static Texture GetPreviewTexture(UnityEngine.Object asset, ESAssetPackageCategory category)
@@ -2541,7 +2603,7 @@ namespace ES
             }
 
             if (preview == null)
-                preview = AssetPreview.GetMiniThumbnail(asset);
+                preview = ESEditorPreviewUtility.GetAssetPreviewOrMini(asset, QueuePreviewRepaint);
 
             if (!string.IsNullOrEmpty(path) && preview != null)
             {
@@ -2564,15 +2626,16 @@ namespace ES
                 utility = new PreviewRenderUtility();
                 utility.cameraFieldOfView = 28f;
                 instance = UnityEngine.Object.Instantiate(source);
-                instance.hideFlags = HideFlags.HideAndDontSave;
+                ESEditorPreviewUtility.SetHideFlagsRecursive(instance.transform, ESEditorPreviewUtility.PreviewHideFlags);
+                ESEditorPreviewUtility.TryMarkPreviewObject(instance, "AssetPackagePreview", "Asset package static preview model.", out _);
                 instance.transform.position = Vector3.zero;
                 instance.transform.rotation = Quaternion.identity;
                 instance.transform.localScale = Vector3.one;
-                DisableRuntimeBehaviours(instance);
+                ESEditorPreviewUtility.DisableRuntimeBehaviours(instance);
                 ApplyPreviewFallbackMaterials(instance, configuredFallbackMaterial);
                 utility.AddSingleGO(instance);
 
-                Bounds bounds = CalculateBounds(instance);
+                Bounds bounds = ESEditorPreviewUtility.CalculateBounds(instance);
                 Vector3 center = bounds.center;
                 float radius = Mathf.Max(0.5f, bounds.extents.magnitude);
                 utility.camera.aspect = 1f;
@@ -2606,26 +2669,7 @@ namespace ES
 
         private static Texture2D CopyPreviewTexture(Texture source, int width, int height)
         {
-            if (source == null)
-                return null;
-
-            RenderTexture temporary = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
-            RenderTexture previous = RenderTexture.active;
-            try
-            {
-                Graphics.Blit(source, temporary);
-                RenderTexture.active = temporary;
-                Texture2D copy = new Texture2D(width, height);
-                copy.hideFlags = HideFlags.HideAndDontSave;
-                copy.ReadPixels(new Rect(0f, 0f, width, height), 0, 0);
-                copy.Apply();
-                return copy;
-            }
-            finally
-            {
-                RenderTexture.active = previous;
-                RenderTexture.ReleaseTemporary(temporary);
-            }
+            return ESEditorPreviewUtility.CopyTexture(source, width, height, "ES Asset Package Static Preview");
         }
 
         public static void ApplyPreviewFallbackMaterials(GameObject root, Material configuredFallbackMaterial)
@@ -2865,30 +2909,6 @@ namespace ES
             }
 
             return previewFallbackMaterial;
-        }
-
-        private static void DisableRuntimeBehaviours(GameObject root)
-        {
-            Behaviour[] behaviours = root.GetComponentsInChildren<Behaviour>(true);
-            for (int i = 0; i < behaviours.Length; i++)
-            {
-                if (behaviours[i] is Animator || behaviours[i] is Animation)
-                    continue;
-
-                behaviours[i].enabled = false;
-            }
-        }
-
-        private static Bounds CalculateBounds(GameObject root)
-        {
-            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
-            if (renderers.Length == 0)
-                return new Bounds(root.transform.position, Vector3.one);
-
-            Bounds bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++)
-                bounds.Encapsulate(renderers[i].bounds);
-            return bounds;
         }
 
         private static bool NeedsRichPreview(ESAssetPackageCategory category)
@@ -3136,6 +3156,126 @@ namespace ES
         Fast
     }
 
+    internal static class ESAssetPackagePreviewWorkflow
+    {
+        private const double ReloadDomainPersistentFrameBlockSeconds = 8d;
+
+        public static void RegisterLifecycle()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= ReleaseForAssemblyReload;
+            AssemblyReloadEvents.beforeAssemblyReload += ReleaseForAssemblyReload;
+            EditorApplication.quitting -= ReleaseForEditorQuit;
+            EditorApplication.quitting += ReleaseForEditorQuit;
+            ESAssetPackageGridAnimationFrameCache.BlockPersistentFrameLoading(ReloadDomainPersistentFrameBlockSeconds);
+        }
+
+        public static void RefreshStaticPreviewCache(int assetPreviewTextureCacheSize)
+        {
+            ClearAllInMemoryPreviewData(unloadUnusedAssets: false);
+            AssetPreview.SetPreviewTextureCacheSize(Mathf.Max(256, assetPreviewTextureCacheSize));
+        }
+
+        public static void ClearGridFrameMemory()
+        {
+            ESAssetPackageGridAnimationFrameCache.Clear();
+        }
+
+        public static string GetGridFrameLoadingStatus()
+        {
+            return ESAssetPackageGridAnimationFrameCache.GetPersistentFrameLoadingStatus();
+        }
+
+        public static UnityEngine.Object ResolveConfiguredAnimationPreviewModel(ESAssetPackageBakeData bake)
+        {
+            if (bake != null && bake.animationPreviewModel != null)
+                return bake.animationPreviewModel;
+
+            StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
+            if (stateMachineConfig != null && stateMachineConfig.previewModel != null)
+                return ResolvePreviewGameObject(stateMachineConfig.previewModel) ?? stateMachineConfig.previewModel;
+
+            return null;
+        }
+
+        public static UnityEngine.Object LoadRememberedPreviewModel(string editorPrefsKey)
+        {
+            string guid = EditorPrefs.GetString(editorPrefsKey, string.Empty);
+            if (string.IsNullOrEmpty(guid))
+                return null;
+
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            return string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        }
+
+        public static Avatar ResolveAnimationPreviewAvatar(ESAssetPackageBakeData bake)
+        {
+            if (bake != null && bake.animationPreviewAvatar != null)
+                return bake.animationPreviewAvatar;
+
+            StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
+            return stateMachineConfig != null ? stateMachineConfig.previewAvatar : null;
+        }
+
+        public static Material ResolveAnimationPreviewFallbackMaterial(ESAssetPackageBakeData bake)
+        {
+            if (bake != null && bake.previewFallbackMaterial != null)
+                return bake.previewFallbackMaterial;
+
+            StateMachineConfig stateMachineConfig = StateMachineConfig.Instance;
+            return stateMachineConfig != null ? stateMachineConfig.previewFallbackMaterial : null;
+        }
+
+        public static GameObject ResolvePreviewGameObject(UnityEngine.Object source)
+        {
+            if (source is GameObject go)
+                return go;
+
+            string path = source == null ? string.Empty : AssetDatabase.GetAssetPath(source);
+            return string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        }
+
+        public static bool CanUseAsAnimationPreviewModel(UnityEngine.Object source)
+        {
+            GameObject go = ResolvePreviewGameObject(source);
+            return go != null && go.GetComponentInChildren<Animator>(true) != null;
+        }
+
+        private static void ReleaseForAssemblyReload()
+        {
+            ESAssetPackageGridAnimationFrameCache.BlockPersistentFrameLoading(ReloadDomainPersistentFrameBlockSeconds);
+            ReleaseAllPreviewResources("AssemblyReload");
+        }
+
+        private static void ReleaseForEditorQuit()
+        {
+            ReleaseAllPreviewResources("EditorQuit");
+        }
+
+        private static void ReleaseAllPreviewResources(string reason)
+        {
+            try
+            {
+                foreach (ESAssetPackageBakeWindow window in Resources.FindObjectsOfTypeAll<ESAssetPackageBakeWindow>())
+                    window?.ReleaseInstancePreviewResources();
+                foreach (ESAssetPackageRecordPreviewWindow window in Resources.FindObjectsOfTypeAll<ESAssetPackageRecordPreviewWindow>())
+                    window?.ReleasePreviewResources();
+
+                ClearAllInMemoryPreviewData(unloadUnusedAssets: true);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[ESAssetBakePreviewWorkflow] Release preview resources failed. reason=" + reason + " error=" + ex.Message);
+            }
+        }
+
+        private static void ClearAllInMemoryPreviewData(bool unloadUnusedAssets)
+        {
+            ESAssetPackagePreviewUtility.ClearPreviewCache();
+            if (unloadUnusedAssets)
+                EditorUtility.UnloadUnusedAssetsImmediate(false);
+        }
+    }
+
     internal sealed class ESAssetPackagePreviewSceneContext : IDisposable
     {
         public const int PreviewRenderLayer = 31;
@@ -3162,7 +3302,6 @@ namespace ES
         private ESAssetPackagePreviewBaselinePlatform renderTexturePlatform;
         private double lastRenderTime;
         private bool disposed;
-        private static MethodInfo markPreviewObjectMethod;
 
         public Camera Camera { get; private set; }
         public string LastStatus { get; private set; } = "Preview context not created.";
@@ -3297,28 +3436,12 @@ namespace ES
             if (renderTexture == null)
                 return null;
 
-            RenderTexture oldTarget = Camera.targetTexture;
-            RenderTexture oldActive = RenderTexture.active;
-            try
-            {
-                Camera.targetTexture = renderTexture;
-                Camera.Render();
-                RenderTexture.active = renderTexture;
-                var texture = new Texture2D(width, height)
-                {
-                    name = "ES Asset Package Animation Grid Frame",
-                    hideFlags = HideFlags.HideAndDontSave,
-                    filterMode = FilterMode.Bilinear
-                };
-                texture.ReadPixels(new Rect(0f, 0f, width, height), 0, 0);
-                texture.Apply(false, false);
-                return texture;
-            }
-            finally
-            {
-                Camera.targetTexture = oldTarget;
-                RenderTexture.active = oldActive;
-            }
+            return ESEditorPreviewUtility.RenderCameraSnapshot(
+                Camera,
+                renderTexture,
+                width,
+                height,
+                "ES Asset Package Animation Grid Frame");
         }
 
         public void Dispose()
@@ -3417,14 +3540,12 @@ namespace ES
             renderTextureWidth = width;
             renderTextureHeight = height;
             renderTexturePlatform = baselinePlatform;
-            renderTexture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32)
-            {
-                name = "ES Asset Package Preview RT",
-                hideFlags = HideFlags.HideAndDontSave,
-                antiAliasing = GetAntiAliasing(baselinePlatform),
-                filterMode = FilterMode.Bilinear
-            };
-            renderTexture.Create();
+            renderTexture = ESEditorPreviewUtility.CreateRenderTexture(
+                width,
+                height,
+                24,
+                GetAntiAliasing(baselinePlatform),
+                "ES Asset Package Preview RT");
         }
 
         private static int GetAntiAliasing(ESAssetPackagePreviewBaselinePlatform baselinePlatform)
@@ -3466,30 +3587,14 @@ namespace ES
 
         private void ReleaseRenderTexture()
         {
-            if (renderTexture == null)
-                return;
-
-            renderTexture.Release();
-            UnityEngine.Object.DestroyImmediate(renderTexture);
-            renderTexture = null;
+            ESEditorPreviewUtility.ReleaseRenderTexture(ref renderTexture);
             renderTextureWidth = 0;
             renderTextureHeight = 0;
         }
 
         private static void DestroyObject(UnityEngine.Object obj)
         {
-            if (obj != null)
-                UnityEngine.Object.DestroyImmediate(obj);
-        }
-
-        private static void SetLayerRecursive(Transform root, int layer)
-        {
-            if (root == null)
-                return;
-
-            root.gameObject.layer = layer;
-            for (int i = 0; i < root.childCount; i++)
-                SetLayerRecursive(root.GetChild(i), layer);
+            ESEditorPreviewUtility.DestroyObject(obj);
         }
 
         private static Vector2Int AllocateCell(int allocationId, out string report)
@@ -3592,9 +3697,9 @@ namespace ES
             bool movedBeforeHide = usePreviewScene ? MoveToPreviewScene(obj) : MoveToActiveScene(obj);
             Scene sceneBeforeHide = obj.scene;
             HideFlags hideFlags = GetPreviewObjectHideFlags(samplingTarget);
-            SetHideFlagsRecursive(obj.transform, hideFlags);
+            ESEditorPreviewUtility.SetHideFlagsRecursive(obj.transform, hideFlags);
             bool movedAfterHide = usePreviewScene ? obj.scene == previewScene : MoveToActiveScene(obj);
-            SetLayerRecursive(obj.transform, PreviewRenderLayer);
+            ESEditorPreviewUtility.SetLayerRecursive(obj.transform, PreviewRenderLayer);
             RegisterCleanupMarker(obj, note);
 
             LastObjectFlowStatus =
@@ -3653,53 +3758,20 @@ namespace ES
             return "(" + value.x.ToString("F1") + ", " + value.y.ToString("F1") + ", " + value.z.ToString("F1") + ")";
         }
 
-        private static void SetHideFlagsRecursive(Transform root, HideFlags flags)
-        {
-            if (root == null)
-                return;
-
-            root.gameObject.hideFlags = flags;
-            for (int i = 0; i < root.childCount; i++)
-                SetHideFlagsRecursive(root.GetChild(i), flags);
-        }
-
         private void RegisterCleanupMarker(GameObject obj, string note)
         {
             if (obj == null)
                 return;
 
-            MethodInfo method = GetMarkPreviewObjectMethod();
-            if (method == null)
+            CleanupMarkerAvailable = ESEditorPreviewUtility.TryMarkPreviewObject(obj, Owner, note, out string markerStatus);
+            if (CleanupMarkerAvailable)
             {
-                CleanupMarkerAvailable = false;
-                LastMarkerStatus = "ES editor preview cleanup marker not found.";
+                MarkedObjectCount++;
+                LastMarkerStatus = "Registered " + MarkedObjectCount + " preview objects to ES cleanup scope.";
                 return;
             }
 
-            try
-            {
-                method.Invoke(null, new object[] { obj, Owner, note });
-                CleanupMarkerAvailable = true;
-                MarkedObjectCount++;
-                LastMarkerStatus = "Registered " + MarkedObjectCount + " preview objects to ES cleanup scope.";
-            }
-            catch (Exception ex)
-            {
-                CleanupMarkerAvailable = false;
-                LastMarkerStatus = "Cleanup marker failed: " + ex.GetType().Name + ": " + ex.Message;
-            }
-        }
-
-        private static MethodInfo GetMarkPreviewObjectMethod()
-        {
-            if (markPreviewObjectMethod != null)
-                return markPreviewObjectMethod;
-
-            Type scopeType = AppDomain.CurrentDomain.GetAssemblies()
-                .Select(assembly => assembly.GetType("ES.ESEditorPreviewResourceScope"))
-                .FirstOrDefault(type => type != null);
-            markPreviewObjectMethod = scopeType?.GetMethod("MarkPreviewObject", BindingFlags.Public | BindingFlags.Static);
-            return markPreviewObjectMethod;
+            LastMarkerStatus = markerStatus;
         }
 
         private static bool TrySetCameraScene(Camera camera, Scene scene)
@@ -3767,9 +3839,9 @@ namespace ES
         private const int LongClipSampleRate = 10;
         private const float LongClipThresholdSeconds = 2.4f;
         private const int GridMinFrameCount = 24;
-        private const int GridMaxFrameCount = 72;
-        public const int GridMaxPixels = 256;
-        private const int MaxEntries = 512;
+        private const int GridMaxFrameCount = 36;
+        public const int GridMaxPixels = 128;
+        private const int MaxEntries = 48;
         private const int MaxFramesPerEditorUpdate = 1;
         private static readonly Dictionary<string, Entry> Entries = new Dictionary<string, Entry>();
         private static readonly List<Entry> BuildQueue = new List<Entry>();
@@ -3778,10 +3850,37 @@ namespace ES
         private static string visiblePriorityScope = string.Empty;
         private static int visiblePriorityGeneration;
         private static long queueSerial;
+        private static double blockPersistentFrameLoadingUntil;
 
         public static int GetGridFrameCount(AnimationClip clip)
         {
             return ResolveFrameCount(clip, GridMinFrameCount, GridMaxFrameCount);
+        }
+
+        public static void BlockPersistentFrameLoading(double seconds)
+        {
+            blockPersistentFrameLoadingUntil = Math.Max(blockPersistentFrameLoadingUntil, EditorApplication.timeSinceStartup + Math.Max(0d, seconds));
+        }
+
+        private static bool IsPersistentFrameLoadingBlocked()
+        {
+            return EditorApplication.isCompiling ||
+                   EditorApplication.isUpdating ||
+                   EditorApplication.timeSinceStartup < blockPersistentFrameLoadingUntil;
+        }
+
+        public static string GetPersistentFrameLoadingStatus()
+        {
+            if (EditorApplication.isCompiling)
+                return "ReloadDomain保护：Unity正在编译，暂停加载小格子磁盘帧，避免PNG解码造成内存峰值。";
+            if (EditorApplication.isUpdating)
+                return "ReloadDomain保护：AssetDatabase正在刷新，暂停加载小格子磁盘帧。";
+
+            double remaining = blockPersistentFrameLoadingUntil - EditorApplication.timeSinceStartup;
+            if (remaining > 0d)
+                return "ReloadDomain保护：约 " + remaining.ToString("F1") + " 秒后恢复加载小格子磁盘帧。";
+
+            return string.Empty;
         }
 
         public static int BeginVisiblePagePriority(string scope)
@@ -3815,6 +3914,13 @@ namespace ES
 
         public static void Draw(Rect rect, string key, AnimationClip clip, UnityEngine.Object model, Material fallbackMaterial, Avatar overrideAvatar, int pixels, float playbackSpeed, int frameCount, int maxPixels, float yaw, string viewName, string label, int priorityGeneration, int priorityIndex)
         {
+            if (IsPersistentFrameLoadingBlocked())
+            {
+                DrawStaticModelFallback(rect, model);
+                DrawStatus(rect, "ReloadDomain保护：暂停加载帧缓存", new Color(0.18f, 0.13f, 0.04f, 0.78f));
+                return;
+            }
+
             frameCount = Mathf.Clamp(frameCount, GridMinFrameCount, GridMaxFrameCount);
             pixels = Mathf.Clamp(pixels, 64, Mathf.Clamp(maxPixels, 64, 1024));
             yaw = NormalizeYaw(yaw);
@@ -4120,7 +4226,7 @@ namespace ES
             Texture preview = null;
             GameObject go = ResolvePreviewGameObject(model);
             if (go != null)
-                preview = AssetPreview.GetAssetPreview(go);
+                preview = ESEditorPreviewUtility.GetAssetPreviewOrMini(go, null);
 
             if (preview != null)
                 GUI.DrawTexture(rect, preview, ScaleMode.ScaleToFit);
@@ -4588,6 +4694,7 @@ namespace ES
         private bool previewInputEnabled = true;
         private double repaintInterval;
         private double lastRepaintTime;
+        private int targetPreviewFps = 60;
         private bool editorUpdateRegistered;
         private static MethodInfo samplePlayableGraphMethod;
         public Action RepaintOwner;
@@ -4622,6 +4729,7 @@ namespace ES
             orbitPitch = 8f;
             zoomMultiplier = 1f;
             previewInputEnabled = false;
+            targetPreviewFps = 24;
             repaintInterval = 0.04d;
         }
 
@@ -4631,7 +4739,8 @@ namespace ES
             previewInputEnabled = true;
             baselinePlatform = ESAssetPackagePreviewBaselinePlatform.Desktop;
             renderScale = 4f;
-            repaintInterval = 0d;
+            targetPreviewFps = 60;
+            repaintInterval = 1d / targetPreviewFps;
         }
 
         public void AutoStart(string path, AnimationClip clip, UnityEngine.Object model, Material fallbackMaterial, Avatar overrideAvatar)
@@ -4730,7 +4839,7 @@ namespace ES
             if (!SampleClip(previewInstance, clip, time) && !EvaluatePlayableClip(clip, time) && !EvaluateHumanPoseClip(clip, time))
                 LastStatus = "动画采样失败，查看 Debug";
 
-            Bounds bounds = CalculateBounds(previewInstance);
+            Bounds bounds = ESEditorPreviewUtility.CalculateBounds(previewInstance);
             lastBounds = bounds;
             if (!hasStableCenter)
             {
@@ -4910,7 +5019,7 @@ namespace ES
             if (previewInstance == null)
                 return null;
 
-            Bounds bounds = CalculateBounds(previewInstance);
+            Bounds bounds = ESEditorPreviewUtility.CalculateBounds(previewInstance);
             if (!hasStableCenter)
             {
                 stableCenter = bounds.center;
@@ -5058,6 +5167,9 @@ namespace ES
 
                 if (GUILayout.Button("重置视角", EditorStyles.toolbarButton, GUILayout.Width(74)))
                     ResetView();
+
+                GUILayout.FlexibleSpace();
+                GUILayout.Label(targetPreviewFps + " FPS", EditorStyles.miniLabel, GUILayout.Width(52));
             }
         }
 
@@ -6700,16 +6812,5 @@ namespace ES
             lastRestPoseChangedBoneSamples = string.Empty;
         }
 
-        private static Bounds CalculateBounds(GameObject root)
-        {
-            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
-            if (renderers.Length == 0)
-                return new Bounds(root.transform.position, Vector3.one);
-
-            Bounds bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++)
-                bounds.Encapsulate(renderers[i].bounds);
-            return bounds;
-        }
     }
 }

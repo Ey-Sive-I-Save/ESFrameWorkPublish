@@ -1,13 +1,12 @@
-using UnityEngine;
+﻿using UnityEngine;
 using ES;
 using System.Threading;
 using System;
 
-namespace ES.Examples
-{
+namespace ES.Samples{
     /// <summary>
-    /// Coroutine API 演示 - 协程工具
-    /// 提供Action延迟执行、重复执行、网络下载等协程封装
+    /// Coroutine API 婕旂ず - 鍗忕▼宸ュ叿
+    /// 鎻愪緵Action寤惰繜鎵ц銆侀噸澶嶆墽琛屻€佺綉缁滀笅杞界瓑鍗忕▼灏佽
     /// </summary>
     public class Example_Coroutine : MonoBehaviour
     {
@@ -15,57 +14,57 @@ namespace ES.Examples
 
         private void Start()
         {
-            Debug.Log("=== Coroutine API 演示 ===");
+            Debug.Log("=== Coroutine API 婕旂ず ===");
 
-            // 1. 延迟执行Action（使用缓存的WaitForSeconds）
+            // 1. 寤惰繜鎵цAction锛堜娇鐢ㄧ紦瀛樼殑WaitForSeconds锛?
             StartCoroutine(ESDesignUtility.Coroutine.Delay1sCached(() =>
             {
-                Debug.Log("1秒后执行（使用缓存）");
+                Debug.Log("1绉掑悗鎵ц锛堜娇鐢ㄧ紦瀛橈級");
             }));
 
-            // 2. 自定义延迟执行
+            // 2. 鑷畾涔夊欢杩熸墽琛?
             StartCoroutine(ESDesignUtility.Coroutine.ActionDelay(() =>
             {
-                Debug.Log("2.5秒后执行");
+                Debug.Log("2.5绉掑悗鎵ц");
             }, delay: 2.5f));
 
-            // 3. 下一帧执行
+            // 3. 涓嬩竴甯ф墽琛?
             StartCoroutine(ESDesignUtility.Coroutine.ActionDelayOneFrame(() =>
             {
-                Debug.Log("下一帧执行");
+                Debug.Log("涓嬩竴甯ф墽琛?);
             }));
 
-            // 4. 重复执行（每隔1秒执行一次，共3次）
+            // 4. 閲嶅鎵ц锛堟瘡闅?绉掓墽琛屼竴娆★紝鍏?娆★級
             StartCoroutine(ESDesignUtility.Coroutine.ActionRepeat(
-                action: () => Debug.Log($"重复执行: {Time.time}"),
+                action: () => Debug.Log($"閲嶅鎵ц: {Time.time}"),
                 startDelay: 0.5f,
                 internal_: 1f,
                 times: 3
             ));
 
-            // 5. 可取消的重复执行
+            // 5. 鍙彇娑堢殑閲嶅鎵ц
             cancellationToken = new CancellationTokenSource();
             StartCoroutine(ESDesignUtility.Coroutine.ActionRepeat(
-                action: () => Debug.Log("可取消的重复执行"),
+                action: () => Debug.Log("鍙彇娑堢殑閲嶅鎵ц"),
                 startDelay: 0f,
                 internal_: 0.5f,
-                times: -1, // 无限循环
+                times: -1, // 鏃犻檺寰幆
                 source: cancellationToken
             ));
 
-            // 6秒后取消
+            // 6绉掑悗鍙栨秷
             StartCoroutine(ESDesignUtility.Coroutine.ActionDelay(() =>
             {
                 cancellationToken?.Cancel();
-                Debug.Log("已取消重复执行");
+                Debug.Log("宸插彇娑堥噸澶嶆墽琛?);
             }, delay: 6f));
 
-            // 6. 等待条件满足（使用ActionRepeat配合条件判断实现）
+            // 6. 绛夊緟鏉′欢婊¤冻锛堜娇鐢ˋctionRepeat閰嶅悎鏉′欢鍒ゆ柇瀹炵幇锛?
             float startTime = Time.time;
             CancellationTokenSource conditionToken = new CancellationTokenSource();
             StartCoroutine(ESDesignUtility.Coroutine.ActionRepeat(
                 action: () => {
-                    Debug.Log($"持续执行中... 已过 {Time.time - startTime:F1}秒");
+                    Debug.Log($"鎸佺画鎵ц涓?.. 宸茶繃 {Time.time - startTime:F1}绉?);
                     if (Time.time - startTime > 3f) conditionToken?.Cancel();
                 },
                 startDelay: 0f,
@@ -74,23 +73,24 @@ namespace ES.Examples
                 source: conditionToken
             ));
 
-            // 7. FixedUpdate 延迟
+            // 7. FixedUpdate 寤惰繜
             StartCoroutine(ESDesignUtility.Coroutine.DelayNextFixedCached(() =>
             {
-                Debug.Log("在下一次FixedUpdate执行");
+                Debug.Log("鍦ㄤ笅涓€娆ixedUpdate鎵ц");
             }));
 
-            // 8. 帧末尾执行
+            // 8. 甯ф湯灏炬墽琛?
             StartCoroutine(ESDesignUtility.Coroutine.DelayEndOfFrameCached(() =>
             {
-                Debug.Log("在当前帧末尾执行");
+                Debug.Log("鍦ㄥ綋鍓嶅抚鏈熬鎵ц");
             }));
         }
 
         private void OnDestroy()
         {
-            // 清理取消令牌
+            // 娓呯悊鍙栨秷浠ょ墝
             cancellationToken?.Dispose();
         }
     }
 }
+

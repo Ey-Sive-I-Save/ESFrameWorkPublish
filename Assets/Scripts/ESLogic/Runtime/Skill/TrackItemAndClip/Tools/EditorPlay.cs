@@ -17,6 +17,7 @@ namespace ES
     public class EditorTimelinePlayer
     {
         public static EditorTimelinePlayer Instance { get; } = new();
+        private static bool globalCleanupHooksRegistered;
 
         // 存放当前激活的序列（目前只放一个，未来可放多个）。
         private List<EditorSequencePlayer> activeSequences = new List<EditorSequencePlayer>();
@@ -93,6 +94,65 @@ namespace ES
             EditorApplication.update -= TickAll;
             IsUpdateRegistered = false;
         }
+
+        public static void RegisterGlobalCleanupHooks()
+        {
+            if (globalCleanupHooksRegistered)
+            {
+                AssemblyReloadEvents.beforeAssemblyReload -= CleanupBeforeAssemblyReload;
+                EditorApplication.quitting -= CleanupBeforeEditorQuit;
+                EditorApplication.playModeStateChanged -= CleanupOnPlayModeChanged;
+            }
+
+            globalCleanupHooksRegistered = true;
+            AssemblyReloadEvents.beforeAssemblyReload += CleanupBeforeAssemblyReload;
+            EditorApplication.quitting += CleanupBeforeEditorQuit;
+            EditorApplication.playModeStateChanged += CleanupOnPlayModeChanged;
+        }
+
+        public void CleanupAllPreviewSequences(string reason)
+        {
+            try
+            {
+                Stop();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[EditorTimelinePlayer] Stop failed during cleanup. reason=" + reason + " error=" + e.Message);
+            }
+
+            for (int i = activeSequences.Count - 1; i >= 0; i--)
+            {
+                try
+                {
+                    activeSequences[i]?.DisposeEditorPreviewTarget();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning("[EditorTimelinePlayer] Dispose preview target failed. reason=" + reason + " error=" + e.Message);
+                }
+            }
+
+            activeSequences.Clear();
+            UnregisterUpdate();
+        }
+
+        private static void CleanupBeforeAssemblyReload()
+        {
+            Instance.CleanupAllPreviewSequences("AssemblyReload");
+        }
+
+        private static void CleanupBeforeEditorQuit()
+        {
+            Instance.CleanupAllPreviewSequences("EditorQuit");
+        }
+
+        private static void CleanupOnPlayModeChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingEditMode || state == PlayModeStateChange.ExitingPlayMode)
+                Instance.CleanupAllPreviewSequences("PlayModeChanged");
+        }
+
         public void Pause()
         {
             foreach (var seq in activeSequences)
@@ -165,6 +225,14 @@ namespace ES
         ~EditorTimelinePlayer()
         {
             EditorApplication.update -= TickAll;
+        }
+    }
+
+    public class EditorTimelinePlayerLifecycleInitializer : EditorInvoker_Level2
+    {
+        public override void InitInvoke()
+        {
+            EditorTimelinePlayer.RegisterGlobalCleanupHooks();
         }
     }
 

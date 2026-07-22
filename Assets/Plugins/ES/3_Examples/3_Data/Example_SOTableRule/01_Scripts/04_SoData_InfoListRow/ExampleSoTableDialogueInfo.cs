@@ -2,8 +2,7 @@ using System;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 
-namespace ES
-{
+namespace ES.Samples{
     [Serializable]
     public sealed class ExampleSoTableDialogueLine
     {

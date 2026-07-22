@@ -44,7 +44,7 @@ namespace ES
         [ShowInInspector, BoxGroup("扩展模块集"), HideLabel, LabelText("模块列表")]
         [ListDrawerSettings(
             ShowFoldout = true,
-            ListElementLabelName = "$type",
+            ListElementLabelName = "InspectorModuleLabel",
             DefaultExpandedState = true,
             DraggableItems = false,
             ShowIndexLabels = false,
@@ -220,9 +220,9 @@ namespace ES
         public bool Signal_IsActiveAndEnable
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => myCore.enabled;
+            get => myCore != null && myCore.isActiveAndEnabled;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set { myCore.enabled = value; }
+            set { }
         }
 
         //尝试启用
@@ -252,12 +252,6 @@ namespace ES
         public void TryDestroySelf()
         {
             OnDestroy();
-            int count = MyModules.ValuesNow.Count;
-            for (int i = 0; i < count; i++)
-            {
-                var use = MyModules.ValuesNow[i];
-                use.TryDestroySelf();
-            }
         }
         #endregion
 
@@ -295,9 +289,10 @@ namespace ES
 
         protected virtual void OnDestroy()
         {
-            foreach (var i in MyModules.ValuesNow)
+            int count = MyModules.ValuesNow.Count;
+            for (int i = 0; i < count; i++)
             {
-                i.TryDestroySelf();//销毁
+                DestroyModuleImmediately(MyModules.ValuesNow[i]);
             }
         }
         #endregion
@@ -332,6 +327,8 @@ namespace ES
                 MyModules.Add(use);
                 use.Signal_HasSubmit = true;
                 use.EnabledSelf = true;
+                if (Signal_IsActiveAndEnable)
+                    use._TryTestActiveAndEnable();
             };
         }
         //移除模块
@@ -391,6 +388,17 @@ namespace ES
             }
             module.Signal_Dirty = false;
             return ESTryResult.Succeed;
+        }
+
+        private static void DestroyModuleImmediately(Module_ module)
+        {
+            if (module == null || module.HasDestroy)
+                return;
+
+            module._TryTestInActiveAndDisable();
+            module.Signal_HasSubmit = false;
+            module.HasDestroy = true;
+            module.OnDestroy();
         }
     }
 

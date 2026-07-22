@@ -19,7 +19,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:07:37
     AccessCount: 7
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/WoodMaterial 16.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/WoodMaterial 16.mat
     AssetGUID: 93a100bd71e3c8e4193b3391c9e5b33d
     AssetName: WoodMaterial 16
     InstanceID: 0
@@ -34,7 +34,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:07:37
     AccessCount: 6
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/WoodMaterial 16.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/WoodMaterial 16.mat
     AssetGUID: 93a100bd71e3c8e4193b3391c9e5b33d
     AssetName: WoodMaterial 16
     InstanceID: 0
@@ -49,7 +49,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:07:37
     AccessCount: 8
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/MetalMaterial 16.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/MetalMaterial 16.mat
     AssetGUID: 1ef84781356e9034bbc41ea9dff52edf
     AssetName: MetalMaterial 16
     InstanceID: 0
@@ -64,7 +64,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:07:37
     AccessCount: 6
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/MetalMaterial 16.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/MetalMaterial 16.mat
     AssetGUID: 1ef84781356e9034bbc41ea9dff52edf
     AssetName: MetalMaterial 16
     InstanceID: 0
@@ -79,7 +79,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:07:37
     AccessCount: 7
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/FabricMaterial 16.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/FabricMaterial 16.mat
     AssetGUID: 90c5fcae2826bd94181af9ff2bf8e231
     AssetName: FabricMaterial 16
     InstanceID: 0
@@ -94,7 +94,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:07:37
     AccessCount: 6
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/FabricMaterial 16.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/FabricMaterial 16.mat
     AssetGUID: 90c5fcae2826bd94181af9ff2bf8e231
     AssetName: FabricMaterial 16
     InstanceID: 0
@@ -109,7 +109,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:12:04
     AccessCount: 5
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Wall_Green 1.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/Wall_Green 1.mat
     AssetGUID: 203e35fda97e0ff40a124d9444c9a869
     AssetName: Wall_Green 1
     InstanceID: 0
@@ -124,7 +124,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:12:04
     AccessCount: 0
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Wall_Green 1.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/Wall_Green 1.mat
     AssetGUID: 203e35fda97e0ff40a124d9444c9a869
     AssetName: Wall_Green 1
     InstanceID: 0
@@ -139,7 +139,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:12:04
     AccessCount: 8
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Wood_DarkRed 1.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/Wood_DarkRed 1.mat
     AssetGUID: 2dd279e7cf5149040ad260fcd1461b41
     AssetName: Wood_DarkRed 1
     InstanceID: 0
@@ -154,7 +154,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:12:04
     AccessCount: 0
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Wood_DarkRed 1.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/Wood_DarkRed 1.mat
     AssetGUID: 2dd279e7cf5149040ad260fcd1461b41
     AssetName: Wood_DarkRed 1
     InstanceID: 0
@@ -169,7 +169,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:12:04
     AccessCount: 2
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Floor_Wood 1.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/Floor_Wood 1.mat
     AssetGUID: 53bdf441a7ea7b04f8d208dd29551946
     AssetName: Floor_Wood 1
     InstanceID: 0
@@ -184,7 +184,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:12:04
     AccessCount: 0
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Floor_Wood 1.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/Floor_Wood 1.mat
     AssetGUID: 53bdf441a7ea7b04f8d208dd29551946
     AssetName: Floor_Wood 1
     InstanceID: 0
@@ -199,7 +199,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:12:04
     AccessCount: 2
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Ceiling_White 1.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/Ceiling_White 1.mat
     AssetGUID: 633dfaba3aab52545a64cdc25d79d601
     AssetName: Ceiling_White 1
     InstanceID: 0
@@ -214,7 +214,7 @@ MonoBehaviour:
     LastAccessTime: 2026-01-21 03:12:04
     AccessCount: 0
     ImportanceScore: 70
-    AssetPath: Assets/NormalResources/Materials/From_ESVMCP/Ceiling_White 1.mat
+    AssetPath: Assets/ESNormalAssets/Materials/From_ESVMCP/Ceiling_White 1.mat
     AssetGUID: 633dfaba3aab52545a64cdc25d79d601
     AssetName: Ceiling_White 1
     InstanceID: 0

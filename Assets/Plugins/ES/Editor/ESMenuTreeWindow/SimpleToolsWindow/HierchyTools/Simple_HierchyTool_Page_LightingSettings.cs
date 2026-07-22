@@ -76,11 +76,144 @@ namespace ES
 
         private string lastResultSummary = "";
         private string lastResultDetail = "";
+        private string lightSearch = "";
+        private int lightPreviewPageIndex;
+        private const int LightPreviewPageSize = 12;
 
-        [OnInspectorGUI]
+        [OnInspectorGUI, PropertyOrder(-200)]
         private void DrawResultPanel()
         {
+            int lightCount = GetFilteredSelectedLights().Count;
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "灯光批量设置",
+                "用于统一选区内 Light 参数、随机化灯光表现、批量添加 Light，或把当前加载场景里的灯光转为烘焙模式。",
+                SimpleToolsMaturity.Upgrading,
+                "灯光会影响画面、烘焙结果和运行时性能；“转为烘焙”会扫描已加载场景，不只处理当前选区。");
+            SimpleToolsPanelUtility.DrawLargeListGuard(lightCount, "灯光");
+            DrawLightingActionPanel();
+            DrawLightPreviewPanel();
             SimpleToolsPanelUtility.DrawResultSummary("最近灯光操作", lastResultSummary, lastResultDetail);
+        }
+
+        private void DrawLightingActionPanel()
+        {
+            var selectedLights = GetFilteredSelectedLights();
+            int bakedCount = selectedLights.Count(light => light != null && light.lightmapBakeType == LightmapBakeType.Baked);
+            int realtimeCount = selectedLights.Count(light => light != null && light.lightmapBakeType == LightmapBakeType.Realtime);
+            int shadowCount = selectedLights.Count(light => light != null && light.shadows != LightShadows.None);
+
+            SimpleToolsPanelUtility.DrawSectionTitle("核心流程", "先确认选区灯光，再选择统一写入、随机化、补组件或全场景转烘焙。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                SimpleToolsPanelUtility.DrawSummary(
+                    $"选区命中: {selectedLights.Count}",
+                    $"实时: {realtimeCount}",
+                    $"烘焙: {bakedCount}",
+                    $"有阴影: {shadowCount}",
+                    $"过滤: {(useTypeFilter ? filterType.ToString() : "类型不限")}");
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("应用设置", SimpleToolsActionTone.Warning, 30, GUILayout.Width(92)))
+                        ApplyLightingSettings();
+                    if (SimpleToolsPanelUtility.DrawActionButton("随机化", SimpleToolsActionTone.Primary, 30, GUILayout.Width(92)))
+                        ApplyRandomLightingSettings();
+                    if (SimpleToolsPanelUtility.DrawActionButton("补 Light", SimpleToolsActionTone.Success, 30, GUILayout.Width(92)))
+                        AddLightComponents();
+                    if (SimpleToolsPanelUtility.DrawActionButton("转烘焙", SimpleToolsActionTone.Danger, 30, GUILayout.Width(92)))
+                        ConvertAllToBaked();
+                    if (SimpleToolsPanelUtility.DrawActionButton("重置参数", SimpleToolsActionTone.Neutral, 30, GUILayout.Width(92)))
+                        ResetToDefaults();
+                    GUILayout.FlexibleSpace();
+                }
+            }
+        }
+
+        private void DrawLightPreviewPanel()
+        {
+            var lights = GetFilteredSelectedLights();
+            SimpleToolsPanelUtility.DrawSectionTitle("选区灯光预览", "按对象路径、灯光类型、烘焙模式搜索；大选区自动分页。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("搜索", EditorStyles.miniBoldLabel, GUILayout.Width(36));
+                    lightSearch = EditorGUILayout.TextField(lightSearch);
+                    if (GUILayout.Button("清空", EditorStyles.miniButton, GUILayout.Width(48)))
+                    {
+                        lightSearch = string.Empty;
+                        lightPreviewPageIndex = 0;
+                    }
+                }
+
+                if (lights.Count == 0)
+                {
+                    SimpleToolsPanelUtility.DrawEmptyState("当前选区没有命中的灯光。请先选择带 Light 的对象，或开启包含子对象。");
+                    return;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("对象路径", EditorStyles.miniBoldLabel, GUILayout.MinWidth(180));
+                    EditorGUILayout.LabelField("类型", EditorStyles.miniBoldLabel, GUILayout.Width(64));
+                    EditorGUILayout.LabelField("强度", EditorStyles.miniBoldLabel, GUILayout.Width(52));
+                    EditorGUILayout.LabelField("范围", EditorStyles.miniBoldLabel, GUILayout.Width(52));
+                    EditorGUILayout.LabelField("烘焙", EditorStyles.miniBoldLabel, GUILayout.Width(72));
+                    GUILayout.Space(48);
+                }
+
+                foreach (var light in SimpleToolsPanelUtility.PageItems(lights, ref lightPreviewPageIndex, LightPreviewPageSize, out _))
+                    DrawLightPreviewRow(light);
+
+                SimpleToolsPanelUtility.DrawPager(ref lightPreviewPageIndex, lights.Count, LightPreviewPageSize);
+            }
+        }
+
+        private List<Light> GetFilteredSelectedLights()
+        {
+            var targets = SimpleToolsSafetyUtility.CollectTargets(Selection.gameObjects, includeChildren)
+                .Select(obj => obj != null ? obj.GetComponent<Light>() : null)
+                .Where(light => light != null)
+                .Where(light => !useTypeFilter || light.type == filterType)
+                .Where(light => light.gameObject != null && NameMatches(light.gameObject.name));
+
+            if (!string.IsNullOrWhiteSpace(lightSearch))
+            {
+                string keyword = lightSearch.Trim();
+                targets = targets.Where(light =>
+                    ContainsIgnoreCase(SimpleToolsSafetyUtility.GetHierarchyPath(light.gameObject), keyword) ||
+                    ContainsIgnoreCase(light.type.ToString(), keyword) ||
+                    ContainsIgnoreCase(light.lightmapBakeType.ToString(), keyword));
+            }
+
+            return targets.Distinct().ToList();
+        }
+
+        private static bool ContainsIgnoreCase(string source, string keyword)
+        {
+            return !string.IsNullOrEmpty(source) &&
+                   !string.IsNullOrEmpty(keyword) &&
+                   source.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static void DrawLightPreviewRow(Light light)
+        {
+            if (light == null || light.gameObject == null)
+                return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(SimpleToolsSafetyUtility.GetHierarchyPath(light.gameObject), EditorStyles.miniLabel, GUILayout.MinWidth(180));
+                EditorGUILayout.LabelField(light.type.ToString(), EditorStyles.miniLabel, GUILayout.Width(64));
+                EditorGUILayout.LabelField(light.intensity.ToString("0.##"), EditorStyles.miniLabel, GUILayout.Width(52));
+                EditorGUILayout.LabelField(light.range.ToString("0.##"), EditorStyles.miniLabel, GUILayout.Width(52));
+                EditorGUILayout.LabelField(light.lightmapBakeType.ToString(), EditorStyles.miniLabel, GUILayout.Width(72));
+                if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(44)))
+                {
+                    Selection.activeGameObject = light.gameObject;
+                    EditorGUIUtility.PingObject(light.gameObject);
+                }
+            }
         }
 
         [FoldoutGroup("随机化属性", expanded: false)]
@@ -95,6 +228,7 @@ namespace ES
         [LabelText("随机颜色范围-MAX"), Space(5)]
         public Color randomColorMax = Color.white;
 
+        [FoldoutGroup("4. 旧按钮入口", Expanded = false)]
         [Button("应用灯光设置", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void ApplyLightingSettings()
         {
@@ -128,13 +262,13 @@ namespace ES
             }
 
             // 操作预览
-            string previewMessage = $"将修改以下 {filteredObjects.Count} 个对象：\n" +
-                                   string.Join("\n", filteredObjects.Take(10).Select(obj => obj.name)) +
-                                   (filteredObjects.Count > 10 ? "\n..." : "");
-            if (!EditorUtility.DisplayDialog("预览修改", previewMessage, "确认应用", "取消"))
-            {
+            string previewMessage = SimpleToolsSafetyUtility.JoinPreview(filteredObjects.Select(SimpleToolsSafetyUtility.GetHierarchyPath), 12);
+            if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                "确认应用灯光设置",
+                filteredObjects.Count,
+                "修改以下灯光：\n" + previewMessage,
+                "会覆盖目标 Light 的类型、颜色、强度、范围、阴影和烘焙模式。"))
                 return;
-            }
 
             int modifiedCount = 0;
             Undo.SetCurrentGroupName("Apply Lighting Settings");
@@ -176,6 +310,7 @@ namespace ES
             EditorUtility.DisplayDialog("成功", $"成功修改 {modifiedCount} 个灯光组件！", "确定");
         }
 
+        [FoldoutGroup("4. 旧按钮入口")]
         [Button("应用随机灯光设置", ButtonHeight = 34), GUIColor(0.25f, 0.62f, 0.45f)]
         public void ApplyRandomLightingSettings()
         {
@@ -208,13 +343,13 @@ namespace ES
             }
 
             // 操作预览
-            string previewMessage = $"将随机修改以下 {filteredObjects.Count} 个对象：\n" +
-                                   string.Join("\n", filteredObjects.Take(10).Select(obj => obj.name)) +
-                                   (filteredObjects.Count > 10 ? "\n..." : "");
-            if (!EditorUtility.DisplayDialog("预览随机修改", previewMessage, "确认应用", "取消"))
-            {
+            string previewMessage = SimpleToolsSafetyUtility.JoinPreview(filteredObjects.Select(SimpleToolsSafetyUtility.GetHierarchyPath), 12);
+            if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                "确认随机灯光设置",
+                filteredObjects.Count,
+                "随机修改以下灯光：\n" + previewMessage,
+                "会批量随机化目标 Light 的颜色和强度，并覆盖范围、阴影、烘焙模式。"))
                 return;
-            }
 
             int modifiedCount = 0;
             Undo.SetCurrentGroupName("Apply Random Lighting Settings");
@@ -261,6 +396,7 @@ namespace ES
             EditorUtility.DisplayDialog("成功", $"成功随机修改 {modifiedCount} 个灯光组件！", "确定");
         }
 
+        [FoldoutGroup("4. 旧按钮入口")]
         [Button("批量添加Light组件", ButtonHeight = 34), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
         public void AddLightComponents()
         {
@@ -282,13 +418,13 @@ namespace ES
             }
 
             // 操作预览
-            string previewMessage = $"将为以下 {filteredObjects.Count} 个对象添加Light组件：\n" +
-                                   string.Join("\n", filteredObjects.Take(10).Select(obj => obj.name)) +
-                                   (filteredObjects.Count > 10 ? "\n..." : "");
-            if (!EditorUtility.DisplayDialog("预览添加", previewMessage, "确认添加", "取消"))
-            {
+            string previewMessage = SimpleToolsSafetyUtility.JoinPreview(filteredObjects.Select(SimpleToolsSafetyUtility.GetHierarchyPath), 12);
+            if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                "确认添加 Light 组件",
+                filteredObjects.Count,
+                "为以下对象添加 Light：\n" + previewMessage,
+                "会给没有 Light 的目标对象新增组件，并写入当前灯光参数。"))
                 return;
-            }
 
             int addedCount = 0;
             Undo.SetCurrentGroupName("Add Light Components");
@@ -324,6 +460,7 @@ namespace ES
             EditorUtility.DisplayDialog("成功", $"成功添加 {addedCount} 个Light组件！", "确定");
         }
 
+        [FoldoutGroup("4. 旧按钮入口")]
         [Button("将所有灯光转为烘焙", ButtonHeight = 34), GUIColor("@ESDesignUtility.ColorSelector.Color_05")]
         public void ConvertAllToBaked()
         {
@@ -346,13 +483,13 @@ namespace ES
             }
 
             // 操作预览
-            string previewMessage = $"将转换以下 {filteredLights.Count} 个灯光为烘焙模式：\n" +
-                                   string.Join("\n", filteredLights.Take(10).Select(light => light.gameObject.name)) +
-                                   (filteredLights.Count > 10 ? "\n..." : "");
-            if (!EditorUtility.DisplayDialog("预览转换", previewMessage, "确认转换", "取消"))
-            {
+            string previewMessage = SimpleToolsSafetyUtility.JoinPreview(filteredLights.Select(light => light != null && light.gameObject != null ? SimpleToolsSafetyUtility.GetHierarchyPath(light.gameObject) : null), 12);
+            if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                "确认转换为烘焙灯光",
+                filteredLights.Count,
+                "转换以下已加载场景灯光：\n" + previewMessage,
+                "该操作扫描当前已加载场景，不限当前选区，会把命中灯光的 LightmapBakeType 改为 Baked。"))
                 return;
-            }
 
             int convertedCount = 0;
             Undo.SetCurrentGroupName("Convert Lights to Baked");
@@ -454,6 +591,7 @@ namespace ES
             }
         }
 
+        [FoldoutGroup("4. 旧按钮入口")]
         [Button("重置为默认设置", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
         public void ResetToDefaults()
         {

@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
-namespace ES
-{
+namespace ES.Samples{
     [Serializable]
     public sealed class ExampleNativeSoRewardRow : IString
     {

@@ -6,6 +6,14 @@ using UnityEngine;
 
 namespace ES
 {
+    public class ESEditorPreviewResourceScopeInitializer : EditorInvoker_Level2
+    {
+        public override void InitInvoke()
+        {
+            ESEditorPreviewLifecycleHub.RegisterGlobalHooks();
+        }
+    }
+
     /// <summary>
     /// 编辑器预览临时资源生命周期容器。
     /// 用于统一登记并释放预览中创建的隐藏 GameObject、RenderTexture 和自定义资源。
@@ -29,9 +37,14 @@ namespace ES
             if (obj == null)
                 return null;
 
-            obj.hideFlags = HideFlags.HideAndDontSave;
+            obj.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
             unityObjects.Add(obj);
             return obj;
+        }
+
+        public Texture2D RegisterTexture(Texture2D texture)
+        {
+            return RegisterObject(texture);
         }
 
         public GameObject RegisterGameObject(GameObject gameObject, bool recursiveHideFlags = false)
@@ -39,10 +52,10 @@ namespace ES
             if (gameObject == null)
                 return null;
 
-            gameObject.hideFlags = HideFlags.HideAndDontSave;
+            gameObject.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
             MarkPreviewObject(gameObject, owner, note);
             if (recursiveHideFlags)
-                SetHideFlagsRecursive(gameObject.transform, HideFlags.HideAndDontSave);
+                ESEditorPreviewUtility.SetHideFlagsRecursive(gameObject.transform, ESEditorPreviewUtility.PreviewHideFlags);
 
             unityObjects.Add(gameObject);
             return gameObject;
@@ -90,34 +103,12 @@ namespace ES
             if (obj == null)
                 return;
 
-            EditorPreviewGameObjectSign marker = obj.GetComponent<EditorPreviewGameObjectSign>();
-            if (marker == null)
-                marker = obj.AddComponent<EditorPreviewGameObjectSign>();
-
-            marker.Setup(owner, note);
-            marker.hideFlags = HideFlags.HideAndDontSave;
+            ESEditorPreviewUtility.MarkPreviewObject(obj, owner, note);
         }
 
-        [InitializeOnLoadMethod]
-        private static void RegisterGlobalPreviewCleanup()
+        internal static void RegisterGlobalPreviewCleanup()
         {
-            EditorApplication.playModeStateChanged -= CleanupOnPlayModeStateChanged;
-            EditorApplication.playModeStateChanged += CleanupOnPlayModeStateChanged;
-            AssemblyReloadEvents.beforeAssemblyReload -= CleanupAllMarkedPreviewObjectsSilent;
-            AssemblyReloadEvents.beforeAssemblyReload += CleanupAllMarkedPreviewObjectsSilent;
-            EditorApplication.quitting -= CleanupAllMarkedPreviewObjectsSilent;
-            EditorApplication.quitting += CleanupAllMarkedPreviewObjectsSilent;
-        }
-
-        private static void CleanupOnPlayModeStateChanged(PlayModeStateChange state)
-        {
-            if (state == PlayModeStateChange.ExitingEditMode || state == PlayModeStateChange.ExitingPlayMode)
-                CleanupAllMarkedPreviewObjectsSilent();
-        }
-
-        private static void CleanupAllMarkedPreviewObjectsSilent()
-        {
-            CleanupAllMarkedPreviewObjects();
+            ESEditorPreviewLifecycleHub.RegisterGlobalHooks();
         }
 
         [MenuItem(MenuItemPathDefine.PREVIEW_CLEANUP_PATH + "清理全部预览残留对象", false, 0)]
@@ -129,23 +120,7 @@ namespace ES
 
         public static int CleanupAllMarkedPreviewObjects()
         {
-            int removed = 0;
-            EditorPreviewGameObjectSign[] markers = Resources.FindObjectsOfTypeAll<EditorPreviewGameObjectSign>();
-            for (int i = 0; i < markers.Length; i++)
-            {
-                EditorPreviewGameObjectSign marker = markers[i];
-                if (marker == null)
-                    continue;
-
-                GameObject obj = marker.gameObject;
-                if (obj == null || EditorUtility.IsPersistent(obj))
-                    continue;
-
-                UnityEngine.Object.DestroyImmediate(obj);
-                removed++;
-            }
-
-            return removed;
+            return ESEditorPreviewUtility.CleanupAllMarkedPreviewObjects();
         }
 
         private static void DestroyRegisteredObject(UnityEngine.Object obj)
@@ -153,24 +128,7 @@ namespace ES
             if (obj == null)
                 return;
 
-            if (obj is RenderTexture renderTexture)
-            {
-                renderTexture.Release();
-                UnityEngine.Object.DestroyImmediate(renderTexture);
-                return;
-            }
-
-            UnityEngine.Object.DestroyImmediate(obj);
-        }
-
-        private static void SetHideFlagsRecursive(Transform root, HideFlags flags)
-        {
-            if (root == null)
-                return;
-
-            root.gameObject.hideFlags = flags;
-            for (int i = 0; i < root.childCount; i++)
-                SetHideFlagsRecursive(root.GetChild(i), flags);
+            ESEditorPreviewUtility.DestroyObject(obj);
         }
     }
 }

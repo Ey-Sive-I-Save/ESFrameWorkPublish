@@ -8,7 +8,7 @@
   - Link 容器相关文件（接收者列表中经常需要判断目标是否已销毁）；
   - 各类 EditorWindow 中对选中对象的检查。
 - 建议抽取的方法：
-  - 见 [Assets/ES/AIPreview/Common/CommonUtilityPreview.cs](Assets/ES/AIPreview/Common/CommonUtilityPreview.cs)
+  - 见 [Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/AIPreview/Common/CommonUtilityPreview.cs](Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/AIPreview/Common/CommonUtilityPreview.cs)
     - `CommonUtilityPreview.IsUnityObjectAlive(object obj)`
 - 未来替换方向：
   - 将散落的 `if (obj == null || (obj is UnityEngine.Object uo && uo == null))` 统一替换为该方法，提高可读性并减少错误使用。
@@ -20,7 +20,7 @@
     - 多处使用 `Debug.Log(...)` 进行流程调试（平移/选择/编辑操作）。
   - DevManagement 系列窗口（日志/任务操作成功后统一使用 Debug + Dialog）。
 - 建议抽取的方法：
-  - 见 [Assets/ES/AIPreview/Common/CommonUtilityPreview.cs](Assets/ES/AIPreview/Common/CommonUtilityPreview.cs)
+  - 见 [Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/AIPreview/Common/CommonUtilityPreview.cs](Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/AIPreview/Common/CommonUtilityPreview.cs)
     - `CommonUtilityPreview.Log(string category, string message)`
 - 未来替换方向：
   - 将 Debug.Log 调用改为 `CommonUtilityPreview.Log("TrackView", "开始平移")` 这类形式，便于统一过滤与重定向日志输出。

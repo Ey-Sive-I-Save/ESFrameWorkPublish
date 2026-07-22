@@ -19,7 +19,7 @@ namespace ES
 
         [NonSerialized] private Rigidbody _rigidbody;
         [NonSerialized] private bool _hasPendingResult;
-        [NonSerialized] private ProjectileMotionResult _pendingResult;
+        [NonSerialized] private ShotMotionResult _pendingResult;
 
         public override void Start()
         {
@@ -32,7 +32,7 @@ namespace ES
             }
         }
 
-        public void SubmitProjectileResult(in ProjectileMotionResult result)
+        public void SubmitShotResult(in ShotMotionResult result)
         {
             _pendingResult = result;
             _hasPendingResult = true;
@@ -97,14 +97,22 @@ namespace ES
     }
 
     [Serializable, TypeRegistryItem("Item 飞行物模块")]
-    public sealed class ItemProjectileModule : ItemBasicModuleBase
+    public sealed class ItemShotModule : ItemBasicModuleBase
     {
+        [Title("飞行物Shared")]
+        [HideLabel]
+        public ItemShotSharedData sharedData = ItemShotSharedData.Default;
+
+        [Title("飞行物Variable")]
+        [HideLabel]
+        public ItemShotVariableData variableData = ItemShotVariableData.Default;
+
         [Title("飞行物配置")]
         [LabelText("瞄准模式")]
         public ShotAimMode aimMode = ShotAimMode.Free;
         [LabelText("阻挡模式")]
         public ShotBlockMode blockMode = ShotBlockMode.AnyBlocker;
-        public ProjectileMotionConfig config = ProjectileMotionConfig.Straight(30f, 5f);
+        public ShotMotionConfig config = ShotMotionConfig.Straight(30f, 5f);
         [LabelText("命中层")]
         public LayerMask hitLayers = ~0;
         [LabelText("命中半径")]
@@ -113,14 +121,14 @@ namespace ES
         public int hitBufferCapacity = 8;
 
         [Title("运行监控")]
-        [ShowInInspector, ReadOnly] public ProjectileMotionState state;
-        [ShowInInspector, ReadOnly] public ProjectileMotionResult latestResult;
+        [ShowInInspector, ReadOnly] public ShotMotionState state;
+        [ShowInInspector, ReadOnly] public ShotMotionResult latestResult;
         [LabelText("命中缓存溢出次数")]
         [ShowInInspector, ReadOnly] public int hitOverflowCount;
 
-        [NonSerialized] private ProjectileHitCandidate[] _hitResults;
-        [NonSerialized] private IItemProjectileHitSolver _hitSolver;
-        [NonSerialized] private IItemProjectileTickScheduler _tickScheduler;
+        [NonSerialized] private ShotHitCandidate[] _hitResults;
+        [NonSerialized] private IItemShotHitSolver _hitSolver;
+        [NonSerialized] private IItemShotTickScheduler _tickScheduler;
         [NonSerialized] private ItemMotionModule _motionModule;
         [NonSerialized] private Transform _targetTransform;
 
@@ -129,6 +137,7 @@ namespace ES
             base.Start();
             EnsureRuntimeHelpers();
             ResolveMotionModule();
+            ApplyShotData(sharedData, variableData);
         }
 
         public void Launch(Vector3 direction)
@@ -137,8 +146,9 @@ namespace ES
                 return;
 
             Vector3 dir = direction.sqrMagnitude > 0.0001f ? direction.normalized : MyCore.transform.forward;
+            dir = ApplySpread(dir);
             _targetTransform = null;
-            state = new ProjectileMotionState
+            state = new ShotMotionState
             {
                 previousPosition = MyCore.transform.position,
                 currentPosition = MyCore.transform.position,
@@ -158,16 +168,18 @@ namespace ES
                 return;
 
             _targetTransform = null;
-            Vector3 toTarget = targetPosition - MyCore.transform.position;
+            Vector3 resolvedTargetPosition = targetPosition + variableData.targetOffset;
+            Vector3 toTarget = resolvedTargetPosition - MyCore.transform.position;
             Vector3 dir = toTarget.sqrMagnitude > 0.0001f ? toTarget.normalized : MyCore.transform.forward;
-            state = new ProjectileMotionState
+            dir = ApplySpread(dir);
+            state = new ShotMotionState
             {
                 previousPosition = MyCore.transform.position,
                 currentPosition = MyCore.transform.position,
                 currentRotation = MyCore.transform.rotation,
                 velocity = dir * Mathf.Max(0f, config.speed),
                 direction = dir,
-                targetPosition = targetPosition,
+                targetPosition = resolvedTargetPosition,
                 elapsedTime = 0f,
                 hasTarget = true,
                 launched = true
@@ -185,7 +197,7 @@ namespace ES
                 return;
 
             _targetTransform = target;
-            if (mustHit)
+            if (mustHit && sharedData.allowMustHit)
                 aimMode = ShotAimMode.MustHit;
             else if (aimMode == ShotAimMode.Free)
                 aimMode = ShotAimMode.Target;
@@ -194,16 +206,30 @@ namespace ES
             _targetTransform = target;
         }
 
-        public void ApplyShotConfig(ItemShotConfig shotConfig)
+        public void ApplyShotData(in ItemShotSharedData shared, in ItemShotVariableData variable)
         {
-            if (shotConfig == null || !shotConfig.enabled)
+            if (!shared.enabled)
                 return;
 
-            aimMode = shotConfig.aimMode;
-            blockMode = shotConfig.blockMode;
-            hitLayers = shotConfig.hitLayers;
-            castRadius = Mathf.Max(0f, shotConfig.radius);
-            config = shotConfig.ToProjectileMotionConfig();
+            sharedData = shared;
+            variableData = NormalizeVariable(variable);
+
+            aimMode = shared.aimMode;
+            if (variableData.forceMustHit && shared.allowMustHit)
+                aimMode = ShotAimMode.MustHit;
+
+            blockMode = shared.blockMode;
+            hitLayers = shared.hitLayers;
+            castRadius = Mathf.Max(0f, shared.radius * variableData.radiusMultiplier);
+            config = shared.ToShotMotionConfig(variableData);
+        }
+
+        public void ApplyShotData(ItemDataInfo itemData)
+        {
+            if (itemData == null)
+                return;
+
+            ApplyShotData(itemData.shotShared, itemData.shotVariable);
         }
 
         protected override void Update()
@@ -211,12 +237,12 @@ namespace ES
             Tick(Time.deltaTime);
         }
 
-        public void SetHitSolver(IItemProjectileHitSolver solver)
+        public void SetHitSolver(IItemShotHitSolver solver)
         {
             _hitSolver = solver;
         }
 
-        public void SetTickScheduler(IItemProjectileTickScheduler scheduler)
+        public void SetTickScheduler(IItemShotTickScheduler scheduler)
         {
             _tickScheduler = scheduler;
         }
@@ -231,26 +257,26 @@ namespace ES
                 return;
 
             RefreshTargetPosition();
-            latestResult = ProjectileMotionSolver.Step(ref state, config, deltaTime);
+            latestResult = ShotMotionSolver.Step(ref state, config, deltaTime);
             TryBuildHitCandidate(ref latestResult);
             TryBuildMustHitCandidate(ref latestResult);
 
-            ResolveMotionModule()?.SubmitProjectileResult(latestResult);
+            ResolveMotionModule()?.SubmitShotResult(latestResult);
 
-            if (latestResult.kind == ProjectileMotionKind.Arrived || latestResult.kind == ProjectileMotionKind.Expired)
+            if (latestResult.kind == ShotMotionKind.Arrived || latestResult.kind == ShotMotionKind.Expired)
                 state.launched = false;
         }
 
-        private void TryBuildHitCandidate(ref ProjectileMotionResult result)
+        private void TryBuildHitCandidate(ref ShotMotionResult result)
         {
             if (blockMode == ShotBlockMode.None)
                 return;
 
-            if (result.kind == ProjectileMotionKind.Delayed || result.kind == ProjectileMotionKind.Warmup)
+            if (result.kind == ShotMotionKind.Delayed || result.kind == ShotMotionKind.Warmup)
                 return;
 
             EnsureRuntimeHelpers();
-            ItemProjectileHitQuery query = new ItemProjectileHitQuery
+            ItemShotHitQuery query = new ItemShotHitQuery
             {
                 from = result.previousPosition,
                 to = result.currentPosition,
@@ -267,20 +293,20 @@ namespace ES
             if (_hitSolver.IsOverflow)
                 hitOverflowCount++;
 
-            ProjectileHitCandidate hit = _hitResults[0];
+            ShotHitCandidate hit = _hitResults[0];
             hit.incomingVelocity = result.velocity;
             result.hasHitCandidate = true;
             result.hitCandidate = hit;
         }
 
-        private void TryBuildMustHitCandidate(ref ProjectileMotionResult result)
+        private void TryBuildMustHitCandidate(ref ShotMotionResult result)
         {
-            if (aimMode != ShotAimMode.MustHit || result.hasHitCandidate || result.kind != ProjectileMotionKind.Arrived)
+            if (aimMode != ShotAimMode.MustHit || result.hasHitCandidate || result.kind != ShotMotionKind.Arrived)
                 return;
 
             Collider targetCollider = _targetTransform != null ? _targetTransform.GetComponentInChildren<Collider>() : null;
             result.hasHitCandidate = true;
-            result.hitCandidate = new ProjectileHitCandidate
+            result.hitCandidate = new ShotHitCandidate
             {
                 collider = targetCollider,
                 point = result.currentPosition,
@@ -297,7 +323,47 @@ namespace ES
             if (_targetTransform == null || !state.hasTarget)
                 return;
 
-            state.targetPosition = _targetTransform.position;
+            state.targetPosition = _targetTransform.position + variableData.targetOffset;
+        }
+
+        private Vector3 ApplySpread(Vector3 direction)
+        {
+            float spreadAngle = Mathf.Max(0f, variableData.spreadAngle);
+            if (spreadAngle <= 0f || direction.sqrMagnitude <= 0.0001f)
+                return direction;
+
+            float yaw = RangeFromSeed(variableData.logicSeed, 0, -spreadAngle, spreadAngle);
+            float pitch = RangeFromSeed(variableData.logicSeed, 1, -spreadAngle, spreadAngle);
+            Quaternion basis = Quaternion.LookRotation(direction.normalized, Vector3.up);
+            return (basis * Quaternion.Euler(pitch, yaw, 0f) * Vector3.forward).normalized;
+        }
+
+        private static ItemShotVariableData NormalizeVariable(ItemShotVariableData variable)
+        {
+            if (variable.speedMultiplier <= 0f)
+                variable.speedMultiplier = 1f;
+            if (variable.lifeTimeMultiplier <= 0f)
+                variable.lifeTimeMultiplier = 1f;
+            if (variable.radiusMultiplier <= 0f)
+                variable.radiusMultiplier = 1f;
+
+            variable.launchDelay = Mathf.Max(0f, variable.launchDelay);
+            variable.trackingStartTime = Mathf.Max(0f, variable.trackingStartTime);
+            variable.spreadAngle = Mathf.Max(0f, variable.spreadAngle);
+            return variable;
+        }
+
+        private static float RangeFromSeed(int seed, uint channel, float min, float max)
+        {
+            uint value = (uint)seed;
+            value ^= 0x9E3779B9u + channel * 0x85EBCA6Bu;
+            value ^= value >> 16;
+            value *= 0x7FEB352Du;
+            value ^= value >> 15;
+            value *= 0x846CA68Bu;
+            value ^= value >> 16;
+            float t = (value & 0x00FFFFFFu) / 16777215f;
+            return Mathf.Lerp(min, max, t);
         }
 
         private ItemMotionModule ResolveMotionModule()
@@ -313,13 +379,13 @@ namespace ES
         {
             int capacity = Mathf.Max(1, hitBufferCapacity);
             if (_hitResults == null || _hitResults.Length != capacity)
-                _hitResults = new ProjectileHitCandidate[capacity];
+                _hitResults = new ShotHitCandidate[capacity];
 
             if (_hitSolver == null)
-                _hitSolver = new ItemProjectilePhysicsHitSolver(capacity);
+                _hitSolver = new ItemShotPhysicsHitSolver(capacity);
 
             if (_tickScheduler == null)
-                _tickScheduler = new ItemProjectileAlwaysTickScheduler();
+                _tickScheduler = new ItemShotAlwaysTickScheduler();
         }
     }
 }

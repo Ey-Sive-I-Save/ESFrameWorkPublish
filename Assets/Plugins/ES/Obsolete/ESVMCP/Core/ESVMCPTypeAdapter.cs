@@ -1,7 +1,7 @@
 using UnityEngine;
 using System;
 
-namespace ES.VMCP
+namespace ES.Obsolete.VMCP
 {
     /// <summary>
     /// 智能类型适配器 - 自动处理GameObject和Component之间的转换

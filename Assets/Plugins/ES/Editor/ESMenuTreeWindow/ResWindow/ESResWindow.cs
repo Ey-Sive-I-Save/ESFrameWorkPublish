@@ -18,11 +18,17 @@ namespace ES
             OpenWindow();
         }
 
+        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "资产管理窗口", false, 0)]
+        public static void TryOpenWindowFromQuickWindows()
+        {
+            OpenWindow();
+        }
+
 
         #region 数据缓存
         public const string MenuNameForLibraryRoot = "资源库";
 
-        public ESLibraryWindowMenuTemplate<ResLibConsumer, ResLibrary, ResBook, ResPage> menuTemplate = new ESLibraryWindowMenuTemplate<ResLibConsumer, ResLibrary, ResBook, ResPage>();
+        public ESLibraryWindowMenuTemplate<ESAssetLibraryConsumer, ESAssetLibrary, ESAssetBook, ESAssetPage> menuTemplate = new ESLibraryWindowMenuTemplate<ESAssetLibraryConsumer, ESAssetLibrary, ESAssetBook, ESAssetPage>();
         public Page_Root_GlobalSetting page_root_GlobalSettings;
 
         // public Page_Root_Build page_index_Build;
@@ -81,7 +87,7 @@ namespace ES
             [VerticalGroup("总组/数据")]
             public string createText = "--构建流程--";
             private ReorderableList reorderableListForLibraries;
-            private List<ResLibrary> libraries;
+            private List<ESAssetLibrary> libraries;
             [HorizontalGroup("总组/数据/分", Width = 355)]
             [OnInspectorGUI]
             public void DrawLibs()
@@ -97,10 +103,10 @@ namespace ES
             }
             public override ESWindowPageBase ES_Refresh()
             {
-                libraries = ESEditorSO.SOS.GetNewGroupOfType<ResLibrary>();
+                libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
                 if (libraries != null)
                 {
-                    reorderableListForLibraries = new ReorderableList(libraries, typeof(ResLibrary))
+                    reorderableListForLibraries = new ReorderableList(libraries, typeof(ESAssetLibrary))
                     {
                         draggable = false,      // 允许拖拽排序
                         displayAdd = false, // 显示添加按钮

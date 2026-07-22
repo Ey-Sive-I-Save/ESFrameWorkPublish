@@ -14,8 +14,8 @@
 
 源码位置：
 
-- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ProjectileMotionTypes.cs`
-- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ProjectileMotionSolver.cs`
+- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ShotMotionTypes.cs`
+- `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ShotMotionSolver.cs`
 - `Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic/ItemBasicModules.cs`
 - `Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ItemDataInfo.cs`
 
@@ -28,8 +28,8 @@
 - 转向速度：`turnSpeed`，避免目标追踪瞬间硬拐。
 - Transform 目标：`LaunchTo(Transform target)` / `LaunchTo(Transform target, bool mustHit)`。
 - 必中模式：`ShotAimMode.MustHit` 到达目标点时生成命中候选，即使没有真实物理碰撞。
-- 内部命中查询预留：`IItemProjectileHitSolver`，默认使用 `Physics.SphereCastNonAlloc`。
-- 内部 Tick 预留：`IItemProjectileTickScheduler`，后续可替换为空间哈希、分组 Tick、距离预算等。
+- 内部命中查询预留：`IItemShotHitSolver`，默认使用 `Physics.SphereCastNonAlloc`。
+- 内部 Tick 预留：`IItemShotTickScheduler`，后续可替换为空间哈希、分组 Tick、距离预算等。
 
 ## 必中不是碰撞特例
 
@@ -84,14 +84,14 @@ Shot 内置的应该是高频、通用、可预测的运动参数：
 
 当前设计已经预留两处可替换点：
 
-- `IItemProjectileHitSolver`：默认物理 SphereCastNonAlloc，后续可替换为空间哈希、圆/球简化碰撞、Job 批处理。
-- `IItemProjectileTickScheduler`：默认每帧 Tick，后续可替换为分组 Tick、预算 Tick、远距离降频、重要性排序。
+- `IItemShotHitSolver`：默认物理 SphereCastNonAlloc，后续可替换为空间哈希、圆/球简化碰撞、Job 批处理。
+- `IItemShotTickScheduler`：默认每帧 Tick，后续可替换为分组 Tick、预算 Tick、远距离降频、重要性排序。
 
 不要提前把所有飞行物锁死在 Unity Physics 单发查询上，也不要把所有飞行物锁死为每帧全量 Tick。第一版可以用默认实现跑通，但接口必须保留。
 
 ## 中文配置口径
 
-`ItemDataInfo` 是总入口，不要拆出 `DoorDataInfo`、`TowerDataInfo`、`ProjectileDataInfo`。
+`ItemDataInfo` 是总入口，不要拆出 `DoorDataInfo`、`TowerDataInfo`、`ShotDataInfo`。
 
 常见配置块：
 
@@ -100,18 +100,21 @@ baseConfig      基础：类型、预制体、显示名、图标、标签
 interactConfig  交互：能否交互、提示、距离、条件
 logicConfig     逻辑：生成、使用、命中、过期、销毁前 Op
 moveConfig      移动：门/机关/平台/掉落/旋转/跟随等
-shotConfig      飞行物：Shot 专属
+shotShared      飞行物共享模板：同类 Shot 共用，运行时只读
+shotVariable    飞行物出生变量：每发 Shot 独有，发射时拷贝进模块
 weaponConfig    武器：引用 Shot Item，不内嵌飞行逻辑
 ```
 
 门、塔、机关不需要一上来各自独立 Config。多数门只需要 `interactConfig + logicConfig`，会移动再加 `moveConfig`。
+
+Shot 数据已经放弃旧 `ItemShotConfig` 一坨配置。`ItemShotModule.ApplyShotData(shared, variable)` 是新入口：Shared 管基础弹道/命中/寿命/必中许可，Variable 管 seed、倍率、强制必中、延迟覆盖、目标偏移、散射角。不要把每发可变状态写回 `ItemDataInfo`。
 
 ## 近期不要做的事
 
 - 不要恢复旧的 `Runtime/Movement` 方案。
 - 不要重新引入 `ESMotionBody` 这种和 Entity/Item 并列的大根。
 - 不要把 Shot 改成独立散落的 MonoBehaviour 闭环。
-- 不要把伤害、Buff、VFX、音效、对象池、全局调度塞进 `ItemProjectileModule`。
+- 不要把伤害、Buff、VFX、音效、对象池、全局调度塞进 `ItemShotModule`。
 - 不要创建一堆 `ItemMotionDomain / ItemCollisionDomain / ItemLifetimeDomain`。Domain 是大边界，能力点进 Module。
 - 不要把 `MustHit` 当作跳过架构的 hack，它是合法瞄准模式。
 

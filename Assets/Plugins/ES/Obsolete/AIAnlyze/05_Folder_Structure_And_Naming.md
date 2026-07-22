@@ -6,7 +6,7 @@
   - `Assets/Plugins/ES/0_Stand/`：基础通用能力（Res、Attributes、BaseDefine 等）；
   - `Assets/Plugins/ES/1_Design/`：设计/运行时抽象（Link、ModuleAndHosting、Link Pool 等）；
   - `Assets/Plugins/ES/Editor/`：编辑器扩展（ESMenuTreeWindow、DevManagement 等）；
-  - `Assets/ES/DevManagement`、`Assets/ES/Documentation`：项目级数据与文档资产。  
+  - `Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/DevManagement`、`Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Documentation`：项目级数据与文档资产。  
   - 整体上已经形成“基础 -> 设计 -> Editor -> 项目数据”的分层。
 
 - **部分命名具有语义**  
@@ -39,7 +39,7 @@
 
 - **为“面向项目”的代码与“通用框架”代码再划一道线**  
   - 通用框架建议归入 `Assets/Plugins/ES/Framework` 或类似命名；
-  - 项目专用逻辑（如 DevManagement 工具、特定游戏模块）放在 `Assets/ES/Game` 或 `Assets/ES/Project` 下；
+  - 项目专用逻辑（如 DevManagement 工具、特定游戏模块）放在 `Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Game` 或 `Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Project` 下；
   - 这样未来如果要把 ES 框架抽出成独立包，会更加顺畅。
 
 ## 4. 命名规范建议（可逐步演进，不必一次性大改）
@@ -63,4 +63,4 @@
 
 - 当前结构总体是“可用且清晰”的，但在**命名一致性**和**长远可维护性**上还有改进空间：
   - 建议从新增文件开始遵守新规范，而对旧文件按需、渐进式地迁移；
-  - 可以在 Assets/ES/Documentation 或 AIAnlyze 目录下进一步固化一份“项目命名规范”文档，供团队参考。
+  - 可以在 Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/Documentation 或 AIAnlyze 目录下进一步固化一份“项目命名规范”文档，供团队参考。

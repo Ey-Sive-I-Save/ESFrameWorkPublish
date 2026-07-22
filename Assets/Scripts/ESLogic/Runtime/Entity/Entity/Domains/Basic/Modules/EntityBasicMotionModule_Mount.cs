@@ -5,7 +5,7 @@ using UnityEngine;
 namespace ES
 {
     [Serializable, TypeRegistryItem("基础骑乘模块")]
-    public class EntityBasicMountModule : EntityBasicModuleBase, IEntitySupportMotion
+    public class EntityBasicMountModule : EntityBasicModuleBase, IEntityKCCBeforeMotion, IEntityKCCRotationMotion, IEntityKCCVelocityMotion
     {
         [Title("开关")]
         public bool enableMount = true;
@@ -56,6 +56,7 @@ namespace ES
             if (MyCore != null)
             {
                 MyCore.kcc.mountModule = this;
+                MyCore.kcc.RebuildMotionSchedulers();
             }
 
             // 构造跟踪器并绑定状态（无委托，零 GC）
@@ -272,9 +273,11 @@ namespace ES
             }
         }
 
-        public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, float deltaTime)
+        public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, Vector3 initialPosition, float deltaTime)
         {
-            if (!enableMount || !_lifecycle.IsActive || kcc == null || kcc.motor == null) return false;
+            if (!enableMount || !_lifecycle.IsActive || kcc.CurrentSupportFlags != StateSupportFlags.Mounted) return false;
+            if (kcc.workWorld < 20) return false;
+            kcc.workWorld -= 20;
             // ★ 防止 KCC Grounding 在骑乘/MatchTarget 期间与 SetPositionAndRotation 产生冲突。
             //   Climb 模块采用同样的做法：ForceUnground 告知 KCC 本帧不做稳定地面检测，
             //   避免 KCC 将角色压回地面，对抗 MatchTarget 向上对齐的位移。
@@ -282,15 +285,19 @@ namespace ES
             return true;
         }
 
-        public bool UpdateRotation(Entity owner, EntityKCCData kcc, ref Quaternion currentRotation, float deltaTime)
+        public bool UpdateRotation(Entity owner, EntityKCCData kcc, Quaternion initialRotation, ref Quaternion currentRotation, float deltaTime)
         {
-            if (!enableMount || currentMount == null) return false;
+            if (!enableMount || currentMount == null || kcc.CurrentSupportFlags != StateSupportFlags.Mounted) return false;
+            if (kcc.workSelf < 100) return false;
+            kcc.workSelf -= 100;
             return true;
         }
 
-        public bool UpdateVelocity(Entity owner, EntityKCCData kcc, ref Vector3 currentVelocity, float deltaTime)
+        public bool UpdateVelocity(Entity owner, EntityKCCData kcc, Vector3 initialVelocity, ref Vector3 currentVelocity, float deltaTime)
         {
-            if (!enableMount || currentMount == null) return false;
+            if (!enableMount || currentMount == null || kcc.CurrentSupportFlags != StateSupportFlags.Mounted) return false;
+            if (kcc.workSelf < 100) return false;
+            kcc.workSelf -= 100;
             currentVelocity = Vector3.zero;
             return true;
         }

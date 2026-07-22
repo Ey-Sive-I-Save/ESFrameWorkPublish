@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 
 
-namespace ES {
+namespace ES.Obsolete{
     /*SupportOperation �?ValueEntryOp是一对，
      * ValueEntryOp提供修改意愿的效果导向，
      * 而Support提供的是修改的值和操作类型

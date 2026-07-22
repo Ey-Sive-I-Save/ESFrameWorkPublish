@@ -11,6 +11,16 @@ namespace ES.EditorInternal
     public class ESGraphView_Part_InspectorView : VisualElement
     {
         public new class UxmlFactory : UxmlFactory<ESGraphView_Part_InspectorView, UxmlTraits> { }
+        public sealed class TabButton : Button
+        {
+            public VisualElement TargetElement { get; private set; }
+
+            public TabButton(string text, VisualElement targetElement)
+            {
+                this.text = text;
+                TargetElement = targetElement;
+            }
+        }
 
         UnityEditor.Editor editorForNode;
         UnityEditor.Editor editorForContainer;

@@ -8,8 +8,7 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 
 
-namespace ES
-{
+namespace ES.Obsolete{
 
     /*  IValueEntryOperation
      * 值通道导向操作，他的目的是把一个效果指定到特定的无解析�?值一般有数值和引用两种>上，

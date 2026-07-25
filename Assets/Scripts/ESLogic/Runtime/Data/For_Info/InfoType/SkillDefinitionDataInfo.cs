@@ -5,10 +5,10 @@ using UnityEngine;
 
 namespace ES
 {
-    [ESCreatePath("鏁版嵁淇℃伅", "瀹屾暣鎶€鑳戒綋鏁版嵁淇℃伅")]
-    public class SkillDefinitionDataInfo : SoDataInfo
+    [ESCreatePath("数据信息", "完整技能体数据信息")]
+    public class SkillDefinitionDataInfo : SoDataInfo, IGameCoreSO
     {
-        [Title("鍩虹")]
+        [Title("基础")]
         [LabelText("Skill Tags")]
         public List<string> tags = new List<string>();
 
@@ -16,14 +16,14 @@ namespace ES
         [HideLabel, InlineProperty]
         public ESSkillConfigKey skillKey = new ESSkillConfigKey();
 
-        [LabelText("缁戝畾杞ㄩ亾杩囩▼")]
+        [LabelText("绑定轨道过程")]
         public SkillTrackProcessInfo trackProcess;
 
         [LabelText("Base State")]
         public StateAniDataInfo baseStateInfo;
 
         [Title("Unlock And Upgrade")]
-        [LabelText("榛樿瑙ｉ攣")]
+        [LabelText("默认解锁")]
         public bool unlockedByDefault = true;
 
         [LabelText("Max Enhance Level")]
@@ -33,7 +33,7 @@ namespace ES
         public List<SkillDefinitionDataInfo> linkedSkills = new List<SkillDefinitionDataInfo>();
 
         [Title("Resource And Charges")]
-        [LabelText("娆℃暟妯″紡")]
+        [LabelText("次数模式")]
         public SkillChargeMode chargeMode = SkillChargeMode.None;
 
         [ShowIf(nameof(UsesCharges))]
@@ -41,20 +41,20 @@ namespace ES
         public int maxCharges = 1;
 
         [ShowIf(nameof(UsesCharges))]
-        [LabelText("鎭㈠闂撮殧")]
+        [LabelText("恢复间隔")]
         public float rechargeInterval = 1f;
 
         [LabelText("Shared Resource Group")]
         public string sharedResourceGroup;
 
-        [Title("閲婃斁鎺у埗")]
-        [LabelText("鎵撴柇妯″紡")]
+        [Title("释放控制")]
+        [LabelText("打断模式")]
         public SkillCastInterruptMode interruptMode = SkillCastInterruptMode.ManualCancelable;
 
-        [LabelText("鍏佽涓诲姩鍙栨秷")]
+        [LabelText("允许主动取消")]
         public bool canManualCancel = true;
 
-        [LabelText("閲婃斁鍓嶆彁")]
+        [LabelText("释放前提")]
         [SerializeReference]
         public ESGetBoolExpression castCondition;
 
@@ -63,33 +63,38 @@ namespace ES
         public ESGetGameObjectExpression initialTargetExpression;
 
         [Title("Value Prepare")]
-        [LabelText("鍩虹鍊嶇巼")]
+        [LabelText("基础倍率")]
         public float baseMultiplier = 1f;
 
         [LabelText("Dynamic Multiplier Expression")]
         [SerializeReference]
         public ESGetFloatExpression dynamicMultiplierExpression;
 
-        [Title("杩愯涓婁笅鏂囬濉厖")]
+        [Title("运行上下文预填充")]
         [LabelText("Prefill User From State Host")]
         public bool prefillUserFromStateHost = true;
 
-        [LabelText("鍒濆鐩爣鍔犲叆鐩爣鍒楄〃")]
+        [LabelText("初始目标加入目标列表")]
         public bool addInitialTargetToList = true;
 
-        [Title("鎵╁睍鏀寔")]
-        [LabelText("鐩告満鏀寔")]
+        [Title("扩展支持")]
+        [LabelText("相机支持")]
         public SkillCameraSupportMode cameraSupport = SkillCameraSupportMode.None;
 
         [LabelText("Continuous Skill")]
         public bool isContinuousSkill;
 
-        [LabelText("鍚敤鍥炶皟鎸傜偣")]
+        [LabelText("启用回调挂点")]
         public bool enableCallbacks;
 
         private bool UsesCharges()
         {
             return chargeMode == SkillChargeMode.FixedCharges || chargeMode == SkillChargeMode.RechargeOverTime;
+        }
+
+        public void InjectGameCoreTables()
+        {
+            ESRuntimeDataModule.InjectGameCoreRoot(this);
         }
     }
 

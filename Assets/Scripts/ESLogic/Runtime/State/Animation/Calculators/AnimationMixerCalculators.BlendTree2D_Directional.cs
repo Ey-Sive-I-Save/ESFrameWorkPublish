@@ -29,8 +29,8 @@ namespace ES
                 public string marker;
             }
 
-            public StateParameter parameterX = "DirectionX";
-            public StateParameter parameterY = "DirectionY";
+            public StateFloatParameterReference parameterX = StateDefaultFloatParameter.MoveX;
+            public StateFloatParameterReference parameterY = StateDefaultFloatParameter.MoveZ;
             public ClipSample2D[] samples = new ClipSample2D[0];
 
             [Range(0f, 1f)]
@@ -206,9 +206,9 @@ namespace ES
                 }
                    
 
-                // 通过context获取参数（直接传StateParameter，零GC）
-                float paramX = context.GetFloat(parameterX, 0f);
-                float paramY = context.GetFloat(parameterY, 0f);
+                // Built-in float parameter lookup has no allocation.
+                float paramX = context.GetFloat(parameterX.Parameter, 0f);
+                float paramY = context.GetFloat(parameterY.Parameter, 0f);
                     
                 Vector2 rawInput = new Vector2(paramX, paramY);
 
@@ -299,8 +299,8 @@ namespace ES
                 if (runtime == null || !runtime.mixer.IsValid() || samples.Length == 0) return;
 
                 // 直接读取参数，跳过输入平滑
-                float paramX = context.GetFloat(parameterX, 0f);
-                float paramY = context.GetFloat(parameterY, 0f);
+                float paramX = context.GetFloat(parameterX.Parameter, 0f);
+                float paramY = context.GetFloat(parameterY.Parameter, 0f);
                 Vector2 rawInput = new Vector2(paramX, paramY);
 
                 // 立即设置 lastInput2D（后续帧从此值开始平滑）

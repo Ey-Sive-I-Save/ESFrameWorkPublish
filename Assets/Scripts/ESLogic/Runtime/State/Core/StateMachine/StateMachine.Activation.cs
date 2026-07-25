@@ -604,13 +604,22 @@ namespace ES
             }
         }
 
-        public bool ForceEnterState(StateBase targetState, StateLayerType layer = StateLayerType.NotClear)
+        /// <summary>
+        /// Replaces every running state on one layer without normal merge/support arbitration.
+        /// This is a system boundary for recovery, cinematics, temporary playback and similar
+        /// exceptional flows; ordinary gameplay actions should use <see cref="TryActivateState"/>.
+        /// </summary>
+        public bool ForceReplaceLayer(StateBase targetState, StateForceReason reason, StateLayerType layer = StateLayerType.NotClear)
         {
-            if (targetState == null) return false;
+            if (targetState == null || reason == StateForceReason.None) return false;
 
             layer = ResolveLayerForState(targetState, layer);
             var layerData = GetLayerByType(layer);
             if (layerData == null) return false;
+
+            int txId = ++_activationTxIdCounter;
+            int runningBefore = runningStates.Count;
+            int layerRunningBefore = layerData.runningStates.Count;
 
             while (layerData.runningStates.Count > 0)
             {
@@ -630,6 +639,9 @@ namespace ES
                 if (targetState.baseStatus == StateBaseStatus.Running)
                     targetState.OnStateExit();
                 MarkDirty(StateDirtyReason.Exit);
+                PushActivationEvent(txId, targetState, layer, layerData.layerType, StateActivationCode.Fail,
+                    ActivationEventKind.Failure, ActivationFailureKind.Exception, 0, runningBefore, runningStates.Count,
+                    layerRunningBefore, layerData.runningStates.Count, reason);
                 return false;
             }
             ApplyFadeIn(targetState, layerData);
@@ -640,7 +652,18 @@ namespace ES
             }
 
             MarkDirty(StateDirtyReason.Enter);
+            PushActivationEvent(txId, targetState, layer, layerData.layerType, StateActivationCode.Success,
+                ActivationEventKind.Forced, ActivationFailureKind.None, 0, runningBefore, runningStates.Count,
+                layerRunningBefore, layerData.runningStates.Count, reason);
             return true;
+        }
+
+        /// <summary>
+        /// Legacy compatibility wrapper. Prefer <see cref="ForceReplaceLayer"/> and provide a reason.
+        /// </summary>
+        public bool ForceEnterState(StateBase targetState, StateLayerType layer = StateLayerType.NotClear)
+        {
+            return ForceReplaceLayer(targetState, StateForceReason.Legacy, layer);
         }
 
         private void TruelyDeactivateState(StateBase state, StateLayerType layer)
@@ -769,14 +792,34 @@ namespace ES
             return true;
         }
 
-        public void ForceExitState(StateBase targetState)
+        /// <summary>Immediately exits one running state, bypassing only caller-level exit policy.</summary>
+        public bool ForceExit(StateBase targetState, StateForceReason reason)
         {
-            if (targetState == null) return;
+            if (targetState == null || reason == StateForceReason.None) return false;
 
             if (stateLayerMap.TryGetValue(targetState, out var layer))
             {
+                int txId = ++_activationTxIdCounter;
+                int runningBefore = runningStates.Count;
+                var layerRuntime = GetLayerByType(layer);
+                int layerRunningBefore = layerRuntime != null ? layerRuntime.runningStates.Count : 0;
                 TruelyDeactivateState(targetState, layer);
+                int layerRunningAfter = layerRuntime != null ? layerRuntime.runningStates.Count : 0;
+                PushActivationEvent(txId, targetState, layer, layer, StateActivationCode.Success,
+                    ActivationEventKind.Forced, ActivationFailureKind.None, 0, runningBefore, runningStates.Count,
+                    layerRunningBefore, layerRunningAfter, reason);
+                return true;
             }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Legacy compatibility wrapper. Prefer <see cref="ForceExit"/> and provide a reason.
+        /// </summary>
+        public void ForceExitState(StateBase targetState)
+        {
+            ForceExit(targetState, StateForceReason.Legacy);
         }
 
         public void DeactivateLayer(StateLayerType layer)

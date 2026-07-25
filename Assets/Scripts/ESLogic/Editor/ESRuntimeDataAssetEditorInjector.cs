@@ -14,7 +14,7 @@ namespace ES
 
         public static ESAssetAutoRegisterReport AutoRegisterAllLibraries(bool clearBeforeInject = true, bool logReport = true)
         {
-            ESAssetAutoRegisterReport report = ESRuntimeDataAsset.RebuildAssetTableFromLibrariesEditor(true, clearBeforeInject);
+            ESAssetAutoRegisterReport report = ESRuntimeDataAsset.RebuildEditorConfigQueryTableFromLibraries(true, clearBeforeInject);
             if (logReport)
                 Debug.Log(report.ToString());
 

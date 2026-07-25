@@ -32,7 +32,7 @@ namespace ES
                 public string marker;
             }
 
-            public StateParameter parameterFloat = StateDefaultFloatParameter.Speed;
+            public StateFloatParameterReference parameterFloat = StateDefaultFloatParameter.Speed;
             public ClipSampleForBlend1D[] samples = new ClipSampleForBlend1D[0];
 
             [BoxGroup("曲线阈值")]
@@ -181,8 +181,8 @@ namespace ES
                 if (!runtime.mixer.IsValid() || samples.Length == 0)
                     return;
 
-                // 通过context获取参数（直接传StateParameter，零GC）
-                float rawInput = context.GetFloat(parameterFloat, 0f);
+                // Built-in float parameter lookup has no allocation.
+                float rawInput = context.GetFloat(parameterFloat.Parameter, 0f);
 
                 // 自定义曲线阈值映射
                 float mappedInput = useCustomThresholdCurve
@@ -349,7 +349,7 @@ namespace ES
                 if (runtime == null || !runtime.mixer.IsValid() || samples.Length == 0) return;
 
                 // 直接读取参数，跳过输入平滑
-                float rawInput = context.GetFloat(parameterFloat, 0f);
+                float rawInput = context.GetFloat(parameterFloat.Parameter, 0f);
                 float mappedInput = useCustomThresholdCurve ? MapInputByCurve(rawInput) : rawInput;
 
                 // 立即设置 lastInput（后续帧从此值开始平滑）

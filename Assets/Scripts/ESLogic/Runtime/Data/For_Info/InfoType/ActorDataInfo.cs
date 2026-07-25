@@ -4,40 +4,35 @@ using UnityEngine;
 
 namespace ES
 {
-    [ESCreatePath("鏁版嵁淇℃伅", "瑙掕壊鏁版嵁淇℃伅")]
+    [ESCreatePath("数据信息", "角色数据信息")]
+    /// <summary>
+    /// 非 GameCore 的通用角色定义（Player/Rider/StoryActor 等）。
+    /// Monster 与 NPC 必须使用各自独立的 GameCore 根 SO，禁止通过 Actor 注入。
+    /// </summary>
     public class ActorDataInfo : SoDataInfo
     {
-        [Title("瑙掕壊瀹氫綅")]
-        [LabelText("瑙掕壊绫诲瀷")]
+        [Title("角色定位")]
+        [LabelText("角色类型")]
         public ActorDataKind actorKind = ActorDataKind.Player;
 
-        [LabelText("鏄剧ず鍚嶇О")]
+        [LabelText("显示名称")]
         public string displayName;
 
-        [LabelText("璇存槑")]
+        [LabelText("说明")]
         [MultiLineProperty(3)]
         public string description;
 
-        [Title("Runtime Key")]
-        [ShowIf(nameof(ShowNpcKey))]
-        [HideLabel, InlineProperty]
-        public ESNpcConfigKey npcKey = new ESNpcConfigKey();
-
-        [ShowIf(nameof(ShowMonsterKey))]
-        [HideLabel, InlineProperty]
-        public ESMonsterConfigKey monsterKey = new ESMonsterConfigKey();
-
-        [Title("杩愬姩鍏变韩閰嶇疆")]
+        [Title("运动共享配置")]
         [InfoBox("Shared motion data is read-mostly runtime definition. Buffs and skills should modify variable/runtime data instead.")]
         [HideLabel]
         public EntityMotionSharedData motionShared = EntityMotionSharedData.Default;
 
-        [Title("杩愬姩鍙橀噺閰嶇疆")]
+        [Title("运动变量配置")]
         [InfoBox("Variable motion data is the spawn/runtime default. Gameplay changes should target runtime variables, not shared data.")]
         [HideLabel]
         public EntityMotionVariableData motionVariable = EntityMotionVariableData.Default;
 
-        [Button("鍒濆鍖栭€氱敤瑙掕壊杩愬姩閰嶇疆")]
+        [Button("初始化通用角色运动配置")]
         public void InitDefaultMotion()
         {
             motionShared = EntityMotionSharedData.Default;
@@ -51,32 +46,17 @@ namespace ES
             motionVariable = EntityMotionVariableData.Default;
         }
 
-        private bool ShowNpcKey()
-        {
-            return actorKind == ActorDataKind.NPC;
-        }
-
-        private bool ShowMonsterKey()
-        {
-            return actorKind == ActorDataKind.Monster;
-        }
     }
 
     public enum ActorDataKind
     {
-        [InspectorName("鐜╁")]
+        [InspectorName("玩家")]
         Player = 0,
-
-        [InspectorName("NPC")]
-        NPC = 1,
-
-        [InspectorName("鎬墿")]
-        Monster = 2,
 
         [InspectorName("Rider")]
         Rider = 3,
 
-        [InspectorName("鍓ф儏瑙掕壊")]
+        [InspectorName("剧情角色")]
         StoryActor = 4
     }
 
@@ -84,90 +64,90 @@ namespace ES
     public struct EntityMotionSharedData
     {
         [Title("Main Motion Abilities")]
-        [LabelText("鍚敤鍦伴潰绉诲姩")]
+        [LabelText("启用地面移动")]
         public bool enableGroundMove;
 
-        [LabelText("鍚敤璺宠穬")]
+        [LabelText("启用跳跃")]
         public bool enableJump;
 
-        [LabelText("鍚敤涓嬭共")]
+        [LabelText("启用下蹲")]
         public bool enableCrouch;
 
-        [LabelText("鍚敤椋炶")]
+        [LabelText("启用飞行")]
         public bool enableFly;
 
         [LabelText("Enable Climb")]
         public bool enableClimb;
 
-        [LabelText("鍚敤楠戜箻")]
+        [LabelText("启用骑乘")]
         public bool enableMount;
 
-        [LabelText("棰勭暀绔嬩綋鏈哄姩")]
+        [LabelText("预留立体机动")]
         public bool enableGrappleMotion;
 
-        [Title("鍦伴潰鍙傛暟")]
-        [LabelText("鏈€澶у湴闈㈤€熷害")]
+        [Title("地面参数")]
+        [LabelText("最大地面速度")]
         public float maxStableMoveSpeed;
 
-        [LabelText("鍦伴潰鍝嶅簲閫熷害")]
+        [LabelText("地面响应速度")]
         public float stableMovementSharpness;
 
-        [LabelText("鏈€澶х┖涓€熷害")]
+        [LabelText("最大空中速度")]
         public float maxAirMoveSpeed;
 
-        [LabelText("绌轰腑鍔犻€熷害")]
+        [LabelText("空中加速度")]
         public float airAccelerationSpeed;
 
-        [LabelText("璺宠穬閫熷害")]
+        [LabelText("跳跃速度")]
         public float jumpSpeed;
 
-        [Title("鏂滈潰/鍙伴樁绛栫暐")]
+        [Title("斜面/台阶策略")]
         [LabelText("Max Stable Slope Angle")]
         [Range(0f, 89f)]
         public float maxStableSlopeAngle;
 
-        [LabelText("闄″潯婊戣惤閫熷害")]
+        [LabelText("陡坡滑落速度")]
         public float steepSlopeSlideSpeed;
 
-        [LabelText("涓婂潯閫熷害鍊嶇巼")]
+        [LabelText("上坡速度倍率")]
         public float uphillSpeedMultiplier;
 
-        [LabelText("涓嬪潯閫熷害鍊嶇巼")]
+        [LabelText("下坡速度倍率")]
         public float downhillSpeedMultiplier;
 
         [LabelText("Downhill Inertia")]
         public float downhillInertia;
 
-        [LabelText("鍔ㄦ€佸钩鍙扮户鎵块€熷害")]
+        [LabelText("动态平台继承速度")]
         public bool inheritMovingPlatformVelocity;
 
-        [LabelText("鍙伴樁閫傚簲")]
+        [LabelText("台阶适应")]
         public EntityMotionStepPolicy stepPolicy;
 
-        [Title("椋炶绛栫暐")]
-        [LabelText("椋炶妯″紡")]
+        [Title("飞行策略")]
+        [LabelText("飞行模式")]
         public EntityFlyControlMode flyControlMode;
 
-        [LabelText("椋炶鏈€澶ч€熷害")]
+        [LabelText("飞行最大速度")]
         public float flyMaxSpeed;
 
-        [LabelText("椋炶鍐插埡鍊嶇巼")]
+        [LabelText("飞行冲刺倍率")]
         public float flySprintMultiplier;
 
-        [LabelText("鎮仠鍒跺姩")]
+        [LabelText("悬停制动")]
         public float flyHoverBrake;
 
-        [LabelText("淇啿鍔犻€熷害")]
+        [LabelText("俯冲加速度")]
         public float flyDiveAcceleration;
 
-        [Title("楠戜箻绛栫暐")]
-        [LabelText("杞藉叿鎺ョ杈撳叆")]
+        [Title("骑乘策略")]
+        [LabelText("载具接管输入")]
         public bool mountVehicleConsumesInput;
 
-        [LabelText("楠戜箻鏃堕攣瀹氳鑹查€熷害")]
+        [LabelText("骑乘时锁定角色速度")]
         public bool mountLockRiderVelocity;
 
-        [LabelText("楠戜箻瀵归綈瀹屾垚鍚庣敱杞藉叿鍚屾")]
+        [LabelText("骑乘对齐完成后由载具同步")]
         public bool mountSyncAfterMatchTarget;
 
         public static EntityMotionSharedData Default => new EntityMotionSharedData
@@ -226,26 +206,26 @@ namespace ES
         [LabelText("Initial Support Flag")]
         public StateSupportFlags initialSupportFlag;
 
-        [LabelText("閫熷害鍊嶇巼")]
+        [LabelText("速度倍率")]
         public float speedMultiplier;
 
-        [LabelText("閫熷害涓婇檺(<=0 涓嶉檺鍒?")]
+        [LabelText("速度上限(<=0 不限制)")]
         public float speedLimit;
 
-        [LabelText("閲嶅姏鍊嶇巼")]
+        [LabelText("重力倍率")]
         public float gravityMultiplier;
 
-        [Title("鎺у埗鏉冮檺")]
-        [LabelText("鍏佽绉诲姩杈撳叆")]
+        [Title("控制权限")]
+        [LabelText("允许移动输入")]
         public bool allowMoveInput;
 
-        [LabelText("鍏佽杞悜杈撳叆")]
+        [LabelText("允许转向输入")]
         public bool allowLookInput;
 
-        [LabelText("鍏佽璺宠穬")]
+        [LabelText("允许跳跃")]
         public bool allowJump;
 
-        [LabelText("鍏佽鍒囨崲杩愬姩妯″紡")]
+        [LabelText("允许切换运动模式")]
         public bool allowMotionModeSwitch;
 
         [LabelText("Allow Root Motion")]
@@ -267,25 +247,25 @@ namespace ES
 
     public enum EntityMotionStepPolicy
     {
-        [InspectorName("浜ょ粰 KCC")]
+        [InspectorName("交给 KCC")]
         CharacterController = 0,
 
-        [InspectorName("鑴?IK 杈呭姪")]
+        [InspectorName("足部 IK 辅助")]
         FootIKAssist = 1,
 
-        [InspectorName("涓ユ牸鐗╃悊")]
+        [InspectorName("严格物理")]
         StrictPhysics = 2
     }
 
     public enum EntityFlyControlMode
     {
-        [InspectorName("鐩告満鏂瑰悜")]
+        [InspectorName("相机方向")]
         CameraRelative = 0,
 
-        [InspectorName("瑙掕壊鏈濆悜")]
+        [InspectorName("角色朝向")]
         CharacterForward = 1,
 
-        [InspectorName("閿佸畾鐩爣")]
+        [InspectorName("锁定目标")]
         TargetRelative = 2
     }
 }

@@ -19,6 +19,8 @@ using Cursor = UnityEngine.UIElements.Cursor;
 
 public class ESTrackViewWindow : OdinEditorWindow
 {
+    private static readonly Vector2 s_MinWindowSize = new Vector2(600f, 420f);
+
     public static ESTrackViewWindow window;
     public static ITrackSequence Sequence { get { if (TrackContainer != null) return TrackContainer.Sequence; return null; } }
     public static IEditorTrackSupport_GetSequence TrackContainer;
@@ -27,6 +29,7 @@ public class ESTrackViewWindow : OdinEditorWindow
     private static float s_CopiedClipStartTime;
     private static readonly List<CopiedClipPayload> s_CopiedClips = new List<CopiedClipPayload>();
     private bool m_AutoValidationScheduled;
+    private double m_LastAutoValidationRequestTime;
     private bool m_ViewRefreshScheduled;
     private readonly HashSet<ESEditorTrackClip> m_SelectedClips = new HashSet<ESEditorTrackClip>();
     private readonly List<ITrackClip> m_ValidationErrorClips = new List<ITrackClip>();
@@ -57,6 +60,9 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     [SerializeField]
     public VisualGUIDrawerSO drawerSOForTrackClip;
+
+    [SerializeField, Range(180f, 420f)]
+    private float m_TrackPanelWidth = DefaultTrackPanelWidth;
     #region  加载滞留
 
     protected override void OnImGUI()
@@ -72,6 +78,7 @@ public class ESTrackViewWindow : OdinEditorWindow
     {
         EditorApplication.update -= FlushScheduledViewRefresh;
         EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+        DisposeEmbeddedInspectorEditor();
         CleanupTrackPreviewPlayer();
         base.OnDestroy();
 
@@ -80,6 +87,7 @@ public class ESTrackViewWindow : OdinEditorWindow
     {
         base.OnEnable();
         window = this;
+        minSize = s_MinWindowSize;
         Selection.selectionChanged -= OnTrackWindowSelectionChanged;
         Selection.selectionChanged += OnTrackWindowSelectionChanged;
         s_CursorDefault = new Cursor
@@ -108,6 +116,8 @@ public class ESTrackViewWindow : OdinEditorWindow
     protected override void OnDisable()
     {
         EditorApplication.update -= FlushScheduledViewRefresh;
+        m_AutoValidationScheduled = false;
+        DisposeEmbeddedInspectorEditor();
         EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
         CleanupTrackPreviewPlayer();
         ClearFocusedEditingClip(null);
@@ -213,8 +223,14 @@ public class ESTrackViewWindow : OdinEditorWindow
     }
 
     public const float totalPixel = 800;
-    public const float LeftTrackPixel = 200;
-    public static float dynamicTargetTotalPixel { get { return window.horSlider.resolvedStyle.width; } }
+    private const float DefaultTrackPanelWidth = 220f;
+    private const float MinTrackPanelWidth = 180f;
+    private const float MaxTrackPanelWidth = 420f;
+    private const float MinTimelineCanvasWidth = 180f;
+    public static float LeftTrackPixel => window != null ? window.m_TrackPanelWidth : DefaultTrackPanelWidth;
+    public static float dynamicTargetTotalPixel => window != null && window.rightPanel != null
+        ? window.rightPanel.resolvedStyle.width
+        : totalPixel;
 
     public static float ResolveWidth()
     {
@@ -234,6 +250,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     public VisualElement rightPanel;
     public VisualElement leftPanel;
+    private VisualElement m_TimelineWorkspace;
 
     public ESTrackCreatorToolbar CreatorToolBar;
 
@@ -250,6 +267,19 @@ public class ESTrackViewWindow : OdinEditorWindow
     private ESEditorTrackItem m_DragSortingTrack;
     private VisualElement m_TrackInsertLine;
     private int m_DragTargetIndex = -1;
+    private VisualElement m_TrackPanelSplitter;
+    private bool m_IsResizingTrackPanel;
+    private int m_TrackPanelResizePointerId = -1;
+    private VisualElement m_InspectorPanel;
+    private Button m_InspectorToggleButton;
+    private Label m_InspectorTitleLabel;
+    private IMGUIContainer m_InspectorGuiContainer;
+    private OdinEditor m_EmbeddedInspectorEditor;
+    private VisualGUIDrawerSO m_EmbeddedInspectorDrawer;
+    private ESEditorTrackItem m_EmbeddedInspectorTrack;
+    private ESEditorTrackClip m_EmbeddedInspectorClip;
+    private bool m_IsInspectorDrawerOpen;
+    private Vector2 m_InspectorScrollPosition;
 
     private VisualElement timeCursor;
     private bool isDraggingCursor = false;
@@ -302,6 +332,7 @@ public class ESTrackViewWindow : OdinEditorWindow
     {
         window = GetWindow<ESTrackViewWindow>();
         window.titleContent = new GUIContent("【轨道】编辑器");
+        window.minSize = s_MinWindowSize;
     }
     public static void InitNewSequenceAndOpenWindow()
     {
@@ -359,6 +390,8 @@ public class ESTrackViewWindow : OdinEditorWindow
                 ESTrackViewWindow.window.leftPanel.Add(item);
                 ESTrackViewWindow.window.Items.Add(item);
             }
+
+            window.UpdateTimelineContentHeight();
 
             ESEditorHandle.AddSimpleHandleTask(() =>
             {
@@ -478,22 +511,178 @@ public class ESTrackViewWindow : OdinEditorWindow
         verScroll = rootVisualElement.Query<ScrollView>();
         rightPanel = rootVisualElement.Query<VisualElement>("DownRightPart");
         leftPanel = rootVisualElement.Query("DownLeftPart");
-
-        leftPanel.style.width = LeftTrackPixel;
-        leftPanel.style.minWidth = LeftTrackPixel;
-        leftPanel.style.maxWidth = LeftTrackPixel;
-
-        horSlider.style.left = LeftTrackPixel;
-        rightPanel.style.left = LeftTrackPixel;
-        ruler.style.left = 0;
+        m_TimelineWorkspace = rootVisualElement.Query<VisualElement>("DownPart");
+        m_TrackPanelSplitter = rootVisualElement.Query<VisualElement>("TrackPanelSplitter");
+        m_TrackPanelSplitter.style.cursor = new Cursor
+        {
+            texture = EditorGUIUtility.Load("Cursors/d_ResizeHorizontal") as Texture2D,
+            hotspot = new Vector2(8, 8)
+        };
 
 
         m_SelectionVisual = rootVisualElement.Query("SeletionContent");
+        m_SelectionVisual.pickingMode = PickingMode.Ignore;
+        m_SelectionVisual.style.display = DisplayStyle.None;
 
         CreatorToolBar = rootVisualElement.Query<ESTrackCreatorToolbar>();
 
         toolbar = rootVisualElement.Query<ESTrackTimerToolbar>();
+        CreateInspectorPanel();
+        ApplyTrackPanelLayout(false);
+        UpdateInspectorLayout();
         RefreshEntityDisplay();
+    }
+
+    private void CreateInspectorPanel()
+    {
+        if (m_InspectorPanel != null)
+            return;
+
+        m_InspectorToggleButton = new Button(ToggleInspectorDrawer)
+        {
+            text = "属性",
+            tooltip = "显示或隐藏当前轨道/片段的属性。窗口较窄时将在独立窗口中编辑。"
+        };
+        m_InspectorToggleButton.AddToClassList("track-inspector-toggle");
+        rootVisualElement.Add(m_InspectorToggleButton);
+
+        m_InspectorPanel = new VisualElement { name = "TrackInspectorPanel" };
+        m_InspectorPanel.AddToClassList("track-inspector-panel");
+
+        VisualElement header = new VisualElement();
+        header.AddToClassList("track-inspector-header");
+        m_InspectorTitleLabel = new Label("属性检查器");
+        m_InspectorTitleLabel.AddToClassList("track-inspector-title");
+        header.Add(m_InspectorTitleLabel);
+
+        Button openWindowButton = new Button(OpenInspectorInSeparateWindow)
+        {
+            text = "弹出",
+            tooltip = "在独立窗口中编辑当前属性。"
+        };
+        openWindowButton.AddToClassList("track-inspector-header-button");
+        header.Add(openWindowButton);
+
+        Button closeButton = new Button(CloseInspectorDrawer)
+        {
+            text = "×",
+            tooltip = "隐藏属性检查器。"
+        };
+        closeButton.AddToClassList("track-inspector-header-button");
+        header.Add(closeButton);
+        m_InspectorPanel.Add(header);
+
+        m_InspectorGuiContainer = new IMGUIContainer(DrawEmbeddedInspector);
+        m_InspectorGuiContainer.AddToClassList("track-inspector-content");
+        m_InspectorPanel.Add(m_InspectorGuiContainer);
+        rootVisualElement.Add(m_InspectorPanel);
+        m_InspectorPanel.BringToFront();
+    }
+
+    private void UpdateInspectorLayout()
+    {
+        if (m_InspectorPanel == null || m_InspectorToggleButton == null || verScroll == null)
+            return;
+
+        const float dockedInspectorMinimumWidth = 1000f;
+        const float drawerInspectorMinimumWidth = 720f;
+        const float inspectorWidth = 320f;
+        float width = rootVisualElement.layout.width;
+        bool docked = width >= dockedInspectorMinimumWidth;
+        bool canUseDrawer = width >= drawerInspectorMinimumWidth;
+
+        verScroll.style.marginRight = docked ? inspectorWidth : 0f;
+        m_InspectorToggleButton.style.display = docked ? DisplayStyle.None : DisplayStyle.Flex;
+        m_InspectorToggleButton.text = canUseDrawer ? "属性" : "弹窗属性";
+
+        bool hasTarget = m_EmbeddedInspectorDrawer != null;
+        bool showPanel = canUseDrawer && hasTarget && (docked || m_IsInspectorDrawerOpen);
+        m_InspectorPanel.style.display = showPanel ? DisplayStyle.Flex : DisplayStyle.None;
+        if (showPanel)
+            m_InspectorPanel.BringToFront();
+    }
+
+    private void ToggleInspectorDrawer()
+    {
+        if (rootVisualElement.layout.width < 720f)
+        {
+            OpenInspectorInSeparateWindow();
+            return;
+        }
+
+        m_IsInspectorDrawerOpen = !m_IsInspectorDrawerOpen;
+        UpdateInspectorLayout();
+    }
+
+    private void CloseInspectorDrawer()
+    {
+        m_IsInspectorDrawerOpen = false;
+        UpdateInspectorLayout();
+    }
+
+    private void DisposeEmbeddedInspectorEditor()
+    {
+        if (m_EmbeddedInspectorEditor == null)
+            return;
+
+        UnityEngine.Object.DestroyImmediate(m_EmbeddedInspectorEditor);
+        m_EmbeddedInspectorEditor = null;
+    }
+
+    private void SetEmbeddedInspector(VisualGUIDrawerSO drawer, string title, ESEditorTrackItem trackItem, ESEditorTrackClip clip, bool revealDrawer)
+    {
+        if (drawer == null)
+            return;
+
+        bool targetChanged = m_EmbeddedInspectorDrawer != drawer || m_EmbeddedInspectorTrack != trackItem || m_EmbeddedInspectorClip != clip;
+        m_EmbeddedInspectorDrawer = drawer;
+        m_EmbeddedInspectorTrack = trackItem;
+        m_EmbeddedInspectorClip = clip;
+        m_InspectorTitleLabel.text = string.IsNullOrEmpty(title) ? "属性检查器" : title;
+        if (targetChanged || m_EmbeddedInspectorEditor == null)
+        {
+            DisposeEmbeddedInspectorEditor();
+            m_EmbeddedInspectorEditor = OdinEditor.CreateEditor(drawer, typeof(OdinEditor)) as OdinEditor;
+        }
+
+        if (revealDrawer)
+            m_IsInspectorDrawerOpen = true;
+        UpdateInspectorLayout();
+        m_InspectorGuiContainer?.MarkDirtyRepaint();
+    }
+
+    private void DrawEmbeddedInspector()
+    {
+        if (m_EmbeddedInspectorEditor == null)
+        {
+            EditorGUILayout.HelpBox("没有可编辑的轨道或片段。", MessageType.Info);
+            return;
+        }
+
+        EditorGUI.BeginChangeCheck();
+        m_InspectorScrollPosition = EditorGUILayout.BeginScrollView(m_InspectorScrollPosition);
+        m_EmbeddedInspectorEditor.DrawDefaultInspector();
+        EditorGUILayout.EndScrollView();
+        if (EditorGUI.EndChangeCheck())
+            ApplyEmbeddedInspectorChanges();
+    }
+
+    private void ApplyEmbeddedInspectorChanges()
+    {
+        if (m_EmbeddedInspectorTrack != null)
+        {
+            m_EmbeddedInspectorTrack.UpdateNodeMatchAndForeachUpdate();
+            m_EmbeddedInspectorTrack.UpdateWhenEdit();
+        }
+
+        if (m_EmbeddedInspectorClip != null)
+        {
+            m_EmbeddedInspectorClip.SetTimeScaleAndStartShowCache();
+            m_EmbeddedInspectorClip.UpdateNodeView();
+        }
+
+        ESTrackViewWindowHelper.SaveContainerChanges();
+        SyncTotalTimeFromCurrentSequence(false);
     }
 
     private void BindNormalHandles()
@@ -506,6 +695,10 @@ public class ESTrackViewWindow : OdinEditorWindow
         rootVisualElement.focusable = true;
         rootVisualElement.RegisterCallback<KeyDownEvent>(OnTrackWindowKeyDown, TrickleDown.TrickleDown);
         rootVisualElement.RegisterCallback<PointerDownEvent>(OnTrackWindowPointerDown, TrickleDown.TrickleDown);
+        rootVisualElement.RegisterCallback<PointerMoveEvent>(OnTrackPanelSplitterPointerMove, TrickleDown.TrickleDown);
+        rootVisualElement.RegisterCallback<PointerUpEvent>(OnTrackPanelSplitterPointerUp, TrickleDown.TrickleDown);
+        rootVisualElement.RegisterCallback<PointerCaptureOutEvent>(OnTrackPanelSplitterPointerCaptureOut, TrickleDown.TrickleDown);
+        rootVisualElement.RegisterCallback<GeometryChangedEvent>(OnTimelineGeometryChanged);
         rightPanel.RegisterCallback<WheelEvent>(OnRightPanelWheel, TrickleDown.TrickleDown);
         verScroll.RegisterCallback<WheelEvent>(OnScrollViewWheel, TrickleDown.TrickleDown);
 
@@ -519,11 +712,113 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         // 4. 右键上下文菜单
         rightPanel.RegisterCallback<ContextClickEvent>(OnContextClick_CompleteMenu, TrickleDown.TrickleDown);
+        m_TrackPanelSplitter.RegisterCallback<PointerDownEvent>(OnTrackPanelSplitterPointerDown);
 
+    }
+
+    private void OnTimelineGeometryChanged(GeometryChangedEvent evt)
+    {
+        if (Mathf.Abs(evt.newRect.width - evt.oldRect.width) > 0.1f)
+        {
+            ApplyTrackPanelLayout(true);
+            UpdateInspectorLayout();
+        }
+    }
+
+    private void OnTrackPanelSplitterPointerDown(PointerDownEvent evt)
+    {
+        if (evt.button != 0)
+            return;
+
+        m_IsResizingTrackPanel = true;
+        m_TrackPanelResizePointerId = evt.pointerId;
+        m_TrackPanelSplitter.CapturePointer(evt.pointerId);
+        evt.StopPropagation();
+    }
+
+    private void OnTrackPanelSplitterPointerMove(PointerMoveEvent evt)
+    {
+        if (!m_IsResizingTrackPanel || evt.pointerId != m_TrackPanelResizePointerId)
+            return;
+
+        float maxWidth = Mathf.Max(MinTrackPanelWidth, rootVisualElement.layout.width - MinTimelineCanvasWidth);
+        m_TrackPanelWidth = Mathf.Clamp(rootVisualElement.WorldToLocal(evt.position).x, MinTrackPanelWidth, Mathf.Min(MaxTrackPanelWidth, maxWidth));
+        ApplyTrackPanelLayout(true);
+        evt.StopPropagation();
+    }
+
+    private void OnTrackPanelSplitterPointerUp(PointerUpEvent evt)
+    {
+        if (!m_IsResizingTrackPanel || evt.pointerId != m_TrackPanelResizePointerId)
+            return;
+
+        EndTrackPanelResize();
+        evt.StopPropagation();
+    }
+
+    private void OnTrackPanelSplitterPointerCaptureOut(PointerCaptureOutEvent evt)
+    {
+        if (m_IsResizingTrackPanel && evt.pointerId == m_TrackPanelResizePointerId)
+            EndTrackPanelResize();
+    }
+
+    private void EndTrackPanelResize()
+    {
+        if (m_TrackPanelSplitter != null && m_TrackPanelResizePointerId >= 0 && m_TrackPanelSplitter.HasPointerCapture(m_TrackPanelResizePointerId))
+            m_TrackPanelSplitter.ReleasePointer(m_TrackPanelResizePointerId);
+
+        m_IsResizingTrackPanel = false;
+        m_TrackPanelResizePointerId = -1;
+    }
+
+    private void ApplyTrackPanelLayout(bool refreshTracks)
+    {
+        if (leftPanel == null || rightPanel == null || horSlider == null)
+            return;
+
+        float availableWidth = rootVisualElement.layout.width;
+        float maxWidth = availableWidth > 0f
+            ? Mathf.Max(MinTrackPanelWidth, availableWidth - MinTimelineCanvasWidth)
+            : MaxTrackPanelWidth;
+        m_TrackPanelWidth = Mathf.Clamp(m_TrackPanelWidth, MinTrackPanelWidth, Mathf.Min(MaxTrackPanelWidth, maxWidth));
+
+        leftPanel.style.width = m_TrackPanelWidth;
+        leftPanel.style.minWidth = m_TrackPanelWidth;
+        leftPanel.style.maxWidth = m_TrackPanelWidth;
+        rightPanel.style.left = m_TrackPanelWidth;
+        horSlider.style.left = m_TrackPanelWidth;
+
+        if (m_TrackPanelSplitter != null)
+            m_TrackPanelSplitter.style.left = m_TrackPanelWidth;
+
+        float canvasWidth = Mathf.Max(1f, rightPanel.resolvedStyle.width);
+        ruler?.ApplyTimelineWidth(canvasWidth);
+        foreach (ESEditorTrackItem trackItem in Items)
+            trackItem?.ApplyTimelineLayout(m_TrackPanelWidth, canvasWidth);
+
+        if (refreshTracks)
+        {
+            MoveTimeCursor(cursorTime);
+            ScheduleViewRefresh();
+        }
+    }
+
+    internal void UpdateTimelineContentHeight()
+    {
+        if (m_TimelineWorkspace == null)
+            return;
+
+        const float headerHeight = 40f;
+        const float rowHeight = 40f;
+        const float minimumHeight = 400f;
+        m_TimelineWorkspace.style.minHeight = Mathf.Max(minimumHeight, headerHeight + Items.Count * rowHeight);
     }
 
     private void CreateTimeCursor()
     {
+        m_SelectionVisual.RemoveFromHierarchy();
+        leftPanel.Add(m_SelectionVisual);
+
         timeCursor = new VisualElement
         {
             name = "time-cursor",
@@ -811,6 +1106,7 @@ public class ESTrackViewWindow : OdinEditorWindow
     {
         if (SelectedTrackItem == trackItem)
         {
+            SetTrackInspectorTarget(trackItem, false);
             rootVisualElement?.Focus();
             return;
         }
@@ -822,6 +1118,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         if (SelectedTrackItem != null)
             SelectedTrackItem.SetSelected(true);
 
+        SetTrackInspectorTarget(SelectedTrackItem, false);
         rootVisualElement?.Focus();
     }
 
@@ -878,6 +1175,7 @@ public class ESTrackViewWindow : OdinEditorWindow
                 RefreshClipSelectionVisuals();
             }
 
+            SetClipInspectorTarget(SelectedClip, false);
             rootVisualElement?.Focus();
             return;
         }
@@ -892,7 +1190,26 @@ public class ESTrackViewWindow : OdinEditorWindow
             RefreshClipSelectionVisuals();
         }
 
+        SetClipInspectorTarget(SelectedClip, false);
         rootVisualElement?.Focus();
+    }
+
+    private void SetTrackInspectorTarget(ESEditorTrackItem trackItem, bool revealDrawer)
+    {
+        if (trackItem == null || trackItem.item == null || drawerSOForTrackItem == null)
+            return;
+
+        drawerSOForTrackItem.drawerData = trackItem.item;
+        SetEmbeddedInspector(drawerSOForTrackItem, "轨道 · " + trackItem.item.DisplayName, trackItem, null, revealDrawer);
+    }
+
+    private void SetClipInspectorTarget(ESEditorTrackClip clip, bool revealDrawer)
+    {
+        if (clip == null || clip.trackClip == null || drawerSOForTrackClip == null)
+            return;
+
+        drawerSOForTrackClip.drawerData = clip.trackClip;
+        SetEmbeddedInspector(drawerSOForTrackClip, "片段 · " + clip.trackClip.DisplayName, null, clip, revealDrawer);
     }
 
     public bool IsClipSelected(ESEditorTrackClip clip)
@@ -1146,7 +1463,7 @@ public class ESTrackViewWindow : OdinEditorWindow
             return;
 
         MarkAllTrackVisibilityCachesDirty();
-        UpdateClipsSimple();
+        UpdateClipsSimple(ESTrackClipUpdateFlags.All);
         MoveTimeCursor(cursorTime);
     }
 
@@ -1341,18 +1658,10 @@ public class ESTrackViewWindow : OdinEditorWindow
         if (Items == null || Items.Count == 0)
             return ESTrackViewIconUtility.ProtectedBasicTrackCount;
 
+        const float trackRowHeight = 40f;
         float localY = leftPanel.WorldToLocal(worldMousePosition).y;
-        int targetIndex = Items.Count;
-        for (int i = 0; i < Items.Count; i++)
-        {
-            var item = Items[i];
-            float middleY = item.layout.y + item.layout.height * 0.5f;
-            if (localY < middleY)
-            {
-                targetIndex = i;
-                break;
-            }
-        }
+        float firstTrackY = Items[0] != null ? Items[0].layout.y : 0f;
+        int targetIndex = Mathf.FloorToInt((localY - firstTrackY) / trackRowHeight + 0.5f);
 
         return ESTrackViewIconUtility.ClampUserTrackInsertIndex(targetIndex, Items.Count);
     }
@@ -1579,8 +1888,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         float pixelsPerSec = pixelPerSecond;
 
         // 计算游标在 rightPanel 内的 x 位置
-        // 注意：剪辑块起始偏移为 LeftTrackPixel，因此游标也需要加上这个偏移
-        float xPos = ESTrackViewWindow.LeftTrackPixel + (currentTime - startShow) * pixelsPerSec;
+        float xPos = LeftTrackPixel + (currentTime - startShow) * pixelsPerSec;
 
         timeCursor.style.left = xPos;
 
@@ -2045,6 +2353,95 @@ public class ESTrackViewWindow : OdinEditorWindow
     public OdinEditorWindow Last_EditorWindowForTrackClip;
     public OdinEditorWindow Last_EditorWindowForSkillDataInfo;
 
+    public void EditTrack(ESEditorTrackItem trackItem, bool forceSeparateWindow = false)
+    {
+        if (trackItem == null || trackItem.item == null || drawerSOForTrackItem == null)
+            return;
+
+        if (!forceSeparateWindow && rootVisualElement != null && rootVisualElement.layout.width >= 720f)
+        {
+            if (Last_EditorWindowForTrackItem != null)
+                Last_EditorWindowForTrackItem.Close();
+
+            trackItem.UpdateNodeMatchAndForeachUpdate();
+            trackItem.UpdateWhenEdit();
+            SetTrackInspectorTarget(trackItem, true);
+            return;
+        }
+
+        drawerSOForTrackItem.drawerData = trackItem.item;
+        if (Last_EditorWindowForTrackItem != null)
+            Last_EditorWindowForTrackItem.Close();
+
+        trackItem.UpdateNodeMatchAndForeachUpdate();
+        trackItem.UpdateWhenEdit();
+        Last_EditorWindowForTrackItem = ESTrackItemTemporaryInspectorWindow.OpenFor(
+            drawerSOForTrackItem,
+            "编辑轨道<" + trackItem.item.DisplayName + ">",
+            "轨道项目",
+            () =>
+            {
+                drawerSOForTrackItem.drawerData = null;
+                ESTrackViewWindowHelper.SaveContainerChanges();
+                trackItem.UpdateNodeMatchAndForeachUpdate();
+                trackItem.UpdateWhenEdit();
+                if (m_EmbeddedInspectorTrack == trackItem)
+                    SetTrackInspectorTarget(trackItem, false);
+            });
+    }
+
+    public void EditClip(ESEditorTrackClip clip, bool forceSeparateWindow = false)
+    {
+        if (clip == null || clip.trackClip == null || drawerSOForTrackClip == null)
+            return;
+
+        SetFocusedEditingClip(clip);
+        if (!forceSeparateWindow && rootVisualElement != null && rootVisualElement.layout.width >= 720f)
+        {
+            if (Last_EditorWindowForTrackClip != null)
+                Last_EditorWindowForTrackClip.Close();
+
+            clip.SetTimeScaleAndStartShowCache();
+            clip.UpdateNodeView();
+            SetClipInspectorTarget(clip, true);
+            return;
+        }
+
+        if (Last_EditorWindowForTrackClip != null)
+            Last_EditorWindowForTrackClip.Close();
+
+        drawerSOForTrackClip.drawerData = clip.trackClip;
+        clip.SetTimeScaleAndStartShowCache();
+        clip.UpdateNodeView();
+        Last_EditorWindowForTrackClip = ESTrackClipTemporaryInspectorWindow.OpenFor(
+            drawerSOForTrackClip,
+            "编辑片段<" + clip.trackClip.DisplayName + ">",
+            "片段",
+            () =>
+            {
+                clip.SetTimeScaleAndStartShowCache();
+                clip.UpdateNodeView();
+                ClearFocusedEditingClip(clip);
+                if (drawerSOForTrackClip != null && ReferenceEquals(drawerSOForTrackClip.drawerData, clip.trackClip))
+                    drawerSOForTrackClip.drawerData = null;
+                ESTrackViewWindowHelper.SaveContainerChanges();
+                if (m_EmbeddedInspectorClip == clip)
+                    SetClipInspectorTarget(clip, false);
+            });
+    }
+
+    private void OpenInspectorInSeparateWindow()
+    {
+        if (m_EmbeddedInspectorClip != null)
+        {
+            EditClip(m_EmbeddedInspectorClip, true);
+            return;
+        }
+
+        if (m_EmbeddedInspectorTrack != null)
+            EditTrack(m_EmbeddedInspectorTrack, true);
+    }
+
     public void ShowMenu_SelectTrackAndAddTrack(ESEditorTrackItem trackItem)
     {
         if (trackItem == null || trackItem.item == null)
@@ -2059,23 +2456,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
         menu.AddItem(new GUIContent("编辑轨道项目"), false, () =>
         {
-            drawerSOForTrackItem.drawerData = trackItem.item;
-            if (Last_EditorWindowForTrackItem != null)
-                Last_EditorWindowForTrackItem.Close();
-
-            trackItem.UpdateNodeMatchAndForeachUpdate();
-            trackItem.UpdateWhenEdit();
-            Last_EditorWindowForTrackItem = ESTrackItemTemporaryInspectorWindow.OpenFor(
-                drawerSOForTrackItem,
-                "编辑轨道<" + trackItem.item.DisplayName + ">",
-                "轨道项目",
-                () =>
-            {
-                drawerSOForTrackItem.drawerData = null;
-                ESTrackViewWindowHelper.SaveContainerChanges();
-                trackItem.UpdateNodeMatchAndForeachUpdate();
-                trackItem.UpdateWhenEdit();
-            });
+            EditTrack(trackItem);
         });
         menu.AddSeparator("");
 
@@ -2534,7 +2915,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         GenericMenu.AddItem(new GUIContent("【刷新】/刷新片段节点"), false, () =>
         {
             SyncTotalTimeFromCurrentSequence(true);
-            UpdateClipsSimple();
+            UpdateClipsSimple(ESTrackClipUpdateFlags.All);
         });
 
         GenericMenu.AddItem(new GUIContent("【校验】/检查当前技能序列"), false, ValidateCurrentSequenceAndReport);
@@ -2707,15 +3088,35 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     private void ScheduleAutoValidateSequenceVisuals()
     {
-        if (m_AutoValidationScheduled || rootVisualElement == null)
+        if (rootVisualElement == null)
+            return;
+
+        m_LastAutoValidationRequestTime = EditorApplication.timeSinceStartup;
+        if (m_AutoValidationScheduled)
             return;
 
         m_AutoValidationScheduled = true;
-        rootVisualElement.schedule.Execute(() =>
+        Action validateWhenIdle = null;
+        validateWhenIdle = () =>
         {
+            if (rootVisualElement == null)
+            {
+                m_AutoValidationScheduled = false;
+                return;
+            }
+
+            const double validationIdleDelay = 0.25d;
+            double remainingDelay = validationIdleDelay - (EditorApplication.timeSinceStartup - m_LastAutoValidationRequestTime);
+            if (remainingDelay > 0d)
+            {
+                rootVisualElement.schedule.Execute(validateWhenIdle).ExecuteLater(Mathf.CeilToInt((float)(remainingDelay * 1000d)));
+                return;
+            }
+
             m_AutoValidationScheduled = false;
             AutoValidateSequenceVisuals();
-        }).ExecuteLater(80);
+        };
+        rootVisualElement.schedule.Execute(validateWhenIdle).ExecuteLater(250);
     }
 
     private void AutoValidateSequenceVisuals()
@@ -2985,7 +3386,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     private void UpdateSelectionVisual()
     {
-        m_SelectionVisual.style.left = m_SelectionRect.x;
+        m_SelectionVisual.style.left = LeftTrackPixel + m_SelectionRect.x;
         m_SelectionVisual.style.top = m_SelectionRect.y;
         m_SelectionVisual.style.width = m_SelectionRect.width;
         m_SelectionVisual.style.height = m_SelectionRect.height;
@@ -3016,7 +3417,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
 
 
-    private void UpdateClipsSimple()
+    private void UpdateClipsSimple(ESTrackClipUpdateFlags flags = ESTrackClipUpdateFlags.Layout)
     {
         if (ruler == null || ruler.TopRuler == null || Items == null)
             return;
@@ -3027,9 +3428,8 @@ public class ESTrackViewWindow : OdinEditorWindow
         foreach (var i in Items)
         {
             if (i != null)
-                i.UpdateNodes(visibleStart, visibleEnd);
+                i.UpdateNodes(visibleStart, visibleEnd, flags);
         }
-        ScheduleAutoValidateSequenceVisuals();
     }
 
     private void ScheduleViewRefresh()
@@ -3146,6 +3546,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
                         var item = new ESEditorTrackItem().InitWithItem(newItem);
                         ESTrackViewWindow.window.leftPanel.Add(item);
                         ESTrackViewWindow.window.Items.Add(item);
+                        ESTrackViewWindow.window.UpdateTimelineContentHeight();
                         ESDesignUtility.SafeEditor.Wrap_SetDirty(ESTrackViewWindow.TrackContainer as UnityEngine.Object);
                         SkillSequenceRuntimeCache.NotifySequenceChanged(ESTrackViewWindow.Sequence);
                     }
@@ -3371,39 +3772,7 @@ public class ESTrackViewWindowHelper : EditorInvoker_Level0
             return;
 
         ESTrackViewWindow trackWindow = ESTrackViewWindow.window;
-        if (ESTrackViewWindow.window.Last_EditorWindowForTrackClip != null &&
-            ESTrackViewWindow.window.drawerSOForTrackClip != null &&
-            ReferenceEquals(ESTrackViewWindow.window.drawerSOForTrackClip.drawerData, clip.trackClip))
-        {
-            trackWindow.SetFocusedEditingClip(clip);
-            ESTrackViewWindow.window.Last_EditorWindowForTrackClip.Focus();
-            return;
-        }
-
-        trackWindow.SetFocusedEditingClip(clip);
-        if (ESTrackViewWindow.window.Last_EditorWindowForTrackClip != null)
-        {
-            ESTrackViewWindow.window.Last_EditorWindowForTrackClip.Close();
-        }
-        ESTrackViewWindow.window.drawerSOForTrackClip.drawerData = clip.trackClip;
-        clip.SetTimeScaleAndStartShowCache();
-        clip.UpdateNodeView();
-        ESTrackViewWindow.window.Last_EditorWindowForTrackClip = ESTrackClipTemporaryInspectorWindow.OpenFor(
-            ESTrackViewWindow.window.drawerSOForTrackClip,
-            "编辑片段<" + clip.trackClip.DisplayName,
-            "片段",
-            () =>
-        {
-            clip.SetTimeScaleAndStartShowCache();
-            clip.UpdateNodeView();
-            if (trackWindow != null)
-            {
-                trackWindow.ClearFocusedEditingClip(clip);
-                if (trackWindow.drawerSOForTrackClip != null && ReferenceEquals(trackWindow.drawerSOForTrackClip.drawerData, clip.trackClip))
-                    trackWindow.drawerSOForTrackClip.drawerData = null;
-            }
-            ESTrackViewWindowHelper.SaveContainerChanges();
-        });
+        trackWindow.EditClip(clip);
     }
 
     public static void SaveContainerChanges()

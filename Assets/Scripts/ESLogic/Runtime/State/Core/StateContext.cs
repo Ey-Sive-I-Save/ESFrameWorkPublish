@@ -1,61 +1,19 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace ES
 {
     /// <summary>
-    /// 上下文参数类型
-    /// </summary>
-    public enum ContextParameterType
-    {
-        Float,          // 浮点数
-        Int,            // 整数
-        Bool,           // 布尔值
-        Trigger,        // 触发器(使用后自动重置)
-        StateValue,     // 状态枚举值
-        Entity,         // 实体对象引用
-        String,         // 字符串标记
-        Curve           // 曲线参数(用于IK等)
-    }
-
-    /// <summary>
-    /// 上下文参数定义
-    /// </summary>
-    [Serializable]
-    public class ContextParameter
-    {
-        public string name;
-        public ContextParameterType type;
-        
-        // 不同类型的值存储
-        public float floatValue;
-        public int intValue;
-        public bool boolValue;
-        public string stringValue;
-        public UnityEngine.Object entityValue;
-        public AnimationCurve curveValue;
-        
-        public ContextParameter(string name, ContextParameterType type)
-        {
-            this.name = name;
-            this.type = type;
-        }
-    }
-
-    /// <summary>
     /// 状态机上下文 - 管理所有可变参数
     /// 
     /// 设计原则：
     /// 1. 整个状态机共享一个StateMachineContext
     /// 2. 枚举参数使用数组索引，零开销直接访问（史上最强性能）
-    /// 3. 字符串参数使用字典，支持退化到ContextPool
-    /// 4. 统一的Get/Set方法，支持枚举和字符串
+    /// 3. 运行时只接受已声明的强类型参数，不提供字符串回退。
     /// </summary>
     public class StateMachineContext
     {
-        private const int DefaultParamDictionaryCapacity = 32;
-        private const int DefaultTriggerSetCapacity = 16;
 
         public bool enableChangeEvents = true;
         public bool enableDefaultParamEvents = true;
@@ -123,22 +81,17 @@ namespace ES
         /// <summary>攀爬时沿墙面的垂直输入（-1=下, 0=静止, 1=上）</summary>
         public float ClimbVertical;
 
+        // Project-level animation inputs. Kept in the typed core store, not the string fallback.
+        public float WeaponEquipWeight;
+        public float UpperBodyWeight;
+        public float WeaponFirePulse;
+        public float WeaponInHandWeight;
+        public float FootSupportShare;
+
         // ===== 可扩展默认参数（Int/Bool 分离枚举） =====
         private int[] _defaultEnumIntValues;
         private bool[] _defaultEnumBoolValues;
         
-        // ==================== 字符串参数 - 字典存储（支持退化） ====================
-        private Dictionary<string, float> _floatParams;
-        private Dictionary<string, int> _intParams;
-        private Dictionary<string, bool> _boolParams;
-        private Dictionary<string, string> _stringParams;
-        private Dictionary<string, UnityEngine.Object> _entityParams;
-        private Dictionary<string, AnimationCurve> _curveParams;
-        private HashSet<string> _activeTriggers;
-
-        // 退化到Entity的ContextPool（仅字符串参数）
-        private ContextPool _fallbackContextPool;
-
         // 参数链事件（统一 Link 标准）
         public readonly LinkReceiveChannelPool<StateDefaultFloatParameter, Link_StateContext_DefaultFloatChange> LinkRCL_DefaultFloat
             = new LinkReceiveChannelPool<StateDefaultFloatParameter, Link_StateContext_DefaultFloatChange>();
@@ -149,56 +102,17 @@ namespace ES
         public readonly LinkReceiveChannelPool<StateDefaultBoolParameter, Link_StateContext_DefaultBoolChange> LinkRCL_DefaultBool
             = new LinkReceiveChannelPool<StateDefaultBoolParameter, Link_StateContext_DefaultBoolChange>();
 
-        public readonly LinkReceiveChannelPool<string, Link_ContextEvent_FloatChange> LinkRCL_Float
-            = new LinkReceiveChannelPool<string, Link_ContextEvent_FloatChange>();
-
-        public readonly LinkReceiveChannelPool<string, Link_ContextEvent_IntChange> LinkRCL_Int
-            = new LinkReceiveChannelPool<string, Link_ContextEvent_IntChange>();
-
-        public readonly LinkReceiveChannelPool<string, Link_ContextEvent_BoolChange> LinkRCL_Bool
-            = new LinkReceiveChannelPool<string, Link_ContextEvent_BoolChange>();
-
-        public readonly LinkReceiveChannelPool<string, Link_ContextEvent_StringChange> LinkRCL_String
-            = new LinkReceiveChannelPool<string, Link_ContextEvent_StringChange>();
-
-        public readonly LinkReceiveChannelPool<string, Link_ContextEvent_UnityObjectChange> LinkRCL_Entity
-            = new LinkReceiveChannelPool<string, Link_ContextEvent_UnityObjectChange>();
-
-        public readonly LinkReceiveChannelPool<string, Link_StateContext_CurveChange> LinkRCL_Curve
-            = new LinkReceiveChannelPool<string, Link_StateContext_CurveChange>();
-
-        public readonly LinkReceiveChannelPool<string, Link_StateContext_TriggerFired> LinkRCL_Trigger
-            = new LinkReceiveChannelPool<string, Link_StateContext_TriggerFired>();
-
-        public StateMachineContext(ContextPool fallbackPool = null)
+        public StateMachineContext()
         {
             // 初始化元数据
             contextID = Guid.NewGuid().ToString();
             creationTime = Time.time;
             lastUpdateTime = Time.time;
-            _sharedData = new Dictionary<string, object>(DefaultParamDictionaryCapacity);
+            _sharedData = new Dictionary<string, object>(32);
             _runtimeFlags = new HashSet<string>();
             
-            // 初始化参数字典
-            _floatParams = new Dictionary<string, float>(DefaultParamDictionaryCapacity);
-            _intParams = new Dictionary<string, int>(DefaultParamDictionaryCapacity);
-            _boolParams = new Dictionary<string, bool>(DefaultParamDictionaryCapacity);
-            _stringParams = new Dictionary<string, string>(DefaultParamDictionaryCapacity);
-            _entityParams = new Dictionary<string, UnityEngine.Object>(DefaultParamDictionaryCapacity);
-            _curveParams = new Dictionary<string, AnimationCurve>(DefaultParamDictionaryCapacity);
-            _activeTriggers = new HashSet<string>(DefaultTriggerSetCapacity);
-            _fallbackContextPool = fallbackPool;
-
             _defaultEnumIntValues = new int[StateDefaultNumericParameterCatalog.MaxIntParameterValue + 1];
             _defaultEnumBoolValues = new bool[StateDefaultNumericParameterCatalog.MaxBoolParameterValue + 1];
-        }
-
-        /// <summary>
-        /// 设置退化ContextPool
-        /// </summary>
-        public void SetFallbackContextPool(ContextPool pool)
-        {
-            _fallbackContextPool = pool;
         }
 
         #region Float Parameters
@@ -212,9 +126,9 @@ namespace ES
             float previous = 0f;
             switch (param)
             {
-                case StateDefaultFloatParameter.SpeedX: previous = SpeedX; changed = !Mathf.Approximately(previous, value); SpeedX = value; break;
-                case StateDefaultFloatParameter.SpeedY: previous = SpeedY; changed = !Mathf.Approximately(previous, value); SpeedY = value; break;
-                case StateDefaultFloatParameter.SpeedZ: previous = SpeedZ; changed = !Mathf.Approximately(previous, value); SpeedZ = value; break;
+                case StateDefaultFloatParameter.MoveX: previous = SpeedX; changed = !Mathf.Approximately(previous, value); SpeedX = value; break;
+                case StateDefaultFloatParameter.VerticalSpeed: previous = SpeedY; changed = !Mathf.Approximately(previous, value); SpeedY = value; break;
+                case StateDefaultFloatParameter.MoveZ: previous = SpeedZ; changed = !Mathf.Approximately(previous, value); SpeedZ = value; break;
                 case StateDefaultFloatParameter.AimYaw: previous = AimYaw; changed = !Mathf.Approximately(previous, value); AimYaw = value; break;
                 case StateDefaultFloatParameter.AimPitch: previous = AimPitch; changed = !Mathf.Approximately(previous, value); AimPitch = value; break;
                 case StateDefaultFloatParameter.Speed: previous = Speed; changed = !Mathf.Approximately(previous, value); Speed = value; break;
@@ -229,8 +143,13 @@ namespace ES
                 case StateDefaultFloatParameter.IsSliding: previous = IsSliding; changed = !Mathf.Approximately(previous, value); IsSliding = value; break;
                 case StateDefaultFloatParameter.AvgSpeedX: previous = AvgSpeedX; changed = !Mathf.Approximately(previous, value); AvgSpeedX = value; break;
                 case StateDefaultFloatParameter.AvgSpeedZ: previous = AvgSpeedZ; changed = !Mathf.Approximately(previous, value); AvgSpeedZ = value; break;
-                case StateDefaultFloatParameter.ClimbHorizontal: previous = ClimbHorizontal; changed = !Mathf.Approximately(previous, value); ClimbHorizontal = value; break;
-                case StateDefaultFloatParameter.ClimbVertical: previous = ClimbVertical; changed = !Mathf.Approximately(previous, value); ClimbVertical = value; break;
+                case StateDefaultFloatParameter.ClimbX: previous = ClimbHorizontal; changed = !Mathf.Approximately(previous, value); ClimbHorizontal = value; break;
+                case StateDefaultFloatParameter.ClimbY: previous = ClimbVertical; changed = !Mathf.Approximately(previous, value); ClimbVertical = value; break;
+                case StateDefaultFloatParameter.WeaponEquipWeight: previous = WeaponEquipWeight; changed = !Mathf.Approximately(previous, value); WeaponEquipWeight = value; break;
+                case StateDefaultFloatParameter.UpperBodyWeight: previous = UpperBodyWeight; changed = !Mathf.Approximately(previous, value); UpperBodyWeight = value; break;
+                case StateDefaultFloatParameter.WeaponFirePulse: previous = WeaponFirePulse; changed = !Mathf.Approximately(previous, value); WeaponFirePulse = value; break;
+                case StateDefaultFloatParameter.WeaponInHandWeight: previous = WeaponInHandWeight; changed = !Mathf.Approximately(previous, value); WeaponInHandWeight = value; break;
+                case StateDefaultFloatParameter.FootSupportShare: previous = FootSupportShare; changed = !Mathf.Approximately(previous, value); FootSupportShare = value; break;
             }
 
             if (changed && enableChangeEvents && enableDefaultParamEvents)
@@ -241,16 +160,6 @@ namespace ES
                     Value_Now = value
                 });
 
-                if (TryGetDefaultFloatName(param, out string name))
-                {
-                    LinkRCL_Float.SendLink(name, new Link_ContextEvent_FloatChange
-                    {
-                        Value_Pre = previous,
-                        Value_Now = value,
-                        Create = false,
-                        Remove = false
-                    });
-                }
             }
         }
 
@@ -262,16 +171,6 @@ namespace ES
             float value = GetDefaultFloat(param);
             LinkRCL_DefaultFloat.SendLink(param, new Link_StateContext_DefaultFloatChange { Value_Pre = value, Value_Now = value });
 
-            if (TryGetDefaultFloatName(param, out string name))
-            {
-                LinkRCL_Float.SendLink(name, new Link_ContextEvent_FloatChange
-                {
-                    Value_Pre = value,
-                    Value_Now = value,
-                    Create = false,
-                    Remove = false
-                });
-            }
         }
 
         /// <summary>
@@ -296,16 +195,6 @@ namespace ES
                     Value_Now = value
                 });
 
-                if (StateDefaultNumericParameterCatalog.TryGetName(param, out string name))
-                {
-                    LinkRCL_Int.SendLink(name, new Link_ContextEvent_IntChange
-                    {
-                        Value_Pre = previous,
-                        Value_Now = value,
-                        Create = false,
-                        Remove = false
-                    });
-                }
             }
         }
 
@@ -362,16 +251,6 @@ namespace ES
                     Value_Now = value
                 });
 
-                if (StateDefaultNumericParameterCatalog.TryGetName(param, out string name))
-                {
-                    LinkRCL_Bool.SendLink(name, new Link_ContextEvent_BoolChange
-                    {
-                        Value_Pre = previous,
-                        Value_Now = value,
-                        Create = false,
-                        Remove = false
-                    });
-                }
             }
         }
 
@@ -413,9 +292,9 @@ namespace ES
         {
             switch (param)
             {
-                case StateDefaultFloatParameter.SpeedX: return SpeedX;
-                case StateDefaultFloatParameter.SpeedY: return SpeedY;
-                case StateDefaultFloatParameter.SpeedZ: return SpeedZ;
+                case StateDefaultFloatParameter.MoveX: return SpeedX;
+                case StateDefaultFloatParameter.VerticalSpeed: return SpeedY;
+                case StateDefaultFloatParameter.MoveZ: return SpeedZ;
                 case StateDefaultFloatParameter.AimYaw: return AimYaw;
                 case StateDefaultFloatParameter.AimPitch: return AimPitch;
                 case StateDefaultFloatParameter.Speed: return Speed;
@@ -430,8 +309,13 @@ namespace ES
                 case StateDefaultFloatParameter.IsSliding: return IsSliding;
                 case StateDefaultFloatParameter.AvgSpeedX: return AvgSpeedX;
                 case StateDefaultFloatParameter.AvgSpeedZ: return AvgSpeedZ;
-                case StateDefaultFloatParameter.ClimbHorizontal: return ClimbHorizontal;
-                case StateDefaultFloatParameter.ClimbVertical: return ClimbVertical;
+                case StateDefaultFloatParameter.ClimbX: return ClimbHorizontal;
+                case StateDefaultFloatParameter.ClimbY: return ClimbVertical;
+                case StateDefaultFloatParameter.WeaponEquipWeight: return WeaponEquipWeight;
+                case StateDefaultFloatParameter.UpperBodyWeight: return UpperBodyWeight;
+                case StateDefaultFloatParameter.WeaponFirePulse: return WeaponFirePulse;
+                case StateDefaultFloatParameter.WeaponInHandWeight: return WeaponInHandWeight;
+                case StateDefaultFloatParameter.FootSupportShare: return FootSupportShare;
                 default: return defaultValue;
             }
         }
@@ -451,363 +335,7 @@ namespace ES
         {
             return GetDefaultFloat(param, defaultValue);
         }
-        
-        /// <summary>
-        /// 设置字符串参数
-        /// </summary>
-        public void SetFloat(string name, float value)
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                return;
-            }
 
-            bool existed = _floatParams.TryGetValue(name, out float oldValue);
-            bool changed = !existed || !Mathf.Approximately(oldValue, value);
-            _floatParams[name] = value;
-            if (changed && enableChangeEvents)
-            {
-                LinkRCL_Float.SendLink(name, new Link_ContextEvent_FloatChange
-                {
-                    Value_Pre = oldValue,
-                    Value_Now = value,
-                    Create = !existed,
-                    Remove = false
-                });
-            }
-        }
-
-        /// <summary>
-        /// 获取字符串参数（支持退化到ContextPool）
-        /// </summary>
-        public float GetFloat(string name, float defaultValue = 0f)
-        {
-            if (string.IsNullOrEmpty(name))
-                return defaultValue;
-
-            if (_floatParams.TryGetValue(name, out float value))
-                return value;
-            
-            // 退化到ContextPool
-            if (_fallbackContextPool != null)
-            {
-                var contextValue = _fallbackContextPool.GetValue(name);
-                if (contextValue is float floatVal)
-                    return floatVal;
-                if (contextValue is int intVal)
-                    return intVal;
-            }
-            
-            return defaultValue;
-        }
-        
-        /// <summary>
-        /// SetFloat StateParameter重载 - 根据EnumValue自动选择路径
-        /// </summary>
-        public void SetFloat(StateParameter param, float value)
-        {
-            if (param.EnumValue != StateDefaultFloatParameter.None)
-            {
-                SetDefaultFloat(param.EnumValue, value);
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(param.StringValue))
-                    return;
-                SetFloat(param.StringValue, value);
-            }
-        }
-        
-        /// <summary>
-        /// GetFloat StateParameter重载 - 根据EnumValue自动选择路径
-        /// </summary>
-        public float GetFloat(StateParameter param, float defaultValue = 0f)
-        {
-            if (param.EnumValue != StateDefaultFloatParameter.None)
-            {
-                return GetDefaultFloat(param.EnumValue, defaultValue);
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(param.StringValue))
-                    return defaultValue;
-                return GetFloat(param.StringValue, defaultValue);
-            }
-        }
-
-        public bool TryGetFloat(string name, out float value)
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                value = default;
-                return false;
-            }
-
-            if (_floatParams.TryGetValue(name, out value))
-                return true;
-
-            if (_fallbackContextPool != null)
-            {
-                var contextValue = _fallbackContextPool.GetValue(name);
-                if (contextValue is float floatVal)
-                {
-                    value = floatVal;
-                    return true;
-                }
-
-                if (contextValue is int intVal)
-                {
-                    value = intVal;
-                    return true;
-                }
-            }
-
-            value = default;
-            return false;
-        }
-
-        public bool TryGetFloat(StateParameter param, out float value)
-        {
-            if (param.EnumValue != StateDefaultFloatParameter.None)
-            {
-                value = GetDefaultFloat(param.EnumValue);
-                return true;
-            }
-
-            if (string.IsNullOrEmpty(param.StringValue))
-            {
-                value = default;
-                return false;
-            }
-
-            return TryGetFloat(param.StringValue, out value);
-        }
-
-        public bool HasFloat(string name) => _floatParams.ContainsKey(name);
-
-        public bool HasFloat(StateParameter param)
-        {
-            if (param.EnumValue != StateDefaultFloatParameter.None)
-                return true;
-
-            return !string.IsNullOrEmpty(param.StringValue) && _floatParams.ContainsKey(param.StringValue);
-        }
-        
-        #endregion
-
-        #region Int Parameters
-        public void SetInt(string name, int value)
-        {
-            if (string.IsNullOrEmpty(name))
-                return;
-
-            bool existed = _intParams.TryGetValue(name, out int oldValue);
-            bool changed = !existed || oldValue != value;
-            _intParams[name] = value;
-            if (changed && enableChangeEvents)
-            {
-                LinkRCL_Int.SendLink(name, new Link_ContextEvent_IntChange
-                {
-                    Value_Pre = oldValue,
-                    Value_Now = value,
-                    Create = !existed,
-                    Remove = false
-                });
-            }
-        }
-
-        public int GetInt(string name, int defaultValue = 0)
-        {
-            if (string.IsNullOrEmpty(name))
-                return defaultValue;
-
-            return _intParams.TryGetValue(name, out int value) ? value : defaultValue;
-        }
-
-        public bool HasInt(string name) => !string.IsNullOrEmpty(name) && _intParams.ContainsKey(name);
-
-        #endregion
-
-        #region Bool Parameters
-        public void SetBool(string name, bool value)
-        {
-            if (string.IsNullOrEmpty(name))
-                return;
-
-            bool existed = _boolParams.TryGetValue(name, out bool oldValue);
-            bool changed = !existed || oldValue != value;
-            _boolParams[name] = value;
-            if (changed && enableChangeEvents)
-            {
-                LinkRCL_Bool.SendLink(name, new Link_ContextEvent_BoolChange
-                {
-                    Value_Pre = oldValue,
-                    Value_Now = value,
-                    Create = !existed,
-                    Remove = false
-                });
-            }
-        }
-
-        public bool GetBool(string name, bool defaultValue = false)
-        {
-            if (string.IsNullOrEmpty(name))
-                return defaultValue;
-
-            return _boolParams.TryGetValue(name, out bool value) ? value : defaultValue;
-        }
-
-        public bool HasBool(string name) => !string.IsNullOrEmpty(name) && _boolParams.ContainsKey(name);
-
-        #endregion
-
-        #region Trigger Parameters
-        public void SetTrigger(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-                return;
-
-            _activeTriggers.Add(name);
-            if (enableChangeEvents)
-            {
-                LinkRCL_Trigger.SendLink(name, new Link_StateContext_TriggerFired { FiredTime = Time.time });
-            }
-        }
-
-        public bool GetTrigger(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-                return false;
-
-            return _activeTriggers.Contains(name);
-        }
-
-        public void ResetTrigger(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-                return;
-
-            _activeTriggers.Remove(name);
-        }
-
-        public void ResetAllTriggers()
-        {
-            _activeTriggers.Clear();
-        }
-        #endregion
-
-        #region String Parameters
-        public void SetString(string name, string value)
-        {
-            if (string.IsNullOrEmpty(name))
-                return;
-
-            bool existed = _stringParams.TryGetValue(name, out string oldValue);
-            bool changed = !existed || oldValue != value;
-            _stringParams[name] = value;
-            if (changed && enableChangeEvents)
-            {
-                LinkRCL_String.SendLink(name, new Link_ContextEvent_StringChange
-                {
-                    Value_Pre = oldValue,
-                    Value_Now = value,
-                    Create = !existed,
-                    Remove = false
-                });
-            }
-        }
-
-        public string GetString(string name, string defaultValue = "")
-        {
-            if (string.IsNullOrEmpty(name))
-                return defaultValue;
-
-            return _stringParams.TryGetValue(name, out string value) ? value : defaultValue;
-        }
-
-        public bool HasString(string name) => !string.IsNullOrEmpty(name) && _stringParams.ContainsKey(name);
-        #endregion
-
-        #region Entity Parameters
-        public void SetEntity(string name, UnityEngine.Object entity)
-        {
-            if (string.IsNullOrEmpty(name))
-                return;
-
-            bool existed = _entityParams.TryGetValue(name, out var oldValue);
-            bool changed = !existed || oldValue != entity;
-            _entityParams[name] = entity;
-            if (changed && enableChangeEvents)
-            {
-                LinkRCL_Entity.SendLink(name, new Link_ContextEvent_UnityObjectChange
-                {
-                    Value_Pre = oldValue,
-                    Value_Now = entity,
-                    Create = !existed,
-                    Remove = false
-                });
-            }
-        }
-
-        public T GetEntity<T>(string name) where T : UnityEngine.Object
-        {
-            if (string.IsNullOrEmpty(name))
-                return null;
-
-            return _entityParams.TryGetValue(name, out var entity) ? entity as T : null;
-        }
-
-        public UnityEngine.Object GetEntity(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-                return null;
-
-            return _entityParams.TryGetValue(name, out var entity) ? entity : null;
-        }
-
-        public bool HasEntity(string name) => !string.IsNullOrEmpty(name) && _entityParams.ContainsKey(name);
-        #endregion
-
-        #region Curve Parameters (for IK)
-        public void SetCurve(string name, AnimationCurve curve)
-        {
-            if (string.IsNullOrEmpty(name))
-                return;
-
-            bool existed = _curveParams.TryGetValue(name, out var oldValue);
-            bool changed = !existed || oldValue != curve;
-            _curveParams[name] = curve;
-            if (changed && enableChangeEvents)
-            {
-                LinkRCL_Curve.SendLink(name, new Link_StateContext_CurveChange
-                {
-                    Value_Pre = oldValue,
-                    Value_Now = curve,
-                    Create = !existed,
-                    Remove = false
-                });
-            }
-        }
-
-        public AnimationCurve GetCurve(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-                return null;
-
-            return _curveParams.TryGetValue(name, out var curve) ? curve : null;
-        }
-
-        public float EvaluateCurve(string name, float time, float defaultValue = 0f)
-        {
-            if (string.IsNullOrEmpty(name))
-                return defaultValue;
-
-            if (_curveParams.TryGetValue(name, out var curve) && curve != null)
-                return curve.Evaluate(time);
-            return defaultValue;
-        }
-
-        public bool HasCurve(string name) => !string.IsNullOrEmpty(name) && _curveParams.ContainsKey(name);
         #endregion
 
         /// <summary>
@@ -815,13 +343,6 @@ namespace ES
         /// </summary>
         public void Clear()
         {
-            _floatParams.Clear();
-            _intParams.Clear();
-            _boolParams.Clear();
-            _stringParams.Clear();
-            _entityParams.Clear();
-            _curveParams.Clear();
-            _activeTriggers.Clear();
 
             if (_defaultEnumIntValues != null)
             {
@@ -840,10 +361,18 @@ namespace ES
         public void Update()
         {
             // 触发器在下一帧自动重置
-            _activeTriggers.Clear();
             RefreshMotionDerivedParameters();
             
             // 更新时间戳
+            lastUpdateTime = Time.time;
+        }
+
+        /// <summary>
+        /// Starts one state-machine tick. Legacy string triggers are pulse values and expire
+        /// before the next tick. Motion derivation deliberately does not happen here.
+        /// </summary>
+        internal void BeginStateMachineTick()
+        {
             lastUpdateTime = Time.time;
         }
 
@@ -959,6 +488,11 @@ namespace ES
             target.AvgSpeedZ = AvgSpeedZ;
             target.ClimbHorizontal = ClimbHorizontal;
             target.ClimbVertical = ClimbVertical;
+            target.WeaponEquipWeight = WeaponEquipWeight;
+            target.UpperBodyWeight = UpperBodyWeight;
+            target.WeaponFirePulse = WeaponFirePulse;
+            target.WeaponInHandWeight = WeaponInHandWeight;
+            target.FootSupportShare = FootSupportShare;
 
             if (target._defaultEnumIntValues == null || target._defaultEnumIntValues.Length != _defaultEnumIntValues.Length)
             {
@@ -973,21 +507,6 @@ namespace ES
             Array.Copy(_defaultEnumIntValues, target._defaultEnumIntValues, _defaultEnumIntValues.Length);
             Array.Copy(_defaultEnumBoolValues, target._defaultEnumBoolValues, _defaultEnumBoolValues.Length);
             
-            bool originalEvents = target.enableChangeEvents;
-            target.enableChangeEvents = false;
-            foreach (var kv in _floatParams) target.SetFloat(kv.Key, kv.Value);
-            foreach (var kv in _intParams) target.SetInt(kv.Key, kv.Value);
-            foreach (var kv in _boolParams) target.SetBool(kv.Key, kv.Value);
-            foreach (var kv in _stringParams) target.SetString(kv.Key, kv.Value);
-            foreach (var kv in _entityParams) target.SetEntity(kv.Key, kv.Value);
-            foreach (var kv in _curveParams) target.SetCurve(kv.Key, kv.Value);
-            foreach (var trigger in _activeTriggers) target.SetTrigger(trigger);
-            target.enableChangeEvents = originalEvents;
-        }
-
-        private static bool TryGetDefaultFloatName(StateDefaultFloatParameter param, out string name)
-        {
-            return StateDefaultFloatParameterUtility.TryGetName(param, out name);
         }
 
         #region 共享数据管理（原StateMachineContext功能）
@@ -1065,3 +584,4 @@ namespace ES
         #endregion
     }
 }
+

@@ -84,6 +84,7 @@ namespace ES
     internal static class SimpleToolsPanelUtility
     {
         public const int DefaultPageSize = 30;
+        public const int MaxRenderRowsPerPage = 100;
         public const int LargeListWarningThreshold = 500;
         public const int HeavyOperationWarningThreshold = 2000;
         public static readonly Color PrimaryColor = new Color(0.28f, 0.52f, 0.85f);
@@ -97,49 +98,13 @@ namespace ES
         {
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.LabelField(title ?? "未命名工具", EditorStyles.boldLabel);
-                    GUILayout.FlexibleSpace();
-                    DrawMaturityBadge(maturity);
-                }
-
-                if (!string.IsNullOrWhiteSpace(purpose))
-                    EditorGUILayout.LabelField(purpose, EditorStyles.wordWrappedMiniLabel);
-
-                if (!string.IsNullOrWhiteSpace(risk))
-                    EditorGUILayout.HelpBox(risk, MessageType.Warning);
+                EditorGUILayout.LabelField(title ?? "未命名工具", EditorStyles.boldLabel);
             }
         }
 
         public static void DrawMaturityBadge(SimpleToolsMaturity maturity)
         {
-            string label;
-            SimpleToolsActionTone tone;
-            switch (maturity)
-            {
-                case SimpleToolsMaturity.Industrial:
-                    label = "工业级";
-                    tone = SimpleToolsActionTone.Success;
-                    break;
-                case SimpleToolsMaturity.Upgrading:
-                    label = "升级中";
-                    tone = SimpleToolsActionTone.Primary;
-                    break;
-                case SimpleToolsMaturity.Experimental:
-                    label = "实验";
-                    tone = SimpleToolsActionTone.Warning;
-                    break;
-                default:
-                    label = "旧工具";
-                    tone = SimpleToolsActionTone.Danger;
-                    break;
-            }
-
-            Color previous = GUI.backgroundColor;
-            GUI.backgroundColor = GetToneColor(tone);
-            GUILayout.Label(label, EditorStyles.miniButton, GUILayout.Width(58), GUILayout.Height(20));
-            GUI.backgroundColor = previous;
+            // Kept for source compatibility while tool pages are simplified.
         }
 
         public static void DrawLargeListGuard(int totalCount, string itemName = "条目")
@@ -158,8 +123,6 @@ namespace ES
         {
             EditorGUILayout.Space(6);
             EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
-            if (!string.IsNullOrWhiteSpace(subtitle))
-                EditorGUILayout.LabelField(subtitle, EditorStyles.miniLabel);
         }
 
         public static void DrawSummary(params string[] items)
@@ -192,10 +155,7 @@ namespace ES
         public static void DrawResultSummary(string title, string summary, string detail = null)
         {
             if (string.IsNullOrWhiteSpace(summary))
-            {
-                DrawEmptyState("还没有执行结果。完成一次扫描、预览或批处理后，这里会显示最近结果。");
                 return;
-            }
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
@@ -323,7 +283,7 @@ namespace ES
 
         public static List<T> PageItems<T>(IList<T> items, ref int pageIndex, int pageSize, out int totalPages)
         {
-            pageSize = Mathf.Max(1, pageSize);
+            pageSize = Mathf.Clamp(pageSize, 1, MaxRenderRowsPerPage);
             int count = items != null ? items.Count : 0;
             totalPages = Mathf.Max(1, Mathf.CeilToInt(count / (float)pageSize));
             pageIndex = Mathf.Clamp(pageIndex, 0, totalPages - 1);
@@ -339,7 +299,7 @@ namespace ES
 
         public static void DrawPager(ref int pageIndex, int totalCount, int pageSize)
         {
-            pageSize = Mathf.Max(1, pageSize);
+            pageSize = Mathf.Clamp(pageSize, 1, MaxRenderRowsPerPage);
             int totalPages = Mathf.Max(1, Mathf.CeilToInt(totalCount / (float)pageSize));
             pageIndex = Mathf.Clamp(pageIndex, 0, totalPages - 1);
 
@@ -379,8 +339,7 @@ namespace ES
             if (string.IsNullOrEmpty(path))
                 return;
 
-            File.WriteAllText(path, report.ToText());
-            EditorUtility.RevealInFinder(path);
+            TrySaveText(path, report.ToText(), "保存工具报告");
         }
 
         private static void SaveTextToFile(string title, string text)
@@ -394,8 +353,26 @@ namespace ES
             if (string.IsNullOrEmpty(path))
                 return;
 
-            File.WriteAllText(path, text ?? string.Empty);
-            EditorUtility.RevealInFinder(path);
+            TrySaveText(path, text ?? string.Empty, "保存工具结果");
+        }
+
+        private static bool TrySaveText(string path, string text, string operationName)
+        {
+            try
+            {
+                File.WriteAllText(path, text ?? string.Empty);
+                EditorUtility.RevealInFinder(path);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
+                EditorUtility.DisplayDialog(
+                    string.IsNullOrWhiteSpace(operationName) ? "保存失败" : operationName + "失败",
+                    $"无法写入文件：\n{path}\n\n{ex.Message}\n\n请确认路径存在、文件未被占用且当前用户拥有写入权限。",
+                    "知道了");
+                return false;
+            }
         }
 
         private static string SanitizeFileName(string fileName)
@@ -411,10 +388,13 @@ namespace ES
 
         public static bool DrawActionButton(string label, SimpleToolsActionTone tone, int height = 28, params GUILayoutOption[] options)
         {
-            Color previous = GUI.backgroundColor;
+            Color previousBackground = GUI.backgroundColor;
+            Color previousContent = GUI.contentColor;
             GUI.backgroundColor = GetToneColor(tone);
-            bool clicked = GUILayout.Button(label, MergeHeight(height, options));
-            GUI.backgroundColor = previous;
+            GUI.contentColor = Color.white;
+            bool clicked = GUILayout.Button(label, EditorStyles.miniButton, MergeHeight(height, options));
+            GUI.backgroundColor = previousBackground;
+            GUI.contentColor = previousContent;
             return clicked;
         }
 

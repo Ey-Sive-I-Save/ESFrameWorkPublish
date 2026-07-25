@@ -1,10 +1,45 @@
 using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// 存档 JSON 的唯一序列化边界。默认不写入 CLR 类型名；多态数据请使用明确的 DTO、JsonConverter 或独立分区版本迁移。
+    /// </summary>
+    public static class ESGameSaveJson
+    {
+        private static readonly JsonSerializerSettings CompactSettings = new JsonSerializerSettings
+        {
+            Formatting = Formatting.None,
+            NullValueHandling = NullValueHandling.Include,
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            ReferenceLoopHandling = ReferenceLoopHandling.Error,
+            TypeNameHandling = TypeNameHandling.None
+        };
+
+        private static readonly JsonSerializerSettings PrettySettings = new JsonSerializerSettings
+        {
+            Formatting = Formatting.Indented,
+            NullValueHandling = NullValueHandling.Include,
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            ReferenceLoopHandling = ReferenceLoopHandling.Error,
+            TypeNameHandling = TypeNameHandling.None
+        };
+
+        public static string Serialize<T>(T value, bool prettyPrint = false)
+        {
+            return JsonConvert.SerializeObject(value, prettyPrint ? PrettySettings : CompactSettings);
+        }
+
+        public static T Deserialize<T>(string json)
+        {
+            return JsonConvert.DeserializeObject<T>(json, CompactSettings);
+        }
+    }
+
     public static class ESGameSaveKeys
     {
         public const string ArchiveKey = "ES.GameSave.ArchiveJson";
@@ -75,7 +110,7 @@ namespace ES
                 sectionKey = sectionKey,
                 schemaVersion = schemaVersion,
                 typeName = typeof(T).FullName,
-                json = JsonUtility.ToJson(data, prettyPrint)
+                json = ESGameSaveJson.Serialize(data, prettyPrint)
             };
         }
 
@@ -87,7 +122,7 @@ namespace ES
 
             try
             {
-                value = JsonUtility.FromJson<T>(json);
+                value = ESGameSaveJson.Deserialize<T>(json);
                 return true;
             }
             catch (Exception exception)

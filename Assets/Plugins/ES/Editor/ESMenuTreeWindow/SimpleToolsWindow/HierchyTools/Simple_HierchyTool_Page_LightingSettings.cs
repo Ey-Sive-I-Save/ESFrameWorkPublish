@@ -80,7 +80,7 @@ namespace ES
         private int lightPreviewPageIndex;
         private const int LightPreviewPageSize = 12;
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             int lightCount = GetFilteredSelectedLights().Count;

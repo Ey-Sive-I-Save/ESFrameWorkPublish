@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -9,23 +10,51 @@ using UnityEditor;
 
 namespace ES
 {
+    [AttributeUsage(AttributeTargets.Enum, AllowMultiple = false, Inherited = false)]
+    public sealed class ESEnumScriptAttribute : Attribute
+    {
+        public readonly string assetPath;
+        public readonly string note;
+
+        public ESEnumScriptAttribute(string assetPath = null, string note = null)
+        {
+            this.assetPath = assetPath;
+            this.note = note;
+        }
+    }
+
     [Serializable]
     public struct ESEnumScriptJumpResult
     {
         public string enumTypeName;
         public string assetPath;
         public int enumLine;
+        public int openBraceLine;
+        public int closeBraceLine;
         public int insertLine;
         public int memberLine;
+        public bool singleLineEnum;
         public bool found;
 
         public bool HasInsertLine => insertLine > 0;
         public bool HasMemberLine => memberLine > 0;
+        public string EditPositionText
+        {
+            get
+            {
+                if (!found)
+                    return "enum script not registered or not found";
+
+                return singleLineEnum
+                    ? "single-line enum: edit this line or expand it before appending"
+                    : "append before the enum closing brace";
+            }
+        }
     }
 
     public static class ESEnumScriptJumpTemplate
     {
-        public const string DefaultTitle = "ES 枚举补充请求";
+        public const string DefaultTitle = "ES enum append request";
 
         public static string ToEnumMemberName(string value)
         {
@@ -62,30 +91,76 @@ namespace ES
             string enumTypeName = enumType != null ? enumType.Name : "UnknownEnum";
             string memberName = ToEnumMemberName(desiredStringKey);
 
-            StringBuilder builder = new StringBuilder(768);
+            StringBuilder builder = new StringBuilder(1024);
             builder.AppendLine(DefaultTitle);
             builder.AppendLine();
-            builder.AppendLine("目标：给指定枚举追加一个新成员，或判断应继续使用 stringKey。");
+            builder.AppendLine("Goal: add one enum member, or decide to keep stringKey if this is dynamic data.");
             builder.AppendLine();
-            builder.AppendLine("规则：");
-            builder.AppendLine("1. 只修改枚举定义，不改运行时表、不改加载逻辑。");
-            builder.AppendLine("2. 保留 None = 0，不重排、不复用已有数值。");
-            builder.AppendLine("3. 新枚举值追加到枚举末尾，先检查语义是否重复。");
-            builder.AppendLine("4. 如果这是临时、动态、外部配置驱动的数据，应说明继续使用 stringKey。");
+            builder.AppendLine("Rules:");
+            builder.AppendLine("1. Only edit the enum declaration file.");
+            builder.AppendLine("2. Keep None = 0. Do not reorder or reuse existing values.");
+            builder.AppendLine("3. Append at the end of the enum and check semantic duplication first.");
+            builder.AppendLine("4. If the data should stay external/dynamic, keep stringKey and do not add enum.");
             builder.AppendLine();
-            builder.AppendLine("枚举类型：" + enumTypeName);
-            builder.AppendLine("建议成员：" + memberName);
-            builder.AppendLine("来源 stringKey：" + (desiredStringKey ?? string.Empty));
-            builder.AppendLine("当前枚举值：" + (currentEnumValue ?? string.Empty));
-            builder.AppendLine("脚本路径：" + (jump.assetPath ?? string.Empty));
-            builder.AppendLine("枚举行：" + jump.enumLine);
-            builder.AppendLine("建议插入行：" + jump.insertLine);
+            builder.AppendLine("enumType: " + enumTypeName);
+            builder.AppendLine("suggestedMember: " + memberName);
+            builder.AppendLine("sourceStringKey: " + (desiredStringKey ?? string.Empty));
+            builder.AppendLine("currentEnumValue: " + (currentEnumValue ?? string.Empty));
+            builder.AppendLine("scriptPath: " + (jump.assetPath ?? string.Empty));
+            builder.AppendLine("enumLine: " + jump.enumLine);
+            builder.AppendLine("openBraceLine: " + jump.openBraceLine);
+            builder.AppendLine("closeBraceLine: " + jump.closeBraceLine);
+            builder.AppendLine("suggestedInsertLine: " + jump.insertLine);
+            builder.AppendLine("singleLineEnum: " + jump.singleLineEnum);
+            builder.AppendLine("editPosition: " + jump.EditPositionText);
+            builder.AppendLine();
+            builder.AppendLine("suggestedCode:");
+            builder.AppendLine("    " + memberName + " = <next_value>,");
             return builder.ToString();
         }
     }
 
     public static class ESEnumScriptJump
     {
+        private static readonly Dictionary<Type, ESEnumScriptJumpResult> ResultByEnumType = new Dictionary<Type, ESEnumScriptJumpResult>(128);
+
+        public static void ClearRegistry()
+        {
+            ResultByEnumType.Clear();
+        }
+
+        public static bool RegisterEnum(Type enumType, ESEnumScriptAttribute attribute)
+        {
+            if (enumType == null || !enumType.IsEnum)
+                return false;
+
+            ESEnumScriptJumpResult result = new ESEnumScriptJumpResult
+            {
+                enumTypeName = enumType.Name
+            };
+
+#if UNITY_EDITOR
+            if (attribute != null && !string.IsNullOrEmpty(attribute.assetPath))
+            {
+                string fullPath = AssetPathToFullPath(attribute.assetPath);
+                if (TryReadEnumFile(enumType.Name, null, fullPath, ref result))
+                {
+                    ResultByEnumType[enumType] = result;
+                    return true;
+                }
+            }
+#endif
+
+            result.found = false;
+            ResultByEnumType[enumType] = result;
+            return false;
+        }
+
+        public static bool IsRegistered(Type enumType)
+        {
+            return enumType != null && ResultByEnumType.ContainsKey(enumType);
+        }
+
         public static bool TryFindEnum(Type enumType, out ESEnumScriptJumpResult result)
         {
             return TryFindEnum(enumType, null, out result);
@@ -101,7 +176,7 @@ namespace ES
 #if UNITY_EDITOR
             if (!TryFindEnum(enumType, out ESEnumScriptJumpResult result))
             {
-                EditorUtility.DisplayDialog("ES 枚举跳转", "没有找到枚举脚本：" + enumType?.Name, "确定");
+                EditorUtility.DisplayDialog("ES Enum Jump", "Enum script is not registered or not found: " + enumType?.Name, "OK");
                 return false;
             }
 
@@ -110,6 +185,11 @@ namespace ES
 #else
             return false;
 #endif
+        }
+
+        public static bool OpenEnumAppendPosition(Type enumType)
+        {
+            return OpenEnum(enumType, true);
         }
 
         public static bool OpenEnumMember(Type enumType, string memberName)
@@ -136,54 +216,48 @@ namespace ES
             GUIUtility.systemCopyBuffer = BuildAppendRequest(enumType, desiredStringKey, currentEnumValue);
         }
 
+        public static bool CopyAppendRequestAndOpenAppendPosition(Type enumType, string desiredStringKey, string currentEnumValue = null)
+        {
+            CopyAppendRequest(enumType, desiredStringKey, currentEnumValue);
+            return OpenEnumAppendPosition(enumType);
+        }
+
         private static bool TryFindEnum(Type enumType, string memberName, out ESEnumScriptJumpResult result)
         {
             result = default;
             if (enumType == null)
                 return false;
 
-            result.enumTypeName = enumType.Name;
+            if (!ResultByEnumType.TryGetValue(enumType, out result))
+            {
+                ESEnumScriptAttribute attribute = Attribute.GetCustomAttribute(enumType, typeof(ESEnumScriptAttribute)) as ESEnumScriptAttribute;
+                if (attribute == null)
+                {
+                    result = new ESEnumScriptJumpResult
+                    {
+                        enumTypeName = enumType.Name,
+                        found = false
+                    };
+                    return false;
+                }
 
-#if UNITY_EDITOR
-            string[] guids = AssetDatabase.FindAssets(enumType.Name + " t:MonoScript");
-            if (TryFindEnumInGuids(enumType.Name, memberName, guids, ref result))
+                RegisterEnum(enumType, attribute);
+                ResultByEnumType.TryGetValue(enumType, out result);
+            }
+
+            if (!result.found || string.IsNullOrEmpty(memberName))
+                return result.found;
+
+            ESEnumScriptJumpResult memberResult = result;
+            string fullPath = AssetPathToFullPath(result.assetPath);
+            if (TryReadEnumFile(enumType.Name, memberName, fullPath, ref memberResult))
+            {
+                result = memberResult;
                 return true;
-#endif
-
-            string dataPath = Application.dataPath;
-            if (string.IsNullOrEmpty(dataPath) || !Directory.Exists(dataPath))
-                return false;
-
-            string[] files = Directory.GetFiles(dataPath, "*.cs", SearchOption.AllDirectories);
-            for (int i = 0; i < files.Length; i++)
-            {
-                if (TryReadEnumFile(enumType.Name, memberName, files[i], ref result))
-                    return true;
             }
 
-            return false;
+            return result.found;
         }
-
-#if UNITY_EDITOR
-        private static bool TryFindEnumInGuids(string enumName, string memberName, string[] guids, ref ESEnumScriptJumpResult result)
-        {
-            if (guids == null)
-                return false;
-
-            for (int i = 0; i < guids.Length; i++)
-            {
-                string assetPath = AssetDatabase.GUIDToAssetPath(guids[i]);
-                if (string.IsNullOrEmpty(assetPath))
-                    continue;
-
-                string fullPath = AssetPathToFullPath(assetPath);
-                if (TryReadEnumFile(enumName, memberName, fullPath, ref result))
-                    return true;
-            }
-
-            return false;
-        }
-#endif
 
         private static bool TryReadEnumFile(string enumName, string memberName, string fullPath, ref ESEnumScriptJumpResult result)
         {
@@ -197,8 +271,8 @@ namespace ES
 
             result.assetPath = FullPathToAssetPath(fullPath);
             result.enumLine = CountLine(text, enumIndex);
-            result.insertLine = FindInsertLine(text, enumIndex);
-            result.memberLine = string.IsNullOrEmpty(memberName) ? 0 : FindMemberLine(text, enumIndex, memberName);
+            FillBraceAndInsertLines(text, enumIndex, ref result);
+            result.memberLine = string.IsNullOrEmpty(memberName) ? 0 : FindMemberLine(text, enumIndex, memberName, result.closeBraceLine);
             result.found = true;
             return true;
         }
@@ -214,11 +288,17 @@ namespace ES
             return text.IndexOf(pattern, StringComparison.Ordinal);
         }
 
-        private static int FindInsertLine(string text, int enumIndex)
+        private static void FillBraceAndInsertLines(string text, int enumIndex, ref ESEnumScriptJumpResult result)
         {
             int openBrace = text.IndexOf('{', enumIndex);
             if (openBrace < 0)
-                return CountLine(text, enumIndex);
+            {
+                result.openBraceLine = 0;
+                result.closeBraceLine = 0;
+                result.insertLine = result.enumLine;
+                result.singleLineEnum = false;
+                return;
+            }
 
             int depth = 0;
             for (int i = openBrace; i < text.Length; i++)
@@ -232,17 +312,25 @@ namespace ES
                 {
                     depth--;
                     if (depth == 0)
-                        return CountLine(text, i);
+                    {
+                        result.openBraceLine = CountLine(text, openBrace);
+                        result.closeBraceLine = CountLine(text, i);
+                        result.insertLine = result.closeBraceLine;
+                        result.singleLineEnum = result.openBraceLine == result.closeBraceLine;
+                        return;
+                    }
                 }
             }
 
-            return CountLine(text, openBrace);
+            result.openBraceLine = CountLine(text, openBrace);
+            result.closeBraceLine = 0;
+            result.insertLine = result.openBraceLine;
+            result.singleLineEnum = false;
         }
 
-        private static int FindMemberLine(string text, int enumIndex, string memberName)
+        private static int FindMemberLine(string text, int enumIndex, string memberName, int closeBraceLine)
         {
             int openBrace = text.IndexOf('{', enumIndex);
-            int closeBraceLine = FindInsertLine(text, enumIndex);
             if (openBrace < 0 || closeBraceLine <= 0)
                 return 0;
 
@@ -303,5 +391,23 @@ namespace ES
             return Path.GetFullPath(Path.Combine(projectRoot ?? string.Empty, assetPath)).Replace('\\', '/');
         }
 #endif
+    }
+
+    public sealed class ESAS_Register_ESEnumScriptJump : EditorRegister_FOR_ClassAttribute<ESEnumScriptAttribute>
+    {
+        public override int Order => EditorRegisterOrder.Level0.GetHashCode();
+
+        public override void Handle(ESEnumScriptAttribute attribute, Type type)
+        {
+            ESEnumScriptJump.RegisterEnum(type, attribute);
+        }
+    }
+
+    public sealed class ESEnumScriptJumpClearOnAssemblyStream : EditorInvoker_Level0
+    {
+        public override void InitInvoke()
+        {
+            ESEnumScriptJump.ClearRegistry();
+        }
     }
 }

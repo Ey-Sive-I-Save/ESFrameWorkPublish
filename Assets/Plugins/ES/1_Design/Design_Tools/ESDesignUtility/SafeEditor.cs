@@ -566,15 +566,30 @@ namespace ES
             {
 #if UNITY_EDITOR
                 List<T> results = new List<T>();
-                string[] guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}");
-                foreach (string guid in guids)
+                if (typeof(ESSO).IsAssignableFrom(typeof(T)))
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(guid);
-                    T asset = AssetDatabase.LoadAssetAtPath<T>(path);
-                    if (asset != null)
+                    var indexed = ESEditorSO.SOS.GetNewGroupOfType<T>() ?? new List<T>(0);
+                    foreach (T asset in indexed)
                     {
-                        results.Add(asset);
-                        EditorUtility.SetDirty(asset);
+                        if (asset != null)
+                        {
+                            results.Add(asset);
+                            EditorUtility.SetDirty(asset);
+                        }
+                    }
+                }
+                else
+                {
+                    string[] guids = AssetDatabase.FindAssets($"t:{typeof(T).Name}");
+                    foreach (string guid in guids)
+                    {
+                        string path = AssetDatabase.GUIDToAssetPath(guid);
+                        T asset = AssetDatabase.LoadAssetAtPath<T>(path);
+                        if (asset != null)
+                        {
+                            results.Add(asset);
+                            EditorUtility.SetDirty(asset);
+                        }
                     }
                 }
 #endif

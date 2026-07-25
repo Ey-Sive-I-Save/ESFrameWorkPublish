@@ -20,6 +20,9 @@ namespace ES
         MovementMode = 1001,
         ActionPhase = 1002,
         ComboStep = 1003,
+        Stance = 1004,
+        LocomotionMode = 1005,
+        WeaponSlot = 1006,
     }
 
     /// <summary>
@@ -31,6 +34,8 @@ namespace ES
         IsAiming = 2001,
         IsLockingTarget = 2002,
         IsInputBlocked = 2003,
+        IsGrounded = 2004,
+        WantsSprint = 2005,
     }
 
     public readonly struct StateDefaultIntParameterDefinition
@@ -68,6 +73,9 @@ namespace ES
             new StateDefaultIntParameterDefinition(StateDefaultIntParameter.MovementMode, "MovementMode"),
             new StateDefaultIntParameterDefinition(StateDefaultIntParameter.ActionPhase, "ActionPhase"),
             new StateDefaultIntParameterDefinition(StateDefaultIntParameter.ComboStep, "ComboStep"),
+            new StateDefaultIntParameterDefinition(StateDefaultIntParameter.Stance, "Stance"),
+            new StateDefaultIntParameterDefinition(StateDefaultIntParameter.LocomotionMode, "LocomotionMode"),
+            new StateDefaultIntParameterDefinition(StateDefaultIntParameter.WeaponSlot, "WeaponSlot"),
         };
 
         private static readonly StateDefaultBoolParameterDefinition[] BoolDefinitions =
@@ -75,6 +83,8 @@ namespace ES
             new StateDefaultBoolParameterDefinition(StateDefaultBoolParameter.IsAiming, "IsAiming"),
             new StateDefaultBoolParameterDefinition(StateDefaultBoolParameter.IsLockingTarget, "IsLockingTarget"),
             new StateDefaultBoolParameterDefinition(StateDefaultBoolParameter.IsInputBlocked, "IsInputBlocked"),
+            new StateDefaultBoolParameterDefinition(StateDefaultBoolParameter.IsGrounded, "IsGrounded"),
+            new StateDefaultBoolParameterDefinition(StateDefaultBoolParameter.WantsSprint, "WantsSprint"),
         };
 
         private static readonly StateDefaultIntParameterDefinition[] IntDefinitionsByIndex;

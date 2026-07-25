@@ -1822,7 +1822,7 @@ namespace ES
             }
 
             if (forceIfStillRunning && state.baseStatus == StateBaseStatus.Running)
-                sm.ForceExitState(state);
+                sm.ForceExit(state, StateForceReason.GameplayCleanup);
         }
 
         private string ResolveStateKeyForLifecycle(StateBase state, string fallbackKey)
@@ -1854,8 +1854,8 @@ namespace ES
 
             if (sm != null)
             {
-                sm.SetFloat(StateDefaultFloatParameter.ClimbHorizontal, 0f);
-                sm.SetFloat(StateDefaultFloatParameter.ClimbVertical, 0f);
+                sm.Set(StateCoreParams.ClimbX, 0f);
+                sm.Set(StateCoreParams.ClimbY, 0f);
             }
         }
 

@@ -107,9 +107,24 @@ namespace ES
             SimpleToolsPanelUtility.DrawSummary(
                 $"场景快捷: {sceneCount} 个",
                 $"资产快捷: {assetCount} 个",
-                $"打开方式: {(data.UseAdditiveMode ? "叠加打开" : "单场景打开")}",
-                $"切换前保存: {(data.AutoSaveBeforeSwitch ? "自动保存" : "手动确认")}");
+                $"打开方式: {GetOpenModeText(data.UseAdditiveMode)}",
+                $"切换前保存: {GetSaveModeText(data.AutoSaveBeforeSwitch)}");
             SimpleToolsPanelUtility.DrawResultSummary("最近场景/资产操作", lastResultSummary, lastResultDetail);
+        }
+
+        private static string GetOpenModeText(bool useAdditiveMode)
+        {
+            return useAdditiveMode ? "叠加打开" : "单场景打开";
+        }
+
+        private static string GetSaveModeText(bool autoSave)
+        {
+            return autoSave ? "自动保存" : "手动确认";
+        }
+
+        private static string GetSaveResultText(bool saved)
+        {
+            return saved ? "成功" : "失败";
         }
 
         private void DrawSceneManagementSection()
@@ -485,7 +500,7 @@ namespace ES
                     if (activeScene.isDirty)
                     {
                         bool saved = EditorSceneManager.SaveScene(activeScene);
-                        Debug.Log($"自动保存场景 {activeScene.name} {(saved ? "成功" : "失败")}");
+                        Debug.Log($"自动保存场景 {activeScene.name} {GetSaveResultText(saved)}");
                     }
                 }
                 else if (mode == OpenSceneMode.Single && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())

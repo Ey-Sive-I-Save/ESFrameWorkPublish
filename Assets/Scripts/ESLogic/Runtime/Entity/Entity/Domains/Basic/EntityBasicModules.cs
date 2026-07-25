@@ -175,6 +175,8 @@ namespace ES
                     
                     // 设置当前帧速度参数（性能热点：直写快路径）
                     stateMachine.SetMotionSpeedXZ(localVelocity.x, localVelocity.z);
+                    stateMachine.Set(StateCoreParams.VerticalSpeed, localVelocity.y);
+                    stateMachine.Set(StateCoreParams.IsGrounded, MyCore.kcc.monitor.isStableOnGround);
 
                     // ★ 滑动窗口平均速度计算
                     // 将本帧数据写入环形缓冲区
@@ -441,16 +443,12 @@ namespace ES
         public float firePulseDecaySpeed = 18f;
 
         [Title("动画参数键")]
-        public string paramUpperBodyLayerWeight = "Gun_UpperLayerWeight";
-        public string paramEquipBlend = "Gun_EquipBlend";
-        public string paramFirePulse = "Gun_FirePulse";
-        public string paramWeaponIndex = "Gun_WeaponIndex";
-        public string paramIsWeaponInHand = "Gun_IsWeaponInHand";
-        public string paramIsAiming01 = "Gun_IsAiming01";
 
         [NonSerialized] private StateMachine _sm;
         [NonSerialized] private StateBase _aimState;
         [NonSerialized] private StateBase _peekState;
+        [NonSerialized] private StateFinalIKDriver _cachedIKDriver;
+        [NonSerialized] private Animator _cachedIKDriverAnimator;
         [NonSerialized] private StateLifecycleTracker _aimLifecycle = new StateLifecycleTracker();
         [NonSerialized] private StateLifecycleTracker _peekLifecycle = new StateLifecycleTracker();
         [NonSerialized] private bool _isInAttachmentConsistencyPass;
@@ -647,7 +645,7 @@ namespace ES
                     isAiming = true;
                     lastAimStateFailureReason = string.Empty;
                     if (_sm != null)
-                        _sm.SetBool(StateDefaultBoolParameter.IsAiming, true);
+                        _sm.Set(StateCoreParams.IsAiming, true);
 
                     var ikDriver = ResolveIKDriver();
                     if (ikDriver != null)
@@ -985,7 +983,19 @@ namespace ES
 
             StateMachine stateMachine = MyCore.stateDomain != null ? MyCore.stateDomain.stateMachine : null;
             Animator stateAnimator = stateMachine != null && stateMachine.BoundAnimator != null ? stateMachine.BoundAnimator : MyCore.animator;
-            return stateAnimator != null ? stateAnimator.GetComponent<StateFinalIKDriver>() : null;
+            if (stateAnimator == null)
+            {
+                _cachedIKDriver = null;
+                _cachedIKDriverAnimator = null;
+                return null;
+            }
+
+            if (_cachedIKDriver != null && _cachedIKDriverAnimator == stateAnimator)
+                return _cachedIKDriver;
+
+            _cachedIKDriverAnimator = stateAnimator;
+            _cachedIKDriver = stateAnimator.GetComponent<StateFinalIKDriver>();
+            return _cachedIKDriver;
         }
 
         private StateBase ResolveAimState()
@@ -1123,7 +1133,7 @@ namespace ES
             isAiming = true;
             lastAimStateFailureReason = string.Empty;
             if (_sm != null)
-                _sm.SetBool(StateDefaultBoolParameter.IsAiming, true);
+                _sm.Set(StateCoreParams.IsAiming, true);
             LogCombatState($"Aim enter | State={GetStateDebugName(_aimState)} | Layer={TryGetStateLayer(_aimState)}");
         }
 
@@ -1142,7 +1152,7 @@ namespace ES
             ForceStopAimInternal();
             lastAimStateFailureReason = string.Empty;
             if (_sm != null)
-                _sm.SetBool(StateDefaultBoolParameter.IsAiming, false);
+                _sm.Set(StateCoreParams.IsAiming, false);
         }
 
         private void OnPeekEnter()
@@ -1163,7 +1173,7 @@ namespace ES
         {
             isAiming = false;
             if (_sm != null)
-                _sm.SetBool(StateDefaultBoolParameter.IsAiming, false);
+                _sm.Set(StateCoreParams.IsAiming, false);
             ForceStopPeekInternal();
         }
 
@@ -1214,7 +1224,7 @@ namespace ES
             _equipBlendCurrent = _weaponInHand ? 1f : 0f;
             SetActionPhase(_weaponInHand ? 1 : 2);
             if (_sm != null)
-                _sm.SetBool(StateDefaultBoolParameter.IsAiming, false);
+                _sm.Set(StateCoreParams.IsAiming, false);
         }
 
         private void TickWeaponFusion(float deltaTime)
@@ -1245,12 +1255,11 @@ namespace ES
                     Mathf.Max(0.01f, firePulseDecaySpeed) * deltaTime);
             }
 
-            _sm.SetFloat(paramUpperBodyLayerWeight, _upperBodyLayerWeightCurrent);
-            _sm.SetFloat(paramEquipBlend, _equipBlendCurrent);
-            _sm.SetFloat(paramFirePulse, _firePulseCurrent);
-            _sm.SetFloat(paramWeaponIndex, weaponIndex);
-            _sm.SetFloat(paramIsWeaponInHand, _weaponInHand ? 1f : 0f);
-            _sm.SetFloat(paramIsAiming01, isAiming ? 1f : 0f);
+            _sm.Set(StateCoreParams.UpperBodyWeight, _upperBodyLayerWeightCurrent);
+            _sm.Set(StateCoreParams.WeaponEquipWeight, _equipBlendCurrent);
+            _sm.Set(StateCoreParams.WeaponFirePulse, _firePulseCurrent);
+            _sm.Set(StateCoreParams.WeaponSlot, weaponIndex);
+            _sm.Set(StateCoreParams.WeaponInHandWeight, _weaponInHand ? 1f : 0f);
 
             if (!isAiming || !_weaponInHand)
             {
@@ -1907,7 +1916,7 @@ namespace ES
         {
             _actionPhase = phase;
             if (_sm != null)
-                _sm.SetInt(StateDefaultIntParameter.ActionPhase, phase);
+                _sm.Set(StateCoreParams.ActionPhase, phase);
         }
 
         private bool TryActivateStateByKey(string stateKey)
@@ -2998,7 +3007,7 @@ namespace ES
 
             if (_quickStopState.baseStatus == StateBaseStatus.Running)
             {
-                _sm.ForceExitState(_quickStopState);
+                _sm.ForceExit(_quickStopState, StateForceReason.GameplayCleanup);
             }
 
             isQuickStopping = false;

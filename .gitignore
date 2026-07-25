@@ -10,6 +10,7 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
+/HybridCLRData/
 *.log
 
 # MemoryCaptures can get excessive in size.

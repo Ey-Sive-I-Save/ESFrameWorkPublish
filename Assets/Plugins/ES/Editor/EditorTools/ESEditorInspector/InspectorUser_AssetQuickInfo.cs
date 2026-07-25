@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Text;
@@ -13,6 +14,13 @@ namespace ES
         private const string DANGER_PREF_KEY = "ES_ResHelper_ShowAssetQuickInfoDanger";
         private const string GUIDE_EDIT_MODE_PREF_KEY = "ES_AssetGuide_EditMode";
         private const long MaxCopyTextBytes = 1024 * 1024;
+        private static readonly Color RegistryPanelColor = new Color(0.18f, 0.55f, 0.82f, 0.55f);
+        private static readonly GUIContent RuntimeKeyDerivedLabel = new GUIContent(
+            "Runtime Key",
+            "Enum Key 非 None 时，Runtime Key 由 Enum Key 自动决定。");
+        private static readonly GUIContent RuntimeKeyEditableLabel = new GUIContent(
+            "Runtime Key",
+            $"字符串资源运行键，可手动设置为不小于 {ESAssetRegistry.DefaultStringRuntimeKeyStart} 的唯一值。");
 
         private static readonly HashSet<string> TextExtensions = new HashSet<string>
         {
@@ -40,6 +48,7 @@ namespace ES
                 DrawHeader(ob, path, appendMode, showDanger, out appendMode, out showDanger);
                 DrawInfoRows(ob, path, guid, appendMode);
                 DrawAssetGuide(ob, guid);
+                DrawAssetRegistryKeys(ob, path, guid);
                 DrawTextCopy(path, fileInfo, appendMode);
 
                 if (showDanger && CanDeleteAsset(path))
@@ -196,6 +205,193 @@ namespace ES
             {
                 record.MarkManuallyEdited();
                 EditorUtility.SetDirty(data);
+            }
+        }
+
+        private static void DrawAssetRegistryKeys(UnityEngine.Object asset, string path, string guid)
+        {
+            if (asset is MonoScript)
+                return;
+
+            ESAssetReferKind kind = ESAssetPage.DetermineKind(asset);
+            if (!ESAssetReferConfigKeySwitch.IsSupportedKind(kind))
+                return;
+
+            EditorGUILayout.Space(5);
+            Color previousBackgroundColor = GUI.backgroundColor;
+            GUI.backgroundColor = RegistryPanelColor;
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                GUI.backgroundColor = previousBackgroundColor;
+                ESAssetPage page = null;
+                bool registered = !string.IsNullOrEmpty(guid) && ESAssetRegistry.TryGetByGuid(guid, out page);
+
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Label("资源注册键", EditorStyles.boldLabel);
+                GUILayout.FlexibleSpace();
+                GUILayout.Label(registered ? $"已注册 · {kind}" : $"未注册 · {kind}", EditorStyles.miniLabel);
+                EditorGUILayout.EndHorizontal();
+
+                if (!registered)
+                {
+                    EditorGUILayout.HelpBox("当前资产尚未进入资源注册表。点击后会使用现有资源收集规则生成对应 Page 并刷新注册表。", MessageType.Info);
+                    if (GUILayout.Button("注册当前资产", GUILayout.Height(22)))
+                    {
+                        RegisterCurrentAsset(asset, path, guid);
+                        GUIUtility.ExitGUI();
+                    }
+                    return;
+                }
+
+                DrawRegisteredAssetKeys(asset, page, kind);
+            }
+
+            GUI.backgroundColor = previousBackgroundColor;
+        }
+
+        private static void DrawRegisteredAssetKeys(UnityEngine.Object asset, ESAssetPage page, ESAssetReferKind kind)
+        {
+            string nextStringKey = EditorGUILayout.DelayedTextField("String Key", page.StringKey ?? string.Empty);
+            if (!string.Equals(nextStringKey, page.StringKey, StringComparison.Ordinal))
+            {
+                nextStringKey = nextStringKey?.Trim();
+                if (string.IsNullOrEmpty(nextStringKey))
+                {
+                    Debug.LogWarning("[资源注册键] String Key 不能为空。", asset);
+                }
+                else
+                {
+                    RecordSourceLibraryUndo(page, "修改资源 String Key");
+                    if (ESAssetRegistry.RenameStringKey(page, nextStringKey))
+                        AssetDatabase.SaveAssets();
+                }
+            }
+
+            Type enumType = GetAssetEnumType(kind);
+            if (enumType == null)
+            {
+                EditorGUILayout.HelpBox($"资产类型 {kind} 没有绑定枚举类型，无法编辑 Enum Key。", MessageType.Warning);
+            }
+            else
+            {
+                Enum current = (Enum)Enum.ToObject(enumType, page.EnumKey);
+                Enum selected = EditorGUILayout.EnumPopup("Enum Key", current);
+                int nextEnumKey = Convert.ToInt32(selected);
+                if (nextEnumKey != page.EnumKey)
+                {
+                    RecordSourceLibraryUndo(page, "修改资源 Enum Key");
+                    if (ESAssetRegistry.RenameEnumKey(page, nextEnumKey))
+                        AssetDatabase.SaveAssets();
+                }
+            }
+
+            bool runtimeKeyDerivedFromEnum = page.EnumKey != 0;
+            using (new EditorGUI.DisabledScope(runtimeKeyDerivedFromEnum))
+            {
+                GUIContent runtimeKeyLabel = runtimeKeyDerivedFromEnum
+                    ? RuntimeKeyDerivedLabel
+                    : RuntimeKeyEditableLabel;
+                int nextRuntimeKey = EditorGUILayout.DelayedIntField(runtimeKeyLabel, page.RuntimeKey);
+                if (!runtimeKeyDerivedFromEnum && nextRuntimeKey != page.RuntimeKey)
+                {
+                    if (nextRuntimeKey < ESAssetRegistry.DefaultStringRuntimeKeyStart)
+                    {
+                        Debug.LogWarning(
+                            $"[资源注册键] 字符串 Runtime Key 必须不小于 {ESAssetRegistry.DefaultStringRuntimeKeyStart}。",
+                            asset);
+                    }
+                    else
+                    {
+                        RecordSourceLibraryUndo(page, "修改资源 Runtime Key");
+                        if (ESAssetRegistry.RenameRuntimeKey(page, nextRuntimeKey))
+                        {
+                            AssetDatabase.SaveAssets();
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[资源注册键] Runtime Key {nextRuntimeKey} 已被占用或不符合当前键规则。", asset);
+                        }
+                    }
+                }
+            }
+
+            if (runtimeKeyDerivedFromEnum)
+                EditorGUILayout.LabelField("Runtime Key 由当前 Enum Key 自动同步", EditorStyles.miniLabel);
+
+            EditorGUILayout.Space(2);
+            EditorGUILayout.BeginHorizontal();
+
+            if (enumType != null && GUILayout.Button("定位枚举成员", EditorStyles.miniButtonLeft, GUILayout.ExpandWidth(true)))
+            {
+                string memberName = Enum.GetName(enumType, page.EnumKey);
+                if (string.IsNullOrEmpty(memberName))
+                    ESEnumScriptJump.OpenEnumAppendPosition(enumType);
+                else
+                    ESEnumScriptJump.OpenEnumMember(enumType, memberName);
+            }
+            if (enumType != null && GUILayout.Button("枚举扩容", EditorStyles.miniButtonRight, GUILayout.ExpandWidth(true)))
+                ESEnumScriptJump.OpenEnumAppendPosition(enumType);
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private static void RegisterCurrentAsset(UnityEngine.Object asset, string path, string guid)
+        {
+            ESAssetLibrary library = ESGlobalResToolsSupportConfig.CollectAssetToRecommendedLibrary(
+                asset,
+                showConfirmDialog: false,
+                silent: false);
+
+            if (library == null)
+            {
+                Debug.LogWarning("[资源注册键] 注册失败：没有可用的资源库或收集规则未启用。", asset);
+                return;
+            }
+
+            library.InjectToAssetRegistryEditor();
+            if (!string.IsNullOrEmpty(guid) && ESAssetRegistry.TryGetByGuid(guid, out _))
+            {
+                Debug.Log($"[资源注册键] 已注册资产：{path}", asset);
+                return;
+            }
+
+            Debug.LogWarning($"[资源注册键] 已执行收集，但注册表中仍未找到资产：{path}", asset);
+        }
+
+        private static void RecordSourceLibraryUndo(ESAssetPage page, string actionName)
+        {
+            if (page == null || string.IsNullOrEmpty(page.SourceLibrary))
+                return;
+
+            string libraryPath = AssetDatabase.GUIDToAssetPath(page.SourceLibrary);
+            ESAssetLibrary library = string.IsNullOrEmpty(libraryPath)
+                ? null
+                : AssetDatabase.LoadAssetAtPath<ESAssetLibrary>(libraryPath);
+            if (library != null)
+                Undo.RecordObject(library, actionName);
+        }
+
+        private static Type GetAssetEnumType(ESAssetReferKind kind)
+        {
+            switch (kind)
+            {
+                case ESAssetReferKind.Prefab: return typeof(ESAssetReferPrefabEnumKey);
+                case ESAssetReferKind.Scene: return typeof(ESAssetReferSceneEnumKey);
+                case ESAssetReferKind.Sprite: return typeof(ESAssetReferSpriteEnumKey);
+                case ESAssetReferKind.SpriteAtlas: return typeof(ESAssetReferSpriteAtlasEnumKey);
+                case ESAssetReferKind.Texture2D: return typeof(ESAssetReferTexture2DEnumKey);
+                case ESAssetReferKind.Texture: return typeof(ESAssetReferTextureEnumKey);
+                case ESAssetReferKind.Material: return typeof(ESAssetReferMaterialEnumKey);
+                case ESAssetReferKind.Mesh: return typeof(ESAssetReferMeshEnumKey);
+                case ESAssetReferKind.AnimationClip: return typeof(ESAssetReferAnimationClipEnumKey);
+                case ESAssetReferKind.AnimatorController: return typeof(ESAssetReferAnimatorControllerEnumKey);
+                case ESAssetReferKind.Avatar: return typeof(ESAssetReferAvatarEnumKey);
+                case ESAssetReferKind.AudioClip: return typeof(ESAssetReferAudioClipEnumKey);
+                case ESAssetReferKind.VideoClip: return typeof(ESAssetReferVideoClipEnumKey);
+                case ESAssetReferKind.TimelineAsset: return typeof(ESAssetReferTimelineAssetEnumKey);
+                case ESAssetReferKind.PlayableAsset: return typeof(ESAssetReferPlayableAssetEnumKey);
+                case ESAssetReferKind.TerrainData: return typeof(ESAssetReferTerrainDataEnumKey);
+                default: return null;
             }
         }
 

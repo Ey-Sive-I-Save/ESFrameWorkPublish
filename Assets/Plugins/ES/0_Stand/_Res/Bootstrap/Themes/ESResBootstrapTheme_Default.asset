@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6de92ab0667e46b3a65f231454e5c102, type: 3}
+  m_Name: ESResBootstrapTheme_Default
+  m_EditorClassIdentifier: 
+  productName: ES RESOURCE CENTER
+  productSubtitle: "\u5B89\u5168\u9A8C\u8BC1 \xB7 \u5E73\u6ED1\u8FC7\u6E21 \xB7 \u5373\u523B\u542F\u7A0B"
+  localModeNotice: "\u672C\u5730\u8D44\u6E90\u6A21\u5F0F\uFF1A\u6A21\u62DF\u9A8C\u8BC1\uFF0C\u4E0D\u8BF7\u6C42\u670D\u52A1\u7AEF"
+  announcement: "\u6B22\u8FCE\u56DE\u6765\u3002\u8D44\u6E90\u9A8C\u8BC1\u5B8C\u6210\u540E\u5373\u53EF\u8FDB\u5165\u6E38\u620F\u3002"
+  logo: {fileID: 0}
+  background: {fileID: 0}
+  loadingPanel: {fileID: 0}
+  progressTrack: {fileID: 0}
+  progressFill: {fileID: 0}
+  primaryButton: {fileID: 0}
+  backgroundTint: {r: 0.025, g: 0.07, b: 0.13, a: 1}
+  panelTint: {r: 0.035, g: 0.1, b: 0.18, a: 0.92}
+  accentColor: {r: 0.94, g: 0.71, b: 0.27, a: 1}
+  bodyColor: {r: 0.71, g: 0.79, b: 0.9, a: 1}
+  announcementColor: {r: 0.8, g: 0.85, b: 0.92, a: 0.9}
+  buttonTextColor: {r: 0.012, g: 0.018, b: 0.035, a: 1}
+  titleFontSize: 48
+  bodyFontSize: 19
+  statusFontSize: 27
+  buttonFontSize: 19
+  referenceResolution: {x: 1920, y: 1080}

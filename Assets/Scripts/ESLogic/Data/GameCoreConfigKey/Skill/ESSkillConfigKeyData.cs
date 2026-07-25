@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace ES
 {
+    [ESEnumScript("Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Skill/ESSkillConfigKeyData.cs")]
     public enum ESSkillEnumKey : ushort
     {
         None = 0,
@@ -25,9 +26,5 @@ namespace ES
         public StateAniDataInfo baseStateInfo;
         public GameObject prefab;
         public UnityEngine.Object extraAsset;
-        public ESGameCoreConfigJsonSource jsonSource;
     }
-
-    [Serializable]
-    public sealed class ESSkillConfigKeyJsonRecord : ESGameCoreConfigKeyJsonRecord { }
 }

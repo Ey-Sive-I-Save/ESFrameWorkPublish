@@ -217,7 +217,7 @@ namespace ES
 
             [LabelText("参数")]
             [Tooltip("用于比较的 float 参数")]
-            public StateParameter parameter;
+            public StateFloatParameterReference parameter;
 
             [LabelText("比较")]
             public PhaseTransitionCompare compare;
@@ -233,7 +233,7 @@ namespace ES
             public bool Check(in StateMachineContext context)
             {
                 if (!enable) return false;
-                float diff = context.GetFloat(parameter, 0f) - threshold;
+                float diff = context.GetFloat(parameter.Parameter, 0f) - threshold;
 
                 if (compare == PhaseTransitionCompare.Greater)
                     return includeEqual ? (diff >= 0f) : (diff > 0f);
@@ -279,7 +279,7 @@ namespace ES
             [LabelText("混合参数")]
             [Tooltip("控制主次Clip混合的参数（0=主，1=次）")]
             [ShowIf("@phaseCalculator == null && enableSecondaryClipBlend")]
-            public StateParameter blendParameter;
+            public StateFloatParameterReference blendParameter;
 
             [LabelText("最小时长")]
             [Tooltip("该阶段最短持续时间（秒）。在此之前不会发生任何切换（切换条件/播完切换/自动切换/额外切换）。")]
@@ -302,7 +302,7 @@ namespace ES
             [LabelText("触发参数")]
             [HideInInspector]
             [Tooltip("(兼容旧字段) 旧版“触发参数”。已统一迁移到【切换条件】中")]
-            public StateParameter transitionTrigger;
+            public StateFloatParameterReference transitionTrigger;
 
             [LabelText("触发阈值")]
             [HideInInspector]
@@ -538,6 +538,7 @@ namespace ES
             runtime.phaseUsesCalculator = new bool[PhaseCount];
             runtime.phaseBlendWeights = new float[PhaseCount];
             runtime.phaseBlendVelocities = new float[PhaseCount];
+            runtime.InitializePhaseMixerWeightCaches(PhaseCount);
             runtime.EnsureClipOverrideSlots(PhaseCount * 2);
 
             InitPhaseRuntime(runtime, graph, 0, pre);
@@ -1087,6 +1088,7 @@ namespace ES
                     runtime.phasePrimaryPlayables[phaseIndex].SetSpeed(oldSpeed);
                     runtime.phasePrimaryPlayables[phaseIndex].SetTime(oldTime);
                     graph.Connect(runtime.phasePrimaryPlayables[phaseIndex], 0, runtime.phaseMixers[phaseIndex], 0);
+                    runtime.InvalidatePhaseMixerWeightCache(phaseIndex);
                 }
                 else
                 {
@@ -1120,6 +1122,7 @@ namespace ES
             runtime.phaseSecondaryPlayables[phaseIndex].SetSpeed(os2);
             runtime.phaseSecondaryPlayables[phaseIndex].SetTime(ot2);
             g2.Connect(runtime.phaseSecondaryPlayables[phaseIndex], 0, runtime.phaseMixers[phaseIndex], 1);
+            runtime.InvalidatePhaseMixerWeightCache(phaseIndex);
 
             runtime.UpdateClipOverrideSlot(clipIndex, newClip);
             return true;
@@ -1359,7 +1362,7 @@ namespace ES
                     if (doLog)
                     {
                         float v = phase.extraTransitionCondition.enable
-                            ? context.GetFloat(phase.extraTransitionCondition.parameter, 0f)
+                            ? context.GetFloat(phase.extraTransitionCondition.parameter.Parameter, 0f)
                             : 0f;
                         Debug.Log(
                             $"[Phase4][SwitchReason] extraTransition | owner={ownerNameForLog} | phase={phaseIndex} {phase.phaseName} -> {t} | " +
@@ -1373,7 +1376,7 @@ namespace ES
                 if (doLog)
                 {
                     float v = phase.extraTransitionCondition.enable
-                        ? context.GetFloat(phase.extraTransitionCondition.parameter, 0f)
+                        ? context.GetFloat(phase.extraTransitionCondition.parameter.Parameter, 0f)
                         : 0f;
                     Debug.Log(
                         $"[Phase4][NoSwitch] extraTransition 条件成立但目标=当前 | owner={ownerNameForLog} | phase={phaseIndex} {phase.phaseName} | " +
@@ -1489,7 +1492,7 @@ namespace ES
                     if (doLog)
                     {
                         float v = phase.transitionCondition.enable
-                            ? context.GetFloat(phase.transitionCondition.parameter, 0f)
+                            ? context.GetFloat(phase.transitionCondition.parameter.Parameter, 0f)
                             : 0f;
                         Debug.Log(
                             $"[Phase4][SwitchReason] transitionCondition | owner={ownerNameForLog} | phase={phaseIndex} {phase.phaseName} -> {t} | " +
@@ -1502,7 +1505,7 @@ namespace ES
                 if (doLog)
                 {
                     float v = phase.transitionCondition.enable
-                        ? context.GetFloat(phase.transitionCondition.parameter, 0f)
+                        ? context.GetFloat(phase.transitionCondition.parameter.Parameter, 0f)
                         : 0f;
                     Debug.Log(
                         $"[Phase4][NoSwitch] transitionCondition 成立但目标=当前 | owner={ownerNameForLog} | phase={phaseIndex} {phase.phaseName} | " +
@@ -1515,11 +1518,11 @@ namespace ES
             if (doLog)
             {
                 bool extraEnable = phase.extraTransitionCondition.enable;
-                float extraV = extraEnable ? context.GetFloat(phase.extraTransitionCondition.parameter, 0f) : 0f;
+                float extraV = extraEnable ? context.GetFloat(phase.extraTransitionCondition.parameter.Parameter, 0f) : 0f;
                 bool extraOk = phaseTime >= phase.minDuration && phase.extraTransitionCondition.Check(context);
 
                 bool transEnable = phase.transitionCondition.enable;
-                float transV = transEnable ? context.GetFloat(phase.transitionCondition.parameter, 0f) : 0f;
+                float transV = transEnable ? context.GetFloat(phase.transitionCondition.parameter.Parameter, 0f) : 0f;
                 bool transOk = phase.transitionCondition.Check(context);
 
                 Debug.Log(
@@ -1625,10 +1628,9 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool HasTrigger(StateParameter trigger)
+        private static bool HasTrigger(StateFloatParameterReference trigger)
         {
-            return trigger.EnumValue != StateDefaultFloatParameter.None ||
-                   !string.IsNullOrEmpty(trigger.StringValue);
+            return trigger.IsValid;
         }
 
         private void UpdatePhaseOutput(
@@ -1724,7 +1726,7 @@ namespace ES
                 return;
             }
 
-            float targetBlend = Mathf.Clamp01(context.GetFloat(phase.blendParameter, 0f));
+            float targetBlend = Mathf.Clamp01(context.GetFloat(phase.blendParameter.Parameter, 0f));
 
             if (runtime.phaseBlendWeights == null || runtime.phaseBlendVelocities == null)
             {
@@ -1759,8 +1761,7 @@ namespace ES
             float w0 = 1f - runtime.phaseBlendWeights[phaseIndex];
             float w1 = runtime.phaseBlendWeights[phaseIndex];
             
-            runtime.phaseMixers[phaseIndex].SetInputWeight(0, w0);
-            runtime.phaseMixers[phaseIndex].SetInputWeight(1, w1);
+            runtime.SetPhaseMixerWeightsIfChanged(runtime.phaseMixers[phaseIndex], phaseIndex, w0, w1);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (allowThisFrameLog)

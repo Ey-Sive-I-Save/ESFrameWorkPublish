@@ -83,8 +83,10 @@ namespace ES
         [LabelText("Key")]
         public string key;
 
-        [LabelText("Prefab")]
-        public GameObject prefab;
+        [LabelText("Prefab Key")]
+        [InlineProperty]
+        [InfoBox("使用 Prefab 类型内的 EnumKey/StringKey 寻址。运行时先异步加载并持有资源，再同步创建池对象。")]
+        public ESAssetReferPrefabConfigKey prefabKey = new ESAssetReferPrefabConfigKey();
 
         [LabelText("预热数量")]
         public int prewarmCount = 8;

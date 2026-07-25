@@ -67,7 +67,7 @@ namespace ES
 
             public string ToOneLine()
             {
-                return $"{ObjectPath} | Animator:{(HasAnimator ? "有" : "无")} | Controller:{CurrentController} | {ControllerStrategy} | {ClipStrategy} | {Risk}";
+                return $"{ObjectPath} | Animator:{SimpleToolsSafetyUtility.YesNo(HasAnimator)} | Controller:{CurrentController} | {ControllerStrategy} | {ClipStrategy} | {Risk}";
             }
         }
         #region 公共设置
@@ -146,12 +146,12 @@ namespace ES
         public string assetGroupName = "默认";
 
         [HideInInspector]
-        [ShowInInspector, ReadOnly, LabelText("预览将应用的对象"), ListDrawerSettings(DraggableItems = false)]
+        [ShowInInspector, ReadOnly, LabelText("预览将应用的对象"), ListDrawerSettings(DraggableItems = false, ShowPaging = true, NumberOfItemsPerPage = 12)]
         [PropertyTooltip("显示将要应用设置的对象列表（包括添加 Animator 的对象）。")]
         public List<string> previewObjects = new List<string>();
 
         [HideInInspector]
-        [FoldoutGroup("资产创建记录"), ShowInInspector, ReadOnly, LabelText("最近创建"), ListDrawerSettings(DraggableItems = false, NumberOfItemsPerPage = 6)]
+        [FoldoutGroup("资产创建记录"), ShowInInspector, ReadOnly, LabelText("最近创建"), ListDrawerSettings(DraggableItems = false, ShowPaging = true, NumberOfItemsPerPage = 6)]
         public List<CreatedAnimationAssetRecord> createdAssetRecords = new List<CreatedAnimationAssetRecord>();
 
         private string lastResultSummary = "";
@@ -167,7 +167,7 @@ namespace ES
         private static readonly string[] AnimatorStatusFilterLabels = { "全部", "缺Animator", "空Controller", "会建资产", "高风险" };
         private static readonly string[] AnimatorSortLabels = { "路径", "风险", "Controller", "策略" };
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             DrawAnimatorWorkbench();
@@ -229,7 +229,7 @@ namespace ES
 
         private void DrawAnimatorControllerPanel()
         {
-            SimpleToolsPanelUtility.DrawSectionTitle("Controller 策略", "决定对象没有 Controller 时如何处理。");
+            SimpleToolsPanelUtility.DrawSectionTitle("目标范围", "从当前 Hierarchy 选中对象收集目标，可递归子对象。");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 animatorController = (RuntimeAnimatorController)EditorGUILayout.ObjectField("指定 Controller", animatorController, typeof(RuntimeAnimatorController), false);
@@ -240,7 +240,7 @@ namespace ES
 
         private void DrawAnimatorClipPanel()
         {
-            SimpleToolsPanelUtility.DrawSectionTitle("Clip 策略", "创建新 Controller 时，可选择忽略、共享 Clip 或为对象创建独立 Clip。");
+            SimpleToolsPanelUtility.DrawSectionTitle("Controller 策略", "决定对象没有 Controller 时如何处理。");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 defaultAnimationClip = (AnimationClip)EditorGUILayout.ObjectField("默认 Clip", defaultAnimationClip, typeof(AnimationClip), false);
@@ -307,11 +307,11 @@ namespace ES
                 return;
 
             var rows = GetFilteredAnimatorPreview(false);
-            SimpleToolsPanelUtility.DrawSectionTitle("预览统计", "按 Animator 状态、Controller 状态和风险聚类。");
+            SimpleToolsPanelUtility.DrawSectionTitle("预览与执行", "高风险操作都先生成预览，再按当前选择执行。");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 DrawInfoRow("Animator", $"已有 {rows.Count(r => r.HasAnimator)} | 缺少 {rows.Count(r => !r.HasAnimator)}");
-                DrawInfoRow("Controller", $"已有 {rows.Count(r => r.CurrentController != "<空>")} | 空 {rows.Count(r => r.CurrentController == "<空>")}");
+                DrawInfoRow("Controller", GetControllerCountSummary(rows));
                 DrawInfoRow("策略", BuildControllerStrategySummary(rows));
                 DrawInfoRow("风险", BuildRiskSummary(rows));
             }
@@ -411,7 +411,7 @@ namespace ES
 
         private void DrawAnimatorReportPanel()
         {
-            SimpleToolsPanelUtility.DrawSectionTitle("报告", "记录修改对象、创建资产和失败项。");
+            SimpleToolsPanelUtility.DrawSectionTitle("资产创建记录", "记录 Controller / Clip 创建路径和来源策略。");
             if (string.IsNullOrWhiteSpace(lastResultSummary) && string.IsNullOrWhiteSpace(lastResultDetail))
             {
                 SimpleToolsPanelUtility.DrawEmptyState("还没有执行结果。刷新预览或执行一次操作后，这里会显示报告。");
@@ -593,6 +593,13 @@ namespace ES
             return string.Join("  |  ", rows.GroupBy(r => r.ControllerStrategy).OrderByDescending(g => g.Count()).Select(g => $"{g.Key} {g.Count()}"));
         }
 
+        private string GetControllerCountSummary(IEnumerable<AnimatorBatchPreviewRecord> rows)
+        {
+            int assignedCount = rows.Count(r => r.CurrentController != "<空>");
+            int emptyCount = rows.Count(r => r.CurrentController == "<空>");
+            return $"已有 {assignedCount} | 空 {emptyCount}";
+        }
+
         private string BuildRiskSummary(IEnumerable<AnimatorBatchPreviewRecord> rows)
         {
             return string.Join("  |  ", rows.GroupBy(r => r.Risk).OrderByDescending(g => g.Count()).Take(6).Select(g => $"{g.Key} {g.Count()}"));
@@ -765,8 +772,6 @@ namespace ES
         public void ApplyAnimatorSettings()
         {
             createdAssetRecords.Clear();
-            int undoGroup = Undo.GetCurrentGroup();
-            Undo.SetCurrentGroupName("批量应用Animator设置");
 
             var selectedObjects = Selection.gameObjects;
             if (selectedObjects == null || selectedObjects.Length == 0)
@@ -834,7 +839,7 @@ namespace ES
                 }
                 else if (clipNullAction == ClipNullAction.Ignore)
                 {
-                    // 不创建剪辑
+                    // 不创建剪辑。
                 }
             }
 
@@ -850,19 +855,28 @@ namespace ES
             }
 
             int modifiedCount = 0;
-            EditorUtility.DisplayProgressBar("应用Animator设置", "开始处理...", 0f);
+            bool cancelled = false;
+            var changedTargets = new List<GameObject>();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("批量应用Animator设置");
             try
             {
                 for (int i = 0; i < affectedTargets.Count; i++)
                 {
                     var obj = affectedTargets[i];
                     float progress = (float)i / affectedTargets.Count;
-                    EditorUtility.DisplayProgressBar("应用Animator设置", $"正在处理 {obj.name}...", progress);
+                    if (EditorUtility.DisplayCancelableProgressBar("应用Animator设置", $"正在处理 {obj.name}...", progress))
+                    {
+                        cancelled = true;
+                        break;
+                    }
 
                     var animator = obj.GetComponent<Animator>();
+                    bool changed = false;
                     if (addAnimatorIfMissing && animator == null)
                     {
                         animator = Undo.AddComponent<Animator>(obj);
+                        changed = true;
                     }
                     if (animator != null)
                     {
@@ -871,9 +885,21 @@ namespace ES
                         // 应用settings
                         if (enableApplySettings)
                         {
-                            animator.updateMode = updateMode;
-                            animator.cullingMode = cullingMode;
-                            animator.applyRootMotion = applyRootMotion;
+                            if (animator.updateMode != updateMode)
+                            {
+                                animator.updateMode = updateMode;
+                                changed = true;
+                            }
+                            if (animator.cullingMode != cullingMode)
+                            {
+                                animator.cullingMode = cullingMode;
+                                changed = true;
+                            }
+                            if (animator.applyRootMotion != applyRootMotion)
+                            {
+                                animator.applyRootMotion = applyRootMotion;
+                                changed = true;
+                            }
                         }
 
                         // 如果Controller为null，则设置
@@ -923,19 +949,24 @@ namespace ES
                                     }
                                     else if (clipNullAction == ClipNullAction.Ignore)
                                     {
-                                        // 不创建剪辑
+                                        // 不创建剪辑。
                                     }
                                 }
                             }
 
-                            if (controllerToUse != null)
+                            if (controllerToUse != null && animator.runtimeAnimatorController != controllerToUse)
                             {
                                 animator.runtimeAnimatorController = controllerToUse;
+                                changed = true;
                             }
                         }
 
-                        EditorUtility.SetDirty(animator);
-                        modifiedCount++;
+                        if (changed)
+                        {
+                            EditorUtility.SetDirty(animator);
+                            changedTargets.Add(obj);
+                            modifiedCount++;
+                        }
                     }
                 }
             }
@@ -945,10 +976,18 @@ namespace ES
                 Undo.CollapseUndoOperations(undoGroup);
             }
 
-            MarkScenesDirty(affectedTargets);
-            lastResultSummary = $"Animator 设置完成: 修改 {modifiedCount} 个 | 目标 {affectedTargets.Count} 个 | 新建资产 {createdAssetRecords.Count} 个";
-            lastResultDetail = BuildAnimatorResultDetail(affectedTargets);
-            EditorUtility.DisplayDialog("成功", $"成功修改 {modifiedCount} 个Animator组件！", "确定");
+            MarkScenesDirty(changedTargets);
+            string completionState = cancelled ? "已取消" : "完成";
+            lastResultSummary = $"Animator 设置{completionState}: 修改 {modifiedCount} 个 | 目标 {affectedTargets.Count} 个 | 新建资产 {createdAssetRecords.Count} 个";
+            lastResultDetail = BuildAnimatorResultDetail(changedTargets);
+            if (cancelled)
+                lastResultDetail = "操作由用户取消；已修改的场景对象可通过 Ctrl+Z 撤销。已创建的资产请通过版本控制或手动删除回退。\n\n" + lastResultDetail;
+            EditorUtility.DisplayDialog(
+                cancelled ? "Animator 设置已取消" : "Animator 设置完成",
+                cancelled
+                    ? $"已在取消前修改 {modifiedCount} 个 Animator 组件"
+                    : $"成功修改 {modifiedCount} 个 Animator 组件",
+                "确定");
         }
 
         public void AddAnimatorComponents()
@@ -966,21 +1005,46 @@ namespace ES
                 return;
 
             int addedCount = 0;
-            foreach (var obj in targets)
+            bool cancelled = false;
+            var changedTargets = new List<GameObject>();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("Batch Add Animator Components");
+            try
             {
-                var animator = Undo.AddComponent<Animator>(obj);
-                if (animatorController != null)
+                for (int index = 0; index < targets.Count; index++)
                 {
-                    animator.runtimeAnimatorController = animatorController;
+                    var obj = targets[index];
+                    if (EditorUtility.DisplayCancelableProgressBar("添加 Animator", obj != null ? obj.name : "Missing Object", (float)index / targets.Count))
+                    {
+                        cancelled = true;
+                        break;
+                    }
+
+                    if (obj == null || obj.GetComponent<Animator>() != null)
+                        continue;
+
+                    var animator = Undo.AddComponent<Animator>(obj);
+                    if (animatorController != null)
+                        animator.runtimeAnimatorController = animatorController;
+
+                    EditorUtility.SetDirty(animator);
+                    changedTargets.Add(obj);
+                    addedCount++;
                 }
-                EditorUtility.SetDirty(animator);
-                addedCount++;
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+                Undo.CollapseUndoOperations(undoGroup);
             }
 
-            MarkScenesDirty(targets);
-            lastResultSummary = $"添加 Animator 完成: 添加 {addedCount} 个 | 目标 {targets.Count} 个";
-            lastResultDetail = BuildAnimatorResultDetail(targets);
-            EditorUtility.DisplayDialog("成功", $"成功添加 {addedCount} 个Animator组件！", "确定");
+            MarkScenesDirty(changedTargets);
+            string completionState = cancelled ? "cancelled" : "completed";
+            lastResultSummary = $"Add Animator {completionState}: added {addedCount}, targets {targets.Count}.";
+            lastResultDetail = BuildAnimatorResultDetail(changedTargets);
+            if (cancelled)
+                lastResultDetail = "操作由用户取消；已添加的场景组件可通过 Ctrl+Z 撤销。\n\n" + lastResultDetail;
+            EditorUtility.DisplayDialog(cancelled ? "Add Animator cancelled" : "Add Animator complete", cancelled ? $"Added {addedCount} Animator components before cancellation." : $"Added {addedCount} Animator components.", "OK");
         }
 
         public void RemoveAnimatorComponents()
@@ -988,30 +1052,53 @@ namespace ES
             var selectedObjects = Selection.gameObjects;
             if (selectedObjects == null || selectedObjects.Length == 0)
             {
-                EditorUtility.DisplayDialog("错误", "请先选择GameObject！", "确定");
+                EditorUtility.DisplayDialog("Error", "Select one or more GameObjects first.", "OK");
                 return;
             }
 
             var allObjects = SimpleToolsSafetyUtility.CollectTargets(selectedObjects, includeChildren);
             var targets = allObjects.Where(obj => obj != null && obj.GetComponent<Animator>() != null).ToList();
-            if (!ConfirmTargetOperation("确认批量移除Animator", "移除 Animator 从", targets))
+            if (!ConfirmTargetOperation("Confirm batch Animator removal", "Remove Animator", targets))
                 return;
 
             int removedCount = 0;
-            foreach (var obj in targets)
+            bool cancelled = false;
+            var changedTargets = new List<GameObject>();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("Batch Remove Animator Components");
+            try
             {
-                var animator = obj.GetComponent<Animator>();
-                if (animator != null)
+                for (int index = 0; index < targets.Count; index++)
                 {
+                    var obj = targets[index];
+                    if (EditorUtility.DisplayCancelableProgressBar("移除 Animator", obj != null ? obj.name : "Missing Object", (float)index / targets.Count))
+                    {
+                        cancelled = true;
+                        break;
+                    }
+
+                    var animator = obj != null ? obj.GetComponent<Animator>() : null;
+                    if (animator == null)
+                        continue;
+
                     Undo.DestroyObjectImmediate(animator);
+                    changedTargets.Add(obj);
                     removedCount++;
                 }
             }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+                Undo.CollapseUndoOperations(undoGroup);
+            }
 
-            MarkScenesDirty(targets);
-            lastResultSummary = $"移除 Animator 完成: 移除 {removedCount} 个 | 目标 {targets.Count} 个";
-            lastResultDetail = BuildAnimatorResultDetail(targets);
-            EditorUtility.DisplayDialog("成功", $"成功移除 {removedCount} 个Animator组件！", "确定");
+            MarkScenesDirty(changedTargets);
+            string completionState = cancelled ? "已取消" : "完成";
+            lastResultSummary = $"移除 Animator {completionState}: 移除 {removedCount} 个 | 目标 {targets.Count} 个";
+            lastResultDetail = BuildAnimatorResultDetail(changedTargets);
+            if (cancelled)
+                lastResultDetail = "操作由用户取消；已移除的场景组件可通过 Ctrl+Z 撤销。\n\n" + lastResultDetail;
+            EditorUtility.DisplayDialog(cancelled ? "移除 Animator 已取消" : "移除 Animator 完成", cancelled ? $"取消前已移除 {removedCount} 个 Animator 组件。" : $"成功移除 {removedCount} 个 Animator 组件。", "确定");
         }
 
         private void MarkScenesDirty(IEnumerable<GameObject> targets)
@@ -1074,22 +1161,45 @@ namespace ES
                 controllerToUse = controller;
             }
 
-            foreach (var obj in targets)
+            bool cancelled = false;
+            var changedTargets = new List<GameObject>();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("Batch Replace Animator Controllers");
+            try
             {
-                var animator = obj.GetComponent<Animator>();
-                if (animator != null && animator.runtimeAnimatorController == null && controllerToUse != null)
+                for (int index = 0; index < targets.Count; index++)
                 {
+                    var obj = targets[index];
+                    if (EditorUtility.DisplayCancelableProgressBar("替换 Animator Controller", obj != null ? obj.name : "Missing Object", (float)index / targets.Count))
+                    {
+                        cancelled = true;
+                        break;
+                    }
+
+                    var animator = obj != null ? obj.GetComponent<Animator>() : null;
+                    if (animator == null || animator.runtimeAnimatorController != null || controllerToUse == null)
+                        continue;
+
                     Undo.RecordObject(animator, "Replace Animator Controller");
                     animator.runtimeAnimatorController = controllerToUse;
                     EditorUtility.SetDirty(animator);
+                    changedTargets.Add(obj);
                     replacedCount++;
                 }
             }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+                Undo.CollapseUndoOperations(undoGroup);
+            }
 
-            MarkScenesDirty(targets);
-            lastResultSummary = $"替换 Controller 完成: 替换 {replacedCount} 个 | 目标 {targets.Count} 个 | 新建资产 {createdAssetRecords.Count} 个";
-            lastResultDetail = BuildAnimatorResultDetail(targets);
-            EditorUtility.DisplayDialog("成功", $"成功替换 {replacedCount} 个空的AnimatorController！", "确定");
+            MarkScenesDirty(changedTargets);
+            string completionState = cancelled ? "已取消" : "完成";
+            lastResultSummary = $"替换 Controller {completionState}: 替换 {replacedCount} 个 | 目标 {targets.Count} 个 | 新建资产 {createdAssetRecords.Count} 个";
+            lastResultDetail = BuildAnimatorResultDetail(changedTargets);
+            if (cancelled)
+                lastResultDetail = "操作由用户取消；已修改的场景组件可通过 Ctrl+Z 撤销。新建资产请通过版本控制或手动删除回退。\n\n" + lastResultDetail;
+            EditorUtility.DisplayDialog(cancelled ? "替换 Controller 已取消" : "替换 Controller 完成", cancelled ? $"取消前已替换 {replacedCount} 个空 Animator Controller。" : $"成功替换 {replacedCount} 个空 Animator Controller。", "确定");
         }
 
         public void ResetToDefaultSettings()
@@ -1160,7 +1270,7 @@ namespace ES
                     var settings = JsonUtility.FromJson<SettingsData>(json);
                     if (settings == null)
                     {
-                        EditorUtility.DisplayDialog("导入失败", "设置文件为空或格式无效。", "知道了");
+                        EditorUtility.DisplayDialog("Import failed", "The settings file is empty or invalid.", "OK");
                         return;
                     }
 
@@ -1229,8 +1339,7 @@ namespace ES
                 animatorController = controller_;
             }
 
-            // 获取所有对象
-
+            // 获取所有对象。
             if (clipNullAction == ClipNullAction.CreateIndividual)
             {
                 // 为每个对象创建独立的clip

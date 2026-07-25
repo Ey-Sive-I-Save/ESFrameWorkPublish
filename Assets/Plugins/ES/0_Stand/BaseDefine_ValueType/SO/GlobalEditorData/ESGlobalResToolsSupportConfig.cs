@@ -75,6 +75,7 @@ namespace ES
         [InspectorName("视频")] VideoClip,
         [InspectorName("Timeline")] TimelineAsset,
         [InspectorName("Playable")] PlayableAsset,
+        [InspectorName("ScriptableObject")] ScriptableObject,
         [InspectorName("地形数据")] TerrainData,
         [InspectorName("其他")] Other
     }

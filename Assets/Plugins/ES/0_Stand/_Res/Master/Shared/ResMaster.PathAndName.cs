@@ -324,7 +324,8 @@ namespace ES
         /// <returns>本地构建路径。</returns>
         public string GetLocalBuildPath()
         {
-            return Application.streamingAssetsPath + "/" + ESGlobalResSetting.ResParentFolderName+"/"+ESResMaster.GetParentFolderNameByRuntimePlatform(ESGlobalResSetting.Instance.applyPlatform);
+            RuntimePlatform platform = Application.isEditor ? Settings.applyPlatform : Application.platform;
+            return Application.streamingAssetsPath + "/" + ESGlobalResSetting.ResParentFolderName + "/" + ESResMaster.GetParentFolderNameByRuntimePlatform(platform);
         }
 
         /// <summary>
@@ -433,6 +434,7 @@ namespace ES
             // GameIdentity路径
             public static string NetGameIdentityPath { get; private set; }
             public static string LocalGameIdentityPath { get; private set; }
+            public static string LocalBuildGameIdentityPath { get; private set; }
 
             // ConsumerIdentity路径
             public static string NetConsumerBasePath { get; private set; }
@@ -457,6 +459,7 @@ namespace ES
                 // GameIdentity路径
                 NetGameIdentityPath = NetBasePath + "/" + JsonDataFileName.PathJsonFileName_ESGameIdentity;
                 LocalGameIdentityPath = LocalBasePath + "/" + JsonDataFileName.PathJsonFileName_ESGameIdentity;
+                LocalBuildGameIdentityPath = LocalBuildPath + "/" + JsonDataFileName.PathJsonFileName_ESGameIdentity;
 
                 // ConsumerIdentity路径
                 NetConsumerBasePath = NetBasePath + "/" + ESGlobalResSetting.ResConsumersExpandParentFolderName;

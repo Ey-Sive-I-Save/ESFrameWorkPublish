@@ -388,6 +388,19 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Set(StateFloatParameter parameter, float value)
+        {
+            if (!parameter.IsValid) return;
+            SetFloat(parameter.id, value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public float Get(StateFloatParameter parameter, float defaultValue = 0f)
+        {
+            return parameter.IsValid ? GetFloat(parameter.id, defaultValue) : defaultValue;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public float GetFloat(StateDefaultFloatParameter parameter, float defaultValue = 0f)
         {
             var ctx = stateContext;
@@ -406,6 +419,19 @@ namespace ES
             {
                 ctx.SetDefaultInt(parameter, value);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Set(StateIntParameter parameter, int value)
+        {
+            if (!parameter.IsValid) return;
+            SetInt(parameter.id, value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int Get(StateIntParameter parameter, int defaultValue = 0)
+        {
+            return parameter.IsValid ? GetInt(parameter.id, defaultValue) : defaultValue;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -453,6 +479,19 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Set(StateBoolParameter parameter, bool value)
+        {
+            if (!parameter.IsValid) return;
+            SetBool(parameter.id, value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Get(StateBoolParameter parameter, bool defaultValue = false)
+        {
+            return parameter.IsValid ? GetBool(parameter.id, defaultValue) : defaultValue;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool GetBool(StateDefaultBoolParameter parameter, bool defaultValue = false)
         {
             var ctx = stateContext;
@@ -482,94 +521,6 @@ namespace ES
             if (ctx != null)
             {
                 return ctx.HasDefaultBool(parameter);
-            }
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetFloat(StateParameter parameter, float value)
-        {
-            var ctx = stateContext;
-            if (ctx != null)
-            {
-                ctx.SetFloat(parameter, value);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetFloat(string paramName, float value)
-        {
-            var ctx = stateContext;
-            if (ctx != null)
-            {
-                ctx.SetFloat(paramName, value);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float GetFloat(StateParameter parameter, float defaultValue = 0f)
-        {
-            var ctx = stateContext;
-            if (ctx != null)
-            {
-                return ctx.GetFloat(parameter, defaultValue);
-            }
-            return defaultValue;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float GetFloat(string paramName, float defaultValue = 0f)
-        {
-            var ctx = stateContext;
-            if (ctx != null)
-            {
-                return ctx.GetFloat(paramName, defaultValue);
-            }
-            return defaultValue;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetFloat(string paramName, out float value)
-        {
-            var ctx = stateContext;
-            if (ctx != null)
-            {
-                return ctx.TryGetFloat(paramName, out value);
-            }
-            value = default;
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetFloat(StateParameter parameter, out float value)
-        {
-            var ctx = stateContext;
-            if (ctx != null)
-            {
-                return ctx.TryGetFloat(parameter, out value);
-            }
-            value = default;
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool HasFloat(StateParameter parameter)
-        {
-            var ctx = stateContext;
-            if (ctx != null)
-            {
-                return ctx.HasFloat(parameter);
-            }
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool HasFloat(string paramName)
-        {
-            var ctx = stateContext;
-            if (ctx != null)
-            {
-                return ctx.HasFloat(paramName);
             }
             return false;
         }

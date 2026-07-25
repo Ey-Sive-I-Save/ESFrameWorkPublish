@@ -47,11 +47,11 @@ namespace ES
     {
         public override string MigrateArchiveJson(string oldArchiveJson, ESGameSaveMigrationContext context)
         {
-            ESGameSaveArchive archive = UnityEngine.JsonUtility.FromJson<ESGameSaveArchive>(oldArchiveJson);
+            ESGameSaveArchive archive = ESGameSaveJson.Deserialize<ESGameSaveArchive>(oldArchiveJson);
             if (archive != null)
             {
                 archive.archiveVersion = toArchiveVersion;
-                return UnityEngine.JsonUtility.ToJson(archive, true);
+                return ESGameSaveJson.Serialize(archive, true);
             }
 
             return oldArchiveJson;

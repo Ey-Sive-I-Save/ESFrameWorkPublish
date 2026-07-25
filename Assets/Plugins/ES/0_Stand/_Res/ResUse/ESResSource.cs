@@ -827,7 +827,6 @@ namespace ES
     }
     public class ESABSource : ESResSourceBase
     {
-        public bool IsNet = true;
         public static readonly string[] s_EmptyDeps = new string[0];
 
         protected override void Initilized()
@@ -1106,7 +1105,6 @@ namespace ES
 
         public override void TryAutoPushedToPool()
         {
-            base.TryAutoPushedToPool();
             var instance = ESResMaster.Instance;
             instance?.PoolForESABSource.PushToPool(this);
         }
@@ -1359,7 +1357,6 @@ namespace ES
 
         public override void TryAutoPushedToPool()
         {
-            base.TryAutoPushedToPool();
             var instance = ESResMaster.Instance;
             instance?.PoolForESAsset.PushToPool(this);
         }
@@ -1780,7 +1777,6 @@ namespace ES
 
         public override void TryAutoPushedToPool()
         {
-            base.TryAutoPushedToPool();
             ESResMaster.Instance?.PoolForESInternalResource?.PushToPool(this);
         }
     }
@@ -2029,7 +2025,6 @@ namespace ES
 
         public override void TryAutoPushedToPool()
         {
-            base.TryAutoPushedToPool();
             ESResMaster.Instance?.PoolForESNetImage?.PushToPool(this);
         }
 
@@ -2275,7 +2270,6 @@ namespace ES
 
         public override void TryAutoPushedToPool()
         {
-            base.TryAutoPushedToPool();
             var instance = ESResMaster.Instance;
             instance?.PoolForESRawFile.PushToPool(this);
         }

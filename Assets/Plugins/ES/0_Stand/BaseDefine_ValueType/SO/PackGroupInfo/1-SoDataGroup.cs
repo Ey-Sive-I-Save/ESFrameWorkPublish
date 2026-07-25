@@ -20,7 +20,7 @@ namespace ES
         IEnumerable<ISoDataInfo> AllInfos { get; }
         void _RemoveInfoFromDic(string s); 
     }
-    public abstract class SoDataGroup<SoType> : ESSO, ISoDataGroup where SoType : ScriptableObject, ISoDataInfo
+    public abstract class SoDataGroup<SoType> : ESSO, ISoDataGroup, IGameCoreSO where SoType : ScriptableObject, ISoDataInfo
     {
         [LabelText("数据组字典")]
         [HideLabel]
@@ -59,6 +59,14 @@ namespace ES
         public Type GetSOInfoType()
         {
             return typeof(SoType);
+        }
+
+        /// <summary>聚合启动入口：只转发已声明为 GameCore 的 Info，不反射、不猜测类型。</summary>
+        public void InjectGameCoreTables()
+        {
+            foreach (SoType info in Infos.Values)
+                if (info is IGameCoreSO gameCore)
+                    gameCore.InjectGameCoreTables();
         }
         public void _RemoveInfoFromDic(string k)
         {

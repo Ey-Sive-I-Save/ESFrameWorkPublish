@@ -16,18 +16,18 @@ namespace ES
         
         // ===== 核心运动参数 (1-7) =====
         /// <summary>当前帧局部空间横向速度（角色右方向，由输入驱动）</summary>
-        SpeedX = 1,
+        MoveX = 1,
         /// <summary>当前帧垂直速度（跳跃/下落）</summary>
-        SpeedY = 2,
+        VerticalSpeed = 2,
         /// <summary>当前帧局部空间前后速度（角色前方向，由输入驱动）</summary>
-        SpeedZ = 3,
+        MoveZ = 3,
         /// <summary>瞄准偏航角（水平旋转）</summary>
         AimYaw = 4,
         /// <summary>瞄准俯仰角（垂直旋转）</summary>
         AimPitch = 5,
         /// <summary>水平综合速度 = sqrt(SpeedX² + SpeedZ²)</summary>
         Speed = 6,
-        /// <summary>是否接地（0/1 float）</summary>
+        /// <summary>Legacy 0/1 float flag. New code must use StateCoreParams.IsGrounded.</summary>
         IsGrounded = 7,
         
         // ===== 运动阈值 (8-10) =====
@@ -53,9 +53,22 @@ namespace ES
         
         // ===== 攀爬参数 (18-19) =====
         /// <summary>攀爬时沿墙面的水平输入（-1=左, 0=静止, 1=右）</summary>
-        ClimbHorizontal = 18,
+        ClimbX = 18,
         /// <summary>攀爬时沿墙面的垂直输入（-1=下, 0=静止, 1=上）</summary>
-        ClimbVertical = 19,
+        ClimbY = 19,
+
+        WeaponEquipWeight = 20,
+        UpperBodyWeight = 21,
+        WeaponFirePulse = 22,
+        WeaponInHandWeight = 23,
+        FootSupportShare = 24,
+
+        // Source compatibility aliases. Do not use in new code.
+        [Obsolete("Use MoveX.")] SpeedX = MoveX,
+        [Obsolete("Use VerticalSpeed.")] SpeedY = VerticalSpeed,
+        [Obsolete("Use MoveZ.")] SpeedZ = MoveZ,
+        [Obsolete("Use ClimbX.")] ClimbHorizontal = ClimbX,
+        [Obsolete("Use ClimbY.")] ClimbVertical = ClimbY,
     }
 
 }

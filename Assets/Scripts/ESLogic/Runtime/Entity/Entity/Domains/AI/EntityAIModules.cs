@@ -269,6 +269,10 @@ namespace ES
         private float _freeLookYaw;
         private bool _freeLookInited;
         private Camera _cachedMainCamera;
+        // Driver is stable for the lifetime of a bound Animator. Cache the positive
+        // lookup because combat input dispatch runs every frame.
+        [NonSerialized] private StateFinalIKDriver _cachedIKDriver;
+        [NonSerialized] private Animator _cachedIKDriverAnimator;
         private CameraSource _lastCameraSource = CameraSource.None;
 
         private float _cameraYaw;
@@ -502,7 +506,19 @@ namespace ES
 
             StateMachine stateMachine = MyCore.stateDomain != null ? MyCore.stateDomain.stateMachine : null;
             Animator stateAnimator = stateMachine != null && stateMachine.BoundAnimator != null ? stateMachine.BoundAnimator : MyCore.animator;
-            return stateAnimator != null ? stateAnimator.GetComponent<StateFinalIKDriver>() : null;
+            if (stateAnimator == null)
+            {
+                _cachedIKDriver = null;
+                _cachedIKDriverAnimator = null;
+                return null;
+            }
+
+            if (_cachedIKDriver != null && _cachedIKDriverAnimator == stateAnimator)
+                return _cachedIKDriver;
+
+            _cachedIKDriverAnimator = stateAnimator;
+            _cachedIKDriver = stateAnimator.GetComponent<StateFinalIKDriver>();
+            return _cachedIKDriver;
         }
 
         private void ApplyCombatAimAndPeek(StateFinalIKDriver ikDriver, EntityBasicCombatModule combatModule, Transform cam)
@@ -946,6 +962,8 @@ namespace ES
 
         public override void OnDestroy()
         {
+            _cachedIKDriver = null;
+            _cachedIKDriverAnimator = null;
             if (_runtimeAimTarget != null)
             {
                 if (Application.isPlaying)

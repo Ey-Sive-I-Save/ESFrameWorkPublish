@@ -12,7 +12,7 @@ using UnityEditor;
 namespace ES
 {
     // 注意：StateDefaultParameter枚举已移至 0EnumSupport/StateDefaultParameter.cs
-    // 注意：StateParameter结构体已移至 1NormalFeatureSupportData/StateParameter.cs
+    // Animation parameter references are serialized as StateFloatParameterReference.
 
     /// <summary>
     /// 动画混合器类型（用于StateBase识别与扩展能力）

@@ -11,10 +11,10 @@
   <Project Path="Assembly-CSharp-firstpass.csproj" />
   <Project Path="RootMotionEditor.csproj" />
   <Project Path="Gaskellgames.FolderSystem.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="DOTween.Modules.csproj" />
   <Project Path="VHierarchy.csproj" />
   <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
-  <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="KCC.csproj" />
   <Project Path="ESInstaller.csproj" />
   <Project Path="KCC.Editor.csproj" />

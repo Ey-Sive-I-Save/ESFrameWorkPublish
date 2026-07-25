@@ -1,4 +1,4 @@
-﻿using ES;
+using ES;
 using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
@@ -31,14 +31,19 @@ namespace ES
         private string lastResultDetail = "";
         private string auditSearch = "";
         private bool showOnlyRisks = false;
+        private int auditPageIndex;
+        private int auditPageSize = SimpleToolsPanelUtility.DefaultPageSize;
         private List<TransformAuditRecord> auditRecords = new List<TransformAuditRecord>();
+        private readonly List<TransformAuditRecord> filteredAuditRecords = new List<TransformAuditRecord>();
+        private readonly List<TransformAuditRecord> pagedAuditRecords = new List<TransformAuditRecord>();
+        private bool auditFilterDirty = true;
         private const int LargeTransformOperationThreshold = 200;
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             SimpleToolsPanelUtility.DrawToolHeader(
-                "对齐、分布与布景微调工作台",
+                "用于 3D / 2D / UI 对象的批量对齐、均匀分布、尺寸匹配、落地吸附、网格吸附和轻微随机化。",
                 "用于 3D / 2D / UI 对象的批量对齐、均匀分布、尺寸匹配、落地吸附、网格吸附和轻微随机化。",
                 SimpleToolsMaturity.Upgrading,
                 "会直接修改 Transform 或 RectTransform。建议开启执行前确认；父子对象同时选中时保持“跳过重复子级”，避免重复位移。");
@@ -101,7 +106,7 @@ namespace ES
             [ReadOnly, TableColumnWidth(220, false), LabelText("路径")]
             public string Path;
 
-            [ReadOnly, TableColumnWidth(90, false), LabelText("类型")]
+            [ReadOnly, TableColumnWidth(90, false), LabelText("边界")]
             public string Kind;
 
             [ReadOnly, TableColumnWidth(90, false), LabelText("边界")]
@@ -296,7 +301,7 @@ namespace ES
         private void QuickAlignCameraTop() { alignMode = AlignMode.CameraTop; AlignObjects(); }
 
         [HorizontalGroup("对齐/基础对齐/CameraAlignButtons")]
-        [Button("⬇ 镜头下对齐", ButtonHeight = 30), GUIColor(0.4f, 0.6f, 0.8f)]
+        [Button("⬆ 镜头上对齐", ButtonHeight = 30), GUIColor(0.4f, 0.6f, 0.8f)]
         private void QuickAlignCameraBottom() { alignMode = AlignMode.CameraBottom; AlignObjects(); }
 
         [TabGroup("对齐", "基础对齐")]
@@ -329,16 +334,16 @@ namespace ES
         [MinValue(0)]
         public float distributionSpacing = 10f;
 
-        [VerticalGroup("对齐/智能分布/Settings/Right"), LabelWidth(100)]
+        [VerticalGroup("对齐/智能分布/Settings/Left"), LabelWidth(100)]
         [LabelText("保持相对顺序"), PropertySpace(5)]
         public bool maintainOrder = true;
 
         [VerticalGroup("对齐/智能分布/Settings/Right"), LabelWidth(100)]
-        [LabelText("反向排列"), PropertySpace(5)]
+        [LabelText("保持相对顺序"), PropertySpace(5)]
         public bool reverseOrder = false;
 
         [VerticalGroup("对齐/智能分布/Settings/Right"), LabelWidth(100)]
-        [LabelText("预览模式"), PropertySpace(5)]
+        [LabelText("反向排列"), PropertySpace(5)]
         public bool previewMode = false;
 
         [TabGroup("对齐", "智能分布")]
@@ -357,7 +362,7 @@ namespace ES
         public float dynamicSpacing = 1f;
 
         [VerticalGroup("对齐/智能分布/DynamicSpacing/Left"), LabelWidth(120)]
-        [LabelText("间距数值"), ShowIf("@enableDynamicSpacing"), PropertySpace(5)]
+        [LabelText("当前间距"), ShowIf("@enableDynamicSpacing"), PropertySpace(5)]
         [ReadOnly, ShowInInspector]
         private string CurrentSpacingText => $"{dynamicSpacing:F2} 单位";
 
@@ -368,14 +373,14 @@ namespace ES
 
         [HorizontalGroup("对齐/智能分布/DynamicSpacing")]
         [VerticalGroup("对齐/智能分布/DynamicSpacing/Right"), LabelWidth(100)]
-        [Button("🎯 智能间距", ButtonHeight = 30), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
+        [Button("🔄 同步间距值", ButtonHeight = 30), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
         private void AutoCalculateSpacing() { dynamicSpacing = CalculateOptimalSpacing(); }
 
         [HorizontalGroup("对齐/智能分布/DynamicSpacing")]
         [VerticalGroup("对齐/智能分布/DynamicSpacing/Right"), LabelWidth(100)]
-        [Button("🔄 重置", ButtonHeight = 30), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
+        [Button("🎯 智能间距", ButtonHeight = 30), ShowIf("@enableDynamicSpacing && IsSpacingDistribute()")]
         private void ResetSpacing() { dynamicSpacing = 0f; }
-        [HorizontalGroup("对齐/智能分布/PreviewButtons")]
+        [HorizontalGroup("对齐/智能分布/DynamicSpacing")]
         [Button("👁 预览分布", ButtonHeight = 30), GUIColor(0.4f, 0.8f, 0.6f)]
         private void PreviewDistribution() { PreviewDistributeObjects(); }
 
@@ -393,50 +398,50 @@ namespace ES
         private void QuickDistributeH() { distributeMode = DistributeMode.HorizontalEven; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/DistributeButtons")]
-        [Button("↕ 垂直均匀", ButtonHeight = 30), GUIColor(0.7f, 0.5f, 0.9f)]
+        [Button("↔ 水平均匀", ButtonHeight = 30), GUIColor(0.7f, 0.5f, 0.9f)]
         private void QuickDistributeV() { distributeMode = DistributeMode.VerticalEven; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/DistributeButtons")]
-        [Button("⇿ 深度均匀", ButtonHeight = 30), GUIColor(0.7f, 0.5f, 0.9f)]
+        [Button("↕ 垂直均匀", ButtonHeight = 30), GUIColor(0.7f, 0.5f, 0.9f)]
         private void QuickDistributeD() { distributeMode = DistributeMode.DepthEven; DistributeObjects(); }
 
         [TabGroup("对齐", "智能分布")]
-        [HorizontalGroup("对齐/智能分布/SpacingButtons")]
+        [HorizontalGroup("对齐/智能分布/DistributeButtons")]
         [Button("⟷ 水平间距", ButtonHeight = 30), GUIColor(0.9f, 0.6f, 0.4f)]
         private void QuickDistributeHS() { distributeMode = DistributeMode.HorizontalSpacing; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/SpacingButtons")]
-        [Button("⟺ 垂直间距", ButtonHeight = 30), GUIColor(0.9f, 0.6f, 0.4f)]
+        [Button("⟷ 水平间距", ButtonHeight = 30), GUIColor(0.9f, 0.6f, 0.4f)]
         private void QuickDistributeVS() { distributeMode = DistributeMode.VerticalSpacing; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/SpacingButtons")]
-        [Button("⇆ 深度间距", ButtonHeight = 30), GUIColor(0.9f, 0.6f, 0.4f)]
+        [Button("⟺ 垂直间距", ButtonHeight = 30), GUIColor(0.9f, 0.6f, 0.4f)]
         private void QuickDistributeDS() { distributeMode = DistributeMode.DepthSpacing; DistributeObjects(); }
 
         [TabGroup("对齐", "智能分布")]
-        [HorizontalGroup("对齐/智能分布/CameraButtons")]
+        [HorizontalGroup("对齐/智能分布/SpacingButtons")]
         [Button("📷 镜头水平均匀", ButtonHeight = 30), GUIColor(0.4f, 0.7f, 0.9f)]
         private void QuickDistributeCH() { distributeMode = DistributeMode.CameraHorizontalEven; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/CameraButtons")]
-        [Button("📷 镜头垂直均匀", ButtonHeight = 30), GUIColor(0.4f, 0.7f, 0.9f)]
+        [Button("📷 镜头水平均匀", ButtonHeight = 30), GUIColor(0.4f, 0.7f, 0.9f)]
         private void QuickDistributeCV() { distributeMode = DistributeMode.CameraVerticalEven; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/CameraButtons")]
-        [Button("📷 镜头深度均匀", ButtonHeight = 30), GUIColor(0.4f, 0.7f, 0.9f)]
+        [Button("📷 镜头垂直均匀", ButtonHeight = 30), GUIColor(0.4f, 0.7f, 0.9f)]
         private void QuickDistributeCD() { distributeMode = DistributeMode.CameraDepthEven; DistributeObjects(); }
 
         [TabGroup("对齐", "智能分布")]
-        [HorizontalGroup("对齐/智能分布/CameraSpacingButtons")]
+        [HorizontalGroup("对齐/智能分布/CameraButtons")]
         [Button("📐 镜头水平间距", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.7f)]
         private void QuickDistributeCHS() { distributeMode = DistributeMode.CameraHorizontalSpacing; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/CameraSpacingButtons")]
-        [Button("📐 镜头垂直间距", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.7f)]
+        [Button("📐 镜头水平间距", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.7f)]
         private void QuickDistributeCVS() { distributeMode = DistributeMode.CameraVerticalSpacing; DistributeObjects(); }
 
         [HorizontalGroup("对齐/智能分布/CameraSpacingButtons")]
-        [Button("📐 镜头深度间距", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.7f)]
+        [Button("📐 镜头垂直间距", ButtonHeight = 30), GUIColor(0.6f, 0.8f, 0.7f)]
         private void QuickDistributeCDS() { distributeMode = DistributeMode.CameraDepthSpacing; DistributeObjects(); }
         #endregion
 
@@ -458,7 +463,7 @@ namespace ES
         public bool matchWidth = true;
 
         [VerticalGroup("对齐/尺寸匹配/Options/Left"), LabelWidth(120)]
-        [LabelText("✓ 匹配高度(Y轴)"), PropertySpace(5)]
+        [LabelText("✓ 匹配宽度(X轴)"), PropertySpace(5)]
         public bool matchHeight = true;
 
         [VerticalGroup("对齐/尺寸匹配/Options/Left"), LabelWidth(120)]
@@ -467,13 +472,13 @@ namespace ES
         public bool matchDepth = false;
 
         [VerticalGroup("对齐/尺寸匹配/Options/Right"), LabelWidth(120)]
-        [LabelText("匹配旋转角度"), PropertySpace(5)]
+        [LabelText("匹配深度(Z轴)"), PropertySpace(5)]
         [InfoBox("复制参考对象的Rotation\n适用于对齐倾斜或旋转的对象")]
         public bool matchRotation = false;
 
         [VerticalGroup("对齐/尺寸匹配/Options/Right"), LabelWidth(120)]
-        [LabelText("⚠ 匹配整体缩放"), PropertySpace(5)]
-        [InfoBox("直接复制参考对象的Scale\n⚠ 会覆盖上面的单独尺寸匹配\n适用于完全克隆对象尺寸")]
+        [LabelText("匹配旋转角度"), PropertySpace(5)]
+        [InfoBox("复制参考对象的Rotation\n适用于对齐倾斜或旋转的对象")]
         public bool matchScale = false;
 
         [TabGroup("对齐", "尺寸匹配")]
@@ -483,10 +488,10 @@ namespace ES
         #endregion
 
         #region 布景整理
-        [TabGroup("对齐", "布景整理")]
+        [TabGroup("对齐", "尺寸匹配")]
         [InfoBox("面向场景布置：落地/贴表面、网格归整、轻微随机错落。所有操作都有确认、Undo 和变更报告。", InfoMessageType.Info)]
 
-        [TabGroup("对齐", "布景整理")]
+        [TabGroup("对齐", "尺寸匹配")]
         [HorizontalGroup("对齐/布景整理/Surface")]
         [VerticalGroup("对齐/布景整理/Surface/Left"), LabelWidth(120)]
         [LabelText("射线层"), PropertySpace(5)]
@@ -497,29 +502,29 @@ namespace ES
         public float surfaceCastHeight = 50f;
 
         [VerticalGroup("对齐/布景整理/Surface/Left"), LabelWidth(120)]
-        [LabelText("检测距离"), MinValue(0.1f)]
+        [LabelText("上方起点"), MinValue(0.1f)]
         public float surfaceCastDistance = 200f;
 
-        [VerticalGroup("对齐/布景整理/Surface/Right"), LabelWidth(120)]
+        [VerticalGroup("对齐/布景整理/Surface/Left"), LabelWidth(120)]
         [LabelText("表面偏移")]
         public float surfaceOffset = 0f;
 
-        [VerticalGroup("对齐/布景整理/Surface/Right"), LabelWidth(120)]
-        [LabelText("对齐法线")]
+        [VerticalGroup("对齐/布景整理/Surface/Left"), LabelWidth(120)]
+        [LabelText("表面偏移")]
         public bool alignToSurfaceNormal = false;
 
         [VerticalGroup("对齐/布景整理/Surface/Right"), LabelWidth(120)]
-        [LabelText("忽略自身碰撞")]
+        [LabelText("表面偏移")]
         public bool ignoreSelfColliders = true;
 
         [VerticalGroup("对齐/布景整理/Surface/Right"), LabelWidth(120)]
-        [LabelText("忽略选区碰撞")]
+        [LabelText("对齐法线")]
         public bool ignoreSelectionColliders = true;
 
         [TabGroup("对齐", "布景整理")]
         [HorizontalGroup("对齐/布景整理/Grid")]
         [VerticalGroup("对齐/布景整理/Grid/Left"), LabelWidth(120)]
-        [LabelText("网格尺寸")]
+        [LabelText("忽略选区碰撞")]
         public Vector3 gridSize = Vector3.one;
 
         [VerticalGroup("对齐/布景整理/Grid/Right"), LabelWidth(80)]
@@ -527,7 +532,7 @@ namespace ES
         public bool snapGridX = true;
 
         [VerticalGroup("对齐/布景整理/Grid/Right"), LabelWidth(80)]
-        [LabelText("吸附Y")]
+        [LabelText("网格尺寸")]
         public bool snapGridY = false;
 
         [VerticalGroup("对齐/布景整理/Grid/Right"), LabelWidth(80)]
@@ -537,20 +542,20 @@ namespace ES
         [TabGroup("对齐", "布景整理")]
         [HorizontalGroup("对齐/布景整理/Random")]
         [VerticalGroup("对齐/布景整理/Random/Left"), LabelWidth(120)]
-        [LabelText("随机种子")]
+        [LabelText("吸附Y")]
         public int randomSeed = 2026;
 
         [VerticalGroup("对齐/布景整理/Random/Left"), LabelWidth(120)]
-        [LabelText("位置扰动")]
+        [LabelText("吸附Z")]
         public Vector3 randomPositionRange = new Vector3(0.25f, 0f, 0.25f);
 
         [VerticalGroup("对齐/布景整理/Random/Right"), LabelWidth(120)]
-        [LabelText("Y旋转范围")]
+        [LabelText("随机种子")]
         [MinMaxSlider(-180f, 180f, true)]
         public Vector2 randomYawRange = new Vector2(-8f, 8f);
 
-        [VerticalGroup("对齐/布景整理/Random/Right"), LabelWidth(120)]
-        [LabelText("统一缩放范围")]
+        [VerticalGroup("对齐/布景整理/Random/Left"), LabelWidth(120)]
+        [LabelText("位置扰动")]
         [MinMaxSlider(0.01f, 3f, true)]
         public Vector2 randomUniformScaleRange = new Vector2(1f, 1f);
 
@@ -569,28 +574,28 @@ namespace ES
         #endregion
 
         #region 高级选项
-        [TabGroup("对齐", "高级选项")]
+        [TabGroup("对齐", "布景整理")]
         [InfoBox("高级选项控制边界计算、对象过滤、确认弹窗和成功提示。", InfoMessageType.Info)]
 
         
         [TabGroup("对齐", "高级选项")]
-        [LabelText("包含子对象"), PropertySpace(5)]
-        [InfoBox("开启后计算子对象组合边界。")]
+        [LabelText("仅处理活跃对象"), PropertySpace(5)]
+        [InfoBox("开启后跳过未激活对象。")]
         public bool includeChildren = false;
 
         [TabGroup("对齐", "高级选项")]
-        [LabelText("仅处理活跃对象"), PropertySpace(5)]
-        [InfoBox("开启后跳过未激活对象。")]
+        [LabelText("忽略锁定对象"), PropertySpace(5)]
+        [InfoBox("开启后计算子对象组合边界。")]
         public bool activeOnly = true;
 
         [TabGroup("对齐", "高级选项")]
-        [LabelText("忽略锁定对象"), PropertySpace(5)]
+        [LabelText("跳过重复子级"), PropertySpace(5)]
         [InfoBox("开启后跳过 HideFlags.NotEditable 对象。")]
         public bool ignoreLocked = true;
 
         [TabGroup("对齐", "高级选项")]
-        [LabelText("跳过重复子级"), PropertySpace(5)]
-        [InfoBox("开启后，如果父对象和子对象同时选中，只处理父对象，避免子对象被父级带动后又单独移动一次。")]
+        [LabelText("仅处理活跃对象"), PropertySpace(5)]
+        [InfoBox("开启后跳过未激活对象。")]
         public bool skipNestedSelection = true;
 
         [TabGroup("对齐", "高级选项")]
@@ -599,18 +604,18 @@ namespace ES
         public bool protectPrefabAssets = true;
 
         [TabGroup("对齐", "高级选项")]
-        [LabelText("对齐后选中"), PropertySpace(5)]
-        [InfoBox("开启后操作完成仍保持目标选中。")]
-        public bool selectAfterAlign = true;
-
-        [TabGroup("对齐", "高级选项")]
         [LabelText("显示成功提示"), PropertySpace(5)]
         [InfoBox("关闭可减少连续操作时的弹窗。")]
-        public bool showSuccessDialogs = false;
+        public bool selectAfterAlign = true;
 
         [TabGroup("对齐", "高级选项")]
         [LabelText("执行前确认"), PropertySpace(5)]
         [InfoBox("开启后，对齐、分布、尺寸匹配会先显示实际处理对象预览。建议商业项目保持开启，避免误改大量对象。")]
+        public bool showSuccessDialogs = false;
+
+        [TabGroup("对齐", "高级选项")]
+        [LabelText("对齐后选中"), PropertySpace(5)]
+        [InfoBox("开启后操作完成仍保持目标选中。")]
         public bool confirmBeforeApply = true;
 
         [TabGroup("对齐", "高级选项")]
@@ -626,7 +631,7 @@ namespace ES
         #endregion
 
         #region 选区审计
-        [TabGroup("对齐", "选区审计")]
+        [TabGroup("对齐", "高级选项")]
         [InfoBox("执行前先看有效对象、边界来源、Prefab 状态和 UI 布局风险。这里不修改场景。", InfoMessageType.Info)]
         [HorizontalGroup("对齐/选区审计/Toolbar")]
         [Button("刷新选区审计", ButtonHeight = 30), GUIColor(0.28f, 0.52f, 0.85f)]
@@ -640,15 +645,22 @@ namespace ES
         private void ClearSelectionAudit()
         {
             auditRecords.Clear();
+            auditFilterDirty = true;
+            auditPageIndex = 0;
         }
 
         [TabGroup("对齐", "选区审计")]
-        [HorizontalGroup("对齐/选区审计/Filters")]
+        [HorizontalGroup("对齐/选区审计/Toolbar")]
         [LabelText("搜索"), LabelWidth(40)]
         public string AuditSearch
         {
             get => auditSearch;
-            set => auditSearch = value ?? "";
+            set
+            {
+                auditSearch = value ?? "";
+                auditPageIndex = 0;
+                auditFilterDirty = true;
+            }
         }
 
         [HorizontalGroup("对齐/选区审计/Filters")]
@@ -656,7 +668,21 @@ namespace ES
         public bool ShowOnlyRisks
         {
             get => showOnlyRisks;
-            set => showOnlyRisks = value;
+            set
+            {
+                showOnlyRisks = value;
+                auditPageIndex = 0;
+                auditFilterDirty = true;
+            }
+        }
+
+        [TabGroup("对齐", "选区审计")]
+        [HorizontalGroup("对齐/选区审计/Filters")]
+        [LabelText("ÿҳ"), LabelWidth(42)]
+        public int AuditPageSize
+        {
+            get => auditPageSize;
+            set => auditPageSize = Mathf.Clamp(value, 10, 100);
         }
 
         [TabGroup("对齐", "选区审计")]
@@ -664,8 +690,17 @@ namespace ES
         private string AuditSummary => BuildAuditSummary();
 
         [TabGroup("对齐", "选区审计")]
+        [OnInspectorGUI]
+        private void DrawAuditPager()
+        {
+            int filteredCount = GetFilteredAuditRecords().Count;
+            SimpleToolsPanelUtility.DrawLargeListGuard(filteredCount, "预览表");
+            SimpleToolsPanelUtility.DrawPager(ref auditPageIndex, filteredCount, auditPageSize);
+        }
+
+        [TabGroup("对齐", "选区审计")]
         [ShowInInspector, ReadOnly, TableList(IsReadOnly = true, AlwaysExpanded = true), LabelText("当前审计清单")]
-        private List<TransformAuditRecord> FilteredAuditRecords => GetFilteredAuditRecords();
+        private List<TransformAuditRecord> FilteredAuditRecords => GetPagedAuditRecords();
         #endregion
 
         private bool ConfirmTransformOperation(string title, string action, GameObject[] selectedObjects, int affectedCountOffset = 0)
@@ -720,6 +755,7 @@ namespace ES
         private void RebuildAuditRecords(GameObject[] selectedObjects)
         {
             auditRecords.Clear();
+            auditFilterDirty = true;
             if (selectedObjects == null)
                 return;
 
@@ -769,34 +805,58 @@ namespace ES
                 });
             }
 
-            lastResultSummary = $"选区审计完成: {auditRecords.Count} 个有效对象 | 风险 {auditRecords.Count(item => item.RiskLevel != "低")} 项";
+            int riskCount = auditRecords.Count(item => item.RiskLevel != "低");
+            lastResultSummary = $"选区审计完成: {auditRecords.Count} 个有效对象 | 风险 {riskCount} 项";
             lastResultDetail = BuildAuditSummary();
         }
 
         private List<TransformAuditRecord> GetFilteredAuditRecords()
         {
-            IEnumerable<TransformAuditRecord> query = auditRecords;
-            if (showOnlyRisks)
-                query = query.Where(item => item.RiskLevel != "低");
+            if (!auditFilterDirty)
+                return filteredAuditRecords;
 
-            if (!string.IsNullOrWhiteSpace(auditSearch))
+            filteredAuditRecords.Clear();
+            string keyword = string.IsNullOrWhiteSpace(auditSearch) ? null : auditSearch.Trim();
+            for (int i = 0; i < auditRecords.Count; i++)
             {
-                string keyword = auditSearch.Trim();
-                query = query.Where(item =>
-                    ContainsIgnoreCase(item.Object != null ? item.Object.name : "", keyword) ||
-                    ContainsIgnoreCase(item.Path, keyword) ||
-                    ContainsIgnoreCase(item.Kind, keyword) ||
-                    ContainsIgnoreCase(item.BoundsSource, keyword) ||
-                    ContainsIgnoreCase(item.Note, keyword));
+                var record = auditRecords[i];
+                if (record == null || (showOnlyRisks && record.RiskLevel == "高"))
+                    continue;
+
+                if (keyword != null &&
+                    !ContainsIgnoreCase(record.Object != null ? record.Object.name : "", keyword) &&
+                    !ContainsIgnoreCase(record.Path, keyword) &&
+                    !ContainsIgnoreCase(record.Kind, keyword) &&
+                    !ContainsIgnoreCase(record.BoundsSource, keyword) &&
+                    !ContainsIgnoreCase(record.Note, keyword))
+                    continue;
+
+                filteredAuditRecords.Add(record);
             }
 
-            return query.ToList();
+            auditFilterDirty = false;
+            return filteredAuditRecords;
+        }
+
+        private List<TransformAuditRecord> GetPagedAuditRecords()
+        {
+            var filtered = GetFilteredAuditRecords();
+            int pageSize = Mathf.Clamp(auditPageSize, 10, SimpleToolsPanelUtility.MaxRenderRowsPerPage);
+            int totalPages = Mathf.Max(1, Mathf.CeilToInt(filtered.Count / (float)pageSize));
+            auditPageIndex = Mathf.Clamp(auditPageIndex, 0, totalPages - 1);
+            int start = auditPageIndex * pageSize;
+            int end = Mathf.Min(start + pageSize, filtered.Count);
+
+            pagedAuditRecords.Clear();
+            for (int i = start; i < end; i++)
+                pagedAuditRecords.Add(filtered[i]);
+            return pagedAuditRecords;
         }
 
         private string BuildAuditSummary()
         {
             if (auditRecords.Count == 0)
-                return "尚未生成审计。点击“刷新选区审计”查看当前有效选区。";
+                return "<丢失>";
 
             int prefabCount = auditRecords.Count(item => item.PrefabState == "实例");
             int highRisk = auditRecords.Count(item => item.RiskLevel == "高");
@@ -1049,7 +1109,7 @@ namespace ES
             if (!ConfirmTransformOperation("确认执行分布", "分布", selectedObjects))
                 return;
 
-            // 如果在预览模式，先清除预览
+            // 计算所有对象的总边界
             if (isPreviewing)
                 ClearDistributionPreview();
 
@@ -1058,7 +1118,7 @@ namespace ES
 
             var transforms = selectedObjects.Select(obj => obj.transform).ToList();
             
-            // 根据位置排序
+            // 计算所有对象的总边界
             SortTransformsByDistributionMode(transforms);
             
             if (reverseOrder)
@@ -1085,7 +1145,7 @@ namespace ES
             }
 
             FinalizeTransformChanges(selectedObjects);
-            lastResultSummary = $"分布完成: {selectedObjects.Length} 个对象 | 模式 {distributeMode} | 反向 {(reverseOrder ? "是" : "否")}";
+            lastResultSummary = $"分布完成: {selectedObjects.Length} 个对象 | 模式 {distributeMode} | 反向 {SimpleToolsSafetyUtility.YesNo(reverseOrder)}";
             lastResultDetail = BuildTransformChangeReport(selectedObjects, beforeSnapshots);
 
             if (showSuccessDialogs)
@@ -1099,7 +1159,7 @@ namespace ES
         {
             if (transforms.Count < 2) return;
 
-            // 计算所有对象的总边界
+            // 在目标范围内分布对象
             Bounds totalBounds = GetObjectBounds(transforms[0]);
             foreach (var transform in transforms)
             {
@@ -1113,7 +1173,7 @@ namespace ES
             float totalDistance = endPos - startPos;
             if (totalDistance <= 0 || transforms.Count <= 1) return;
 
-            // 计算所有对象在轴上的投影尺寸
+            // 计算所有对象的总边界
             List<float> objectSizesOnAxis = new List<float>();
             float totalObjectSize = 0f;
             
@@ -1132,7 +1192,7 @@ namespace ES
             
             float spacing = (transforms.Count > 1) ? availableSpace / (transforms.Count - 1) : 0;
 
-            // 在目标范围内分布对象
+            // 计算每个对象在指定轴上的投影尺寸
             float currentPos = startPos;
             for (int i = 0; i < transforms.Count; i++)
             {
@@ -1154,7 +1214,7 @@ namespace ES
         {
             if (transforms.Count < 2) return;
 
-            // 计算所有对象的总边界
+            // 计算间距：直接使用用户设定的间距值
             Bounds totalBounds = GetObjectBounds(transforms[0]);
             foreach (var transform in transforms)
             {
@@ -1165,7 +1225,7 @@ namespace ES
             axis.Normalize();
             GetBoundsProjection(totalBounds, axis, out float startPos, out _);
 
-            // 计算每个对象在指定轴上的投影尺寸
+            // 计算间距：直接使用用户设定的间距值
             List<float> objectSizes = new List<float>();
 
             foreach (var transform in transforms)
@@ -1176,7 +1236,7 @@ namespace ES
                 objectSizes.Add(size);
             }
 
-            // 计算间距：直接使用用户设定的间距值
+            // 当切换到间距模式时，设置智能默认值
             float spacing = distributionSpacing;
 
             float currentPos = startPos;
@@ -1209,15 +1269,15 @@ namespace ES
 
         #region 动态间距调整
         [InfoBox("🎚️ 动态间距调整：实时控制对象间距\n" +
-                "• 实时预览：拖动滑条即时看到效果\n" +
-                "• 拖动会基于预览前位置重算，不会叠加漂移\n" +
+                "• 仅间距模式：仅在间距分布模式下工作\n" +
+                "• 仅间距模式：仅在间距分布模式下工作\n" +
                 "• 仅间距模式：仅在间距分布模式下工作\n" +
                 "• 满意后应用预览，不满意可一键清除", InfoMessageType.Info)]
         [PropertySpace(5)]
         
         private void OnDistributeModeChanged()
         {
-            // 当切换到间距模式时，设置智能默认值
+            // 只有在间距分布模式下才工作
             if (IsSpacingDistribute() && enableDynamicSpacing)
             {
                 // 如果当前distributionSpacing是默认值（10），则使用智能计算的值
@@ -1237,7 +1297,7 @@ namespace ES
         {
             if (!enableDynamicSpacing) return;
             
-            // 只有在间距分布模式下才工作
+            // 执行实时分布
             if (!IsSpacingDistribute()) return;
             
             var selectedObjects = GetValidSelection();
@@ -1268,7 +1328,7 @@ namespace ES
             // 更新distributionSpacing为当前滑条值
             distributionSpacing = dynamicSpacing;
 
-            // 执行实时分布
+            // 计算所有对象在当前分布轴上的平均尺寸
             var transforms = selectedObjects.Select(obj => obj.transform).ToList();
             SortTransformsByDistributionMode(transforms);
             
@@ -1293,7 +1353,7 @@ namespace ES
             var selectedObjects = GetValidSelection();
             if (selectedObjects.Length < 2) return 1f;
 
-            // 计算所有对象在当前分布轴上的平均尺寸
+            // 如果已经在预览，先清除
             float totalSize = 0f;
             int axisCount = 0;
             Vector3 axis = GetDistributeAxis(distributeMode, selectedObjects.Select(obj => obj.transform).ToArray());
@@ -1331,18 +1391,18 @@ namespace ES
             if (!ValidateCoordinateMode(selectedObjects, IsCameraDistributeMode(distributeMode)))
                 return;
 
-            // 如果已经在预览，先清除
+            // 执行预览分布
             if (isPreviewing)
                 ClearDistributionPreview();
 
-            // 保存原始位置
+            // 执行预览分布
             originalPositions.Clear();
             foreach (var obj in selectedObjects)
             {
                 originalPositions[obj.transform] = obj.transform.position;
             }
 
-            // 执行预览分布
+            // 恢复原始位置
             var transforms = selectedObjects.Select(obj => obj.transform).ToList();
             Undo.SetCurrentGroupName("Preview Distribution");
             previewUndoGroup = Undo.GetCurrentGroup();
@@ -1429,7 +1489,7 @@ namespace ES
             lastResultDetail = BuildTransformChangeReport(selectedObjects, beforeSnapshots);
 
             if (showSuccessDialogs)
-                EditorUtility.DisplayDialog("成功", "✓ 预览效果已应用！", "确定");
+                EditorUtility.DisplayDialog("尺寸匹配错误", "❌ 无法获取参考对象\n\n请检查选择设置和对象状态", "确定");
             
             if (selectAfterAlign)
                 Selection.objects = selectedObjects;
@@ -1456,10 +1516,10 @@ namespace ES
             if (!matchWidth && !matchHeight && !matchDepth && !matchRotation && !matchScale)
             {
                 EditorUtility.DisplayDialog("尺寸匹配提示", 
-                    "❌ 未选择任何匹配选项\n\n请至少勾选一个匹配选项：\n" +
-                    "• 匹配宽度(X轴)\n" +
-                    "• 匹配高度(Y轴)\n" +
-                    "• 匹配深度(Z轴)\n" +
+                    "• 匹配旋转角度\n" +
+                    "• 匹配旋转角度\n" +
+                    "• 匹配旋转角度\n" +
+                    "• 匹配旋转角度\n" +
                     "• 匹配旋转角度\n" +
                     "• 匹配整体缩放", "确定");
                 return;
@@ -1640,19 +1700,19 @@ namespace ES
             var selectedObjects = GetValidSelection();
             if (selectedObjects.Length == 0)
             {
-                EditorUtility.DisplayDialog("网格吸附提示", "请先选择至少一个对象。", "确定");
+                EditorUtility.DisplayDialog("网格吸附提示", "请至少勾选一个吸附轴。", "确定");
                 return;
             }
 
             if (!IsFinite(gridSize) || gridSize.x <= 0f || gridSize.y <= 0f || gridSize.z <= 0f)
             {
-                EditorUtility.DisplayDialog("网格吸附提示", "网格尺寸必须大于 0。", "确定");
+                EditorUtility.DisplayDialog("网格吸附提示", "请至少勾选一个吸附轴。", "确定");
                 return;
             }
 
             if (!snapGridX && !snapGridY && !snapGridZ)
             {
-                EditorUtility.DisplayDialog("网格吸附提示", "请至少勾选一个吸附轴。", "确定");
+                EditorUtility.DisplayDialog("随机错落提示", "请先选择至少一个对象。", "确定");
                 return;
             }
 
@@ -1681,7 +1741,7 @@ namespace ES
             var selectedObjects = GetValidSelection();
             if (selectedObjects.Length == 0)
             {
-                EditorUtility.DisplayDialog("随机错落提示", "请先选择至少一个对象。", "确定");
+                EditorUtility.DisplayDialog("随机错落提示", "统一缩放范围必须大于 0，且最小值不能超过最大值。", "确定");
                 return;
             }
 
@@ -1802,11 +1862,11 @@ namespace ES
                 if (detailLines.Count < 12)
                 {
                     var changes = new List<string>();
-                    if (positionChanged) changes.Add($"Pos {before.Position.ToString("F2")} -> {after.Position.ToString("F2")}");
-                    if (scaleChanged) changes.Add($"Scale {before.LocalScale.ToString("F2")} -> {after.LocalScale.ToString("F2")}");
-                    if (rotationChanged) changes.Add($"Rot {before.Rotation.eulerAngles.ToString("F1")} -> {after.Rotation.eulerAngles.ToString("F1")}");
-                    if (rectChanged) changes.Add($"Size {before.RectSize.ToString("F1")} -> {after.RectSize.ToString("F1")}");
-                    detailLines.Add($"{GetHierarchyPath(obj.transform)} | {string.Join("；", changes)}");
+                    if (positionChanged) changes.Add("Pos " + before.Position.ToString("F2") + " -> " + after.Position.ToString("F2"));
+                    if (scaleChanged) changes.Add("Scale " + before.LocalScale.ToString("F2") + " -> " + after.LocalScale.ToString("F2"));
+                    if (rotationChanged) changes.Add("Rot " + before.Rotation.eulerAngles.ToString("F1") + " -> " + after.Rotation.eulerAngles.ToString("F1"));
+                    if (rectChanged) changes.Add("Size " + before.RectSize.ToString("F1") + " -> " + after.RectSize.ToString("F1"));
+                    detailLines.Add(GetHierarchyPath(obj.transform) + " | " + string.Join("；", changes));
                 }
             }
 
@@ -1956,7 +2016,7 @@ namespace ES
                         center += corner;
                     center /= 4f;
                     
-                    // 创建边界并扩展到所有角
+                    // 包含子对象（如果启用）
                     bounds = new Bounds(center, Vector3.zero);
                     foreach (var corner in corners)
                         bounds.Encapsulate(corner);
@@ -2221,7 +2281,7 @@ namespace ES
                 return true;
 
             EditorUtility.DisplayDialog("局部坐标模式不可用",
-                "局部坐标模式要求本次处理的对象处在同一个父对象下。\n\n" +
+                "当前选区存在多个父级，继续处理会让边界轴向和局部轴向不一致。\n" +
                 "当前选区存在多个父级，继续处理会让边界轴向和局部轴向不一致。\n" +
                 "请改用世界坐标，或只选择同一父级下的对象。",
                 "知道了");
@@ -2358,8 +2418,8 @@ namespace ES
 
         #region 辅助方法
         [InfoBox("🔧 辅助方法集合：专业工具函数\n" +
-                "• 选择验证：过滤有效对象\n" +
-                "• 模式判断：分布类型检测\n" +
+                "• 信息显示：选择状态反馈\n" +
+                "• 信息显示：选择状态反馈\n" +
                 "• 信息显示：选择状态反馈\n" +
                 "• 性能优化：高效对象处理", InfoMessageType.Info)]
         [PropertySpace(5)]
@@ -2429,7 +2489,7 @@ namespace ES
             {
                 var firstObj = selected[0];
                 var bounds = GetObjectBounds(firstObj.transform);
-                info += $" | 首个: {firstObj.name} (尺寸: {bounds.size.ToString("F2")})";
+                info += " | 首个: " + firstObj.name + " (尺寸: " + bounds.size.ToString("F2") + ")";
             }
             return info;
         }

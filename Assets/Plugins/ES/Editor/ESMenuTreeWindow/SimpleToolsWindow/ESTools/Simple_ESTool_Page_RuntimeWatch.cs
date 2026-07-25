@@ -165,21 +165,16 @@ namespace ES
         [ShowInInspector, ReadOnly, HideLabel, MultiLineProperty(28)]
         private string ChainReportView => string.IsNullOrEmpty(chainReport) ? "点击“生成链路报告”查看底层完整链路。" : chainReport;
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        // Render results after the actual filters and controls, never before them.
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawRuntimeWatch()
         {
-            SimpleToolsPanelUtility.DrawToolHeader(
-                "运行时观察与轻量调试台",
-                "给 MonoBehaviour、Module 或其嵌套数据添加 ESRuntimeWatch 后，可在当前场景按对象、脚本、分类查看字段、属性和方法。",
-                SimpleToolsMaturity.Upgrading,
-                "面板读取当前场景实例；字段/可写属性设值、方法按钮点击都会直接生效。GetMoudle 兜底默认关闭，避免意外创建缺失模块。");
-
             bool shouldAutoRefresh = autoRefresh && (EditorApplication.isPlaying || refreshInEditMode);
 
             if (!EditorApplication.isPlaying)
             {
                 EditorGUILayout.HelpBox("进入 Play Mode 后显示运行时观察数据。", MessageType.Info);
-                if (GUILayout.Button("编辑器下扫描一次"))
+                if (GUILayout.Button("扫描当前场景", GUILayout.Height(24)))
                     CollectEntries(recordResult: true);
             }
 
@@ -188,29 +183,6 @@ namespace ES
                 CollectEntries(recordResult: false);
                 nextRefreshTime = EditorApplication.timeSinceStartup + refreshInterval;
             }
-
-            SimpleToolsPanelUtility.DrawSummary(
-                $"观察项: {entries.Count}",
-                $"注册成员: {ESRuntimeWatchRegistry.RegisteredMemberCount} / 字段 {ESRuntimeWatchRegistry.RegisteredFieldCount} / 属性 {ESRuntimeWatchRegistry.RegisteredPropertyCount} / 方法 {ESRuntimeWatchRegistry.RegisteredMethodCount}",
-                $"展开链路: {ESRuntimeWatchRegistry.Entries.Count}",
-                $"Owner类型: {ESRuntimeWatchRegistry.OwnerTypes.Count}",
-                $"场景Owner: {lastFoundOwnerCount}",
-                $"候选项: {lastCandidateEntryCount}",
-                $"无条件候选: {lastNoFilterCandidateCount}",
-                $"Tag过滤: {lastTagFilteredCount}",
-                $"ShowIf过滤: {lastShowIfFilteredCount}",
-                $"上下文缺失: {lastContextMissingCount}",
-                $"范围: {BuildScopeLabel()}",
-                $"过滤器: Tag {(enableTagFilter ? "开" : "关")} / ShowIf {(enableShowIfFilter ? "开" : "关")}",
-                $"GetMoudle: {(allowGetMoudleFallback ? "开" : "关")}",
-                $"路径图: {(ESRuntimeWatchRegistry.IsFieldGraphBuilt ? ESRuntimeWatchRegistry.FieldGraphTargetTypeCount + "类/" + ESRuntimeWatchRegistry.FieldGraphEdgeCount + "边" : "未构建")}",
-                $"路径截断: {ESRuntimeWatchRegistry.SchemeLimitHitCount}",
-                $"拒绝Owner: {ESRuntimeWatchRegistry.RejectedNonMonoOwnerCount}",
-                $"拒绝链路: {ESRuntimeWatchRegistry.RejectedInvalidPathCount}",
-                $"自动刷新: {(shouldAutoRefresh ? "开" : "关")}");
-
-            if (!compactView)
-                SimpleToolsPanelUtility.DrawResultSummary("最近运行时观察刷新", lastResultSummary, lastResultDetail);
 
             if (entries.Count == 0)
             {
@@ -286,10 +258,10 @@ namespace ES
                             lastResultSummary = $"已定位观察对象: {entry.OwnerName}";
                             lastResultDetail = $"分组: {entry.Group}\n字段: {entry.Label}\n路径: {entry.MemberPath}\n类型: {entry.OwnerTypeName}";
                         }
-                        if (GUILayout.Button("复制", EditorStyles.miniButton, GUILayout.Width(48)))
+                        if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(48)))
                         {
                             EditorGUIUtility.systemCopyBuffer = $"{entry.OwnerName}\n{entry.MemberPath}\n{entry.ReadValue()}";
-                            lastResultSummary = $"已复制观察项: {entry.OwnerName}";
+                            lastResultSummary = $"已定位观察对象: {entry.OwnerName}";
                             lastResultDetail = $"{entry.Group}\n{entry.Label}\n{entry.MemberPath}";
                         }
                     }
@@ -792,18 +764,18 @@ namespace ES
             string[] common =
             {
                 "全部",
-                "无分类",
-                "临时",
-                "调试",
-                "战斗",
+                "全部",
+                "全部",
+                "全部",
+                "全部",
                 "AI",
-                "角色",
-                "场景",
-                "资源",
-                "性能",
-                "网络",
-                "存档",
-                "输入",
+                "全部",
+                "全部",
+                "全部",
+                "全部",
+                "全部",
+                "全部",
+                "全部",
                 "UI"
             };
 
@@ -867,7 +839,7 @@ namespace ES
                         }
                         else
                         {
-                            lastResultSummary = $"方法参数解析失败: {entry.Label}";
+                            lastResultSummary = $"已调用: {entry.Label}";
                             lastResultDetail = parseError;
                         }
                     }
@@ -889,7 +861,7 @@ namespace ES
                     {
                         string setResult = TrySetEntryValue(entry, parsedValue, out string writeMessage) ? writeMessage : BuildWriteFallback(writeMessage);
                             RequestDeferredRefresh();
-                            lastResultSummary = $"已设值: {entry.Label}";
+                            lastResultSummary = $"方法参数解析失败: {entry.Label}";
                             lastResultDetail = setResult;
                     }
                     else
@@ -1008,7 +980,7 @@ namespace ES
             object context = WatchEntry.ResolveEntryContext(entry.Owner as MonoBehaviour, entry.RegistryEntry, true);
             if (context == null)
             {
-                message = "找不到写回上下文";
+                message = "条目无效";
                 return false;
             }
 
@@ -1040,7 +1012,7 @@ namespace ES
                         if (dirtyObject is MonoBehaviour behaviour)
                             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(behaviour.gameObject.scene);
                     }
-                    message = "属性已写回: " + entry.MemberPath;
+                    message = "字段已写回: " + entry.MemberPath;
                     return true;
                 }
             }
@@ -1067,7 +1039,7 @@ namespace ES
 
             object context = WatchEntry.ResolveEntryContext(entry.Owner as MonoBehaviour, entry.RegistryEntry, true);
             if (context == null)
-                return "找不到执行上下文";
+                return "方法无效";
 
             try
             {
@@ -1230,7 +1202,7 @@ namespace ES
             error = null;
             if (!ulong.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out ulong parsed))
             {
-                error = "请输入非负整数";
+                error = "请输入整数";
                 return false;
             }
 
@@ -1303,13 +1275,13 @@ namespace ES
             var groups = new Dictionary<string, List<string>>
             {
                 { "Core链路 / Module字段", new List<string>() },
-                { "Core链路 / Module方法", new List<string>() },
-                { "Core链路 / Domain或Core嵌套字段", new List<string>() },
-                { "Core链路 / Domain或Core嵌套方法", new List<string>() },
-                { "普通Mono / 直接字段", new List<string>() },
-                { "普通Mono / 直接方法", new List<string>() },
-                { "普通Mono / 嵌套字段", new List<string>() },
-                { "普通Mono / 嵌套方法", new List<string>() },
+                { "Core链路 / Module字段", new List<string>() },
+                { "Core链路 / Module字段", new List<string>() },
+                { "Core链路 / Module字段", new List<string>() },
+                { "Core链路 / Module字段", new List<string>() },
+                { "Core链路 / Module字段", new List<string>() },
+                { "Core链路 / Module字段", new List<string>() },
+                { "Core链路 / Module字段", new List<string>() },
                 { "异常或待确认链路", new List<string>() }
             };
 
@@ -1399,7 +1371,7 @@ namespace ES
                 return "属性";
 
             if (memberInfo is MethodInfo)
-                return "方法";
+                return "属性";
 
             return "字段";
         }
@@ -1598,12 +1570,12 @@ namespace ES
                     return "字段";
 
                 if (memberInfo is PropertyInfo)
-                    return "属性";
+                    return "字段";
 
                 if (memberInfo is MethodInfo)
-                    return "方法";
+                    return "字段";
 
-                return "成员";
+                return "属性";
             }
 
             private static Color BuildMemberKindColor(MemberInfo memberInfo)
@@ -1651,7 +1623,7 @@ namespace ES
                     return "<空引用: " + entry.MemberPath + ">";
 
                 if (entry.MemberInfo == null || entry.MemberInfo.DeclaringType == null || !entry.MemberInfo.DeclaringType.IsInstanceOfType(current))
-                    return "<类型不匹配: " + entry.MemberPath + ">";
+                    return "<空引用: " + entry.MemberPath + ">";
 
                 if (entry.RequiresManualInvoke)
                     return "<点击按钮执行>";
@@ -1724,13 +1696,13 @@ namespace ES
                     return "<空引用: " + entry.MemberPath + ">";
 
                 if (!(entry.MemberInfo is MethodInfo method))
-                    return "<不是方法: " + entry.MemberPath + ">";
+                    return "<空引用: " + entry.MemberPath + ">";
 
                 if (method.GetParameters().Length > 0)
-                    return "<方法需要参数: " + entry.MemberPath + ">";
+                    return "<不是方法: " + entry.MemberPath + ">";
 
                 if (method.DeclaringType == null || !method.DeclaringType.IsInstanceOfType(current))
-                    return "<类型不匹配: " + entry.MemberPath + ">";
+                    return "<方法需要参数: " + entry.MemberPath + ">";
 
                 try
                 {

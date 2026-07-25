@@ -157,7 +157,7 @@ namespace ES
             if (_layerRuntime == null || !_layerRuntime.mixer.IsValid()) return;
             if (_pipelineSlotIndex < 0 || _pipelineSlotIndex >= _layerRuntime.mixer.GetInputCount()) return;
 
-            _layerRuntime.mixer.SetInputWeight(_pipelineSlotIndex, _playableWeight);
+            _layerRuntime.SetMixerSlotWeightIfChanged(_pipelineSlotIndex, _playableWeight);
             _layerRuntime.MarkDirty(PipelineDirtyFlags.MixerWeights);
         }
 

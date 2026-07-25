@@ -39,30 +39,100 @@ MonoBehaviour:
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 0}
+      Kind: 0
+      EnumKey: 0
+      StringKey: 
+      RuntimeKey: 0
+      AssetGuid: 
+      LocalFileId: 0
+      AssetPath: 
+      AssetTypeName: 
+      SourceLibrary: 
+      SourceBook: 
     - Name: EditorInitAndUpdater
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 0}
+      Kind: 0
+      EnumKey: 0
+      StringKey: 
+      RuntimeKey: 0
+      AssetGuid: 
+      LocalFileId: 0
+      AssetPath: 
+      AssetTypeName: 
+      SourceLibrary: 
+      SourceBook: 
     - Name: 0_Stand
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 0}
+      Kind: 0
+      EnumKey: 0
+      StringKey: 
+      RuntimeKey: 0
+      AssetGuid: 
+      LocalFileId: 0
+      AssetPath: 
+      AssetTypeName: 
+      SourceLibrary: 
+      SourceBook: 
     - Name: EditorInitAndUpdater
       ColorTag: 0
       namedOption: 2
       OB: {fileID: 0}
+      Kind: 0
+      EnumKey: 0
+      StringKey: 
+      RuntimeKey: 0
+      AssetGuid: 
+      LocalFileId: 0
+      AssetPath: 
+      AssetTypeName: 
+      SourceLibrary: 
+      SourceBook: 
     - Name: SODataInfoWindow
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 0}
+      Kind: 0
+      EnumKey: 0
+      StringKey: 
+      RuntimeKey: 0
+      AssetGuid: 
+      LocalFileId: 0
+      AssetPath: 
+      AssetTypeName: 
+      SourceLibrary: 
+      SourceBook: 
     - Name: ESDisplayToType
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 0}
+      Kind: 0
+      EnumKey: 0
+      StringKey: 
+      RuntimeKey: 0
+      AssetGuid: 
+      LocalFileId: 0
+      AssetPath: 
+      AssetTypeName: 
+      SourceLibrary: 
+      SourceBook: 
     - Name: AA
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 0}
+      Kind: 0
+      EnumKey: 0
+      StringKey: 
+      RuntimeKey: 0
+      AssetGuid: 
+      LocalFileId: 0
+      AssetPath: 
+      AssetTypeName: 
+      SourceLibrary: 
+      SourceBook: 
   - Name: book PreNameToABKeys
     WritableDefaultMessageOnEditor: 1
     PreferredAssetCategory: 12
@@ -98,19 +168,29 @@ MonoBehaviour:
     PreferredAssetCategory: 1
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferPrefab"
+    Desc: ESAssetReferPrefab
     pages:
     - Name: GameObject (3)
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 7055376591365242435, guid: 495b09c783492784e88277aa816dfdce, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: GameObject (3)
+      RuntimeKey: 30000
+      AssetGuid: 495b09c783492784e88277aa816dfdce
+      LocalFileId: 0
+      AssetPath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 15754b957c654b547a5d5dfad62fcce0
+      SourceBook: "\u9ED8\u8BA4 \u9ED8\u8BA4\u9884\u5236\u4F53Book"
   DefaultSceneBook:
     Name: "\u9ED8\u8BA4 \u573A\u666F Book"
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 2
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferScene"
+    Desc: ESAssetReferScene
     pages: []
   DefaultSpriteBook:
     Name: "\u9ED8\u8BA4 \u7CBE\u7075 Book"
@@ -118,15 +198,15 @@ MonoBehaviour:
     PreferredAssetCategory: 3
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferSprite"
+    Desc: ESAssetReferSprite
     pages: []
   DefaultTexture2DBook:
-    Name: "DefaultTexture2DBook"
+    Name: DefaultTexture2DBook
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 6
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferTexture2D"
+    Desc: ESAssetReferTexture2D
     pages: []
   DefaultTextureBook:
     Name: "\u9ED8\u8BA4 \u7EB9\u7406 Book"
@@ -134,15 +214,15 @@ MonoBehaviour:
     PreferredAssetCategory: 6
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferTexture"
+    Desc: ESAssetReferTexture
     pages: []
   DefaultSpriteAtlasBook:
-    Name: "DefaultSpriteAtlasBook"
+    Name: DefaultSpriteAtlasBook
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 4
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferSpriteAtlas"
+    Desc: ESAssetReferSpriteAtlas
     pages: []
   DefaultMaterialBook:
     Name: "\u9ED8\u8BA4 \u6750\u8D28 Book"
@@ -150,15 +230,15 @@ MonoBehaviour:
     PreferredAssetCategory: 5
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferMaterial"
+    Desc: ESAssetReferMaterial
     pages: []
   DefaultMeshBook:
-    Name: "DefaultMeshBook"
+    Name: DefaultMeshBook
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 8
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferMesh"
+    Desc: ESAssetReferMesh
     pages: []
   DefaultAnimationClipBook:
     Name: "\u9ED8\u8BA4 \u52A8\u753B Book"
@@ -166,23 +246,23 @@ MonoBehaviour:
     PreferredAssetCategory: 10
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferAnimationClip"
+    Desc: ESAssetReferAnimationClip
     pages: []
   DefaultAnimatorControllerBook:
-    Name: "DefaultAnimatorControllerBook"
+    Name: DefaultAnimatorControllerBook
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 11
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferAnimatorController"
+    Desc: ESAssetReferAnimatorController
     pages: []
   DefaultAvatarBook:
-    Name: "DefaultAvatarBook"
+    Name: DefaultAvatarBook
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 12
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferAvatar"
+    Desc: ESAssetReferAvatar
     pages: []
   DefaultAudioClipBook:
     Name: "\u9ED8\u8BA4 \u97F3\u6548 Book"
@@ -190,43 +270,61 @@ MonoBehaviour:
     PreferredAssetCategory: 9
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferAudioClip"
+    Desc: ESAssetReferAudioClip
     pages:
     - Name: "\u65B0\u5EFA\u89D2\u8272\u6570\u636E\u7EC483227"
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 11400000, guid: b7efbde1b85ac534f8df3ded09592512, type: 2}
+      Kind: 16
+      EnumKey: 0
+      StringKey: "\u65B0\u5EFA\u89D2\u8272\u6570\u636E\u7EC483227"
+      RuntimeKey: 30012
+      AssetGuid: b7efbde1b85ac534f8df3ded09592512
+      LocalFileId: 0
+      AssetPath: "Assets/ESNormalAssets/Data/Group/Actor/\u65B0\u5EFA\u89D2\u8272\u6570\u636E\u7EC483227.asset"
+      AssetTypeName: ES.ActorDataGroup
+      SourceLibrary: 15754b957c654b547a5d5dfad62fcce0
+      SourceBook: "\u9ED8\u8BA4 \u97F3\u6548 Book"
   DefaultVideoClipBook:
-    Name: "DefaultVideoClipBook"
+    Name: DefaultVideoClipBook
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 19
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferVideoClip"
+    Desc: ESAssetReferVideoClip
     pages: []
   DefaultTimelineAssetBook:
-    Name: "DefaultTimelineAssetBook"
+    Name: DefaultTimelineAssetBook
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 13
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferTimelineAsset"
+    Desc: ESAssetReferTimelineAsset
     pages: []
   DefaultPlayableAssetBook:
-    Name: "DefaultPlayableAssetBook"
+    Name: DefaultPlayableAssetBook
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 14
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferPlayableAsset"
+    Desc: ESAssetReferPlayableAsset
+    pages: []
+  DefaultScriptableObjectBook:
+    Name: Default ScriptableObject Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 16
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferScriptableObject
     pages: []
   DefaultTerrainDataBook:
-    Name: "DefaultTerrainDataBook"
+    Name: DefaultTerrainDataBook
     WritableDefaultMessageOnEditor: 0
     PreferredAssetCategory: 15
     CustomIcon: {fileID: 0}
     ColorTag: 0
-    Desc: "ESAssetReferTerrainData"
+    Desc: ESAssetReferTerrainData
     pages: []
   ContainsBuild: 1
   IsNet: 0

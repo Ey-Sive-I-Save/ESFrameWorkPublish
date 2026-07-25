@@ -30,6 +30,9 @@ namespace ES
         [LabelText("打开入口后自动 resume")]
         public bool autoResumeOnOpen = true;
 
+        [LabelText("优先后台 CMD 中转")]
+        public bool preferExternalTerminal = true;
+
         [LabelText("自动记录恢复 Key")]
         public bool autoCaptureResumeKey = true;
 

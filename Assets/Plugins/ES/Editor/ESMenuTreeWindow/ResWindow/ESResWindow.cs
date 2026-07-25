@@ -5,13 +5,48 @@ using Sirenix.Utilities.Editor;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
 namespace ES
 {
+    [InitializeOnLoad]
     public class ESResWindow : ESMenuTreeWindowAB<ESResWindow> //OdinMenuEditorWindow
     {
+        static ESResWindow()
+        {
+            ESAssetReferEditorBridge.OpenRegistryPage = OpenAndSelectAssetPage;
+        }
+
+        private static void OpenAndSelectAssetPage(ESAssetPage page)
+        {
+            if (page == null)
+                return;
+
+            OpenWindow();
+            EditorApplication.delayCall += () =>
+            {
+                if (menuTree == null)
+                    return;
+                foreach (OdinMenuItem item in menuTree.EnumerateTree())
+                {
+                    if (!(item.Value is ESAssetPage candidate))
+                        continue;
+                    bool identityMatches = !string.IsNullOrEmpty(page.AssetGuid)
+                        && candidate.AssetGuid == page.AssetGuid
+                        && candidate.LocalFileId == page.LocalFileId;
+                    if (!ReferenceEquals(candidate, page) && !identityMatches)
+                        continue;
+                    menuTree.Selection.Clear();
+                    menuTree.Selection.Add(item);
+                    item.Select();
+                    UsingWindow?.Repaint();
+                    return;
+                }
+            };
+        }
+
         [MenuItem(MenuItemPathDefine.RESOURCE_WINDOW_PATH, false, 0)]
         public static void TryOpenWindow()
         {
@@ -50,7 +85,60 @@ namespace ES
         }
         void PartPage_Library(OdinMenuTree tree)
         {
+            EnsureConsumerConfiguration();
             menuTemplate.ApplyTemplateToMenuTree(this, tree, MenuNameForLibraryRoot);
+        }
+
+        private static void EnsureConsumerConfiguration()
+        {
+            List<ESAssetLibraryConsumer> consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
+                ?.Where(item => item != null)
+                .ToList() ?? new List<ESAssetLibraryConsumer>();
+            bool changed = false;
+
+            if (consumers.Count == 0)
+            {
+                var consumer = ScriptableObject.CreateInstance<ESAssetLibraryConsumer>();
+                consumer.Name = "DefaultConsumer";
+                consumer.Desc = "自动创建的默认资源消费入口。";
+                consumer.IsTotalConsumer = true;
+                consumer.Channel = "default";
+                consumer.EnsureStableIdentity();
+                List<ESAssetLibrary> libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
+                if (libraries != null)
+                    consumer.ConsumerLibFolders.AddRange(libraries.Where(item => item != null && item.ContainsBuild));
+
+                string basePath = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_;
+                if (!AssetDatabase.IsValidFolder(basePath))
+                    ESDesignUtility.SafeEditor.Quick_CreateAssetFolder(basePath);
+                string consumerFolder = basePath + "/Consumer";
+                if (!AssetDatabase.IsValidFolder(consumerFolder))
+                    AssetDatabase.CreateFolder(basePath, "Consumer");
+                string path = AssetDatabase.GenerateUniqueAssetPath(consumerFolder + "/DefaultConsumer.asset");
+                AssetDatabase.CreateAsset(consumer, path);
+                consumers.Add(consumer);
+                changed = true;
+                Debug.Log("[ESResWindow] 未发现 Consumer，已自动创建 DefaultConsumer 并设为总入口。");
+            }
+
+            if (!consumers.Any(item => item.IsTotalConsumer))
+            {
+                Undo.RecordObject(consumers[0], "Assign Default Total Consumer");
+                consumers[0].IsTotalConsumer = true;
+                EditorUtility.SetDirty(consumers[0]);
+                changed = true;
+            }
+
+            foreach (ESAssetLibraryConsumer consumer in consumers)
+            {
+                bool consumerChanged = consumer.EnsureStableIdentity();
+                if (!consumerChanged) continue;
+                EditorUtility.SetDirty(consumer);
+                changed = true;
+            }
+
+            if (changed)
+                AssetDatabase.SaveAssets();
         }
 
         void PartPage_Setting(OdinMenuTree tree)
@@ -67,6 +155,7 @@ namespace ES
 
         public class Page_Root_GlobalSetting : ESWindowPageBase
         {
+            private const string ResourcePipelineTaskKey = "ES.ResourcePipeline";
             /*
              直接绘制本体了哈 ESGlobalResSetting
              */
@@ -81,6 +170,16 @@ namespace ES
                     editor.DrawDefaultInspector();
                 }
             }
+
+            public override void OnPageDisable()
+            {
+                base.OnPageDisable();
+                if (editor != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(editor);
+                    editor = null;
+                }
+            }
             [PropertySpace(20, 30)]
             [HorizontalGroup("总组")]
             [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
@@ -92,9 +191,6 @@ namespace ES
             [OnInspectorGUI]
             public void DrawLibs()
             {
-                // 实时修改版本号
-                ESGlobalResSetting.Instance.Version = EditorGUILayout.TextField("版本号", ESGlobalResSetting.Instance.Version);
-
                 SirenixEditorGUI.BeginBox();
 
                 if (reorderableListForLibraries != null) reorderableListForLibraries.DoLayoutList();
@@ -134,20 +230,23 @@ namespace ES
                 {
                     if (libraries == null) return;
                     var lib = libraries[index];
+                    if (lib == null) return;
                     var color = isActive ? Color.yellow : (isFocused ? Color.white : Color.white);
 
                     GUIHelper.PushColor(color);
                     EditorGUILayout.BeginHorizontal();
-                    Rect left = new Rect(rect.x, rect.y, rect.width * 0.15f, rect.height);
-                    lib.ContainsBuild = EditorGUI.ToggleLeft(left, "构建", lib.ContainsBuild);
-                    Rect left2 = new Rect(rect.x + 0.15f * rect.width, rect.y, rect.width * 0.15f, rect.height);
-                    lib.IsNet = EditorGUI.ToggleLeft(left2, "远端", lib.IsNet);
-                    Rect left3 = new Rect(rect.x + 0.3f * rect.width, rect.y, rect.width * 0.15f, rect.height);
-                    lib.IsMainInClude = EditorGUI.ToggleLeft(left3, "主包", lib.IsMainInClude);
-                    Rect right = new Rect(rect.x + 0.45f * rect.width, rect.y, rect.width * 0.5f, rect.height);
+                    Rect left = new Rect(rect.x, rect.y, rect.width * 0.2f, rect.height);
+                    bool containsBuild = EditorGUI.ToggleLeft(left, "参与构建", lib.ContainsBuild);
+                    if (containsBuild != lib.ContainsBuild)
+                    {
+                        Undo.RecordObject(lib, "Change Library Build Inclusion");
+                        lib.ContainsBuild = containsBuild;
+                        EditorUtility.SetDirty(lib);
+                    }
+                    Rect right = new Rect(rect.x + 0.22f * rect.width, rect.y, rect.width * 0.73f, rect.height);
                     Rect rightOFF = right;
                     rightOFF.x -= 10;
-                    SirenixEditorGUI.DrawBorders(rightOFF, (int)(rect.width * 0.5f), 0, (int)rect.height, 0, colorBL);
+                    SirenixEditorGUI.DrawBorders(rightOFF, (int)(rect.width * 0.73f), 0, (int)rect.height, 0, colorBL);
                     EditorGUI.LabelField(right, lib.Name._AddPreAndLast("【", "】"));
 
                     SirenixEditorGUI.DrawBorders(rect, 2);
@@ -161,13 +260,15 @@ namespace ES
             [OnInspectorGUI()]
             public void AnalyzeAndAssignAssetPaths()
             {
-                if (GUILayout.Button("资源分析与去向生成", GUILayout.Height(50)))
+                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
+                EditorGUI.BeginDisabledGroup(pipelineBusy);
+                if (GUILayout.Button(pipelineBusy ? "资源管线任务执行中…" : "1. 烘焙资产引用", GUILayout.Height(50)))
                 {
                     ESEditorHandle.AddSimpleHandleTask(() =>
                     {
-                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-资源分析与去向生成", "开始分配资源去向，旧的手动地址可能失效！！", "直接来吧", "取消"))
+                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-烘焙资产引用", "只分析资产身份与引用关系，不修改 AB 标签。", "开始", "取消"))
                         {
-                            ESEditorRes.Build_PrepareAnalyzeAssetsKeys();
+                            ESAssetReferenceBaker.Bake();
                         }
                         else
                         {
@@ -175,10 +276,11 @@ namespace ES
                         }
 
 
-                    });
+                    }, key: ResourcePipelineTaskKey);
                 }
+                EditorGUI.EndDisabledGroup();
                 ;
-                SirenixEditorGUI.InfoMessageBox("资源去向生成用于生成全部资源的去向，在这之后资源才能被保证正确加载,否则可能出现冲突问题等");
+                SirenixEditorGUI.InfoMessageBox("输出每个 Library 的 Catalog 与 ReferenceGraph；不打标签、不构建、不发布。");
 
             }
 
@@ -186,34 +288,35 @@ namespace ES
             [OnInspectorGUI()]
             public void BuildAssetBundlesAndDependencies()
             {
-                if (GUILayout.Button("构建AB与依赖", GUILayout.Height(50)))
+                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
+                EditorGUI.BeginDisabledGroup(pipelineBusy);
+                if (GUILayout.Button(pipelineBusy ? "资源管线任务执行中…" : "2. 规划并标记 AB", GUILayout.Height(50)))
                 {
                     ESEditorHandle.AddSimpleHandleTask(() =>
                     {
                         try
                         {
-                            if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-构建AB与依赖", "这是最重要的一步！！", "直接来吧", "取消"))
+                            if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-规划并标记 AB", "读取烘焙结果，生成可审查计划并仅修改 ES 管理标签。", "开始", "取消"))
                             {
-
-                                ESEditorRes.BuildABAndCreateABHashAndDependsJsonData();
-
-                                Debug.Log("构建AB与依赖完成。");
+                                ESAssetBundleBuildPlanner.PlanAndMark();
+                                Debug.Log("资源包构建规划完成。");
                             }
                             else
                             {
-                                Debug.LogWarning("放弃-<构建AB与依赖>");
+                                Debug.LogWarning("已取消资源包构建规划。");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Debug.LogError($"构建AB与依赖失败: {ex.Message}");
+                            Debug.LogError($"资源包构建规划失败: {ex.Message}");
                         }
-                    });
+                    }, key: ResourcePipelineTaskKey);
                 }
+                EditorGUI.EndDisabledGroup();
                 ;
 
 
-                SirenixEditorGUI.InfoMessageBox("开始构建AB包和依赖关系这是发布模式下必须进行的一步");
+                SirenixEditorGUI.InfoMessageBox("只生成构建计划与资源清单，并应用 ES 管理的资源包标签；不会真正构建资源包。");
 
             }
 
@@ -221,14 +324,15 @@ namespace ES
             [OnInspectorGUI()]
             public void Click_Server()
             {
-                if (GUILayout.Button("上传到服务器", GUILayout.Height(50)))
+                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
+                EditorGUI.BeginDisabledGroup(pipelineBusy);
+                if (GUILayout.Button(pipelineBusy ? "资源管线任务执行中…" : "3. 构建资源包", GUILayout.Height(50)))
                 {
                     ESEditorHandle.AddSimpleHandleTask(() =>
                     {
-                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-上传到服务器", "开始上传到服务器，需要保证已经完成基础配置并且支持！！", "直接来吧", "取消"))
+                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始构建资源包", "校验标签与计划一致后，构建到资源包暂存目录。", "开始", "取消"))
                         {
-
-
+                            ESAssetBundleBuilder.Build();
                         }
                         else
                         {
@@ -236,12 +340,13 @@ namespace ES
                         }
 
 
-                    });
+                    }, key: ResourcePipelineTaskKey);
                 }
+                EditorGUI.EndDisabledGroup();
                 ;
 
 
-                SirenixEditorGUI.InfoMessageBox("经过配置后可用");
+                SirenixEditorGUI.InfoMessageBox("唯一真正执行 Unity 资源包构建的阶段；只写入资源包暂存目录，不会发布。");
 
             }
 
@@ -249,14 +354,15 @@ namespace ES
             [OnInspectorGUI()]
             public void Click_ALL()
             {
-                if (GUILayout.Button("一键完成", GUILayout.Height(50)))
+                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
+                EditorGUI.BeginDisabledGroup(pipelineBusy);
+                if (GUILayout.Button(pipelineBusy ? "资源管线任务执行中…" : "4. 发布资源包", GUILayout.Height(50)))
                 {
                     ESEditorHandle.AddSimpleHandleTask(() =>
                     {
-                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-一键完成全部流程", "从资源去向分配开始完成全部工作", "直接来吧", "取消"))
+                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始发布资源包", "只发布已经校验的暂存产物，并在最后写入根发布清单。", "开始", "取消"))
                         {
-
-
+                            ESAssetBundlePublisher.Publish();
                         }
                         else
                         {
@@ -264,12 +370,13 @@ namespace ES
                         }
 
 
-                    });
+                    }, key: ResourcePipelineTaskKey);
                 }
+                EditorGUI.EndDisabledGroup();
                 ;
 
 
-                SirenixEditorGUI.InfoMessageBox("前面的步骤一次性完成");
+                SirenixEditorGUI.InfoMessageBox("只校验并分发暂存产物，根发布清单会在最后原子写入；不会重新分析或构建资源。");
 
             }
 

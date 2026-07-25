@@ -19,9 +19,5 @@ namespace ES
         public BuffVariableData defaultVariableData;
         public GameObject prefab;
         public UnityEngine.Object extraAsset;
-        public ESGameCoreConfigJsonSource jsonSource;
     }
-
-    [Serializable]
-    public sealed class ESBuffConfigKeyJsonRecord : ESGameCoreConfigKeyJsonRecord { }
 }

@@ -1,5 +1,12 @@
 {
   "dependencies": {
+    "com.code-philosophy.hybridclr": {
+      "version": "https://github.com/focus-creative-games/hybridclr_unity.git#v8.12.0",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "e4def761d69b27b7b51a5de0f6d272861416a2d6"
+    },
     "com.code-philosophy.luban": {
       "version": "https://github.com/focus-creative-games/luban_unity.git",
       "depth": 0,

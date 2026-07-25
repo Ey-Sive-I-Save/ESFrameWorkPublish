@@ -4,6 +4,25 @@ using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// Why a system bypassed normal state activation arbitration.
+    /// Supply a concrete value when using ForceReplaceLayer or ForceExit.
+    /// </summary>
+    public enum StateForceReason : byte
+    {
+        None = 0,
+        Legacy = 1,
+        GameplayCleanup = 2,
+        TemporaryAnimation = 3,
+        ExitAutoActivation = 4,
+        Death = 5,
+        Respawn = 6,
+        SceneTransition = 7,
+        NetworkCorrection = 8,
+        Cinematic = 9,
+        Debug = 10,
+    }
+
     [Flags]
     public enum StateActivationCode : byte
     {

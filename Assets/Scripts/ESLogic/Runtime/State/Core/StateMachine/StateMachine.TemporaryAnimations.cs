@@ -178,7 +178,7 @@ namespace ES
             }
 
             bool activated = forceEnter
-                ? ForceEnterState(tempState, layer)
+                ? ForceReplaceLayer(tempState, StateForceReason.TemporaryAnimation, layer)
                 : TryActivateState(tempState, layer);
 
             if (!activated)

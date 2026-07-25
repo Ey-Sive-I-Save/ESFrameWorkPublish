@@ -25,7 +25,7 @@ namespace ES
         private string lastResultSummary = "";
         private string lastResultDetail = "";
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             SimpleToolsPanelUtility.DrawToolHeader(

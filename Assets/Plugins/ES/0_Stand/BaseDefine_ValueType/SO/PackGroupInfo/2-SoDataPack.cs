@@ -23,7 +23,7 @@ namespace ES
         bool EnableAutoRefresh { get; }
         void Check();
     }
-    public abstract class SoDataPack<Info> : ESSO, ISoDataPack where Info : ScriptableObject, ISoDataInfo
+    public abstract class SoDataPack<Info> : ESSO, ISoDataPack, IGameCoreSO where Info : ScriptableObject, ISoDataInfo
     {
 
         [LabelText("启用自动更新")] public bool enableAutoRefresh = true;
@@ -45,6 +45,14 @@ namespace ES
         public Type GetSOInfoType()
         {
             return typeof(Info);
+        }
+
+        /// <summary>聚合启动入口：未实现 IGameCoreSO 的 Info 正常跳过。</summary>
+        public void InjectGameCoreTables()
+        {
+            foreach (Info info in Infos.Values)
+                if (info is IGameCoreSO gameCore)
+                    gameCore.InjectGameCoreTables();
         }
 
         public void _AddInfoToDic(string k, ScriptableObject so)

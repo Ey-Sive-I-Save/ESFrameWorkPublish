@@ -38,6 +38,8 @@ namespace ES
         public override void ESWindow_OnOpen()
         {
             base.ESWindow_OnOpen();
+            EditorApplication.delayCall -= ApplyDefaultMenuWidth;
+            EditorApplication.delayCall += ApplyDefaultMenuWidth;
             if (UsingWindow.HasDelegate)
             {
                 //已经注册委托
@@ -52,11 +54,17 @@ namespace ES
         {
             HasDelegate = true;
         }
+
+        private static void ApplyDefaultMenuWidth()
+        {
+            if (UsingWindow != null)
+                UsingWindow.MenuWidth = 245;
+        }
         #endregion
 
         #region 数据滞留与声明
         //根页面名
-        public const string PageName_CoreWorkbench = "01 高价值工作台";
+        public const string PageName_CoreWorkbench = "01 常用工具";
         public const string PageName_SceneBatchTools = "02 场景批处理";
         public const string PageName_AssetPublishTools = "03 资产与发布";
         public const string PageName_DiagnosticsTools = "04 诊断与集成";
@@ -86,22 +94,22 @@ namespace ES
         public const string PageName_LightingSettings = "灯光设置工具";
         public const string PageName_ParticleSystemAdjustment = "粒子系统批量调整工具";
 
-        private const string MenuPath_RuntimeWatch = PageName_CoreWorkbench + "/运行时观察  [工业级]";
-        private const string MenuPath_MaterialReplacement = PageName_CoreWorkbench + "/材质批量替换  [工业级]";
-        private const string MenuPath_PrefabManagement = PageName_CoreWorkbench + "/Prefab实例管理  [工业级]";
-        private const string MenuPath_PhysicsAlign = PageName_CoreWorkbench + "/物理对齐与布景  [工业级]";
-        private const string MenuPath_AnimationBatchSetting = PageName_CoreWorkbench + "/动画器批量设置  [工业级]";
-        private const string MenuPath_BatchStaticSettingCore = PageName_CoreWorkbench + "/批量静态设置  [工业级]";
-        private const string MenuPath_AssetReferenceChecker = PageName_CoreWorkbench + "/资源引用检查  [工业级]";
-        private const string MenuPath_BatchRename = PageName_SceneBatchTools + "/" + PageName_BatchRename + "  [升级中]";
-        private const string MenuPath_SceneOptimization = PageName_SceneBatchTools + "/" + PageName_SceneOptimization + "  [升级中]";
-        private const string MenuPath_LightingSettings = PageName_SceneBatchTools + "/" + PageName_LightingSettings + "  [升级中]";
-        private const string MenuPath_ParticleSystemAdjustment = PageName_SceneBatchTools + "/" + PageName_ParticleSystemAdjustment + "  [升级中]";
-        private const string MenuPath_UnityPackageTool = PageName_AssetPublishTools + "/" + PageName_UnityPackageTool + "  [升级中]";
-        private const string MenuPath_TextureSpriteTool = PageName_AssetPublishTools + "/" + PageName_TextureSpriteTool + "  [升级中]";
-        private const string MenuPath_ObjectPool = PageName_DiagnosticsTools + "/" + PageName_ObjectPool + "  [诊断]";
-        private const string MenuPath_TopToolbar = PageName_DiagnosticsTools + "/" + PageName_TopToolbar + "  [配置]";
-        private const string MenuPath_SceneTextRepair = PageName_DiagnosticsTools + "/" + PageName_SceneTextRepair + "  [修复]";
+        private const string MenuPath_RuntimeWatch = PageName_CoreWorkbench + "/07 运行时观察";
+        private const string MenuPath_MaterialReplacement = PageName_CoreWorkbench + "/01 材质批量替换";
+        private const string MenuPath_PrefabManagement = PageName_CoreWorkbench + "/02 Prefab实例管理";
+        private const string MenuPath_PhysicsAlign = PageName_CoreWorkbench + "/03 物理对齐与布景";
+        private const string MenuPath_AnimationBatchSetting = PageName_CoreWorkbench + "/04 动画器批量设置";
+        private const string MenuPath_BatchStaticSettingCore = PageName_CoreWorkbench + "/05 批量静态设置";
+        private const string MenuPath_AssetReferenceChecker = PageName_CoreWorkbench + "/06 资源引用检查";
+        private const string MenuPath_BatchRename = PageName_SceneBatchTools + "/01 " + PageName_BatchRename;
+        private const string MenuPath_SceneOptimization = PageName_SceneBatchTools + "/02 " + PageName_SceneOptimization;
+        private const string MenuPath_LightingSettings = PageName_SceneBatchTools + "/03 " + PageName_LightingSettings;
+        private const string MenuPath_ParticleSystemAdjustment = PageName_SceneBatchTools + "/04 " + PageName_ParticleSystemAdjustment;
+        private const string MenuPath_UnityPackageTool = PageName_AssetPublishTools + "/01 " + PageName_UnityPackageTool;
+        private const string MenuPath_TextureSpriteTool = PageName_AssetPublishTools + "/02 " + PageName_TextureSpriteTool;
+        private const string MenuPath_ObjectPool = PageName_DiagnosticsTools + "/01 " + PageName_ObjectPool + "  [诊断]";
+        private const string MenuPath_TopToolbar = PageName_DiagnosticsTools + "/02 " + PageName_TopToolbar + "  [配置]";
+        private const string MenuPath_SceneTextRepair = PageName_DiagnosticsTools + "/03 " + PageName_SceneTextRepair + "  [修复]";
 
         [NonSerialized] public Page_SimpleToolsOverview pageOverview;
         [NonSerialized] public Page_UnityPackageTool pageUnityPackageTool;
@@ -160,10 +168,11 @@ namespace ES
         protected override void ES_OnBuildMenuTree(OdinMenuTree tree)
         {
             base.ES_OnBuildMenuTree(tree);
+            tree.Config.DrawSearchToolbar = true;
             {
                 QuickBuildRootMenu(tree, PageName_Overview, ref pageOverview, SdfIconType.Speedometer2);
 
-                // 高价值工作台：已重点工业化，优先显示。
+                // Frequently used editor tools.
                 QuickBuildRootMenu(tree, MenuPath_RuntimeWatch, ref pageRuntimeWatch, SdfIconType.Activity);
                 QuickBuildRootMenu(tree, MenuPath_MaterialReplacement, ref pageMaterialReplacement, SdfIconType.Palette);
                 QuickBuildRootMenu(tree, MenuPath_PrefabManagement, ref pagePrefabManagement, SdfIconType.Box);
@@ -186,8 +195,23 @@ namespace ES
                 QuickBuildRootMenu(tree, MenuPath_ObjectPool, ref pageObjectPool, SdfIconType.Droplet);
                 QuickBuildRootMenu(tree, MenuPath_TopToolbar, ref pageTopToolbar, SdfIconType.Map);
                 QuickBuildRootMenu(tree, MenuPath_SceneTextRepair, ref pageSceneTextRepair, SdfIconType.Search);
+                ConfigureDefaultMenuExpansion(tree);
             }
             ES_LoadData();
+        }
+
+        private static void ConfigureDefaultMenuExpansion(OdinMenuTree tree)
+        {
+            if (tree == null)
+                return;
+
+            foreach (var item in tree.EnumerateTree())
+            {
+                if (item == null)
+                    continue;
+
+                item.Toggled = item.Name == PageName_CoreWorkbench || item.Name == PageName_SceneBatchTools;
+            }
         }
 
 
@@ -252,22 +276,7 @@ namespace ES
             [OnInspectorGUI]
             private void DrawOverview()
             {
-                SimpleToolsPanelUtility.DrawToolHeader(
-                    "ES 简单工具集总览",
-                    "这里按商业价值和操作风险组织工具。优先使用高价值工作台；场景批处理和资产发布区仍在继续统一 UI、分页、报告和大批量保护。",
-                    SimpleToolsMaturity.Upgrading,
-                    "批量写场景、Prefab、材质、动画、静态标记前必须先预览目标和规则。旧工具没有预览时要按高风险处理。");
-
-                SimpleToolsPanelUtility.DrawSectionTitle("推荐使用顺序", "先用成熟工具处理高频问题，再进入升级中工具。");
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                {
-                    DrawOverviewRow("01 高价值工作台", "RuntimeWatch、材质替换、Prefab管理、物理布景、Animator、静态标记、资源引用检查。", SimpleToolsMaturity.Industrial);
-                    DrawOverviewRow("02 场景批处理", "批量重命名、场景优化、灯光设置、粒子调整。已开始接入统一风险提示和大列表保护。", SimpleToolsMaturity.Upgrading);
-                    DrawOverviewRow("03 资产与发布", "UnityPackage、纹理精灵。下一步补资产批处理报告、失败项复查和导出记录。", SimpleToolsMaturity.Upgrading);
-                    DrawOverviewRow("04 诊断与集成", "对象池、顶部工具栏、场景文本修复。偏框架配套和诊断，不混入场景批量写入区。", SimpleToolsMaturity.Upgrading);
-                }
-
-                SimpleToolsPanelUtility.DrawSectionTitle("按任务进入", "不记工具名也能开工；按钮只负责跳页，不会执行任何写入。");
+                EditorGUILayout.HelpBox("选择左侧工具后再执行操作。批量修改场景或资产前，请先确认目标范围。", MessageType.Info);
                 using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                 {
                     DrawQuickOpenRow(
@@ -283,34 +292,6 @@ namespace ES
                         ("导出包", MenuPath_UnityPackageTool, "确认资源清单后再导出 UnityPackage。"),
                         ("切 Sprite", MenuPath_TextureSpriteTool, "批量设置纹理导入和精灵切分。"));
                 }
-
-                SimpleToolsPanelUtility.DrawSectionTitle("风险分层", "判断是否必须预览、是否要二次确认。");
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                {
-                    EditorGUILayout.LabelField("低风险：只扫描、只定位、只复制报告、只读运行时数据。", EditorStyles.wordWrappedMiniLabel);
-                    EditorGUILayout.LabelField("中风险：改当前场景对象的名称、位置、Static Flags、Animator 参数、材质槽位。必须支持 Undo。", EditorStyles.wordWrappedMiniLabel);
-                    EditorGUILayout.LabelField("高风险：保存 Prefab Asset、改导入设置、批量创建/删除资产、跨场景写入。必须先预览并二次确认。", EditorStyles.wordWrappedMiniLabel);
-                }
-
-                SimpleToolsPanelUtility.DrawSectionTitle("统一化进度", "这部分是后续 AI 和开发者判断工具状态的基准。");
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                {
-                    EditorGUILayout.LabelField("已落地：总入口按商业价值重排；公共分页、报告、历史、重操作确认、大列表提示；部分旧工具接入统一头部。", EditorStyles.wordWrappedMiniLabel);
-                    EditorGUILayout.LabelField("继续推进：所有表格统一分页；批量工具统一预览签名；失败项报告结构化；导出报告落到每个核心工具。", EditorStyles.wordWrappedMiniLabel);
-                    EditorGUILayout.LabelField("保守边界：不把低价值工具平均工业化；批量写资产和场景的工具优先。", EditorStyles.wordWrappedMiniLabel);
-                }
-
-                SimpleToolsPanelUtility.DrawSectionTitle("人工验证清单", "Unity 面板里必须实际点过，不用截图也要按这个顺序过一遍。");
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                {
-                    EditorGUILayout.LabelField("1. 空选区：空状态清楚，不报错，不弹无意义异常。", EditorStyles.wordWrappedMiniLabel);
-                    EditorGUILayout.LabelField("2. 小选区：预览、定位、执行、Undo、Dirty、报告都能跑通。", EditorStyles.wordWrappedMiniLabel);
-                    EditorGUILayout.LabelField("3. 大选区：分页不卡，搜索能缩小范围，执行前会提示目标数量和风险。", EditorStyles.wordWrappedMiniLabel);
-                    EditorGUILayout.LabelField("4. Prefab/资产：不应误改 Prefab Asset；需要改资产时必须明确进入资产模式或二次确认。", EditorStyles.wordWrappedMiniLabel);
-                    EditorGUILayout.LabelField("5. 失败项：失败原因必须进入报告，不能只在 Console 里刷一串异常。", EditorStyles.wordWrappedMiniLabel);
-                }
-
-                SimpleToolsPanelUtility.DrawOperationHistory();
             }
 
             private static void DrawOverviewRow(string title, string description, SimpleToolsMaturity maturity)

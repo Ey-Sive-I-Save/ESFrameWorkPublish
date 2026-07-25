@@ -57,6 +57,19 @@ namespace ES
 
             Editor_RegisterToSOIndex();
         }
+
+        /// <summary>
+        /// Ensures the editor apply hook runs no more than once per editor-domain lifetime.
+        /// Both Unity's OnEnable callback and the assembly-stream apply phase must use this entry point.
+        /// </summary>
+        public void Editor_EnsureApplied()
+        {
+            if (apply_Editor)
+                return;
+
+            OnEditorApply();
+            apply_Editor = true;
+        }
 #endif
         public virtual void OnEditorApply()
         {
@@ -72,11 +85,7 @@ namespace ES
                 init_Editor = true;
             }
 
-            if (!apply_Editor)
-            {
-                OnEditorApply();
-                apply_Editor = true;
-            }
+            // Apply is intentionally deferred to SoEditorApplier (Order 40), after all ESSO assets are registered.
 #endif
         }
 

@@ -226,6 +226,10 @@ namespace ES
         public float[] phaseBlendWeights;
         /// <summary>阶段内主次混合速度</summary>
         public float[] phaseBlendVelocities;
+        /// <summary>每个阶段本地双 Clip Mixer 最近写入的主动画权重。</summary>
+        public float[] phaseLastAppliedPrimaryWeights;
+        /// <summary>每个阶段本地双 Clip Mixer 最近写入的次动画权重。</summary>
+        public float[] phaseLastAppliedSecondaryWeights;
 
         // ==================== SequentialStates Mixer权重写入缓存（性能关键） ====================
 
@@ -466,6 +470,8 @@ namespace ES
             phaseUsesCalculator = null;
             phaseBlendWeights = null;
             phaseBlendVelocities = null;
+            phaseLastAppliedPrimaryWeights = null;
+            phaseLastAppliedSecondaryWeights = null;
 
             // ★ 清理主Mixer中的子Playable（先断开再销毁mixer）
             if (mixer.IsValid())
@@ -965,6 +971,51 @@ namespace ES
                 for (int i = 0; i < lastMixerInputWeights.Length; i++)
                     lastMixerInputWeights[i] = float.NaN;
             }
+        }
+
+        public void InitializePhaseMixerWeightCaches(int phaseCount)
+        {
+            phaseLastAppliedPrimaryWeights = new float[phaseCount];
+            phaseLastAppliedSecondaryWeights = new float[phaseCount];
+            for (int i = 0; i < phaseCount; i++)
+            {
+                phaseLastAppliedPrimaryWeights[i] = float.NaN;
+                phaseLastAppliedSecondaryWeights[i] = float.NaN;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetPhaseMixerWeightsIfChanged(AnimationMixerPlayable mixer, int phaseIndex, float primaryWeight, float secondaryWeight)
+        {
+            if (!mixer.IsValid()) return;
+            if (phaseLastAppliedPrimaryWeights == null || phaseLastAppliedSecondaryWeights == null
+                || (uint)phaseIndex >= (uint)phaseLastAppliedPrimaryWeights.Length
+                || (uint)phaseIndex >= (uint)phaseLastAppliedSecondaryWeights.Length)
+            {
+                mixer.SetInputWeight(0, primaryWeight);
+                mixer.SetInputWeight(1, secondaryWeight);
+                return;
+            }
+
+            if (phaseLastAppliedPrimaryWeights[phaseIndex] != primaryWeight)
+            {
+                mixer.SetInputWeight(0, primaryWeight);
+                phaseLastAppliedPrimaryWeights[phaseIndex] = primaryWeight;
+            }
+            if (phaseLastAppliedSecondaryWeights[phaseIndex] != secondaryWeight)
+            {
+                mixer.SetInputWeight(1, secondaryWeight);
+                phaseLastAppliedSecondaryWeights[phaseIndex] = secondaryWeight;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void InvalidatePhaseMixerWeightCache(int phaseIndex)
+        {
+            if (phaseLastAppliedPrimaryWeights != null && (uint)phaseIndex < (uint)phaseLastAppliedPrimaryWeights.Length)
+                phaseLastAppliedPrimaryWeights[phaseIndex] = float.NaN;
+            if (phaseLastAppliedSecondaryWeights != null && (uint)phaseIndex < (uint)phaseLastAppliedSecondaryWeights.Length)
+                phaseLastAppliedSecondaryWeights[phaseIndex] = float.NaN;
         }
 
         public void RewindCachedPlayableTreeForEnter()

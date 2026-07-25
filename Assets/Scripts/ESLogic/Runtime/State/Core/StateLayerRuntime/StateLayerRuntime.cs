@@ -72,6 +72,8 @@ namespace ES
         [NonSerialized] private readonly List<KeyValuePair<StateBase, int>> _stateToSlotListCache = new List<KeyValuePair<StateBase, int>>(64);
         /// <summary>上一次写入 RootMixer 的层级权重（用于阈值比较）</summary>
         [NonSerialized] internal float lastAppliedRootMixerWeight = float.NaN;
+        // Slot cache skips redundant native AnimationMixerPlayable weight writes.
+        [NonSerialized] internal readonly float[] lastAppliedMixerSlotWeights = new float[32];
         public StateLayerRuntime(StateLayerType type, StateMachine machine)
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -80,6 +82,8 @@ namespace ES
             layerType = type;
             stateMachine = machine;
             runningStates = new SwapBackSet<StateBase>(16);
+            for (int i = 0; i < lastAppliedMixerSlotWeights.Length; i++)
+                lastAppliedMixerSlotWeights[i] = float.NaN;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -112,7 +116,31 @@ namespace ES
 
         public float GetStateWeight(StateBase state) => state != null ? state.PlayableWeight : 0f;
 
-        public bool ActivateState(StateBase state)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void SetMixerSlotWeightIfChanged(int slotIndex, float value)
+        {
+            if (!mixer.IsValid() || slotIndex < 0 || slotIndex >= mixer.GetInputCount()) return;
+            if ((uint)slotIndex >= (uint)lastAppliedMixerSlotWeights.Length)
+            {
+                mixer.SetInputWeight(slotIndex, value);
+                return;
+            }
+            if (lastAppliedMixerSlotWeights[slotIndex] == value) return;
+            mixer.SetInputWeight(slotIndex, value);
+            lastAppliedMixerSlotWeights[slotIndex] = value;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void InvalidateMixerSlotWeight(int slotIndex)
+        {
+            if ((uint)slotIndex < (uint)lastAppliedMixerSlotWeights.Length)
+                lastAppliedMixerSlotWeights[slotIndex] = float.NaN;
+        }
+
+        // State transitions must be arbitrated by StateMachine. Keeping this
+        // internal prevents gameplay assemblies from bypassing merge rules,
+        // support-flag handling, lifecycle callbacks and activation rollback.
+        internal bool ActivateState(StateBase state)
         {
             if (state == null) return false;
             var machine = GetStateMachineOrNull();
@@ -128,7 +156,9 @@ namespace ES
             return true;
         }
 
-        public bool DeactivateState(StateBase state)
+        // See ActivateState: external callers must use
+        // StateMachine.TryDeactivateState instead.
+        internal bool DeactivateState(StateBase state)
         {
             if (state == null) return false;
             var machine = GetStateMachineOrNull();

@@ -15,6 +15,8 @@ namespace ES
     {
         public const string ResParentFolderName = "Res";
         public const string ResConsumersExpandParentFolderName = "_ExpandConsumers";
+        public const string ESOutputRootFolderName = "ES";
+        public const string InitialTargetFolderName = "InitialTarget";
 
         [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
         public string createText = "--资源管理全局设置--";
@@ -30,11 +32,6 @@ namespace ES
         [EnumToggleButtons]
         [InfoBox("运行时资产入口的总模式。业务代码不直接判断路径，只通过 AssetTable / AssetModule 使用该模式。", InfoMessageType.Info)]
         public ESAssetRunMode AssetRunMode = ESAssetRunMode.EditorDirect;
-
-        [VerticalGroup("Main/BuildAndRun")]
-        [ESBoolOption("启用发布模式", "使用模拟模式")]
-        [InfoBox("旧构建输出开关：目前 ESResEditor 仍使用它区分远程构建输出和本地构建输出。运行时加载模式以上方 AssetRunMode 为准。", InfoMessageType.Warning)]
-        public bool EnablePublishMode = true;
 
         [VerticalGroup("Main/BuildAndRun")]
         [LabelText("辅助代码生成模式")]
@@ -56,14 +53,14 @@ namespace ES
         public string Path_Net = "http....";
 
         [VerticalGroup("Main/FolderPath")]
-        [LabelText("远程资源库构建文件夹"), ShowInInspector, InlineButton("OpenOutBuild", "打开远程构建文件夹")]
-        public string Path_RemoteResOutBuildPath { get => _path_RemoteResOutPath; set { } }
-        private string _path_RemoteResOutPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "ES", ResParentFolderName);
+        [LabelText("远程资源库构建文件夹（权威路径）"), ShowInInspector, DisplayAsString, InlineButton("OpenOutBuild", "打开远程构建文件夹")]
+        public string Path_RemoteResOutBuildPath => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResParentFolderName);
 
         [VerticalGroup("Main/FolderPath")]
-        [LabelText("构建初始目标"), ShowInInspector, InlineButton("OpenInitialTarget", "打开初始目标文件夹")]
-        public string Path_BuildInitialTarget { get => _path_BuildInitialTarget; set { } }
-        private string _path_BuildInitialTarget = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "ES", "InitialTarget");
+        [LabelText("构建初始目标（权威路径）"), ShowInInspector, DisplayAsString, InlineButton("OpenInitialTarget", "打开初始目标文件夹")]
+        public string Path_BuildInitialTarget => Path.Combine(ProjectRootPath, ESOutputRootFolderName, InitialTargetFolderName);
+
+        private static string ProjectRootPath => Directory.GetParent(Application.dataPath).FullName;
 
         [VerticalGroup("Main/FolderPath")]
         [FolderPath, LabelText("默认资源库放置文件夹")]
@@ -86,6 +83,18 @@ namespace ES
         [InlineButton("OpenPersist", "打开持久下载文件夹")]
         public string Path_Sub_DownloadRelative_ = ResParentFolderName;
 
+        public bool IsHotUpdateMode => AssetRunMode == ESAssetRunMode.HotUpdate;
+
+        public static bool IsAssetBundleReleaseMode(ESAssetRunMode mode)
+        {
+            return mode == ESAssetRunMode.LocalBuild || mode == ESAssetRunMode.HotUpdate;
+        }
+
+        public bool ShouldUseRemoteLibrary(bool libraryAllowsRemote)
+        {
+            return IsHotUpdateMode && libraryAllowsRemote;
+        }
+
         public override void OnEditorInitialized()
         {
 #if UNITY_EDITOR
@@ -96,16 +105,95 @@ namespace ES
 
         private void OpenOutBuild()
         {
-            string log = ESStandUtility.SafeEditor.Quick_System_CreateDirectory(_path_RemoteResOutPath).Message;
+            string log = ESStandUtility.SafeEditor.Quick_System_CreateDirectory(Path_RemoteResOutBuildPath).Message;
             Debug.Log(log);
-            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(_path_RemoteResOutPath, false);
+            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(Path_RemoteResOutBuildPath, false);
         }
+
+#if UNITY_EDITOR
+        [SerializeField, HideInInspector] private bool editorRunModeSnapshotInitialized;
+        [SerializeField, HideInInspector] private ESAssetRunMode previousEditorRunMode;
+
+        private void OnValidate()
+        {
+            if (Application.isPlaying)
+                return;
+
+            if (!editorRunModeSnapshotInitialized)
+            {
+                previousEditorRunMode = AssetRunMode;
+                editorRunModeSnapshotInitialized = true;
+                return;
+            }
+
+            bool switchedFromLocalRelease = previousEditorRunMode == ESAssetRunMode.LocalBuild;
+            bool switchedToRemoteRelease = AssetRunMode == ESAssetRunMode.HotUpdate;
+            if (switchedFromLocalRelease && switchedToRemoteRelease)
+                PromptLocalReleaseCleanup();
+
+            previousEditorRunMode = AssetRunMode;
+            EditorUtility.SetDirty(this);
+        }
+
+        private void PromptLocalReleaseCleanup()
+        {
+            string platform = ESResMaster.GetValidBuildTargetByRuntimePlatform(applyPlatform).ToString();
+            string platformRoot = Path.Combine(Application.streamingAssetsPath, ResParentFolderName, platform);
+            string rootManifestPath = Path.Combine(platformRoot, "ESAssetReleaseManifest.json");
+            if (!File.Exists(rootManifestPath))
+                return;
+
+            int choice = EditorUtility.DisplayDialogComplex(
+                "切换至热更新模式",
+                "检测到 StreamingAssets 中存在当前本地发布资源。是否删除当前版本的 ES 生成资源？\n\n只会删除根清单指定的当前发布版本，以及新版根清单和 Bundle 索引；不会删除旧 ESRes 文件。",
+                "删除当前本地发布资源",
+                "保留",
+                "帮我定位");
+
+            if (choice == 0)
+                DeleteCurrentLocalRelease(platformRoot, rootManifestPath);
+            else if (choice == 2)
+                ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(platformRoot, false);
+        }
+
+        private static void DeleteCurrentLocalRelease(string platformRoot, string rootManifestPath)
+        {
+            try
+            {
+                ESLocalReleasePointer pointer = JsonUtility.FromJson<ESLocalReleasePointer>(File.ReadAllText(rootManifestPath));
+                string releaseVersion = pointer != null ? pointer.releaseVersion : null;
+                if (!string.IsNullOrEmpty(releaseVersion) && string.Equals(Path.GetFileName(releaseVersion), releaseVersion, System.StringComparison.Ordinal))
+                {
+                    string releaseFolder = Path.GetFullPath(Path.Combine(platformRoot, releaseVersion));
+                    string validatedRoot = Path.GetFullPath(platformRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                    if (releaseFolder.StartsWith(validatedRoot, System.StringComparison.OrdinalIgnoreCase) && Directory.Exists(releaseFolder))
+                        Directory.Delete(releaseFolder, true);
+                }
+
+                File.Delete(rootManifestPath);
+                string bundleIndexPath = Path.Combine(platformRoot, "ESAssetReleaseBundleIndex.json");
+                if (File.Exists(bundleIndexPath))
+                    File.Delete(bundleIndexPath);
+                AssetDatabase.Refresh();
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError("[ESGlobalResSetting] 清理本地发布资源失败：" + exception.Message);
+            }
+        }
+
+        [System.Serializable]
+        private sealed class ESLocalReleasePointer
+        {
+            public string releaseVersion = string.Empty;
+        }
+#endif
 
         private void OpenInitialTarget()
         {
-            string log = ESStandUtility.SafeEditor.Quick_System_CreateDirectory(_path_BuildInitialTarget).Message;
+            string log = ESStandUtility.SafeEditor.Quick_System_CreateDirectory(Path_BuildInitialTarget).Message;
             Debug.Log(log);
-            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(_path_BuildInitialTarget, false);
+            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(Path_BuildInitialTarget, false);
         }
 
         private void OpenPersist()

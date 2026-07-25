@@ -19,10 +19,9 @@ namespace ES
             {
                 TopRuler.style.left = 0;
                 TopRuler.style.top = 0;
-                TopRuler.style.width = 800;
-                TopRuler.style.minWidth = 800;
-                TopRuler.style.maxWidth = 800;
-                TopRuler.style.height = 30;
+                TopRuler.style.position = Position.Absolute;
+                TopRuler.style.right = 0;
+                TopRuler.style.bottom = 0;
                 Add(TopRuler);
 
             }
@@ -30,6 +29,13 @@ namespace ES
         public void UpdateRuler()
         {
             
+        }
+
+        public void ApplyTimelineWidth(float width)
+        {
+            style.width = width;
+            TopRuler.style.width = width;
+            TopRuler.MarkDirtyRepaint();
         }
     }
 
@@ -156,7 +162,7 @@ namespace ES
                             painter.strokeColor = off > 1 ? levelup_down2 : levelup_down1;
 
                             painter.MoveTo(vv);
-                            vv.y = 1000;
+                            vv.y = contentRect.height;
                             painter.LineTo(vv);
                             painter.Stroke();
                             painter.ClosePath();

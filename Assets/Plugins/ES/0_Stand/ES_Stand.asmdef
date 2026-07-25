@@ -1,6 +1,9 @@
 {
     "name": "ES_Stand",
     "references": [
-        "Unity.Timeline"
+        "Unity.Timeline",
+        "Unity.TextMeshPro",
+        "UniTask",
+        "HybridCLR.Runtime"
     ]
 }

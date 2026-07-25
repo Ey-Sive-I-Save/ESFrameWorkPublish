@@ -189,3 +189,184 @@ For small-tool validation, prioritize in this order:
 - `dotnet build Assembly-CSharp-Editor-firstpass.csproj -v:minimal --no-dependencies`
 
 如果完整依赖编译失败，先确认是否仍是 `Assets/Scripts/ESLogic` 中缺失或删除文件导致，不要直接归因到 RuntimeWatch。
+
+## 2026-07-22 ObjectPool 工具重写与 SimpleTools 后续警告
+
+职责重申：本段仍属于 Codex 的“工具重写 / 商业级验证”职责，不是对象池运行时架构重定义。后续 AI 修改 `SimpleToolsWindow` 时，应优先保持工具真实、可验证、低误导，而不是堆新按钮。
+
+### ObjectPool 工具当前边界
+
+当前工具文件：
+
+```text
+Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs
+```
+
+当前只允许收成四个真实页签：
+
+```text
+运行时统计
+PrefabPrewarmDataInfo审计
+GameManager接入
+PlayMode池组状态
+```
+
+不要再恢复这些伪入口：
+
+```text
+预制件池化
+预热条目录入
+Selection.objects 读取 Project Prefab
+Selection.objects 读取 Hierarchy Prefab 实例
+GetNearestPrefabInstanceRoot
+GetCorrespondingObjectFromSource
+从当前选中 Prefab 自动加入预热配置
+```
+
+原因：Project/Hierarchy 选中 Prefab 只能说明“当前选择了一个 Prefab 资产或实例”，不能说明它已经进入 ES 根池化体系。把它做成“预制件池化入口”会误导开发者，以为录入行为等价于 GameManager 对象池接入。
+
+### PrefabPrewarmDataInfo 的正确查询方式
+
+`PrefabPrewarmDataInfo` 是 `SoDataInfo/ESSO` 链路资产。编辑器工具查询它时应走 SOS 高速通道：
+
+```csharp
+ESEditorSO.SOS.GetNewGroupOfType<PrefabPrewarmDataInfo>()
+```
+
+不要再用：
+
+```csharp
+AssetDatabase.FindAssets("t:PrefabPrewarmDataInfo")
+```
+
+更广义规则：只有明确继承 `ESSO` 的类型才享受 SOS 快速返回。接口类型、普通 `ScriptableObject`、不确定继承链的类型，不能因为某些实现类可能是 ESSO 就直接跳 SOS 早退，否则会漏掉非 ESSO 实现。
+
+已经确认过的 ESSO/SOS 修正方向包括：
+
+```text
+PrefabPrewarmDataInfo
+StateMachineConfig
+ESInputConfig
+ESSoTableDataRule
+ESAssetPackageBakeData
+ESAssetLibrary
+ESGlobalProjectAssetGuideData
+```
+
+后续如果发现 `FindAllSOAssetsQuickly`、`Quick_InitAsset<T>()`、`LoadAssetAtPath` 包装层内部绕过 SOS，要先判断目标类型是否真是 ESSO 子类。是 ESSO 子类才改高速通道；接口和普通 SO 不要乱改。
+
+### GameManager 接入页的真实语义
+
+`GameManager接入` 页只应做以下事情：
+
+```text
+定位当前场景 ESGameManager
+获取或创建 ESGameObjectPoolModule
+把当前目标 PrefabPrewarmDataInfo 接入 pool.prewarmSources
+从 pool.prewarmSources 移除当前目标 PrefabPrewarmDataInfo
+PlayMode 下调用运行时加载/刷新/卸载入口
+显示当前 GameManager 已接入的预热配置列表
+```
+
+会写入配置的操作必须保留确认、`Undo.RecordObject`、`EditorUtility.SetDirty`、`EditorSceneManager.MarkSceneDirty`。编辑模式只写配置关系，不实例化池对象；真正预热和池组创建发生在 PlayMode 或模块运行时入口中。
+
+不要在 `GameManager接入` 页新增“帮你扫描 Project Prefab 并自动接入”的功能。正确流程是：先由 SO 数据系统维护 `PrefabPrewarmDataInfo`，再由本页把配置资产接入 GameManager。
+
+### PlayMode 池组状态页
+
+`PlayMode池组状态` 是只读运行时诊断页，只能查看当前 `ESGameObjectPoolModule` 已经创建的池组统计：
+
+```text
+key
+activeCount
+inactiveCount
+totalCount
+createdCount
+rentCount
+returnCount
+missCount
+repairCount
+overflowDestroyCount
+prewarmSourceCount
+```
+
+此页不得创建对象、不得预热、不得回收、不得写配置。当前实现通过编辑器反射读取 `ESGameObjectPoolModule` 私有 `groupsByKey`，再调用公开 `TryGetStats(key, out stats)` 获得统计。这个方案可用但不是最终理想形态；更好的后续方向是在运行时模块中提供正式只读 API，例如 `GetAllStats()` 或 `CopyStatsTo(List<ESGameObjectPoolStats>)`，让编辑器不用反射私有字段。
+
+如果要新增正式 API，注意它必须是只读、低分配、不会暴露内部可变字典引用。
+
+### 运行时统计页和 GameManager 池组页不要混淆
+
+`运行时统计` 读取的是旧的/通用的 `PoolStatistics.GlobalStatisticsGroup` 口径，偏对象池统计汇总。
+
+`PlayMode池组状态` 读取的是 `ESGameObjectPoolModule` 当前 GameObject 池组口径，偏 GameManager 模块实例状态。
+
+二者可以同时存在，但 UI 文案必须写清楚，不要让开发者误以为它们是同一个数据源。
+
+### SimpleTools 商业级改造铁律
+
+后续 AI 继续强化 SimpleTools 时，先按工具价值和风险排序，不要均匀撒改动。优先处理：
+
+```text
+高频使用
+会写资产或场景
+可能批量破坏数据
+文案与真实行为不一致
+无预览、无确认、无报告
+按钮堆叠导致误操作
+```
+
+每个工具应尽量收成统一工作流：
+
+```text
+范围
+规则
+预览
+执行
+报告
+历史/复查（可选）
+```
+
+不要让工具 UI 变成按钮清单。中文界面要口语化但准确，尤其要写清楚“会改什么、不改什么、失败后如何复查”。空状态要告诉用户下一步做什么，而不是占大块面积写无效说明。
+
+### 高风险工具的最低安全线
+
+任何批量工具只要会改对象、资源、Prefab、Importer、场景、文件，都必须至少满足：
+
+```text
+执行前可预览
+执行前有明确确认
+只执行当前预览签名对应的结果
+执行项和跳过项可区分
+失败项保留并可复制/定位
+场景对象修改走 Undo 和 MarkSceneDirty
+资产修改走 SetDirty / SaveAssets / Importer 保存
+路径写入有边界检查
+大批量操作有数量提示和必要截断
+```
+
+不要把“点按钮后弹成功”当成报告。报告至少要包含成功数、失败数、跳过数、风险项和关键路径预览。
+
+### 当前验证命令
+
+本轮 ObjectPool 工具收口后，以下编译通过，均为 `0 warning, 0 error`：
+
+```text
+dotnet build ES_Design.csproj --no-restore /p:BuildProjectReferences=false
+dotnet build ES_Logic.csproj --no-restore /p:BuildProjectReferences=false
+dotnet build ES_Editor.csproj --no-restore /p:BuildProjectReferences=false
+```
+
+以后修改 `Simple_ESTool_Page_ObjectPool.cs` 后，至少跑 `ES_Editor.csproj`。如果涉及 `ESGameObjectPoolModule` 或 `PrefabPrewarmDataInfo`，同时跑 `ES_Logic.csproj`。
+
+### 不要误读当前工具成熟度
+
+ObjectPool 工具当前已经从“伪入口混杂”收回到真实链路，但仍不是最终形态。最值得继续做的是：
+
+```text
+给 ESGameObjectPoolModule 增加正式只读池组统计 API，替代编辑器反射私有 groupsByKey
+PrefabPrewarmDataInfo 审计表格进一步商业化，展示每个条目的 Key、Prefab、数量、启用、Scene/Space 条件和风险
+GameManager 接入页把编辑模式写配置、PlayMode 加载运行时状态分得更明显
+把 SimpleTools 总入口按商业价值重排，减少低价值旧工具干扰
+```
+
+但不要为了“更强”重新加入从 Selection 直接录入 Prefab 的入口。那是伪池化，不是 ES GameManager 根池化。

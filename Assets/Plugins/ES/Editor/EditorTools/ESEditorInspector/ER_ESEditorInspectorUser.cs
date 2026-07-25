@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 namespace ES
 {
@@ -20,7 +21,8 @@ namespace ES
                 UnityEditor.Editor.finishedDefaultHeaderGUI -= OnFinishedDefaultHeaderGUI;
                 UnityEditor.Editor.finishedDefaultHeaderGUI += OnFinishedDefaultHeaderGUI;
             }
-            users.Add(singleton);
+            if (singleton != null && !users.Exists(user => user != null && user.GetType() == singleton.GetType()))
+                users.Add(singleton);
             users.Sort(comp);
         }
 
@@ -30,6 +32,16 @@ namespace ES
                 return;
 
             var target = ed.targets[0];
+
+            // Import Settings 与 Imported Object 会分别创建 Editor，并触发两次 Header 回调。
+            // 有实际主资产时只在 Imported Object 上绘制，确保信息区只出现一次，且类型判断拿到真实资产。
+            if (target is AssetImporter importer &&
+                !string.IsNullOrEmpty(importer.assetPath) &&
+                AssetDatabase.LoadMainAssetAtPath(importer.assetPath) != null)
+            {
+                return;
+            }
+
             foreach (var user in activeRegister.users)
             {
                 if (user.Apply(target))

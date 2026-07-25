@@ -76,8 +76,6 @@ namespace ES
         [Required]
         [LabelText("全局设置")]
         public ESGlobalResSetting Settings;
-        [LabelText("自动开始下载")]
-        public bool AutoDownload = false;
         protected override void DoAwake()
         {
             base.DoAwake();
@@ -91,11 +89,8 @@ namespace ES
             // 初始化默认路径缓存
             DefaultPaths.InitDefaultPaths();
 
-            if (Application.isPlaying && AutoDownload)
-            {
-                Debug.Log("ESResMaster: AutoDownload 启动");
-                GameInit_ResCompareAndDownload();
-            }
+            // 发布资源启动已由启动场景中的 ESResManager / 新版 Bootstrap 接管。
+            // ESResMaster 仅保留旧对象池与旧 API 的过渡承载，不再自行初始化资源。
         }
 
         
@@ -333,7 +328,6 @@ namespace ES
         internal ESResSourceBase CreateResSource_AssetBundle(ESResKey abKey)
         {
             var use = PoolForESABSource.GetInPool();
-            use.IsNet = true;//还没实装
             use.Set(abKey, ESResSourceLoadType.AssetBundle);
             use.TargetType = typeof(AssetBundle);
             return use;

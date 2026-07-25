@@ -160,8 +160,8 @@ namespace ES
         [FoldoutGroup("2. 详细预览"), OnInspectorGUI]
         private void DrawPreviewPager()
         {
-            previewPageSize = Mathf.Clamp(previewPageSize, 10, 200);
-            int filteredCount = GetFilteredRenameQuery().Count();
+            previewPageSize = Mathf.Clamp(previewPageSize, 10, SimpleToolsPanelUtility.MaxRenderRowsPerPage);
+            int filteredCount = GetFilteredRenameRecords().Count;
             SimpleToolsPanelUtility.DrawPager(ref previewPageIndex, filteredCount, previewPageSize);
         }
 
@@ -169,6 +169,8 @@ namespace ES
         private List<RenamePreviewRecord> FilteredRenamePlan => GetFilteredRenamePlan();
 
         private readonly List<RenamePreviewRecord> renamePlan = new List<RenamePreviewRecord>();
+        private readonly List<RenamePreviewRecord> filteredRenamePlan = new List<RenamePreviewRecord>();
+        private readonly List<RenamePreviewRecord> pagedRenamePlan = new List<RenamePreviewRecord>();
         private static readonly List<RenameRuleSnapshot> renameRuleHistory = new List<RenameRuleSnapshot>();
         private const string RenameRuleHistoryPrefsKey = "ES.SimpleTools.BatchRename.RuleHistory";
         private const int MaxRenameRuleHistory = 8;
@@ -177,6 +179,10 @@ namespace ES
         private string lastResultSummary = "";
         private string lastResultDetail = "";
         private int previewPageIndex;
+        private int renamePlanVersion;
+        private int cachedRenamePlanVersion = -1;
+        private string cachedPreviewSearch;
+        private bool cachedOnlyShowChanged;
 
         private string RenameModeInfo
         {
@@ -198,13 +204,13 @@ namespace ES
             }
         }
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawRenameWorkbench()
         {
             int selectedCount = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
             SimpleToolsPanelUtility.DrawToolHeader(
                 "批量重命名工作台",
-                "选中对象，填一个命名规则，然后直接执行；需要逐项复核时再打开详细预览。",
+                "批量重命名工作台",
                 SimpleToolsMaturity.Upgrading,
                 "会直接修改场景对象名称。预览和执行共用同一份计划，支持冲突自动改名、勾选执行、Undo 和场景 Dirty。");
             SimpleToolsPanelUtility.DrawLargeListGuard(selectedCount, "选中对象");
@@ -313,7 +319,8 @@ namespace ES
             BuildRenamePlan(selectedObjects);
             previewPageIndex = 0;
             previewSignature = BuildPreviewSignature(selectedObjects);
-            lastResultSummary = $"预览完成: 目标 {renamePlan.Count} 个 | 会修改 {renamePlan.Count(item => item.State == "会改")} 个";
+            int changedCount = renamePlan.Count(item => item.State == "会改");
+            lastResultSummary = $"预览完成: 目标 {renamePlan.Count} 个 | 会修改 {changedCount} 个";
             lastResultDetail = BuildPlanReport(renamePlan.Where(item => item.State == "会改"), 16);
         }
 
@@ -359,12 +366,22 @@ namespace ES
             int group = Undo.GetCurrentGroup();
             Undo.SetCurrentGroupName("Batch Rename");
             int changedCount = 0;
+            bool cancelled = false;
             var changedObjects = new List<GameObject>();
 
             try
             {
                 for (int i = 0; i < targets.Count; i++)
                 {
+                    if (i % 20 == 0 && EditorUtility.DisplayCancelableProgressBar(
+                "确认批量重命名",
+                            $"重命名 {targets.Count} / {renamePlan.Count} 个对象。\n\n{preview}",
+                            (float)i / Mathf.Max(1, targets.Count)))
+                    {
+                        cancelled = true;
+                        break;
+                    }
+
                     var record = targets[i];
                     if (record.Object == null || record.Object.name == record.NewName)
                         continue;
@@ -374,9 +391,6 @@ namespace ES
                     EditorUtility.SetDirty(record.Object);
                     changedObjects.Add(record.Object);
                     changedCount++;
-
-                    if (i % 20 == 0)
-                        EditorUtility.DisplayProgressBar("批量重命名", $"正在重命名: {i + 1}/{targets.Count}", (float)i / Mathf.Max(1, targets.Count));
                 }
 
                 MarkScenesDirty(changedObjects);
@@ -387,13 +401,21 @@ namespace ES
                 Undo.CollapseUndoOperations(group);
             }
 
+            string completionState = cancelled ? "已取消" : "完成";
             lastResultSummary = $"重命名完成: 修改 {changedCount} / {targets.Count} 个对象 | 模式: {renameMode}";
             lastResultDetail = BuildPlanReport(targets, 24);
+            if (cancelled)
+                lastResultDetail = "操作由用户取消；已修改的对象可通过 Ctrl+Z 撤销。\n\n" + lastResultDetail;
             AddRenameRuleHistory(CaptureCurrentRuleSnapshot("执行"));
             var refreshedSelection = GetSortedSelection();
             BuildRenamePlan(refreshedSelection);
             previewSignature = BuildPreviewSignature(refreshedSelection);
-            EditorUtility.DisplayDialog("重命名完成", $"已修改 {changedCount} 个对象名称。", "完成");
+            EditorUtility.DisplayDialog(
+                cancelled ? "重命名已取消" : "重命名完成",
+                cancelled
+                    ? $"已在取消前修改 {changedCount} 个对象名称。可通过 Ctrl+Z 撤销本次已执行修改。"
+                    : $"已修改 {changedCount} 个对象名称。",
+                "完成");
         }
 
         private RenameRuleSnapshot CaptureCurrentRuleSnapshot(string source)
@@ -428,7 +450,7 @@ namespace ES
                 case RenameMode.Replace:
                     return $"{source}: 替换 {findText} -> {replaceText}";
                 case RenameMode.Number:
-                    return $"{source}: 编号 {baseName}{numberSeparator}{startNumber.ToString($"D{numberDigits}")}";
+                    return $"{source}: 编号 {baseName}{numberSeparator}{startNumber.ToString(GetNumberFormat())}";
                 default:
                     return source + ": 未知规则";
             }
@@ -559,6 +581,7 @@ namespace ES
         private void BuildRenamePlan(GameObject[] selectedObjects)
         {
             renamePlan.Clear();
+            renamePlanVersion++;
             if (selectedObjects == null || selectedObjects.Length == 0)
                 return;
 
@@ -664,29 +687,49 @@ namespace ES
 
         private List<RenamePreviewRecord> GetFilteredRenamePlan()
         {
-            int totalPages;
-            var filtered = GetFilteredRenameQuery().ToList();
-            return SimpleToolsPanelUtility.PageItems(filtered, ref previewPageIndex, previewPageSize, out totalPages);
+            var filtered = GetFilteredRenameRecords();
+            int pageSize = Mathf.Clamp(previewPageSize, 10, SimpleToolsPanelUtility.MaxRenderRowsPerPage);
+            int totalPages = Mathf.Max(1, Mathf.CeilToInt(filtered.Count / (float)pageSize));
+            previewPageIndex = Mathf.Clamp(previewPageIndex, 0, totalPages - 1);
+            int start = previewPageIndex * pageSize;
+            int end = Mathf.Min(start + pageSize, filtered.Count);
+
+            pagedRenamePlan.Clear();
+            for (int i = start; i < end; i++)
+                pagedRenamePlan.Add(filtered[i]);
+            return pagedRenamePlan;
         }
 
-        private IEnumerable<RenamePreviewRecord> GetFilteredRenameQuery()
+        private List<RenamePreviewRecord> GetFilteredRenameRecords()
         {
-            IEnumerable<RenamePreviewRecord> query = renamePlan;
-            if (onlyShowChanged)
-                query = query.Where(item => item.State == "会改");
+            if (cachedRenamePlanVersion == renamePlanVersion &&
+                cachedOnlyShowChanged == onlyShowChanged &&
+                string.Equals(cachedPreviewSearch, previewSearch, StringComparison.Ordinal))
+                return filteredRenamePlan;
 
-            if (!string.IsNullOrWhiteSpace(previewSearch))
+            filteredRenamePlan.Clear();
+            string keyword = string.IsNullOrWhiteSpace(previewSearch) ? null : previewSearch.Trim();
+            for (int i = 0; i < renamePlan.Count; i++)
             {
-                string keyword = previewSearch.Trim();
-                query = query.Where(item =>
-                    ContainsIgnoreCase(item.Path, keyword) ||
-                    ContainsIgnoreCase(item.OriginalName, keyword) ||
-                    ContainsIgnoreCase(item.NewName, keyword) ||
-                    ContainsIgnoreCase(item.State, keyword) ||
-                    ContainsIgnoreCase(item.Note, keyword));
+                var item = renamePlan[i];
+                if (item == null || (onlyShowChanged && item.State != "会改"))
+                    continue;
+
+                if (keyword != null &&
+                    !ContainsIgnoreCase(item.Path, keyword) &&
+                    !ContainsIgnoreCase(item.OriginalName, keyword) &&
+                    !ContainsIgnoreCase(item.NewName, keyword) &&
+                    !ContainsIgnoreCase(item.State, keyword) &&
+                    !ContainsIgnoreCase(item.Note, keyword))
+                    continue;
+
+                filteredRenamePlan.Add(item);
             }
 
-            return query;
+            cachedRenamePlanVersion = renamePlanVersion;
+            cachedOnlyShowChanged = onlyShowChanged;
+            cachedPreviewSearch = previewSearch;
+            return filteredRenamePlan;
         }
 
         private void SetPlanSelection(bool selected, bool changedOnly)
@@ -706,7 +749,7 @@ namespace ES
             int changed = renamePlan.Count(item => item.State == "会改");
             int checkedChanged = renamePlan.Count(item => item.Selected && item.State == "会改");
             int conflicts = renamePlan.Count(item => item.Note.Contains("冲突"));
-            int filteredCount = GetFilteredRenameQuery().Count();
+            int filteredCount = GetFilteredRenameRecords().Count;
             int totalPages = Mathf.Max(1, Mathf.CeilToInt(filteredCount / (float)Mathf.Max(1, previewPageSize)));
             previewPageIndex = Mathf.Clamp(previewPageIndex, 0, totalPages - 1);
             return $"预览 {renamePlan.Count} | 会修改 {changed} | 勾选执行 {checkedChanged} | 自动处理冲突 {conflicts} | 筛选后 {filteredCount} | 第 {previewPageIndex + 1}/{totalPages} 页";
@@ -715,8 +758,19 @@ namespace ES
         private string BuildPlanReport(IEnumerable<RenamePreviewRecord> records, int limit)
         {
             return SimpleToolsSafetyUtility.JoinPreview(
-                records?.Where(item => item != null).Select(item => $"{item.Path}: {item.OriginalName} -> {item.NewName}{(string.IsNullOrWhiteSpace(item.Note) ? "" : " | " + item.Note)}"),
+                records?.Where(item => item != null).Select(BuildPlanRecordText),
                 limit);
+        }
+
+        private string GetNumberFormat()
+        {
+            return "D" + numberDigits;
+        }
+
+        private static string BuildPlanRecordText(RenamePreviewRecord item)
+        {
+            string note = string.IsNullOrWhiteSpace(item.Note) ? string.Empty : " | " + item.Note;
+            return $"{item.Path}: {item.OriginalName} -> {item.NewName}{note}";
         }
 
         private string BuildPreviewSignature(GameObject[] selectedObjects)

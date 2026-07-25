@@ -5,6 +5,18 @@ using Sirenix.OdinInspector;
 
 namespace ES
 {
+    internal static class ESConfigKeyEnumConverter<TEnumKey> where TEnumKey : struct, Enum
+    {
+        static ESConfigKeyEnumConverter()
+        {
+            if (Enum.GetUnderlyingType(typeof(TEnumKey)) != typeof(ushort))
+                throw new InvalidOperationException("[ESConfigKey][Enum] ConfigKey 枚举必须使用 ushort 底层类型：" + typeof(TEnumKey).FullName);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int ToInt(TEnumKey value) => Unsafe.As<TEnumKey, ushort>(ref value);
+    }
+
     public static class ESConfigKeyProtocol
     {
         public const int DefaultStringRuntimeKeyStart = 30000;
@@ -24,7 +36,7 @@ namespace ES
     public static class ESAssetNamingWeight
     {
         public const int GuidAuthority = (int)ESAssetNamingSource.AssetGuid;
-        public const int EnumRuntimeKey = (int)ESAssetNamingSource.EnumKey;
+        public const int EnumConfigKey = (int)ESAssetNamingSource.EnumKey;
         public const int StringConfigKey = (int)ESAssetNamingSource.StringKey;
         public const int AddressKey = (int)ESAssetNamingSource.Address;
         public const int EditorAssetPath = (int)ESAssetNamingSource.AssetPath;
@@ -57,7 +69,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int EnumToInt(TEnumKey value)
         {
-            return Convert.ToInt32(value);
+            return ESConfigKeyEnumConverter<TEnumKey>.ToInt(value);
         }
     }
 
@@ -75,7 +87,6 @@ namespace ES
         public string address;
         public string groupName;
         public string editorPath;
-        public int assetRuntimeKey;
         public bool editorOnly;
         public bool alwaysLoaded;
 
@@ -105,9 +116,9 @@ namespace ES
 
             resKey.ConfigEnumKeyInt = EnumKeyInt;
             resKey.ConfigStringKey = stringKey;
-            resKey.AssetRuntimeKey = assetRuntimeKey;
             resKey.GUID = guid;
             resKey.LocalFileId = localFileId;
+            resKey.AssetTypeName = assetTypeName;
             resKey.Path = editorPath;
             resKey.Address = address;
             resKey.GroupName = groupName;
@@ -121,7 +132,6 @@ namespace ES
                 return;
 
             stringKey = resKey.ConfigStringKey;
-            assetRuntimeKey = resKey.AssetRuntimeKey;
             guid = resKey.GUID;
             localFileId = resKey.LocalFileId;
             editorPath = resKey.Path;
@@ -135,11 +145,11 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int EnumToInt(TEnumKey value)
         {
-            return Convert.ToInt32(value);
+            return ESConfigKeyEnumConverter<TEnumKey>.ToInt(value);
         }
     }
 
-    public sealed class ESConfigKeyTable<TData> where TData : class
+    public class ESConfigKeyTable<TData> where TData : class
     {
         private struct Slot
         {
@@ -206,11 +216,10 @@ namespace ES
                 return 0;
 
             int enumKey = key.EnumKeyInt;
-            if (enumKey != 0 && !slotByRuntimeKey.ContainsKey(enumKey))
-                return enumKey;
-
+            // EnumKey 在当前 TData 表内是权威业务键。重复时必须由注册阶段明确拒绝，
+            // 不能静默降级到 String RuntimeKey，否则同一个 Enum 会指向两份定义。
             if (enumKey != 0)
-                AddConflict(enumKey, key.GetStringKey(fallbackStringKey), "Enum runtime key is duplicated. Try string key fallback.");
+                return enumKey;
 
             return BakeStringRuntimeKey(key.GetStringKey(fallbackStringKey));
         }
@@ -241,14 +250,8 @@ namespace ES
                 return 0;
 
             int enumKey = key.EnumKeyInt;
-            if (enumKey != 0 && !slotByRuntimeKey.ContainsKey(enumKey))
-                return enumKey;
-
-            if (key.assetRuntimeKey != 0 && !slotByRuntimeKey.ContainsKey(key.assetRuntimeKey))
-                return key.assetRuntimeKey;
-
             if (enumKey != 0)
-                AddConflict(enumKey, key.GetStringKey(fallbackStringKey), "Asset enum runtime key is duplicated. Try asset runtime key or string key fallback.");
+                return enumKey;
 
             return BakeStringRuntimeKey(key.GetStringKey(fallbackStringKey));
         }
@@ -317,9 +320,6 @@ namespace ES
 
             int enumKey = key.EnumKeyInt;
             if (enumKey != 0 && TryGet(enumKey, out data))
-                return true;
-
-            if (key.assetRuntimeKey != 0 && TryGet(key.assetRuntimeKey, out data))
                 return true;
 
             return TryGetByStringKey(key.StringKey, out data);
@@ -486,11 +486,8 @@ namespace ES
         public int BakeRaw(int enumKey, string stringKey)
         {
             EnsureCanBuild();
-            if (enumKey != 0 && !slotByRuntimeKey.ContainsKey(enumKey))
-                return enumKey;
-
             if (enumKey != 0)
-                AddConflict(enumKey, stringKey, "Enum runtime key is duplicated. Try string key fallback.");
+                return enumKey;
 
             return BakeStringRuntimeKey(stringKey);
         }

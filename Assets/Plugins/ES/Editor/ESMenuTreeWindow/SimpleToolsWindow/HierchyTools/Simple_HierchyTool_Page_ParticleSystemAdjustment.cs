@@ -18,10 +18,20 @@ namespace ES
     [Serializable]
     public class Page_ParticleSystemAdjustment : ESWindowPageBase
     {
+        private enum ParticleLookPreset
+        {
+            Custom,
+            Fire,
+            Smoke,
+            Sparks,
+            Dust,
+            Magic
+        }
+
         [Title("粒子系统批量调整工具", "批量调整粒子系统参数", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
-        public string readMe = "选择带 ParticleSystem 的对象，按需包含子对象。应用会修改参数；播放/停止只发送预览指令；清空会先确认。";
+        public string readMe = "选择包含 ParticleSystem 的对象，按需包含子对象。应用会修改参数；播放/停止只发送预览指令；清空会先确认。";
 
         [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-5)]
         private string TargetSummary
@@ -66,17 +76,40 @@ namespace ES
         private string particleSearch = "";
         private int particlePreviewPageIndex;
         private const int ParticlePreviewPageSize = 12;
+        private const float PreviewTimelineMaximum = 10f;
+        private const float PreviewFrameStep = 1f / 30f;
+        private const int PreviewConfirmationThreshold = 64;
+        private float previewTime;
+        private int previewRandomSeed = 12345;
+        private bool previewIsPlaying;
+        private readonly List<ParticlePreviewState> previewStates = new List<ParticlePreviewState>();
+        private ParticleLookPreset quickLookPreset = ParticleLookPreset.Custom;
+        private float quickIntensity = 1f;
+        private float quickMotion = 1f;
+        private float quickScale = 1f;
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        private sealed class ParticlePreviewState
+        {
+            public ParticleSystem particleSystem;
+            public bool useAutoRandomSeed;
+            public uint randomSeed;
+            public bool wasPlaying;
+            public bool wasPaused;
+            public float time;
+        }
+
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             int targetCount = GetParticleTargets().Count;
             SimpleToolsPanelUtility.DrawToolHeader(
                 "粒子系统批量调整",
-                "用于批量统一粒子系统的主模块、发射速率、模拟空间，并快速播放/停止/清空选区内粒子。",
+                "粒子系统批量调整",
                 SimpleToolsMaturity.Upgrading,
                 "应用参数和清空会直接影响场景对象；播放/停止只是发送编辑器播放指令，不代表已经预览应用后的参数效果。");
             SimpleToolsPanelUtility.DrawLargeListGuard(targetCount, "粒子系统");
+            DrawQuickTuningPanel();
+            DrawSceneViewPreviewPanel();
             DrawParticleActionPanel();
             DrawParticlePreviewPanel();
             SimpleToolsPanelUtility.DrawResultSummary("最近粒子操作", lastResultSummary, lastResultDetail);
@@ -94,7 +127,7 @@ namespace ES
             {
                 SimpleToolsPanelUtility.DrawSummary(
                     $"命中: {targets.Count}",
-                    $"将变更: {changedCount}",
+                    $"命中: {targets.Count}",
                     $"Loop: {loopingCount}",
                     $"WorldSpace: {worldSpaceCount}",
                     $"写入参数: Duration/Loop/Lifetime/Speed/Size/Color/Rate/Space");
@@ -103,10 +136,6 @@ namespace ES
                 {
                     if (SimpleToolsPanelUtility.DrawActionButton("应用参数", SimpleToolsActionTone.Warning, 30, GUILayout.Width(92)))
                         ApplyParticleSystemSettings();
-                    if (SimpleToolsPanelUtility.DrawActionButton("播放当前", SimpleToolsActionTone.Success, 30, GUILayout.Width(92)))
-                        PlayAllParticleSystems();
-                    if (SimpleToolsPanelUtility.DrawActionButton("停止当前", SimpleToolsActionTone.Neutral, 30, GUILayout.Width(92)))
-                        StopAllParticleSystems();
                     if (SimpleToolsPanelUtility.DrawActionButton("清空粒子", SimpleToolsActionTone.Danger, 30, GUILayout.Width(92)))
                         ClearAllParticleSystems();
                     GUILayout.FlexibleSpace();
@@ -130,6 +159,375 @@ namespace ES
                 Debug.LogWarning("[SimpleTools] 粒子系统目标收集达到软上限，已截断预览/操作范围。");
 
             return targets;
+        }
+
+        private void DrawQuickTuningPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle(
+                "用于批量统一粒子系统的主模块、发射速率、模拟空间，并快速播放/停止/清空选区内粒子。",
+                "应用参数和清空会直接影响场景对象；播放/停止只是发送编辑器播放指令，不代表已经预览应用后的参数效果。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    quickLookPreset = (ParticleLookPreset)EditorGUILayout.EnumPopup("目标效果", quickLookPreset, GUILayout.Width(180));
+                    if (SimpleToolsPanelUtility.DrawActionButton("生成建议参数", SimpleToolsActionTone.Primary, 26, GUILayout.Width(98)))
+                        ApplyQuickLookPreset();
+                    if (SimpleToolsPanelUtility.DrawActionButton("设为自定义", SimpleToolsActionTone.Neutral, 26, GUILayout.Width(88)))
+                        quickLookPreset = ParticleLookPreset.Custom;
+                    GUILayout.FlexibleSpace();
+                    EditorGUILayout.LabelField(GetQuickLookDescription(quickLookPreset), EditorStyles.miniLabel, GUILayout.MinWidth(150));
+                }
+
+                EditorGUI.BeginChangeCheck();
+                quickIntensity = EditorGUILayout.Slider("强度（发射量）", quickIntensity, 0.1f, 3f);
+                quickMotion = EditorGUILayout.Slider("运动感（速度）", quickMotion, 0.1f, 3f);
+                quickScale = EditorGUILayout.Slider("体积感（尺寸）", quickScale, 0.1f, 3f);
+                if (EditorGUI.EndChangeCheck() && quickLookPreset != ParticleLookPreset.Custom)
+                    ApplyQuickLookPreset();
+            }
+        }
+
+        private void ApplyQuickLookPreset()
+        {
+            if (quickLookPreset == ParticleLookPreset.Custom)
+            {
+                lastResultSummary = "快速调参：自定义模式";
+                lastResultDetail = "请选择一个目标效果后生成建议参数，或直接使用下方的完整参数。";
+                return;
+            }
+
+            float baseDuration;
+            float baseLifetime;
+            float baseSpeed;
+            float baseSize;
+            float baseEmissionRate;
+            Color baseColor;
+            ParticleSystemSimulationSpace baseSpace;
+            bool baseLoop;
+            switch (quickLookPreset)
+            {
+                case ParticleLookPreset.Fire:
+                    baseDuration = 1.5f;
+                    baseLifetime = 0.9f;
+                    baseSpeed = 2.4f;
+                    baseSize = 0.7f;
+                    baseEmissionRate = 48f;
+                    baseColor = new Color(1f, 0.38f, 0.08f, 1f);
+                    baseSpace = ParticleSystemSimulationSpace.Local;
+                    baseLoop = true;
+                    break;
+                case ParticleLookPreset.Smoke:
+                    baseDuration = 4f;
+                    baseLifetime = 3.6f;
+                    baseSpeed = 0.65f;
+                    baseSize = 1.7f;
+                    baseEmissionRate = 14f;
+                    baseColor = new Color(0.42f, 0.42f, 0.42f, 0.7f);
+                    baseSpace = ParticleSystemSimulationSpace.World;
+                    baseLoop = true;
+                    break;
+                case ParticleLookPreset.Sparks:
+                    baseDuration = 0.8f;
+                    baseLifetime = 0.75f;
+                    baseSpeed = 7.5f;
+                    baseSize = 0.14f;
+                    baseEmissionRate = 36f;
+                    baseColor = new Color(1f, 0.74f, 0.18f, 1f);
+                    baseSpace = ParticleSystemSimulationSpace.World;
+                    baseLoop = false;
+                    break;
+                case ParticleLookPreset.Dust:
+                    baseDuration = 3f;
+                    baseLifetime = 2.5f;
+                    baseSpeed = 0.55f;
+                    baseSize = 0.55f;
+                    baseEmissionRate = 18f;
+                    baseColor = new Color(0.62f, 0.5f, 0.34f, 0.65f);
+                    baseSpace = ParticleSystemSimulationSpace.World;
+                    baseLoop = true;
+                    break;
+                default:
+                    baseDuration = 2.2f;
+                    baseLifetime = 1.8f;
+                    baseSpeed = 1.4f;
+                    baseSize = 0.45f;
+                    baseEmissionRate = 28f;
+                    baseColor = new Color(0.38f, 0.56f, 1f, 1f);
+                    baseSpace = ParticleSystemSimulationSpace.Local;
+                    baseLoop = true;
+                    break;
+            }
+
+            duration = Mathf.Clamp(baseDuration, 0f, 10f);
+            looping = baseLoop;
+            startLifetime = Mathf.Clamp(baseLifetime, 0f, 10f);
+            startSpeed = Mathf.Clamp(baseSpeed * quickMotion, 0f, 100f);
+            startSize = Mathf.Clamp(baseSize * quickScale, 0f, 10f);
+            startColor = baseColor;
+            emissionRate = Mathf.Clamp(baseEmissionRate * quickIntensity, 0f, 1000f);
+            simulationSpace = baseSpace;
+            particlePreviewPageIndex = 0;
+            lastResultSummary = "快速调参已更新；参数尚未写入场景。";
+            lastResultDetail = $"强度 {quickIntensity:0.0}× | 运动 {quickMotion:0.0}× | 体积 {quickScale:0.0}×。参数尚未写入场景，可先查看变更预览。";
+        }
+
+        private static string GetQuickLookDisplayName(ParticleLookPreset preset)
+        {
+            switch (preset)
+            {
+                case ParticleLookPreset.Fire: return "火焰";
+                case ParticleLookPreset.Smoke: return "烟雾";
+                case ParticleLookPreset.Sparks: return "火花";
+                case ParticleLookPreset.Dust: return "飘尘";
+                case ParticleLookPreset.Magic: return "魔法光点";
+                default: return "自定义";
+            }
+        }
+
+        private static string GetQuickLookDescription(ParticleLookPreset preset)
+        {
+            switch (preset)
+            {
+                case ParticleLookPreset.Fire: return "短寿命、高频、局部空间";
+                case ParticleLookPreset.Smoke: return "长寿命、低速、世界空间";
+                case ParticleLookPreset.Sparks: return "短促爆发、高速、世界空间";
+                case ParticleLookPreset.Dust: return "轻量飘散、低速、世界空间";
+                case ParticleLookPreset.Magic: return "中寿命、局部循环、冷色";
+                default: return "保留当前手动参数";
+            }
+        }
+
+        private void DrawSceneViewPreviewPanel()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle(
+                "SceneView 真实预览",
+                "应用参数和清空会直接影响场景对象；播放/停止只是发送编辑器播放指令，不代表已经预览应用后的参数效果。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("预览时间", EditorStyles.miniBoldLabel, GUILayout.Width(56));
+                    EditorGUI.BeginChangeCheck();
+                    float nextPreviewTime = EditorGUILayout.Slider(previewTime, 0f, PreviewTimelineMaximum);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        previewTime = nextPreviewTime;
+                        SimulatePreviewAtCurrentTime();
+                    }
+
+                    EditorGUILayout.LabelField("随机种子", EditorStyles.miniBoldLabel, GUILayout.Width(56));
+                    previewRandomSeed = EditorGUILayout.IntField(previewRandomSeed, GUILayout.Width(72));
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton("从头预览", SimpleToolsActionTone.Primary, 28, GUILayout.Width(88)))
+                    {
+                        previewTime = 0f;
+                        SimulatePreviewAtCurrentTime();
+                    }
+                    if (SimpleToolsPanelUtility.DrawActionButton(previewIsPlaying ? "暂停并定格" : "继续播放", SimpleToolsActionTone.Success, 28, GUILayout.Width(88)))
+                    {
+                        if (previewIsPlaying)
+                            PausePreview();
+                        else
+                            PlayPreview();
+                    }
+                    if (SimpleToolsPanelUtility.DrawActionButton("前进一步", SimpleToolsActionTone.Neutral, 28, GUILayout.Width(76)))
+                    {
+                        previewTime = Mathf.Min(PreviewTimelineMaximum, previewTime + PreviewFrameStep);
+                        SimulatePreviewAtCurrentTime();
+                    }
+                    if (SimpleToolsPanelUtility.DrawActionButton("结束并恢复", SimpleToolsActionTone.Warning, 28, GUILayout.Width(88)))
+                        RestorePreviewSession();
+
+                    GUILayout.FlexibleSpace();
+                    EditorGUILayout.LabelField(previewStates.Count > 0 ? $"预览中 {previewStates.Count}" : "未启动预览", EditorStyles.miniLabel);
+                }
+            }
+        }
+
+        private bool EnsurePreviewSession()
+        {
+            var particleSystems = GetPreviewParticleSystems();
+            if (particleSystems.Count == 0)
+            {
+                EditorUtility.DisplayDialog("无法预览", "当前选区没有可预览的 ParticleSystem。", "确定");
+                return false;
+            }
+
+            if (previewStates.Count > 0 && !IsSamePreviewSession(particleSystems))
+                RestorePreviewSession();
+
+            if (previewStates.Count == 0)
+            {
+                if (particleSystems.Count >= PreviewConfirmationThreshold &&
+                    !SimpleToolsPanelUtility.ConfirmHeavyOperation(
+                        "确认粒子预览",
+                        particleSystems.Count,
+                "用于批量统一粒子系统的主模块、发射速率、模拟空间，并快速播放/停止/清空选区内粒子。",
+                        "预览不会写入参数；结束预览会恢复随机种子和播放状态。"))
+                    return false;
+
+                foreach (var particleSystem in particleSystems)
+                {
+                    previewStates.Add(new ParticlePreviewState
+                    {
+                        particleSystem = particleSystem,
+                        useAutoRandomSeed = particleSystem.useAutoRandomSeed,
+                        randomSeed = particleSystem.randomSeed,
+                        wasPlaying = particleSystem.isPlaying,
+                        wasPaused = particleSystem.isPaused,
+                        time = particleSystem.time
+                    });
+                }
+            }
+
+            uint seed = unchecked((uint)previewRandomSeed);
+            foreach (var state in previewStates)
+            {
+                if (state.particleSystem == null)
+                    continue;
+
+                state.particleSystem.useAutoRandomSeed = false;
+                state.particleSystem.randomSeed = seed;
+            }
+
+            return true;
+        }
+
+        private List<ParticleSystem> GetPreviewParticleSystems()
+        {
+            var systems = new List<ParticleSystem>();
+            var seenInstanceIds = new HashSet<int>();
+            foreach (var target in GetParticleTargets())
+            {
+                if (target == null)
+                    continue;
+
+                foreach (var particleSystem in target.GetComponentsInChildren<ParticleSystem>(true))
+                {
+                    if (particleSystem != null && seenInstanceIds.Add(particleSystem.GetInstanceID()))
+                        systems.Add(particleSystem);
+                }
+            }
+
+            return systems;
+        }
+
+        private List<ParticleSystem> GetPreviewRootParticleSystems()
+        {
+            var systems = previewStates
+                .Select(state => state.particleSystem)
+                .Where(particleSystem => particleSystem != null)
+                .ToList();
+            var systemIds = new HashSet<int>(systems.Select(item => item.GetInstanceID()));
+            return systems.Where(particleSystem =>
+            {
+                Transform parent = particleSystem.transform.parent;
+                while (parent != null)
+                {
+                    var parentParticleSystem = parent.GetComponent<ParticleSystem>();
+                    if (parentParticleSystem != null && systemIds.Contains(parentParticleSystem.GetInstanceID()))
+                        return false;
+
+                    parent = parent.parent;
+                }
+
+                return true;
+            }).ToList();
+        }
+
+        private bool IsSamePreviewSession(List<ParticleSystem> particleSystems)
+        {
+            if (particleSystems.Count != previewStates.Count)
+                return false;
+
+            var currentIds = new HashSet<int>(particleSystems.Select(item => item.GetInstanceID()));
+            return previewStates.All(state => state.particleSystem != null && currentIds.Contains(state.particleSystem.GetInstanceID()));
+        }
+
+        private void SimulatePreviewAtCurrentTime()
+        {
+            if (!EnsurePreviewSession())
+                return;
+
+            previewIsPlaying = false;
+            foreach (var particleSystem in GetPreviewRootParticleSystems())
+            {
+                particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                particleSystem.Simulate(previewTime, true, true, true);
+                particleSystem.Pause(true);
+            }
+
+            SceneView.RepaintAll();
+            lastResultSummary = $"预览定格: {previewTime:0.00}s | {previewStates.Count} 个粒子系统";
+            lastResultDetail = "使用固定随机种子在 SceneView 中模拟当前参数；点击“结束并恢复”可恢复预览前的随机设置和播放状态。";
+        }
+
+        private void PlayPreview()
+        {
+            if (!EnsurePreviewSession())
+                return;
+
+            foreach (var particleSystem in GetPreviewRootParticleSystems())
+            {
+                particleSystem.Play(true);
+            }
+
+            previewIsPlaying = true;
+            SceneView.RepaintAll();
+            lastResultSummary = $"预览播放: {previewStates.Count} 个粒子系统";
+            lastResultDetail = "播放使用固定随机种子。可暂停定格、拖动时间轴，或结束并恢复。";
+        }
+
+        private void PausePreview()
+        {
+            foreach (var particleSystem in GetPreviewRootParticleSystems())
+            {
+                particleSystem.Pause(true);
+            }
+
+            previewIsPlaying = false;
+            SceneView.RepaintAll();
+        }
+
+        private void RestorePreviewSession()
+        {
+            if (previewStates.Count == 0)
+                return;
+
+            foreach (var state in previewStates)
+            {
+                var particleSystem = state.particleSystem;
+                if (particleSystem == null)
+                    continue;
+
+                particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                particleSystem.useAutoRandomSeed = state.useAutoRandomSeed;
+                particleSystem.randomSeed = state.randomSeed;
+            }
+
+            foreach (var particleSystem in GetPreviewRootParticleSystems())
+            {
+                var state = previewStates.FirstOrDefault(item => item.particleSystem == particleSystem);
+                if (state == null)
+                    continue;
+
+                particleSystem.Simulate(Mathf.Max(0f, state.time), true, true, true);
+                if (state.wasPlaying)
+                    particleSystem.Play(true);
+                else if (state.wasPaused)
+                    particleSystem.Pause(true);
+            }
+
+            int restoredCount = previewStates.Count;
+            previewStates.Clear();
+            previewIsPlaying = false;
+            SceneView.RepaintAll();
+            lastResultSummary = $"预览已结束并恢复: {restoredCount} 个粒子系统";
+            lastResultDetail = "随机种子和预览前播放状态已恢复。";
         }
 
         private void DrawParticlePreviewPanel()
@@ -284,16 +682,19 @@ namespace ES
         [Button("应用参数到选中粒子", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void ApplyParticleSystemSettings()
         {
+            if (previewStates.Count > 0)
+                RestorePreviewSession();
+
             var selectedObjects = Selection.gameObjects;
             if (selectedObjects == null || selectedObjects.Length == 0)
             {
-                EditorUtility.DisplayDialog("错误", "请先选择GameObject！", "确定");
+                EditorUtility.DisplayDialog("错误", "请先选择 GameObject。", "确定");
                 return;
             }
 
             var targets = GetParticleTargets();
 
-            // 统计将被修改的粒子系统数量
+            // 统计将被修改的粒子系统数量。
             if (!ConfirmParticleOperation("确认应用粒子设置", "修改", targets))
                 return;
 
@@ -335,10 +736,13 @@ namespace ES
         [Button("播放选中粒子", ButtonHeight = 32), GUIColor(0.25f, 0.62f, 0.45f)]
         public void PlayAllParticleSystems()
         {
+            if (previewStates.Count > 0)
+                RestorePreviewSession();
+
             var selectedObjects = Selection.gameObjects;
             if (selectedObjects == null || selectedObjects.Length == 0)
             {
-                EditorUtility.DisplayDialog("错误", "请先选择GameObject！", "确定");
+                EditorUtility.DisplayDialog("错误", "请先选择 GameObject。", "确定");
                 return;
             }
 
@@ -367,7 +771,7 @@ namespace ES
             // 选中所有播放的粒子系统 GameObject
             Selection.objects = objectsToSelect.ToArray();
 
-            // 刷新 Scene 视图以确保粒子播放可见
+            // 刷新 Scene 视图以确保粒子播放可见。
             UnityEditor.SceneView.RepaintAll();
 
             lastResultSummary = $"已发送播放: {playedCount} 个粒子系统 | 目标: {targets.Count}";
@@ -379,10 +783,13 @@ namespace ES
         [Button("停止选中粒子", ButtonHeight = 32), GUIColor(0.75f, 0.58f, 0.25f)]
         public void StopAllParticleSystems()
         {
+            if (previewStates.Count > 0)
+                RestorePreviewSession();
+
             var selectedObjects = Selection.gameObjects;
             if (selectedObjects == null || selectedObjects.Length == 0)
             {
-                EditorUtility.DisplayDialog("错误", "请先选择GameObject！", "确定");
+                EditorUtility.DisplayDialog("错误", "请先选择 GameObject。", "确定");
                 return;
             }
 
@@ -413,6 +820,9 @@ namespace ES
         [Button("清空选中粒子", ButtonHeight = 32), GUIColor(0.82f, 0.38f, 0.30f)]
         public void ClearAllParticleSystems()
         {
+            if (previewStates.Count > 0)
+                RestorePreviewSession();
+
             var selectedObjects = Selection.gameObjects;
             if (selectedObjects == null || selectedObjects.Length == 0)
             {
@@ -453,6 +863,13 @@ namespace ES
             {
                 EditorSceneManager.MarkSceneDirty(scene);
             }
+        }
+
+        public override void OnPageDisable()
+        {
+            if (previewStates.Count > 0)
+                RestorePreviewSession();
+            base.OnPageDisable();
         }
     }
     #endregion

@@ -73,9 +73,9 @@ namespace ES
                  "不适合角色、可移动平台、门、机关、运行时生成/回收对象，以及会在运行时改变 Transform 或 Renderer 状态的对象。", InfoMessageType.Info)]
 
         [FoldoutGroup("说明与风险"), InfoBox("风险：Static Flags 不是普通分类标签，错误标记会导致烘焙结果、遮挡剔除、合批和运行时表现不符合预期。\n" +
-                 "• 覆盖模式会把未勾选的静态标记清掉。\n" +
-                 "• 清除所有静态标记会移除目标对象参与烘焙、遮挡剔除和批处理的资格。\n" +
-                 "• Prefab 实例会记录 Override；Project 中的 Prefab 资产默认会被保护过滤。\n" +
+                 "这些标记会被 Unity 的静态批处理、光照烘焙、反射探针、遮挡剔除和旧导航流程读取。\n" +
+                 "适合处理运行时不会移动、不会缩放、不会频繁启停的场景物体，例如建筑、地面、墙体、岩石、固定装饰。\n" +
+                 "适合处理运行时不会移动、不会缩放、不会频繁启停的场景物体，例如建筑、地面、墙体、岩石、固定装饰。\n" +
                  "建议先刷新预览，只勾选确认要处理的对象，再执行。", InfoMessageType.Warning)]
 
         [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
@@ -91,10 +91,10 @@ namespace ES
 
         [InfoBox("标记含义：\n" +
                  "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加静态批处理相关内存占用。\n" +
-                 "• 贡献全局光照：对象参与光照贴图/全局光照烘焙；错误开启会影响烘焙时间和光照结果。\n" +
-                 "• 反射探针静态：对象参与反射探针烘焙和静态反射采样。\n" +
-                 "• 遮挡剔除静态：对象可作为遮挡物；被遮挡物静态：对象可被遮挡剔除系统隐藏。\n" +
-                 "• 导航静态(旧)：旧 Unity 导航静态标记，新项目通常由 NavMesh 工作流单独管理。", InfoMessageType.Info)]
+                 "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加静态批处理相关内存占用。\n" +
+                 "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加静态批处理相关内存占用。\n" +
+                 "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加静态批处理相关内存占用。\n" +
+                 "导航静态：旧 Unity 导航静态标记，新项目通常由 NavMesh 工作流单独管理。", InfoMessageType.Info)]
         [LabelText("应用模式"), Space(5)]
         public StaticApplyMode applyMode = StaticApplyMode.Override;
 
@@ -128,7 +128,7 @@ namespace ES
         public bool batchingStatic = false;
 
         [Tooltip("兼容旧 Unity 导航静态标记。新项目通常由 NavMesh 工作流单独管理。")]
-        [LabelText("导航静态(旧)"), GUIColor("@navigationStatic ? EnabledColor : DisabledColor")]
+        [LabelText("被遮挡物静态"), GUIColor("@navigationStatic ? EnabledColor : DisabledColor")]
         public bool navigationStatic = false;
 
         [Tooltip("参与反射探针烘焙和静态反射采样。")]
@@ -197,17 +197,22 @@ namespace ES
         private string lastAuditSummary = "";
         private string previewSearch = "";
         private bool onlyShowWillChange = false;
+        private int previewPageIndex;
+        private int previewPageSize = SimpleToolsPanelUtility.DefaultPageSize;
         private bool usePreviewSelection = true;
         private string previewSignature = "";
         private List<StaticPreviewRecord> previewRecords = new List<StaticPreviewRecord>();
+        private readonly List<StaticPreviewRecord> filteredPreviewRecords = new List<StaticPreviewRecord>();
+        private readonly List<StaticPreviewRecord> pagedPreviewRecords = new List<StaticPreviewRecord>();
+        private bool previewFilterDirty = true;
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             var targetInfo = CollectStaticTargets();
             SimpleToolsPanelUtility.DrawToolHeader(
                 "静态标记批处理工作台",
-                "用于批量设置 GameObject Static Flags，适合布景、烘焙、遮挡剔除和静态批处理前的整理。",
+                "静态标记批处理工作台",
                 SimpleToolsMaturity.Upgrading,
                 "Static Flags 会影响渲染、烘焙和遮挡结果。建议先刷新预览，只处理勾选项；Prefab 资产默认保护，场景实例会记录 Override。");
             SimpleToolsPanelUtility.DrawSummary(
@@ -256,7 +261,12 @@ namespace ES
         public string PreviewSearch
         {
             get => previewSearch;
-            set => previewSearch = value ?? "";
+            set
+            {
+                previewSearch = value ?? "";
+                previewPageIndex = 0;
+                previewFilterDirty = true;
+            }
         }
 
         [HorizontalGroup("PreviewFilters")]
@@ -264,12 +274,25 @@ namespace ES
         public bool OnlyShowWillChange
         {
             get => onlyShowWillChange;
-            set => onlyShowWillChange = value;
+            set
+            {
+                onlyShowWillChange = value;
+                previewPageIndex = 0;
+                previewFilterDirty = true;
+            }
+        }
+
+        [HorizontalGroup("PreviewFilters")]
+        [LabelText("每页"), LabelWidth(42)]
+        public int PreviewPageSize
+        {
+            get => previewPageSize;
+            set => previewPageSize = Mathf.Clamp(value, 10, 100);
         }
 
         [HorizontalGroup("PreviewFilters")]
         [LabelText("只处理勾选"), LabelWidth(80)]
-        [InfoBox("开启后，应用/清除只处理预览表中勾选的对象；没有刷新预览时会处理当前有效目标。", InfoMessageType.None)]
+        [InfoBox("开启后，应用或清除只处理预览表中勾选的对象；没有刷新预览时会处理当前有效目标。", InfoMessageType.None)]
         public bool UsePreviewSelection
         {
             get => usePreviewSelection;
@@ -279,13 +302,22 @@ namespace ES
         [ShowInInspector, ReadOnly, DisplayAsString, HideLabel]
         private string PreviewSummary => BuildPreviewSummary();
 
+        [OnInspectorGUI]
+        private void DrawStaticPreviewPager()
+        {
+            int filteredCount = GetFilteredPreviewRecords().Count;
+            SimpleToolsPanelUtility.DrawLargeListGuard(filteredCount, "预览表");
+            SimpleToolsPanelUtility.DrawPager(ref previewPageIndex, filteredCount, previewPageSize);
+        }
+
         [ShowInInspector, TableList(IsReadOnly = false, AlwaysExpanded = true), LabelText("静态标记预览")]
-        private List<StaticPreviewRecord> FilteredPreviewRecords => GetFilteredPreviewRecords();
+        private List<StaticPreviewRecord> FilteredPreviewRecords => GetPagedPreviewRecords();
 
         public void RefreshStaticPreview()
         {
             var targetInfo = CollectStaticTargets();
             RebuildPreviewRecords(targetInfo.Targets);
+            previewPageIndex = 0;
             previewSignature = BuildPreviewSignature(targetInfo.Targets);
             lastAuditSummary = BuildStaticAudit(targetInfo.Targets, targetInfo.FilteredCount);
             lastResultSummary = $"预览完成: 目标 {targetInfo.Targets.Count} 个 | 过滤 {targetInfo.FilteredCount} 个";
@@ -315,7 +347,7 @@ namespace ES
             var targetInfo = CollectStaticTargets();
             if (Selection.gameObjects == null || Selection.gameObjects.Length == 0)
             {
-                EditorUtility.DisplayDialog("需要选择对象", "先在层级窗口选中要处理的 GameObject。", "知道了");
+                EditorUtility.DisplayDialog("No selection", "Select GameObjects in the Hierarchy first.", "OK");
                 return;
             }
 
@@ -325,14 +357,14 @@ namespace ES
             var allObjects = ResolveOperationTargets(targetInfo.Targets);
             if (allObjects.Count == 0)
             {
-                EditorUtility.DisplayDialog("没有可处理对象", "当前没有可处理对象。请检查 Prefab 资产保护、预览勾选项、子对象和未激活对象设置。", "知道了");
+                EditorUtility.DisplayDialog("No eligible objects", "Check prefab protection, preview selections, child-object, and inactive-object settings.", "OK");
                 return;
             }
 
             StaticEditorFlags selectedFlags = ComposeSelectedFlags();
             if (applyMode != StaticApplyMode.Override && selectedFlags == 0)
             {
-                EditorUtility.DisplayDialog("没有勾选标记", "添加/移除模式下，请至少勾选一个要处理的 Static Flag。", "知道了");
+                EditorUtility.DisplayDialog("No flags selected", "Select at least one Static Flag in Add or Remove mode.", "OK");
                 return;
             }
 
@@ -340,7 +372,7 @@ namespace ES
             string modeHint = GetApplyModeHint(selectedFlags);
             if (!EditorUtility.DisplayDialog("确认应用静态标记",
                 $"用途: {GetPurposeHint(selectedFlags)}\n风险: {GetRiskHint(selectedFlags)}\n\n将处理 {allObjects.Count} 个对象的 Static Flags。\n过滤对象: {targetInfo.FilteredCount} 个\n模式: {modeHint}\n\n{preview}\n\n支持 Ctrl+Z 撤销。继续吗？",
-                "开始应用", "取消"))
+                "Apply", "Cancel"))
                 return;
 
             Undo.RecordObjects(allObjects.ToArray(), "Batch Static Setting");
@@ -504,6 +536,7 @@ namespace ES
         private void RebuildPreviewRecords(List<GameObject> targets)
         {
             previewRecords.Clear();
+            previewFilterDirty = true;
             StaticEditorFlags selectedFlags = ComposeSelectedFlags();
 
             foreach (var obj in targets ?? new List<GameObject>())
@@ -531,30 +564,53 @@ namespace ES
                     TargetFlags = DescribeFlags(target),
                     ChangeState = willChange ? "会变" : "不变",
                     PrefabState = prefabInstance ? "实例" : prefabAsset ? "资产" : "场景",
-                    Note = notes.Count == 0 ? "可处理" : string.Join("；", notes)
+                    Note = notes.Count == 0 ? "Ready" : string.Join(", ", notes)
                 });
             }
         }
 
         private List<StaticPreviewRecord> GetFilteredPreviewRecords()
         {
-            IEnumerable<StaticPreviewRecord> query = previewRecords;
-            if (onlyShowWillChange)
-                query = query.Where(record => record.ChangeState == "会变");
+            if (!previewFilterDirty)
+                return filteredPreviewRecords;
 
-            if (!string.IsNullOrWhiteSpace(previewSearch))
+            filteredPreviewRecords.Clear();
+            string keyword = string.IsNullOrWhiteSpace(previewSearch) ? null : previewSearch.Trim();
+            for (int i = 0; i < previewRecords.Count; i++)
             {
-                string keyword = previewSearch.Trim();
-                query = query.Where(record =>
-                    ContainsIgnoreCase(record.Object != null ? record.Object.name : "", keyword) ||
-                    ContainsIgnoreCase(record.Path, keyword) ||
-                    ContainsIgnoreCase(record.CurrentFlags, keyword) ||
-                    ContainsIgnoreCase(record.TargetFlags, keyword) ||
-                    ContainsIgnoreCase(record.PrefabState, keyword) ||
-                    ContainsIgnoreCase(record.Note, keyword));
+                var record = previewRecords[i];
+                if (record == null || (onlyShowWillChange && record.ChangeState != "会变"))
+                    continue;
+
+                if (keyword != null &&
+                    !ContainsIgnoreCase(record.Object != null ? record.Object.name : "", keyword) &&
+                    !ContainsIgnoreCase(record.Path, keyword) &&
+                    !ContainsIgnoreCase(record.CurrentFlags, keyword) &&
+                    !ContainsIgnoreCase(record.TargetFlags, keyword) &&
+                    !ContainsIgnoreCase(record.PrefabState, keyword) &&
+                    !ContainsIgnoreCase(record.Note, keyword))
+                    continue;
+
+                filteredPreviewRecords.Add(record);
             }
 
-            return query.ToList();
+            previewFilterDirty = false;
+            return filteredPreviewRecords;
+        }
+
+        private List<StaticPreviewRecord> GetPagedPreviewRecords()
+        {
+            var filtered = GetFilteredPreviewRecords();
+            int pageSize = Mathf.Clamp(previewPageSize, 10, SimpleToolsPanelUtility.MaxRenderRowsPerPage);
+            int totalPages = Mathf.Max(1, Mathf.CeilToInt(filtered.Count / (float)pageSize));
+            previewPageIndex = Mathf.Clamp(previewPageIndex, 0, totalPages - 1);
+            int start = previewPageIndex * pageSize;
+            int end = Mathf.Min(start + pageSize, filtered.Count);
+
+            pagedPreviewRecords.Clear();
+            for (int i = start; i < end; i++)
+                pagedPreviewRecords.Add(filtered[i]);
+            return pagedPreviewRecords;
         }
 
         private string BuildPreviewSummary()
@@ -669,9 +725,9 @@ namespace ES
             switch (applyMode)
             {
                 case StaticApplyMode.AddOnly:
-                    return $"只添加 [{selected}]";
+                    return $"覆盖为 [{selected}]";
                 case StaticApplyMode.RemoveOnly:
-                    return $"只移除 [{selected}]";
+                    return $"覆盖为 [{selected}]";
                 case StaticApplyMode.Override:
                 default:
                     return $"覆盖为 [{selected}]";
@@ -700,7 +756,7 @@ namespace ES
                 purposes.Add("兼容旧版导航静态标记");
 #pragma warning restore CS0618
 
-            return purposes.Count == 0 ? "设置 Unity Static Flags。" : string.Join("；", purposes);
+            return purposes.Count == 0 ? "Set Unity Static Flags" : string.Join(", ", purposes);
         }
 
         private string GetRiskHint(StaticEditorFlags selectedFlags)
@@ -708,21 +764,21 @@ namespace ES
             if (applyMode == StaticApplyMode.Override)
             {
                 if (selectedFlags == 0)
-                    return "覆盖为空会清掉所有已管理的 Static Flags。";
+                    return "An empty override clears all managed Static Flags.";
 
-                return "覆盖模式会移除未勾选的已管理 Static Flags；如果对象已有其他静态用途，请先看预览。";
+                return "Override removes unselected managed Static Flags. Review the preview if objects have other static uses.";
             }
 
             if (applyMode == StaticApplyMode.RemoveOnly)
-                return "只移除勾选项，不会影响未勾选的 Static Flags；但被移除的系统将不再读取这些对象。";
+                return "Remove only clears selected flags. Systems for those flags will no longer use these objects.";
 
-            return "只添加勾选项，不会清掉现有 Static Flags；但误加到动态对象仍可能造成烘焙或剔除结果错误。";
+            return "Add only keeps existing flags. Adding flags to dynamic objects can still affect baking or culling.";
         }
 
         private string DescribeFlags(StaticEditorFlags flags)
         {
             if (flags == 0)
-                return "无";
+                return "None";
 
             var names = new List<string>();
             if ((flags & StaticEditorFlags.ContributeGI) != 0) names.Add("GI");

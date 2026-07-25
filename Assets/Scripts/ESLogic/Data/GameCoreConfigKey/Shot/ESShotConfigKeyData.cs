@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace ES
 {
+    [ESEnumScript("Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Shot/ESShotConfigKeyData.cs")]
     public enum ESShotEnumKey : ushort
     {
         None = 0,
@@ -25,9 +26,5 @@ namespace ES
         public ItemShotVariableData defaultVariableData;
         public GameObject prefab;
         public UnityEngine.Object extraAsset;
-        public ESGameCoreConfigJsonSource jsonSource;
     }
-
-    [Serializable]
-    public sealed class ESShotConfigKeyJsonRecord : ESGameCoreConfigKeyJsonRecord { }
 }

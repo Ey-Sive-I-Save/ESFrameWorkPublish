@@ -6,7 +6,8 @@
         "ES_Design",
         "ES_Logic",
         "Unity.InputSystem",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "HybridCLR.Editor"
     ],
     "includePlatforms": [
         "Editor"

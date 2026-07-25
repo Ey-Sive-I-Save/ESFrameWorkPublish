@@ -3,12 +3,14 @@ using UnityEngine;
 
 namespace ES
 {
+    [ESEnumScript("Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Actor/ESActorConfigKeyData.cs")]
     public enum ESMonsterEnumKey : ushort
     {
         None = 0,
         Custom = 1
     }
 
+    [ESEnumScript("Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Actor/ESActorConfigKeyData.cs")]
     public enum ESNpcEnumKey : ushort
     {
         None = 0,
@@ -29,12 +31,11 @@ namespace ES
         public string displayName;
         public string sourcePackage;
         public string version;
-        public ActorDataInfo soSource;
+        public ScriptableObject soSource;
         public EntityMotionSharedData sharedData;
         public EntityMotionVariableData defaultVariableData;
         public GameObject prefab;
         public UnityEngine.Object extraAsset;
-        public ESGameCoreConfigJsonSource jsonSource;
     }
 
     [Serializable]
@@ -45,17 +46,10 @@ namespace ES
         public string displayName;
         public string sourcePackage;
         public string version;
-        public ActorDataInfo soSource;
+        public ScriptableObject soSource;
         public EntityMotionSharedData sharedData;
         public EntityMotionVariableData defaultVariableData;
         public GameObject prefab;
         public UnityEngine.Object extraAsset;
-        public ESGameCoreConfigJsonSource jsonSource;
     }
-
-    [Serializable]
-    public sealed class ESMonsterConfigKeyJsonRecord : ESGameCoreConfigKeyJsonRecord { }
-
-    [Serializable]
-    public sealed class ESNpcConfigKeyJsonRecord : ESGameCoreConfigKeyJsonRecord { }
 }

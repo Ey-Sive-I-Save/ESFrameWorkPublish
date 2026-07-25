@@ -475,9 +475,9 @@ namespace ES
             if (!aim && !biped && !lookAt && !grounder && !fullBody)
                 return $"{mode}：本帧无 IK 求解";
 
-            string grounderNode = grounder ? "BipedIK(+Grounder)" : "BipedIK";
+            string grounderNode = grounder ? "BipedIK(Grounder: PreSolve)" : "BipedIK";
             string fullBodyNode = _scheduleMode == FinalIKDriverScheduleMode.DriverCoreManualProceduralDelegates
-                ? "FBBIK(+HitReaction/Recoil)"
+                ? "FBBIK(+Procedural Delegates: HitReaction/Recoil)"
                 : "FBBIK";
 
             if (aim && biped && lookAt && fullBody)
@@ -562,7 +562,9 @@ namespace ES
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             _finalIKScheduleSummaryCache = BuildFinalIKScheduleSummary();
-            _finalIKCommercialOrderSummaryCache = "Grounder -> Aim -> LookAt -> FBBIK -> Recoil -> HitReaction";
+            _finalIKCommercialOrderSummaryCache =
+                "AimIK -> Grounder(Biped PreSolve) -> BipedIK -> LookAtIK -> FBBIK -> " +
+                "Procedural Delegates(HitReaction/Recoil: subscription order, no fixed precedence)";
             _finalIKScheduleBlockSummaryCache = BuildFinalIKScheduleBlockSummary();
 #endif
         }

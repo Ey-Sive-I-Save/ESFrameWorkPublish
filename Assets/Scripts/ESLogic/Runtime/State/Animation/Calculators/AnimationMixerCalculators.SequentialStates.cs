@@ -55,7 +55,7 @@ namespace ES
 
             [LabelText("参数")]
             [Tooltip("用于比较的 float 参数")]
-            public StateParameter parameter;
+            public StateFloatParameterReference parameter;
 
             [LabelText("比较")]
             public PhaseTransitionCompare compare;
@@ -71,7 +71,7 @@ namespace ES
             public bool Check(in StateMachineContext context)
             {
                 if (!enable) return false;
-                float diff = context.GetFloat(parameter, 0f) - threshold;
+                float diff = context.GetFloat(parameter.Parameter, 0f) - threshold;
 
                 if (compare == PhaseTransitionCompare.Greater)
                     return includeEqual ? (diff >= 0f) : (diff > 0f);
@@ -131,7 +131,7 @@ namespace ES
             [LabelText("混合参数")]
             [Tooltip("控制主次Clip混合的参数（0=主，1=次）")]
             [ShowIf("@phaseCalculator == null && enableSecondaryClipBlend")]
-            public StateParameter blendParameter;
+            public StateFloatParameterReference blendParameter;
             
             [LabelText("最小时长")]
             [Tooltip("该阶段最短持续时间（秒）。在此之前不会发生：切换条件/播完切换/自动切换")]
@@ -154,7 +154,7 @@ namespace ES
             [LabelText("切换参数")]
             [HideInInspector]
             [Tooltip("(兼容旧字段) 旧版“触发参数”。已统一迁移到【切换条件】中")]
-            public StateParameter transitionTrigger;
+            public StateFloatParameterReference transitionTrigger;
 
             [LabelText("触发阈值")]
             [HideInInspector]
@@ -213,7 +213,7 @@ namespace ES
                     phaseName = "起跳 (JumpStart)",
                     primaryClip = null,
                     secondaryClip = null,
-                    blendParameter = "JumpPower",
+                    blendParameter = StateDefaultFloatParameter.None,
                     minDuration = 0.1f,
                     maxDuration = 0.15f,
                     autoTransition = true,
@@ -224,29 +224,38 @@ namespace ES
                     phaseName = "上升 (Rising)",
                     primaryClip = null,
                     secondaryClip = null,
-                    blendParameter = "VerticalSpeed",
+                    blendParameter = StateDefaultFloatParameter.VerticalSpeed,
                     minDuration = 0.2f,
                     maxDuration = 2f,
                     autoTransition = false,
-                    transitionTrigger = "VelocityNegative"  // 速度变负时切换
+                    transitionCondition = new PhaseTransitionCondition
+                    {
+                        enable = true,
+                        parameter = StateDefaultFloatParameter.VerticalSpeed,
+                        compare = PhaseTransitionCompare.Less,
+                        threshold = 0f
+                    }
                 },
                 new SequentialPhase
                 {
                     phaseName = "下落 (Falling)",
                     primaryClip = null,
                     secondaryClip = null,
-                    blendParameter = "FallSpeed",
+                    blendParameter = StateDefaultFloatParameter.VerticalSpeed,
                     minDuration = 0.15f,
                     maxDuration = 5f,
                     autoTransition = false,
-                    transitionTrigger = "OnGrounded"  // 接地时切换
+                    // The typed core surface has no float grounded proxy. Use the hard
+                    // maximum duration as the template fallback; production assets can
+                    // configure a suitable typed float transition condition.
+                    transitionTrigger = StateDefaultFloatParameter.None
                 },
                 new SequentialPhase
                 {
                     phaseName = "落地 (Landing)",
                     primaryClip = null,
                     secondaryClip = null,
-                    blendParameter = "ImpactForce",
+                    blendParameter = StateDefaultFloatParameter.None,
                     minDuration = 0.2f,
                     maxDuration = 0.3f,
                     autoTransition = true,
@@ -285,7 +294,7 @@ namespace ES
                     phaseName = "前摇 (Windup)",
                     primaryClip = null,
                     secondaryClip = null,
-                    blendParameter = "AttackCharge",
+                    blendParameter = StateDefaultFloatParameter.None,
                     minDuration = 0.15f,
                     maxDuration = 0.2f,
                     autoTransition = true,
@@ -296,7 +305,7 @@ namespace ES
                     phaseName = "攻击 (Strike)",
                     primaryClip = null,
                     secondaryClip = null,
-                    blendParameter = "AttackPower",
+                    blendParameter = StateDefaultFloatParameter.None,
                     minDuration = 0.3f,
                     maxDuration = 0.4f,
                     autoTransition = true,
@@ -307,7 +316,7 @@ namespace ES
                     phaseName = "后摇 (Recovery)",
                     primaryClip = null,
                     secondaryClip = null,
-                    blendParameter = "RecoverySpeed",
+                    blendParameter = StateDefaultFloatParameter.None,
                     minDuration = 0.25f,
                     maxDuration = 0.35f,
                     autoTransition = true,
@@ -402,6 +411,7 @@ namespace ES
             runtime.phaseUsesCalculator = new bool[phases.Length];
             runtime.phaseBlendWeights = new float[phases.Length];
             runtime.phaseBlendVelocities = new float[phases.Length];
+            runtime.InitializePhaseMixerWeightCaches(phases.Length);
             runtime.EnsureClipOverrideSlots(phases.Length * 2);
 
             for (int i = 0; i < phases.Length; i++)
@@ -770,6 +780,7 @@ namespace ES
                     runtime.phasePrimaryPlayables[phaseIndex].SetSpeed(oldSpeed);
                     runtime.phasePrimaryPlayables[phaseIndex].SetTime(oldTime);
                     graph.Connect(runtime.phasePrimaryPlayables[phaseIndex], 0, runtime.phaseMixers[phaseIndex], 0);
+                    runtime.InvalidatePhaseMixerWeightCache(phaseIndex);
                 }
                 else
                 {
@@ -807,6 +818,7 @@ namespace ES
                 runtime.phaseSecondaryPlayables[phaseIndex].SetSpeed(oldSpeed);
                 runtime.phaseSecondaryPlayables[phaseIndex].SetTime(oldTime);
                 graph.Connect(runtime.phaseSecondaryPlayables[phaseIndex], 0, runtime.phaseMixers[phaseIndex], 1);
+                runtime.InvalidatePhaseMixerWeightCache(phaseIndex);
             }
 
             runtime.UpdateClipOverrideSlot(clipIndex, newClip);
@@ -1122,8 +1134,7 @@ namespace ES
 
         private bool HasTransitionTrigger(SequentialPhase phase)
         {
-            return phase.transitionTrigger.EnumValue != StateDefaultFloatParameter.None ||
-                   !string.IsNullOrEmpty(phase.transitionTrigger.StringValue);
+            return phase.transitionTrigger.IsValid;
         }
 
         private static bool IsPlayableEndedInternal(Playable playable, int depth)
@@ -1226,7 +1237,7 @@ namespace ES
             if (runtime.phaseMixers == null || !runtime.phaseMixers[phaseIndex].IsValid())
                 return;
 
-            float targetBlend = Mathf.Clamp01(context.GetFloat(phase.blendParameter, 0f));
+            float targetBlend = Mathf.Clamp01(context.GetFloat(phase.blendParameter.Parameter, 0f));
 
             if (runtime.phaseBlendWeights == null || runtime.phaseBlendVelocities == null)
                 return;
@@ -1251,8 +1262,7 @@ namespace ES
             float primaryWeight = 1f - runtime.phaseBlendWeights[phaseIndex];
             float secondaryWeight = runtime.phaseBlendWeights[phaseIndex];
 
-            runtime.phaseMixers[phaseIndex].SetInputWeight(0, primaryWeight);
-            runtime.phaseMixers[phaseIndex].SetInputWeight(1, secondaryWeight);
+            runtime.SetPhaseMixerWeightsIfChanged(runtime.phaseMixers[phaseIndex], phaseIndex, primaryWeight, secondaryWeight);
         }
     }
 

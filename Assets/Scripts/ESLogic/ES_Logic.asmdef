@@ -4,6 +4,7 @@
     "references": [
         "ES_Stand",
         "ES_Design",
+        "UniTask",
         "Unity.TextMeshPro",
         "DOTween.Modules",
         "KCC",

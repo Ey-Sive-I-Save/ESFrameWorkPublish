@@ -253,7 +253,7 @@ namespace ES
             /// </summary>
             static void OnCmdAgentToolbarGUI()
             {
-                if (GUILayout.Button(new GUIContent("AI", "打开【ES】Cmd Agent，并按配置自动恢复最近会话"), EditorStyles.toolbarButton, GUILayout.Width(42)))
+                if (GUILayout.Button(new GUIContent("Agent", "打开【ES】Cmd Agent：后台 CMD/Codex 中转，并按配置自动恢复最近会话"), EditorStyles.toolbarButton, GUILayout.Width(56)))
                     ESCmdAgentWindow.OpenAndResume();
             }
             static void OnAssetQuickAccessToolbarGUI()
@@ -586,7 +586,7 @@ namespace ES
                     SimpleToolsWindow.UsingWindow = simpleToolsWindow;
 
                     // 延迟执行，确保窗口和菜单树完全初始化
-                    EditorApplication.delayCall += () => SelectTopToolbarPage();
+                    QueueSelectTopToolbarPage();
                 }
                 catch (Exception ex)
                 {
@@ -597,6 +597,12 @@ namespace ES
             /// <summary>
             /// 选择顶部工具栏页面
             /// </summary>
+            private static void QueueSelectTopToolbarPage()
+            {
+                EditorApplication.delayCall -= SelectTopToolbarPage;
+                EditorApplication.delayCall += SelectTopToolbarPage;
+            }
+
             private static void SelectTopToolbarPage()
             {
                 try
@@ -612,14 +618,14 @@ namespace ES
                         SimpleToolsWindow.UsingWindow.ForceMenuTreeRebuild();
 
                         // 再次延迟检查
-                        EditorApplication.delayCall += () => SelectTopToolbarPage();
+                        QueueSelectTopToolbarPage();
                         return;
                     }
 
                     if (SimpleToolsWindow.MenuItems == null || SimpleToolsWindow.MenuItems.Count == 0)
                     {
                         // 再次延迟重试
-                        EditorApplication.delayCall += () => SelectTopToolbarPage();
+                        QueueSelectTopToolbarPage();
                         return;
                     }
 
@@ -635,21 +641,28 @@ namespace ES
                     {
                         // 最后一次尝试：强制刷新窗口
                         SimpleToolsWindow.UsingWindow.ESWindow_RefreshWindow();
-                        EditorApplication.delayCall += () =>
-                        {
-                            if (SimpleToolsWindow.MenuItems != null && SimpleToolsWindow.MenuItems.TryGetValue(menuPath, out var item))
-                            {
-                                SimpleToolsWindow.UsingWindow.MenuTree.Selection.Clear();
-                                SimpleToolsWindow.UsingWindow.MenuTree.Selection.Add(item);
-                                SimpleToolsWindow.UsingWindow.Repaint();
-                            }
-                        };
+                        EditorApplication.delayCall -= SelectTopToolbarPageAfterRefresh;
+                        EditorApplication.delayCall += SelectTopToolbarPageAfterRefresh;
                     }
                 }
                 catch (Exception ex)
                 {
                     Debug.LogError($"选择顶部工具栏页面失败: {ex.Message}");
                 }
+            }
+
+            private static void SelectTopToolbarPageAfterRefresh()
+            {
+                const string menuPath = "【ES集成工具集】/顶部工具栏";
+                if (SimpleToolsWindow.UsingWindow == null || SimpleToolsWindow.UsingWindow.MenuTree == null || SimpleToolsWindow.MenuItems == null)
+                    return;
+
+                if (!SimpleToolsWindow.MenuItems.TryGetValue(menuPath, out var item))
+                    return;
+
+                SimpleToolsWindow.UsingWindow.MenuTree.Selection.Clear();
+                SimpleToolsWindow.UsingWindow.MenuTree.Selection.Add(item);
+                SimpleToolsWindow.UsingWindow.Repaint();
             }
 
             #endregion

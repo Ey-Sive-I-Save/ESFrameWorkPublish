@@ -66,7 +66,7 @@ ESGameTag.行为类_禁止释放技能
 
 - `ESBuffKey` 表示“这个 Buff 配置是谁”。
 - `ESGameTag` 表示“实体当前拥有什么状态事实”。
-- `RuntimeKey` 表示跨资产、跨配置、跨运行缓存的统一身份协议。
+- `RuntimeKey` 表示当前进程中对应强类型 AssetTable 的运行索引；由 `ConfigKey` 解析得到。必须与 AssetKind/EnumType 一起解释，不允许把裸 int 当成跨资产类型或跨进程身份。
 
 三者可以协作，但不能混成一个东西。
 
@@ -113,5 +113,4 @@ string customKey = "控制/冰冻";
 
 ## 一句话
 
-分类展示交给 Inspector，运行身份交给强类型键和 RuntimeKey；字符串用于配置扩展，不进入高频判断。
-
+分类展示交给 Inspector，配置身份交给强类型 ConfigKey；热路径可在启动后把它解析为当前表内的 RuntimeKey。字符串不进入高频判断。

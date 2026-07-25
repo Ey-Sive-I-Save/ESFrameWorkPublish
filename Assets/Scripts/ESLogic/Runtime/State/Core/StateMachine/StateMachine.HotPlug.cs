@@ -114,7 +114,8 @@ namespace ES
 #endif
 
             playableGraph.Connect(statePlayable, 0, layer.mixer, inputIndex);
-            layer.mixer.SetInputWeight(inputIndex, 0f);
+            layer.InvalidateMixerSlotWeight(inputIndex);
+            layer.SetMixerSlotWeightIfChanged(inputIndex, 0f);
 
             layer.stateToSlotMap[state] = inputIndex;
             state.BindLayerSlot(layer, inputIndex);
@@ -153,7 +154,8 @@ namespace ES
                     playableGraph.Disconnect(layer.mixer, slotIndex);
                 }
 
-                layer.mixer.SetInputWeight(slotIndex, 0f);
+                layer.InvalidateMixerSlotWeight(slotIndex);
+                layer.SetMixerSlotWeightIfChanged(slotIndex, 0f);
             }
 
             layer.stateToSlotMap.Remove(state);

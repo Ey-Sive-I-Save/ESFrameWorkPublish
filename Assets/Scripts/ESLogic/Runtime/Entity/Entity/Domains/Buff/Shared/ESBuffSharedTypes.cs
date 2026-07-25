@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace ES
 {
+    [ESEnumScript("Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Buff/Shared/ESBuffSharedTypes.cs")]
     public enum ESBuffEnumKey : ushort
     {
         None = 0,

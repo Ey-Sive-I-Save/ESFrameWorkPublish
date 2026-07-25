@@ -28,7 +28,7 @@ namespace ES
             {
                 string configName = currentConfigIndex == -1 ? "默认配置" : GetExtensionConfigName();
                 int collectCount = SelectedAssets != null ? SelectedAssets.Count : 0;
-                return $"配置: {configName} | 包名: {PackageName} | 收集路径: {collectCount} 个 | 输出: {ExportPath} | 包含依赖: {(IncludeDependencies ? "是" : "否")}";
+                return $"配置: {configName} | 包名: {PackageName} | 收集路径: {collectCount} 个 | 输出: {ExportPath} | 包含依赖: {SimpleToolsSafetyUtility.YesNo(IncludeDependencies)}";
             }
         }
 
@@ -54,7 +54,7 @@ namespace ES
         private string cachedPackagePreviewPackageName = "";
         private bool cachedPackagePreviewIncludeDependencies;
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             var previewPaths = EnsurePackagePreviewCache(false, out var configName, out var outputPath, out var packageName, out var includeDependencies, out var configValid);
@@ -104,7 +104,7 @@ namespace ES
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 string finalOutputPath = Path.Combine(outputPath ?? string.Empty, SanitizeFileName(packageName) + ".unitypackage").Replace("\\", "/");
-                EditorGUILayout.LabelField($"配置: {configName} | 资源: {previewPaths.Count} | 依赖: {(includeDependencies ? "包含" : "不包含")}", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField($"配置: {configName} | 资源: {previewPaths.Count} | 依赖: {GetDependencyInclusionText(includeDependencies)}", EditorStyles.wordWrappedMiniLabel);
                 EditorGUILayout.LabelField("输出: " + finalOutputPath, EditorStyles.wordWrappedMiniLabel);
 
                 using (new EditorGUILayout.HorizontalScope())
@@ -285,7 +285,7 @@ namespace ES
 
         [LabelText("当前配置"), ValueDropdown("GetConfigNames"), Space(10)]
         [OnValueChanged("OnConfigChanged")]
-        public int currentConfigIndex = -1; // -1 表示默认配置，0+ 表示扩展配置
+        public int currentConfigIndex = -1; // -1 表示默认配置，非负表示扩展配置
 
         // 使用全局配置列表
         private List<ESGlobalEditorDefaultConfi.UnityPackageConfig> GlobalPackageConfigs
@@ -323,7 +323,7 @@ namespace ES
                 IsEnabled = true
             };
 
-            // 从当前设置复制初始值
+            // 从当前设置复制初始值。
             if (globalConfigs.Count > 0 && currentConfigIndex >= 0 && currentConfigIndex < globalConfigs.Count)
             {
                 var currentConfig = globalConfigs[currentConfigIndex];
@@ -604,7 +604,7 @@ namespace ES
             }
         }
 
-        [ShowInInspector, LabelText("选中的资源路径"), FolderPath, ListDrawerSettings(DraggableItems = false)]
+        [ShowInInspector, LabelText("选中的资源路径"), FolderPath, ListDrawerSettings(DraggableItems = false, ShowPaging = true, NumberOfItemsPerPage = 20)]
         public List<string> SelectedAssets
         {
             get
@@ -688,7 +688,7 @@ namespace ES
             var globalConfigs = GlobalPackageConfigs;
             if (globalConfigs == null || globalConfigs.Count == 0)
             {
-                // 如果全局配置为空，创建一个默认配置
+                // 如果全局配置为空，创建一个默认配置。
                 var defaultConfig = new ESGlobalEditorDefaultConfi.UnityPackageConfig
                 {
                     ConfigName = "默认配置",
@@ -715,22 +715,22 @@ namespace ES
                 currentConfigIndex = 0;
             }
 
-            // 获取当前选中的资源
+            // 获取当前选中的资源。
             var selected = Selection.objects;
 
-            // 处理默认配置的情况
+            // 处理默认配置的情况。
             if (currentConfigIndex == -1)
             {
-                // 对于默认配置，直接使用全局配置的值
+                // 对于默认配置，直接使用全局配置的值。
                 var globalConfig = ESGlobalEditorDefaultConfi.Instance;
                 if (globalConfig != null)
                 {
-                    // 只有当没有手动设置资源时，才自动更新选中的资源
+                    // 只有当没有手动设置资源时，才自动更新选中的资源。
                     if (globalConfig.PackageCollectPath == null || globalConfig.PackageCollectPath.Count == 0)
                     {
                         globalConfig.PackageCollectPath = new List<string>();
 
-                        // 1. 添加当前选中的资源
+                        // 1. 添加当前选中的资源。
                         if (selected != null && selected.Length > 0)
                         {
                             globalConfig.PackageCollectPath.AddRange(GetValidSelectedAssetPaths(selected));
@@ -742,7 +742,7 @@ namespace ES
                         {
                             if (AssetDatabase.IsValidFolder(path))
                             {
-                                // 直接添加文件夹路径
+                                // 直接添加文件夹路径。
                                 if (!globalConfig.PackageCollectPath.Contains(path))
                                     globalConfig.PackageCollectPath.Add(path);
                             }
@@ -766,12 +766,12 @@ namespace ES
                 // 处理扩展配置
                 var currentConfig = globalConfigs[currentConfigIndex];
 
-                // 只有当没有手动设置资源时，才自动更新选中的资源
+                // 只有当没有手动设置资源时，才自动更新选中的资源。
                 if (currentConfig.CollectPaths == null || currentConfig.CollectPaths.Count == 0)
                 {
                     currentConfig.CollectPaths = new List<string>();
 
-                    // 1. 添加当前选中的资源
+                    // 1. 添加当前选中的资源。
                     if (selected != null && selected.Length > 0)
                     {
                         currentConfig.CollectPaths.AddRange(GetValidSelectedAssetPaths(selected));
@@ -785,7 +785,7 @@ namespace ES
                         {
                             if (AssetDatabase.IsValidFolder(path))
                             {
-                                // 直接添加文件夹路径
+                                // 直接添加文件夹路径。
                                 if (!currentConfig.CollectPaths.Contains(path))
                                     currentConfig.CollectPaths.Add(path);
                             }
@@ -814,7 +814,7 @@ namespace ES
                     }
                     catch
                     {
-                        // 如果配置不存在或访问失败，保持当前值
+                        // 如果配置不存在或访问失败，保持当前值。
                     }
                 }
 
@@ -828,7 +828,7 @@ namespace ES
                     }
                     catch
                     {
-                        // 如果配置不存在或访问失败，保持当前值
+                        // 如果配置不存在或访问失败，保持当前值。
                     }
                 }
             }
@@ -922,7 +922,7 @@ namespace ES
             config.PackageName = currentConfig.PackageName;
             config.PackageSelfPathForMain = currentConfig.OutputPath;
             config.IncludeDependencies_ = currentConfig.IncludeDependencies_;
-            // 合并收集路径，去重
+            // 合并收集路径，去重。
             var allPaths = new HashSet<string>(config.PackageCollectPath ?? new List<string>());
             foreach (var path in currentConfig.CollectPaths)
             {
@@ -971,7 +971,7 @@ namespace ES
             if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
                 "确认导出 UnityPackage",
                 assetPaths.Length,
-                $"配置：{configName}\n输出：{finalOutputPath}\n包含依赖：{(includeDependencies ? "是" : "否")}\n\n{exportPreview}",
+                $"配置：{configName}\n输出：{finalOutputPath}\n包含依赖：{SimpleToolsSafetyUtility.YesNo(includeDependencies)}\n\n{exportPreview}",
                 "会把展开后的资源写入 unitypackage 文件。包含依赖时包体可能明显变大，请确认没有把临时文件或内部工具打进去。"))
                 return;
 
@@ -983,7 +983,7 @@ namespace ES
                 AssetDatabase.ExportPackage(assetPaths, finalOutputPath,
                     includeDependencies ? ExportPackageOptions.IncludeDependencies : ExportPackageOptions.Default);
 
-                lastResultSummary = $"打包完成: {assetPaths.Length} 个资源 | 配置 {configName} | 依赖 {(includeDependencies ? "包含" : "不包含")}";
+                lastResultSummary = $"打包完成: {assetPaths.Length} 个资源 | 配置 {configName} | 依赖 {GetDependencyInclusionText(includeDependencies)}";
                 lastResultDetail = $"输出文件:\n{finalOutputPath}\n\n资源预览:\n" + SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
                 EditorUtility.DisplayDialog("成功", $"Package导出成功！\n配置: {configName}\n路径: {finalOutputPath}", "确定");
                 EditorUtility.RevealInFinder(finalOutputPath);
@@ -1013,14 +1013,14 @@ namespace ES
                 return;
             }
 
-            // 检查路径是否存在
+            // 检查路径是否存在。
             if (!AssetDatabase.IsValidFolder(publishPath))
             {
                 EditorUtility.DisplayDialog("错误", $"发布路径不存在: {publishPath}", "确定");
                 return;
             }
 
-            // 收集发布路径下的所有资源
+            // 收集发布路径下的所有资源。
             var guids = AssetDatabase.FindAssets("", new[] { publishPath });
             var assetPaths = new List<string>();
             var assetPathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1044,7 +1044,7 @@ namespace ES
                 outputDir = "Assets/../ESOutput/UnityPackage";
             }
 
-            // 生成包名（使用全局配置的固定包名 + 时间戳）
+            // 生成包名（使用全局配置的固定包名加时间戳）。
             var packageName = config.PackageName;
             if (string.IsNullOrEmpty(packageName))
             {
@@ -1092,6 +1092,11 @@ namespace ES
 
             fileName = fileName.Trim();
             return string.IsNullOrEmpty(fileName) ? "ESPackage" : fileName;
+        }
+
+        private static string GetDependencyInclusionText(bool includeDependencies)
+        {
+            return includeDependencies ? "包含" : "不包含";
         }
 
         private List<string> GetValidSelectedAssetPaths(UnityEngine.Object[] selected)

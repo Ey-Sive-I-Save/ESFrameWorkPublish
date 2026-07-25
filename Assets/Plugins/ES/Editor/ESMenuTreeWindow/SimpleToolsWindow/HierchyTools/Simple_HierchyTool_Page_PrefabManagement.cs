@@ -82,7 +82,7 @@ namespace ES
                 int selectedCount = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
                 int modifiedCount = detectedPrefabs.Count(info => info != null && info.hasModifications);
                 int missingCount = detectedPrefabs.Count(info => info != null && info.isMissing);
-                return $"当前选择: {selectedCount} 个对象 | 已分析 Prefab: {detectedPrefabs.Count} 个 | 已修改: {modifiedCount} | 丢失引用: {missingCount} | 包含子对象: {(includeChildren ? "是" : "否")}";
+                return $"当前选择: {selectedCount} 个对象 | 已分析 Prefab: {detectedPrefabs.Count} 个 | 已修改: {modifiedCount} | 丢失引用: {missingCount} | 包含子对象: {SimpleToolsSafetyUtility.YesNo(includeChildren)}";
             }
         }
 
@@ -123,7 +123,7 @@ namespace ES
         private static readonly string[] PrefabStatusFilterLabels = { "全部", "已修改", "丢失", "变体", "正常" };
         private static readonly string[] PrefabSortLabels = { "对象", "风险", "资产", "路径" };
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             DrawPrefabWorkbench();
@@ -495,10 +495,9 @@ namespace ES
         }
         #endregion
 
-        #region 分析和检测功能
-
+        #region 分析功能
         /// <summary>
-        /// 在当前场景中查找所有丢失Prefab引用的对象
+        /// 刷新并分析当前选择的Prefab实例，生成详细统计信息
         /// </summary>
         [Tooltip("扫描整个场景，查找所有Prefab引用丢失的对象。找到的对象会被自动选中，方便批量处理。")]
         public void FindMissingPrefabs()
@@ -507,7 +506,7 @@ namespace ES
             var rootObjects = scene.GetRootGameObjects();
             var missingList = new List<GameObject>();
 
-            // 遍历场景中的所有对象
+            // 遍历场景中的所有对象。
             foreach (var root in rootObjects)
             {
                 var allTransforms = root.GetComponentsInChildren<Transform>(true);
@@ -836,7 +835,7 @@ namespace ES
                     writer.WriteLine("=== ES Prefab 实例审计报告 ===");
                     writer.WriteLine($"生成时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                     writer.WriteLine($"上下文: {GetContextLabel()}");
-                    writer.WriteLine($"包含子对象: {(includeChildren ? "是" : "否")}");
+                    writer.WriteLine($"包含子对象: {SimpleToolsSafetyUtility.YesNo(includeChildren)}");
                     writer.WriteLine($"筛选结果: {rows.Count} / {detectedPrefabs.Count}");
                     writer.WriteLine();
                     writer.WriteLine("=== 风险总览 ===");
@@ -908,7 +907,7 @@ namespace ES
             int prefabCount = prefabTargets.Count;
             if (prefabCount == 0)
             {
-                EditorUtility.DisplayDialog("提示", "ℹ️ 选中的对象中没有Prefab实例！", "确定");
+                EditorUtility.DisplayDialog("提示", "选中的对象中没有 Prefab 实例。", "确定");
                 return;
             }
 
@@ -969,7 +968,7 @@ namespace ES
             int prefabCount = prefabTargets.Count;
             if (prefabCount == 0)
             {
-                EditorUtility.DisplayDialog("提示", "ℹ️ 选中的对象中没有Prefab实例！", "确定");
+                EditorUtility.DisplayDialog("提示", "选中的对象中没有 Prefab 实例。", "确定");
                 return;
             }
 
@@ -1030,7 +1029,7 @@ namespace ES
             int prefabCount = prefabTargets.Count;
             if (prefabCount == 0)
             {
-                EditorUtility.DisplayDialog("提示", "ℹ️ 选中的对象中没有Prefab实例！", "确定");
+                EditorUtility.DisplayDialog("提示", "选中的对象中没有 Prefab 实例。", "确定");
                 return;
             }
 
@@ -1084,7 +1083,7 @@ namespace ES
         {
             if (targetPrefab == null)
             {
-                EditorUtility.DisplayDialog("错误", "❌ 请先设置目标Prefab！\n\n在'基础设置'中选择要替换的目标Prefab资产。", "确定");
+                EditorUtility.DisplayDialog("错误", "请先设置目标 Prefab！\n\n在基础设置中选择要替换的目标 Prefab 资产。", "确定");
                 return;
             }
 

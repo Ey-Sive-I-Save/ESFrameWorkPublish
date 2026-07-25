@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -132,7 +134,7 @@ namespace ES
         public int repairCount;
         public int overflowDestroyCount;
 
-        public readonly Dictionary<PrefabPrewarmDataInfo, int> prewarmSources = new Dictionary<PrefabPrewarmDataInfo, int>(4);
+        public readonly Dictionary<object, int> prewarmSources = new Dictionary<object, int>(4);
 
         public int ActiveCount => active.Count;
         public int InactiveCount => inactive.Count;
@@ -187,6 +189,26 @@ namespace ES
         }
     }
 
+    internal sealed class ESGameObjectPoolAsyncPrewarmContext : IDisposable
+    {
+        public readonly ESAssetScope assetScope;
+        public readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        public readonly Dictionary<PrefabPrewarmEntry, GameObject> loadedPrefabs = new Dictionary<PrefabPrewarmEntry, GameObject>();
+        public bool ready;
+
+        public ESGameObjectPoolAsyncPrewarmContext(ESAssetScope scope)
+        {
+            assetScope = scope;
+        }
+
+        public void Dispose()
+        {
+            cancellation.Cancel();
+            cancellation.Dispose();
+            assetScope.Dispose();
+        }
+    }
+
     [Serializable]
     [TypeRegistryItem("GameObject对象池模块")]
     public sealed class ESGameObjectPoolModule : ESRuntimeModule
@@ -224,6 +246,7 @@ namespace ES
         private readonly List<TrailRenderer> trailBuffer = new List<TrailRenderer>(8);
         private readonly List<IESGameObjectPoolResettable> resettableBuffer = new List<IESGameObjectPoolResettable>(8);
         private readonly Dictionary<PrefabPrewarmDataInfo, HashSet<ESGameObjectPoolPrewarmScope>> loadedPrewarmScopes = new Dictionary<PrefabPrewarmDataInfo, HashSet<ESGameObjectPoolPrewarmScope>>(16);
+        private readonly Dictionary<PrefabPrewarmDataInfo, Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext>> asyncPrewarmContexts = new Dictionary<PrefabPrewarmDataInfo, Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext>>(16);
 
         private Transform root;
         private float nextRepairTime;
@@ -346,36 +369,77 @@ namespace ES
             CreateInactive(group, count);
         }
 
+        internal void PrewarmOwned(GameObject prefab, int count, object source, string key = null, ESGameObjectPoolConfig config = null)
+        {
+            if (prefab == null || count <= 0 || source == null)
+                return;
+            ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, key, config);
+            AddPrewarmSource(group, source, count);
+            CreateInactive(group, count);
+        }
+
+        internal void ReleaseOwnedPrewarm(GameObject prefab, int count, object source, string key = null, bool clearExclusiveInactive = true)
+        {
+            ESGameObjectPoolGroup group = ResolveGroup(prefab, key);
+            if (group == null || source == null)
+                return;
+            RemovePrewarmSource(group, source, count);
+            if (clearExclusiveInactive && group.PrewarmSourceCount == 0)
+            {
+                ClearExclusiveGroup(group, false);
+                RemoveGroupIfUnused(group);
+            }
+        }
+
+        public async UniTask<GameObject> PrewarmAsync(
+            ESAssetReferPrefabConfigKey prefabKey,
+            ESAssetScope assetScope,
+            int count,
+            string key = null,
+            ESGameObjectPoolConfig config = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (prefabKey == null) throw new ArgumentNullException(nameof(prefabKey));
+            if (assetScope == null) throw new ArgumentNullException(nameof(assetScope));
+            if (prefabKey.EnumKeyInt == 0 && string.IsNullOrEmpty(prefabKey.StringKey))
+                throw new InvalidOperationException("[ESRes][Prewarm] Prefab ConfigKey 缺少 EnumKey/StringKey。");
+            if (!prefabKey.HasGuid)
+                throw new InvalidOperationException("[ESRes][Prewarm] Prefab ConfigKey 尚未解析到 GUID，请先在资源注册表完成登记。");
+
+            var refer = new ESAssetReferPrefab();
+            refer.InitializeGeneratedReference(
+                prefabKey.guid,
+                prefabKey.localFileId,
+                ESAssetReferKind.Prefab,
+                prefabKey.EnumKeyInt,
+                prefabKey.StringKey);
+
+            GameObject prefab = await assetScope.LoadAsync(refer, cancellationToken);
+            if (prefab == null)
+                throw new InvalidOperationException("[ESRes][Prewarm] Prefab ConfigKey 加载结果为空。");
+
+            Prewarm(prefab, count, key, config);
+            return prefab;
+        }
+
         public void Prewarm(PrefabPrewarmDataInfo dataInfo)
         {
-            Prewarm(dataInfo, null, null);
+            LoadPrewarmForCurrentScene(dataInfo);
         }
 
         public void Prewarm(PrefabPrewarmDataInfo dataInfo, string sceneName)
         {
-            Prewarm(dataInfo, sceneName, currentSpaceName);
+            LoadPrewarmForScene(dataInfo, sceneName, currentSpaceName);
         }
 
         public void Prewarm(PrefabPrewarmDataInfo dataInfo, string sceneName, string spaceName)
         {
-            if (dataInfo == null || dataInfo.entries == null)
-                return;
+            PrewarmAsync(dataInfo, sceneName, spaceName).Forget();
+        }
 
-            if (!string.IsNullOrEmpty(sceneName) && !dataInfo.Supports(sceneName, spaceName))
-                return;
-
-            int count = dataInfo.entries.Count;
-            for (int i = 0; i < count; i++)
-            {
-                PrefabPrewarmEntry entry = dataInfo.entries[i];
-                if (entry == null || !entry.enabled || entry.prefab == null)
-                    continue;
-
-                ESGameObjectPoolConfig config = entry.useCustomConfig ? entry.config : defaultConfig;
-                ESGameObjectPoolGroup group = GetOrCreateGroup(entry.prefab, entry.key, config);
-                AddPrewarmSource(group, dataInfo, entry.prewarmCount);
-                CreateInactive(group, entry.prewarmCount);
-            }
+        public UniTask<bool> PrewarmAsync(PrefabPrewarmDataInfo dataInfo, string sceneName, string spaceName, CancellationToken cancellationToken = default)
+        {
+            return LoadPrewarmForSceneAsync(dataInfo, sceneName, spaceName, cancellationToken);
         }
 
         public void PrewarmForCurrentScene(PrefabPrewarmDataInfo dataInfo)
@@ -402,14 +466,57 @@ namespace ES
         {
             if (dataInfo == null || string.IsNullOrEmpty(sceneName) || !dataInfo.Supports(sceneName, spaceName))
                 return false;
-
-            HashSet<ESGameObjectPoolPrewarmScope> scopes = GetLoadedScopeSet(dataInfo);
             ESGameObjectPoolPrewarmScope scope = new ESGameObjectPoolPrewarmScope(sceneName, spaceName);
-            if (!scopes.Add(scope))
+            if (TryGetAsyncPrewarmContext(dataInfo, scope, out _))
+                return false;
+            LoadPrewarmForSceneAsync(dataInfo, sceneName, spaceName).Forget();
+            return true;
+        }
+
+        public async UniTask<bool> LoadPrewarmForSceneAsync(PrefabPrewarmDataInfo dataInfo, string sceneName, string spaceName, CancellationToken cancellationToken = default)
+        {
+            if (dataInfo == null || dataInfo.entries == null || string.IsNullOrEmpty(sceneName) || !dataInfo.Supports(sceneName, spaceName))
                 return false;
 
-            Prewarm(dataInfo, sceneName, spaceName);
-            return true;
+            ESGameObjectPoolPrewarmScope scopeKey = new ESGameObjectPoolPrewarmScope(sceneName, spaceName);
+            if (TryGetAsyncPrewarmContext(dataInfo, scopeKey, out _))
+                return false;
+
+            var context = new ESGameObjectPoolAsyncPrewarmContext(ESAssets.CreateScope());
+            GetAsyncPrewarmContextMap(dataInfo).Add(scopeKey, context);
+            using (CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.cancellation.Token))
+            {
+                try
+                {
+                    for (int i = 0; i < dataInfo.entries.Count; i++)
+                    {
+                        PrefabPrewarmEntry entry = dataInfo.entries[i];
+                        if (entry == null || !entry.enabled || entry.prefabKey == null || entry.prewarmCount <= 0)
+                            continue;
+
+                        ESGameObjectPoolConfig config = entry.useCustomConfig ? entry.config : defaultConfig;
+                        GameObject prefab = await PrewarmAsync(entry.prefabKey, context.assetScope, entry.prewarmCount, entry.key, config, linked.Token);
+                        context.loadedPrefabs[entry] = prefab;
+                        ESGameObjectPoolGroup group = ResolveGroup(prefab, entry.key);
+                        AddPrewarmSource(group, dataInfo, entry.prewarmCount);
+                    }
+
+                    context.ready = true;
+                    GetLoadedScopeSet(dataInfo).Add(scopeKey);
+                    return true;
+                }
+                catch (OperationCanceledException)
+                {
+                    RollbackAsyncPrewarm(dataInfo, scopeKey, context, true);
+                    return false;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError($"[ESRes][Prewarm] Prefab 预热失败：Data={dataInfo.name}, Scene={sceneName}, Space={spaceName}, Error={exception.Message}", dataInfo);
+                    RollbackAsyncPrewarm(dataInfo, scopeKey, context, true);
+                    return false;
+                }
+            }
         }
 
         public void ReleasePrewarm(PrefabPrewarmDataInfo dataInfo, bool clearExclusiveInactive = true)
@@ -426,10 +533,10 @@ namespace ES
             for (int i = 0; i < count; i++)
             {
                 PrefabPrewarmEntry entry = dataInfo.entries[i];
-                if (entry == null || entry.prefab == null)
+                if (entry == null || entry.prefabKey == null)
                     continue;
 
-                ESGameObjectPoolGroup group = ResolveGroup(entry.prefab, entry.key);
+                ESGameObjectPoolGroup group = ResolveGroup(ResolvePrewarmedPrefab(dataInfo, entry), entry.key);
                 if (group == null)
                     continue;
 
@@ -468,13 +575,16 @@ namespace ES
                 return false;
 
             ESGameObjectPoolPrewarmScope scope = new ESGameObjectPoolPrewarmScope(sceneName, spaceName);
-            if (!loadedPrewarmScopes.TryGetValue(dataInfo, out HashSet<ESGameObjectPoolPrewarmScope> scopes) || !scopes.Remove(scope))
+            bool wasReady = loadedPrewarmScopes.TryGetValue(dataInfo, out HashSet<ESGameObjectPoolPrewarmScope> scopes) && scopes.Remove(scope);
+            bool wasLoading = TryGetAsyncPrewarmContext(dataInfo, scope, out ESGameObjectPoolAsyncPrewarmContext context) && !context.ready;
+            if (!wasReady && !wasLoading)
                 return false;
 
-            if (scopes.Count == 0)
+            if (scopes != null && scopes.Count == 0)
                 loadedPrewarmScopes.Remove(dataInfo);
 
             ReleasePrewarm(dataInfo, clearExclusiveInactive);
+            DisposeAsyncPrewarmContext(dataInfo, scope);
             return true;
         }
 
@@ -610,6 +720,10 @@ namespace ES
             groupsByKey.Clear();
             groupsByPrefab.Clear();
             loadedPrewarmScopes.Clear();
+            foreach (Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext> contexts in asyncPrewarmContexts.Values)
+                foreach (ESGameObjectPoolAsyncPrewarmContext context in contexts.Values)
+                    context.Dispose();
+            asyncPrewarmContexts.Clear();
         }
 
         public override void OnDestroy()
@@ -923,7 +1037,67 @@ namespace ES
             return scopes;
         }
 
-        private void AddPrewarmSource(ESGameObjectPoolGroup group, PrefabPrewarmDataInfo source, int count)
+        private Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext> GetAsyncPrewarmContextMap(PrefabPrewarmDataInfo dataInfo)
+        {
+            if (asyncPrewarmContexts.TryGetValue(dataInfo, out Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext> contexts))
+                return contexts;
+
+            contexts = new Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext>();
+            asyncPrewarmContexts.Add(dataInfo, contexts);
+            return contexts;
+        }
+
+        private bool TryGetAsyncPrewarmContext(PrefabPrewarmDataInfo dataInfo, ESGameObjectPoolPrewarmScope scope, out ESGameObjectPoolAsyncPrewarmContext context)
+        {
+            context = null;
+            return dataInfo != null
+                && asyncPrewarmContexts.TryGetValue(dataInfo, out Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext> contexts)
+                && contexts.TryGetValue(scope, out context);
+        }
+
+        private GameObject ResolvePrewarmedPrefab(PrefabPrewarmDataInfo dataInfo, PrefabPrewarmEntry entry)
+        {
+            if (dataInfo == null || entry == null || !asyncPrewarmContexts.TryGetValue(dataInfo, out Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext> contexts))
+                return null;
+
+            foreach (ESGameObjectPoolAsyncPrewarmContext context in contexts.Values)
+                if (context.loadedPrefabs.TryGetValue(entry, out GameObject prefab) && prefab != null)
+                    return prefab;
+            return null;
+        }
+
+        private void DisposeAsyncPrewarmContext(PrefabPrewarmDataInfo dataInfo, ESGameObjectPoolPrewarmScope scope)
+        {
+            if (!TryGetAsyncPrewarmContext(dataInfo, scope, out ESGameObjectPoolAsyncPrewarmContext context))
+                return;
+
+            Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext> contexts = asyncPrewarmContexts[dataInfo];
+            contexts.Remove(scope);
+            if (contexts.Count == 0)
+                asyncPrewarmContexts.Remove(dataInfo);
+            context.Dispose();
+        }
+
+        private void RollbackAsyncPrewarm(PrefabPrewarmDataInfo dataInfo, ESGameObjectPoolPrewarmScope scope, ESGameObjectPoolAsyncPrewarmContext context, bool clearExclusiveInactive)
+        {
+            foreach (KeyValuePair<PrefabPrewarmEntry, GameObject> pair in context.loadedPrefabs)
+            {
+                PrefabPrewarmEntry entry = pair.Key;
+                ESGameObjectPoolGroup group = ResolveGroup(pair.Value, entry.key);
+                if (group == null)
+                    continue;
+
+                RemovePrewarmSource(group, dataInfo, entry.prewarmCount);
+                if (clearExclusiveInactive && group.PrewarmSourceCount == 0)
+                {
+                    ClearExclusiveGroup(group, false);
+                    RemoveGroupIfUnused(group);
+                }
+            }
+            DisposeAsyncPrewarmContext(dataInfo, scope);
+        }
+
+        private void AddPrewarmSource(ESGameObjectPoolGroup group, object source, int count)
         {
             if (group == null || source == null)
                 return;
@@ -935,7 +1109,7 @@ namespace ES
                 group.prewarmSources.Add(source, addCount);
         }
 
-        private void RemovePrewarmSource(ESGameObjectPoolGroup group, PrefabPrewarmDataInfo source, int count)
+        private void RemovePrewarmSource(ESGameObjectPoolGroup group, object source, int count)
         {
             if (group == null || source == null)
                 return;

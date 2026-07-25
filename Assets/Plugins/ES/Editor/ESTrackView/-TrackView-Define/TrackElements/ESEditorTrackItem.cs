@@ -9,6 +9,15 @@ using UnityEngine;
 using UnityEngine.UIElements;
 namespace ES
 {
+    [Flags]
+    public enum ESTrackClipUpdateFlags
+    {
+        None = 0,
+        Layout = 1 << 0,
+        Content = 1 << 1,
+        All = Layout | Content
+    }
+
     public class ESEditorTrackItem : UnityEngine.UIElements.VisualElement
     {
         public new class UxmlFactory : UxmlFactory<ESEditorTrackItem, UxmlTraits> { }
@@ -30,6 +39,8 @@ namespace ES
         private bool m_VisibilityCacheDirty = true;
         private int m_LastVisibleStartIndex = -1;
         private int m_LastVisibleEndIndexExclusive = -1;
+        private readonly HashSet<ESEditorTrackClip> m_ActiveClips = new HashSet<ESEditorTrackClip>();
+        private readonly List<ESEditorTrackClip> m_ActiveClipsToRemove = new List<ESEditorTrackClip>();
 
 
         #region  运行时
@@ -85,6 +96,7 @@ namespace ES
         {
             // 整个轨道项采用水平布局
             style.flexDirection = FlexDirection.Row;
+            style.position = Position.Relative;
             style.flexShrink = 0;
             style.height = TrackRowHeight;
             style.minHeight = TrackRowHeight;
@@ -94,6 +106,7 @@ namespace ES
             CreateRightPanel();
             // 左侧面板 - 固定宽度，显示轨道信息
             CreateLeftPanel();
+            ApplyTimelineLayout(ESTrackViewWindow.LeftTrackPixel, ESTrackViewWindow.dynamicTargetTotalPixel);
 
             BindClipsArea();
             RegisterCallback<PointerDownEvent>(OnTrackPointerDown, TrickleDown.TrickleDown);
@@ -210,9 +223,9 @@ namespace ES
                 tooltip = "启用/禁用当前轨道。禁用后运行时烘焙、运行和编辑器预览都会跳过这条轨道。",
                 style =
                 {
-                    width = 34,
-                    minWidth = 34,
-                    height = 18,
+                    width = 42,
+                    minWidth = 42,
+                    height = 22,
                     marginRight = 6,
                     paddingLeft = 0,
                     paddingRight = 0,
@@ -228,6 +241,7 @@ namespace ES
                     borderLeftWidth = 1
                 }
             };
+            m_EnableButton.AddToClassList("track-enable-button");
             m_Header.Add(m_EnableButton);
 
             // 折叠/展开按钮
@@ -301,7 +315,7 @@ namespace ES
                 style =
             {
 
-                flexGrow = 1,
+                position = Position.Absolute,
                 flexDirection = FlexDirection.Column,
                 backgroundColor = new StyleColor(new Color(0.052f, 0.057f, 0.066f, 1f)),
                 height = TrackRowHeight,
@@ -316,10 +330,8 @@ namespace ES
                 focusable = true,
                 style =
             {
-                  left =  ESTrackViewWindow.LeftTrackPixel,
-                width=9999,
-                minWidth=9999,
-                 position= Position.Absolute,
+                left = 0,
+                position= Position.Absolute,
                 flexGrow = 1,
                 flexDirection = FlexDirection.Row,
                 alignItems = Align.Center,
@@ -334,6 +346,23 @@ namespace ES
             // 轨道节点容器 - 修改为相对定位
             m_RightPanel.Add(m_TrackClipsContainer);
             Add(m_RightPanel);
+        }
+
+        internal void ApplyTimelineLayout(float trackPanelWidth, float timelineWidth)
+        {
+            float canvasWidth = Mathf.Max(1f, timelineWidth);
+            float itemWidth = trackPanelWidth + canvasWidth;
+
+            style.width = itemWidth;
+            style.minWidth = itemWidth;
+            m_LeftPanel.style.width = trackPanelWidth;
+            m_LeftPanel.style.minWidth = trackPanelWidth;
+            m_LeftPanel.style.maxWidth = trackPanelWidth;
+            m_RightPanel.style.left = trackPanelWidth;
+            m_RightPanel.style.width = canvasWidth;
+            m_RightPanel.style.minWidth = canvasWidth;
+            m_TrackClipsContainer.style.width = canvasWidth;
+            m_TrackClipsContainer.style.minWidth = canvasWidth;
         }
         private void UpdateTrackColor()
         {
@@ -817,10 +846,43 @@ namespace ES
 
         public void SetCurrentTime(float time)
         {
-            foreach (var node in TrackClips)
+            EnsureVisibilityCache();
+
+            int activeStartIndex = FindFirstClipPotentiallyVisibleAtOrAfter(time);
+            int activeEndIndexExclusive = FindFirstClipStartingAfter(time);
+            m_ActiveClipsToRemove.Clear();
+            foreach (ESEditorTrackClip activeClip in m_ActiveClips)
             {
-                node.HighlightIfActive(time);
+                if (activeClip == null || activeClip.StartTime > time || activeClip.StartTime + activeClip.Duration < time)
+                    m_ActiveClipsToRemove.Add(activeClip);
             }
+
+            for (int i = 0; i < m_ActiveClipsToRemove.Count; i++)
+            {
+                ESEditorTrackClip activeClip = m_ActiveClipsToRemove[i];
+                if (activeClip != null)
+                    activeClip.SetActiveHighlight(false);
+                m_ActiveClips.Remove(activeClip);
+            }
+
+            for (int i = activeStartIndex; i < activeEndIndexExclusive; i++)
+            {
+                ESEditorTrackClip clip = m_VisibilitySortedClips[i];
+                if (clip == null || clip.StartTime > time || clip.StartTime + clip.Duration < time)
+                    continue;
+
+                if (m_ActiveClips.Add(clip))
+                    clip.SetActiveHighlight(true);
+            }
+        }
+
+        private void ClearActiveClipHighlights()
+        {
+            foreach (ESEditorTrackClip activeClip in m_ActiveClips)
+                activeClip?.SetActiveHighlight(false);
+
+            m_ActiveClips.Clear();
+            m_ActiveClipsToRemove.Clear();
         }
 
         // 公共方法：设置轨道高度
@@ -839,10 +901,10 @@ namespace ES
         {
             float visibleStart = ESTrackViewWindow.window.StartShow;
             float visibleEnd = ESTrackViewWindow.window.GetVisibleEndTime();
-            UpdateNodes(visibleStart, visibleEnd);
+            UpdateNodes(visibleStart, visibleEnd, ESTrackClipUpdateFlags.All);
         }
 
-        internal void UpdateNodes(float visibleStart, float visibleEnd)
+        internal void UpdateNodes(float visibleStart, float visibleEnd, ESTrackClipUpdateFlags flags = ESTrackClipUpdateFlags.All)
         {
             EnsureVisibilityCache();
 
@@ -862,8 +924,10 @@ namespace ES
                 if (node == null)
                     continue;
 
-                node.SetTimeScaleAndStartShowVisible(ESTrackViewWindow.window.pixelPerSecond, visibleStart, visibleEnd);
-                if (node.resolvedStyle.display != DisplayStyle.None)
+                if ((flags & ESTrackClipUpdateFlags.Layout) != 0)
+                    node.SetTimeScaleAndStartShowVisible(ESTrackViewWindow.window.pixelPerSecond, visibleStart, visibleEnd);
+
+                if ((flags & ESTrackClipUpdateFlags.Content) != 0 && node.resolvedStyle.display != DisplayStyle.None)
                     node.UpdateNodeView();
             }
 
@@ -881,6 +945,7 @@ namespace ES
             if (!m_VisibilityCacheDirty && m_VisibilitySortedClips.Count == TrackClips.Count)
                 return;
 
+            ClearActiveClipHighlights();
             for (int i = 0; i < TrackClips.Count; i++)
             {
                 ESEditorTrackClip clip = TrackClips[i];

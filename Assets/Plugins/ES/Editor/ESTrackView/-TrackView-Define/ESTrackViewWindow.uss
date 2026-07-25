@@ -28,3 +28,165 @@ Button {
 .track-node.expanding {
     background-color: rgba(58, 125, 109, 0.98);
 }
+
+.timeline-workspace {
+    position: relative;
+    flex-grow: 1;
+    width: 100%;
+    min-width: 480px;
+    min-height: 400px;
+    background-color: rgb(20, 22, 26);
+}
+
+.timeline-canvas {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    overflow: visible;
+    background-color: rgb(22, 24, 28);
+}
+
+.timeline-ruler {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.timeline-selection {
+    position: absolute;
+    display: none;
+    background-color: rgba(74, 151, 235, 0.18);
+    border-top-color: rgba(116, 188, 255, 0.76);
+    border-right-color: rgba(116, 188, 255, 0.76);
+    border-bottom-color: rgba(116, 188, 255, 0.76);
+    border-left-color: rgba(116, 188, 255, 0.76);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+}
+
+.track-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    overflow: visible;
+    background-color: rgb(18, 20, 23);
+    border-right-width: 1px;
+    border-right-color: rgb(57, 64, 74);
+}
+
+.track-panel-splitter {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    margin-left: -5px;
+    background-color: rgba(101, 128, 157, 0);
+}
+
+.track-panel-splitter:hover {
+    background-color: rgba(101, 156, 211, 0.42);
+}
+
+.timeline-navigator {
+    position: absolute;
+    bottom: 1px;
+    right: 15px;
+    height: 18px;
+    opacity: 0.8;
+}
+
+.track-toolbar-button {
+    border-top-color: rgba(75, 87, 101, 0.62);
+    border-right-color: rgba(20, 24, 29, 0.86);
+    border-bottom-color: rgba(20, 24, 29, 0.86);
+    border-left-color: rgba(75, 87, 101, 0.62);
+}
+
+.track-toolbar-button:hover,
+.track-enable-button:hover {
+    background-color: rgba(50, 65, 81, 1);
+    border-top-color: rgba(100, 142, 184, 0.8);
+    border-right-color: rgba(57, 83, 108, 0.8);
+    border-bottom-color: rgba(57, 83, 108, 0.8);
+    border-left-color: rgba(100, 142, 184, 0.8);
+}
+
+.track-enable-button {
+    color: rgb(207, 224, 239);
+}
+
+.track-inspector-panel {
+    position: absolute;
+    top: 48px;
+    right: 0;
+    bottom: 20px;
+    width: 320px;
+    min-width: 320px;
+    flex-direction: column;
+    background-color: rgb(23, 26, 31);
+    border-left-width: 1px;
+    border-left-color: rgb(65, 77, 91);
+    border-top-width: 1px;
+    border-top-color: rgba(82, 97, 114, 0.8);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(10, 13, 16, 0.95);
+}
+
+.track-inspector-header {
+    height: 30px;
+    min-height: 30px;
+    flex-direction: row;
+    align-items: center;
+    background-color: rgb(30, 35, 42);
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(56, 66, 78);
+}
+
+.track-inspector-title {
+    flex-grow: 1;
+    margin-left: 9px;
+    color: rgb(212, 220, 229);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.track-inspector-header-button {
+    min-width: 38px;
+    height: 24px;
+    margin-right: 4px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 11px;
+}
+
+.track-inspector-content {
+    flex-grow: 1;
+    padding-left: 6px;
+    padding-right: 6px;
+    padding-top: 5px;
+    padding-bottom: 6px;
+    overflow: hidden;
+}
+
+.track-inspector-toggle {
+    position: absolute;
+    top: 52px;
+    right: 7px;
+    height: 25px;
+    min-width: 54px;
+    padding-left: 7px;
+    padding-right: 7px;
+    font-size: 11px;
+    background-color: rgba(36, 46, 58, 0.98);
+    border-top-color: rgba(100, 140, 182, 0.8);
+    border-right-color: rgba(48, 71, 94, 0.92);
+    border-bottom-color: rgba(21, 28, 36, 0.95);
+    border-left-color: rgba(76, 108, 142, 0.9);
+}

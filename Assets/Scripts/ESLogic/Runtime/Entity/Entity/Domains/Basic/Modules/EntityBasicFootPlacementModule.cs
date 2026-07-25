@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -141,9 +141,6 @@ namespace ES
         public float footIKWeight = 1f;
 
         [Title("动画驱动(支撑脚/相位)")]
-        [LabelText("支撑share参数名"), Tooltip("从StateMachine读取支撑脚share参数：0=右脚支撑，1=左脚支撑。取不到(<0)则回退纯自动。")]
-        [BoxGroup(GroupName)]
-        public string supportShareParamName = "FootSupportShare";
 
         [Range(0f, 1f)]
         [LabelText("支撑share混合"), Tooltip("0=纯自动(高点优先/命中优先)，1=纯动画/状态机share驱动。")]
@@ -312,7 +309,6 @@ namespace ES
             minMoveSpeed = 0.15f;
 
             // 动画/状态机驱动（默认不改变现有行为：blend=0 纯自动）
-            supportShareParamName = "FootSupportShare";
             supportShareBlend = 0f;
             supportShareMaxDeltaPerSec = 0f;
 
@@ -523,9 +519,9 @@ namespace ES
             float desiredLeftShare = desiredLeftShareAuto;
             float animShareInput = -1f;
             bool usedAnimShare = false;
-            if (supportShareBlend > 0.0001f && machine != null && !string.IsNullOrEmpty(supportShareParamName))
+            if (supportShareBlend > 0.0001f && machine != null)
             {
-                animShareInput = machine.GetFloat(supportShareParamName, -1f);
+                animShareInput = machine.Get(StateCoreParams.FootSupportShare, -1f);
                 if (animShareInput >= 0f)
                 {
                     usedAnimShare = true;

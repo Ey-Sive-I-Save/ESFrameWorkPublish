@@ -11,6 +11,12 @@ namespace ES
     [Serializable]
     public class ESResJsonData_GameIdentity
     {
+        public int SchemaVersion = 2;
+        public string ReleaseId;
+        public string Platform;
+        public string Channel = "default";
+        public string MinAppVersion;
+        public string MaxAppVersion;
         /// <summary>
         /// 构建时间戳（ISO 8601格式）。
         /// </summary>
@@ -33,5 +39,9 @@ namespace ES
     {
         public string FolderName;
         public bool IsRemote; // true: 远程（需下载），false: 本地（内置）
+        public string LibraryVersion;
+        public string LibIdentitySha256;
+        public string DownloadGroup;
+        public bool RequiredAtBoot;
     }
 }

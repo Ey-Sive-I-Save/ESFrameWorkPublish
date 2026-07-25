@@ -23,7 +23,7 @@ namespace ES
     [Flags]
     public enum IssueCategory
     {
-        [InspectorName("所有")]
+        [InspectorName("All")]
         All = ~0,
         [InspectorName("对象清理")]
         ObjectCleanup = 1,
@@ -50,11 +50,11 @@ namespace ES
     {
         [InspectorName("所有")]
         All = ~0,
-        [InspectorName("高")]
+        [InspectorName("High")]
         High = 1,
-        [InspectorName("中")]
+        [InspectorName("Medium")]
         Medium = 2,
-        [InspectorName("低")]
+        [InspectorName("Low")]
         Low = 4
     }
 
@@ -232,7 +232,7 @@ namespace ES
             $"预览模式: {(previewOnly ? "开" : "关")} | 项目资产导入设置: {(allowProjectAssetImportChanges ? "允许修改" : "已保护")} | " +
             $"已记录回滚: {importSettingChanges.Count}";
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawSceneOptimizationWorkbench()
         {
             SimpleToolsPanelUtility.DrawToolHeader(
@@ -369,19 +369,19 @@ namespace ES
         [FoldoutGroup("分析结果"), ShowInInspector, ReadOnly, LabelText("预计优化收益"), TextArea(6, 12)]
         public string estimatedBenefits = "";
 
-        [FoldoutGroup("发现的问题"), ShowInInspector, LabelText("问题类型筛选"), EnumToggleButtons, OnValueChanged("UpdateDisplayedIssues")]
+        [FoldoutGroup("Issues"), ShowInInspector, LabelText("Issue category filter"), EnumToggleButtons, OnValueChanged("UpdateDisplayedIssues")]
         public IssueCategory categoryFilter = IssueCategory.All;
 
-        [FoldoutGroup("发现的问题"), ShowInInspector, LabelText("严重程度筛选"), EnumToggleButtons, OnValueChanged("UpdateDisplayedIssues")]
+        [FoldoutGroup("Issues"), ShowInInspector, LabelText("Severity filter"), EnumToggleButtons, OnValueChanged("UpdateDisplayedIssues")]
         public SeverityFilter severityFilter = SeverityFilter.All;
 
-        [FoldoutGroup("发现的问题"), ShowInInspector, LabelText("最小影响程度"), Range(0, 100), OnValueChanged("UpdateDisplayedIssues")]
+        [FoldoutGroup("Issues"), ShowInInspector, LabelText("Minimum impact"), Range(0, 100), OnValueChanged("UpdateDisplayedIssues")]
         public int minImpact = 0;
 
-        [FoldoutGroup("发现的问题"), HideInInspector]
+        [FoldoutGroup("Issues"), HideInInspector]
         public List<OptimizationIssue> detectedIssues = new List<OptimizationIssue>();
 
-        [FoldoutGroup("发现的问题"), ShowInInspector, LabelText("发现的问题"), ListDrawerSettings(ShowPaging = true, NumberOfItemsPerPage = 5)]
+        [FoldoutGroup("Issues"), ShowInInspector, LabelText("Detected issues"), ListDrawerSettings(ShowPaging = true, NumberOfItemsPerPage = 5)]
         public List<OptimizationIssue> DisplayedIssues = new List<OptimizationIssue>();
         #endregion
 
@@ -389,14 +389,14 @@ namespace ES
         [FoldoutGroup("项目资产导入设置"), ShowInInspector, ReadOnly, LabelText("本次导入设置变更"), ListDrawerSettings(ShowPaging = true, NumberOfItemsPerPage = 6)]
         public List<ImportSettingChangeRecord> importSettingChanges = new List<ImportSettingChangeRecord>();
 
-        [FoldoutGroup("项目资产导入设置"), ShowInInspector, ReadOnly, LabelText("待执行导入设置变更预览"), ListDrawerSettings(ShowPaging = true, NumberOfItemsPerPage = 6)]
+        [FoldoutGroup("项目资产导入设置"), ShowInInspector, ReadOnly, LabelText("Pending import-setting changes"), ListDrawerSettings(ShowPaging = true, NumberOfItemsPerPage = 6)]
         public List<ImportSettingChangeRecord> pendingImportSettingChanges = new List<ImportSettingChangeRecord>();
 
         [FoldoutGroup("项目资产导入设置"), Button("刷新导入设置预览", ButtonHeight = 32), GUIColor(0.35f, 0.75f, 0.9f)]
         public void RefreshImportSettingPreview()
         {
             pendingImportSettingChanges = BuildPendingImportSettingChanges();
-            EditorUtility.DisplayDialog("导入设置预览已刷新", $"预计会修改 {pendingImportSettingChanges.Count} 个项目资产导入设置。", "完成");
+            EditorUtility.DisplayDialog("Import-setting preview refreshed", $"This will modify {pendingImportSettingChanges.Count} project asset import settings.", "OK");
         }
 
         [FoldoutGroup("项目资产导入设置"), Button("导出回滚JSON", ButtonHeight = 32), GUIColor(0.35f, 0.65f, 1f)]
@@ -422,7 +422,7 @@ namespace ES
             try
             {
                 File.WriteAllText(path, JsonUtility.ToJson(data, true), Encoding.UTF8);
-                EditorUtility.DisplayDialog("回滚文件已导出", $"已导出 {importSettingChanges.Count} 条导入设置变更。", "完成");
+                EditorUtility.DisplayDialog("Rollback file exported", $"Exported {importSettingChanges.Count} import-setting changes.", "OK");
             }
             catch (Exception ex)
             {
@@ -450,13 +450,13 @@ namespace ES
 
             if (data == null || data.changes == null || data.changes.Count == 0)
             {
-                EditorUtility.DisplayDialog("回滚文件无效", "没有读取到可回滚的导入设置。", "知道了");
+                EditorUtility.DisplayDialog("Invalid rollback file", "No import-setting changes could be read.", "OK");
                 return;
             }
 
             if (!EditorUtility.DisplayDialog("确认回滚导入设置",
                 $"将按 JSON 中的修改前状态回滚 {data.changes.Count} 个资源导入设置。\n\n这会重新导入相关资产，建议先提交或备份项目。",
-                "开始回滚", "取消"))
+                "Start rollback", "Cancel"))
                 return;
 
             int restored = 0;
@@ -594,20 +594,20 @@ namespace ES
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置"), LabelText("高面数阈值"), Range(1000, 100000)]
         public int highPolyThreshold = 10000;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置"), LabelText("纹理大小阈值(MB)"), Range(1, 100)]
+        [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置"), LabelText("Texture size threshold (MB)"), Range(1, 100)]
         public int textureSizeThreshold = 10;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置"), LabelText("粒子发射率阈值"), Range(10, 1000)]
         public int particleEmissionThreshold = 100;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化", "GameObject相关优化")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("清理空对象")]
+        [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("Remove empty objects")]
         public bool optimizeEmptyObjects = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("移除丢失脚本")]
         public bool removeMissingScripts = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("禁用非活跃对象")]
+        [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("Disable inactive objects")]
         public bool disableInactiveObjects = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("标记静态对象")]
@@ -632,7 +632,7 @@ namespace ES
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/渲染优化"), LabelText("优化阴影设置")]
         public bool optimizeShadows = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化", "纹理与内存优化")]
+        [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化", "Texture and memory optimization")]
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("压缩纹理")]
         public bool compressTextures = false;
 
@@ -642,7 +642,7 @@ namespace ES
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("禁用纹理读写")]
         public bool disableTextureReadWrite = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("纹理最大尺寸"), ValueDropdown("GetTextureSizeOptions")]
+        [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("Maximum texture size"), ValueDropdown("GetTextureSizeOptions")]
         public int maxTextureSize = 2048;
 
         private IEnumerable GetTextureSizeOptions()
@@ -658,7 +658,7 @@ namespace ES
         }
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/灯光优化", "光照系统优化")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/灯光优化"), LabelText("转换为烘焙灯光")]
+        [FoldoutGroup("优化设置"), TitleGroup("优化设置/灯光优化"), LabelText("Convert to baked lights")]
         public bool convertToBakedLights = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/灯光优化"), LabelText("优化光照贴图")]
@@ -677,7 +677,7 @@ namespace ES
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/粒子优化"), LabelText("降低粒子数量")]
         public bool reduceParticleCount = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/粒子优化"), LabelText("禁用非活跃粒子")]
+        [FoldoutGroup("优化设置"), TitleGroup("优化设置/粒子优化"), LabelText("Disable inactive particles")]
         public bool disableInactiveParticles = true;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/音频优化", "音频资源优化")]
@@ -688,7 +688,7 @@ namespace ES
         public bool enableAudioStreaming = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化", "物理系统优化")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化"), LabelText("优化碰撞体")]
+        [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化"), LabelText("Optimize colliders")]
         public bool optimizeColliders = true;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化"), LabelText("简化Mesh Collider")]
@@ -705,7 +705,7 @@ namespace ES
         public bool previewOnly = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("允许修改项目资产导入设置")]
-        [InfoBox("关闭时不会修改 Texture/Audio Importer。打开后会改项目资产导入设置，不只影响当前场景，请先提交或备份项目。", InfoMessageType.Warning)]
+        [InfoBox("When enabled, this can change Texture/Audio importer settings across the project. Commit or back up first.", InfoMessageType.Warning)]
         public bool allowProjectAssetImportChanges = false;
 
         [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("优化级别"), ValueDropdown("GetOptimizationLevelOptions")]
@@ -717,8 +717,8 @@ namespace ES
             {
                 { "轻度 - 安全优化", "轻度" },
                 { "中度 - 平衡优化", "中度" },
-                { "重度 - 激进优化", "重度" },
-                { "自定义 - 手动控制", "自定义" }
+                { "Heavy - aggressive optimization", "重度" },
+                { "Custom - manual control", "自定义" }
             };
         }
 
@@ -726,7 +726,7 @@ namespace ES
         public bool verboseLogging = true;
         #endregion
 
-        #region 分析功能(增强版)
+        #region 分析功能（增强）
         public void AnalyzeScene()
         {
             if (!HasUsableActiveScene("分析"))
@@ -760,7 +760,7 @@ namespace ES
                     }
                 }
 
-                // 阶段2: 材质与纹理分析
+                // 阶段2: 材质与纹理分析。
                 EditorUtility.DisplayProgressBar("场景分析 [2/6]", "分析材质与纹理...", 0.3f);
                 AnalyzeMaterials();
                 AnalyzeTextures();
@@ -957,7 +957,7 @@ namespace ES
                     shadowCastingLights++;
             }
 
-            // 空对象检测(增强)
+            // 空对象检测（增强）
             var components = obj.GetComponents<Component>();
             if (components.Length == 1 && obj.transform.childCount == 0)
             {
@@ -976,7 +976,7 @@ namespace ES
                 {
                     missingScriptCount++;
                     AddIssue(IssueCategory.ObjectCleanup, $"丢失脚本: {obj.name}", SeverityFilter.Medium, obj,
-                        "移除丢失的脚本引用", 50);
+                        "移除丢失脚本组件", 40);
                     break;
                 }
             }
@@ -995,7 +995,7 @@ namespace ES
                 {
                     highPolyCount++;
                     AddIssue(IssueCategory.MeshOptimization, $"高面数模型: {obj.name} ({triangleCount} 三角面)", SeverityFilter.High, obj,
-                        "添加LOD系统或简化模型", 90);
+                        "降低网格面数或配置 LOD", 75);
                 }
 
                 // 检查是否需要LOD
@@ -1009,7 +1009,7 @@ namespace ES
             {
                 rendererCount++;
 
-                // 静态批处理检查
+                // 静态批处理检测
                 if (!obj.isStatic && renderer.GetType() == typeof(MeshRenderer))
                 {
                     AddIssue(IssueCategory.RenderingOptimization, $"可标记为静态: {obj.name}", SeverityFilter.Medium, obj,
@@ -1039,7 +1039,7 @@ namespace ES
                 {
                     highEmissionParticles++;
                     AddIssue(IssueCategory.ParticleOptimization, $"高发射率粒子: {obj.name} ({emission.rateOverTime.constant}/s)", SeverityFilter.Medium, obj,
-                        "降低粒子发射率", 55);
+                        "降低发射率或缩短粒子生命周期", 50);
                 }
             }
 
@@ -1089,7 +1089,7 @@ namespace ES
                     {
                         nonConvexMeshColliders++;
                         AddIssue(IssueCategory.PhysicsOptimization, $"非凸网格碰撞体: {obj.name}", SeverityFilter.Medium, obj,
-                            "使用简单碰撞体或凸网格碰撞体", 65);
+                            "使用凸包或简化碰撞体", 45);
                     }
                 }
             }
@@ -1133,7 +1133,7 @@ namespace ES
                 {
                     realtimeReflectionProbes++;
                     AddIssue(IssueCategory.LightingOptimization, $"实时反射探针: {obj.name}", SeverityFilter.Medium, obj,
-                        "转换为烘焙模式", 70);
+                        "改为烘焙反射探针或减少刷新频率", 55);
                 }
             }
         }
@@ -1141,7 +1141,7 @@ namespace ES
         private void AddIssue(IssueCategory category, string description, SeverityFilter severity,
             GameObject target, string fixAction, int estimatedImpact)
         {
-            // 只添加当前场景中对象的优化问题
+            // 只添加当前场景中对象的优化问题。
             if (target == null || target.scene != SceneManager.GetActiveScene())
                 return;
 
@@ -1207,7 +1207,7 @@ namespace ES
                     duplicateMaterials += kvp.Value.Count - 1;
                     GameObject relatedObj = FindGameObjectWithMaterial(kvp.Value[0]);
                     AddIssue(IssueCategory.MaterialOptimization, $"重复材质: {kvp.Key} (x{kvp.Value.Count})", SeverityFilter.Medium, relatedObj,
-                        "合并重复的材质", 65);
+                        "合并相同材质或使用共享材质", 35);
                 }
             }
         }
@@ -1242,7 +1242,7 @@ namespace ES
                     oversizedTextureCount++;
                     GameObject relatedObj = FindGameObjectWithTexture(texture);
                     AddIssue(IssueCategory.TextureOptimization, $"超大纹理: {texture.name} ({textureSize / 1024 / 1024}MB)", SeverityFilter.High, relatedObj,
-                        "压缩或缩小纹理", 80);
+                        "降低最大尺寸或启用合适压缩", 70);
                 }
 
                 var importer = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -1269,7 +1269,7 @@ namespace ES
                         readableTextures++;
                         GameObject relatedObj = FindGameObjectWithTexture(texture);
                         AddIssue(IssueCategory.TextureOptimization, $"可读纹理: {texture.name}", SeverityFilter.Low, relatedObj,
-                            "禁用Read/Write以节省内存", 40);
+                            "关闭 Read/Write Enabled", 20);
                     }
                 }
             }
@@ -1367,7 +1367,8 @@ namespace ES
                 if (renderer == null || renderer.gameObject == null)
                     continue;
 
-                // 检查批处理友好性
+                // 检查批处理友好性。
+                // Static renderers can participate in static batching.
                 if (renderer.gameObject.isStatic)
                 {
                     batchableRenderers++;
@@ -1464,10 +1465,10 @@ namespace ES
             overview.AppendLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             overview.AppendLine();
             overview.AppendLine($"🎯 对象总数: {totalObjects} (活跃: {activeObjects}, 静态: {staticObjects})");
-            overview.AppendLine($"💡 灯光: {lightCount} 个 (实时: {realtimeLightCount}, 烘焙: {bakedLightCount})");
+            overview.AppendLine($"🎯 对象总数: {totalObjects} (活跃: {activeObjects}, 静态: {staticObjects})");
+            overview.AppendLine($"🎨 渲染器: {rendererCount} 个");
             overview.AppendLine($"🎨 渲染器: {rendererCount} 个");
             overview.AppendLine($"📐 网格: {meshCount} 个 ({totalTriangles:N0} 三角面)");
-            overview.AppendLine($"🖼️  材质/纹理: {materialCount}/{textureCount}");
             overview.AppendLine($"💾 估算内存: {totalMemoryUsage / 1024 / 1024}MB");
             overview.AppendLine($"🎭 Draw Calls: ~{drawCallEstimate}");
             overview.AppendLine($"⚠️  问题总数: {detectedIssues.Count}");
@@ -1514,69 +1515,67 @@ namespace ES
             report.AppendLine($"│ 网格总数:   {meshCount,6}                   │");
             report.AppendLine($"│ 高面数模型: {highPolyCount,6}                   │");
             report.AppendLine($"│ 总三角面:   {totalTriangles,12:N0}       │");
-            report.AppendLine($"│ 总顶点数:   {totalVertices,12:N0}       │");
             report.AppendLine($"│ 重复网格:   {duplicateMeshes,6}                   │");
+            report.AppendLine($"│ 网格内存:   {meshMemory / 1024 / 1024,6} MB              │");
             report.AppendLine($"│ 网格内存:   {meshMemory / 1024 / 1024,6} MB              │");
             report.AppendLine("└────────────────────────────────────┘");
             report.AppendLine();
 
             // 材质纹理
             report.AppendLine("┌─ 材质纹理 ────────────────────────┐");
-            report.AppendLine($"│ 材质总数: {materialCount,6} │ 唯一: {uniqueMaterials,6} │");
             report.AppendLine($"│ 重复材质: {duplicateMaterials,6} │ Shader: {shaderCount,4}   │");
             report.AppendLine($"│ 纹理总数: {textureCount,6} │ 超大: {oversizedTextureCount,6} │");
             report.AppendLine($"│ 未压缩:   {uncompressedTextureCount,6} │ 可读: {readableTextures,6} │");
             report.AppendLine($"│ 无Mipmap: {mipmapDisabledTextures,6}                  │");
+            report.AppendLine($"│ 纹理内存: {textureMemory / 1024 / 1024,6} MB              │");
             report.AppendLine($"│ 纹理内存: {textureMemory / 1024 / 1024,6} MB              │");
             report.AppendLine("└────────────────────────────────────┘");
             report.AppendLine();
 
             // 粒子系统
             report.AppendLine("┌─ 粒子系统 ────────────────────────┐");
-            report.AppendLine($"│ 粒子系统: {particleSystemCount,6}                   │");
             report.AppendLine($"│ 非活跃:   {inactiveParticleCount,6}                   │");
+            report.AppendLine($"│ 高发射率: {highEmissionParticles,6}                   │");
             report.AppendLine($"│ 高发射率: {highEmissionParticles,6}                   │");
             report.AppendLine("└────────────────────────────────────┘");
             report.AppendLine();
 
             // 音频
             report.AppendLine("┌─ 音频资源 ────────────────────────┐");
-            report.AppendLine($"│ 音频源:   {audioSourceCount,6}                   │");
             report.AppendLine($"│ 未压缩:   {uncompressedAudioCount,6}                   │");
             report.AppendLine($"│ 流式加载: {streamingAudioCount,6}                   │");
+            report.AppendLine($"│ 音频内存: {audioMemory / 1024 / 1024,6} MB              │");
             report.AppendLine($"│ 音频内存: {audioMemory / 1024 / 1024,6} MB              │");
             report.AppendLine("└────────────────────────────────────┘");
             report.AppendLine();
 
             // 物理系统
             report.AppendLine("┌─ 物理系统 ────────────────────────┐");
-            report.AppendLine($"│ 刚体:     {rigidbodyCount,6} │ 运动学: {kinematicRigidbodyCount,6} │");
             report.AppendLine($"│ 碰撞体:   {colliderCount,6} │ 触发器: {triggerColliderCount,6} │");
+            report.AppendLine($"│ 网格碰撞: {meshColliderCount,6} │ 非凸:   {nonConvexMeshColliders,6} │");
             report.AppendLine($"│ 网格碰撞: {meshColliderCount,6} │ 非凸:   {nonConvexMeshColliders,6} │");
             report.AppendLine("└────────────────────────────────────┘");
             report.AppendLine();
 
             // UI系统
-            report.AppendLine("┌─ UI系统 ──────────────────────────┐");
-            report.AppendLine($"│ Canvas:   {canvasCount,6}                   │");
-            report.AppendLine($"│ Raycaster:{graphicRaycasterCount,6}                   │");
-            report.AppendLine($"│ UI元素:   {uiElementCount,6}                   │");
-            report.AppendLine("└────────────────────────────────────┘");
+            report.AppendLine("UI System");
+            report.AppendLine($"Canvas: {canvasCount,6}");
+            report.AppendLine($"Raycaster: {graphicRaycasterCount,6}");
+            report.AppendLine($"UI Elements: {uiElementCount,6}");
             report.AppendLine();
 
             // 动画系统
-            report.AppendLine("┌─ 动画系统 ────────────────────────┐");
-            report.AppendLine($"│ Animator: {animatorCount,6}                   │");
-            report.AppendLine("└────────────────────────────────────┘");
+            report.AppendLine("Animation System");
+            report.AppendLine($"Animator: {animatorCount,6}");
             report.AppendLine();
 
             // 总内存
             report.AppendLine("┌─ 内存统计 ────────────────────────┐");
             report.AppendLine($"│ 网格内存:   {meshMemory / 1024 / 1024,6} MB            │");
+            report.AppendLine($"│ 网格内存:   {meshMemory / 1024 / 1024,6} MB            │");
             report.AppendLine($"│ 纹理内存:   {textureMemory / 1024 / 1024,6} MB            │");
             report.AppendLine($"│ 音频内存:   {audioMemory / 1024 / 1024,6} MB            │");
             report.AppendLine($"│ ────────────────────────────│");
-            report.AppendLine($"│ 总计内存:   {totalMemoryUsage / 1024 / 1024,6} MB            │");
             report.AppendLine("└────────────────────────────────────┘");
 
             analysisResult = report.ToString();
@@ -1589,7 +1588,7 @@ namespace ES
             StringBuilder suggestions = new StringBuilder();
             suggestions.AppendLine("═══════════════════════════════════════");
             suggestions.AppendLine("      优化建议 (按优先级排序)");
-            suggestions.AppendLine("═══════════════════════════════════════");
+            suggestions.AppendLine("      优化建议 (按优先级排序)");
             suggestions.AppendLine();
 
             // 分类统计
@@ -1601,8 +1600,8 @@ namespace ES
             int lowCount = categoryCounts.ContainsKey(SeverityFilter.Low) ? categoryCounts[SeverityFilter.Low] : 0;
 
             suggestions.AppendLine($"🔴 高优先级: {highCount} 个问题");
+            suggestions.AppendLine($"🔴 高优先级: {highCount} 个问题");
             suggestions.AppendLine($"🟡 中优先级: {mediumCount} 个问题");
-            suggestions.AppendLine($"🟢 低优先级: {lowCount} 个问题");
             suggestions.AppendLine();
             suggestions.AppendLine("─────────────────────────────────────");
             suggestions.AppendLine();
@@ -1643,7 +1642,7 @@ namespace ES
             StringBuilder benefits = new StringBuilder();
             benefits.AppendLine("═══════════════════════════════════════");
             benefits.AppendLine("          预计优化收益");
-            benefits.AppendLine("═══════════════════════════════════════");
+            benefits.AppendLine("          预计优化收益");
             benefits.AppendLine();
 
             long memorySaved = 0;
@@ -1713,7 +1712,7 @@ namespace ES
         }
         #endregion
 
-        #region 优化功能(增强版)
+        #region 优化功能（增强）
         public void AutoOptimizeScene()
         {
             if (!HasUsableActiveScene("优化"))
@@ -1952,7 +1951,7 @@ namespace ES
                 ExportImportSettingRollback();
             }
 
-            // 重新分析以查看效果
+            // 重新分析以查看效果。
             if (!previewOnly)
             {
                 AssetDatabase.SaveAssets();
@@ -2069,7 +2068,7 @@ namespace ES
                     var animator = obj.GetComponent<Animator>();
                     var particleSystem = obj.GetComponent<ParticleSystem>();
 
-                    // 没有动态组件的对象可以标记为静态
+                    // 没有动态组件的对象可以标记为静态。
                     if (renderer != null && rigidbody == null && animator == null && particleSystem == null)
                     {
                         Undo.RecordObject(obj, "Mark Static");
@@ -2428,7 +2427,7 @@ namespace ES
 
                 if (!collider.convex && !collider.GetComponent<Rigidbody>())
                 {
-                    // 如果没有刚体且不是凸的,尝试转换为简单碰撞体
+                    // 如果没有刚体且不是凸体，尝试转换为简单碰撞体。
                     if (simplifyMeshColliders)
                     {
                         Undo.RecordObject(collider.gameObject, "Simplify Collider");
@@ -2811,7 +2810,7 @@ namespace ES
         }
         #endregion
 
-        #region 报告导出(增强版)
+        #region 报告导出（增强）
         [BoxGroup("报告导出"), Button("📄 导出详细报告(TXT)", ButtonHeight = 34), GUIColor(0.5f, 0.8f, 0.5f)]
         public void ExportDetailedReport()
         {

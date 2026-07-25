@@ -40,6 +40,8 @@ namespace ES
         private float m_LastAppliedLeft = float.NaN;
         private float m_LastAppliedWidth = float.NaN;
         private DisplayStyle m_LastAppliedDisplay = (DisplayStyle)(-1);
+        private string m_LastAppliedClipName;
+        private bool m_IsActive;
         private const float StylePixelEpsilon = 0.25f;
 
         public event Action<ESEditorTrackClip> OnClipClicked;
@@ -867,7 +869,16 @@ namespace ES
         private bool hasSetORI=false;
         public void HighlightIfActive(float currentTime)
         {
-            if (currentTime >= StartTime && currentTime <= StartTime + Duration)
+            SetActiveHighlight(currentTime >= StartTime && currentTime <= StartTime + Duration);
+        }
+
+        public void SetActiveHighlight(bool active)
+        {
+            if (m_IsActive == active)
+                return;
+
+            m_IsActive = active;
+            if (active)
             {
                 if (!hasSetORI)
                     originalBgColor = style.backgroundColor.value;
@@ -905,8 +916,14 @@ namespace ES
 
         public void UpdateNodeView()
         {
-            m_ClipNameLabel.text = ClipName;
-            tooltip = ClipName;
+            string clipName = ClipName;
+            if (m_LastAppliedClipName == clipName)
+                return;
+
+            m_LastAppliedClipName = clipName;
+            m_ClipNameLabel.text = clipName;
+            if (!m_HasValidationWarning)
+                tooltip = clipName;
             AdjustFontToFit();
         }
 

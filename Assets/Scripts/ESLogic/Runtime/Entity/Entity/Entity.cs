@@ -29,11 +29,6 @@ namespace ES
         [ShowInInspector, Sirenix.OdinInspector.ReadOnly, LabelText("游戏标签")]
         private ESTagRefCountSet64 gameTags;
 
-        [NonSerialized, ShowInInspector, Sirenix.OdinInspector.ReadOnly, LabelText("LOD缓存索引")]
-        private int lodCacheIndex = -1;
-
-        public int LODCacheIndex => lodCacheIndex;
-
         #region Domains
 
         [TabGroup("生命体结构", "身体基础"), HideLabel, HideReferenceObjectPicker, SerializeReference]
@@ -65,7 +60,6 @@ namespace ES
             EnsureEntityStructure();
             EnsureEntityOpSupport();
             gameTags.Warmup();
-            RegisterLODCache();
             InitializeKCC();
         }
 
@@ -102,7 +96,6 @@ namespace ES
         {
             base.OnDestroy();
 
-            UnregisterLODCache();
             opSupport?.Dispose();
 
             opSupport = null;
@@ -134,80 +127,6 @@ namespace ES
 
             if (opSupport.Kind != ESOpSupportKind.Entity || opSupport.OwnerEntity != this)
                 opSupport.InitializeEntityOwner(this, GetInstanceID());
-        }
-
-        public void RegisterLODCache()
-        {
-            ESLODModule lodModule = ESGameManager.LODModule;
-            if (lodModule == null)
-                return;
-
-            lodCacheIndex = lodModule.RegisterEntity(this);
-        }
-
-        public void UnregisterLODCache()
-        {
-            ESLODModule lodModule = ESGameManager.LODModule;
-            if (lodModule == null)
-            {
-                lodCacheIndex = -1;
-                return;
-            }
-
-            lodModule.UnregisterEntity(this);
-            lodCacheIndex = -1;
-        }
-
-        public bool TryGetLODCache(out ESLODCacheEntry cache)
-        {
-            ESLODModule lodModule = ESGameManager.LODModule;
-            if (lodModule != null && !lodModule.IsValidCacheIndex(lodCacheIndex))
-                lodCacheIndex = lodModule.RegisterEntity(this);
-
-            if (lodModule != null && lodModule.IsValidCacheIndex(lodCacheIndex))
-            {
-                cache = lodModule.GetCacheReadOnly(lodCacheIndex);
-                return true;
-            }
-
-            cache = default;
-            return false;
-        }
-
-        public void SetEntityLODLevel(ESEntityLODLevel level)
-        {
-            ESLODModule lodModule = ESGameManager.LODModule;
-            if (lodModule == null)
-                return;
-
-            if (!lodModule.IsValidCacheIndex(lodCacheIndex))
-                lodCacheIndex = lodModule.RegisterEntity(this);
-
-            lodModule.SetEntityLevel(lodCacheIndex, level);
-        }
-
-        public void AddEntityLODGate(ESEntityLODGate gate)
-        {
-            ESLODModule lodModule = ESGameManager.LODModule;
-            if (lodModule == null)
-                return;
-
-            if (!lodModule.IsValidCacheIndex(lodCacheIndex))
-                lodCacheIndex = lodModule.RegisterEntity(this);
-
-            lodModule.AddEntityGate(lodCacheIndex, gate);
-        }
-
-        public void RemoveEntityLODGate(ESEntityLODGate gate)
-        {
-            ESLODModule lodModule = ESGameManager.LODModule;
-            if (lodModule == null)
-                return;
-
-            if (!lodModule.IsValidCacheIndex(lodCacheIndex))
-                lodCacheIndex = lodModule.RegisterEntity(this);
-
-            lodModule.RemoveEntityGate(lodCacheIndex, gate);
         }
 
         #endregion

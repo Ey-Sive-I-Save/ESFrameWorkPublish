@@ -198,7 +198,7 @@ namespace ES
         public List<MaterialUsage> usedMaterials = new List<MaterialUsage>();
 
         [HideInInspector]
-        [LabelText("启用资产批处理")]
+        [LabelText("Enable prefab asset batch")]
         public bool enablePrefabAssetBatch = false;
 
         [HideInInspector]
@@ -207,7 +207,7 @@ namespace ES
 
         [HideInInspector]
         [FolderPath(AbsolutePath = false)]
-        [LabelText("Prefab 搜索文件夹")]
+        [LabelText("Prefab search folder")]
         [ShowIf("enablePrefabAssetBatch")]
         [HideIf("useSelectedPrefabAssets")]
         public string prefabAssetFolder = "Assets";
@@ -220,14 +220,14 @@ namespace ES
             if (!TryValidateScanSettings(out var message))
             {
                 prefabAssetPreview.Clear();
-                EditorUtility.DisplayDialog("设置不完整", message, "知道了");
+                EditorUtility.DisplayDialog("Incomplete settings", message, "OK");
                 return;
             }
 
             if (!TryValidatePrefabAssetBatchSettings(out message))
             {
                 prefabAssetPreview.Clear();
-                EditorUtility.DisplayDialog("Prefab 批处理设置不完整", message, "知道了");
+                EditorUtility.DisplayDialog("设置不完整", message, "知道了");
                 return;
             }
 
@@ -235,7 +235,7 @@ namespace ES
             previewSettingsSignature = BuildSettingsSignature();
             lastResultSummary = $"Prefab 资产预览完成: 命中 {prefabAssetPreview.Count} 个 prefab 资产";
             lastResultDetail = BuildPrefabBatchReport(prefabAssetPreview, warnings);
-            EditorUtility.DisplayDialog("Prefab 资产预览已刷新", $"命中 {prefabAssetPreview.Count} 个 prefab 资产。", "完成");
+            EditorUtility.DisplayDialog("Prefab asset preview refreshed", $"Matched {prefabAssetPreview.Count} prefab assets.", "OK");
         }
 
         public void ReplacePrefabAssets()
@@ -248,7 +248,7 @@ namespace ES
 
             if (!TryValidatePrefabAssetBatchSettings(out message))
             {
-                EditorUtility.DisplayDialog("Prefab 批处理设置不完整", message, "知道了");
+                EditorUtility.DisplayDialog("设置不完整", message, "知道了");
                 return;
             }
 
@@ -304,7 +304,7 @@ namespace ES
             ExecuteReplacement(enabledRecords);
         }
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             DrawMaterialWorkbench();
@@ -432,7 +432,7 @@ namespace ES
                 DrawInfoRow("目标 Shader", targetMaterial != null && targetMaterial.shader != null ? targetMaterial.shader.name : "未设置");
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("使用当前选中材质作为源", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                    if (GUILayout.Button("Use selection as source", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
                         UseSelectionAsSourceMaterial();
                     if (GUILayout.Button("使用当前选中材质作为目标", EditorStyles.miniButtonMid, GUILayout.Height(24)))
                         UseSelectionAsTargetMaterial();
@@ -444,7 +444,7 @@ namespace ES
 
         private void DrawScenePreviewActions()
         {
-            SimpleToolsPanelUtility.DrawSectionTitle("预览与执行", "场景模式只处理场景或 Prefab Mode 中的实例引用，执行前会检查预览签名。");
+            SimpleToolsPanelUtility.DrawSectionTitle("Preview and execute", "Scene mode only processes instance references in the scene or Prefab Mode. The preview signature is checked before execution.");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 if (IsPreviewStale(replacementPreview.Count))
@@ -456,13 +456,13 @@ namespace ES
                         RefreshReplacementPreview();
                     if (SimpleToolsPanelUtility.DrawActionButton("查询材质使用", SimpleToolsActionTone.Neutral, 32))
                         QueryMaterialUsage();
-                    if (SimpleToolsPanelUtility.DrawActionButton("执行勾选替换", SimpleToolsActionTone.Warning, 32))
+                    if (SimpleToolsPanelUtility.DrawActionButton("Replace selected", SimpleToolsActionTone.Warning, 32))
                         ReplaceMaterials();
                 }
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("全选当前预览", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                    if (GUILayout.Button("Select all preview items", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
                         EnableFilteredPreviewItems(true);
                     if (GUILayout.Button("取消当前预览", EditorStyles.miniButtonMid, GUILayout.Height(24)))
                         EnableFilteredPreviewItems(false);
@@ -493,7 +493,7 @@ namespace ES
             if (replacementPreview.Count == 0 && usedMaterials.Count == 0)
                 return;
 
-            SimpleToolsPanelUtility.DrawSectionTitle("结果筛选", "搜索对象路径、材质名、Shader、组件类型、槽位和来源。");
+            SimpleToolsPanelUtility.DrawSectionTitle("Result filters", "Search by object path, material, shader, component, slot, or source.");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 using (new EditorGUILayout.HorizontalScope())
@@ -529,17 +529,17 @@ namespace ES
                 EditorGUILayout.LabelField($"替换预览表  ({rows.Count}/{replacementPreview.Count})", EditorStyles.boldLabel);
                 if (rows.Count == 0)
                 {
-                    EditorGUILayout.LabelField("当前筛选条件下没有预览项。", EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("No preview items match the current filters.", EditorStyles.wordWrappedMiniLabel);
                     return;
                 }
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    EditorGUILayout.LabelField("选", EditorStyles.miniBoldLabel, GUILayout.Width(28));
+                    EditorGUILayout.LabelField("Use", EditorStyles.miniBoldLabel, GUILayout.Width(28));
                     EditorGUILayout.LabelField("对象路径", EditorStyles.miniBoldLabel, GUILayout.MinWidth(170));
                     EditorGUILayout.LabelField("组件/槽位", EditorStyles.miniBoldLabel, GUILayout.Width(150));
                     EditorGUILayout.LabelField("当前 -> 目标", EditorStyles.miniBoldLabel, GUILayout.Width(180));
-                    EditorGUILayout.LabelField("状态", EditorStyles.miniBoldLabel, GUILayout.Width(92));
+                    EditorGUILayout.LabelField("Status", EditorStyles.miniBoldLabel, GUILayout.Width(92));
                     GUILayout.Space(96);
                 }
 
@@ -565,7 +565,7 @@ namespace ES
                 EditorGUILayout.LabelField(record.TargetPath, EditorStyles.miniLabel, GUILayout.MinWidth(170));
                 EditorGUILayout.LabelField($"{record.ComponentType}.{record.Location}", EditorStyles.miniLabel, GUILayout.Width(150));
                 EditorGUILayout.LabelField($"{GetMaterialName(record.CurrentMaterial)} -> {GetMaterialName(record.TargetMaterial)}", EditorStyles.miniLabel, GUILayout.Width(180));
-                EditorGUILayout.LabelField($"{(record.CanWrite ? "可写" : "不可写")} | {record.Source}", EditorStyles.miniLabel, GUILayout.Width(92));
+                EditorGUILayout.LabelField($"{GetWriteStateText(record.CanWrite)} | {record.Source}", EditorStyles.miniLabel, GUILayout.Width(92));
                 if (GUILayout.Button("对象", EditorStyles.miniButtonLeft, GUILayout.Width(44)))
                     record.PingObject();
                 if (GUILayout.Button("当前", EditorStyles.miniButtonMid, GUILayout.Width(44)))
@@ -583,7 +583,7 @@ namespace ES
                 enablePrefabAssetBatch = true;
                 useSelectedPrefabAssets = GUILayout.Toggle(useSelectedPrefabAssets, "优先处理 Project 中选中的 Prefab 资产", EditorStyles.miniButton, GUILayout.Height(24));
                 if (!useSelectedPrefabAssets)
-                    prefabAssetFolder = EditorGUILayout.TextField("Prefab 搜索文件夹", prefabAssetFolder);
+                    prefabAssetFolder = EditorGUILayout.TextField("Prefab search folder", prefabAssetFolder);
 
                 if (IsPreviewStale(prefabAssetPreview.Count))
                     SimpleToolsPanelUtility.DrawWarning("设置已变化，当前 Prefab 资产预览可能不是最新。执行前建议刷新。");
@@ -692,7 +692,7 @@ namespace ES
         {
             if (string.IsNullOrWhiteSpace(lastResultSummary) && string.IsNullOrWhiteSpace(lastResultDetail))
             {
-                EditorUtility.DisplayDialog("没有报告", "还没有可复制的扫描或执行结果。", "知道了");
+                EditorUtility.DisplayDialog("No report", "There is no scan or execution result to copy.", "OK");
                 return;
             }
 
@@ -705,7 +705,7 @@ namespace ES
         {
             if (string.IsNullOrWhiteSpace(lastResultSummary) && string.IsNullOrWhiteSpace(lastResultDetail))
             {
-                EditorUtility.DisplayDialog("没有报告", "还没有可导出的扫描或执行结果。", "知道了");
+                EditorUtility.DisplayDialog("No report", "There is no scan or execution result to export.", "OK");
                 return;
             }
 
@@ -1042,7 +1042,7 @@ namespace ES
                 var property = serializedObject.FindProperty(propertyPath);
                 if (property == null || property.propertyType != SerializedPropertyType.ObjectReference)
                 {
-                    error = "序列化字段路径已经失效。";
+                    error = "The serialized field path is no longer valid.";
                     return false;
                 }
 
@@ -1210,6 +1210,7 @@ namespace ES
         private void ExecuteReplacement(List<MaterialReferenceRecord> records)
         {
             int replaced = 0;
+            bool cancelled = false;
             var changedObjects = new HashSet<GameObject>();
             var changedComponents = new HashSet<Component>();
             var failedMessages = new List<string>();
@@ -1218,8 +1219,18 @@ namespace ES
             int undoGroup = Undo.GetCurrentGroup();
             try
             {
-                foreach (var record in records)
+                for (int i = 0; i < records.Count; i++)
                 {
+                    if (i % 20 == 0 && EditorUtility.DisplayCancelableProgressBar(
+                            "批量替换材质",
+                            $"正在处理: {i + 1}/{records.Count}",
+                            (float)i / Mathf.Max(1, records.Count)))
+                    {
+                        cancelled = true;
+                        break;
+                    }
+
+                    var record = records[i];
                     if (record == null || record.Accessor == null)
                     {
                         failedMessages.Add("存在失效预览项，已跳过。");
@@ -1247,15 +1258,24 @@ namespace ES
             }
             finally
             {
+                EditorUtility.ClearProgressBar();
                 Undo.CollapseUndoOperations(undoGroup);
             }
 
             MarkScenesDirty(changedObjects);
-            lastResultSummary = $"替换完成: 已执行勾选可写项 {records.Count} 个 | 实际替换 {replaced} 处 | 影响 {changedObjects.Count} 个对象 | 失败 {failedMessages.Count} 项";
+            string completionState = cancelled ? "cancelled" : "completed";
+            lastResultSummary = $"Replacement {completionState}: processed {records.Count}, replaced {replaced}, affected {changedObjects.Count} objects, failed {failedMessages.Count}.";
             lastResultDetail = BuildExecutionReport(changedObjects, failedMessages);
+            if (cancelled)
+                lastResultDetail = "操作由用户取消；已替换的引用可通过 Ctrl+Z 撤销。\n\n" + lastResultDetail;
 
             string failed = failedMessages.Count > 0 ? "\n\n失败项:\n" + SimpleToolsSafetyUtility.JoinPreview(failedMessages, 8) : string.Empty;
-            EditorUtility.DisplayDialog("材质替换完成", $"已替换 {replaced} 处材质引用，影响 {changedObjects.Count} 个对象。{failed}", "完成");
+            EditorUtility.DisplayDialog(
+                cancelled ? "Material replacement cancelled" : "Material replacement completed",
+                cancelled
+                    ? $"Replaced {replaced} material references before cancellation, affecting {changedObjects.Count} objects. You can undo with Ctrl+Z.{failed}"
+                    : $"Replaced {replaced} material references, affecting {changedObjects.Count} objects.{failed}",
+                "OK");
         }
 
         private List<PrefabAssetBatchRecord> BuildPrefabAssetPreview(out List<string> warnings)
@@ -1309,81 +1329,104 @@ namespace ES
             int changedAssetCount = 0;
             int replacedReferenceCount = 0;
             int skippedReferenceCount = 0;
+            bool cancelled = false;
             var failedMessages = new List<string>();
             var scanWarnings = new List<string>();
             var changedAssetPaths = new List<string>();
 
-            foreach (var entry in entries)
+            try
             {
-                GameObject root = null;
-                try
+                for (int i = 0; i < entries.Count; i++)
                 {
-                    root = PrefabUtility.LoadPrefabContents(entry.AssetPath);
-                    var targets = CollectTargetsFromRoots(new[] { root });
-                    var records = ScanMaterialReferences(targets, scanWarnings, "PrefabAsset", entry.AssetPath)
-                        .Where(item => ShouldReplaceMaterial(item.CurrentMaterial))
-                        .Where(item => allowSameMaterial || item.CurrentMaterial != targetMaterial)
-                        .ToList();
-
-                    int changedThisAsset = 0;
-                    foreach (var record in records)
+                    if (EditorUtility.DisplayCancelableProgressBar(
+                            "替换 Prefab 资产材质",
+                            $"正在处理: {i + 1}/{entries.Count}",
+                            (float)i / Mathf.Max(1, entries.Count)))
                     {
-                        if (record == null || record.Accessor == null || !record.CanWrite)
-                        {
-                            skippedReferenceCount++;
-                            continue;
-                        }
-
-                        var current = record.Accessor.Read();
-                        if (!ShouldReplaceMaterial(current) || (!allowSameMaterial && current == targetMaterial))
-                        {
-                            skippedReferenceCount++;
-                            continue;
-                        }
-
-                        if (record.Accessor.Write(targetMaterial, out var error))
-                        {
-                            changedThisAsset++;
-                            replacedReferenceCount++;
-                        }
-                        else
-                        {
-                            failedMessages.Add($"{entry.AssetPath} | {record.TargetPath} | {record.ComponentType}.{record.Location}: {error}");
-                        }
+                        cancelled = true;
+                        break;
                     }
 
-                    if (changedThisAsset > 0)
+                    var entry = entries[i];
+                    GameObject root = null;
+                    try
                     {
-                        var saved = PrefabUtility.SaveAsPrefabAsset(root, entry.AssetPath);
-                        if (saved == null)
+                        root = PrefabUtility.LoadPrefabContents(entry.AssetPath);
+                        var targets = CollectTargetsFromRoots(new[] { root });
+                        var records = ScanMaterialReferences(targets, scanWarnings, "PrefabAsset", entry.AssetPath)
+                            .Where(item => ShouldReplaceMaterial(item.CurrentMaterial))
+                            .Where(item => allowSameMaterial || item.CurrentMaterial != targetMaterial)
+                            .ToList();
+
+                        int changedThisAsset = 0;
+                        foreach (var record in records)
                         {
-                            failedMessages.Add($"{entry.AssetPath}: 保存 Prefab 资产失败。");
-                            continue;
+                            if (record == null || record.Accessor == null || !record.CanWrite)
+                            {
+                                skippedReferenceCount++;
+                                continue;
+                            }
+
+                            var current = record.Accessor.Read();
+                            if (!ShouldReplaceMaterial(current) || (!allowSameMaterial && current == targetMaterial))
+                            {
+                                skippedReferenceCount++;
+                                continue;
+                            }
+
+                            if (record.Accessor.Write(targetMaterial, out var error))
+                            {
+                                changedThisAsset++;
+                                replacedReferenceCount++;
+                            }
+                            else
+                            {
+                                failedMessages.Add($"{entry.AssetPath} | {record.TargetPath} | {record.ComponentType}.{record.Location}: {error}");
+                            }
                         }
 
-                        changedAssetCount++;
-                        changedAssetPaths.Add(entry.AssetPath);
+                        if (changedThisAsset > 0)
+                        {
+                            var saved = PrefabUtility.SaveAsPrefabAsset(root, entry.AssetPath);
+                            if (saved == null)
+                            {
+                                failedMessages.Add(entry.AssetPath + ": 保存 Prefab 失败。");
+                                continue;
+                            }
+
+                            changedAssetCount++;
+                            changedAssetPaths.Add(entry.AssetPath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        failedMessages.Add($"{entry.AssetPath}: 替换失败，{ex.Message}");
+                    }
+                    finally
+                    {
+                        if (root != null)
+                            PrefabUtility.UnloadPrefabContents(root);
                     }
                 }
-                catch (Exception ex)
-                {
-                    failedMessages.Add($"{entry.AssetPath}: 替换失败，{ex.Message}");
-                }
-                finally
-                {
-                    if (root != null)
-                        PrefabUtility.UnloadPrefabContents(root);
-                }
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
             }
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            lastResultSummary = $"Prefab 资产替换完成: 已执行勾选资产 {entries.Count} 个 | 修改 {changedAssetCount} 个资产 | 替换 {replacedReferenceCount} 处引用 | 跳过 {skippedReferenceCount} 处 | 失败 {failedMessages.Count} 项";
+            string completionState = cancelled ? "cancelled" : "completed";
+            lastResultSummary = $"Prefab material replacement {completionState}: processed {entries.Count}, changed {changedAssetCount}, replaced {replacedReferenceCount}, skipped {skippedReferenceCount}, failed {failedMessages.Count}.";
             lastResultDetail = BuildPrefabExecutionReport(changedAssetPaths, failedMessages, scanWarnings);
-            EditorUtility.DisplayDialog("Prefab 资产替换完成",
-                $"已修改 {changedAssetCount} 个 Prefab 资产，替换 {replacedReferenceCount} 处材质引用。",
-                "完成");
+            if (cancelled)
+                lastResultDetail = "操作由用户取消；已保存的 Prefab 资产修改已保留，请通过版本控制或备份回退。\n\n" + lastResultDetail;
+            EditorUtility.DisplayDialog(cancelled ? "Prefab material replacement cancelled" : "Prefab material replacement completed",
+                cancelled
+                    ? $"Changed {changedAssetCount} prefab assets and replaced {replacedReferenceCount} material references before cancellation."
+                    : $"Changed {changedAssetCount} prefab assets and replaced {replacedReferenceCount} material references.",
+                "OK");
         }
 
         private List<GameObject> CollectTargets()
@@ -1865,13 +1908,13 @@ namespace ES
         {
             var risks = new List<string>();
             if (!record.CanWrite)
-                risks.Add("不可写");
+                risks.Add("空材质填充");
 
             if (record.TargetObject != null && PrefabUtility.IsPartOfPrefabInstance(record.TargetObject))
                 risks.Add("Prefab实例覆盖");
 
             if (record.CurrentMaterial == null)
-                risks.Add("空材质填充");
+                risks.Add("脚本字段");
 
             if (record.TargetComponent is MonoBehaviour)
                 risks.Add("脚本字段");
@@ -1913,7 +1956,7 @@ namespace ES
             var list = usageSource?.Where(item => item != null).ToList() ?? new List<MaterialUsage>();
             if (list.Count > 0)
             {
-                builder.AppendLine($"组件分布: {string.Join(", ", list.GroupBy(item => item.componentType).OrderByDescending(g => g.Count()).Select(g => $"{g.Key}:{g.Count()}"))}");
+                builder.AppendLine("组件分布: " + BuildUsageComponentDistribution(list));
             }
 
             if (warnings != null && warnings.Count > 0)
@@ -1957,10 +2000,40 @@ namespace ES
                 return string.Empty;
 
             var builder = new StringBuilder();
-            builder.AppendLine($"来源分布: {string.Join(", ", list.GroupBy(item => item.Source).OrderByDescending(g => g.Count()).Select(g => $"{g.Key}:{g.Count()}"))}");
+            builder.AppendLine("来源分布: " + BuildSourceDistribution(list));
             builder.AppendLine($"可写项: {list.Count(item => item.CanWrite)} | 不可写项: {list.Count(item => !item.CanWrite)} | Prefab实例: {list.Count(item => item.TargetObject != null && PrefabUtility.IsPartOfPrefabInstance(item.TargetObject))}");
-            builder.AppendLine($"组件分布: {string.Join(", ", list.GroupBy(item => item.ComponentType).OrderByDescending(g => g.Count()).Select(g => $"{g.Key}:{g.Count()}"))}");
+            builder.AppendLine("组件分布: " + BuildReferenceComponentDistribution(list));
             return builder.ToString().TrimEnd();
+        }
+
+        private static string GetWriteStateText(bool canWrite)
+        {
+            return canWrite ? "Writable" : "Read-only";
+        }
+
+        private static string BuildUsageComponentDistribution(IEnumerable<MaterialUsage> records)
+        {
+            return string.Join(", ", records.GroupBy(item => item.componentType).OrderByDescending(group => group.Count()).Select(FormatDistributionGroup));
+        }
+
+        private static string BuildSourceDistribution(IEnumerable<MaterialReferenceRecord> records)
+        {
+            return string.Join(", ", records.GroupBy(item => item.Source).OrderByDescending(group => group.Count()).Select(FormatDistributionGroup));
+        }
+
+        private static string BuildReferenceComponentDistribution(IEnumerable<MaterialReferenceRecord> records)
+        {
+            return string.Join(", ", records.GroupBy(item => item.ComponentType).OrderByDescending(group => group.Count()).Select(FormatDistributionGroup));
+        }
+
+        private static string FormatDistributionGroup<TKey>(IGrouping<TKey, MaterialUsage> group)
+        {
+            return group.Key + ":" + group.Count();
+        }
+
+        private static string FormatDistributionGroup<TKey>(IGrouping<TKey, MaterialReferenceRecord> group)
+        {
+            return group.Key + ":" + group.Count();
         }
 
         private string BuildPrefabBatchReport(IEnumerable<PrefabAssetBatchRecord> entries, List<string> warnings)
@@ -2001,7 +2074,7 @@ namespace ES
         private string BuildPrefabExecutionReport(IEnumerable<string> changedAssetPaths, List<string> failedMessages, List<string> scanWarnings)
         {
             var builder = new StringBuilder();
-            builder.AppendLine("修改的 Prefab 资产:");
+            builder.AppendLine("扫描警告:");
             builder.AppendLine(SimpleToolsSafetyUtility.JoinPreview(changedAssetPaths, ReportExportLimit));
 
             if (scanWarnings != null && scanWarnings.Count > 0)
@@ -2081,7 +2154,7 @@ namespace ES
             {
                 if (string.IsNullOrWhiteSpace(prefabAssetFolder) || !AssetDatabase.IsValidFolder(prefabAssetFolder))
                 {
-                    warnings?.Add("Prefab 搜索文件夹无效。");
+                    warnings?.Add("Prefab search folder is invalid.");
                     return result;
                 }
 
@@ -2097,7 +2170,7 @@ namespace ES
         {
             if (!enablePrefabAssetBatch)
             {
-                message = "请先打开“启用资产批处理”。";
+                message = "Enable asset batch processing first.";
                 return false;
             }
 
@@ -2111,13 +2184,13 @@ namespace ES
 
                 if (!hasPrefabSelection)
                 {
-                    message = "当前没有选中的 Prefab 资产。请选中 Project 里的 prefab，或者关闭“优先处理选中 Prefab 资产”改为文件夹扫描。";
+                    message = "No Prefab asset is selected. Select a Prefab in Project, or scan a folder instead.";
                     return false;
                 }
             }
             else if (string.IsNullOrWhiteSpace(prefabAssetFolder) || !AssetDatabase.IsValidFolder(prefabAssetFolder))
             {
-                message = "Prefab 搜索文件夹无效。";
+                message = "Prefab search folder is invalid.";
                 return false;
             }
 

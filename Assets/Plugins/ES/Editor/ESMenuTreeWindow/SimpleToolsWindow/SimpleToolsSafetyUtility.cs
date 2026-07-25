@@ -12,6 +12,21 @@ namespace ES
         public const string QuarantineFolder = "Assets/_ESToolQuarantine";
         public const int DefaultCollectSoftLimit = 5000;
 
+        public static string YesNo(bool value)
+        {
+            return value ? "是" : "否";
+        }
+
+        public static string EnabledDisabled(bool value)
+        {
+            return value ? "启用" : "禁用";
+        }
+
+        public static string ExistsMissing(bool value)
+        {
+            return value ? "已存在" : "未找到";
+        }
+
         public static List<GameObject> CollectTargets(GameObject[] roots, bool includeChildren, bool includeInactive = true)
         {
             return CollectTargets(roots, includeChildren, includeInactive, DefaultCollectSoftLimit, out _);

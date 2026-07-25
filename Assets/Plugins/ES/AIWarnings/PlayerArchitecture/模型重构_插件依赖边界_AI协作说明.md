@@ -9,10 +9,10 @@
 - 插件根目录：`Assets/Plugins`
 - 包清单：`Packages/manifest.json`
 - 主要运行时程序集：`Assets/Scripts/ESLogic/ES_Logic.asmdef`
-- 玩家空壳程序集：`Assets/Scripts/ESPlayer/ESPlayer.asmdef`
+- 玩家空壳程序集：`Assets/Scripts/ESPlayer/ESPlayer.asmdef`。它当前仅保留历史测试材料，不是玩家运行主链。
 - 设计层程序集：`Assets/Plugins/ES/1_Design/ES_Design.asmdef`
 - 角色现状主体：`Assets/Scripts/ESLogic/Runtime/Entity`
-- 运动抽象：`Assets/Scripts/ESLogic/Runtime/Movement`
+- 运动入口：`Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs` 与 `IEntitySupportMotion.cs`
 - 状态/IK：`Assets/Scripts/ESLogic/Runtime/State`
 - 输入运行时：`Assets/Plugins/ES/1_Design/Input`、`Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESInputModule.cs`
 
@@ -147,7 +147,7 @@
 
 ## 禁止误操作
 
-- 不要因为 `ESPlayer` 目录存在就认定玩家主逻辑在其中；当前主逻辑仍大量位于 `Assets/Scripts/ESLogic/Runtime/Entity`。
+- 不要因为 `ESPlayer` 目录存在就认定玩家主逻辑在其中；当前主逻辑仍位于 `Assets/Scripts/ESLogic/Runtime/Entity`，正式玩家层尚未独立落地。
 - 不要恢复旧 `Assets/Plugins/ES/2_Feature/ESGameCore` 作为新 GameManager。
 - 不要继续扩大 `EntityBasicModules.cs` 承担所有运动/战斗/输入职责。
 - 不要把 DOTween 用作角色权威位移。
@@ -157,7 +157,7 @@
 ## 可能过时点，必须源码复核
 
 - `ES_Logic.asmdef` 的第三方引用可能继续变化，改架构前必须重读。
-- `ESPlayer.asmdef` 当前使用 GUID 引用，后续若改为命名引用，需要重新确认对应程序集。
+- `ESPlayer.asmdef` 当前使用 GUID 引用；它仅保留历史测试材料。后续若要移除或迁移，先关闭 Unity 并清理 FolderSystem 的路径缓存，再重新核对程序集引用。
 - Cinemachine 当前角色侧直接引用较少，但相机系统可能后续补齐；不要只按本文件判断最终耦合。
 - Luban/MemoryPack/UniTask 当前更多是可用工具链，不代表已在角色主线形成稳定方案。
 - `【必须】玩家_大黑塔_工业级层级模板` 当前更像场景内模板/说明对象，不是已经可直接复用的完整玩家 prefab。

@@ -10,16 +10,65 @@ using UnityEditor;
 
 namespace ES
 {
+    internal readonly struct ESAssetKindIntKey : IEquatable<ESAssetKindIntKey>
+    {
+        public readonly ESAssetReferKind Kind;
+        public readonly int Value;
+
+        public ESAssetKindIntKey(ESAssetReferKind kind, int value)
+        {
+            Kind = kind;
+            Value = value;
+        }
+
+        public bool Equals(ESAssetKindIntKey other) => Kind == other.Kind && Value == other.Value;
+        public override bool Equals(object obj) => obj is ESAssetKindIntKey other && Equals(other);
+        public override int GetHashCode() => ((int)Kind * 397) ^ Value;
+    }
+
+    internal readonly struct ESAssetKindStringKey : IEquatable<ESAssetKindStringKey>
+    {
+        public readonly ESAssetReferKind Kind;
+        public readonly string Value;
+
+        public ESAssetKindStringKey(ESAssetReferKind kind, string value)
+        {
+            Kind = kind;
+            Value = value ?? string.Empty;
+        }
+
+        public bool Equals(ESAssetKindStringKey other) => Kind == other.Kind && string.Equals(Value, other.Value, StringComparison.Ordinal);
+        public override bool Equals(object obj) => obj is ESAssetKindStringKey other && Equals(other);
+        public override int GetHashCode() => ((int)Kind * 397) ^ StringComparer.Ordinal.GetHashCode(Value);
+    }
+
+    /// <summary>主资产以 GUID + 0 标识；独立子资产以 GUID + LocalFileId 标识。</summary>
+    internal readonly struct ESAssetIdentityKey : IEquatable<ESAssetIdentityKey>
+    {
+        public readonly string Guid;
+        public readonly long LocalFileId;
+
+        public ESAssetIdentityKey(string guid, long localFileId)
+        {
+            Guid = guid ?? string.Empty;
+            LocalFileId = localFileId;
+        }
+
+        public bool Equals(ESAssetIdentityKey other) => LocalFileId == other.LocalFileId && string.Equals(Guid, other.Guid, StringComparison.Ordinal);
+        public override bool Equals(object obj) => obj is ESAssetIdentityKey other && Equals(other);
+        public override int GetHashCode() => (StringComparer.Ordinal.GetHashCode(Guid) * 397) ^ LocalFileId.GetHashCode();
+    }
+
     public class ESAssetLibrary : LibrarySoBase<ESAssetBook>
     {
         [NonSerialized]
         private readonly Dictionary<ESAssetReferKind, List<ESAssetPage>> _pagesByKind = new Dictionary<ESAssetReferKind, List<ESAssetPage>>(32);
 
         [NonSerialized]
-        private readonly Dictionary<int, ESAssetPage> _pageByEnumKey = new Dictionary<int, ESAssetPage>(256);
+        private readonly Dictionary<ESAssetKindIntKey, ESAssetPage> _pageByEnumKey = new Dictionary<ESAssetKindIntKey, ESAssetPage>(256);
 
         [NonSerialized]
-        private readonly Dictionary<string, ESAssetPage> _pageByStringKey = new Dictionary<string, ESAssetPage>(256);
+        private readonly Dictionary<ESAssetKindStringKey, ESAssetPage> _pageByStringKey = new Dictionary<ESAssetKindStringKey, ESAssetPage>(256);
 
         [NonSerialized]
         private readonly Dictionary<string, ESAssetPage> _pageByGuid = new Dictionary<string, ESAssetPage>(256);
@@ -51,6 +100,7 @@ namespace ES
             SetupDefaultBook(DefaultVideoClipBook, EditorIconType.VideoClip, ESAssetCategory.Video);
             SetupDefaultBook(DefaultTimelineAssetBook, EditorIconType.Animation, ESAssetCategory.Timeline);
             SetupDefaultBook(DefaultPlayableAssetBook, EditorIconType.File, ESAssetCategory.Playable);
+            SetupDefaultBook(DefaultScriptableObjectBook, EditorIconType.ScriptableObject, ESAssetCategory.Script);
             SetupDefaultBook(DefaultTerrainDataBook, EditorIconType.Terrain, ESAssetCategory.TerrainData);
         }
 
@@ -81,6 +131,7 @@ namespace ES
             if (DefaultVideoClipBook != null) yield return DefaultVideoClipBook;
             if (DefaultTimelineAssetBook != null) yield return DefaultTimelineAssetBook;
             if (DefaultPlayableAssetBook != null) yield return DefaultPlayableAssetBook;
+            if (DefaultScriptableObjectBook != null) yield return DefaultScriptableObjectBook;
             if (DefaultTerrainDataBook != null) yield return DefaultTerrainDataBook;
         }
 
@@ -122,12 +173,14 @@ namespace ES
         [ShowIf("ShowDefaultPrefabBook")]
         public ESAssetBook DefaultPlayableAssetBook = new ESAssetBook() { Name = "Default PlayableAsset Book", Desc = "ESAssetReferPlayableAsset" };
         [ShowIf("ShowDefaultPrefabBook")]
+        public ESAssetBook DefaultScriptableObjectBook = new ESAssetBook() { Name = "Default ScriptableObject Book", Desc = "ESAssetReferScriptableObject" };
+        [ShowIf("ShowDefaultPrefabBook")]
         public ESAssetBook DefaultTerrainDataBook = new ESAssetBook() { Name = "Default TerrainData Book", Desc = "ESAssetReferTerrainData" };
 
         [LabelText("Can Build")]
         public bool ContainsBuild = true;
 
-        [ESBoolOption("Remote Download", "Local Library")]
+        [ESBoolOption("允许热更新远端发布", "仅随包本地")]
         public bool IsNet = true;
 
         public override void OnEditorApply()
@@ -135,10 +188,33 @@ namespace ES
             base.OnEditorApply();
             Refresh();
 #if UNITY_EDITOR
-            NormalizePagesEditor();
-            ESAssetRegistry.BuildFromAssetLibrary(this);
+            InjectToAssetRegistryEditor();
 #endif
         }
+
+#if UNITY_EDITOR
+        private new void OnEnable()
+        {
+            EditorApplication.delayCall -= InjectToAssetRegistryEditor;
+            EditorApplication.delayCall += InjectToAssetRegistryEditor;
+        }
+
+        private void OnValidate()
+        {
+            MarkFastIndexDirty();
+            EditorApplication.delayCall -= InjectToAssetRegistryEditor;
+            EditorApplication.delayCall += InjectToAssetRegistryEditor;
+        }
+
+        public void InjectToAssetRegistryEditor()
+        {
+            if (this == null)
+                return;
+
+            NormalizePagesEditor();
+            ESAssetRegistry.BuildFromAssetLibrary(this);
+        }
+#endif
 
         public override void EditorOnly_DragAssetsToBooks(UnityEngine.Object[] assets)
         {
@@ -163,8 +239,7 @@ namespace ES
             }
 
             MarkFastIndexDirty();
-            NormalizePagesEditor();
-            ESAssetRegistry.BuildFromAssetLibrary(this);
+            InjectToAssetRegistryEditor();
             EditorUtility.SetDirty(this);
 #endif
         }
@@ -205,6 +280,7 @@ namespace ES
                 case ESAssetReferKind.VideoClip: return DefaultVideoClipBook;
                 case ESAssetReferKind.TimelineAsset: return DefaultTimelineAssetBook;
                 case ESAssetReferKind.PlayableAsset: return DefaultPlayableAssetBook;
+                case ESAssetReferKind.ScriptableObject: return DefaultScriptableObjectBook;
                 case ESAssetReferKind.TerrainData: return DefaultTerrainDataBook;
                 default: return null;
             }
@@ -269,6 +345,11 @@ namespace ES
                 return false;
 
             bool changed = false;
+            if (page.RefreshAssetIdentityEditor(out _, out _, out _, out _))
+            {
+                changed = true;
+            }
+
             var kind = ESAssetPage.DetermineKind(page.OB);
             if (page.Kind != kind)
             {
@@ -278,7 +359,7 @@ namespace ES
 
             if (string.IsNullOrEmpty(page.StringKey))
             {
-                page.StringKey = !string.IsNullOrEmpty(page.Name) ? page.Name : page.OB.name;
+                page.StringKey = page.ResolveEffectiveStringKey();
                 changed = true;
             }
 
@@ -300,13 +381,13 @@ namespace ES
             return _pagesByKind.TryGetValue(kind, out var pages) ? pages : Array.Empty<ESAssetPage>();
         }
 
-        public bool TryGetPageByEnumKey(int enumKey, out ESAssetPage page)
+        public bool TryGetPageByEnumKey(ESAssetReferKind kind, int enumKey, out ESAssetPage page)
         {
             EnsureFastIndex();
-            return _pageByEnumKey.TryGetValue(enumKey, out page);
+            return _pageByEnumKey.TryGetValue(new ESAssetKindIntKey(kind, enumKey), out page);
         }
 
-        public bool TryGetPageByStringKey(string stringKey, out ESAssetPage page)
+        public bool TryGetPageByStringKey(ESAssetReferKind kind, string stringKey, out ESAssetPage page)
         {
             EnsureFastIndex();
             if (string.IsNullOrEmpty(stringKey))
@@ -315,7 +396,7 @@ namespace ES
                 return false;
             }
 
-            return _pageByStringKey.TryGetValue(stringKey, out page);
+            return _pageByStringKey.TryGetValue(new ESAssetKindStringKey(kind, stringKey), out page);
         }
 
         public bool TryGetPageByGuid(string guid, out ESAssetPage page)
@@ -362,15 +443,15 @@ namespace ES
 
             pages.Add(page);
 
-            if (page.EnumKey != 0 && !_pageByEnumKey.ContainsKey(page.EnumKey))
+            if (page.EnumKey != 0 && !_pageByEnumKey.ContainsKey(new ESAssetKindIntKey(kind, page.EnumKey)))
             {
-                _pageByEnumKey.Add(page.EnumKey, page);
+                _pageByEnumKey.Add(new ESAssetKindIntKey(kind, page.EnumKey), page);
             }
 
             var stringKey = string.IsNullOrEmpty(page.StringKey) ? page.Name : page.StringKey;
-            if (!string.IsNullOrEmpty(stringKey) && !_pageByStringKey.ContainsKey(stringKey))
+            if (!string.IsNullOrEmpty(stringKey) && !_pageByStringKey.ContainsKey(new ESAssetKindStringKey(kind, stringKey)))
             {
-                _pageByStringKey.Add(stringKey, page);
+                _pageByStringKey.Add(new ESAssetKindStringKey(kind, stringKey), page);
             }
 
 #if UNITY_EDITOR
@@ -393,159 +474,218 @@ namespace ES
     {
     }
 
-    [Serializable]
-    public struct ESAssetRecord
+    public sealed class ESEditorConfigAssetPageTable
     {
-        public ESAssetReferKind kind;
-        public int enumKey;
-        public string stringKey;
-        public string guid;
-        public long localFileId;
-        public string assetPath;
-        public int runtimeKey;
-        public string assetName;
-        public Type assetType;
-        public string libraryName;
-        public string bookName;
-    }
-
-    public sealed class ESAssetTable
-    {
-        private readonly List<ESAssetRecord> records;
-        private readonly Dictionary<int, int> slotByRuntimeKey;
-        private readonly Dictionary<int, int> slotByEnumKey;
-        private readonly Dictionary<string, int> slotByStringKey;
+        private readonly List<ESAssetPage> pages;
+        private readonly Dictionary<ESAssetReferKind, List<ESAssetPage>> pagesByKind;
+        private readonly Dictionary<ESAssetKindIntKey, int> slotByRuntimeKey;
+        private readonly Dictionary<ESAssetKindIntKey, int> slotByEnumKey;
+        private readonly Dictionary<ESAssetKindStringKey, int> slotByStringKey;
         private readonly Dictionary<string, int> slotByGuid;
+        private readonly Dictionary<ESAssetIdentityKey, int> slotByIdentity;
 
-        public ESAssetTable(int capacity = 256)
+        public ESEditorConfigAssetPageTable(int capacity = 256)
         {
-            records = new List<ESAssetRecord>(capacity);
-            slotByRuntimeKey = new Dictionary<int, int>(capacity);
-            slotByEnumKey = new Dictionary<int, int>(capacity);
-            slotByStringKey = new Dictionary<string, int>(capacity);
+            pages = new List<ESAssetPage>(capacity);
+            pagesByKind = new Dictionary<ESAssetReferKind, List<ESAssetPage>>(32);
+            slotByRuntimeKey = new Dictionary<ESAssetKindIntKey, int>(capacity);
+            slotByEnumKey = new Dictionary<ESAssetKindIntKey, int>(capacity);
+            slotByStringKey = new Dictionary<ESAssetKindStringKey, int>(capacity);
             slotByGuid = new Dictionary<string, int>(capacity);
+            slotByIdentity = new Dictionary<ESAssetIdentityKey, int>(capacity);
         }
 
-        public int Count => records.Count;
-        public IReadOnlyList<ESAssetRecord> Records => records;
+        public int Count => pages.Count;
+        public IReadOnlyList<ESAssetPage> Pages => pages;
 
         public void Clear()
         {
-            records.Clear();
+            pages.Clear();
+            pagesByKind.Clear();
             slotByRuntimeKey.Clear();
             slotByEnumKey.Clear();
             slotByStringKey.Clear();
             slotByGuid.Clear();
+            slotByIdentity.Clear();
         }
 
-        public void Load(IReadOnlyList<ESAssetRecord> sourceRecords)
+        public void Load(IReadOnlyList<ESAssetPage> sourcePages)
         {
             Clear();
-            if (sourceRecords == null)
+            if (sourcePages == null)
                 return;
 
-            for (int i = 0; i < sourceRecords.Count; i++)
+            for (int i = 0; i < sourcePages.Count; i++)
             {
-                Register(sourceRecords[i], true);
+                Register(sourcePages[i], true);
             }
         }
 
-        public bool Register(ESAssetRecord record, bool allowOverride = true)
+        public bool Register(ESAssetPage page, bool allowOverride = true)
         {
-            if (record.runtimeKey == 0)
+            if (page == null || page.RuntimeKey == 0)
                 return false;
 
-            if (TryFindSlot(record, out int slot))
+            if (TryFindSlot(page, out int slot))
             {
                 if (!allowOverride)
                     return false;
 
-                Replace(slot, record);
+                Replace(slot, page);
                 return true;
             }
 
-            slot = records.Count;
-            records.Add(record);
-            Bind(slot, record);
+            slot = pages.Count;
+            pages.Add(page);
+            Bind(slot, page);
             return true;
         }
 
-        public bool Remove(int runtimeKey)
+        public bool Remove(ESAssetReferKind kind, int runtimeKey)
         {
-            if (!slotByRuntimeKey.TryGetValue(runtimeKey, out int slot))
+            if (!slotByRuntimeKey.TryGetValue(new ESAssetKindIntKey(kind, runtimeKey), out int slot))
                 return false;
 
-            records.RemoveAt(slot);
+            pages.RemoveAt(slot);
             RebuildIndex();
             return true;
         }
 
-        public bool TryGet(int runtimeKey, out ESAssetRecord record)
+        public IReadOnlyList<ESAssetPage> GetPagesByKind(ESAssetReferKind kind)
         {
-            if (slotByRuntimeKey.TryGetValue(runtimeKey, out int slot))
+            return pagesByKind.TryGetValue(kind, out var kindPages) ? kindPages : Array.Empty<ESAssetPage>();
+        }
+
+        public bool TryGet(int runtimeKey, out ESAssetPage page)
+        {
+            if (TryGetAnyRuntime(runtimeKey, out int slot))
             {
-                record = records[slot];
+                page = pages[slot];
                 return true;
             }
 
-            record = default;
+            page = null;
             return false;
         }
 
-        public bool TryGetByEnum(int enumKey, out ESAssetRecord record)
+        public bool TryGet(ESAssetReferKind kind, int runtimeKey, out ESAssetPage page)
         {
-            if (slotByEnumKey.TryGetValue(enumKey, out int slot))
+            if (slotByRuntimeKey.TryGetValue(new ESAssetKindIntKey(kind, runtimeKey), out int slot))
             {
-                record = records[slot];
+                page = pages[slot];
                 return true;
             }
 
-            record = default;
+            page = null;
             return false;
         }
 
-        public bool TryGetByString(string stringKey, out ESAssetRecord record)
+        public bool TryGetByEnum(int enumKey, out ESAssetPage page)
         {
-            if (!string.IsNullOrEmpty(stringKey) && slotByStringKey.TryGetValue(stringKey, out int slot))
+            if (TryGetAnyEnum(enumKey, out int slot))
             {
-                record = records[slot];
+                page = pages[slot];
                 return true;
             }
 
-            record = default;
+            page = null;
             return false;
         }
 
-        public bool TryGetByGuid(string guid, out ESAssetRecord record)
+        public bool TryGetByEnum(ESAssetReferKind kind, int enumKey, out ESAssetPage page)
+        {
+            if (slotByEnumKey.TryGetValue(new ESAssetKindIntKey(kind, enumKey), out int slot))
+            {
+                page = pages[slot];
+                return true;
+            }
+
+            page = null;
+            return false;
+        }
+
+        public bool TryGetByString(string stringKey, out ESAssetPage page)
+        {
+            if (!string.IsNullOrEmpty(stringKey) && TryGetAnyString(stringKey, out int slot))
+            {
+                page = pages[slot];
+                return true;
+            }
+
+            page = null;
+            return false;
+        }
+
+        public bool TryGetByString(ESAssetReferKind kind, string stringKey, out ESAssetPage page)
+        {
+            if (slotByStringKey.TryGetValue(new ESAssetKindStringKey(kind, stringKey), out int slot))
+            {
+                page = pages[slot];
+                return true;
+            }
+
+            page = null;
+            return false;
+        }
+
+        public bool TryGetByGuid(string guid, out ESAssetPage page)
         {
             if (!string.IsNullOrEmpty(guid) && slotByGuid.TryGetValue(guid, out int slot))
             {
-                record = records[slot];
+                page = pages[slot];
                 return true;
             }
 
-            record = default;
+            page = null;
             return false;
         }
 
-        private bool TryFindSlot(ESAssetRecord record, out int slot)
+        public bool TryGetByGuid(ESAssetReferKind kind, string guid, out ESAssetPage page)
         {
-            if (record.runtimeKey != 0 && slotByRuntimeKey.TryGetValue(record.runtimeKey, out slot))
+            if (TryGetByGuid(guid, out page) && page.Kind == kind)
                 return true;
-            if (record.enumKey != 0 && slotByEnumKey.TryGetValue(record.enumKey, out slot))
+
+            page = null;
+            return false;
+        }
+
+        public bool TryGetByAssetIdentity(ESAssetReferKind kind, string guid, long localFileId, out ESAssetPage page)
+        {
+            if (!string.IsNullOrEmpty(guid)
+                && slotByIdentity.TryGetValue(new ESAssetIdentityKey(guid, localFileId), out int slot)
+                && pages[slot].Kind == kind)
+            {
+                page = pages[slot];
                 return true;
-            if (!string.IsNullOrEmpty(record.stringKey) && slotByStringKey.TryGetValue(record.stringKey, out slot))
+            }
+
+            page = null;
+            return false;
+        }
+
+        private bool TryFindSlot(ESAssetPage page, out int slot)
+        {
+            if (!string.IsNullOrEmpty(page.AssetGuid)
+                && slotByIdentity.TryGetValue(new ESAssetIdentityKey(page.AssetGuid, page.LocalFileId), out slot))
                 return true;
-            if (!string.IsNullOrEmpty(record.guid) && slotByGuid.TryGetValue(record.guid, out slot))
-                return true;
+
+            if (string.IsNullOrEmpty(page.AssetGuid))
+            {
+                if (page.RuntimeKey != 0 && slotByRuntimeKey.TryGetValue(new ESAssetKindIntKey(page.Kind, page.RuntimeKey), out slot))
+                    return true;
+                if (page.EnumKey != 0 && slotByEnumKey.TryGetValue(new ESAssetKindIntKey(page.Kind, page.EnumKey), out slot))
+                    return true;
+                if (!string.IsNullOrEmpty(page.EffectiveStringKey) && slotByStringKey.TryGetValue(new ESAssetKindStringKey(page.Kind, page.EffectiveStringKey), out slot))
+                    return true;
+            }
 
             slot = -1;
             return false;
         }
 
-        private void Replace(int slot, ESAssetRecord record)
+        private void Replace(int slot, ESAssetPage page)
         {
-            records[slot] = record;
+            pages[slot] = page;
             RebuildIndex();
         }
 
@@ -555,22 +695,86 @@ namespace ES
             slotByEnumKey.Clear();
             slotByStringKey.Clear();
             slotByGuid.Clear();
-            for (int i = 0; i < records.Count; i++)
+            slotByIdentity.Clear();
+            pagesByKind.Clear();
+            for (int i = 0; i < pages.Count; i++)
             {
-                Bind(i, records[i]);
+                Bind(i, pages[i]);
             }
         }
 
-        private void Bind(int slot, ESAssetRecord record)
+        private void Bind(int slot, ESAssetPage page)
         {
-            if (record.runtimeKey != 0)
-                slotByRuntimeKey[record.runtimeKey] = slot;
-            if (record.enumKey != 0)
-                slotByEnumKey[record.enumKey] = slot;
-            if (!string.IsNullOrEmpty(record.stringKey))
-                slotByStringKey[record.stringKey] = slot;
-            if (!string.IsNullOrEmpty(record.guid))
-                slotByGuid[record.guid] = slot;
+            if (page == null)
+                return;
+
+            if (!pagesByKind.TryGetValue(page.Kind, out var kindPages))
+            {
+                kindPages = new List<ESAssetPage>(16);
+                pagesByKind.Add(page.Kind, kindPages);
+            }
+
+            kindPages.Add(page);
+
+            if (page.RuntimeKey != 0)
+                TryBind(slotByRuntimeKey, new ESAssetKindIntKey(page.Kind, page.RuntimeKey), slot);
+            if (page.EnumKey != 0)
+                TryBind(slotByEnumKey, new ESAssetKindIntKey(page.Kind, page.EnumKey), slot);
+            if (!string.IsNullOrEmpty(page.EffectiveStringKey))
+                TryBind(slotByStringKey, new ESAssetKindStringKey(page.Kind, page.EffectiveStringKey), slot);
+            if (!string.IsNullOrEmpty(page.AssetGuid))
+            {
+                TryBind(slotByGuid, page.AssetGuid, slot);
+                TryBind(slotByIdentity, new ESAssetIdentityKey(page.AssetGuid, page.LocalFileId), slot);
+            }
+        }
+
+        private static void TryBind<TKey>(Dictionary<TKey, int> map, TKey key, int slot)
+        {
+            if (!map.ContainsKey(key))
+                map.Add(key, slot);
+        }
+
+        private bool TryGetAnyRuntime(int runtimeKey, out int slot)
+        {
+            foreach (var pair in slotByRuntimeKey)
+            {
+                if (pair.Key.Value == runtimeKey)
+                {
+                    slot = pair.Value;
+                    return true;
+                }
+            }
+            slot = -1;
+            return false;
+        }
+
+        private bool TryGetAnyEnum(int enumKey, out int slot)
+        {
+            foreach (var pair in slotByEnumKey)
+            {
+                if (pair.Key.Value == enumKey)
+                {
+                    slot = pair.Value;
+                    return true;
+                }
+            }
+            slot = -1;
+            return false;
+        }
+
+        private bool TryGetAnyString(string stringKey, out int slot)
+        {
+            foreach (var pair in slotByStringKey)
+            {
+                if (string.Equals(pair.Key.Value, stringKey, StringComparison.Ordinal))
+                {
+                    slot = pair.Value;
+                    return true;
+                }
+            }
+            slot = -1;
+            return false;
         }
     }
 
@@ -578,29 +782,55 @@ namespace ES
     {
         public const int DefaultStringRuntimeKeyStart = 30000;
 
-        private static readonly List<ESAssetRecord> records = new List<ESAssetRecord>(256);
-        private static readonly ESAssetTable table = new ESAssetTable(256);
-        private static int nextStringRuntimeKey = DefaultStringRuntimeKeyStart;
+        private static readonly List<ESAssetPage> pages = new List<ESAssetPage>(256);
+        private static readonly ESEditorConfigAssetPageTable editorConfigQueryTable = new ESEditorConfigAssetPageTable(256);
+        private static readonly List<string> warnings = new List<string>(64);
+        private static readonly Dictionary<string, PageKeySnapshot> snapshotsByGuid = new Dictionary<string, PageKeySnapshot>(256);
+        private static readonly HashSet<string> suppressedLibraryInjectOnce = new HashSet<string>();
+        private static readonly Dictionary<ESAssetReferKind, int> nextStringRuntimeKeyByKind = new Dictionary<ESAssetReferKind, int>(32);
+        private static int version;
 
-        public static ESAssetTable Table => table;
-        public static IReadOnlyList<ESAssetRecord> Records => records;
+        private struct PageKeySnapshot
+        {
+            public int runtimeKey;
+            public int enumKey;
+            public string stringKey;
+            public string assetPath;
+        }
+
+        public static ESEditorConfigAssetPageTable EditorConfigQueryTable => editorConfigQueryTable;
+        public static IReadOnlyList<ESAssetPage> Pages => pages;
+        public static int WarningCount => warnings.Count;
+        public static IReadOnlyList<string> Warnings => warnings;
+        /// <summary>编辑器注册表快照版本；Key 选择器据此精确失效缓存。</summary>
+        public static int Version => version;
 
         public static void Clear()
         {
-            records.Clear();
-            table.Clear();
-            nextStringRuntimeKey = DefaultStringRuntimeKeyStart;
+            pages.Clear();
+            editorConfigQueryTable.Clear();
+            warnings.Clear();
+            snapshotsByGuid.Clear();
+            suppressedLibraryInjectOnce.Clear();
+            nextStringRuntimeKeyByKind.Clear();
+            unchecked { version++; }
         }
 
-        public static ESAssetRecord[] BuildFromAssetLibrary(ESAssetLibrary library, bool clearBeforeBuild = false)
+        public static int BuildFromAssetLibrary(ESAssetLibrary library, bool clearBeforeBuild = false, int startOrderIndex = 0)
         {
             if (clearBeforeBuild)
                 Clear();
 
             if (library == null)
-                return Array.Empty<ESAssetRecord>();
+                return 0;
 
             library.NormalizePagesEditor();
+            string libraryKey = GetLibraryRegistryKey(library);
+            if (startOrderIndex == 0 && suppressedLibraryInjectOnce.Remove(libraryKey))
+                return 0;
+
+            RemovePagesBySourceLibrary(libraryKey);
+            int count = 0;
             foreach (var book in library.GetAllUseableBooks())
             {
                 if (book?.pages == null)
@@ -608,68 +838,78 @@ namespace ES
 
                 for (int i = 0; i < book.pages.Count; i++)
                 {
-                    RegisterAsset((ESAssetPage)book.pages[i], library.Name, book.Name);
+                    if (RegisterAsset((ESAssetPage)book.pages[i], libraryKey, book.Name))
+                        count++;
                 }
             }
 
-            return records.ToArray();
+            return count;
         }
 
         [Obsolete("Use BuildFromAssetLibrary instead.")]
-        public static ESAssetRecord[] BuildFromLibrary(ResLibrary library, bool clearBeforeBuild = false)
+        public static int BuildFromLibrary(ResLibrary library, bool clearBeforeBuild = false)
         {
-            return BuildFromAssetLibrary(library, clearBeforeBuild);
+            return BuildFromAssetLibrary(library, clearBeforeBuild, 0);
         }
 
-        public static ESAssetRecord[] BuildFromAssetLibraries(IReadOnlyList<ESAssetLibrary> libraries, bool clearBeforeBuild = true)
+        public static int BuildFromAssetLibraries(IReadOnlyList<ESAssetLibrary> libraries, bool clearBeforeBuild = true, int startOrderIndex = 0)
         {
             if (clearBeforeBuild)
                 Clear();
 
             if (libraries == null)
-                return records.ToArray();
+                return 0;
 
+            int count = 0;
             for (int i = 0; i < libraries.Count; i++)
             {
-                BuildFromAssetLibrary(libraries[i], false);
+                count += BuildFromAssetLibrary(libraries[i], false, startOrderIndex);
             }
 
-            return records.ToArray();
+            return count;
         }
 
         [Obsolete("Use BuildFromAssetLibraries instead.")]
-        public static ESAssetRecord[] BuildFromLibraries(IReadOnlyList<ResLibrary> libraries, bool clearBeforeBuild = true)
+        public static int BuildFromLibraries(IReadOnlyList<ResLibrary> libraries, bool clearBeforeBuild = true)
         {
             if (clearBeforeBuild)
                 Clear();
 
             if (libraries == null)
-                return records.ToArray();
+                return 0;
 
+            int count = 0;
             for (int i = 0; i < libraries.Count; i++)
             {
-                BuildFromAssetLibrary(libraries[i], false);
+                count += BuildFromAssetLibrary(libraries[i], false, 0);
             }
 
-            return records.ToArray();
+            return count;
         }
 
         public static bool RegisterAsset(ESAssetPage page)
         {
-            return RegisterAsset(page, null, null);
+            return RegisterAsset(page, null, null, 0);
         }
 
-        public static bool RegisterAsset(ESAssetPage page, string libraryName, string bookName)
+        public static bool RegisterAsset(ESAssetPage page, string libraryName, string bookName, int startOrderIndex = 0)
         {
             if (page == null || page.OB == null)
                 return false;
 
-            ESAssetReferKind kind = page.Kind;
-            if (kind == ESAssetReferKind.None || kind == ESAssetReferKind.Other)
-                kind = ESAssetPage.DetermineKind(page.OB);
-
-            string stringKey = string.IsNullOrEmpty(page.StringKey) ? page.Name : page.StringKey;
-            return RegisterAsset(page.OB, kind, page.EnumKey, stringKey, libraryName, bookName);
+            page.RefreshAssetIdentityEditor();
+            if (string.IsNullOrEmpty(page.StringKey))
+                page.StringKey = page.ResolveEffectiveStringKey();
+            if (!string.IsNullOrEmpty(libraryName))
+                page.SourceLibrary = libraryName;
+            if (!string.IsNullOrEmpty(bookName))
+                page.SourceBook = bookName;
+            page.RuntimeKey = BakeRuntimeKey(page);
+            WarnIfSnapshotChanged(page);
+            UpsertPageByGuidAuthority(page);
+            if (startOrderIndex > 0)
+                MarkSourceLibraryDirty(page, startOrderIndex);
+            return true;
         }
 
         public static bool RegisterAsset(UnityEngine.Object asset, ESAssetReferKind kind, int enumKey, string stringKey)
@@ -683,47 +923,34 @@ namespace ES
             if (asset == null || kind == ESAssetReferKind.None || kind == ESAssetReferKind.Other)
                 return false;
 
-            string assetPath = AssetDatabase.GetAssetPath(asset);
-            string guid = null;
-            long localFileId = 0;
-            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out guid, out localFileId);
-            if (string.IsNullOrEmpty(stringKey))
-                stringKey = asset.name;
-
-            ESAssetRecord record = new ESAssetRecord
+            ESAssetPage page = new ESAssetPage
             {
-                kind = kind,
-                enumKey = enumKey,
-                stringKey = stringKey,
-                guid = guid,
-                localFileId = localFileId,
-                assetPath = assetPath,
-                runtimeKey = BakeRuntimeKey(enumKey, stringKey),
-                assetName = asset.name,
-                assetType = asset.GetType(),
-                libraryName = libraryName,
-                bookName = bookName
+                Name = asset.name,
+                OB = asset,
+                Kind = kind,
+                EnumKey = enumKey,
+                StringKey = string.IsNullOrEmpty(stringKey) ? asset.name : stringKey,
+                SourceLibrary = libraryName ?? string.Empty,
+                SourceBook = bookName ?? string.Empty
             };
-
-            UpsertRecord(record);
-            return true;
+            return RegisterAsset(page, libraryName, bookName, 0);
 #else
             return false;
 #endif
         }
 
-        public static bool RemoveAsset(string guid)
+        public static bool RemoveAsset(string guid, int startOrderIndex = 0)
         {
             if (string.IsNullOrEmpty(guid))
                 return false;
 
-            for (int i = 0; i < records.Count; i++)
+            for (int i = 0; i < pages.Count; i++)
             {
-                if (records[i].guid == guid)
+                if (pages[i].AssetGuid == guid)
                 {
-                    int runtimeKey = records[i].runtimeKey;
-                    records.RemoveAt(i);
-                    table.Remove(runtimeKey);
+                    RemovePageFromSourceLibrary(pages[i], startOrderIndex + 1);
+                    pages.RemoveAt(i);
+                    RebuildEditorConfigQueryTable();
                     return true;
                 }
             }
@@ -731,86 +958,709 @@ namespace ES
             return false;
         }
 
-        public static bool RemoveAsset(ESAssetPage page)
+        public static bool RemoveAsset(ESAssetPage page, int startOrderIndex = 0)
         {
 #if UNITY_EDITOR
             if (page?.OB == null)
                 return false;
 
             string path = AssetDatabase.GetAssetPath(page.OB);
-            return RemoveAsset(string.IsNullOrEmpty(path) ? null : AssetDatabase.AssetPathToGUID(path));
+            return RemoveAsset(string.IsNullOrEmpty(path) ? null : AssetDatabase.AssetPathToGUID(path), startOrderIndex);
 #else
             return false;
 #endif
         }
 
-        public static bool RenameAsset(ESAssetRecord record, string newName)
+        public static bool RenameAsset(ESAssetPage page, string newName, int startOrderIndex = 0)
         {
-            if (record.runtimeKey == 0)
+            if (page == null)
                 return false;
 
-            for (int i = 0; i < records.Count; i++)
+            if (TryFindPageIndexByGuidOrRuntime(page, out int index))
             {
-                if (records[i].runtimeKey == record.runtimeKey)
-                {
-                    record.assetName = newName;
-                    records[i] = record;
-                    table.Register(record, true);
-                    return true;
-                }
+                page.Name = newName;
+                page.RuntimeKey = BakeRuntimeKey(page);
+                WarnIfSnapshotChanged(page);
+                pages[index] = page;
+                RebuildEditorConfigQueryTable();
+                MarkSourceLibraryDirty(page, startOrderIndex + 1);
+                return true;
             }
 
             return false;
         }
 
-        public static bool RenameStringKey(ESAssetRecord record, string newStringKey)
+        public static bool RenameAsset(string guid, string newName, int startOrderIndex = 0)
         {
-            if (record.runtimeKey == 0 || string.IsNullOrEmpty(newStringKey))
+            if (!TryGetByGuid(guid, out ESAssetPage page))
                 return false;
 
-            for (int i = 0; i < records.Count; i++)
+            return RenameAsset(page, newName, startOrderIndex);
+        }
+
+        public static bool RenameAsset(UnityEngine.Object asset, string newName, int startOrderIndex = 0)
+        {
+#if UNITY_EDITOR
+            if (!TryResolvePageByAsset(asset, out ESAssetPage page))
+                return false;
+
+            return RenameAsset(page, newName, startOrderIndex);
+#else
+            return false;
+#endif
+        }
+
+        public static bool RenameStringKey(ESAssetPage page, string newStringKey, int startOrderIndex = 0)
+        {
+            if (page == null || string.IsNullOrEmpty(newStringKey))
+                return false;
+
+            if (TryFindPageIndexByGuidOrRuntime(page, out int index))
             {
-                if (records[i].runtimeKey == record.runtimeKey)
+                ESAssetPage oldPage = pages[index];
+                page.StringKey = newStringKey;
+                page.RuntimeKey = BakeRuntimeKey(page);
+                WarnIfKeyChanged(oldPage, page);
+                WarnIfSnapshotChanged(page);
+                pages[index] = page;
+                RebuildEditorConfigQueryTable();
+                MarkSourceLibraryDirty(page, startOrderIndex + 1);
+                return true;
+            }
+
+            page.StringKey = newStringKey;
+            return RegisterAsset(page);
+        }
+
+        public static bool RenameStringKey(string guid, string newStringKey, int startOrderIndex = 0)
+        {
+            if (!TryGetByGuid(guid, out ESAssetPage page))
+                return false;
+
+            return RenameStringKey(page, newStringKey, startOrderIndex);
+        }
+
+        public static bool RenameStringKey(UnityEngine.Object asset, string newStringKey, int startOrderIndex = 0)
+        {
+#if UNITY_EDITOR
+            if (!TryResolvePageByAsset(asset, out ESAssetPage page))
+                return false;
+
+            return RenameStringKey(page, newStringKey, startOrderIndex);
+#else
+            return false;
+#endif
+        }
+
+        public static bool RenameEnumKey(ESAssetPage page, int newEnumKey, int startOrderIndex = 0)
+        {
+            if (page == null)
+                return false;
+
+            if (TryFindPageIndexByGuidOrRuntime(page, out int index))
+            {
+                ESAssetPage oldPage = pages[index];
+                page.EnumKey = newEnumKey;
+                page.RuntimeKey = BakeRuntimeKey(page);
+                WarnIfKeyChanged(oldPage, page);
+                WarnIfSnapshotChanged(page);
+                pages[index] = page;
+                RebuildEditorConfigQueryTable();
+                MarkSourceLibraryDirty(page, startOrderIndex + 1);
+                return true;
+            }
+
+            page.EnumKey = newEnumKey;
+            return RegisterAsset(page);
+        }
+
+        public static bool RenameEnumKey(string guid, int newEnumKey, int startOrderIndex = 0)
+        {
+            if (!TryGetByGuid(guid, out ESAssetPage page))
+                return false;
+
+            return RenameEnumKey(page, newEnumKey, startOrderIndex);
+        }
+
+        public static bool RenameEnumKey(UnityEngine.Object asset, int newEnumKey, int startOrderIndex = 0)
+        {
+#if UNITY_EDITOR
+            if (!TryResolvePageByAsset(asset, out ESAssetPage page))
+                return false;
+
+            return RenameEnumKey(page, newEnumKey, startOrderIndex);
+#else
+            return false;
+#endif
+        }
+
+        public static bool RenameRuntimeKey(ESAssetPage page, int newRuntimeKey, int startOrderIndex = 0)
+        {
+            if (page == null
+                || page.EnumKey != 0
+                || newRuntimeKey < DefaultStringRuntimeKeyStart)
+            {
+                return false;
+            }
+
+            if (!TryFindPageIndexByGuidOrRuntime(page, out int index))
+                return false;
+
+            if (editorConfigQueryTable.TryGet(page.Kind, newRuntimeKey, out ESAssetPage conflict)
+                && conflict != null
+                && !ReferenceEquals(conflict, page)
+                && (string.IsNullOrEmpty(page.AssetGuid) || conflict.AssetGuid != page.AssetGuid))
+            {
+                return false;
+            }
+
+            if (page.RuntimeKey == newRuntimeKey)
+                return true;
+
+            page.RuntimeKey = newRuntimeKey;
+            pages[index] = page;
+            EnsureNextStringRuntimeKeyAfter(page.Kind, newRuntimeKey);
+            RebuildEditorConfigQueryTable();
+            MarkSourceLibraryDirty(page, startOrderIndex + 1);
+            return true;
+        }
+
+        public static bool RenameRuntimeKey(string guid, int newRuntimeKey, int startOrderIndex = 0)
+        {
+            if (!TryGetByGuid(guid, out ESAssetPage page))
+                return false;
+
+            return RenameRuntimeKey(page, newRuntimeKey, startOrderIndex);
+        }
+
+        public static bool RenameRuntimeKey(UnityEngine.Object asset, int newRuntimeKey, int startOrderIndex = 0)
+        {
+#if UNITY_EDITOR
+            if (!TryResolvePageByAsset(asset, out ESAssetPage page))
+                return false;
+
+            return RenameRuntimeKey(page, newRuntimeKey, startOrderIndex);
+#else
+            return false;
+#endif
+        }
+
+        public static bool RefreshAssetPath(ESAssetPage page, int startOrderIndex = 0)
+        {
+#if UNITY_EDITOR
+            if (page == null || page.OB == null)
+                return false;
+
+            bool identityChanged = page.RefreshAssetIdentityEditor(out string oldGuid, out long oldLocalFileId, out string oldPath, out string oldTypeName);
+            if (!TryFindPageIndexByGuidOrRuntime(page, out int index))
+                return RegisterAsset(page);
+
+            ESAssetPage oldPage = pages[index];
+            page.RuntimeKey = BakeRuntimeKey(page);
+            if (identityChanged)
+                AddWarning("Asset identity refreshed by asset authority"
+                    + " | oldGuid=" + oldGuid
+                    + "/oldLocalFileId=" + oldLocalFileId
+                    + "/oldPath=" + oldPath
+                    + "/oldType=" + oldTypeName, oldPage, page);
+
+            WarnIfSnapshotChanged(page);
+            pages[index] = page;
+            RebuildEditorConfigQueryTable();
+            MarkSourceLibraryDirty(page, startOrderIndex + 1);
+            return true;
+#else
+            return false;
+#endif
+        }
+
+        public static bool RefreshAssetPath(string guid, int startOrderIndex = 0)
+        {
+#if UNITY_EDITOR
+            if (string.IsNullOrEmpty(guid) || !TryGetByGuid(guid, out ESAssetPage page))
+                return false;
+
+            if (!TryFindPageIndexByGuidOrRuntime(page, out int index))
+                return false;
+
+            ESAssetPage oldPage = pages[index];
+            string oldPath = page.AssetPath;
+            string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+            if (string.IsNullOrEmpty(assetPath))
+                return false;
+
+            UnityEngine.Object loadedAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            if (loadedAsset != null)
+                page.OB = loadedAsset;
+
+            page.AssetGuid = guid;
+            page.AssetPath = assetPath;
+            if (page.OB != null)
+            {
+                page.Kind = ESAssetPage.DetermineKind(page.OB);
+                page.AssetTypeName = page.OB.GetType().FullName;
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(page.OB, out _, out long localFileId);
+                page.LocalFileId = localFileId;
+                if (string.IsNullOrEmpty(page.Name))
+                    page.Name = page.OB.name;
+                if (string.IsNullOrEmpty(page.StringKey))
+                    page.StringKey = page.ResolveEffectiveStringKey();
+            }
+
+            page.RuntimeKey = BakeRuntimeKey(page);
+            if (oldPath != page.AssetPath)
+                AddWarning("AssetPath changed by GUID-only asset authority | oldPath=" + oldPath, oldPage, page);
+
+            WarnIfSnapshotChanged(page);
+            pages[index] = page;
+            RebuildEditorConfigQueryTable();
+            MarkSourceLibraryDirty(page, startOrderIndex + 1);
+            return true;
+#else
+            return false;
+#endif
+        }
+
+        public static bool RefreshAssetPath(UnityEngine.Object asset, int startOrderIndex = 0)
+        {
+#if UNITY_EDITOR
+            if (!TryResolvePageByAsset(asset, out ESAssetPage page))
+                return false;
+
+            return RefreshAssetPath(page, startOrderIndex);
+#else
+            return false;
+#endif
+        }
+
+        public static bool TryGet(int runtimeKey, out ESAssetPage page)
+        {
+            return editorConfigQueryTable.TryGet(runtimeKey, out page);
+        }
+
+        public static bool TryGet(ESAssetReferKind kind, int runtimeKey, out ESAssetPage page)
+        {
+            return editorConfigQueryTable.TryGet(kind, runtimeKey, out page);
+        }
+
+        public static bool TryGetByEnum(int enumKey, out ESAssetPage page)
+        {
+            return editorConfigQueryTable.TryGetByEnum(enumKey, out page);
+        }
+
+        public static bool TryGetByEnum(ESAssetReferKind kind, int enumKey, out ESAssetPage page)
+        {
+            return editorConfigQueryTable.TryGetByEnum(kind, enumKey, out page);
+        }
+
+        public static bool TryGetByString(string stringKey, out ESAssetPage page)
+        {
+            return editorConfigQueryTable.TryGetByString(stringKey, out page);
+        }
+
+        public static bool TryGetByString(ESAssetReferKind kind, string stringKey, out ESAssetPage page)
+        {
+            return editorConfigQueryTable.TryGetByString(kind, stringKey, out page);
+        }
+
+        public static bool TryGetByGuid(string guid, out ESAssetPage page)
+        {
+            return editorConfigQueryTable.TryGetByGuid(guid, out page);
+        }
+
+        public static bool TryGetByGuid(ESAssetReferKind kind, string guid, out ESAssetPage page)
+        {
+            return editorConfigQueryTable.TryGetByGuid(kind, guid, out page);
+        }
+
+        /// <summary>编辑器收集解析使用完整身份，避免子资产与主资源共享 GUID 时误命中。</summary>
+        public static bool TryGetByAssetIdentity(ESAssetReferKind kind, string guid, long localFileId, out ESAssetPage page)
+        {
+            return editorConfigQueryTable.TryGetByAssetIdentity(kind, guid, localFileId, out page);
+        }
+
+        public static IReadOnlyList<ESAssetPage> GetPagesByKind(ESAssetReferKind kind)
+        {
+            return editorConfigQueryTable.GetPagesByKind(kind);
+        }
+
+        public static string GetWarningReport()
+        {
+            if (warnings.Count == 0)
+                return string.Empty;
+
+            return string.Join(Environment.NewLine, warnings);
+        }
+
+        private static void UpsertPageByGuidAuthority(ESAssetPage page)
+        {
+            if (TryFindPageIndexByGuidOrRuntime(page, out int index))
+            {
+                ESAssetPage existing = pages[index];
+                WarnIfKeyChanged(existing, page);
+                pages[index] = page;
+                RebuildEditorConfigQueryTable();
+                return;
+            }
+
+            WarnIfKeyConflict(page);
+            pages.Add(page);
+            RebuildEditorConfigQueryTable();
+        }
+
+        private static bool TryFindPageIndexByGuidOrRuntime(ESAssetPage page, out int index)
+        {
+            if (page != null && !string.IsNullOrEmpty(page.AssetGuid))
+            {
+                for (int i = 0; i < pages.Count; i++)
                 {
-                    record.stringKey = newStringKey;
-                    record.runtimeKey = BakeRuntimeKey(record.enumKey, newStringKey);
-                    records[i] = record;
-                    table.Load(records);
-                    return true;
+                    ESAssetPage existing = pages[i];
+                    if (existing != null
+                        && existing.AssetGuid == page.AssetGuid
+                        && existing.LocalFileId == page.LocalFileId)
+                    {
+                        index = i;
+                        return true;
+                    }
                 }
             }
 
+            if (page != null && page.RuntimeKey != 0)
+            {
+                for (int i = 0; i < pages.Count; i++)
+                {
+                    ESAssetPage existing = pages[i];
+                    if (existing != null && existing.Kind == page.Kind && existing.RuntimeKey == page.RuntimeKey && string.IsNullOrEmpty(existing.AssetGuid))
+                    {
+                        index = i;
+                        return true;
+                    }
+                }
+            }
+
+            index = -1;
             return false;
         }
 
-        private static void UpsertRecord(ESAssetRecord record)
+#if UNITY_EDITOR
+        private static bool TryResolvePageByAsset(UnityEngine.Object asset, out ESAssetPage page)
         {
-            for (int i = 0; i < records.Count; i++)
+            page = null;
+            if (asset == null)
+                return false;
+
+            if (AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string guid, out long localFileId))
             {
-                ESAssetRecord existing = records[i];
-                if (existing.runtimeKey == record.runtimeKey
-                    || (!string.IsNullOrEmpty(record.guid) && existing.guid == record.guid)
-                    || (!string.IsNullOrEmpty(record.stringKey) && existing.stringKey == record.stringKey))
+                if (!AssetDatabase.IsSubAsset(asset))
+                    localFileId = 0;
+
+                ESAssetReferKind identityKind = ESAssetPage.DetermineKind(asset);
+                if (!string.IsNullOrEmpty(guid) && TryGetByAssetIdentity(identityKind, guid, localFileId, out page))
+                    return true;
+            }
+
+            ESAssetReferKind kind = ESAssetPage.DetermineKind(asset);
+            if (kind == ESAssetReferKind.None || kind == ESAssetReferKind.Other)
+                return false;
+
+            page = ESAssetPage.Create(asset);
+            bool registered = RegisterAsset(page);
+            if (registered)
+                AddWarning("Asset object registered without source ESAssetLibrary; Registry mirror updated only", null, page);
+            return registered;
+        }
+#endif
+
+        private static void RebuildEditorConfigQueryTable()
+        {
+            editorConfigQueryTable.Load(pages);
+            for (int i = 0; i < pages.Count; i++)
+            {
+                RememberSnapshot(pages[i]);
+            }
+            unchecked { version++; }
+        }
+
+        private static void RemovePagesBySourceLibrary(string sourceLibrary)
+        {
+            if (string.IsNullOrEmpty(sourceLibrary))
+                return;
+
+            for (int i = pages.Count - 1; i >= 0; i--)
+            {
+                if (pages[i] != null && pages[i].SourceLibrary == sourceLibrary)
+                    pages.RemoveAt(i);
+            }
+
+            RebuildEditorConfigQueryTable();
+        }
+
+        private static string GetLibraryRegistryKey(ESAssetLibrary library)
+        {
+#if UNITY_EDITOR
+            if (library != null)
+            {
+                string path = AssetDatabase.GetAssetPath(library);
+                string guid = string.IsNullOrEmpty(path) ? null : AssetDatabase.AssetPathToGUID(path);
+                if (!string.IsNullOrEmpty(guid))
+                    return guid;
+            }
+#endif
+            return library != null ? library.Name : string.Empty;
+        }
+
+        private static void MarkSourceLibraryDirty(ESAssetPage page, int startOrderIndex)
+        {
+#if UNITY_EDITOR
+            if (page == null || string.IsNullOrEmpty(page.SourceLibrary))
+                return;
+
+            string libraryPath = AssetDatabase.GUIDToAssetPath(page.SourceLibrary);
+            if (string.IsNullOrEmpty(libraryPath))
+                return;
+
+            ESAssetLibrary library = AssetDatabase.LoadAssetAtPath<ESAssetLibrary>(libraryPath);
+            if (library == null)
+                return;
+
+            if (startOrderIndex > 0)
+                suppressedLibraryInjectOnce.Add(page.SourceLibrary);
+
+            EditorUtility.SetDirty(library);
+#endif
+        }
+
+        public static void MarkSourceLibraryDirtyByPage(ESAssetPage page, int startOrderIndex = 0)
+        {
+            MarkSourceLibraryDirty(page, startOrderIndex);
+        }
+
+        private static bool RemovePageFromSourceLibrary(ESAssetPage page, int startOrderIndex)
+        {
+#if UNITY_EDITOR
+            ESAssetLibrary library = LoadSourceLibrary(page);
+            if (library == null)
+                return false;
+
+            bool removed = false;
+            foreach (var book in library.GetAllUseableBooks())
+            {
+                if (book?.pages == null)
+                    continue;
+
+                for (int i = book.pages.Count - 1; i >= 0; i--)
                 {
-                    records[i] = record;
-                    table.Register(record, true);
-                    return;
+                    ESAssetPage candidate = book.pages[i];
+                    if (candidate == null)
+                        continue;
+
+                    candidate.RefreshAssetIdentityEditor();
+                    if (!string.IsNullOrEmpty(page.AssetGuid)
+                        && candidate.AssetGuid == page.AssetGuid
+                        && candidate.LocalFileId == page.LocalFileId)
+                    {
+                        book.pages.RemoveAt(i);
+                        removed = true;
+                    }
                 }
             }
 
-            records.Add(record);
-            table.Register(record, true);
+            if (removed)
+            {
+                if (startOrderIndex > 0)
+                    suppressedLibraryInjectOnce.Add(page.SourceLibrary);
+
+                library.MarkFastIndexDirty();
+                EditorUtility.SetDirty(library);
+            }
+
+            return removed;
+#else
+            return false;
+#endif
         }
 
-        private static int BakeRuntimeKey(int enumKey, string stringKey)
+        private static ESAssetLibrary LoadSourceLibrary(ESAssetPage page)
         {
+#if UNITY_EDITOR
+            if (page == null || string.IsNullOrEmpty(page.SourceLibrary))
+                return null;
+
+            string libraryPath = AssetDatabase.GUIDToAssetPath(page.SourceLibrary);
+            return string.IsNullOrEmpty(libraryPath) ? null : AssetDatabase.LoadAssetAtPath<ESAssetLibrary>(libraryPath);
+#else
+            return null;
+#endif
+        }
+
+        private static void WarnIfKeyChanged(ESAssetPage oldPage, ESAssetPage newPage)
+        {
+            if (oldPage == null || newPage == null)
+                return;
+
+            if (oldPage.RuntimeKey != 0 && newPage.RuntimeKey != 0 && oldPage.RuntimeKey != newPage.RuntimeKey)
+                AddWarning("RuntimeKey changed by GUID authority", oldPage, newPage);
+            if (oldPage.EnumKey != 0 && newPage.EnumKey != 0 && oldPage.EnumKey != newPage.EnumKey)
+                AddWarning("EnumKey changed by GUID authority", oldPage, newPage);
+            if (!string.IsNullOrEmpty(oldPage.EffectiveStringKey)
+                && !string.IsNullOrEmpty(newPage.EffectiveStringKey)
+                && oldPage.EffectiveStringKey != newPage.EffectiveStringKey)
+                AddWarning("StringKey changed by GUID authority", oldPage, newPage);
+        }
+
+        private static void WarnIfSnapshotChanged(ESAssetPage page)
+        {
+            if (page == null || string.IsNullOrEmpty(page.AssetGuid))
+                return;
+
+            if (!snapshotsByGuid.TryGetValue(page.AssetGuid, out PageKeySnapshot old))
+                return;
+
+            string newStringKey = page.EffectiveStringKey;
+            if (old.runtimeKey != 0 && page.RuntimeKey != 0 && old.runtimeKey != page.RuntimeKey)
+                AddWarning("RuntimeKey changed by asset self override", SnapshotToPage(page, old), page);
+            if (old.enumKey != 0 && page.EnumKey != 0 && old.enumKey != page.EnumKey)
+                AddWarning("EnumKey changed by asset self override", SnapshotToPage(page, old), page);
+            if (!string.IsNullOrEmpty(old.stringKey) && !string.IsNullOrEmpty(newStringKey) && old.stringKey != newStringKey)
+                AddWarning("StringKey changed by asset self override", SnapshotToPage(page, old), page);
+            if (!string.IsNullOrEmpty(old.assetPath) && !string.IsNullOrEmpty(page.AssetPath) && old.assetPath != page.AssetPath)
+                AddWarning("AssetPath changed by asset self override", SnapshotToPage(page, old), page);
+        }
+
+        private static void RememberSnapshot(ESAssetPage page)
+        {
+            if (page == null || string.IsNullOrEmpty(page.AssetGuid))
+                return;
+
+            snapshotsByGuid[page.AssetGuid] = new PageKeySnapshot
+            {
+                runtimeKey = page.RuntimeKey,
+                enumKey = page.EnumKey,
+                stringKey = page.EffectiveStringKey,
+                assetPath = page.AssetPath
+            };
+        }
+
+        private static ESAssetPage SnapshotToPage(ESAssetPage current, PageKeySnapshot snapshot)
+        {
+            return new ESAssetPage
+            {
+                Name = current != null ? current.Name : string.Empty,
+                Kind = current != null ? current.Kind : ESAssetReferKind.None,
+                RuntimeKey = snapshot.runtimeKey,
+                EnumKey = snapshot.enumKey,
+                StringKey = snapshot.stringKey,
+                AssetGuid = current != null ? current.AssetGuid : string.Empty,
+                AssetPath = snapshot.assetPath
+            };
+        }
+
+        private static void WarnIfKeyConflict(ESAssetPage page)
+        {
+            if (page == null)
+                return;
+
+            for (int i = 0; i < pages.Count; i++)
+            {
+                ESAssetPage existing = pages[i];
+                if (existing == null)
+                    continue;
+
+                bool sameIdentity = !string.IsNullOrEmpty(page.AssetGuid)
+                    && existing.AssetGuid == page.AssetGuid
+                    && existing.LocalFileId == page.LocalFileId;
+                if (sameIdentity)
+                    continue;
+
+                if (page.Kind == existing.Kind && page.RuntimeKey != 0 && existing.RuntimeKey == page.RuntimeKey)
+                    AddWarning("RuntimeKey conflict, GUID keeps assets separated", existing, page);
+                if (page.Kind == existing.Kind && page.EnumKey != 0 && existing.EnumKey == page.EnumKey)
+                    AddWarning("EnumKey conflict, GUID keeps assets separated", existing, page);
+                if (page.Kind == existing.Kind && !string.IsNullOrEmpty(page.EffectiveStringKey) && existing.EffectiveStringKey == page.EffectiveStringKey)
+                    AddWarning("StringKey conflict, GUID keeps assets separated", existing, page);
+            }
+        }
+
+        private static void AddWarning(string reason, ESAssetPage a, ESAssetPage b)
+        {
+            string message = "[ESAssetRegistry] " + reason
+                + " | A=" + DescribePage(a)
+                + " | B=" + DescribePage(b);
+            if (!warnings.Contains(message))
+            {
+                warnings.Add(message);
+                Debug.LogWarning(message);
+            }
+        }
+
+        private static string DescribePage(ESAssetPage page)
+        {
+            if (page == null)
+                return "<null>";
+
+            return page.Kind
+                + "/runtime=" + page.RuntimeKey
+                + "/enum=" + page.EnumKey
+                + "/string=" + page.EffectiveStringKey
+                + "/guid=" + page.AssetGuid
+                + "/path=" + page.AssetPath;
+        }
+
+        private static int BakeRuntimeKey(ESAssetPage page)
+        {
+            if (page == null)
+                return 0;
+
+            int enumKey = page.EnumKey;
+            string stringKey = page.EffectiveStringKey;
+
             if (enumKey != 0)
                 return enumKey;
 
-            if (!string.IsNullOrEmpty(stringKey) && table.TryGetByString(stringKey, out ESAssetRecord existing))
-                return existing.runtimeKey;
+            if (!string.IsNullOrEmpty(page.AssetGuid)
+                && snapshotsByGuid.TryGetValue(page.AssetGuid, out PageKeySnapshot snapshot)
+                && snapshot.runtimeKey >= DefaultStringRuntimeKeyStart
+                && snapshot.enumKey == enumKey
+                && string.Equals(snapshot.stringKey, stringKey, StringComparison.Ordinal))
+            {
+                EnsureNextStringRuntimeKeyAfter(page.Kind, snapshot.runtimeKey);
+                return snapshot.runtimeKey;
+            }
 
-            return nextStringRuntimeKey++;
+            if (page.RuntimeKey >= DefaultStringRuntimeKeyStart)
+            {
+                EnsureNextStringRuntimeKeyAfter(page.Kind, page.RuntimeKey);
+                return page.RuntimeKey;
+            }
+
+            if (!string.IsNullOrEmpty(stringKey)
+                && editorConfigQueryTable.TryGetByString(page.Kind, stringKey, out ESAssetPage existing)
+                && existing.RuntimeKey >= DefaultStringRuntimeKeyStart)
+            {
+                EnsureNextStringRuntimeKeyAfter(page.Kind, existing.RuntimeKey);
+                return existing.RuntimeKey;
+            }
+
+            int nextRuntimeKey = GetNextStringRuntimeKey(page.Kind);
+            while (editorConfigQueryTable.TryGet(page.Kind, nextRuntimeKey, out _))
+                nextRuntimeKey++;
+            nextStringRuntimeKeyByKind[page.Kind] = nextRuntimeKey + 1;
+            return nextRuntimeKey;
+        }
+
+        private static int GetNextStringRuntimeKey(ESAssetReferKind kind)
+        {
+            return nextStringRuntimeKeyByKind.TryGetValue(kind, out int nextRuntimeKey)
+                ? nextRuntimeKey
+                : DefaultStringRuntimeKeyStart;
+        }
+
+        private static void EnsureNextStringRuntimeKeyAfter(ESAssetReferKind kind, int runtimeKey)
+        {
+            int nextRuntimeKey = GetNextStringRuntimeKey(kind);
+            if (runtimeKey >= nextRuntimeKey)
+                nextStringRuntimeKeyByKind[kind] = runtimeKey + 1;
         }
     }
+
 }

@@ -11,6 +11,9 @@ namespace ES
     [Serializable]
     public class ESResJsonData_AssetsKeys
     {
+        public int SchemaVersion = 2;
+        public string ReleaseId;
+        public string LibraryId;
         /// <summary>
         /// 资源键列表，包含所有资源的标识信息,使用List让用索引访问更高效。
         /// </summary>

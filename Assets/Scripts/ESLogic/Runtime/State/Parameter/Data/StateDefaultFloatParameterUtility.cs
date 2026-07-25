@@ -26,7 +26,12 @@ namespace ES
             "AvgSpeedX",
             "AvgSpeedZ",
             "ClimbHorizontal",
-            "ClimbVertical"
+            "ClimbVertical",
+            "WeaponEquipWeight",
+            "UpperBodyWeight",
+            "WeaponFirePulse",
+            "WeaponInHandWeight",
+            "FootSupportShare"
         };
 
         public static bool TryGetName(StateDefaultFloatParameter parameter, out string name)

@@ -32,6 +32,10 @@ namespace ES
         private readonly VisualElement m_PlaybackGroup = new VisualElement();
         private readonly VisualElement m_ContextGroup = new VisualElement();
         private readonly VisualElement m_RightGroup = new VisualElement();
+        private const float ExpandedToolbarWidth = 650f;
+        private const float ContextToolbarWidth = 380f;
+        private const float NavigationToolbarWidth = 330f;
+        private const float PreviewToolbarWidth = 270f;
 
         public ESTrackTimerToolbar()
         {
@@ -61,6 +65,8 @@ namespace ES
             CreateContextControls();
             CreateMoreControls();
             BindEvents();
+            RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
+            schedule.Execute(() => ApplyResponsiveLayout(resolvedStyle.width)).StartingIn(0);
         }
 
         private static void ConfigureGroup(VisualElement group, float flexGrow, float flexShrink)
@@ -212,6 +218,32 @@ namespace ES
             Setting.clicked += ShowMoreMenu;
         }
 
+        private void OnGeometryChanged(GeometryChangedEvent evt)
+        {
+            if (Mathf.Abs(evt.newRect.width - evt.oldRect.width) > 0.1f)
+                ApplyResponsiveLayout(evt.newRect.width);
+        }
+
+        private void ApplyResponsiveLayout(float width)
+        {
+            bool showContext = width >= ContextToolbarWidth;
+            bool showEntityStatus = width >= ExpandedToolbarWidth;
+            bool showNavigation = width >= NavigationToolbarWidth;
+            bool showPreview = width >= PreviewToolbarWidth;
+            bool compactPreview = width < ExpandedToolbarWidth;
+
+            m_ContextGroup.style.display = showContext ? DisplayStyle.Flex : DisplayStyle.None;
+            EntityStatusGroup.style.display = showEntityStatus ? DisplayStyle.Flex : DisplayStyle.None;
+            LastBlockButton.style.display = showNavigation ? DisplayStyle.Flex : DisplayStyle.None;
+            NextBlockButton.style.display = showNavigation ? DisplayStyle.Flex : DisplayStyle.None;
+            PreviewButton.style.display = showPreview ? DisplayStyle.Flex : DisplayStyle.None;
+            PreviewButton.style.width = compactPreview ? 28 : 46;
+            PreviewButton.text = compactPreview ? "预" : "预览";
+
+            if (showEntityStatus)
+                EntityStatusGroup.style.maxWidth = width >= 820f ? 190 : 132;
+        }
+
         private void AddToolbarButton(VisualElement parent, Button button, Texture2D icon, float width, float height, string tooltip = null)
         {
             if (icon != null)
@@ -232,6 +264,7 @@ namespace ES
             button.style.borderTopColor = new Color(0.25f, 0.29f, 0.34f, 0.75f);
             button.style.borderRightColor = new Color(0.045f, 0.05f, 0.06f, 0.9f);
             button.style.borderBottomColor = new Color(0.045f, 0.05f, 0.06f, 0.9f);
+            button.AddToClassList("track-toolbar-button");
             parent.Add(button);
         }
 

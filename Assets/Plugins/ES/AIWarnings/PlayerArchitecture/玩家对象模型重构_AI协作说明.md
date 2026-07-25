@@ -26,7 +26,7 @@ This note is for AI agents working on the player-object/model architecture rebui
 ## Verified Project Shape
 
 - This is a Unity project. The requested workspace is `Assets/Plugins`, but the player/entity runtime is mostly outside it under `Assets/Scripts/ESLogic`.
-- `Assets/Scripts/ESPlayer` currently exists but is mostly an empty shell. Do not assume it contains the active player implementation.
+- `Assets/Scripts/ESPlayer` 是当前保留的空壳程序集和历史测试材料；不要把它当作玩家实现入口。它暂不移动，因为项目文件夹图标工具缓存了该绝对路径。
 - The active runtime entry for player-like characters is `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs`.
 - `Entity` inherits `Core` and implements `KinematicCharacterController.ICharacterController`.
 - `Entity` directly registers four serialized domains: `EntityBasicDomain`, `EntityAIDomain`, `EntityBuffDomain`, and `EntityStateDomain`.
@@ -40,12 +40,9 @@ This note is for AI agents working on the player-object/model architecture rebui
 - `Entity.cs` combines generic entity hosting, KCC motion callbacks, state-machine bridging, IK driver lookup, and gameplay-facing motion API. Treat it as a high-risk file.
 - `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityBasicModules.cs` is very large and mixes movement, combat, weapon handling, camera, quick stop, root motion, skill test code, and shared structs. Avoid adding more player-specific behavior there unless explicitly migrating.
 - `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/EntityAIModules.cs` contains both input collection and input dispatch. It is not purely AI.
-- There are two input paths:
-  - Global/service path: `ESInputModule`, `ESInputRuntime`, `ESInputService`, `ESInputActionId`.
-  - Entity-local path: `EntityAIInputSystemModule` with `InputActionProperty` fields and `InputSnapshot`.
-- Because of the two input paths, do not hardwire new player code directly to Unity `InputActionProperty` unless the task explicitly targets the old entity-local path.
+- 当前输入主链是 `ESInputModule -> ESInputService -> EntityPlayerInputWriteModule / EntityAIInputDispatchModule`。不要在新玩家代码中直接绑定 Unity `InputActionProperty`，也不要恢复已删除的旧实体输入类型。
 - `EntityBasicCombatModule` contains weapon mounting, aim/peek, firing, and animation parameter duties. It is not only "combat".
-- Buff domain currently looks skeletal compared with Basic/AI/State. Do not assume a full buff architecture already exists.
+- Buff 域已有运行时实例、叠层、ValueChange、Permit 和 OpSupport 链路；但仍需按当前源码确认具体能力，不能把它误当作已经完成全部商业 Buff 功能。
 
 ## Architecture Direction
 
@@ -68,8 +65,8 @@ The important boundary is: input source produces intent; intent drives player co
 - Prefer adding thin adapter/facade classes over rewriting `Entity.cs` immediately.
 - Avoid mass refactors while the worktree is dirty. Keep changes small and reversible.
 - Preserve Odin serialization and Unity `.meta` files when moving or creating assets.
-- Do not delete the old `EntityAIInputSystemModule` path until all prefabs/scenes/configs using it are identified.
-- When introducing player-specific files, prefer `Assets/Scripts/ESPlayer` or a clearly named runtime folder instead of expanding `EntityBasicModules.cs`.
+- 已删除的 `EntityAIInputSystemModule` 与 `EntityInputStateModule` 不得恢复；若旧场景或 Prefab 出现 Missing Type，清理其序列化坏引用。
+- 新增正式玩家层时，使用清晰的 `Assets/Scripts/ESLogic/Runtime/Player` 目录，而不是扩张 `EntityBasicModules.cs`；未验证材料只能放入 `Tests~` 或 `Samples~`。
 - If splitting `EntityBasicModules.cs`, first do mechanical class-per-file extraction with no behavior change. Functional redesign should be a separate step.
 - Maintain compatibility with existing `Core.ModuleTables` lookup. Some systems call `TryGetValue(typeof(SomeModule))`, so changing `TableKeyType` can break runtime behavior.
 - Treat KCC callbacks as high-frequency and allocation-sensitive. Avoid LINQ, reflection, hierarchy search, or string work inside movement callbacks.

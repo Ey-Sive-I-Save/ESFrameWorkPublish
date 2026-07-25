@@ -11,6 +11,9 @@ namespace ES
     [Serializable]
     public class ESResJsonData_ABMetadata
     {
+        public int SchemaVersion = 2;
+        public string ReleaseId;
+        public string LibraryId;
         // 从Hashes类
         public Dictionary<string, string> PreToHashes = new Dictionary<string, string>();
 
@@ -20,5 +23,18 @@ namespace ES
         // 从Dependences类
         public Dictionary<string, string[]> Dependences = new Dictionary<string, string[]>();
 
+        public Dictionary<string, ESResBundleRecord> BundleRecords = new Dictionary<string, ESResBundleRecord>();
+
+    }
+
+    [Serializable]
+    public class ESResBundleRecord
+    {
+        public string BundleId;
+        public string PreName;
+        public string FileName;
+        public string Sha256;
+        public long SizeBytes;
+        public string[] Dependencies;
     }
 }

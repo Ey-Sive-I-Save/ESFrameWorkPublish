@@ -47,6 +47,7 @@ MonoBehaviour:
     - ESPlayer
     - Gaskellgames
     - Gaskellgames.FolderSystem
+    - HybridCLR.Runtime
     - KCC
     - Luban.Runtime
     - MemoryPack.Unity

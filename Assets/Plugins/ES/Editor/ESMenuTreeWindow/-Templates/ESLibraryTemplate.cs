@@ -5,6 +5,7 @@ using Sirenix.Utilities.Editor;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditorInternal;
@@ -35,11 +36,6 @@ namespace ES
             [ESBackGround("yellow", 0.2f), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
             [LabelText("库文件夹名(文件夹用)")]
             public string LibFolderName = IESLibrary.DefaultLibFolderName;
-            [ESBackGround("yellow", 0.2f), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
-            [LabelText("是否包含在主包中")]
-            public bool IsMainInClude = true;
-
-
             [TextArea(3, 7)]
             [LabelText("描述")]
             public string LibDESC = "描述：这是一个做啥的库";
@@ -81,7 +77,6 @@ namespace ES
                         lib.SetSTR(lib.name);
                         lib.LibFolderName = LibFolderName;
                         lib.Desc = LibDESC;
-                        lib.IsMainInClude = IsMainInClude;
                         lib.Refresh();
                     }
                     else
@@ -1861,6 +1856,12 @@ namespace ES
                 consumer.Name = ConsumerName;
                 consumer.Desc = ConsumerDesc;
                 consumer.ConsumerLibFolders.AddRange(selectedLibraries);
+                if (consumer is ESAssetLibraryConsumer resourceConsumer)
+                {
+                    resourceConsumer.EnsureStableIdentity();
+                    var allConsumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>();
+                    resourceConsumer.IsTotalConsumer = allConsumers == null || !allConsumers.Any(item => item != null && item.IsTotalConsumer);
+                }
 
                 string basePath = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_;
                 if (!AssetDatabase.IsValidFolder(basePath))
@@ -1872,7 +1873,7 @@ namespace ES
                 {
                     AssetDatabase.CreateFolder(basePath, "Consumer");
                 }
-                string path = consumerFolder + "/" + ConsumerName + ".asset";
+                string path = AssetDatabase.GenerateUniqueAssetPath(consumerFolder + "/" + ConsumerName + ".asset");
                 AssetDatabase.CreateAsset(consumer, path);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -1883,66 +1884,569 @@ namespace ES
 
         public class Page_Index_Consumer : ESWindowPageBase
         {
+            private static readonly string[] TabNames = { "基础与备注", "Library 配置", "发布关系", "代码与文件" };
+
             [HideInInspector]
             public TConsumer package;
             [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
             public string createText = "--编辑Consumer--";
 
+            private int selectedTab;
+
             [OnInspectorGUI]
             public void DrawPackage()
             {
+                if (package == null)
+                {
+                    EditorGUILayout.HelpBox("Consumer 资产已丢失，请刷新资源面板。", MessageType.Error);
+                    return;
+                }
+
+                selectedTab = GUILayout.Toolbar(selectedTab, TabNames, GUILayout.Height(28));
+                EditorGUILayout.Space(8);
+                switch (selectedTab)
+                {
+                    case 0:
+                        DrawBasicInfo();
+                        break;
+                    case 1:
+                        DrawLibraries();
+                        break;
+                    case 2:
+                        DrawPublishSettings();
+                        break;
+                    default:
+                        DrawCodePackages();
+                        break;
+                }
+            }
+
+            private void DrawBasicInfo()
+            {
                 SirenixEditorGUI.BeginBox();
-                package.Name = EditorGUILayout.TextField("Consumer名", package.Name);
-                package.Version = EditorGUILayout.TextField("版本号", package.Version);
-                package.Desc = EditorGUILayout.TextArea("描述", package.Desc, GUILayout.Height(50));
+                EditorGUILayout.LabelField("Consumer 基础信息", EditorStyles.boldLabel);
+                EditorGUI.BeginChangeCheck();
+                string name = EditorGUILayout.DelayedTextField("Consumer 名", package.Name);
+                string version = EditorGUILayout.DelayedTextField("业务版本", package.Version);
+                EditorGUILayout.LabelField("描述");
+                string description = EditorGUILayout.TextArea(package.Desc, GUILayout.MinHeight(70));
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(package, "Edit Consumer Basic Info");
+                    package.Name = name;
+                    package.Version = version;
+                    package.Desc = description;
+                    MarkPackageDirty();
+                }
                 SirenixEditorGUI.EndBox();
 
-                // 绘制Libraries列表
-                EditorGUILayout.LabelField("包含的库:");
-                for (int i = 0; i < package.ConsumerLibFolders.Count; i++)
+                if (package is ESAssetLibraryConsumer resourceConsumer)
+                    DrawResourceNotes(resourceConsumer);
+
+                if (package is ESAssetLibraryConsumer gameCoreConsumer)
+                    DrawGameCoreAssets(gameCoreConsumer);
+            }
+
+            private void DrawGameCoreAssets(ESAssetLibraryConsumer consumer)
+            {
+                SirenixEditorGUI.BeginBox();
+                EditorGUILayout.LabelField("GameCore 启动核心", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("已收集", (consumer.GameCoreAssets?.Count ?? 0) + " 个");
+                EditorGUILayout.LabelField("手动补充", (consumer.ManualGameCoreAssets?.Count ?? 0) + " 个");
+                EditorGUILayout.HelpBox("必需 Library 中的文件夹会在同步时递归扫描 IGameCoreSO；可将额外的 IGameCoreSO 直接拖到下方。", MessageType.Info);
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("同步并检查"))
                 {
-                    var lib = package.ConsumerLibFolders[i];
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.ObjectField(lib, typeof(TLib), false);
-                    if (GUILayout.Button("移除", GUILayout.Width(50)))
+                    try
                     {
-                        Undo.RecordObject(package, "Remove Library from Consumer");
-                        package.ConsumerLibFolders.RemoveAt(i);
-                        EditorUtility.SetDirty(package);
-                        // 移除操作需要立即保存
-                        AssetDatabase.SaveAssets();
-                        i--;
+                        Undo.RecordObject(consumer, "Sync Consumer GameCore Assets");
+                        ESAssetReferenceBaker.SyncConsumerGameCoreAssets(consumer);
+                        MarkPackageDirty();
+                    }
+                    catch (Exception exception)
+                    {
+                        EditorUtility.DisplayDialog("GameCore 依赖检查未通过", exception.Message, "确定");
+                    }
+                }
+                if (GUILayout.Button("清空手动补充"))
+                {
+                    Undo.RecordObject(consumer, "Clear Manual GameCore Assets");
+                    consumer.ManualGameCoreAssets?.Clear();
+                    MarkPackageDirty();
+                }
+                EditorGUILayout.EndHorizontal();
+
+                Rect dropArea = GUILayoutUtility.GetRect(0, 40, GUILayout.ExpandWidth(true));
+                GUI.Box(dropArea, "拖入 IGameCoreSO 以手动补充");
+                Event current = Event.current;
+                if (dropArea.Contains(current.mousePosition) && current.type == EventType.DragUpdated)
+                {
+                    DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+                    current.Use();
+                }
+                else if (dropArea.Contains(current.mousePosition) && current.type == EventType.DragPerform)
+                {
+                    DragAndDrop.AcceptDrag();
+                    Undo.RecordObject(consumer, "Add Manual GameCore Assets");
+                    foreach (UnityEngine.Object asset in DragAndDrop.objectReferences)
+                        if (!ESAssetReferenceBaker.TryAddManualGameCoreAsset(consumer, asset))
+                            Debug.LogWarning("[ESRes] 仅允许拖入实现 IGameCoreSO 的 ScriptableObject：" + asset.name);
+                    MarkPackageDirty();
+                    current.Use();
+                }
+
+                if (consumer.ManualGameCoreAssets != null)
+                for (int index = 0; index < consumer.ManualGameCoreAssets.Count; index++)
+                {
+                    ESAssetReferBase refer = consumer.ManualGameCoreAssets[index];
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField(refer == null ? "<Missing>" : refer.GUID, EditorStyles.miniLabel);
+                    if (GUILayout.Button("移除", GUILayout.Width(55)))
+                    {
+                        Undo.RecordObject(consumer, "Remove Manual GameCore Asset");
+                        consumer.ManualGameCoreAssets.RemoveAt(index--);
+                        MarkPackageDirty();
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+                if (consumer.GameCoreValidationErrors != null && consumer.GameCoreValidationErrors.Count > 0)
+                    EditorGUILayout.HelpBox(string.Join("\n", consumer.GameCoreValidationErrors), MessageType.Error);
+                else
+                    EditorGUILayout.HelpBox("GameCore 依赖检查通过。", MessageType.Info);
+                SirenixEditorGUI.EndBox();
+            }
+
+            private void DrawResourceNotes(ESAssetLibraryConsumer resourceConsumer)
+            {
+                SirenixEditorGUI.BeginBox();
+                EditorGUILayout.LabelField("制作与版本备注", EditorStyles.boldLabel);
+                EditorGUI.BeginChangeCheck();
+                string maintainer = EditorGUILayout.DelayedTextField("维护负责人", resourceConsumer.Maintainer);
+                EditorGUILayout.LabelField("对外版本说明");
+                string releaseNotes = EditorGUILayout.TextArea(resourceConsumer.ReleaseNotes, GUILayout.MinHeight(65));
+                EditorGUILayout.LabelField("内部备注（不写入发布清单）");
+                string internalNotes = EditorGUILayout.TextArea(resourceConsumer.InternalNotes, GUILayout.MinHeight(65));
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(resourceConsumer, "Edit Consumer Notes");
+                    resourceConsumer.Maintainer = maintainer;
+                    resourceConsumer.ReleaseNotes = releaseNotes;
+                    resourceConsumer.InternalNotes = internalNotes;
+                    MarkPackageDirty();
+                }
+
+                resourceConsumer.Tags ??= new List<string>();
+                EditorGUILayout.LabelField("标签", EditorStyles.boldLabel);
+                for (int index = 0; index < resourceConsumer.Tags.Count; index++)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    string tag = EditorGUILayout.DelayedTextField(resourceConsumer.Tags[index]);
+                    if (!string.Equals(tag, resourceConsumer.Tags[index], StringComparison.Ordinal))
+                    {
+                        Undo.RecordObject(resourceConsumer, "Edit Consumer Tag");
+                        resourceConsumer.Tags[index] = tag.Trim();
+                        MarkPackageDirty();
+                    }
+                    if (GUILayout.Button("移除", GUILayout.Width(55)))
+                    {
+                        Undo.RecordObject(resourceConsumer, "Remove Consumer Tag");
+                        resourceConsumer.Tags.RemoveAt(index--);
+                        MarkPackageDirty();
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+                if (GUILayout.Button("添加标签"))
+                {
+                    Undo.RecordObject(resourceConsumer, "Add Consumer Tag");
+                    resourceConsumer.Tags.Add(string.Empty);
+                    MarkPackageDirty();
+                }
+                SirenixEditorGUI.EndBox();
+            }
+
+            private void DrawLibraries()
+            {
+                DrawLibraryList("启动必需 Library", package.ConsumerLibFolders, "Required");
+                if (package is ESAssetLibraryConsumer resourceConsumer)
+                    DrawResourceLibraryList("可选下载 Library", resourceConsumer.OptionalLibFolders, "Optional");
+            }
+
+            private void DrawPublishSettings()
+            {
+                if (!(package is ESAssetLibraryConsumer resourceConsumer))
+                {
+                    EditorGUILayout.HelpBox("当前 Consumer 类型没有发布扩展配置。", MessageType.Info);
+                    return;
+                }
+
+                SirenixEditorGUI.BeginBox();
+                EditorGUILayout.LabelField("发布身份", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("稳定 ID", string.IsNullOrEmpty(resourceConsumer.ConsumerId) ? "未生成" : resourceConsumer.ConsumerId);
+                if (string.IsNullOrEmpty(resourceConsumer.ConsumerId) && GUILayout.Button("生成稳定 ID"))
+                {
+                    Undo.RecordObject(resourceConsumer, "Generate Consumer Stable Id");
+                    resourceConsumer.EnsureStableIdentity();
+                    MarkPackageDirty();
+                }
+
+                EditorGUI.BeginChangeCheck();
+                bool hasOtherTotalConsumer = HasOtherTotalConsumer(resourceConsumer);
+                EditorGUI.BeginDisabledGroup(resourceConsumer.IsTotalConsumer && !hasOtherTotalConsumer);
+                bool isTotal = EditorGUILayout.ToggleLeft("总 Consumer（唯一启动入口）", resourceConsumer.IsTotalConsumer);
+                EditorGUI.EndDisabledGroup();
+                string channel = EditorGUILayout.DelayedTextField("发布渠道", resourceConsumer.Channel);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    if (isTotal && !resourceConsumer.IsTotalConsumer)
+                        ClearOtherTotalConsumers(resourceConsumer);
+                    Undo.RecordObject(resourceConsumer, "Edit Consumer Publish Settings");
+                    resourceConsumer.IsTotalConsumer = isTotal;
+                    resourceConsumer.Channel = string.IsNullOrWhiteSpace(channel) ? "default" : channel.Trim();
+                    MarkPackageDirty();
+                }
+                if (resourceConsumer.IsTotalConsumer && hasOtherTotalConsumer)
+                {
+                    EditorGUILayout.HelpBox("检测到多个总 Consumer，请将当前项修复为唯一启动入口。", MessageType.Error);
+                    if (GUILayout.Button("将当前项设为唯一总 Consumer"))
+                    {
+                        ClearOtherTotalConsumers(resourceConsumer);
+                        MarkPackageDirty();
+                    }
+                }
+                else if (resourceConsumer.IsTotalConsumer)
+                {
+                    EditorGUILayout.HelpBox("若要更换启动入口，请在目标 Consumer 上开启“总 Consumer”。", MessageType.Info);
+                }
+                EditorGUILayout.LabelField("构建修订", resourceConsumer.BuildRevision.ToString());
+                EditorGUILayout.LabelField("运行时版本", resourceConsumer.RuntimeVersion);
+                EditorGUILayout.LabelField("最后构建 UTC", string.IsNullOrEmpty(resourceConsumer.LastBuildUtc) ? "尚未构建" : resourceConsumer.LastBuildUtc);
+                SirenixEditorGUI.EndBox();
+
+                DrawRequiredConsumers(resourceConsumer);
+            }
+
+            private void DrawCodePackages()
+            {
+                if (!(package is ESAssetLibraryConsumer resourceConsumer))
+                {
+                    EditorGUILayout.HelpBox("当前 Consumer 不支持代码更新。", MessageType.Info);
+                    return;
+                }
+
+                resourceConsumer.CodePackages ??= new List<ESConsumerCodePackageConfig>();
+                SirenixEditorGUI.BeginBox();
+                EditorGUILayout.LabelField("代码更新", EditorStyles.boldLabel);
+                EditorGUI.BeginChangeCheck();
+                bool enableCodeHotUpdate = EditorGUILayout.ToggleLeft("启用代码热更", resourceConsumer.EnableCodeHotUpdate);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Undo.RecordObject(resourceConsumer, "Toggle Consumer Code Hot Update");
+                    ESCodeModuleEditorIntegration.SetConsumerHotUpdateEnabled(resourceConsumer, enableCodeHotUpdate);
+                    MarkPackageDirty();
+                }
+                if (resourceConsumer.EnableCodeHotUpdate)
+                {
+                    AssemblyDefinitionAsset currentDefinition = ESCodeModuleEditorIntegration.GetConsumerAssemblyDefinition(resourceConsumer);
+                    EditorGUI.BeginChangeCheck();
+                    AssemblyDefinitionAsset selectedDefinition = (AssemblyDefinitionAsset)EditorGUILayout.ObjectField(
+                        "代码模块", currentDefinition, typeof(AssemblyDefinitionAsset), false);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(resourceConsumer, "Set Consumer Hot Update Assembly");
+                        ESCodeModuleEditorIntegration.SetConsumerAssemblyDefinition(resourceConsumer, selectedDefinition);
+                        MarkPackageDirty();
+                    }
+                    if (selectedDefinition == null)
+                        EditorGUILayout.HelpBox("请选择该 Consumer 使用的代码模块。", MessageType.Warning);
+                    EditorGUILayout.HelpBox("选择后，ES 会自动完成编译、发布和启动加载。", MessageType.Info);
+                    EditorGUILayout.BeginHorizontal();
+                    using (new EditorGUI.DisabledScope(selectedDefinition == null))
+                    {
+                        if (GUILayout.Button("打开代码目录")) ESCodeModuleEditorIntegration.OpenConsumerCodeFolder(resourceConsumer);
+                        if (GUILayout.Button("检查配置"))
+                        {
+                            try { EditorUtility.DisplayDialog("配置检查", ESCodeModuleEditorIntegration.ValidateConsumerInEditor(resourceConsumer), "确定"); }
+                            catch (Exception exception) { EditorUtility.DisplayDialog("配置检查未通过", exception.Message, "确定"); }
+                        }
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+                SirenixEditorGUI.EndBox();
+                EditorGUILayout.Space(4);
+                EditorGUILayout.LabelField("附加文件", EditorStyles.boldLabel);
+                EditorGUILayout.HelpBox("仅在需要额外代码、调试符号或数据文件时添加。自动生成的运行文件不会显示在这里。", MessageType.Info);
+                for (int index = 0; index < resourceConsumer.CodePackages.Count; index++)
+                {
+                    ESConsumerCodePackageConfig config = resourceConsumer.CodePackages[index];
+                    if (config == null)
+                    {
+                        Undo.RecordObject(resourceConsumer, "Repair Consumer Code Package");
+                        config = new ESConsumerCodePackageConfig();
+                        resourceConsumer.CodePackages[index] = config;
+                        MarkPackageDirty();
+                    }
+                    if (config.ManagedByHybridCLR)
+                        continue;
+
+                    SirenixEditorGUI.BeginBox();
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(config.PackageKey) ? "未命名文件" : config.PackageKey, EditorStyles.boldLabel);
+                    if (GUILayout.Button("移除", GUILayout.Width(55)))
+                    {
+                        Undo.RecordObject(resourceConsumer, "Remove Consumer Code Package");
+                        resourceConsumer.CodePackages.RemoveAt(index--);
+                        MarkPackageDirty();
+                        EditorGUILayout.EndHorizontal();
+                        SirenixEditorGUI.EndBox();
+                        continue;
+                    }
+                    EditorGUILayout.EndHorizontal();
+
+                    EditorGUI.BeginChangeCheck();
+                    bool enabled = EditorGUILayout.Toggle("启用", config.Enabled);
+                    string packageKey = EditorGUILayout.DelayedTextField("名称", config.PackageKey);
+                    ESConsumerCodePackageKind kind = DrawAdditionalFileKind(config.Kind);
+                    EditorGUILayout.BeginHorizontal();
+                    string sourcePath = EditorGUILayout.DelayedTextField("文件", config.SourcePath);
+                    if (GUILayout.Button("选择", GUILayout.Width(55)))
+                    {
+                        string selectedPath = EditorUtility.OpenFilePanel("选择附加文件", ResolveCodePackageDirectory(config.SourcePath), string.Empty);
+                        if (!string.IsNullOrEmpty(selectedPath))
+                            sourcePath = MakeProjectRelativePath(selectedPath);
+                    }
+                    EditorGUILayout.EndHorizontal();
+                    bool requiredAtBoot = EditorGUILayout.Toggle("启动时准备", config.RequiredAtBoot);
+                    int loadOrder = EditorGUILayout.IntField("优先级", config.LoadOrder);
+                    EditorGUILayout.LabelField("备注");
+                    string notes = EditorGUILayout.TextArea(config.Notes, GUILayout.MinHeight(45));
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(resourceConsumer, "Edit Consumer Code Package");
+                        config.Enabled = enabled;
+                        config.PackageKey = packageKey.Trim();
+                        config.Kind = kind;
+                        config.SourcePath = sourcePath.Trim();
+                        config.RequiredAtBoot = requiredAtBoot;
+                        config.LoadOrder = loadOrder;
+                        config.Notes = notes;
+                        MarkPackageDirty();
+                    }
+                    SirenixEditorGUI.EndBox();
+                }
+
+                if (GUILayout.Button("添加附加文件", GUILayout.Height(28)))
+                {
+                    Undo.RecordObject(resourceConsumer, "Add Consumer Code Package");
+                    resourceConsumer.CodePackages.Add(new ESConsumerCodePackageConfig
+                    {
+                        PackageKey = "file_" + (resourceConsumer.CodePackages.Count + 1),
+                        Kind = ESConsumerCodePackageKind.RawBinary
+                    });
+                    MarkPackageDirty();
+                }
+
+                IEnumerable<string> duplicateKeys = resourceConsumer.CodePackages
+                    .Where(item => item != null && !item.ManagedByHybridCLR && item.Enabled && !string.IsNullOrWhiteSpace(item.PackageKey))
+                    .GroupBy(item => item.PackageKey.Trim(), StringComparer.Ordinal)
+                    .Where(group => group.Count() > 1)
+                    .Select(group => group.Key);
+                string duplicates = string.Join(", ", duplicateKeys);
+                if (!string.IsNullOrEmpty(duplicates))
+                    EditorGUILayout.HelpBox("附加文件名称重复：" + duplicates, MessageType.Error);
+            }
+
+            private static ESConsumerCodePackageKind DrawAdditionalFileKind(ESConsumerCodePackageKind current)
+            {
+                ESConsumerCodePackageKind[] values =
+                {
+                    ESConsumerCodePackageKind.HotUpdateAssembly,
+                    ESConsumerCodePackageKind.Symbols,
+                    ESConsumerCodePackageKind.ManagedData,
+                    ESConsumerCodePackageKind.RawBinary
+                };
+                string[] labels = { "附加代码模块", "调试文件", "数据文件", "其他文件" };
+                int index = Array.IndexOf(values, current);
+                if (index < 0) index = values.Length - 1;
+                return values[EditorGUILayout.Popup("类型", index, labels)];
+            }
+
+            private static string ResolveCodePackageDirectory(string sourcePath)
+            {
+                if (string.IsNullOrWhiteSpace(sourcePath))
+                    return Directory.GetParent(Application.dataPath).FullName;
+                string fullPath = Path.IsPathRooted(sourcePath)
+                    ? sourcePath
+                    : Path.Combine(Directory.GetParent(Application.dataPath).FullName, sourcePath);
+                return File.Exists(fullPath) ? Path.GetDirectoryName(fullPath) : Directory.GetParent(Application.dataPath).FullName;
+            }
+
+            private static string MakeProjectRelativePath(string fullPath)
+            {
+                string projectRoot = Directory.GetParent(Application.dataPath).FullName.Replace('\\', '/').TrimEnd('/');
+                string normalized = (fullPath ?? string.Empty).Replace('\\', '/');
+                return normalized.StartsWith(projectRoot + "/", StringComparison.OrdinalIgnoreCase)
+                    ? normalized.Substring(projectRoot.Length + 1)
+                    : normalized;
+            }
+
+            private void DrawLibraryList(string title, List<TLib> list, string undoPrefix)
+            {
+                SirenixEditorGUI.BeginBox();
+                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+                for (int index = 0; index < list.Count; index++)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.ObjectField(list[index], typeof(TLib), false);
+                    if (GUILayout.Button("移除", GUILayout.Width(55)))
+                    {
+                        Undo.RecordObject(package, "Remove " + undoPrefix + " Library");
+                        list.RemoveAt(index--);
+                        MarkPackageDirty();
                     }
                     EditorGUILayout.EndHorizontal();
                 }
 
-                if (GUILayout.Button("添加库"))
+                if (GUILayout.Button("添加 " + title))
+                    ShowLibraryMenu(list, undoPrefix);
+                SirenixEditorGUI.EndBox();
+            }
+
+            private void ShowLibraryMenu(List<TLib> list, string undoPrefix)
+            {
+                var menu = new GenericMenu();
+                var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<TLib>() ?? new List<TLib>();
+                bool hasCandidate = false;
+                foreach (TLib library in allLibraries.Where(item => item != null && !list.Contains(item)))
                 {
-                    // 弹出选择库的窗口或列表
-                    var allLibs = ESEditorSO.SOS.GetNewGroupOfType<TLib>();
-                    var menu = new GenericMenu();
-                    foreach (var lib in allLibs)
+                    hasCandidate = true;
+                    TLib captured = library;
+                    menu.AddItem(new GUIContent(captured.Name), false, () =>
                     {
-                        if (!package.ConsumerLibFolders.Contains(lib))
-                        {
-                            menu.AddItem(new GUIContent(lib.Name), false, () =>
-                            {
-                                Undo.RecordObject(package, "Add Library to Consumer");
-                                package.ConsumerLibFolders.Add(lib);
-                                EditorUtility.SetDirty(package);
-                                // 添加操作需要立即保存
-                                AssetDatabase.SaveAssets();
-                            });
-                        }
+                        Undo.RecordObject(package, "Add " + undoPrefix + " Library");
+                        list.Add(captured);
+                        MarkPackageDirty();
+                    });
+                }
+                if (!hasCandidate)
+                    menu.AddDisabledItem(new GUIContent("没有可添加的 Library"));
+                menu.ShowAsContext();
+            }
+
+            private void DrawResourceLibraryList(string title, List<ESAssetLibrary> list, string undoPrefix)
+            {
+                SirenixEditorGUI.BeginBox();
+                EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+                for (int index = 0; index < list.Count; index++)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.ObjectField(list[index], typeof(ESAssetLibrary), false);
+                    if (GUILayout.Button("移除", GUILayout.Width(55)))
+                    {
+                        Undo.RecordObject(package, "Remove " + undoPrefix + " Library");
+                        list.RemoveAt(index--);
+                        MarkPackageDirty();
                     }
+                    EditorGUILayout.EndHorizontal();
+                }
+                if (GUILayout.Button("添加 " + title))
+                {
+                    var menu = new GenericMenu();
+                    var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>();
+                    bool hasCandidate = false;
+                    foreach (ESAssetLibrary library in allLibraries.Where(item => item != null && !list.Contains(item)))
+                    {
+                        hasCandidate = true;
+                        ESAssetLibrary captured = library;
+                        menu.AddItem(new GUIContent(captured.Name), false, () =>
+                        {
+                            Undo.RecordObject(package, "Add " + undoPrefix + " Library");
+                            list.Add(captured);
+                            MarkPackageDirty();
+                        });
+                    }
+                    if (!hasCandidate)
+                        menu.AddDisabledItem(new GUIContent("没有可添加的 Library"));
                     menu.ShowAsContext();
                 }
+                SirenixEditorGUI.EndBox();
+            }
+
+            private void DrawRequiredConsumers(ESAssetLibraryConsumer resourceConsumer)
+            {
+                SirenixEditorGUI.BeginBox();
+                EditorGUILayout.LabelField("依赖 Consumer", EditorStyles.boldLabel);
+                for (int index = 0; index < resourceConsumer.RequiredConsumers.Count; index++)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.ObjectField(resourceConsumer.RequiredConsumers[index], typeof(ESAssetLibraryConsumer), false);
+                    if (GUILayout.Button("移除", GUILayout.Width(55)))
+                    {
+                        Undo.RecordObject(resourceConsumer, "Remove Required Consumer");
+                        resourceConsumer.RequiredConsumers.RemoveAt(index--);
+                        MarkPackageDirty();
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+                if (GUILayout.Button("添加依赖 Consumer"))
+                {
+                    var menu = new GenericMenu();
+                    var allConsumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>() ?? new List<ESAssetLibraryConsumer>();
+                    bool hasCandidate = false;
+                    foreach (ESAssetLibraryConsumer consumer in allConsumers.Where(item => item != null && item != resourceConsumer && !resourceConsumer.RequiredConsumers.Contains(item)))
+                    {
+                        hasCandidate = true;
+                        ESAssetLibraryConsumer captured = consumer;
+                        menu.AddItem(new GUIContent(captured.Name), false, () =>
+                        {
+                            Undo.RecordObject(resourceConsumer, "Add Required Consumer");
+                            resourceConsumer.RequiredConsumers.Add(captured);
+                            MarkPackageDirty();
+                        });
+                    }
+                    if (!hasCandidate)
+                        menu.AddDisabledItem(new GUIContent("没有可添加的 Consumer"));
+                    menu.ShowAsContext();
+                }
+                SirenixEditorGUI.EndBox();
+            }
+
+            private static void ClearOtherTotalConsumers(ESAssetLibraryConsumer current)
+            {
+                var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>();
+                if (consumers == null) return;
+                foreach (ESAssetLibraryConsumer consumer in consumers)
+                {
+                    if (consumer == null || consumer == current || !consumer.IsTotalConsumer) continue;
+                    Undo.RecordObject(consumer, "Change Total Consumer");
+                    consumer.IsTotalConsumer = false;
+                    EditorUtility.SetDirty(consumer);
+                }
+            }
+
+            private static bool HasOtherTotalConsumer(ESAssetLibraryConsumer current)
+            {
+                var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>();
+                return consumers != null && consumers.Any(consumer => consumer != null && consumer != current && consumer.IsTotalConsumer);
+            }
+
+            private void MarkPackageDirty()
+            {
+                EditorUtility.SetDirty(package);
             }
 
             public override ESWindowPageBase ES_Refresh()
             {
+                if (package is ESAssetLibraryConsumer resourceConsumer && resourceConsumer.EnsureStableIdentity())
+                    EditorUtility.SetDirty(resourceConsumer);
                 createText = $"--编辑Consumer【{package.Name}】--";
                 return base.ES_Refresh();
+            }
+
+            public override void OnPageDisable()
+            {
+                base.OnPageDisable();
+                if (package != null && EditorUtility.IsDirty(package))
+                    AssetDatabase.SaveAssets();
             }
         }
 

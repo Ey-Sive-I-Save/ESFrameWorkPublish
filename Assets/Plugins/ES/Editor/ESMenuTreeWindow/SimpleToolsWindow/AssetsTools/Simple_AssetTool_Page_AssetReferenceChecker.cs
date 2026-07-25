@@ -27,10 +27,19 @@ namespace ES
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选择检查范围，先分析引用，再人工确认。\n疑似未使用资源默认只隔离，不直接删除。";
 
-        private string PanelSummary =>
-            $"范围: {checkFolder} | 已检查: {totalFilesChecked} | 疑似未使用: {unusedAssets.Count} " +
-            $"(高 {unusedAssets.Count(a => a.Confidence == "高")} / 中 {unusedAssets.Count(a => a.Confidence == "中")} / 低 {unusedAssets.Count(a => a.Confidence == "低")}) | " +
-            $"引用结果: {selectedAssetReferences.Count} | 依赖结果: {selectedAssetDependencies.Count} | 状态: {(lastScanCanceled ? "不完整" : "完整")}";
+        private string PanelSummary
+        {
+            get
+            {
+                int highCount = unusedAssets.Count(a => a.Confidence == "高");
+                int mediumCount = unusedAssets.Count(a => a.Confidence == "中");
+                int lowCount = unusedAssets.Count(a => a.Confidence == "低");
+                string state = lastScanCanceled ? "不完整" : "完整";
+                return $"范围: {checkFolder} | 已检查: {totalFilesChecked} | 疑似未使用: {unusedAssets.Count} " +
+                       $"(高 {highCount} / 中 {mediumCount} / 低 {lowCount}) | " +
+                       $"引用结果: {selectedAssetReferences.Count} | 依赖结果: {selectedAssetDependencies.Count} | 状态: {state}";
+            }
+        }
 
         #region 基础设置
         [TabGroup("检查配置", "目标设置")]
@@ -50,7 +59,7 @@ namespace ES
 
         [TabGroup("检查配置", "目标设置")]
         [LabelText("排除文件类型"), Space(5)]
-        [InfoBox("排除不需要检查的文件类型，如.meta、.cs、.txt、.md等。")]
+        [InfoBox("排除不需要检查的文件类型，如 .meta、.cs、.txt、.md 等。")]
         public List<string> excludeExtensions = new List<string> { ".meta", ".cs", ".js", ".dll", ".txt", ".md" };
 
         [TabGroup("检查配置", "资源包分离")]
@@ -126,7 +135,7 @@ namespace ES
         [HideInInspector]
         public List<AssetReferenceInfo> unusedAssets = new List<AssetReferenceInfo>();
 
-        private string UnusedStats => $"总文件数: {totalFilesChecked}, 疑似未使用: {unusedAssets.Count}, 结果状态: {(lastScanCanceled ? "扫描已取消，不完整" : "完整")}";
+        private string UnusedStats => $"总文件数: {totalFilesChecked}, 疑似未使用: {unusedAssets.Count}, 结果状态: {GetScanStateText()}";
 
         [TabGroup("分析结果", "引用分析")]
         [HideInInspector]
@@ -215,7 +224,7 @@ namespace ES
             public AssetReferenceInfo(string path, bool indirect = false, string confidence = "中", string reason = "未发现显式依赖")
             {
                 AssetPath = path;
-                // 将Unity Asset路径转换为文件系统路径
+                // 将 Unity Asset 路径转换为文件系统路径。
                 string fullPath = Path.Combine(Application.dataPath, path.Substring("Assets/".Length));
                 FileSize = GetFileSizeString(fullPath);
                 LastModified = GetLastModifiedString(fullPath);
@@ -260,7 +269,7 @@ namespace ES
         #endregion
 
         #region 自定义绘制
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawCustomLists()
         {
             DrawAssetReferenceWorkbench();
@@ -269,7 +278,6 @@ namespace ES
         private void DrawAssetReferenceWorkbench()
         {
             DrawWorkbenchHeader();
-            DrawTargetSnapshot();
             DrawQuickSettings();
             DrawWorkflowActions();
             DrawResultDashboard();
@@ -306,7 +314,7 @@ namespace ES
             {
                 DrawInfoRow("扫描文件夹", checkFolder);
                 DrawInfoRow("排除文件夹", excludeFolders.Count == 0 ? "无" : string.Join(", ", excludeFolders));
-                DrawInfoRow("文件类型", includeExtensions.Count == 0 ? $"全部有效资源，排除 {string.Join(", ", excludeExtensions)}" : string.Join(", ", includeExtensions));
+                DrawInfoRow("文件类型", GetExtensionSummaryText());
                 DrawInfoRow("安全保护", protectEntryAssets ? $"开启，保护入口和 {protectedFolders.Count} 个保护路径" : "关闭");
                 DrawInfoRow("当前选中", hasSelectedAsset ? $"{selected.name}  |  {selectedPath}" : "未选中 Project 资源。引用/依赖分析前，请先在 Project 窗口点一个资源。");
                 DrawInfoRow("资源包入口", $"{packageRootFolder}  |  路径 {packageUsedEntryPaths.Count} 个，拖入资产 {packageUsedEntryAssets.Count(a => a != null)} 个");
@@ -521,7 +529,7 @@ namespace ES
                 EditorGUILayout.LabelField("候选聚类", EditorStyles.boldLabel);
                 DrawInfoRow("按类型", BuildTopExtensionSummary(candidates, 6));
                 DrawInfoRow("按目录", BuildTopDirectorySummary(candidates, 5));
-                DrawInfoRow("体积估算", $"当前筛选候选约 {FormatFileSize(SumKnownFileSize(candidates))}，低置信候选 {candidates.Count(a => a.Confidence == "低")} 个。");
+                DrawInfoRow("体积估算", GetCandidateSizeSummary(candidates));
             }
         }
 
@@ -883,7 +891,7 @@ namespace ES
                 var referencedAssets = new HashSet<string>();
                 var progressTitle = deepAnalysis ? "深度引用分析" : "快速引用分析";
 
-                // 第一遍：收集所有被引用的资源
+                // 第一遍：收集所有被引用的资源。
                 if (!CollectReferencedAssets(allAssetPaths, referencedAssets, progressTitle))
                 {
                     lastScanCanceled = true;
@@ -902,7 +910,7 @@ namespace ES
                     }
                 }
 
-                // 第二遍：找出疑似未使用资源
+                // 第二遍：找出疑似未使用资源。
                 FindUnusedAssetsFromList(allAssetPaths, referencedAssets);
 
                 // 强制刷新UI
@@ -944,7 +952,7 @@ namespace ES
 
             ExecuteWithProgress("查找引用", "正在分析引用关系...", () =>
             {
-                // 获取所有资源路径，包括可能引用目标资源的任何文件
+                // 获取所有资源路径，包括可能引用目标资源的任何文件。
                 var allAssetPaths = AssetDatabase.GetAllAssetPaths();
                 var filteredPaths = FilterAssetPathsForReferenceCheck(allAssetPaths);
 
@@ -952,7 +960,7 @@ namespace ES
                 {
                     var currentPath = filteredPaths[i];
 
-                    // 检查用户是否取消操作
+                    // 检查用户是否取消操作。
                     if (EditorUtility.DisplayCancelableProgressBar("查找引用",
                         $"检查: {Path.GetFileName(currentPath)} ({i + 1}/{filteredPaths.Count})",
                         (float)i / filteredPaths.Count))
@@ -963,7 +971,7 @@ namespace ES
 
                     try
                     {
-                        // 检查直接引用
+                        // 检查直接引用。
                         var dependencies = AssetDatabase.GetDependencies(currentPath, false);
                         if (Array.IndexOf(dependencies, assetPath) >= 0)
                         {
@@ -1024,7 +1032,7 @@ namespace ES
                     }
                 }
 
-                // 如果启用了深度分析，获取所有依赖
+                // 如果启用了深度分析，获取所有依赖。
                 if (deepAnalysis)
                 {
                     var allDependencies = AssetDatabase.GetDependencies(assetPath, true);
@@ -1254,16 +1262,16 @@ namespace ES
                     writer.WriteLine("=== 资产引用分析报告 ===");
                     writer.WriteLine($"生成时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                     writer.WriteLine($"检查文件夹: {checkFolder}");
-                    writer.WriteLine($"深度分析: {(deepAnalysis ? "启用" : "禁用")}");
+                    writer.WriteLine($"深度分析: {SimpleToolsSafetyUtility.EnabledDisabled(deepAnalysis)}");
                     writer.WriteLine();
 
                     if (unusedAssets.Count > 0)
                     {
                         writer.WriteLine("=== 风险总览 ===");
                         writer.WriteLine($"疑似未使用: {unusedAssets.Count}");
-                        writer.WriteLine($"高置信: {unusedAssets.Count(a => a.Confidence == "高")}");
-                        writer.WriteLine($"中置信: {unusedAssets.Count(a => a.Confidence == "中")}");
-                        writer.WriteLine($"低置信: {unusedAssets.Count(a => a.Confidence == "低")}");
+                        writer.WriteLine($"High confidence: {unusedAssets.Count(a => GetConfidenceSort(a) >= 3)}");
+                        writer.WriteLine($"Medium confidence: {unusedAssets.Count(a => GetConfidenceSort(a) == 2)}");
+                        writer.WriteLine($"Low confidence: {unusedAssets.Count(a => GetConfidenceSort(a) <= 1)}");
                         writer.WriteLine($"体积估算: {FormatFileSize(SumKnownFileSize(unusedAssets))}");
                         writer.WriteLine($"类型分布: {BuildTopExtensionSummary(unusedAssets, 12)}");
                         writer.WriteLine($"目录分布: {BuildTopDirectorySummary(unusedAssets, 12)}");
@@ -1285,7 +1293,7 @@ namespace ES
                         writer.WriteLine($"=== 引用分析 ({selectedAssetReferences.Count} 个) ===");
                         foreach (var reference in selectedAssetReferences)
                         {
-                            writer.WriteLine($"{(reference.IsIndirect ? "[间接]" : "[直接]")}\t{reference.FileSize}\t{reference.LastModified}\t{reference.AssetPath}");
+                            writer.WriteLine($"{GetReferenceTypeLabel(reference.IsIndirect)}\t{reference.FileSize}\t{reference.LastModified}\t{reference.AssetPath}");
                         }
                         writer.WriteLine();
                     }
@@ -1295,7 +1303,7 @@ namespace ES
                         writer.WriteLine($"=== 依赖分析 ({selectedAssetDependencies.Count} 个) ===");
                         foreach (var dependency in selectedAssetDependencies)
                         {
-                            writer.WriteLine($"{(dependency.IsIndirect ? "[间接]" : "[直接]")}\t{dependency.FileSize}\t{dependency.LastModified}\t{dependency.AssetPath}");
+                            writer.WriteLine($"{GetReferenceTypeLabel(dependency.IsIndirect)}\t{dependency.FileSize}\t{dependency.LastModified}\t{dependency.AssetPath}");
                         }
                         writer.WriteLine();
                     }
@@ -1341,16 +1349,16 @@ namespace ES
             currentPageDependencies = 0;
             currentPagePackageKeep = 0;
             currentPagePackageExternal = 0;
-            lastResultSummary = "分析结果已清除";
-            lastResultDetail = "疑似未使用、引用分析、依赖分析、资源包分离和缓存结果已清空。";
+            lastResultSummary = "Analysis results cleared.";
+            lastResultDetail = "Unused-asset, reference, dependency, package separation, and cache results were cleared.";
         }
 
         public void JumpToAllUnusedAssets()
         {
             if (unusedAssets.Count == 0)
             {
-                lastResultSummary = "跳转取消: 没有疑似未使用资源";
-                lastResultDetail = "请先执行扫描并复核结果。";
+                lastResultSummary = "Jump cancelled: no potentially unused assets.";
+                lastResultDetail = "Run a scan and review its results first.";
                 EditorUtility.DisplayDialog("提示", "没有疑似未使用资源可以跳转！", "确定");
                 return;
             }
@@ -1452,7 +1460,7 @@ namespace ES
                 if (excludeFolders.Any(exclude => IsPathInsideFolder(normalizedPath, SimpleToolsSafetyUtility.NormalizeAssetPath(exclude))))
                     continue;
 
-                // 检查文件类型过滤
+                // 检查文件类型过滤。
                 var extension = Path.GetExtension(normalizedPath).ToLower();
                 if (excludeExtensions.Contains(extension))
                     continue;
@@ -1460,7 +1468,7 @@ namespace ES
                 if (includeExtensions.Count > 0 && !includeExtensions.Contains(extension))
                     continue;
 
-                // 跳过文件夹
+                // 跳过文件夹。
                 if (AssetDatabase.IsValidFolder(normalizedPath))
                     continue;
 
@@ -1486,13 +1494,13 @@ namespace ES
                 if (excludeFolders.Any(exclude => IsPathInsideFolder(normalizedPath, SimpleToolsSafetyUtility.NormalizeAssetPath(exclude))))
                     continue;
 
-                // 对于引用检查，我们需要包含更多文件类型，因为任何文件都可能引用资源
-                // 只排除.meta文件和文件夹
+                // 对于引用检查，需要包含更多文件类型，因为任何文件都可能引用资源。
+                // 只排除 meta 文件和文件夹。
                 var extension = Path.GetExtension(normalizedPath).ToLower();
                 if (extension == ".meta")
                     continue;
 
-                // 跳过文件夹
+                // 跳过文件夹。
                 if (AssetDatabase.IsValidFolder(normalizedPath))
                     continue;
 
@@ -1643,13 +1651,13 @@ namespace ES
 
             if (normalized.Contains("/Resources/", StringComparison.OrdinalIgnoreCase) || normalized.EndsWith("/Resources", StringComparison.OrdinalIgnoreCase))
             {
-                reason = "Resources运行时入口";
+                reason = "Resources 运行时入口";
                 return true;
             }
 
             if (normalized.Contains("/StreamingAssets/", StringComparison.OrdinalIgnoreCase))
             {
-                reason = "StreamingAssets运行时入口";
+                reason = "StreamingAssets 运行时入口";
                 return true;
             }
 
@@ -1778,13 +1786,13 @@ namespace ES
 
             if (normalized.Contains("/Resources/", StringComparison.OrdinalIgnoreCase) || normalized.EndsWith("/Resources", StringComparison.OrdinalIgnoreCase))
             {
-                reason = "Resources运行时入口";
+                reason = "Resources 运行时入口";
                 return true;
             }
 
             if (normalized.Contains("/StreamingAssets/", StringComparison.OrdinalIgnoreCase))
             {
-                reason = "StreamingAssets运行时入口";
+                reason = "StreamingAssets 运行时入口";
                 return true;
             }
 
@@ -1919,23 +1927,50 @@ namespace ES
 
         private void ShowAnalysisCompleteDialog()
         {
-            string message = $"深度引用分析完成！\n\n" +
-                           $"总检查文件: {totalFilesChecked}\n" +
-                           $"疑似未使用资源: {unusedAssets.Count}\n" +
-                           $"高置信度: {unusedAssets.Count(a => a.Confidence == "高")} | 中: {unusedAssets.Count(a => a.Confidence == "中")} | 低: {unusedAssets.Count(a => a.Confidence == "低")}\n" +
-                           $"结果状态: {(lastScanCanceled ? "不完整" : "完整")}";
+            string message = $"Reference analysis completed.\n\n" +
+                           $"Files checked: {totalFilesChecked}\n" +
+                           $"Potentially unused assets: {unusedAssets.Count}\n" +
+                            $"Status: {GetEnglishScanStateText()}";
 
             if (unusedAssets.Count > 0)
             {
-                message += "\n\n建议先选中检查结果。需要清理时，使用“移入隔离区”，不要直接删。";
+                message += "\n\nReview results first. Use the quarantine action instead of deleting assets directly.";
             }
 
-            EditorUtility.DisplayDialog("分析完成", message, "确定");
-            lastResultSummary = $"引用分析完成: 检查 {totalFilesChecked} 个 | 疑似未使用 {unusedAssets.Count} 个 | 状态 {(lastScanCanceled ? "不完整" : "完整")}";
+            EditorUtility.DisplayDialog("Analysis complete", message, "OK");
+            lastResultSummary = $"Reference analysis: checked {totalFilesChecked}, potentially unused {unusedAssets.Count}, status {GetEnglishScanStateText().ToLowerInvariant()}.";
             lastResultDetail = SimpleToolsSafetyUtility.JoinPreview(unusedAssets.Select(asset => $"{asset.AssetPath} | {asset.Confidence} | {asset.Reason}"), 12);
         }
 
         #region 统一UI辅助方法
+        private string GetScanStateText()
+        {
+            return lastScanCanceled ? "扫描已取消，不完整" : "完整";
+        }
+
+        private string GetExtensionSummaryText()
+        {
+            return includeExtensions.Count == 0
+                ? "全部有效资源，排除 " + string.Join(", ", excludeExtensions)
+                : string.Join(", ", includeExtensions);
+        }
+
+        private string GetCandidateSizeSummary(List<AssetReferenceInfo> candidates)
+        {
+            int lowConfidenceCount = candidates.Count(a => a.Confidence == "低");
+            return $"当前筛选候选约 {FormatFileSize(SumKnownFileSize(candidates))}，低置信候选 {lowConfidenceCount} 个。";
+        }
+
+        private string GetEnglishScanStateText()
+        {
+            return lastScanCanceled ? "Incomplete" : "Complete";
+        }
+
+        private static string GetReferenceTypeLabel(bool indirect)
+        {
+            return indirect ? "[间接]" : "[直接]";
+        }
+
         private void ShowErrorDialog(string message)
         {
             lastResultSummary = "操作失败";
@@ -1976,7 +2011,7 @@ namespace ES
 
         private void UpdateProgress(string message, float progress)
         {
-            EditorUtility.DisplayProgressBar("处理中", message, progress);
+            EditorUtility.DisplayProgressBar("Processing", message, progress);
         }
 
         private void RefreshUI()

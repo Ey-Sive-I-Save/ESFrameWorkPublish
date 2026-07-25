@@ -47,9 +47,7 @@ namespace ES
             // AB包类型
             RegisterType(ESResSourceLoadType.AssetBundle, () => 
             {
-                var source = ESResMaster.Instance.PoolForESABSource.GetInPool();
-                source.IsNet = true;
-                return source;
+                return ESResMaster.Instance.PoolForESABSource.GetInPool();
             });
 
             // AB资源类型

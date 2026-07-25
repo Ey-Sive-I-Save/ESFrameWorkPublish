@@ -153,6 +153,9 @@ namespace Gaskellgames.FolderSystem.EditorOnly
             // check for valid draw
             if (path == "") { return; }
             if (Event.current.type != EventType.Repaint) { return; }
+            // AssetDatabase may briefly retain a GUID after a folder move/delete.
+            // Avoid breaking ProjectBrowser repaint while its cache catches up.
+            if (!Directory.Exists(path)) { return; }
             if (!File.GetAttributes(path).HasFlag(FileAttributes.Directory)) { return; }
 
             // get folder icon position

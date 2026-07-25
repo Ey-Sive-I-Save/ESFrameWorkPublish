@@ -3,6 +3,7 @@ using Sirenix.OdinInspector;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -11,21 +12,22 @@ using System.Linq;
 
 namespace ES
 {
-    #region ES集成工具集-对象池工具
+    #region ES集成工具 - 对象池工具
     [Serializable]
     public class Page_ObjectPool : ESWindowPageBase
     {
         public enum ObjectPoolToolTab
         {
             运行时统计,
-            预热数据,
-            GameManager接入
+            PrefabPrewarmDataInfo审计,
+            GameManager接入,
+            PlayMode池组状态
         }
 
         [DisplayAsString(Overflow = true, FontSize = 13), HideLabel]
         public string PoolCoreInfo = "";
 
-        [Title("对象池<集成>工具", "ES对象池运行时数据汇总管理", bold: true, titleAlignment: TitleAlignments.Centered)]
+        [Title("对象池集成工具", "ES 对象池运行时数据汇总管理", bold: true, titleAlignment: TitleAlignments.Centered)]
         [InfoBox("汇总 Poolable-Define.cs 支持的对象池运行时统计。用于查看池数量、创建量、活跃量、回收量和丢弃量。", InfoMessageType.Info)]
         [DisplayAsString(fontSize: 12), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "支持 IPoolable / IPoolableAuto / Pool<T> / ESSimplePool<T> / ESSimplePoolSingleton<T> / PoolStatistics。";
@@ -36,6 +38,7 @@ namespace ES
         // 搜索文本
         private string searchText = "";
         private string prewarmSearchText = "";
+        private string poolGroupSearchText = "";
 
         [EnumToggleButtons, HideLabel]
         public ObjectPoolToolTab currentTab = ObjectPoolToolTab.运行时统计;
@@ -53,22 +56,25 @@ namespace ES
         private string lastResultSummary = "";
         private string lastResultDetail = "";
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         public void DrawThisWindow()
         {
             SimpleToolsPanelUtility.DrawToolHeader(
                 "对象池与预热配置",
-                "这里处理运行时对象池统计、PrefabPrewarmDataInfo 预热配置资产审计、GameManager 对象池模块接入。",
+                "对象池与预热配置",
                 SimpleToolsMaturity.Upgrading,
                 "PrefabPrewarmDataInfo 是 ESSO/SoDataInfo 资产；工具只扫描这种配置资产，不再把当前 Selection 伪装成池化入口。");
 
             switch (currentTab)
             {
-                case ObjectPoolToolTab.预热数据:
+                case ObjectPoolToolTab.PrefabPrewarmDataInfo审计:
                     DrawPrewarmDataPanel();
                     break;
                 case ObjectPoolToolTab.GameManager接入:
                     DrawGameManagerPoolPanel();
+                    break;
+                case ObjectPoolToolTab.PlayMode池组状态:
+                    DrawPlayModePoolGroupsPanel();
                     break;
                 default:
                     DrawPoolUsagePanel();
@@ -113,27 +119,27 @@ namespace ES
             int totalPooled = allStats.Sum(stat => stat.CurrentPooled);
             int totalDiscarded = allStats.Sum(stat => stat.DiscardedCount);
             SimpleToolsPanelUtility.DrawSummary(
-                $"总池数: {totalPools}",
-                $"总创建: {totalCreated}",
+                $"平均总利用率: {avgTotalUtilization:P2}",
+                $"平均总利用率: {avgTotalUtilization:P2}",
                 $"活跃: {totalActive}",
                 $"池中: {totalPooled}",
                 $"丢弃: {totalDiscarded}");
 
             if (totalPools == 0)
             {
-                SimpleToolsPanelUtility.DrawEmptyState("当前没有对象池统计。先运行会创建对象池的功能，再回来查看池中、活跃、峰值和丢弃情况。");
+                SimpleToolsPanelUtility.DrawEmptyState("全局统计组还没有初始化。进入 Play Mode 或触发对象池创建后，这里会显示运行时统计。");
                 return;
             }
 
             bool hasLargeGroup = globalGroup.Groups.Any(kvp => kvp.Value != null && kvp.Value.Count() >= 3);
 
-            // 如果有大组或有折叠功能，显示搜索框
+            // 如果有大组或有折叠功能，显示搜索栏。
             if (hasLargeGroup || foldouts.Count > 0)
             {
                 searchText = EditorGUILayout.TextField("搜索 (组或池名)", searchText);
             }
 
-            // 遍历所有分组
+            // 遍历所有分组。
             foreach (var groupKey in globalGroup.Groups.Keys)
             {
                 var groupList = globalGroup.GetGroupDirectly(groupKey);
@@ -169,7 +175,7 @@ namespace ES
                             var stat = groupList.ValuesNow[i];
                             if (stat == null || !stat.IsValid) continue;
 
-                            // 如果有搜索文本且不匹配组名，检查池名
+                            // 如果有搜索文本且不匹配组名，检查池项。
                             if (!string.IsNullOrEmpty(searchText) && !groupMatches &&
                                 !ContainsIgnoreCase(stat.PoolDisplayName, searchText))
                             {
@@ -177,7 +183,7 @@ namespace ES
                             }
 
                             EditorGUILayout.LabelField(
-                                $"{stat.PoolDisplayName}    创建 {stat.TotalCreated} | 获取 {stat.TotalGets} | 回收 {stat.TotalReturns} | 池中 {stat.CurrentPooled} | 活跃 {stat.CurrentActive} | 峰值 {stat.PeakActive} | 丢弃 {stat.DiscardedCount}",
+                                $"池中: {totalPooled}",
                                 EditorStyles.miniLabel);
                         }
                     }
@@ -206,7 +212,7 @@ namespace ES
                     GUILayout.FlexibleSpace();
                 }
 
-                EditorGUILayout.LabelField("判断口径：高频/扩容偏高通常说明池容量偏小或创建压力高；低频/容量偏空通常说明预热过量。", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("判断口径：高频扩容偏高通常说明池容量偏小或创建压力高；低频/容量偏空通常说明预热过量。", EditorStyles.wordWrappedMiniLabel);
             }
         }
 
@@ -226,12 +232,16 @@ namespace ES
 
                 int entryCount = infos.Sum(info => info != null && info.entries != null ? info.entries.Count : 0);
                 int enabledEntryCount = infos.Sum(info => info != null && info.entries != null ? info.entries.Count(entry => entry != null && entry.enabled) : 0);
-                int missingPrefabCount = infos.Sum(info => info != null && info.entries != null ? info.entries.Count(entry => entry != null && entry.prefab == null) : 0);
+                int missingPrefabCount = infos.Sum(info => info != null && info.entries != null ? info.entries.Count(IsMissingPrefabKey) : 0);
+                int invalidCount = infos.Sum(CountInvalidPrewarmEntries);
+                int duplicateKeyCount = infos.Sum(CountDuplicatePrewarmKeys);
                 SimpleToolsPanelUtility.DrawSummary(
                     $"配置资产: {infos.Count}",
                     $"条目: {entryCount}",
                     $"启用: {enabledEntryCount}",
-                    $"Prefab丢失: {missingPrefabCount}");
+                    $"Prefab丢失: {missingPrefabCount}",
+                    $"异常条目: {invalidCount}",
+                    $"重复Key: {duplicateKeyCount}");
 
                 if (infos.Count == 0)
                 {
@@ -246,20 +256,21 @@ namespace ES
 
         private void DrawGameManagerPoolPanel()
         {
+            var infos = FindPrewarmDataInfos();
             ESGameManager manager = ResolveSceneGameManager();
             ESGameObjectPoolModule pool = ResolvePoolModule(manager, false);
             int sourceCount = pool != null && pool.prewarmSources != null ? pool.prewarmSources.Count : 0;
             bool targetLinked = pool != null && targetPrewarmData != null && pool.prewarmSources != null && pool.prewarmSources.Contains(targetPrewarmData);
 
-            SimpleToolsPanelUtility.DrawSectionTitle("GameManager 池化接入", "把选中的 PrefabPrewarmDataInfo 接到当前场景 ESGameManager 的对象池模块。编辑模式只写配置，运行时按钮才会真正加载池对象。");
+            SimpleToolsPanelUtility.DrawSectionTitle("Prefab 预热数据", "PrefabPrewarmDataInfo 是 ESSO/SoDataInfo 配置资产，也是 ESGameObjectPoolModule 的预热配置入口。这里扫描的是配置资产，不扫描 Prefab。");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 SimpleToolsPanelUtility.DrawSummary(
-                    $"GameManager: {(manager != null ? manager.name : "未找到")}",
-                    $"对象池模块: {(pool != null ? "已存在" : "未创建")}",
-                    $"预热配置数: {sourceCount}",
-                    $"目标已接入: {(targetLinked ? "是" : "否")}",
-                    $"运行状态: {(Application.isPlaying ? "Play Mode" : "编辑模式")}");
+                    $"GameManager: {GetManagerName(manager)}",
+                    $"对象池模块: {GetPoolStateText(pool)}",
+                    $"配置资产: {infos.Count}",
+                    $"目标已接入: {SimpleToolsSafetyUtility.YesNo(targetLinked)}",
+                    $"运行状态: {GetRuntimeStateText()}");
 
                 EditorGUILayout.HelpBox("建议流程：先在“预热数据”页选择已有 PrefabPrewarmDataInfo 配置资产，再到这里把该配置接入 GameManager。编辑模式不会实例化对象池；进入 Play Mode 后由模块按场景和 Space 条件加载。", MessageType.Info);
 
@@ -306,6 +317,60 @@ namespace ES
 
                 DrawGameManagerPrewarmSourceList(pool);
                 SimpleToolsPanelUtility.DrawResultSummary("最近 GameManager 接入结果", lastResultSummary, lastResultDetail);
+            }
+        }
+
+        private void DrawPlayModePoolGroupsPanel()
+        {
+            ESGameManager manager = ResolveSceneGameManager();
+            ESGameObjectPoolModule pool = ResolvePoolModule(manager, false);
+            int sourceCount = pool != null && pool.prewarmSources != null ? pool.prewarmSources.Count : 0;
+            int missingPrefabCount = FindPrewarmDataInfos().Sum(CountMissingPrefabKeys);
+            List<ESGameObjectPoolStats> stats = Application.isPlaying && pool != null
+                ? CollectPoolGroupStats(pool)
+                : new List<ESGameObjectPoolStats>(0);
+
+            SimpleToolsPanelUtility.DrawSectionTitle("PlayMode 池组状态", "只读查看 ESGameObjectPoolModule 当前已经创建的池组。此页不创建、不预热、不回收对象。");
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                SimpleToolsPanelUtility.DrawSummary(
+                    $"运行状态: {GetRuntimeStateText()}",
+                    $"GameManager: {GetManagerName(manager)}",
+                    $"对象池模块: {GetPoolStateText(pool)}",
+                    $"预热配置数: {sourceCount}",
+                    $"活跃: {stats.Sum(item => item.activeCount)}",
+                    $"池中: {stats.Sum(item => item.inactiveCount)}",
+                    $"Prefab丢失: {missingPrefabCount}");
+
+                if (!Application.isPlaying)
+                {
+                    SimpleToolsPanelUtility.DrawEmptyState("当前项目没有找到 PrefabPrewarmDataInfo。可通过 SO 数据窗口创建“Prefab预热配置”，再回到这里维护条目。");
+                    return;
+                }
+
+                if (pool == null)
+                {
+                    SimpleToolsPanelUtility.DrawEmptyState("当前项目没有找到 PrefabPrewarmDataInfo。可通过 SO 数据窗口创建“Prefab预热配置”，再回到这里维护条目。");
+                    return;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("搜索", EditorStyles.miniBoldLabel, GUILayout.Width(36));
+                    poolGroupSearchText = EditorGUILayout.TextField(poolGroupSearchText);
+                    if (GUILayout.Button("清空", EditorStyles.miniButton, GUILayout.Width(48)))
+                        poolGroupSearchText = string.Empty;
+                    if (GUILayout.Button("复制报告", EditorStyles.miniButton, GUILayout.Width(72)))
+                        EditorGUIUtility.systemCopyBuffer = BuildPoolGroupStatusReport(stats);
+                }
+
+                if (stats.Count == 0)
+                {
+                    SimpleToolsPanelUtility.DrawEmptyState("当前项目没有找到 PrefabPrewarmDataInfo。可通过 SO 数据窗口创建“Prefab预热配置”，再回到这里维护条目。");
+                    return;
+                }
+
+                DrawPoolGroupStatsTable(stats);
             }
         }
 
@@ -508,6 +573,103 @@ namespace ES
             }
         }
 
+        private void DrawPoolGroupStatsTable(List<ESGameObjectPoolStats> stats)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("Key", EditorStyles.miniBoldLabel, GUILayout.MinWidth(220));
+                EditorGUILayout.LabelField("活跃", EditorStyles.miniBoldLabel, GUILayout.Width(44));
+                EditorGUILayout.LabelField("池中", EditorStyles.miniBoldLabel, GUILayout.Width(44));
+                EditorGUILayout.LabelField("总量", EditorStyles.miniBoldLabel, GUILayout.Width(44));
+                EditorGUILayout.LabelField("创建", EditorStyles.miniBoldLabel, GUILayout.Width(48));
+                EditorGUILayout.LabelField("借出", EditorStyles.miniBoldLabel, GUILayout.Width(48));
+                EditorGUILayout.LabelField("归还", EditorStyles.miniBoldLabel, GUILayout.Width(48));
+                EditorGUILayout.LabelField("Miss", EditorStyles.miniBoldLabel, GUILayout.Width(48));
+                EditorGUILayout.LabelField("修补", EditorStyles.miniBoldLabel, GUILayout.Width(48));
+                EditorGUILayout.LabelField("溢出销毁", EditorStyles.miniBoldLabel, GUILayout.Width(68));
+                EditorGUILayout.LabelField("预热源", EditorStyles.miniBoldLabel, GUILayout.Width(56));
+            }
+
+            int shown = 0;
+            foreach (var stat in stats.OrderByDescending(item => item.activeCount).ThenBy(item => item.key, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(poolGroupSearchText) &&
+                    !ContainsIgnoreCase(stat.key, poolGroupSearchText))
+                    continue;
+
+                using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+                {
+                    EditorGUILayout.LabelField(stat.key ?? "<无Key>", EditorStyles.miniLabel, GUILayout.MinWidth(220));
+                    EditorGUILayout.LabelField(stat.activeCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(44));
+                    EditorGUILayout.LabelField(stat.inactiveCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(44));
+                    EditorGUILayout.LabelField(stat.totalCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(44));
+                    EditorGUILayout.LabelField(stat.createdCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(48));
+                    EditorGUILayout.LabelField(stat.rentCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(48));
+                    EditorGUILayout.LabelField(stat.returnCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(48));
+                    EditorGUILayout.LabelField(stat.missCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(48));
+                    EditorGUILayout.LabelField(stat.repairCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(48));
+                    EditorGUILayout.LabelField(stat.overflowDestroyCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(68));
+                    EditorGUILayout.LabelField(stat.prewarmSourceCount.ToString(), EditorStyles.miniLabel, GUILayout.Width(56));
+                }
+
+                shown++;
+                if (shown >= 120)
+                {
+                    EditorGUILayout.HelpBox("池组超过 120 条，已截断显示。请用搜索缩小范围，复制报告仍包含当前收集到的全部池组。", MessageType.Info);
+                    break;
+                }
+            }
+
+            if (shown == 0)
+                SimpleToolsPanelUtility.DrawEmptyState("对象池模块还没有接入任何 PrefabPrewarmDataInfo。先选择目标预热数据，再点击“接入目标预热数据”。");
+        }
+
+        private static List<ESGameObjectPoolStats> CollectPoolGroupStats(ESGameObjectPoolModule pool)
+        {
+            List<ESGameObjectPoolStats> result = new List<ESGameObjectPoolStats>(32);
+            if (pool == null)
+                return result;
+
+            foreach (string key in CollectPoolGroupKeys(pool))
+            {
+                if (string.IsNullOrEmpty(key))
+                    continue;
+
+                if (pool.TryGetStats(key, out ESGameObjectPoolStats stats))
+                    result.Add(stats);
+            }
+
+            return result;
+        }
+
+        private static IEnumerable<string> CollectPoolGroupKeys(ESGameObjectPoolModule pool)
+        {
+            if (pool == null)
+                yield break;
+
+            FieldInfo field = typeof(ESGameObjectPoolModule).GetField("groupsByKey", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field?.GetValue(pool) is not IDictionary dictionary)
+                yield break;
+
+            foreach (DictionaryEntry entry in dictionary)
+            {
+                if (entry.Key is string key)
+                    yield return key;
+            }
+        }
+
+        private static string BuildPoolGroupStatusReport(List<ESGameObjectPoolStats> stats)
+        {
+            if (stats == null || stats.Count == 0)
+                return "当前没有运行时池组。";
+
+            return string.Join("\n", stats
+                .OrderByDescending(item => item.activeCount)
+                .ThenBy(item => item.key, StringComparer.OrdinalIgnoreCase)
+                .Select(item =>
+                    $"{item.key} | 活跃 {item.activeCount} | 池中 {item.inactiveCount} | 总量 {item.totalCount} | 创建 {item.createdCount} | 借出 {item.rentCount} | 归还 {item.returnCount} | Miss {item.missCount} | 修补 {item.repairCount} | 溢出销毁 {item.overflowDestroyCount} | 预热源 {item.prewarmSourceCount}"));
+        }
+
         private static string BuildGameManagerPrewarmDetail(ESGameManager manager, ESGameObjectPoolModule pool)
         {
             if (manager == null || pool == null)
@@ -558,13 +720,15 @@ namespace ES
             string path = AssetDatabase.GetAssetPath(info);
             int count = info.entries != null ? info.entries.Count : 0;
             int enabled = info.entries != null ? info.entries.Count(entry => entry != null && entry.enabled) : 0;
-            int missing = info.entries != null ? info.entries.Count(entry => entry != null && entry.prefab == null) : 0;
+            int missing = info.entries != null ? info.entries.Count(IsMissingPrefabKey) : 0;
+            int invalid = CountInvalidPrewarmEntries(info);
+            int duplicate = CountDuplicatePrewarmKeys(info);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField(info.KeyName ?? info.name, EditorStyles.boldLabel, GUILayout.Width(180));
-                    EditorGUILayout.LabelField($"条目 {count} | 启用 {enabled} | 丢失 {missing}", EditorStyles.miniLabel, GUILayout.Width(160));
+                    EditorGUILayout.LabelField($"条目 {count} | 启用 {enabled} | 丢失 {missing} | 异常 {invalid} | 重复 {duplicate}", EditorStyles.miniLabel, GUILayout.Width(250));
                     EditorGUILayout.LabelField(path, EditorStyles.miniLabel, GUILayout.MinWidth(200));
                     if (GUILayout.Button("选为目标", EditorStyles.miniButton, GUILayout.Width(68)))
                         targetPrewarmData = info;
@@ -577,7 +741,65 @@ namespace ES
 
                 if (missing > 0)
                     EditorGUILayout.HelpBox("存在 Prefab 丢失条目，运行时预热会跳过这些项。", MessageType.Warning);
+                if (invalid > 0)
+                    EditorGUILayout.HelpBox("存在 Key 为空、预热数量小于等于 0、或启用项 Prefab 为空的异常条目。", MessageType.Warning);
+                if (duplicate > 0)
+                    EditorGUILayout.HelpBox("存在重复 Key。运行时同 Key 池组会合并或覆盖预期，请明确配置。", MessageType.Warning);
             }
+        }
+
+        private static int CountInvalidPrewarmEntries(PrefabPrewarmDataInfo info)
+        {
+            if (info == null || info.entries == null)
+                return 0;
+
+            int count = 0;
+            foreach (var entry in info.entries)
+            {
+                if (entry == null)
+                {
+                    count++;
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(entry.key) || entry.prewarmCount <= 0 || (entry.enabled && IsMissingPrefabKey(entry)))
+                    count++;
+            }
+
+            return count;
+        }
+
+        private static int CountMissingPrefabKeys(PrefabPrewarmDataInfo info)
+        {
+            if (info == null || info.entries == null)
+                return 0;
+
+            return info.entries.Count(IsMissingPrefabKey);
+        }
+
+        private static bool IsMissingPrefabKey(PrefabPrewarmEntry entry)
+        {
+            return entry == null || entry.prefabKey == null ||
+                   (entry.prefabKey.EnumKeyInt == 0 && string.IsNullOrWhiteSpace(entry.prefabKey.StringKey));
+        }
+
+        private static int CountDuplicatePrewarmKeys(PrefabPrewarmDataInfo info)
+        {
+            if (info == null || info.entries == null)
+                return 0;
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            int duplicates = 0;
+            foreach (var entry in info.entries)
+            {
+                if (entry == null || string.IsNullOrWhiteSpace(entry.key))
+                    continue;
+
+                if (!seen.Add(entry.key))
+                    duplicates++;
+            }
+
+            return duplicates;
         }
 
         /// <summary>
@@ -614,7 +836,7 @@ namespace ES
                 return;
             }
 
-            // 计算均值
+            // 计算均值。
             avgRealTimeUtilization = allStats.Average(s => s.CurrentPooled > 0 ? (float)s.CurrentActive / s.CurrentPooled : 0f);
             avgTotalUtilization = allStats.Average(s => s.TotalCreated > 0 ? (float)s.TotalGets / s.TotalCreated : 0f);
             avgDiscarded = (float)allStats.Average(s => s.DiscardedCount);
@@ -683,6 +905,21 @@ namespace ES
             return !string.IsNullOrEmpty(value)
                    && !string.IsNullOrEmpty(search)
                    && value.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string GetManagerName(ESGameManager manager)
+        {
+            return manager != null ? manager.name : "未找到";
+        }
+
+        private static string GetPoolStateText(ESGameObjectPoolModule pool)
+        {
+            return pool != null ? "已存在" : "未创建";
+        }
+
+        private static string GetRuntimeStateText()
+        {
+            return Application.isPlaying ? "Play Mode" : "编辑模式";
         }
 
         private static string BuildPoolPreview(IEnumerable<PoolStatistics> pools)

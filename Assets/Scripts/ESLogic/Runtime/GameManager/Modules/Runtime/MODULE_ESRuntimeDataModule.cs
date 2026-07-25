@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using Sirenix.OdinInspector;
 using UnityEngine;
 #if UNITY_EDITOR
@@ -60,22 +63,23 @@ namespace ES
 
     public static class ESRuntimeDataAsset
     {
-        public static readonly ESConfigKeyTable<ESAssetReferPrefabConfigData> Prefabs = new ESConfigKeyTable<ESAssetReferPrefabConfigData>(256);
-        public static readonly ESConfigKeyTable<ESAssetReferSpriteConfigData> Sprites = new ESConfigKeyTable<ESAssetReferSpriteConfigData>(256);
-        public static readonly ESConfigKeyTable<ESAssetReferAudioClipConfigData> AudioClips = new ESConfigKeyTable<ESAssetReferAudioClipConfigData>(256);
-        public static readonly ESConfigKeyTable<ESAssetReferAnimationClipConfigData> AnimationClips = new ESConfigKeyTable<ESAssetReferAnimationClipConfigData>(256);
-        public static readonly ESConfigKeyTable<ESAssetReferAnimatorControllerConfigData> AnimatorControllers = new ESConfigKeyTable<ESAssetReferAnimatorControllerConfigData>(128);
-        public static readonly ESConfigKeyTable<ESAssetReferMaterialConfigData> Materials = new ESConfigKeyTable<ESAssetReferMaterialConfigData>(256);
-        public static readonly ESConfigKeyTable<ESAssetReferMeshConfigData> Meshes = new ESConfigKeyTable<ESAssetReferMeshConfigData>(256);
-        public static readonly ESConfigKeyTable<ESAssetReferSceneConfigData> Scenes = new ESConfigKeyTable<ESAssetReferSceneConfigData>(64);
-        public static readonly ESConfigKeyTable<ESAssetReferTextureConfigData> Textures = new ESConfigKeyTable<ESAssetReferTextureConfigData>(128);
-        public static readonly ESConfigKeyTable<ESAssetReferTexture2DConfigData> Texture2Ds = new ESConfigKeyTable<ESAssetReferTexture2DConfigData>(128);
-        public static readonly ESConfigKeyTable<ESAssetReferSpriteAtlasConfigData> SpriteAtlases = new ESConfigKeyTable<ESAssetReferSpriteAtlasConfigData>(64);
-        public static readonly ESConfigKeyTable<ESAssetReferAvatarConfigData> Avatars = new ESConfigKeyTable<ESAssetReferAvatarConfigData>(64);
-        public static readonly ESConfigKeyTable<ESAssetReferPlayableAssetConfigData> PlayableAssets = new ESConfigKeyTable<ESAssetReferPlayableAssetConfigData>(64);
-        public static readonly ESConfigKeyTable<ESAssetReferTimelineAssetConfigData> TimelineAssets = new ESConfigKeyTable<ESAssetReferTimelineAssetConfigData>(64);
-        public static readonly ESConfigKeyTable<ESAssetReferVideoClipConfigData> VideoClips = new ESConfigKeyTable<ESAssetReferVideoClipConfigData>(64);
-        public static readonly ESConfigKeyTable<ESAssetReferTerrainDataConfigData> TerrainDatas = new ESConfigKeyTable<ESAssetReferTerrainDataConfigData>(32);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferPrefabConfigData, GameObject> Prefabs = new ESAssetConfigKeyTable<ESAssetReferPrefabConfigData, GameObject>(256);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferSpriteConfigData, Sprite> Sprites = new ESAssetConfigKeyTable<ESAssetReferSpriteConfigData, Sprite>(256);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferAudioClipConfigData, AudioClip> AudioClips = new ESAssetConfigKeyTable<ESAssetReferAudioClipConfigData, AudioClip>(256);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferAnimationClipConfigData, AnimationClip> AnimationClips = new ESAssetConfigKeyTable<ESAssetReferAnimationClipConfigData, AnimationClip>(256);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController> AnimatorControllers = new ESAssetConfigKeyTable<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController>(128);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferMaterialConfigData, Material> Materials = new ESAssetConfigKeyTable<ESAssetReferMaterialConfigData, Material>(256);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferMeshConfigData, Mesh> Meshes = new ESAssetConfigKeyTable<ESAssetReferMeshConfigData, Mesh>(256);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferSceneConfigData, UnityEngine.Object> Scenes = new ESAssetConfigKeyTable<ESAssetReferSceneConfigData, UnityEngine.Object>(64);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferTextureConfigData, Texture> Textures = new ESAssetConfigKeyTable<ESAssetReferTextureConfigData, Texture>(128);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferTexture2DConfigData, Texture2D> Texture2Ds = new ESAssetConfigKeyTable<ESAssetReferTexture2DConfigData, Texture2D>(128);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas> SpriteAtlases = new ESAssetConfigKeyTable<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas>(64);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferAvatarConfigData, Avatar> Avatars = new ESAssetConfigKeyTable<ESAssetReferAvatarConfigData, Avatar>(64);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset> PlayableAssets = new ESAssetConfigKeyTable<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset>(64);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferScriptableObjectConfigData, ScriptableObject> ScriptableObjects = new ESAssetConfigKeyTable<ESAssetReferScriptableObjectConfigData, ScriptableObject>(128);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferTimelineAssetConfigData, UnityEngine.Object> TimelineAssets = new ESAssetConfigKeyTable<ESAssetReferTimelineAssetConfigData, UnityEngine.Object>(64);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip> VideoClips = new ESAssetConfigKeyTable<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip>(64);
+        public static readonly ESAssetConfigKeyTable<ESAssetReferTerrainDataConfigData, TerrainData> TerrainDatas = new ESAssetConfigKeyTable<ESAssetReferTerrainDataConfigData, TerrainData>(32);
 
         public static void BeginBuild(bool clear)
         {
@@ -92,6 +96,7 @@ namespace ES
             SpriteAtlases.BeginBuild(clear);
             Avatars.BeginBuild(clear);
             PlayableAssets.BeginBuild(clear);
+            ScriptableObjects.BeginBuild(clear);
             TimelineAssets.BeginBuild(clear);
             VideoClips.BeginBuild(clear);
             TerrainDatas.BeginBuild(clear);
@@ -112,6 +117,7 @@ namespace ES
             SpriteAtlases.EndBuild();
             Avatars.EndBuild();
             PlayableAssets.EndBuild();
+            ScriptableObjects.EndBuild();
             TimelineAssets.EndBuild();
             VideoClips.EndBuild();
             TerrainDatas.EndBuild();
@@ -154,10 +160,32 @@ namespace ES
             count += ClearLoadedAssets(SpriteAtlases);
             count += ClearLoadedAssets(Avatars);
             count += ClearLoadedAssets(PlayableAssets);
+            count += ClearLoadedAssets(ScriptableObjects);
             count += ClearLoadedAssets(TimelineAssets);
             count += ClearLoadedAssets(VideoClips);
             count += ClearLoadedAssets(TerrainDatas);
             return count;
+        }
+
+        public static void ClearAllPendingAssetLoads()
+        {
+            Prefabs.ClearPendingLoads();
+            Sprites.ClearPendingLoads();
+            AudioClips.ClearPendingLoads();
+            AnimationClips.ClearPendingLoads();
+            AnimatorControllers.ClearPendingLoads();
+            Materials.ClearPendingLoads();
+            Meshes.ClearPendingLoads();
+            Scenes.ClearPendingLoads();
+            Textures.ClearPendingLoads();
+            Texture2Ds.ClearPendingLoads();
+            SpriteAtlases.ClearPendingLoads();
+            Avatars.ClearPendingLoads();
+            PlayableAssets.ClearPendingLoads();
+            ScriptableObjects.ClearPendingLoads();
+            TimelineAssets.ClearPendingLoads();
+            VideoClips.ClearPendingLoads();
+            TerrainDatas.ClearPendingLoads();
         }
 
         private static int ClearLoadedAssets<TData>(ESConfigKeyTable<TData> table)
@@ -177,15 +205,15 @@ namespace ES
         }
 
 #if UNITY_EDITOR
-        [MenuItem("ES/Asset Registry/Rebuild AssetTable From AssetLibraries")]
-        public static void MenuRebuildAssetTableFromLibrariesEditor()
+        [MenuItem("ES/Asset Registry/Rebuild EditorConfig QueryTable From AssetLibraries")]
+        public static void MenuRebuildEditorConfigQueryTableFromLibraries()
         {
-            ESAssetAutoRegisterReport report = RebuildAssetTableFromLibrariesEditor(true, true);
+            ESAssetAutoRegisterReport report = RebuildEditorConfigQueryTableFromLibraries(true, true);
             AssetDatabase.SaveAssets();
             Debug.Log(report.ToString());
         }
 
-        public static ESAssetAutoRegisterReport RebuildAssetTableFromLibrariesEditor(bool rebuildLegacyConfigTables = true, bool clearBeforeBuild = true)
+        public static ESAssetAutoRegisterReport RebuildEditorConfigQueryTableFromLibraries(bool rebuildAssetConfigTables = true, bool clearBeforeBuild = true)
         {
             ESAssetAutoRegisterReport report = new ESAssetAutoRegisterReport();
             List<ESAssetLibrary> indexedLibraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>(0);
@@ -205,29 +233,28 @@ namespace ES
             }
 
             report.libraryCount = libraries.Count;
-            ESAssetRecord[] records = ESAssetRegistry.BuildFromAssetLibraries(libraries, clearBeforeBuild);
-            ESGameManager.AssetTable.Load(records);
-            report.registeredPageCount = ESGameManager.AssetTable.Count;
+            ESAssetRegistry.BuildFromAssetLibraries(libraries, clearBeforeBuild);
+            report.registeredPageCount = ESAssetRegistry.EditorConfigQueryTable.Count;
 
-            if (rebuildLegacyConfigTables)
-                RebuildLegacyConfigTablesFromRecords(records);
+            if (rebuildAssetConfigTables)
+                RebuildAssetConfigTablesFromPages(ESAssetRegistry.Pages);
 
             report.conflictCount = GetAssetConflictCount();
             report.conflictReport = GetAssetConflictReport();
             return report;
         }
 
-        public static int RebuildLegacyConfigTablesFromRecords(IReadOnlyList<ESAssetRecord> records)
+        public static int RebuildAssetConfigTablesFromPages(IReadOnlyList<ESAssetPage> pages)
         {
             BeginBuild(true);
             try
             {
                 int count = 0;
-                if (records != null)
+                if (pages != null)
                 {
-                    for (int i = 0; i < records.Count; i++)
+                    for (int i = 0; i < pages.Count; i++)
                     {
-                        if (RegisterRecordAsLegacyConfigData(records[i]))
+                        if (RegisterPageAsAssetConfigData(pages[i]))
                             count++;
                     }
                 }
@@ -240,64 +267,153 @@ namespace ES
             }
         }
 
-        private static bool RegisterRecordAsLegacyConfigData(ESAssetRecord record)
+        private static bool RegisterPageAsAssetConfigData(ESAssetPage page)
         {
-            switch (record.kind)
+            if (page == null)
+                return false;
+
+            // GameCore SO is Consumer-owned and intentionally has no global AssetTable entry.
+            if (page.Kind == ESAssetReferKind.ScriptableObject && page.OB is ScriptableObject scriptableObject
+                && ESScriptableObjectClassification.GetClass(scriptableObject) == ESScriptableObjectClass.GameCore)
+                return false;
+
+            switch (page.Kind)
             {
                 case ESAssetReferKind.Prefab:
-                    return RegisterPrefab(CreateAssetDataFromRecord<ESAssetReferPrefabConfigData, ESAssetReferPrefabConfigKey>(record, new ESAssetReferPrefabConfigData(), new ESAssetReferPrefabConfigKey()));
+                    return RegisterPrefab(CreateAssetDataFromPage<ESAssetReferPrefabConfigData, ESAssetReferPrefabConfigKey>(page, new ESAssetReferPrefabConfigData(), new ESAssetReferPrefabConfigKey()));
                 case ESAssetReferKind.Scene:
-                    return RegisterScene(CreateAssetDataFromRecord<ESAssetReferSceneConfigData, ESAssetReferSceneConfigKey>(record, new ESAssetReferSceneConfigData(), new ESAssetReferSceneConfigKey()));
+                    return RegisterScene(CreateAssetDataFromPage<ESAssetReferSceneConfigData, ESAssetReferSceneConfigKey>(page, new ESAssetReferSceneConfigData(), new ESAssetReferSceneConfigKey()));
                 case ESAssetReferKind.Sprite:
-                    return RegisterSprite(CreateAssetDataFromRecord<ESAssetReferSpriteConfigData, ESAssetReferSpriteConfigKey>(record, new ESAssetReferSpriteConfigData(), new ESAssetReferSpriteConfigKey()));
+                    return RegisterSprite(CreateAssetDataFromPage<ESAssetReferSpriteConfigData, ESAssetReferSpriteConfigKey>(page, new ESAssetReferSpriteConfigData(), new ESAssetReferSpriteConfigKey()));
                 case ESAssetReferKind.Texture2D:
-                    return RegisterTexture2D(CreateAssetDataFromRecord<ESAssetReferTexture2DConfigData, ESAssetReferTexture2DConfigKey>(record, new ESAssetReferTexture2DConfigData(), new ESAssetReferTexture2DConfigKey()));
+                    return RegisterTexture2D(CreateAssetDataFromPage<ESAssetReferTexture2DConfigData, ESAssetReferTexture2DConfigKey>(page, new ESAssetReferTexture2DConfigData(), new ESAssetReferTexture2DConfigKey()));
                 case ESAssetReferKind.Texture:
-                    return RegisterTexture(CreateAssetDataFromRecord<ESAssetReferTextureConfigData, ESAssetReferTextureConfigKey>(record, new ESAssetReferTextureConfigData(), new ESAssetReferTextureConfigKey()));
+                    return RegisterTexture(CreateAssetDataFromPage<ESAssetReferTextureConfigData, ESAssetReferTextureConfigKey>(page, new ESAssetReferTextureConfigData(), new ESAssetReferTextureConfigKey()));
                 case ESAssetReferKind.SpriteAtlas:
-                    return RegisterSpriteAtlas(CreateAssetDataFromRecord<ESAssetReferSpriteAtlasConfigData, ESAssetReferSpriteAtlasConfigKey>(record, new ESAssetReferSpriteAtlasConfigData(), new ESAssetReferSpriteAtlasConfigKey()));
+                    return RegisterSpriteAtlas(CreateAssetDataFromPage<ESAssetReferSpriteAtlasConfigData, ESAssetReferSpriteAtlasConfigKey>(page, new ESAssetReferSpriteAtlasConfigData(), new ESAssetReferSpriteAtlasConfigKey()));
                 case ESAssetReferKind.Material:
-                    return RegisterMaterial(CreateAssetDataFromRecord<ESAssetReferMaterialConfigData, ESAssetReferMaterialConfigKey>(record, new ESAssetReferMaterialConfigData(), new ESAssetReferMaterialConfigKey()));
+                    return RegisterMaterial(CreateAssetDataFromPage<ESAssetReferMaterialConfigData, ESAssetReferMaterialConfigKey>(page, new ESAssetReferMaterialConfigData(), new ESAssetReferMaterialConfigKey()));
                 case ESAssetReferKind.Mesh:
-                    return RegisterMesh(CreateAssetDataFromRecord<ESAssetReferMeshConfigData, ESAssetReferMeshConfigKey>(record, new ESAssetReferMeshConfigData(), new ESAssetReferMeshConfigKey()));
+                    return RegisterMesh(CreateAssetDataFromPage<ESAssetReferMeshConfigData, ESAssetReferMeshConfigKey>(page, new ESAssetReferMeshConfigData(), new ESAssetReferMeshConfigKey()));
                 case ESAssetReferKind.AnimationClip:
-                    return RegisterAnimationClip(CreateAssetDataFromRecord<ESAssetReferAnimationClipConfigData, ESAssetReferAnimationClipConfigKey>(record, new ESAssetReferAnimationClipConfigData(), new ESAssetReferAnimationClipConfigKey()));
+                    return RegisterAnimationClip(CreateAssetDataFromPage<ESAssetReferAnimationClipConfigData, ESAssetReferAnimationClipConfigKey>(page, new ESAssetReferAnimationClipConfigData(), new ESAssetReferAnimationClipConfigKey()));
                 case ESAssetReferKind.AnimatorController:
-                    return RegisterAnimatorController(CreateAssetDataFromRecord<ESAssetReferAnimatorControllerConfigData, ESAssetReferAnimatorControllerConfigKey>(record, new ESAssetReferAnimatorControllerConfigData(), new ESAssetReferAnimatorControllerConfigKey()));
+                    return RegisterAnimatorController(CreateAssetDataFromPage<ESAssetReferAnimatorControllerConfigData, ESAssetReferAnimatorControllerConfigKey>(page, new ESAssetReferAnimatorControllerConfigData(), new ESAssetReferAnimatorControllerConfigKey()));
                 case ESAssetReferKind.Avatar:
-                    return RegisterAvatar(CreateAssetDataFromRecord<ESAssetReferAvatarConfigData, ESAssetReferAvatarConfigKey>(record, new ESAssetReferAvatarConfigData(), new ESAssetReferAvatarConfigKey()));
+                    return RegisterAvatar(CreateAssetDataFromPage<ESAssetReferAvatarConfigData, ESAssetReferAvatarConfigKey>(page, new ESAssetReferAvatarConfigData(), new ESAssetReferAvatarConfigKey()));
                 case ESAssetReferKind.AudioClip:
-                    return RegisterAudioClip(CreateAssetDataFromRecord<ESAssetReferAudioClipConfigData, ESAssetReferAudioClipConfigKey>(record, new ESAssetReferAudioClipConfigData(), new ESAssetReferAudioClipConfigKey()));
+                    return RegisterAudioClip(CreateAssetDataFromPage<ESAssetReferAudioClipConfigData, ESAssetReferAudioClipConfigKey>(page, new ESAssetReferAudioClipConfigData(), new ESAssetReferAudioClipConfigKey()));
                 case ESAssetReferKind.VideoClip:
-                    return RegisterVideoClip(CreateAssetDataFromRecord<ESAssetReferVideoClipConfigData, ESAssetReferVideoClipConfigKey>(record, new ESAssetReferVideoClipConfigData(), new ESAssetReferVideoClipConfigKey()));
+                    return RegisterVideoClip(CreateAssetDataFromPage<ESAssetReferVideoClipConfigData, ESAssetReferVideoClipConfigKey>(page, new ESAssetReferVideoClipConfigData(), new ESAssetReferVideoClipConfigKey()));
                 case ESAssetReferKind.TimelineAsset:
-                    return RegisterTimelineAsset(CreateAssetDataFromRecord<ESAssetReferTimelineAssetConfigData, ESAssetReferTimelineAssetConfigKey>(record, new ESAssetReferTimelineAssetConfigData(), new ESAssetReferTimelineAssetConfigKey()));
+                    return RegisterTimelineAsset(CreateAssetDataFromPage<ESAssetReferTimelineAssetConfigData, ESAssetReferTimelineAssetConfigKey>(page, new ESAssetReferTimelineAssetConfigData(), new ESAssetReferTimelineAssetConfigKey()));
                 case ESAssetReferKind.PlayableAsset:
-                    return RegisterPlayableAsset(CreateAssetDataFromRecord<ESAssetReferPlayableAssetConfigData, ESAssetReferPlayableAssetConfigKey>(record, new ESAssetReferPlayableAssetConfigData(), new ESAssetReferPlayableAssetConfigKey()));
+                    return RegisterPlayableAsset(CreateAssetDataFromPage<ESAssetReferPlayableAssetConfigData, ESAssetReferPlayableAssetConfigKey>(page, new ESAssetReferPlayableAssetConfigData(), new ESAssetReferPlayableAssetConfigKey()));
+                case ESAssetReferKind.ScriptableObject:
+                    return RegisterScriptableObject(CreateAssetDataFromPage<ESAssetReferScriptableObjectConfigData, ESAssetReferScriptableObjectConfigKey>(page, new ESAssetReferScriptableObjectConfigData(), new ESAssetReferScriptableObjectConfigKey()));
                 case ESAssetReferKind.TerrainData:
-                    return RegisterTerrainData(CreateAssetDataFromRecord<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey>(record, new ESAssetReferTerrainDataConfigData(), new ESAssetReferTerrainDataConfigKey()));
+                    return RegisterTerrainData(CreateAssetDataFromPage<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey>(page, new ESAssetReferTerrainDataConfigData(), new ESAssetReferTerrainDataConfigKey()));
                 default:
                     return false;
             }
         }
 
-        private static TData CreateAssetDataFromRecord<TData, TKey>(ESAssetRecord record, TData data, TKey key)
+        private static TData CreateAssetDataFromPage<TData, TKey>(ESAssetPage page, TData data, TKey key)
             where TKey : IESConfigKey
         {
             Type keyType = key.GetType();
-            keyType.GetField("stringKey")?.SetValue(key, record.stringKey);
-            keyType.GetField("assetRuntimeKey")?.SetValue(key, record.runtimeKey);
-            keyType.GetMethod("SetAssetAuthority")?.Invoke(key, new object[] { record.guid, record.localFileId, record.assetType != null ? record.assetType.FullName : null, record.assetPath });
+            var enumKeyField = keyType.GetField("enumKey");
+            if (enumKeyField != null && enumKeyField.FieldType.IsEnum)
+                enumKeyField.SetValue(key, Enum.ToObject(enumKeyField.FieldType, page.EnumKey));
+            keyType.GetField("stringKey")?.SetValue(key, page.EffectiveStringKey);
+            keyType.GetMethod("SetAssetAuthority")?.Invoke(key, new object[] { page.AssetGuid, page.LocalFileId, page.AssetTypeName, page.AssetPath });
 
             Type dataType = data.GetType();
-            dataType.GetField("runtimeKey")?.SetValue(data, record.runtimeKey);
-            dataType.GetField("keyName")?.SetValue(data, record.stringKey);
-            dataType.GetField("displayName")?.SetValue(data, record.assetName);
-            dataType.GetField("sourcePackage")?.SetValue(data, record.libraryName);
+            dataType.GetField("keyName")?.SetValue(data, page.EffectiveStringKey);
+            dataType.GetField("displayName")?.SetValue(data, page.Name);
+            dataType.GetField("sourcePackage")?.SetValue(data, page.SourceLibrary);
             dataType.GetField("key")?.SetValue(data, key);
+            var setAssetIdentity = dataType.GetMethod("SetAssetIdentity");
+            setAssetIdentity?.Invoke(data, new object[] { page.AssetGuid, page.LocalFileId });
             return data;
         }
 #endif
+
+        public static int RebuildAssetConfigTablesFromCatalogs(IReadOnlyList<ESRuntimeCatalog> catalogs)
+        {
+            BeginBuild(true);
+            try
+            {
+                int count = 0;
+                if (catalogs == null)
+                    return count;
+
+                for (int catalogIndex = 0; catalogIndex < catalogs.Count; catalogIndex++)
+                {
+                    ESRuntimeCatalog catalog = catalogs[catalogIndex];
+                    if (catalog?.assets == null)
+                        continue;
+
+                    for (int assetIndex = 0; assetIndex < catalog.assets.Count; assetIndex++)
+                        if (RegisterCatalogEntryAsAssetConfigData(catalog.assets[assetIndex]))
+                            count++;
+                }
+                return count;
+            }
+            finally
+            {
+                EndBuild();
+            }
+        }
+
+        private static bool RegisterCatalogEntryAsAssetConfigData(ESRuntimeCatalogEntry entry)
+        {
+            if (entry == null || !entry.isBusinessAsset || entry.identity == null || !entry.identity.IsValid || !Enum.TryParse(entry.kind, out ESAssetReferKind kind))
+                return false;
+            if (entry.enumKey == 0 && string.IsNullOrEmpty(entry.stringKey))
+                throw new InvalidOperationException("Catalog \u4e1a\u52a1\u8d44\u4ea7\u7f3a\u5c11 EnumKey/StringKey\uff1a" + entry.identity.guid);
+
+            switch (kind)
+            {
+                case ESAssetReferKind.Prefab: return RegisterPrefab(CreateAssetDataFromCatalog<ESAssetReferPrefabConfigData, ESAssetReferPrefabConfigKey>(entry, new ESAssetReferPrefabConfigData(), new ESAssetReferPrefabConfigKey()));
+                case ESAssetReferKind.Scene: return RegisterScene(CreateAssetDataFromCatalog<ESAssetReferSceneConfigData, ESAssetReferSceneConfigKey>(entry, new ESAssetReferSceneConfigData(), new ESAssetReferSceneConfigKey()));
+                case ESAssetReferKind.Sprite: return RegisterSprite(CreateAssetDataFromCatalog<ESAssetReferSpriteConfigData, ESAssetReferSpriteConfigKey>(entry, new ESAssetReferSpriteConfigData(), new ESAssetReferSpriteConfigKey()));
+                case ESAssetReferKind.Texture2D: return RegisterTexture2D(CreateAssetDataFromCatalog<ESAssetReferTexture2DConfigData, ESAssetReferTexture2DConfigKey>(entry, new ESAssetReferTexture2DConfigData(), new ESAssetReferTexture2DConfigKey()));
+                case ESAssetReferKind.Texture: return RegisterTexture(CreateAssetDataFromCatalog<ESAssetReferTextureConfigData, ESAssetReferTextureConfigKey>(entry, new ESAssetReferTextureConfigData(), new ESAssetReferTextureConfigKey()));
+                case ESAssetReferKind.SpriteAtlas: return RegisterSpriteAtlas(CreateAssetDataFromCatalog<ESAssetReferSpriteAtlasConfigData, ESAssetReferSpriteAtlasConfigKey>(entry, new ESAssetReferSpriteAtlasConfigData(), new ESAssetReferSpriteAtlasConfigKey()));
+                case ESAssetReferKind.Material: return RegisterMaterial(CreateAssetDataFromCatalog<ESAssetReferMaterialConfigData, ESAssetReferMaterialConfigKey>(entry, new ESAssetReferMaterialConfigData(), new ESAssetReferMaterialConfigKey()));
+                case ESAssetReferKind.Mesh: return RegisterMesh(CreateAssetDataFromCatalog<ESAssetReferMeshConfigData, ESAssetReferMeshConfigKey>(entry, new ESAssetReferMeshConfigData(), new ESAssetReferMeshConfigKey()));
+                case ESAssetReferKind.AnimationClip: return RegisterAnimationClip(CreateAssetDataFromCatalog<ESAssetReferAnimationClipConfigData, ESAssetReferAnimationClipConfigKey>(entry, new ESAssetReferAnimationClipConfigData(), new ESAssetReferAnimationClipConfigKey()));
+                case ESAssetReferKind.AnimatorController: return RegisterAnimatorController(CreateAssetDataFromCatalog<ESAssetReferAnimatorControllerConfigData, ESAssetReferAnimatorControllerConfigKey>(entry, new ESAssetReferAnimatorControllerConfigData(), new ESAssetReferAnimatorControllerConfigKey()));
+                case ESAssetReferKind.Avatar: return RegisterAvatar(CreateAssetDataFromCatalog<ESAssetReferAvatarConfigData, ESAssetReferAvatarConfigKey>(entry, new ESAssetReferAvatarConfigData(), new ESAssetReferAvatarConfigKey()));
+                case ESAssetReferKind.AudioClip: return RegisterAudioClip(CreateAssetDataFromCatalog<ESAssetReferAudioClipConfigData, ESAssetReferAudioClipConfigKey>(entry, new ESAssetReferAudioClipConfigData(), new ESAssetReferAudioClipConfigKey()));
+                case ESAssetReferKind.VideoClip: return RegisterVideoClip(CreateAssetDataFromCatalog<ESAssetReferVideoClipConfigData, ESAssetReferVideoClipConfigKey>(entry, new ESAssetReferVideoClipConfigData(), new ESAssetReferVideoClipConfigKey()));
+                case ESAssetReferKind.TimelineAsset: return RegisterTimelineAsset(CreateAssetDataFromCatalog<ESAssetReferTimelineAssetConfigData, ESAssetReferTimelineAssetConfigKey>(entry, new ESAssetReferTimelineAssetConfigData(), new ESAssetReferTimelineAssetConfigKey()));
+                case ESAssetReferKind.PlayableAsset: return RegisterPlayableAsset(CreateAssetDataFromCatalog<ESAssetReferPlayableAssetConfigData, ESAssetReferPlayableAssetConfigKey>(entry, new ESAssetReferPlayableAssetConfigData(), new ESAssetReferPlayableAssetConfigKey()));
+                case ESAssetReferKind.ScriptableObject: return RegisterScriptableObject(CreateAssetDataFromCatalog<ESAssetReferScriptableObjectConfigData, ESAssetReferScriptableObjectConfigKey>(entry, new ESAssetReferScriptableObjectConfigData(), new ESAssetReferScriptableObjectConfigKey()));
+                case ESAssetReferKind.TerrainData: return RegisterTerrainData(CreateAssetDataFromCatalog<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey>(entry, new ESAssetReferTerrainDataConfigData(), new ESAssetReferTerrainDataConfigKey()));
+                default: return false;
+            }
+        }
+
+        private static TData CreateAssetDataFromCatalog<TData, TKey>(ESRuntimeCatalogEntry entry, TData data, TKey key)
+            where TKey : IESConfigKey
+        {
+            Type keyType = key.GetType();
+            var enumKeyField = keyType.GetField("enumKey");
+            if (enumKeyField != null && enumKeyField.FieldType.IsEnum)
+                enumKeyField.SetValue(key, Enum.ToObject(enumKeyField.FieldType, entry.enumKey));
+            keyType.GetField("stringKey")?.SetValue(key, entry.stringKey);
+            keyType.GetMethod("SetAssetAuthority")?.Invoke(key, new object[] { entry.identity.guid, entry.identity.localFileId, entry.assetTypeName, null });
+
+            Type dataType = data.GetType();
+            dataType.GetField("keyName")?.SetValue(data, entry.stringKey);
+            dataType.GetField("displayName")?.SetValue(data, entry.pageName);
+            dataType.GetField("sourcePackage")?.SetValue(data, entry.libraryFolder);
+            dataType.GetField("key")?.SetValue(data, key);
+            dataType.GetMethod("SetAssetIdentity")?.Invoke(data, new object[] { entry.identity.guid, entry.identity.localFileId });
+            return data;
+        }
 
         public static int GetAssetConflictCount()
         {
@@ -314,6 +430,7 @@ namespace ES
                 + SpriteAtlases.ConflictCount
                 + Avatars.ConflictCount
                 + PlayableAssets.ConflictCount
+                + ScriptableObjects.ConflictCount
                 + TimelineAssets.ConflictCount
                 + VideoClips.ConflictCount
                 + TerrainDatas.ConflictCount;
@@ -335,6 +452,7 @@ namespace ES
             AppendConflictReport(builder, "SpriteAtlas", SpriteAtlases.GetConflictReport());
             AppendConflictReport(builder, "Avatar", Avatars.GetConflictReport());
             AppendConflictReport(builder, "PlayableAsset", PlayableAssets.GetConflictReport());
+            AppendConflictReport(builder, "ScriptableObject", ScriptableObjects.GetConflictReport());
             AppendConflictReport(builder, "TimelineAsset", TimelineAssets.GetConflictReport());
             AppendConflictReport(builder, "VideoClip", VideoClips.GetConflictReport());
             AppendConflictReport(builder, "TerrainData", TerrainDatas.GetConflictReport());
@@ -467,6 +585,15 @@ namespace ES
             return UpsertAssetData(PlayableAssets, data, data.runtimeKey, data.key.GetStringKey(data.keyName));
         }
 
+        public static bool RegisterScriptableObject(ESAssetReferScriptableObjectConfigData data)
+        {
+            if (data == null || data.key == null)
+                return false;
+
+            data.runtimeKey = ScriptableObjects.Bake(data.key, data.keyName);
+            return UpsertAssetData(ScriptableObjects, data, data.runtimeKey, data.key.GetStringKey(data.keyName));
+        }
+
         public static bool RegisterTimelineAsset(ESAssetReferTimelineAssetConfigData data)
         {
             if (data == null || data.key == null)
@@ -497,10 +624,9 @@ namespace ES
         private static bool UpsertAssetData<TData>(ESConfigKeyTable<TData> table, TData data, int runtimeKey, string stringKey)
             where TData : class, IESAssetReferConfigData
         {
-            if (table.TryGet(runtimeKey, out TData existing) || table.TryGetByStringKey(stringKey, out existing))
-                data.CopyRuntimeAssetStateFrom(existing);
-
-            return table.Upsert(runtimeKey, data, stringKey);
+            // Asset EnumKey/StringKey are authoritative inside their typed table.
+            // A duplicate must be rejected instead of silently replacing or falling back.
+            return table.Register(runtimeKey, data, stringKey);
         }
 
     }
@@ -519,8 +645,7 @@ namespace ES
 
         [ShowInInspector, ReadOnly, LabelText("Buff Table")]
         public readonly ESConfigKeyTable<ESBuffRuntimeData> Buffs = BuffTable;
-
-        [ShowInInspector, ReadOnly, LabelText("椋炶鐗╄〃")]
+        [ShowInInspector, ReadOnly, LabelText("\u98de\u884c\u7269\u8868")]
         public readonly ESConfigKeyTable<ESShotRuntimeData> Shots = ShotTable;
 
         [ShowInInspector, ReadOnly, LabelText("Monster Table")]
@@ -531,11 +656,9 @@ namespace ES
 
         [ShowInInspector, ReadOnly, LabelText("Weapon Table")]
         public readonly ESConfigKeyTable<ESWeaponRuntimeData> Weapons = WeaponTable;
-
-        [ShowInInspector, ReadOnly, LabelText("鎶€鑳借〃")]
+        [ShowInInspector, ReadOnly, LabelText("\u6280\u80fd\u8868")]
         public readonly ESConfigKeyTable<ESSkillRuntimeData> Skills = SkillTable;
-
-        [ShowInInspector, ReadOnly, LabelText("Buff瀹炰緥绱㈠紩")]
+        [ShowInInspector, ReadOnly, LabelText("Buff\u5b9e\u4f8b\u7d22\u5f15")]
         public readonly ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffInstances = BuffInstanceIndex;
 
         [ShowInInspector, ReadOnly, LabelText("Shot Instance Index")]
@@ -544,8 +667,196 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("Building")]
         private static bool isBuilding;
 
+        [NonSerialized]
+        private ESRuntimeDataAssetLoadingService assetLoadingService;
+
         public bool IsBuilding => isBuilding;
         public static bool IsBuildingStatic => isBuilding;
+        public ESRuntimeDataAssetLoadingService AssetLoadingService => assetLoadingService ??= new ESRuntimeDataAssetLoadingService();
+
+        public static void InjectGameCoreRoot(BuffDefinitionDataInfo info)
+        {
+            bool ownsBuildScope = BeginRootInjection(info);
+            try { if (!RegisterBuff(info)) ThrowRootInjectionFailed("Buff", info); }
+            finally { EndRootInjection(ownsBuildScope); }
+        }
+
+        public static void InjectGameCoreRoot(SkillDefinitionDataInfo info)
+        {
+            bool ownsBuildScope = BeginRootInjection(info);
+            try { if (!RegisterSkill(info)) ThrowRootInjectionFailed("Skill", info); }
+            finally { EndRootInjection(ownsBuildScope); }
+        }
+
+        public static void InjectGameCoreRoot(ItemDataInfo info)
+        {
+            bool ownsBuildScope = BeginRootInjection(info);
+            try { if (!RegisterShot(info) && !RegisterWeapon(info)) ThrowRootInjectionFailed("Item", info); }
+            finally { EndRootInjection(ownsBuildScope); }
+        }
+
+        private static void InjectGameCoreRootInternal(ScriptableObject source, Func<bool> register, string category)
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source), "[ESGameCore][Inject] \u6839 SO \u4e0d\u80fd\u4e3a\u7a7a\u3002");
+            if (register == null)
+                throw new ArgumentNullException(nameof(register));
+
+            bool ownsBuildScope = !isBuilding;
+            if (ownsBuildScope)
+                BeginBuildStatic(clear: false);
+            try
+            {
+                if (!register())
+                    throw new InvalidOperationException("[ESGameCore][Inject] " + category + " \u6839 SO \u6ce8\u5165\u5931\u8d25\uff1a" + source.name);
+            }
+            finally
+            {
+                if (ownsBuildScope)
+                    EndBuildStatic();
+            }
+        }
+
+        private static bool BeginRootInjection(ScriptableObject source)
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source), "[ESGameCore][Inject] \u6839 SO \u4e0d\u80fd\u4e3a\u7a7a\u3002");
+            bool ownsBuildScope = !isBuilding;
+            if (ownsBuildScope)
+                BeginBuildStatic(clear: false);
+            return ownsBuildScope;
+        }
+
+        private static void EndRootInjection(bool ownsBuildScope)
+        {
+            if (ownsBuildScope)
+                EndBuildStatic();
+        }
+
+        private static void ThrowRootInjectionFailed(string category, ScriptableObject source)
+        {
+            throw new InvalidOperationException("[ESGameCore][Inject] " + category + " \u6839 SO \u6ce8\u5165\u5931\u8d25\uff1a" + source.name);
+        }
+
+        public void InitializeAssetLoading(ESGlobalAssetRuntimeMap manifest, IESRuntimeAssetBundleProvider provider, ESRuntimeRetryPolicy retryPolicy)
+        {
+            AssetLoadingService.Initialize(manifest, provider, retryPolicy);
+        }
+
+        public void InitializeAssetLoading(IESAssetRuntimeProvider provider)
+        {
+            AssetLoadingService.Initialize(provider);
+        }
+
+        public void InitializeAssetLoadingForRunMode(ESGlobalAssetRuntimeMap manifest, ESGlobalResSetting settings, ESRuntimeRetryPolicy retryPolicy)
+        {
+            AssetLoadingService.Initialize(ESAssetRuntimeProviderFactory.Create(manifest, settings, retryPolicy));
+        }
+        /// <summary>Explicit entry for the current release pipeline.</summary>
+        public async UniTask<ESRuntimeReleaseDownloadResult> InitializeAssetLoadingFromReleaseAsync(ESGlobalResSetting settings, CancellationToken cancellationToken = default)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            ESAssetRunMode runMode = ESAssetRunModeSession.Lock(settings);
+            if (runMode != ESAssetRunMode.LocalBuild && runMode != ESAssetRunMode.HotUpdate)
+                throw new InvalidOperationException($"\u53d1\u5e03\u8d44\u6e90\u94fe\u53ea\u652f\u6301 LocalBuild \u6216 HotUpdate\uff0c\u5f53\u524d\u6a21\u5f0f\u4e3a {runMode}\u3002");
+
+            var result = await ESRuntimeReleaseBootstrap.InitializeAsync(settings, cancellationToken);
+            await InitializeAssetLoadingFromReleaseResultAsync(settings, result, cancellationToken);
+            return result;
+        }
+
+        public async UniTask InitializeAssetLoadingFromReleaseResultAsync(ESGlobalResSetting settings, ESRuntimeReleaseDownloadResult result, CancellationToken cancellationToken = default)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            if (result == null || result.RuntimeMap == null) throw new ArgumentNullException(nameof(result));
+            ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(result.Catalogs);
+            InitializeAssetLoadingForRunMode(result.RuntimeMap, settings, ESRuntimeRetryPolicy.Default);
+            await PreloadGameCoreAssetsAsync(result.GameCoreAssets, cancellationToken);
+        }
+
+        /// <summary>
+        /// Preloads Consumer GameCore assets after the runtime provider is ready.
+        /// Each IGameCoreSO injects its own target GameCore table.
+        /// </summary>
+        public async UniTask<ESGameCoreAssetPreloadReport> PreloadGameCoreAssetsAsync(IEnumerable<ESRuntimeConsumerGameCoreReference> assets, CancellationToken cancellationToken = default)
+        {
+            if (!AssetLoadingService.IsInitialized) throw new InvalidOperationException("\u5fc5\u987b\u5148\u521d\u59cb\u5316\u65b0\u7248 Asset Provider\uff0c\u624d\u80fd\u9884\u70ed GameCore \u8d44\u4ea7\u3002");
+            var report = new ESGameCoreAssetPreloadReport();
+            var identities = new HashSet<ESAssetIdentity>();
+            foreach (ESRuntimeConsumerGameCoreReference entry in OrderGameCoreAssets(assets))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (entry == null || !entry.IsValid || !identities.Add(new ESAssetIdentity(entry.guid, entry.localFileId)))
+                {
+                    report.skippedCount++;
+                    continue;
+                }
+
+                report.requestedCount++;
+                try
+                {
+                    var refer = new ESAssetReferScriptableObject();
+                    refer.InitializeGeneratedReference(entry.guid, entry.localFileId, ESAssetReferKind.ScriptableObject, 0, string.Empty);
+                    ScriptableObject asset = await ESAssets.LoadAsync(refer, cancellationToken);
+                    if (!(asset is IGameCoreSO gameCore))
+                        throw new InvalidOperationException("Consumer GameCore \u8d44\u4ea7\u672a\u5b9e\u73b0 IGameCoreSO\uff1a" + entry.guid);
+                    gameCore.InjectGameCoreTables();
+                    report.loadedCount++;
+                }
+                catch (Exception exception)
+                {
+                    report.failedCount++;
+                    report.errors.Add(entry.guid + ":" + entry.localFileId + " : " + exception.Message);
+                    throw;
+                }
+            }
+            return report;
+        }
+
+        private static IReadOnlyList<ESRuntimeConsumerGameCoreReference> OrderGameCoreAssets(IEnumerable<ESRuntimeConsumerGameCoreReference> source)
+        {
+            var byId = new Dictionary<ESAssetIdentity, ESRuntimeConsumerGameCoreReference>();
+            foreach (ESRuntimeConsumerGameCoreReference entry in source ?? Array.Empty<ESRuntimeConsumerGameCoreReference>())
+                if (entry != null && entry.IsValid)
+                    byId[new ESAssetIdentity(entry.guid, entry.localFileId)] = entry;
+
+            var ordered = new List<ESRuntimeConsumerGameCoreReference>(byId.Count);
+            var visited = new HashSet<ESAssetIdentity>();
+            var visiting = new HashSet<ESAssetIdentity>();
+            void Visit(ESAssetIdentity id)
+            {
+                if (visited.Contains(id)) return;
+                if (!byId.TryGetValue(id, out ESRuntimeConsumerGameCoreReference entry))
+                    throw new InvalidOperationException("Consumer \u7f3a\u5c11 GameCore \u4f9d\u8d56\uff1a" + id);
+                if (!visiting.Add(id))
+                    throw new InvalidOperationException("Consumer GameCore \u5b58\u5728\u5faa\u73af\u4f9d\u8d56\uff1a" + id);
+                foreach (ESRuntimeConsumerGameCoreDependencyReference dependency in entry.dependencies ?? new List<ESRuntimeConsumerGameCoreDependencyReference>())
+                {
+                    if (dependency == null || !dependency.IsValid)
+                        throw new InvalidOperationException("GameCore \u5305\u542b\u65e0\u6548\u4f9d\u8d56\uff1a" + id);
+                    Visit(new ESAssetIdentity(dependency.guid, dependency.localFileId));
+                }
+                visiting.Remove(id);
+                visited.Add(id);
+                ordered.Add(entry);
+            }
+
+            foreach (ESAssetIdentity id in byId.Keys.OrderBy(item => item.Guid, StringComparer.Ordinal).ThenBy(item => item.LocalFileId))
+                Visit(id);
+            return ordered;
+        }
+        /// <summary>Compatibility entry; new boot flow uses Consumer GameCoreAssets.</summary>
+        public UniTask<ESGameCoreAssetPreloadReport> PreloadGameCoreAssetsAsync(ESGameCoreAssetPreloadCatalog catalog, CancellationToken cancellationToken = default)
+        {
+            if (catalog == null) throw new ArgumentNullException(nameof(catalog));
+            if (!AssetLoadingService.IsInitialized) throw new InvalidOperationException("\u5fc5\u987b\u5148\u521d\u59cb\u5316\u65b0\u7248 Asset Provider\uff0c\u624d\u80fd\u9884\u70ed GameCore \u8d44\u4ea7\u3002");
+            return catalog.PreloadAsync(cancellationToken);
+        }
+
+        public void DisposeAssetLoading()
+        {
+            assetLoadingService?.Dispose();
+        }
 
         public void BeginBuild(bool clear = false)
         {
@@ -591,9 +902,7 @@ namespace ES
         public void Initialize(
             IEnumerable<BuffDefinitionDataInfo> buffs = null,
             IEnumerable<ItemDataInfo> items = null,
-            IEnumerable<ActorDataInfo> actors = null,
             IEnumerable<SkillDefinitionDataInfo> skills = null,
-            IEnumerable<ESGameCoreConfigKeyJsonRecord> jsonRecords = null,
             bool clear = true)
         {
             BeginBuild(clear);
@@ -601,9 +910,7 @@ namespace ES
             {
                 RegisterBuffs(buffs);
                 RegisterItems(items);
-                RegisterActors(actors);
                 RegisterSkills(skills);
-                RegisterJsonRecords(jsonRecords);
             }
             finally
             {
@@ -644,21 +951,6 @@ namespace ES
             return count;
         }
 
-        public int RegisterActors(IEnumerable<ActorDataInfo> infos)
-        {
-            if (infos == null)
-                return 0;
-
-            int count = 0;
-            foreach (ActorDataInfo info in infos)
-            {
-                if (RegisterActor(info))
-                    count++;
-            }
-
-            return count;
-        }
-
         public int RegisterSkills(IEnumerable<SkillDefinitionDataInfo> infos)
         {
             if (infos == null)
@@ -674,7 +966,7 @@ namespace ES
             return count;
         }
 
-        public bool RegisterBuff(BuffDefinitionDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
+        public static bool RegisterBuff(BuffDefinitionDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
         {
             if (info == null || info.sharedData == null)
                 return false;
@@ -682,8 +974,8 @@ namespace ES
             if (info.sharedData.key == null)
                 info.sharedData.key = new ESBuffConfigKey();
 
-            if (IsSameBuffAlreadyRegistered(info))
-                return true;
+            if (TryGetByKey(BuffTable, info.sharedData.key, info.KeyName, out ESBuffRuntimeData existingBuff))
+                return ReferenceEquals(existingBuff.soSource, info);
 
             ESBuffRuntimeData data = new ESBuffRuntimeData
             {
@@ -697,11 +989,11 @@ namespace ES
                 extraAsset = extraAsset
             };
 
-            data.runtimeKey = Buffs.Bake(info.sharedData.key, info.KeyName);
-            return Buffs.Upsert(data.runtimeKey, data, info.sharedData.key.GetStringKey(info.KeyName));
+            data.runtimeKey = BuffTable.Bake(info.sharedData.key, info.KeyName);
+            return BuffTable.Upsert(data.runtimeKey, data, info.sharedData.key.GetStringKey(info.KeyName));
         }
 
-        public bool RegisterShot(ItemDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
+        public static bool RegisterShot(ItemDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
         {
             if (info == null || info.baseConfig == null || info.baseConfig.kind != ItemKind.Shot)
                 return false;
@@ -709,8 +1001,8 @@ namespace ES
             if (info.shotKey == null)
                 info.shotKey = new ESShotConfigKey();
 
-            if (IsSameShotAlreadyRegistered(info))
-                return true;
+            if (TryGetByKey(ShotTable, info.shotKey, info.KeyName, out ESShotRuntimeData existingShot))
+                return ReferenceEquals(existingShot.soSource, info);
 
             ESShotRuntimeData data = new ESShotRuntimeData
             {
@@ -724,11 +1016,11 @@ namespace ES
                 extraAsset = extraAsset
             };
 
-            data.runtimeKey = Shots.Bake(info.shotKey, info.KeyName);
-            return Shots.Upsert(data.runtimeKey, data, info.shotKey.GetStringKey(info.KeyName));
+            data.runtimeKey = ShotTable.Bake(info.shotKey, info.KeyName);
+            return ShotTable.Upsert(data.runtimeKey, data, info.shotKey.GetStringKey(info.KeyName));
         }
 
-        public bool RegisterWeapon(ItemDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
+        public static bool RegisterWeapon(ItemDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
         {
             if (info == null || info.baseConfig == null || info.baseConfig.kind != ItemKind.Weapon)
                 return false;
@@ -736,8 +1028,8 @@ namespace ES
             if (info.weaponKey == null)
                 info.weaponKey = new ESWeaponConfigKey();
 
-            if (IsSameWeaponAlreadyRegistered(info))
-                return true;
+            if (TryGetByKey(WeaponTable, info.weaponKey, info.KeyName, out ESWeaponRuntimeData existingWeapon))
+                return ReferenceEquals(existingWeapon.soSource, info);
 
             ESWeaponRuntimeData data = new ESWeaponRuntimeData
             {
@@ -751,67 +1043,11 @@ namespace ES
                 extraAsset = extraAsset
             };
 
-            data.runtimeKey = Weapons.Bake(info.weaponKey, info.KeyName);
-            return Weapons.Upsert(data.runtimeKey, data, info.weaponKey.GetStringKey(info.KeyName));
+            data.runtimeKey = WeaponTable.Bake(info.weaponKey, info.KeyName);
+            return WeaponTable.Upsert(data.runtimeKey, data, info.weaponKey.GetStringKey(info.KeyName));
         }
 
-        public bool RegisterActor(ActorDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
-        {
-            if (info == null)
-                return false;
-
-            if (info.actorKind == ActorDataKind.Monster)
-            {
-                if (info.monsterKey == null)
-                    info.monsterKey = new ESMonsterConfigKey();
-
-                if (IsSameMonsterAlreadyRegistered(info))
-                    return true;
-
-                ESMonsterRuntimeData data = new ESMonsterRuntimeData
-                {
-                    keyName = info.KeyName,
-                    displayName = DisplayName(info),
-                    sourcePackage = info.name,
-                    soSource = info,
-                    sharedData = info.motionShared,
-                    defaultVariableData = info.motionVariable,
-                    prefab = prefab,
-                    extraAsset = extraAsset
-                };
-
-                data.runtimeKey = Monsters.Bake(info.monsterKey, info.KeyName);
-                return Monsters.Upsert(data.runtimeKey, data, info.monsterKey.GetStringKey(info.KeyName));
-            }
-
-            if (info.actorKind == ActorDataKind.NPC)
-            {
-                if (info.npcKey == null)
-                    info.npcKey = new ESNpcConfigKey();
-
-                if (IsSameNpcAlreadyRegistered(info))
-                    return true;
-
-                ESNpcRuntimeData data = new ESNpcRuntimeData
-                {
-                    keyName = info.KeyName,
-                    displayName = DisplayName(info),
-                    sourcePackage = info.name,
-                    soSource = info,
-                    sharedData = info.motionShared,
-                    defaultVariableData = info.motionVariable,
-                    prefab = prefab,
-                    extraAsset = extraAsset
-                };
-
-                data.runtimeKey = Npcs.Bake(info.npcKey, info.KeyName);
-                return Npcs.Upsert(data.runtimeKey, data, info.npcKey.GetStringKey(info.KeyName));
-            }
-
-            return false;
-        }
-
-        public bool RegisterSkill(SkillDefinitionDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
+        public static bool RegisterSkill(SkillDefinitionDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
         {
             if (info == null)
                 return false;
@@ -819,8 +1055,8 @@ namespace ES
             if (info.skillKey == null)
                 info.skillKey = new ESSkillConfigKey();
 
-            if (IsSameSkillAlreadyRegistered(info))
-                return true;
+            if (TryGetByKey(SkillTable, info.skillKey, info.KeyName, out ESSkillRuntimeData existingSkill))
+                return ReferenceEquals(existingSkill.soSource, info);
 
             ESSkillRuntimeData data = new ESSkillRuntimeData
             {
@@ -834,8 +1070,8 @@ namespace ES
                 extraAsset = extraAsset
             };
 
-            data.runtimeKey = Skills.Bake(info.skillKey, info.KeyName);
-            return Skills.Upsert(data.runtimeKey, data, info.skillKey.GetStringKey(info.KeyName));
+            data.runtimeKey = SkillTable.Bake(info.skillKey, info.KeyName);
+            return SkillTable.Upsert(data.runtimeKey, data, info.skillKey.GetStringKey(info.KeyName));
         }
 
         public bool TryGetBuff(int runtimeKey, out ESBuffRuntimeData data) => Buffs.TryGet(runtimeKey, out data);
@@ -859,181 +1095,6 @@ namespace ES
         public bool TryGetWeapon(string stringKey, out ESWeaponRuntimeData data) => TryGetByString(Weapons, stringKey, out data);
         public bool TryGetSkill(string stringKey, out ESSkillRuntimeData data) => TryGetByString(Skills, stringKey, out data);
 
-        public bool RegisterJsonRecord(ESGameCoreConfigKeyJsonRecord record)
-        {
-            if (record == null || string.IsNullOrEmpty(record.kind) || (record.enumKey == 0 && string.IsNullOrEmpty(record.stringKey)))
-                return false;
-
-            switch (record.kind)
-            {
-                case ESGameCoreConfigKeyJsonKinds.Buff:
-                    return RegisterJsonBuff(record);
-                case ESGameCoreConfigKeyJsonKinds.Shot:
-                    return RegisterJsonShot(record);
-                case ESGameCoreConfigKeyJsonKinds.Monster:
-                    return RegisterJsonMonster(record);
-                case ESGameCoreConfigKeyJsonKinds.Npc:
-                    return RegisterJsonNpc(record);
-                case ESGameCoreConfigKeyJsonKinds.Weapon:
-                    return RegisterJsonWeapon(record);
-                case ESGameCoreConfigKeyJsonKinds.Skill:
-                    return RegisterJsonSkill(record);
-                default:
-                    return false;
-            }
-        }
-
-        public int RegisterJsonRecords(IEnumerable<ESGameCoreConfigKeyJsonRecord> records)
-        {
-            if (records == null)
-                return 0;
-
-            int count = 0;
-            foreach (ESGameCoreConfigKeyJsonRecord record in records)
-            {
-                if (RegisterJsonRecord(record))
-                    count++;
-            }
-
-            return count;
-        }
-
-        public bool RegisterJson(string json)
-        {
-            if (string.IsNullOrEmpty(json))
-                return false;
-
-            ESGameCoreConfigKeyJsonRecord record = JsonUtility.FromJson<ESGameCoreConfigKeyJsonRecord>(json);
-            return RegisterJsonRecord(record);
-        }
-
-        public int RegisterJsonBatch(string json)
-        {
-            if (string.IsNullOrEmpty(json))
-                return 0;
-
-            ESGameCoreConfigKeyJsonBatch batch = JsonUtility.FromJson<ESGameCoreConfigKeyJsonBatch>(json);
-            return batch != null ? RegisterJsonRecords(batch.records) : 0;
-        }
-
-        public string CreateJson(ESGameCoreConfigKeyJsonRecord record, bool prettyPrint = true)
-        {
-            return record == null ? string.Empty : JsonUtility.ToJson(record, prettyPrint);
-        }
-
-        public string CreateJsonBatch(IList<ESGameCoreConfigKeyJsonRecord> records, bool prettyPrint = true)
-        {
-            ESGameCoreConfigKeyJsonBatch batch = new ESGameCoreConfigKeyJsonBatch
-            {
-                records = records != null ? ToArray(records) : Array.Empty<ESGameCoreConfigKeyJsonRecord>()
-            };
-            return JsonUtility.ToJson(batch, prettyPrint);
-        }
-
-        public ESGameCoreConfigKeyJsonRecord CreateBuffJsonRecord(BuffDefinitionDataInfo info)
-        {
-            if (info == null || info.sharedData == null)
-                return null;
-
-            ESBuffConfigKey key = info.sharedData.key;
-            return CreateRecord(
-                ESGameCoreConfigKeyJsonKinds.Buff,
-                key != null ? key.EnumKeyInt : 0,
-                key != null ? key.GetStringKey(info.KeyName) : info.KeyName,
-                info.KeyName,
-                null,
-                info.name,
-                JsonUtility.ToJson(info.sharedData),
-                JsonUtility.ToJson(info.variableData));
-        }
-
-        public ESGameCoreConfigKeyJsonRecord CreateShotJsonRecord(ItemDataInfo info)
-        {
-            if (info == null || info.baseConfig == null || info.baseConfig.kind != ItemKind.Shot)
-                return null;
-
-            ESShotConfigKey key = info.shotKey;
-            return CreateRecord(
-                ESGameCoreConfigKeyJsonKinds.Shot,
-                key != null ? key.EnumKeyInt : 0,
-                key != null ? key.GetStringKey(info.KeyName) : info.KeyName,
-                DisplayName(info),
-                null,
-                info.name,
-                JsonUtility.ToJson(info.shotShared),
-                JsonUtility.ToJson(info.shotVariable));
-        }
-
-        public ESGameCoreConfigKeyJsonRecord CreateWeaponJsonRecord(ItemDataInfo info)
-        {
-            if (info == null || info.baseConfig == null || info.baseConfig.kind != ItemKind.Weapon)
-                return null;
-
-            ESWeaponConfigKey key = info.weaponKey;
-            return CreateRecord(
-                ESGameCoreConfigKeyJsonKinds.Weapon,
-                key != null ? key.EnumKeyInt : 0,
-                key != null ? key.GetStringKey(info.KeyName) : info.KeyName,
-                DisplayName(info),
-                null,
-                info.name,
-                JsonUtility.ToJson(info.weaponShared),
-                JsonUtility.ToJson(info.weaponVariable));
-        }
-
-        public ESGameCoreConfigKeyJsonRecord CreateActorJsonRecord(ActorDataInfo info)
-        {
-            if (info == null)
-                return null;
-
-            if (info.actorKind == ActorDataKind.Monster)
-            {
-                ESMonsterConfigKey key = info.monsterKey;
-                return CreateRecord(
-                    ESGameCoreConfigKeyJsonKinds.Monster,
-                    key != null ? key.EnumKeyInt : 0,
-                    key != null ? key.GetStringKey(info.KeyName) : info.KeyName,
-                    DisplayName(info),
-                    null,
-                    info.name,
-                    JsonUtility.ToJson(info.motionShared),
-                    JsonUtility.ToJson(info.motionVariable));
-            }
-
-            if (info.actorKind == ActorDataKind.NPC)
-            {
-                ESNpcConfigKey key = info.npcKey;
-                return CreateRecord(
-                    ESGameCoreConfigKeyJsonKinds.Npc,
-                    key != null ? key.EnumKeyInt : 0,
-                    key != null ? key.GetStringKey(info.KeyName) : info.KeyName,
-                    DisplayName(info),
-                    null,
-                    info.name,
-                    JsonUtility.ToJson(info.motionShared),
-                    JsonUtility.ToJson(info.motionVariable));
-            }
-
-            return null;
-        }
-
-        public ESGameCoreConfigKeyJsonRecord CreateSkillJsonRecord(SkillDefinitionDataInfo info)
-        {
-            if (info == null)
-                return null;
-
-            ESSkillConfigKey key = info.skillKey;
-            return CreateRecord(
-                ESGameCoreConfigKeyJsonKinds.Skill,
-                key != null ? key.EnumKeyInt : 0,
-                key != null ? key.GetStringKey(info.KeyName) : info.KeyName,
-                info.KeyName,
-                null,
-                info.name,
-                string.Empty,
-                string.Empty);
-        }
-
         public string GetConflictReport()
         {
             System.Text.StringBuilder builder = new System.Text.StringBuilder(512);
@@ -1046,163 +1107,27 @@ namespace ES
             return builder.ToString();
         }
 
-        private bool RegisterJsonBuff(ESGameCoreConfigKeyJsonRecord record)
+        private static bool IsSameBuffAlreadyRegistered(BuffDefinitionDataInfo info)
         {
-            int runtimeKey = Buffs.BakeRaw(record.enumKey, record.stringKey);
-            if (runtimeKey == 0)
-                return false;
-
-            ESBuffRuntimeData data = new ESBuffRuntimeData
-            {
-                runtimeKey = runtimeKey,
-                keyName = record.stringKey,
-                displayName = record.displayName,
-                sourcePackage = record.sourcePackage,
-                version = record.version,
-                sharedData = FromJsonOrDefault<BuffSharedData>(record.sharedDataJson),
-                defaultVariableData = FromJsonOrDefault<BuffVariableData>(record.variableDataJson),
-                jsonSource = record.ToSource()
-            };
-
-            return Buffs.Upsert(runtimeKey, data, record.stringKey);
-        }
-
-        private bool RegisterJsonShot(ESGameCoreConfigKeyJsonRecord record)
-        {
-            int runtimeKey = Shots.BakeRaw(record.enumKey, record.stringKey);
-            if (runtimeKey == 0)
-                return false;
-
-            ESShotRuntimeData data = new ESShotRuntimeData
-            {
-                runtimeKey = runtimeKey,
-                keyName = record.stringKey,
-                displayName = record.displayName,
-                sourcePackage = record.sourcePackage,
-                version = record.version,
-                sharedData = FromJsonOrDefault<ItemShotSharedData>(record.sharedDataJson),
-                defaultVariableData = FromJsonOrDefault<ItemShotVariableData>(record.variableDataJson),
-                jsonSource = record.ToSource()
-            };
-
-            return Shots.Upsert(runtimeKey, data, record.stringKey);
-        }
-
-        private bool RegisterJsonMonster(ESGameCoreConfigKeyJsonRecord record)
-        {
-            int runtimeKey = Monsters.BakeRaw(record.enumKey, record.stringKey);
-            if (runtimeKey == 0)
-                return false;
-
-            ESMonsterRuntimeData data = new ESMonsterRuntimeData
-            {
-                runtimeKey = runtimeKey,
-                keyName = record.stringKey,
-                displayName = record.displayName,
-                sourcePackage = record.sourcePackage,
-                version = record.version,
-                sharedData = FromJsonOrDefault<EntityMotionSharedData>(record.sharedDataJson),
-                defaultVariableData = FromJsonOrDefault<EntityMotionVariableData>(record.variableDataJson),
-                jsonSource = record.ToSource()
-            };
-
-            return Monsters.Upsert(runtimeKey, data, record.stringKey);
-        }
-
-        private bool RegisterJsonNpc(ESGameCoreConfigKeyJsonRecord record)
-        {
-            int runtimeKey = Npcs.BakeRaw(record.enumKey, record.stringKey);
-            if (runtimeKey == 0)
-                return false;
-
-            ESNpcRuntimeData data = new ESNpcRuntimeData
-            {
-                runtimeKey = runtimeKey,
-                keyName = record.stringKey,
-                displayName = record.displayName,
-                sourcePackage = record.sourcePackage,
-                version = record.version,
-                sharedData = FromJsonOrDefault<EntityMotionSharedData>(record.sharedDataJson),
-                defaultVariableData = FromJsonOrDefault<EntityMotionVariableData>(record.variableDataJson),
-                jsonSource = record.ToSource()
-            };
-
-            return Npcs.Upsert(runtimeKey, data, record.stringKey);
-        }
-
-        private bool RegisterJsonWeapon(ESGameCoreConfigKeyJsonRecord record)
-        {
-            int runtimeKey = Weapons.BakeRaw(record.enumKey, record.stringKey);
-            if (runtimeKey == 0)
-                return false;
-
-            ESWeaponRuntimeData data = new ESWeaponRuntimeData
-            {
-                runtimeKey = runtimeKey,
-                keyName = record.stringKey,
-                displayName = record.displayName,
-                sourcePackage = record.sourcePackage,
-                version = record.version,
-                sharedData = FromJsonOrDefault<ItemWeaponSharedData>(record.sharedDataJson),
-                defaultVariableData = FromJsonOrDefault<ItemWeaponVariableData>(record.variableDataJson),
-                jsonSource = record.ToSource()
-            };
-
-            return Weapons.Upsert(runtimeKey, data, record.stringKey);
-        }
-
-        private bool RegisterJsonSkill(ESGameCoreConfigKeyJsonRecord record)
-        {
-            int runtimeKey = Skills.BakeRaw(record.enumKey, record.stringKey);
-            if (runtimeKey == 0)
-                return false;
-
-            ESSkillRuntimeData data = new ESSkillRuntimeData
-            {
-                runtimeKey = runtimeKey,
-                keyName = record.stringKey,
-                displayName = record.displayName,
-                sourcePackage = record.sourcePackage,
-                version = record.version,
-                jsonSource = record.ToSource()
-            };
-
-            return Skills.Upsert(runtimeKey, data, record.stringKey);
-        }
-
-        private bool IsSameBuffAlreadyRegistered(BuffDefinitionDataInfo info)
-        {
-            return TryGetByKey(Buffs, info.sharedData.key, info.KeyName, out ESBuffRuntimeData data)
+            return TryGetByKey(BuffTable, info.sharedData.key, info.KeyName, out ESBuffRuntimeData data)
                 && ReferenceEquals(data.soSource, info);
         }
 
-        private bool IsSameShotAlreadyRegistered(ItemDataInfo info)
+        private static bool IsSameShotAlreadyRegistered(ItemDataInfo info)
         {
-            return TryGetByKey(Shots, info.shotKey, info.KeyName, out ESShotRuntimeData data)
+            return TryGetByKey(ShotTable, info.shotKey, info.KeyName, out ESShotRuntimeData data)
                 && ReferenceEquals(data.soSource, info);
         }
 
-        private bool IsSameWeaponAlreadyRegistered(ItemDataInfo info)
+        private static bool IsSameWeaponAlreadyRegistered(ItemDataInfo info)
         {
-            return TryGetByKey(Weapons, info.weaponKey, info.KeyName, out ESWeaponRuntimeData data)
+            return TryGetByKey(WeaponTable, info.weaponKey, info.KeyName, out ESWeaponRuntimeData data)
                 && ReferenceEquals(data.soSource, info);
         }
 
-        private bool IsSameMonsterAlreadyRegistered(ActorDataInfo info)
+        private static bool IsSameSkillAlreadyRegistered(SkillDefinitionDataInfo info)
         {
-            return TryGetByKey(Monsters, info.monsterKey, info.KeyName, out ESMonsterRuntimeData data)
-                && ReferenceEquals(data.soSource, info);
-        }
-
-        private bool IsSameNpcAlreadyRegistered(ActorDataInfo info)
-        {
-            return TryGetByKey(Npcs, info.npcKey, info.KeyName, out ESNpcRuntimeData data)
-                && ReferenceEquals(data.soSource, info);
-        }
-
-        private bool IsSameSkillAlreadyRegistered(SkillDefinitionDataInfo info)
-        {
-            return TryGetByKey(Skills, info.skillKey, info.KeyName, out ESSkillRuntimeData data)
+            return TryGetByKey(SkillTable, info.skillKey, info.KeyName, out ESSkillRuntimeData data)
                 && ReferenceEquals(data.soSource, info);
         }
 
@@ -1232,55 +1157,10 @@ namespace ES
             return TryGetByString(table, stringKey, out data);
         }
 
-        private static T FromJsonOrDefault<T>(string json)
-        {
-            return string.IsNullOrEmpty(json) ? default : JsonUtility.FromJson<T>(json);
-        }
-
-        private static ESGameCoreConfigKeyJsonRecord CreateRecord(
-            string kind,
-            int enumKey,
-            string stringKey,
-            string displayName,
-            string prefabAddress,
-            string sourcePackage,
-            string sharedDataJson,
-            string variableDataJson)
-        {
-            return new ESGameCoreConfigKeyJsonRecord
-            {
-                kind = kind,
-                enumKey = enumKey,
-                stringKey = stringKey,
-                displayName = displayName,
-                prefabAddress = prefabAddress,
-                sourcePackage = sourcePackage,
-                sharedDataJson = sharedDataJson,
-                variableDataJson = variableDataJson
-            };
-        }
-
-        private static ESGameCoreConfigKeyJsonRecord[] ToArray(IList<ESGameCoreConfigKeyJsonRecord> records)
-        {
-            ESGameCoreConfigKeyJsonRecord[] array = new ESGameCoreConfigKeyJsonRecord[records.Count];
-            for (int i = 0; i < records.Count; i++)
-                array[i] = records[i];
-
-            return array;
-        }
-
         private static string DisplayName(ItemDataInfo info)
         {
             if (info != null && info.baseConfig != null && !string.IsNullOrEmpty(info.baseConfig.displayName))
                 return info.baseConfig.displayName;
-
-            return info != null ? info.KeyName : string.Empty;
-        }
-
-        private static string DisplayName(ActorDataInfo info)
-        {
-            if (info != null && !string.IsNullOrEmpty(info.displayName))
-                return info.displayName;
 
             return info != null ? info.KeyName : string.Empty;
         }

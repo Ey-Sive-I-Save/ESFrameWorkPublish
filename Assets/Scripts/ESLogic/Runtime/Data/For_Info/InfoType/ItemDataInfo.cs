@@ -2,26 +2,26 @@
 
 namespace ES
 {
-    [ESCreatePath("鏁版嵁淇℃伅", "鐗╁搧鏁版嵁淇℃伅")]
-    public class ItemDataInfo : SoDataInfo
+    [ESCreatePath("数据信息", "物品数据信息")]
+    public class ItemDataInfo : SoDataInfo, IGameCoreSO, IConditionalGameCoreSO
     {
-        [Title("鎽樿")]
-        [ShowInInspector, ReadOnly, LabelText("閰嶇疆璇存槑")]
+        [Title("摘要")]
+        [ShowInInspector, ReadOnly, LabelText("配置说明")]
         private string EditorSummary => BuildEditorSummary();
 
-        [Title("鍩虹")]
+        [Title("基础")]
         [HideLabel]
         public ItemBaseConfig baseConfig = new ItemBaseConfig();
 
-        [Title("浜や簰")]
+        [Title("交互")]
         [HideLabel]
         public ItemInteractConfig interactConfig = new ItemInteractConfig();
 
-        [Title("閫昏緫")]
+        [Title("逻辑")]
         [HideLabel]
         public ItemLogicConfig logicConfig = new ItemLogicConfig();
 
-        [Title("绉诲姩")]
+        [Title("移动")]
         [ShowIf(nameof(ShowMoveConfig))]
         [HideLabel]
         public ItemMoveConfig moveConfig = new ItemMoveConfig();
@@ -48,7 +48,7 @@ namespace ES
         [HideLabel]
         public ItemDoorVariableData doorVariable = ItemDoorVariableData.Default;
 
-        [Title("Trap / 闄烽槺")]
+        [Title("Trap / 陷阱")]
         [ShowIf(nameof(ShowTrapConfig))]
         [HideLabel]
         public ItemTrapSharedData trapShared = ItemTrapSharedData.Default;
@@ -57,7 +57,7 @@ namespace ES
         [HideLabel]
         public ItemTrapVariableData trapVariable = ItemTrapVariableData.Default;
 
-        [Title("Weapon / 姝﹀櫒")]
+        [Title("Weapon / 武器")]
         [ShowIf(nameof(ShowWeaponConfig))]
         [HideLabel]
         public ItemWeaponSharedData weaponShared = ItemWeaponSharedData.Default;
@@ -83,7 +83,7 @@ namespace ES
         [HideLabel]
         public ItemPickupVariableData pickupVariable = ItemPickupVariableData.Default;
 
-        [Title("Zone / 鍖哄煙")]
+        [Title("Zone / 区域")]
         [ShowIf(nameof(ShowZoneConfig))]
         [HideLabel]
         public ItemZoneSharedData zoneShared = ItemZoneSharedData.Default;
@@ -126,6 +126,13 @@ namespace ES
                     || baseConfig.kind == ItemKind.Pickup
                     || baseConfig.kind == ItemKind.Trap
                     || baseConfig.kind == ItemKind.Zone);
+        }
+
+        public bool IsGameCoreRoot => baseConfig != null && (baseConfig.kind == ItemKind.Shot || baseConfig.kind == ItemKind.Weapon);
+
+        public void InjectGameCoreTables()
+        {
+            ESRuntimeDataModule.InjectGameCoreRoot(this);
         }
 
         private string BuildEditorSummary()

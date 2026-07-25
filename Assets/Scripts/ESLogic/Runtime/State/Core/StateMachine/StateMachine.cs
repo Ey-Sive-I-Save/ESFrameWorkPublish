@@ -259,6 +259,7 @@ namespace ES
             Success = 3,
             Rollback = 4,
             Failure = 5,
+            Forced = 6,
         }
 
         public enum ActivationFailureKind : byte
@@ -281,6 +282,7 @@ namespace ES
             public StateActivationCode code;
             public ActivationEventKind kind;
             public ActivationFailureKind failureKind;
+            public StateForceReason forceReason;
             public byte interruptCount;
             public ushort runningBefore;
             public ushort runningAfter;
@@ -593,7 +595,8 @@ namespace ES
             int runningBefore,
             int runningAfter,
             int layerRunningBefore,
-            int layerRunningAfter)
+            int layerRunningAfter,
+            StateForceReason forceReason = StateForceReason.None)
         {
             int write = _activationEventWriteIndex;
             _activationEventRing[write] = new ActivationEventRecord
@@ -607,6 +610,7 @@ namespace ES
                 code = code,
                 kind = kind,
                 failureKind = failureKind,
+                forceReason = forceReason,
                 interruptCount = (byte)Mathf.Clamp(interruptCount, 0, byte.MaxValue),
                 runningBefore = (ushort)Mathf.Clamp(runningBefore, 0, ushort.MaxValue),
                 runningAfter = (ushort)Mathf.Clamp(runningAfter, 0, ushort.MaxValue),

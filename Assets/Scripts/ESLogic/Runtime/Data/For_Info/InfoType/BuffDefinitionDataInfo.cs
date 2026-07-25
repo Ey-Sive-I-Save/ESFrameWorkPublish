@@ -5,14 +5,14 @@ using UnityEngine;
 
 namespace ES
 {
-    [ESCreatePath("鏁版嵁淇℃伅", "Buff瀹氫箟鏁版嵁")]
-    public class BuffDefinitionDataInfo : SoDataInfo, ISharedAndVariable<BuffSharedData, BuffVariableData>
+    [ESCreatePath("数据信息", "Buff定义数据")]
+    public class BuffDefinitionDataInfo : SoDataInfo, ISharedAndVariable<BuffSharedData, BuffVariableData>, IGameCoreSO
     {
-        [TitleGroup("Buff瀹氫箟/鍏变韩鏁版嵁", "鍏变韩鏁版嵁", Alignment = TitleAlignments.Left)]
+        [TitleGroup("Buff定义/共享数据", "共享数据", Alignment = TitleAlignments.Left)]
         [HideLabel, InlineProperty]
         public BuffSharedData sharedData = new BuffSharedData();
 
-        [TitleGroup("Buff瀹氫箟/榛樿鍙彉鏁版嵁", "榛樿鍙彉鏁版嵁", Alignment = TitleAlignments.Left)]
+        [TitleGroup("Buff定义/默认可变数据", "默认可变数据", Alignment = TitleAlignments.Left)]
         [HideLabel, InlineProperty]
         public BuffVariableData variableData = new BuffVariableData();
 
@@ -29,6 +29,11 @@ namespace ES
         }
 
         private void OnValidate() { }
+
+        public void InjectGameCoreTables()
+        {
+            ESRuntimeDataModule.InjectGameCoreRoot(this);
+        }
     }
 
     [Serializable]
@@ -38,27 +43,27 @@ namespace ES
         [HideLabel, InlineProperty]
         public ESBuffConfigKey key = new ESBuffConfigKey();
 
-        [Title("鍩虹")]
-        [LabelText("鏍囩")]
+        [Title("基础")]
+        [LabelText("标签")]
         public List<ESGameTag> tags = new List<ESGameTag>();
 
-        [LabelText("榛樿鎸佺画鏃堕棿")]
+        [LabelText("默认持续时间")]
         public float duration = 5f;
 
-        [Title("鍙犲眰 / 浜掓枼 / 鏉ユ簮")]
+        [Title("叠层 / 互斥 / 来源")]
         [LabelText("Buff Group")]
         public string buffGroup;
 
-        [LabelText("寮哄害")]
+        [LabelText("强度")]
         public int strength = 0;
 
-        [LabelText("鏉ユ簮闅旂")]
+        [LabelText("来源隔离")]
         public ESBuffSourceIsolationMode sourceIsolationMode = ESBuffSourceIsolationMode.IgnoreSource;
 
-        [LabelText("鍙犲眰妯″紡")]
+        [LabelText("叠层模式")]
         public ESBuffStackMode stackMode = ESBuffStackMode.StackSameBuff;
 
-        [LabelText("鏃堕棿鍒锋柊")]
+        [LabelText("时间刷新")]
         public ESBuffTimeRefreshMode timeRefreshMode = ESBuffTimeRefreshMode.ResetDuration;
 
         [LabelText("Group Conflict")]
@@ -69,10 +74,10 @@ namespace ES
         public int maxStack = 1;
 
         [Title("Tick")]
-        [LabelText("Tick妯″紡")]
+        [LabelText("Tick模式")]
         public ESBuffTickMode tickMode = ESBuffTickMode.None;
 
-        [LabelText("Tick闂撮殧")]
+        [LabelText("Tick间隔")]
         [Min(0f)]
         public float tickInterval = 1f;
 
@@ -95,7 +100,7 @@ namespace ES
         [SerializeReference]
         public List<ESBuffFloatValueChangeBinding> floatChanges = new List<ESBuffFloatValueChangeBinding>();
 
-        [LabelText("鏉冮檺鍙樺寲")]
+        [LabelText("权限变化")]
         [SerializeReference]
         public List<ESBuffPermitValueChangeBinding> permitChanges = new List<ESBuffPermitValueChangeBinding>();
 
@@ -104,20 +109,20 @@ namespace ES
     [Serializable]
     public sealed class BuffVariableData : IDeepClone<BuffVariableData>
     {
-        [LabelText("灞傛暟")]
+        [LabelText("层数")]
         [Min(1)]
         public int stackCount = 1;
 
-        [LabelText("鍓╀綑鏃堕棿")]
+        [LabelText("剩余时间")]
         public float remainingTime;
 
         [LabelText("Elapsed Time")]
         public float elapsedTime;
 
-        [LabelText("Tick绱")]
+        [LabelText("Tick累计")]
         public float tickAccumulator;
 
-        [LabelText("鏉ユ簮Key")]
+        [LabelText("来源Key")]
         public int sourceKey;
 
         public void DeepCloneFrom(BuffVariableData t)
@@ -139,7 +144,7 @@ namespace ES
         [LabelText("Stat Key")]
         public string statKey;
 
-        [LabelText("鍙樺寲")]
+        [LabelText("变化")]
         public ESFloatValueChangeExpressionBinding change = new ESFloatValueChangeExpressionBinding();
     }
 
@@ -149,7 +154,7 @@ namespace ES
         [LabelText("Permit Key")]
         public string permitKey;
 
-        [LabelText("鍙樺寲")]
+        [LabelText("变化")]
         public ESPermitValueChangeExpressionBinding change = new ESPermitValueChangeExpressionBinding();
     }
 }

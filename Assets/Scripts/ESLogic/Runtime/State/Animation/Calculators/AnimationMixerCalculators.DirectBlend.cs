@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Playables;
@@ -29,39 +29,12 @@ namespace ES
             {
                 public AnimationClip clip;
                 public string marker;
-                public string weightParameter;  // 权重参数名
+                public StateFloatParameterReference weightParameter;  // 权重参数名
                 public float defaultWeight;     // 默认权重
-            }
-
-            [Serializable]
-            public class WeightEvent
-            {
-                [LabelText("事件名")]
-                public string eventName;
-
-                [LabelText("关联Clip索引")]
-                public int clipIndex;
-
-                [LabelText("触发阈值"), Range(0f, 1f)]
-                public float threshold;
-
-                [LabelText("上升触发"), Tooltip("权重从低到高穿越阈值时触发")]
-                public bool triggerOnRising;
-
-                [LabelText("下降触发"), Tooltip("权重从高到低穿越阈值时触发")]
-                public bool triggerOnFalling;
             }
 
             public DirectClip[] clips = new DirectClip[0];
             public bool autoNormalize = false;  // 是否自动归一化权重
-
-            [BoxGroup("事件回调")]
-            [LabelText("权重事件")]
-            public WeightEvent[] weightEvents = new WeightEvent[0];
-
-            [BoxGroup("事件回调")]
-            [LabelText("事件参数名前缀"), Tooltip("触发事件时写入运行时参数的名称前缀")]
-            public string eventParamPrefix = "OnWeight_";
 
             public override StateAnimationMixerKind CalculatorKind => StateAnimationMixerKind.DirectBlend;
 
@@ -104,10 +77,10 @@ namespace ES
 
                 clips = new DirectClip[4]
                 {
-                    new DirectClip { clip = null, weightParameter = "Weight0", defaultWeight = 0f },
-                    new DirectClip { clip = null, weightParameter = "Weight1", defaultWeight = 0f },
-                    new DirectClip { clip = null, weightParameter = "Weight2", defaultWeight = 0f },
-                    new DirectClip { clip = null, weightParameter = "Weight3", defaultWeight = 0f }
+                    new DirectClip { clip = null, defaultWeight = 0f },
+                    new DirectClip { clip = null, defaultWeight = 0f },
+                    new DirectClip { clip = null, defaultWeight = 0f },
+                    new DirectClip { clip = null, defaultWeight = 0f }
                 };
                 
                 _isCalculatorInitialized = false; // 重置初始化标记
@@ -192,10 +165,10 @@ namespace ES
                 // 通过context读取所有参数 - 零GC
                 for (int i = 0; i < clips.Length; i++)
                 {
-                    string paramName = clips[i].weightParameter;
-                    runtime.targetWeights[i] = string.IsNullOrEmpty(paramName)
+                    var parameter = clips[i].weightParameter;
+                    runtime.targetWeights[i] = !parameter.IsValid
                         ? clips[i].defaultWeight
-                        : context.GetFloat(paramName, clips[i].defaultWeight);
+                        : context.GetFloat(parameter.Parameter, clips[i].defaultWeight);
                 }
 
                 // 归一化(可选)
@@ -234,33 +207,6 @@ namespace ES
                     runtime.SetMixerInputWeightIfChanged(runtime.mixer, i, runtime.currentWeights[i]);
                 }
 
-                // 触发权重事件（基于上/下穿越阈值）
-                if (weightEvents != null && weightEvents.Length > 0)
-                {
-                    for (int i = 0; i < weightEvents.Length; i++)
-                    {
-                        var evt = weightEvents[i];
-                        if (evt.clipIndex < 0 || evt.clipIndex >= runtime.currentWeights.Length)
-                            continue;
-
-                        float current = runtime.currentWeights[evt.clipIndex];
-                        float previous = runtime.weightTargetCache != null && evt.clipIndex < runtime.weightTargetCache.Length
-                            ? runtime.weightTargetCache[evt.clipIndex]
-                            : current;
-
-                        bool rising = evt.triggerOnRising && previous < evt.threshold && current >= evt.threshold;
-                        bool falling = evt.triggerOnFalling && previous > evt.threshold && current <= evt.threshold;
-
-                        if (rising || falling)
-                        {
-                            string paramName = string.IsNullOrEmpty(evt.eventName)
-                                ? eventParamPrefix + evt.clipIndex
-                                : eventParamPrefix + evt.eventName;
-
-                            context.SetTrigger(paramName);
-                        }
-                    }
-                }
             }
 
             /// <summary>
@@ -304,10 +250,10 @@ namespace ES
                 // 读取目标权重
                 for (int i = 0; i < clips.Length; i++)
                 {
-                    string paramName = clips[i].weightParameter;
-                    runtime.targetWeights[i] = string.IsNullOrEmpty(paramName)
+                    var parameter = clips[i].weightParameter;
+                    runtime.targetWeights[i] = !parameter.IsValid
                         ? clips[i].defaultWeight
-                        : context.GetFloat(paramName, clips[i].defaultWeight);
+                        : context.GetFloat(parameter.Parameter, clips[i].defaultWeight);
                 }
 
                 // 归一化(如果启用)
@@ -472,3 +418,4 @@ namespace ES
         }
 
 }
+

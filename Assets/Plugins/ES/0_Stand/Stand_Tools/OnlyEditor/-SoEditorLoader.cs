@@ -69,7 +69,7 @@ namespace ES
                 foreach (var g in group)
                 {
                     if (g != null)
-                        g.OnEditorApply();
+                        g.Editor_EnsureApplied();
                 }
             }
         }

@@ -98,7 +98,7 @@ namespace ES
 
             if (_flyState.baseStatus == StateBaseStatus.Running)
             {
-                sm.ForceExitState(_flyState);
+                sm.ForceExit(_flyState, StateForceReason.GameplayCleanup);
             }
 
             flyHold = _flyLifecycle.IsActive;

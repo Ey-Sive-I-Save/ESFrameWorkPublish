@@ -122,7 +122,6 @@ namespace ES
     {
         public int ConfigEnumKeyInt;
         public string ConfigStringKey;
-        public int AssetRuntimeKey;
         public long LocalFileId;
         public string AssetTypeName;
         public string Address;
@@ -134,11 +133,10 @@ namespace ES
         public bool HasAssetAuthority => !string.IsNullOrEmpty(GUID);
         public bool IsSubAsset => LocalFileId != 0;
 
-        public void SetConfigKey(int enumKey, string stringKey, int runtimeKey = 0)
+        public void SetConfigKey(int enumKey, string stringKey)
         {
             ConfigEnumKeyInt = enumKey;
             ConfigStringKey = stringKey;
-            AssetRuntimeKey = runtimeKey;
         }
 
         public void SetAssetAuthority(string guid, long localFileId, string typeName, string path)

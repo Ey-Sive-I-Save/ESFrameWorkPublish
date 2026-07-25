@@ -88,7 +88,7 @@ namespace ES
             public override void UpdateWeights(AnimationCalculatorRuntime runtime, in StateMachineContext context, float deltaTime)
             {
                 // 单Clip无需更新权重，但可通过context支持动态速度
-                // 示例: runtime.singlePlayable.SetSpeed(context.GetFloat("Speed", speed));
+                // Example: runtime.singlePlayable.SetSpeed(context.GetFloat(StateDefaultFloatParameter.Speed, speed));
                 // 单Clip权重由外部State权重控制
             }
 

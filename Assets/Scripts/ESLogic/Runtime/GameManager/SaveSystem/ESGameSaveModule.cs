@@ -318,7 +318,7 @@ namespace ES
                     archive = new ESGameSaveArchive();
 
                 archive.PrepareBeforeSave(slotId, displayName, currentArchiveVersion, gameVersion, configVersion);
-                string archiveJson = JsonUtility.ToJson(archive, true);
+                string archiveJson = ESGameSaveJson.Serialize(archive, true);
                 bool success = SaveArchiveJsonAtomic(slotId, archiveJson, out string message, out long fileSize);
 
                 stopwatch.Stop();
@@ -372,7 +372,7 @@ namespace ES
                     return false;
                 }
 
-                archive = JsonUtility.FromJson<ESGameSaveArchive>(archiveJson);
+                archive = ESGameSaveJson.Deserialize<ESGameSaveArchive>(archiveJson);
                 if (archive == null)
                 {
                     stopwatch.Stop();
@@ -466,7 +466,7 @@ namespace ES
         private bool TryMigrateArchiveJson(string slotId, ref string archiveJson, out string message)
         {
             message = string.Empty;
-            ESGameSaveArchive header = JsonUtility.FromJson<ESGameSaveArchive>(archiveJson);
+            ESGameSaveArchive header = ESGameSaveJson.Deserialize<ESGameSaveArchive>(archiveJson);
             if (header == null)
             {
                 message = "无法读取存档头";

@@ -381,7 +381,7 @@ namespace ES
             }
 
             float deltaTime = Time.deltaTime;
-            stateContext.lastUpdateTime = Time.time;
+            stateContext.BeginStateMachineTick();
 
             // 更新所有运行中的状态
             var statesToDeactivate = _statesToDeactivateCache;
@@ -625,7 +625,7 @@ namespace ES
             bool activated;
             if (binding.forceEnter)
             {
-                activated = ForceEnterState(toState, toLayer);
+                activated = ForceReplaceLayer(toState, StateForceReason.ExitAutoActivation, toLayer);
             }
             else
             {
@@ -636,7 +636,7 @@ namespace ES
 
             if (!activated && binding.fallbackToForceEnterOnFail)
             {
-                activated = ForceEnterState(toState, toLayer);
+                activated = ForceReplaceLayer(toState, StateForceReason.ExitAutoActivation, toLayer);
             }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD

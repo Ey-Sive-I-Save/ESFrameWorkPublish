@@ -23,6 +23,18 @@ namespace ES
         public UnityEngine.Object LoadedAssetObject => loadedAsset;
         public bool LoadedAssetReady => loadedAssetReady;
         public bool HasLoadedAsset => loadedAssetReady;
+        [SerializeField] private string assetGuid;
+        [SerializeField] private long assetLocalFileId;
+
+        public string AssetGuid => assetGuid;
+        public long AssetLocalFileId => assetLocalFileId;
+        public bool IsSubAsset => AssetLocalFileId != 0;
+
+        public void SetAssetIdentity(string guid, long localFileId)
+        {
+            assetGuid = guid ?? string.Empty;
+            assetLocalFileId = localFileId;
+        }
 
         public void SetLoadedAsset(TAsset asset)
         {
@@ -76,6 +88,7 @@ namespace ES
                 case ESAssetReferKind.VideoClip: return ESAssetCategory.Video;
                 case ESAssetReferKind.TimelineAsset: return ESAssetCategory.Timeline;
                 case ESAssetReferKind.PlayableAsset: return ESAssetCategory.Playable;
+                case ESAssetReferKind.ScriptableObject: return ESAssetCategory.Script;
                 case ESAssetReferKind.TerrainData: return ESAssetCategory.TerrainData;
                 default: return ESAssetCategory.Other;
             }
@@ -100,6 +113,7 @@ namespace ES
                 case ESAssetReferKind.VideoClip: return nameof(ESAssetReferVideoClipConfigKey);
                 case ESAssetReferKind.TimelineAsset: return nameof(ESAssetReferTimelineAssetConfigKey);
                 case ESAssetReferKind.PlayableAsset: return nameof(ESAssetReferPlayableAssetConfigKey);
+                case ESAssetReferKind.ScriptableObject: return nameof(ESAssetReferScriptableObjectConfigKey);
                 case ESAssetReferKind.TerrainData: return nameof(ESAssetReferTerrainDataConfigKey);
                 default: return string.Empty;
             }
@@ -124,6 +138,7 @@ namespace ES
                 case ESAssetReferKind.VideoClip: return nameof(ESAssetReferVideoClipConfigData);
                 case ESAssetReferKind.TimelineAsset: return nameof(ESAssetReferTimelineAssetConfigData);
                 case ESAssetReferKind.PlayableAsset: return nameof(ESAssetReferPlayableAssetConfigData);
+                case ESAssetReferKind.ScriptableObject: return nameof(ESAssetReferScriptableObjectConfigData);
                 case ESAssetReferKind.TerrainData: return nameof(ESAssetReferTerrainDataConfigData);
                 default: return string.Empty;
             }
@@ -137,7 +152,11 @@ namespace ES
             }
 
             resKey.ConfigEnumKeyInt = page.EnumKey;
-            resKey.ConfigStringKey = page.StringKey;
+            resKey.ConfigStringKey = page.EffectiveStringKey;
+            resKey.GUID = page.AssetGuid;
+            resKey.LocalFileId = page.LocalFileId;
+            resKey.AssetTypeName = page.AssetTypeName;
+            resKey.Path = page.AssetPath;
 
 #if UNITY_EDITOR
             if (page.OB != null)

@@ -9,6 +9,7 @@
 ```text
 Architecture  常用架构说明、Core-Domain-Module 使用说明
 Components    开发者常挂的 Mono 组件
+Templates     场景结构模板；只提供装配与引用，不代表完整运行时系统
 Wrappers      轻封装、绑定器、Tracker 使用封装、ExpressionSource 到 ValueChange 的桥接
 Examples      最小样例、输入触发技能、状态生命周期、ValueChange Buff 示例
 Docs          当前主链路说明、废弃方案和协作注意事项
@@ -34,6 +35,9 @@ ValueEntry
 
 Command 常用组件位于：
   Assets/Scripts/ESLogic/Runtime/Command/Components/ESCommandPlayer.cs
+
+Templates/Weapon
+  ESWeaponSceneTemplate：武器场景结构与挂点模板，不包含射击、换弹、伤害或网络逻辑
 
 Wrappers/ValueChange
   ESFloatValueChangeExpressionBinding

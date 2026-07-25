@@ -33,7 +33,7 @@ namespace ES
                 int spriteCount = selected.OfType<Sprite>().Count();
                 string normalizedOutput = SimpleToolsSafetyUtility.NormalizeAssetPath(outputFolder);
                 string outputState = SimpleToolsSafetyUtility.IsAssetPath(normalizedOutput) ? normalizedOutput : "输出目录不在 Assets 下";
-                return $"选中纹理: {textureCount} | 选中 Sprite: {spriteCount} | 输出: {outputState} | 同名处理: {(autoRenameOnConflict ? "自动改名" : "跳过")}";
+                return $"选中纹理: {textureCount} | 选中 Sprite: {spriteCount} | 输出: {outputState} | 同名处理: {GetConflictHandlingText()}";
             }
         }
 
@@ -86,7 +86,7 @@ namespace ES
         private readonly List<string> cachedTextureFolderPaths = new List<string>();
         private string cachedTextureFolderSignature = "";
 
-        [OnInspectorGUI, PropertyOrder(-200)]
+        [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
             var previewRows = BuildTexturePreviewRows();
@@ -135,8 +135,9 @@ namespace ES
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 string normalizedOutput = SimpleToolsSafetyUtility.NormalizeAssetPath(outputFolder);
-                EditorGUILayout.LabelField($"输出目录: {(SimpleToolsSafetyUtility.IsAssetPath(normalizedOutput) ? normalizedOutput : "不可用，必须在 Assets 下")}", EditorStyles.wordWrappedMiniLabel);
-                EditorGUILayout.LabelField($"导入设置: SpriteMode={spriteMode} | PPU={pixelsPerUnit:0.##} | Filter={filterMode} | MaxSize={maxTextureSize} | MipMaps={(generateMipMaps ? "开" : "关")}", EditorStyles.wordWrappedMiniLabel);
+                string outputLabel = SimpleToolsSafetyUtility.IsAssetPath(normalizedOutput) ? normalizedOutput : "不可用，必须在 Assets 下";
+                EditorGUILayout.LabelField($"输出目录: {outputLabel}", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField($"导入设置: SpriteMode={spriteMode} | PPU={pixelsPerUnit:0.##} | Filter={filterMode} | MaxSize={maxTextureSize} | MipMaps={GetMipMapsText()}", EditorStyles.wordWrappedMiniLabel);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -381,7 +382,7 @@ namespace ES
             if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
                 "确认从 Sprite 生成纹理",
                 selectedSprites.Length,
-                $"从 {selectedSprites.Length} 个 Sprite 生成纹理文件。\n\n输出目录：{outputFolder}\n格式：{outputFormat}\n同名处理：{(autoRenameOnConflict ? "自动改名" : "跳过")}\n\n{preview}",
+                $"从 {selectedSprites.Length} 个 Sprite 生成纹理文件。\n\n输出目录：{outputFolder}\n格式：{outputFormat}\n同名处理：{GetConflictHandlingText()}\n\n{preview}",
                 "会在项目中写入新文件并导入为 Unity 资产。源纹理不可读的 Sprite 会被跳过。"))
                 return;
 
@@ -489,7 +490,7 @@ namespace ES
 
             Undo.CollapseUndoOperations(undoGroup);
 
-            // 选择生成的结果
+            // 选择生成的结果。
             var generatedObjects = generatedPaths.Select(p => AssetDatabase.LoadAssetAtPath<Texture2D>(p)).Where(t => t != null).ToArray();
             if (generatedObjects.Length > 0)
             {
@@ -591,6 +592,16 @@ namespace ES
 
             fileName = fileName.Trim();
             return string.IsNullOrEmpty(fileName) ? "SpriteTexture" : fileName;
+        }
+
+        private string GetConflictHandlingText()
+        {
+            return autoRenameOnConflict ? "自动改名" : "跳过";
+        }
+
+        private string GetMipMapsText()
+        {
+            return generateMipMaps ? "开" : "关";
         }
 
         public void ResetToDefaults()

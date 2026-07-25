@@ -67,7 +67,7 @@ namespace ES
             {
                 if (layer.hasReferencePose)
                 {
-                    layer.mixer.SetInputWeight(0, 1f);
+                    layer.SetMixerSlotWeightIfChanged(0, 1f);
                     layer.referencePoseWeightsNormalized = false;
                 }
                 ClearMixerWeightDirty(layer, topologyDirty);
@@ -103,12 +103,12 @@ namespace ES
                     var state = states[i];
                     float w = _mixerEffectiveWeights[i];
                     state.SetEffectivePlayableWeightNoDirty(w);
-                    layer.mixer.SetInputWeight(slots[i], w);
+                    layer.SetMixerSlotWeightIfChanged(slots[i], w);
                 }
 
                 if (layer.hasReferencePose)
                 {
-                    layer.mixer.SetInputWeight(0, 0f);
+                    layer.SetMixerSlotWeightIfChanged(0, 0f);
                     layer.referencePoseWeightsNormalized = false;
                 }
 
@@ -169,12 +169,12 @@ namespace ES
                     var s = states[i];
                     float w = _mixerEffectiveWeights[i];
                     s.SetEffectivePlayableWeightNoDirty(w);
-                    layer.mixer.SetInputWeight(slots[i], w);
+                    layer.SetMixerSlotWeightIfChanged(slots[i], w);
                 }
 
                 if (layer.hasReferencePose)
                 {
-                    layer.mixer.SetInputWeight(0, 0f);
+                    layer.SetMixerSlotWeightIfChanged(0, 0f);
                     layer.referencePoseWeightsNormalized = false;
                 }
 
@@ -241,12 +241,12 @@ namespace ES
                 var state = states[i];
                 float w = _mixerEffectiveWeights[i];
                 state.SetEffectivePlayableWeightNoDirty(w);
-                layer.mixer.SetInputWeight(slots[i], w);
+                layer.SetMixerSlotWeightIfChanged(slots[i], w);
             }
 
             if (layer.hasReferencePose)
             {
-                layer.mixer.SetInputWeight(0, 0f);
+                layer.SetMixerSlotWeightIfChanged(0, 0f);
                 layer.referencePoseWeightsNormalized = false;
             }
 
@@ -299,7 +299,7 @@ namespace ES
                         break;
                     }
                 }
-                if (!used) layer.mixer.SetInputWeight(slot, 0f);
+                if (!used) layer.SetMixerSlotWeightIfChanged(slot, 0f);
             }
         }
 

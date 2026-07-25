@@ -42,8 +42,25 @@ namespace ES
         /// </summary>
         /// <param name="forceRedownload">是否强制重新下载所有资源（忽略本地缓存）</param>
         /// <param name="verifyIntegrity">是否验证文件完整性</param>
+        [Obsolete("Release initialization is owned by ESResManager / ESRuntimeReleaseBootstrap. This legacy entry only forwards to ESResManager.")]
+        public void InitializeResourcesByRunMode(bool forceRedownload = false, bool verifyIntegrity = true)
+        {
+            if (ESResManager.Instance != null)
+            {
+                ESResManager.Instance.RestartBootstrapFlow();
+                return;
+            }
+
+            Debug.LogError("[ESResMaster] 旧资源初始化入口已废弃。请在启动场景配置 ESResManager 并由其执行新版 Bootstrap。");
+        }
+
         public void GameInit_ResCompareAndDownload(bool forceRedownload = false, bool verifyIntegrity = true)
         {
+            if (Settings == null || !Settings.IsHotUpdateMode)
+            {
+                Debug.LogError("[ESResMaster] GameInit_ResCompareAndDownload 仅允许在 HotUpdate 模式调用。");
+                return;
+            }
             // 路径已在Awake中初始化，这里直接开始下载流程
 
             //全部卸载
@@ -60,6 +77,80 @@ namespace ES
             callback.OnError = (error) => Debug.LogError($"初始化下载失败: {error}");
 
             StartCoroutine(InitTryDownload(callback, forceRedownload, verifyIntegrity));
+        }
+
+        private IEnumerator GameInit_LoadLocalBuild()
+        {
+            AssetBundle.UnloadAllAssetBundles(unloadAllObjects: false);
+            _injectedLibs.Clear();
+            GlobalAssetKeys.Clear();
+            GlobalABKeys.Clear();
+            GlobalABPreToHashes.Clear();
+            GlobalABHashToPres.Clear();
+            GlobalDependencies.Clear();
+            GlobalDownloadState = ESResGlobalDownloadState.Comparing;
+
+            string identityJson = null;
+            string error = null;
+            yield return ReadLocalText(DefaultPaths.LocalBuildGameIdentityPath,
+                text => identityJson = text,
+                reason => error = reason);
+
+            if (string.IsNullOrEmpty(identityJson))
+            {
+                GlobalDownloadState = ESResGlobalDownloadState.None;
+                Debug.LogError($"[ESResMaster] 本地构建 GameIdentity 读取失败：{error ?? DefaultPaths.LocalBuildGameIdentityPath}");
+                yield break;
+            }
+
+            ESResJsonData_GameIdentity identity;
+            try
+            {
+                identity = JsonConvert.DeserializeObject<ESResJsonData_GameIdentity>(identityJson);
+            }
+            catch (Exception ex)
+            {
+                GlobalDownloadState = ESResGlobalDownloadState.None;
+                Debug.LogError($"[ESResMaster] 本地构建 GameIdentity 解析失败：{ex.Message}");
+                yield break;
+            }
+
+            if (identity == null || identity.RequiredLibrariesFolders == null)
+            {
+                GlobalDownloadState = ESResGlobalDownloadState.None;
+                Debug.LogError("[ESResMaster] 本地构建 GameIdentity 无效或缺少 RequiredLibrariesFolders。");
+                yield break;
+            }
+
+            // 本地构建清单中的库一律按本地路径处理，避免旧 JSON 中的 IsRemote 污染运行模式。
+            foreach (var lib in identity.RequiredLibrariesFolders)
+            {
+                if (lib != null) lib.IsRemote = false;
+            }
+
+            var callback = new ESCallback<string>();
+            callback.OnError = errorText => Debug.LogError($"[ESResMaster] 本地资源初始化失败：{errorText}");
+            callback.OnSuccess = message => Debug.Log($"[ESResMaster] 本地资源初始化完成：{message}");
+            yield return StartCoroutine(DownloadLibrariesAsync(identity.RequiredLibrariesFolders, callback));
+        }
+
+        private IEnumerator ReadLocalText(string path, Action<string> onSuccess, Action<string> onFailure)
+        {
+            if (string.IsNullOrEmpty(path)) { onFailure?.Invoke("路径为空"); yield break; }
+            bool useRequest = path.IndexOf("://", StringComparison.Ordinal) >= 0 || Application.platform == RuntimePlatform.Android || Application.platform == RuntimePlatform.WebGLPlayer;
+            if (!useRequest && File.Exists(path))
+            {
+                try { onSuccess?.Invoke(File.ReadAllText(path)); }
+                catch (Exception ex) { onFailure?.Invoke(ex.Message); }
+                yield break;
+            }
+            string requestPath = path.IndexOf("://", StringComparison.Ordinal) >= 0 ? path : "file://" + path;
+            using (var request = UnityWebRequest.Get(requestPath))
+            {
+                yield return request.SendWebRequest();
+                if (request.result == UnityWebRequest.Result.Success) onSuccess?.Invoke(request.downloadHandler.text);
+                else onFailure?.Invoke(request.error);
+            }
         }
 
         #region 游戏初始化下载
@@ -123,15 +214,8 @@ namespace ES
 
             if (!needDownload)
             {
-                // 即使不需要下载，也必须加载每个库的JSON信息
-                foreach (var lib in remoteGameIdentity.RequiredLibrariesFolders)
-                {
-                    ESLog.Verbose("使用库 " + lib.FolderName + " 无需下载" + lib.IsRemote);
-                    EnsureLibraryMetadataLoaded(lib);
-                }
-
-                GlobalDownloadState = ESResGlobalDownloadState.AllReady;
-                callback?.Success("所有资源已准备就绪，无需下载");
+                // 版本未变化时仍走统一库处理：远端库复用缓存，本地库从 StreamingAssets 异步注入。
+                yield return StartCoroutine(DownloadLibrariesAsync(remoteGameIdentity.RequiredLibrariesFolders, callback));
                 yield break;
             }
 
@@ -157,6 +241,7 @@ namespace ES
 
             var libsToDownload = new List<RequiredLibrary>();
             var remoteLibIdentities = new Dictionary<string, ESResJsonData_LibIndentity>();
+            bool anyLibraryFailed = false;
 
             if (requiredLibs == null || requiredLibs.Count == 0)
             {
@@ -205,6 +290,13 @@ namespace ES
                                     Debug.LogError($"解析远程LibIdentity失败 {lib.FolderName}");
                                     return;
                                 }
+                                if (!string.IsNullOrEmpty(lib.LibIdentitySha256) &&
+                                    !string.Equals(ESResManifestIntegrity.ComputeFileSha256FromText(text), lib.LibIdentitySha256, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    identityDownloadFailed = true;
+                                    Debug.LogError($"LibIdentity完整性校验失败 {lib.FolderName}");
+                                    return;
+                                }
                                 Directory.CreateDirectory(Path.GetDirectoryName(localLibIdentityPath));
                                 File.WriteAllText(localLibIdentityPath, text);
                                 remoteLibIdentities[lib.FolderName] = remoteLibIdentity;
@@ -223,7 +315,7 @@ namespace ES
 
                     if (identityDownloadFailed || remoteLibIdentity == null)
                     {
-                        callback?.Error($"库 {lib.FolderName} LibIdentity 下载失败");
+                        anyLibraryFailed = true;
                         continue;
                     }
 
@@ -239,29 +331,36 @@ namespace ES
                             EnsureLibraryMetadataLoaded(lib);
                             DownloadedLibraries[lib.FolderName] = registeredRemoteLib;
                         }
+                        else anyLibraryFailed = true;
                     }
                 }
                 else
                 {
                     ESLog.Verbose("使用本地库 " + lib.FolderName);
-                    string libIdentityPath = DefaultPaths.GetLocalBuildLibIdentityPath(lib.FolderName);
-                    if (TryRegisterLibraryFromLocal(lib.FolderName, libIdentityPath, false, null, out var registeredLocalLib))
+                    DownloadedLibraryData registeredLocalLib = null;
+                    string localLoadError = null;
+                    yield return LoadBuiltInLibrary(lib, loaded => registeredLocalLib = loaded, reason => localLoadError = reason);
+                    if (registeredLocalLib != null)
                     {
-                        EnsureLibraryMetadataLoaded(lib);
                         DownloadedLibraries[lib.FolderName] = registeredLocalLib;
                     }
                     else
                     {
-                        Debug.LogWarning($"本地库 {lib.FolderName} 不存在或LibIdentity无效");
+                        anyLibraryFailed = true;
+                        Debug.LogWarning($"本地库 {lib.FolderName} 加载失败：{localLoadError}");
                     }
                 }
             }
 
             if (libsToDownload.Count == 0)
             {
-                GlobalDownloadState = ESResGlobalDownloadState.AllReady;
-                callback?.UpdateProgress(1f, "所有库均已是最新版本");
-                callback?.Success("无需下载任何库");
+                GlobalDownloadState = anyLibraryFailed ? ESResGlobalDownloadState.None : ESResGlobalDownloadState.AllReady;
+                if (anyLibraryFailed) callback?.Error("一个或多个必需库初始化失败");
+                else
+                {
+                    callback?.UpdateProgress(1f, "所有库均已是最新版本");
+                    callback?.Success("无需下载任何库");
+                }
                 yield break;
             }
 
@@ -287,6 +386,7 @@ namespace ES
                 };
                 libCallback.OnError = error =>
                 {
+                    anyLibraryFailed = true;
                     completedLibs++;
                     float overallProgress = 0.3f + (0.7f * completedLibs / Mathf.Max(libsToDownload.Count, 1));
                     callback?.UpdateProgress(overallProgress, $"库 {lib.FolderName} 下载失败: {error}");
@@ -299,7 +399,12 @@ namespace ES
                 yield return StartCoroutine(DownloadLibraryAsync(lib, remoteIdentity, libCallback));
             }
 
-            GlobalDownloadState = ESResGlobalDownloadState.AllReady;
+            GlobalDownloadState = anyLibraryFailed ? ESResGlobalDownloadState.None : ESResGlobalDownloadState.AllReady;
+            if (anyLibraryFailed)
+            {
+                callback?.Error("一个或多个必需库下载或初始化失败");
+                yield break;
+            }
             callback?.UpdateProgress(1.0f, "初始化下载流程完成");
             callback?.Success($"成功初始化 {libsToDownload.Count} 个库的下载流程");
             
@@ -336,6 +441,12 @@ namespace ES
                 assetKeysLocal,
                 () =>
                 {
+                    if (!ESResManifestIntegrity.VerifyFileSha256(assetKeysLocal, remoteLibIdentity?.AssetKeysSha256))
+                    {
+                        assetKeysFailed = true;
+                        callback?.Error("AssetKeys完整性校验失败");
+                        return;
+                    }
                     InjectAssetKeysData(lib, assetKeysLocal);
                     callback?.UpdateProgress(0.3f, "AssetKeys.json下载完成");
                 },
@@ -360,6 +471,12 @@ namespace ES
                 abMetadataLocal,
                 () =>
                 {
+                    if (!ESResManifestIntegrity.VerifyFileSha256(abMetadataLocal, remoteLibIdentity?.ABMetadataSha256))
+                    {
+                        abMetadataFailed = true;
+                        callback?.Error("ABMetadata完整性校验失败");
+                        return;
+                    }
                     abMetadata = InjectABMetadataData(lib, abMetadataLocal);
                     callback?.UpdateProgress(0.6f, "ABMetadata.json下载完成");
                     if (abMetadata == null)
@@ -396,7 +513,11 @@ namespace ES
                 string preName = kvp.Key;
                 string hashedName = kvp.Value;
 
-                if (!localABFiles.Contains(hashedName))
+                bool bundleMissingOrInvalid = !localABFiles.Contains(hashedName);
+                if (!bundleMissingOrInvalid && abMetadata.BundleRecords.TryGetValue(preName, out var localRecord) && !string.IsNullOrEmpty(localRecord.Sha256))
+                    bundleMissingOrInvalid = !ESResManifestIntegrity.VerifyFileSha256(Path.Combine(abLocalPath, hashedName), localRecord.Sha256);
+
+                if (bundleMissingOrInvalid)
                 {
                     abToDownload.Add(hashedName);
 
@@ -423,6 +544,14 @@ namespace ES
                     abLocalFilePath,
                     () =>
                     {
+                        string preName = abMetadata.PreToHashes.FirstOrDefault(pair => pair.Value == hashedName).Key;
+                        if (abMetadata.BundleRecords.TryGetValue(preName, out var record) &&
+                            !ESResManifestIntegrity.VerifyFileSha256(abLocalFilePath, record.Sha256))
+                        {
+                            abDownloadFailed = true;
+                            callback?.Error($"AB完整性校验失败 {hashedName}");
+                            return;
+                        }
                         downloadedCount++;
                         float progress = 0.82f + (0.15f * downloadedCount / Mathf.Max(abToDownload.Count, 1));
                         callback?.UpdateProgress(progress, $"已下载 {hashedName}");
@@ -478,6 +607,42 @@ namespace ES
         #endregion
 
         #region 注入辅助
+        private IEnumerator LoadBuiltInLibrary(RequiredLibrary lib, Action<DownloadedLibraryData> onSuccess, Action<string> onFailure)
+        {
+            string identityJson = null;
+            string readError = null;
+            yield return ReadLocalText(DefaultPaths.GetLocalBuildLibIdentityPath(lib.FolderName), text => identityJson = text, error => readError = error);
+            if (string.IsNullOrEmpty(identityJson)) { onFailure?.Invoke("LibIdentity 读取失败：" + readError); yield break; }
+
+            ESResJsonData_LibIndentity identity;
+            try { identity = JsonConvert.DeserializeObject<ESResJsonData_LibIndentity>(identityJson); }
+            catch (Exception ex) { onFailure?.Invoke("LibIdentity 解析失败：" + ex.Message); yield break; }
+            if (identity == null || !TryRegisterLibraryFromLocal(lib.FolderName, string.Empty, false, identity, out var registeredLib))
+            {
+                onFailure?.Invoke("LibIdentity 无效");
+                yield break;
+            }
+
+            string assetKeysJson = null;
+            readError = null;
+            yield return ReadLocalText(DefaultPaths.GetLocalBuildAssetKeysPath(lib.FolderName), text => assetKeysJson = text, error => readError = error);
+            if (string.IsNullOrEmpty(assetKeysJson)) { onFailure?.Invoke("AssetKeys 读取失败：" + readError); yield break; }
+
+            string metadataJson = null;
+            readError = null;
+            yield return ReadLocalText(DefaultPaths.GetLocalBuildABMetadataPath(lib.FolderName), text => metadataJson = text, error => readError = error);
+            if (string.IsNullOrEmpty(metadataJson)) { onFailure?.Invoke("ABMetadata 读取失败：" + readError); yield break; }
+
+            InjectAssetKeysJson(lib, assetKeysJson);
+            if (InjectABMetadataJson(lib, metadataJson) == null)
+            {
+                onFailure?.Invoke("ABMetadata 注入失败");
+                yield break;
+            }
+            _injectedLibs.Add(lib.FolderName);
+            onSuccess?.Invoke(registeredLib);
+        }
+
         private void EnsureLibraryMetadataLoaded(RequiredLibrary lib)
         {
             if (lib == null || string.IsNullOrEmpty(lib.FolderName))
@@ -493,12 +658,7 @@ namespace ES
             string assetKeysLocal = lib.IsRemote ? DefaultPaths.GetLocalAssetKeysPath(lib.FolderName) : DefaultPaths.GetLocalBuildAssetKeysPath(lib.FolderName);
             string abMetadataLocal = lib.IsRemote ? DefaultPaths.GetLocalABMetadataPath(lib.FolderName) : DefaultPaths.GetLocalBuildABMetadataPath(lib.FolderName);
 
-            // 注意：这里使用 File.ReadAllText，这在 Android 上直接读取 StreamingAssets (jar:file://) 可能会失败
-            // 如果 isRemote 为 false 且在 Android 上，可能需要改用 UnityWebRequest。
-            // 但目前的架构中，ResMaster.PathAndName.cs 假定了本地构建路径是 StreamingAssets。
-            // 为了安全起见，如果在 Android 且不是 Remote，我们应该使用 DownloadTextWithRetries 或类似的机制，但这里是同步调用。
-            // 暂时假定构建流程会将内置库解包到 Persistent 或者使用特定的加载方式，或者当前仅针对 PC/Editor 调试。
-            // 更稳健的做法是把 Inject 改成支持 content string，然后外部负责读取。
+            // 这里只处理 persistentDataPath 中的远端缓存；StreamingAssets 内置库走 LoadBuiltInLibrary。
 
             if (File.Exists(assetKeysLocal))
             {
@@ -824,6 +984,21 @@ namespace ES
                 return true;
             }
 
+            // V2 以内容摘要为准：资源键变更不一定会导致 AB Hash 或 ChangeCount 改变。
+            if (!string.IsNullOrEmpty(remoteLibIdentity.AssetKeysSha256) &&
+                !string.Equals(remoteLibIdentity.AssetKeysSha256, oldLibIdentity.AssetKeysSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.Log($"库 {libFolderName} 需要更新: AssetKeys摘要变化");
+                return true;
+            }
+
+            if (!string.IsNullOrEmpty(remoteLibIdentity.ABMetadataSha256) &&
+                !string.Equals(remoteLibIdentity.ABMetadataSha256, oldLibIdentity.ABMetadataSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.Log($"库 {libFolderName} 需要更新: ABMetadata摘要变化");
+                return true;
+            }
+
             // 比较ChangeCount
             if (remoteLibIdentity.ChangeCount != oldLibIdentity.ChangeCount)
             {
@@ -884,7 +1059,18 @@ namespace ES
         {
             try
             {
-                string assetKeysJson = File.ReadAllText(assetKeysFilePath);
+                InjectAssetKeysJson(lib, File.ReadAllText(assetKeysFilePath));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"注入AssetKeys数据失败 {lib?.FolderName}: {ex.Message}");
+            }
+        }
+
+        private void InjectAssetKeysJson(RequiredLibrary lib, string assetKeysJson)
+        {
+            try
+            {
                 var assetKeysData = JsonConvert.DeserializeObject<ESResJsonData_AssetsKeys>(assetKeysJson);
 
                 if (assetKeysData != null)
@@ -938,7 +1124,19 @@ namespace ES
         {
             try
             {
-                string abMetadataJson = File.ReadAllText(abMetadataFilePath);
+                return InjectABMetadataJson(lib, File.ReadAllText(abMetadataFilePath));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"注入ABMetadata数据失败 {lib?.FolderName}: {ex.Message}");
+                return null;
+            }
+        }
+
+        private ESResJsonData_ABMetadata InjectABMetadataJson(RequiredLibrary lib, string abMetadataJson)
+        {
+            try
+            {
                 var abMetadataData = JsonConvert.DeserializeObject<ESResJsonData_ABMetadata>(abMetadataJson);
 
                 if (abMetadataData != null)

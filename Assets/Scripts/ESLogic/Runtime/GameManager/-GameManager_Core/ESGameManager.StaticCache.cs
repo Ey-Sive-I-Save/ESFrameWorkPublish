@@ -14,9 +14,9 @@ namespace ES
         public static ESInputModule InputModule { get; private set; }
         public static ESRuntimeDataModule RuntimeData { get; private set; }
         public static ESGameObjectPoolModule PoolModule { get; private set; }
+        public static ESResourcePlanRuntimeService ResourcePlans { get; private set; }
         public static ESPhysicsQueryModule PhysicsQueryModule { get; private set; }
         public static ESLODModule LODModule { get; private set; }
-        public static ESAssetTable AssetTable { get; private set; } = ESAssetRegistry.Table;
         public static ESConfigKeyTable<ESBuffRuntimeData> BuffData => ESRuntimeDataModule.BuffTable;
         public static ESConfigKeyTable<ESShotRuntimeData> ShotData => ESRuntimeDataModule.ShotTable;
         public static ESConfigKeyTable<ESMonsterRuntimeData> MonsterData => ESRuntimeDataModule.MonsterTable;
@@ -68,6 +68,8 @@ namespace ES
 
             if (RuntimeMode == null)
                 RuntimeMode = new ESRuntimeModeService();
+            if (ResourcePlans == null)
+                ResourcePlans = new ESResourcePlanRuntimeService();
 
             RuntimeMode.Warmup(RuntimeModeWarmupModeCapacity, RuntimeModeWarmupTagCapacity);
 
@@ -103,7 +105,6 @@ namespace ES
 
             ESCommandServices.SetRuntimeMode(RuntimeMode);
             ESCommandServices.SetInputModule(InputModule);
-            AssetTable = ESAssetRegistry.Table;
         }
 
         private void EnsureDefaultDomains()
@@ -126,11 +127,12 @@ namespace ES
             RuntimeMode = null;
             CommandModule = null;
             InputModule = null;
-            AssetTable = ESAssetRegistry.Table;
             RuntimeData = null;
             PoolModule = null;
             PhysicsQueryModule = null;
             LODModule = null;
+            ResourcePlans?.Dispose();
+            ResourcePlans = null;
             ESCommandServices.Clear();
         }
     }

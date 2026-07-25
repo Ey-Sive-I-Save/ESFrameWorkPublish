@@ -19,21 +19,27 @@ namespace ES
                 if (pendingExpandMenuPath_.IsNullOrWhitespace())
                     return;
 
+                EditorApplication.delayCall -= ApplyPendingMenuExpansionDelayed;
+                EditorApplication.delayCall += ApplyPendingMenuExpansionDelayed;
+            }
+
+            private void ApplyPendingMenuExpansionDelayed()
+            {
+                if (pendingExpandMenuPath_.IsNullOrWhitespace())
+                    return;
+
                 string menuPath = pendingExpandMenuPath_;
                 pendingExpandMenuPath_ = "";
 
-                EditorApplication.delayCall += () =>
-                {
-                    if (UsingWindow != this || MenuTree == null)
-                        return;
+                if (UsingWindow != this || MenuTree == null)
+                    return;
 
-                    if (!MenuItems.TryGetValue(menuPath, out var item) || item == null)
-                        return;
+                if (!MenuItems.TryGetValue(menuPath, out var item) || item == null)
+                    return;
 
-                    SetMenuItemExpanded(item, true);
-                    MenuTree.Selection.Add(item);
-                    Repaint();
-                };
+                SetMenuItemExpanded(item, true);
+                MenuTree.Selection.Add(item);
+                Repaint();
             }
 
             private static void SetMenuItemExpanded(OdinMenuItem item, bool expanded)

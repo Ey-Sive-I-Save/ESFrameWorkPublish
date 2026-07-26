@@ -75,3 +75,9 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 ESFramework_Publish/
+
+# ES resource pipeline generated build/release artifacts. They are reproducible outputs,
+# not source assets; keeping them out of Git also avoids Windows maximum-path failures.
+/ES/BuildStaging/
+/ES/Published/
+/ESOutput/

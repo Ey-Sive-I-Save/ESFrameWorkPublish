@@ -35,6 +35,27 @@ namespace ES
         public List<string> excludedEditorOnlyPaths = new List<string>();
         public List<string> errors = new List<string>(), warnings = new List<string>();
     }
+    [Serializable] public sealed class ESAssetReferenceRoot
+    {
+        public ESPipelineAssetIdentity identity = new ESPipelineAssetIdentity();
+        public string assetPath = string.Empty;
+    }
+    [Serializable] public sealed class ESAssetReferenceNode
+    {
+        public ESPipelineAssetIdentity identity = new ESPipelineAssetIdentity();
+        public string assetPath = string.Empty, assetTypeName = string.Empty, dependencyHash = string.Empty;
+        public bool editorOnly, markable;
+        public List<string> ownerLibraryFolders = new List<string>();
+        public List<string> directDependencies = new List<string>();
+    }
+    [Serializable] public sealed class ESAssetReferenceGraph
+    {
+        public int formatVersion = ESAssetPipelineIO.ReferenceGraphFormatVersion;
+        public string libraryName = string.Empty, libraryFolder = string.Empty, generatedUtc = string.Empty;
+        public List<ESAssetReferenceRoot> roots = new List<ESAssetReferenceRoot>();
+        public List<ESAssetReferenceNode> nodes = new List<ESAssetReferenceNode>();
+        public List<string> errors = new List<string>(), warnings = new List<string>();
+    }
     [Serializable] public sealed class ESAssetBundleAssignment
     {
         public string assetPath = string.Empty, assetBundleKey = string.Empty, ownerLibrary = string.Empty;
@@ -78,7 +99,7 @@ namespace ES
     }
     [Serializable] public sealed class ESAssetBundleManifest
     {
-        public int formatVersion = 2;
+        public int formatVersion = ESAssetPipelineIO.RuntimeProtocolFormatVersion;
         public string platform = string.Empty, libraryName = string.Empty;
         public List<ESAssetBundleRecord> assetBundles = new List<ESAssetBundleRecord>();
         public List<ESRuntimeMainAssetManifestRecord> mainAssetsByGuid = new List<ESRuntimeMainAssetManifestRecord>();
@@ -86,7 +107,7 @@ namespace ES
     }
     [Serializable] public sealed class ESAssetLibraryIdentity
     {
-        public int formatVersion = 2;
+        public int formatVersion = ESAssetPipelineIO.RuntimeProtocolFormatVersion;
         public string libraryName = string.Empty, libraryFolder = string.Empty, platform = string.Empty, version = string.Empty, channel = string.Empty, catalogUrl = string.Empty, assetBundleManifestUrl = string.Empty, catalogSha256 = string.Empty, assetBundleManifestSha256 = string.Empty;
         public List<ESAssetBundleIdentityHash> assetBundles = new List<ESAssetBundleIdentityHash>();
     }
@@ -107,7 +128,7 @@ namespace ES
     }
     [Serializable] public sealed class ESAssetReleaseManifest
     {
-        public int formatVersion = 2;
+        public int formatVersion = ESAssetPipelineIO.RuntimeProtocolFormatVersion;
         public string platform = string.Empty, releaseVersion = string.Empty, channel = string.Empty, publishedUtc = string.Empty;
         public List<ESAssetReleaseLibrary> libraries = new List<ESAssetReleaseLibrary>();
         public string totalConsumerUrl = string.Empty, totalConsumerSha256 = string.Empty, bundleIndexUrl = string.Empty, bundleIndexSha256 = string.Empty;
@@ -139,7 +160,7 @@ namespace ES
     }
     [Serializable] public sealed class ESAssetReleaseBundleIndex
     {
-        public int formatVersion = 2;
+        public int formatVersion = ESAssetPipelineIO.RuntimeProtocolFormatVersion;
         public string platform = string.Empty, releaseVersion = string.Empty;
         public List<ESAssetReleaseBundleRecord> assetBundles = new List<ESAssetReleaseBundleRecord>();
     }
@@ -166,9 +187,14 @@ namespace ES
         public List<ESAssetConsumerGameCoreDependencyReference> dependencies = new List<ESAssetConsumerGameCoreDependencyReference>();
     }
     [Serializable] public sealed class ESAssetConsumerGameCoreDependencyReference { public string guid = string.Empty; public long localFileId; }
+    [Serializable] public sealed class ESAssetConsumerResidentAssetReference
+    {
+        public string guid = string.Empty;
+        public long localFileId;
+    }
     [Serializable] public sealed class ESAssetConsumerManifest
     {
-        public int formatVersion = 2;
+        public int formatVersion = ESAssetPipelineIO.RuntimeProtocolFormatVersion;
         public string consumerId = string.Empty, name = string.Empty, description = string.Empty, maintainer = string.Empty, releaseNotes = string.Empty;
         public string version = string.Empty, platform = string.Empty, channel = string.Empty, publishedUtc = string.Empty;
         public bool isTotalConsumer;
@@ -176,12 +202,15 @@ namespace ES
         public List<ESAssetConsumerReference> requiredConsumers = new List<ESAssetConsumerReference>();
         public List<ESAssetConsumerLibraryReference> libraries = new List<ESAssetConsumerLibraryReference>();
         public List<ESAssetConsumerGameCoreReference> gameCoreAssets = new List<ESAssetConsumerGameCoreReference>();
+        public List<ESAssetConsumerResidentAssetReference> residentAssets = new List<ESAssetConsumerResidentAssetReference>();
         public List<ESAssetConsumerCodePackageReference> codePackages = new List<ESAssetConsumerCodePackageReference>();
     }
 
     internal static class ESAssetPipelineIO
     {
-        public const string CatalogFileName = "ESAssetLibraryCatalog.json", PlanFileName = "ESAssetBundleBuildPlan.json", AssetListFileName = "ESAssetBundleAssetList.json";
+        public const int ReferenceGraphFormatVersion = 1;
+        public const int RuntimeProtocolFormatVersion = 3;
+        public const string CatalogFileName = "ESAssetLibraryCatalog.json", ReferenceGraphFileName = "ESAssetReferenceGraph.json", PlanFileName = "ESAssetBundleBuildPlan.json", AssetListFileName = "ESAssetBundleAssetList.json";
         public const string BundleManifestFileName = "ESAssetBundleManifest.json", LibraryIdentityFileName = "ESAssetLibraryIdentity.json", BuildSetFileName = "ESAssetBuildSet.json", ReleaseManifestFileName = "ESAssetReleaseManifest.json", ConsumerManifestFileName = "ESAssetConsumerManifest.json", ReleaseBundleIndexFileName = "ESAssetReleaseBundleIndex.json";
         public static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;
         public static string PipelineRoot => Path.Combine(ProjectRoot, "ES", "ResourcePipeline");
@@ -195,7 +224,7 @@ namespace ES
         public static string StagingRoot(string platform) => Path.Combine(ProjectRoot, "ES", "BuildStaging", platform);
         public static string StagingLibrariesRoot(string platform) => Path.Combine(StagingRoot(platform), LibrariesFolderName);
         public static string StagingLibraryFolder(string platform, string libraryFolder) => Path.Combine(StagingLibrariesRoot(platform), SafeSegment(libraryFolder));
-        public static string AssetBundleRelativePath(string fileName) => AssetBundlesFolderName + "/" + SafeSegment(fileName);
+        public static string AssetBundleRelativePath(string fileName) => AssetBundlesFolderName + "/" + ESAssetBundleUtility.ToSafeAssetBundleFileName(fileName);
         public static string ReleaseLibraryFolder(string releaseRoot, string platform, string releaseVersion, string libraryFolder)
             => string.IsNullOrEmpty(platform)
                 ? Path.Combine(releaseRoot, releaseVersion, LibrariesFolderName, SafeSegment(libraryFolder))
@@ -211,7 +240,9 @@ namespace ES
         }
         public static string PlatformName => ESAssetBundleBuildTargetUtility.GetBuildTarget(ESGlobalResSetting.Instance.applyPlatform).ToString();
         public static string LibraryBakeFolder(string folder) => Path.Combine(BakeRoot, SafeSegment(folder));
-        public static string GameCoreLibraryFolder(string consumerId) => "__gamecore_" + SafeSegment(consumerId);
+        // LibraryFolder 本身就是物理目录和运行时清单共同使用的权威值，禁止先生成
+        // "__gamecore_x" 再由 SafeSegment 隐式改成 "gamecore_x"，否则构建与发布查找不一致。
+        public static string GameCoreLibraryFolder(string consumerId) => SafeSegment("gamecore_" + SafeSegment(consumerId));
         public static string SafeSegment(string value) => string.IsNullOrWhiteSpace(value) ? "DefaultLibrary" : ESAssetBundleUtility.ToSafeAssetBundleKey(value).Replace('/', '_').Replace('\\', '_');
         public static ESPipelineAssetIdentity GetIdentity(UnityEngine.Object asset)
         {

@@ -72,6 +72,8 @@ namespace ES
         public void Release(ESAssetIdentity id) => loader.Release(id);
         public UniTask<ESRuntimeUnusedAssetUnloadResult> UnloadZeroReferenceAssetsAsync(System.Threading.CancellationToken cancellationToken = default)
             => loader.UnloadZeroReferenceAssetsAsync(cancellationToken);
+        public UniTask<ESRuntimeUnusedAssetBundleUnloadResult> UnloadZeroReferenceAssetBundlesAtSafePointAsync(System.Threading.CancellationToken cancellationToken = default)
+            => loader.UnloadZeroReferenceAssetBundlesAtSafePointAsync(cancellationToken);
         public void UnloadAllAtSafePoint() => loader.UnloadAllAtSafePoint();
         public void Dispose() => loader.Dispose();
     }

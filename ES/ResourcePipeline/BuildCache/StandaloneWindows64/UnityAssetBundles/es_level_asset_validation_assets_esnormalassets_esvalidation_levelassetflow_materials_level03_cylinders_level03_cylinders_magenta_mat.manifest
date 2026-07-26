@@ -1,0 +1,22 @@
+ManifestFileVersion: 0
+CRC: 2418566181
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: f3195afedfa2042192c751e0ec105d45
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 5e762ccb57c4caaabbb5a4199ac82c23
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: f3195afedfa2042192c751e0ec105d45
+HashAppended: 0
+ClassTypes:
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Magenta.mat
+Dependencies: []

@@ -1,3 +1,5 @@
+using System;
+using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 
@@ -6,6 +8,10 @@ namespace ES
     /// <summary>新版资源链的无状态平台和 AssetBundle 命名工具；不依赖旧 ESResMaster。</summary>
     public static class ESAssetBundleUtility
     {
+        // Unity/Mono 在部分编辑器与旧播放器环境仍受 MAX_PATH 约束；物理 AB 名必须留出发布目录空间。
+        public const int MaxAssetBundleKeyLength = 80;
+        private const int StableHashLength = 24;
+
         public static string ToSafeAssetBundleKey(string value, bool preserveSlash = false)
         {
             if (string.IsNullOrWhiteSpace(value)) return "default_assetbundle";
@@ -23,6 +29,35 @@ namespace ES
             while (preserveSlash && result.IndexOf("//", System.StringComparison.Ordinal) >= 0) result = result.Replace("//", "/");
             result = result.Trim('_', '/');
             return string.IsNullOrEmpty(result) ? "default_assetbundle" : result;
+        }
+
+        /// <summary>生成跨机器、跨进程稳定且有界的 AB 标识。保留可读前缀，超长部分使用 SHA-256 后缀。</summary>
+        public static string ToBoundedAssetBundleKey(string value, int maxLength = MaxAssetBundleKeyLength, bool preserveSlash = false)
+        {
+            string safe = ToSafeAssetBundleKey(value, preserveSlash);
+            if (maxLength < 24) maxLength = 24;
+            if (safe.Length <= maxLength) return safe;
+
+            string hash;
+            using (SHA256 sha = SHA256.Create())
+                hash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? string.Empty))).Replace("-", string.Empty).ToLowerInvariant();
+
+            hash = hash.Substring(0, StableHashLength);
+            int prefixLength = Math.Max(1, maxLength - hash.Length - 1);
+            string prefix = safe.Substring(0, Math.Min(prefixLength, safe.Length)).Trim('_', '/');
+            string result = prefix + "_" + hash;
+            return result.Length <= maxLength ? result : result.Substring(0, maxLength);
+        }
+
+        /// <summary>物理文件名保留扩展名，避免 AssetBundles/foo_bundle 与 foo.bundle 不一致。</summary>
+        public static string ToSafeAssetBundleFileName(string fileName)
+        {
+            string value = (fileName ?? string.Empty).Trim();
+            string extension = System.IO.Path.GetExtension(value);
+            string stem = string.IsNullOrEmpty(extension) ? value : value.Substring(0, value.Length - extension.Length);
+            string safeStem = ToBoundedAssetBundleKey(stem, MaxAssetBundleKeyLength);
+            string safeExtension = string.IsNullOrEmpty(extension) ? string.Empty : "." + extension.TrimStart('.').ToLowerInvariant();
+            return safeStem + safeExtension;
         }
 
         public static string GetPlatformFolderName(RuntimePlatform platform)
@@ -59,8 +94,28 @@ namespace ES
                 case RuntimePlatform.LinuxEditor: return "StandaloneLinux64";
                 case RuntimePlatform.PS5: return "PS5";
                 case RuntimePlatform.XboxOne: return "XboxOne";
-                default: return "StandaloneWindows64";
+                default:
+                    throw new System.ArgumentOutOfRangeException(nameof(platform), platform,
+                        "新版资源发布链尚未定义该平台的 BuildTarget/发布目录映射。");
             }
+        }
+
+        /// <summary>
+        /// 新发布链的唯一平台来源。
+        /// 编辑器内可按全局设置模拟目标平台；Player 永远信任自身实际平台，禁止被遗留配置误导。
+        /// </summary>
+        public static RuntimePlatform GetRuntimeResourcePlatform(RuntimePlatform configuredEditorPlatform)
+        {
+#if UNITY_EDITOR
+            return configuredEditorPlatform;
+#else
+            return Application.platform;
+#endif
+        }
+
+        public static string GetRuntimeResourcePlatformName(RuntimePlatform configuredEditorPlatform)
+        {
+            return GetBuildPlatformName(GetRuntimeResourcePlatform(configuredEditorPlatform));
         }
     }
 }

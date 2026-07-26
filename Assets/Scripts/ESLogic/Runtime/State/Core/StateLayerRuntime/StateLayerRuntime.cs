@@ -71,7 +71,7 @@ namespace ES
         [NonSerialized] public List<StateBase> fadeOutToRemoveCache = new List<StateBase>(8);
         [NonSerialized] private readonly List<KeyValuePair<StateBase, int>> _stateToSlotListCache = new List<KeyValuePair<StateBase, int>>(64);
         /// <summary>上一次写入 RootMixer 的层级权重（用于阈值比较）</summary>
-        [NonSerialized] internal float lastAppliedRootMixerWeight = float.NaN;
+        [NonSerialized] internal float lastAppliedRootMixerWeight = -1f;
         // Slot cache skips redundant native AnimationMixerPlayable weight writes.
         [NonSerialized] internal readonly float[] lastAppliedMixerSlotWeights = new float[32];
         public StateLayerRuntime(StateLayerType type, StateMachine machine)
@@ -83,7 +83,7 @@ namespace ES
             stateMachine = machine;
             runningStates = new SwapBackSet<StateBase>(16);
             for (int i = 0; i < lastAppliedMixerSlotWeights.Length; i++)
-                lastAppliedMixerSlotWeights[i] = float.NaN;
+                lastAppliedMixerSlotWeights[i] = -1f;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -134,7 +134,7 @@ namespace ES
         internal void InvalidateMixerSlotWeight(int slotIndex)
         {
             if ((uint)slotIndex < (uint)lastAppliedMixerSlotWeights.Length)
-                lastAppliedMixerSlotWeights[slotIndex] = float.NaN;
+                lastAppliedMixerSlotWeights[slotIndex] = -1f;
         }
 
         // State transitions must be arbitrated by StateMachine. Keeping this

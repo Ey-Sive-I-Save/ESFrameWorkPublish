@@ -261,7 +261,9 @@ namespace ES
             if (playableGraph.IsValid())
             {
                 sb.AppendLine($"PlayableGraph运行中: {playableGraph.IsPlaying()}");
-                sb.AppendLine($"PlayableGraph名称: {playableGraph.GetEditorName()}");
+                // PlayableGraph has no Player-safe name API. GetEditorName is editor/version-specific,
+                // so diagnostics use stable runtime graph facts instead of an editor-only extension.
+                sb.AppendLine($"PlayableGraph节点数: {playableGraph.GetPlayableCount()}");
             }
 
             sb.AppendLine($"\nRootMixer有效: {rootMixer.IsValid()}");

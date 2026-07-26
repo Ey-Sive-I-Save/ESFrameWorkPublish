@@ -20,7 +20,7 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 
 - 为 `SkillDefinitionDataInfo`、`BuffDefinitionDataInfo`、`ActorDataInfo`、`ItemDataInfo` 等领域 Info 接入 `IGameCoreSO`。
 - 让抽象 `SoDataGroup<TInfo>` 与 `SoDataPack<TInfo>` 直接实现 `IGameCoreSO`；遍历 `Infos.Values` 时仅对 `info is IGameCoreSO` 的 Info 转发注入，其他 Info 正常跳过。
-- 建立明确的 Key 校验、唯一目标 Table 注入与重复 Key 失败策略。
+- 建立明确的 Key 校验、显式枚举分流、目标 Table 注入与重复 Key 失败策略。
 - 将根 SO 收集到唯一 Consumer 启动核心包，并验证启动注入。
 
 ## 新类别固定模板
@@ -35,7 +35,7 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 可选：<Category>DataGroup / <Category>DataPack
 ```
 
-`<Category>DataInfo.InjectGameCoreTables()` 必须直接校验 Key 并写入 `<Category>RuntimeTable`。Group/Pack 已在抽象基类中完成接口转发，因此新类别不得修改 `0_Stand`、不得添加反射注册、不得修改中央启动分发。
+`<Category>DataInfo.InjectGameCoreTables()` 必须直接校验 Key 并写入所属强类型 RuntimeTable。一个根 SO **类型**允许通过稳定、显式的领域枚举分流到多个兼容 Table；例如 `ItemDataInfo + ItemKind.Shot → ShotTable`、`ItemDataInfo + ItemKind.Weapon → WeaponTable`。每个 SO **资产实例**必须只进入当前枚举选中的一个分支，不得盲目写入全部 Table。Group/Pack 已在抽象基类中完成接口转发，因此新类别不得修改 `0_Stand`、不得添加反射注册、不得修改中央启动分发。
 
 运行期业务代码必须持有强类型 `<Category>ConfigKey`，直接查询 `<Category>RuntimeTable`；不得用字符串类别、`Type` 或 `Dictionary<Type, object>` 作为热路径入口。
 
@@ -46,17 +46,19 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 2. 不得让 RuntimeData、SharedData、VariableData、AssetTable 记录实现 IGameCoreSO。
 3. 不得在 InjectGameCoreTables 内加载 AB、下载资源、读取 Library 或依赖 RuntimeKey。
 4. 不得为兼容旧 JSON 源、旧 ESResKey 恢复旧配置链路。
-5. 不得让同一个根 SO 注入多个不相干的领域 Table。
+5. 不得把“一类根 SO”错误等同于“一类 GameCore”。允许由显式领域枚举做兼容分流；禁止隐式猜测、字符串/类型名分发，禁止一个资产实例不经枚举选择就盲目注入多个 Table。
 6. 不得反射查找 InjectGameCoreTables、按类型名猜测注入资格，或强制所有 Info 实现 IGameCoreSO。
 7. 不得为新增类别修改 `0_Stand`，不得新增 `ESRuntimeDataModule.InjectGameCoreRoot` 重载、中央 switch 或类型注册表。
 8. 不得继承其他类别的 `*DataInfo`；类别相似只能复用可序列化组合数据，不能复用 DataInfo 继承层级。
+9. `*SharedData` 必须是引用类型 `class`，表示多个运行实例共享的只读定义；不得使用 `struct` 冒充共享数据。
+10. `*VariableData` 只有在字段全为值类型时才可使用 `struct`；禁止包含 `string`、数组、List、Dictionary、class、UnityEngine.Object、接口或 delegate。含引用字段时必须实现显式深拷贝。
 ```
 
 ## 执行步骤
 
 ```text
 1. 在新类别目录创建 Key、RuntimeData、强类型 RuntimeTable 和 DataInfo；不修改 0_Stand 或中央模块。
-2. 由 DataInfo 实现 IGameCoreSO.InjectGameCoreTables：校验 Key、拒绝重复、直接注入本类别 Table。
+2. 由 DataInfo 实现 IGameCoreSO.InjectGameCoreTables：校验根 SO 的领域枚举和对应 Key、拒绝重复，并直接注入枚举选中的强类型 Table。
 3. 可选创建 Group/Pack；抽象基类会遍历 Infos.Values，并只转发实际实现 IGameCoreSO 的 Info。
 4. 配置唯一 Consumer，确认其收集到 Info、Group 或 Pack 时不混入普通资源、Key 或嵌套数据。
 5. 编译，并验证启动期加载、注入、强类型按 Key 查询、重复 Key 失败与非 GameCore Info 跳过场景。

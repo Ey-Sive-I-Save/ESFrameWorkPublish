@@ -1,0 +1,33 @@
+ManifestFileVersion: 0
+CRC: 4292216591
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: dd4dfe0bb8b1223a03f9ed4fa6062045
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 173c92049fa4f46ef09f166b73c2eb70
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: dd4dfe0bb8b1223a03f9ed4fa6062045
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 135
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Blue.prefab
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalid_f0ba012f5dce10f7e19b826d

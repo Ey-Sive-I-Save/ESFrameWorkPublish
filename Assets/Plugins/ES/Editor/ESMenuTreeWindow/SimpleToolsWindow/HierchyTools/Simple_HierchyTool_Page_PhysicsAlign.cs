@@ -12,7 +12,7 @@ namespace ES
 {
     #region 智能对齐与分布工具
     /// <summary>
-    /// 商业级智能对齐与分布工具
+    /// 智能对齐与分布工具。
     /// 支持2D/3D/UI多场景，提供精确对齐、均匀分布、尺寸匹配等高级功能
     /// </summary>
     [Serializable]
@@ -23,7 +23,7 @@ namespace ES
 
         
         [PropertySpace(10)]
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        [HideInInspector]
         private string PanelSummary =>
             $"当前选择: {(Selection.transforms != null ? Selection.transforms.Length : 0)} 个对象 | 对齐: {alignMode} | 分布: {distributeMode} | 坐标: {coordinateMode} | 边界: {boundsMode}";
 

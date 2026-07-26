@@ -174,7 +174,7 @@ namespace ES
             if (!EditorApplication.isPlaying)
             {
                 EditorGUILayout.HelpBox("进入 Play Mode 后显示运行时观察数据。", MessageType.Info);
-                if (GUILayout.Button("扫描当前场景", GUILayout.Height(24)))
+                if (SimpleToolsPanelUtility.DrawCompactButton("扫描当前场景", 108, 24))
                     CollectEntries(recordResult: true);
             }
 

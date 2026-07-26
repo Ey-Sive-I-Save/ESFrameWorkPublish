@@ -573,7 +573,9 @@ namespace ES
                 {
                     pass = ctx != null && binding.condition(ctx);
                 }
+#pragma warning disable CS0168 // The exception is intentionally logged only in Editor/Development builds.
                 catch (Exception e)
+#pragma warning restore CS0168
                 {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                     var dbg = StateMachineDebugSettings.Instance;

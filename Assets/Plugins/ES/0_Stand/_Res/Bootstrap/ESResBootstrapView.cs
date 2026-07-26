@@ -9,6 +9,8 @@ namespace ES
     [DisallowMultipleComponent]
     public sealed class ESResBootstrapView : MonoBehaviour
     {
+        private static bool warnedMissingDefaultFont;
+
         private ESResBootstrapTheme theme;
         private TextMeshProUGUI titleText, subtitleText, announcementText, statusText, detailText, percentText, actionText;
         private Image backgroundImage, logoImage, panelImage, trackImage, progressFill, actionImage;
@@ -68,6 +70,13 @@ namespace ES
             actionButton.onClick.AddListener(() => action());
         }
 
+        /// <summary>资源准备完成后隐藏启动 UI；Manager 本身保持存活以支持后续更新检查。</summary>
+        public void SetVisible(bool visible)
+        {
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas != null) canvas.enabled = visible;
+        }
+
         private void BuildCanvas()
         {
             if (FindFirstObjectByType<EventSystem>() == null)
@@ -91,6 +100,7 @@ namespace ES
             actionButton = Image("Action", panelImage.transform, Accent).gameObject.AddComponent<Button>(); actionImage = actionButton.GetComponent<Image>(); Rect(actionButton.GetComponent<RectTransform>(), new Vector2(.72f, -.34f), new Vector2(.94f, -.08f));
             actionText = Text("Label", actionButton.transform, 19, ButtonText, TextAlignmentOptions.Center, FontStyles.Bold); Stretch(actionText.rectTransform); actionButton.targetGraphic = actionImage;
             ApplyTheme(theme); actionButton.gameObject.SetActive(false);
+            Debug.Log("[ESRes][Bootstrap][View] 启动界面初始化完成。", this);
         }
 
         private static Image Image(string name, Transform parent, Color color)
@@ -101,7 +111,40 @@ namespace ES
             return result;
         }
         private static TextMeshProUGUI Text(string name, Transform parent, int size, Color color, TextAlignmentOptions align, FontStyles style) { var result = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>(); result.transform.SetParent(parent, false); result.fontSize = size; result.color = color; result.alignment = align; result.fontStyle = style; result.enableWordWrapping = false; result.overflowMode = TextOverflowModes.Overflow; return result; }
-        private static void ApplyFont(TextMeshProUGUI text, TMP_FontAsset font) { text.font = font != null ? font : TMP_Settings.defaultFontAsset; }
+        private static void ApplyFont(TextMeshProUGUI text, TMP_FontAsset font)
+        {
+            if (text == null) return;
+
+            if (font != null)
+            {
+                text.font = font;
+                return;
+            }
+
+            TMP_FontAsset fallback = null;
+            Exception failure = null;
+            try
+            {
+                fallback = TMP_Settings.defaultFontAsset;
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+
+            if (fallback != null)
+            {
+                text.font = fallback;
+                return;
+            }
+
+            if (warnedMissingDefaultFont) return;
+            warnedMissingDefaultFont = true;
+            string reason = failure == null
+                ? "TMP Settings 未配置默认字体。"
+                : $"读取 TMP 默认字体失败：{failure.GetType().Name}: {failure.Message}";
+            Debug.LogWarning($"[ESRes][Bootstrap][TMP] {reason} 启动流程将继续；请在启动主题中指定字体，或修复 TMP Settings。", text);
+        }
         private static void Stretch(RectTransform transform) => Rect(transform, Vector2.zero, Vector2.one);
         private static void Rect(RectTransform transform, Vector2 min, Vector2 max, Vector2 offsetMin = default, Vector2 offsetMax = default) { transform.anchorMin = min; transform.anchorMax = max; transform.offsetMin = offsetMin; transform.offsetMax = offsetMax; }
     }

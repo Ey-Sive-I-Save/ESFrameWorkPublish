@@ -10,6 +10,13 @@ namespace ES
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Register()
         {
+            EnsureRegistered();
+        }
+
+        // HybridCLR 程序集是在 Player 启动阶段之后动态载入的，Unity 不保证此时再次派发
+        // RuntimeInitializeOnLoadMethod。由 Stand 启动层在 Assembly.Load 后显式调用该入口。
+        public static void EnsureRegistered()
+        {
             ESResBootstrapRuntimeBridge.Register(InitializeAsync);
         }
 

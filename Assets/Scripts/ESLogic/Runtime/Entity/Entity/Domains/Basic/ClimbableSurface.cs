@@ -97,6 +97,14 @@ namespace ES
         [LabelText("翻越后着地点"), Tooltip("翻越完成后角色的落脚位置")]
         public Transform landingPoint;
 
+        [ShowIf("@enableBilateral && surfaceType != ClimbableSurfaceType.Wall")]
+        [LabelText("反面 MatchTarget 锚点"), Tooltip("双面表面从模拟法线反侧进入时使用。未配置则兼容并回退到‘MatchTarget锚点’。")]
+        public Transform reverseMatchTargetAnchor;
+
+        [ShowIf("@enableBilateral && surfaceType != ClimbableSurfaceType.Wall")]
+        [LabelText("反面翻越后着地点"), Tooltip("双面表面从模拟法线反侧翻越时使用。未配置则兼容并回退到‘翻越后着地点’。")]
+        public Transform reverseLandingPoint;
+
         [ShowIf("@surfaceType == ClimbableSurfaceType.LowWall")]
         [LabelText("矮墙高度(米)"), Tooltip("实际矮墙高度，用于判断是否可以直接翻越")]
         public float wallHeight = 1.2f;
@@ -112,15 +120,44 @@ namespace ES
         private const float LandingProbeUpOffset = 2.0f;
         private const float LandingProbeDownDistance = 8.0f;
 
+        [Title("物理探测")]
+        [LabelText("表面探测层"), Tooltip("顶面与落点射线使用的层。不要使用全层扫描，以免密集场景截断命中。")]
+        public LayerMask surfaceProbeLayers = Physics.DefaultRaycastLayers;
+
+        [LabelText("指定表面 Collider（可选）"), Tooltip("复杂组合关卡建议显式指定。填写后，顶面/厚度/落点计算只使用这些 Collider，不再自动把父子层级中的其它 Collider 当作本攀爬面。留空保持旧的自动收集行为。")]
+        public Collider[] explicitSurfaceColliders;
+
         // MatchTarget 射线探测：缓存本物体及父物体链的碰撞体（两个方向都要找），避免每帧分配
         [NonSerialized] private Collider[] _cachedSurfaceColliders;
         // Physics.RaycastNonAlloc 复用缓冲区（Unity 单线程，static 共享安全）
-        private static readonly RaycastHit[] _sharedRayBuffer = new RaycastHit[32];
+        private static readonly RaycastHit[] _sharedRayBuffer = new RaycastHit[64];
+        [NonSerialized] private bool _warnedRayBufferTruncated;
 
         private void EnsureSurfaceColliders()
         {
             if (_cachedSurfaceColliders != null) return;
             var set = new System.Collections.Generic.HashSet<Collider>();
+
+            bool hasExplicitColliders = false;
+            if (explicitSurfaceColliders != null)
+            {
+                for (int i = 0; i < explicitSurfaceColliders.Length; i++)
+                {
+                    Collider collider = explicitSurfaceColliders[i];
+                    if (collider == null) continue;
+                    set.Add(collider);
+                    hasExplicitColliders = true;
+                }
+            }
+
+            if (hasExplicitColliders)
+            {
+                _cachedSurfaceColliders = new Collider[set.Count];
+                set.CopyTo(_cachedSurfaceColliders);
+                return;
+            }
+
+            // 兼容旧配置：未显式指定时，仍自动收集自身/子节点及父级链的 Collider。
             // 子物体（含自身）
             foreach (var c in GetComponentsInChildren<Collider>(true))
                 set.Add(c);
@@ -199,13 +236,10 @@ namespace ES
                 }
 
                 Vector3 dir = toChar.normalized;
-                Vector3 n = baseNormal;
-                Vector3 nInv = -baseNormal;
-
-                // 同一坐标系下比较“方向”与法线/反法线的夹角，选夹角更小的
-                float angleN = Vector3.Angle(dir, n);
-                float angleInv = Vector3.Angle(dir, nInv);
-                return angleN <= angleInv ? n : nInv;
+                // bilateralFlipAngle 是明确的作者阈值：超过该角度才视为从反面接近。
+                // 默认 90° 等价于按墙平面两侧切换。
+                float angleToBaseNormal = Vector3.Angle(dir, baseNormal);
+                return angleToBaseNormal > bilateralFlipAngle ? -baseNormal : baseNormal;
             }
 
             return baseNormal;
@@ -277,8 +311,9 @@ namespace ES
         /// </summary>
         public Vector3 GetTopPositionNearEntry(Vector3 entryCharacterPosition, bool ignoreMatchTargetAnchor)
         {
-            if (!ignoreMatchTargetAnchor && matchTargetAnchor != null)
-                return matchTargetAnchor.position;
+            Transform targetAnchor = ResolveMatchTargetAnchor(entryCharacterPosition);
+            if (!ignoreMatchTargetAnchor && targetAnchor != null)
+                return targetAnchor.position;
 
             EnsureSurfaceColliders();
 
@@ -336,7 +371,8 @@ namespace ES
         private bool TryRaycastOwnSurface(Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit bestHit)
         {
             EnsureSurfaceColliders();
-            int count = Physics.RaycastNonAlloc(origin, direction, _sharedRayBuffer, maxDistance, ~0, QueryTriggerInteraction.Ignore);
+            int count = Physics.RaycastNonAlloc(origin, direction, _sharedRayBuffer, maxDistance, surfaceProbeLayers, QueryTriggerInteraction.Ignore);
+            WarnIfRayBufferTruncated(count);
             bestHit = default;
             float closestDist = float.MaxValue;
             bool found = false;
@@ -395,8 +431,9 @@ namespace ES
         /// </summary>
         public Quaternion GetMatchTargetRotation(Vector3 characterPosition)
         {
-            if (matchTargetAnchor != null)
-                return matchTargetAnchor.rotation;
+            Transform targetAnchor = ResolveMatchTargetAnchor(characterPosition);
+            if (targetAnchor != null)
+                return targetAnchor.rotation;
             Vector3 faceDir = -GetDynamicNormal(characterPosition);
             if (faceDir.sqrMagnitude < 0.001f) faceDir = Vector3.forward;
             return Quaternion.LookRotation(faceDir, Vector3.up);
@@ -444,8 +481,9 @@ namespace ES
         /// </summary>
         public Vector3 GetLandingPosition(Vector3 characterPosition, Vector3 approachNormalWorld, bool ignoreLandingPoint)
         {
-            if (!ignoreLandingPoint && landingPoint != null)
-                return landingPoint.position;
+            Transform configuredLandingPoint = ResolveLandingPoint(characterPosition, approachNormalWorld);
+            if (!ignoreLandingPoint && configuredLandingPoint != null)
+                return configuredLandingPoint.position;
 
             Vector3 approachNormal = approachNormalWorld;
             if (approachNormal.sqrMagnitude < 0.0001f)
@@ -540,7 +578,8 @@ namespace ES
         private bool TryRaycastExcludeOwnSurface(Vector3 origin, Vector3 direction, float maxDistance, out RaycastHit bestHit)
         {
             EnsureSurfaceColliders();
-            int count = Physics.RaycastNonAlloc(origin, direction, _sharedRayBuffer, maxDistance, ~0, QueryTriggerInteraction.Ignore);
+            int count = Physics.RaycastNonAlloc(origin, direction, _sharedRayBuffer, maxDistance, surfaceProbeLayers, QueryTriggerInteraction.Ignore);
+            WarnIfRayBufferTruncated(count);
 
             bestHit = default;
             float closestDist = float.MaxValue;
@@ -589,20 +628,51 @@ namespace ES
             float minY = Mathf.Min(top.y, bottom.y);
             float maxY = Mathf.Max(top.y, bottom.y);
             bool inRange = characterY >= minY && characterY <= maxY;
-            Debug.Log(string.Format(
-                "[ClimbableSurface] IsInHeightRange -> inRange={0}, characterY={1:F3}, minY={2:F3}, maxY={3:F3}, areaCenterLocal={4}, areaSizeLocal={5}, halfLocal={6}, topOffset={7:F3}, bottomOffset={8:F3}, topWorld={9}, bottomWorld={10}",
-                inRange,
-                characterY,
-                minY,
-                maxY,
-                areaCenter,
-                areaSize,
-                half,
-                topHeightOffset,
-                bottomHeightOffset,
-                top,
-                bottom));
             return inRange;
+        }
+
+        private Transform ResolveMatchTargetAnchor(Vector3 characterPosition)
+        {
+            if (enableBilateral && reverseMatchTargetAnchor != null && IsReverseSide(characterPosition))
+                return reverseMatchTargetAnchor;
+
+            return matchTargetAnchor;
+        }
+
+        private Transform ResolveLandingPoint(Vector3 characterPosition, Vector3 approachNormalWorld)
+        {
+            Vector3 approachNormal = approachNormalWorld;
+            if (approachNormal.sqrMagnitude < 0.0001f)
+                approachNormal = GetDynamicNormal(characterPosition);
+
+            if (enableBilateral && reverseLandingPoint != null && IsReverseApproachNormal(approachNormal))
+                return reverseLandingPoint;
+
+            return landingPoint;
+        }
+
+        private bool IsReverseSide(Vector3 characterPosition)
+        {
+            return IsReverseApproachNormal(GetDynamicNormal(characterPosition));
+        }
+
+        private bool IsReverseApproachNormal(Vector3 approachNormalWorld)
+        {
+            Vector3 baseNormal = GetSimulatedNormal();
+            return baseNormal.sqrMagnitude > 0.0001f
+                && approachNormalWorld.sqrMagnitude > 0.0001f
+                && Vector3.Dot(baseNormal.normalized, approachNormalWorld.normalized) < 0f;
+        }
+
+        private void WarnIfRayBufferTruncated(int count)
+        {
+#if UNITY_EDITOR
+            if (!_warnedRayBufferTruncated && count == _sharedRayBuffer.Length)
+            {
+                _warnedRayBufferTruncated = true;
+                Debug.LogWarning($"[ClimbableSurface] 射线命中达到缓冲上限({_sharedRayBuffer.Length})，请收紧‘表面探测层’。", this);
+            }
+#endif
         }
 
         /// <summary>

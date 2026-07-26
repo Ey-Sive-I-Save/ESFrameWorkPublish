@@ -26,3 +26,171 @@ MonoBehaviour:
   Desc: "\u63CF\u8FF0\uFF1A\u8FD9\u4E2AConsumer\u5305\u542B\u54EA\u4E9B\u5E93"
   ConsumerLibFolders:
   - {fileID: 11400000, guid: bd6a374707a713e4eb09b6802f8fe4aa, type: 2}
+  ConsumerId: 9d9f1fbec0874e4c8d9800c0bd35b9f8
+  IsTotalConsumer: 1
+  Channel: default
+  Maintainer: 
+  ReleaseNotes: 
+  InternalNotes: 
+  Tags: []
+  OptionalLibFolders: []
+  RequiredConsumers:
+  - {fileID: 11400000, guid: 19b44b7027dc97546927c9efc596a799, type: 2}
+  GameCoreAssets: []
+  ManualGameCoreAssets: []
+  GameCoreValidationErrors: []
+  ResidentAssets: []
+  EnableCodeHotUpdate: 0
+  HotUpdateAssemblyDefinitionGuid: 
+  HotUpdateAssemblyName: 
+  HotUpdateSourceFolder: 
+  CodePackages:
+  - Enabled: 1
+    PackageKey: es.aot.mscorlib
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/mscorlib.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 0
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.System
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/System.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 1
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.System.Core
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/System.Core.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 2
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.DOTween
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/DOTween.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 3
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.ES_Stand
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/ES_Stand.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 4
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.EasySave3
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/EasySave3.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 5
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.Newtonsoft.Json
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/Newtonsoft.Json.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 6
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.Sirenix.OdinInspector.Attributes
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/Sirenix.OdinInspector.Attributes.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 7
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.Sirenix.Serialization
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/Sirenix.Serialization.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 8
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.Sirenix.Utilities
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/Sirenix.Utilities.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 9
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.System.Runtime.CompilerServices.Unsafe
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/System.Runtime.CompilerServices.Unsafe.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 10
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.UniTask
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/UniTask.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 11
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.Unity.InputSystem
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/Unity.InputSystem.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 12
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.UnityEngine.CoreModule
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/UnityEngine.CoreModule.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 13
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.aot.UnityEngine.JSONSerializeModule
+    Kind: 1
+    SourcePath: HybridCLRData/AssembliesPostIl2CppStrip/StandaloneWindows64/UnityEngine.JSONSerializeModule.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 14
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.hot.framework.es_design
+    Kind: 0
+    SourcePath: HybridCLRData/HotUpdateDlls/StandaloneWindows64/ES_Design.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 1000
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.hot.framework.es_logic
+    Kind: 0
+    SourcePath: HybridCLRData/HotUpdateDlls/StandaloneWindows64/ES_Logic.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 1100
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  - Enabled: 1
+    PackageKey: es.hot.framework.esplayer
+    Kind: 0
+    SourcePath: HybridCLRData/HotUpdateDlls/StandaloneWindows64/ESPlayer.dll
+    RequiredAtBoot: 1
+    ManagedByHybridCLR: 1
+    LoadOrder: 1200
+    Notes: "\u7531 ES \u4EE3\u7801\u70ED\u66F4\u7CFB\u7EDF\u81EA\u52A8\u7EF4\u62A4"
+  BuildRevision: 10
+  LastBuildUtc: 2026-07-26T15:38:44.1224221Z
+  references:
+    version: 2
+    RefIds: []

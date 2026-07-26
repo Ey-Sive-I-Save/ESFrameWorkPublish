@@ -236,10 +236,6 @@ namespace ES
 
         public void SetCrouch(bool enable)
         {
-            if (enable)
-            {
-                stateDomain.stateMachine.SetSupportFlags(StateSupportFlags.Crouched);
-            }
             kcc.SetCrouch(enable);
         }
 

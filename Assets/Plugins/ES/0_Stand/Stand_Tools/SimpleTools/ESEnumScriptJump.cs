@@ -384,13 +384,11 @@ namespace ES
             return normalized;
         }
 
-#if UNITY_EDITOR
         private static string AssetPathToFullPath(string assetPath)
         {
             string projectRoot = Path.GetDirectoryName(Application.dataPath)?.Replace('\\', '/');
             return Path.GetFullPath(Path.Combine(projectRoot ?? string.Empty, assetPath)).Replace('\\', '/');
         }
-#endif
     }
 
     public sealed class ESAS_Register_ESEnumScriptJump : EditorRegister_FOR_ClassAttribute<ESEnumScriptAttribute>

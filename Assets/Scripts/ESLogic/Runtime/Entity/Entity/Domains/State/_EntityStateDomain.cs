@@ -14,7 +14,10 @@ using UnityEditor;
 namespace ES
 {
     [Serializable, TypeRegistryItem("状态表现域")]
-    public partial class EntityStateDomain : Domain<Entity, EntityStateModuleBase>, IPreviewElement, IPreviewAreaModeProvider, IPreviewElementLifecycle, IPreviewElementEditorUpdate
+    public partial class EntityStateDomain : Domain<Entity, EntityStateModuleBase>
+#if UNITY_EDITOR
+        , IPreviewElement, IPreviewAreaModeProvider, IPreviewElementLifecycle, IPreviewElementEditorUpdate
+#endif
     {
         private static readonly StateSupportFlags[] PreflightSupportFlags =
         {

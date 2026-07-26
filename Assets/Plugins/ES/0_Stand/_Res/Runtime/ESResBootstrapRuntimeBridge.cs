@@ -9,6 +9,8 @@ namespace ES
     {
         private static Func<ESGlobalResSetting, ESRuntimeReleaseDownloadResult, CancellationToken, UniTask> initializer;
 
+        public static bool IsRegistered => initializer != null;
+
         public static void Register(Func<ESGlobalResSetting, ESRuntimeReleaseDownloadResult, CancellationToken, UniTask> value)
         {
             initializer = value ?? throw new ArgumentNullException(nameof(value));

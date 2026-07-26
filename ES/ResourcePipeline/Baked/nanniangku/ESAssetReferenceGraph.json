@@ -1,0 +1,127 @@
+{
+  "formatVersion": 1,
+  "libraryName": "男娘库",
+  "libraryFolder": "nanniangku",
+  "generatedUtc": "2026-07-26T15:35:43.5717549Z",
+  "roots": [
+    {
+      "identity": {
+        "guid": "b7efbde1b85ac534f8df3ded09592512",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "b7efbde1b85ac534f8df3ded09592512"
+      },
+      "assetPath": "Assets/ESNormalAssets/Data/Group/Actor/新建角色数据组83227.asset"
+    },
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab"
+    }
+  ],
+  "nodes": [
+    {
+      "identity": {
+        "guid": "b7efbde1b85ac534f8df3ded09592512",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "b7efbde1b85ac534f8df3ded09592512"
+      },
+      "assetPath": "Assets/ESNormalAssets/Data/Group/Actor/新建角色数据组83227.asset",
+      "assetTypeName": "ES.ActorDataGroup",
+      "dependencyHash": "febf397fa9ca822ebad151321fb6e452",
+      "editorOnly": false,
+      "markable": true,
+      "ownerLibraryFolders": [
+        "nanniangku"
+      ],
+      "directDependencies": [
+        "Assets/Scripts/ESLogic/Runtime/Data/For_Info/GroupType/ActorDataGroup.cs",
+        "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ActorDataInfo.cs"
+      ]
+    },
+    {
+      "identity": {
+        "guid": "a43b0f8f0c53eba4e8fb65148bafdd7a",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "a43b0f8f0c53eba4e8fb65148bafdd7a"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "53f2619f3d744d1d7f7c6ee2eb06d72e",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    },
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "dependencyHash": "78c080a50f238d52f8484d041764f7e4",
+      "editorOnly": false,
+      "markable": true,
+      "ownerLibraryFolders": [
+        "ceshiku",
+        "haha11",
+        "nanniangku"
+      ],
+      "directDependencies": [
+        "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs"
+      ]
+    },
+    {
+      "identity": {
+        "guid": "9cac72d466e1b7b4bb1dc4ce51ff08ee",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "9cac72d466e1b7b4bb1dc4ce51ff08ee"
+      },
+      "assetPath": "Assets/Scripts/ESLogic/Runtime/Data/For_Info/GroupType/ActorDataGroup.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "91b9737ea2a8d9fd37406394ce39fe2e",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    },
+    {
+      "identity": {
+        "guid": "6564680c81fcf5a4397f4b92e3ebb0f4",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "6564680c81fcf5a4397f4b92e3ebb0f4"
+      },
+      "assetPath": "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ActorDataInfo.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "b0aed68f7d534084b68c73139b4fba35",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "引用图已标记 EditorOnly 依赖：Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/GroupType/ActorDataGroup.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ActorDataInfo.cs"
+  ]
+}

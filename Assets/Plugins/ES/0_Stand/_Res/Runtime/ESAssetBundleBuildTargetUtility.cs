@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System;
 using UnityEditor;
 using UnityEngine;
 
@@ -9,20 +10,11 @@ namespace ES
     {
         public static BuildTarget GetBuildTarget(RuntimePlatform? runtimePlatform = null)
         {
-            switch (runtimePlatform ?? Application.platform)
-            {
-                case RuntimePlatform.WindowsPlayer:
-                case RuntimePlatform.WindowsEditor: return BuildTarget.StandaloneWindows64;
-                case RuntimePlatform.Android: return BuildTarget.Android;
-                case RuntimePlatform.IPhonePlayer:
-                case RuntimePlatform.tvOS: return BuildTarget.iOS;
-                case RuntimePlatform.WebGLPlayer: return BuildTarget.WebGL;
-                case RuntimePlatform.LinuxPlayer:
-                case RuntimePlatform.LinuxEditor: return BuildTarget.StandaloneLinux64;
-                case RuntimePlatform.PS5: return BuildTarget.PS5;
-                case RuntimePlatform.XboxOne: return BuildTarget.XboxOne;
-                default: return BuildTarget.StandaloneWindows64;
-            }
+            RuntimePlatform sourcePlatform = runtimePlatform ?? Application.platform;
+            string canonicalPlatformName = ESAssetBundleUtility.GetBuildPlatformName(sourcePlatform);
+            if (Enum.TryParse(canonicalPlatformName, out BuildTarget target)) return target;
+            throw new ArgumentOutOfRangeException(nameof(runtimePlatform), sourcePlatform,
+                "无法将统一资源平台名转换为 Unity BuildTarget：" + canonicalPlatformName);
         }
     }
 }

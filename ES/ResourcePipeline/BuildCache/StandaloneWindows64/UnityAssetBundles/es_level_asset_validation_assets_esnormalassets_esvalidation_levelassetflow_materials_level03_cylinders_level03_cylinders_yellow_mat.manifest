@@ -1,0 +1,22 @@
+ManifestFileVersion: 0
+CRC: 4218636469
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: a2d6fe315ed62552a8ae754293706202
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 5e762ccb57c4caaabbb5a4199ac82c23
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: a2d6fe315ed62552a8ae754293706202
+HashAppended: 0
+ClassTypes:
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Yellow.mat
+Dependencies: []

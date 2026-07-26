@@ -59,7 +59,7 @@ namespace ES
                 "场景切换可能触发保存确认；快捷数据写入 ESSceneGlobalData。添加、删除、重命名和分组修改会记录 Undo。");
 
             EditorGUILayout.BeginVertical();
-            selectedTab = GUILayout.Toolbar(selectedTab, new string[] { "场景管理", "资产管理" });
+            selectedTab = EditorGUILayout.Popup("管理内容", selectedTab, new[] { "场景管理", "资产管理" });
             DrawSummaryAndResult(dataInstance);
 
             SimpleToolsPanelUtility.DrawSectionTitle("编辑操作", "用于撤销或重做快捷列表配置变更。");
@@ -191,15 +191,15 @@ namespace ES
 
             // 快捷按钮
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("➕ 添加当前场景", GUILayout.Height(25)))
+            if (SimpleToolsPanelUtility.DrawCompactButton("➕ 添加当前场景", 118, 25))
             {
                 AddCurrentScene();
             }
-            if (GUILayout.Button("🔄 从Build Settings同步", GUILayout.Height(25)))
+            if (SimpleToolsPanelUtility.DrawCompactButton("🔄 从Build Settings同步", 142, 25))
             {
                 SyncFromBuildSettings();
             }
-            if (GUILayout.Button("📂 打开Project窗口", GUILayout.Height(25)))
+            if (SimpleToolsPanelUtility.DrawCompactButton("📂 打开Project窗口", 120, 25))
             {
                 EditorApplication.ExecuteMenuItem("Window/General/Project");
             }
@@ -387,11 +387,11 @@ namespace ES
             // 添加资产按钮
             EditorGUILayout.Space(10);
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("➕ 添加当前选中资产", GUILayout.Height(25)))
+            if (SimpleToolsPanelUtility.DrawCompactButton("➕ 添加当前选中资产", 132, 25))
             {
                 AddSelectedAsset();
             }
-            if (GUILayout.Button("➕ 添加当前选中文件夹", GUILayout.Height(25)))
+            if (SimpleToolsPanelUtility.DrawCompactButton("➕ 添加当前选中文件夹", 148, 25))
             {
                 AddSelectedFolder();
             }
@@ -447,7 +447,7 @@ namespace ES
 
             EditorGUILayout.BeginHorizontal();
 
-            if (GUILayout.Button("打开数据配置", GUILayout.Height(30)))
+            if (SimpleToolsPanelUtility.DrawCompactButton("打开数据配置", 112, 30))
             {
                 Selection.activeObject = ESSceneGlobalData.Instance;
                 EditorGUIUtility.PingObject(ESSceneGlobalData.Instance);
@@ -455,7 +455,7 @@ namespace ES
                 lastResultDetail = AssetDatabase.GetAssetPath(ESSceneGlobalData.Instance);
             }
 
-            if (GUILayout.Button("刷新缓存", GUILayout.Height(30)))
+            if (SimpleToolsPanelUtility.DrawCompactButton("刷新缓存", 92, 30))
             {
                 AssetDatabase.Refresh();
                 lastResultSummary = "AssetDatabase 刷新完成";
@@ -463,12 +463,6 @@ namespace ES
                 Debug.Log("缓存已刷新");
             }
 
-            if (GUILayout.Button("Agent：新页签恢复", GUILayout.Height(30)))
-            {
-                ESCmdAgentWindow.OpenAndResume();
-                lastResultSummary = "已打开 Cmd Agent 页签";
-                lastResultDetail = "已创建页签，并优先使用 codex resume 恢复最近会话。";
-            }
             EditorGUILayout.EndHorizontal();
         }
 

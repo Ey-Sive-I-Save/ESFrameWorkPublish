@@ -631,6 +631,14 @@ namespace ES
 
     }
 
+    public sealed class ESConsumerResidentAssetPreloadReport
+    {
+        public int requestedCount;
+        public int loadedCount;
+        public int skippedCount;
+        public readonly List<string> errors = new List<string>();
+    }
+
     [Serializable, TypeRegistryItem("RuntimeData/Table")]
     public sealed class ESRuntimeDataModule : ESSystemModule
     {
@@ -669,87 +677,30 @@ namespace ES
 
         [NonSerialized]
         private ESRuntimeDataAssetLoadingService assetLoadingService;
+        [NonSerialized]
+        private ESAssetScope consumerResidentAssetScope;
+
+        public ESConsumerResidentAssetPreloadReport LastResidentAssetPreloadReport { get; private set; }
 
         public bool IsBuilding => isBuilding;
         public static bool IsBuildingStatic => isBuilding;
         public ESRuntimeDataAssetLoadingService AssetLoadingService => assetLoadingService ??= new ESRuntimeDataAssetLoadingService();
 
-        public static void InjectGameCoreRoot(BuffDefinitionDataInfo info)
-        {
-            bool ownsBuildScope = BeginRootInjection(info);
-            try { if (!RegisterBuff(info)) ThrowRootInjectionFailed("Buff", info); }
-            finally { EndRootInjection(ownsBuildScope); }
-        }
-
-        public static void InjectGameCoreRoot(SkillDefinitionDataInfo info)
-        {
-            bool ownsBuildScope = BeginRootInjection(info);
-            try { if (!RegisterSkill(info)) ThrowRootInjectionFailed("Skill", info); }
-            finally { EndRootInjection(ownsBuildScope); }
-        }
-
-        public static void InjectGameCoreRoot(ItemDataInfo info)
-        {
-            bool ownsBuildScope = BeginRootInjection(info);
-            try { if (!RegisterShot(info) && !RegisterWeapon(info)) ThrowRootInjectionFailed("Item", info); }
-            finally { EndRootInjection(ownsBuildScope); }
-        }
-
-        private static void InjectGameCoreRootInternal(ScriptableObject source, Func<bool> register, string category)
-        {
-            if (source == null)
-                throw new ArgumentNullException(nameof(source), "[ESGameCore][Inject] \u6839 SO \u4e0d\u80fd\u4e3a\u7a7a\u3002");
-            if (register == null)
-                throw new ArgumentNullException(nameof(register));
-
-            bool ownsBuildScope = !isBuilding;
-            if (ownsBuildScope)
-                BeginBuildStatic(clear: false);
-            try
-            {
-                if (!register())
-                    throw new InvalidOperationException("[ESGameCore][Inject] " + category + " \u6839 SO \u6ce8\u5165\u5931\u8d25\uff1a" + source.name);
-            }
-            finally
-            {
-                if (ownsBuildScope)
-                    EndBuildStatic();
-            }
-        }
-
-        private static bool BeginRootInjection(ScriptableObject source)
-        {
-            if (source == null)
-                throw new ArgumentNullException(nameof(source), "[ESGameCore][Inject] \u6839 SO \u4e0d\u80fd\u4e3a\u7a7a\u3002");
-            bool ownsBuildScope = !isBuilding;
-            if (ownsBuildScope)
-                BeginBuildStatic(clear: false);
-            return ownsBuildScope;
-        }
-
-        private static void EndRootInjection(bool ownsBuildScope)
-        {
-            if (ownsBuildScope)
-                EndBuildStatic();
-        }
-
-        private static void ThrowRootInjectionFailed(string category, ScriptableObject source)
-        {
-            throw new InvalidOperationException("[ESGameCore][Inject] " + category + " \u6839 SO \u6ce8\u5165\u5931\u8d25\uff1a" + source.name);
-        }
-
         public void InitializeAssetLoading(ESGlobalAssetRuntimeMap manifest, IESRuntimeAssetBundleProvider provider, ESRuntimeRetryPolicy retryPolicy)
         {
+            DisposeConsumerResidentAssets();
             AssetLoadingService.Initialize(manifest, provider, retryPolicy);
         }
 
         public void InitializeAssetLoading(IESAssetRuntimeProvider provider)
         {
+            DisposeConsumerResidentAssets();
             AssetLoadingService.Initialize(provider);
         }
 
         public void InitializeAssetLoadingForRunMode(ESGlobalAssetRuntimeMap manifest, ESGlobalResSetting settings, ESRuntimeRetryPolicy retryPolicy)
         {
+            DisposeConsumerResidentAssets();
             AssetLoadingService.Initialize(ESAssetRuntimeProviderFactory.Create(manifest, settings, retryPolicy));
         }
         /// <summary>Explicit entry for the current release pipeline.</summary>
@@ -771,7 +722,64 @@ namespace ES
             if (result == null || result.RuntimeMap == null) throw new ArgumentNullException(nameof(result));
             ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(result.Catalogs);
             InitializeAssetLoadingForRunMode(result.RuntimeMap, settings, ESRuntimeRetryPolicy.Default);
+            await PreloadConsumerResidentAssetsAsync(result.ResidentAssets, cancellationToken);
             await PreloadGameCoreAssetsAsync(result.GameCoreAssets, cancellationToken);
+        }
+
+        /// <summary>Consumer 启动常驻资产在 GameCore 注入前加载；由模块持有到资源系统重置。</summary>
+        public async UniTask<ESConsumerResidentAssetPreloadReport> PreloadConsumerResidentAssetsAsync(
+            IEnumerable<ESRuntimeConsumerResidentAssetReference> assets, CancellationToken cancellationToken = default)
+        {
+            if (!AssetLoadingService.IsInitialized)
+                throw new InvalidOperationException("[ESRes][Resident] 必须先初始化 Asset Provider。");
+
+            consumerResidentAssetScope?.Dispose();
+            consumerResidentAssetScope = ESAssets.CreateScope();
+            var report = new ESConsumerResidentAssetPreloadReport();
+            var identities = new HashSet<ESAssetIdentity>();
+            try
+            {
+                foreach (ESRuntimeConsumerResidentAssetReference entry in assets ?? Array.Empty<ESRuntimeConsumerResidentAssetReference>())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (entry == null || !entry.IsValid || !identities.Add(new ESAssetIdentity(entry.guid, entry.localFileId)))
+                    {
+                        report.skippedCount++;
+                        continue;
+                    }
+
+                    report.requestedCount++;
+                    try
+                    {
+                        var refer = new ESAssetReferUnityObject();
+                        refer.InitializeGeneratedReference(entry.guid, entry.localFileId, ESAssetReferKind.Other, 0, string.Empty);
+                        await consumerResidentAssetScope.LoadAsync(refer, cancellationToken);
+                        report.loadedCount++;
+                    }
+                    catch (Exception exception)
+                    {
+                        string message = "[ESRes][Resident] 启动常驻资产加载失败：GUID=" + entry.guid
+                            + ", LocalFileId=" + entry.localFileId + ", Error=" + exception.Message;
+                        report.errors.Add(message);
+                        Debug.LogError(message);
+                        throw;
+                    }
+                }
+                LastResidentAssetPreloadReport = report;
+                return report;
+            }
+            catch
+            {
+                DisposeConsumerResidentAssets();
+                throw;
+            }
+        }
+
+        private void DisposeConsumerResidentAssets()
+        {
+            consumerResidentAssetScope?.Dispose();
+            consumerResidentAssetScope = null;
+            LastResidentAssetPreloadReport = null;
         }
 
         /// <summary>
@@ -855,7 +863,15 @@ namespace ES
 
         public void DisposeAssetLoading()
         {
+            DisposeConsumerResidentAssets();
             assetLoadingService?.Dispose();
+            assetLoadingService = null;
+        }
+
+        public override void OnDestroy()
+        {
+            DisposeAssetLoading();
+            base.OnDestroy();
         }
 
         public void BeginBuild(bool clear = false)
@@ -899,181 +915,6 @@ namespace ES
             }
         }
 
-        public void Initialize(
-            IEnumerable<BuffDefinitionDataInfo> buffs = null,
-            IEnumerable<ItemDataInfo> items = null,
-            IEnumerable<SkillDefinitionDataInfo> skills = null,
-            bool clear = true)
-        {
-            BeginBuild(clear);
-            try
-            {
-                RegisterBuffs(buffs);
-                RegisterItems(items);
-                RegisterSkills(skills);
-            }
-            finally
-            {
-                EndBuild();
-            }
-        }
-
-        public int RegisterBuffs(IEnumerable<BuffDefinitionDataInfo> infos)
-        {
-            if (infos == null)
-                return 0;
-
-            int count = 0;
-            foreach (BuffDefinitionDataInfo info in infos)
-            {
-                if (RegisterBuff(info))
-                    count++;
-            }
-
-            return count;
-        }
-
-        public int RegisterItems(IEnumerable<ItemDataInfo> infos)
-        {
-            if (infos == null)
-                return 0;
-
-            int count = 0;
-            foreach (ItemDataInfo info in infos)
-            {
-                if (RegisterShot(info))
-                    count++;
-
-                if (RegisterWeapon(info))
-                    count++;
-            }
-
-            return count;
-        }
-
-        public int RegisterSkills(IEnumerable<SkillDefinitionDataInfo> infos)
-        {
-            if (infos == null)
-                return 0;
-
-            int count = 0;
-            foreach (SkillDefinitionDataInfo info in infos)
-            {
-                if (RegisterSkill(info))
-                    count++;
-            }
-
-            return count;
-        }
-
-        public static bool RegisterBuff(BuffDefinitionDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
-        {
-            if (info == null || info.sharedData == null)
-                return false;
-
-            if (info.sharedData.key == null)
-                info.sharedData.key = new ESBuffConfigKey();
-
-            if (TryGetByKey(BuffTable, info.sharedData.key, info.KeyName, out ESBuffRuntimeData existingBuff))
-                return ReferenceEquals(existingBuff.soSource, info);
-
-            ESBuffRuntimeData data = new ESBuffRuntimeData
-            {
-                keyName = info.KeyName,
-                displayName = info.KeyName,
-                sourcePackage = info.name,
-                soSource = info,
-                sharedData = info.sharedData,
-                defaultVariableData = info.variableData,
-                prefab = prefab,
-                extraAsset = extraAsset
-            };
-
-            data.runtimeKey = BuffTable.Bake(info.sharedData.key, info.KeyName);
-            return BuffTable.Upsert(data.runtimeKey, data, info.sharedData.key.GetStringKey(info.KeyName));
-        }
-
-        public static bool RegisterShot(ItemDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
-        {
-            if (info == null || info.baseConfig == null || info.baseConfig.kind != ItemKind.Shot)
-                return false;
-
-            if (info.shotKey == null)
-                info.shotKey = new ESShotConfigKey();
-
-            if (TryGetByKey(ShotTable, info.shotKey, info.KeyName, out ESShotRuntimeData existingShot))
-                return ReferenceEquals(existingShot.soSource, info);
-
-            ESShotRuntimeData data = new ESShotRuntimeData
-            {
-                keyName = info.KeyName,
-                displayName = DisplayName(info),
-                sourcePackage = info.name,
-                soSource = info,
-                sharedData = info.shotShared,
-                defaultVariableData = info.shotVariable,
-                prefab = prefab != null ? prefab : info.baseConfig.prefab,
-                extraAsset = extraAsset
-            };
-
-            data.runtimeKey = ShotTable.Bake(info.shotKey, info.KeyName);
-            return ShotTable.Upsert(data.runtimeKey, data, info.shotKey.GetStringKey(info.KeyName));
-        }
-
-        public static bool RegisterWeapon(ItemDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
-        {
-            if (info == null || info.baseConfig == null || info.baseConfig.kind != ItemKind.Weapon)
-                return false;
-
-            if (info.weaponKey == null)
-                info.weaponKey = new ESWeaponConfigKey();
-
-            if (TryGetByKey(WeaponTable, info.weaponKey, info.KeyName, out ESWeaponRuntimeData existingWeapon))
-                return ReferenceEquals(existingWeapon.soSource, info);
-
-            ESWeaponRuntimeData data = new ESWeaponRuntimeData
-            {
-                keyName = info.KeyName,
-                displayName = DisplayName(info),
-                sourcePackage = info.name,
-                soSource = info,
-                sharedData = info.weaponShared,
-                defaultVariableData = info.weaponVariable,
-                prefab = prefab != null ? prefab : info.baseConfig.prefab,
-                extraAsset = extraAsset
-            };
-
-            data.runtimeKey = WeaponTable.Bake(info.weaponKey, info.KeyName);
-            return WeaponTable.Upsert(data.runtimeKey, data, info.weaponKey.GetStringKey(info.KeyName));
-        }
-
-        public static bool RegisterSkill(SkillDefinitionDataInfo info, GameObject prefab = null, UnityEngine.Object extraAsset = null)
-        {
-            if (info == null)
-                return false;
-
-            if (info.skillKey == null)
-                info.skillKey = new ESSkillConfigKey();
-
-            if (TryGetByKey(SkillTable, info.skillKey, info.KeyName, out ESSkillRuntimeData existingSkill))
-                return ReferenceEquals(existingSkill.soSource, info);
-
-            ESSkillRuntimeData data = new ESSkillRuntimeData
-            {
-                keyName = info.KeyName,
-                displayName = info.KeyName,
-                sourcePackage = info.name,
-                soSource = info,
-                trackProcess = info.trackProcess,
-                baseStateInfo = info.baseStateInfo,
-                prefab = prefab,
-                extraAsset = extraAsset
-            };
-
-            data.runtimeKey = SkillTable.Bake(info.skillKey, info.KeyName);
-            return SkillTable.Upsert(data.runtimeKey, data, info.skillKey.GetStringKey(info.KeyName));
-        }
-
         public bool TryGetBuff(int runtimeKey, out ESBuffRuntimeData data) => Buffs.TryGet(runtimeKey, out data);
         public bool TryGetShot(int runtimeKey, out ESShotRuntimeData data) => Shots.TryGet(runtimeKey, out data);
         public bool TryGetMonster(int runtimeKey, out ESMonsterRuntimeData data) => Monsters.TryGet(runtimeKey, out data);
@@ -1107,30 +948,6 @@ namespace ES
             return builder.ToString();
         }
 
-        private static bool IsSameBuffAlreadyRegistered(BuffDefinitionDataInfo info)
-        {
-            return TryGetByKey(BuffTable, info.sharedData.key, info.KeyName, out ESBuffRuntimeData data)
-                && ReferenceEquals(data.soSource, info);
-        }
-
-        private static bool IsSameShotAlreadyRegistered(ItemDataInfo info)
-        {
-            return TryGetByKey(ShotTable, info.shotKey, info.KeyName, out ESShotRuntimeData data)
-                && ReferenceEquals(data.soSource, info);
-        }
-
-        private static bool IsSameWeaponAlreadyRegistered(ItemDataInfo info)
-        {
-            return TryGetByKey(WeaponTable, info.weaponKey, info.KeyName, out ESWeaponRuntimeData data)
-                && ReferenceEquals(data.soSource, info);
-        }
-
-        private static bool IsSameSkillAlreadyRegistered(SkillDefinitionDataInfo info)
-        {
-            return TryGetByKey(SkillTable, info.skillKey, info.KeyName, out ESSkillRuntimeData data)
-                && ReferenceEquals(data.soSource, info);
-        }
-
         private static bool TryGetByString<TData>(ESConfigKeyTable<TData> table, string stringKey, out TData data)
             where TData : class
         {
@@ -1139,30 +956,6 @@ namespace ES
 
             data = null;
             return false;
-        }
-
-        private static bool TryGetByKey<TEnumKey, TData>(ESConfigKeyTable<TData> table, ESGameCoreConfigKey<TEnumKey> key, string fallbackStringKey, out TData data)
-            where TEnumKey : struct, Enum
-            where TData : class
-        {
-            data = null;
-            if (table == null || key == null)
-                return false;
-
-            int enumKey = key.EnumKeyInt;
-            if (enumKey != 0 && table.TryGet(enumKey, out data))
-                return true;
-
-            string stringKey = key.GetStringKey(fallbackStringKey);
-            return TryGetByString(table, stringKey, out data);
-        }
-
-        private static string DisplayName(ItemDataInfo info)
-        {
-            if (info != null && info.baseConfig != null && !string.IsNullOrEmpty(info.baseConfig.displayName))
-                return info.baseConfig.displayName;
-
-            return info != null ? info.KeyName : string.Empty;
         }
 
         private static void AppendConflictReport<TData>(System.Text.StringBuilder builder, string tableName, ESConfigKeyTable<TData> table)

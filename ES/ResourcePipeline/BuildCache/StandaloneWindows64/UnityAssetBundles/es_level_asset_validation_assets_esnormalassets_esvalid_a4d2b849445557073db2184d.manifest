@@ -1,0 +1,66 @@
+ManifestFileVersion: 0
+CRC: 3194575395
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 42bbe60179af20210ab402d6cac834b6
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 4faba2a88d0d01597a864eef96f994bb
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 42bbe60179af20210ab402d6cac834b6
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 20
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 65
+  Script: {instanceID: 0}
+- Class: 81
+  Script: {instanceID: 0}
+- Class: 89
+  Script: {instanceID: 0}
+- Class: 104
+  Script: {instanceID: 0}
+- Class: 108
+  Script: {instanceID: 0}
+- Class: 114
+  Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: b6a54f8e62134de1b4ec3b47620f1001, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: c7b65f9f73244ef2a5fd4c5873102002, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: d8c760a084355f03b60e5d6984203003, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+- Class: 157
+  Script: {instanceID: 0}
+- Class: 196
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level01_Blocks.unity
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalid_0471316d46f12a81bd7b942c
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalid_1cb3cb0f46f3ba11f68812ca
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalid_31940685092c71fccc961e91
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalid_345f3be8c0abf326c9aef2b7
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalid_715f20fa6819318d5132b219
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalid_b4e9b734fe286f57911cfea8

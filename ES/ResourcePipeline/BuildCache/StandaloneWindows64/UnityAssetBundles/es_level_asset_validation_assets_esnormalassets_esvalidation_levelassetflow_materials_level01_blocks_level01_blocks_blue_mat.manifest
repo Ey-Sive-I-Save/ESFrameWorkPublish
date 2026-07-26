@@ -1,0 +1,22 @@
+ManifestFileVersion: 0
+CRC: 2754121851
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 9756f074d308698977d8ba096c00d618
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 5e762ccb57c4caaabbb5a4199ac82c23
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 9756f074d308698977d8ba096c00d618
+HashAppended: 0
+ClassTypes:
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Blue.mat
+Dependencies: []

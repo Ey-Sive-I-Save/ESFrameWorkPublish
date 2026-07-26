@@ -1,0 +1,53 @@
+{
+  "formatVersion": 2,
+  "libraryName": "Library Name",
+  "libraryFolder": "haha11",
+  "assets": [
+    {
+      "identity": {
+        "guid": "ced2cf8765a6a8a4ea274b78c4070e15",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "ced2cf8765a6a8a4ea274b78c4070e15"
+      },
+      "assetPath": "Assets/ESNormalAssets/Prefabs/Cube.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "Cube",
+      "libraryName": "Library Name",
+      "libraryFolder": "haha11",
+      "pageName": "Cube",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "GameObject (3)",
+      "libraryName": "Library Name",
+      "libraryFolder": "haha11",
+      "pageName": "GameObject (3)",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    }
+  ],
+  "excludedEditorOnlyPaths": [],
+  "errors": [],
+  "warnings": [
+    "资产身份重复，规划时将按同一物理资产去重：测试库/GameObject (3) 与 Library Name/GameObject (3)",
+    "类型内 StringKey 对同一资产重复注册，构建时静默去重：测试库/GameObject (3) 与 Library Name/GameObject (3)"
+  ]
+}

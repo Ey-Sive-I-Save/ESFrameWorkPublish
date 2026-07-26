@@ -1,0 +1,710 @@
+{
+  "formatVersion": 1,
+  "platform": "StandaloneWindows64",
+  "assets": [
+    {
+      "identity": {
+        "guid": "8111bbc5676f4d58809f1911ee5ae65a",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "8111bbc5676f4d58809f1911ee5ae65a"
+      },
+      "assetBundleKey": "ceshiku_assets_plugins_es_3_examples_1_runtime_example_8735c7f4b2f2a297d4c42f49",
+      "internalName": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetGameCoreFlowHotUpdateTest.unity",
+      "kind": "Scene",
+      "typeName": "UnityEditor.SceneAsset",
+      "ownerLibrary": "ceshiku",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetBundleKey": "ceshiku_assets_plugins_es_3_examples_1_runtime_example_res_gameobject_3_prefab",
+      "internalName": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "ceshiku",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000025",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000025"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_01efbb65b06be3b2c9660f2e",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Cyan.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000002",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000002"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_0471316d46f12a81bd7b942c",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000003",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000003"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_1cb3cb0f46f3ba11f68812ca",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Yellow.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000005",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000005"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_1cdfe265412aa9bebaa79b42",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Cyan.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000010",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000010"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_1de13b9432557f1d044c3db8",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Red.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000021",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000021"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_208a957c43d22b952a29feb9",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Green.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f700000000002",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f700000000002"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_20e8b95cf2c0f6312f27f54b",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level03_Cylinders.unity",
+      "kind": "Scene",
+      "typeName": "UnityEditor.SceneAsset",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000005",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000005"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_31940685092c71fccc961e91",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Cyan.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000000",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000000"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_345f3be8c0abf326c9aef2b7",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Red.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000010",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000010"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_348742df55a902e9ecdba892",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Red.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000015",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000015"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_3757e61f309027ab1c81d462",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Cyan.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000023",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000023"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_38cc2deab6410f64895c8fff",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Yellow.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000000",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000000"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_3ab00b3ab8df0dca31811419",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Red.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000014",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000014"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_4aacffbe38b7574045556dcf",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Magenta.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000024",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000024"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_5408b7ac2e30c5a46b686d91",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Magenta.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000014",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000014"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_55e0d9efb1094f9239d317ef",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Magenta.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000021",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000021"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_5667646677806f71aad5094a",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Green.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000003",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000003"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_692143be7e4e0be83db1ad96",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Yellow.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000001",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000001"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_715f20fa6819318d5132b219",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Green.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000013",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000013"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_823e1989115ccc22e35c642d",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Yellow.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000020",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000020"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_8564381cf2f58aad07e6851c",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Red.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000020",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000020"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_88bbf05760a88cf8d7787508",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Red.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000022",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000022"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_8f768f4e4d3d6a575901b047",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Blue.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f700000000000",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f700000000000"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_a4d2b849445557073db2184d",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level01_Blocks.unity",
+      "kind": "Scene",
+      "typeName": "UnityEditor.SceneAsset",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000011",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000011"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_a65bf1c208c35a8c5bfe9605",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Green.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000004",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000004"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_adfc9e0e6dc3763d5da20bb3",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Magenta.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000001",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000001"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_b0f7369ef61774a57667ba77",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Green.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000025",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000025"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_b3399cf4ad4adac35d605700",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Cyan.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000004",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000004"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_b4e9b734fe286f57911cfea8",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Magenta.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000002",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000002"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_bfb32a54c6f429b13a04c6c5",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Blue.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f700000000001",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f700000000001"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_ca5953de04fbecc155db422b",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level02_Spheres.unity",
+      "kind": "Scene",
+      "typeName": "UnityEditor.SceneAsset",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000023",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000023"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_d90292502a10e84b285f775f",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Yellow.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000013",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000013"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_e1c49e610b7ac7b51552cb6b",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Yellow.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000015",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000015"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_e4d38ac31bbe4040e4c7bd86",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Cyan.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000022",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000022"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_e5bc269420a074dd36f6fe8c",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Blue.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000024",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000024"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_f08584b10c0ad4106e246475",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Magenta.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000012",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000012"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_f0ba012f5dce10f7e19b826d",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Blue.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000012",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000012"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_faab309e3d715efc9d634aed",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Blue.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000011",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000011"
+      },
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_fded1e86fb71b1dced45382d",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Green.mat",
+      "kind": "Material",
+      "typeName": "UnityEngine.Material",
+      "ownerLibrary": "es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "4ce9a317fc44b0443b2c694b934dfe41",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "4ce9a317fc44b0443b2c694b934dfe41"
+      },
+      "assetBundleKey": "gamecore_es_level_asset_validation_core",
+      "internalName": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/ESLevelAssetValidationGameCore.asset",
+      "kind": "ScriptableObject",
+      "typeName": "ES.ESLevelAssetValidationGameCore",
+      "ownerLibrary": "gamecore_es_level_asset_validation",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "ced2cf8765a6a8a4ea274b78c4070e15",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "ced2cf8765a6a8a4ea274b78c4070e15"
+      },
+      "assetBundleKey": "haha11_assets_esnormalassets_prefabs_cube_prefab",
+      "internalName": "Assets/ESNormalAssets/Prefabs/Cube.prefab",
+      "kind": "Prefab",
+      "typeName": "UnityEngine.GameObject",
+      "ownerLibrary": "haha11",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "b7efbde1b85ac534f8df3ded09592512",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "b7efbde1b85ac534f8df3ded09592512"
+      },
+      "assetBundleKey": "nanniangku_assets_esnormalassets_data_group_actor_83227_asset",
+      "internalName": "Assets/ESNormalAssets/Data/Group/Actor/新建角色数据组83227.asset",
+      "kind": "ScriptableObject",
+      "typeName": "ES.ActorDataGroup",
+      "ownerLibrary": "nanniangku",
+      "subAssetName": "",
+      "isBusinessAsset": true
+    }
+  ]
+}

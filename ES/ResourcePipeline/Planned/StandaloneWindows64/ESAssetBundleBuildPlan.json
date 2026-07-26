@@ -1,0 +1,647 @@
+{
+  "formatVersion": 1,
+  "platform": "StandaloneWindows64",
+  "generatedUtc": "2026-07-26T15:35:46.1011918Z",
+  "assignments": [
+    {
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetGameCoreFlowHotUpdateTest.unity",
+      "assetBundleKey": "ceshiku_assets_plugins_es_3_examples_1_runtime_example_8735c7f4b2f2a297d4c42f49",
+      "ownerLibrary": "ceshiku",
+      "identity": {
+        "guid": "8111bbc5676f4d58809f1911ee5ae65a",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "8111bbc5676f4d58809f1911ee5ae65a"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab",
+      "assetBundleKey": "ceshiku_assets_plugins_es_3_examples_1_runtime_example_res_gameobject_3_prefab",
+      "ownerLibrary": "ceshiku",
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Cyan.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_01efbb65b06be3b2c9660f2e",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000025",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000025"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_0471316d46f12a81bd7b942c",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000002",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000002"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Yellow.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_1cb3cb0f46f3ba11f68812ca",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000003",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000003"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Cyan.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_1cdfe265412aa9bebaa79b42",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000005",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000005"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Red.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_1de13b9432557f1d044c3db8",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000010",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000010"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Green.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_208a957c43d22b952a29feb9",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000021",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000021"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level03_Cylinders.unity",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_20e8b95cf2c0f6312f27f54b",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f700000000002",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f700000000002"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Cyan.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_31940685092c71fccc961e91",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000005",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000005"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Red.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_345f3be8c0abf326c9aef2b7",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000000",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000000"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Red.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_348742df55a902e9ecdba892",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000010",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000010"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Cyan.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_3757e61f309027ab1c81d462",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000015",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000015"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Yellow.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_38cc2deab6410f64895c8fff",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000023",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000023"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Red.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_3ab00b3ab8df0dca31811419",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000000",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000000"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Magenta.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_4aacffbe38b7574045556dcf",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000014",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000014"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Magenta.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_5408b7ac2e30c5a46b686d91",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000024",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000024"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Magenta.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_55e0d9efb1094f9239d317ef",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000014",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000014"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Green.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_5667646677806f71aad5094a",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000021",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000021"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Yellow.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_692143be7e4e0be83db1ad96",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000003",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000003"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Green.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_715f20fa6819318d5132b219",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000001",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000001"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Yellow.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_823e1989115ccc22e35c642d",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000013",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000013"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Red.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_8564381cf2f58aad07e6851c",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000020",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000020"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Red.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_88bbf05760a88cf8d7787508",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000020",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000020"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Blue.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_8f768f4e4d3d6a575901b047",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000022",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000022"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level01_Blocks.unity",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_a4d2b849445557073db2184d",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f700000000000",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f700000000000"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Green.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_a65bf1c208c35a8c5bfe9605",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000011",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000011"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Magenta.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_adfc9e0e6dc3763d5da20bb3",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000004",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000004"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Green.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_b0f7369ef61774a57667ba77",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000001",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000001"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Cyan.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_b3399cf4ad4adac35d605700",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000025",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000025"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Magenta.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_b4e9b734fe286f57911cfea8",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000004",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000004"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Blue.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_bfb32a54c6f429b13a04c6c5",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000002",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000002"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level02_Spheres.unity",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_ca5953de04fbecc155db422b",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f700000000001",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f700000000001"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Yellow.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_d90292502a10e84b285f775f",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000023",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000023"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Yellow.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_e1c49e610b7ac7b51552cb6b",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000013",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000013"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Cyan.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_e4d38ac31bbe4040e4c7bd86",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000015",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000015"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Blue.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_e5bc269420a074dd36f6fe8c",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000022",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000022"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Magenta.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_f08584b10c0ad4106e246475",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000024",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000024"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Blue.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_f0ba012f5dce10f7e19b826d",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000012",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000012"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Blue.prefab",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_faab309e3d715efc9d634aed",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f400000000012",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000012"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Green.mat",
+      "assetBundleKey": "es_level_asset_validation_assets_esnormalassets_esvalid_fded1e86fb71b1dced45382d",
+      "ownerLibrary": "es_level_asset_validation",
+      "identity": {
+        "guid": "00000000000000001a9f300000000011",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000011"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/ESLevelAssetValidationGameCore.asset",
+      "assetBundleKey": "gamecore_es_level_asset_validation_core",
+      "ownerLibrary": "gamecore_es_level_asset_validation",
+      "identity": {
+        "guid": "4ce9a317fc44b0443b2c694b934dfe41",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "4ce9a317fc44b0443b2c694b934dfe41"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/Prefabs/Cube.prefab",
+      "assetBundleKey": "haha11_assets_esnormalassets_prefabs_cube_prefab",
+      "ownerLibrary": "haha11",
+      "identity": {
+        "guid": "ced2cf8765a6a8a4ea274b78c4070e15",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "ced2cf8765a6a8a4ea274b78c4070e15"
+      },
+      "isBusinessAsset": true
+    },
+    {
+      "assetPath": "Assets/ESNormalAssets/Data/Group/Actor/新建角色数据组83227.asset",
+      "assetBundleKey": "nanniangku_assets_esnormalassets_data_group_actor_83227_asset",
+      "ownerLibrary": "nanniangku",
+      "identity": {
+        "guid": "b7efbde1b85ac534f8df3ded09592512",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "b7efbde1b85ac534f8df3ded09592512"
+      },
+      "isBusinessAsset": true
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "已排除 EditorOnly Page：测试库/SingletonSeriMono (Assets/Plugins/ES/0_Stand/Stand_Tools/SingletonAndOnlyOne/SingletonSeriMono.cs)",
+    "资产类型不支持运行时加载，已跳过：测试库/AA 2，类型=Other (Assets/Plugins/ES/0_Stand/TESTING/AA 2.asset)",
+    "资产类型不支持运行时加载，已跳过：测试库/AA 1，类型=Other (Assets/Plugins/ES/0_Stand/TESTING/AA 1.asset)",
+    "已排除 EditorOnly Page：测试库/CircleDenpendceSamples (Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDenpendceSamples.cs)",
+    "已排除 EditorOnly Page：测试库/CircleDependenceSamplePrefabRef (Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs)",
+    "资产身份重复，规划时将按同一物理资产去重：测试库/GameObject (3) 与 测试库/GameObject (3)",
+    "类型内 StringKey 对同一资产重复注册，构建时静默去重：测试库/GameObject (3) 与 测试库/GameObject (3)",
+    "引用图已标记 EditorOnly 依赖：Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetFlowTestSceneController.cs",
+    "引用图已标记 EditorOnly 依赖：Packages/com.unity.render-pipelines.universal/Editor/AssetVersion.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveDepth.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveVertical.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveHorizontal.cs",
+    "引用图已标记 EditorOnly 依赖：Packages/com.unity.render-pipelines.universal/Runtime/UniversalAdditionalLightData.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESResourcePlanInfo.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESLevelAssetValidationGameCore.cs",
+    "资产身份重复，规划时将按同一物理资产去重：测试库/GameObject (3) 与 Library Name/GameObject (3)",
+    "类型内 StringKey 对同一资产重复注册，构建时静默去重：测试库/GameObject (3) 与 Library Name/GameObject (3)",
+    "引用图已标记 EditorOnly 依赖：Packages/com.whisper.unity/Runtime/Utils/RotatingCube.cs",
+    "资产身份重复，规划时将按同一物理资产去重：测试库/GameObject (3) 与 男娘库/GameObject (3)",
+    "类型内 StringKey 对同一资产重复注册，构建时静默去重：测试库/GameObject (3) 与 男娘库/GameObject (3)",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/GroupType/ActorDataGroup.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ActorDataInfo.cs",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "Skipped non-markable Unity planning dependency: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+    "同一物理资产被多个 Library 使用，沿用首个确定归属：Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab -> ceshiku_assets_plugins_es_3_examples_1_runtime_example_res_gameobject_3_prefab，忽略 haha11_assets_plugins_es_3_examples_1_runtime_example_res_gameobject_3_prefab",
+    "同一物理资产被多个 Library 使用，沿用首个确定归属：Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab -> ceshiku_assets_plugins_es_3_examples_1_runtime_example_res_gameobject_3_prefab，忽略 nanniangku_assets_plugins_es_3_examples_1_runtime_examp_2135e0aecf6ecc15be67df4b"
+  ]
+}

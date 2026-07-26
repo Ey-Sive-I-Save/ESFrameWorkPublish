@@ -53,10 +53,9 @@ namespace ES
         {
             stateGeneralFinalIKDriverPose.Reset();
 
-            bool captureIKContributionSummary = false;
 #if UNITY_EDITOR
             var dbg = StateMachineDebugSettings.Instance;
-            captureIKContributionSummary = ShouldCaptureIKContributionSummary(dbg);
+            bool captureIKContributionSummary = ShouldCaptureIKContributionSummary(dbg);
 #endif
 
 #if UNITY_EDITOR

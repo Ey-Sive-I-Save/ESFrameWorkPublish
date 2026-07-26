@@ -1,0 +1,34 @@
+ManifestFileVersion: 0
+CRC: 4270233362
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: ec47dd9350f14c32fe1f8a51d5bf9223
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: cd45db8577ee6ee044b49709ca4fa853
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: ec47dd9350f14c32fe1f8a51d5bf9223
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 104
+  Script: {instanceID: 0}
+- Class: 114
+  Script: {fileID: 11500000, guid: f0d16e91abc34401b1e4f87c790024f2, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+- Class: 157
+  Script: {instanceID: 0}
+- Class: 196
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetGameCoreFlowHotUpdateTest.unity
+Dependencies: []

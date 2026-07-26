@@ -137,6 +137,7 @@ namespace ES
             base.Start();
             EnsureRuntimeHelpers();
             ResolveMotionModule();
+            sharedData ??= ItemShotSharedData.Default;
             ApplyShotData(sharedData, variableData);
         }
 
@@ -206,8 +207,10 @@ namespace ES
             _targetTransform = target;
         }
 
-        public void ApplyShotData(in ItemShotSharedData shared, in ItemShotVariableData variable)
+        public void ApplyShotData(ItemShotSharedData shared, in ItemShotVariableData variable)
         {
+            if (shared == null)
+                throw new System.ArgumentNullException(nameof(shared), "Shot SharedData 不能为空。");
             if (!shared.enabled)
                 return;
 

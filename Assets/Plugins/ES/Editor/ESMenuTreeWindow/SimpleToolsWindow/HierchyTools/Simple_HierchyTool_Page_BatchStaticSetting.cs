@@ -78,7 +78,7 @@ namespace ES
                  "适合处理运行时不会移动、不会缩放、不会频繁启停的场景物体，例如建筑、地面、墙体、岩石、固定装饰。\n" +
                  "建议先刷新预览，只勾选确认要处理的对象，再执行。", InfoMessageType.Warning)]
 
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        [HideInInspector]
         private string PanelSummary
         {
             get
@@ -90,11 +90,12 @@ namespace ES
         }
 
         [InfoBox("标记含义：\n" +
-                 "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加静态批处理相关内存占用。\n" +
-                 "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加静态批处理相关内存占用。\n" +
-                 "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加静态批处理相关内存占用。\n" +
-                 "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加静态批处理相关内存占用。\n" +
-                 "导航静态：旧 Unity 导航静态标记，新项目通常由 NavMesh 工作流单独管理。", InfoMessageType.Info)]
+                 "• 贡献全局光照：让对象参与光照贴图和全局光照烘焙。\n" +
+                 "• 遮挡剔除静态：将对象作为遮挡物参与遮挡剔除数据构建。\n" +
+                 "• 被遮挡物静态：允许对象作为可被遮挡对象参与遮挡剔除。\n" +
+                 "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加相关内存占用。\n" +
+                 "• 导航静态：旧 Unity 导航静态标记；新项目通常由 NavMesh 工作流单独管理。\n" +
+                 "• 反射探针静态：让对象参与反射探针烘焙和静态反射采样。", InfoMessageType.Info)]
         [LabelText("应用模式"), Space(5)]
         public StaticApplyMode applyMode = StaticApplyMode.Override;
 
@@ -128,7 +129,7 @@ namespace ES
         public bool batchingStatic = false;
 
         [Tooltip("兼容旧 Unity 导航静态标记。新项目通常由 NavMesh 工作流单独管理。")]
-        [LabelText("被遮挡物静态"), GUIColor("@navigationStatic ? EnabledColor : DisabledColor")]
+        [LabelText("导航静态"), GUIColor("@navigationStatic ? EnabledColor : DisabledColor")]
         public bool navigationStatic = false;
 
         [Tooltip("参与反射探针烘焙和静态反射采样。")]
@@ -137,7 +138,7 @@ namespace ES
 
         [HorizontalGroup("Presets")]
         [Tooltip("读取当前有效目标中第一个对象的 Static Flags，并同步到上方开关。不会修改场景。")]
-        [Button("读取首个对象", ButtonHeight = 24)]
+        [Button("读取当前标记", ButtonHeight = 24)]
         private void LoadFlagsFromFirstSelected()
         {
             var targetInfo = CollectStaticTargets();
@@ -155,7 +156,7 @@ namespace ES
 
         [HorizontalGroup("Presets")]
         [Tooltip("勾选批处理静态、被遮挡物静态、反射探针静态。适合不会移动的普通场景装饰和建筑件。")]
-        [Button("减少DrawCall", ButtonHeight = 24)]
+        [Button("批处理 + 反射探针", ButtonHeight = 24)]
         private void PresetRenderingStatic()
         {
             contributeGI = false;
@@ -168,7 +169,7 @@ namespace ES
 
         [HorizontalGroup("Presets")]
         [Tooltip("勾选贡献全局光照、批处理静态、被遮挡物静态、反射探针静态。适合需要参与光照贴图和反射烘焙的静态场景物体。")]
-        [Button("准备光照烘焙", ButtonHeight = 24)]
+        [Button("GI + 批处理 + 反射", ButtonHeight = 24)]
         private void PresetLightBakeStatic()
         {
             contributeGI = true;
@@ -181,7 +182,7 @@ namespace ES
 
         [HorizontalGroup("Presets")]
         [Tooltip("勾选遮挡剔除静态和被遮挡物静态。适合墙体、建筑块、室内结构等遮挡关系明确的物体。")]
-        [Button("准备遮挡剔除", ButtonHeight = 24)]
+        [Button("遮挡物 + 被遮挡物", ButtonHeight = 24)]
         private void PresetOcclusionStatic()
         {
             contributeGI = false;
@@ -211,8 +212,8 @@ namespace ES
         {
             var targetInfo = CollectStaticTargets();
             SimpleToolsPanelUtility.DrawToolHeader(
-                "静态标记批处理工作台",
-                "静态标记批处理工作台",
+                "静态标记批处理",
+                "预览确认后再应用静态标记。",
                 SimpleToolsMaturity.Upgrading,
                 "Static Flags 会影响渲染、烘焙和遮挡结果。建议先刷新预览，只处理勾选项；Prefab 资产默认保护，场景实例会记录 Override。");
             SimpleToolsPanelUtility.DrawSummary(

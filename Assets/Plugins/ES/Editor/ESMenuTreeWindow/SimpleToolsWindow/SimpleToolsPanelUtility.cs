@@ -93,6 +93,7 @@ namespace ES
         public static readonly Color DangerColor = new Color(0.82f, 0.38f, 0.30f);
         public static readonly Color NeutralColor = new Color(0.48f, 0.48f, 0.48f);
         private static readonly List<string> OperationHistory = new List<string>(32);
+        private static readonly Dictionary<string, bool> DetailFoldoutStates = new Dictionary<string, bool>(StringComparer.Ordinal);
 
         public static void DrawToolHeader(string title, string purpose, SimpleToolsMaturity maturity, string risk = null)
         {
@@ -137,7 +138,7 @@ namespace ES
                 return;
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                EditorGUILayout.LabelField(text, EditorStyles.miniLabel);
+                EditorGUILayout.LabelField(CompactDisplayText(text, 220), EditorStyles.wordWrappedMiniLabel);
         }
 
         public static void DrawEmptyState(string message)
@@ -162,11 +163,7 @@ namespace ES
                 EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(title) ? "最近结果" : title, EditorStyles.boldLabel);
                 EditorGUILayout.LabelField(summary, EditorStyles.miniLabel);
 
-                if (!string.IsNullOrWhiteSpace(detail))
-                {
-                    EditorGUILayout.Space(2);
-                    EditorGUILayout.TextArea(detail, GUILayout.MinHeight(42), GUILayout.MaxHeight(110));
-                }
+                DrawDetailFoldout(title, detail);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -179,6 +176,11 @@ namespace ES
                     GUILayout.FlexibleSpace();
                 }
             }
+        }
+
+        public static void DrawCompactDetail(string title, string detail)
+        {
+            DrawDetailFoldout(title, detail);
         }
 
         private static string BuildLegacyReportText(string title, string summary, string detail)
@@ -218,11 +220,7 @@ namespace ES
                 DrawReportList("警告", report.WarningItems, previewLimit, MessageType.Warning);
                 DrawReportList("失败", report.FailedItems, previewLimit, MessageType.Error);
 
-                if (!string.IsNullOrWhiteSpace(report.Detail))
-                {
-                    EditorGUILayout.Space(2);
-                    EditorGUILayout.TextArea(report.Detail, GUILayout.MinHeight(42), GUILayout.MaxHeight(140));
-                }
+                DrawDetailFoldout(report.Title, report.Detail);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -274,9 +272,10 @@ namespace ES
             if (items == null || items.Count == 0)
                 return;
 
-            string text = string.Join("\n", items.Take(Mathf.Max(1, previewLimit)));
-            if (items.Count > previewLimit)
-                text += $"\n... 还有 {items.Count - previewLimit} 项";
+            int visibleCount = Mathf.Min(3, Mathf.Max(1, previewLimit));
+            string text = string.Join("\n", items.Take(visibleCount).Select(item => CompactDisplayText(item, 120)));
+            if (items.Count > visibleCount)
+                text += $"\n... 还有 {items.Count - visibleCount} 项";
 
             EditorGUILayout.HelpBox($"{title}：{items.Count}\n{text}", type);
         }
@@ -388,14 +387,34 @@ namespace ES
 
         public static bool DrawActionButton(string label, SimpleToolsActionTone tone, int height = 28, params GUILayoutOption[] options)
         {
+            return DrawActionButton(label, null, tone, height, options);
+        }
+
+        public static bool DrawActionButton(string label, string tooltip, SimpleToolsActionTone tone, int height = 28, params GUILayoutOption[] options)
+        {
             Color previousBackground = GUI.backgroundColor;
             Color previousContent = GUI.contentColor;
-            GUI.backgroundColor = GetToneColor(tone);
-            GUI.contentColor = Color.white;
-            bool clicked = GUILayout.Button(label, EditorStyles.miniButton, MergeHeight(height, options));
-            GUI.backgroundColor = previousBackground;
-            GUI.contentColor = previousContent;
-            return clicked;
+            try
+            {
+                GUI.backgroundColor = GetToneColor(tone);
+                GUI.contentColor = Color.white;
+                return GUILayout.Button(new GUIContent(label, tooltip), EditorStyles.miniButton, MergeHeight(height, options));
+            }
+            finally
+            {
+                GUI.backgroundColor = previousBackground;
+                GUI.contentColor = previousContent;
+            }
+        }
+
+        public static bool DrawCompactButton(string label, int width = 96, int height = 24, GUIStyle style = null)
+        {
+            return DrawCompactButton(label, null, width, height, style);
+        }
+
+        public static bool DrawCompactButton(string label, string tooltip, int width = 96, int height = 24, GUIStyle style = null)
+        {
+            return GUILayout.Button(new GUIContent(label, tooltip), style ?? EditorStyles.miniButton, GUILayout.Width(width), GUILayout.Height(height));
         }
 
         private static Color GetToneColor(SimpleToolsActionTone tone)
@@ -418,12 +437,36 @@ namespace ES
         private static GUILayoutOption[] MergeHeight(int height, GUILayoutOption[] options)
         {
             if (options == null || options.Length == 0)
-                return new[] { GUILayout.Height(height) };
+                return new[] { GUILayout.Height(height), GUILayout.MinWidth(82), GUILayout.MaxWidth(160) };
 
-            var merged = new GUILayoutOption[options.Length + 1];
+            var merged = new GUILayoutOption[options.Length + 2];
             merged[0] = GUILayout.Height(height);
             Array.Copy(options, 0, merged, 1, options.Length);
+            merged[merged.Length - 1] = GUILayout.MaxWidth(180);
             return merged;
+        }
+
+        private static void DrawDetailFoldout(string title, string detail)
+        {
+            if (string.IsNullOrWhiteSpace(detail))
+                return;
+
+            string key = string.IsNullOrWhiteSpace(title) ? "SimpleToolsDetail" : title;
+            bool expanded = DetailFoldoutStates.TryGetValue(key, out bool value) && value;
+            expanded = EditorGUILayout.Foldout(expanded, "详情（可复制或保存完整内容）", true);
+            DetailFoldoutStates[key] = expanded;
+            if (!expanded)
+                return;
+
+            EditorGUILayout.LabelField(CompactDisplayText(detail, 480), EditorStyles.wordWrappedMiniLabel);
+        }
+
+        private static string CompactDisplayText(string text, int maximumCharacters)
+        {
+            if (string.IsNullOrWhiteSpace(text) || text.Length <= maximumCharacters)
+                return text;
+
+            return text.Substring(0, Mathf.Max(1, maximumCharacters)) + "...";
         }
     }
 }

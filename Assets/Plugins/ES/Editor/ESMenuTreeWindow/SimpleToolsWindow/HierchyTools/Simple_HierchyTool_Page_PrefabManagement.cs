@@ -64,7 +64,7 @@ namespace ES
 
     #region Prefab管理工具
     /// <summary>
-    /// 商业级Prefab实例批量管理工具
+    /// Prefab 实例批量管理工具。
     /// 提供全面的Prefab实例管理、检测、优化功能
     /// 支持批量应用、还原、断开、替换等操作
     /// 所有危险操作均带有确认对话框和Undo支持
@@ -73,7 +73,7 @@ namespace ES
     public class Page_PrefabManagement : ESWindowPageBase
     {
         #region UI配置
-        [Title("Prefab实例管理工具", "商业级Prefab实例批量管理解决方案", bold: true, titleAlignment: TitleAlignments.Centered)]
+        [Title("Prefab实例管理工具", "检查和批量处理 Prefab 实例", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         private string PanelSummary
         {
@@ -183,14 +183,14 @@ namespace ES
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                includeChildren = GUILayout.Toggle(includeChildren, "包含子对象和嵌套实例", EditorStyles.miniButton, GUILayout.Height(24));
+                includeChildren = EditorGUILayout.Toggle("包含子对象和嵌套实例", includeChildren);
                 targetPrefab = (GameObject)EditorGUILayout.ObjectField("替换目标 Prefab", targetPrefab, typeof(GameObject), false);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("使用当前选中资产作为替换目标", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("使用当前选中资产作为替换目标", 184, 24, EditorStyles.miniButtonLeft))
                         UseSelectionAsTargetPrefab();
-                    if (GUILayout.Button("清空替换目标", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("清空替换目标", 96, 24, EditorStyles.miniButtonRight))
                         targetPrefab = null;
                 }
             }
@@ -256,7 +256,7 @@ namespace ES
                     EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
 
                 if (!string.IsNullOrWhiteSpace(lastResultDetail))
-                    EditorGUILayout.TextArea(lastResultDetail, GUILayout.MinHeight(38), GUILayout.MaxHeight(96));
+                    SimpleToolsPanelUtility.DrawCompactDetail("Prefab 审计详情", lastResultDetail);
 
                 DrawInfoRow("风险摘要", BuildPrefabRiskSummary(GetFilteredPrefabInfos(false)));
                 DrawInfoRow("资产分布", BuildPrefabAssetSummary(GetFilteredPrefabInfos(false), 5));
@@ -282,10 +282,10 @@ namespace ES
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("状态", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                    prefabStatusFilterIndex = GUILayout.Toolbar(prefabStatusFilterIndex, PrefabStatusFilterLabels, EditorStyles.miniButton, GUILayout.Height(22));
+                    prefabStatusFilterIndex = EditorGUILayout.Popup("状态", prefabStatusFilterIndex, PrefabStatusFilterLabels, GUILayout.Width(260));
                     GUILayout.Space(8);
                     EditorGUILayout.LabelField("排序", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                    prefabSortIndex = GUILayout.Toolbar(prefabSortIndex, PrefabSortLabels, EditorStyles.miniButton, GUILayout.Width(198), GUILayout.Height(22));
+                    prefabSortIndex = EditorGUILayout.Popup("排序", prefabSortIndex, PrefabSortLabels, GUILayout.Width(240));
                 }
             }
         }

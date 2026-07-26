@@ -1,0 +1,56 @@
+ManifestFileVersion: 0
+CRC: 4208861588
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 2010550e31b3f9bec8941b9f56e6df4d
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: c3cb2ec45e60ba999a514b346461027b
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 2010550e31b3f9bec8941b9f56e6df4d
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 20
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 81
+  Script: {instanceID: 0}
+- Class: 89
+  Script: {instanceID: 0}
+- Class: 104
+  Script: {instanceID: 0}
+- Class: 108
+  Script: {instanceID: 0}
+- Class: 136
+  Script: {instanceID: 0}
+- Class: 157
+  Script: {instanceID: 0}
+- Class: 196
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level03_Cylinders.unity
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level03_cylinders_level03_cylinders_blue_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level03_cylinders_level03_cylinders_cyan_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level03_cylinders_level03_cylinders_green_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level03_cylinders_level03_cylinders_magenta_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level03_cylinders_level03_cylinders_red_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level03_cylinders_level03_cylinders_yellow_prefab

@@ -180,14 +180,18 @@ namespace ES
                     editor = null;
                 }
             }
-            [PropertySpace(20, 30)]
-            [HorizontalGroup("总组")]
-            [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
-            [VerticalGroup("总组/数据")]
+            [PropertySpace(12, 18)]
+            // 根组先纵向排标题和内容；只有“内容”子组需要左右分栏。
+            [VerticalGroup("总组")]
+            [DisplayAsString(fontSize: 24, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
+            [VerticalGroup("总组/标题")]
             public string createText = "--构建流程--";
             private ReorderableList reorderableListForLibraries;
             private List<ESAssetLibrary> libraries;
-            [HorizontalGroup("总组/数据/分", Width = 355)]
+            // “内容”是横向容器：左侧库列表，右侧依次显示四个流程步骤。
+            // 子组必须使用不同路径，不能让 HorizontalGroup 与 VerticalGroup 共用同一路径。
+            [HorizontalGroup("总组/内容")]
+            [HorizontalGroup("总组/内容/库", Width = 285)]
             [OnInspectorGUI]
             public void DrawLibs()
             {
@@ -256,13 +260,13 @@ namespace ES
                 };
             }
 
-            [HorizontalGroup("总组/数据/分", MinWidth = 100)]
+            [HorizontalGroup("总组/内容/操作")]
             [OnInspectorGUI()]
             public void AnalyzeAndAssignAssetPaths()
             {
                 bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
                 EditorGUI.BeginDisabledGroup(pipelineBusy);
-                if (GUILayout.Button(pipelineBusy ? "资源管线任务执行中…" : "1. 烘焙资产引用", GUILayout.Height(50)))
+                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "1. 烘焙引用", GUILayout.Height(42)))
                 {
                     ESEditorHandle.AddSimpleHandleTask(() =>
                     {
@@ -280,17 +284,17 @@ namespace ES
                 }
                 EditorGUI.EndDisabledGroup();
                 ;
-                SirenixEditorGUI.InfoMessageBox("输出每个 Library 的 Catalog 与 ReferenceGraph；不打标签、不构建、不发布。");
+                SirenixEditorGUI.InfoMessageBox("生成 Catalog 与引用图；不改标签。");
 
             }
 
-            [HorizontalGroup("总组/数据/分", MinWidth = 100)]
+            [HorizontalGroup("总组/内容/操作")]
             [OnInspectorGUI()]
             public void BuildAssetBundlesAndDependencies()
             {
                 bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
                 EditorGUI.BeginDisabledGroup(pipelineBusy);
-                if (GUILayout.Button(pipelineBusy ? "资源管线任务执行中…" : "2. 规划并标记 AB", GUILayout.Height(50)))
+                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "2. 规划并标记", GUILayout.Height(42)))
                 {
                     ESEditorHandle.AddSimpleHandleTask(() =>
                     {
@@ -316,17 +320,17 @@ namespace ES
                 ;
 
 
-                SirenixEditorGUI.InfoMessageBox("只生成构建计划与资源清单，并应用 ES 管理的资源包标签；不会真正构建资源包。");
+                SirenixEditorGUI.InfoMessageBox("生成计划并写入 ES 管理的 AB 标签。");
 
             }
 
-            [HorizontalGroup("总组/数据/分", MinWidth = 100)]
+            [HorizontalGroup("总组/内容/操作")]
             [OnInspectorGUI()]
             public void Click_Server()
             {
                 bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
                 EditorGUI.BeginDisabledGroup(pipelineBusy);
-                if (GUILayout.Button(pipelineBusy ? "资源管线任务执行中…" : "3. 构建资源包", GUILayout.Height(50)))
+                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "3. 构建资源包", GUILayout.Height(42)))
                 {
                     ESEditorHandle.AddSimpleHandleTask(() =>
                     {
@@ -346,17 +350,17 @@ namespace ES
                 ;
 
 
-                SirenixEditorGUI.InfoMessageBox("唯一真正执行 Unity 资源包构建的阶段；只写入资源包暂存目录，不会发布。");
+                SirenixEditorGUI.InfoMessageBox("执行 Unity AB 构建，输出到暂存目录。");
 
             }
 
-            [HorizontalGroup("总组/数据/分", MinWidth = 100)]
+            [HorizontalGroup("总组/内容/操作")]
             [OnInspectorGUI()]
             public void Click_ALL()
             {
                 bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
                 EditorGUI.BeginDisabledGroup(pipelineBusy);
-                if (GUILayout.Button(pipelineBusy ? "资源管线任务执行中…" : "4. 发布资源包", GUILayout.Height(50)))
+                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "4. 发布资源包", GUILayout.Height(42)))
                 {
                     ESEditorHandle.AddSimpleHandleTask(() =>
                     {
@@ -376,7 +380,7 @@ namespace ES
                 ;
 
 
-                SirenixEditorGUI.InfoMessageBox("只校验并分发暂存产物，根发布清单会在最后原子写入；不会重新分析或构建资源。");
+                SirenixEditorGUI.InfoMessageBox("校验并发布，最后写入根清单。");
 
             }
 

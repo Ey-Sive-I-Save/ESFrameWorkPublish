@@ -33,7 +33,7 @@ namespace ES
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选择包含 ParticleSystem 的对象，按需包含子对象。应用会修改参数；播放/停止只发送预览指令；清空会先确认。";
 
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-5)]
+        [HideInInspector]
         private string TargetSummary
         {
             get
@@ -678,7 +678,7 @@ namespace ES
                 "会批量影响选区内命中的 ParticleSystem。请确认包含子对象选项和命中清单。");
         }
 
-        [FoldoutGroup("4. 旧按钮入口", Expanded = false)]
+        [FoldoutGroup("旧按钮入口", Expanded = false)]
         [Button("应用参数到选中粒子", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void ApplyParticleSystemSettings()
         {
@@ -732,7 +732,7 @@ namespace ES
             EditorUtility.DisplayDialog("粒子参数已应用", $"已修改 {modifiedCount} 个粒子系统。", "完成");
         }
 
-        [FoldoutGroup("4. 旧按钮入口")]
+        [FoldoutGroup("旧按钮入口")]
         [Button("播放选中粒子", ButtonHeight = 32), GUIColor(0.25f, 0.62f, 0.45f)]
         public void PlayAllParticleSystems()
         {
@@ -779,7 +779,7 @@ namespace ES
             EditorUtility.DisplayDialog("粒子播放已发送", $"已播放 {playedCount} 个粒子系统。", "完成");
         }
 
-        [FoldoutGroup("4. 旧按钮入口")]
+        [FoldoutGroup("旧按钮入口")]
         [Button("停止选中粒子", ButtonHeight = 32), GUIColor(0.75f, 0.58f, 0.25f)]
         public void StopAllParticleSystems()
         {
@@ -816,7 +816,7 @@ namespace ES
             EditorUtility.DisplayDialog("粒子停止已发送", $"已停止 {stoppedCount} 个粒子系统。", "完成");
         }
 
-        [FoldoutGroup("4. 旧按钮入口")]
+        [FoldoutGroup("旧按钮入口")]
         [Button("清空选中粒子", ButtonHeight = 32), GUIColor(0.82f, 0.38f, 0.30f)]
         public void ClearAllParticleSystems()
         {

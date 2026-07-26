@@ -1,0 +1,810 @@
+{
+  "formatVersion": 2,
+  "libraryName": "关卡资源卸载验收库",
+  "libraryFolder": "es_level_asset_validation",
+  "assets": [
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000002",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000002"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Blue.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level01_blocks_blue",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Blue",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000005",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000005"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Cyan.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level01_blocks_cyan",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Cyan",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000001",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000001"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Green.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level01_blocks_green",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Green",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000004",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000004"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Magenta.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level01_blocks_magenta",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Magenta",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000000",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000000"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Red.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level01_blocks_red",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Red",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000003",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000003"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Yellow.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level01_blocks_yellow",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Yellow",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000012",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000012"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Blue.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level02_spheres_blue",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Blue",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000015",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000015"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Cyan.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level02_spheres_cyan",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Cyan",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000011",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000011"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Green.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level02_spheres_green",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Green",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000014",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000014"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Magenta.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level02_spheres_magenta",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Magenta",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000010",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000010"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Red.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level02_spheres_red",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Red",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000013",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000013"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Yellow.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level02_spheres_yellow",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Yellow",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000022",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000022"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Blue.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level03_cylinders_blue",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Blue",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000025",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000025"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Cyan.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level03_cylinders_cyan",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Cyan",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000021",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000021"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Green.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level03_cylinders_green",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Green",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000024",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000024"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Magenta.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level03_cylinders_magenta",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Magenta",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000020",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000020"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Red.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level03_cylinders_red",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Red",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f300000000023",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f300000000023"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Yellow.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "kind": "Material",
+      "stringKey": "level_validation_material_level03_cylinders_yellow",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Yellow",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000002",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000002"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_1_blue",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Blue",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000005",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000005"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Cyan.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_1_cyan",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Cyan",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000001",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000001"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Green.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_1_green",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Green",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000004",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000004"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Magenta.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_1_magenta",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Magenta",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000000",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000000"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Red.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_1_red",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Red",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000003",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000003"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Yellow.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_1_yellow",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks_Yellow",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000012",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000012"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Blue.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_2_blue",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Blue",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000015",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000015"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Cyan.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_2_cyan",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Cyan",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000011",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000011"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Green.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_2_green",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Green",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000014",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000014"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Magenta.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_2_magenta",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Magenta",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000010",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000010"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Red.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_2_red",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Red",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000013",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000013"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Yellow.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_2_yellow",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres_Yellow",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000022",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000022"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Blue.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_3_blue",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Blue",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000025",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000025"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Cyan.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_3_cyan",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Cyan",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000021",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000021"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Green.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_3_green",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Green",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000024",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000024"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Magenta.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_3_magenta",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Magenta",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000020",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000020"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Red.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_3_red",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Red",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f400000000023",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f400000000023"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Yellow.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "level_validation_3_yellow",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders_Yellow",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f700000000000",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f700000000000"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level01_Blocks.unity",
+      "assetTypeName": "UnityEditor.SceneAsset",
+      "kind": "Scene",
+      "stringKey": "level_validation_scene_1",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level01_Blocks",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f700000000001",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f700000000001"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level02_Spheres.unity",
+      "assetTypeName": "UnityEditor.SceneAsset",
+      "kind": "Scene",
+      "stringKey": "level_validation_scene_2",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level02_Spheres",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "00000000000000001a9f700000000002",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "00000000000000001a9f700000000002"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level03_Cylinders.unity",
+      "assetTypeName": "UnityEditor.SceneAsset",
+      "kind": "Scene",
+      "stringKey": "level_validation_scene_3",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "Level03_Cylinders",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "4ce9a317fc44b0443b2c694b934dfe41",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "4ce9a317fc44b0443b2c694b934dfe41"
+      },
+      "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/ESLevelAssetValidationGameCore.asset",
+      "assetTypeName": "ES.ESLevelAssetValidationGameCore",
+      "kind": "ScriptableObject",
+      "stringKey": "ESLevelAssetValidationGameCore",
+      "libraryName": "关卡资源卸载验收库",
+      "libraryFolder": "es_level_asset_validation",
+      "pageName": "ESLevelAssetValidationGameCore",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    }
+  ],
+  "excludedEditorOnlyPaths": [],
+  "errors": [],
+  "warnings": []
+}

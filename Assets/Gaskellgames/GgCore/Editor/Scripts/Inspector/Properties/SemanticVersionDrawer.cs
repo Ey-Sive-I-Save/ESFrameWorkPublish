@@ -47,14 +47,22 @@ namespace Gaskellgames.EditorOnly
             patch = property.FindPropertyRelative("patch");
             
             // draw property
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.PrefixLabel(new GUIContent(label.text, label.tooltip));
-            GUILayout.Space(2);
-            EditorGUIUtility.labelWidth = 35;
-            major.intValue = EditorGUILayout.IntField(new GUIContent("Major"), major.intValue, GUILayout.Width(70), GUILayout.ExpandWidth(true));
-            minor.intValue = EditorGUILayout.IntField(new GUIContent("Minor"), minor.intValue, GUILayout.Width(70), GUILayout.ExpandWidth(true));
-            patch.intValue = EditorGUILayout.IntField(new GUIContent("Patch"), patch.intValue, GUILayout.Width(70), GUILayout.ExpandWidth(true));
-            EditorGUILayout.EndHorizontal();
+            float previousLabelWidth = EditorGUIUtility.labelWidth;
+            try
+            {
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.PrefixLabel(new GUIContent(label.text, label.tooltip));
+                GUILayout.Space(2);
+                EditorGUIUtility.labelWidth = 35;
+                major.intValue = EditorGUILayout.IntField(new GUIContent("Major"), major.intValue, GUILayout.Width(70), GUILayout.ExpandWidth(true));
+                minor.intValue = EditorGUILayout.IntField(new GUIContent("Minor"), minor.intValue, GUILayout.Width(70), GUILayout.ExpandWidth(true));
+                patch.intValue = EditorGUILayout.IntField(new GUIContent("Patch"), patch.intValue, GUILayout.Width(70), GUILayout.ExpandWidth(true));
+                EditorGUILayout.EndHorizontal();
+            }
+            finally
+            {
+                EditorGUIUtility.labelWidth = previousLabelWidth;
+            }
 
             // close property
             EditorGUI.EndProperty();

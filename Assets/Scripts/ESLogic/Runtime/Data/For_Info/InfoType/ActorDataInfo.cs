@@ -61,7 +61,7 @@ namespace ES
     }
 
     [Serializable]
-    public struct EntityMotionSharedData
+    public sealed class EntityMotionSharedData
     {
         [Title("Main Motion Abilities")]
         [LabelText("启用地面移动")]

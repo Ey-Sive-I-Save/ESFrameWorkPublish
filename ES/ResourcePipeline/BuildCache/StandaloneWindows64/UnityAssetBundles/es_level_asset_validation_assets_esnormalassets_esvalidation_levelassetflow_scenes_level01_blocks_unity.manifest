@@ -1,0 +1,56 @@
+ManifestFileVersion: 0
+CRC: 1032857012
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: e3f0b422b4520858e0fcf305b59f0e4b
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 646d6a2484d15baadcb44ea09e2dc908
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: e3f0b422b4520858e0fcf305b59f0e4b
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 20
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 65
+  Script: {instanceID: 0}
+- Class: 81
+  Script: {instanceID: 0}
+- Class: 89
+  Script: {instanceID: 0}
+- Class: 104
+  Script: {instanceID: 0}
+- Class: 108
+  Script: {instanceID: 0}
+- Class: 157
+  Script: {instanceID: 0}
+- Class: 196
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level01_Blocks.unity
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level01_blocks_level01_blocks_blue_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level01_blocks_level01_blocks_cyan_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level01_blocks_level01_blocks_green_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level01_blocks_level01_blocks_magenta_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level01_blocks_level01_blocks_red_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level01_blocks_level01_blocks_yellow_prefab

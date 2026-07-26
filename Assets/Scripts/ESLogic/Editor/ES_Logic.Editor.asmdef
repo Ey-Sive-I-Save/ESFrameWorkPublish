@@ -1,0 +1,22 @@
+{
+    "name": "ES_Logic.Editor",
+    "rootNamespace": "",
+    "references": [
+        "ES_Logic",
+        "ES_Stand",
+        "ES_Design",
+        "Unity.InputSystem",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

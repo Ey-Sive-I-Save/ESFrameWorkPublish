@@ -46,14 +46,34 @@ MonoBehaviour:
   showGuideUsage: 1
   assetGuides: []
   sceneHierarchyExpansionRecords:
-  - sceneGuid: b4b75588872fe9740ab90f542b86ce3e
-    scenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene
-      1.unity
-    savedUtcTicks: 639205836954653168
-    expandedTransformPaths:
-    - '%E7%8E%A9%E5%AE%B6%E4%BA%92%E5%8A%A8%E7%BB%84#0@19'
-    - '%E9%A2%84%E8%A7%88%E4%B8%93%E7%94%A8#0@26'
-    - RuntimeWatch_%E8%A7%86%E9%A2%91%E6%BC%94%E7%A4%BA%E7%BB%84#0@27
+  - sceneGuid: a2c061c580e2c9f4fb76d3d840d1a5ff
+    scenePath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/ESLevelAssetValidation.unity
+    savedUtcTicks: 639206775100712028
+    expandedTransformPaths: []
+  - sceneGuid: 8111bbc5676f4d58809f1911ee5ae65a
+    scenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetGameCoreFlowHotUpdateTest.unity
+    savedUtcTicks: 639206504532493887
+    expandedTransformPaths: []
+  - sceneGuid: 00000000000000001a9f700000000000
+    scenePath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level01_Blocks.unity
+    savedUtcTicks: 639206775078146723
+    expandedTransformPaths: []
+  - sceneGuid: 00000000000000001a9f700000000001
+    scenePath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level02_Spheres.unity
+    savedUtcTicks: 639206767526414630
+    expandedTransformPaths: []
+  - sceneGuid: 00000000000000001a9f700000000002
+    scenePath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level03_Cylinders.unity
+    savedUtcTicks: 639206504545544325
+    expandedTransformPaths: []
+  - sceneGuid: 6bd32f5e9a6645199c104bf1d0f2095a
+    scenePath: Assets/Plugins/ES/0_Stand/_Res/Bootstrap/ESBootstrap.unity
+    savedUtcTicks: 639206775090675748
+    expandedTransformPaths: []
+  - sceneGuid: 99c9720ab356a0642a771bea13969a05
+    scenePath: Assets/Scenes/SampleScene.unity
+    savedUtcTicks: 639206536592583216
+    expandedTransformPaths: []
   displayTitleFontSize: 22
   displayHintFontSize: 14
   displayTitleColor: {r: 1, g: 0.82, b: 0.28, a: 1}

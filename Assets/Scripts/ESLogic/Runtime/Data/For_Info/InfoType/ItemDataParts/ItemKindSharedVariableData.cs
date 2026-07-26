@@ -5,7 +5,7 @@ using UnityEngine;
 namespace ES
 {
     [Serializable]
-    public struct ItemDoorSharedData
+    public sealed class ItemDoorSharedData
     {
         [LabelText("默认开启")]
         public bool defaultOpen;
@@ -57,7 +57,7 @@ namespace ES
     }
 
     [Serializable]
-    public struct ItemTrapSharedData
+    public sealed class ItemTrapSharedData
     {
         [LabelText("启用")]
         public bool enabled;
@@ -113,7 +113,7 @@ namespace ES
     }
 
     [Serializable]
-    public struct ItemWeaponSharedData
+    public sealed class ItemWeaponSharedData
     {
         [LabelText("武器类型")]
         public ItemWeaponKind weaponKind;
@@ -165,7 +165,7 @@ namespace ES
     }
 
     [Serializable]
-    public struct ItemPickupSharedData
+    public sealed class ItemPickupSharedData
     {
         [LabelText("拾取半径")]
         public float radius;
@@ -209,7 +209,7 @@ namespace ES
     }
 
     [Serializable]
-    public struct ItemZoneSharedData
+    public sealed class ItemZoneSharedData
     {
         [LabelText("启用")]
         public bool enabled;
@@ -257,7 +257,7 @@ namespace ES
     }
 
     [Serializable]
-    public struct ItemPropSharedData
+    public sealed class ItemPropSharedData
     {
         [LabelText("可交互")]
         public bool canInteract;

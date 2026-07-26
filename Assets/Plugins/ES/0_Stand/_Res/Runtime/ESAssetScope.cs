@@ -178,5 +178,14 @@ namespace ES
                 return UniTask.FromException<ESRuntimeUnusedAssetUnloadResult>(new InvalidOperationException("ESRuntimeDataAssetLoadingService 尚未初始化。"));
             return provider.UnloadZeroReferenceAssetsAsync(cancellationToken);
         }
+
+        /// <summary>关卡切换后的增量安全点。仅卸载已无 Scope/Handle 租约的 AB。</summary>
+        public static UniTask<ESRuntimeUnusedAssetBundleUnloadResult> UnloadReleasedAssetBundlesAtSafePointAsync(CancellationToken cancellationToken = default)
+        {
+            IESAssetRuntimeProvider provider = ESAssetReferTableResolver.Current?.RuntimeProvider;
+            if (provider == null)
+                return UniTask.FromException<ESRuntimeUnusedAssetBundleUnloadResult>(new InvalidOperationException("ESRuntimeDataAssetLoadingService 尚未初始化。"));
+            return provider.UnloadZeroReferenceAssetBundlesAtSafePointAsync(cancellationToken);
+        }
     }
 }

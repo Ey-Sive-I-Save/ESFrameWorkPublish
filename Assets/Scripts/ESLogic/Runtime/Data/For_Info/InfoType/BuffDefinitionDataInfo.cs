@@ -32,7 +32,48 @@ namespace ES
 
         public void InjectGameCoreTables()
         {
-            ESRuntimeDataModule.InjectGameCoreRoot(this);
+            ESBuffGameCoreTable.Inject(this);
+        }
+    }
+
+    /// <summary>Buff 领域强类型注册入口；根 SO 直接注入，不经过中央类别分发。</summary>
+    public static class ESBuffGameCoreTable
+    {
+        public static ESConfigKeyTable<ESBuffRuntimeData> Table => ESRuntimeDataGameCore.Buffs;
+
+        public static void Inject(BuffDefinitionDataInfo info)
+        {
+            if (info == null) throw new ArgumentNullException(nameof(info));
+            if (info.sharedData == null) throw new InvalidOperationException("Buff 缺少 SharedData：" + info.name);
+
+            bool ownsBuild = !Table.IsBuilding;
+            if (ownsBuild) Table.BeginBuild();
+            try
+            {
+                info.sharedData.key ??= new ESBuffConfigKey();
+                if (Table.TryGet(info.sharedData.key, out ESBuffRuntimeData existing))
+                {
+                    if (ReferenceEquals(existing.soSource, info)) return;
+                    throw new InvalidOperationException("Buff GameCore Key 重复：" + info.KeyName);
+                }
+
+                var data = new ESBuffRuntimeData
+                {
+                    keyName = info.KeyName,
+                    displayName = info.KeyName,
+                    sourcePackage = info.name,
+                    soSource = info,
+                    sharedData = info.sharedData,
+                    defaultVariableData = info.variableData
+                };
+                data.runtimeKey = Table.Bake(info.sharedData.key, info.KeyName);
+                if (!Table.Upsert(info.sharedData.key, data, info.KeyName))
+                    throw new InvalidOperationException("Buff GameCore 注入失败：" + info.KeyName);
+            }
+            finally
+            {
+                if (ownsBuild) Table.EndBuild();
+            }
         }
     }
 

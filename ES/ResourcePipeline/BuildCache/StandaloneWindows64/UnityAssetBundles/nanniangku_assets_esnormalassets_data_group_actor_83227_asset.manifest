@@ -1,0 +1,30 @@
+ManifestFileVersion: 0
+CRC: 2689063599
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 385d7100b86aca39652bba80314687f7
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: d396c232333758d66a3649085b6540dc
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 385d7100b86aca39652bba80314687f7
+HashAppended: 0
+ClassTypes:
+- Class: 114
+  Script: {fileID: 11500000, guid: 6564680c81fcf5a4397f4b92e3ebb0f4, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 9cac72d466e1b7b4bb1dc4ce51ff08ee, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers:
+- AssemblyName: ES_Logic
+  ClassName: ES.EntityMotionSharedData
+- AssemblyName: ES_Logic
+  ClassName: ES.EntityMotionVariableData
+- AssemblyName: Sirenix.Serialization
+  ClassName: Sirenix.Serialization.SerializationData
+Assets:
+- "Assets/ESNormalAssets/Data/Group/Actor/\u65B0\u5EFA\u89D2\u8272\u6570\u636E\u7EC483227.asset"
+Dependencies: []

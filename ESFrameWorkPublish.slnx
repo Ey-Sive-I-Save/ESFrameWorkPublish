@@ -14,6 +14,7 @@
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="DOTween.Modules.csproj" />
   <Project Path="VHierarchy.csproj" />
+  <Project Path="ES_Logic.Editor.csproj" />
   <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
   <Project Path="KCC.csproj" />
   <Project Path="ESInstaller.csproj" />

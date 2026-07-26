@@ -418,11 +418,6 @@ namespace ES
                 SirenixEditorGUI.BeginBox();
 
 
-                // 始终创建Space以避免Layout/Repaint控件数量不匹配
-                Debug.Log($"[DrawPage] Dynamic Offset: {dynamicOffset}");
-
-
-
                 var newName = EditorGUILayout.TextField("Page命名", page.Name);
                 if (newName != page.Name)
                 {
@@ -891,7 +886,6 @@ namespace ES
                         page = book.pages[index];
                         // 记录选中Page的窗口位置（用于动态对齐）
                         selectedPageWindowY = rect.y;
-                        Debug.Log($"[Pages] Selected page: {page.Name}, Y position: {rect.y}");
                     }
 
                     // 获取Page关联的资源对象
@@ -1944,7 +1938,10 @@ namespace ES
                     DrawResourceNotes(resourceConsumer);
 
                 if (package is ESAssetLibraryConsumer gameCoreConsumer)
+                {
                     DrawGameCoreAssets(gameCoreConsumer);
+                    DrawResidentAssets(gameCoreConsumer);
+                }
             }
 
             private void DrawGameCoreAssets(ESAssetLibraryConsumer consumer)
@@ -2013,6 +2010,58 @@ namespace ES
                     EditorGUILayout.HelpBox(string.Join("\n", consumer.GameCoreValidationErrors), MessageType.Error);
                 else
                     EditorGUILayout.HelpBox("GameCore 依赖检查通过。", MessageType.Info);
+                SirenixEditorGUI.EndBox();
+            }
+
+            private void DrawResidentAssets(ESAssetLibraryConsumer consumer)
+            {
+                consumer.ResidentAssets ??= new List<ESAssetReferBase>();
+                SirenixEditorGUI.BeginBox();
+                EditorGUILayout.LabelField("启动常驻资产", EditorStyles.boldLabel);
+                EditorGUILayout.HelpBox("拖入已注册到 AssetLibrary 的普通资产。Consumer 初始化时自动加载，场景切换不释放；GameCore、Scene、脚本和 EditorOnly 资产不允许加入。", MessageType.Info);
+
+                Rect dropArea = GUILayoutUtility.GetRect(0, 42, GUILayout.ExpandWidth(true));
+                GUI.Box(dropArea, "拖入普通资产作为启动常驻资产");
+                Event current = Event.current;
+                if (dropArea.Contains(current.mousePosition) && current.type == EventType.DragUpdated)
+                {
+                    DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+                    current.Use();
+                }
+                else if (dropArea.Contains(current.mousePosition) && current.type == EventType.DragPerform)
+                {
+                    DragAndDrop.AcceptDrag();
+                    Undo.RecordObject(consumer, "Add Consumer Resident Assets");
+                    foreach (UnityEngine.Object asset in DragAndDrop.objectReferences)
+                        if (!ESAssetReferenceBaker.TryAddResidentAsset(consumer, asset, out string error))
+                            Debug.LogWarning("[ESRes][Resident] " + asset.name + "：" + error, asset);
+                    MarkPackageDirty();
+                    current.Use();
+                }
+
+                for (int index = 0; index < consumer.ResidentAssets.Count; index++)
+                {
+                    ESAssetReferBase refer = consumer.ResidentAssets[index];
+                    string path = refer == null ? string.Empty : AssetDatabase.GUIDToAssetPath(refer.GUID);
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField(string.IsNullOrEmpty(path) ? "<Missing>" : path, EditorStyles.miniLabel);
+                    if (!string.IsNullOrEmpty(path) && GUILayout.Button("定位", GUILayout.Width(48)))
+                    {
+                        UnityEngine.Object target = AssetDatabase.LoadMainAssetAtPath(path);
+                        Selection.activeObject = target;
+                        EditorGUIUtility.PingObject(target);
+                    }
+                    if (GUILayout.Button("移除", GUILayout.Width(48)))
+                    {
+                        Undo.RecordObject(consumer, "Remove Consumer Resident Asset");
+                        consumer.ResidentAssets.RemoveAt(index--);
+                        MarkPackageDirty();
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+
+                if (consumer.ResidentAssets.Count == 0)
+                    EditorGUILayout.LabelField("当前没有启动常驻资产。", EditorStyles.centeredGreyMiniLabel);
                 SirenixEditorGUI.EndBox();
             }
 

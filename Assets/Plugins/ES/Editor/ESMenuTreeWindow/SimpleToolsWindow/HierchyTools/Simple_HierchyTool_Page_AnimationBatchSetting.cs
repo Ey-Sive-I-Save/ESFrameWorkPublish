@@ -146,7 +146,6 @@ namespace ES
         public string assetGroupName = "默认";
 
         [HideInInspector]
-        [ShowInInspector, ReadOnly, LabelText("预览将应用的对象"), ListDrawerSettings(DraggableItems = false, ShowPaging = true, NumberOfItemsPerPage = 12)]
         [PropertyTooltip("显示将要应用设置的对象列表（包括添加 Animator 的对象）。")]
         public List<string> previewObjects = new List<string>();
 
@@ -220,8 +219,8 @@ namespace ES
             SimpleToolsPanelUtility.DrawSectionTitle("目标范围", "从当前 Hierarchy 选中对象收集目标，可递归子对象。");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                includeChildren = GUILayout.Toggle(includeChildren, "包含子对象", EditorStyles.miniButtonLeft, GUILayout.Height(24));
-                addAnimatorIfMissing = GUILayout.Toggle(addAnimatorIfMissing, "缺少 Animator 时自动添加", EditorStyles.miniButtonRight, GUILayout.Height(24));
+                includeChildren = EditorGUILayout.Toggle("包含子对象", includeChildren);
+                addAnimatorIfMissing = EditorGUILayout.Toggle("缺少 Animator 时自动添加", addAnimatorIfMissing);
                 DrawInfoRow("当前选择", Selection.gameObjects == null || Selection.gameObjects.Length == 0 ? "未选择对象" : $"{Selection.gameObjects.Length} 个对象");
                 DrawInfoRow("实际目标", $"{GetSelectedTargets().Count} 个对象");
             }
@@ -229,11 +228,11 @@ namespace ES
 
         private void DrawAnimatorControllerPanel()
         {
-            SimpleToolsPanelUtility.DrawSectionTitle("目标范围", "从当前 Hierarchy 选中对象收集目标，可递归子对象。");
+            SimpleToolsPanelUtility.DrawSectionTitle("Controller 策略", "指定已有 Controller，或在目标缺失时选择创建策略。");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 animatorController = (RuntimeAnimatorController)EditorGUILayout.ObjectField("指定 Controller", animatorController, typeof(RuntimeAnimatorController), false);
-                controllerNullAction = (ControllerNullAction)GUILayout.Toolbar((int)controllerNullAction, ControllerNullActionLabels, EditorStyles.miniButton, GUILayout.Height(24));
+                controllerNullAction = (ControllerNullAction)EditorGUILayout.Popup("缺失 Controller", (int)controllerNullAction, ControllerNullActionLabels);
                 assetGroupName = EditorGUILayout.TextField("资产分组", assetGroupName);
             }
         }
@@ -244,7 +243,7 @@ namespace ES
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 defaultAnimationClip = (AnimationClip)EditorGUILayout.ObjectField("默认 Clip", defaultAnimationClip, typeof(AnimationClip), false);
-                clipNullAction = (ClipNullAction)GUILayout.Toolbar((int)clipNullAction, ClipNullActionLabels, EditorStyles.miniButton, GUILayout.Height(24));
+                clipNullAction = (ClipNullAction)EditorGUILayout.Popup("缺失 Clip", (int)clipNullAction, ClipNullActionLabels);
                 if (clipNullAction != ClipNullAction.Ignore)
                     newClipName = EditorGUILayout.TextField("新 Clip 名称", newClipName);
             }
@@ -255,7 +254,7 @@ namespace ES
             SimpleToolsPanelUtility.DrawSectionTitle("Animator 属性", "仅在启用后批量修改 UpdateMode、CullingMode 和 RootMotion。");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                enableApplySettings = GUILayout.Toggle(enableApplySettings, "启用属性批量设置", EditorStyles.miniButton, GUILayout.Height(24));
+                enableApplySettings = EditorGUILayout.Toggle("启用属性批量设置", enableApplySettings);
                 GUI.enabled = enableApplySettings;
                 updateMode = (AnimatorUpdateMode)EditorGUILayout.EnumPopup("更新模式", updateMode);
                 cullingMode = (AnimatorCullingMode)EditorGUILayout.EnumPopup("剔除模式", cullingMode);
@@ -289,13 +288,13 @@ namespace ES
                 }
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("选中筛选结果", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("选中筛选结果", 104, 24, EditorStyles.miniButtonLeft))
                         SelectFilteredAnimatorPreview();
-                    if (GUILayout.Button("导出设置", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("导出设置", 76, 24, EditorStyles.miniButtonMid))
                         ExportSettings();
-                    if (GUILayout.Button("导入设置", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("导入设置", 76, 24, EditorStyles.miniButtonMid))
                         ImportSettings();
-                    if (GUILayout.Button("重置设置", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("重置设置", 76, 24, EditorStyles.miniButtonRight))
                         ResetToDefaultSettings();
                 }
             }
@@ -335,10 +334,10 @@ namespace ES
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("状态", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                    animatorStatusFilter = GUILayout.Toolbar(animatorStatusFilter, AnimatorStatusFilterLabels, EditorStyles.miniButton, GUILayout.Width(210), GUILayout.Height(22));
+                    animatorStatusFilter = EditorGUILayout.Popup("状态", animatorStatusFilter, AnimatorStatusFilterLabels, GUILayout.Width(260));
                     GUILayout.Space(8);
                     EditorGUILayout.LabelField("排序", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                    animatorSortIndex = GUILayout.Toolbar(animatorSortIndex, AnimatorSortLabels, EditorStyles.miniButton, GUILayout.Width(168), GUILayout.Height(22));
+                    animatorSortIndex = EditorGUILayout.Popup("排序", animatorSortIndex, AnimatorSortLabels, GUILayout.Width(220));
                 }
             }
         }
@@ -422,7 +421,7 @@ namespace ES
             {
                 EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
                 if (!string.IsNullOrWhiteSpace(lastResultDetail))
-                    EditorGUILayout.TextArea(lastResultDetail, GUILayout.MinHeight(46), GUILayout.MaxHeight(120));
+                    SimpleToolsPanelUtility.DrawCompactDetail("动画器处理详情", lastResultDetail);
             }
         }
         #endregion

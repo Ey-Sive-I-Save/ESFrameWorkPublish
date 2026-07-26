@@ -322,14 +322,14 @@ MonoBehaviour:
       ColorTag: 4
       namedOption: 0
       OB: {fileID: 102900000, guid: 8111bbc5676f4d58809f1911ee5ae65a, type: 3}
-      Kind: 18
+      Kind: 2
       EnumKey: 0
       StringKey: es_asset_gamecore_flow_hotupdate_test
       RuntimeKey: 30000
       AssetGuid: 8111bbc5676f4d58809f1911ee5ae65a
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetGameCoreFlowHotUpdateTest.unity
-      AssetTypeName: UnityEngine.Object
+      AssetTypeName: UnityEditor.SceneAsset
       SourceLibrary: 4718578158784d34ba816e7be20ffed1
       SourceBook: "\u9ED8\u8BA4 \u573A\u666F Book"
   DefaultSpriteBook:

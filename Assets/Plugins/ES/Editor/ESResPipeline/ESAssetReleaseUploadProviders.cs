@@ -51,11 +51,28 @@ namespace ES
         public ESAssetReleaseUploadTarget Target { get; }
         public ESAssetReleaseUploadPlan Plan { get; }
         public ESAssetReleaseUploadPlanFile File { get; }
+        /// <summary>
+        /// 唯一允许用于远端存储的对象键：发布计划的平台层由框架统一补入。
+        /// OSS/S3/HTTP 等 Provider 不得直接使用 File.relativePath，否则会把不同平台互相覆盖。
+        /// </summary>
+        public string RemoteObjectKey => BuildRemoteObjectKey(Target.objectPrefix, Plan.platform, File.relativePath);
         public ESAssetReleaseUploadFileRequest(ESAssetReleaseUploadTarget target, ESAssetReleaseUploadPlan plan, ESAssetReleaseUploadPlanFile file)
         {
             Target = target ?? throw new ArgumentNullException(nameof(target));
             Plan = plan ?? throw new ArgumentNullException(nameof(plan));
             File = file ?? throw new ArgumentNullException(nameof(file));
+        }
+
+        private static string BuildRemoteObjectKey(string prefix, string platform, string relativePath)
+        {
+            string normalizedPrefix = (prefix ?? string.Empty).Trim().Trim('/');
+            string normalizedPlatform = (platform ?? string.Empty).Trim().Trim('/');
+            string normalizedRelativePath = (relativePath ?? string.Empty).Replace('\\', '/').Trim('/');
+            if (string.IsNullOrEmpty(normalizedPlatform)) throw new InvalidOperationException("上传计划缺少平台目录。");
+            if (string.IsNullOrEmpty(normalizedRelativePath)) throw new InvalidOperationException("上传文件缺少相对路径。");
+            return string.IsNullOrEmpty(normalizedPrefix)
+                ? normalizedPlatform + "/" + normalizedRelativePath
+                : normalizedPrefix + "/" + normalizedPlatform + "/" + normalizedRelativePath;
         }
     }
 
@@ -108,7 +125,7 @@ namespace ES
         }
         public IESAssetReleaseUploadOperation BeginUpload(ESAssetReleaseUploadFileRequest request)
         {
-            return new ESCompletedReleaseUploadOperation(true, "手动上传：" + request.File.relativePath);
+            return new ESCompletedReleaseUploadOperation(true, "手动上传：" + request.RemoteObjectKey);
         }
     }
 

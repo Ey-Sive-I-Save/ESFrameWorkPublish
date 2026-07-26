@@ -35,6 +35,7 @@ namespace ES
 
         [VerticalGroup("Main/BuildAndRun")]
         [LabelText("辅助代码生成模式")]
+        [HideInInspector]
         public ESABCodegenMode CodegenMode = ESABCodegenMode.CodeAsOriginal;
 
         [VerticalGroup("Main/BuildAndRun")]
@@ -56,8 +57,7 @@ namespace ES
         [LabelText("远程资源库构建文件夹（权威路径）"), ShowInInspector, DisplayAsString, InlineButton("OpenOutBuild", "打开远程构建文件夹")]
         public string Path_RemoteResOutBuildPath => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResParentFolderName);
 
-        [VerticalGroup("Main/FolderPath")]
-        [LabelText("构建初始目标（权威路径）"), ShowInInspector, DisplayAsString, InlineButton("OpenInitialTarget", "打开初始目标文件夹")]
+        [HideInInspector]
         public string Path_BuildInitialTarget => Path.Combine(ProjectRootPath, ESOutputRootFolderName, InitialTargetFolderName);
 
         private static string ProjectRootPath => Directory.GetParent(Application.dataPath).FullName;
@@ -65,12 +65,14 @@ namespace ES
         [VerticalGroup("Main/FolderPath")]
         [FolderPath, LabelText("默认资源库放置文件夹")]
         [InlineButton("Ping_", "<*>")]
+        [HideInInspector]
         [FormerlySerializedAs("Path_ResLibraryFolder")]
         public string Path_AssetLibraryFolder = "";
 
         [VerticalGroup("Main/FolderPath")]
         [FolderPath, LabelText("AB帮助代码生成文件夹")]
         [InlineButton("Ping_", "<*>")]
+        [HideInInspector]
         public string Path_ABHelperCodeGen = "";
 
         [VerticalGroup("Main/FolderPath")]

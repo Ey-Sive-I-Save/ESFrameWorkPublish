@@ -1,0 +1,172 @@
+ManifestFileVersion: 0
+CRC: 1425290073
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: ceshiku_assets_plugins_es_3_examples_1_runtime_example_res_gameobject_3_prefab
+      Dependencies: {}
+    Info_1:
+      Name: gamecore_es_level_asset_validation_core
+      Dependencies: {}
+    Info_2:
+      Name: haha11_assets_esnormalassets_prefabs_cube_prefab
+      Dependencies: {}
+    Info_3:
+      Name: nanniangku_assets_esnormalassets_data_group_actor_83227_asset
+      Dependencies: {}
+    Info_4:
+      Name: ceshiku_assets_plugins_es_3_examples_1_runtime_example_8735c7f4b2f2a297d4c42f49
+      Dependencies: {}
+    Info_5:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_01efbb65b06be3b2c9660f2e
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_b3399cf4ad4adac35d605700
+    Info_6:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_0471316d46f12a81bd7b942c
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_bfb32a54c6f429b13a04c6c5
+    Info_7:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_1cb3cb0f46f3ba11f68812ca
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_692143be7e4e0be83db1ad96
+    Info_8:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_1cdfe265412aa9bebaa79b42
+      Dependencies: {}
+    Info_9:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_1de13b9432557f1d044c3db8
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_348742df55a902e9ecdba892
+    Info_10:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_208a957c43d22b952a29feb9
+      Dependencies: {}
+    Info_11:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_20e8b95cf2c0f6312f27f54b
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_01efbb65b06be3b2c9660f2e
+        Dependency_1: es_level_asset_validation_assets_esnormalassets_esvalid_5408b7ac2e30c5a46b686d91
+        Dependency_2: es_level_asset_validation_assets_esnormalassets_esvalid_5667646677806f71aad5094a
+        Dependency_3: es_level_asset_validation_assets_esnormalassets_esvalid_8564381cf2f58aad07e6851c
+        Dependency_4: es_level_asset_validation_assets_esnormalassets_esvalid_8f768f4e4d3d6a575901b047
+        Dependency_5: es_level_asset_validation_assets_esnormalassets_esvalid_d90292502a10e84b285f775f
+    Info_12:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_31940685092c71fccc961e91
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_1cdfe265412aa9bebaa79b42
+    Info_13:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_345f3be8c0abf326c9aef2b7
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_3ab00b3ab8df0dca31811419
+    Info_14:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_348742df55a902e9ecdba892
+      Dependencies: {}
+    Info_15:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_3757e61f309027ab1c81d462
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_e4d38ac31bbe4040e4c7bd86
+    Info_16:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_38cc2deab6410f64895c8fff
+      Dependencies: {}
+    Info_17:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_3ab00b3ab8df0dca31811419
+      Dependencies: {}
+    Info_18:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_4aacffbe38b7574045556dcf
+      Dependencies: {}
+    Info_19:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_5408b7ac2e30c5a46b686d91
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_f08584b10c0ad4106e246475
+    Info_20:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_55e0d9efb1094f9239d317ef
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_4aacffbe38b7574045556dcf
+    Info_21:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_5667646677806f71aad5094a
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_208a957c43d22b952a29feb9
+    Info_22:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_692143be7e4e0be83db1ad96
+      Dependencies: {}
+    Info_23:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_715f20fa6819318d5132b219
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_b0f7369ef61774a57667ba77
+    Info_24:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_823e1989115ccc22e35c642d
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_e1c49e610b7ac7b51552cb6b
+    Info_25:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_8564381cf2f58aad07e6851c
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_88bbf05760a88cf8d7787508
+    Info_26:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_88bbf05760a88cf8d7787508
+      Dependencies: {}
+    Info_27:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_8f768f4e4d3d6a575901b047
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_e5bc269420a074dd36f6fe8c
+    Info_28:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_a4d2b849445557073db2184d
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_0471316d46f12a81bd7b942c
+        Dependency_1: es_level_asset_validation_assets_esnormalassets_esvalid_1cb3cb0f46f3ba11f68812ca
+        Dependency_2: es_level_asset_validation_assets_esnormalassets_esvalid_31940685092c71fccc961e91
+        Dependency_3: es_level_asset_validation_assets_esnormalassets_esvalid_345f3be8c0abf326c9aef2b7
+        Dependency_4: es_level_asset_validation_assets_esnormalassets_esvalid_715f20fa6819318d5132b219
+        Dependency_5: es_level_asset_validation_assets_esnormalassets_esvalid_b4e9b734fe286f57911cfea8
+    Info_29:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_a65bf1c208c35a8c5bfe9605
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_fded1e86fb71b1dced45382d
+    Info_30:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_adfc9e0e6dc3763d5da20bb3
+      Dependencies: {}
+    Info_31:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_b0f7369ef61774a57667ba77
+      Dependencies: {}
+    Info_32:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_b3399cf4ad4adac35d605700
+      Dependencies: {}
+    Info_33:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_b4e9b734fe286f57911cfea8
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_adfc9e0e6dc3763d5da20bb3
+    Info_34:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_bfb32a54c6f429b13a04c6c5
+      Dependencies: {}
+    Info_35:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_ca5953de04fbecc155db422b
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_1de13b9432557f1d044c3db8
+        Dependency_1: es_level_asset_validation_assets_esnormalassets_esvalid_3757e61f309027ab1c81d462
+        Dependency_2: es_level_asset_validation_assets_esnormalassets_esvalid_55e0d9efb1094f9239d317ef
+        Dependency_3: es_level_asset_validation_assets_esnormalassets_esvalid_823e1989115ccc22e35c642d
+        Dependency_4: es_level_asset_validation_assets_esnormalassets_esvalid_a65bf1c208c35a8c5bfe9605
+        Dependency_5: es_level_asset_validation_assets_esnormalassets_esvalid_faab309e3d715efc9d634aed
+    Info_36:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_d90292502a10e84b285f775f
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_38cc2deab6410f64895c8fff
+    Info_37:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_e1c49e610b7ac7b51552cb6b
+      Dependencies: {}
+    Info_38:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_e4d38ac31bbe4040e4c7bd86
+      Dependencies: {}
+    Info_39:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_e5bc269420a074dd36f6fe8c
+      Dependencies: {}
+    Info_40:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_f08584b10c0ad4106e246475
+      Dependencies: {}
+    Info_41:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_f0ba012f5dce10f7e19b826d
+      Dependencies: {}
+    Info_42:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_faab309e3d715efc9d634aed
+      Dependencies:
+        Dependency_0: es_level_asset_validation_assets_esnormalassets_esvalid_f0ba012f5dce10f7e19b826d
+    Info_43:
+      Name: es_level_asset_validation_assets_esnormalassets_esvalid_fded1e86fb71b1dced45382d
+      Dependencies: {}

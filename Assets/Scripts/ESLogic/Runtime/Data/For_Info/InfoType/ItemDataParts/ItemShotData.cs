@@ -5,7 +5,7 @@ using UnityEngine;
 namespace ES
 {
     [Serializable]
-    public struct ItemShotSharedData
+    public sealed class ItemShotSharedData
     {
         [LabelText("启用飞行物")]
         public bool enabled;

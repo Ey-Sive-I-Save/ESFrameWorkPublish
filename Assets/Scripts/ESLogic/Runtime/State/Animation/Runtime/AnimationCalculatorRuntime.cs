@@ -948,7 +948,7 @@ namespace ES
             {
                 lastMixerInputWeights = new float[inputCount];
                 for (int i = 0; i < inputCount; i++)
-                    lastMixerInputWeights[i] = float.NaN;
+                    lastMixerInputWeights[i] = -1f;
             }
         }
 
@@ -969,7 +969,7 @@ namespace ES
             if (lastMixerInputWeights != null)
             {
                 for (int i = 0; i < lastMixerInputWeights.Length; i++)
-                    lastMixerInputWeights[i] = float.NaN;
+                    lastMixerInputWeights[i] = -1f;
             }
         }
 
@@ -979,8 +979,8 @@ namespace ES
             phaseLastAppliedSecondaryWeights = new float[phaseCount];
             for (int i = 0; i < phaseCount; i++)
             {
-                phaseLastAppliedPrimaryWeights[i] = float.NaN;
-                phaseLastAppliedSecondaryWeights[i] = float.NaN;
+                phaseLastAppliedPrimaryWeights[i] = -1f;
+                phaseLastAppliedSecondaryWeights[i] = -1f;
             }
         }
 
@@ -1013,9 +1013,9 @@ namespace ES
         public void InvalidatePhaseMixerWeightCache(int phaseIndex)
         {
             if (phaseLastAppliedPrimaryWeights != null && (uint)phaseIndex < (uint)phaseLastAppliedPrimaryWeights.Length)
-                phaseLastAppliedPrimaryWeights[phaseIndex] = float.NaN;
+                phaseLastAppliedPrimaryWeights[phaseIndex] = -1f;
             if (phaseLastAppliedSecondaryWeights != null && (uint)phaseIndex < (uint)phaseLastAppliedSecondaryWeights.Length)
-                phaseLastAppliedSecondaryWeights[phaseIndex] = float.NaN;
+                phaseLastAppliedSecondaryWeights[phaseIndex] = -1f;
         }
 
         public void RewindCachedPlayableTreeForEnter()

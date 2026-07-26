@@ -1,0 +1,56 @@
+ManifestFileVersion: 0
+CRC: 2426295003
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 26c8b998fcb96e3d95d461c0d6721230
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: c5c7646abecbde829982f19492495db5
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 26c8b998fcb96e3d95d461c0d6721230
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 20
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 81
+  Script: {instanceID: 0}
+- Class: 89
+  Script: {instanceID: 0}
+- Class: 104
+  Script: {instanceID: 0}
+- Class: 108
+  Script: {instanceID: 0}
+- Class: 135
+  Script: {instanceID: 0}
+- Class: 157
+  Script: {instanceID: 0}
+- Class: 196
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level02_Spheres.unity
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level02_spheres_level02_spheres_blue_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level02_spheres_level02_spheres_cyan_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level02_spheres_level02_spheres_green_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level02_spheres_level02_spheres_magenta_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level02_spheres_level02_spheres_red_prefab
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalidation_levelassetflow_prefabs_level02_spheres_level02_spheres_yellow_prefab

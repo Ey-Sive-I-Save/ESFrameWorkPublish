@@ -1949,15 +1949,6 @@ namespace SpriteShadersUltimate
             fieldRect.width -= labelRect.width;
             fieldRect.x += labelRect.width;
 
-            EditorGUIUtility.fieldWidth = fieldRect.width;
-            EditorGUIUtility.labelWidth = labelRect.width;
-
-            if (prop.type == MaterialProperty.PropType.Range)
-            {
-                EditorGUIUtility.fieldWidth = 50;
-                EditorGUIUtility.labelWidth = labelRect.width;
-            }
-
             return fullRect;
         }
 

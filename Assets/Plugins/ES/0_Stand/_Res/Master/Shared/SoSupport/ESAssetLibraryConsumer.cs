@@ -3,10 +3,16 @@ using System.Collections;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 namespace ES
 {
     public class ESAssetLibraryConsumer : LibConsumer<ESAssetLibrary>
     {
+#if UNITY_EDITOR
+        private static bool validatingTotalConsumer;
+#endif
         [LabelText("Consumer 稳定 ID"), ReadOnly]
         public string ConsumerId = string.Empty;
 
@@ -47,6 +53,11 @@ namespace ES
         [LabelText("GameCore 依赖检查"), ReadOnly, MultiLineProperty(5)]
         public List<string> GameCoreValidationErrors = new List<string>();
 
+        [LabelText("启动常驻资产")]
+        [Tooltip("Consumer 初始化时加载并由框架长期持有。资产必须已注册到 AssetLibrary；不会执行 GameCore 注入。")]
+        [SerializeReference]
+        public List<ESAssetReferBase> ResidentAssets = new List<ESAssetReferBase>();
+
         [LabelText("启用代码热更")]
         public bool EnableCodeHotUpdate;
 
@@ -78,6 +89,36 @@ namespace ES
             ConsumerId = Guid.NewGuid().ToString("N");
             return true;
         }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            bool identityChanged = EnsureStableIdentity();
+            if (identityChanged)
+                EditorUtility.SetDirty(this);
+            if (!IsTotalConsumer || validatingTotalConsumer)
+                return;
+
+            validatingTotalConsumer = true;
+            try
+            {
+                foreach (string guid in AssetDatabase.FindAssets("t:" + nameof(ESAssetLibraryConsumer)))
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    ESAssetLibraryConsumer other = AssetDatabase.LoadAssetAtPath<ESAssetLibraryConsumer>(path);
+                    if (other == null || other == this || !other.IsTotalConsumer)
+                        continue;
+                    Undo.RecordObject(other, "Set Exclusive Total Consumer");
+                    other.IsTotalConsumer = false;
+                    EditorUtility.SetDirty(other);
+                }
+            }
+            finally
+            {
+                validatingTotalConsumer = false;
+            }
+        }
+#endif
 
         public void IncrementBuildRevision()
         {

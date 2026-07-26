@@ -80,14 +80,13 @@ namespace ES
                         catch (Exception e)
                         {
                             Debug.LogError($"执行 Editor Task 时发生异常: {e}");
+                            // 回池会重置 SingleKey，必须先保存并解锁，否则面板会永久显示“任务执行中”。
+                            string failedTaskKey = useTask.SingleKey;
+                            if (!failedTaskKey.IsNullOrWhitespace())
+                                singleKeys.Remove(failedTaskKey);
                             // 出错的 Task 必须从队列里踢出去，避免死循环
-                            useTask.TryAutoPushedToPool();
                             RunningTasks.Dequeue();
-                            // 异常发生，强制解锁，防止死锁！
-                            if (!useTask.SingleKey.IsNullOrWhitespace())
-                            {
-                                singleKeys.Remove(useTask.SingleKey);
-                            }
+                            useTask.TryAutoPushedToPool();
                             return;
                         }
                         if (useTask.OnlyOnce || useTask.MaxFrame <= 0 || useTask.CanExit())

@@ -92,7 +92,7 @@ namespace ES
             public List<RenameRuleSnapshot> Items = new List<RenameRuleSnapshot>();
         }
 
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        [HideInInspector]
         private string PanelSummary
         {
             get
@@ -104,60 +104,60 @@ namespace ES
             }
         }
 
-        [FoldoutGroup("1. 命名规则", Expanded = true), InfoBox("@RenameModeInfo", InfoMessageType.Info)]
-        [FoldoutGroup("1. 命名规则"), LabelText("重命名模式")]
+        [FoldoutGroup("命名规则", Expanded = true), InfoBox("@RenameModeInfo", InfoMessageType.Info)]
+        [FoldoutGroup("命名规则"), LabelText("重命名模式")]
         public RenameMode renameMode = RenameMode.Prefix;
 
-        [FoldoutGroup("1. 命名规则"), LabelText("排序方式")]
+        [FoldoutGroup("命名规则"), LabelText("排序方式")]
         public RenameSortMode sortMode = RenameSortMode.HierarchyPath;
 
-        [FoldoutGroup("1. 命名规则"), LabelText("保护 Prefab 资产")]
+        [FoldoutGroup("命名规则"), LabelText("保护 Prefab 资产")]
         [InfoBox("开启后跳过 Project 窗口里选中的 Prefab 资产，只处理场景对象和 Prefab Mode 中的对象。", InfoMessageType.Info)]
         public bool protectPrefabAssets = true;
 
-        [FoldoutGroup("1. 命名规则"), LabelText("前缀文本"), ShowIf("renameMode", RenameMode.Prefix)]
+        [FoldoutGroup("命名规则"), LabelText("前缀文本"), ShowIf("renameMode", RenameMode.Prefix)]
         public string prefixText = "New_";
 
-        [FoldoutGroup("1. 命名规则"), LabelText("后缀文本"), ShowIf("renameMode", RenameMode.Suffix)]
+        [FoldoutGroup("命名规则"), LabelText("后缀文本"), ShowIf("renameMode", RenameMode.Suffix)]
         public string suffixText = "_Copy";
 
-        [FoldoutGroup("1. 命名规则"), LabelText("查找文本"), ShowIf("renameMode", RenameMode.Replace)]
+        [FoldoutGroup("命名规则"), LabelText("查找文本"), ShowIf("renameMode", RenameMode.Replace)]
         public string findText = "Old";
 
-        [FoldoutGroup("1. 命名规则"), LabelText("替换文本"), ShowIf("renameMode", RenameMode.Replace)]
+        [FoldoutGroup("命名规则"), LabelText("替换文本"), ShowIf("renameMode", RenameMode.Replace)]
         public string replaceText = "New";
 
-        [FoldoutGroup("1. 命名规则"), LabelText("区分大小写"), ShowIf("renameMode", RenameMode.Replace)]
+        [FoldoutGroup("命名规则"), LabelText("区分大小写"), ShowIf("renameMode", RenameMode.Replace)]
         public bool replaceCaseSensitive = true;
 
-        [FoldoutGroup("1. 命名规则"), LabelText("基础名称"), ShowIf("renameMode", RenameMode.Number)]
+        [FoldoutGroup("命名规则"), LabelText("基础名称"), ShowIf("renameMode", RenameMode.Number)]
         public string baseName = "Object";
 
-        [FoldoutGroup("1. 命名规则"), LabelText("编号分隔符"), ShowIf("renameMode", RenameMode.Number)]
+        [FoldoutGroup("命名规则"), LabelText("编号分隔符"), ShowIf("renameMode", RenameMode.Number)]
         public string numberSeparator = "_";
 
-        [FoldoutGroup("1. 命名规则"), LabelText("起始编号"), ShowIf("renameMode", RenameMode.Number)]
+        [FoldoutGroup("命名规则"), LabelText("起始编号"), ShowIf("renameMode", RenameMode.Number)]
         public int startNumber = 1;
 
-        [FoldoutGroup("1. 命名规则"), LabelText("编号位数"), Range(1, 8), ShowIf("renameMode", RenameMode.Number)]
+        [FoldoutGroup("命名规则"), LabelText("编号位数"), Range(1, 8), ShowIf("renameMode", RenameMode.Number)]
         public int numberDigits = 3;
 
-        [FoldoutGroup("2. 详细预览", Expanded = false), HorizontalGroup("2. 详细预览/Filters"), LabelText("搜索"), LabelWidth(40)]
+        [FoldoutGroup("详细预览", Expanded = false), HorizontalGroup("详细预览/Filters"), LabelText("搜索"), LabelWidth(40)]
         public string previewSearch = "";
 
-        [FoldoutGroup("2. 详细预览"), HorizontalGroup("2. 详细预览/Filters"), LabelText("只看会改"), LabelWidth(70)]
+        [FoldoutGroup("详细预览"), HorizontalGroup("详细预览/Filters"), LabelText("只看会改"), LabelWidth(70)]
         public bool onlyShowChanged = false;
 
-        [FoldoutGroup("2. 详细预览"), HorizontalGroup("2. 详细预览/Filters"), LabelText("只执行勾选"), LabelWidth(85)]
+        [FoldoutGroup("详细预览"), HorizontalGroup("详细预览/Filters"), LabelText("只执行勾选"), LabelWidth(85)]
         public bool executeCheckedOnly = true;
 
-        [FoldoutGroup("2. 详细预览"), HorizontalGroup("2. 详细预览/Page"), LabelText("每页数量"), LabelWidth(60)]
+        [FoldoutGroup("详细预览"), HorizontalGroup("详细预览/Page"), LabelText("每页数量"), LabelWidth(60)]
         public int previewPageSize = SimpleToolsPanelUtility.DefaultPageSize;
 
-        [FoldoutGroup("2. 详细预览"), ShowInInspector, ReadOnly, DisplayAsString, HideLabel]
+        [FoldoutGroup("详细预览"), ShowInInspector, ReadOnly, DisplayAsString, HideLabel]
         private string PreviewSummary => BuildPreviewSummary();
 
-        [FoldoutGroup("2. 详细预览"), OnInspectorGUI]
+        [FoldoutGroup("详细预览"), OnInspectorGUI]
         private void DrawPreviewPager()
         {
             previewPageSize = Mathf.Clamp(previewPageSize, 10, SimpleToolsPanelUtility.MaxRenderRowsPerPage);
@@ -165,7 +165,7 @@ namespace ES
             SimpleToolsPanelUtility.DrawPager(ref previewPageIndex, filteredCount, previewPageSize);
         }
 
-        [FoldoutGroup("2. 详细预览"), ShowInInspector, TableList(IsReadOnly = false, AlwaysExpanded = true), LabelText("重命名计划")]
+        [FoldoutGroup("详细预览"), ShowInInspector, TableList(IsReadOnly = false, AlwaysExpanded = true), LabelText("重命名计划")]
         private List<RenamePreviewRecord> FilteredRenamePlan => GetFilteredRenamePlan();
 
         private readonly List<RenamePreviewRecord> renamePlan = new List<RenamePreviewRecord>();
@@ -209,8 +209,8 @@ namespace ES
         {
             int selectedCount = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
             SimpleToolsPanelUtility.DrawToolHeader(
-                "批量重命名工作台",
-                "批量重命名工作台",
+                "批量重命名",
+                "先预览命名结果，再执行重命名。",
                 SimpleToolsMaturity.Upgrading,
                 "会直接修改场景对象名称。预览和执行共用同一份计划，支持冲突自动改名、勾选执行、Undo 和场景 Dirty。");
             SimpleToolsPanelUtility.DrawLargeListGuard(selectedCount, "选中对象");

@@ -36,21 +36,81 @@ namespace ES
             return true;
         }
 
+        public static bool TryAddResidentAsset(ESAssetLibraryConsumer consumer, UnityEngine.Object asset, out string error)
+        {
+            error = string.Empty;
+            if (consumer == null || asset == null)
+            {
+                error = "Consumer 或资产为空。";
+                return false;
+            }
+
+            string path = AssetDatabase.GetAssetPath(asset);
+            if (string.IsNullOrWhiteSpace(path) || ESAssetPipelineIO.IsEditorOnly(path, asset))
+            {
+                error = "脚本、EditorOnly 或无效资产不能作为启动常驻资产。";
+                return false;
+            }
+            if (asset is SceneAsset)
+            {
+                error = "Scene 不能作为常驻对象加载，请使用场景加载流程。";
+                return false;
+            }
+            if (asset is ScriptableObject scriptableObject
+                && ESScriptableObjectClassification.GetClass(scriptableObject) == ESScriptableObjectClass.GameCore)
+            {
+                error = "IGameCoreSO 应放入 GameCoreAssets，不能重复放入 ResidentAssets。";
+                return false;
+            }
+
+            ESPipelineAssetIdentity identity = ESAssetPipelineIO.GetIdentity(asset);
+            if (!identity.IsValid)
+            {
+                error = "资产缺少有效 GUID/LocalFileId。";
+                return false;
+            }
+
+            ESAssetPage page = null;
+            foreach (ESAssetReferKind kind in Enum.GetValues(typeof(ESAssetReferKind)))
+                if (kind != ESAssetReferKind.None
+                    && ESAssetRegistry.TryGetByAssetIdentity(kind, identity.guid, identity.localFileId, out page))
+                    break;
+            if (page == null)
+            {
+                error = "资产尚未注册到 AssetLibrary，请先完成资源注册。";
+                return false;
+            }
+
+            consumer.ResidentAssets ??= new List<ESAssetReferBase>();
+            if (consumer.ResidentAssets.Any(item => item != null && item.AssetIdentity.Equals(new ESAssetIdentity(identity.guid, identity.localFileId))))
+                return true;
+
+            var refer = new ESAssetReferUnityObject();
+            refer.InitializeGeneratedReference(identity.guid, identity.localFileId, page.Kind, page.EnumKey, page.EffectiveStringKey);
+            consumer.ResidentAssets.Add(refer);
+            EditorUtility.SetDirty(consumer);
+            return true;
+        }
+
         /// <summary>
         /// 烘焙入口改为编辑器长任务。每帧只推进一个 Library、Consumer 或输出文件；
         /// AssetDatabase 的原子调用仍保持在主线程，避免额外线程同步和 GC 压力。
         /// </summary>
         public static ESEditorLongTask Bake()
         {
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>().Where(item => item != null).OrderBy(item => item.LibFolderName, StringComparer.Ordinal).ToList();
+            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>()
+                .Where(item => item != null && item.ContainsBuild)
+                .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
+                .ToList();
             return ESEditorHandle.EnqueueLongTask(new ESAssetReferenceBakeLongTask(libraries));
         }
 
         private sealed class ESAssetReferenceBakeLongTask : ESEditorLongTask
         {
-            private enum Phase { Catalogs, ValidateKeys, GameCore, WriteCatalogs, Finish }
+            private enum Phase { Catalogs, Graphs, ValidateKeys, GameCore, WriteOutputs, Finish }
             private readonly List<ESAssetLibrary> libraries;
             private readonly Dictionary<ESAssetLibrary, ESAssetLibraryCatalog> catalogs = new Dictionary<ESAssetLibrary, ESAssetLibraryCatalog>();
+            private readonly Dictionary<ESAssetLibrary, ESAssetReferenceGraph> graphs = new Dictionary<ESAssetLibrary, ESAssetReferenceGraph>();
             private readonly List<ESAssetLibraryConsumer> consumers;
             private readonly List<string> gameCoreErrors = new List<string>();
             private Phase phase;
@@ -72,8 +132,20 @@ namespace ES
                         if (index < libraries.Count)
                         {
                             ESAssetLibrary library = libraries[index];
-                            SetProgress(index, libraries.Count + consumers.Count + libraries.Count + 2, "分析资源库：" + library.Name);
+                            SetProgress(index, TotalSteps, "分析资源库：" + library.Name);
                             catalogs.Add(library, CreateCatalog(library));
+                            index++;
+                            return ESEditorLongTaskStepResult.Continue;
+                        }
+                        index = 0;
+                        phase = Phase.Graphs;
+                        return ESEditorLongTaskStepResult.Continue;
+                    case Phase.Graphs:
+                        if (index < libraries.Count)
+                        {
+                            ESAssetLibrary library = libraries[index];
+                            SetProgress(libraries.Count + index, TotalSteps, "烘焙直接依赖图：" + library.Name);
+                            graphs.Add(library, CreateReferenceGraph(catalogs[library], catalogs.Values));
                             index++;
                             return ESEditorLongTaskStepResult.Continue;
                         }
@@ -81,7 +153,7 @@ namespace ES
                         phase = Phase.ValidateKeys;
                         return ESEditorLongTaskStepResult.Continue;
                     case Phase.ValidateKeys:
-                        SetProgress(libraries.Count, libraries.Count + consumers.Count + libraries.Count + 2, "校验业务资源键");
+                        SetProgress(libraries.Count * 2, TotalSteps, "校验业务资源键");
                         ValidateBusinessKeys(catalogs.Values);
                         phase = Phase.GameCore;
                         return ESEditorLongTaskStepResult.Continue;
@@ -89,21 +161,25 @@ namespace ES
                         if (index < consumers.Count)
                         {
                             ESAssetLibraryConsumer consumer = consumers[index];
-                            SetProgress(libraries.Count + index, libraries.Count + consumers.Count + libraries.Count + 2, "同步游戏核心：" + consumer.Name);
+                            SetProgress(libraries.Count * 2 + 1 + index, TotalSteps, "同步游戏核心：" + consumer.Name);
                             gameCoreErrors.AddRange(SyncConsumerGameCoreCatalog(consumer, libraries));
                             index++;
                             return ESEditorLongTaskStepResult.Continue;
                         }
                         AssetDatabase.SaveAssets();
                         index = 0;
-                        phase = Phase.WriteCatalogs;
+                        phase = Phase.WriteOutputs;
                         return ESEditorLongTaskStepResult.Continue;
-                    case Phase.WriteCatalogs:
+                    case Phase.WriteOutputs:
                         if (index < libraries.Count)
                         {
-                            ESAssetLibraryCatalog catalog = catalogs[libraries[index]];
-                            SetProgress(libraries.Count + consumers.Count + index, libraries.Count + consumers.Count + libraries.Count + 2, "写入资源目录：" + catalog.libraryName);
-                            ESAssetPipelineIO.WriteJson(Path.Combine(ESAssetPipelineIO.LibraryBakeFolder(catalog.libraryFolder), ESAssetPipelineIO.CatalogFileName), catalog);
+                            ESAssetLibrary library = libraries[index];
+                            ESAssetLibraryCatalog catalog = catalogs[library];
+                            ESAssetReferenceGraph graph = graphs[library];
+                            SetProgress(libraries.Count * 2 + consumers.Count + 1 + index, TotalSteps, "写入资源目录与引用图：" + catalog.libraryName);
+                            string outputFolder = ESAssetPipelineIO.LibraryBakeFolder(catalog.libraryFolder);
+                            ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.CatalogFileName), catalog);
+                            ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.ReferenceGraphFileName), graph);
                             index++;
                             return ESEditorLongTaskStepResult.Continue;
                         }
@@ -111,17 +187,29 @@ namespace ES
                         return ESEditorLongTaskStepResult.Continue;
                     default:
                         AssetDatabase.Refresh();
-                        int errors = catalogs.Values.Sum(item => item.errors.Count) + gameCoreErrors.Count;
-                        Debug.Log($"[ESRes][Bake] 完成 {catalogs.Count} 个资源库，错误 {errors}。输出：{ESAssetPipelineIO.BakeRoot}");
+                        int errors = catalogs.Values.Sum(item => item.errors.Count) + graphs.Values.Sum(item => item.errors.Count) + gameCoreErrors.Count;
+                        int warnings = catalogs.Values.Sum(item => item.warnings.Count) + graphs.Values.Sum(item => item.warnings.Count);
+                        Debug.Log($"[ESRes][Bake] 完成 {catalogs.Count} 个资源库与引用图，错误 {errors}，警告 {warnings}。输出：{ESAssetPipelineIO.BakeRoot}");
+                        foreach (string warning in catalogs.Values.SelectMany(item => item.warnings)
+                            .Concat(graphs.Values.SelectMany(item => item.warnings))
+                            .Distinct(StringComparer.Ordinal))
+                            Debug.LogWarning("[ESRes][Bake][Warning] " + warning);
                         if (errors > 0)
                         {
+                            foreach (string error in catalogs.Values.SelectMany(item => item.errors)
+                                .Concat(graphs.Values.SelectMany(item => item.errors))
+                                .Concat(gameCoreErrors)
+                                .Distinct(StringComparer.Ordinal))
+                                Debug.LogError("[ESRes][Bake][Error] " + error);
                             SetFailure(new InvalidOperationException("[ESRes][Bake] 资产引用烘焙存在错误，请检查资源目录后再规划资源包。"));
                             return ESEditorLongTaskStepResult.Fail;
                         }
-                        SetProgress(libraries.Count + consumers.Count + libraries.Count + 2, libraries.Count + consumers.Count + libraries.Count + 2, "烘焙完成");
+                        SetProgress(TotalSteps, TotalSteps, "烘焙完成");
                         return ESEditorLongTaskStepResult.Complete;
                 }
             }
+
+            private int TotalSteps => libraries.Count * 3 + consumers.Count + 2;
         }
         private static ESAssetLibraryCatalog CreateCatalog(ESAssetLibrary library)
         {
@@ -152,18 +240,13 @@ namespace ES
                         catalog.warnings.Add($"已排除 IInternalSO：{library.Name}/{page.Name} ({path})");
                         continue;
                     }
-                    if (page.OB is ScriptableObject gameCoreCandidate && ESScriptableObjectClassification.GetClass(gameCoreCandidate) == ESScriptableObjectClass.GameCore)
-                    {
-                        catalog.warnings.Add($"IGameCoreSO 仅归属 Consumer 启动核心包，不写入 Library Catalog：{library.Name}/{page.Name} ({path})");
-                        continue;
-                    }
                     if (!ESAssetReferConfigKeySwitch.IsSupportedKind(actualKind))
                     {
-                        catalog.errors.Add($"资产类型不支持运行时加载：{library.Name}/{page.Name}，类型={actualKind} ({path})");
+                        catalog.warnings.Add($"资产类型不支持运行时加载，已跳过：{library.Name}/{page.Name}，类型={actualKind} ({path})");
                         continue;
                     }
                     if (page.Kind != actualKind)
-                        catalog.errors.Add($"Page 类型与实际资产不一致：{library.Name}/{page.Name}，配置={page.Kind}，实际={actualKind} ({path})");
+                        catalog.warnings.Add($"Page 类型与实际资产不一致，已采用实际类型：{library.Name}/{page.Name}，配置={page.Kind}，实际={actualKind} ({path})");
                     if (identity.IsSubAsset && !ValidateSubAssetSelector(catalog, library, page, path, identity)) continue;
                     catalog.assets.Add(new ESAssetCatalogEntry { identity = identity, assetPath = path, assetTypeName = page.OB.GetType().FullName, kind = actualKind.ToString(), enumKey = page.EnumKey,
                         stringKey = page.ResolveEffectiveStringKey(), libraryName = library.Name, libraryFolder = library.LibFolderName, pageName = page.Name, namedOption = page.namedOption.ToString(), subAssetName = identity.IsSubAsset ? page.OB.name : string.Empty });
@@ -171,6 +254,101 @@ namespace ES
             }
             catalog.assets = catalog.assets.OrderBy(item => item.kind, StringComparer.Ordinal).ThenBy(item => item.enumKey).ThenBy(item => item.stringKey, StringComparer.Ordinal).ToList();
             return catalog;
+        }
+
+        private static ESAssetReferenceGraph CreateReferenceGraph(ESAssetLibraryCatalog catalog, IEnumerable<ESAssetLibraryCatalog> allCatalogs)
+        {
+            var graph = new ESAssetReferenceGraph
+            {
+                libraryName = catalog.libraryName,
+                libraryFolder = catalog.libraryFolder,
+                generatedUtc = DateTime.UtcNow.ToString("O")
+            };
+            var ownersByPath = (allCatalogs ?? Enumerable.Empty<ESAssetLibraryCatalog>())
+                .SelectMany(item => (item.assets ?? new List<ESAssetCatalogEntry>())
+                    .Where(asset => asset != null && !string.IsNullOrWhiteSpace(asset.assetPath))
+                    .Select(asset => new { asset.assetPath, item.libraryFolder }))
+                .GroupBy(item => item.assetPath, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key,
+                    group => group.Select(item => item.libraryFolder).Where(item => !string.IsNullOrWhiteSpace(item)).Distinct(StringComparer.Ordinal).OrderBy(item => item, StringComparer.Ordinal).ToList(),
+                    StringComparer.Ordinal);
+            var nodes = new Dictionary<string, ESAssetReferenceNode>(StringComparer.Ordinal);
+            var visiting = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (ESAssetCatalogEntry asset in catalog.assets ?? new List<ESAssetCatalogEntry>())
+            {
+                if (asset == null || asset.identity == null || !asset.identity.IsValid || string.IsNullOrWhiteSpace(asset.assetPath))
+                {
+                    graph.errors.Add("Catalog 包含无法建立引用图的根资产。Library=" + catalog.libraryFolder);
+                    continue;
+                }
+                graph.roots.Add(new ESAssetReferenceRoot { identity = asset.identity, assetPath = asset.assetPath });
+                AddReferenceNode(asset.assetPath, graph, nodes, visiting, ownersByPath);
+            }
+
+            graph.roots = graph.roots
+                .GroupBy(item => item.identity.Key, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .OrderBy(item => item.assetPath, StringComparer.Ordinal)
+                .ThenBy(item => item.identity.localFileId)
+                .ToList();
+            graph.nodes = nodes.Values.OrderBy(item => item.assetPath, StringComparer.Ordinal).ToList();
+            graph.errors = graph.errors.Distinct(StringComparer.Ordinal).ToList();
+            graph.warnings = graph.warnings.Distinct(StringComparer.Ordinal).ToList();
+            return graph;
+        }
+
+        private static void AddReferenceNode(string assetPath, ESAssetReferenceGraph graph,
+            Dictionary<string, ESAssetReferenceNode> nodes, HashSet<string> visiting,
+            Dictionary<string, List<string>> ownersByPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath) || nodes.ContainsKey(assetPath))
+                return;
+            if (!visiting.Add(assetPath))
+            {
+                graph.errors.Add("资产引用存在循环：" + assetPath);
+                return;
+            }
+
+            try
+            {
+                UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+                ESPipelineAssetIdentity identity = ESAssetPipelineIO.GetMainIdentity(assetPath);
+                bool editorOnly = ESAssetPipelineIO.IsEditorOnly(assetPath, asset);
+                string[] directDependencies = AssetDatabase.GetDependencies(assetPath, false)
+                    .Where(path => !string.IsNullOrWhiteSpace(path) && !string.Equals(path, assetPath, StringComparison.Ordinal))
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(path => path, StringComparer.Ordinal)
+                    .ToArray();
+                var node = new ESAssetReferenceNode
+                {
+                    identity = identity,
+                    assetPath = assetPath,
+                    assetTypeName = asset != null ? asset.GetType().FullName : string.Empty,
+                    dependencyHash = AssetDatabase.GetAssetDependencyHash(assetPath).ToString(),
+                    editorOnly = editorOnly,
+                    markable = !editorOnly && identity.IsValid && assetPath.StartsWith("Assets/", StringComparison.Ordinal),
+                    ownerLibraryFolders = ownersByPath.TryGetValue(assetPath, out List<string> owners) ? new List<string>(owners) : new List<string>(),
+                    directDependencies = editorOnly ? new List<string>() : directDependencies.ToList()
+                };
+                nodes.Add(assetPath, node);
+
+                if (editorOnly)
+                {
+                    graph.warnings.Add("引用图已标记 EditorOnly 依赖：" + assetPath);
+                    return;
+                }
+                foreach (string dependencyPath in node.directDependencies)
+                    AddReferenceNode(dependencyPath, graph, nodes, visiting, ownersByPath);
+            }
+            catch (Exception exception)
+            {
+                graph.errors.Add("引用图分析失败：" + assetPath + "，" + exception.Message);
+            }
+            finally
+            {
+                visiting.Remove(assetPath);
+            }
         }
 
         private static bool ValidateSubAssetSelector(ESAssetLibraryCatalog catalog, ESAssetLibrary library, ESAssetPage page, string assetPath, ESPipelineAssetIdentity identity)
@@ -216,11 +394,6 @@ namespace ES
                 if (asset is ScriptableObject internalCandidate && ESScriptableObjectClassification.GetClass(internalCandidate) == ESScriptableObjectClass.Internal)
                 {
                     catalog.warnings.Add("文件夹内 IInternalSO 已跳过：" + assetPath);
-                    continue;
-                }
-                if (asset is ScriptableObject gameCoreCandidate && ESScriptableObjectClassification.GetClass(gameCoreCandidate) == ESScriptableObjectClass.GameCore)
-                {
-                    catalog.warnings.Add("文件夹内 IGameCoreSO 仅归属 Consumer 启动核心包，已跳过 Catalog：" + assetPath);
                     continue;
                 }
                 if (!ESAssetReferConfigKeySwitch.IsSupportedKind(kind))
@@ -294,13 +467,14 @@ namespace ES
             var asset = AssetDatabase.LoadMainAssetAtPath(path) as ScriptableObject;
             if (asset == null || ESScriptableObjectClassification.GetClass(asset) != ESScriptableObjectClass.GameCore)
                 return;
+            if (!paths.Add(path))
+                return;
             ESPipelineAssetIdentity identity = ESAssetPipelineIO.GetIdentity(asset);
             if (!identity.IsValid)
                 return;
             var refer = new ESAssetReferScriptableObject();
             refer.InitializeGeneratedReference(identity.guid, identity.localFileId, ESAssetReferKind.ScriptableObject, 0, string.Empty);
             destination.Add(refer);
-            paths.Add(path);
         }
 
         private static List<string> ValidateGameCoreDependencies(ESAssetLibraryConsumer consumer, HashSet<string> collectedPaths)
@@ -325,14 +499,26 @@ namespace ES
             foreach (var catalog in catalogs) foreach (var asset in catalog.assets)
             {
                 if (!identities.TryGetValue(asset.identity.Key, out var identityOwner)) identities.Add(asset.identity.Key, asset);
-                else if (identityOwner.isBusinessAsset && asset.isBusinessAsset) catalog.errors.Add($"资产身份冲突：{identityOwner.libraryName}/{identityOwner.pageName} 与 {asset.libraryName}/{asset.pageName}");
+                else if (identityOwner.isBusinessAsset && asset.isBusinessAsset) catalog.warnings.Add($"资产身份重复，规划时将按同一物理资产去重：{identityOwner.libraryName}/{identityOwner.pageName} 与 {asset.libraryName}/{asset.pageName}");
                 if (asset.isBusinessAsset && asset.enumKey != 0) ValidateKey(catalog, enumKeys, asset.kind + "\n" + asset.enumKey, asset, "类型内 EnumKey");
                 if (asset.isBusinessAsset && !string.IsNullOrEmpty(asset.stringKey)) ValidateKey(catalog, stringKeys, asset.kind + "\n" + asset.stringKey, asset, "类型内 StringKey");
             }
         }
         private static void ValidateKey(ESAssetLibraryCatalog catalog, Dictionary<string, ESAssetCatalogEntry> index, string key, ESAssetCatalogEntry asset, string label)
         {
-            if (!index.TryGetValue(key, out var existing)) index.Add(key, asset); else if (!ReferenceEquals(existing, asset)) catalog.errors.Add($"{label} 冲突：{existing.libraryName}/{existing.pageName} 与 {asset.libraryName}/{asset.pageName}");
+            if (!index.TryGetValue(key, out var existing))
+            {
+                index.Add(key, asset);
+                return;
+            }
+            if (ReferenceEquals(existing, asset)) return;
+            if (existing.identity != null && asset.identity != null
+                && string.Equals(existing.identity.Key, asset.identity.Key, StringComparison.Ordinal))
+            {
+                catalog.warnings.Add($"{label} 对同一资产重复注册，构建时静默去重：{existing.libraryName}/{existing.pageName} 与 {asset.libraryName}/{asset.pageName}");
+                return;
+            }
+            catalog.errors.Add($"{label} 指向不同资产，无法确定业务寻址：{existing.libraryName}/{existing.pageName} 与 {asset.libraryName}/{asset.pageName}");
         }
     }
 }

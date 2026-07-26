@@ -132,7 +132,7 @@ namespace ES
 
         public void InjectGameCoreTables()
         {
-            ESRuntimeDataModule.InjectGameCoreRoot(this);
+            ESItemGameCoreTable.Inject(this);
         }
 
         private string BuildEditorSummary()
@@ -166,5 +166,99 @@ namespace ES
                     return "Select an Item kind. Main kinds: Shot / Door / Trap / Weapon / Pickup / Zone / Prop.";
             }
         }
+    }
+
+    /// <summary>Item 的枚举分流注册入口；Shot/Weapon 分别写入各自强类型表。</summary>
+    public static class ESItemGameCoreTable
+    {
+        public static void Inject(ItemDataInfo info)
+        {
+            if (info == null) throw new System.ArgumentNullException(nameof(info));
+            if (info.baseConfig == null) throw new System.InvalidOperationException("Item 缺少 BaseConfig：" + info.name);
+
+            switch (info.baseConfig.kind)
+            {
+                case ItemKind.Shot: ESShotGameCoreTable.Inject(info); return;
+                case ItemKind.Weapon: ESWeaponGameCoreTable.Inject(info); return;
+                default: throw new System.InvalidOperationException("非 GameCore Item 不得注入：" + info.name + " (" + info.baseConfig.kind + ")");
+            }
+        }
+    }
+
+    /// <summary>Shot 的强类型 GameCore 表入口；ItemDataInfo 是其按 ItemKind 分流的配置根。</summary>
+    public static class ESShotGameCoreTable
+    {
+        public static ESConfigKeyTable<ESShotRuntimeData> Table => ESRuntimeDataGameCore.Shots;
+
+        public static void Inject(ItemDataInfo info)
+        {
+            if (info == null) throw new System.ArgumentNullException(nameof(info));
+            if (info.baseConfig == null || info.baseConfig.kind != ItemKind.Shot)
+                throw new System.InvalidOperationException("Shot Table 只能接收 ItemKind.Shot：" + info.name);
+
+            bool ownsBuild = !Table.IsBuilding;
+            if (ownsBuild) Table.BeginBuild();
+            try
+            {
+                info.shotShared ??= ItemShotSharedData.Default;
+                info.shotKey ??= new ESShotConfigKey();
+                if (Table.TryGet(info.shotKey, out ESShotRuntimeData existing))
+                {
+                    if (object.ReferenceEquals(existing.soSource, info)) return;
+                    throw new System.InvalidOperationException("Shot GameCore Key 重复：" + info.KeyName);
+                }
+                var data = new ESShotRuntimeData
+                {
+                    keyName = info.KeyName, displayName = ESItemGameCoreDisplayName.Get(info), sourcePackage = info.name,
+                    soSource = info, sharedData = info.shotShared, defaultVariableData = info.shotVariable,
+                    prefab = info.baseConfig.prefab
+                };
+                data.runtimeKey = Table.Bake(info.shotKey, info.KeyName);
+                if (!Table.Upsert(info.shotKey, data, info.KeyName))
+                    throw new System.InvalidOperationException("Shot GameCore 注入失败：" + info.KeyName);
+            }
+            finally { if (ownsBuild) Table.EndBuild(); }
+        }
+    }
+
+    /// <summary>Weapon 的强类型 GameCore 表入口；ItemDataInfo 是其按 ItemKind 分流的配置根。</summary>
+    public static class ESWeaponGameCoreTable
+    {
+        public static ESConfigKeyTable<ESWeaponRuntimeData> Table => ESRuntimeDataGameCore.Weapons;
+
+        public static void Inject(ItemDataInfo info)
+        {
+            if (info == null) throw new System.ArgumentNullException(nameof(info));
+            if (info.baseConfig == null || info.baseConfig.kind != ItemKind.Weapon)
+                throw new System.InvalidOperationException("Weapon Table 只能接收 ItemKind.Weapon：" + info.name);
+
+            bool ownsBuild = !Table.IsBuilding;
+            if (ownsBuild) Table.BeginBuild();
+            try
+            {
+                info.weaponShared ??= ItemWeaponSharedData.Default;
+                info.weaponKey ??= new ESWeaponConfigKey();
+                if (Table.TryGet(info.weaponKey, out ESWeaponRuntimeData existing))
+                {
+                    if (object.ReferenceEquals(existing.soSource, info)) return;
+                    throw new System.InvalidOperationException("Weapon GameCore Key 重复：" + info.KeyName);
+                }
+                var data = new ESWeaponRuntimeData
+                {
+                    keyName = info.KeyName, displayName = ESItemGameCoreDisplayName.Get(info), sourcePackage = info.name,
+                    soSource = info, sharedData = info.weaponShared, defaultVariableData = info.weaponVariable,
+                    prefab = info.baseConfig.prefab
+                };
+                data.runtimeKey = Table.Bake(info.weaponKey, info.KeyName);
+                if (!Table.Upsert(info.weaponKey, data, info.KeyName))
+                    throw new System.InvalidOperationException("Weapon GameCore 注入失败：" + info.KeyName);
+            }
+            finally { if (ownsBuild) Table.EndBuild(); }
+        }
+    }
+
+    internal static class ESItemGameCoreDisplayName
+    {
+        public static string Get(ItemDataInfo info) => !string.IsNullOrWhiteSpace(info.baseConfig.displayName) ? info.baseConfig.displayName : info.KeyName;
     }
 }

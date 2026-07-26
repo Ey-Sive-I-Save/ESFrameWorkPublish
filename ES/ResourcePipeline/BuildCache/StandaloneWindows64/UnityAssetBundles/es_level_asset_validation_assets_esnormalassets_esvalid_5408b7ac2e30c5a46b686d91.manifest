@@ -1,0 +1,33 @@
+ManifestFileVersion: 0
+CRC: 3470707158
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: b7e0c97863f80e7c1296e914cb1e608a
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: cdffbf2a50eab02917f0413328ad945f
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: b7e0c97863f80e7c1296e914cb1e608a
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 136
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Magenta.prefab
+Dependencies:
+- F:/aaProject/ESFrameWorkPublish/ES/ResourcePipeline/BuildCache/StandaloneWindows64/UnityAssetBundles/es_level_asset_validation_assets_esnormalassets_esvalid_f08584b10c0ad4106e246475

@@ -17,7 +17,7 @@ using UnityEngine;
 
 namespace ES
 {
-    #region 商业级资源引用检查工具
+    #region 资源引用检查工具
     [Serializable]
     public class Page_AssetReferenceChecker : ESWindowPageBase
     {
@@ -323,12 +323,12 @@ namespace ES
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     GUI.enabled = selected != null;
-                    if (GUILayout.Button("用选中目录作为扫描范围", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("用选中目录作为扫描范围", 152, 24, EditorStyles.miniButtonLeft))
                         UseSelectionAsCheckFolder();
-                    if (GUILayout.Button("加入资源包入口", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("加入资源包入口", 108, 24, EditorStyles.miniButtonMid))
                         AddSelectionToPackageEntries();
                     GUI.enabled = packageUsedEntryPaths.Count > 0 || packageUsedEntryAssets.Any(a => a != null);
-                    if (GUILayout.Button("清空入口", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("清空入口", 76, 24, EditorStyles.miniButtonRight))
                         ClearPackageEntries();
                     GUI.enabled = true;
                 }
@@ -346,20 +346,13 @@ namespace ES
                 checkFolder = EditorGUILayout.TextField("扫描范围", checkFolder);
                 packageRootFolder = EditorGUILayout.TextField("资源包根目录", packageRootFolder);
 
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    deepAnalysis = GUILayout.Toggle(deepAnalysis, "深度分析", EditorStyles.miniButtonLeft, GUILayout.Height(24));
-                    protectEntryAssets = GUILayout.Toggle(protectEntryAssets, "保护入口", EditorStyles.miniButtonMid, GUILayout.Height(24));
-                    useCache = GUILayout.Toggle(useCache, "缓存优化", EditorStyles.miniButtonMid, GUILayout.Height(24));
-                    memoryOptimization = GUILayout.Toggle(memoryOptimization, "低内存", EditorStyles.miniButtonRight, GUILayout.Height(24));
-                }
-
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    checkScenes = GUILayout.Toggle(checkScenes, "场景", EditorStyles.miniButtonLeft, GUILayout.Height(22));
-                    checkPrefabs = GUILayout.Toggle(checkPrefabs, "Prefab", EditorStyles.miniButtonMid, GUILayout.Height(22));
-                    checkScripts = GUILayout.Toggle(checkScripts, "脚本", EditorStyles.miniButtonRight, GUILayout.Height(22));
-                }
+                deepAnalysis = EditorGUILayout.Toggle("深度分析", deepAnalysis);
+                protectEntryAssets = EditorGUILayout.Toggle("保护入口", protectEntryAssets);
+                useCache = EditorGUILayout.Toggle("缓存优化", useCache);
+                memoryOptimization = EditorGUILayout.Toggle("低内存", memoryOptimization);
+                checkScenes = EditorGUILayout.Toggle("检查场景", checkScenes);
+                checkPrefabs = EditorGUILayout.Toggle("检查 Prefab", checkPrefabs);
+                checkScripts = EditorGUILayout.Toggle("检查脚本", checkScripts);
             }
         }
 
@@ -391,15 +384,15 @@ namespace ES
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     GUI.enabled = unusedAssets.Count > 0;
-                    if (GUILayout.Button("选中候选", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("选中候选", 76, 24, EditorStyles.miniButtonLeft))
                         SelectUnusedAssets();
-                    if (GUILayout.Button("移入隔离区", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("移入隔离区", 92, 24, EditorStyles.miniButtonMid))
                         QuarantineUnusedAssets();
                     GUI.enabled = HasAnyResult();
-                    if (GUILayout.Button("导出报告", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("导出报告", 76, 24, EditorStyles.miniButtonMid))
                         ExportAnalysisReport();
                     GUI.enabled = true;
-                    if (GUILayout.Button("清空结果", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("清空结果", 76, 24, EditorStyles.miniButtonRight))
                         ClearResults();
                 }
             }
@@ -421,7 +414,7 @@ namespace ES
                     EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
 
                 if (!string.IsNullOrWhiteSpace(lastResultDetail))
-                    EditorGUILayout.TextArea(lastResultDetail, GUILayout.MinHeight(36), GUILayout.MaxHeight(92));
+                    SimpleToolsPanelUtility.DrawCompactDetail("资源检查详情", lastResultDetail);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -452,18 +445,15 @@ namespace ES
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    EditorGUILayout.LabelField("置信度", EditorStyles.miniBoldLabel, GUILayout.Width(52));
-                    confidenceFilterIndex = GUILayout.Toolbar(confidenceFilterIndex, ConfidenceFilterLabels, EditorStyles.miniButton, GUILayout.Height(22));
+                    confidenceFilterIndex = EditorGUILayout.Popup("置信度", confidenceFilterIndex, ConfidenceFilterLabels, GUILayout.Width(260));
                     GUILayout.Space(8);
-                    EditorGUILayout.LabelField("排序", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                    resultSortIndex = GUILayout.Toolbar(resultSortIndex, ResultSortLabels, EditorStyles.miniButton, GUILayout.Width(238), GUILayout.Height(22));
+                    resultSortIndex = EditorGUILayout.Popup("排序", resultSortIndex, ResultSortLabels, GUILayout.Width(280));
                 }
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    EditorGUILayout.LabelField("每页", EditorStyles.miniBoldLabel, GUILayout.Width(34));
                     int pageSizeIndex = Mathf.Clamp(Array.IndexOf(PageSizeOptions, pageSize), 0, PageSizeOptions.Length - 1);
-                    pageSizeIndex = GUILayout.Toolbar(pageSizeIndex, PageSizeLabels, EditorStyles.miniButton, GUILayout.Width(126), GUILayout.Height(22));
+                    pageSizeIndex = EditorGUILayout.Popup("每页", pageSizeIndex, PageSizeLabels, GUILayout.Width(180));
                     pageSize = PageSizeOptions[pageSizeIndex];
                     GUILayout.FlexibleSpace();
                     if (GUILayout.Button("打开隔离区", EditorStyles.miniButton, GUILayout.Width(82), GUILayout.Height(22)))
@@ -868,7 +858,7 @@ namespace ES
         private static readonly string[] PageSizeLabels = { "10", "25", "50" };
         #endregion
 
-        #region 商业级核心方法
+        #region 核心方法
         public void FindUnusedAssets()
         {
             if (!ValidateCheckFolder())

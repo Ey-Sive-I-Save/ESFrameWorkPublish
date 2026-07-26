@@ -27,7 +27,8 @@ namespace ES
             ESCodeModuleEditorIntegration.GenerateAndSyncAll(consumers);
             ESAssetConsumerBuildRevision.IncrementAllForBuild();
 
-            string releaseVersion = ESGlobalResSetting.Instance.Version + "." + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
+            DateTime publishLocalTime = DateTime.Now;
+            string releaseVersion = ESGlobalResSetting.Instance.Version + "." + publishLocalTime.ToString("yyyyMMddHHmmssfff");
             string initialRoot = ToAbsolutePath(ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_);
             string localTestRoot = Path.Combine(ESAssetPipelineIO.ProjectRoot, "ES", "Published", "LocalTest", platform);
             string cdnRoot = Path.Combine(ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath, platform);
@@ -41,6 +42,9 @@ namespace ES
                 identity.version = releaseVersion;
                 identity.channel = release.channel;
                 string libraryFolder = Path.GetFileName(stageFolder);
+                // Staging 的实际规范化目录名是发布与运行时共同使用的 LibraryFolder 权威值。
+                // 同时兼容由旧 Planner 生成、Identity 中仍带前导下划线的 GameCore 暂存产物。
+                identity.libraryFolder = libraryFolder;
                 var manifest = ESAssetPipelineIO.ReadJson<ESAssetBundleManifest>(Path.Combine(stageFolder, ESAssetPipelineIO.BundleManifestFileName));
                 string relativeBase = ESAssetPipelineIO.ReleaseLibraryRelativeBase(platform, releaseVersion, libraryFolder);
                 identity.catalogUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + ESAssetPipelineIO.CatalogFileName);
@@ -62,6 +66,7 @@ namespace ES
                 publishedLibraries.Add(libraryFolder, new PublishedLibrary
                 {
                     identity = identity,
+                    manifest = manifest,
                     identityUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, identityRelativePath),
                     identitySha256 = ESResManifestIntegrity.ComputeFileSha256(publishedIdentityPath)
                 });
@@ -129,6 +134,10 @@ namespace ES
                 string identityPath = Path.Combine(folder, ESAssetPipelineIO.LibraryIdentityFileName);
                 var manifest = ESAssetPipelineIO.ReadJson<ESAssetBundleManifest>(manifestPath);
                 var identity = ESAssetPipelineIO.ReadJson<ESAssetLibraryIdentity>(identityPath);
+                if (manifest == null || manifest.formatVersion != ESAssetPipelineIO.RuntimeProtocolFormatVersion)
+                    throw new InvalidDataException($"[ESRes][Publish] AB Manifest 协议版本过旧，请重新执行 AB 构建：{manifestPath}");
+                if (identity == null || identity.formatVersion != ESAssetPipelineIO.RuntimeProtocolFormatVersion)
+                    throw new InvalidDataException($"[ESRes][Publish] Library Identity 协议版本过旧，请重新执行 AB 构建：{identityPath}");
                 if (!ESResManifestIntegrity.VerifyFileSha256(manifestPath, identity.assetBundleManifestSha256)) throw new InvalidDataException("AB Manifest Hash 不匹配：" + manifestPath);
                 string catalogPath = Path.Combine(folder, ESAssetPipelineIO.CatalogFileName);
                 if (!string.IsNullOrEmpty(identity.catalogSha256) && !ESResManifestIntegrity.VerifyFileSha256(catalogPath, identity.catalogSha256)) throw new InvalidDataException("Catalog Hash 不匹配：" + catalogPath);
@@ -239,6 +248,7 @@ namespace ES
                 AddLibraries(manifest.libraries, consumer.OptionalLibFolders, false, libraries);
                 AddGameCoreLibrary(manifest.libraries, consumer, libraries);
                 AddGameCoreAssets(manifest.gameCoreAssets, consumer.GameCoreAssets);
+                AddResidentAssets(manifest, consumer, libraries);
                 PublishCodePackages(manifest.codePackages, consumer, platform, releaseVersion, initialRoot, localTestRoot, cdnRoot);
 
                 string relativePath = platform + "/" + releaseVersion + "/Consumers/" + consumer.ConsumerId + ".json";
@@ -312,6 +322,83 @@ namespace ES
                 }
                 root.dependencies = root.dependencies.OrderBy(item => item.guid, StringComparer.Ordinal).ThenBy(item => item.localFileId).ToList();
             }
+        }
+
+        private static void AddResidentAssets(ESAssetConsumerManifest manifest, ESAssetLibraryConsumer consumer, Dictionary<string, PublishedLibrary> libraries)
+        {
+            var identities = new HashSet<ESAssetIdentity>();
+            foreach (ESAssetReferBase refer in consumer.ResidentAssets ?? Enumerable.Empty<ESAssetReferBase>())
+            {
+                if (refer == null || !refer.IsValid)
+                    throw new InvalidOperationException("Consumer 启动常驻资产包含无效引用：" + consumer.Name);
+
+                var id = refer.AssetIdentity;
+                if (!identities.Add(id))
+                    continue;
+
+                string path = AssetDatabase.GUIDToAssetPath(id.Guid);
+                UnityEngine.Object asset = id.LocalFileId == 0
+                    ? AssetDatabase.LoadMainAssetAtPath(path)
+                    : FindSubAsset(path, id.Guid, id.LocalFileId);
+                if (asset == null || ESAssetPipelineIO.IsEditorOnly(path, asset) || asset is SceneAsset)
+                    throw new InvalidOperationException("Consumer 启动常驻资产无效、属于 EditorOnly 或为 Scene：" + path);
+                if (asset is ScriptableObject scriptableObject
+                    && ESScriptableObjectClassification.GetClass(scriptableObject) == ESScriptableObjectClass.GameCore)
+                    throw new InvalidOperationException("GameCore 资产不能重复进入 ResidentAssets：" + path);
+
+                var owners = libraries.Where(pair => ContainsIdentity(pair.Value.manifest, id)).ToList();
+                if (owners.Count == 0)
+                    throw new InvalidOperationException("启动常驻资产未出现在任何已构建 AssetLibrary 中：" + path);
+                if (owners.Count != 1)
+                    throw new InvalidOperationException("启动常驻资产在多个 Library 构建清单中重复：" + path);
+
+                KeyValuePair<string, PublishedLibrary> owner = owners[0];
+                ESAssetConsumerLibraryReference libraryReference = manifest.libraries.FirstOrDefault(item => string.Equals(item.libraryFolder, owner.Key, StringComparison.Ordinal));
+                if (libraryReference == null)
+                {
+                    libraryReference = new ESAssetConsumerLibraryReference
+                    {
+                        libraryName = owner.Value.identity.libraryName,
+                        libraryFolder = owner.Key,
+                        libraryIdentityUrl = owner.Value.identityUrl,
+                        libraryIdentitySha256 = owner.Value.identitySha256,
+                        requiredAtBoot = true
+                    };
+                    manifest.libraries.Add(libraryReference);
+                }
+                else
+                {
+                    libraryReference.requiredAtBoot = true;
+                }
+
+                manifest.residentAssets.Add(new ESAssetConsumerResidentAssetReference { guid = id.Guid, localFileId = id.LocalFileId });
+            }
+
+            manifest.residentAssets = manifest.residentAssets
+                .OrderBy(item => item.guid, StringComparer.Ordinal)
+                .ThenBy(item => item.localFileId)
+                .ToList();
+        }
+
+        private static bool ContainsIdentity(ESAssetBundleManifest manifest, ESAssetIdentity id)
+        {
+            if (manifest == null) return false;
+            if (id.IsSubAsset)
+                return manifest.subAssetsById.Any(item => item != null
+                    && string.Equals(item.guid, id.Guid, StringComparison.Ordinal)
+                    && item.localFileId == id.LocalFileId);
+            return manifest.mainAssetsByGuid.Any(item => item != null && string.Equals(item.guid, id.Guid, StringComparison.Ordinal));
+        }
+
+        private static UnityEngine.Object FindSubAsset(string path, string guid, long localFileId)
+        {
+            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(path))
+                if (asset != null
+                    && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string candidateGuid, out long candidateLocalFileId)
+                    && string.Equals(candidateGuid, guid, StringComparison.Ordinal)
+                    && candidateLocalFileId == localFileId)
+                    return asset;
+            return null;
         }
 
         private static void ValidatePublishedBundleIndex(string cdnRoot, string releaseVersion, ESAssetReleaseBundleIndex bundleIndex)
@@ -418,6 +505,7 @@ namespace ES
         private sealed class PublishedLibrary
         {
             public ESAssetLibraryIdentity identity;
+            public ESAssetBundleManifest manifest;
             public string identityUrl;
             public string identitySha256;
         }

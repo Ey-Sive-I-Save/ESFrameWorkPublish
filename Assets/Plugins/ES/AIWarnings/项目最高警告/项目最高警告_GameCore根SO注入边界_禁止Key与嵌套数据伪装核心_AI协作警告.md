@@ -17,7 +17,7 @@ Consumer 启动核心包只允许收集并加载实现该接口的根 SO。运�
 
 - `SkillDefinitionDataInfo`：注入 SkillTable。
 - `BuffDefinitionDataInfo`：注入 BuffTable。
-- `ActorDataInfo`：按 `ActorDataKind` 注入 NPC / Monster 等对应 Actor Table。
+- `ActorDataInfo`：非 GameCore 通用角色定义，不实现 `IGameCoreSO`；Player / Rider / StoryActor 等正常由普通 Actor Group/Pack 组织。
 - `ItemDataInfo`：按 `ItemKind` 注入 Weapon / Shot 等对应 Item 领域 Table。
 - 所有承载上述 Info 的 `SoDataGroup<TInfo>` 与 `SoDataPack<TInfo>`：它们也是可被 Consumer 直接收集的启动根 SO，必须直接实现 `IGameCoreSO`。
 
@@ -45,12 +45,13 @@ Group/Pack 仅负责转发与聚合，不创建第二套 Key、不复制内容�
 
 ## 新 GameCore 类别的固定扩展边界
 
-新增类别必须在自己的领域目录内新增 Key、RuntimeData、强类型 Table 与 Info；Info 的 `InjectGameCoreTables()` 直接写入自己的领域 Table。
+新增类别必须在自己的领域目录内新增 Key、RuntimeData、强类型 Table 与 Info；Info 的 `InjectGameCoreTables()` 直接写入枚举选中的领域 Table。根 SO 类型不是 GameCore 类别本身：一个根 SO 类型可以通过稳定、显式的领域枚举，分流到多个兼容强类型 Table。
 
 ```text
-<NewCategory>DataInfo : SoDataInfo, IGameCoreSO
+<Domain>DataInfo : SoDataInfo, IGameCoreSO
   → InjectGameCoreTables()
-  → <NewCategory>RuntimeTable.Register(...)
+  → ExplicitDomainKind
+  → selected <Category>RuntimeTable.Register(...)
 ```
 
 不得为新类别修改 `0_Stand`，不得向 `ESRuntimeDataModule.InjectGameCoreRoot(...)` 增加重载、switch 或类型注册表。现有中央重载仅是旧类别过渡代码，不是新类别模板。
@@ -58,6 +59,12 @@ Group/Pack 仅负责转发与聚合，不创建第二套 Key、不复制内容�
 不同 GameCore 类别严禁继承彼此的 `*DataInfo`。Monster 与 NPC 这类即使字段相似，也必须是独立 `SoDataInfo` 根类型；若确有稳定共享字段，只允许使用可序列化组合数据，不允许以继承伪造类别关系。
 
 启动期接口转发只发生一次，不处于 Update/战斗/查表热路径；运行期必须直接使用新类别自己的 `ESConfigKeyTable<T>`，不得走 `Type`、字符串类别或反射分发。
+
+## Shared / Variable 数据类型边界
+
+`*SharedData` 是多个运行实例共同读取的定义对象，必须是 `[Serializable] class`，由 RuntimeData/Table 持有同一引用；运行期不得修改它。
+
+`*VariableData` 是单个运行实例的可变状态模板。仅当其全部字段都是值类型时允许使用 `struct`；一旦包含任何引用字段，必须提供显式深拷贝，不允许依赖 struct 的浅拷贝。
 
 ## 严禁实现 IGameCoreSO 的对象
 
@@ -70,7 +77,7 @@ Key 只负责业务寻址；RuntimeData 只负责运行时承载；嵌套数据�
 
 ## 注入规则
 
-1. 每个根 SO 必须校验自身 Key 有效、类别与表匹配、目标表无冲突后再注入。
+1. 每个根 SO 必须校验自身 Key 有效、显式枚举类别与表匹配、目标表无冲突后再注入；一个资产实例只写入其当前枚举选中的分支。
 2. 同一个 Info、Group 或 Pack 不得归属多个 Consumer 启动核心包。
 3. 一个 Item 根 SO 若按 `ItemKind` 映射到 Weapon 或 Shot，只向该实际类别的表注入；禁止同一条数据盲目写入多个表。
 4. GameCore 注入不得依赖 AssetBundle 名、路径、GUID 或 RuntimeKey；如需 Unity 资产，只保存类型化 Asset Key。
@@ -83,7 +90,7 @@ Key 只负责业务寻址；RuntimeData 只负责运行时承载；嵌套数据�
 ```text
 该对象是否为独立 ScriptableObject 根资产？
 该对象是否有稳定业务 Key？
-它注入的唯一目标 Table 是什么？
+它是否需要由显式领域枚举分流？当前资产实例注入哪个 Table？
 它是否会被 Consumer 启动包收集？
 ```
 

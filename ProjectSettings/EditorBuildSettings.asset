@@ -9,6 +9,6 @@ EditorBuildSettings:
     path: Assets/Plugins/ES/0_Stand/_Res/Bootstrap/ESBootstrap.unity
     guid: 6bd32f5e9a6645199c104bf1d0f2095a
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    path: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/ESLevelAssetValidation.unity
+    guid: a2c061c580e2c9f4fb76d3d840d1a5ff
   m_configObjects: {}

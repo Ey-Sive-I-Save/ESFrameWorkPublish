@@ -4,30 +4,38 @@
 
 ## 必读最高警告
 
-1. `项目最高警告/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md`
+1. `项目最高警告/项目最高警告_P0_UTF8唯一编码_禁止AI默认代码页覆写与机械转码_AI协作警告.md`
+   - 适用：所有源码、配置、文档及其他文本文件的读取、修改、生成和批处理。
+   - 重点：全项目唯一使用 UTF-8；禁止 PowerShell 默认代码页覆写和未经验证的机械转码；修改后必须严格解码、乱码扫描并检查 Diff。
+
+2. `项目最高警告/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md`
    - 适用：资源加载、AssetLibrary、AssetRegistry、RuntimeKey、Manifest、GameManager 启动资源流程。
    - 重点：`ESAssetLibrary` 只是编辑器资产组织工具；运行时不依赖 Library，只依赖烘焙后的 Manifest/Table；RuntimeKey 只在当前 Manifest/Table 内稳定，不是配置、存档或跨进程身份。
 
-2. `项目最高警告/项目最高警告_AssemblyStream只做Editor特性注册解耦_禁止全量扫盘_AI协作警告.md`
+3. `项目最高警告/项目最高警告_AssemblyStream只做Editor特性注册解耦_禁止全量扫盘_AI协作警告.md`
    - 适用：程序集流、编辑器自动注册、特性注册、资源扫描、ReloadDomain 后自动执行。
    - 重点：AssemblyStream 只做 Editor 元数据发现和注册解耦；禁止恢复 Runtime 程序集流；禁止在注册器里全量扫盘、扫资产、加载大资源。
    - 例外：`-SoEditorLoader.cs` 的 SO 编辑器索引、`ESEditorToolBar.cs` 的工具栏入口已标记为核心底层白名单，不要反复误判，但也不要照抄扩散。
 
-3. `项目最高警告/项目最高警告_禁止滥用InitializeOnLoad_优先程序集流注册器_AI协作警告.md`
+4. `项目最高警告/项目最高警告_禁止滥用InitializeOnLoad_优先程序集流注册器_AI协作警告.md`
    - 适用：任何编辑器初始化、域重载自动执行、编译后自动注册、`delayCall/update` 常驻逻辑。
    - 重点：普通工具和业务初始化不要随手用 `[InitializeOnLoad]`；优先使用 AssemblyStream 的 `EditorInvoker_*` / `EditorRegister_FOR_*`。
 
-4. `项目最高警告/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md`
+5. `项目最高警告/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md`
    - 适用：运行时核心热路径、Update/KCC/IK/StateMachine/AI/对象池等高频链路。
    - 重点：初始化阶段严格验证，热路径信任初始化结果；不要每帧用大量判空掩盖初始化错误。
 
-5. `项目最高警告/项目最高警告_配置双键与Inspector分层_AI协作警告.md`
+6. `项目最高警告/项目最高警告_配置双键与Inspector分层_AI协作警告.md`
    - 适用：Buff、Tag、State、Skill、Item、Camera、Mode 等可配置运行对象。
    - 重点：配置层允许“枚举键 + 字符串键”，运行时热路径优先使用已烘焙、已缓存的强类型键。
 
-6. `项目最高警告/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md`
+7. `项目最高警告/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md`
    - 适用：Skill、Buff、Actor、Item 的启动核心包、GameCoreTable、Consumer 收集与注入。
    - 重点：仅独立根定义 SO 实现 `IGameCoreSO`；Key、RuntimeData、Shared/Variable 嵌套数据严禁实现。
+
+8. `项目最高警告/项目最高警告_IL2CPP工具链注册_禁止以编译器文件存在代替Unity可检测_AI协作警告.md`
+   - 适用：Windows IL2CPP、HybridCLR、AOT 生成、Consumer 发布和 Player 构建。
+   - 重点：`cl.exe` 存在不等于 Unity 可用；必须通过带 C++ 组件要求的 `vswhere` 验证 Visual Studio 实例注册，检测失败先修复 Installer，禁止降级 Mono 或跳过 HybridCLR。
 
 ## 常用协作资料
 

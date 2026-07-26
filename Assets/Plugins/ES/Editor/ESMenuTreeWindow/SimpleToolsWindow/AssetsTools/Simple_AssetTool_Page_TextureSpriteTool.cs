@@ -23,7 +23,7 @@ namespace ES
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选中纹理或 Sprite，设置导入参数后批量处理。\n生成文件会自动避开重名，失败项会统一汇总。";
 
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        [HideInInspector]
         private string PanelSummary
         {
             get

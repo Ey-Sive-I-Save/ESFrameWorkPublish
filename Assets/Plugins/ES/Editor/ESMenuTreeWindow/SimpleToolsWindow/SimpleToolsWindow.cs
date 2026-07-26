@@ -16,6 +16,12 @@ namespace ES
     //简单工具窗口
     public class SimpleToolsWindow : ESMenuTreeWindowAB<SimpleToolsWindow>
     {
+        private Vector2 toolContentScrollPosition;
+
+        // Keep Odin's normal inspectors, but replace its two-axis outer scroll
+        // container with a vertical-only one for this tool collection.
+        public override bool UseScrollView => false;
+
         [MenuItem(MenuItemPathDefine.EDITOR_OPTIMIZATION_PATH + "简单工具集", false, 0)]
         public static void TryOpenWindow()
         {
@@ -60,6 +66,7 @@ namespace ES
             if (UsingWindow != null)
                 UsingWindow.MenuWidth = 245;
         }
+
         #endregion
 
         #region 数据滞留与声明
@@ -131,6 +138,9 @@ namespace ES
 
         #region 缓冲刷新和加载保存
         //缓冲回执
+        /// <summary>
+        /// 刷新窗口
+        /// </summary>
         protected override void OnImGUI()
         {
             if (UsingWindow == null)
@@ -138,16 +148,52 @@ namespace ES
                 UsingWindow = this;
                 ES_LoadData();
             }
-            if (UsingWindow != null)
-            {
 
+            ClampLeakedEditorGuiWidths();
+            try
+            {
+                base.OnImGUI();
             }
-            base.OnImGUI();
+            finally
+            {
+                // A drawer used by the selected page can run during base.OnImGUI.
+                // Do not carry an invalid width into Odin's next Layout/Repaint pass.
+                ClampLeakedEditorGuiWidths();
+            }
         }
 
-        /// <summary>
-        /// 刷新窗口
-        /// </summary>
+        protected override void DrawEditors()
+        {
+            toolContentScrollPosition.x = 0f;
+            toolContentScrollPosition = GUILayout.BeginScrollView(
+                toolContentScrollPosition,
+                false,
+                true,
+                GUIStyle.none,
+                GUI.skin.verticalScrollbar);
+            toolContentScrollPosition.x = 0f;
+            try
+            {
+                base.DrawEditors();
+            }
+            finally
+            {
+                GUILayout.EndScrollView();
+            }
+        }
+
+        private static void ClampLeakedEditorGuiWidths()
+        {
+            // Third-party material/property inspectors may leave these process-wide
+            // values at zero or at the previous inspector's full width. Both cases
+            // collapse Odin value fields or make the editor scroll area grow forever.
+            if (EditorGUIUtility.fieldWidth < 16f || EditorGUIUtility.fieldWidth > 320f)
+                EditorGUIUtility.fieldWidth = 50f;
+
+            if (EditorGUIUtility.labelWidth < 0f || EditorGUIUtility.labelWidth > 480f)
+                EditorGUIUtility.labelWidth = 0f;
+        }
+
         public override void ESWindow_RefreshWindow()
         {
             base.ESWindow_RefreshWindow();
@@ -163,6 +209,7 @@ namespace ES
         {
             // 保存数据逻辑
         }
+
         #endregion
 
         protected override void ES_OnBuildMenuTree(OdinMenuTree tree)
@@ -334,7 +381,7 @@ namespace ES
                             item.Select();
                     }
 
-                    EditorGUILayout.LabelField(tip, EditorStyles.wordWrappedMiniLabel, GUILayout.MinWidth(120));
+                    EditorGUILayout.LabelField(tip, EditorStyles.wordWrappedMiniLabel, GUILayout.MinWidth(120), GUILayout.MaxWidth(260));
                 }
             }
         }

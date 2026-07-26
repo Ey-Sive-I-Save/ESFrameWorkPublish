@@ -6,8 +6,10 @@ namespace ES
     [CreateTrackItem(TrackItemType.Skill, "对象轨道")]
     public class SkillTrackItem_GameObject : SkillTrackItem<SkillTrackClip_GameObject>
     {
+#if UNITY_EDITOR
         [System.NonSerialized]
         private GameObjectTrackEditorSampler lastCreatedEditorSampler;
+#endif
 
         public override Color ItemBGColor => new Color(0.22f, 0.58f, 0.34f, 0.42f);
 

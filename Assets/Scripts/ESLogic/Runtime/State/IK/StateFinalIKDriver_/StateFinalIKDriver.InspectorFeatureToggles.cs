@@ -92,7 +92,9 @@ namespace ES
         [TitleGroup("DriverLayout/测试工具/实时权重测试盒/实时权重测试", BoldTitle = true)]
         [InfoBox("运行时打开后，Driver 会直接用当前测试滑杆和测试目标覆盖状态机输出，便于不进入 FinalIK 面板就验证权重效果。四肢测试使用当前的 IK 目标点 Transform。", InfoMessageType.Warning)]
         [LabelText("启用实时权重测试")]
+#pragma warning disable CS0414 // Read by the Editor/Development-build diagnostic path in StateFinalIKDriver.RuntimeAndInit.
         [SerializeField] private bool enableRealtimeWeightTest = false;
+#pragma warning restore CS0414
 
         [TabGroup("DriverLayout", "测试工具")]
         [PropertyOrder(51)]

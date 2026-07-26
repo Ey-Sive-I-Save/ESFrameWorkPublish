@@ -24,7 +24,7 @@ namespace ES
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选择带有Light组件的GameObject，\n设置灯光属性，\n点击应用按钮批量修改";
 
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        [HideInInspector]
         private string PanelSummary
         {
             get
@@ -228,7 +228,7 @@ namespace ES
         [LabelText("随机颜色范围-MAX"), Space(5)]
         public Color randomColorMax = Color.white;
 
-        [FoldoutGroup("4. 旧按钮入口", Expanded = false)]
+        [FoldoutGroup("旧按钮入口", Expanded = false)]
         [Button("应用灯光设置", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
         public void ApplyLightingSettings()
         {
@@ -310,7 +310,7 @@ namespace ES
             EditorUtility.DisplayDialog("成功", $"成功修改 {modifiedCount} 个灯光组件！", "确定");
         }
 
-        [FoldoutGroup("4. 旧按钮入口")]
+        [FoldoutGroup("旧按钮入口")]
         [Button("应用随机灯光设置", ButtonHeight = 34), GUIColor(0.25f, 0.62f, 0.45f)]
         public void ApplyRandomLightingSettings()
         {
@@ -396,7 +396,7 @@ namespace ES
             EditorUtility.DisplayDialog("成功", $"成功随机修改 {modifiedCount} 个灯光组件！", "确定");
         }
 
-        [FoldoutGroup("4. 旧按钮入口")]
+        [FoldoutGroup("旧按钮入口")]
         [Button("批量添加Light组件", ButtonHeight = 34), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
         public void AddLightComponents()
         {
@@ -460,7 +460,7 @@ namespace ES
             EditorUtility.DisplayDialog("成功", $"成功添加 {addedCount} 个Light组件！", "确定");
         }
 
-        [FoldoutGroup("4. 旧按钮入口")]
+        [FoldoutGroup("旧按钮入口")]
         [Button("将所有灯光转为烘焙", ButtonHeight = 34), GUIColor("@ESDesignUtility.ColorSelector.Color_05")]
         public void ConvertAllToBaked()
         {
@@ -591,7 +591,7 @@ namespace ES
             }
         }
 
-        [FoldoutGroup("4. 旧按钮入口")]
+        [FoldoutGroup("旧按钮入口")]
         [Button("重置为默认设置", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
         public void ResetToDefaults()
         {

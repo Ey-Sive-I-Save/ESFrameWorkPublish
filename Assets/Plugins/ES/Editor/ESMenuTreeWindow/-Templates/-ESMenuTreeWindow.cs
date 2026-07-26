@@ -15,7 +15,6 @@ namespace ES {
     {
         public static This UsingWindow;
         public static OdinMenuTree menuTree;
-        private static Texture2D blackTexture;
         public static Dictionary<string, OdinMenuItem> MenuItems = new Dictionary<string, OdinMenuItem>();
         
         /// <summary>
@@ -39,15 +38,6 @@ namespace ES {
         protected override void Initialize()
         {
             base.Initialize();
-            if (blackTexture != null)
-            {
-                DestroyImmediate(blackTexture);
-                blackTexture = null;
-            }
-            blackTexture = new Texture2D(1, 1);
-            blackTexture.hideFlags = HideFlags.HideAndDontSave;
-            blackTexture.SetPixel(0, 0, Color.black + new Color(0.05f, 0.05f, 0.05f));
-            blackTexture.Apply();
         }
 
         public virtual void ESWindow_OnOpen()
@@ -193,7 +183,6 @@ namespace ES {
             {
                 UsingWindow = this as This;
             }
-            if(blackTexture)GUI.DrawTexture(new Rect(0, 0, position.width, position.height), blackTexture);
             base.OnImGUI();
         }
         public static void ES_RefreshWindow()
@@ -244,11 +233,6 @@ namespace ES {
             
             // 清理列表
             registeredPages.Clear();
-            if (blackTexture != null)
-            {
-                DestroyImmediate(blackTexture);
-                blackTexture = null;
-            }
         }
     }
 
@@ -269,18 +253,4 @@ namespace ES {
         }
     }
 
-    public class BlackBackgroundDrawer : OdinValueDrawer<ESWindowPageBase>
-    {
-        private ESAreaSolver area = new ESAreaSolver();
-        public static Color color = new Color(0.05f,0.05f,0.05f,1);
-        protected override void DrawPropertyLayout(GUIContent label)
-        {
-            area.UpdateAtFisrt();
-            var rect = area.TargetArea;
-            SirenixEditorGUI.DrawBorders(rect, (int)rect.width, 0, (int)rect.height + 2, 0, color);
-            this.CallNextDrawer(label);
-            area.UpdateAtLast();
-        }
-
-    }
 }

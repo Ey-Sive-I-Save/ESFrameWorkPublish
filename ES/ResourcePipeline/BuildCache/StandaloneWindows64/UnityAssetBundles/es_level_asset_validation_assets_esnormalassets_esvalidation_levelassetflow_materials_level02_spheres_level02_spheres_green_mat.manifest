@@ -1,0 +1,22 @@
+ManifestFileVersion: 0
+CRC: 3815952900
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 46640ca7c6a984bf9bbbbfce2d10d97a
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 5e762ccb57c4caaabbb5a4199ac82c23
+  IncrementalBuildHash:
+    serializedVersion: 2
+    Hash: 46640ca7c6a984bf9bbbbfce2d10d97a
+HashAppended: 0
+ClassTypes:
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+SerializeReferenceClassIdentifiers: []
+Assets:
+- Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Green.mat
+Dependencies: []

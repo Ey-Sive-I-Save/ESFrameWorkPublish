@@ -1,0 +1,53 @@
+{
+  "formatVersion": 2,
+  "libraryName": "男娘库",
+  "libraryFolder": "nanniangku",
+  "assets": [
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "GameObject (3)",
+      "libraryName": "男娘库",
+      "libraryFolder": "nanniangku",
+      "pageName": "GameObject (3)",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "b7efbde1b85ac534f8df3ded09592512",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "b7efbde1b85ac534f8df3ded09592512"
+      },
+      "assetPath": "Assets/ESNormalAssets/Data/Group/Actor/新建角色数据组83227.asset",
+      "assetTypeName": "ES.ActorDataGroup",
+      "kind": "ScriptableObject",
+      "stringKey": "新建角色数据组83227",
+      "libraryName": "男娘库",
+      "libraryFolder": "nanniangku",
+      "pageName": "新建角色数据组83227",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    }
+  ],
+  "excludedEditorOnlyPaths": [],
+  "errors": [],
+  "warnings": [
+    "资产身份重复，规划时将按同一物理资产去重：测试库/GameObject (3) 与 男娘库/GameObject (3)",
+    "类型内 StringKey 对同一资产重复注册，构建时静默去重：测试库/GameObject (3) 与 男娘库/GameObject (3)"
+  ]
+}

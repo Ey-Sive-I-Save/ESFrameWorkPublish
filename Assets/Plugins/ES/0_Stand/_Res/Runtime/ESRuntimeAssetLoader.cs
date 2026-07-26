@@ -45,6 +45,18 @@ namespace ES
         }
     }
 
+    /// <summary>资源安全点的增量清理结果。仅卸载没有活动租约的 AssetBundle。</summary>
+    public readonly struct ESRuntimeUnusedAssetBundleUnloadResult
+    {
+        public readonly int UnloadedAssetBundleCount;
+        public readonly int EvictedCachedAssetCount;
+        public ESRuntimeUnusedAssetBundleUnloadResult(int unloadedAssetBundleCount, int evictedCachedAssetCount)
+        {
+            UnloadedAssetBundleCount = unloadedAssetBundleCount;
+            EvictedCachedAssetCount = evictedCachedAssetCount;
+        }
+    }
+
     [Serializable]
     public struct ESRuntimeRetryPolicy
     {
@@ -72,6 +84,7 @@ namespace ES
         bool TryGetStatus(ESAssetIdentity id, out ESRuntimeAssetLoadStatus status);
         void Release(ESAssetIdentity id);
         UniTask<ESRuntimeUnusedAssetUnloadResult> UnloadZeroReferenceAssetsAsync(CancellationToken cancellationToken = default);
+        UniTask<ESRuntimeUnusedAssetBundleUnloadResult> UnloadZeroReferenceAssetBundlesAtSafePointAsync(CancellationToken cancellationToken = default);
         void UnloadAllAtSafePoint();
     }
 
@@ -273,6 +286,59 @@ namespace ES
             AsyncOperation operation = Resources.UnloadUnusedAssets();
             await operation.ToUniTask(cancellationToken: cancellationToken);
             return new ESRuntimeUnusedAssetUnloadResult(evicted, true);
+        }
+
+        /// <summary>
+        /// 关卡切换后的增量安全点：只处理没有活动 Handle/Scope 租约的 AB。
+        /// 调用者必须先销毁旧关卡实例并 Release 旧 ResourcePlan；绝不在普通游戏帧调用。
+        /// </summary>
+        public async UniTask<ESRuntimeUnusedAssetBundleUnloadResult> UnloadZeroReferenceAssetBundlesAtSafePointAsync(CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            if (loadingObjects.Count > 0) throw new InvalidOperationException("[ESRes][Load] 仍有资产请求进行中，不能执行增量资源安全点卸载。");
+            foreach (AssetBundleLease lease in assetBundles.Values)
+                if (lease.InFlight != null) throw new InvalidOperationException("[ESRes][Load] 仍有 AssetBundle 请求进行中，不能执行增量资源安全点卸载。");
+
+            int evicted = 0;
+            List<ESAssetIdentity> unusedAssets = null;
+            foreach (var pair in objectRefCounts)
+            {
+                if (pair.Value > 0) continue;
+                if (unusedAssets == null) unusedAssets = new List<ESAssetIdentity>();
+                unusedAssets.Add(pair.Key);
+            }
+            if (unusedAssets != null)
+            {
+                evicted = unusedAssets.Count;
+                for (int i = 0; i < unusedAssets.Count; i++)
+                {
+                    ESAssetIdentity id = unusedAssets[i];
+                    objectRefCounts.Remove(id);
+                    cachedObjects.Remove(id);
+                    Report(id, ESRuntimeAssetLoadState.Released, 0f, 0, "Zero-reference level cache evicted");
+                }
+            }
+
+            int unloaded = 0;
+            List<string> unusedBundles = null;
+            foreach (var pair in assetBundles)
+            {
+                if (pair.Value.RefCount != 0) continue;
+                if (unusedBundles == null) unusedBundles = new List<string>();
+                unusedBundles.Add(pair.Key);
+            }
+            if (unusedBundles != null)
+                for (int i = 0; i < unusedBundles.Count; i++)
+                {
+                    AssetBundleLease lease = assetBundles[unusedBundles[i]];
+                    if (lease.Bundle != null) lease.Bundle.Unload(false);
+                    assetBundles.Remove(unusedBundles[i]);
+                    unloaded++;
+                }
+
+            if (evicted > 0 || unloaded > 0)
+                await Resources.UnloadUnusedAssets().ToUniTask(cancellationToken: cancellationToken);
+            return new ESRuntimeUnusedAssetBundleUnloadResult(unloaded, evicted);
         }
 
         private async UniTask<T> GetOrLoadAssetAsync<T>(ESAssetIdentity id, string assetBundleKey, string internalName, CancellationToken token) where T : UnityEngine.Object

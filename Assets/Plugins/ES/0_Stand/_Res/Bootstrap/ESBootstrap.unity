@@ -161,7 +161,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a7b0e9d5f2047eb9df0b1e4c23e6a51, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  initialGameplayScene: 
-  resourceMode: 0
-  localVerificationSimulationSeconds: 2.8
+  initialGameplayScene: ESLevelAssetValidation
+  globalResSetting: {fileID: 11400000, guid: 450506343753b8349aa8b8bd11f90955, type: 2}
   bootstrapTheme: {fileID: 11400000, guid: e2cc3a29b7b447ce8ecdd0bd82e16b9a, type: 2}

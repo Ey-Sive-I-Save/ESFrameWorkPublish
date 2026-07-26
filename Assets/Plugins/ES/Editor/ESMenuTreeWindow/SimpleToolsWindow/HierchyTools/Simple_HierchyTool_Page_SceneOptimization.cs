@@ -226,7 +226,7 @@ namespace ES
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "全面分析当前场景的性能瓶颈，\n提供优化建议并支持一键自动优化，\n生成详细的优化报告以供参考";
 
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        [HideInInspector]
         private string PanelSummary =>
             $"场景: {SceneManager.GetActiveScene().name} | 对象: {totalObjects} | 问题: {detectedIssues.Count} | " +
             $"预览模式: {(previewOnly ? "开" : "关")} | 项目资产导入设置: {(allowProjectAssetImportChanges ? "允许修改" : "已保护")} | " +
@@ -357,16 +357,16 @@ namespace ES
         #endregion
 
         #region 分析结果
-        [FoldoutGroup("分析结果"), ShowInInspector, ReadOnly, LabelText("场景概览"), TextArea(8, 15)]
+        [FoldoutGroup("分析结果"), ReadOnly, LabelText("场景概览"), TextArea(2, 5)]
         public string sceneOverview = "等待分析...";
 
-        [FoldoutGroup("分析结果"), ShowInInspector, ReadOnly, LabelText("性能报告"), TextArea(15, 25)]
+        [FoldoutGroup("分析结果"), ReadOnly, LabelText("性能报告"), TextArea(2, 5)]
         public string analysisResult = "点击'全面分析'按钮开始检测...";
 
-        [FoldoutGroup("分析结果"), ShowInInspector, ReadOnly, LabelText("优化建议(按优先级排序)"), TextArea(12, 20)]
+        [FoldoutGroup("分析结果"), ReadOnly, LabelText("优化建议(按优先级排序)"), TextArea(2, 5)]
         public string optimizationSuggestions = "";
 
-        [FoldoutGroup("分析结果"), ShowInInspector, ReadOnly, LabelText("预计优化收益"), TextArea(6, 12)]
+        [FoldoutGroup("分析结果"), ReadOnly, LabelText("预计优化收益"), TextArea(2, 5)]
         public string estimatedBenefits = "";
 
         [FoldoutGroup("Issues"), ShowInInspector, LabelText("Issue category filter"), EnumToggleButtons, OnValueChanged("UpdateDisplayedIssues")]
@@ -2551,6 +2551,13 @@ namespace ES
             foreach (var path in sceneDependencyPaths)
             {
                 if (string.IsNullOrEmpty(path) || !SimpleToolsSafetyUtility.IsAssetPath(path))
+                    continue;
+
+                // GetDependencies(scene.path, true) includes the scene itself.
+                // Loading all objects from a .unity file exposes scene objects to
+                // AssetDatabase's threaded reader, which Unity explicitly forbids.
+                // The scene file is a dependency root, not a resource asset to scan.
+                if (path.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(path).OfType<T>())

@@ -16,14 +16,17 @@ namespace ES
     [Serializable] public sealed class ESRuntimeConsumerCodePackageReference { public string packageKey, kind, fileName, url, sha256, notes; public long size; public bool requiredAtBoot; public int loadOrder; }
     [Serializable] public sealed class ESRuntimeConsumerGameCoreReference { public string guid; public long localFileId; public List<ESRuntimeConsumerGameCoreDependencyReference> dependencies = new List<ESRuntimeConsumerGameCoreDependencyReference>(); public bool IsValid => !string.IsNullOrEmpty(guid) && localFileId >= 0; }
     [Serializable] public sealed class ESRuntimeConsumerGameCoreDependencyReference { public string guid; public long localFileId; public bool IsValid => !string.IsNullOrEmpty(guid) && localFileId >= 0; }
+    [Serializable] public sealed class ESRuntimeConsumerResidentAssetReference { public string guid; public long localFileId; public bool IsValid => !string.IsNullOrEmpty(guid) && localFileId >= 0; }
     [Serializable] public sealed class ESRuntimeConsumerManifest
     {
+        public int formatVersion;
         public string consumerId, name, description, maintainer, releaseNotes, version, platform, channel, publishedUtc;
         public bool isTotalConsumer;
         public List<string> tags = new List<string>();
         public List<ESRuntimeConsumerReference> requiredConsumers = new List<ESRuntimeConsumerReference>();
         public List<ESRuntimeConsumerLibraryReference> libraries = new List<ESRuntimeConsumerLibraryReference>();
         public List<ESRuntimeConsumerGameCoreReference> gameCoreAssets = new List<ESRuntimeConsumerGameCoreReference>();
+        public List<ESRuntimeConsumerResidentAssetReference> residentAssets = new List<ESRuntimeConsumerResidentAssetReference>();
         public List<ESRuntimeConsumerCodePackageReference> codePackages = new List<ESRuntimeConsumerCodePackageReference>();
     }
     [Serializable] public sealed class ESRuntimeLibraryIdentity { public int formatVersion; public string libraryName, libraryFolder, platform, version, channel, catalogUrl, assetBundleManifestUrl, catalogSha256, assetBundleManifestSha256; }
@@ -66,6 +69,7 @@ namespace ES
         public IReadOnlyList<ESRuntimeCatalog> Catalogs { get; internal set; }
         public IReadOnlyList<ESRuntimeDownloadedCodePackage> DownloadedCodePackages { get; internal set; }
         public IReadOnlyList<ESRuntimeConsumerGameCoreReference> GameCoreAssets { get; internal set; }
+        public IReadOnlyList<ESRuntimeConsumerResidentAssetReference> ResidentAssets { get; internal set; }
     }
 
     public sealed class ESRuntimeDownloadedCodePackage
@@ -88,7 +92,7 @@ namespace ES
             public ESRuntimeReleaseManifest Root;
             public Dictionary<string, ESRuntimeReleaseBundleRecord> BundlesByKey;
         }
-        private const int ReleaseProtocolFormatVersion = 2;
+        private const int ReleaseProtocolFormatVersion = 3;
         private const int MaxAttempts = 3;
         private readonly ESGlobalResSetting settings;
         private readonly string platform;
@@ -107,7 +111,7 @@ namespace ES
                 throw new ArgumentOutOfRangeException(nameof(lockedRunMode), lockedRunMode, "Release downloader only supports LocalBuild and HotUpdate.");
 
             runMode = lockedRunMode;
-            platform = ESAssetBundleUtility.GetBuildPlatformName(settings.applyPlatform);
+            platform = ESAssetBundleUtility.GetRuntimeResourcePlatformName(settings.applyPlatform);
             cacheRoot = Path.Combine(Application.persistentDataPath, settings.Path_Sub_DownloadRelative_, "ReleaseV2", platform);
             useLocalReleaseSource = runMode == ESAssetRunMode.LocalBuild;
             localReleaseRoot = Application.streamingAssetsPath.TrimEnd('/', '\\') + "/" + ESGlobalResSetting.ResParentFolderName;
@@ -176,9 +180,11 @@ namespace ES
             var catalogs = new List<ESRuntimeCatalog>();
             var roots = new HashSet<string>(StringComparer.Ordinal);
             await DownloadLibraryAsync(libraryReference, context.Root.releaseVersion, context.BundlesByKey, roots, mainAssets, subAssets, catalogs, cancellationToken);
+            ValidateCatalogsAgainstGlobalAssetRecords(catalogs, mainAssets, subAssets);
             await DownloadAssetBundleClosureAsync(roots, context.BundlesByKey, records, cancellationToken);
             if (!useLocalReleaseSource) SaveVerifiedIndex();
-            return CreateResult(context.Root.releaseVersion, new[] { libraryReference.libraryFolder }, records, mainAssets, subAssets, catalogs, Array.Empty<ESRuntimeDownloadedCodePackage>(), Array.Empty<ESRuntimeConsumerGameCoreReference>());
+            return CreateResult(context.Root.releaseVersion, new[] { libraryReference.libraryFolder }, records, mainAssets, subAssets, catalogs,
+                Array.Empty<ESRuntimeDownloadedCodePackage>(), Array.Empty<ESRuntimeConsumerGameCoreReference>(), Array.Empty<ESRuntimeConsumerResidentAssetReference>());
         }
 
         internal UniTask<ESRuntimeReleaseDownloadResult> DownloadBootAndInitializeCodeAsync(CancellationToken cancellationToken = default)
@@ -205,7 +211,8 @@ namespace ES
             var libraries = new Dictionary<string, ESRuntimeConsumerLibraryReference>(StringComparer.Ordinal);
             var codePackages = new Dictionary<string, CollectedCodePackage>(StringComparer.Ordinal);
             var gameCoreAssets = new Dictionary<ESAssetIdentity, ESRuntimeConsumerGameCoreReference>();
-            await CollectConsumerContentAsync(total, libraries, codePackages, gameCoreAssets, new HashSet<string>(StringComparer.Ordinal), true, cancellationToken);
+            var residentAssets = new Dictionary<ESAssetIdentity, ESRuntimeConsumerResidentAssetReference>();
+            await CollectConsumerContentAsync(total, libraries, codePackages, gameCoreAssets, residentAssets, new HashSet<string>(StringComparer.Ordinal), true, cancellationToken);
             var assetBundleRecords = new List<ESRuntimeAssetBundleRecord>();
             var mainAssets = new List<ESRuntimeAssetRecord>();
             var subAssets = new List<ESRuntimeSubAssetRecord>();
@@ -213,6 +220,7 @@ namespace ES
             var requiredAssetBundleKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var library in libraries.Values.OrderBy(item => item.libraryFolder, StringComparer.Ordinal))
                 await DownloadLibraryAsync(library, root.releaseVersion, bundlesByKey, requiredAssetBundleKeys, mainAssets, subAssets, catalogs, cancellationToken);
+            ValidateCatalogsAgainstGlobalAssetRecords(catalogs, mainAssets, subAssets);
             var downloadedCodePackages = new List<ESRuntimeDownloadedCodePackage>();
             foreach (CollectedCodePackage codePackage in codePackages.Values.OrderBy(item => item.Reference.loadOrder).ThenBy(item => item.Reference.packageKey, StringComparer.Ordinal))
                 downloadedCodePackages.Add(await DownloadCodePackageAsync(codePackage, cancellationToken));
@@ -230,7 +238,8 @@ namespace ES
                 DownloadedLibraries = libraries.Keys.OrderBy(item => item, StringComparer.Ordinal).ToArray(),
                 Catalogs = catalogs,
                 DownloadedCodePackages = downloadedCodePackages,
-                GameCoreAssets = gameCoreAssets.Values.ToArray()
+                GameCoreAssets = gameCoreAssets.Values.ToArray(),
+                ResidentAssets = residentAssets.Values.ToArray()
             };
         }
 
@@ -256,6 +265,7 @@ namespace ES
                 throw new InvalidDataException("RootReleaseManifest is missing TotalConsumer location or hash.");
             Report(ESRuntimeReleaseDownloadStage.ReadingConsumer, "TotalConsumer");
             var total = await DownloadJsonAsync<ESRuntimeConsumerManifest>(root.totalConsumerUrl, Path.Combine(cacheRoot, "Consumers", "total.json"), root.totalConsumerSha256, token);
+            ValidateFormat(total?.formatVersion, "TotalConsumerManifest");
             if (total == null || !total.isTotalConsumer || string.IsNullOrWhiteSpace(total.consumerId))
                 throw new InvalidDataException("TotalConsumerManifest is invalid.");
             return total;
@@ -263,6 +273,7 @@ namespace ES
 
         private async UniTask<ESRuntimeConsumerManifest> FindConsumerAsync(ESRuntimeConsumerManifest current, string consumerId, HashSet<string> visited, CancellationToken token)
         {
+            ValidateFormat(current?.formatVersion, "ConsumerManifest");
             if (current == null || !visited.Add(current.consumerId)) return null;
             if (string.Equals(current.consumerId, consumerId, StringComparison.Ordinal)) return current;
             foreach (ESRuntimeConsumerReference reference in current.requiredConsumers ?? new List<ESRuntimeConsumerReference>())
@@ -272,6 +283,7 @@ namespace ES
                 string childId = SafePathSegment(reference.consumerId, "ConsumerId");
                 Report(ESRuntimeReleaseDownloadStage.ReadingConsumer, childId);
                 var child = await DownloadJsonAsync<ESRuntimeConsumerManifest>(reference.consumerUrl, Path.Combine(cacheRoot, "Consumers", childId + ".json"), reference.consumerSha256, token);
+                ValidateFormat(child?.formatVersion, "ConsumerManifest:" + childId);
                 if (child == null || !string.Equals(child.consumerId, childId, StringComparison.Ordinal))
                     throw new InvalidDataException("Consumer dependency manifest identity does not match its signed reference: " + childId);
                 ESRuntimeConsumerManifest found = await FindConsumerAsync(child, consumerId, visited, token);
@@ -282,6 +294,7 @@ namespace ES
 
         private async UniTask<ESRuntimeConsumerLibraryReference> FindLibraryAsync(ESRuntimeConsumerManifest current, string libraryFolder, HashSet<string> visited, CancellationToken token)
         {
+            ValidateFormat(current?.formatVersion, "ConsumerManifest");
             if (current == null || !visited.Add(current.consumerId)) return null;
             foreach (ESRuntimeConsumerLibraryReference library in current.libraries ?? new List<ESRuntimeConsumerLibraryReference>())
                 if (library != null && string.Equals(SafePathSegment(library.libraryFolder, "Library folder"), libraryFolder, StringComparison.Ordinal))
@@ -293,6 +306,7 @@ namespace ES
                 string childId = SafePathSegment(reference.consumerId, "ConsumerId");
                 Report(ESRuntimeReleaseDownloadStage.ReadingConsumer, childId);
                 var child = await DownloadJsonAsync<ESRuntimeConsumerManifest>(reference.consumerUrl, Path.Combine(cacheRoot, "Consumers", childId + ".json"), reference.consumerSha256, token);
+                ValidateFormat(child?.formatVersion, "ConsumerManifest:" + childId);
                 if (child == null || !string.Equals(child.consumerId, childId, StringComparison.Ordinal))
                     throw new InvalidDataException("Consumer dependency manifest identity does not match its signed reference: " + childId);
                 ESRuntimeConsumerLibraryReference found = await FindLibraryAsync(child, libraryFolder, visited, token);
@@ -306,7 +320,8 @@ namespace ES
             var libraries = new Dictionary<string, ESRuntimeConsumerLibraryReference>(StringComparer.Ordinal);
             var codePackages = new Dictionary<string, CollectedCodePackage>(StringComparer.Ordinal);
             var gameCoreAssets = new Dictionary<ESAssetIdentity, ESRuntimeConsumerGameCoreReference>();
-            await CollectConsumerContentAsync(consumer, libraries, codePackages, gameCoreAssets, new HashSet<string>(StringComparer.Ordinal), requiredAtBootOnly, token);
+            var residentAssets = new Dictionary<ESAssetIdentity, ESRuntimeConsumerResidentAssetReference>();
+            await CollectConsumerContentAsync(consumer, libraries, codePackages, gameCoreAssets, residentAssets, new HashSet<string>(StringComparer.Ordinal), requiredAtBootOnly, token);
             var records = new List<ESRuntimeAssetBundleRecord>();
             var mainAssets = new List<ESRuntimeAssetRecord>();
             var subAssets = new List<ESRuntimeSubAssetRecord>();
@@ -314,24 +329,27 @@ namespace ES
             var roots = new HashSet<string>(StringComparer.Ordinal);
             foreach (ESRuntimeConsumerLibraryReference library in libraries.Values.OrderBy(item => item.libraryFolder, StringComparer.Ordinal))
                 await DownloadLibraryAsync(library, context.Root.releaseVersion, context.BundlesByKey, roots, mainAssets, subAssets, catalogs, token);
+            ValidateCatalogsAgainstGlobalAssetRecords(catalogs, mainAssets, subAssets);
             await DownloadAssetBundleClosureAsync(roots, context.BundlesByKey, records, token);
             var downloadedCode = new List<ESRuntimeDownloadedCodePackage>();
             foreach (CollectedCodePackage code in codePackages.Values.OrderBy(item => item.Reference.loadOrder).ThenBy(item => item.Reference.packageKey, StringComparer.Ordinal))
                 downloadedCode.Add(await DownloadCodePackageAsync(code, token));
             if (!useLocalReleaseSource) SaveVerifiedIndex();
-            return CreateResult(context.Root.releaseVersion, libraries.Keys.OrderBy(item => item, StringComparer.Ordinal).ToArray(), records, mainAssets, subAssets, catalogs, downloadedCode, gameCoreAssets.Values.ToArray());
+            return CreateResult(context.Root.releaseVersion, libraries.Keys.OrderBy(item => item, StringComparer.Ordinal).ToArray(), records, mainAssets, subAssets, catalogs, downloadedCode, gameCoreAssets.Values.ToArray(), residentAssets.Values.ToArray());
         }
 
-        private static ESRuntimeReleaseDownloadResult CreateResult(string version, IReadOnlyList<string> libraries, List<ESRuntimeAssetBundleRecord> bundles, List<ESRuntimeAssetRecord> mainAssets, List<ESRuntimeSubAssetRecord> subAssets, List<ESRuntimeCatalog> catalogs, IReadOnlyList<ESRuntimeDownloadedCodePackage> codePackages, IReadOnlyList<ESRuntimeConsumerGameCoreReference> gameCoreAssets)
+        private static ESRuntimeReleaseDownloadResult CreateResult(string version, IReadOnlyList<string> libraries, List<ESRuntimeAssetBundleRecord> bundles, List<ESRuntimeAssetRecord> mainAssets, List<ESRuntimeSubAssetRecord> subAssets, List<ESRuntimeCatalog> catalogs, IReadOnlyList<ESRuntimeDownloadedCodePackage> codePackages, IReadOnlyList<ESRuntimeConsumerGameCoreReference> gameCoreAssets, IReadOnlyList<ESRuntimeConsumerResidentAssetReference> residentAssets)
         {
             var runtimeMap = ScriptableObject.CreateInstance<ESGlobalAssetRuntimeMap>();
             runtimeMap.SetRecords(bundles.ToArray(), mainAssets.ToArray(), subAssets.ToArray());
-            return new ESRuntimeReleaseDownloadResult { RuntimeMap = runtimeMap, ReleaseVersion = version, DownloadedLibraries = libraries, Catalogs = catalogs, DownloadedCodePackages = codePackages, GameCoreAssets = gameCoreAssets };
+            return new ESRuntimeReleaseDownloadResult { RuntimeMap = runtimeMap, ReleaseVersion = version, DownloadedLibraries = libraries, Catalogs = catalogs, DownloadedCodePackages = codePackages, GameCoreAssets = gameCoreAssets, ResidentAssets = residentAssets };
         }
 
         private async UniTask CollectConsumerContentAsync(ESRuntimeConsumerManifest consumer, Dictionary<string, ESRuntimeConsumerLibraryReference> libraries,
-            Dictionary<string, CollectedCodePackage> codePackages, Dictionary<ESAssetIdentity, ESRuntimeConsumerGameCoreReference> gameCoreAssets, HashSet<string> visitedConsumers, bool requiredAtBootOnly, CancellationToken token)
+            Dictionary<string, CollectedCodePackage> codePackages, Dictionary<ESAssetIdentity, ESRuntimeConsumerGameCoreReference> gameCoreAssets,
+            Dictionary<ESAssetIdentity, ESRuntimeConsumerResidentAssetReference> residentAssets, HashSet<string> visitedConsumers, bool requiredAtBootOnly, CancellationToken token)
         {
+            ValidateFormat(consumer?.formatVersion, "ConsumerManifest");
             if (consumer == null || string.IsNullOrWhiteSpace(consumer.consumerId)) throw new InvalidDataException("Consumer Manifest 缺少稳定 ID。");
             if (!visitedConsumers.Add(consumer.consumerId)) return;
             foreach (var dependency in consumer.requiredConsumers ?? new List<ESRuntimeConsumerReference>())
@@ -340,9 +358,10 @@ namespace ES
                 string childId = SafePathSegment(dependency.consumerId, "ConsumerId");
                 Report(ESRuntimeReleaseDownloadStage.ReadingConsumer, childId);
                 var child = await DownloadJsonAsync<ESRuntimeConsumerManifest>(dependency.consumerUrl, Path.Combine(cacheRoot, "Consumers", childId + ".json"), dependency.consumerSha256, token);
+                ValidateFormat(child?.formatVersion, "ConsumerManifest:" + childId);
                 if (child == null || !string.Equals(child.consumerId, dependency.consumerId, StringComparison.Ordinal))
                     throw new InvalidDataException("Consumer dependency manifest identity does not match its signed reference: " + dependency.consumerId);
-                await CollectConsumerContentAsync(child, libraries, codePackages, gameCoreAssets, visitedConsumers, requiredAtBootOnly, token);
+                await CollectConsumerContentAsync(child, libraries, codePackages, gameCoreAssets, residentAssets, visitedConsumers, requiredAtBootOnly, token);
             }
             foreach (var library in consumer.libraries ?? new List<ESRuntimeConsumerLibraryReference>())
             {
@@ -371,6 +390,13 @@ namespace ES
                                 && !existing.dependencies.Any(item => item != null && item.guid == dependency.guid && item.localFileId == dependency.localFileId))
                                 existing.dependencies.Add(dependency);
                     }
+                }
+            foreach (ESRuntimeConsumerResidentAssetReference asset in consumer.residentAssets ?? new List<ESRuntimeConsumerResidentAssetReference>())
+                if (asset != null && asset.IsValid)
+                {
+                    var id = new ESAssetIdentity(asset.guid, asset.localFileId);
+                    if (!residentAssets.ContainsKey(id))
+                        residentAssets.Add(id, asset);
                 }
             foreach (ESRuntimeConsumerCodePackageReference codePackage in consumer.codePackages ?? new List<ESRuntimeConsumerCodePackageReference>())
             {
@@ -481,7 +507,17 @@ namespace ES
             Report(ESRuntimeReleaseDownloadStage.ReadingCatalog, libraryFolder);
             var catalog = await DownloadJsonAsync<ESRuntimeCatalog>(identity.catalogUrl, Path.Combine(libraryRoot, "ESAssetLibraryCatalog.json"), identity.catalogSha256, token);
             if (catalog == null || catalog.assets == null) throw new InvalidDataException("Catalog 解析失败：" + library.libraryFolder);
-            if (!string.IsNullOrEmpty(catalog.libraryFolder) && !string.Equals(catalog.libraryFolder, libraryFolder, StringComparison.Ordinal)) throw new InvalidDataException("Catalog Library 身份不匹配：" + library.libraryFolder);
+            if (!string.IsNullOrEmpty(catalog.libraryFolder) && !string.Equals(catalog.libraryFolder, libraryFolder, StringComparison.Ordinal))
+            {
+                // 兼容旧发布物：早期 GameCore 构建曾把规范目录 gamecore_x 写成 __gamecore_x。
+                // 只允许这一种已知历史差异，普通 Library 仍必须严格匹配身份。
+                string legacyGameCoreFolder = "__" + libraryFolder;
+                bool legacyGameCoreName = libraryFolder.StartsWith("gamecore_", StringComparison.Ordinal)
+                    && string.Equals(catalog.libraryFolder, legacyGameCoreFolder, StringComparison.Ordinal);
+                if (!legacyGameCoreName)
+                    throw new InvalidDataException("Catalog Library 身份不匹配：" + library.libraryFolder);
+                Debug.LogWarning("[ESRes][Catalog] 兼容旧 GameCore Catalog 目录名：" + catalog.libraryFolder + " -> " + libraryFolder);
+            }
             catalogs.Add(catalog);
             Report(ESRuntimeReleaseDownloadStage.ReadingAssetBundleManifest, libraryFolder);
             var manifest = await DownloadJsonAsync<ESRuntimeBundleManifest>(identity.assetBundleManifestUrl, Path.Combine(libraryRoot, "ESAssetBundleManifest.json"), identity.assetBundleManifestSha256, token);
@@ -504,9 +540,41 @@ namespace ES
                     || !(indexed.dependencies ?? new List<string>()).OrderBy(item => item, StringComparer.Ordinal).SequenceEqual((bundle.dependencies ?? new List<string>()).OrderBy(item => item, StringComparer.Ordinal), StringComparer.Ordinal)) throw new InvalidDataException("Global Bundle index differs from Library Manifest: " + bundle.assetBundleKey);
                 requiredAssetBundleKeys.Add(bundle.assetBundleKey);
             }
-            ValidateCatalogAndAssetRecords(catalog, manifest, ownedAssetBundleKeys);
-            foreach (var asset in manifest.mainAssetsByGuid ?? new List<ESRuntimeReleaseMainAssetRecord>()) mainAssets.Add(new ESRuntimeAssetRecord(asset.guid, asset.assetBundleKey, asset.internalName, asset.typeName));
-            foreach (var asset in manifest.subAssetsById ?? new List<ESRuntimeReleaseSubAssetRecord>()) subAssets.Add(new ESRuntimeSubAssetRecord(asset.guid, asset.localFileId, asset.assetBundleKey, asset.internalName, asset.subAssetName, asset.typeName));
+            // Catalog 的业务资产可以由同一 Consumer 的另一个物理 Library（例如
+            // gamecore_<consumerId>）承载。此处只校验本 Manifest 自身的文件索引；
+            // 所有 Library 收集完成后，再使用全局 GUID 索引校验 Catalog。
+            ValidateManifestAssetRecords(manifest, availableAssetBundleKeys);
+            foreach (var asset in manifest.mainAssetsByGuid ?? new List<ESRuntimeReleaseMainAssetRecord>())
+            {
+                requiredAssetBundleKeys.Add(asset.assetBundleKey);
+                AddOrValidateMainAssetRecord(mainAssets, new ESRuntimeAssetRecord(asset.guid, asset.assetBundleKey, asset.internalName, asset.typeName));
+            }
+            foreach (var asset in manifest.subAssetsById ?? new List<ESRuntimeReleaseSubAssetRecord>())
+            {
+                requiredAssetBundleKeys.Add(asset.assetBundleKey);
+                AddOrValidateSubAssetRecord(subAssets, new ESRuntimeSubAssetRecord(asset.guid, asset.localFileId, asset.assetBundleKey, asset.internalName, asset.subAssetName, asset.typeName));
+            }
+        }
+
+        private static void AddOrValidateMainAssetRecord(List<ESRuntimeAssetRecord> destination, ESRuntimeAssetRecord candidate)
+        {
+            ESRuntimeAssetRecord existing = destination.FirstOrDefault(item => string.Equals(item.Guid, candidate.Guid, StringComparison.Ordinal));
+            if (existing == null) { destination.Add(candidate); return; }
+            if (!string.Equals(existing.AssetBundleKey, candidate.AssetBundleKey, StringComparison.Ordinal)
+                || !string.Equals(existing.InternalName, candidate.InternalName, StringComparison.Ordinal)
+                || !string.Equals(existing.TypeName, candidate.TypeName, StringComparison.Ordinal))
+                throw new InvalidDataException("[ESRes][Catalog] 同一 GUID 指向不同物理资源：GUID=" + candidate.Guid + ", A=" + existing.AssetBundleKey + "/" + existing.InternalName + ", B=" + candidate.AssetBundleKey + "/" + candidate.InternalName);
+        }
+
+        private static void AddOrValidateSubAssetRecord(List<ESRuntimeSubAssetRecord> destination, ESRuntimeSubAssetRecord candidate)
+        {
+            ESRuntimeSubAssetRecord existing = destination.FirstOrDefault(item => string.Equals(item.Guid, candidate.Guid, StringComparison.Ordinal) && item.LocalFileId == candidate.LocalFileId);
+            if (existing == null) { destination.Add(candidate); return; }
+            if (!string.Equals(existing.AssetBundleKey, candidate.AssetBundleKey, StringComparison.Ordinal)
+                || !string.Equals(existing.InternalName, candidate.InternalName, StringComparison.Ordinal)
+                || !string.Equals(existing.Selector, candidate.Selector, StringComparison.Ordinal)
+                || !string.Equals(existing.TypeName, candidate.TypeName, StringComparison.Ordinal))
+                throw new InvalidDataException("[ESRes][SubAsset] 同一子资产身份指向不同物理资源：GUID=" + candidate.Guid + ", LocalFileId=" + candidate.LocalFileId + ", A=" + existing.AssetBundleKey + "/" + existing.InternalName + ", B=" + candidate.AssetBundleKey + "/" + candidate.InternalName);
         }
 
         private Dictionary<string, ESRuntimeReleaseBundleRecord> ValidateGlobalBundleIndex(ESRuntimeReleaseManifest root, ESRuntimeReleaseBundleIndex index)
@@ -554,7 +622,7 @@ namespace ES
             foreach (string key in bundlesByKey.Keys) Visit(key);
         }
 
-        private static void ValidateCatalogAndAssetRecords(ESRuntimeCatalog catalog, ESRuntimeBundleManifest manifest, HashSet<string> ownedBundleKeys)
+        private static void ValidateManifestAssetRecords(ESRuntimeBundleManifest manifest, HashSet<string> ownedBundleKeys)
         {
             var mainByGuid = new Dictionary<string, ESRuntimeReleaseMainAssetRecord>(StringComparer.Ordinal);
             foreach (ESRuntimeReleaseMainAssetRecord asset in manifest.mainAssetsByGuid ?? new List<ESRuntimeReleaseMainAssetRecord>())
@@ -574,17 +642,36 @@ namespace ES
                     throw new InvalidDataException("[ESRes][SubAsset] Library 子资产文件索引无效或身份重复：Library=" + manifest.libraryName + ", GUID=" + (asset?.guid ?? "<null>") + ", LocalFileId=" + (asset?.localFileId.ToString() ?? "<null>") + ", BundleKey=" + (asset?.assetBundleKey ?? "<null>") + ", InternalName=" + (asset?.internalName ?? "<null>") + ", Selector=" + (asset?.subAssetName ?? "<null>") + ", Type=" + (asset?.typeName ?? "<null>"));
             }
 
+        }
+
+        private static void ValidateCatalogsAgainstGlobalAssetRecords(IReadOnlyList<ESRuntimeCatalog> catalogs, IReadOnlyList<ESRuntimeAssetRecord> mainAssets, IReadOnlyList<ESRuntimeSubAssetRecord> subAssets)
+        {
+            var mainByGuid = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ESRuntimeAssetRecord asset in mainAssets ?? Array.Empty<ESRuntimeAssetRecord>())
+            {
+                if (asset == null || string.IsNullOrWhiteSpace(asset.Guid) || !mainByGuid.Add(asset.Guid))
+                    throw new InvalidDataException("[ESRes][Catalog] 全局主资源文件索引无效或身份重复：GUID=" + (asset?.Guid ?? "<null>"));
+            }
+            var subById = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ESRuntimeSubAssetRecord asset in subAssets ?? Array.Empty<ESRuntimeSubAssetRecord>())
+            {
+                string id = asset == null ? string.Empty : asset.Guid + ":" + asset.LocalFileId;
+                if (asset == null || string.IsNullOrWhiteSpace(asset.Guid) || asset.LocalFileId == 0 || !subById.Add(id))
+                    throw new InvalidDataException("[ESRes][SubAsset] 全局子资产文件索引无效或身份重复：" + id);
+            }
+
+            foreach (ESRuntimeCatalog catalog in catalogs ?? Array.Empty<ESRuntimeCatalog>())
             foreach (ESRuntimeCatalogEntry entry in catalog.assets ?? new List<ESRuntimeCatalogEntry>())
             {
                 if (entry == null || !entry.isBusinessAsset) continue;
                 if (entry.identity == null || !entry.identity.IsValid) throw new InvalidDataException("[ESRes][Catalog] Catalog 业务资源身份无效：Library=" + catalog.libraryFolder + ", Page=" + entry.pageName + ", GUID=" + (entry.identity?.guid ?? "<null>") + ", LocalFileId=" + (entry.identity?.localFileId.ToString() ?? "<null>"));
                 bool indexed = entry.identity.localFileId == 0
-                    ? mainByGuid.ContainsKey(entry.identity.guid)
-                    : subById.ContainsKey(entry.identity.guid + ":" + entry.identity.localFileId);
+                    ? mainByGuid.Contains(entry.identity.guid)
+                    : subById.Contains(entry.identity.guid + ":" + entry.identity.localFileId);
                 if (!indexed)
                 {
                     string tag = entry.identity.localFileId == 0 ? "[ESRes][Catalog]" : "[ESRes][SubAsset]";
-                    throw new InvalidDataException(tag + " Catalog 业务资源未进入文件索引：Library=" + catalog.libraryFolder + ", Page=" + entry.pageName + ", GUID=" + entry.identity.guid + ", LocalFileId=" + entry.identity.localFileId + ", Kind=" + entry.kind + ", Type=" + entry.assetTypeName);
+                    throw new InvalidDataException(tag + " Catalog 业务资源未进入全局文件索引：Library=" + catalog.libraryFolder + ", Page=" + entry.pageName + ", GUID=" + entry.identity.guid + ", LocalFileId=" + entry.identity.localFileId + ", Kind=" + entry.kind + ", Type=" + entry.assetTypeName);
                 }
             }
         }
@@ -660,16 +747,26 @@ namespace ES
                 return localText;
             }
 
-            if (!string.IsNullOrEmpty(expectedHash) && File.Exists(localPath) && ESResManifestIntegrity.VerifyFileSha256(localPath, expectedHash)) return File.ReadAllText(localPath);
+            if (!string.IsNullOrEmpty(expectedHash) && File.Exists(localPath) && ESResManifestIntegrity.VerifyFileSha256(localPath, expectedHash))
+            {
+                VerboseLog("复用已校验清单缓存 | " + url);
+                return File.ReadAllText(localPath);
+            }
+            VerboseLog("请求远端清单 | " + url);
             string text = await RequestTextAsync(url, token);
             if (!string.IsNullOrEmpty(expectedHash) && !string.Equals(ESResManifestIntegrity.ComputeFileSha256FromText(text), expectedHash, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("下载文件 Hash 不匹配：" + url);
             WriteTextAtomically(localPath, text);
+            VerboseLog("清单校验完成并写入缓存 | " + url);
             return text;
         }
 
         private async UniTask EnsureFileAsync(string url, string localPath, string relativePath, long expectedSize, string expectedHash, CancellationToken token)
         {
-            if (IsVerified(relativePath, localPath, expectedSize, expectedHash)) return;
+            if (IsVerified(relativePath, localPath, expectedSize, expectedHash))
+            {
+                VerboseLog("复用已校验文件缓存 | " + relativePath + " | " + expectedSize + " bytes");
+                return;
+            }
             if (useLocalReleaseSource)
             {
                 string sourcePath = ResolveLocalReleasePath(url);
@@ -705,6 +802,7 @@ namespace ES
             for (var attempt = 1; attempt <= MaxAttempts; attempt++)
             {
                 long length = File.Exists(partPath) ? new FileInfo(partPath).Length : 0;
+                VerboseLog("下载资源文件 | Attempt=" + attempt + "/" + MaxAttempts + " | Resume=" + length + " | Size=" + expectedSize + " | " + url);
                 using (var request = UnityWebRequest.Get(url))
                 {
                     request.timeout = 30;
@@ -713,6 +811,7 @@ namespace ES
                     await request.SendWebRequest().ToUniTask(cancellationToken: token);
                     if (request.result != UnityWebRequest.Result.Success || (length > 0 && request.responseCode == 200))
                     {
+                        VerboseLog("资源下载失败，准备重试 | HTTP=" + request.responseCode + " | " + request.error + " | " + url);
                         if (length > 0 && request.responseCode == 200 && File.Exists(partPath)) File.Delete(partPath);
                         if (attempt == MaxAttempts) throw new IOException("资源文件下载失败：" + url + "，" + request.error);
                         await UniTask.Delay(TimeSpan.FromSeconds(attempt), cancellationToken: token);
@@ -724,6 +823,7 @@ namespace ES
                     if (File.Exists(localPath)) File.Delete(localPath);
                     File.Move(partPath, localPath);
                     verified[relativePath] = new ESRuntimeVerifiedFile { relativePath = relativePath, size = expectedSize, sha256 = expectedHash };
+                    VerboseLog("资源校验完成 | " + relativePath + " | " + expectedSize + " bytes");
                     return;
                 }
                 if (File.Exists(partPath)) File.Delete(partPath);
@@ -772,7 +872,14 @@ namespace ES
 
         private void Report(ESRuntimeReleaseDownloadStage stage, string subject, int completedCount = 0, int totalCount = 0)
         {
+            VerboseLog("阶段=" + stage + " | 目标=" + (subject ?? string.Empty) + " | " + completedCount + "/" + totalCount);
             ProgressChanged?.Invoke(new ESRuntimeReleaseDownloadProgress(stage, subject, completedCount, totalCount));
+        }
+
+        private void VerboseLog(string message)
+        {
+            if (settings != null && settings.EnableResVerboseLog)
+                Debug.Log("[ESRes][Release] " + message);
         }
 
         private void PrepareVerifiedIndex(string releaseVersion)

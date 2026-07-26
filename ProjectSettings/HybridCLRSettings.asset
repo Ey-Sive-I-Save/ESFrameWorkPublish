@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &1
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e189374413a3f00468e49d51d8b27a09, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enable: 1
+  useGlobalIl2cpp: 0
+  hybridclrRepoURL: https://github.com/focus-creative-games/hybridclr.git
+  il2cppPlusRepoURL: https://github.com/focus-creative-games/il2cpp_plus.git
+  hotUpdateAssemblyDefinitions:
+  - {fileID: 5897886265953266890, guid: 1764b38706c31e34885d5988a5436060, type: 3}
+  - {fileID: 5897886265953266890, guid: 14fd0e2674c4b6144985a0522c97c44b, type: 3}
+  - {fileID: 5897886265953266890, guid: 1905e086fdaa85c46b2958b2ec356db1, type: 3}
+  hotUpdateAssemblies: []
+  preserveHotUpdateAssemblies: []
+  hotUpdateDllCompileOutputRootDir: HybridCLRData/HotUpdateDlls
+  externalHotUpdateAssembliyDirs: []
+  strippedAOTDllOutputRootDir: HybridCLRData/AssembliesPostIl2CppStrip
+  patchAOTAssemblies:
+  - mscorlib
+  - System
+  - System.Core
+  - DOTween
+  - ES_Stand
+  - EasySave3
+  - Newtonsoft.Json
+  - Sirenix.OdinInspector.Attributes
+  - Sirenix.Serialization
+  - Sirenix.Utilities
+  - System.Runtime.CompilerServices.Unsafe
+  - UniTask
+  - Unity.InputSystem
+  - UnityEngine.CoreModule
+  - UnityEngine.JSONSerializeModule
+  outputLinkFile: HybridCLRGenerate/link.xml
+  outputAOTGenericReferenceFile: HybridCLRGenerate/AOTGenericReferences.cs
+  maxGenericReferenceIteration: 10
+  maxMethodBridgeGenericIteration: 10

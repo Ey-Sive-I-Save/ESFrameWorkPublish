@@ -65,6 +65,7 @@ namespace ES
             if (ownsBuild) Table.BeginBuild();
             try
             {
+                info.motionShared ??= EntityMotionSharedData.Default;
                 info.monsterKey ??= new ESMonsterConfigKey();
                 if (Table.TryGet(info.monsterKey, out ESMonsterRuntimeData existing))
                 {
@@ -104,6 +105,7 @@ namespace ES
             if (ownsBuild) Table.BeginBuild();
             try
             {
+                info.motionShared ??= EntityMotionSharedData.Default;
                 info.npcKey ??= new ESNpcConfigKey();
                 if (Table.TryGet(info.npcKey, out ESNpcRuntimeData existing))
                 {

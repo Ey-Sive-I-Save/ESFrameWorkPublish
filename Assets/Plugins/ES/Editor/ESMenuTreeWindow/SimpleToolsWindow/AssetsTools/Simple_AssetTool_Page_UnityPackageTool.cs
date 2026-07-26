@@ -21,7 +21,7 @@ namespace ES
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选择或创建打包配置，\n设置要打包的资源，\n点击打包按钮生成UnityPackage";
 
-        [ShowInInspector, ReadOnly, DisplayAsString, HideLabel, PropertyOrder(-10)]
+        [HideInInspector]
         private string PanelSummary
         {
             get
@@ -59,7 +59,7 @@ namespace ES
         {
             var previewPaths = EnsurePackagePreviewCache(false, out var configName, out var outputPath, out var packageName, out var includeDependencies, out var configValid);
             SimpleToolsPanelUtility.DrawToolHeader(
-                "UnityPackage 打包工作台",
+                "UnityPackage 打包",
                 "用于把明确的资源路径导出为 .unitypackage，适合框架发布、演示包、局部模块交付和版本归档。",
                 SimpleToolsMaturity.Upgrading,
                 "导出会递归展开文件夹并可选择包含依赖；请确认收集路径、输出路径和排除规则，避免把临时资源或内部工具打进包里。");
@@ -1166,12 +1166,12 @@ namespace ES
             GUILayout.Space(10);
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("确定"))
+            if (GUILayout.Button("确定", GUILayout.Width(80), GUILayout.Height(24)))
             {
                 onConfirm?.Invoke(inputValue);
                 Close();
             }
-            if (GUILayout.Button("取消"))
+            if (GUILayout.Button("取消", GUILayout.Width(80), GUILayout.Height(24)))
             {
                 onConfirm?.Invoke(null);
                 Close();

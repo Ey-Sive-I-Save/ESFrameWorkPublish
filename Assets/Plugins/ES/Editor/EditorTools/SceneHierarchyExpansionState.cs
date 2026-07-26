@@ -575,8 +575,12 @@ public static class SceneHierarchyExpansionState
 
     private static void SaveSceneExpansionData(Scene scene, SceneExpansionData data)
     {
-        ESGlobalProjectAssetGuideData globalData = ESGlobalProjectAssetGuideData.GetOrCreateData();
-        if (globalData == null)
+        // This method also runs from AssemblyReloadEvents.beforeAssemblyReload.
+        // Creating an asset there fires a ProjectBrowser refresh while Unity is rebuilding its TreeView,
+        // which can produce a Unity-internal NullReferenceException. Persist only when the global data
+        // asset already exists; normal editor commands create it on a safe event-loop turn.
+        if (!ESGlobalProjectAssetGuideData.TryFindExistingData(out ESGlobalProjectAssetGuideData globalData)
+            || globalData == null)
             return;
 
         globalData.SetSceneExpansion(GetSceneGuid(scene), scene.path, data.expandedTransformPaths);

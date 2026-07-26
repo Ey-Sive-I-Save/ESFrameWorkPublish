@@ -1,0 +1,82 @@
+{
+  "formatVersion": 2,
+  "libraryName": "测试库",
+  "libraryFolder": "ceshiku",
+  "assets": [
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "GameObject (3)",
+      "libraryName": "测试库",
+      "libraryFolder": "ceshiku",
+      "pageName": "GameObject (3)",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "GameObject (3)",
+      "libraryName": "测试库",
+      "libraryFolder": "ceshiku",
+      "pageName": "GameObject (3)",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "8111bbc5676f4d58809f1911ee5ae65a",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "8111bbc5676f4d58809f1911ee5ae65a"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetGameCoreFlowHotUpdateTest.unity",
+      "assetTypeName": "UnityEditor.SceneAsset",
+      "kind": "Scene",
+      "stringKey": "es_asset_gamecore_flow_hotupdate_test",
+      "libraryName": "测试库",
+      "libraryFolder": "ceshiku",
+      "pageName": "ESAssetGameCoreFlowHotUpdateTest",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    }
+  ],
+  "excludedEditorOnlyPaths": [
+    "Assets/Plugins/ES/0_Stand/Stand_Tools/SingletonAndOnlyOne/SingletonSeriMono.cs",
+    "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDenpendceSamples.cs",
+    "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs"
+  ],
+  "errors": [],
+  "warnings": [
+    "已排除 EditorOnly Page：测试库/SingletonSeriMono (Assets/Plugins/ES/0_Stand/Stand_Tools/SingletonAndOnlyOne/SingletonSeriMono.cs)",
+    "资产类型不支持运行时加载，已跳过：测试库/AA 2，类型=Other (Assets/Plugins/ES/0_Stand/TESTING/AA 2.asset)",
+    "资产类型不支持运行时加载，已跳过：测试库/AA 1，类型=Other (Assets/Plugins/ES/0_Stand/TESTING/AA 1.asset)",
+    "已排除 EditorOnly Page：测试库/CircleDenpendceSamples (Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDenpendceSamples.cs)",
+    "已排除 EditorOnly Page：测试库/CircleDependenceSamplePrefabRef (Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs)",
+    "资产身份重复，规划时将按同一物理资产去重：测试库/GameObject (3) 与 测试库/GameObject (3)",
+    "类型内 StringKey 对同一资产重复注册，构建时静默去重：测试库/GameObject (3) 与 测试库/GameObject (3)"
+  ]
+}

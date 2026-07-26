@@ -1,0 +1,729 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ff30c92106c41f4c8c9625abbf17ad6, type: 3}
+  m_Name: ESLevelAssetValidationLibrary
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  collectionConfig:
+    overallPriority: 1
+  Name: "\u5173\u5361\u8D44\u6E90\u5378\u8F7D\u9A8C\u6536\u5E93"
+  LibFolderName: es_level_asset_validation
+  ChangeCount: 0
+  IsMainInClude: 1
+  Books: []
+  Desc: 
+  DefaultPrefabBook:
+    Name: Default Prefab Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 1
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferPrefab
+    pages:
+    - Name: Level01_Blocks_Red
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 100, guid: 00000000000000001a9f400000000000, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_1_red
+      RuntimeKey: 30014
+      AssetGuid: 00000000000000001a9f400000000000
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Red.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level01_Blocks_Green
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 104, guid: 00000000000000001a9f400000000001, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_1_green
+      RuntimeKey: 30015
+      AssetGuid: 00000000000000001a9f400000000001
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Green.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level01_Blocks_Blue
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 108, guid: 00000000000000001a9f400000000002, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_1_blue
+      RuntimeKey: 30016
+      AssetGuid: 00000000000000001a9f400000000002
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level01_Blocks_Yellow
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 112, guid: 00000000000000001a9f400000000003, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_1_yellow
+      RuntimeKey: 30017
+      AssetGuid: 00000000000000001a9f400000000003
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Yellow.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level01_Blocks_Magenta
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 116, guid: 00000000000000001a9f400000000004, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_1_magenta
+      RuntimeKey: 30018
+      AssetGuid: 00000000000000001a9f400000000004
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Magenta.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level01_Blocks_Cyan
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 120, guid: 00000000000000001a9f400000000005, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_1_cyan
+      RuntimeKey: 30019
+      AssetGuid: 00000000000000001a9f400000000005
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Cyan.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level02_Spheres_Red
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 124, guid: 00000000000000001a9f400000000010, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_2_red
+      RuntimeKey: 30020
+      AssetGuid: 00000000000000001a9f400000000010
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Red.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level02_Spheres_Green
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 128, guid: 00000000000000001a9f400000000011, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_2_green
+      RuntimeKey: 30021
+      AssetGuid: 00000000000000001a9f400000000011
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Green.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level02_Spheres_Blue
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 132, guid: 00000000000000001a9f400000000012, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_2_blue
+      RuntimeKey: 30022
+      AssetGuid: 00000000000000001a9f400000000012
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Blue.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level02_Spheres_Yellow
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 136, guid: 00000000000000001a9f400000000013, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_2_yellow
+      RuntimeKey: 30023
+      AssetGuid: 00000000000000001a9f400000000013
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Yellow.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level02_Spheres_Magenta
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 140, guid: 00000000000000001a9f400000000014, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_2_magenta
+      RuntimeKey: 30024
+      AssetGuid: 00000000000000001a9f400000000014
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Magenta.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level02_Spheres_Cyan
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 144, guid: 00000000000000001a9f400000000015, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_2_cyan
+      RuntimeKey: 30025
+      AssetGuid: 00000000000000001a9f400000000015
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Cyan.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level03_Cylinders_Red
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 148, guid: 00000000000000001a9f400000000020, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_3_red
+      RuntimeKey: 30026
+      AssetGuid: 00000000000000001a9f400000000020
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Red.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level03_Cylinders_Green
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 152, guid: 00000000000000001a9f400000000021, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_3_green
+      RuntimeKey: 30027
+      AssetGuid: 00000000000000001a9f400000000021
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Green.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level03_Cylinders_Blue
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 156, guid: 00000000000000001a9f400000000022, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_3_blue
+      RuntimeKey: 30028
+      AssetGuid: 00000000000000001a9f400000000022
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Blue.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level03_Cylinders_Yellow
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 160, guid: 00000000000000001a9f400000000023, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_3_yellow
+      RuntimeKey: 30029
+      AssetGuid: 00000000000000001a9f400000000023
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Yellow.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level03_Cylinders_Magenta
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 164, guid: 00000000000000001a9f400000000024, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_3_magenta
+      RuntimeKey: 30030
+      AssetGuid: 00000000000000001a9f400000000024
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Magenta.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+    - Name: Level03_Cylinders_Cyan
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 168, guid: 00000000000000001a9f400000000025, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: level_validation_3_cyan
+      RuntimeKey: 30031
+      AssetGuid: 00000000000000001a9f400000000025
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Cyan.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Prefab Book
+  DefaultSceneBook:
+    Name: Default Scene Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 2
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferScene
+    pages:
+    - Name: Level01_Blocks
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 102900000, guid: 00000000000000001a9f700000000000, type: 3}
+      Kind: 2
+      EnumKey: 0
+      StringKey: level_validation_scene_1
+      RuntimeKey: 30001
+      AssetGuid: 00000000000000001a9f700000000000
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level01_Blocks.unity
+      AssetTypeName: UnityEditor.SceneAsset
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Scene Book
+    - Name: Level02_Spheres
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 102900000, guid: 00000000000000001a9f700000000001, type: 3}
+      Kind: 2
+      EnumKey: 0
+      StringKey: level_validation_scene_2
+      RuntimeKey: 30002
+      AssetGuid: 00000000000000001a9f700000000001
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level02_Spheres.unity
+      AssetTypeName: UnityEditor.SceneAsset
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Scene Book
+    - Name: Level03_Cylinders
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 102900000, guid: 00000000000000001a9f700000000002, type: 3}
+      Kind: 2
+      EnumKey: 0
+      StringKey: level_validation_scene_3
+      RuntimeKey: 30003
+      AssetGuid: 00000000000000001a9f700000000002
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level03_Cylinders.unity
+      AssetTypeName: UnityEditor.SceneAsset
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Scene Book
+  DefaultSpriteBook:
+    Name: Default Sprite Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 3
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferSprite
+    pages: []
+  DefaultTexture2DBook:
+    Name: Default Texture2D Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 6
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferTexture2D
+    pages: []
+  DefaultTextureBook:
+    Name: Default Texture Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 6
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferTexture
+    pages: []
+  DefaultSpriteAtlasBook:
+    Name: Default SpriteAtlas Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 4
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferSpriteAtlas
+    pages: []
+  DefaultMaterialBook:
+    Name: Default Material Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 5
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferMaterial
+    pages:
+    - Name: Level01_Blocks_Blue
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000002, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level01_blocks_blue
+      RuntimeKey: 30000
+      AssetGuid: 00000000000000001a9f300000000002
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Blue.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level01_Blocks_Cyan
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000005, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level01_blocks_cyan
+      RuntimeKey: 30001
+      AssetGuid: 00000000000000001a9f300000000005
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Cyan.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level01_Blocks_Green
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000001, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level01_blocks_green
+      RuntimeKey: 30002
+      AssetGuid: 00000000000000001a9f300000000001
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Green.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level01_Blocks_Magenta
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000004, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level01_blocks_magenta
+      RuntimeKey: 30003
+      AssetGuid: 00000000000000001a9f300000000004
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Magenta.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level01_Blocks_Red
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000000, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level01_blocks_red
+      RuntimeKey: 30004
+      AssetGuid: 00000000000000001a9f300000000000
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Red.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level01_Blocks_Yellow
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000003, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level01_blocks_yellow
+      RuntimeKey: 30005
+      AssetGuid: 00000000000000001a9f300000000003
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Yellow.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level02_Spheres_Blue
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000012, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level02_spheres_blue
+      RuntimeKey: 30006
+      AssetGuid: 00000000000000001a9f300000000012
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Blue.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level02_Spheres_Cyan
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000015, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level02_spheres_cyan
+      RuntimeKey: 30007
+      AssetGuid: 00000000000000001a9f300000000015
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Cyan.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level02_Spheres_Green
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000011, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level02_spheres_green
+      RuntimeKey: 30008
+      AssetGuid: 00000000000000001a9f300000000011
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Green.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level02_Spheres_Magenta
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000014, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level02_spheres_magenta
+      RuntimeKey: 30009
+      AssetGuid: 00000000000000001a9f300000000014
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Magenta.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level02_Spheres_Red
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000010, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level02_spheres_red
+      RuntimeKey: 30010
+      AssetGuid: 00000000000000001a9f300000000010
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Red.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level02_Spheres_Yellow
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000013, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level02_spheres_yellow
+      RuntimeKey: 30011
+      AssetGuid: 00000000000000001a9f300000000013
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Yellow.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level03_Cylinders_Blue
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000022, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level03_cylinders_blue
+      RuntimeKey: 30012
+      AssetGuid: 00000000000000001a9f300000000022
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Blue.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level03_Cylinders_Cyan
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000025, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level03_cylinders_cyan
+      RuntimeKey: 30013
+      AssetGuid: 00000000000000001a9f300000000025
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Cyan.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level03_Cylinders_Green
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000021, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level03_cylinders_green
+      RuntimeKey: 30014
+      AssetGuid: 00000000000000001a9f300000000021
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Green.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level03_Cylinders_Magenta
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000024, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level03_cylinders_magenta
+      RuntimeKey: 30015
+      AssetGuid: 00000000000000001a9f300000000024
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Magenta.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level03_Cylinders_Red
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000020, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level03_cylinders_red
+      RuntimeKey: 30016
+      AssetGuid: 00000000000000001a9f300000000020
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Red.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+    - Name: Level03_Cylinders_Yellow
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 2100000, guid: 00000000000000001a9f300000000023, type: 2}
+      Kind: 7
+      EnumKey: 0
+      StringKey: level_validation_material_level03_cylinders_yellow
+      RuntimeKey: 30017
+      AssetGuid: 00000000000000001a9f300000000023
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Yellow.mat
+      AssetTypeName: UnityEngine.Material
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default Material Book
+  DefaultMeshBook:
+    Name: Default Mesh Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 8
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferMesh
+    pages: []
+  DefaultAnimationClipBook:
+    Name: Default AnimationClip Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 10
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferAnimationClip
+    pages: []
+  DefaultAnimatorControllerBook:
+    Name: Default AnimatorController Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 11
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferAnimatorController
+    pages: []
+  DefaultAvatarBook:
+    Name: Default Avatar Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 12
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferAvatar
+    pages: []
+  DefaultAudioClipBook:
+    Name: Default AudioClip Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 9
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferAudioClip
+    pages: []
+  DefaultVideoClipBook:
+    Name: Default VideoClip Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 19
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferVideoClip
+    pages: []
+  DefaultTimelineAssetBook:
+    Name: Default TimelineAsset Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 13
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferTimelineAsset
+    pages: []
+  DefaultPlayableAssetBook:
+    Name: Default PlayableAsset Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 14
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferPlayableAsset
+    pages: []
+  DefaultScriptableObjectBook:
+    Name: Default ScriptableObject Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 16
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferScriptableObject
+    pages:
+    - Name: ESLevelAssetValidationGameCore
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 11400000, guid: 4ce9a317fc44b0443b2c694b934dfe41, type: 2}
+      Kind: 16
+      EnumKey: 0
+      StringKey: ESLevelAssetValidationGameCore
+      RuntimeKey: 30013
+      AssetGuid: 4ce9a317fc44b0443b2c694b934dfe41
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/ESLevelAssetValidationGameCore.asset
+      AssetTypeName: ES.ESLevelAssetValidationGameCore
+      SourceLibrary: 32b800c6a6fa10049a5b41dc648b6d8c
+      SourceBook: Default ScriptableObject Book
+  DefaultTerrainDataBook:
+    Name: Default TerrainData Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 15
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferTerrainData
+    pages: []
+  ContainsBuild: 1
+  IsNet: 1

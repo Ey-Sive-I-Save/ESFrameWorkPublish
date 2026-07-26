@@ -1,0 +1,180 @@
+{
+  "formatVersion": 1,
+  "libraryName": "Library Name",
+  "libraryFolder": "haha11",
+  "generatedUtc": "2026-07-26T15:35:43.5214255Z",
+  "roots": [
+    {
+      "identity": {
+        "guid": "ced2cf8765a6a8a4ea274b78c4070e15",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "ced2cf8765a6a8a4ea274b78c4070e15"
+      },
+      "assetPath": "Assets/ESNormalAssets/Prefabs/Cube.prefab"
+    },
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab"
+    }
+  ],
+  "nodes": [
+    {
+      "identity": {
+        "guid": "c600ee02bd31618499bfe810e7dbca98",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "c600ee02bd31618499bfe810e7dbca98"
+      },
+      "assetPath": "Assets/ESNormalAssets/Materials/材质1黑.mat",
+      "assetTypeName": "UnityEngine.Material",
+      "dependencyHash": "af9019ccc6435fff7c70923c90041c3e",
+      "editorOnly": false,
+      "markable": true,
+      "ownerLibraryFolders": [],
+      "directDependencies": [
+        "Packages/com.unity.render-pipelines.universal/Editor/AssetVersion.cs",
+        "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader"
+      ]
+    },
+    {
+      "identity": {
+        "guid": "ced2cf8765a6a8a4ea274b78c4070e15",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "ced2cf8765a6a8a4ea274b78c4070e15"
+      },
+      "assetPath": "Assets/ESNormalAssets/Prefabs/Cube.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "dependencyHash": "14a04bc3c108d00d691fe23a07db8f64",
+      "editorOnly": false,
+      "markable": true,
+      "ownerLibraryFolders": [
+        "haha11"
+      ],
+      "directDependencies": [
+        "Assets/ESNormalAssets/Materials/材质1黑.mat",
+        "Packages/com.unity.render-pipelines.universal/Runtime/UniversalAdditionalLightData.cs",
+        "Packages/com.whisper.unity/Runtime/Utils/RotatingCube.cs"
+      ]
+    },
+    {
+      "identity": {
+        "guid": "a43b0f8f0c53eba4e8fb65148bafdd7a",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "a43b0f8f0c53eba4e8fb65148bafdd7a"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "53f2619f3d744d1d7f7c6ee2eb06d72e",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    },
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "dependencyHash": "78c080a50f238d52f8484d041764f7e4",
+      "editorOnly": false,
+      "markable": true,
+      "ownerLibraryFolders": [
+        "ceshiku",
+        "haha11",
+        "nanniangku"
+      ],
+      "directDependencies": [
+        "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs"
+      ]
+    },
+    {
+      "identity": {
+        "guid": "d0353a89b1f911e48b9e16bdc9f2e058",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "d0353a89b1f911e48b9e16bdc9f2e058"
+      },
+      "assetPath": "Packages/com.unity.render-pipelines.universal/Editor/AssetVersion.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "32658fcbbe1a332050004e3b27abb4a3",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    },
+    {
+      "identity": {
+        "guid": "474bcb49853aa07438625e644c072ee6",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "474bcb49853aa07438625e644c072ee6"
+      },
+      "assetPath": "Packages/com.unity.render-pipelines.universal/Runtime/UniversalAdditionalLightData.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "bb97a7d7f3b2fecfb1f706b61782b3ab",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    },
+    {
+      "identity": {
+        "guid": "933532a4fcc9baf4fa0491de14d08ed7",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "933532a4fcc9baf4fa0491de14d08ed7"
+      },
+      "assetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
+      "assetTypeName": "UnityEngine.Shader",
+      "dependencyHash": "f0a1ea784e8d8eb98e10c50c30c0b7f8",
+      "editorOnly": false,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    },
+    {
+      "identity": {
+        "guid": "b1033d10016c24195b53f011eb12b139",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "b1033d10016c24195b53f011eb12b139"
+      },
+      "assetPath": "Packages/com.whisper.unity/Runtime/Utils/RotatingCube.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "e0f76429eca4578a390289958ccc417a",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "引用图已标记 EditorOnly 依赖：Packages/com.unity.render-pipelines.universal/Editor/AssetVersion.cs",
+    "引用图已标记 EditorOnly 依赖：Packages/com.unity.render-pipelines.universal/Runtime/UniversalAdditionalLightData.cs",
+    "引用图已标记 EditorOnly 依赖：Packages/com.whisper.unity/Runtime/Utils/RotatingCube.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs"
+  ]
+}

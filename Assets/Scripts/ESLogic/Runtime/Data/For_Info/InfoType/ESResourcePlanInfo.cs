@@ -27,10 +27,14 @@ namespace ES
     public sealed class ESResourcePlanPrefabEntry : ESResourcePlanEntryBase
     {
         [LabelText("Prefab Key"), InlineProperty] public ESAssetReferPrefabConfigKey key = new ESAssetReferPrefabConfigKey();
-        [LabelText("对象池 Key")] public string poolKey;
-        [LabelText("预热数量"), MinValue(0)] public int prewarmCount;
-        [LabelText("独立池配置")] public bool useCustomPoolConfig;
-        [ShowIf(nameof(useCustomPoolConfig)), HideLabel] public ESGameObjectPoolConfig poolConfig = new ESGameObjectPoolConfig();
+    }
+
+    [Serializable]
+    public sealed class ESResourcePlanPrefabPrewarmEntry : ESResourcePlanEntryBase
+    {
+        [LabelText("预热配置"), Required]
+        [InfoBox("预热内容、数量和对象池参数统一在 PrefabPrewarmDataInfo 中维护。Plan 只负责进入与退出生命周期。")]
+        public PrefabPrewarmDataInfo data;
     }
 
     [Serializable] public sealed class ESResourcePlanSpriteEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferSpriteConfigKey key = new ESAssetReferSpriteConfigKey(); }
@@ -58,8 +62,11 @@ namespace ES
         [ShowIf(nameof(NeedsTargetInfoKey)), LabelText("所属配置键")]
         public string targetInfoKey;
 
-        [Title("Prefab 与对象池"), LabelText("Prefab")]
+        [Title("Prefab"), LabelText("仅加载并持有")]
         public List<ESResourcePlanPrefabEntry> prefabs = new List<ESResourcePlanPrefabEntry>(8);
+
+        [LabelText("对象池预热配置")]
+        public List<ESResourcePlanPrefabPrewarmEntry> prefabPrewarms = new List<ESResourcePlanPrefabPrewarmEntry>(4);
 
         [Title("图形资源"), LabelText("Sprite")]
         public List<ESResourcePlanSpriteEntry> sprites = new List<ESResourcePlanSpriteEntry>(8);

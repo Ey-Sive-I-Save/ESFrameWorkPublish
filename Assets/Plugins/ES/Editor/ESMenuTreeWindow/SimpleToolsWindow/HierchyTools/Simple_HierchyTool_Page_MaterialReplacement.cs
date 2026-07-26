@@ -359,7 +359,7 @@ namespace ES
 
         private void DrawMaterialModeTabs()
         {
-            materialToolMode = GUILayout.Toolbar(materialToolMode, MaterialToolModeLabels, GUILayout.Height(28));
+            materialToolMode = EditorGUILayout.Popup("工作模式", materialToolMode, MaterialToolModeLabels);
         }
 
         private void DrawMaterialScopePanel()
@@ -367,18 +367,10 @@ namespace ES
             SimpleToolsPanelUtility.DrawSectionTitle("扫描范围", "选择扫描场景对象、当前选择，或在资产模式中扫描 Prefab 文件。");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.LabelField("目标范围", EditorStyles.miniBoldLabel, GUILayout.Width(58));
-                    targetScope = (TargetScope)GUILayout.Toolbar((int)targetScope, TargetScopeLabels, EditorStyles.miniButton, GUILayout.Height(24));
-                }
-
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    includeInactive = GUILayout.Toggle(includeInactive, "包含未激活", EditorStyles.miniButtonLeft, GUILayout.Height(22));
-                    skipHideFlagsObjects = GUILayout.Toggle(skipHideFlagsObjects, "跳过隐藏对象", EditorStyles.miniButtonMid, GUILayout.Height(22));
-                    scanSerializedScriptFields = GUILayout.Toggle(scanSerializedScriptFields, "扫描脚本材质字段", EditorStyles.miniButtonRight, GUILayout.Height(22));
-                }
+                targetScope = (TargetScope)EditorGUILayout.Popup("目标范围", (int)targetScope, TargetScopeLabels);
+                includeInactive = EditorGUILayout.Toggle("包含未激活", includeInactive);
+                skipHideFlagsObjects = EditorGUILayout.Toggle("跳过隐藏对象", skipHideFlagsObjects);
+                scanSerializedScriptFields = EditorGUILayout.Toggle("扫描脚本材质字段", scanSerializedScriptFields);
 
                 componentTypes = DrawComponentMask(componentTypes);
                 DrawInfoRow("当前来源", GetEditingSourceLabel());
@@ -391,11 +383,7 @@ namespace ES
             SimpleToolsPanelUtility.DrawSectionTitle("匹配规则", "定义哪些材质引用会进入替换预览。");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.LabelField("模式", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                    replacementMode = (ReplacementMode)GUILayout.Toolbar((int)replacementMode, ReplacementModeLabels, EditorStyles.miniButton, GUILayout.Height(24));
-                }
+                replacementMode = (ReplacementMode)EditorGUILayout.Popup("匹配模式", (int)replacementMode, ReplacementModeLabels);
 
                 switch (replacementMode)
                 {
@@ -415,11 +403,8 @@ namespace ES
                         break;
                 }
 
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    setDefaultWhenNull = GUILayout.Toggle(setDefaultWhenNull, "空材质也填充", EditorStyles.miniButtonLeft, GUILayout.Height(22));
-                    allowSameMaterial = GUILayout.Toggle(allowSameMaterial, "允许替换成相同材质", EditorStyles.miniButtonRight, GUILayout.Height(22));
-                }
+                setDefaultWhenNull = EditorGUILayout.Toggle("空材质也填充", setDefaultWhenNull);
+                allowSameMaterial = EditorGUILayout.Toggle("允许替换成相同材质", allowSameMaterial);
             }
         }
 
@@ -432,11 +417,11 @@ namespace ES
                 DrawInfoRow("目标 Shader", targetMaterial != null && targetMaterial.shader != null ? targetMaterial.shader.name : "未设置");
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Use selection as source", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("Use selection as source", 138, 24, EditorStyles.miniButtonLeft))
                         UseSelectionAsSourceMaterial();
-                    if (GUILayout.Button("使用当前选中材质作为目标", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("使用当前选中材质作为目标", 168, 24, EditorStyles.miniButtonMid))
                         UseSelectionAsTargetMaterial();
-                    if (GUILayout.Button("交换源和目标", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("交换源和目标", 96, 24, EditorStyles.miniButtonRight))
                         SwapSourceAndTargetMaterial();
                 }
             }
@@ -462,11 +447,11 @@ namespace ES
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Select all preview items", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("Select all preview items", 136, 24, EditorStyles.miniButtonLeft))
                         EnableFilteredPreviewItems(true);
-                    if (GUILayout.Button("取消当前预览", EditorStyles.miniButtonMid, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("取消当前预览", 96, 24, EditorStyles.miniButtonMid))
                         EnableFilteredPreviewItems(false);
-                    if (GUILayout.Button("选中命中对象", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("选中命中对象", 96, 24, EditorStyles.miniButtonRight))
                         SelectFilteredPreviewObjects();
                 }
             }
@@ -506,14 +491,11 @@ namespace ES
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    EditorGUILayout.LabelField("可写", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                    materialWritableFilter = GUILayout.Toolbar(materialWritableFilter, WritableFilterLabels, EditorStyles.miniButton, GUILayout.Width(118), GUILayout.Height(22));
+                    materialWritableFilter = EditorGUILayout.Popup("可写", materialWritableFilter, WritableFilterLabels, GUILayout.Width(180));
                     GUILayout.Space(8);
-                    EditorGUILayout.LabelField("来源", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                    materialSourceFilter = GUILayout.Toolbar(materialSourceFilter, SourceFilterLabels, EditorStyles.miniButton, GUILayout.Width(160), GUILayout.Height(22));
+                    materialSourceFilter = EditorGUILayout.Popup("来源", materialSourceFilter, SourceFilterLabels, GUILayout.Width(220));
                     GUILayout.Space(8);
-                    EditorGUILayout.LabelField("排序", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                    materialSortIndex = GUILayout.Toolbar(materialSortIndex, MaterialSortLabels, EditorStyles.miniButton, GUILayout.Width(210), GUILayout.Height(22));
+                    materialSortIndex = EditorGUILayout.Popup("排序", materialSortIndex, MaterialSortLabels, GUILayout.Width(260));
                 }
             }
         }
@@ -581,7 +563,7 @@ namespace ES
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 enablePrefabAssetBatch = true;
-                useSelectedPrefabAssets = GUILayout.Toggle(useSelectedPrefabAssets, "优先处理 Project 中选中的 Prefab 资产", EditorStyles.miniButton, GUILayout.Height(24));
+                useSelectedPrefabAssets = EditorGUILayout.Toggle("优先处理 Project 中选中的 Prefab 资产", useSelectedPrefabAssets);
                 if (!useSelectedPrefabAssets)
                     prefabAssetFolder = EditorGUILayout.TextField("Prefab search folder", prefabAssetFolder);
 
@@ -676,13 +658,13 @@ namespace ES
             {
                 EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
                 if (!string.IsNullOrWhiteSpace(lastResultDetail))
-                    EditorGUILayout.TextArea(lastResultDetail, GUILayout.MinHeight(46), GUILayout.MaxHeight(120));
+                    SimpleToolsPanelUtility.DrawCompactDetail("材质替换详情", lastResultDetail);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("复制报告", EditorStyles.miniButtonLeft, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("复制报告", 76, 24, EditorStyles.miniButtonLeft))
                         CopyLastReport();
-                    if (GUILayout.Button("导出 TXT", EditorStyles.miniButtonRight, GUILayout.Height(24)))
+                    if (SimpleToolsPanelUtility.DrawCompactButton("导出 TXT", 76, 24, EditorStyles.miniButtonRight))
                         ExportLastReportTxt();
                 }
             }
@@ -1625,13 +1607,9 @@ namespace ES
             bool particle = (value & ComponentType.ParticleSystemRenderer) != 0;
             bool script = (value & ComponentType.MonoBehaviour) != 0;
 
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField("组件", EditorStyles.miniBoldLabel, GUILayout.Width(34));
-                renderer = GUILayout.Toggle(renderer, "Renderer", EditorStyles.miniButtonLeft, GUILayout.Height(22));
-                particle = GUILayout.Toggle(particle, "ParticleRenderer", EditorStyles.miniButtonMid, GUILayout.Height(22));
-                script = GUILayout.Toggle(script, "脚本字段", EditorStyles.miniButtonRight, GUILayout.Height(22));
-            }
+            renderer = EditorGUILayout.Toggle("处理 Renderer", renderer);
+            particle = EditorGUILayout.Toggle("处理 ParticleSystemRenderer", particle);
+            script = EditorGUILayout.Toggle("处理脚本字段", script);
 
             var result = ComponentType.None;
             if (renderer) result |= ComponentType.Renderer;

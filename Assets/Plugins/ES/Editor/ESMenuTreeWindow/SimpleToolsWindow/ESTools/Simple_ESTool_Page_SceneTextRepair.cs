@@ -29,7 +29,7 @@ namespace ES
         private void DrawResultPanel()
         {
             SimpleToolsPanelUtility.DrawToolHeader(
-                "场景文本修复工作台",
+                "场景文本修复",
                 "用于扫描 .unity 文本里 SceneRoots.m_Roots 中已经失效的本地 fileID，并在确认后生成备份再修复。",
                 SimpleToolsMaturity.Upgrading,
                 "只处理 SceneRoots 根节点列表，不扫描组件字段、Prefab Override 或资源引用。修复要求项目启用 Force Text，并会直接写入场景文件。");

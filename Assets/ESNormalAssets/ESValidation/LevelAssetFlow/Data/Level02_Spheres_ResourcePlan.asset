@@ -1,0 +1,117 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47d54198f048049438a590333b39677e, type: 3}
+  m_Name: Level02_Spheres_ResourcePlan
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: 
+  targetKind: 1
+  targetInfoKey: Level02_Spheres
+  prefabs:
+  - required: 1
+    key:
+      enumKey: 0
+      stringKey: level_validation_2_red
+      guid: 00000000000000001a9f400000000010
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address: 
+      groupName: 
+      editorPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Red.prefab
+      editorOnly: 0
+      alwaysLoaded: 0
+  - required: 1
+    key:
+      enumKey: 0
+      stringKey: level_validation_2_green
+      guid: 00000000000000001a9f400000000011
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address: 
+      groupName: 
+      editorPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Green.prefab
+      editorOnly: 0
+      alwaysLoaded: 0
+  - required: 1
+    key:
+      enumKey: 0
+      stringKey: level_validation_2_blue
+      guid: 00000000000000001a9f400000000012
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address: 
+      groupName: 
+      editorPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Blue.prefab
+      editorOnly: 0
+      alwaysLoaded: 0
+  - required: 1
+    key:
+      enumKey: 0
+      stringKey: level_validation_2_yellow
+      guid: 00000000000000001a9f400000000013
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address: 
+      groupName: 
+      editorPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Yellow.prefab
+      editorOnly: 0
+      alwaysLoaded: 0
+  - required: 1
+    key:
+      enumKey: 0
+      stringKey: level_validation_2_magenta
+      guid: 00000000000000001a9f400000000014
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address: 
+      groupName: 
+      editorPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Magenta.prefab
+      editorOnly: 0
+      alwaysLoaded: 0
+  - required: 1
+    key:
+      enumKey: 0
+      stringKey: level_validation_2_cyan
+      guid: 00000000000000001a9f400000000015
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address: 
+      groupName: 
+      editorPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Cyan.prefab
+      editorOnly: 0
+      alwaysLoaded: 0
+  prefabPrewarms: []
+  sprites: []
+  materials: []
+  meshes: []
+  textures: []
+  texture2Ds: []
+  spriteAtlases: []
+  avatars: []
+  terrainDatas: []
+  audioClips: []
+  animationClips: []
+  animatorControllers: []
+  playableAssets: []
+  timelineAssets: []
+  videoClips: []
+  scriptableObjects: []
+  releaseOnExit: 1
+  releaseDelaySeconds: 0

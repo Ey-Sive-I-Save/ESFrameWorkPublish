@@ -17,26 +17,41 @@ namespace ES
             ESAssetBundleBuildPlan previousPlan = File.Exists(previousPlanPath) ? ESAssetPipelineIO.ReadJson<ESAssetBundleBuildPlan>(previousPlanPath) : null;
             var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>().Where(item => item != null && item.ContainsBuild).OrderBy(item => item.LibFolderName, StringComparer.Ordinal).ToList();
             var catalogs = new List<ESAssetLibraryCatalog>();
+            var graphNodes = new Dictionary<string, Dictionary<string, ESAssetReferenceNode>>(StringComparer.Ordinal);
+            var bakeWarnings = new List<string>();
             foreach (var library in libraries)
             {
                 string folder = ESAssetPipelineIO.LibraryBakeFolder(library.LibFolderName);
                 var catalog = ESAssetPipelineIO.ReadJson<ESAssetLibraryCatalog>(Path.Combine(folder, ESAssetPipelineIO.CatalogFileName));
                 if (catalog.errors.Count > 0) throw new InvalidOperationException($"Library [{catalog.libraryName}] 的烘焙结果包含错误。");
+                if (catalog.warnings != null) bakeWarnings.AddRange(catalog.warnings);
+                var graph = ESAssetPipelineIO.ReadJson<ESAssetReferenceGraph>(Path.Combine(folder, ESAssetPipelineIO.ReferenceGraphFileName));
+                if (graph.warnings != null) bakeWarnings.AddRange(graph.warnings);
+                Dictionary<string, ESAssetReferenceNode> nodeIndex = ValidateReferenceGraph(catalog, graph);
                 catalogs.Add(catalog);
+                graphNodes.Add(catalog.libraryFolder, nodeIndex);
             }
 
             var plan = new ESAssetBundleBuildPlan { platform = platform, generatedUtc = DateTime.UtcNow.ToString("O") };
+            plan.warnings.AddRange(bakeWarnings.Distinct(StringComparer.Ordinal));
             var assetList = new ESAssetBundleAssetList { platform = platform };
             var assignmentByPath = new Dictionary<string, ESAssetBundleAssignment>(StringComparer.Ordinal);
             var dependencyUsages = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
             var dependencyIdentities = new Dictionary<string, ESPipelineAssetIdentity>(StringComparer.Ordinal);
+            var dependencyTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+            var collectedGameCorePaths = GetCollectedGameCorePaths();
             var editorOnlyPaths = new HashSet<string>(catalogs.SelectMany(item => item.excludedEditorOnlyPaths ?? new List<string>()), StringComparer.Ordinal);
             var businessPaths = new HashSet<string>(catalogs.SelectMany(item => item.assets).Where(item => item.isBusinessAsset).Select(item => item.assetPath), StringComparer.Ordinal);
 
             foreach (var catalog in catalogs)
             {
+                Dictionary<string, ESAssetReferenceNode> nodeIndex = graphNodes[catalog.libraryFolder];
                 foreach (var asset in catalog.assets)
                 {
+                    // 仍保留在普通 Catalog/Assets 中用于业务寻址；已被 Consumer 收集的 GameCore
+                    // 只由专用启动核心包承载，避免同一物理资产重复进入两个 AB。
+                    if (collectedGameCorePaths.Contains(asset.assetPath))
+                        continue;
                     if (ESAssetPipelineIO.IsEditorOnly(asset.assetPath))
                     {
                         editorOnlyPaths.Add(asset.assetPath);
@@ -46,26 +61,29 @@ namespace ES
                     if (!asset.isBusinessAsset && businessPaths.Contains(asset.assetPath)) continue;
                     string bundleKey = GetRootBundleKey(asset);
                     AddAssignment(plan, assignmentByPath, asset.assetPath, asset.identity, bundleKey, catalog.libraryFolder, asset.isBusinessAsset);
-                    assetList.assets.Add(new ESAssetBundleAssetEntry { identity = asset.identity, assetBundleKey = bundleKey, internalName = asset.assetPath, kind = asset.kind, typeName = asset.assetTypeName,
-                        ownerLibrary = catalog.libraryFolder, isBusinessAsset = asset.isBusinessAsset, subAssetName = asset.subAssetName });
-                    foreach (string dependencyPath in AssetDatabase.GetDependencies(asset.assetPath, true)
-                        .Where(path => !string.Equals(path, asset.assetPath, StringComparison.Ordinal))
-                        .Distinct(StringComparer.Ordinal))
+                    ESAssetBundleAssignment effectiveAssignment = assignmentByPath[asset.assetPath];
+                    bundleKey = effectiveAssignment.assetBundleKey;
+                    if (!assetList.assets.Any(item => item.identity != null && asset.identity != null
+                        && string.Equals(item.identity.Key, asset.identity.Key, StringComparison.Ordinal)))
+                        assetList.assets.Add(new ESAssetBundleAssetEntry { identity = asset.identity, assetBundleKey = bundleKey, internalName = asset.assetPath, kind = asset.kind, typeName = asset.assetTypeName,
+                            ownerLibrary = effectiveAssignment.ownerLibrary, isBusinessAsset = asset.isBusinessAsset, subAssetName = asset.subAssetName });
+                    foreach (ESAssetReferenceNode dependency in EnumerateTransitiveDependencies(nodeIndex, asset.assetPath))
                     {
-                        if (ESAssetPipelineIO.IsEditorOnly(dependencyPath))
+                        string dependencyPath = dependency.assetPath;
+                        if (dependency.editorOnly)
                         {
                             editorOnlyPaths.Add(dependencyPath);
                             continue;
                         }
-                        var dependencyIdentity = ESAssetPipelineIO.GetMainIdentity(dependencyPath);
-                        if (!dependencyIdentity.IsValid || !dependencyPath.StartsWith("Assets/", StringComparison.Ordinal))
+                        if (!dependency.markable || dependency.identity == null || !dependency.identity.IsValid)
                         {
                             plan.warnings.Add("Skipped non-markable Unity planning dependency: " + dependencyPath);
                             continue;
                         }
                         if (!dependencyUsages.TryGetValue(dependencyPath, out var usages)) dependencyUsages.Add(dependencyPath, usages = new HashSet<string>(StringComparer.Ordinal));
                         usages.Add(bundleKey);
-                        dependencyIdentities[dependencyPath] = dependencyIdentity;
+                        dependencyIdentities[dependencyPath] = dependency.identity;
+                        dependencyTypes[dependencyPath] = dependency.assetTypeName;
                     }
                 }
             }
@@ -77,12 +95,12 @@ namespace ES
                 if (assignmentByPath.ContainsKey(usage.Key)) continue;
                 if (usage.Value.Count == 1) continue;
                 string guid = dependencyIdentities[usage.Key].guid;
-                string bundleKey = ESAssetBundleUtility.ToSafeAssetBundleKey("__shared/" + (guid.Length > 12 ? guid.Substring(0, 12) : guid));
+                string bundleKey = ESAssetBundleUtility.ToBoundedAssetBundleKey("__shared/" + (guid.Length > 12 ? guid.Substring(0, 12) : guid));
                 const string owner = "__shared";
                 plan.warnings.Add($"共享依赖独立成包：{usage.Key}，被 {usage.Value.Count} 个 AB 使用。");
                 AddAssignment(plan, assignmentByPath, usage.Key, dependencyIdentities[usage.Key], bundleKey, owner, false);
                 assetList.assets.Add(new ESAssetBundleAssetEntry { identity = dependencyIdentities[usage.Key], assetBundleKey = bundleKey, internalName = usage.Key,
-                    typeName = (AssetDatabase.GetMainAssetTypeAtPath(usage.Key) ?? typeof(UnityEngine.Object)).FullName, ownerLibrary = owner, isBusinessAsset = false });
+                    typeName = string.IsNullOrWhiteSpace(dependencyTypes[usage.Key]) ? typeof(UnityEngine.Object).FullName : dependencyTypes[usage.Key], ownerLibrary = owner, isBusinessAsset = false });
             }
 
             plan.assignments = assignmentByPath.Values.OrderBy(item => item.assetBundleKey, StringComparer.Ordinal).ThenBy(item => item.assetPath, StringComparer.Ordinal).ToList();
@@ -95,11 +113,115 @@ namespace ES
             Debug.Log($"[ESAssetBundleBuildPlanner] 规划 {plan.assignments.Count} 个资产，{plan.warnings.Count} 条警告。输出：{outputFolder}");
         }
 
+        private static HashSet<string> GetCollectedGameCorePaths()
+        {
+            var paths = new HashSet<string>(StringComparer.Ordinal);
+            IEnumerable<ESAssetLibraryConsumer> consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
+                ?? Enumerable.Empty<ESAssetLibraryConsumer>();
+            foreach (ESAssetLibraryConsumer consumer in consumers)
+            foreach (ESAssetReferBase refer in consumer?.GameCoreAssets ?? new List<ESAssetReferBase>())
+            {
+                if (refer == null || !refer.IsValid) continue;
+                string path = AssetDatabase.GUIDToAssetPath(refer.GUID);
+                if (!string.IsNullOrWhiteSpace(path)) paths.Add(path);
+            }
+            return paths;
+        }
+
+        private static Dictionary<string, ESAssetReferenceNode> ValidateReferenceGraph(ESAssetLibraryCatalog catalog, ESAssetReferenceGraph graph)
+        {
+            if (graph == null || graph.formatVersion != ESAssetPipelineIO.ReferenceGraphFormatVersion)
+                throw new InvalidDataException("[ESRes][Plan] 引用图协议无效，请重新烘焙：" + catalog.libraryFolder);
+            if (!string.Equals(graph.libraryFolder, catalog.libraryFolder, StringComparison.Ordinal)
+                || !string.Equals(graph.libraryName, catalog.libraryName, StringComparison.Ordinal))
+                throw new InvalidDataException("[ESRes][Plan] Catalog 与引用图 Library 身份不一致：" + catalog.libraryFolder);
+            if (graph.errors != null && graph.errors.Count > 0)
+                throw new InvalidDataException("[ESRes][Plan] 引用图包含错误：" + string.Join("\n", graph.errors));
+
+            var nodes = new Dictionary<string, ESAssetReferenceNode>(StringComparer.Ordinal);
+            foreach (ESAssetReferenceNode node in graph.nodes ?? new List<ESAssetReferenceNode>())
+            {
+                if (node == null || string.IsNullOrWhiteSpace(node.assetPath) || !nodes.TryAdd(node.assetPath, node))
+                    throw new InvalidDataException("[ESRes][Plan] 引用图包含空路径或重复节点：" + catalog.libraryFolder);
+                ESPipelineAssetIdentity currentIdentity = ESAssetPipelineIO.GetMainIdentity(node.assetPath);
+                if (node.identity == null || node.identity.localFileId != 0
+                    || !string.Equals(node.identity.guid, currentIdentity.guid, StringComparison.Ordinal))
+                    throw new InvalidDataException("[ESRes][Plan] 引用图资产身份已变化，请重新烘焙：" + node.assetPath);
+                UnityEngine.Object currentAsset = AssetDatabase.LoadMainAssetAtPath(node.assetPath);
+                bool currentEditorOnly = ESAssetPipelineIO.IsEditorOnly(node.assetPath, currentAsset);
+                bool currentMarkable = !currentEditorOnly && currentIdentity.IsValid && node.assetPath.StartsWith("Assets/", StringComparison.Ordinal);
+                if (node.editorOnly != currentEditorOnly || node.markable != currentMarkable)
+                    throw new InvalidDataException("[ESRes][Plan] 引用图资产分类已变化，请重新烘焙：" + node.assetPath);
+                string currentHash = AssetDatabase.GetAssetDependencyHash(node.assetPath).ToString();
+                if (string.IsNullOrWhiteSpace(node.dependencyHash) || !string.Equals(node.dependencyHash, currentHash, StringComparison.Ordinal))
+                    throw new InvalidDataException("[ESRes][Plan] 资产依赖已变化，请重新烘焙：" + node.assetPath);
+            }
+            foreach (ESAssetReferenceNode node in nodes.Values)
+                foreach (string dependencyPath in node.directDependencies ?? new List<string>())
+                    if (!nodes.ContainsKey(dependencyPath))
+                        throw new InvalidDataException("[ESRes][Plan] 引用图缺少依赖节点：" + node.assetPath + " -> " + dependencyPath);
+
+            var expectedRoots = new HashSet<string>((catalog.assets ?? new List<ESAssetCatalogEntry>())
+                .Where(item => item != null && item.identity != null)
+                .Select(item => item.identity.Key + "\n" + item.assetPath), StringComparer.Ordinal);
+            var actualRoots = new HashSet<string>((graph.roots ?? new List<ESAssetReferenceRoot>())
+                .Where(item => item != null && item.identity != null)
+                .Select(item => item.identity.Key + "\n" + item.assetPath), StringComparer.Ordinal);
+            if (!expectedRoots.SetEquals(actualRoots))
+                throw new InvalidDataException("[ESRes][Plan] Catalog 根资产与引用图不一致，请重新烘焙：" + catalog.libraryFolder);
+            foreach (ESAssetReferenceRoot root in graph.roots ?? new List<ESAssetReferenceRoot>())
+            {
+                if (!nodes.ContainsKey(root.assetPath))
+                    throw new InvalidDataException("[ESRes][Plan] 引用图根节点缺失：" + root.assetPath);
+                if (!IdentityExistsAtPath(root.assetPath, root.identity))
+                    throw new InvalidDataException("[ESRes][Plan] 根资产 GUID/LocalFileId 已变化，请重新烘焙：" + root.assetPath);
+            }
+            return nodes;
+        }
+
+        private static bool IdentityExistsAtPath(string assetPath, ESPipelineAssetIdentity identity)
+        {
+            if (identity == null || !identity.IsValid || string.IsNullOrWhiteSpace(assetPath)) return false;
+            if (!identity.IsSubAsset)
+                return string.Equals(AssetDatabase.AssetPathToGUID(assetPath), identity.guid, StringComparison.Ordinal);
+            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+                if (asset != null
+                    && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string guid, out long localFileId)
+                    && string.Equals(guid, identity.guid, StringComparison.Ordinal)
+                    && localFileId == identity.localFileId)
+                    return true;
+            return false;
+        }
+
+        private static List<ESAssetReferenceNode> EnumerateTransitiveDependencies(Dictionary<string, ESAssetReferenceNode> nodes, string rootPath)
+        {
+            if (!nodes.TryGetValue(rootPath, out ESAssetReferenceNode root))
+                throw new InvalidDataException("[ESRes][Plan] 引用图中找不到根资产：" + rootPath);
+
+            var result = new List<ESAssetReferenceNode>();
+            var visited = new HashSet<string>(StringComparer.Ordinal) { rootPath };
+            var stack = new Stack<string>((root.directDependencies ?? new List<string>()).Reverse<string>());
+            while (stack.Count > 0)
+            {
+                string path = stack.Pop();
+                if (!visited.Add(path)) continue;
+                if (!nodes.TryGetValue(path, out ESAssetReferenceNode node))
+                    throw new InvalidDataException("[ESRes][Plan] 引用图遍历遇到缺失节点：" + path);
+                result.Add(node);
+                if (node.editorOnly) continue;
+                List<string> dependencies = node.directDependencies ?? new List<string>();
+                for (int i = dependencies.Count - 1; i >= 0; i--)
+                    stack.Push(dependencies[i]);
+            }
+            return result;
+        }
+
         private static void AddAssignment(ESAssetBundleBuildPlan plan, Dictionary<string, ESAssetBundleAssignment> index, string path, ESPipelineAssetIdentity identity, string bundleKey, string owner, bool business)
         {
             if (index.TryGetValue(path, out var existing))
             {
-                if (!string.Equals(existing.assetBundleKey, bundleKey, StringComparison.Ordinal)) plan.errors.Add($"同一资产被规划到多个 AB：{path} -> {existing.assetBundleKey} / {bundleKey}");
+                if (!string.Equals(existing.assetBundleKey, bundleKey, StringComparison.Ordinal))
+                    plan.warnings.Add($"同一物理资产被多个 Library 使用，沿用首个确定归属：{path} -> {existing.assetBundleKey}，忽略 {bundleKey}");
                 existing.isBusinessAsset |= business;
                 return;
             }
@@ -117,7 +239,7 @@ namespace ES
                     throw new InvalidOperationException("GameCore Consumer 缺少稳定 ID：" + consumer.Name);
 
                 string owner = ESAssetPipelineIO.GameCoreLibraryFolder(consumer.ConsumerId);
-                string bundleKey = ESAssetBundleUtility.ToSafeAssetBundleKey(owner + "/core");
+                string bundleKey = ESAssetBundleUtility.ToBoundedAssetBundleKey(owner + "/core");
                 foreach (ESAssetReferBase refer in consumer.GameCoreAssets)
                 {
                     if (refer == null || !refer.IsValid)
@@ -165,7 +287,7 @@ namespace ES
             if (asset.namedOption == ABNamedOption.UsePageName.ToString()) raw = asset.pageName;
             else if (asset.namedOption == ABNamedOption.UseParentPath.ToString() || asset.namedOption == ABNamedOption.UsePageFolder.ToString()) raw = Path.GetDirectoryName(asset.assetPath);
             else raw = asset.assetPath;
-            return ESAssetBundleUtility.ToSafeAssetBundleKey(asset.libraryFolder + "/" + raw);
+            return ESAssetBundleUtility.ToBoundedAssetBundleKey(asset.libraryFolder + "/" + raw);
         }
 
         private static void ApplyManagedLabels(ESAssetBundleBuildPlan previous, ESAssetBundleBuildPlan current, IEnumerable<string> editorOnlyPaths)

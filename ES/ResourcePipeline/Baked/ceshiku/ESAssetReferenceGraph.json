@@ -1,0 +1,109 @@
+{
+  "formatVersion": 1,
+  "libraryName": "测试库",
+  "libraryFolder": "ceshiku",
+  "generatedUtc": "2026-07-26T15:35:43.2828337Z",
+  "roots": [
+    {
+      "identity": {
+        "guid": "8111bbc5676f4d58809f1911ee5ae65a",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "8111bbc5676f4d58809f1911ee5ae65a"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetGameCoreFlowHotUpdateTest.unity"
+    },
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab"
+    }
+  ],
+  "nodes": [
+    {
+      "identity": {
+        "guid": "f0d16e91abc34401b1e4f87c790024f2",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "f0d16e91abc34401b1e4f87c790024f2"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetFlowTestSceneController.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "c809bf9ecd0f843362820fd2bf8a5ea9",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    },
+    {
+      "identity": {
+        "guid": "8111bbc5676f4d58809f1911ee5ae65a",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "8111bbc5676f4d58809f1911ee5ae65a"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetGameCoreFlowHotUpdateTest.unity",
+      "assetTypeName": "UnityEditor.SceneAsset",
+      "dependencyHash": "bd543e05049a4ee32e939281dfb47c60",
+      "editorOnly": false,
+      "markable": true,
+      "ownerLibraryFolders": [
+        "ceshiku"
+      ],
+      "directDependencies": [
+        "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetFlowTestSceneController.cs"
+      ]
+    },
+    {
+      "identity": {
+        "guid": "a43b0f8f0c53eba4e8fb65148bafdd7a",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "a43b0f8f0c53eba4e8fb65148bafdd7a"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "53f2619f3d744d1d7f7c6ee2eb06d72e",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    },
+    {
+      "identity": {
+        "guid": "495b09c783492784e88277aa816dfdce",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "495b09c783492784e88277aa816dfdce"
+      },
+      "assetPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "dependencyHash": "78c080a50f238d52f8484d041764f7e4",
+      "editorOnly": false,
+      "markable": true,
+      "ownerLibraryFolders": [
+        "ceshiku",
+        "haha11",
+        "nanniangku"
+      ],
+      "directDependencies": [
+        "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs"
+      ]
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "引用图已标记 EditorOnly 依赖：Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetFlowTestSceneController.cs"
+  ]
+}

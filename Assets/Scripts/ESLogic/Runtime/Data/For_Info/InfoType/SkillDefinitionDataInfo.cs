@@ -94,7 +94,47 @@ namespace ES
 
         public void InjectGameCoreTables()
         {
-            ESRuntimeDataModule.InjectGameCoreRoot(this);
+            ESSkillGameCoreTable.Inject(this);
+        }
+    }
+
+    /// <summary>Skill 领域强类型注册入口；根 SO 直接注入，不经过中央类别分发。</summary>
+    public static class ESSkillGameCoreTable
+    {
+        public static ESConfigKeyTable<ESSkillRuntimeData> Table => ESRuntimeDataGameCore.Skills;
+
+        public static void Inject(SkillDefinitionDataInfo info)
+        {
+            if (info == null) throw new ArgumentNullException(nameof(info));
+
+            bool ownsBuild = !Table.IsBuilding;
+            if (ownsBuild) Table.BeginBuild();
+            try
+            {
+                info.skillKey ??= new ESSkillConfigKey();
+                if (Table.TryGet(info.skillKey, out ESSkillRuntimeData existing))
+                {
+                    if (ReferenceEquals(existing.soSource, info)) return;
+                    throw new InvalidOperationException("Skill GameCore Key 重复：" + info.KeyName);
+                }
+
+                var data = new ESSkillRuntimeData
+                {
+                    keyName = info.KeyName,
+                    displayName = info.KeyName,
+                    sourcePackage = info.name,
+                    soSource = info,
+                    trackProcess = info.trackProcess,
+                    baseStateInfo = info.baseStateInfo
+                };
+                data.runtimeKey = Table.Bake(info.skillKey, info.KeyName);
+                if (!Table.Upsert(info.skillKey, data, info.KeyName))
+                    throw new InvalidOperationException("Skill GameCore 注入失败：" + info.KeyName);
+            }
+            finally
+            {
+                if (ownsBuild) Table.EndBuild();
+            }
         }
     }
 

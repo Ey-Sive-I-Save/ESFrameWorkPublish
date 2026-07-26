@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e727a53253e67dd4f8d71dd69501093b, type: 3}
+  m_Name: ESLevelAssetValidationGameCore
+  m_EditorClassIdentifier: 
+  levels:
+  - levelName: Level01_Blocks
+    scene:
+      rid: 23629098908909575
+    resourcePlan: {fileID: 11400000, guid: 083828bbccf7fcd4091c65c79b91a663, type: 2}
+  - levelName: Level02_Spheres
+    scene:
+      rid: 23629098908909576
+    resourcePlan: {fileID: 11400000, guid: e48d3ed04f3a36c4eb6a7b6d9d7e881b, type: 2}
+  - levelName: Level03_Cylinders
+    scene:
+      rid: 23629098908909577
+    resourcePlan: {fileID: 11400000, guid: 89d7a5d4e6d962e4f9df341f16a2c92e, type: 2}
+  references:
+    version: 2
+    RefIds:
+    - rid: 23629098908909575
+      type: {class: ESAssetReferScene, ns: ES, asm: ES_Stand}
+      data:
+        _guid: 00000000000000001a9f700000000000
+        _localFileId: 0
+        _assetKind: 2
+        _resolvedEnumKey: 0
+        _resolvedStringKey: level_validation_scene_1
+        _inputMode: 1
+        _sceneName: 
+    - rid: 23629098908909576
+      type: {class: ESAssetReferScene, ns: ES, asm: ES_Stand}
+      data:
+        _guid: 00000000000000001a9f700000000001
+        _localFileId: 0
+        _assetKind: 2
+        _resolvedEnumKey: 0
+        _resolvedStringKey: level_validation_scene_2
+        _inputMode: 1
+        _sceneName: 
+    - rid: 23629098908909577
+      type: {class: ESAssetReferScene, ns: ES, asm: ES_Stand}
+      data:
+        _guid: 00000000000000001a9f700000000002
+        _localFileId: 0
+        _assetKind: 2
+        _resolvedEnumKey: 0
+        _resolvedStringKey: level_validation_scene_3
+        _inputMode: 1
+        _sceneName: 

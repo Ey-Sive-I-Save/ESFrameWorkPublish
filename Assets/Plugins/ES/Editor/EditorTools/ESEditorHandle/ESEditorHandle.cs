@@ -9,7 +9,8 @@ namespace ES
 {
 
 
-    public class ESEditorHandle : EditorInvoker_Level0
+    /// <summary>纯静态 Editor 任务调度器；按需订阅 EditorApplication.update，不参与程序集流实例化。</summary>
+    public static class ESEditorHandle
     {
         public static readonly ESSimplePool<ESEditorHandleTask> TaskPool = new ESSimplePool<ESEditorHandleTask>(
             () => new ESEditorHandleTask(),
@@ -31,11 +32,6 @@ namespace ES
 
         private static int nextLongTaskId;
         private static bool registered;
-
-        public override void InitInvoke()
-        {
-            // 不在 Domain Reload 后常驻 update。真正入队任务时再订阅，空闲后立即退订。
-        }
 
         private static void RegisterUpdate()
         {
@@ -92,12 +88,7 @@ namespace ES
                         if (useTask.OnlyOnce || useTask.MaxFrame <= 0 || useTask.CanExit())
                         {
                             if (!useTask.SingleKey.IsNullOrWhitespace())
-                            {
-                                if (singleKeys.TryGetValue(useTask.SingleKey, out var flag))
-                                {
-                                    if (flag > 0) singleKeys[useTask.SingleKey] = -1;
-                                }
-                            }
+                                singleKeys.Remove(useTask.SingleKey);
                             useTask.TryAutoPushedToPool();
                             RunningTasks.Dequeue();
                         }

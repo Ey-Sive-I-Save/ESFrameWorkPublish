@@ -6,7 +6,9 @@ namespace ES
     [ESEnumScript("Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Shot/ESShotConfigKeyData.cs")]
     public enum ESShotEnumKey : ushort
     {
+        [InspectorName("未配置")]
         None = 0,
+        [InspectorName("自定义")]
         Custom = 1
     }
 

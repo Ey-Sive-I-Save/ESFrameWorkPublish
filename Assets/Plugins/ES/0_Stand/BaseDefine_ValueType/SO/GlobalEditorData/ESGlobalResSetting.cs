@@ -53,14 +53,35 @@ namespace ES
         [LabelText("服务器网络路径")]
         public string Path_Net = "http....";
 
-        [VerticalGroup("Main/FolderPath")]
-        [LabelText("远程资源库构建文件夹（权威路径）"), ShowInInspector, DisplayAsString, InlineButton("OpenOutBuild", "打开远程构建文件夹")]
+        [HideInInspector]
         public string Path_RemoteResOutBuildPath => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResParentFolderName);
+
+        [HideInInspector]
+        public string Path_RemotePlatform => Path.Combine(Path_RemoteResOutBuildPath, CurrentBuildPlatformName);
+
+        [HideInInspector]
+        public string Path_BuildStaging => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "BuildStaging", CurrentBuildPlatformName);
+
+        [HideInInspector]
+        public string Path_PipelineBaked => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "ResourcePipeline", "Baked");
+
+        [HideInInspector]
+        public string Path_PipelinePlanned => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "ResourcePipeline", "Planned", CurrentBuildPlatformName);
+
+        [HideInInspector]
+        public string Path_PipelineBuildCache => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "ResourcePipeline", "BuildCache", CurrentBuildPlatformName, "UnityAssetBundles");
+
+        [HideInInspector]
+        public string Path_LocalTest => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "Published", "LocalTest", CurrentBuildPlatformName);
+
+        [HideInInspector]
+        public string Path_ManualUploadPlans => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "Published", "ManualUploadPlans", CurrentBuildPlatformName);
 
         [HideInInspector]
         public string Path_BuildInitialTarget => Path.Combine(ProjectRootPath, ESOutputRootFolderName, InitialTargetFolderName);
 
         private static string ProjectRootPath => Directory.GetParent(Application.dataPath).FullName;
+        private string CurrentBuildPlatformName => ESAssetBundleUtility.GetBuildPlatformName(applyPlatform);
 
         [VerticalGroup("Main/FolderPath")]
         [FolderPath, LabelText("默认资源库放置文件夹")]
@@ -75,15 +96,77 @@ namespace ES
         [HideInInspector]
         public string Path_ABHelperCodeGen = "";
 
-        [VerticalGroup("Main/FolderPath")]
-        [FolderPath, LabelText("本地AB包资源父路径")]
-        [InlineButton("Ping_", "<*>")]
-        public string Path_LocalBuildOnEditorPath_ => Path.Combine("Assets/StreamingAssets", ResParentFolderName);
+        [HideInInspector]
+        public string Path_LocalBuildOnEditorPath_ => Path.Combine("Assets", "StreamingAssets", ResParentFolderName);
+
+        [HideInInspector]
+        public string Path_LocalBuildPlatform => Path.Combine(ProjectRootPath, Path_LocalBuildOnEditorPath_, CurrentBuildPlatformName);
 
         [VerticalGroup("Main/FolderPath")]
         [LabelText("下载持久相对路径")]
         [InlineButton("OpenPersist", "打开持久下载文件夹")]
         public string Path_Sub_DownloadRelative_ = ResParentFolderName;
+
+        [HideInInspector]
+        public string Path_RuntimeDownloadCache => Path.Combine(Application.persistentDataPath, Path_Sub_DownloadRelative_ ?? string.Empty);
+
+        [VerticalGroup("Main/FolderPath")]
+        [OnInspectorGUI]
+        private void DrawGeneratedFolderShortcuts()
+        {
+#if UNITY_EDITOR
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("高频目录", EditorStyles.boldLabel);
+            DrawFolderShortcut("远端当前平台", Path_RemotePlatform, true);
+            DrawFolderShortcut("本机测试 LocalTest", Path_LocalTest, true);
+            DrawFolderShortcut("内置 StreamingAssets", Path_LocalBuildPlatform, true);
+            DrawFolderShortcut("运行时下载缓存", Path_RuntimeDownloadCache, true);
+
+            EditorGUILayout.Space(5);
+            EditorGUILayout.LabelField("管线与维护目录", EditorStyles.boldLabel);
+            DrawFolderShortcut("构建暂存 Staging", Path_BuildStaging);
+            DrawFolderShortcut("Unity AB BuildCache", Path_PipelineBuildCache);
+            DrawFolderShortcut("远端发布根目录", Path_RemoteResOutBuildPath);
+            DrawFolderShortcut("手工上传计划", Path_ManualUploadPlans);
+            DrawFolderShortcut("分包计划 Planned", Path_PipelinePlanned);
+            DrawFolderShortcut("引用烘焙 Baked", Path_PipelineBaked);
+#endif
+        }
+
+#if UNITY_EDITOR
+        private static void DrawFolderShortcut(string label, string path, bool important = false)
+        {
+            string fullPath = Path.GetFullPath(path);
+            string displayPath = GetCompactDisplayPath(fullPath);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                bool exists = Directory.Exists(fullPath);
+                var labelContent = new GUIContent((exists ? "● " : "○ ") + label, fullPath);
+                Color previousContentColor = GUI.contentColor;
+                if (important) GUI.contentColor = new Color(1f, 0.72f, 0.20f);
+                EditorGUILayout.LabelField(labelContent, important ? EditorStyles.boldLabel : EditorStyles.label, GUILayout.Width(155));
+                GUI.contentColor = previousContentColor;
+                var pathContent = new GUIContent(displayPath, fullPath + "\n点击文本可选择并复制；点击右侧按钮可创建并打开目录。");
+                EditorGUILayout.SelectableLabel(pathContent.text, EditorStyles.textField,
+                    GUILayout.Height(EditorGUIUtility.singleLineHeight), GUILayout.MinWidth(80));
+                Color previousBackgroundColor = GUI.backgroundColor;
+                if (important) GUI.backgroundColor = new Color(1f, 0.67f, 0.15f);
+                bool open = GUILayout.Button(new GUIContent("打开", fullPath), GUILayout.Width(48), GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                GUI.backgroundColor = previousBackgroundColor;
+                if (open)
+                    OpenGeneratedFolder(fullPath);
+            }
+        }
+
+        private static string GetCompactDisplayPath(string fullPath)
+        {
+            string projectRoot = Path.GetFullPath(ProjectRootPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string normalized = Path.GetFullPath(fullPath);
+            if (normalized.StartsWith(projectRoot + Path.DirectorySeparatorChar, System.StringComparison.OrdinalIgnoreCase))
+                return normalized.Substring(projectRoot.Length + 1).Replace('\\', '/');
+            return normalized.Replace('\\', '/');
+        }
+#endif
 
         public bool IsHotUpdateMode => AssetRunMode == ESAssetRunMode.HotUpdate;
 
@@ -107,9 +190,15 @@ namespace ES
 
         private void OpenOutBuild()
         {
-            string log = ESStandUtility.SafeEditor.Quick_System_CreateDirectory(Path_RemoteResOutBuildPath).Message;
+            OpenGeneratedFolder(Path_RemoteResOutBuildPath);
+        }
+
+        private static void OpenGeneratedFolder(string path)
+        {
+            string fullPath = Path.GetFullPath(path);
+            string log = ESStandUtility.SafeEditor.Quick_System_CreateDirectory(fullPath).Message;
             Debug.Log(log);
-            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(Path_RemoteResOutBuildPath, false);
+            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(fullPath, false);
         }
 
 #if UNITY_EDITOR
@@ -200,9 +289,7 @@ namespace ES
 
         private void OpenPersist()
         {
-            string path = Application.persistentDataPath + "/" + Path_Sub_DownloadRelative_;
-            ESStandUtility.SafeEditor.Quick_System_CreateDirectory(path);
-            ESStandUtility.SafeEditor.Quick_OpenInSystemFolder(path, false);
+            OpenGeneratedFolder(Path_RuntimeDownloadCache);
         }
 
         private void Ping_(string path)

@@ -57,9 +57,15 @@ namespace ES
 
         public string stringKey;
 
+        // 编辑器选择与烘焙阶段的精确身份。运行时查表仍只使用 enumKey/stringKey。
+        public string definitionGuid;
+        public long definitionLocalFileId;
+        public string definitionTypeName;
+
         public string StringKey => stringKey;
         public int EnumKeyInt => EnumToInt(enumKey);
         public bool HasEnumKey => EnumKeyInt != 0;
+        public bool HasDefinitionIdentity => !string.IsNullOrEmpty(definitionGuid);
 
         public string GetStringKey(string fallbackStringKey)
         {

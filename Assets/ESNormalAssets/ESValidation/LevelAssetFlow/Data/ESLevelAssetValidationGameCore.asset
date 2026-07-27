@@ -37,7 +37,7 @@ MonoBehaviour:
         _resolvedEnumKey: 0
         _resolvedStringKey: level_validation_scene_1
         _inputMode: 1
-        _sceneName: 
+        _sceneName: Level01_Blocks
     - rid: 23629098908909576
       type: {class: ESAssetReferScene, ns: ES, asm: ES_Stand}
       data:

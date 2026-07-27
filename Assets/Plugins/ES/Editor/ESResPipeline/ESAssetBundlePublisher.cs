@@ -11,6 +11,19 @@ namespace ES
     {
         public static void Publish()
         {
+            try
+            {
+                SetPublishProgress("准备发布环境", 0.01f);
+                PublishCore();
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
+        }
+
+        private static void PublishCore()
+        {
             ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
             string platform = ESAssetPipelineIO.PlatformName;
             string stagingRoot = ESAssetPipelineIO.StagingRoot(platform);
@@ -18,24 +31,31 @@ namespace ES
             var buildSet = ESAssetPipelineIO.ReadJson<ESAssetBuildSet>(Path.Combine(stagingRoot, ESAssetPipelineIO.BuildSetFileName));
             var stageFolders = buildSet.libraryFolders.Select(folder => ESAssetPipelineIO.StagingLibraryFolder(platform, folder)).ToList();
             if (stageFolders.Count == 0) throw new InvalidOperationException("资源包暂存目录中没有可发布的资源库。");
+            SetPublishProgress("校验暂存资源、Manifest 与 Hash", 0.05f);
             ValidateAll(stageFolders);
             var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
                 .Where(item => item != null)
                 .OrderBy(item => AssetDatabase.GetAssetPath(item), StringComparer.Ordinal)
                 .ToList();
             if (consumers.Count == 0) throw new InvalidOperationException("未找到资源使用者（Consumer）。请先创建至少一个 Consumer。\n");
+            SetPublishProgress("生成 HybridCLR AOT 元数据与热更代码包（此阶段通常最耗时）", 0.10f);
             ESCodeModuleEditorIntegration.GenerateAndSyncAll(consumers);
+            SetPublishProgress("同步 Consumer 构建修订", 0.48f);
             ESAssetConsumerBuildRevision.IncrementAllForBuild();
 
             DateTime publishLocalTime = DateTime.Now;
             string releaseVersion = ESGlobalResSetting.Instance.Version + "." + publishLocalTime.ToString("yyyyMMddHHmmssfff");
-            string initialRoot = ToAbsolutePath(ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_);
+            bool includeInitialPackage = ESGlobalResSetting.Instance.AssetRunMode == ESAssetRunMode.LocalBuild;
+            string initialRoot = includeInitialPackage ? ToAbsolutePath(ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_) : null;
+            if (!includeInitialPackage)
+                RemoveGeneratedStreamingAssets(platform);
             string localTestRoot = Path.Combine(ESAssetPipelineIO.ProjectRoot, "ES", "Published", "LocalTest", platform);
             string cdnRoot = Path.Combine(ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath, platform);
             var release = new ESAssetReleaseManifest { platform = platform, releaseVersion = releaseVersion, channel = "default", publishedUtc = DateTime.UtcNow.ToString("O") };
             var publishedLibraries = new Dictionary<string, PublishedLibrary>(StringComparer.Ordinal);
             var bundleIndex = new ESAssetReleaseBundleIndex { platform = platform, releaseVersion = releaseVersion };
 
+            SetPublishProgress("复制并校验 Library 发布产物", 0.55f);
             foreach (string stageFolder in stageFolders)
             {
                 var identity = ESAssetPipelineIO.ReadJson<ESAssetLibraryIdentity>(Path.Combine(stageFolder, ESAssetPipelineIO.LibraryIdentityFileName));
@@ -49,7 +69,8 @@ namespace ES
                 string relativeBase = ESAssetPipelineIO.ReleaseLibraryRelativeBase(platform, releaseVersion, libraryFolder);
                 identity.catalogUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + ESAssetPipelineIO.CatalogFileName);
                 identity.assetBundleManifestUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + ESAssetPipelineIO.BundleManifestFileName);
-                CopyStage(stageFolder, ESAssetPipelineIO.ReleaseLibraryFolder(initialRoot, platform, releaseVersion, libraryFolder), manifest, identity);
+                if (includeInitialPackage)
+                    CopyStage(stageFolder, ESAssetPipelineIO.ReleaseLibraryFolder(initialRoot, platform, releaseVersion, libraryFolder), manifest, identity);
                 CopyStage(stageFolder, ESAssetPipelineIO.ReleaseLibraryFolder(localTestRoot, string.Empty, releaseVersion, libraryFolder), manifest, identity);
                 CopyStage(stageFolder, ESAssetPipelineIO.ReleaseLibraryFolder(cdnRoot, string.Empty, releaseVersion, libraryFolder), manifest, identity);
                 release.libraries.Add(new ESAssetReleaseLibrary
@@ -88,14 +109,18 @@ namespace ES
                 throw new InvalidDataException("全局 Bundle 索引包含重复 AssetBundleKey。");
             bundleIndex.assetBundles = bundleIndex.assetBundles.OrderBy(item => item.assetBundleKey, StringComparer.Ordinal).ToList();
             string bundleIndexRelativePath = platform + "/" + releaseVersion + "/" + ESAssetPipelineIO.ReleaseBundleIndexFileName;
-            string initialBundleIndexPath = Path.Combine(initialRoot, platform, releaseVersion, ESAssetPipelineIO.ReleaseBundleIndexFileName);
+            string initialBundleIndexPath = includeInitialPackage
+                ? Path.Combine(initialRoot, platform, releaseVersion, ESAssetPipelineIO.ReleaseBundleIndexFileName)
+                : null;
             string localBundleIndexPath = Path.Combine(localTestRoot, releaseVersion, ESAssetPipelineIO.ReleaseBundleIndexFileName);
             string cdnBundleIndexPath = Path.Combine(cdnRoot, releaseVersion, ESAssetPipelineIO.ReleaseBundleIndexFileName);
-            ESAssetPipelineIO.WriteJson(initialBundleIndexPath, bundleIndex, true);
+            if (includeInitialPackage)
+                ESAssetPipelineIO.WriteJson(initialBundleIndexPath, bundleIndex, true);
             ESAssetPipelineIO.WriteJson(localBundleIndexPath, bundleIndex, true);
             ESAssetPipelineIO.WriteJson(cdnBundleIndexPath, bundleIndex, true);
             release.bundleIndexUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, bundleIndexRelativePath);
             release.bundleIndexSha256 = ESResManifestIntegrity.ComputeFileSha256(cdnBundleIndexPath);
+            SetPublishProgress("校验全局 Bundle 索引与依赖闭包", 0.72f);
             ValidatePublishedBundleIndex(cdnRoot, releaseVersion, bundleIndex);
 
             var totalConsumers = consumers.Where(item => item.IsTotalConsumer).ToList();
@@ -113,16 +138,30 @@ namespace ES
             if (totalConsumers.Count != 1) throw new InvalidOperationException("资源发布只能有一个总资源使用者。请取消多余 Consumer 的“总 Consumer（启动入口）”勾选。");
             var consumerPublications = new Dictionary<string, ESAssetConsumerReference>(StringComparer.Ordinal);
             var publishStack = new HashSet<string>(StringComparer.Ordinal);
+            SetPublishProgress("生成 Consumer、GameCore 与代码包发布清单", 0.82f);
             ESAssetConsumerReference totalConsumer = PublishConsumer(totalConsumers[0], consumers, publishedLibraries, consumerPublications, publishStack, platform, releaseVersion, initialRoot, localTestRoot, cdnRoot);
             release.totalConsumerUrl = totalConsumer.consumerUrl;
             release.totalConsumerSha256 = totalConsumer.consumerSha256;
 
-            ESAssetPipelineIO.WriteJson(Path.Combine(initialRoot, platform, ESAssetPipelineIO.ReleaseManifestFileName), release, true);
+            // 本机副本在根清单切换前完成清理；若清理失败，远端根清单仍不会指向半完成的新版本。
+            PruneGeneratedReleaseVersions(localTestRoot, releaseVersion);
+            if (includeInitialPackage)
+                PruneGeneratedReleaseVersions(Path.Combine(initialRoot, platform), releaseVersion);
+            SetPublishProgress("原子写入发布根清单并生成上传计划", 0.94f);
+            if (includeInitialPackage)
+                ESAssetPipelineIO.WriteJson(Path.Combine(initialRoot, platform, ESAssetPipelineIO.ReleaseManifestFileName), release, true);
             ESAssetPipelineIO.WriteJson(Path.Combine(localTestRoot, ESAssetPipelineIO.ReleaseManifestFileName), release, true);
             ESAssetPipelineIO.WriteJson(Path.Combine(cdnRoot, ESAssetPipelineIO.ReleaseManifestFileName), release, true);
             string uploadPlanPath = WriteManualUploadPlan(cdnRoot, platform, releaseVersion);
+            PruneManualUploadPlans(Path.GetDirectoryName(uploadPlanPath), 10);
             AssetDatabase.Refresh();
+            SetPublishProgress("发布完成", 1f);
             Debug.Log($"[ESAssetBundlePublisher] 发布完成：{releaseVersion}，资源库数量 {release.libraries.Count}。根清单已最后原子写入。\n手动 OSS 上传计划：{uploadPlanPath}");
+        }
+
+        private static void SetPublishProgress(string message, float progress)
+        {
+            EditorUtility.DisplayProgressBar("ES 资源发布", message, Mathf.Clamp01(progress));
         }
 
         private static void ValidateAll(List<string> stageFolders)
@@ -252,10 +291,12 @@ namespace ES
                 PublishCodePackages(manifest.codePackages, consumer, platform, releaseVersion, initialRoot, localTestRoot, cdnRoot);
 
                 string relativePath = platform + "/" + releaseVersion + "/Consumers/" + consumer.ConsumerId + ".json";
-                string initialPath = Path.Combine(initialRoot, platform, releaseVersion, "Consumers", consumer.ConsumerId + ".json");
+                string initialPath = string.IsNullOrEmpty(initialRoot) ? null
+                    : Path.Combine(initialRoot, platform, releaseVersion, "Consumers", consumer.ConsumerId + ".json");
                 string localPath = Path.Combine(localTestRoot, releaseVersion, "Consumers", consumer.ConsumerId + ".json");
                 string cdnPath = Path.Combine(cdnRoot, releaseVersion, "Consumers", consumer.ConsumerId + ".json");
-                ESAssetPipelineIO.WriteJson(initialPath, manifest, true);
+                if (!string.IsNullOrEmpty(initialRoot))
+                    ESAssetPipelineIO.WriteJson(initialPath, manifest, true);
                 ESAssetPipelineIO.WriteJson(localPath, manifest, true);
                 ESAssetPipelineIO.WriteJson(cdnPath, manifest, true);
                 var result = new ESAssetConsumerReference { consumerId = consumer.ConsumerId, consumerUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativePath), consumerSha256 = ESResManifestIntegrity.ComputeFileSha256(cdnPath) };
@@ -310,17 +351,27 @@ namespace ES
                     throw new InvalidOperationException("GameCore 资产路径无效：" + root.guid);
                 foreach (string dependencyPath in AssetDatabase.GetDependencies(rootPath, true))
                 {
-                    var dependency = AssetDatabase.LoadMainAssetAtPath(dependencyPath) as ScriptableObject;
-                    if (dependency == null || ESScriptableObjectClassification.GetClass(dependency) != ESScriptableObjectClass.GameCore)
+                    if (string.Equals(dependencyPath, rootPath, StringComparison.Ordinal))
                         continue;
-                    ESPipelineAssetIdentity identity = ESAssetPipelineIO.GetIdentity(dependency);
-                    var runtimeIdentity = new ESAssetIdentity(identity.guid, identity.localFileId);
-                    if (!byIdentity.ContainsKey(runtimeIdentity))
-                        throw new InvalidOperationException("GameCore 依赖未归属当前 Consumer：" + rootPath + " -> " + dependencyPath);
-                    if (!runtimeIdentity.Equals(new ESAssetIdentity(root.guid, root.localFileId)))
-                        root.dependencies.Add(new ESAssetConsumerGameCoreDependencyReference { guid = identity.guid, localFileId = identity.localFileId });
+                    foreach (UnityEngine.Object loaded in AssetDatabase.LoadAllAssetsAtPath(dependencyPath))
+                    {
+                        var dependency = loaded as ScriptableObject;
+                        if (dependency == null || ESScriptableObjectClassification.GetClass(dependency) != ESScriptableObjectClass.GameCore)
+                            continue;
+                        ESPipelineAssetIdentity identity = ESAssetPipelineIO.GetIdentity(dependency);
+                        var runtimeIdentity = new ESAssetIdentity(identity.guid, identity.localFileId);
+                        if (!byIdentity.ContainsKey(runtimeIdentity))
+                            throw new InvalidOperationException("GameCore 依赖未归属当前 Consumer：" + rootPath + " -> " + dependencyPath + " (" + identity.Key + ")");
+                        if (!runtimeIdentity.Equals(new ESAssetIdentity(root.guid, root.localFileId)))
+                            root.dependencies.Add(new ESAssetConsumerGameCoreDependencyReference { guid = identity.guid, localFileId = identity.localFileId });
+                    }
                 }
-                root.dependencies = root.dependencies.OrderBy(item => item.guid, StringComparer.Ordinal).ThenBy(item => item.localFileId).ToList();
+                root.dependencies = root.dependencies
+                    .GroupBy(item => item.guid + ":" + item.localFileId, StringComparer.Ordinal)
+                    .Select(group => group.First())
+                    .OrderBy(item => item.guid, StringComparer.Ordinal)
+                    .ThenBy(item => item.localFileId)
+                    .ToList();
             }
         }
 
@@ -465,10 +516,12 @@ namespace ES
                     throw new InvalidOperationException($"Consumer“{consumer.Name}”的附加文件名称冲突：{fileName}");
 
                 string relativePath = platform + "/" + releaseVersion + "/Code/" + consumer.ConsumerId + "/" + fileName;
-                string initialPath = Path.Combine(initialRoot, platform, releaseVersion, "Code", consumer.ConsumerId, fileName);
+                string initialPath = string.IsNullOrEmpty(initialRoot) ? null
+                    : Path.Combine(initialRoot, platform, releaseVersion, "Code", consumer.ConsumerId, fileName);
                 string localPath = Path.Combine(localTestRoot, releaseVersion, "Code", consumer.ConsumerId, fileName);
                 string cdnPath = Path.Combine(cdnRoot, releaseVersion, "Code", consumer.ConsumerId, fileName);
-                CopyFile(sourcePath, initialPath);
+                if (!string.IsNullOrEmpty(initialRoot))
+                    CopyFile(sourcePath, initialPath);
                 CopyFile(sourcePath, localPath);
                 CopyFile(sourcePath, cdnPath);
 
@@ -500,6 +553,72 @@ namespace ES
         {
             Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
             File.Copy(sourcePath, destinationPath, true);
+        }
+
+        /// <summary>
+        /// HotUpdate 发布不应把资源、Consumer 或代码包写入 StreamingAssets。
+        /// 这里只清理由本管线管理的目标平台目录，不触碰 StreamingAssets 下的其它业务文件。
+        /// </summary>
+        internal static void RemoveGeneratedStreamingAssets(string platform)
+        {
+            string resRoot = Path.GetFullPath(Path.Combine(ESAssetPipelineIO.ProjectRoot, "Assets", "StreamingAssets", ESGlobalResSetting.ResParentFolderName));
+            string platformRoot = Path.GetFullPath(Path.Combine(resRoot, platform));
+            string validatedRoot = resRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!platformRoot.StartsWith(validatedRoot, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("StreamingAssets 清理目标越界：" + platformRoot);
+            bool removed = false;
+            if (Directory.Exists(platformRoot))
+            {
+                Directory.Delete(platformRoot, true);
+                removed = true;
+            }
+            string metaPath = platformRoot + ".meta";
+            if (File.Exists(metaPath))
+            {
+                File.Delete(metaPath);
+                removed = true;
+            }
+            if (!removed) return;
+            AssetDatabase.Refresh();
+            Debug.Log("[ESRes][Cleanup] HotUpdate 模式：已清理 StreamingAssets 生成平台目录：" + platformRoot);
+        }
+
+        private static void PruneGeneratedReleaseVersions(string generatedRoot, string currentReleaseVersion)
+        {
+            if (string.IsNullOrWhiteSpace(generatedRoot) || !Directory.Exists(generatedRoot)) return;
+            string root = Path.GetFullPath(generatedRoot);
+            int removed = 0;
+            foreach (string folder in Directory.EnumerateDirectories(root).ToArray())
+            {
+                string name = Path.GetFileName(folder);
+                if (string.Equals(name, currentReleaseVersion, StringComparison.Ordinal)) continue;
+                // 只删除本发布器生成的版本目录，避免误删根目录中的其它工具数据。
+                bool generatedRelease = Directory.Exists(Path.Combine(folder, ESAssetPipelineIO.LibrariesFolderName))
+                    || Directory.Exists(Path.Combine(folder, "Consumers"))
+                    || Directory.Exists(Path.Combine(folder, "Code"))
+                    || File.Exists(Path.Combine(folder, ESAssetPipelineIO.ReleaseBundleIndexFileName));
+                if (!generatedRelease) continue;
+                string target = Path.GetFullPath(folder);
+                string validatedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                if (!target.StartsWith(validatedRoot, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("本地发布版本清理目标越界：" + target);
+                Directory.Delete(target, true);
+                removed++;
+            }
+            if (removed > 0)
+                Debug.Log($"[ESRes][Cleanup] {root} 已删除 {removed} 个旧本机发布版本，仅保留 {currentReleaseVersion}。");
+        }
+
+        private static void PruneManualUploadPlans(string planFolder, int keepCount)
+        {
+            if (string.IsNullOrWhiteSpace(planFolder) || !Directory.Exists(planFolder)) return;
+            string[] obsolete = Directory.EnumerateFiles(planFolder, "*.json", SearchOption.TopDirectoryOnly)
+                .OrderByDescending(path => File.GetLastWriteTimeUtc(path))
+                .Skip(Math.Max(1, keepCount))
+                .ToArray();
+            foreach (string path in obsolete) File.Delete(path);
+            if (obsolete.Length > 0)
+                Debug.Log($"[ESRes][Cleanup] 手工上传计划已删除 {obsolete.Length} 份旧记录，保留最新 {Math.Max(1, keepCount)} 份。");
         }
 
         private sealed class PublishedLibrary

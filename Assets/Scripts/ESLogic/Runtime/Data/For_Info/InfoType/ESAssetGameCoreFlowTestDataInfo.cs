@@ -11,7 +11,9 @@ namespace ES
     [ESEnumScript("Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESAssetGameCoreFlowTestDataInfo.cs")]
     public enum ESFlowTestEnumKey : ushort
     {
+        [InspectorName("未配置")]
         None = 0,
+        [InspectorName("商业流程验收")]
         CommercialFlowTest = 1
     }
 
@@ -83,24 +85,24 @@ namespace ES
         [LabelText("Shot"), InlineProperty] public ESShotConfigKey shot = new ESShotConfigKey();
 
         [TitleGroup("Asset References")]
-        [LabelText("Prefab"), InlineProperty] public ESAssetReferPrefab prefab = new ESAssetReferPrefab();
-        [LabelText("Sprite / SubAsset"), InlineProperty] public ESAssetReferSprite sprite = new ESAssetReferSprite();
-        [LabelText("AudioClip"), InlineProperty] public ESAssetReferAudioClip audioClip = new ESAssetReferAudioClip();
-        [LabelText("Material"), InlineProperty] public ESAssetReferMaterial material = new ESAssetReferMaterial();
-        [LabelText("Texture"), InlineProperty] public ESAssetReferTexture texture = new ESAssetReferTexture();
-        [LabelText("Texture2D"), InlineProperty] public ESAssetReferTexture2D texture2D = new ESAssetReferTexture2D();
-        [LabelText("AnimationClip / SubAsset"), InlineProperty] public ESAssetReferAnimationClip animationClip = new ESAssetReferAnimationClip();
-        [LabelText("AnimatorController"), InlineProperty] public ESAssetReferAnimatorController animatorController = new ESAssetReferAnimatorController();
-        [LabelText("SpriteAtlas"), InlineProperty] public ESAssetReferSpriteAtlas spriteAtlas = new ESAssetReferSpriteAtlas();
-        [LabelText("Avatar / SubAsset"), InlineProperty] public ESAssetReferAvatar avatar = new ESAssetReferAvatar();
-        [LabelText("VideoClip"), InlineProperty] public ESAssetReferVideoClip videoClip = new ESAssetReferVideoClip();
-        [LabelText("TimelineAsset"), InlineProperty] public ESAssetReferTimelineAsset timelineAsset = new ESAssetReferTimelineAsset();
-        [LabelText("PlayableAsset"), InlineProperty] public ESAssetReferPlayableAsset playableAsset = new ESAssetReferPlayableAsset();
-        [LabelText("Mesh / SubAsset"), InlineProperty] public ESAssetReferMesh mesh = new ESAssetReferMesh();
-        [LabelText("TerrainData"), InlineProperty] public ESAssetReferTerrainData terrainData = new ESAssetReferTerrainData();
-        [LabelText("ScriptableObject"), InlineProperty] public ESAssetReferScriptableObject scriptableObject = new ESAssetReferScriptableObject();
-        [LabelText("UnityObject"), InlineProperty] public ESAssetReferUnityObject unityObject = new ESAssetReferUnityObject();
-        [LabelText("Scene"), InlineProperty] public ESAssetReferScene scene = new ESAssetReferScene();
+        public ESAssetReferPrefab prefab = new ESAssetReferPrefab();
+        public ESAssetReferSprite sprite = new ESAssetReferSprite();
+        public ESAssetReferAudioClip audioClip = new ESAssetReferAudioClip();
+        public ESAssetReferMaterial material = new ESAssetReferMaterial();
+        public ESAssetReferTexture texture = new ESAssetReferTexture();
+        public ESAssetReferTexture2D texture2D = new ESAssetReferTexture2D();
+        public ESAssetReferAnimationClip animationClip = new ESAssetReferAnimationClip();
+        public ESAssetReferAnimatorController animatorController = new ESAssetReferAnimatorController();
+        public ESAssetReferSpriteAtlas spriteAtlas = new ESAssetReferSpriteAtlas();
+        public ESAssetReferAvatar avatar = new ESAssetReferAvatar();
+        public ESAssetReferVideoClip videoClip = new ESAssetReferVideoClip();
+        public ESAssetReferTimelineAsset timelineAsset = new ESAssetReferTimelineAsset();
+        public ESAssetReferPlayableAsset playableAsset = new ESAssetReferPlayableAsset();
+        public ESAssetReferMesh mesh = new ESAssetReferMesh();
+        public ESAssetReferTerrainData terrainData = new ESAssetReferTerrainData();
+        public ESAssetReferScriptableObject scriptableObject = new ESAssetReferScriptableObject();
+        public ESAssetReferUnityObject unityObject = new ESAssetReferUnityObject();
+        public ESAssetReferScene scene = new ESAssetReferScene();
 
         [TitleGroup("Execution")]
         [LabelText("Load Scene (changes active scene)")]

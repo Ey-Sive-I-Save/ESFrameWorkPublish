@@ -180,6 +180,10 @@ namespace ES
         [LabelText("Can Build")]
         public bool ContainsBuild = true;
 
+        [LabelText("AB 短码")]
+        [Tooltip("2~12 位小写字母、数字或下划线；首次烘焙自动生成并持久化。修改后会生成一套新的 BundleKey。")]
+        public string AssetBundleCode = string.Empty;
+
         [ESBoolOption("允许热更新远端发布", "仅随包本地")]
         public bool IsNet = true;
 

@@ -229,6 +229,24 @@ namespace ES
                     SaveAssetsImmediate();  // 文件夹改名需立即保存
                 }
 
+                if (library is ESAssetLibrary assetLibrary)
+                {
+                    string previousBundleCode = assetLibrary.AssetBundleCode;
+                    string nextBundleCode = EditorGUILayout.TextField("AB 短码", previousBundleCode);
+                    if (!string.Equals(nextBundleCode, previousBundleCode, StringComparison.Ordinal))
+                    {
+                        Undo.RecordObject(assetLibrary, "Edit AssetBundle Code");
+                        assetLibrary.AssetBundleCode = nextBundleCode.Trim().ToLowerInvariant();
+                        MarkDirtyDeferred();
+                    }
+                    if (string.IsNullOrWhiteSpace(assetLibrary.AssetBundleCode))
+                        EditorGUILayout.HelpBox("首次烘焙会自动生成并固化 AB 短码。", MessageType.Info);
+                    else if (!ESAssetBundleUtility.IsValidLibraryCode(assetLibrary.AssetBundleCode))
+                        EditorGUILayout.HelpBox("AB 短码必须为 2~12 位，只能包含 a-z、0-9、_。", MessageType.Error);
+                    else
+                        EditorGUILayout.HelpBox("正式发布后修改此短码会让该 Library 的 BundleKey 全部变化。", MessageType.Warning);
+                }
+
                 DrawActiveCollectLibraryPanel();
 
                 EditorGUILayout.LabelField("↓库描述↓");

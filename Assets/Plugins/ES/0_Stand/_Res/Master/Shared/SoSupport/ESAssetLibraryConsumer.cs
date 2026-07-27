@@ -40,17 +40,17 @@ namespace ES
         [LabelText("依赖 Consumer")]
         public List<ESAssetLibraryConsumer> RequiredConsumers = new List<ESAssetLibraryConsumer>();
 
-        [LabelText("启动游戏核心")]
+        [HideInInspector]
         [Tooltip("由资产烘焙自动维护。仅收集本 Consumer 必需 Library 中实现 IGameCoreSO 的 ScriptableObject。")]
         [SerializeReference]
         public List<ESAssetReferBase> GameCoreAssets = new List<ESAssetReferBase>();
 
-        [LabelText("手动补充 GameCore")]
+        [HideInInspector]
         [Tooltip("用于不在必需 Library 中的启动核心。烘焙同步不会覆盖此列表。")]
         [SerializeReference]
         public List<ESAssetReferBase> ManualGameCoreAssets = new List<ESAssetReferBase>();
 
-        [LabelText("GameCore 依赖检查"), ReadOnly, MultiLineProperty(5)]
+        [HideInInspector]
         public List<string> GameCoreValidationErrors = new List<string>();
 
         [LabelText("启动常驻资产")]

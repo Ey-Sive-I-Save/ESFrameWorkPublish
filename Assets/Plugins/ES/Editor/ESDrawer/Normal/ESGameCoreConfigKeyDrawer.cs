@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using ES;
 using UnityEditor;
 using UnityEngine;
@@ -8,111 +10,173 @@ namespace ES.EditorInternal
     public abstract class ESGameCoreConfigKeyDrawerBase : PropertyDrawer
     {
         private const float Line = 18f;
-        private const float Gap = 4f;
-        private const float Padding = 5f;
-
-        private static readonly GUIContent EnumKeyLabel = new GUIContent("Enum Key");
-        private static readonly GUIContent StringKeyLabel = new GUIContent("String Key");
-        private static readonly GUIContent EnumPrimaryStatus = new GUIContent("Enum \u4e3b\u952e \u00b7 String \u5907\u7528");
-        private static readonly GUIContent EnumOnlyStatus = new GUIContent("Enum \u4e3b\u952e");
-        private static readonly GUIContent StringOnlyStatus = new GUIContent("String \u4e3b\u952e");
-        private static readonly GUIContent EmptyStatus = new GUIContent("\u672a\u914d\u7f6e");
-        private static GUIStyle statusStyle;
+        private const float Gap = 2f;
+        private const float PanelPadding = 6f;
+        private static readonly Color PanelAccent = new Color(1f, 0.72f, 0.18f, 0.95f);
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            return Padding * 2f + Line * 6f + Gap * 5f;
+            int lines = property.isExpanded ? 10 : 5;
+            return lines * Line + (lines - 1) * Gap + PanelPadding * 2f;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
 
+            GUI.Box(position, GUIContent.none, EditorStyles.helpBox);
+            EditorGUI.DrawRect(new Rect(position.x + 2f, position.y + 2f, Mathf.Max(0f, position.width - 4f), 2f), PanelAccent);
+            position = new Rect(
+                position.x + PanelPadding,
+                position.y + PanelPadding,
+                Mathf.Max(0f, position.width - PanelPadding * 2f),
+                Mathf.Max(0f, position.height - PanelPadding * 2f));
+
             SerializedProperty enumKey = property.FindPropertyRelative("enumKey");
             SerializedProperty stringKey = property.FindPropertyRelative("stringKey");
             Type enumType = ResolveEnumType();
-            bool hasEnum = enumKey != null && enumKey.intValue != 0;
-            bool hasString = stringKey != null && !string.IsNullOrWhiteSpace(stringKey.stringValue);
-
-            Color oldBackground = GUI.backgroundColor;
-            GUI.backgroundColor = hasEnum || hasString
-                ? new Color(0.34f, 0.68f, 0.48f, 1f)
-                : new Color(0.82f, 0.48f, 0.28f, 1f);
-            GUI.Box(position, GUIContent.none, EditorStyles.helpBox);
-            GUI.backgroundColor = oldBackground;
-
-            position.x += Padding;
-            position.y += Padding;
-            position.width -= Padding * 2f;
-            position.height -= Padding * 2f;
+            ESGameCoreDefinitionLocator.Candidate current = ESGameCoreDefinitionLocator.FindCandidate(property, enumType);
 
             Rect row = NextLine(ref position);
-            DrawSplit(row, 0.58f, out Rect left, out Rect right);
-            EditorGUI.LabelField(left, label, EditorStyles.boldLabel);
-            EditorGUI.LabelField(right, ResolveStatus(hasEnum, hasString), StatusStyle);
+            DrawHeader(row, ResolveTitle(property, label, enumType), "GameCore ConfigKey");
 
             row = NextLine(ref position);
-            DrawSplit(row, 0.44f, out left, out right);
-            EditorGUI.PropertyField(left, enumKey, EnumKeyLabel);
-            EditorGUI.PropertyField(right, stringKey, StringKeyLabel);
+            const string enumLabel = "枚举 Key";
+            Rect contentRect = EditorGUI.PrefixLabel(row, new GUIContent(enumLabel));
+            DrawActionRow(contentRect, out Rect selectorRect, out Rect clearRect, out Rect locateRect);
+            EditorGUI.BeginChangeCheck();
+            EditorGUI.PropertyField(selectorRect, enumKey, GUIContent.none);
+            if (EditorGUI.EndChangeCheck())
+                ApplyEnumSelection(property, enumType, enumKey.intValue);
 
-            row = NextLine(ref position);
-            DrawSplit(row, 0.5f, out left, out right);
-            if (GUI.Button(left, "\u4ece\u5f53\u524d\u5b9a\u4e49\u586b\u5145 String", EditorStyles.miniButtonLeft))
+            bool configured = (enumKey != null && enumKey.intValue != 0) || (stringKey != null && !string.IsNullOrWhiteSpace(stringKey.stringValue));
+            using (new EditorGUI.DisabledScope(!configured))
             {
-                stringKey.stringValue = ResolveSuggestedStringKey(property);
-                property.serializedObject.ApplyModifiedProperties();
-                MarkDirty(property);
-            }
-            if (GUI.Button(right, "\u590d\u5236 ConfigKey", EditorStyles.miniButtonRight))
-                CopyKey(enumKey, stringKey, enumType);
-
-            row = NextLine(ref position);
-            DrawSplit(row, 0.5f, out left, out right);
-            using (new EditorGUI.DisabledScope(enumType == null))
-            {
-                if (GUI.Button(left, "\u5b9a\u4f4d\u5f53\u524d\u679a\u4e3e", EditorStyles.miniButtonLeft))
-                    OpenCurrentEnumMember(enumType, enumKey);
-                if (GUI.Button(right, "\u679a\u4e3e\u6269\u5bb9\u4f4d\u7f6e", EditorStyles.miniButtonRight))
-                    ESEnumScriptJump.OpenEnumAppendPosition(enumType);
+                if (GUI.Button(clearRect, new GUIContent("×", "清空配置"), EditorStyles.miniButton))
+                    Clear(property);
+                if (GUI.Button(locateRect, new GUIContent("定位", "定位定义资产"), EditorStyles.miniButton))
+                    LocateDefinitionAsset(property, enumType);
             }
 
             row = NextLine(ref position);
-            DrawSplit(row, 0.5f, out left, out right);
-            using (new EditorGUI.DisabledScope(enumType == null))
+            Rect stringRect = EditorGUI.PrefixLabel(row, new GUIContent("字符串 Key", "可直接输入，也可从已有 GameCore 定义中选择。"));
+            DrawStringSelectionRow(stringRect, out Rect stringInputRect, out Rect stringSelectRect);
+            EditorGUI.BeginChangeCheck();
+            string editedStringKey = EditorGUI.DelayedTextField(stringInputRect, stringKey.stringValue);
+            if (EditorGUI.EndChangeCheck())
             {
-                if (GUI.Button(left, "\u590d\u5236\u811a\u672c\u5b9a\u4f4d", EditorStyles.miniButtonLeft))
-                    CopyEnumScriptLocation(enumType, enumKey);
-                if (GUI.Button(right, "\u590d\u5236\u679a\u4e3e\u6269\u5bb9\u8bf7\u6c42", EditorStyles.miniButtonRight))
-                    CopyAiEnumRequest(enumType, enumKey, stringKey, ResolveSuggestedStringKey(property));
+                stringKey.stringValue = editedStringKey?.Trim() ?? string.Empty;
+                ClearDefinitionIdentity(property);
+                Apply(property);
+                TryBindOwningDefinition(property, enumType);
             }
+            if (GUI.Button(stringSelectRect, StringSelectContent(stringSelectRect), EditorStyles.miniButton))
+                ShowStringKeyMenu(stringSelectRect, property, enumType);
 
             row = NextLine(ref position);
-            DrawSplit(row, 0.5f, out left, out right);
-            if (GUI.Button(left, "\u5b9a\u4f4d\u5b9a\u4e49\u8d44\u4ea7", EditorStyles.miniButtonLeft))
-                LocateDefinitionAsset(property, enumType, openEditor: false);
-            if (GUI.Button(right, "\u6253\u5f00\u5b9a\u4e49\u7f16\u8f91\u5668", EditorStyles.miniButtonRight))
-                LocateDefinitionAsset(property, enumType, openEditor: true);
+            Rect assetRect = EditorGUI.PrefixLabel(row, new GUIContent("资产(备选)", "拖入定义资产以反向同步 ConfigKey"));
+            Type definitionType = ESGameCoreDefinitionLocator.ResolveAssetType(enumType) ?? typeof(ScriptableObject);
+            EditorGUI.BeginChangeCheck();
+            ScriptableObject selected = EditorGUI.ObjectField(assetRect, current?.asset, definitionType, false) as ScriptableObject;
+            if (EditorGUI.EndChangeCheck())
+            {
+                if (selected == null)
+                {
+                    ClearDefinitionIdentity(property);
+                    Apply(property);
+                }
+                else if (ESGameCoreDefinitionLocator.TryCreateCandidate(selected, enumType, out ESGameCoreDefinitionLocator.Candidate selectedCandidate))
+                    ApplyCandidate(property, selectedCandidate);
+                else
+                    Debug.LogWarning("[ESGameCore][ConfigKey] 选择的定义资产不包含对应类型的 ConfigKey：" + selected.name, selected);
+            }
+
+            string keySummary = current != null ? current.effectiveStringKey : (stringKey != null ? stringKey.stringValue : string.Empty);
+            property.isExpanded = EditorGUI.Foldout(NextLine(ref position), property.isExpanded,
+                current != null ? "已同步 · " + current.asset.GetType().Name + " · " + keySummary
+                    : (string.IsNullOrEmpty(keySummary) ? "高级信息" : "仅 Key · 尚未绑定定义身份"), true, EditorStyles.foldout);
+
+            if (property.isExpanded)
+            {
+                DrawReadOnly(ref position, "Enum Key", enumKey);
+                DrawReadOnly(ref position, "String Key", stringKey);
+                DrawReadOnly(ref position, "Definition GUID", property.FindPropertyRelative("definitionGuid"));
+                DrawReadOnly(ref position, "Local File Id", property.FindPropertyRelative("definitionLocalFileId"));
+                DrawReadOnly(ref position, "Definition Type", property.FindPropertyRelative("definitionTypeName"));
+            }
 
             EditorGUI.EndProperty();
         }
 
         protected abstract Type ResolveEnumType();
 
-        private static GUIStyle StatusStyle
+        private static void DrawHeader(Rect rect, string title, string subtitle)
         {
-            get
-            {
-                if (statusStyle == null)
-                    statusStyle = new GUIStyle(EditorStyles.miniBoldLabel) { alignment = TextAnchor.MiddleRight };
-                return statusStyle;
-            }
+            Rect marker = new Rect(rect.x, rect.y + 2f, 3f, rect.height - 4f);
+            EditorGUI.DrawRect(marker, PanelAccent);
+            Rect titleRect = new Rect(marker.xMax + 5f, rect.y, Mathf.Max(0f, rect.width - marker.width - 5f), rect.height);
+            GUIStyle style = new GUIStyle(EditorStyles.boldLabel);
+            style.normal.textColor = PanelAccent;
+            EditorGUI.LabelField(titleRect, title + "  ·  " + subtitle, style);
         }
 
-        private static GUIContent ResolveStatus(bool hasEnum, bool hasString)
+        private static string ResolveTitle(SerializedProperty property, GUIContent label, Type enumType)
         {
-            if (hasEnum) return hasString ? EnumPrimaryStatus : EnumOnlyStatus;
-            return hasString ? StringOnlyStatus : EmptyStatus;
+            if (HasVisibleLabel(label)) return label.text;
+            if (property != null && !string.IsNullOrWhiteSpace(property.displayName)) return property.displayName;
+            string name = enumType != null ? enumType.Name : "GameCore";
+            return name.Replace("EnumKey", string.Empty).Replace("ES", string.Empty) + " Key";
+        }
+
+        private static void DrawStringSelectionRow(Rect rect, out Rect input, out Rect select)
+        {
+            float selectWidth = rect.width >= 150f ? 42f : 24f;
+            select = new Rect(rect.xMax - selectWidth, rect.y, selectWidth, rect.height);
+            input = new Rect(rect.x, rect.y, Mathf.Max(20f, select.x - Gap - rect.x), rect.height);
+        }
+
+        private static GUIContent StringSelectContent(Rect rect)
+        {
+            return new GUIContent(rect.width >= 40f ? "选择" : "▼", "从已有 GameCore 定义中选择字符串 Key");
+        }
+
+        private static void ShowStringKeyMenu(Rect position, SerializedProperty property, Type enumType)
+        {
+            var menu = new GenericMenu();
+            IReadOnlyList<ESGameCoreDefinitionLocator.Candidate> candidates = ESGameCoreDefinitionLocator.GetCandidates(enumType, true);
+            if (candidates.Count == 0)
+            {
+                menu.AddDisabledItem(new GUIContent("没有可选的 GameCore 定义"));
+            }
+            else
+            {
+                foreach (ESGameCoreDefinitionLocator.Candidate item in candidates)
+                {
+                    ESGameCoreDefinitionLocator.Candidate captured = item;
+                    string path = AssetDatabase.GetAssetPath(item.asset).Replace("/", " › ");
+                    string key = string.IsNullOrWhiteSpace(item.effectiveStringKey) ? "<无字符串 Key>" : item.effectiveStringKey;
+                    string menuPath = key + " · " + item.asset.name + " · " + item.asset.GetType().Name + " · " + path;
+                    menu.AddItem(
+                        new GUIContent(menuPath, AssetPreview.GetMiniThumbnail(item.asset)),
+                        false,
+                        () => ApplyCandidate(property, captured));
+                }
+            }
+            menu.DropDown(position);
+        }
+
+        private static bool HasVisibleLabel(GUIContent label)
+        {
+            return label != null && !string.IsNullOrWhiteSpace(label.text);
+        }
+
+        private static void DrawActionRow(Rect rect, out Rect selector, out Rect clear, out Rect locate)
+        {
+            float clearWidth = 22f;
+            float locateWidth = rect.width >= 180f ? 42f : 24f;
+            locate = new Rect(rect.xMax - locateWidth, rect.y, locateWidth, rect.height);
+            clear = new Rect(locate.x - Gap - clearWidth, rect.y, clearWidth, rect.height);
+            selector = new Rect(rect.x, rect.y, Mathf.Max(20f, clear.x - Gap - rect.x), rect.height);
         }
 
         private static Rect NextLine(ref Rect position)
@@ -122,55 +186,61 @@ namespace ES.EditorInternal
             return rect;
         }
 
-        private static void DrawSplit(Rect rect, float leftRatio, out Rect left, out Rect right)
+        private static void DrawReadOnly(ref Rect position, string label, SerializedProperty value)
         {
-            float width = Mathf.Floor((rect.width - Gap) * leftRatio);
-            left = new Rect(rect.x, rect.y, width, rect.height);
-            right = new Rect(left.xMax + Gap, rect.y, rect.width - width - Gap, rect.height);
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUI.PropertyField(NextLine(ref position), value, new GUIContent(label));
         }
 
-        private static string ResolveSuggestedStringKey(SerializedProperty property)
+        private static void ApplyEnumSelection(SerializedProperty property, Type enumType, int enumValue)
         {
-            UnityEngine.Object target = property.serializedObject.targetObject;
-            if (target is SoDataInfo info && !string.IsNullOrEmpty(info.KeyName))
-                return info.KeyName;
-            return target != null ? target.name : string.Empty;
-        }
-
-        private static void CopyKey(SerializedProperty enumKey, SerializedProperty stringKey, Type enumType)
-        {
-            string enumName = enumType != null && enumKey != null
-                ? enumType.Name + "." + ResolveEnumMemberName(enumType, enumKey)
-                : "UnknownEnum";
-            EditorGUIUtility.systemCopyBuffer =
-                "enumKey: " + enumName + Environment.NewLine +
-                "stringKey: " + (stringKey != null ? stringKey.stringValue : string.Empty);
-        }
-
-        private static void OpenCurrentEnumMember(Type enumType, SerializedProperty enumKey)
-        {
-            string memberName = ResolveEnumMemberName(enumType, enumKey);
-            if (string.IsNullOrEmpty(memberName))
-                ESEnumScriptJump.OpenEnum(enumType);
-            else
-                ESEnumScriptJump.OpenEnumMember(enumType, memberName);
-        }
-
-        private static void CopyEnumScriptLocation(Type enumType, SerializedProperty enumKey)
-        {
-            string memberName = ResolveEnumMemberName(enumType, enumKey);
-            ESEnumScriptJumpResult result;
-            bool found = !string.IsNullOrEmpty(memberName)
-                ? ESEnumScriptJump.TryFindEnumMember(enumType, memberName, out result)
-                : ESEnumScriptJump.TryFindEnum(enumType, out result);
-            if (!found)
+            property.FindPropertyRelative("enumKey").intValue = enumValue;
+            ClearDefinitionIdentity(property);
+            SerializedProperty stringKey = property.FindPropertyRelative("stringKey");
+            if (enumValue != 0 && stringKey != null && string.IsNullOrWhiteSpace(stringKey.stringValue))
             {
-                Debug.LogWarning("[ESGameCore][Enum] \u672a\u627e\u5230\u679a\u4e3e\u811a\u672c\u5b9a\u4f4d\uff1a" + (enumType != null ? enumType.Name : "<null>"));
-                return;
+                UnityEngine.Object target = property.serializedObject.targetObject;
+                stringKey.stringValue = target is SoDataInfo info && !string.IsNullOrWhiteSpace(info.KeyName)
+                    ? info.KeyName
+                    : (target != null ? target.name : string.Empty);
             }
+            Apply(property);
+            TryBindOwningDefinition(property, enumType);
+        }
 
-            int line = result.HasMemberLine ? result.memberLine : result.enumLine;
-            EditorGUIUtility.systemCopyBuffer = result.assetPath + ":" + line;
+        private static void TryBindOwningDefinition(SerializedProperty property, Type enumType)
+        {
+            property.serializedObject.Update();
+            if (property.serializedObject.targetObject is ScriptableObject definition
+                && ESGameCoreDefinitionLocator.TryCreateCandidate(definition, enumType, out ESGameCoreDefinitionLocator.Candidate candidate))
+                ApplyCandidate(property, candidate);
+        }
+
+        private static void ApplyCandidate(SerializedProperty property, ESGameCoreDefinitionLocator.Candidate candidate)
+        {
+            property.serializedObject.Update();
+            property.FindPropertyRelative("enumKey").intValue = candidate.enumKey;
+            property.FindPropertyRelative("stringKey").stringValue = candidate.effectiveStringKey ?? string.Empty;
+            property.FindPropertyRelative("definitionGuid").stringValue = candidate.guid ?? string.Empty;
+            property.FindPropertyRelative("definitionLocalFileId").longValue = candidate.localFileId;
+            property.FindPropertyRelative("definitionTypeName").stringValue = candidate.assetTypeName ?? string.Empty;
+            Apply(property);
+        }
+
+        private static void Clear(SerializedProperty property)
+        {
+            property.serializedObject.Update();
+            property.FindPropertyRelative("enumKey").intValue = 0;
+            property.FindPropertyRelative("stringKey").stringValue = string.Empty;
+            ClearDefinitionIdentity(property);
+            Apply(property);
+        }
+
+        private static void ClearDefinitionIdentity(SerializedProperty property)
+        {
+            property.FindPropertyRelative("definitionGuid").stringValue = string.Empty;
+            property.FindPropertyRelative("definitionLocalFileId").longValue = 0;
+            property.FindPropertyRelative("definitionTypeName").stringValue = string.Empty;
         }
 
         private static string ResolveEnumMemberName(Type enumType, SerializedProperty enumKey)
@@ -180,23 +250,14 @@ namespace ES.EditorInternal
             return Enum.GetName(enumType, enumKey.intValue);
         }
 
-        private static void CopyAiEnumRequest(Type enumType, SerializedProperty enumKey, SerializedProperty stringKey, string fallbackStringKey)
+        private static void Apply(SerializedProperty property)
         {
-            string desiredStringKey = stringKey != null && !string.IsNullOrEmpty(stringKey.stringValue)
-                ? stringKey.stringValue
-                : fallbackStringKey;
-            string current = ResolveEnumMemberName(enumType, enumKey) ?? "Unknown";
-            ESEnumScriptJump.CopyAppendRequest(enumType, desiredStringKey, current);
+            property.serializedObject.ApplyModifiedProperties();
+            foreach (UnityEngine.Object target in property.serializedObject.targetObjects)
+                if (target != null) EditorUtility.SetDirty(target);
         }
 
-        private static void MarkDirty(SerializedProperty property)
-        {
-            UnityEngine.Object target = property.serializedObject.targetObject;
-            if (target != null)
-                EditorUtility.SetDirty(target);
-        }
-
-        private static void LocateDefinitionAsset(SerializedProperty property, Type enumType, bool openEditor)
+        private static void LocateDefinitionAsset(SerializedProperty property, Type enumType)
         {
             ScriptableObject target = ESGameCoreDefinitionLocator.Find(property, enumType);
             if (target == null)
@@ -207,13 +268,97 @@ namespace ES.EditorInternal
 
             Selection.activeObject = target;
             EditorGUIUtility.PingObject(target);
-            if (openEditor)
-                ESGameCoreDefinitionEditorWindow.Open(target);
         }
     }
 
     internal static class ESGameCoreDefinitionLocator
     {
+        internal sealed class Candidate
+        {
+            public ScriptableObject asset;
+            public int enumKey;
+            public string effectiveStringKey;
+            public string guid;
+            public long localFileId;
+            public string assetTypeName;
+        }
+
+        private static readonly Dictionary<Type, List<Candidate>> CandidateCache = new Dictionary<Type, List<Candidate>>();
+
+        static ESGameCoreDefinitionLocator()
+        {
+            EditorApplication.projectChanged += CandidateCache.Clear;
+        }
+
+        public static IReadOnlyList<Candidate> GetCandidates(Type enumType, bool refresh = false)
+        {
+            if (enumType == null) return Array.Empty<Candidate>();
+            if (!refresh && CandidateCache.TryGetValue(enumType, out List<Candidate> cached)) return cached;
+            var result = new List<Candidate>();
+            Type assetType = ResolveAssetType(enumType);
+            if (assetType != null)
+                foreach (string guid in AssetDatabase.FindAssets("t:ScriptableObject"))
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    foreach (UnityEngine.Object loaded in AssetDatabase.LoadAllAssetsAtPath(path))
+                        if (loaded is ScriptableObject asset && assetType.IsInstanceOfType(asset)
+                            && TryCreateCandidate(asset, enumType, out Candidate candidate))
+                            result.Add(candidate);
+                }
+            result = result.GroupBy(item => item.guid + ":" + item.localFileId, StringComparer.Ordinal).Select(group => group.First()).ToList();
+            result.Sort((left, right) =>
+            {
+                int pathCompare = string.CompareOrdinal(AssetDatabase.GetAssetPath(left.asset), AssetDatabase.GetAssetPath(right.asset));
+                return pathCompare != 0 ? pathCompare : left.localFileId.CompareTo(right.localFileId);
+            });
+            CandidateCache[enumType] = result;
+            return result;
+        }
+
+        public static Candidate FindCandidate(SerializedProperty property, Type enumType)
+        {
+            if (property == null || enumType == null) return null;
+            int enumValue = property.FindPropertyRelative("enumKey")?.intValue ?? 0;
+            string stringValue = property.FindPropertyRelative("stringKey")?.stringValue ?? string.Empty;
+            string definitionGuid = property.FindPropertyRelative("definitionGuid")?.stringValue ?? string.Empty;
+            long definitionLocalFileId = property.FindPropertyRelative("definitionLocalFileId")?.longValue ?? 0;
+            string definitionTypeName = property.FindPropertyRelative("definitionTypeName")?.stringValue ?? string.Empty;
+            if (!string.IsNullOrEmpty(definitionGuid))
+            {
+                ScriptableObject exact = ResolveExact(definitionGuid, definitionLocalFileId);
+                if (TryCreateCandidate(exact, enumType, out Candidate exactCandidate))
+                    return string.IsNullOrEmpty(definitionTypeName)
+                        || string.Equals(definitionTypeName, exactCandidate.assetTypeName, StringComparison.Ordinal)
+                        ? exactCandidate
+                        : null;
+                return null;
+            }
+            List<Candidate> keyMatches = GetCandidates(enumType).Where(candidate =>
+                (enumValue != 0 && candidate.enumKey == enumValue)
+                || (enumValue == 0 && !string.IsNullOrEmpty(stringValue)
+                    && string.Equals(candidate.effectiveStringKey, stringValue, StringComparison.Ordinal))).ToList();
+            return keyMatches.Count == 1 ? keyMatches[0] : null;
+        }
+
+        public static bool TryCreateCandidate(ScriptableObject asset, Type enumType, out Candidate candidate)
+        {
+            candidate = null;
+            if (asset == null || enumType == null) return false;
+            IESConfigKey key = ResolveKey(asset, enumType);
+            if (key == null || !AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string guid, out long localFileId)) return false;
+            string fallback = asset is SoDataInfo info ? info.KeyName : asset.name;
+            candidate = new Candidate
+            {
+                asset = asset,
+                enumKey = key.EnumKeyInt,
+                effectiveStringKey = string.IsNullOrEmpty(key.StringKey) ? fallback : key.StringKey,
+                guid = guid,
+                localFileId = localFileId,
+                assetTypeName = asset.GetType().AssemblyQualifiedName
+            };
+            return true;
+        }
+
         public static ScriptableObject Find(SerializedProperty property, Type enumType)
         {
             if (property == null || enumType == null)
@@ -224,45 +369,39 @@ namespace ES.EditorInternal
             int enumValue = enumKey != null ? enumKey.intValue : 0;
             string stringValue = stringKey != null ? stringKey.stringValue : string.Empty;
 
-            if (property.serializedObject.targetObject is ScriptableObject current
-                && Matches(current, enumType, enumValue, stringValue))
-                return current;
-
-            Type assetType = ResolveAssetType(enumType);
-            if (assetType == null || (enumValue == 0 && string.IsNullOrEmpty(stringValue)))
-                return null;
-
-            string[] guids = AssetDatabase.FindAssets("t:" + assetType.Name);
-            ScriptableObject selected = null;
-            string selectedPath = null;
-            int matchCount = 0;
-            for (int i = 0; i < guids.Length; i++)
+            string definitionGuid = property.FindPropertyRelative("definitionGuid")?.stringValue ?? string.Empty;
+            if (!string.IsNullOrEmpty(definitionGuid))
             {
-                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-                ScriptableObject candidate = AssetDatabase.LoadAssetAtPath(path, assetType) as ScriptableObject;
-                if (candidate == null || !Matches(candidate, enumType, enumValue, stringValue))
-                    continue;
-
-                matchCount++;
-                if (selected == null || string.CompareOrdinal(path, selectedPath) < 0)
-                {
-                    selected = candidate;
-                    selectedPath = path;
-                }
+                long localFileId = property.FindPropertyRelative("definitionLocalFileId")?.longValue ?? 0;
+                return ResolveExact(definitionGuid, localFileId);
             }
 
-            if (matchCount > 1)
-                Debug.LogWarning("[ESGameCore][Locate] ConfigKey \u5339\u914d\u5230 " + matchCount + " \u4e2a\u6839\u5b9a\u4e49\uff0c\u5df2\u5b9a\u4f4d\u5230\u8def\u5f84\u6392\u5e8f\u6700\u524d\u7684\u9879\u3002", selected);
-            return selected;
+            Candidate selected = FindCandidate(property, enumType);
+            if (selected != null) return selected.asset;
+            if (property.serializedObject.targetObject is ScriptableObject current && Matches(current, enumType, enumValue, stringValue)) return current;
+            return null;
         }
 
-        private static Type ResolveAssetType(Type enumType)
+        private static ScriptableObject ResolveExact(string guid, long localFileId)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if (string.IsNullOrEmpty(path)) return null;
+            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(path))
+                if (asset is ScriptableObject scriptableObject
+                    && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string candidateGuid, out long candidateLocalFileId)
+                    && candidateGuid == guid && candidateLocalFileId == localFileId)
+                    return scriptableObject;
+            return null;
+        }
+
+        public static Type ResolveAssetType(Type enumType)
         {
             if (enumType == typeof(ESBuffEnumKey)) return typeof(BuffDefinitionDataInfo);
             if (enumType == typeof(ESSkillEnumKey)) return typeof(SkillDefinitionDataInfo);
             if (enumType == typeof(ESMonsterEnumKey)) return typeof(MonsterDataInfo);
             if (enumType == typeof(ESNpcEnumKey)) return typeof(NpcDataInfo);
             if (enumType == typeof(ESShotEnumKey) || enumType == typeof(ESWeaponEnumKey)) return typeof(ItemDataInfo);
+            if (enumType == typeof(ESFlowTestEnumKey)) return typeof(ESAssetGameCoreFlowTestDataInfo);
             return null;
         }
 
@@ -285,6 +424,7 @@ namespace ES.EditorInternal
             if (asset is SkillDefinitionDataInfo skill && enumType == typeof(ESSkillEnumKey)) return skill.skillKey;
             if (asset is MonsterDataInfo monster && enumType == typeof(ESMonsterEnumKey)) return monster.monsterKey;
             if (asset is NpcDataInfo npc && enumType == typeof(ESNpcEnumKey)) return npc.npcKey;
+            if (asset is ESAssetGameCoreFlowTestDataInfo flowTest && enumType == typeof(ESFlowTestEnumKey)) return flowTest.testKey;
             if (asset is ItemDataInfo item && item.baseConfig != null)
             {
                 if (enumType == typeof(ESShotEnumKey) && item.baseConfig.kind == ItemKind.Shot) return item.shotKey;
@@ -436,5 +576,11 @@ namespace ES.EditorInternal
     public sealed class ESSkillConfigKeyDrawer : ESGameCoreConfigKeyDrawerBase
     {
         protected override Type ResolveEnumType() => typeof(ESSkillEnumKey);
+    }
+
+    [CustomPropertyDrawer(typeof(ESFlowTestConfigKey))]
+    public sealed class ESFlowTestConfigKeyDrawer : ESGameCoreConfigKeyDrawerBase
+    {
+        protected override Type ResolveEnumType() => typeof(ESFlowTestEnumKey);
     }
 }

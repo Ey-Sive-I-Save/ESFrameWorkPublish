@@ -9,8 +9,118 @@ namespace ES
     public static class ESAssetBundleUtility
     {
         // Unity/Mono 在部分编辑器与旧播放器环境仍受 MAX_PATH 约束；物理 AB 名必须留出发布目录空间。
-        public const int MaxAssetBundleKeyLength = 80;
+        public const int MaxAssetBundleKeyLength = 56;
+        public const int MaxAssetBundleFileNameLength = 63;
+        public const int MinLibraryCodeLength = 2;
+        public const int MaxLibraryCodeLength = 12;
         private const int StableHashLength = 24;
+
+        public static string ToReadableSlug(string value, int maxLength, string fallback = "asset")
+        {
+            string source = value ?? string.Empty;
+            var transliterated = new StringBuilder(source.Length * 2);
+            foreach (char c in source)
+            {
+                if (c >= '\u4e00' && c <= '\u9fa5')
+                    transliterated.Append(NPinyin.Pinyin.GetPinyin(c, Encoding.UTF8));
+                else
+                    transliterated.Append(c);
+            }
+
+            string slug = ToSafeAssetBundleKey(transliterated.ToString());
+            if (string.Equals(slug, "default_assetbundle", StringComparison.Ordinal)) slug = fallback;
+            if (maxLength > 0 && slug.Length > maxLength) slug = slug.Substring(0, maxLength).Trim('_');
+            return string.IsNullOrEmpty(slug) ? fallback : slug;
+        }
+
+        public static string StableHash(string value, int length)
+        {
+            if (length < 1 || length > 64) throw new ArgumentOutOfRangeException(nameof(length));
+            using (SHA256 sha = SHA256.Create())
+            {
+                string hash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? string.Empty)))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+                return hash.Substring(0, length);
+            }
+        }
+
+        public static bool IsValidLibraryCode(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length < MinLibraryCodeLength || value.Length > MaxLibraryCodeLength) return false;
+            foreach (char c in value)
+                if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) return false;
+            return value[0] != '_' && value[value.Length - 1] != '_';
+        }
+
+        public static string NormalizeLibraryCode(string value)
+        {
+            string code = ToReadableSlug(value, MaxLibraryCodeLength, "lib").Trim('_');
+            return code.Length < MinLibraryCodeLength ? "lib" : code;
+        }
+
+        public static string CreateAutomaticLibraryCode(string libraryName, string libraryAssetGuid)
+        {
+            string hint = ToReadableSlug(libraryName, 5, "lib");
+            string result = hint + "_" + StableHash(libraryAssetGuid, 6);
+            return result.Length <= MaxLibraryCodeLength ? result : result.Substring(0, MaxLibraryCodeLength).TrimEnd('_');
+        }
+
+        public static string GetTypeCode(string kind)
+        {
+            switch (kind ?? string.Empty)
+            {
+                case "Prefab": return "pfb";
+                case "Material": return "mat";
+                case "Texture":
+                case "Texture2D": return "tex";
+                case "Sprite": return "spr";
+                case "AudioClip": return "aud";
+                case "Scene": return "scn";
+                case "ScriptableObject": return "so";
+                case "AnimationClip": return "anim";
+                case "Mesh": return "mesh";
+                case "SpriteAtlas": return "atlas";
+                default: return "asset";
+            }
+        }
+
+        public static string CreateAssetBundleKey(string libraryCode, string libraryAssetGuid, string folderPath,
+            string kind, string assetHint, string assetGuid, long localFileId)
+        {
+            string folderHint = ToReadableSlug(System.IO.Path.GetFileName(folderPath?.Replace('\\', '/')), 10, "root");
+            string folderHash = StableHash((folderPath ?? string.Empty).Replace('\\', '/').ToLowerInvariant(), 4);
+            string identityHash = StableHash(libraryAssetGuid + "|asset|" + assetGuid + ":" + localFileId, 12);
+            string key = NormalizeLibraryCode(libraryCode) + "_" + folderHint + "_" + folderHash + "_"
+                + GetTypeCode(kind) + "_" + ToReadableSlug(assetHint, 12) + "_" + identityHash;
+            return RequireValidAssetBundleKey(key);
+        }
+
+        public static string CreateGroupBundleKey(string libraryCode, string libraryAssetGuid, string groupPath,
+            string namedOption, string folderAssetGuid)
+        {
+            string folderHint = ToReadableSlug(System.IO.Path.GetFileName(groupPath?.Replace('\\', '/')), 10, "root");
+            string folderHash = StableHash((groupPath ?? string.Empty).Replace('\\', '/').ToLowerInvariant(), 6);
+            string groupHash = StableHash(libraryAssetGuid + "|group|" + namedOption + "|" + folderAssetGuid, 12);
+            string key = NormalizeLibraryCode(libraryCode) + "_" + folderHint + "_" + folderHash + "_grp_" + groupHash;
+            return RequireValidAssetBundleKey(key);
+        }
+
+        public static string CreateSpecialBundleKey(string scopeCode, string hint, string stableIdentity)
+        {
+            string key = NormalizeLibraryCode(scopeCode) + "_" + ToReadableSlug(hint, 12) + "_asset_"
+                + StableHash(stableIdentity, 12);
+            return RequireValidAssetBundleKey(key);
+        }
+
+        public static string RequireValidAssetBundleKey(string key)
+        {
+            string safe = ToSafeAssetBundleKey(key);
+            if (!string.Equals(key, safe, StringComparison.Ordinal))
+                throw new ArgumentException("AssetBundleKey 包含非法字符：" + key, nameof(key));
+            if (key.Length > MaxAssetBundleKeyLength)
+                throw new ArgumentException($"AssetBundleKey 超过 {MaxAssetBundleKeyLength} 字符：{key}", nameof(key));
+            return key;
+        }
 
         public static string ToSafeAssetBundleKey(string value, bool preserveSlash = false)
         {
@@ -38,11 +148,7 @@ namespace ES
             if (maxLength < 24) maxLength = 24;
             if (safe.Length <= maxLength) return safe;
 
-            string hash;
-            using (SHA256 sha = SHA256.Create())
-                hash = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? string.Empty))).Replace("-", string.Empty).ToLowerInvariant();
-
-            hash = hash.Substring(0, StableHashLength);
+            string hash = StableHash(value, StableHashLength);
             int prefixLength = Math.Max(1, maxLength - hash.Length - 1);
             string prefix = safe.Substring(0, Math.Min(prefixLength, safe.Length)).Trim('_', '/');
             string result = prefix + "_" + hash;
@@ -57,7 +163,10 @@ namespace ES
             string stem = string.IsNullOrEmpty(extension) ? value : value.Substring(0, value.Length - extension.Length);
             string safeStem = ToBoundedAssetBundleKey(stem, MaxAssetBundleKeyLength);
             string safeExtension = string.IsNullOrEmpty(extension) ? string.Empty : "." + extension.TrimStart('.').ToLowerInvariant();
-            return safeStem + safeExtension;
+            string result = safeStem + safeExtension;
+            if (result.Length > MaxAssetBundleFileNameLength)
+                throw new ArgumentException($"AssetBundle 文件名超过 {MaxAssetBundleFileNameLength} 字符：{result}", nameof(fileName));
+            return result;
         }
 
         public static string GetPlatformFolderName(RuntimePlatform platform)

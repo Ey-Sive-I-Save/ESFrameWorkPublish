@@ -23,14 +23,15 @@ namespace ES
     {
         public ESPipelineAssetIdentity identity = new ESPipelineAssetIdentity();
         public string assetPath = string.Empty, assetTypeName = string.Empty, kind = string.Empty, stringKey = string.Empty;
-        public string libraryName = string.Empty, libraryFolder = string.Empty, pageName = string.Empty, namedOption = string.Empty, subAssetName = string.Empty;
+        public string libraryName = string.Empty, libraryFolder = string.Empty, libraryBundleCode = string.Empty, pageName = string.Empty, namedOption = string.Empty, subAssetName = string.Empty;
+        public string parentFolderPath = string.Empty, parentFolderGuid = string.Empty, topLevelFolderPath = string.Empty, topLevelFolderGuid = string.Empty;
         public int enumKey;
         public bool isBusinessAsset = true;
     }
     [Serializable] public sealed class ESAssetLibraryCatalog
     {
-        public int formatVersion = 2;
-        public string libraryName = string.Empty, libraryFolder = string.Empty;
+        public int formatVersion = 3;
+        public string libraryName = string.Empty, libraryFolder = string.Empty, libraryBundleCode = string.Empty, libraryAssetGuid = string.Empty;
         public List<ESAssetCatalogEntry> assets = new List<ESAssetCatalogEntry>();
         public List<string> excludedEditorOnlyPaths = new List<string>();
         public List<string> errors = new List<string>(), warnings = new List<string>();
@@ -64,7 +65,7 @@ namespace ES
     }
     [Serializable] public sealed class ESAssetBundleBuildPlan
     {
-        public int formatVersion = 1;
+        public int formatVersion = 2;
         public string platform = string.Empty, generatedUtc = string.Empty;
         public List<ESAssetBundleAssignment> assignments = new List<ESAssetBundleAssignment>();
         public List<string> errors = new List<string>(), warnings = new List<string>();
@@ -77,7 +78,7 @@ namespace ES
     }
     [Serializable] public sealed class ESAssetBundleAssetList
     {
-        public int formatVersion = 1;
+        public int formatVersion = 2;
         public string platform = string.Empty;
         public List<ESAssetBundleAssetEntry> assets = new List<ESAssetBundleAssetEntry>();
     }
@@ -108,7 +109,7 @@ namespace ES
     [Serializable] public sealed class ESAssetLibraryIdentity
     {
         public int formatVersion = ESAssetPipelineIO.RuntimeProtocolFormatVersion;
-        public string libraryName = string.Empty, libraryFolder = string.Empty, platform = string.Empty, version = string.Empty, channel = string.Empty, catalogUrl = string.Empty, assetBundleManifestUrl = string.Empty, catalogSha256 = string.Empty, assetBundleManifestSha256 = string.Empty;
+        public string libraryName = string.Empty, libraryFolder = string.Empty, libraryBundleCode = string.Empty, platform = string.Empty, version = string.Empty, channel = string.Empty, catalogUrl = string.Empty, assetBundleManifestUrl = string.Empty, catalogSha256 = string.Empty, assetBundleManifestSha256 = string.Empty;
         public List<ESAssetBundleIdentityHash> assetBundles = new List<ESAssetBundleIdentityHash>();
     }
     [Serializable] public sealed class ESAssetBundleIdentityHash
@@ -209,7 +210,7 @@ namespace ES
     internal static class ESAssetPipelineIO
     {
         public const int ReferenceGraphFormatVersion = 1;
-        public const int RuntimeProtocolFormatVersion = 3;
+        public const int RuntimeProtocolFormatVersion = 4;
         public const string CatalogFileName = "ESAssetLibraryCatalog.json", ReferenceGraphFileName = "ESAssetReferenceGraph.json", PlanFileName = "ESAssetBundleBuildPlan.json", AssetListFileName = "ESAssetBundleAssetList.json";
         public const string BundleManifestFileName = "ESAssetBundleManifest.json", LibraryIdentityFileName = "ESAssetLibraryIdentity.json", BuildSetFileName = "ESAssetBuildSet.json", ReleaseManifestFileName = "ESAssetReleaseManifest.json", ConsumerManifestFileName = "ESAssetConsumerManifest.json", ReleaseBundleIndexFileName = "ESAssetReleaseBundleIndex.json";
         public static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;

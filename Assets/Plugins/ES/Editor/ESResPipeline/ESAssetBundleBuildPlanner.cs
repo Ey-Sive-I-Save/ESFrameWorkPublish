@@ -23,6 +23,12 @@ namespace ES
             {
                 string folder = ESAssetPipelineIO.LibraryBakeFolder(library.LibFolderName);
                 var catalog = ESAssetPipelineIO.ReadJson<ESAssetLibraryCatalog>(Path.Combine(folder, ESAssetPipelineIO.CatalogFileName));
+                if (catalog == null || catalog.formatVersion != 3)
+                    throw new InvalidDataException("[ESRes][Plan] Catalog 命名协议已过期，请重新烘焙：" + library.LibFolderName);
+                if (!string.Equals(catalog.libraryBundleCode, library.AssetBundleCode, StringComparison.Ordinal)
+                    || !ESAssetBundleUtility.IsValidLibraryCode(catalog.libraryBundleCode)
+                    || string.IsNullOrWhiteSpace(catalog.libraryAssetGuid))
+                    throw new InvalidDataException("[ESRes][Plan] Catalog LibraryCode/GUID 无效或已变化，请重新烘焙：" + library.LibFolderName);
                 if (catalog.errors.Count > 0) throw new InvalidOperationException($"Library [{catalog.libraryName}] 的烘焙结果包含错误。");
                 if (catalog.warnings != null) bakeWarnings.AddRange(catalog.warnings);
                 var graph = ESAssetPipelineIO.ReadJson<ESAssetReferenceGraph>(Path.Combine(folder, ESAssetPipelineIO.ReferenceGraphFileName));
@@ -59,7 +65,7 @@ namespace ES
                         continue;
                     }
                     if (!asset.isBusinessAsset && businessPaths.Contains(asset.assetPath)) continue;
-                    string bundleKey = GetRootBundleKey(asset);
+                    string bundleKey = GetRootBundleKey(catalog, asset);
                     AddAssignment(plan, assignmentByPath, asset.assetPath, asset.identity, bundleKey, catalog.libraryFolder, asset.isBusinessAsset);
                     ESAssetBundleAssignment effectiveAssignment = assignmentByPath[asset.assetPath];
                     bundleKey = effectiveAssignment.assetBundleKey;
@@ -94,8 +100,9 @@ namespace ES
             {
                 if (assignmentByPath.ContainsKey(usage.Key)) continue;
                 if (usage.Value.Count == 1) continue;
-                string guid = dependencyIdentities[usage.Key].guid;
-                string bundleKey = ESAssetBundleUtility.ToBoundedAssetBundleKey("__shared/" + (guid.Length > 12 ? guid.Substring(0, 12) : guid));
+                ESPipelineAssetIdentity sharedIdentity = dependencyIdentities[usage.Key];
+                string bundleKey = ESAssetBundleUtility.CreateSpecialBundleKey("shared", Path.GetFileNameWithoutExtension(usage.Key),
+                    "shared|" + sharedIdentity.guid + ":" + sharedIdentity.localFileId);
                 const string owner = "__shared";
                 plan.warnings.Add($"共享依赖独立成包：{usage.Key}，被 {usage.Value.Count} 个 AB 使用。");
                 AddAssignment(plan, assignmentByPath, usage.Key, dependencyIdentities[usage.Key], bundleKey, owner, false);
@@ -105,6 +112,8 @@ namespace ES
 
             plan.assignments = assignmentByPath.Values.OrderBy(item => item.assetBundleKey, StringComparer.Ordinal).ThenBy(item => item.assetPath, StringComparer.Ordinal).ToList();
             assetList.assets = assetList.assets.OrderBy(item => item.assetBundleKey, StringComparer.Ordinal).ThenBy(item => item.internalName, StringComparer.Ordinal).ThenBy(item => item.identity.localFileId).ToList();
+            ValidateBundleKeys(plan);
+            AddRenameWarnings(previousPlan, plan);
             if (plan.errors.Count > 0) throw new InvalidOperationException(string.Join("\n", plan.errors));
             ApplyManagedLabels(previousPlan, plan, editorOnlyPaths);
             ESAssetPipelineIO.WriteJson(previousPlanPath, plan);
@@ -218,6 +227,7 @@ namespace ES
 
         private static void AddAssignment(ESAssetBundleBuildPlan plan, Dictionary<string, ESAssetBundleAssignment> index, string path, ESPipelineAssetIdentity identity, string bundleKey, string owner, bool business)
         {
+            ESAssetBundleUtility.RequireValidAssetBundleKey(bundleKey);
             if (index.TryGetValue(path, out var existing))
             {
                 if (!string.Equals(existing.assetBundleKey, bundleKey, StringComparison.Ordinal))
@@ -239,7 +249,8 @@ namespace ES
                     throw new InvalidOperationException("GameCore Consumer 缺少稳定 ID：" + consumer.Name);
 
                 string owner = ESAssetPipelineIO.GameCoreLibraryFolder(consumer.ConsumerId);
-                string bundleKey = ESAssetBundleUtility.ToBoundedAssetBundleKey(owner + "/core");
+                string gameCoreCode = "gc_" + ESAssetBundleUtility.StableHash(consumer.ConsumerId, 6);
+                string bundleKey = ESAssetBundleUtility.CreateSpecialBundleKey(gameCoreCode, "core", "gamecore|" + consumer.ConsumerId);
                 foreach (ESAssetReferBase refer in consumer.GameCoreAssets)
                 {
                     if (refer == null || !refer.IsValid)
@@ -281,13 +292,51 @@ namespace ES
             return null;
         }
 
-        private static string GetRootBundleKey(ESAssetCatalogEntry asset)
+        private static string GetRootBundleKey(ESAssetLibraryCatalog catalog, ESAssetCatalogEntry asset)
         {
-            string raw;
-            if (asset.namedOption == ABNamedOption.UsePageName.ToString()) raw = asset.pageName;
-            else if (asset.namedOption == ABNamedOption.UseParentPath.ToString() || asset.namedOption == ABNamedOption.UsePageFolder.ToString()) raw = Path.GetDirectoryName(asset.assetPath);
-            else raw = asset.assetPath;
-            return ESAssetBundleUtility.ToBoundedAssetBundleKey(asset.libraryFolder + "/" + raw);
+            if (asset == null || asset.identity == null || !asset.identity.IsValid)
+                throw new InvalidDataException("[ESRes][Plan] Catalog 包含无效命名身份：" + catalog.libraryFolder);
+            if (!string.Equals(asset.libraryBundleCode, catalog.libraryBundleCode, StringComparison.Ordinal))
+                throw new InvalidDataException("[ESRes][Plan] Catalog Entry 的 LibraryCode 不一致：" + asset.assetPath);
+
+            if (asset.namedOption == ABNamedOption.UseParentPath.ToString())
+                return ESAssetBundleUtility.CreateGroupBundleKey(catalog.libraryBundleCode, catalog.libraryAssetGuid,
+                    asset.parentFolderPath, asset.namedOption, asset.parentFolderGuid);
+            if (asset.namedOption == ABNamedOption.UsePageFolder.ToString())
+                return ESAssetBundleUtility.CreateGroupBundleKey(catalog.libraryBundleCode, catalog.libraryAssetGuid,
+                    asset.topLevelFolderPath, asset.namedOption, asset.topLevelFolderGuid);
+
+            string hint = asset.namedOption == ABNamedOption.UsePageName.ToString()
+                ? asset.pageName
+                : Path.GetFileNameWithoutExtension(asset.assetPath);
+            return ESAssetBundleUtility.CreateAssetBundleKey(catalog.libraryBundleCode, catalog.libraryAssetGuid,
+                asset.parentFolderPath, asset.kind, hint, asset.identity.guid, asset.identity.localFileId);
+        }
+
+        private static void ValidateBundleKeys(ESAssetBundleBuildPlan plan)
+        {
+            var owners = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (IGrouping<string, ESAssetBundleAssignment> group in (plan.assignments ?? new List<ESAssetBundleAssignment>())
+                .GroupBy(item => item.assetBundleKey, StringComparer.Ordinal))
+            {
+                ESAssetBundleUtility.RequireValidAssetBundleKey(group.Key);
+                string[] groupOwners = group.Select(item => item.ownerLibrary).Distinct(StringComparer.Ordinal).ToArray();
+                if (groupOwners.Length != 1)
+                    throw new InvalidDataException("[ESRes][Plan] BundleKey 跨归属冲突：" + group.Key + " -> " + string.Join(",", groupOwners));
+                if (!owners.TryAdd(group.Key, groupOwners[0]))
+                    throw new InvalidDataException("[ESRes][Plan] BundleKey 重复：" + group.Key);
+            }
+        }
+
+        private static void AddRenameWarnings(ESAssetBundleBuildPlan previous, ESAssetBundleBuildPlan current)
+        {
+            if (previous?.assignments == null) return;
+            var oldByPath = previous.assignments.Where(item => item != null && !string.IsNullOrWhiteSpace(item.assetPath))
+                .GroupBy(item => item.assetPath, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            foreach (ESAssetBundleAssignment assignment in current.assignments ?? new List<ESAssetBundleAssignment>())
+                if (oldByPath.TryGetValue(assignment.assetPath, out ESAssetBundleAssignment old)
+                    && !string.Equals(old.assetBundleKey, assignment.assetBundleKey, StringComparison.Ordinal))
+                    current.warnings.Add($"[ESRes][Plan][Rename] {old.assetBundleKey} -> {assignment.assetBundleKey} | {assignment.assetPath}");
         }
 
         private static void ApplyManagedLabels(ESAssetBundleBuildPlan previous, ESAssetBundleBuildPlan current, IEnumerable<string> editorOnlyPaths)

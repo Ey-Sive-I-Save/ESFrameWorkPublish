@@ -12,6 +12,8 @@ namespace ES
         public static void Build()
         {
             ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
+            if (ESGlobalResSetting.Instance.AssetRunMode == ESAssetRunMode.HotUpdate)
+                ESAssetBundlePublisher.RemoveGeneratedStreamingAssets(ESAssetPipelineIO.PlatformName);
             string platform = ESAssetPipelineIO.PlatformName;
             string planFolder = ESAssetPipelineIO.PlanRoot(platform);
             var plan = ESAssetPipelineIO.ReadJson<ESAssetBundleBuildPlan>(Path.Combine(planFolder, ESAssetPipelineIO.PlanFileName));
@@ -36,6 +38,7 @@ namespace ES
             AssetBundleManifest unityManifest = BuildPipeline.BuildAssetBundles(buildRoot, builds, BuildAssetBundleOptions.ChunkBasedCompression, target);
             if (unityManifest == null) throw new InvalidOperationException("[ESRes][Build] BuildPipeline.BuildAssetBundles 返回 null。");
             ValidateBuiltBundleGraph(plan, unityManifest);
+            PruneBuildCache(buildRoot, builds.Select(item => item.assetBundleName));
 
             var ownerByBundle = plan.assignments.GroupBy(item => item.assetBundleKey, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Select(item => item.ownerLibrary).OrderBy(item => item, StringComparer.Ordinal).First(), StringComparer.Ordinal);
             var owners = ownerByBundle.Values.Distinct(StringComparer.Ordinal).OrderBy(item => item, StringComparer.Ordinal).ToList();
@@ -55,6 +58,8 @@ namespace ES
         {
             if (plan == null || assetList == null)
                 throw new InvalidOperationException("[ESRes][Build] BuildPlan/AssetList cannot be null.");
+            if (plan.formatVersion != 2 || assetList.formatVersion != 2)
+                throw new InvalidOperationException("[ESRes][Build] BuildPlan/AssetList 命名协议已过期，请重新规划。");
             if (!string.Equals(plan.platform, assetList.platform, StringComparison.Ordinal))
                 throw new InvalidOperationException($"[ESRes][Build] BuildPlan and AssetList platform mismatch: Plan={plan.platform}, AssetList={assetList.platform}");
 
@@ -63,6 +68,10 @@ namespace ES
             {
                 if (assignment == null || string.IsNullOrWhiteSpace(assignment.assetPath) || string.IsNullOrWhiteSpace(assignment.assetBundleKey))
                     throw new InvalidOperationException("[ESRes][Build] BuildPlan contains an invalid assignment.");
+                ESAssetBundleUtility.RequireValidAssetBundleKey(assignment.assetBundleKey);
+                string physicalFileName = assignment.assetBundleKey + ".bundle";
+                if (physicalFileName.Length > ESAssetBundleUtility.MaxAssetBundleFileNameLength)
+                    throw new InvalidOperationException("[ESRes][Build] AssetBundle 文件名超长：" + physicalFileName);
                 if (!assignmentByPath.TryAdd(assignment.assetPath, assignment))
                     throw new InvalidOperationException("[ESRes][Build] Duplicate assignment path: " + assignment.assetPath);
             }
@@ -164,7 +173,9 @@ namespace ES
             string catalogDestination = Path.Combine(stageFolder, ESAssetPipelineIO.CatalogFileName);
             ESAssetLibraryCatalog catalog;
             if (File.Exists(catalogSource)) { File.Copy(catalogSource, catalogDestination, true); catalog = ESAssetPipelineIO.ReadJson<ESAssetLibraryCatalog>(catalogSource); }
-            else { catalog = new ESAssetLibraryCatalog { libraryName = owner, libraryFolder = owner }; ESAssetPipelineIO.WriteJson(catalogDestination, catalog); }
+            else { catalog = new ESAssetLibraryCatalog { libraryName = owner, libraryFolder = owner,
+                libraryBundleCode = ESAssetBundleUtility.NormalizeLibraryCode(owner), libraryAssetGuid = ESAssetBundleUtility.StableHash(owner, 32) };
+                ESAssetPipelineIO.WriteJson(catalogDestination, catalog); }
 
             // 同一 GUID 可以出现在多个业务 Catalog 中，但物理资源只打进一个权威 AB。
             // 每份 Catalog 所属 Manifest 都写入 GUID -> 全局 BundleKey 的别名记录，
@@ -186,7 +197,8 @@ namespace ES
 
             string manifestPath = Path.Combine(stageFolder, ESAssetPipelineIO.BundleManifestFileName);
             ESAssetPipelineIO.WriteJson(manifestPath, manifest);
-            var identity = new ESAssetLibraryIdentity { libraryName = catalog.libraryName, libraryFolder = owner, platform = platform, version = ESGlobalResSetting.Instance.Version,
+            var identity = new ESAssetLibraryIdentity { libraryName = catalog.libraryName, libraryFolder = owner, libraryBundleCode = catalog.libraryBundleCode,
+                platform = platform, version = ESGlobalResSetting.Instance.Version,
                 channel = "staging", catalogSha256 = ESResManifestIntegrity.ComputeFileSha256(catalogDestination), assetBundleManifestSha256 = ESResManifestIntegrity.ComputeFileSha256(manifestPath),
                 assetBundles = manifest.assetBundles.Select(item => new ESAssetBundleIdentityHash { assetBundleKey = item.assetBundleKey, sha256 = item.sha256, size = item.size }).ToList() };
             ESAssetPipelineIO.WriteJson(Path.Combine(stageFolder, ESAssetPipelineIO.LibraryIdentityFileName), identity);
@@ -227,6 +239,38 @@ namespace ES
             // BuildSet 只在全部 Library 成功构建后写入；旧指针不可保留。
             foreach (string file in Directory.EnumerateFiles(stagingRoot, "*", SearchOption.TopDirectoryOnly))
                 File.Delete(file);
+        }
+
+        private static void PruneBuildCache(string buildRoot, IEnumerable<string> activeBundleKeys)
+        {
+            if (!Directory.Exists(buildRoot)) return;
+            string rootManifestName = Path.GetFileName(buildRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            var retainedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                rootManifestName,
+                rootManifestName + ".manifest"
+            };
+            foreach (string key in activeBundleKeys ?? Enumerable.Empty<string>())
+            {
+                retainedFiles.Add(key);
+                retainedFiles.Add(key + ".manifest");
+            }
+
+            int removed = 0;
+            foreach (string file in Directory.EnumerateFiles(buildRoot, "*", SearchOption.TopDirectoryOnly))
+            {
+                if (retainedFiles.Contains(Path.GetFileName(file))) continue;
+                File.Delete(file);
+                removed++;
+            }
+            // 新命名规范禁止斜杠，当前有效 Bundle 不会占用子目录；这里清除旧路径式命名产物。
+            foreach (string folder in Directory.EnumerateDirectories(buildRoot))
+            {
+                Directory.Delete(folder, true);
+                removed++;
+            }
+            if (removed > 0)
+                Debug.Log($"[ESRes][Cleanup] BuildCache 已移除 {removed} 个不在当前 BuildPlan 中的旧产物。");
         }
 
         private static void RecreateGeneratedDirectory(string path)

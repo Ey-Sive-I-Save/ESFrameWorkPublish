@@ -1,0 +1,432 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-4164972694135412838
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52758267bd164f04b97a1e68d0fb0bb3, type: 3}
+  m_Name: "\u4FE1\u606F\u6570\u636E\u952E2"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u6570\u636E\u952E2"
+  baseConfig:
+    kind: 4
+    prefab: {fileID: 0}
+    displayName: 
+    icon: {fileID: 0}
+    tags: []
+  interactConfig:
+    canInteract: 0
+    useMode: 1
+    prompt: 
+    distance: 1.5
+    requireFacing: 1
+    condition:
+      rid: -2
+  logicConfig:
+    onSpawn:
+      rid: -2
+    onUse:
+      rid: -2
+    onHit:
+      rid: -2
+    onExpire:
+      rid: -2
+    onDestroy:
+      rid: -2
+  moveConfig:
+    mode: 0
+    speed: 1
+    rotateSpeed: 90
+    amount: 1
+    points: []
+    loop: 1
+    backAndForth: 1
+    useGravity: 1
+  shotShared:
+    enabled: 1
+    aimMode: 0
+    blockMode: 2
+    launchDelay: 0
+    warmupTime: 0
+    speed: 30
+    acceleration: 120
+    maxSpeed: 30
+    trackingStartTime: 0
+    trackingDuration: -1
+    turnSpeed: 720
+    lifeTime: 5
+    radius: 0.05
+    hitLayers:
+      serializedVersion: 2
+      m_Bits: 887
+    useGravity: 0
+    orientToVelocity: 1
+    allowMustHit: 1
+  shotKey:
+    enumKey: 0
+    stringKey: 
+    definitionGuid: 
+    definitionLocalFileId: 0
+    definitionTypeName: 
+  shotVariable:
+    logicSeed: 0
+    speedMultiplier: 1
+    lifeTimeMultiplier: 1
+    radiusMultiplier: 1
+    forceMustHit: 0
+    overrideLaunchDelay: 0
+    launchDelay: 0
+    overrideTrackingStartTime: 0
+    trackingStartTime: 0
+    targetOffset: {x: 0, y: 0, z: 0}
+    spreadAngle: 0
+  doorShared:
+    defaultOpen: 0
+    canLock: 0
+    blocksWhenClosed: 1
+    interactDistance: 2
+    moveDuration: 0.3
+    logicTag: 
+  doorVariable:
+    isOpen: 0
+    isLocked: 0
+    disabledTime: 0
+  trapShared:
+    enabled: 1
+    oneShot: 0
+    radius: 1.5
+    checkInterval: 0.1
+    cooldown: 0.5
+    targetLayers:
+      serializedVersion: 2
+      m_Bits: 4294967295
+  trapVariable:
+    active: 1
+    cooldownLeft: 0
+    triggerCount: 0
+    logicSeed: 0
+  weaponShared:
+    weaponKind: 0
+    defaultShotKey: 
+    hitRadius: 0.2
+    cooldown: 0.2
+    socketName: 
+  weaponKey:
+    enumKey: 0
+    stringKey: 
+    definitionGuid: 
+    definitionLocalFileId: 0
+    definitionTypeName: 
+  weaponVariable:
+    durability: 1
+    cooldownLeft: 0
+    ammo: 0
+    logicSeed: 0
+  weaponConfig:
+    enabled: 0
+    weaponKind: 2
+    equipSlot: 
+    baseDamage: 10
+    attackInterval: 0.3
+    shotItem: {fileID: 0}
+    onUse:
+      rid: -2
+  pickupShared:
+    radius: 1.2
+    autoPickup: 0
+    lifeTime: 0
+    maxStack: 1
+  pickupVariable:
+    count: 1
+    lifeLeft: 0
+    reserved: 0
+  zoneShared:
+    enabled: 1
+    radius: 3
+    checkInterval: 0.2
+    duration: 0
+    targetLayers:
+      serializedVersion: 2
+      m_Bits: 4294967295
+  zoneVariable:
+    active: 1
+    durationLeft: 0
+    logicSeed: 0
+  propShared:
+    canInteract: 0
+    breakable: 0
+    blocks: 1
+    maxDurability: 1
+    logicTag: 
+  propVariable:
+    durability: 1
+    state: 0
+    disabledTime: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+--- !u!114 &-882475586591429200
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52758267bd164f04b97a1e68d0fb0bb3, type: 3}
+  m_Name: "\u4FE1\u606F\u6570\u636E\u952E36402"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: "\u6570\u636E\u952E"
+  baseConfig:
+    kind: 4
+    prefab: {fileID: 0}
+    displayName: 
+    icon: {fileID: 0}
+    tags: []
+  interactConfig:
+    canInteract: 0
+    useMode: 1
+    prompt: 
+    distance: 1.5
+    requireFacing: 1
+    condition:
+      rid: -2
+  logicConfig:
+    onSpawn:
+      rid: -2
+    onUse:
+      rid: -2
+    onHit:
+      rid: -2
+    onExpire:
+      rid: -2
+    onDestroy:
+      rid: -2
+  moveConfig:
+    mode: 0
+    speed: 1
+    rotateSpeed: 90
+    amount: 1
+    points: []
+    loop: 1
+    backAndForth: 1
+    useGravity: 1
+  shotShared:
+    enabled: 1
+    aimMode: 0
+    blockMode: 2
+    launchDelay: 0
+    warmupTime: 0
+    speed: 30
+    acceleration: 120
+    maxSpeed: 30
+    trackingStartTime: 0
+    trackingDuration: -1
+    turnSpeed: 720
+    lifeTime: 5
+    radius: 0.05
+    hitLayers:
+      serializedVersion: 2
+      m_Bits: 887
+    useGravity: 0
+    orientToVelocity: 1
+    allowMustHit: 1
+  shotKey:
+    enumKey: 0
+    stringKey: "\u6570\u636E\u952E2"
+    definitionGuid: 49e26b8b9b34e454f86e2845bc836204
+    definitionLocalFileId: -882475586591429200
+    definitionTypeName: ES.ItemDataInfo, ES_Logic, Version=0.0.0.0, Culture=neutral,
+      PublicKeyToken=null
+  shotVariable:
+    logicSeed: 0
+    speedMultiplier: 1
+    lifeTimeMultiplier: 1
+    radiusMultiplier: 1
+    forceMustHit: 0
+    overrideLaunchDelay: 0
+    launchDelay: 0
+    overrideTrackingStartTime: 0
+    trackingStartTime: 0
+    targetOffset: {x: 0, y: 0, z: 0}
+    spreadAngle: 0
+  doorShared:
+    defaultOpen: 0
+    canLock: 0
+    blocksWhenClosed: 1
+    interactDistance: 2
+    moveDuration: 0.3
+    logicTag: 
+  doorVariable:
+    isOpen: 0
+    isLocked: 0
+    disabledTime: 0
+  trapShared:
+    enabled: 1
+    oneShot: 0
+    radius: 1.5
+    checkInterval: 0.1
+    cooldown: 0.5
+    targetLayers:
+      serializedVersion: 2
+      m_Bits: 4294967295
+  trapVariable:
+    active: 1
+    cooldownLeft: 0
+    triggerCount: 0
+    logicSeed: 0
+  weaponShared:
+    weaponKind: 0
+    defaultShotKey: 
+    hitRadius: 0.2
+    cooldown: 0.2
+    socketName: 
+  weaponKey:
+    enumKey: 0
+    stringKey: 
+    definitionGuid: 
+    definitionLocalFileId: 0
+    definitionTypeName: 
+  weaponVariable:
+    durability: 1
+    cooldownLeft: 0
+    ammo: 0
+    logicSeed: 0
+  weaponConfig:
+    enabled: 0
+    weaponKind: 2
+    equipSlot: 
+    baseDamage: 10
+    attackInterval: 0.3
+    shotItem: {fileID: 0}
+    onUse:
+      rid: -2
+  pickupShared:
+    radius: 1.2
+    autoPickup: 0
+    lifeTime: 0
+    maxStack: 1
+  pickupVariable:
+    count: 1
+    lifeLeft: 0
+    reserved: 0
+  zoneShared:
+    enabled: 1
+    radius: 3
+    checkInterval: 0.2
+    duration: 0
+    targetLayers:
+      serializedVersion: 2
+      m_Bits: 4294967295
+  zoneVariable:
+    active: 1
+    durationLeft: 0
+    logicSeed: 0
+  propShared:
+    canInteract: 0
+    breakable: 0
+    blocks: 1
+    maxDurability: 1
+    logicTag: 
+  propVariable:
+    durability: 1
+    state: 0
+    disabledTime: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b927bbeb4d8dc2344a37c5c7072fde90, type: 3}
+  m_Name: "\u65B0\u5EFA\u7269\u54C1\u6570\u636E\u7EC41566"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects:
+    - {fileID: -882475586591429200}
+    - {fileID: -4164972694135412838}
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes:
+    - Name: Infos
+      Entry: 7
+      Data: 0|System.Collections.Generic.Dictionary`2[[System.String, mscorlib],[ES.ItemDataInfo,
+        ES_Logic]], mscorlib
+    - Name: comparer
+      Entry: 7
+      Data: 1|System.Collections.Generic.GenericEqualityComparer`1[[System.String,
+        mscorlib]], mscorlib
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 12
+      Data: 2
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u6570\u636E\u952E"
+    - Name: $v
+      Entry: 10
+      Data: 0
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 7
+      Data: 
+    - Name: $k
+      Entry: 1
+      Data: "\u6570\u636E\u952E2"
+    - Name: $v
+      Entry: 10
+      Data: 1
+    - Name: 
+      Entry: 8
+      Data: 
+    - Name: 
+      Entry: 13
+      Data: 
+    - Name: 
+      Entry: 8
+      Data: 

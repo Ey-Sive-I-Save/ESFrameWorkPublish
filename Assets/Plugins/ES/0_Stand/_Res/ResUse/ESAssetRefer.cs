@@ -174,6 +174,8 @@ namespace ES
 #if UNITY_EDITOR
         [NonSerialized]
         private bool _editorValidationDone;
+        [NonSerialized]
+        private bool _editorShowRegistryDetails;
         
         [NonSerialized]
         private UnityEngine.Object _editorAsset;
@@ -423,6 +425,20 @@ namespace ES
             GUI.backgroundColor = _localFileId == 0 ? new Color(0.25f, 0.52f, 0.72f, 1f) : new Color(0.55f, 0.35f, 0.72f, 1f);
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             GUI.backgroundColor = oldColor;
+
+            string registrySummary = registered
+                ? "注册信息 · " + page.SourceBook + " / " + page.Name
+                : "注册信息 · 未注册";
+            _editorShowRegistryDetails = EditorGUILayout.Foldout(
+                _editorShowRegistryDetails,
+                registrySummary,
+                true,
+                EditorStyles.foldoutHeader);
+            if (!_editorShowRegistryDetails)
+            {
+                EditorGUILayout.EndVertical();
+                return;
+            }
 
             EditorGUILayout.LabelField(_localFileId == 0 ? "资产身份" : "子资产身份", EditorStyles.boldLabel);
             EditorGUILayout.LabelField("类型", _editorAsset != null ? _editorAsset.GetType().Name : typeof(T).Name);
@@ -1264,6 +1280,9 @@ namespace ES
     public class ESAssetReferDrawer : OdinValueDrawer<ESAssetReferBase>
     {
         private UnityEngine.Object[] changeTargets;
+        private static GUIStyle atMarkStyle;
+        private static GUIStyle assetKindStyle;
+        private static GUIStyle stateStyle;
 
         protected override void DrawPropertyLayout(GUIContent label)
         {
@@ -1275,12 +1294,17 @@ namespace ES
                 return;
             }
 
+            int previousIndentLevel = EditorGUI.indentLevel;
+            EditorGUI.indentLevel = 0;
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.BeginHorizontal();
             
-            // 添加特殊图标和前缀 @ 表明这是便捷引用工具
+            // 金色 @ 表明这是 ES 资源引用；类型单独强调，隐藏外层 Label 后仍可一眼识别 Scene / Prefab 等类别。
             string state = value.HasResolvedAssetTableKey ? "Table" : "GUID";
-            EditorGUILayout.LabelField("@ " + label.text + "  [" + state + "]", EditorStyles.boldLabel);
+            string assetKind = ResolveAssetKindDisplay(value);
+            GUILayout.Label("@", AtMarkStyle, GUILayout.Width(18f));
+            GUILayout.Label(assetKind, AssetKindStyle, GUILayout.MinWidth(48f), GUILayout.ExpandWidth(false));
+            GUILayout.Label("[" + state + "]", StateStyle, GUILayout.ExpandWidth(true));
             
             // 快速定位按钮
             if (!string.IsNullOrEmpty(value.GUID))
@@ -1303,6 +1327,62 @@ namespace ES
             value.ConfigureEditorPersistence(BeginChange, CommitChange);
             value.Draw();
             EditorGUILayout.EndVertical();
+            EditorGUI.indentLevel = previousIndentLevel;
+        }
+
+        private static GUIStyle AtMarkStyle
+        {
+            get
+            {
+                if (atMarkStyle == null)
+                    atMarkStyle = new GUIStyle(EditorStyles.boldLabel)
+                    {
+                        alignment = TextAnchor.MiddleCenter,
+                        fontSize = 15,
+                        normal = { textColor = new Color(1f, 0.72f, 0.16f) }
+                    };
+                return atMarkStyle;
+            }
+        }
+
+        private static GUIStyle AssetKindStyle
+        {
+            get
+            {
+                if (assetKindStyle == null)
+                    assetKindStyle = new GUIStyle(EditorStyles.boldLabel)
+                    {
+                        alignment = TextAnchor.MiddleLeft,
+                        normal = { textColor = new Color(1f, 0.78f, 0.28f) }
+                    };
+                return assetKindStyle;
+            }
+        }
+
+        private static GUIStyle StateStyle
+        {
+            get
+            {
+                if (stateStyle == null)
+                    stateStyle = new GUIStyle(EditorStyles.miniLabel)
+                    {
+                        alignment = TextAnchor.MiddleLeft,
+                        normal = { textColor = EditorGUIUtility.isProSkin ? new Color(0.68f, 0.72f, 0.78f) : new Color(0.34f, 0.38f, 0.44f) }
+                    };
+                return stateStyle;
+            }
+        }
+
+        private static string ResolveAssetKindDisplay(ESAssetReferBase value)
+        {
+            if (value.AssetKind != ESAssetReferKind.None && value.AssetKind != ESAssetReferKind.Other)
+                return value.AssetKind.ToString();
+
+            string typeName = value.GetType().Name;
+            const string prefix = "ESAssetRefer";
+            if (typeName.StartsWith(prefix, StringComparison.Ordinal))
+                typeName = typeName.Substring(prefix.Length);
+            return string.IsNullOrEmpty(typeName) ? "Asset" : typeName;
         }
 
         private void BeginChange(string actionName)

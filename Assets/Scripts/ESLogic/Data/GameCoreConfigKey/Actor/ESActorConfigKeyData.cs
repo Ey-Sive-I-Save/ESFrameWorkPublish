@@ -6,14 +6,18 @@ namespace ES
     [ESEnumScript("Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Actor/ESActorConfigKeyData.cs")]
     public enum ESMonsterEnumKey : ushort
     {
+        [InspectorName("未配置")]
         None = 0,
+        [InspectorName("自定义")]
         Custom = 1
     }
 
     [ESEnumScript("Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Actor/ESActorConfigKeyData.cs")]
     public enum ESNpcEnumKey : ushort
     {
+        [InspectorName("未配置")]
         None = 0,
+        [InspectorName("自定义")]
         Custom = 1
     }
 

@@ -194,4 +194,5 @@ MonoBehaviour:
     Desc: ESAssetReferTerrainData
     pages: []
   ContainsBuild: 1
+  AssetBundleCode: 
   IsNet: 1

@@ -8,11 +8,11 @@ namespace ES
     [ESCreatePath("数据信息", "Buff定义数据")]
     public class BuffDefinitionDataInfo : SoDataInfo, ISharedAndVariable<BuffSharedData, BuffVariableData>, IGameCoreSO
     {
-        [TitleGroup("Buff定义/共享数据", "共享数据", Alignment = TitleAlignments.Left)]
+        [TitleGroup("共享数据", "共享数据", Alignment = TitleAlignments.Left)]
         [HideLabel, InlineProperty]
         public BuffSharedData sharedData = new BuffSharedData();
 
-        [TitleGroup("Buff定义/默认可变数据", "默认可变数据", Alignment = TitleAlignments.Left)]
+        [TitleGroup("默认可变数据", "默认可变数据", Alignment = TitleAlignments.Left)]
         [HideLabel, InlineProperty]
         public BuffVariableData variableData = new BuffVariableData();
 

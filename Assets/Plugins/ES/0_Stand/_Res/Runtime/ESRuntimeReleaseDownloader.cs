@@ -29,16 +29,16 @@ namespace ES
         public List<ESRuntimeConsumerResidentAssetReference> residentAssets = new List<ESRuntimeConsumerResidentAssetReference>();
         public List<ESRuntimeConsumerCodePackageReference> codePackages = new List<ESRuntimeConsumerCodePackageReference>();
     }
-    [Serializable] public sealed class ESRuntimeLibraryIdentity { public int formatVersion; public string libraryName, libraryFolder, platform, version, channel, catalogUrl, assetBundleManifestUrl, catalogSha256, assetBundleManifestSha256; }
+    [Serializable] public sealed class ESRuntimeLibraryIdentity { public int formatVersion; public string libraryName, libraryFolder, libraryBundleCode, platform, version, channel, catalogUrl, assetBundleManifestUrl, catalogSha256, assetBundleManifestSha256; }
     [Serializable] public sealed class ESRuntimeCatalogIdentity { public string guid; public long localFileId; public bool IsValid => !string.IsNullOrEmpty(guid) && localFileId >= 0; }
     [Serializable] public sealed class ESRuntimeCatalogEntry
     {
         public ESRuntimeCatalogIdentity identity = new ESRuntimeCatalogIdentity();
-        public string assetTypeName, kind, stringKey, libraryName, libraryFolder, pageName, subAssetName;
+        public string assetTypeName, kind, stringKey, libraryName, libraryFolder, libraryBundleCode, pageName, subAssetName;
         public int enumKey;
         public bool isBusinessAsset;
     }
-    [Serializable] public sealed class ESRuntimeCatalog { public string libraryName, libraryFolder; public List<ESRuntimeCatalogEntry> assets = new List<ESRuntimeCatalogEntry>(); }
+    [Serializable] public sealed class ESRuntimeCatalog { public int formatVersion; public string libraryName, libraryFolder, libraryBundleCode, libraryAssetGuid; public List<ESRuntimeCatalogEntry> assets = new List<ESRuntimeCatalogEntry>(); }
     [Serializable] public sealed class ESRuntimeBundleRecord { public string assetBundleKey, fileName, unityHash, sha256, localRelativePath; public uint crc; public long size; public List<string> dependencies = new List<string>(); }
     [Serializable] public sealed class ESRuntimeReleaseMainAssetRecord { public string guid, assetBundleKey, internalName, typeName; }
     [Serializable] public sealed class ESRuntimeReleaseSubAssetRecord { public string guid, assetBundleKey, internalName, subAssetName, typeName; public long localFileId; }
@@ -507,6 +507,10 @@ namespace ES
             Report(ESRuntimeReleaseDownloadStage.ReadingCatalog, libraryFolder);
             var catalog = await DownloadJsonAsync<ESRuntimeCatalog>(identity.catalogUrl, Path.Combine(libraryRoot, "ESAssetLibraryCatalog.json"), identity.catalogSha256, token);
             if (catalog == null || catalog.assets == null) throw new InvalidDataException("Catalog 解析失败：" + library.libraryFolder);
+            if (catalog.formatVersion != 3) throw new InvalidDataException("Catalog 命名协议版本不匹配：" + library.libraryFolder);
+            if (string.IsNullOrWhiteSpace(identity.libraryBundleCode)
+                || !string.Equals(identity.libraryBundleCode, catalog.libraryBundleCode, StringComparison.Ordinal))
+                throw new InvalidDataException("Catalog 与 LibraryIdentity 的 AB 短码不一致：" + library.libraryFolder);
             if (!string.IsNullOrEmpty(catalog.libraryFolder) && !string.Equals(catalog.libraryFolder, libraryFolder, StringComparison.Ordinal))
             {
                 // 兼容旧发布物：早期 GameCore 构建曾把规范目录 gamecore_x 写成 __gamecore_x。

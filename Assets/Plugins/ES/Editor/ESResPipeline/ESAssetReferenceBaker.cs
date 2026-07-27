@@ -102,7 +102,36 @@ namespace ES
                 .Where(item => item != null && item.ContainsBuild)
                 .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
                 .ToList();
+            EnsureLibraryBundleCodes(libraries);
             return ESEditorHandle.EnqueueLongTask(new ESAssetReferenceBakeLongTask(libraries));
+        }
+
+        private static void EnsureLibraryBundleCodes(IReadOnlyCollection<ESAssetLibrary> libraries)
+        {
+            var owners = new Dictionary<string, ESAssetLibrary>(StringComparer.Ordinal);
+            foreach (ESAssetLibrary library in libraries ?? Array.Empty<ESAssetLibrary>())
+            {
+                string assetPath = AssetDatabase.GetAssetPath(library);
+                string libraryGuid = AssetDatabase.AssetPathToGUID(assetPath);
+                if (string.IsNullOrWhiteSpace(libraryGuid))
+                    throw new InvalidOperationException("[ESRes][Bake] Library 缺少稳定 Asset GUID：" + library.Name);
+
+                string code = library.AssetBundleCode?.Trim().ToLowerInvariant() ?? string.Empty;
+                if (string.IsNullOrEmpty(code))
+                {
+                    code = ESAssetBundleUtility.CreateAutomaticLibraryCode(library.Name, libraryGuid);
+                    Undo.RecordObject(library, "Generate AssetBundle Code");
+                    library.AssetBundleCode = code;
+                    EditorUtility.SetDirty(library);
+                    Debug.Log($"[ESRes][Bake][Naming] 已为 Library [{library.Name}] 固化 AB 短码：{code}", library);
+                }
+                if (!ESAssetBundleUtility.IsValidLibraryCode(code))
+                    throw new InvalidOperationException($"[ESRes][Bake] Library [{library.Name}] 的 AB 短码无效：{library.AssetBundleCode}。仅允许 2~12 位 a-z、0-9、_。");
+                if (owners.TryGetValue(code, out ESAssetLibrary existing))
+                    throw new InvalidOperationException($"[ESRes][Bake] Library AB 短码全局冲突：{code}，Library=[{existing.Name}] 与 [{library.Name}]。");
+                owners.Add(code, library);
+            }
+            AssetDatabase.SaveAssets();
         }
 
         private sealed class ESAssetReferenceBakeLongTask : ESEditorLongTask
@@ -213,7 +242,9 @@ namespace ES
         }
         private static ESAssetLibraryCatalog CreateCatalog(ESAssetLibrary library)
         {
-            var catalog = new ESAssetLibraryCatalog { libraryName = library.Name, libraryFolder = library.LibFolderName };
+            string libraryAssetGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(library));
+            var catalog = new ESAssetLibraryCatalog { libraryName = library.Name, libraryFolder = library.LibFolderName,
+                libraryBundleCode = library.AssetBundleCode, libraryAssetGuid = libraryAssetGuid };
             foreach (var book in library.GetAllUseableBooks().Where(item => item != null))
             {
                 if (book.pages == null) continue;
@@ -248,8 +279,11 @@ namespace ES
                     if (page.Kind != actualKind)
                         catalog.warnings.Add($"Page 类型与实际资产不一致，已采用实际类型：{library.Name}/{page.Name}，配置={page.Kind}，实际={actualKind} ({path})");
                     if (identity.IsSubAsset && !ValidateSubAssetSelector(catalog, library, page, path, identity)) continue;
-                    catalog.assets.Add(new ESAssetCatalogEntry { identity = identity, assetPath = path, assetTypeName = page.OB.GetType().FullName, kind = actualKind.ToString(), enumKey = page.EnumKey,
-                        stringKey = page.ResolveEffectiveStringKey(), libraryName = library.Name, libraryFolder = library.LibFolderName, pageName = page.Name, namedOption = page.namedOption.ToString(), subAssetName = identity.IsSubAsset ? page.OB.name : string.Empty });
+                    ESAssetCatalogEntry entry = new ESAssetCatalogEntry { identity = identity, assetPath = path, assetTypeName = page.OB.GetType().FullName, kind = actualKind.ToString(), enumKey = page.EnumKey,
+                        stringKey = page.ResolveEffectiveStringKey(), libraryName = library.Name, libraryFolder = library.LibFolderName, libraryBundleCode = library.AssetBundleCode,
+                        pageName = page.Name, namedOption = page.namedOption.ToString(), subAssetName = identity.IsSubAsset ? page.OB.name : string.Empty };
+                    PopulateBundleFolderIdentity(entry, path, null);
+                    catalog.assets.Add(entry);
                 }
             }
             catalog.assets = catalog.assets.OrderBy(item => item.kind, StringComparer.Ordinal).ThenBy(item => item.enumKey).ThenBy(item => item.stringKey, StringComparer.Ordinal).ToList();
@@ -402,7 +436,7 @@ namespace ES
                     continue;
                 }
                 if (catalog.assets.Any(item => string.Equals(item.assetPath, assetPath, StringComparison.Ordinal))) continue;
-                catalog.assets.Add(new ESAssetCatalogEntry
+                var entry = new ESAssetCatalogEntry
                 {
                     identity = identity,
                     assetPath = assetPath,
@@ -410,11 +444,47 @@ namespace ES
                     kind = kind.ToString(),
                     libraryName = library.Name,
                     libraryFolder = library.LibFolderName,
+                    libraryBundleCode = library.AssetBundleCode,
                     pageName = page.Name,
                     namedOption = page.namedOption.ToString(),
                     isBusinessAsset = false
-                });
+                };
+                PopulateBundleFolderIdentity(entry, assetPath, folderPath);
+                catalog.assets.Add(entry);
             }
+        }
+
+        private static void PopulateBundleFolderIdentity(ESAssetCatalogEntry entry, string assetPath, string folderPageRoot)
+        {
+            string normalizedPath = (assetPath ?? string.Empty).Replace('\\', '/');
+            string parent = (Path.GetDirectoryName(normalizedPath) ?? "Assets").Replace('\\', '/');
+            entry.parentFolderPath = parent;
+            entry.parentFolderGuid = GetFolderIdentity(parent);
+
+            string topLevel = GetTopLevelFolder(normalizedPath, folderPageRoot);
+            entry.topLevelFolderPath = topLevel;
+            entry.topLevelFolderGuid = GetFolderIdentity(topLevel);
+        }
+
+        private static string GetFolderIdentity(string folderPath)
+        {
+            if (string.Equals(folderPath, "Assets", StringComparison.Ordinal)) return "assets-root";
+            string guid = AssetDatabase.AssetPathToGUID(folderPath);
+            if (string.IsNullOrWhiteSpace(guid))
+                throw new InvalidOperationException("[ESRes][Bake] 分包目录缺少稳定 .meta GUID：" + folderPath);
+            return guid;
+        }
+
+        private static string GetTopLevelFolder(string assetPath, string folderPageRoot)
+        {
+            string root = string.IsNullOrWhiteSpace(folderPageRoot) ? "Assets" : folderPageRoot.Replace('\\', '/').TrimEnd('/');
+            string parent = (Path.GetDirectoryName(assetPath) ?? root).Replace('\\', '/');
+            if (!parent.StartsWith(root + "/", StringComparison.Ordinal)) return parent;
+            string relative = parent.Substring(root.Length + 1);
+            int slash = relative.IndexOf('/');
+            string first = slash < 0 ? relative : relative.Substring(0, slash);
+            string candidate = string.IsNullOrWhiteSpace(first) ? root : root + "/" + first;
+            return AssetDatabase.IsValidFolder(candidate) ? candidate : root;
         }
         private static void AddEditorOnlyExclusion(ESAssetLibraryCatalog catalog, string path, string warning)
         {
@@ -440,6 +510,7 @@ namespace ES
             consumer.EnsureStableIdentity();
             var generated = new List<ESAssetReferBase>();
             var paths = new HashSet<string>(StringComparer.Ordinal);
+            var identities = new HashSet<string>(StringComparer.Ordinal);
             foreach (ESAssetLibrary library in (consumer.ConsumerLibFolders ?? new List<ESAssetLibrary>()).Where(library => library != null && libraries.Contains(library)))
             foreach (ESAssetBook book in library.GetAllUseableBooks().Where(book => book?.pages != null))
             foreach (ESAssetPage page in book.pages.Where(page => page?.OB != null))
@@ -447,34 +518,82 @@ namespace ES
                 string pagePath = AssetDatabase.GetAssetPath(page.OB);
                 if (AssetDatabase.IsValidFolder(pagePath))
                     foreach (string guid in AssetDatabase.FindAssets("t:ScriptableObject", new[] { pagePath }))
-                        AddGameCoreAsset(AssetDatabase.GUIDToAssetPath(guid), generated, paths);
+                        AddGameCoreAssetsAtPath(AssetDatabase.GUIDToAssetPath(guid), generated, identities, paths);
                 else
-                    AddGameCoreAsset(pagePath, generated, paths);
+                    AddGameCoreAsset(page.OB as ScriptableObject, generated, identities, paths);
             }
             foreach (ESAssetReferBase refer in consumer.ManualGameCoreAssets ?? new List<ESAssetReferBase>())
                 if (refer != null && refer.IsValid)
-                    AddGameCoreAsset(AssetDatabase.GUIDToAssetPath(refer.GUID), generated, paths);
+                    AddGameCoreAsset(ResolveExactScriptableObject(refer.GUID, refer.LocalFileId), generated, identities, paths);
+            ExpandGameCoreConfigKeyClosure(generated, identities, paths);
             consumer.GameCoreAssets = generated.GroupBy(item => item.AssetIdentity).Select(group => group.First()).ToList();
             consumer.GameCoreValidationErrors = ValidateGameCoreDependencies(consumer, paths);
             EditorUtility.SetDirty(consumer);
             return consumer.GameCoreValidationErrors;
         }
 
-        private static void AddGameCoreAsset(string path, List<ESAssetReferBase> destination, HashSet<string> paths)
+        private static void AddGameCoreAssetsAtPath(string path, List<ESAssetReferBase> destination, HashSet<string> identities, HashSet<string> paths)
         {
             if (string.IsNullOrWhiteSpace(path) || ESAssetPipelineIO.IsEditorOnly(path))
                 return;
-            var asset = AssetDatabase.LoadMainAssetAtPath(path) as ScriptableObject;
+            foreach (UnityEngine.Object loaded in AssetDatabase.LoadAllAssetsAtPath(path))
+                AddGameCoreAsset(loaded as ScriptableObject, destination, identities, paths);
+        }
+
+        private static void AddGameCoreAsset(ScriptableObject asset, List<ESAssetReferBase> destination, HashSet<string> identities, HashSet<string> paths)
+        {
             if (asset == null || ESScriptableObjectClassification.GetClass(asset) != ESScriptableObjectClass.GameCore)
                 return;
-            if (!paths.Add(path))
-                return;
             ESPipelineAssetIdentity identity = ESAssetPipelineIO.GetIdentity(asset);
-            if (!identity.IsValid)
+            if (!identity.IsValid || !identities.Add(identity.Key))
                 return;
+            string path = AssetDatabase.GetAssetPath(asset);
+            if (string.IsNullOrWhiteSpace(path) || ESAssetPipelineIO.IsEditorOnly(path)) return;
+            paths.Add(path);
             var refer = new ESAssetReferScriptableObject();
             refer.InitializeGeneratedReference(identity.guid, identity.localFileId, ESAssetReferKind.ScriptableObject, 0, string.Empty);
             destination.Add(refer);
+        }
+
+        private static void ExpandGameCoreConfigKeyClosure(List<ESAssetReferBase> destination, HashSet<string> identities, HashSet<string> paths)
+        {
+            for (int index = 0; index < destination.Count; index++)
+            {
+                ESAssetReferBase refer = destination[index];
+                ScriptableObject root = ResolveExactScriptableObject(refer.GUID, refer.LocalFileId);
+                if (root == null) continue;
+                var serializedObject = new SerializedObject(root);
+                SerializedProperty iterator = serializedObject.GetIterator();
+                bool enterChildren = true;
+                while (iterator.Next(enterChildren))
+                {
+                    enterChildren = true;
+                    if (!string.Equals(iterator.name, "definitionGuid", StringComparison.Ordinal)
+                        || iterator.propertyType != SerializedPropertyType.String
+                        || string.IsNullOrEmpty(iterator.stringValue))
+                        continue;
+
+                    string parentPath = iterator.propertyPath;
+                    int separator = parentPath.LastIndexOf('.');
+                    parentPath = separator >= 0 ? parentPath.Substring(0, separator + 1) : string.Empty;
+                    SerializedProperty localFileId = serializedObject.FindProperty(parentPath + "definitionLocalFileId");
+                    long fileId = localFileId != null ? localFileId.longValue : 0;
+                    AddGameCoreAsset(ResolveExactScriptableObject(iterator.stringValue, fileId), destination, identities, paths);
+                }
+            }
+        }
+
+        private static ScriptableObject ResolveExactScriptableObject(string guid, long localFileId)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            foreach (UnityEngine.Object loaded in AssetDatabase.LoadAllAssetsAtPath(path))
+                if (loaded is ScriptableObject asset
+                    && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string candidateGuid, out long candidateLocalFileId)
+                    && string.Equals(candidateGuid, guid, StringComparison.Ordinal)
+                    && candidateLocalFileId == localFileId)
+                    return asset;
+            return null;
         }
 
         private static List<string> ValidateGameCoreDependencies(ESAssetLibraryConsumer consumer, HashSet<string> collectedPaths)

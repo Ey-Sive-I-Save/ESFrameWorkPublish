@@ -7,7 +7,9 @@ namespace ES
     [ESEnumScript("Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Buff/Shared/ESBuffSharedTypes.cs")]
     public enum ESBuffEnumKey : ushort
     {
+        [InspectorName("未配置")]
         None = 0,
+        [InspectorName("自定义")]
         Custom = 1
     }
 

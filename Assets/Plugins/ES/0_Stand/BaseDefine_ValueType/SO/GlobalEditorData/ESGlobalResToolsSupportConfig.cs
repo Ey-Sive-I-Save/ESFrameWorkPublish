@@ -423,7 +423,7 @@ namespace ES
             if (!silent) Debug.Log($"[资产收集] 资产 [{asset.name}] 类型判断为: {category}");
 
             // 2. 查找所有 ESAssetLibrary
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
+            var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
             if (libraries == null || libraries.Count == 0)
             {
                 if (!silent) Debug.LogWarning("[资产收集] 未找到任何 ESAssetLibrary");
@@ -534,7 +534,7 @@ namespace ES
             }
 
             // 获取所有Library
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
+            var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
             if (libraries == null || libraries.Count == 0)
             {
                 Debug.LogWarning("[资产收集] 未找到任何 ESAssetLibrary");

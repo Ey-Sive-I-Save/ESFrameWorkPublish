@@ -366,7 +366,7 @@ namespace ES
 #if UNITY_EDITOR
                 if (typeof(ESSO).IsAssignableFrom(typeof(T)))
                 {
-                    var indexed = ESEditorSO.SOS.GetNewGroupOfType<T>();
+                    var indexed = ESEditorSO.GetGroupOfType<T>();
                     if (indexed != null && indexed.Count > 0)
                         return indexed;
                 }
@@ -397,6 +397,11 @@ namespace ES
 
                 if (!typeof(ESSO).IsAssignableFrom(targetType))
                     return values;
+
+                if (includeGroupInfos)
+                    ESEditorSO.EnsureAllTypesLoaded();
+                else
+                    ESEditorSO.EnsureTypesAssignableTo(targetType);
 
                 foreach (var pair in ESEditorSO.SOS.Groups)
                 {
@@ -568,7 +573,7 @@ namespace ES
                 List<T> results = new List<T>();
                 if (typeof(ESSO).IsAssignableFrom(typeof(T)))
                 {
-                    var indexed = ESEditorSO.SOS.GetNewGroupOfType<T>() ?? new List<T>(0);
+                    var indexed = ESEditorSO.GetGroupOfType<T>() ?? new List<T>(0);
                     foreach (T asset in indexed)
                     {
                         if (asset != null)

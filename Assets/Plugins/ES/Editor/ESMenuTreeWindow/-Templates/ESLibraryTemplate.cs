@@ -1665,7 +1665,7 @@ namespace ES
                 var assetToPages = new Dictionary<string, List<(string libName, string bookName, string pageName)>>();
 
                 // 获取所有同类型Library
-                var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<TLib>();
+                var allLibraries = ESEditorSO.GetGroupOfType<TLib>();
 
                 // 遍历所有Library收集资源引用
                 if (allLibraries != null)
@@ -1871,7 +1871,7 @@ namespace ES
                 if (consumer is ESAssetLibraryConsumer resourceConsumer)
                 {
                     resourceConsumer.EnsureStableIdentity();
-                    var allConsumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>();
+                    var allConsumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>();
                     resourceConsumer.IsTotalConsumer = allConsumers == null || !allConsumers.Any(item => item != null && item.IsTotalConsumer);
                 }
 
@@ -2381,7 +2381,7 @@ namespace ES
             private void ShowLibraryMenu(Rect anchorRect, List<TLib> list, string undoPrefix)
             {
                 var entries = new List<ESSearchDropdown.Entry>();
-                var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<TLib>() ?? new List<TLib>();
+                var allLibraries = ESEditorSO.GetGroupOfType<TLib>() ?? new List<TLib>();
                 foreach (TLib library in allLibraries.Where(item => item != null && !list.Contains(item)))
                 {
                     TLib captured = library;
@@ -2424,7 +2424,7 @@ namespace ES
                 {
                     Rect anchorRect = GUILayoutUtility.GetLastRect();
                     var entries = new List<ESSearchDropdown.Entry>();
-                    var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>();
+                    var allLibraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>();
                     foreach (ESAssetLibrary library in allLibraries.Where(item => item != null && !list.Contains(item)))
                     {
                         ESAssetLibrary captured = library;
@@ -2469,7 +2469,7 @@ namespace ES
                 {
                     Rect anchorRect = GUILayoutUtility.GetLastRect();
                     var entries = new List<ESSearchDropdown.Entry>();
-                    var allConsumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>() ?? new List<ESAssetLibraryConsumer>();
+                    var allConsumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>() ?? new List<ESAssetLibraryConsumer>();
                     foreach (ESAssetLibraryConsumer consumer in allConsumers.Where(item => item != null && item != resourceConsumer && !resourceConsumer.RequiredConsumers.Contains(item)))
                     {
                         ESAssetLibraryConsumer captured = consumer;
@@ -2496,7 +2496,7 @@ namespace ES
 
             private static void ClearOtherTotalConsumers(ESAssetLibraryConsumer current)
             {
-                var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>();
+                var consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>();
                 if (consumers == null) return;
                 foreach (ESAssetLibraryConsumer consumer in consumers)
                 {
@@ -2509,7 +2509,7 @@ namespace ES
 
             private static bool HasOtherTotalConsumer(ESAssetLibraryConsumer current)
             {
-                var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>();
+                var consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>();
                 return consumers != null && consumers.Any(consumer => consumer != null && consumer != current && consumer.IsTotalConsumer);
             }
 
@@ -2541,7 +2541,7 @@ namespace ES
             from.QuickBuildRootMenu(tree, menuName, ref page_root_Library, Sirenix.OdinInspector.SdfIconType.KeyboardFill);
             from.QuickBuildRootMenu(tree, "Consumer", ref page_root_Consumer, SdfIconType.Box);
 
-            var libs = ESEditorSO.SOS.GetNewGroupOfType<TLib>();
+            var libs = ESEditorSO.GetGroupOfType<TLib>();
             if (libs != null)
             {
                 List<string> strings = new List<string>(3);
@@ -2568,7 +2568,7 @@ namespace ES
                 }
             }
 
-            var consumers = ESEditorSO.SOS.GetNewGroupOfType<TConsumer>();
+            var consumers = ESEditorSO.GetGroupOfType<TConsumer>();
             if (consumers != null)
             {
                 List<string> strings = new List<string>(3);

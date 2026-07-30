@@ -17,9 +17,14 @@ namespace ES
             get { return MyCore != null ? MyCore : ESGameManager.Instance; }
         }
 
-        public T GetModule<T>() where T : class, IModule, new()
+        public bool TryGetModule<T>(out T module) where T : class, IModule
         {
-            return ESGameManager.GetModuleFast<T>();
+            return ESGameManager.TryGetModule(out module);
+        }
+
+        public T GetOrCreateModule<T>() where T : class, IModule, new()
+        {
+            return ESGameManager.GetOrCreateModule<T>();
         }
     }
 
@@ -37,9 +42,14 @@ namespace ES
             get { return MyCore != null ? MyCore : ESGameManager.Instance; }
         }
 
-        public T GetModule<T>() where T : class, IModule, new()
+        public bool TryGetModule<T>(out T module) where T : class, IModule
         {
-            return ESGameManager.GetModuleFast<T>();
+            return ESGameManager.TryGetModule(out module);
+        }
+
+        public T GetOrCreateModule<T>() where T : class, IModule, new()
+        {
+            return ESGameManager.GetOrCreateModule<T>();
         }
     }
 
@@ -57,9 +67,14 @@ namespace ES
             get { return MyCore != null ? MyCore : ESGameManager.Instance; }
         }
 
-        public T GetModule<T>() where T : class, IModule, new()
+        public bool TryGetModule<T>(out T module) where T : class, IModule
         {
-            return ESGameManager.GetModuleFast<T>();
+            return ESGameManager.TryGetModule(out module);
+        }
+
+        public T GetOrCreateModule<T>() where T : class, IModule, new()
+        {
+            return ESGameManager.GetOrCreateModule<T>();
         }
     }
 }

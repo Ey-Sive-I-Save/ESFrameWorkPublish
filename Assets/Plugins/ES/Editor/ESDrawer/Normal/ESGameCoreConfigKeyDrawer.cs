@@ -348,6 +348,8 @@ namespace ES.EditorInternal
             var identities = new HashSet<string>(StringComparer.Ordinal);
             Type assetType = ResolveAssetType(enumType);
             if (assetType != null)
+            {
+                ESEditorSO.EnsureTypesAssignableTo(assetType);
                 foreach (KeyValuePair<Type, List<ESSO>> group in ESEditorSO.SOS.Groups)
                 {
                     if (group.Key == null || !assetType.IsAssignableFrom(group.Key) || group.Value == null)
@@ -361,6 +363,7 @@ namespace ES.EditorInternal
                             result.Add(candidate);
                     }
                 }
+            }
             result.Sort((left, right) =>
             {
                 int pathCompare = string.CompareOrdinal(AssetDatabase.GetAssetPath(left.asset), AssetDatabase.GetAssetPath(right.asset));

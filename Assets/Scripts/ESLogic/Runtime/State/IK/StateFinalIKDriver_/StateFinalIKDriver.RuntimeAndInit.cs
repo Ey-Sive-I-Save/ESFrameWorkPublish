@@ -115,6 +115,7 @@ namespace ES
             InitAimIK();
             InitGrounder();
             InitHitReactionAndRecoil();
+            ReportEnabledCapabilityGaps();
 
             // ── 辅助 Transform（Hint/Goal） ────────────────────────────────────
             EnsureHintTransforms();
@@ -136,6 +137,37 @@ namespace ES
             _runtimeBindingReady = true;
             RefreshFinalIKScheduleDiagnosticsCache();
             SetDriverEnabled(true, $"Bind 完成 | Animator={animator.name} | StateMachineKey={machine.stateMachineKey}");
+        }
+
+        /// <summary>
+        /// 开启的 IK 能力如果没有可用 Solver，必须在绑定阶段明确报错。
+        /// 不能让 Inspector 显示“已启用”，实际运行时只安全空转。
+        /// </summary>
+        private void ReportEnabledCapabilityGaps()
+        {
+            string missing = string.Empty;
+            if (enableBipedIK && !_bipedIKReady)
+                missing += " BipedIK(" + _bipedIKError + ")";
+            if (enableGrounderBipedIK && !_grounderReady)
+                missing += " GrounderBipedIK";
+            if (enableLookAtIK && !_lookAtIKReady)
+                missing += " LookAtIK";
+            if (enableAimIK && !_aimIKReady)
+                missing += " AimIK(" + _aimIKError + ")";
+            if (enableFullBodyBipedIK && !_fullBodyBipedIKReady)
+                missing += " FullBodyBipedIK";
+            if (enableHitReaction && !_hitReactionReady)
+                missing += " HitReaction";
+            if (enableRecoil && !_recoilReady)
+                missing += " Recoil";
+
+            if (!string.IsNullOrEmpty(missing))
+            {
+                Debug.LogError(
+                    "[StateFinalIKDriver] 已开启的 FinalIK 能力缺少可用 Solver：" + missing
+                    + "。请补齐对应组件与绑定，或显式关闭该能力开关。",
+                    this);
+            }
         }
 
         internal void Unbind()

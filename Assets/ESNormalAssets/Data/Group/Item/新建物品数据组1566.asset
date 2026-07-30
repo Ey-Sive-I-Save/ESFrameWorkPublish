@@ -22,12 +22,12 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: "\u6570\u636E\u952E2"
+  tags: []
   baseConfig:
     kind: 4
     prefab: {fileID: 0}
     displayName: 
     icon: {fileID: 0}
-    tags: []
   interactConfig:
     canInteract: 0
     useMode: 1
@@ -126,12 +126,12 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: "\u6570\u636E\u952E"
+  tags: []
   baseConfig:
     kind: 4
     prefab: {fileID: 0}
     displayName: 
     icon: {fileID: 0}
-    tags: []
   interactConfig:
     canInteract: 0
     useMode: 1

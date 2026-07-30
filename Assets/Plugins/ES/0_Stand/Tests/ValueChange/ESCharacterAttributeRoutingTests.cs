@@ -1,13 +1,35 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using ES.Internal;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace ES.Tests
 {
     public sealed class ESCharacterAttributeRoutingTests
     {
+        private readonly List<GameObject> createdEntities = new List<GameObject>();
+
+        private Entity CreateEntity()
+        {
+            var gameObject = new GameObject("ESCharacterAttributeRoutingTests.Entity");
+            createdEntities.Add(gameObject);
+            return gameObject.AddComponent<Entity>();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            for (int i = createdEntities.Count - 1; i >= 0; i--)
+            {
+                if (createdEntities[i] != null)
+                    Object.DestroyImmediate(createdEntities[i]);
+            }
+
+            createdEntities.Clear();
+        }
         [Test]
         public void Catalog_MapsEachCanonicalKeyToExactlyOneTypedSlot()
         {
@@ -32,7 +54,7 @@ namespace ES.Tests
         [Test]
         public void FixedSlots_RemainLazyAndCustomStatsRemainSparse()
         {
-            EntityBuffDomain domain = new EntityBuffDomain();
+            Entity entity = CreateEntity();
             ESSuperAttributeTable table = ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
             table.floatAttributes.Add(new ESSuperFloatAttributeDefinition
             {
@@ -42,58 +64,58 @@ namespace ES.Tests
                 overrideBaseValue = true,
                 baseValue = 3f
             });
-            domain.BindSuperAttributeTable(table);
+            entity.BindSuperAttributeTable(table);
 
-            Assert.That(domain.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(5f));
-            Assert.That(domain.TryGetFloatStat(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed, out _), Is.False);
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(5f));
+            Assert.That(entity.TryGetFloatStat(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed, out _), Is.False);
 
-            ESFloatValueChangeSet fixedSet = domain.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
+            ESFloatValueChangeSet fixedSet = entity.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
             fixedSet.Add(ESFloatValueChangeOp.Add, 2f);
-            Assert.That(domain.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(7f));
-            Assert.That(domain.TryGetFloatStat(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed, out _), Is.True);
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(7f));
+            Assert.That(entity.TryGetFloatStat(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed, out _), Is.True);
 
-            Assert.That(domain.GetFloatStat("Item.Enchantment.Unregistered", 3f), Is.Null);
-            ESFloatValueChangeSet enchantmentSet = domain.GetFloatStat(501, "Item.Enchantment.Sharpness", 0f);
+            Assert.That(entity.GetFloatStat("Item.Enchantment.Unregistered", 3f), Is.Null);
+            ESFloatValueChangeSet enchantmentSet = entity.GetFloatStat(501, "Item.Enchantment.Sharpness", 0f);
             enchantmentSet.Add(ESFloatValueChangeOp.Add, 4f);
-            Assert.That(domain.GetFloatStatValue(501, "Item.Enchantment.Sharpness", 0f), Is.EqualTo(7f));
-            Assert.That(domain.GetPermit(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed), Is.Null);
-            Assert.That(domain.GetFloatStat(ESCharacterSuperAttributeKeys.CanJump), Is.Null);
+            Assert.That(entity.GetFloatStatValue(501, "Item.Enchantment.Sharpness", 0f), Is.EqualTo(7f));
+            Assert.That(entity.GetPermit(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed), Is.Null);
+            Assert.That(entity.GetFloatStat(ESCharacterSuperAttributeKeys.CanJump), Is.Null);
         }
 
         [Test]
         public void FixedPermitSlot_UsesSameResolverAndDoesNotCreateOnRead()
         {
-            EntityBuffDomain domain = new EntityBuffDomain();
-            Assert.That(domain.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, false), Is.False);
-            Assert.That(domain.TryGetPermit(ESCharacterSuperAttributeKeys.CanJump, out _), Is.False);
+            Entity entity = CreateEntity();
+            Assert.That(entity.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, false), Is.False);
+            Assert.That(entity.TryGetPermit(ESCharacterSuperAttributeKeys.CanJump, out _), Is.False);
 
-            ESPermitSet set = domain.GetCharacterPermit(ESCharacterPermitAttributeId.Jump, false);
+            ESPermitSet set = entity.GetCharacterPermit(ESCharacterPermitAttributeId.Jump, false);
             set.Add(ESPermitLaw.HardEnable);
-            Assert.That(domain.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, false), Is.True);
-            Assert.That(domain.GetPermitResult(ESCharacterSuperAttributeKeys.CanJump, false).decision, Is.EqualTo(ESPermitLaw.HardEnable));
+            Assert.That(entity.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, false), Is.True);
+            Assert.That(entity.GetPermitResult(ESCharacterSuperAttributeKeys.CanJump, false).decision, Is.EqualTo(ESPermitLaw.HardEnable));
         }
 
         [Test]
         public void FixedSlots_CacheDefinitionBaseOverridesWithoutCreatingResolvers()
         {
-            EntityBuffDomain domain = new EntityBuffDomain();
+            Entity entity = CreateEntity();
             ESSuperAttributeTable table = ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
             table.floatAttributes[(int)ESCharacterFloatAttributeId.GroundMaxMoveSpeed].overrideBaseValue = true;
             table.floatAttributes[(int)ESCharacterFloatAttributeId.GroundMaxMoveSpeed].baseValue = 12f;
             table.permitAttributes[(int)ESCharacterPermitAttributeId.Jump].overrideFallbackValue = true;
             table.permitAttributes[(int)ESCharacterPermitAttributeId.Jump].fallbackValue = false;
-            domain.BindSuperAttributeTable(table);
+            entity.BindSuperAttributeTable(table);
 
-            Assert.That(domain.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(12f));
-            Assert.That(domain.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, true), Is.False);
-            Assert.That(domain.TryGetFloatStat(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed, out _), Is.False);
-            Assert.That(domain.TryGetPermit(ESCharacterSuperAttributeKeys.CanJump, out _), Is.False);
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(12f));
+            Assert.That(entity.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, true), Is.False);
+            Assert.That(entity.TryGetFloatStat(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed, out _), Is.False);
+            Assert.That(entity.TryGetPermit(ESCharacterSuperAttributeKeys.CanJump, out _), Is.False);
         }
 
         [Test]
         public void ExplicitRuntimeBasesOutrankDefinitionDefaultsWithoutMaterializingFixedSlots()
         {
-            EntityBuffDomain domain = new EntityBuffDomain();
+            Entity entity = CreateEntity();
             ESSuperAttributeTable table = ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
             table.floatAttributes[(int)ESCharacterFloatAttributeId.GroundMaxMoveSpeed].overrideBaseValue = true;
             table.floatAttributes[(int)ESCharacterFloatAttributeId.GroundMaxMoveSpeed].baseValue = 12f;
@@ -107,78 +129,147 @@ namespace ES.Tests
                 overrideBaseValue = true,
                 baseValue = 3f
             });
-            domain.BindSuperAttributeTable(table);
+            entity.BindSuperAttributeTable(table);
 
-            domain.SetCharacterFloatStatBaseValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 7f);
-            domain.SetCharacterPermitFallbackValue(ESCharacterPermitAttributeId.Jump, true);
-            domain.SetFloatStatBaseValue(501, "Item.Enchantment.Sharpness", 9f);
+            entity.SetCharacterFloatStatBaseValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 7f);
+            entity.SetCharacterPermitFallbackValue(ESCharacterPermitAttributeId.Jump, true);
+            entity.SetFloatStatBaseValue(501, "Item.Enchantment.Sharpness", 9f);
 
-            Assert.That(domain.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(7f));
-            Assert.That(domain.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, false), Is.True);
-            Assert.That(domain.TryGetFloatStat(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed, out _), Is.False);
-            Assert.That(domain.TryGetPermit(ESCharacterSuperAttributeKeys.CanJump, out _), Is.False);
-            Assert.That(domain.TryGetFloatStat((ushort)501, "Item.Enchantment.Sharpness", out _), Is.False);
-            Assert.That(domain.GetFloatStatValue(501, "Item.Enchantment.Sharpness", 0f), Is.EqualTo(9f));
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(7f));
+            Assert.That(entity.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, false), Is.True);
+            Assert.That(entity.TryGetFloatStat(ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed, out _), Is.False);
+            Assert.That(entity.TryGetPermit(ESCharacterSuperAttributeKeys.CanJump, out _), Is.False);
+            Assert.That(entity.TryGetFloatStat((ushort)501, "Item.Enchantment.Sharpness", out _), Is.False);
+            Assert.That(entity.GetFloatStatValue(501, "Item.Enchantment.Sharpness", 0f), Is.EqualTo(9f));
         }
 
         [Test]
         public void ExplicitRuntimeFloatBasesRejectNonFiniteValues()
         {
-            EntityBuffDomain domain = new EntityBuffDomain();
+            Entity entity = CreateEntity();
 
             Assert.Throws<System.ArgumentOutOfRangeException>(() =>
-                domain.SetCharacterFloatStatBaseValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, float.NaN));
+                entity.SetCharacterFloatStatBaseValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, float.NaN));
             Assert.Throws<System.ArgumentOutOfRangeException>(() =>
-                domain.SetFloatStatBaseValue(0, "Custom.Stat", float.PositiveInfinity));
+                entity.SetFloatStatBaseValue(0, "Custom.Stat", float.PositiveInfinity));
         }
 
         [Test]
         public void DisabledSuperAttributeTableFallsBackToBuiltInCharacterDefaults()
         {
-            EntityBuffDomain domain = new EntityBuffDomain();
+            Entity entity = CreateEntity();
             ESSuperAttributeTable table = ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
             table.enabled = false;
-            domain.BindSuperAttributeTable(table);
+            entity.BindSuperAttributeTable(table);
 
-            Assert.That(domain.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(5f));
-            Assert.That(domain.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, false), Is.False);
-            Assert.That(domain.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.Not.Null);
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(5f));
+            Assert.That(entity.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, false), Is.False);
+            Assert.That(entity.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.Not.Null);
         }
 
         [Test]
         public void EffectLease_ReleasesEveryOwnedModifierAndGuardsTableReset()
         {
-            EntityBuffDomain domain = new EntityBuffDomain();
-            ESEffectLease lease = domain.CreateValueChangeEffectLease(out int ownerId);
-            ESFloatValueChangeSet speed = domain.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
-            ESPermitSet jump = domain.GetCharacterPermit(ESCharacterPermitAttributeId.Jump, true);
+            Entity entity = CreateEntity();
+            ESEffectLease lease = entity.CreateValueChangeEffectLease(out int ownerId);
+            ESFloatValueChangeSet speed = entity.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
+            ESPermitSet jump = entity.GetCharacterPermit(ESCharacterPermitAttributeId.Jump, true);
             speed.Add(ESFloatValueChangeOp.Add, 3f, ownerId: ownerId);
             jump.Add(ESPermitLaw.HardDisable, ownerId: ownerId);
 
-            Assert.That(domain.ActiveValueChangeEffectCount, Is.EqualTo(1));
-            Assert.That(domain.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(8f));
-            Assert.That(domain.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, true), Is.False);
-            Assert.Throws<System.InvalidOperationException>(() => domain.ClearValueChanges());
+            Assert.That(entity.ActiveValueChangeEffectCount, Is.EqualTo(1));
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(8f));
+            Assert.That(entity.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, true), Is.False);
+            Assert.Throws<System.InvalidOperationException>(() => entity.ClearValueChanges());
 
             lease.Dispose();
-            Assert.That(domain.ActiveValueChangeEffectCount, Is.Zero);
-            Assert.That(domain.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(5f));
-            Assert.That(domain.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, true), Is.True);
-            Assert.DoesNotThrow(() => domain.ClearValueChanges());
+            Assert.That(entity.ActiveValueChangeEffectCount, Is.Zero);
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(5f));
+            Assert.That(entity.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, true), Is.True);
+            Assert.DoesNotThrow(() => entity.ClearValueChanges());
+        }
+
+        [Test]
+        public void EntityDestroy_InvalidatesActiveEffectLease()
+        {
+            Entity entity = CreateEntity();
+            ESEffectLease lease = entity.CreateValueChangeEffectLease(out int ownerId);
+            ESFloatValueChangeSet speed = entity.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
+            speed.Add(ESFloatValueChangeOp.Add, 3f, ownerId: ownerId);
+
+            Object.DestroyImmediate(entity.gameObject);
+
+            Assert.That(lease.TryRelease(), Is.False);
+        }
+
+        [Test]
+        public void ReleaseEffect_CleansEverySetAndOwnerIdCanBeReused_WhenChangedThrows()
+        {
+            Entity entity = CreateEntity();
+            ESEffectLease lease = entity.CreateValueChangeEffectLease(out int ownerId);
+            ESFloatValueChangeSet speed = entity.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
+            ESPermitSet jump = entity.GetCharacterPermit(ESCharacterPermitAttributeId.Jump, true);
+            speed.Add(ESFloatValueChangeOp.Add, 3f, ownerId: ownerId);
+            jump.Add(ESPermitLaw.HardDisable, ownerId: ownerId);
+
+            System.Action<ESFloatValueChangeSet> throwFloat = _ => throw new System.InvalidOperationException("Float release listener failure.");
+            System.Action<ESPermitSet> throwPermit = _ => throw new System.InvalidOperationException("Permit release listener failure.");
+            speed.Changed += throwFloat;
+            jump.Changed += throwPermit;
+            LogAssert.Expect(LogType.Exception, new Regex("Float release listener failure"));
+            LogAssert.Expect(LogType.Exception, new Regex("Permit release listener failure"));
+
+            Assert.DoesNotThrow(() => lease.Dispose());
+            Assert.That(speed.Count, Is.Zero);
+            Assert.That(jump.Count, Is.Zero);
+            Assert.That(entity.ActiveValueChangeEffectCount, Is.Zero);
+
+            speed.Changed -= throwFloat;
+            jump.Changed -= throwPermit;
+
+            ESEffectLease nextLease = entity.CreateValueChangeEffectLease(out int nextOwnerId);
+            Assert.That(nextOwnerId, Is.EqualTo(ownerId));
+            speed.Add(ESFloatValueChangeOp.Add, 1f, ownerId: nextOwnerId);
+            jump.Add(ESPermitLaw.HardDisable, ownerId: nextOwnerId);
+
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(6f));
+            Assert.That(entity.GetCharacterPermitValue(ESCharacterPermitAttributeId.Jump, true), Is.False);
+            nextLease.Dispose();
+        }
+
+        [Test]
+        public void EntityDestroy_InvalidatesLeasesAndClearsEverySet_WhenChangedThrows()
+        {
+            Entity entity = CreateEntity();
+            ESEffectLease lease = entity.CreateValueChangeEffectLease(out int ownerId);
+            ESFloatValueChangeSet speed = entity.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
+            ESPermitSet jump = entity.GetCharacterPermit(ESCharacterPermitAttributeId.Jump, true);
+            speed.Add(ESFloatValueChangeOp.Add, 3f, ownerId: ownerId);
+            jump.Add(ESPermitLaw.HardDisable, ownerId: ownerId);
+
+            speed.Changed += _ => throw new System.InvalidOperationException("Float destroy listener failure.");
+            jump.Changed += _ => throw new System.InvalidOperationException("Permit destroy listener failure.");
+            LogAssert.Expect(LogType.Exception, new Regex("Float destroy listener failure"));
+            LogAssert.Expect(LogType.Exception, new Regex("Permit destroy listener failure"));
+
+            Assert.DoesNotThrow(() => Object.DestroyImmediate(entity.gameObject));
+            Assert.That(speed.Count, Is.Zero);
+            Assert.That(jump.Count, Is.Zero);
+            Assert.That(lease.TryRelease(), Is.False);
         }
 
         [Test]
         public void ClearValueChanges_RejectsReentrantEffectCreation()
         {
-            EntityBuffDomain domain = new EntityBuffDomain();
-            ESFloatValueChangeSet speed = domain.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
+            Entity entity = CreateEntity();
+            ESFloatValueChangeSet speed = entity.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
             speed.Add(ESFloatValueChangeOp.Add, 1f);
             bool rejected = false;
             speed.Changed += _ =>
             {
                 try
                 {
-                    domain.CreateValueChangeEffectLease(out int ignoredOwnerId);
+                    entity.CreateValueChangeEffectLease(out int ignoredOwnerId);
                 }
                 catch (System.InvalidOperationException)
                 {
@@ -186,28 +277,28 @@ namespace ES.Tests
                 }
             };
 
-            domain.ClearValueChanges();
+            entity.ClearValueChanges();
 
             Assert.That(rejected, Is.True);
-            Assert.That(domain.ActiveValueChangeEffectCount, Is.Zero);
+            Assert.That(entity.ActiveValueChangeEffectCount, Is.Zero);
         }
 
         [Test]
         public void FixedSlots_ApplyDefinitionBoundsWithAndWithoutResolvers()
         {
-            EntityBuffDomain domain = new EntityBuffDomain();
+            Entity entity = CreateEntity();
             ESSuperAttributeTable table = ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
             ESSuperFloatAttributeDefinition speed = table.floatAttributes[(int)ESCharacterFloatAttributeId.GroundMaxMoveSpeed];
             speed.overrideBaseValue = true;
             speed.baseValue = 20f;
             speed.minValue = 2f;
             speed.maxValue = 10f;
-            domain.BindSuperAttributeTable(table);
+            entity.BindSuperAttributeTable(table);
 
-            Assert.That(domain.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(10f));
-            ESFloatValueChangeSet set = domain.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(10f));
+            ESFloatValueChangeSet set = entity.GetCharacterFloatStat(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f);
             set.Add(ESFloatValueChangeOp.Override, -10f);
-            Assert.That(domain.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(2f));
+            Assert.That(entity.GetCharacterFloatStatValue(ESCharacterFloatAttributeId.GroundMaxMoveSpeed, 5f), Is.EqualTo(2f));
         }
 
         [Test]

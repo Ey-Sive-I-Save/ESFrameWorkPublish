@@ -20,8 +20,8 @@
 ## 必须先读
 
 ```text
-Assets/Plugins/ES/AIWarnings/OpTargetPack_Item整合与池化重设_AI协作警告.md
-Assets/Plugins/ES/AIWarnings/运动职责_Shot必中与Item运动_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Shot物理（ItemShotPhysics）/OpTargetPack_Item整合与池化重设_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/Item与Shot物理（ItemShotPhysics）/运动职责_Shot必中与Item运动_AI协作警告.md
 ```
 
 ## 执行要求

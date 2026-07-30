@@ -10,7 +10,7 @@ namespace ES
         public static ESAssetDeliveryMode ResolveLibrary(string libraryFolder)
         {
             string normalized = ESAssetPipelineIO.SafeSegment(libraryFolder);
-            ESAssetLibrary library = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>()
+            ESAssetLibrary library = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
                 ?.FirstOrDefault(item => item != null && string.Equals(ESAssetPipelineIO.SafeSegment(item.LibFolderName), normalized, StringComparison.Ordinal));
             if (library != null)
             {
@@ -21,7 +21,7 @@ namespace ES
                 return library.DeliveryMode;
             }
 
-            foreach (ESAssetLibraryConsumer consumer in ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>() ?? Enumerable.Empty<ESAssetLibraryConsumer>())
+            foreach (ESAssetLibraryConsumer consumer in ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>() ?? Enumerable.Empty<ESAssetLibraryConsumer>())
             {
                 if (consumer == null || !string.Equals(ESAssetPipelineIO.GameCoreLibraryFolder(consumer.ConsumerId), normalized, StringComparison.Ordinal))
                     continue;

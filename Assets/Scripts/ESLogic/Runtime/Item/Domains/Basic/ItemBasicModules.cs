@@ -232,6 +232,7 @@ namespace ES
             if (itemData == null)
                 return;
 
+            MyCore?.BindDefinition(itemData);
             itemData.EnsureActiveKindData();
             ItemShotDataBlock block = itemData.kindData as ItemShotDataBlock;
             if (block != null)

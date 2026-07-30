@@ -44,7 +44,29 @@ namespace ES
             get { return Instance != null; }
         }
 
-        public static T GetModuleFast<T>() where T : class, IModule, new()
+        /// <summary>
+        /// Performs a read-only module lookup. It never constructs or registers a module, so it
+        /// is safe for polling, input, physics and other hot paths.
+        /// </summary>
+        public static bool TryGetModule<T>(out T module) where T : class, IModule
+        {
+            ESGameManager manager = Instance;
+            if (manager != null && manager.ModuleTables != null
+                && manager.ModuleTables.TryGetValue(typeof(T), out IModule registered))
+            {
+                module = registered as T;
+                return module != null;
+            }
+
+            module = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Explicit initialization-only entry. A missing module is constructed and registered by
+        /// the Core. Never call this from a hot path.
+        /// </summary>
+        public static T GetOrCreateModule<T>() where T : class, IModule, new()
         {
             ESGameManager manager = Instance;
             return manager != null ? manager.GetMoudle<T>() : null;

@@ -9,10 +9,10 @@
 ## 必须先读
 
 ```text
-Assets/Plugins/ES/AIWarnings/README.md
-Assets/Plugins/ES/AIWarnings/项目最高警告/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md
-Assets/Plugins/ES/AIWarnings/项目最高警告/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md
-Assets/Plugins/ES/AIWarnings/项目最高警告/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md
 Assets/Plugins/ES/0_Stand/_Res/Runtime/ESScriptableObjectClassification.cs
 Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataModule.cs
 ```

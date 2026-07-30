@@ -35,9 +35,50 @@ namespace ES
         [OdinSerialize]
         public Dictionary<string, Transform> dynamicMap = new Dictionary<string, Transform>();
 
+        [NonSerialized] private Transform[] _defaultCache;
+        [NonSerialized] private bool _runtimeCacheReady;
+
+        private void Awake()
+        {
+            RebuildRuntimeCache();
+            GetComponent<Entity>()?.BindTransformMapping(this);
+        }
+
+        private void OnValidate()
+        {
+            RebuildRuntimeCache();
+        }
+
+        /// <summary>
+        /// 将枚举挂点压入连续数组。运行时读取固定语义挂点不会再走 Dictionary 或层级查找。
+        /// </summary>
+        public void RebuildRuntimeCache()
+        {
+            int count = Enum.GetValues(typeof(DefaultTransformKey)).Length;
+            if (_defaultCache == null || _defaultCache.Length != count)
+                _defaultCache = new Transform[count];
+
+            Array.Clear(_defaultCache, 0, _defaultCache.Length);
+            if (defaultMap != null)
+            {
+                foreach (KeyValuePair<DefaultTransformKey, Transform> pair in defaultMap)
+                {
+                    int index = (int)pair.Key;
+                    if ((uint)index < (uint)_defaultCache.Length)
+                        _defaultCache[index] = pair.Value;
+                }
+            }
+
+            _runtimeCacheReady = true;
+        }
+
         public Transform Resolve(DefaultTransformKey key)
         {
-            return defaultMap != null && defaultMap.TryGetValue(key, out var t) ? t : null;
+            if (!_runtimeCacheReady)
+                RebuildRuntimeCache();
+
+            int index = (int)key;
+            return (uint)index < (uint)_defaultCache.Length ? _defaultCache[index] : null;
         }
 
         public Transform Resolve(string key)
@@ -50,6 +91,13 @@ namespace ES
         {
             if (defaultMap == null) defaultMap = new Dictionary<DefaultTransformKey, Transform>();
             defaultMap[key] = transform;
+
+            if (!_runtimeCacheReady)
+                return;
+
+            int index = (int)key;
+            if ((uint)index < (uint)_defaultCache.Length)
+                _defaultCache[index] = transform;
         }
 
         public void Set(string key, Transform transform)

@@ -98,6 +98,7 @@ namespace ES
             "TemporaryEffectsRoot",
             "RuntimeAttachmentsRoot",
             "RuntimeGeneratedRoot",
+            "WeaponSocket",
         };
 
         private static readonly string[] SharedRequiredPaths =
@@ -283,6 +284,7 @@ namespace ES
         private static GameObject CreateTemplateRoot(string rootName, bool includeDebugRoot)
         {
             GameObject root = new GameObject(rootName);
+            root.layer = ESPhysicsLayers.EntityBody;
 
             Transform runtimeRoot = CreateNode(root.transform, "01_运行时逻辑_Runtime");
             CreateNode(runtimeRoot, "运行时组件_RuntimeComponents");
@@ -359,6 +361,7 @@ namespace ES
             Animator animator = CreateModelAndAnimator(modelRoot, stateMachineConfig);
             StateFinalIKDriver ikDriver = EnsureIKDriver(animator);
             BakeHumanoidBinding(ikDriver, animator);
+            ConfigureFinalIKBaseline(ikDriver);
 
             Entity entity = root.AddComponent<Entity>();
             entity.EnsureEntityStructure();
@@ -406,6 +409,10 @@ namespace ES
                 generatedRoot,
                 debugRoot);
 
+            EntityCharacterProfile profile = root.AddComponent<EntityCharacterProfile>();
+            profile.ConfigureBuildInput();
+            mapping.RebuildRuntimeCache();
+
             return root;
         }
 
@@ -452,32 +459,7 @@ namespace ES
 
         private static void BakeHumanoidBinding(StateFinalIKDriver driver, Animator animator)
         {
-            if (driver == null || animator == null || !animator.isHuman || animator.avatar == null || !animator.avatar.isValid)
-                return;
-
-            SerializedObject serializedDriver = new SerializedObject(driver);
-            SetSerializedBool(serializedDriver, "useDriverBoneBinding", true);
-            SetSerializedObject(serializedDriver, "bindingRoot", animator.transform);
-            SetSerializedObject(serializedDriver, "bindingPelvis", GetHumanBone(animator, HumanBodyBones.Hips));
-            SetSerializedObject(serializedDriver, "bindingSpine", GetHumanBone(animator, HumanBodyBones.Spine));
-            SetSerializedObject(serializedDriver, "bindingChest", ResolveChest(animator));
-            SetSerializedObject(serializedDriver, "bindingNeck", GetHumanBone(animator, HumanBodyBones.Neck));
-            SetSerializedObject(serializedDriver, "bindingHead", GetHumanBone(animator, HumanBodyBones.Head));
-            SetSerializedObject(serializedDriver, "bindingLeftEye", GetHumanBone(animator, HumanBodyBones.LeftEye));
-            SetSerializedObject(serializedDriver, "bindingRightEye", GetHumanBone(animator, HumanBodyBones.RightEye));
-            SetSerializedObject(serializedDriver, "bindingLeftUpperArm", GetHumanBone(animator, HumanBodyBones.LeftUpperArm));
-            SetSerializedObject(serializedDriver, "bindingLeftForearm", GetHumanBone(animator, HumanBodyBones.LeftLowerArm));
-            SetSerializedObject(serializedDriver, "bindingLeftHand", GetHumanBone(animator, HumanBodyBones.LeftHand));
-            SetSerializedObject(serializedDriver, "bindingRightUpperArm", GetHumanBone(animator, HumanBodyBones.RightUpperArm));
-            SetSerializedObject(serializedDriver, "bindingRightForearm", GetHumanBone(animator, HumanBodyBones.RightLowerArm));
-            SetSerializedObject(serializedDriver, "bindingRightHand", GetHumanBone(animator, HumanBodyBones.RightHand));
-            SetSerializedObject(serializedDriver, "bindingLeftThigh", GetHumanBone(animator, HumanBodyBones.LeftUpperLeg));
-            SetSerializedObject(serializedDriver, "bindingLeftCalf", GetHumanBone(animator, HumanBodyBones.LeftLowerLeg));
-            SetSerializedObject(serializedDriver, "bindingLeftFoot", GetHumanBone(animator, HumanBodyBones.LeftFoot));
-            SetSerializedObject(serializedDriver, "bindingRightThigh", GetHumanBone(animator, HumanBodyBones.RightUpperLeg));
-            SetSerializedObject(serializedDriver, "bindingRightCalf", GetHumanBone(animator, HumanBodyBones.RightLowerLeg));
-            SetSerializedObject(serializedDriver, "bindingRightFoot", GetHumanBone(animator, HumanBodyBones.RightFoot));
-            serializedDriver.ApplyModifiedPropertiesWithoutUndo();
+            driver?.ConfigureHumanoidBinding(animator);
         }
 
         private static void ConfigureKcc(Entity entity)
@@ -487,7 +469,7 @@ namespace ES
             entity.kcc.motor.SetCapsuleDimensions(0.35f, 1.8f, 0.9f);
             entity.kcc.motor.MaxStableSlopeAngle = 50f;
             entity.kcc.motor.MaxStepHeight = 0.4f;
-            entity.kcc.motor.StableGroundLayers = ~0;
+            entity.kcc.motor.StableGroundLayers = ESPhysicsLayers.GroundProbeMask;
             entity.kcc.maxStableMoveSpeed = 3.5f;
             entity.kcc.maxAirMoveSpeed = 6f;
             entity.kcc.airAccelerationSpeed = 5f;
@@ -572,8 +554,9 @@ namespace ES
             mapping.Set(DefaultTransformKey.RightHand, GetHumanBone(animator, HumanBodyBones.RightHand) ?? rightHandTarget);
             mapping.Set(DefaultTransformKey.LeftFoot, GetHumanBone(animator, HumanBodyBones.LeftFoot) ?? leftFootTarget);
             mapping.Set(DefaultTransformKey.RightFoot, GetHumanBone(animator, HumanBodyBones.RightFoot) ?? rightFootTarget);
-            mapping.Set(DefaultTransformKey.Weapon,
-                GetHumanBone(animator, HumanBodyBones.RightHand) ?? weaponSocket);
+            // Weapon 是制作好的挂载 Socket；RightHand 则始终保留为骨骼语义。
+            // 这样每个角色可在 Socket 上处理手型、偏移和双手武器辅助，而不会把业务挂载混入 Humanoid 骨骼。
+            mapping.Set(DefaultTransformKey.Weapon, weaponSocket ?? GetHumanBone(animator, HumanBodyBones.RightHand));
             mapping.Set(DefaultTransformKey.Camera, cameraTarget);
 
             mapping.Set("CameraTarget", cameraTarget);
@@ -604,8 +587,18 @@ namespace ES
             mapping.Set("TemporaryEffectsRoot", temporaryEffects);
             mapping.Set("RuntimeAttachmentsRoot", runtimeAttachments);
             mapping.Set("RuntimeGeneratedRoot", generatedRoot);
+            mapping.Set("WeaponSocket", weaponSocket);
             if (debugRoot != null)
                 mapping.Set("DebugRoot", debugRoot);
+        }
+
+        /// <summary>
+        /// 基础与通用池模板不携带 FinalIK Solver。明确关闭功能，避免 Driver 因默认开关而静默退化。
+        /// 正式角色 Variant 只有在挂齐对应 Solver 后才能重新打开功能。
+        /// </summary>
+        private static void ConfigureFinalIKBaseline(StateFinalIKDriver driver)
+        {
+            driver?.ConfigureSolverFreeTemplateBaseline();
         }
 
         private static void StripEditorAndDebugContent(GameObject root)
@@ -639,6 +632,12 @@ namespace ES
             entity.animator = animator;
             StateFinalIKDriver driver = EnsureIKDriver(animator);
             BakeHumanoidBinding(driver, animator);
+            ConfigureFinalIKBaseline(driver);
+
+            EntityCharacterProfile profile = root.GetComponent<EntityCharacterProfile>();
+            if (profile == null)
+                throw new InvalidOperationException("完整通用角色缺少 EntityCharacterProfile。");
+            profile.ConfigureRuntimePoolTemplate();
 
             int moduleCount = entity.aiDomain.MyModules?.ValuesNow?.Count ?? 0;
             for (int i = 0; i < moduleCount; i++)
@@ -664,7 +663,10 @@ namespace ES
             KinematicCharacterController.KinematicCharacterMotor[] motors =
                 prefab.GetComponentsInChildren<KinematicCharacterController.KinematicCharacterMotor>(true);
             CapsuleCollider[] capsules = prefab.GetComponentsInChildren<CapsuleCollider>(true);
+            Collider[] colliders = prefab.GetComponentsInChildren<Collider>(true);
             EntityTransformMapping[] mappings = prefab.GetComponentsInChildren<EntityTransformMapping>(true);
+            EntityCharacterProfile[] profiles = prefab.GetComponentsInChildren<EntityCharacterProfile>(true);
+            EntityWeaponBinding[] weaponBindings = prefab.GetComponentsInChildren<EntityWeaponBinding>(true);
             Animator[] animators = prefab.GetComponentsInChildren<Animator>(true);
             StateFinalIKDriver[] ikDrivers = prefab.GetComponentsInChildren<StateFinalIKDriver>(true);
 
@@ -674,15 +676,19 @@ namespace ES
             CapsuleCollider capsule = prefab.GetComponent<CapsuleCollider>();
             Rigidbody rootRigidbody = prefab.GetComponent<Rigidbody>();
             EntityTransformMapping mapping = prefab.GetComponent<EntityTransformMapping>();
+            EntityCharacterProfile profile = prefab.GetComponent<EntityCharacterProfile>();
             Animator animator = animators.Length == 1 ? animators[0] : null;
             StateFinalIKDriver ikDriver = animator != null ? animator.GetComponent<StateFinalIKDriver>() : null;
 
             bool componentCountValid = entities.Length == 1
                 && motors.Length == 1
                 && capsules.Length == 1
+                && colliders.Length == 1
                 && mappings.Length == 1
+                && profiles.Length == 1
                 && animators.Length == 1
-                && ikDrivers.Length == 1;
+                && ikDrivers.Length == 1
+                && weaponBindings.Length == 0;
 
             bool rootTransformValid = Approximately(prefab.transform.localPosition, Vector3.zero)
                 && Approximately(prefab.transform.localRotation, Quaternion.identity)
@@ -695,6 +701,7 @@ namespace ES
                 && capsule != null
                 && rootRigidbody == null
                 && mapping != null
+                && profile != null
                 && entity.kcc != null
                 && entity.kcc.motor == motor
                 && motor.Capsule == capsule
@@ -715,6 +722,8 @@ namespace ES
                 && animator.avatar.isValid
                 && ikDriver != null
                 && ValidateIKBoneBinding(ikDriver, animator)
+                && ikDriver.ValidateEnabledSolverContract(out _)
+                && ValidateFinalIKTemplateBaseline(ikDriver)
                 && entity.stateDomain != null
                 && entity.stateDomain.stateMachine != null
                 && entity.stateDomain.stateMachine.Config != null
@@ -749,6 +758,11 @@ namespace ES
                 && !entity.aiDomain.autoEnsurePlayerInputModules;
 
             bool mappingValid = ValidateAllMappings(mapping, prefab.transform, expectDebugRoot);
+            EntityCharacterPrefabRole expectedProfileRole = expectDebugRoot
+                ? EntityCharacterPrefabRole.BuildInput
+                : EntityCharacterPrefabRole.RuntimePoolTemplate;
+            string profileError = profile == null ? "缺少 EntityCharacterProfile" : string.Empty;
+            bool profileValid = profile != null && profile.ValidateTemplateRole(expectedProfileRole, out profileError);
             bool stripValid = ValidateEditorOnlyPolicy(prefab.transform, expectDebugRoot)
                 && ValidateRuntimeGeneratedIsEmpty(prefab.transform)
                 && ValidateRigidbodyPolicy(prefab.transform)
@@ -760,14 +774,15 @@ namespace ES
                 && hierarchyValid
                 && modulesValid
                 && mappingValid
+                && profileValid
                 && stripValid
                 && missingScripts == 0;
 
             string stage = expectDebugRoot ? "第一次构建前基础模板" : "完整通用角色架构";
             report = valid
-                ? $"[{stage}检查] 通过：组件唯一性、KCC胶囊契约、Entity四域、Playable动画、IK骨骼、全量Mapping、十区顺序、递归Missing Script、Rigidbody和运行时剥离规则完整。"
+                ? $"[{stage}检查] 通过：底盘组件唯一性、无武器内容组件、KCC胶囊契约、Entity四域、Playable动画、轻量禁用IK、全量Mapping、十区顺序、递归Missing Script、Rigidbody和运行时剥离规则完整。"
                 : $"[{stage}检查] 未通过 | Root={rootAuthorityValid} | Animation={animationValid} | "
-                  + $"Components={componentCountValid} | Hierarchy={hierarchyValid} | Mapping={mappingValid} | Strip={stripValid} | MissingScripts={missingScripts} | "
+                  + $"Components={componentCountValid} | Hierarchy={hierarchyValid} | Mapping={mappingValid} | Profile={profileValid}({profileError}) | Strip={stripValid} | MissingScripts={missingScripts} | "
                   + $"Move={moveCount}, Dispatch={dispatchCount}, PlayerWriter={playerWriterCount}, OptionalMotion={optionalMotionCount}";
             return valid;
         }
@@ -887,43 +902,16 @@ namespace ES
 
         private static bool ValidateIKBoneBinding(StateFinalIKDriver driver, Animator animator)
         {
-            if (driver == null || animator == null || !animator.isHuman)
-                return false;
-
-            SerializedObject serializedDriver = new SerializedObject(driver);
-            SerializedProperty enabledProperty = serializedDriver.FindProperty("useDriverBoneBinding");
-            SerializedProperty rootProperty = serializedDriver.FindProperty("bindingRoot");
-            if (enabledProperty == null || !enabledProperty.boolValue
-                || rootProperty == null || rootProperty.objectReferenceValue != animator.transform)
-                return false;
-
-            return BindingMatches(serializedDriver, "bindingPelvis", GetHumanBone(animator, HumanBodyBones.Hips), animator.transform)
-                && BindingMatches(serializedDriver, "bindingSpine", GetHumanBone(animator, HumanBodyBones.Spine), animator.transform)
-                && BindingMatches(serializedDriver, "bindingChest", ResolveChest(animator), animator.transform)
-                && BindingMatches(serializedDriver, "bindingHead", GetHumanBone(animator, HumanBodyBones.Head), animator.transform)
-                && BindingMatches(serializedDriver, "bindingLeftUpperArm", GetHumanBone(animator, HumanBodyBones.LeftUpperArm), animator.transform)
-                && BindingMatches(serializedDriver, "bindingLeftForearm", GetHumanBone(animator, HumanBodyBones.LeftLowerArm), animator.transform)
-                && BindingMatches(serializedDriver, "bindingLeftHand", GetHumanBone(animator, HumanBodyBones.LeftHand), animator.transform)
-                && BindingMatches(serializedDriver, "bindingRightUpperArm", GetHumanBone(animator, HumanBodyBones.RightUpperArm), animator.transform)
-                && BindingMatches(serializedDriver, "bindingRightForearm", GetHumanBone(animator, HumanBodyBones.RightLowerArm), animator.transform)
-                && BindingMatches(serializedDriver, "bindingRightHand", GetHumanBone(animator, HumanBodyBones.RightHand), animator.transform)
-                && BindingMatches(serializedDriver, "bindingLeftThigh", GetHumanBone(animator, HumanBodyBones.LeftUpperLeg), animator.transform)
-                && BindingMatches(serializedDriver, "bindingLeftCalf", GetHumanBone(animator, HumanBodyBones.LeftLowerLeg), animator.transform)
-                && BindingMatches(serializedDriver, "bindingLeftFoot", GetHumanBone(animator, HumanBodyBones.LeftFoot), animator.transform)
-                && BindingMatches(serializedDriver, "bindingRightThigh", GetHumanBone(animator, HumanBodyBones.RightUpperLeg), animator.transform)
-                && BindingMatches(serializedDriver, "bindingRightCalf", GetHumanBone(animator, HumanBodyBones.RightLowerLeg), animator.transform)
-                && BindingMatches(serializedDriver, "bindingRightFoot", GetHumanBone(animator, HumanBodyBones.RightFoot), animator.transform);
+            return driver != null && driver.MatchesHumanoidBinding(animator);
         }
 
-        private static bool BindingMatches(
-            SerializedObject serializedObject,
-            string propertyName,
-            Transform expected,
-            Transform hierarchyRoot)
+        /// <summary>
+        /// 模板只保留状态到 IK 的表现桥，不携带 Solver 或自动补组件行为。
+        /// 正式 Variant 必须按实际能力显式挂 Solver，不能把通用模板变成无模型也有 IK 负担的角色。
+        /// </summary>
+        private static bool ValidateFinalIKTemplateBaseline(StateFinalIKDriver driver)
         {
-            SerializedProperty property = serializedObject.FindProperty(propertyName);
-            Transform actual = property != null ? property.objectReferenceValue as Transform : null;
-            return expected != null && actual == expected && (actual == hierarchyRoot || actual.IsChildOf(hierarchyRoot));
+            return driver != null && driver.IsSolverFreeTemplateBaseline(out _);
         }
 
         private static bool ValidateAllMappings(
@@ -1192,20 +1180,6 @@ namespace ES
         private static Transform GetHumanBone(Animator animator, HumanBodyBones bone)
         {
             return animator != null && animator.isHuman ? animator.GetBoneTransform(bone) : null;
-        }
-
-        private static void SetSerializedObject(SerializedObject serializedObject, string propertyName, UnityEngine.Object value)
-        {
-            SerializedProperty property = serializedObject.FindProperty(propertyName);
-            if (property != null)
-                property.objectReferenceValue = value;
-        }
-
-        private static void SetSerializedBool(SerializedObject serializedObject, string propertyName, bool value)
-        {
-            SerializedProperty property = serializedObject.FindProperty(propertyName);
-            if (property != null)
-                property.boolValue = value;
         }
 
         private static Transform CreateNode(Transform parent, string name, Vector3 localPosition = default)

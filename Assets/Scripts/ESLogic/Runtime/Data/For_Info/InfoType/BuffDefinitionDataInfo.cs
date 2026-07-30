@@ -110,11 +110,10 @@ namespace ES
         public ESBuffConfigKey key = new ESBuffConfigKey();
 
         [Title("GameTag")]
-        [LabelText("Buff 授予标签")]
+        [LabelText("Buff 生效时添加")]
         [Tooltip("Buff 生命周期内持有的统一稳定 Tag。主 Enum Tag 仅可授予 RuntimeFact；StringKey 与第二组 Enum 由 Catalog 定义。")]
-        public ESTagGrantConfig tagGrants = new ESTagGrantConfig();
+        public List<ESTagStableReference> tags = new List<ESTagStableReference>();
 
-        [FormerlySerializedAs("tags")]
         [SerializeField, HideInInspector]
         private List<ESGameTag> legacyGrantedCoreTags;
 
@@ -199,9 +198,8 @@ namespace ES
             key.definitionLocalFileId = 0;
             key.definitionTypeName = null;
 
-            tagGrants ??= new ESTagGrantConfig();
-            tagGrants.tags ??= new List<ESTagStableReference>();
-            tagGrants.tags.Clear();
+            tags ??= new List<ESTagStableReference>();
+            tags.Clear();
             legacyGrantedCoreTags = null;
             applyTargetTagCondition ??= new ESTagConditionConfig();
             ResetTagCondition(applyTargetTagCondition);
@@ -233,22 +231,22 @@ namespace ES
         {
             error = null;
             EnsureGameTagConfigurationContainers();
-            if (tagGrants != null && !tagGrants.TryValidate(out error))
+            if (!ESTagLeaseSet.TryValidateTags(tags, out error))
             {
-                error = "tagGrants 无效：" + error;
+                error = "tags 无效：" + error;
                 return false;
             }
 
-            if (tagGrants != null && tagGrants.tags != null)
+            if (tags != null)
             {
-                for (int i = 0; i < tagGrants.tags.Count; i++)
+                for (int i = 0; i < tags.Count; i++)
                 {
-                    ESTagStableReference reference = tagGrants.tags[i];
+                    ESTagStableReference reference = tags[i];
                     if (reference.HasEnumKey
                         && reference.enumGroup == ESTagEnumGroup.Primary
                         && !ESGameTagCatalog.CanBeGrantedByBuff((ESGameTag)reference.enumValue))
                     {
-                        error = "tagGrants.tags[" + i + "]=" + reference
+                        error = "tags[" + i + "]=" + reference
                                 + " 不允许由 Buff 授予；Buff 仅可授予 RuntimeFact 主 Enum Tag，能力入口需由对应组件维护。";
                         return false;
                     }
@@ -268,8 +266,7 @@ namespace ES
         /// <summary>编辑器反序列化旧 Buff 时补齐新增的配置容器，不改变既有业务语义。</summary>
         public void EnsureGameTagConfigurationContainers()
         {
-            tagGrants ??= new ESTagGrantConfig();
-            tagGrants.tags ??= new List<ESTagStableReference>();
+            tags ??= new List<ESTagStableReference>();
             applyTargetTagCondition ??= new ESTagConditionConfig();
             EnsureTagConditionLists(applyTargetTagCondition);
             MigrateLegacyTagGrants();
@@ -306,8 +303,8 @@ namespace ES
             if (legacyGrantedCoreTags == null)
                 return;
 
-            if (tagGrants.tags.Count == 0)
-                CopyStableReferences(legacyGrantedCoreTags, tagGrants.tags);
+            if (tags.Count == 0)
+                CopyStableReferences(legacyGrantedCoreTags, tags);
 
             legacyGrantedCoreTags = null;
         }

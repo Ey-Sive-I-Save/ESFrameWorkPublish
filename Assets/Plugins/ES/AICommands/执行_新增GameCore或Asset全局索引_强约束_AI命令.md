@@ -20,10 +20,10 @@
 ## 必须先读
 
 ```text
-Assets/Plugins/ES/AIWarnings/README.md
-Assets/Plugins/ES/AIWarnings/通用架构理解_跨系统纠偏_AI协作警告.md
-Assets/Plugins/ES/AIWarnings/GameCoreGlobalData与AICommands_AI协作警告.md
-Assets/Plugins/ES/AIWarnings/项目最高警告/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/通用架构理解_跨系统纠偏_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/GameCoreGlobalData与AICommands_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md
 Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataModule.cs
 Assets/Plugins/ES/1_Design/ConfigKey/ESConfigKey.cs
 Assets/Plugins/ES/0_Stand/Stand_Tools/SimpleTools/ESEnumScriptJump.cs

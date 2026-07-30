@@ -686,7 +686,7 @@ namespace ES
 
         private List<PrefabPrewarmDataInfo> FindPrewarmDataInfos()
         {
-            var infos = ESEditorSO.SOS.GetNewGroupOfType<PrefabPrewarmDataInfo>() ?? new List<PrefabPrewarmDataInfo>(0);
+            var infos = ESEditorSO.GetGroupOfType<PrefabPrewarmDataInfo>() ?? new List<PrefabPrewarmDataInfo>(0);
             var result = new List<PrefabPrewarmDataInfo>(infos.Count);
             foreach (var info in infos)
             {

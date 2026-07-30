@@ -271,8 +271,7 @@ namespace ES
             }
 
             if (requireEntityPermit
-                && MyCore.buffDomain != null
-                && MyCore.buffDomain.TryGetPermit(entityPermitKey, out ESPermitSet permit)
+                && MyCore.TryGetPermit(entityPermitKey, out ESPermitSet permit)
                 && !permit.Value)
             {
                 result = ESInteractionCheckResult.EntityPermitDenied;

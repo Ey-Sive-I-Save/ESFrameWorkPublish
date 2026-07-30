@@ -1,5 +1,7 @@
 ﻿using System;
 using Sirenix.OdinInspector;
+using UnityEngine;
+using System.Collections.Generic;
 
 namespace ES
 {
@@ -12,6 +14,11 @@ namespace ES
 
         [MultiLineProperty(3)]
         public string description;
+
+        [Title("出生 Tag")]
+        [LabelText("出生时添加")]
+        [Tooltip("Monster 出生后持续持有的事实。Entity Prefab 不重复保存此列表。")]
+        public List<ESTagStableReference> tags = new List<ESTagStableReference>();
 
         [HideLabel, InlineProperty]
         public ESMonsterConfigKey monsterKey = new ESMonsterConfigKey();
@@ -26,6 +33,7 @@ namespace ES
         {
             ESMonsterGameCoreTable.Inject(this);
         }
+
     }
 
     /// <summary>NPC 独立领域根 SO；直接注入 NPC Table，不依赖中央类别分发。</summary>
@@ -37,6 +45,11 @@ namespace ES
 
         [MultiLineProperty(3)]
         public string description;
+
+        [Title("出生 Tag")]
+        [LabelText("出生时添加")]
+        [Tooltip("NPC 出生后持续持有的事实。Entity Prefab 不重复保存此列表。")]
+        public List<ESTagStableReference> tags = new List<ESTagStableReference>();
 
         [HideLabel, InlineProperty]
         public ESNpcConfigKey npcKey = new ESNpcConfigKey();
@@ -51,6 +64,7 @@ namespace ES
         {
             ESNpcGameCoreTable.Inject(this);
         }
+
     }
 
     /// <summary>Monster 领域自己的强类型表入口。启动期写入，运行期直接强类型查表。</summary>
@@ -83,6 +97,7 @@ namespace ES
                     data.soSource = info;
                     data.sharedData = info.motionShared;
                     data.defaultVariableData = info.motionVariable;
+                    data.tags = info.tags;
                     int runtimeKey = Table.CommitRetained(info.monsterKey, data, debugName: info.name);
                     if (runtimeKey == 0)
                         throw new InvalidOperationException("Monster GameCore 注入失败：" + info.name);
@@ -130,6 +145,7 @@ namespace ES
                     data.soSource = info;
                     data.sharedData = info.motionShared;
                     data.defaultVariableData = info.motionVariable;
+                    data.tags = info.tags;
                     int runtimeKey = Table.CommitRetained(info.npcKey, data, debugName: info.name);
                     if (runtimeKey == 0)
                         throw new InvalidOperationException("NPC GameCore 注入失败：" + info.name);

@@ -20,9 +20,9 @@
 ## 必须先读
 
 ```text
-Assets/Plugins/ES/AIWarnings/PlayerArchitecture/玩家对象模型重构_AI协作说明.md
-Assets/Plugins/ES/AIWarnings/PlayerArchitecture/角色通用架构验证_MMO开放世界角色切换剧情RPG战斗_AI协作说明.md
-Assets/Plugins/ES/AIWarnings/PlayerArchitecture/模型重构_今日修正_CoreDomain与AI域控制_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/玩家对象模型重构_AI协作说明.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/角色通用架构验证_MMO开放世界角色切换剧情RPG战斗_AI协作说明.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Entity与世界（EntityWorld）/模型重构_今日修正_CoreDomain与AI域控制_AI协作警告.md
 ```
 
 ## 执行要求

@@ -20,8 +20,8 @@
 ## 必须先读
 
 ```text
-Assets/Plugins/ES/AIWarnings/项目最高警告/项目最高警告_禁止滥用InitializeOnLoad_优先程序集流注册器_AI协作警告.md
-Assets/Plugins/ES/AIWarnings/项目最高警告/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_禁止滥用InitializeOnLoad_优先程序集流注册器_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md
 ```
 
 ## 执行要求

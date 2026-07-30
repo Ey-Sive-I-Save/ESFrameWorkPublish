@@ -87,7 +87,7 @@ namespace ES
 
         private static void AddTypedAssets(List<ESSoTableDataRule> candidates)
         {
-            List<ESSoTableDataRule> rules = ESEditorSO.SOS.GetNewGroupOfType<ESSoTableDataRule>() ?? new List<ESSoTableDataRule>(0);
+            List<ESSoTableDataRule> rules = ESEditorSO.GetGroupOfType<ESSoTableDataRule>() ?? new List<ESSoTableDataRule>(0);
             for (int i = 0; i < rules.Count; i++)
             {
                 ESSoTableDataRule rule = rules[i];

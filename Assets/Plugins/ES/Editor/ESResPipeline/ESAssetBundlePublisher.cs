@@ -33,7 +33,7 @@ namespace ES
             if (stageFolders.Count == 0) throw new InvalidOperationException("资源包暂存目录中没有可发布的资源库。");
             SetPublishProgress("校验暂存资源、Manifest 与 Hash", 0.05f);
             ValidateAll(stageFolders);
-            var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
+            var consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
                 .Where(item => item != null)
                 .OrderBy(item => AssetDatabase.GetAssetPath(item), StringComparer.Ordinal)
                 .ToList();

@@ -24,9 +24,9 @@
 ## 必须先读
 
 ```text
-Assets/Plugins/ES/AIWarnings/README.md
-Assets/Plugins/ES/AIWarnings/通用架构理解_跨系统纠偏_AI协作警告.md
-Assets/Plugins/ES/AIWarnings/GameCoreGlobalData与AICommands_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/通用架构理解_跨系统纠偏_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/GameCoreGlobalData与AICommands_AI协作警告.md
 ```
 
 ## 分级规则

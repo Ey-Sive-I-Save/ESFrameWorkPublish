@@ -5,7 +5,7 @@ namespace ES.Samples
 {
     /// <summary>
     /// 最小可复制示例：展示业务对象如何用少量标记接入 ESRuntimeWatch。
-    /// 完整产品演示请使用 RuntimeWatchVideoCases。
+    /// 完整案例请使用 RuntimeWatchCases。
     /// </summary>
     [AddComponentMenu("ES Samples/Runtime Watch Actor")]
     public class Example_RuntimeWatchActor : MonoBehaviour

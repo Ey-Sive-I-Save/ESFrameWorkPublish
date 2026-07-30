@@ -4,26 +4,36 @@ namespace ES
     {
         public static ESGameSaveModule Module
         {
-            get { return ESGameManager.GetModuleFast<ESGameSaveModule>(); }
+            get
+            {
+                ESGameManager.TryGetModule(out ESGameSaveModule module);
+                return module;
+            }
+        }
+
+        /// <summary>Explicitly initializes the save module for a write/load workflow.</summary>
+        public static ESGameSaveModule EnsureModule()
+        {
+            return ESGameManager.GetOrCreateModule<ESGameSaveModule>();
         }
 
         public static void Set<T>(string sectionKey, T data)
         {
-            ESGameSaveModule module = Module;
+            ESGameSaveModule module = EnsureModule();
             if (module != null)
                 module.Set(sectionKey, data);
         }
 
         public static void Set<T>(string slotId, string sectionKey, T data)
         {
-            ESGameSaveModule module = Module;
+            ESGameSaveModule module = EnsureModule();
             if (module != null)
                 module.Set(slotId, sectionKey, data);
         }
 
         public static void Set<T>(string slotId, string displayName, string sectionKey, T data)
         {
-            ESGameSaveModule module = Module;
+            ESGameSaveModule module = EnsureModule();
             if (module != null)
                 module.Set(slotId, displayName, sectionKey, data);
         }
@@ -62,13 +72,13 @@ namespace ES
 
         public static bool Load()
         {
-            ESGameSaveModule module = Module;
+            ESGameSaveModule module = EnsureModule();
             return module != null && module.Load();
         }
 
         public static bool Load(string slotId)
         {
-            ESGameSaveModule module = Module;
+            ESGameSaveModule module = EnsureModule();
             return module != null && module.Load(slotId);
         }
 

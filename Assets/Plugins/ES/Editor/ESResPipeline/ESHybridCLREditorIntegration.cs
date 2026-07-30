@@ -408,7 +408,7 @@ namespace ES
 
         private static List<ESAssetLibraryConsumer> GetAllConsumers()
         {
-            return ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()?.Where(item => item != null).ToList()
+            return ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()?.Where(item => item != null).ToList()
                 ?? new List<ESAssetLibraryConsumer>();
         }
 

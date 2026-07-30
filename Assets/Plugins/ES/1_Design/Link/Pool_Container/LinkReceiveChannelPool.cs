@@ -125,6 +125,18 @@ public sealed class LinkReceiveChannelPool<Channel, Link>
             receivers.ApplyBuffers();
     }
 
+    /// <summary>
+    /// Immediately commits queued subscriptions for one Channel when it is not currently being
+    /// dispatched. Lifecycle owners use this on release so an inactive pooled receiver is not
+    /// retained until an unrelated future event reaches the same Channel.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void ApplyChannelBuffers(Channel channel)
+    {
+        if (channelReceivers.TryGetValue(channel, out LinkSubscriptionList<IReceiveChannelLink<Channel, Link>> receivers))
+            receivers.ApplyBuffers();
+    }
+
     /// <summary>清空所有订阅。若某个 Channel 正在派发，其清空将在下一轮生效。</summary>
     public void Clear()
     {

@@ -25,8 +25,8 @@ namespace ES
             [LabelText("状态环境")]
             public StateSupportFlags supportFlags;
 
-            [LabelText("环境生效时授予")]
-            public ESTagGrantConfig tagGrants = new ESTagGrantConfig();
+            [LabelText("环境生效时添加")]
+            public List<ESTagStableReference> tags = new List<ESTagStableReference>();
         }
 
         [Title("状态环境到 Tag")]
@@ -107,8 +107,8 @@ namespace ES
                 bool shouldApply = binding != null
                                    && binding.supportFlags != StateSupportFlags.None
                                    && (current & binding.supportFlags) != 0
-                                   && binding.tagGrants != null
-                                   && !binding.tagGrants.IsEmpty;
+                                   && binding.tags != null
+                                   && binding.tags.Count > 0;
                 if (!shouldApply)
                 {
                     leaseSet.ReleaseAll();
@@ -118,8 +118,8 @@ namespace ES
                 if (leaseSet.Count > 0)
                     continue;
 
-                if (!leaseSet.TryAcquire(MyCore.Tags, binding.tagGrants, this, out string error))
-                    Debug.LogWarning("[EntityStateSupportTagProjection] Tag 授予失败: " + error, MyCore);
+                if (!leaseSet.TryApply(MyCore.Tags, binding.tags, this, out string error))
+                    Debug.LogWarning("[EntityStateSupportTagProjection] Tag 添加失败: " + error, MyCore);
             }
         }
 
@@ -918,7 +918,7 @@ namespace ES
 
             AttachWeaponToHand(index);
             _weaponInHand = true;
-            ApplyEquippedWeaponTagGrants(nextWeaponBinding);
+            ApplyEquippedWeaponTags(nextWeaponBinding);
             _lastEquipOrSwitchTime = Time.time;
 
             SetActionPhase(1);
@@ -956,7 +956,7 @@ namespace ES
 
             AttachWeaponToHand(_activeWeaponSlot);
             _weaponInHand = true;
-            ApplyEquippedWeaponTagGrants(weaponBinding);
+            ApplyEquippedWeaponTags(weaponBinding);
             _lastEquipOrSwitchTime = Time.time;
             SetActionPhase(1);
             TryActivateTransitionState(
@@ -1263,7 +1263,7 @@ namespace ES
             if (_peekLifecycle.Release())
                 OnPeekExit();
 
-            ReleaseEquippedWeaponTagGrants();
+            ReleaseEquippedWeaponTags();
 
             base.OnDestroy();
         }
@@ -1331,7 +1331,7 @@ namespace ES
             _actionPhase = 0;
             _weaponInHand = false;
             _activeWeaponSlot = -1;
-            ReleaseEquippedWeaponTagGrants();
+            ReleaseEquippedWeaponTags();
 
             if (!enableWeaponFusion)
                 return;
@@ -1362,7 +1362,7 @@ namespace ES
 
             _weaponInHand = startWithWeaponInHand;
             if (_weaponInHand)
-                ApplyEquippedWeaponTagGrants(GetWeaponBinding(weaponSlots[_activeWeaponSlot]));
+                ApplyEquippedWeaponTags(GetWeaponBinding(weaponSlots[_activeWeaponSlot]));
             _upperBodyLayerWeightCurrent = _weaponInHand ? 1f : 0f;
             _equipBlendCurrent = _weaponInHand ? 1f : 0f;
             SetActionPhase(_weaponInHand ? 1 : 2);
@@ -1500,9 +1500,9 @@ namespace ES
 
         private Transform ResolveHandMount(GunWeaponSlot slot, EntityWeaponBinding weaponBinding)
         {
-            Transform mount = weaponBinding != null && weaponBinding.handMount != null
-                ? weaponBinding.handMount
-                : defaultHandMount;
+            Transform mount = weaponBinding != null
+                ? weaponBinding.ResolveHandMount(MyCore, defaultHandMount)
+                : ResolveCharacterWeaponSocket(defaultHandMount);
 
             if (IsHandMountConflictingWithHolster(slot, weaponBinding, mount))
             {
@@ -1536,7 +1536,7 @@ namespace ES
 
         private Transform ResolveFallbackHandMount(GunWeaponSlot slot, EntityWeaponBinding weaponBinding)
         {
-            Transform candidate = defaultHandMount;
+            Transform candidate = ResolveCharacterWeaponSocket(defaultHandMount);
             if (candidate != null && !IsHandMountConflictingWithHolster(slot, weaponBinding, candidate))
                 return candidate;
 
@@ -1545,6 +1545,17 @@ namespace ES
                 return candidate;
 
             return null;
+        }
+
+        private Transform ResolveCharacterWeaponSocket(Transform fallback)
+        {
+            if (MyCore != null && MyCore.TryResolveTransform("WeaponSocket", out Transform weaponSocket))
+                return weaponSocket;
+
+            if (MyCore != null && MyCore.TryResolveTransform(DefaultTransformKey.Weapon, out Transform mappedWeapon))
+                return mappedWeapon;
+
+            return fallback;
         }
 
         private bool IsHandMountConflictingWithHolster(GunWeaponSlot slot, EntityWeaponBinding weaponBinding, Transform handMount)
@@ -1638,7 +1649,7 @@ namespace ES
 
             var weaponBinding = GetWeaponBinding(currentSlot);
 
-            ReleaseEquippedWeaponTagGrants();
+            ReleaseEquippedWeaponTags();
             AttachWeaponToHolster(_activeWeaponSlot);
             _weaponInHand = false;
             SetActionPhase(2);
@@ -1657,23 +1668,23 @@ namespace ES
             return true;
         }
 
-        private void ApplyEquippedWeaponTagGrants(EntityWeaponBinding binding)
+        private void ApplyEquippedWeaponTags(EntityWeaponBinding binding)
         {
             _equippedWeaponTagLeases ??= new ESTagLeaseSet();
-            if (binding == null || binding.equippedTagGrants == null || binding.equippedTagGrants.IsEmpty)
+            if (binding == null || binding.equippedTags == null || binding.equippedTags.Count == 0)
             {
                 _equippedWeaponTagLeases.ReleaseAll();
                 return;
             }
 
-            if (_equippedWeaponTagLeases.TryAcquire(MyCore.Tags, binding.equippedTagGrants, this, out string error))
+            if (_equippedWeaponTagLeases.TryApply(MyCore.Tags, binding.equippedTags, this, out string error))
                 return;
 
             if (logWeaponMountWarnings)
-                Debug.LogWarning("[EntityBasicCombatModule] 手持武器 Tag 授予失败: " + error, MyCore);
+                Debug.LogWarning("[EntityBasicCombatModule] 手持武器 Tag 添加失败: " + error, MyCore);
         }
 
-        private void ReleaseEquippedWeaponTagGrants()
+        private void ReleaseEquippedWeaponTags()
         {
             _equippedWeaponTagLeases?.ReleaseAll();
         }
@@ -1708,6 +1719,7 @@ namespace ES
             root.SetParent(mount, false);
             root.localPosition = Vector3.zero;
             root.localRotation = Quaternion.identity;
+            weaponBinding?.ApplyHandMountLocalPose(root);
 
             if (logWeaponMountSuccess && !_isInAttachmentConsistencyPass)
                 Debug.Log($"[EntityBasicCombatModule] 手持挂载成功 | Slot={slotIndex} | Weapon={root.name} | Mount={mount.name} | ParentPath={GetTransformPath(root.parent)}", MyCore);
@@ -2219,8 +2231,15 @@ namespace ES
             if (currentBinding != null && currentBinding.switchAssistRightHandTarget != null)
                 return currentBinding.switchAssistRightHandTarget;
 
-            if (nextBinding != null && nextBinding.handMount != null)
-                return nextBinding.handMount;
+            if (nextBinding != null)
+            {
+                if (nextBinding.twoHanded && nextBinding.offHandGripTarget != null)
+                    return nextBinding.offHandGripTarget;
+
+                Transform nextHandMount = nextBinding.ResolveHandMount(MyCore, defaultHandMount);
+                if (nextHandMount != null)
+                    return nextHandMount;
+            }
 
             if (nextSlot != null && nextSlot.weaponRoot != null)
                 return nextSlot.weaponRoot;
@@ -3593,6 +3612,7 @@ namespace ES
 
             return null;
         }
+
     }
 
 }

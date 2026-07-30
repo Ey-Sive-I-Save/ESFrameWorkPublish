@@ -784,7 +784,7 @@ MonoScript:
   m_Icon: {fileID: 0}
   m_Type: 0
   m_ExecutionOrder: 0
-  m_ClassName: RuntimeWatchVideoCase_4_UnityTypes
+  m_ClassName: RuntimeWatchCase_4_UnityTypes
   m_Namespace: ES
   m_AssemblyName: ES_Logic
 --- !u!4 &346436310 stripped
@@ -2638,7 +2638,7 @@ MonoScript:
   m_Icon: {fileID: 0}
   m_Type: 0
   m_ExecutionOrder: 0
-  m_ClassName: RuntimeWatchVideoCase_3_FilterAndNested
+  m_ClassName: RuntimeWatchCase_3_FilterAndNested
   m_Namespace: ES
   m_AssemblyName: ES_Logic
 --- !u!1 &900100000
@@ -6398,7 +6398,7 @@ MonoScript:
   m_Icon: {fileID: 0}
   m_Type: 0
   m_ExecutionOrder: 0
-  m_ClassName: RuntimeWatchVideoCase_2_Methods
+  m_ClassName: RuntimeWatchCase_2_Methods
   m_Namespace: ES
   m_AssemblyName: ES_Logic
 --- !u!1 &1495037107

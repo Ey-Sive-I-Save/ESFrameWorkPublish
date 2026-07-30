@@ -18,7 +18,7 @@ namespace ES.EditorInternal
             ESAssetCatalogKeyPicker.RefreshForValidation();
             ESGameCoreDefinitionLocator.ClearCache();
             int changed = 0;
-            List<ESResourcePlanInfo> plans = ESEditorSO.SOS.GetNewGroupOfType<ESResourcePlanInfo>();
+            List<ESResourcePlanInfo> plans = ESEditorSO.GetGroupOfType<ESResourcePlanInfo>();
             for (int i = 0; i < plans.Count; i++)
                 if (plans[i] != null && Bake(plans[i]))
                     changed++;

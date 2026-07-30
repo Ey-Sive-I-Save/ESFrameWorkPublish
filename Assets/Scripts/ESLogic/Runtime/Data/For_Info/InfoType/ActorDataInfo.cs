@@ -1,6 +1,7 @@
 ﻿using System;
 using Sirenix.OdinInspector;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace ES
 {
@@ -21,6 +22,11 @@ namespace ES
         [LabelText("说明")]
         [MultiLineProperty(3)]
         public string description;
+
+        [Title("出生 Tag")]
+        [LabelText("出生时添加")]
+        [Tooltip("角色出生后持续持有的事实。Entity Prefab 不重复保存此列表。")]
+        public List<ESTagStableReference> tags = new List<ESTagStableReference>();
 
         [Title("运动共享配置")]
         [InfoBox("Shared motion data is read-mostly runtime definition. Buffs and skills should modify variable/runtime data instead.")]

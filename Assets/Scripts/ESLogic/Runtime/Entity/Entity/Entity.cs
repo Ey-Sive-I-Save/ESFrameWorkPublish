@@ -10,12 +10,69 @@ namespace ES
     // Entity：直接接入 KCC 的角色核心（不走模块，超高频）
     [Serializable, TypeRegistryItem("实体核心")]
     [RequireComponent(typeof(KinematicCharacterMotor))]
-    public class Entity : Core, ICharacterController
+    public partial class Entity : Core, ICharacterController, IESEffectLeaseOwner, IESGameObjectPoolLifecycle
     {
+        [ESEditorSection("core", "核心配置", -100f)]
         [LabelText("主 Animator")]
         public Animator animator;
 
+        [NonSerialized] private EntityTransformMapping _transformMapping;
+
+        /// <summary>
+        /// 角色稳定挂点的运行时入口。首次绑定后只读取缓存，不允许业务代码在热路径重新 Find 层级。
+        /// </summary>
+        public EntityTransformMapping TransformMapping => EnsureTransformMapping();
+
+        internal void BindTransformMapping(EntityTransformMapping mapping)
+        {
+            if (mapping == null)
+                return;
+
+            _transformMapping = mapping;
+            _transformMapping.RebuildRuntimeCache();
+        }
+
+        public EntityTransformMapping EnsureTransformMapping()
+        {
+            if (_transformMapping == null)
+            {
+                _transformMapping = GetComponent<EntityTransformMapping>();
+                _transformMapping?.RebuildRuntimeCache();
+            }
+
+            return _transformMapping;
+        }
+
+        /// <summary>
+        /// 角色定义只从同根 Profile 读取：Variant 使用其唯一 DataInfo，
+        /// 通用池模板保留给租户显式 BindDefinition，基础模板保持无定义。
+        /// </summary>
+        private void ApplyPrefabProfileDefinition()
+        {
+            EntityCharacterProfile profile = GetComponent<EntityCharacterProfile>();
+            if (profile == null)
+                return;
+
+            if (!profile.ApplyPrefabDefinition(this, out string error))
+                Debug.LogError("[Entity] Profile 定义绑定失败：" + error, profile);
+        }
+
+        public bool TryResolveTransform(DefaultTransformKey key, out Transform transform)
+        {
+            EntityTransformMapping mapping = EnsureTransformMapping();
+            transform = mapping != null ? mapping.Resolve(key) : null;
+            return transform != null;
+        }
+
+        public bool TryResolveTransform(string key, out Transform transform)
+        {
+            EntityTransformMapping mapping = EnsureTransformMapping();
+            transform = mapping != null ? mapping.Resolve(key) : null;
+            return transform != null;
+        }
+
         [NonSerialized, ShowInInspector, Sirenix.OdinInspector.ReadOnly, LabelText("Entity长期OpSupport")]
+        [ESEditorSection("diagnostics", "诊断", 200f)]
         public ESOpSupport opSupport;
 
         public ESOpSupport OpSupport
@@ -28,41 +85,47 @@ namespace ES
         }
 
         [NonSerialized] private ESTagCollection tags;
+        [NonSerialized] private readonly ESTagLeaseSet intrinsicTagLeases = new ESTagLeaseSet();
+        [NonSerialized] private IReadOnlyList<ESTagStableReference> intrinsicTags;
+        [NonSerialized] private UnityEngine.Object intrinsicTagDefinition;
+        [NonSerialized] private string intrinsicTagError;
+        [NonSerialized] private bool waitsForTagCatalog;
+        [NonSerialized] private ESTagDefinitionState intrinsicTagState;
 
         /// <summary>Entity is one Tag host. The container itself has no Entity-specific behavior.</summary>
         public ESTagCollection Tags => tags ??= CreateTagCollection();
-
-        /// <summary>标签引用计数变化。回调在写入方同步执行，订阅者不得在回调内修改同一 Tag。</summary>
-        public event Action<ESGameTag, int, int> OnGameTagCountChanged;
-
-        /// <summary>标签从不存在变为存在，或从存在变为不存在时触发。</summary>
-        public event Action<ESGameTag, bool> OnGameTagPresenceChanged;
-
-        public event Action<ESTagId, int, int> OnTagCountChanged;
-        public event Action<ESTagId, bool> OnTagPresenceChanged;
+        public ESTagDefinitionState IntrinsicTagState => intrinsicTagState;
+        public UnityEngine.Object IntrinsicTagDefinition => intrinsicTagDefinition;
+        public string IntrinsicTagError => intrinsicTagError ?? string.Empty;
 
         #region Domains
 
-        [TabGroup("生命体结构", "身体基础"), HideLabel, HideReferenceObjectPicker, SerializeReference]
+        [ESEditorSection("body", "身体基础", 10f)]
+        [HideLabel, HideReferenceObjectPicker, SerializeReference]
         public EntityBasicDomain basicDomain = new EntityBasicDomain();
 
-        [TabGroup("生命体结构", "意识AI"), HideLabel, HideReferenceObjectPicker, SerializeReference]
+        [ESEditorSection("ai", "意识 AI", 20f)]
+        [HideLabel, HideReferenceObjectPicker, SerializeReference]
         public EntityAIDomain aiDomain = new EntityAIDomain();
 
-        [TabGroup("生命体结构", "Buff域"), HideLabel, HideReferenceObjectPicker, SerializeReference]
+        [ESEditorSection("buff", "Buff", 30f)]
+        [HideLabel, HideReferenceObjectPicker, SerializeReference]
         public EntityBuffDomain buffDomain = new EntityBuffDomain();
 
-        [TitleGroup("属性基础表（角色 Schema）", Alignment = TitleAlignments.Left)]
+        [ESEditorSection("attributes", "角色属性", 40f)]
+        [Title("属性基础表（角色 Schema）")]
         [HideLabel, InlineProperty]
         public ESSuperAttributeTable superAttributes = ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
 
-        [TabGroup("生命体结构", "状态表现"), HideLabel, HideReferenceObjectPicker, SerializeReference]
+        [ESEditorSection("state", "状态表现", 50f)]
+        [HideLabel, HideReferenceObjectPicker, SerializeReference]
         public EntityStateDomain stateDomain = new EntityStateDomain();
 
         #endregion
 
         #region KCC
 
+        [ESEditorSection("body", "身体基础", 10f)]
         [Title("身体运动核心（KCC，高频）")]
         [HideLabel]
         public EntityKCCData kcc = new EntityKCCData();
@@ -76,6 +139,8 @@ namespace ES
             EnsureEntityStructure();
             EnsureEntityOpSupport();
             Tags.Warmup();
+            EnsureTransformMapping();
+            ApplyPrefabProfileDefinition();
             InitializeKCC();
         }
 
@@ -108,16 +173,44 @@ namespace ES
             base.Update();
         }
 
+        /// <summary>
+        /// Pool return ends this Entity lifetime before deactivation. Old Tag and value-change
+        /// handles become stale, so a delayed release cannot affect the next renter.
+        /// </summary>
+        public void OnPoolDespawned()
+        {
+            UnsubscribeFromTagCatalog();
+            buffDomain?.ClearAllBuffs();
+            ClearDefinition();
+            ResetValueChangesForLifecycleEnd();
+            tags?.ResetForReuse();
+        }
+
+        /// <summary>Called by the pool while inactive, before the next activation.</summary>
+        public void OnPoolSpawned()
+        {
+            EnsureEntityStructure();
+            EnsureEntityOpSupport();
+            Tags.Warmup();
+            EnsureTransformMapping();
+            ApplyPrefabProfileDefinition();
+            ApplyIntrinsicTags();
+        }
+
         protected override void OnDestroy()
         {
+            UnsubscribeFromTagCatalog();
+            intrinsicTagLeases.ReleaseAll();
+            intrinsicTags = null;
+            intrinsicTagDefinition = null;
+            intrinsicTagState = ESTagDefinitionState.Empty;
             if (tags != null)
             {
-                tags.OnTagCountChanged -= HandleTagCountChanged;
-                tags.OnTagPresenceChanged -= HandleTagPresenceChanged;
                 tags.Dispose();
                 tags = null;
             }
             base.OnDestroy();
+            ResetValueChangesForLifecycleEnd();
 
             opSupport?.Dispose();
 
@@ -140,7 +233,7 @@ namespace ES
             buffDomain ??= new EntityBuffDomain();
             superAttributes ??= ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
             ESCharacterAttributeCatalog.EnsureCharacterScope(superAttributes);
-            buffDomain.BindSuperAttributeTable(superAttributes);
+            BindSuperAttributeTable(superAttributes);
             stateDomain ??= new EntityStateDomain();
             stateDomain.stateMachine ??= new StateMachine();
             kcc ??= new EntityKCCData();
@@ -157,29 +250,157 @@ namespace ES
 
         private ESTagCollection CreateTagCollection()
         {
-            var collection = new ESTagCollection();
-            collection.OnTagCountChanged += HandleTagCountChanged;
-            collection.OnTagPresenceChanged += HandleTagPresenceChanged;
-            return collection;
-        }
-
-        private void HandleTagCountChanged(ESTagId tag, int previous, int current)
-        {
-            OnTagCountChanged?.Invoke(tag, previous, current);
-            if (ESGameTagCatalog.TryFromCoreId(tag, out ESGameTag coreTag))
-                OnGameTagCountChanged?.Invoke(coreTag, previous, current);
-        }
-
-        private void HandleTagPresenceChanged(ESTagId tag, bool present)
-        {
-            OnTagPresenceChanged?.Invoke(tag, present);
-            if (ESGameTagCatalog.TryFromCoreId(tag, out ESGameTag coreTag))
-                OnGameTagPresenceChanged?.Invoke(coreTag, present);
+            return new ESTagCollection();
         }
 
         #endregion
 
         #region 游戏标签 API
+
+        /// <summary>Binds the sole Actor definition that owns this Entity's birth Tags.</summary>
+        public bool BindDefinition(ActorDataInfo definition)
+        {
+            return BindIntrinsicTags(definition, definition != null ? definition.tags : null);
+        }
+
+        /// <summary>Binds the sole Monster definition that owns this Entity's birth Tags.</summary>
+        public bool BindDefinition(MonsterDataInfo definition)
+        {
+            return BindIntrinsicTags(definition, definition != null ? definition.tags : null);
+        }
+
+        /// <summary>Binds the sole NPC definition that owns this Entity's birth Tags.</summary>
+        public bool BindDefinition(NpcDataInfo definition)
+        {
+            return BindIntrinsicTags(definition, definition != null ? definition.tags : null);
+        }
+
+        /// <summary>RuntimeData keeps only a reference to its originating Monster definition's direct Tag list.</summary>
+        public bool BindDefinition(ESMonsterRuntimeData definition)
+        {
+            return BindIntrinsicTags(definition != null ? definition.soSource : null, definition != null ? definition.tags : null);
+        }
+
+        /// <summary>RuntimeData keeps only a reference to its originating NPC definition's direct Tag list.</summary>
+        public bool BindDefinition(ESNpcRuntimeData definition)
+        {
+            return BindIntrinsicTags(definition != null ? definition.soSource : null, definition != null ? definition.tags : null);
+        }
+
+        /// <summary>
+        /// Applies the currently bound definition without count jitter. Invalid replacement data
+        /// leaves the prior active Leases intact; a missing Catalog enters Pending and retries on bind.
+        /// </summary>
+        public bool ApplyIntrinsicTags()
+        {
+            if (intrinsicTags == null || intrinsicTags.Count == 0)
+            {
+                intrinsicTagLeases.ReleaseAll();
+                intrinsicTagState = ESTagDefinitionState.Empty;
+                intrinsicTagError = null;
+                UnsubscribeFromTagCatalog();
+                return true;
+            }
+
+            if (!ESTagRuntimeCatalog.IsBound)
+            {
+                intrinsicTagState = ESTagDefinitionState.Pending;
+                intrinsicTagError = "Tag Catalog is not bound.";
+                SubscribeToTagCatalog();
+                return false;
+            }
+
+            if (intrinsicTagLeases.MatchesTags(intrinsicTags))
+            {
+                intrinsicTagState = ESTagDefinitionState.Applied;
+                intrinsicTagError = null;
+                UnsubscribeFromTagCatalog();
+                return true;
+            }
+
+            if (!intrinsicTagLeases.TryApply(Tags, intrinsicTags, this, out string error))
+            {
+                intrinsicTagState = ESTagDefinitionState.Failed;
+                intrinsicTagError = error;
+                UnsubscribeFromTagCatalog();
+                return false;
+            }
+
+            intrinsicTagState = ESTagDefinitionState.Applied;
+            intrinsicTagError = null;
+            UnsubscribeFromTagCatalog();
+            return true;
+        }
+
+        /// <summary>Returns only a Tag currently held by this Entity's definition LeaseSet.</summary>
+        public bool HasIntrinsicTag(ESTagStableReference tag)
+        {
+            return intrinsicTagState == ESTagDefinitionState.Applied
+                   && ESTagRuntimeCatalog.TryGetRuntimeKey(tag, out int runtimeKey)
+                   && intrinsicTagLeases.Contains(ESTagId.FromInt32(runtimeKey));
+        }
+
+        /// <summary>Returns only a currently active definition-owned Tag.</summary>
+        public bool HasIntrinsicTag(ESTagId tag)
+        {
+            return intrinsicTagState == ESTagDefinitionState.Applied && intrinsicTagLeases.Contains(tag);
+        }
+
+        /// <summary>Releases definition-owned Tags but preserves the binding for an explicit later reapply.</summary>
+        public void ReleaseIntrinsicTags()
+        {
+            intrinsicTagLeases.ReleaseAll();
+            if (intrinsicTags == null || intrinsicTags.Count == 0)
+                intrinsicTagState = ESTagDefinitionState.Empty;
+            else
+                intrinsicTagState = ESTagRuntimeCatalog.IsBound ? ESTagDefinitionState.Failed : ESTagDefinitionState.Pending;
+        }
+
+        /// <summary>Ends the definition binding and releases only its own Tag Leases.</summary>
+        public void ClearDefinition()
+        {
+            UnsubscribeFromTagCatalog();
+            intrinsicTagLeases.ReleaseAll();
+            intrinsicTags = null;
+            intrinsicTagDefinition = null;
+            intrinsicTagError = null;
+            intrinsicTagState = ESTagDefinitionState.Empty;
+        }
+
+        private bool BindIntrinsicTags(UnityEngine.Object definition, IReadOnlyList<ESTagStableReference> definitionTags)
+        {
+            bool changed = !ReferenceEquals(intrinsicTagDefinition, definition)
+                           || !ReferenceEquals(intrinsicTags, definitionTags);
+            intrinsicTagDefinition = definition;
+            intrinsicTags = definitionTags;
+            if (changed && !ESTagRuntimeCatalog.IsBound)
+                intrinsicTagLeases.ReleaseAll();
+
+            return ApplyIntrinsicTags();
+        }
+
+        private void SubscribeToTagCatalog()
+        {
+            if (waitsForTagCatalog)
+                return;
+
+            ESTagRuntimeCatalog.CatalogBound += HandleTagCatalogBound;
+            waitsForTagCatalog = true;
+        }
+
+        private void UnsubscribeFromTagCatalog()
+        {
+            if (!waitsForTagCatalog)
+                return;
+
+            ESTagRuntimeCatalog.CatalogBound -= HandleTagCatalogBound;
+            waitsForTagCatalog = false;
+        }
+
+        private void HandleTagCatalogBound()
+        {
+            ApplyIntrinsicTags();
+        }
 
         public bool HasGameTag(ESGameTag tag)
         {
@@ -269,13 +490,962 @@ namespace ES
         }
 
         /// <summary>
-        /// Captures persistent or replicated Tag identities. The payload deliberately contains
-        /// only stable EnumKey/StringKey values and the Catalog SchemaHash, never a process-local
-        /// RuntimeKey, count, or lease source.
+        /// Creates a stable presence view excluding Tags currently supplied by the bound definition.
+        /// It is not a replacement for Buff/equipment/task persistence: those domains must restore
+        /// their own Lease ownership, especially when they share a Tag with the definition.
         /// </summary>
-        public bool TryCreateStableTagSnapshot(ESTagStableTransferScope scope, out ESTagStableSnapshot snapshot, out string error)
+        public bool TryCreateNonIntrinsicTagSnapshot(
+            ESTagStableTransferScope scope,
+            out ESTagStableSnapshot snapshot,
+            out string error)
         {
-            return Tags.TryCreateStableSnapshot(scope, out snapshot, out error);
+            return intrinsicTagLeases.TryCreateSnapshotWithoutOwnedTags(Tags, scope, out snapshot, out error);
+        }
+
+        #endregion
+
+        #region ValueChange / Attribute Runtime
+
+        private struct ValueChangeEffectSlot
+        {
+            public int generation;
+            public bool isActive;
+        }
+
+        // Fixed character slots are compact reference arrays. A resolver is materialized only when a
+        // Buff/code modifier actually targets that slot; KCC can read an unmodified base value directly.
+        [ShowInInspector, ReadOnly, LabelText("角色 Float ValueChange")]
+        private readonly ESFloatValueChangeSet[] characterFloatStats = new ESFloatValueChangeSet[(int)ESCharacterFloatAttributeId.Count];
+
+        [ShowInInspector, ReadOnly, LabelText("角色 Permit ValueChange")]
+        private readonly ESPermitSet[] characterPermitStats = new ESPermitSet[(int)ESCharacterPermitAttributeId.Count];
+
+        // Compiled with the definition table, then read directly by KCC. These arrays deliberately
+        // replace per-frame Catalog/Dictionary lookups for fixed character slots.
+        private readonly float[] characterFloatDefinitionBases = new float[(int)ESCharacterFloatAttributeId.Count];
+        private readonly byte[] characterFloatHasDefinitionBase = new byte[(int)ESCharacterFloatAttributeId.Count];
+        private readonly float[] characterFloatDefinitionMinimums = new float[(int)ESCharacterFloatAttributeId.Count];
+        private readonly float[] characterFloatDefinitionMaximums = new float[(int)ESCharacterFloatAttributeId.Count];
+        private readonly float[] characterFloatExplicitBases = new float[(int)ESCharacterFloatAttributeId.Count];
+        private readonly byte[] characterFloatHasExplicitBase = new byte[(int)ESCharacterFloatAttributeId.Count];
+        private readonly byte[] characterPermitDefinitionFallbacks = new byte[(int)ESCharacterPermitAttributeId.Count];
+        private readonly byte[] characterPermitHasDefinitionFallback = new byte[(int)ESCharacterPermitAttributeId.Count];
+        private readonly byte[] characterPermitExplicitFallbacks = new byte[(int)ESCharacterPermitAttributeId.Count];
+        private readonly byte[] characterPermitHasExplicitFallback = new byte[(int)ESCharacterPermitAttributeId.Count];
+
+        // Optional attributes remain sparse, but are always indexed by an already-resolved
+        // process-local RuntimeKey. Their StringKey never enters a per-instance dictionary.
+        [ShowInInspector, ReadOnly, LabelText("稀疏 Float ValueChange")]
+        private readonly Dictionary<int, ESFloatValueChangeSet> sparseFloatStats = new Dictionary<int, ESFloatValueChangeSet>(16);
+
+        [ShowInInspector, ReadOnly, LabelText("稀疏 Permit ValueChange")]
+        private readonly Dictionary<int, ESPermitSet> sparsePermitStats = new Dictionary<int, ESPermitSet>(16);
+
+        // Explicit bases belong to business runtime state, not to a modifier Set. Sparse RuntimeKey
+        // entries are discarded on catalog rebind; fixed character ids remain stable for the entity.
+        private readonly Dictionary<int, float> sparseFloatExplicitBases = new Dictionary<int, float>(8);
+        private readonly Dictionary<int, bool> sparsePermitExplicitFallbacks = new Dictionary<int, bool>(8);
+
+        [NonSerialized] private ESSuperAttributeTable superAttributeTable;
+        [NonSerialized] private ESSuperAttributeCatalog superAttributeCatalog;
+        [NonSerialized] private string superAttributeCatalogError;
+        private readonly List<ValueChangeEffectSlot> valueChangeEffectSlots = new List<ValueChangeEffectSlot>(8);
+        private readonly List<int> freeValueChangeEffectSlots = new List<int>(8);
+        private int activeValueChangeEffectCount;
+        private bool isValueChangeResetting;
+
+        public int ActiveValueChangeEffectCount => activeValueChangeEffectCount;
+
+        /// <summary>
+        /// Binds and compiles the owning attribute definition table. A catalog transition invalidates
+        /// process-local RuntimeKeys, so it is only valid before this Entity accepts modifiers.
+        /// </summary>
+        public void BindSuperAttributeTable(ESSuperAttributeTable table)
+        {
+            // A disabled table contributes no schema/defaults. Fixed built-in slots still work from
+            // their caller-supplied base values, while unregistered sparse keys remain unavailable.
+            ESSuperAttributeTable effectiveTable = table != null && table.enabled ? table : null;
+            if (ReferenceEquals(superAttributeTable, effectiveTable) && superAttributeCatalog != null)
+                return;
+
+            if (activeValueChangeEffectCount != 0)
+            {
+                throw new InvalidOperationException(
+                    "Cannot bind a different AttributeTable while ValueChange effects are active. Release the owning EffectLease first.");
+            }
+
+            if (superAttributeCatalog != null || HasMaterializedValueChangeSets())
+                ClearValueChanges();
+
+            if (!ReferenceEquals(superAttributeTable, effectiveTable))
+            {
+                sparseFloatExplicitBases.Clear();
+                sparsePermitExplicitFallbacks.Clear();
+            }
+
+            superAttributeTable = effectiveTable;
+            superAttributeCatalog = null;
+            superAttributeCatalogError = null;
+            if (effectiveTable != null && !effectiveTable.TryBuildCatalog(out superAttributeCatalog, out superAttributeCatalogError))
+                superAttributeCatalog = null;
+
+            RebuildFixedSlotDefinitionCache();
+        }
+
+        public ESSuperAttributeCatalog SuperAttributeCatalog => superAttributeCatalog;
+        public string SuperAttributeCatalogError => superAttributeCatalogError;
+
+        /// <summary>
+        /// Creates one runtime-only ownership boundary for modifiers. The returned lease is the
+        /// only supported way for a producer to end that boundary; its owner id is used internally
+        /// by Set bulk release and is never serialized, replicated or treated as a business key.
+        /// </summary>
+        public ESEffectLease CreateValueChangeEffectLease(out int ownerId)
+        {
+            if (isValueChangeResetting)
+                throw new InvalidOperationException("Cannot create a ValueChange EffectLease while the Entity is resetting or rebinding.");
+
+            int slotIndex;
+            ValueChangeEffectSlot slot;
+            int freeLast = freeValueChangeEffectSlots.Count - 1;
+            if (freeLast >= 0)
+            {
+                slotIndex = freeValueChangeEffectSlots[freeLast];
+                freeValueChangeEffectSlots.RemoveAt(freeLast);
+                slot = valueChangeEffectSlots[slotIndex];
+            }
+            else
+            {
+                slotIndex = valueChangeEffectSlots.Count;
+                slot = default;
+                valueChangeEffectSlots.Add(slot);
+            }
+
+            if (slot.generation == int.MaxValue)
+                throw new InvalidOperationException("Entity ValueChange effect generation exhausted.");
+
+            slot.generation++;
+            slot.isActive = true;
+            valueChangeEffectSlots[slotIndex] = slot;
+            activeValueChangeEffectCount++;
+            ownerId = slotIndex + 1;
+            return new ESEffectLease(this, slotIndex, slot.generation);
+        }
+
+        /// <summary>
+        /// Lease callback. A stale or copied lease cannot release a newer effect slot because the
+        /// generation must match. All Tokens owned by this effect are released across every Set.
+        /// </summary>
+        public bool ReleaseEffect(int effectSlot, int generation)
+        {
+            if ((uint)effectSlot >= (uint)valueChangeEffectSlots.Count)
+                return false;
+
+            ValueChangeEffectSlot slot = valueChangeEffectSlots[effectSlot];
+            if (!slot.isActive || slot.generation != generation)
+                return false;
+
+            slot.isActive = false;
+            valueChangeEffectSlots[effectSlot] = slot;
+            try
+            {
+                // Keep this slot unavailable while every Set finishes its cleanup. A listener may
+                // create a new effect, but it must receive a different OwnerId until this release completes.
+                ReleaseAllValueChangesByOwner(effectSlot + 1);
+            }
+            finally
+            {
+                activeValueChangeEffectCount--;
+                freeValueChangeEffectSlots.Add(effectSlot);
+            }
+            return true;
+        }
+
+        public ESFloatValueChangeSet GetFloatStat(string key, float baseValue = 0f)
+        {
+            return GetFloatStat(0, key, baseValue);
+        }
+
+        /// <summary>Stable-key boundary. Both aliases must resolve to the same attribute definition.</summary>
+        public ESFloatValueChangeSet GetFloatStat(ushort enumKey, string key, float baseValue = 0f)
+        {
+            if (TryResolveCharacterFloatSlot(enumKey, key, out ESCharacterFloatAttributeId characterId))
+                return GetCharacterFloatStat(characterId, baseValue);
+
+            return TryResolveFloatRuntimeKey(enumKey, key, out int runtimeKey)
+                ? GetFloatStat(runtimeKey, baseValue)
+                : null;
+        }
+
+        /// <summary>Runtime path for an already resolved catalog key.</summary>
+        public ESFloatValueChangeSet GetFloatStat(int runtimeKey, float baseValue = 0f)
+        {
+            if (superAttributeCatalog == null
+                || !superAttributeCatalog.TryGetFloatDefinition(runtimeKey, out ESSuperFloatAttributeDefinition definition))
+                return null;
+
+            if (definition.storagePolicy == ESKeyStoragePolicy.HotSlot)
+            {
+                return ESCharacterAttributeCatalog.TryGetFloatId(definition.enumKey, out ESCharacterFloatAttributeId characterId)
+                    ? GetCharacterFloatStat(characterId, baseValue)
+                    : null;
+            }
+
+            float resolvedBaseValue = ResolveSparseFloatBase(runtimeKey, baseValue);
+            if (!sparseFloatStats.TryGetValue(runtimeKey, out ESFloatValueChangeSet set))
+            {
+                set = new ESFloatValueChangeSet(resolvedBaseValue);
+                set.SetBounds(definition.minValue, definition.maxValue);
+                sparseFloatStats.Add(runtimeKey, set);
+            }
+            else if (set.BaseValue != resolvedBaseValue)
+            {
+                set.BaseValue = resolvedBaseValue;
+            }
+
+            return set;
+        }
+
+        /// <summary>Gets or creates the modifier resolver for a fixed character float slot.</summary>
+        public ESFloatValueChangeSet GetCharacterFloatStat(ESCharacterFloatAttributeId id, float fallbackBaseValue = 0f)
+        {
+            if (!ESCharacterAttributeCatalog.IsValid(id))
+                return null;
+
+            int index = (int)id;
+            float resolvedBaseValue = ResolveCharacterFloatBase(id, fallbackBaseValue);
+            ESFloatValueChangeSet set = characterFloatStats[index];
+            if (set == null)
+            {
+                set = new ESFloatValueChangeSet(resolvedBaseValue);
+                set.SetBounds(characterFloatDefinitionMinimums[index], characterFloatDefinitionMaximums[index]);
+                characterFloatStats[index] = set;
+            }
+            else if (set.BaseValue != resolvedBaseValue)
+            {
+                set.BaseValue = resolvedBaseValue;
+            }
+
+            return set;
+        }
+
+        /// <summary>Returns an existing float stat without creating an empty ValueChange set.</summary>
+        public bool TryGetFloatStat(string key, out ESFloatValueChangeSet set)
+        {
+            return TryGetFloatStat(0, key, out set);
+        }
+
+        public bool TryGetFloatStat(ushort enumKey, string key, out ESFloatValueChangeSet set)
+        {
+            if (TryResolveCharacterFloatSlot(enumKey, key, out ESCharacterFloatAttributeId characterId))
+            {
+                set = characterFloatStats[(int)characterId];
+                return set != null;
+            }
+
+            if (TryResolveFloatRuntimeKey(enumKey, key, out int runtimeKey))
+                return TryGetFloatStat(runtimeKey, out set);
+
+            set = null;
+            return false;
+        }
+
+        public bool TryGetFloatStat(int runtimeKey, out ESFloatValueChangeSet set)
+        {
+            if (superAttributeCatalog != null
+                && superAttributeCatalog.TryGetFloatDefinition(runtimeKey, out ESSuperFloatAttributeDefinition definition)
+                && definition.storagePolicy == ESKeyStoragePolicy.HotSlot
+                && ESCharacterAttributeCatalog.TryGetFloatId(definition.enumKey, out ESCharacterFloatAttributeId characterId))
+            {
+                set = characterFloatStats[(int)characterId];
+                return set != null;
+            }
+
+            return sparseFloatStats.TryGetValue(runtimeKey, out set);
+        }
+
+        /// <summary>Gets the resolved float value, creating the stat with <paramref name="baseValue"/> when needed.</summary>
+        public float GetFloatStatValue(string key, float baseValue = 0f)
+        {
+            return GetFloatStatValue(0, key, baseValue);
+        }
+
+        public float GetFloatStatValue(ushort enumKey, string key, float baseValue = 0f)
+        {
+            if (TryResolveCharacterFloatSlot(enumKey, key, out ESCharacterFloatAttributeId characterId))
+                return GetCharacterFloatStatValue(characterId, baseValue);
+
+            if (!TryResolveFloatRuntimeKey(enumKey, key, out int runtimeKey))
+                return baseValue;
+
+            ESFloatValueChangeSet set = GetFloatStat(runtimeKey, baseValue);
+            return set != null ? set.Value : baseValue;
+        }
+
+        /// <summary>
+        /// Fixed-slot read for KCC and combat hot paths. It performs only array access and scalar work;
+        /// no string lookup, Dictionary lookup, or resolver allocation occurs for an untouched slot.
+        /// </summary>
+        public float GetCharacterFloatStatValue(ESCharacterFloatAttributeId id, float fallbackBaseValue = 0f)
+        {
+            if (!ESCharacterAttributeCatalog.IsValid(id))
+                return fallbackBaseValue;
+
+            float resolvedBaseValue = ResolveCharacterFloatBase(id, fallbackBaseValue);
+            ESFloatValueChangeSet set = characterFloatStats[(int)id];
+            if (set == null)
+                return ClampCharacterFloatValue(id, resolvedBaseValue);
+
+            if (set.BaseValue != resolvedBaseValue)
+                set.BaseValue = resolvedBaseValue;
+            return set.Value;
+        }
+
+        /// <summary>Sets a runtime business base without affecting active modifiers.</summary>
+        public void SetFloatStatBaseValue(string key, float baseValue)
+        {
+            SetFloatStatBaseValue(0, key, baseValue);
+        }
+
+        public void SetFloatStatBaseValue(ushort enumKey, string key, float baseValue)
+        {
+            ValidateFiniteFloatBase(baseValue);
+
+            if (TryResolveCharacterFloatSlot(enumKey, key, out ESCharacterFloatAttributeId characterId))
+            {
+                SetCharacterFloatStatBaseValue(characterId, baseValue);
+                return;
+            }
+
+            if (!TryResolveFloatRuntimeKey(enumKey, key, out int runtimeKey))
+                return;
+
+            sparseFloatExplicitBases[runtimeKey] = baseValue;
+            if (sparseFloatStats.TryGetValue(runtimeKey, out ESFloatValueChangeSet set))
+                set.BaseValue = baseValue;
+        }
+
+        /// <summary>Sets a fixed runtime base without materializing a modifier resolver.</summary>
+        public void SetCharacterFloatStatBaseValue(ESCharacterFloatAttributeId id, float baseValue)
+        {
+            ValidateFiniteFloatBase(baseValue);
+
+            if (!ESCharacterAttributeCatalog.IsValid(id))
+                return;
+
+            int index = (int)id;
+            characterFloatExplicitBases[index] = baseValue;
+            characterFloatHasExplicitBase[index] = 1;
+            ESFloatValueChangeSet set = characterFloatStats[index];
+            if (set != null)
+                set.BaseValue = baseValue;
+        }
+
+        /// <summary>Sets a permit's fallback value without changing any active permit modifiers.</summary>
+        public void SetPermitFallbackValue(string key, bool fallbackValue)
+        {
+            SetPermitFallbackValue(0, key, fallbackValue);
+        }
+
+        public void SetPermitFallbackValue(ushort enumKey, string key, bool fallbackValue)
+        {
+            if (TryResolveCharacterPermitSlot(enumKey, key, out ESCharacterPermitAttributeId characterId))
+            {
+                SetCharacterPermitFallbackValue(characterId, fallbackValue);
+                return;
+            }
+
+            if (!TryResolvePermitRuntimeKey(enumKey, key, out int runtimeKey))
+                return;
+
+            sparsePermitExplicitFallbacks[runtimeKey] = fallbackValue;
+            if (sparsePermitStats.TryGetValue(runtimeKey, out ESPermitSet set))
+                set.FallbackValue = fallbackValue;
+        }
+
+        /// <summary>Sets a fixed permit fallback without materializing a resolver.</summary>
+        public void SetCharacterPermitFallbackValue(ESCharacterPermitAttributeId id, bool fallbackValue)
+        {
+            if (!ESCharacterAttributeCatalog.IsValid(id))
+                return;
+
+            int index = (int)id;
+            characterPermitExplicitFallbacks[index] = fallbackValue ? (byte)1 : (byte)0;
+            characterPermitHasExplicitFallback[index] = 1;
+            ESPermitSet set = characterPermitStats[index];
+            if (set != null)
+                set.FallbackValue = fallbackValue;
+        }
+
+        public ESPermitSet GetPermit(string key, bool fallbackValue = true)
+        {
+            return GetPermit(0, key, fallbackValue);
+        }
+
+        /// <summary>Stable-key boundary. Both aliases must resolve to the same permit definition.</summary>
+        public ESPermitSet GetPermit(ushort enumKey, string key, bool fallbackValue = true)
+        {
+            if (TryResolveCharacterPermitSlot(enumKey, key, out ESCharacterPermitAttributeId characterId))
+                return GetCharacterPermit(characterId, fallbackValue);
+
+            return TryResolvePermitRuntimeKey(enumKey, key, out int runtimeKey)
+                ? GetPermit(runtimeKey, fallbackValue)
+                : null;
+        }
+
+        /// <summary>Runtime path for an already resolved catalog key.</summary>
+        public ESPermitSet GetPermit(int runtimeKey, bool fallbackValue = true)
+        {
+            if (superAttributeCatalog == null
+                || !superAttributeCatalog.TryGetPermitDefinition(runtimeKey, out ESSuperPermitAttributeDefinition definition))
+                return null;
+
+            if (definition.storagePolicy == ESKeyStoragePolicy.HotSlot)
+            {
+                return ESCharacterAttributeCatalog.TryGetPermitId(definition.enumKey, out ESCharacterPermitAttributeId characterId)
+                    ? GetCharacterPermit(characterId, fallbackValue)
+                    : null;
+            }
+
+            bool resolvedFallbackValue = ResolveSparsePermitFallback(runtimeKey, fallbackValue);
+            if (!sparsePermitStats.TryGetValue(runtimeKey, out ESPermitSet set))
+            {
+                set = new ESPermitSet(resolvedFallbackValue);
+                sparsePermitStats.Add(runtimeKey, set);
+            }
+            else if (set.FallbackValue != resolvedFallbackValue)
+            {
+                set.FallbackValue = resolvedFallbackValue;
+            }
+
+            return set;
+        }
+
+        /// <summary>Gets or creates the modifier resolver for a fixed character permit slot.</summary>
+        public ESPermitSet GetCharacterPermit(ESCharacterPermitAttributeId id, bool fallbackValue = true)
+        {
+            if (!ESCharacterAttributeCatalog.IsValid(id))
+                return null;
+
+            int index = (int)id;
+            bool resolvedFallbackValue = ResolveCharacterPermitFallback(id, fallbackValue);
+            ESPermitSet set = characterPermitStats[index];
+            if (set == null)
+            {
+                set = new ESPermitSet(resolvedFallbackValue);
+                characterPermitStats[index] = set;
+            }
+            else if (set.FallbackValue != resolvedFallbackValue)
+            {
+                set.FallbackValue = resolvedFallbackValue;
+            }
+
+            return set;
+        }
+
+        /// <summary>Gets the resolved permission value, creating the set with <paramref name="fallbackValue"/> when needed.</summary>
+        public bool GetPermitValue(string key, bool fallbackValue = true)
+        {
+            return GetPermitValue(0, key, fallbackValue);
+        }
+
+        public bool GetPermitValue(ushort enumKey, string key, bool fallbackValue = true)
+        {
+            if (TryResolveCharacterPermitSlot(enumKey, key, out ESCharacterPermitAttributeId characterId))
+                return GetCharacterPermitValue(characterId, fallbackValue);
+
+            if (!TryResolvePermitRuntimeKey(enumKey, key, out int runtimeKey))
+                return fallbackValue;
+
+            ESPermitSet set = GetPermit(runtimeKey, fallbackValue);
+            return set == null ? fallbackValue : set.Value;
+        }
+
+        /// <summary>Fixed-slot permit read for hot character paths; no resolver is created for the common no-modifier case.</summary>
+        public bool GetCharacterPermitValue(ESCharacterPermitAttributeId id, bool fallbackValue = true)
+        {
+            if (!ESCharacterAttributeCatalog.IsValid(id))
+                return fallbackValue;
+
+            bool resolvedFallbackValue = ResolveCharacterPermitFallback(id, fallbackValue);
+            ESPermitSet set = characterPermitStats[(int)id];
+            if (set == null)
+                return resolvedFallbackValue;
+
+            if (set.FallbackValue != resolvedFallbackValue)
+                set.FallbackValue = resolvedFallbackValue;
+            return set.Value;
+        }
+
+        /// <summary>Gets the resolved permission and the winning rule's metadata.</summary>
+        public ESPermitLawResult GetPermitResult(string key, bool fallbackValue = true)
+        {
+            return GetPermitResult(0, key, fallbackValue);
+        }
+
+        public ESPermitLawResult GetPermitResult(ushort enumKey, string key, bool fallbackValue = true)
+        {
+            if (TryResolveCharacterPermitSlot(enumKey, key, out ESCharacterPermitAttributeId characterId))
+            {
+                ESPermitSet fixedSet = characterPermitStats[(int)characterId];
+                bool resolvedFallbackValue = ResolveCharacterPermitFallback(characterId, fallbackValue);
+                if (fixedSet == null)
+                    return ESPermitLawResult.Fallback(resolvedFallbackValue);
+
+                if (fixedSet.FallbackValue != resolvedFallbackValue)
+                    fixedSet.FallbackValue = resolvedFallbackValue;
+                return fixedSet.Result;
+            }
+
+            if (!TryResolvePermitRuntimeKey(enumKey, key, out int runtimeKey))
+                return ESPermitLawResult.Fallback(fallbackValue);
+
+            ESPermitSet set = GetPermit(runtimeKey, fallbackValue);
+            return set == null ? ESPermitLawResult.Fallback(fallbackValue) : set.Result;
+        }
+
+        /// <summary>
+        /// Clears inactive Entity-level ValueChange sets and invalidates their existing tokens.
+        /// Active effects must first release their leases so a live Buff cannot be left holding
+        /// stale Tokens after a reset or catalog transition.
+        /// </summary>
+        public void ClearValueChanges()
+        {
+            if (activeValueChangeEffectCount != 0)
+            {
+                throw new InvalidOperationException(
+                    "Cannot clear ValueChanges while effects are active. Release their EffectLease or remove the owning Buff first.");
+            }
+
+            if (isValueChangeResetting)
+                throw new InvalidOperationException("ValueChanges are already being reset or rebound.");
+
+            isValueChangeResetting = true;
+            try
+            {
+                for (int i = 0; i < characterFloatStats.Length; i++)
+                {
+                    ESFloatValueChangeSet set = characterFloatStats[i];
+                    if (set != null)
+                        set.Clear();
+                    characterFloatStats[i] = null;
+                }
+
+                foreach (ESFloatValueChangeSet set in sparseFloatStats.Values)
+                    set.Clear();
+                sparseFloatStats.Clear();
+
+                for (int i = 0; i < characterPermitStats.Length; i++)
+                {
+                    ESPermitSet set = characterPermitStats[i];
+                    if (set != null)
+                        set.Clear();
+                    characterPermitStats[i] = null;
+                }
+
+                foreach (ESPermitSet set in sparsePermitStats.Values)
+                    set.Clear();
+                sparsePermitStats.Clear();
+            }
+            finally
+            {
+                isValueChangeResetting = false;
+            }
+        }
+
+        private void ReleaseAllValueChangesByOwner(int ownerId)
+        {
+            for (int i = 0; i < characterFloatStats.Length; i++)
+                ReleaseAllValueChangesByOwner(characterFloatStats[i], ownerId);
+            foreach (ESFloatValueChangeSet set in sparseFloatStats.Values)
+                ReleaseAllValueChangesByOwner(set, ownerId);
+
+            for (int i = 0; i < characterPermitStats.Length; i++)
+                ReleaseAllValueChangesByOwner(characterPermitStats[i], ownerId);
+            foreach (ESPermitSet set in sparsePermitStats.Values)
+                ReleaseAllValueChangesByOwner(set, ownerId);
+        }
+
+        private static void ReleaseAllValueChangesByOwner(ESFloatValueChangeSet set, int ownerId)
+        {
+            if (set == null)
+                return;
+
+            try
+            {
+                set.ReleaseAllByOwner(ownerId);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
+        private static void ReleaseAllValueChangesByOwner(ESPermitSet set, int ownerId)
+        {
+            if (set == null)
+                return;
+
+            try
+            {
+                set.ReleaseAllByOwner(ownerId);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
+        private bool HasMaterializedValueChangeSets()
+        {
+            for (int i = 0; i < characterFloatStats.Length; i++)
+            {
+                if (characterFloatStats[i] != null)
+                    return true;
+            }
+            if (sparseFloatStats.Count != 0)
+                return true;
+
+            for (int i = 0; i < characterPermitStats.Length; i++)
+            {
+                if (characterPermitStats[i] != null)
+                    return true;
+            }
+            return sparsePermitStats.Count != 0;
+        }
+
+        /// <summary>
+        /// 只读查询现有许可，不创建字典项。适合交互、移动等高频运行时检查。
+        /// </summary>
+        public bool TryGetPermit(string key, out ESPermitSet set)
+        {
+            return TryGetPermit(0, key, out set);
+        }
+
+        public bool TryGetPermit(ushort enumKey, string key, out ESPermitSet set)
+        {
+            if (TryResolveCharacterPermitSlot(enumKey, key, out ESCharacterPermitAttributeId characterId))
+            {
+                set = characterPermitStats[(int)characterId];
+                return set != null;
+            }
+
+            if (TryResolvePermitRuntimeKey(enumKey, key, out int runtimeKey))
+                return TryGetPermit(runtimeKey, out set);
+
+            set = null;
+            return false;
+        }
+
+        public bool TryGetPermit(int runtimeKey, out ESPermitSet set)
+        {
+            if (superAttributeCatalog != null
+                && superAttributeCatalog.TryGetPermitDefinition(runtimeKey, out ESSuperPermitAttributeDefinition definition)
+                && definition.storagePolicy == ESKeyStoragePolicy.HotSlot
+                && ESCharacterAttributeCatalog.TryGetPermitId(definition.enumKey, out ESCharacterPermitAttributeId characterId))
+            {
+                set = characterPermitStats[(int)characterId];
+                return set != null;
+            }
+
+            return sparsePermitStats.TryGetValue(runtimeKey, out set);
+        }
+
+        private float ResolveCharacterFloatBase(ESCharacterFloatAttributeId id, float fallbackBaseValue)
+        {
+            int index = (int)id;
+            if (characterFloatHasExplicitBase[index] != 0)
+                return characterFloatExplicitBases[index];
+
+            return characterFloatHasDefinitionBase[index] != 0
+                ? characterFloatDefinitionBases[index]
+                : fallbackBaseValue;
+        }
+
+        private static void ValidateFiniteFloatBase(float baseValue)
+        {
+            if (float.IsNaN(baseValue) || float.IsInfinity(baseValue))
+                throw new System.ArgumentOutOfRangeException(nameof(baseValue), "Entity attribute base value must be finite.");
+        }
+
+        private bool ResolveCharacterPermitFallback(ESCharacterPermitAttributeId id, bool fallbackValue)
+        {
+            int index = (int)id;
+            if (characterPermitHasExplicitFallback[index] != 0)
+                return characterPermitExplicitFallbacks[index] != 0;
+
+            return characterPermitHasDefinitionFallback[index] != 0
+                ? characterPermitDefinitionFallbacks[index] != 0
+                : fallbackValue;
+        }
+
+        private float ResolveSparseFloatBase(int runtimeKey, float fallbackBaseValue)
+        {
+            if (sparseFloatExplicitBases.TryGetValue(runtimeKey, out float explicitBase))
+                return explicitBase;
+
+            superAttributeCatalog.TryResolveFloatBase(runtimeKey, fallbackBaseValue, out float resolvedBaseValue);
+            return resolvedBaseValue;
+        }
+
+        private bool ResolveSparsePermitFallback(int runtimeKey, bool fallbackValue)
+        {
+            if (sparsePermitExplicitFallbacks.TryGetValue(runtimeKey, out bool explicitFallback))
+                return explicitFallback;
+
+            superAttributeCatalog.TryResolvePermitFallback(runtimeKey, fallbackValue, out bool resolvedFallbackValue);
+            return resolvedFallbackValue;
+        }
+
+        private float ClampCharacterFloatValue(ESCharacterFloatAttributeId id, float value)
+        {
+            int index = (int)id;
+            float minimum = characterFloatDefinitionMinimums[index];
+            float maximum = characterFloatDefinitionMaximums[index];
+            if (value < minimum)
+                return minimum;
+            return value > maximum ? maximum : value;
+        }
+
+        /// <summary>
+        /// Resolves authored fixed-slot defaults exactly once per table bind. KCC later reads only
+        /// these compact arrays and its existing resolver slots; custom sparse definitions stay in
+        /// the Catalog path because they are never part of the motion hot loop.
+        /// </summary>
+        private void RebuildFixedSlotDefinitionCache()
+        {
+            Array.Clear(characterFloatDefinitionBases, 0, characterFloatDefinitionBases.Length);
+            Array.Clear(characterFloatHasDefinitionBase, 0, characterFloatHasDefinitionBase.Length);
+            Array.Clear(characterPermitDefinitionFallbacks, 0, characterPermitDefinitionFallbacks.Length);
+            Array.Clear(characterPermitHasDefinitionFallback, 0, characterPermitHasDefinitionFallback.Length);
+
+            for (int i = 0; i < characterFloatDefinitionMinimums.Length; i++)
+            {
+                characterFloatDefinitionMinimums[i] = float.NegativeInfinity;
+                characterFloatDefinitionMaximums[i] = float.PositiveInfinity;
+            }
+
+            if (superAttributeCatalog == null)
+                return;
+
+            for (int i = 0; i < characterFloatStats.Length; i++)
+            {
+                ESCharacterFloatAttributeId id = (ESCharacterFloatAttributeId)i;
+                ushort enumKey = ESCharacterAttributeCatalog.GetEnumKey(id);
+                if (!superAttributeCatalog.TryGetRuntimeKey(enumKey, ESCharacterAttributeCatalog.GetKey(id), out int runtimeKey)
+                    || !superAttributeCatalog.TryGetFloatDefinition(runtimeKey, out ESSuperFloatAttributeDefinition definition)
+                    || definition.storagePolicy != ESKeyStoragePolicy.HotSlot
+                    || definition.enumKey != enumKey)
+                {
+                    continue;
+                }
+
+                characterFloatDefinitionMinimums[i] = definition.minValue;
+                characterFloatDefinitionMaximums[i] = definition.maxValue;
+                characterFloatDefinitionBases[i] = definition.baseValue;
+                characterFloatHasDefinitionBase[i] = definition.overrideBaseValue ? (byte)1 : (byte)0;
+            }
+
+            for (int i = 0; i < characterPermitStats.Length; i++)
+            {
+                ESCharacterPermitAttributeId id = (ESCharacterPermitAttributeId)i;
+                ushort enumKey = ESCharacterAttributeCatalog.GetEnumKey(id);
+                if (!superAttributeCatalog.TryGetRuntimeKey(enumKey, ESCharacterAttributeCatalog.GetKey(id), out int runtimeKey)
+                    || !superAttributeCatalog.TryGetPermitDefinition(runtimeKey, out ESSuperPermitAttributeDefinition definition)
+                    || definition.storagePolicy != ESKeyStoragePolicy.HotSlot
+                    || definition.enumKey != enumKey
+                    || !definition.overrideFallbackValue)
+                {
+                    continue;
+                }
+
+                characterPermitDefinitionFallbacks[i] = definition.fallbackValue ? (byte)1 : (byte)0;
+                characterPermitHasDefinitionFallback[i] = 1;
+            }
+        }
+
+        private bool TryResolveFloatRuntimeKey(ushort enumKey, string key, out int runtimeKey)
+        {
+            runtimeKey = 0;
+            return superAttributeCatalog != null
+                   && (enumKey != 0 || !string.IsNullOrEmpty(key))
+                   && superAttributeCatalog.TryGetRuntimeKey(enumKey, key, out runtimeKey)
+                   && superAttributeCatalog.TryGetFloatDefinition(runtimeKey, out _);
+        }
+
+        private bool TryResolvePermitRuntimeKey(ushort enumKey, string key, out int runtimeKey)
+        {
+            runtimeKey = 0;
+            return superAttributeCatalog != null
+                   && (enumKey != 0 || !string.IsNullOrEmpty(key))
+                   && superAttributeCatalog.TryGetRuntimeKey(enumKey, key, out runtimeKey)
+                   && superAttributeCatalog.TryGetPermitDefinition(runtimeKey, out _);
+        }
+
+        private bool TryResolveCharacterFloatSlot(ushort enumKey, string key, out ESCharacterFloatAttributeId id)
+        {
+            bool enumConfigured = enumKey != 0;
+            bool stringConfigured = !string.IsNullOrEmpty(key);
+            ESCharacterFloatAttributeId enumId = default;
+            ESCharacterFloatAttributeId stringId = default;
+            bool hasEnum = enumConfigured && ESCharacterAttributeCatalog.TryGetFloatId(enumKey, out enumId);
+            bool hasString = stringConfigured && ESCharacterAttributeCatalog.TryGetFloatId(key, out stringId);
+
+            if ((enumConfigured && !hasEnum)
+                || (stringConfigured && !hasString)
+                || (hasEnum && hasString && enumId != stringId))
+            {
+                id = default;
+                return false;
+            }
+
+            id = hasEnum ? enumId : stringId;
+            if (!hasEnum && !hasString)
+                return false;
+
+            if (superAttributeTable != null && superAttributeCatalog == null)
+                return false;
+
+            if (superAttributeCatalog == null)
+                return true;
+
+            return superAttributeCatalog.TryGetRuntimeKey(enumKey, key, out int runtimeKey)
+                   && superAttributeCatalog.TryGetFloatDefinition(runtimeKey, out ESSuperFloatAttributeDefinition definition)
+                   && definition.storagePolicy == ESKeyStoragePolicy.HotSlot
+                   && ESCharacterAttributeCatalog.TryGetFloatId(definition.enumKey, out ESCharacterFloatAttributeId catalogId)
+                   && catalogId == id;
+        }
+
+        private bool TryResolveCharacterPermitSlot(ushort enumKey, string key, out ESCharacterPermitAttributeId id)
+        {
+            bool enumConfigured = enumKey != 0;
+            bool stringConfigured = !string.IsNullOrEmpty(key);
+            ESCharacterPermitAttributeId enumId = default;
+            ESCharacterPermitAttributeId stringId = default;
+            bool hasEnum = enumConfigured && ESCharacterAttributeCatalog.TryGetPermitId(enumKey, out enumId);
+            bool hasString = stringConfigured && ESCharacterAttributeCatalog.TryGetPermitId(key, out stringId);
+
+            if ((enumConfigured && !hasEnum)
+                || (stringConfigured && !hasString)
+                || (hasEnum && hasString && enumId != stringId))
+            {
+                id = default;
+                return false;
+            }
+
+            id = hasEnum ? enumId : stringId;
+            if (!hasEnum && !hasString)
+                return false;
+
+            if (superAttributeTable != null && superAttributeCatalog == null)
+                return false;
+
+            if (superAttributeCatalog == null)
+                return true;
+
+            return superAttributeCatalog.TryGetRuntimeKey(enumKey, key, out int runtimeKey)
+                   && superAttributeCatalog.TryGetPermitDefinition(runtimeKey, out ESSuperPermitAttributeDefinition definition)
+                   && definition.storagePolicy == ESKeyStoragePolicy.HotSlot
+                   && ESCharacterAttributeCatalog.TryGetPermitId(definition.enumKey, out ESCharacterPermitAttributeId catalogId)
+                   && catalogId == id;
+        }
+
+
+        /// <summary>
+        /// Entity destruction is the only reset path allowed to invalidate active EffectLeases.
+        /// Slots are made inactive before any copied lease can observe a reused owner id.
+        /// </summary>
+        private void ResetValueChangesForLifecycleEnd()
+        {
+            if (isValueChangeResetting)
+                return;
+
+            isValueChangeResetting = true;
+            try
+            {
+                InvalidateAllValueChangeEffectSlots();
+                ClearValueChangeSetsForLifecycleEnd();
+            }
+            finally
+            {
+                activeValueChangeEffectCount = 0;
+                freeValueChangeEffectSlots.Clear();
+                valueChangeEffectSlots.Clear();
+                isValueChangeResetting = false;
+            }
+        }
+
+        private void InvalidateAllValueChangeEffectSlots()
+        {
+            for (int i = 0; i < valueChangeEffectSlots.Count; i++)
+            {
+                ValueChangeEffectSlot slot = valueChangeEffectSlots[i];
+                slot.isActive = false;
+                valueChangeEffectSlots[i] = slot;
+            }
+
+            activeValueChangeEffectCount = 0;
+        }
+
+        private void ClearValueChangeSetsForLifecycleEnd()
+        {
+            for (int i = 0; i < characterFloatStats.Length; i++)
+            {
+                try
+                {
+                    characterFloatStats[i]?.Clear();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+                finally
+                {
+                    characterFloatStats[i] = null;
+                }
+            }
+
+            foreach (ESFloatValueChangeSet set in sparseFloatStats.Values)
+            {
+                try
+                {
+                    set.Clear();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+            sparseFloatStats.Clear();
+
+            for (int i = 0; i < characterPermitStats.Length; i++)
+            {
+                try
+                {
+                    characterPermitStats[i]?.Clear();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+                finally
+                {
+                    characterPermitStats[i] = null;
+                }
+            }
+
+            foreach (ESPermitSet set in sparsePermitStats.Values)
+            {
+                try
+                {
+                    set.Clear();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+            sparsePermitStats.Clear();
         }
 
         #endregion
@@ -404,7 +1574,7 @@ namespace ES
     /// 该投影只服务输入/UI 策略，不能反向修改实体事实；多人或多实体场景必须由控制权系统
     /// 显式 Bind 当前本地控制实体，避免把其他 NPC 的死亡、眩晕投影到玩家输入。
     /// </summary>
-    public sealed class ESGameTagRuntimeModeProjector : IDisposable
+    public sealed class ESGameTagRuntimeModeProjector : IDisposable, IReceiveLink<ESTagPresenceChangedLink>
     {
         private Entity entity;
         private ESRuntimeModeService modeService;
@@ -425,7 +1595,7 @@ namespace ES
 
             entity = controlledEntity;
             modeService = runtimeModeService;
-            entity.OnGameTagPresenceChanged += HandleGameTagPresenceChanged;
+            entity.Tags.AddPresenceChangedReceiver(this);
 
             Sync(ESGameTag.战斗类_战斗中);
             Sync(ESGameTag.战斗类_瞄准中);
@@ -438,7 +1608,7 @@ namespace ES
         public void Dispose()
         {
             if (entity != null)
-                entity.OnGameTagPresenceChanged -= HandleGameTagPresenceChanged;
+                entity.Tags.RemovePresenceChangedReceiver(this);
 
             Release(ref combatHandle);
             Release(ref aimingHandle);
@@ -454,6 +1624,12 @@ namespace ES
         {
             if (entity != null)
                 HandleGameTagPresenceChanged(tag, entity.HasGameTag(tag));
+        }
+
+        void IReceiveLink<ESTagPresenceChangedLink>.OnLink(ESTagPresenceChangedLink link)
+        {
+            if (ESGameTagCatalog.TryFromCoreId(link.Tag, out ESGameTag coreTag))
+                HandleGameTagPresenceChanged(coreTag, link.IsPresent);
         }
 
         private void HandleGameTagPresenceChanged(ESGameTag tag, bool present)
@@ -679,14 +1855,12 @@ namespace ES
 
         private static float ResolveSuperFloat(Entity owner, ESCharacterFloatAttributeId id, float fallbackValue)
         {
-            EntityBuffDomain buffDomain = owner != null ? owner.buffDomain : null;
-            return buffDomain != null ? buffDomain.GetCharacterFloatStatValue(id, fallbackValue) : fallbackValue;
+            return owner != null ? owner.GetCharacterFloatStatValue(id, fallbackValue) : fallbackValue;
         }
 
         private static bool ResolveSuperPermit(Entity owner, ESCharacterPermitAttributeId id, bool fallbackValue)
         {
-            EntityBuffDomain buffDomain = owner != null ? owner.buffDomain : null;
-            return buffDomain != null ? buffDomain.GetCharacterPermitValue(id, fallbackValue) : fallbackValue;
+            return owner != null ? owner.GetCharacterPermitValue(id, fallbackValue) : fallbackValue;
         }
 
         private void ResetWork()

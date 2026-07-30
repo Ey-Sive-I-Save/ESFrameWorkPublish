@@ -75,7 +75,7 @@ namespace ES
     /// <summary>
     /// 通用属性定义表。它只管理稳定键、默认值和定义合法性，绝不持有活动 Modifier 或 Token。
     /// <para>具体领域（角色、载具、武器、建筑）各自用枚举 Catalog 将热点键映射到自己的紧凑运行时槽。</para>
-    /// <para>活动 Modifier 由所属领域持有，例如角色当前由 <see cref="EntityBuffDomain"/> 持有。</para>
+    /// <para>活动 Modifier 由具体宿主持有，例如角色由 <see cref="Entity"/> 直接持有；Buff 域只管理 Buff 生命周期。</para>
     /// </summary>
     [Serializable]
     public class ESSuperAttributeTable

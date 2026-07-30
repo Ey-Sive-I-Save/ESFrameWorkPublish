@@ -33,7 +33,7 @@ namespace ES
 
         private static StateMachineConfig FindStateMachineConfig()
         {
-            List<StateMachineConfig> configs = ESEditorSO.SOS.GetNewGroupOfType<StateMachineConfig>() ?? new List<StateMachineConfig>(0);
+            List<StateMachineConfig> configs = ESEditorSO.GetGroupOfType<StateMachineConfig>() ?? new List<StateMachineConfig>(0);
             StateMachineConfig fallback = null;
 
             for (int i = 0; i < configs.Count; i++)

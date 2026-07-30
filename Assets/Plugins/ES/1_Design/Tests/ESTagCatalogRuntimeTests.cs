@@ -9,6 +9,18 @@ namespace ES.Tests
 {
     public sealed class ESTagCatalogRuntimeTests
     {
+        [SetUp]
+        public void SetUp()
+        {
+            ResetRuntimeCatalogForTest();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            ResetRuntimeCatalogForTest();
+        }
+
         [Test]
         public void TagCatalog_EnforcesRuntimeAvailabilityAndIndependentLeases()
         {
@@ -124,12 +136,14 @@ namespace ES.Tests
                 Assert.That(entity.Tags.Matches(anyConditionConfig), Is.True,
                     "HotSlot and Sparse required-any conditions must compose without changing the HotSlot path.");
 
-                var atomicFailureGrants = new ESTagGrantConfig();
-                atomicFailureGrants.tags.Add(ESTagStableReference.From((ESGameTag)13));
-                atomicFailureGrants.tags.Add(ESTagStableReference.FromString("tests.missing.tag"));
+                var atomicFailureTags = new List<ESTagStableReference>
+                {
+                    ESTagStableReference.From((ESGameTag)13),
+                    ESTagStableReference.FromString("tests.missing.tag")
+                };
                 using (var atomicFailureLeases = new ESTagLeaseSet())
                 {
-                    Assert.That(atomicFailureLeases.TryAcquire(entity.Tags, atomicFailureGrants, new object(), out string atomicError), Is.False);
+                    Assert.That(atomicFailureLeases.TryApply(entity.Tags, atomicFailureTags, new object(), out string atomicError), Is.False);
                     Assert.That(atomicError, Does.Contain("tests.missing.tag"));
                     Assert.That(entity.Tags.Has(ESTagId.FromInt32(13)), Is.False,
                         "A partial grant failure must roll back its HotSlot lease.");
@@ -214,6 +228,697 @@ namespace ES.Tests
             }
         }
 
+        [Test]
+        public void Collection_ClearInvalidatesOldLeaseBeforeSameTagReacquire()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.clear.generation", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                {
+                    ESTagId tag = ESTagId.FromInt32(12);
+                    ESTagLease firstLease = collection.Acquire((ESGameTag)12, new object());
+                    Assert.That(firstLease, Is.Not.Null);
+                    Assert.That(collection.GetCount(tag), Is.EqualTo(1));
+
+                    collection.Clear();
+                    Assert.That(firstLease.IsActive, Is.False, "Clear must invalidate every Lease created before the clear generation.");
+                    Assert.That(collection.GetCount(tag), Is.Zero);
+
+                    using (ESTagLease secondLease = collection.Acquire((ESGameTag)12, new object()))
+                    {
+                        Assert.That(secondLease, Is.Not.Null);
+                        Assert.That(collection.GetCount(tag), Is.EqualTo(1));
+                        Assert.That(firstLease.Release(), Is.False, "An old generation Lease must not release a new holder.");
+                        Assert.That(collection.GetCount(tag), Is.EqualTo(1));
+                    }
+
+                    Assert.That(collection.GetCount(tag), Is.Zero);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void LeaseSet_ReleaseAll_IsSafeAgainstReentrantAcquire()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.reentrant.lease", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                using (var leaseSet = new ESTagLeaseSet())
+                {
+                    var initialTags = new List<ESTagStableReference> { ESTagStableReference.From((ESGameTag)12) };
+                    var reentrantTags = new List<ESTagStableReference> { ESTagStableReference.From((ESGameTag)13) };
+                    Assert.That(leaseSet.TryApply(collection, initialTags, new object(), out string initialError), Is.True, initialError);
+
+                    bool callbackInvoked = false;
+                    bool reentrantAcquireResult = true;
+                    string reentrantError = null;
+                    var receiver = new TagCountReceiver(link =>
+                    {
+                        ESTagId tag = link.Tag;
+                        int previous = link.PreviousCount;
+                        int current = link.CurrentCount;
+                        if (tag != ESTagId.FromInt32(12) || previous != 1 || current != 0)
+                            return;
+
+                        callbackInvoked = true;
+                        reentrantAcquireResult = leaseSet.TryApply(collection, reentrantTags, new object(), out reentrantError);
+                    });
+
+                    collection.AddCountChangedReceiver(receiver);
+                    try
+                    {
+                        leaseSet.ReleaseAll();
+                    }
+                    finally
+                    {
+                        collection.RemoveCountChangedReceiver(receiver);
+                    }
+
+                    Assert.That(callbackInvoked, Is.True);
+                    Assert.That(reentrantAcquireResult, Is.False);
+                    Assert.That(reentrantError, Does.Contain("Reentrant"));
+                    Assert.That(leaseSet.Count, Is.Zero);
+                    Assert.That(collection.GetCount(ESTagId.FromInt32(12)), Is.Zero);
+                    Assert.That(collection.GetCount(ESTagId.FromInt32(13)), Is.Zero,
+                        "A rejected reentrant application must not add a new Lease while release is in progress.");
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void LeaseSet_TryApply_InvalidReplacementPreservesCurrentLeases()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.apply.transaction", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                using (var leaseSet = new ESTagLeaseSet())
+                {
+                    ESTagId firstTag = ESTagId.FromInt32(12);
+                    var firstTags = new List<ESTagStableReference> { ESTagStableReference.From((ESGameTag)12) };
+                    var invalidReplacement = new List<ESTagStableReference>
+                    {
+                        ESTagStableReference.From((ESGameTag)13),
+                        ESTagStableReference.FromString("tests.missing.tag")
+                    };
+
+                    Assert.That(leaseSet.TryApply(collection, firstTags, new object(), out string initialError), Is.True, initialError);
+                    Assert.That(leaseSet.Contains(firstTag), Is.True);
+                    Assert.That(collection.GetCount(firstTag), Is.EqualTo(1));
+
+                    Assert.That(leaseSet.TryApply(collection, invalidReplacement, new object(), out string replacementError), Is.False);
+                    Assert.That(replacementError, Does.Contain("tests.missing.tag"));
+                    Assert.That(leaseSet.MatchesTags(firstTags), Is.True);
+                    Assert.That(leaseSet.Contains(firstTag), Is.True);
+                    Assert.That(collection.GetCount(firstTag), Is.EqualTo(1),
+                        "An invalid replacement must not clear the previously valid ownership boundary.");
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void Collection_ResetForReuse_InvalidatesLeasesAndClearsDiagnostics()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.reset.reuse", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                {
+                    ESTagId tag = ESTagId.FromInt32(12);
+                    ESTagLease oldLease = collection.Acquire((ESGameTag)12, new object());
+                    Assert.That(oldLease, Is.Not.Null);
+                    collection.ResetForReuse();
+
+                    Assert.That(oldLease.IsActive, Is.False);
+                    Assert.That(collection.GetCount(tag), Is.Zero);
+                    Assert.That(collection.GetDebugSnapshot().LastChange.IsValid, Is.False);
+
+                    using (ESTagLease newLease = collection.Acquire((ESGameTag)12, new object()))
+                    {
+                        Assert.That(newLease, Is.Not.Null);
+                        Assert.That(oldLease.Release(), Is.False);
+                        Assert.That(collection.GetCount(tag), Is.EqualTo(1));
+                    }
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void Collection_HandleFreeHostTag_IsIdempotentAndPreservesExternalLease()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.host.own", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                {
+                    ESTagId tag = ESTagId.FromInt32(12);
+                    int countChanged = 0;
+                    int presenceChanged = 0;
+                    var countReceiver = new TagCountReceiver(_ => countChanged++);
+                    var presenceReceiver = new TagPresenceReceiver(_ => presenceChanged++);
+                    collection.AddCountChangedReceiver(countReceiver);
+                    collection.AddPresenceChangedReceiver(presenceReceiver);
+
+                    Assert.That(collection.SetTag((ESGameTag)12, true), Is.True);
+                    Assert.That(collection.SetTag((ESGameTag)12, true), Is.True,
+                        "Repeated Host activation must be idempotent.");
+                    Assert.That(collection.HasOwnTag(tag), Is.True);
+                    Assert.That(collection.GetCount(tag), Is.EqualTo(1));
+                    Assert.That(countChanged, Is.EqualTo(1));
+                    Assert.That(presenceChanged, Is.EqualTo(1));
+
+                    ESTagLease externalLease = collection.Acquire((ESGameTag)12, new object());
+                    Assert.That(externalLease, Is.Not.Null);
+                    Assert.That(collection.GetCount(tag), Is.EqualTo(2));
+
+                    Assert.That(collection.SetTag((ESGameTag)12, false), Is.True);
+                    Assert.That(collection.SetTag((ESGameTag)12, false), Is.True,
+                        "Repeated Host deactivation must be idempotent.");
+                    Assert.That(collection.HasOwnTag(tag), Is.False);
+                    Assert.That(collection.GetCount(tag), Is.EqualTo(1),
+                        "Removing the Host contribution must preserve an external Lease.");
+                    Assert.That(collection.Has(tag), Is.True);
+                    Assert.That(presenceChanged, Is.EqualTo(1),
+                        "Presence must not fall while an external Lease remains active.");
+
+                    externalLease.Dispose();
+                    Assert.That(collection.GetCount(tag), Is.Zero);
+                    Assert.That(countChanged, Is.EqualTo(4));
+                    Assert.That(presenceChanged, Is.EqualTo(2));
+
+                    ESTagStableReference sparseReference = ESTagStableReference.FromString("tests.host.own");
+                    ESTagId sparseTag = ESTagId.FromInt32(4096);
+                    Assert.That(collection.SetTag(sparseReference, true), Is.True);
+                    Assert.That(collection.HasOwnTag(sparseTag), Is.True);
+                    Assert.That(collection.GetCount(sparseTag), Is.EqualTo(1));
+                    collection.ResetForReuse();
+                    Assert.That(collection.HasOwnTag(sparseTag), Is.False);
+                    Assert.That(collection.GetCount(sparseTag), Is.Zero);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void Collection_ClearRejectsReentrantWritesAndReturnsEmpty()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.clear.write", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                {
+                    ESTagId tag = ESTagId.FromInt32(12);
+                    ESTagLease oldLease = collection.Acquire((ESGameTag)12, new object());
+                    ESTagLease reentrantLease = null;
+                    bool reentrantSetResult = true;
+                    var receiver = new TagCountReceiver(change =>
+                    {
+                        if (change.Tag != tag || change.CurrentCount != 0)
+                            return;
+
+                        reentrantLease = collection.Acquire((ESGameTag)12, new object());
+                        reentrantSetResult = collection.SetTag((ESGameTag)12, true);
+                    });
+                    collection.AddCountChangedReceiver(receiver);
+
+                    collection.Clear();
+
+                    Assert.That(reentrantLease, Is.Null,
+                        "A clear callback must not repopulate the collection with a new Lease.");
+                    Assert.That(reentrantSetResult, Is.False,
+                        "A clear callback must not repopulate the Host-owned Tag layer.");
+                    Assert.That(collection.GetCount(tag), Is.Zero);
+                    Assert.That(collection.HasOwnTag(tag), Is.False);
+                    Assert.That(oldLease.IsActive, Is.False);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void Collection_ReentrantMutationQueuesCountAndPresenceInOrder()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.notify.order", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                {
+                    var counts = new List<string>();
+                    var presence = new List<bool>();
+                    bool removed = false;
+                    var countReceiver = new TagCountReceiver(change =>
+                    {
+                        counts.Add(change.PreviousCount + "->" + change.CurrentCount);
+                        if (!removed && change.PreviousCount == 0 && change.CurrentCount == 1)
+                        {
+                            removed = true;
+                            collection.SetTag(change.Tag, false);
+                        }
+                    });
+                    var presenceReceiver = new TagPresenceReceiver(change => presence.Add(change.IsPresent));
+                    collection.AddCountChangedReceiver(countReceiver);
+                    collection.AddPresenceChangedReceiver(presenceReceiver);
+
+                    Assert.That(collection.SetTag((ESGameTag)12, true), Is.False,
+                        "The outer activation must report that a synchronous receiver removed its contribution.");
+                    Assert.That(counts, Is.EqualTo(new[] { "0->1", "1->0" }));
+                    Assert.That(presence, Is.EqualTo(new[] { true, false }));
+                    Assert.That(collection.GetCount(ESTagId.FromInt32(12)), Is.Zero);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void LeaseSet_ReapplyingSameTagsToAnotherCollectionMovesOwnership()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.lease.target", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var first = new ESTagCollection())
+                using (var second = new ESTagCollection())
+                using (var leaseSet = new ESTagLeaseSet())
+                {
+                    ESTagId tag = ESTagId.FromInt32(12);
+                    var tags = new List<ESTagStableReference>
+                    {
+                        ESTagStableReference.From((ESGameTag)12)
+                    };
+
+                    Assert.That(leaseSet.TryApply(first, tags, "first", out string firstError), Is.True, firstError);
+                    Assert.That(first.GetCount(tag), Is.EqualTo(1));
+                    Assert.That(second.GetCount(tag), Is.Zero);
+
+                    Assert.That(leaseSet.TryApply(second, tags, "second", out string secondError), Is.True, secondError);
+                    Assert.That(first.GetCount(tag), Is.Zero,
+                        "Reusing one LeaseSet for another Host must release the former target.");
+                    Assert.That(second.GetCount(tag), Is.EqualTo(1));
+                    Assert.That(leaseSet.Source, Is.EqualTo("second"));
+
+                    leaseSet.ReleaseAll();
+                    Assert.That(second.GetCount(tag), Is.Zero);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void EntityDefinitionTags_ReapplyPoolReuseAndOverlappingTemporaryTagStayCorrect()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.entity.lifecycle", 4096, ESTagAvailability.Runtime);
+            UnityEngine.Object definition = CreateActorDefinition(intrinsicTag: ESTagStableReference.From((ESGameTag)12));
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_LifecycleEntity");
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                ESTagStableReference intrinsicTag = ESTagStableReference.From((ESGameTag)12);
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                ESTagId tag = ESTagId.FromInt32(12);
+                Assert.That(BindActorDefinition(entity, definition), Is.True);
+                Assert.That(entity.IntrinsicTagState, Is.EqualTo(ESTagDefinitionState.Applied));
+                Assert.That(entity.HasIntrinsicTag(intrinsicTag), Is.True);
+                Assert.That(entity.Tags.GetCount(tag), Is.EqualTo(1));
+
+                int duplicateApplyEvents = 0;
+                var receiver = new TagCountReceiver(_ => duplicateApplyEvents++);
+                Assert.That(entity.Tags.AddCountChangedReceiver(receiver), Is.True);
+                try
+                {
+                    Assert.That(entity.ApplyIntrinsicTags(), Is.True);
+                    Assert.That(duplicateApplyEvents, Is.Zero,
+                        "Applying an unchanged definition must not release and reacquire its Tag.");
+                }
+                finally
+                {
+                    entity.Tags.RemoveCountChangedReceiver(receiver);
+                }
+
+                ESTagLease temporaryLease = entity.Tags.Acquire((ESGameTag)12, new object());
+                Assert.That(temporaryLease, Is.Not.Null);
+                Assert.That(entity.Tags.GetCount(tag), Is.EqualTo(2),
+                    "Definition and temporary ownership must aggregate without hiding either source.");
+
+                Assert.That(entity.TryCreateNonIntrinsicTagSnapshot(
+                    ESTagStableTransferScope.SaveGame, out ESTagStableSnapshot snapshot, out string snapshotError), Is.True, snapshotError);
+                Assert.That(snapshot.Tags.Any(tagReference => tagReference.Equals(intrinsicTag)), Is.False,
+                    "A temporary holder sharing an intrinsic Tag cannot be reconstructed from aggregate presence and must not enter the Entity snapshot.");
+
+                entity.OnPoolDespawned();
+                Assert.That(entity.IntrinsicTagState, Is.EqualTo(ESTagDefinitionState.Empty));
+                Assert.That(entity.Tags.GetCount(tag), Is.Zero);
+                Assert.That(temporaryLease.IsActive, Is.False);
+
+                entity.OnPoolSpawned();
+                Assert.That(BindActorDefinition(entity, definition), Is.True);
+                Assert.That(entity.Tags.GetCount(tag), Is.EqualTo(1));
+                Assert.That(temporaryLease.Release(), Is.False,
+                    "A delayed Lease from the previous pool generation must not release the new definition Tag.");
+                Assert.That(entity.Tags.GetCount(tag), Is.EqualTo(1));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(entityObject);
+                UnityEngine.Object.DestroyImmediate(definition);
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void ItemDefinitionTags_PoolReuseAndOverlappingTemporaryTagStayCorrect()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.item.lifecycle", 4096, ESTagAvailability.Runtime);
+            ESTagStableReference intrinsicTag = ESTagStableReference.From((ESGameTag)12);
+            UnityEngine.Object definition = CreateItemDefinition(intrinsicTag);
+            GameObject itemObject = new GameObject("ESTagCatalogRuntimeTests_LifecycleItem");
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                Item item = itemObject.AddComponent<Item>();
+                ESTagId tag = ESTagId.FromInt32(12);
+
+                SetItemPrefabDefinition(item, definition);
+                Assert.That(BindItemDefinition(item, definition), Is.True);
+                Assert.That(item.IntrinsicTagState, Is.EqualTo(ESTagDefinitionState.Applied));
+                Assert.That(item.HasIntrinsicTag(intrinsicTag), Is.True);
+                Assert.That(item.Tags.GetCount(tag), Is.EqualTo(1));
+
+                ESTagLease temporaryLease = item.Tags.Acquire((ESGameTag)12, new object());
+                Assert.That(temporaryLease, Is.Not.Null);
+                Assert.That(item.Tags.GetCount(tag), Is.EqualTo(2));
+
+                Assert.That(item.TryCreateNonIntrinsicTagSnapshot(
+                    ESTagStableTransferScope.SaveGame, out ESTagStableSnapshot snapshot, out string snapshotError), Is.True, snapshotError);
+                Assert.That(snapshot.Tags.Any(tagReference => tagReference.Equals(intrinsicTag)), Is.False);
+
+                item.OnPoolDespawned();
+                Assert.That(item.Tags.GetCount(tag), Is.Zero);
+                Assert.That(temporaryLease.IsActive, Is.False);
+
+                item.OnPoolSpawned();
+                Assert.That(item.IntrinsicTagState, Is.EqualTo(ESTagDefinitionState.Applied),
+                    "A definition assigned to the Item must be rebound before the next activation.");
+                Assert.That(item.Tags.GetCount(tag), Is.EqualTo(1));
+                Assert.That(temporaryLease.Release(), Is.False);
+                Assert.That(item.Tags.GetCount(tag), Is.EqualTo(1));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(itemObject);
+                UnityEngine.Object.DestroyImmediate(definition);
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void ItemWithoutRuntimeFacts_DoesNotMaterializeTagCollection()
+        {
+            GameObject itemObject = new GameObject("ESTagCatalogRuntimeTests_EmptyItem");
+            try
+            {
+                Item item = itemObject.AddComponent<Item>();
+                FieldInfo tagsField = typeof(Item).GetField("tags", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(tagsField, Is.Not.Null);
+                Assert.That(tagsField.GetValue(item), Is.Null,
+                    "An Item without a definition or runtime Tag fact must not allocate ESTagCollection during Awake.");
+
+                Assert.That(item.HasTag(ESTagId.FromInt32(12)), Is.False);
+                Assert.That(tagsField.GetValue(item), Is.Null,
+                    "A read-only false HasTag query must not materialize an empty Item Tag container.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(itemObject);
+            }
+        }
+
+        [Test]
+        public void LeaseSet_RejectsDuplicateAliasesForOneRuntimeKey()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.alias", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                FieldInfo entriesField = typeof(ESTagBakeTable).GetField("entries", BindingFlags.Instance | BindingFlags.NonPublic);
+                var entries = entriesField?.GetValue(catalog) as List<ESTagBakeTable.Entry>;
+                Assert.That(entries, Is.Not.Null);
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    if (entries[i].enumGroup == ESTagEnumGroup.Primary && entries[i].enumValue == 12)
+                    {
+                        ESTagBakeTable.Entry entry = entries[i];
+                        entry.key = "tests.alias.core12";
+                        entries[i] = entry;
+                        break;
+                    }
+                }
+
+                catalog.BuildRuntimeCache();
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                var aliases = new List<ESTagStableReference>
+                {
+                    ESTagStableReference.From((ESGameTag)12),
+                    ESTagStableReference.FromString("tests.alias.core12")
+                };
+
+                Assert.That(ESTagLeaseSet.TryValidateTags(aliases, out string error), Is.False);
+                Assert.That(error, Does.Contain("multiple stable aliases"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void Collection_ObserverExceptionDoesNotStrandLeaseOrBlockOtherObservers()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.observer.exception", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                {
+                    int deliveredCount = 0;
+                    var throwingObserver = new TagCountReceiver(_ => throw new InvalidOperationException("test observer failure"));
+                    var survivingObserver = new TagCountReceiver(_ => deliveredCount++);
+
+                    collection.AddCountChangedReceiver(throwingObserver);
+                    collection.AddCountChangedReceiver(survivingObserver);
+                    try
+                    {
+                        using (ESTagLease lease = collection.Acquire((ESGameTag)12, new object()))
+                        {
+                            Assert.That(lease, Is.Not.Null);
+                            Assert.That(lease.IsActive, Is.True);
+                            Assert.That(collection.GetCount(ESTagId.FromInt32(12)), Is.EqualTo(1));
+                            Assert.That(deliveredCount, Is.EqualTo(1), "A failing observer must not block a later observer.");
+
+                            ESTagObserverExceptionDebugInfo diagnostic = collection.GetDebugSnapshot().LastObserverException;
+                            Assert.That(diagnostic.IsValid, Is.True);
+                            Assert.That(diagnostic.Tag, Is.EqualTo(ESTagId.FromInt32(12)));
+                            Assert.That(diagnostic.EventName, Is.EqualTo("TagCountChanged"));
+                            Assert.That(diagnostic.ExceptionType, Does.Contain(nameof(InvalidOperationException)));
+                        }
+
+                        Assert.That(collection.GetCount(ESTagId.FromInt32(12)), Is.Zero);
+                        Assert.That(deliveredCount, Is.EqualTo(2));
+                    }
+                    finally
+                    {
+                        collection.RemoveCountChangedReceiver(survivingObserver);
+                        collection.RemoveCountChangedReceiver(throwingObserver);
+                    }
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void Collection_LinkSubscriptionsRejectDuplicatesAndCommitChangesNextDispatch()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.link.subscription", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                {
+                    int firstCount = 0;
+                    int secondCount = 0;
+                    int addedDuringDispatchCount = 0;
+                    TagCountReceiver second = null;
+                    var addedDuringDispatch = new TagCountReceiver(_ => addedDuringDispatchCount++);
+                    var first = new TagCountReceiver(_ =>
+                    {
+                        firstCount++;
+                        collection.RemoveCountChangedReceiver(second);
+                        collection.AddCountChangedReceiver(addedDuringDispatch);
+                    });
+                    second = new TagCountReceiver(_ => secondCount++);
+
+                    Assert.That(collection.AddCountChangedReceiver(first), Is.True);
+                    Assert.That(collection.AddCountChangedReceiver(second), Is.True);
+                    Assert.That(collection.AddCountChangedReceiver(second), Is.False, "Duplicate registration must be rejected.");
+
+                    using (ESTagLease lease = collection.Acquire((ESGameTag)12, new object()))
+                    {
+                        Assert.That(firstCount, Is.EqualTo(1));
+                        Assert.That(secondCount, Is.EqualTo(1), "Removal during dispatch must not suppress this round.");
+                        Assert.That(addedDuringDispatchCount, Is.Zero, "Addition during dispatch must begin next round.");
+                    }
+
+                    Assert.That(firstCount, Is.EqualTo(2));
+                    Assert.That(secondCount, Is.EqualTo(1));
+                    Assert.That(addedDuringDispatchCount, Is.EqualTo(1));
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void LinkPoolableReceiver_RemoveThenReaddDuringDispatch_IsNotRecycled()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.link.poolable", 4096, ESTagAvailability.Runtime);
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                using (var collection = new ESTagCollection())
+                {
+                    PoolableTagCountReceiver receiver = null;
+                    receiver = new PoolableTagCountReceiver(_ =>
+                    {
+                        if (receiver.DeliveryCount != 1)
+                            return;
+
+                        Assert.That(collection.RemoveCountChangedReceiver(receiver), Is.True);
+                        Assert.That(collection.AddCountChangedReceiver(receiver), Is.True);
+                    });
+                    Assert.That(collection.AddCountChangedReceiver(receiver), Is.True);
+
+                    Assert.That(collection.SetTag((ESGameTag)12, true), Is.True);
+                    Assert.That(receiver.IsRecycled, Is.False,
+                        "A receiver that is subscribed again at commit must not be returned to its pool.");
+                    Assert.That(receiver.RecycleCount, Is.Zero);
+
+                    Assert.That(collection.SetTag((ESGameTag)12, false), Is.True);
+                    Assert.That(receiver.DeliveryCount, Is.EqualTo(2),
+                        "The re-added receiver must remain active for the next dispatch.");
+
+                    Assert.That(collection.RemoveCountChangedReceiver(receiver), Is.True);
+                    Assert.That(receiver.IsRecycled, Is.True,
+                        "A final removal outside dispatch must still recycle the receiver.");
+                    Assert.That(receiver.RecycleCount, Is.EqualTo(1));
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        private sealed class TagCountReceiver : IReceiveLink<ESTagCountChangedLink>
+        {
+            private readonly Action<ESTagCountChangedLink> callback;
+
+            public TagCountReceiver(Action<ESTagCountChangedLink> callback)
+            {
+                this.callback = callback;
+            }
+
+            public void OnLink(ESTagCountChangedLink link)
+            {
+                callback(link);
+            }
+        }
+
+        private sealed class TagPresenceReceiver : IReceiveLink<ESTagPresenceChangedLink>
+        {
+            private readonly Action<ESTagPresenceChangedLink> callback;
+
+            public TagPresenceReceiver(Action<ESTagPresenceChangedLink> callback)
+            {
+                this.callback = callback;
+            }
+
+            public void OnLink(ESTagPresenceChangedLink link)
+            {
+                callback(link);
+            }
+        }
+
+        private sealed class PoolableTagCountReceiver : IReceiveLink<ESTagCountChangedLink>, IPoolableAuto
+        {
+            private readonly Action<ESTagCountChangedLink> callback;
+
+            public bool IsRecycled { get; set; }
+            public int DeliveryCount { get; private set; }
+            public int RecycleCount { get; private set; }
+
+            public PoolableTagCountReceiver(Action<ESTagCountChangedLink> callback)
+            {
+                this.callback = callback;
+            }
+
+            public void OnLink(ESTagCountChangedLink link)
+            {
+                DeliveryCount++;
+                callback(link);
+            }
+
+            public void TryAutoPushedToPool()
+            {
+                RecycleCount++;
+                IsRecycled = true;
+            }
+
+            public void OnResetAsPoolable()
+            {
+            }
+        }
+
         private static ESTagBakeTable CreateCatalog(string tagKey, ushort tagRuntimeKey, ESTagAvailability availability)
         {
             var entries = new List<ESTagBakeTable.Entry>(33);
@@ -255,6 +960,63 @@ namespace ES.Tests
             field.SetValue(table, entries);
             table.BuildRuntimeCache();
             return table;
+        }
+
+        private static UnityEngine.Object CreateActorDefinition(ESTagStableReference intrinsicTag)
+        {
+            Type actorDataType = typeof(Entity).Assembly.GetType("ES.ActorDataInfo", true);
+            ScriptableObject definition = ScriptableObject.CreateInstance(actorDataType);
+            FieldInfo tagsField = actorDataType.GetField("tags", BindingFlags.Instance | BindingFlags.Public);
+            var tags = tagsField?.GetValue(definition) as List<ESTagStableReference>;
+            Assert.That(tags, Is.Not.Null, "ActorDataInfo must expose its direct tags list.");
+            tags.Add(intrinsicTag);
+            return definition;
+        }
+
+        private static bool BindActorDefinition(Entity entity, UnityEngine.Object definition)
+        {
+            Type actorDataType = typeof(Entity).Assembly.GetType("ES.ActorDataInfo", true);
+            MethodInfo bindDefinition = typeof(Entity).GetMethod(
+                "BindDefinition", BindingFlags.Instance | BindingFlags.Public, null, new[] { actorDataType }, null);
+            Assert.That(bindDefinition, Is.Not.Null, "Entity must retain the ActorDataInfo definition binding API.");
+            return (bool)bindDefinition.Invoke(entity, new object[] { definition });
+        }
+
+        private static UnityEngine.Object CreateItemDefinition(ESTagStableReference intrinsicTag)
+        {
+            Type itemDataType = typeof(Item).Assembly.GetType("ES.ItemDataInfo", true);
+            ScriptableObject definition = ScriptableObject.CreateInstance(itemDataType);
+            FieldInfo tagsField = itemDataType.GetField("tags", BindingFlags.Instance | BindingFlags.Public);
+            var tags = tagsField?.GetValue(definition) as List<ESTagStableReference>;
+            Assert.That(tags, Is.Not.Null, "ItemDataInfo must expose its direct tags list.");
+            tags.Add(intrinsicTag);
+            return definition;
+        }
+
+        private static bool BindItemDefinition(Item item, UnityEngine.Object definition)
+        {
+            Type itemDataType = typeof(Item).Assembly.GetType("ES.ItemDataInfo", true);
+            MethodInfo bindDefinition = typeof(Item).GetMethod(
+                "BindDefinition", BindingFlags.Instance | BindingFlags.Public, null, new[] { itemDataType }, null);
+            Assert.That(bindDefinition, Is.Not.Null, "Item must retain the ItemDataInfo definition binding API.");
+            return (bool)bindDefinition.Invoke(item, new object[] { definition });
+        }
+
+        private static void SetItemPrefabDefinition(Item item, UnityEngine.Object definition)
+        {
+            FieldInfo prefabDefinition = typeof(Item).GetField("prefabDefinition", BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(prefabDefinition, Is.Not.Null, "Item must expose one direct Prefab definition reference.");
+            prefabDefinition.SetValue(item, definition);
+        }
+
+        private static void ResetRuntimeCatalogForTest()
+        {
+            const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+            Type catalogType = typeof(ESTagRuntimeCatalog);
+            catalogType.GetField("table", flags)?.SetValue(null, null);
+            catalogType.GetField("schemaHash", flags)?.SetValue(null, null);
+            catalogType.GetField("runtimeLayoutHash", flags)?.SetValue(null, null);
+            catalogType.GetField("CatalogBound", flags)?.SetValue(null, null);
         }
     }
 }

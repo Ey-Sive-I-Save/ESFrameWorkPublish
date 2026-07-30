@@ -15,7 +15,7 @@ namespace ES
             string outputFolder = ESAssetPipelineIO.PlanRoot(platform);
             string previousPlanPath = Path.Combine(outputFolder, ESAssetPipelineIO.PlanFileName);
             ESAssetBundleBuildPlan previousPlan = File.Exists(previousPlanPath) ? ESAssetPipelineIO.ReadJson<ESAssetBundleBuildPlan>(previousPlanPath) : null;
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>().Where(item => item != null && item.ContainsBuild).OrderBy(item => item.LibFolderName, StringComparer.Ordinal).ToList();
+            var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>().Where(item => item != null && item.ContainsBuild).OrderBy(item => item.LibFolderName, StringComparer.Ordinal).ToList();
             var catalogs = new List<ESAssetLibraryCatalog>();
             var graphNodes = new Dictionary<string, Dictionary<string, ESAssetReferenceNode>>(StringComparer.Ordinal);
             var bakeWarnings = new List<string>();
@@ -125,7 +125,7 @@ namespace ES
         private static HashSet<string> GetCollectedGameCorePaths()
         {
             var paths = new HashSet<string>(StringComparer.Ordinal);
-            IEnumerable<ESAssetLibraryConsumer> consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
+            IEnumerable<ESAssetLibraryConsumer> consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
                 ?? Enumerable.Empty<ESAssetLibraryConsumer>();
             foreach (ESAssetLibraryConsumer consumer in consumers)
             foreach (ESAssetReferBase refer in consumer?.GameCoreAssets ?? new List<ESAssetReferBase>())
@@ -240,7 +240,7 @@ namespace ES
 
         private static void AddConsumerGameCoreAssignments(ESAssetBundleBuildPlan plan, ESAssetBundleAssetList assetList, Dictionary<string, ESAssetBundleAssignment> assignmentByPath)
         {
-            var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
+            var consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
                 ?.Where(item => item != null && item.GameCoreAssets != null).OrderBy(item => item.ConsumerId, StringComparer.Ordinal)
                 ?? Enumerable.Empty<ESAssetLibraryConsumer>();
             foreach (ESAssetLibraryConsumer consumer in consumers)

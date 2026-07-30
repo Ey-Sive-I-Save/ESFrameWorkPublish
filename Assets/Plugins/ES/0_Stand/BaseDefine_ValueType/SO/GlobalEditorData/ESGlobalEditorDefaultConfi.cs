@@ -14,6 +14,7 @@ namespace ES
 {
   [CreateAssetMenu(fileName = "全局编辑器流程基本配置", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "全局编辑器流程基本配置")]
   [ESOnlyEditorSO("全局编辑器默认配置只服务编辑器流程和路径，不应进入运行时构建或AB资源包。")]
+  [ESSOEditorPreLoad]
   public class ESGlobalEditorDefaultConfi : ESEditorGlobalSo<ESGlobalEditorDefaultConfi>
   {
     #region 文件夹管理

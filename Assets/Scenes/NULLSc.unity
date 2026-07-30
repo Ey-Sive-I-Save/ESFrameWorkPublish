@@ -134,7 +134,7 @@ MonoScript:
   m_Icon: {fileID: 0}
   m_Type: 0
   m_ExecutionOrder: 0
-  m_ClassName: RuntimeWatchVideoCase_4_UnityTypes
+  m_ClassName: RuntimeWatchCase_4_UnityTypes
   m_Namespace: ES
   m_AssemblyName: ES_Logic
 --- !u!1 &374778028
@@ -328,10 +328,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 834453027}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 1740839801}
+  m_Script: {fileID: 11500000, guid: c24e9bf3d31846c8905f47e52a3c0005, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   visible: 1
+  liveUpdate: 1
   simulateSlowGetter: 0
   simulateReadFailure: 0
   simulatedGetterCostMs: 3
@@ -403,6 +404,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1415148720}
+  - component: {fileID: 1415148722}
   - component: {fileID: 1415148721}
   m_Layer: 0
   m_Name: "04 \xB7 Unity \u7C7B\u578B\u4E0E\u5F15\u7528"
@@ -439,8 +441,42 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   visible: 1
+  liveUpdate: 1
   target: {fileID: 1113350395}
   targetObject: {fileID: 1113350393}
+  layerMask:
+    serializedVersion: 2
+    m_Bits: 262007
+  vector2Value: {x: 1, y: 2}
+  vector3Value: {x: 1, y: 2, z: 3}
+  vector4Value: {x: 1, y: 2, z: 3, w: 4}
+  colorValue: {r: 0.2, g: 0.7, b: 1, a: 1}
+  rotationValue: {x: 0, y: 0, z: 0, w: 1}
+  rectValue:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 128
+    height: 64
+  boundsValue:
+    m_Center: {x: 0, y: 0, z: 0}
+    m_Extent: {x: 1, y: 1, z: 1}
+--- !u!114 &1415148722
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1415148719}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c24e9bf3d31846c8905f47e52a3c0004, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  visible: 1
+  liveUpdate: 1
+  target: {fileID: 0}
+  targetObject: {fileID: 0}
   layerMask:
     serializedVersion: 2
     m_Bits: 262007
@@ -499,7 +535,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1471896139}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 1843247008}
+  m_Script: {fileID: 11500000, guid: c24e9bf3d31846c8905f47e52a3c0002, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   visible: 1
@@ -542,21 +578,6 @@ Transform:
   - {fileID: 834453028}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!115 &1740839801
-MonoScript:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  serializedVersion: 7
-  m_DefaultReferences: {}
-  m_Icon: {fileID: 0}
-  m_Type: 0
-  m_ExecutionOrder: 0
-  m_ClassName: RuntimeWatchVideoCase_5_Diagnostics
-  m_Namespace: ES
-  m_AssemblyName: ES_Logic
 --- !u!1 &1763482658
 GameObject:
   m_ObjectHideFlags: 0
@@ -629,11 +650,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 1772243541}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 1992406978}
+  m_Script: {fileID: 11500000, guid: c24e9bf3d31846c8905f47e52a3c0003, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   showRuntime: 1
   showTemporary: 1
+  liveUpdate: 1
   requiredRootTag: Player
   nested:
     visible: 1
@@ -734,36 +756,93 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!115 &1843247008
-MonoScript:
+--- !u!1 &2143379612
+GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  serializedVersion: 7
-  m_DefaultReferences: {}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2143379613}
+  - component: {fileID: 2143379615}
+  - component: {fileID: 2143379614}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
-  m_Type: 0
-  m_ExecutionOrder: 0
-  m_ClassName: RuntimeWatchVideoCase_2_Methods
-  m_Namespace: ES
-  m_AssemblyName: ES_Logic
---- !u!115 &1992406978
-MonoScript:
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2143379613
+Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2143379612}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 2.4430916, y: 3.0165348, z: -5.7686405}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2143379614
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2143379612}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3af0731576a17b4881dabce2b6b6114, type: 3}
   m_Name: 
-  serializedVersion: 7
-  m_DefaultReferences: {}
-  m_Icon: {fileID: 0}
-  m_Type: 0
-  m_ExecutionOrder: 0
-  m_ClassName: RuntimeWatchVideoCase_3_FilterAndNested
-  m_Namespace: ES
-  m_AssemblyName: ES_Logic
+  m_EditorClassIdentifier: 
+  effect:
+    rid: 23629202899075092
+  references:
+    version: 2
+    RefIds:
+    - rid: 23629202899075092
+      type: {class: ESPolymorphicReferenceCase/PlayAudioEffect, ns: ES, asm: ES_Stand}
+      data:
+        clip: {fileID: 0}
+        volume: 1
+--- !u!114 &2143379615
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2143379612}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f58f26e3ba6c433f96bf7c0c34a8a172, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ungroupedNote: "\u6B64\u5B57\u6BB5\u6CA1\u6709 ESEditorSection\uFF0C\u5E94\u59CB\u7EC8\u4FDD\u6301\u4E3A\u76EE\u5F55\u5916\u7684\u72EC\u7ACB\u5185\u5BB9\u3002"
+  characterId: warrior_001
+  animator: {fileID: 0}
+  capsuleRadius: 0.35
+  capsuleHeight: 1.8
+  moveSpeed: 4.5
+  controlMode: 0
+  allowAutoAttack: 1
+  stateRules:
+  - stateName: "\u5F85\u673A"
+    animatorState: Idle
+    transitionSeconds: 0.15
+  - stateName: "\u79FB\u52A8"
+    animatorState: Locomotion
+    transitionSeconds: 0.1
+  characterPrefab: {fileID: 0}
+  overrideTurnSpeed: 0
+  turnSpeed: 540
+  useIndependentGroup: 0
+  independentValue: 0.5
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -771,3 +850,4 @@ SceneRoots:
   - {fileID: 1842508294}
   - {fileID: 374778031}
   - {fileID: 1593380177}
+  - {fileID: 2143379613}

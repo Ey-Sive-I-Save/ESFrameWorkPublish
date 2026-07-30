@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace ES
 {
@@ -53,6 +54,7 @@ namespace ES
         public ScriptableObject soSource;
         public EntityMotionSharedData sharedData;
         public EntityMotionVariableData defaultVariableData;
+        public List<ESTagStableReference> tags;
         public GameObject prefab;
         public UnityEngine.Object extraAsset;
 
@@ -70,6 +72,7 @@ namespace ES
             soSource = null;
             sharedData = null;
             defaultVariableData = default;
+            tags = null;
             prefab = null;
             extraAsset = null;
             ownedDefaultSharedData.ResetToDefaults();
@@ -89,6 +92,7 @@ namespace ES
         public ScriptableObject soSource;
         public EntityMotionSharedData sharedData;
         public EntityMotionVariableData defaultVariableData;
+        public List<ESTagStableReference> tags;
         public GameObject prefab;
         public UnityEngine.Object extraAsset;
 
@@ -106,6 +110,7 @@ namespace ES
             soSource = null;
             sharedData = null;
             defaultVariableData = default;
+            tags = null;
             prefab = null;
             extraAsset = null;
             ownedDefaultSharedData.ResetToDefaults();

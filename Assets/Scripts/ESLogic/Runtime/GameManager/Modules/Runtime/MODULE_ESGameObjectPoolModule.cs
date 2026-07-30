@@ -8,12 +8,6 @@ using UnityEngine.SceneManagement;
 
 namespace ES
 {
-    public interface IESGameObjectPoolResettable
-    {
-        void OnGetInPool();
-        void OnPushToPool();
-    }
-
     [Serializable]
     public sealed class ESGameObjectPoolConfig
     {
@@ -76,19 +70,24 @@ namespace ES
         public float AutoReturnDelay { get; private set; }
 
         private ESGameObjectPoolModule owner;
+        private ESGenericLife genericLife;
         private float returnAtTime;
+        private bool dispatchingPoolSpawn;
+        private bool returnRequestedDuringPoolSpawn;
 
         public void Bind(ESGameObjectPoolModule ownerModule, string key, GameObject prefab)
         {
             owner = ownerModule;
             PoolKey = key;
             SourcePrefab = prefab;
+            genericLife = ESGenericLife.EnsureForPooledRoot(gameObject);
         }
 
         public void MarkGetInPool(bool autoReturn, float delay)
         {
             IsSpawned = true;
             Version++;
+            returnRequestedDuringPoolSpawn = false;
             AutoReturnEnabled = autoReturn;
             AutoReturnDelay = Mathf.Max(0f, delay);
             returnAtTime = AutoReturnEnabled ? Time.time + AutoReturnDelay : 0f;
@@ -97,6 +96,7 @@ namespace ES
         public void MarkPushToPool()
         {
             IsSpawned = false;
+            returnRequestedDuringPoolSpawn = false;
             AutoReturnEnabled = false;
             AutoReturnDelay = 0f;
             returnAtTime = 0f;
@@ -105,7 +105,46 @@ namespace ES
 
         public void RequestPushToPool()
         {
+            if (TryDeferReturnDuringPoolSpawn())
+                return;
+
             owner?.PushToPool(gameObject);
+        }
+
+        internal bool NotifyPoolSpawned()
+        {
+            dispatchingPoolSpawn = true;
+            try
+            {
+                return genericLife == null || genericLife.NotifyPoolSpawned();
+            }
+            finally
+            {
+                dispatchingPoolSpawn = false;
+            }
+        }
+
+        internal bool NotifyPoolDespawned()
+        {
+            return genericLife == null || genericLife.NotifyPoolDespawned();
+        }
+
+        internal bool TryDeferReturnDuringPoolSpawn()
+        {
+            if (!dispatchingPoolSpawn)
+                return false;
+
+            returnRequestedDuringPoolSpawn = true;
+            return true;
+        }
+
+        internal bool ConsumeDeferredReturnAfterPoolSpawn()
+        {
+            if (!returnRequestedDuringPoolSpawn)
+                return false;
+
+            returnRequestedDuringPoolSpawn = false;
+            return true;
         }
 
         private void Update()
@@ -244,7 +283,6 @@ namespace ES
         private readonly Dictionary<GameObject, ESGameObjectPoolGroup> groupsByPrefab = new Dictionary<GameObject, ESGameObjectPoolGroup>(DefaultGroupCapacity);
         private readonly List<ParticleSystem> particleBuffer = new List<ParticleSystem>(16);
         private readonly List<TrailRenderer> trailBuffer = new List<TrailRenderer>(8);
-        private readonly List<IESGameObjectPoolResettable> resettableBuffer = new List<IESGameObjectPoolResettable>(8);
         private readonly Dictionary<PrefabPrewarmDataInfo, HashSet<ESGameObjectPoolPrewarmScope>> loadedPrewarmScopes = new Dictionary<PrefabPrewarmDataInfo, HashSet<ESGameObjectPoolPrewarmScope>>(16);
         private readonly Dictionary<PrefabPrewarmDataInfo, Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext>> asyncPrewarmContexts = new Dictionary<PrefabPrewarmDataInfo, Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext>>(16);
 
@@ -689,6 +727,9 @@ namespace ES
             if (pooled == null || string.IsNullOrEmpty(pooled.PoolKey))
                 return false;
 
+            if (pooled.TryDeferReturnDuringPoolSpawn())
+                return true;
+
             if (!groupsByKey.TryGetValue(pooled.PoolKey, out ESGameObjectPoolGroup group))
                 return false;
 
@@ -781,21 +822,68 @@ namespace ES
                     return null;
 
                 instance = CreateInstance(group);
+                if (instance == null)
+                    return null;
+
                 group.missCount++;
             }
 
-            Transform instanceTransform = instance.transform;
-            instanceTransform.SetParent(parent, false);
-            instanceTransform.SetPositionAndRotation(position, rotation);
-            instance.SetActive(true);
-
-            group.active.Add(instance);
-            group.rentCount++;
-
             ESPooledGameObject pooled = instance.GetComponent<ESPooledGameObject>();
-            pooled.MarkGetInPool(autoReturn, autoReturnDelay);
-            NotifyGetInPool(instance);
-            return instance;
+            if (pooled == null)
+            {
+                Debug.LogError("[ESGameObjectPool] A pooled instance lost its ESPooledGameObject bridge and will be discarded.", instance);
+                group.createdCount = Mathf.Max(0, group.createdCount - 1);
+                UnityEngine.Object.Destroy(instance);
+                return null;
+            }
+
+            bool handedToCaller = false;
+            // The active set is established before any operation that can invoke user or Unity
+            // code. From this point every failure path has one recoverable pool record.
+            group.active.Add(instance);
+            try
+            {
+                Transform instanceTransform = instance.transform;
+                instanceTransform.SetParent(parent, false);
+                instanceTransform.SetPositionAndRotation(position, rotation);
+
+                pooled.MarkGetInPool(autoReturn, autoReturnDelay);
+                if (!pooled.NotifyPoolSpawned())
+                    return null;
+
+                // A receiver may request return during OnPoolSpawned. It is deferred until all
+                // receivers have finished, so Despawn never re-enters the active Spawn dispatch.
+                if (pooled.ConsumeDeferredReturnAfterPoolSpawn())
+                {
+                    PushToGroup(group, instance, pooled);
+                    return null;
+                }
+
+                // A callback is allowed to request a return. In that case the nested return has
+                // already completed and this caller must not reactivate or hand out the instance.
+                if (!pooled.IsSpawned || !group.active.Contains(instance))
+                    return null;
+
+                instance.SetActive(true);
+                if (!pooled.IsSpawned || !group.active.Contains(instance))
+                    return null;
+
+                handedToCaller = true;
+                group.rentCount++;
+                return instance;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, instance);
+                return null;
+            }
+            finally
+            {
+                // Pool callbacks and activation must never leave an instance untracked. A nested
+                // return removes it from active itself; otherwise this finally path closes it.
+                if (!handedToCaller && group.active.Contains(instance))
+                    ReturnFailedSpawnToTerminalState(group, instance, pooled);
+            }
         }
 
         private void PushToGroup(ESGameObjectPoolGroup group, GameObject instance, ESPooledGameObject pooled)
@@ -803,20 +891,16 @@ namespace ES
             if (!pooled.IsSpawned || !group.active.Remove(instance))
                 return;
 
-            ResetInstanceForReturn(group, instance, pooled);
+            bool resetSucceeded = ResetInstanceForReturn(group, instance, pooled);
             group.returnCount++;
-
-            if (group.config.destroyOverflow && group.inactive.Count >= group.config.maxInactiveCount)
+            if (resetSucceeded)
             {
-                group.overflowDestroyCount++;
-                group.createdCount = Mathf.Max(0, group.createdCount - 1);
-                UnityEngine.Object.Destroy(instance);
+                StoreInactiveOrDiscard(group, instance, pooled);
                 return;
             }
 
-            instance.SetActive(false);
-            instance.transform.SetParent(group.poolRoot, false);
-            group.inactive.Enqueue(instance);
+            Debug.LogError("[ESGameObjectPool] Pool Despawn or return reset failed; the instance was discarded and will not be reused.", instance);
+            DiscardInstance(group, instance);
         }
 
         private ESGameObjectPoolGroup GetOrCreateGroup(GameObject prefab, string key, ESGameObjectPoolConfig config)
@@ -853,23 +937,47 @@ namespace ES
                     return;
 
                 GameObject instance = CreateInstance(group);
-                instance.SetActive(false);
-                instance.transform.SetParent(group.poolRoot, false);
-                group.inactive.Enqueue(instance);
+                if (instance == null)
+                    continue;
+
+                StoreNewInactive(group, instance);
             }
         }
 
         private GameObject CreateInstance(ESGameObjectPoolGroup group)
         {
-            GameObject instance = UnityEngine.Object.Instantiate(group.prefab);
-            instance.name = $"{group.prefab.name}_Pooled";
-            ESPooledGameObject pooled = instance.GetComponent<ESPooledGameObject>();
-            if (pooled == null)
-                pooled = instance.AddComponent<ESPooledGameObject>();
+            GameObject instance = null;
+            try
+            {
+                instance = UnityEngine.Object.Instantiate(group.prefab);
+                instance.name = $"{group.prefab.name}_Pooled";
+                // Awake may already have run during Instantiate; Unity does not offer a way to defer
+                // it. Pool contracts therefore forbid pool-dependent work in Awake. All Pool work
+                // starts only after this explicit inactive baseline has been established.
+                instance.SetActive(false);
+                ESPooledGameObject pooled = instance.GetComponent<ESPooledGameObject>();
+                if (pooled == null)
+                    pooled = instance.AddComponent<ESPooledGameObject>();
 
-            pooled.Bind(this, group.key, group.prefab);
-            group.createdCount++;
-            return instance;
+                pooled.Bind(this, group.key, group.prefab);
+                if (!ResetInstanceForReturn(group, instance, pooled))
+                {
+                    Debug.LogError("[ESGameObjectPool] New instance failed its inactive Despawn baseline and was discarded.", instance);
+                    DiscardInstance(group, instance, false);
+                    return null;
+                }
+
+                group.createdCount++;
+                return instance;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, instance);
+                if (instance != null)
+                    DiscardInstance(group, instance, false);
+
+                return null;
+            }
         }
 
         private bool CanCreate(ESGameObjectPoolGroup group)
@@ -901,52 +1009,124 @@ namespace ES
             }
         }
 
-        private void ResetInstanceForReturn(ESGameObjectPoolGroup group, GameObject instance, ESPooledGameObject pooled)
+        private bool ResetInstanceForReturn(ESGameObjectPoolGroup group, GameObject instance, ESPooledGameObject pooled)
         {
-            NotifyPushToPool(instance);
-            pooled.MarkPushToPool();
-
-            Rigidbody body = instance.GetComponent<Rigidbody>();
-            if (body != null)
+            try
             {
-                body.velocity = Vector3.zero;
-                body.angularVelocity = Vector3.zero;
+                if (!pooled.NotifyPoolDespawned())
+                    return false;
+
+                Rigidbody body = instance.GetComponent<Rigidbody>();
+                if (body != null)
+                {
+                    body.velocity = Vector3.zero;
+                    body.angularVelocity = Vector3.zero;
+                }
+
+                if (group.config.stopParticlesOnReturn)
+                {
+                    particleBuffer.Clear();
+                    instance.GetComponentsInChildren(true, particleBuffer);
+                    for (int i = 0; i < particleBuffer.Count; i++)
+                        particleBuffer[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
+
+                if (group.config.clearTrailsOnReturn)
+                {
+                    trailBuffer.Clear();
+                    instance.GetComponentsInChildren(true, trailBuffer);
+                    for (int i = 0; i < trailBuffer.Count; i++)
+                        trailBuffer[i].Clear();
+                }
+
+                if (group.config.clearParentOnReturn)
+                    instance.transform.SetParent(group.poolRoot, false);
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, instance);
+                return false;
+            }
+            finally
+            {
+                // Pool bookkeeping is authoritative even when a receiver fails. Old tags, handles
+                // and auto-return timers can no longer claim this instance as spawned afterwards.
+                pooled.MarkPushToPool();
+            }
+        }
+
+        private void ReturnFailedSpawnToTerminalState(ESGameObjectPoolGroup group, GameObject instance, ESPooledGameObject pooled)
+        {
+            group.active.Remove(instance);
+            if (ResetInstanceForReturn(group, instance, pooled))
+            {
+                StoreInactiveOrDiscard(group, instance, pooled);
+                return;
             }
 
-            if (group.config.stopParticlesOnReturn)
-            {
-                particleBuffer.Clear();
-                instance.GetComponentsInChildren(true, particleBuffer);
-                for (int i = 0; i < particleBuffer.Count; i++)
-                    particleBuffer[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            }
+            Debug.LogError("[ESGameObjectPool] Spawn compensation Despawn failed; the instance was discarded and will not be reused.", instance);
+            DiscardInstance(group, instance);
+        }
 
-            if (group.config.clearTrailsOnReturn)
+        private void StoreNewInactive(ESGameObjectPoolGroup group, GameObject instance)
+        {
+            try
             {
-                trailBuffer.Clear();
-                instance.GetComponentsInChildren(true, trailBuffer);
-                for (int i = 0; i < trailBuffer.Count; i++)
-                    trailBuffer[i].Clear();
-            }
-
-            if (group.config.clearParentOnReturn)
+                instance.SetActive(false);
                 instance.transform.SetParent(group.poolRoot, false);
+                group.inactive.Enqueue(instance);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, instance);
+                DiscardInstance(group, instance);
+            }
         }
 
-        private void NotifyGetInPool(GameObject instance)
+        private void StoreInactiveOrDiscard(ESGameObjectPoolGroup group, GameObject instance, ESPooledGameObject pooled)
         {
-            resettableBuffer.Clear();
-            instance.GetComponentsInChildren(true, resettableBuffer);
-            for (int i = 0; i < resettableBuffer.Count; i++)
-                resettableBuffer[i].OnGetInPool();
+            if (instance == null)
+                return;
+
+            try
+            {
+                if (group.config.destroyOverflow && group.inactive.Count >= group.config.maxInactiveCount)
+                {
+                    group.overflowDestroyCount++;
+                    DiscardInstance(group, instance);
+                    return;
+                }
+
+                // MarkPushToPool is idempotent and is repeated here only if a Unity-side reset
+                // failed before its finally block could be observed by a custom implementation.
+                if (pooled.IsSpawned)
+                    pooled.MarkPushToPool();
+
+                instance.SetActive(false);
+                instance.transform.SetParent(group.poolRoot, false);
+                group.inactive.Enqueue(instance);
+            }
+            catch (Exception exception)
+            {
+                // Destroying is safer than retaining an object that is in neither active nor
+                // inactive tracking. The created count remains exact for the surviving group.
+                Debug.LogException(exception, instance);
+                DiscardInstance(group, instance);
+            }
         }
 
-        private void NotifyPushToPool(GameObject instance)
+        private static void DiscardInstance(ESGameObjectPoolGroup group, GameObject instance, bool wasCounted = true)
         {
-            resettableBuffer.Clear();
-            instance.GetComponentsInChildren(true, resettableBuffer);
-            for (int i = 0; i < resettableBuffer.Count; i++)
-                resettableBuffer[i].OnPushToPool();
+            if (instance == null)
+                return;
+
+            group?.active.Remove(instance);
+            if (wasCounted && group != null)
+                group.createdCount = Mathf.Max(0, group.createdCount - 1);
+
+            UnityEngine.Object.Destroy(instance);
         }
 
         private void ClearGroup(ESGameObjectPoolGroup group)

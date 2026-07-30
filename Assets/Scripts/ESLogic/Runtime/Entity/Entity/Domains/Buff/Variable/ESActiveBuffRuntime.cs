@@ -85,8 +85,8 @@ namespace ES
 
         public bool IsInfinite => variableData.remainingTime < 0f;
 
-        [ShowInInspector, ReadOnly, LabelText("Buff 授予的标签数")]
-        public int GrantedGameTagCount => gameTagLeases.Count;
+        [ShowInInspector, ReadOnly, LabelText("Buff 生效标签数")]
+        public int AppliedGameTagCount => gameTagLeases.Count;
 
         /// <summary>
         /// Per-active-Buff token record. This is intentionally a struct: the active Buff already owns
@@ -210,7 +210,7 @@ namespace ES
             ReleaseValueChangeDependencies();
             valueChangesDirty = false;
             ApplyGameTags(sharedData);
-            ReleaseValueChanges();
+            ReleaseValueChangesByEffectLease();
             ApplyFloatChanges(sharedData);
             ApplyPermitChanges(sharedData);
             TriggerOp(sharedData.onApplyOp, true);
@@ -379,6 +379,10 @@ namespace ES
             if (changes == null)
                 return;
 
+            Entity owner = domain != null ? domain.MyCore : null;
+            if (owner == null)
+                return;
+
             for (int i = 0; i < changes.Count; i++)
             {
                 ESBuffFloatValueChangeBinding binding = changes[i];
@@ -391,7 +395,7 @@ namespace ES
                 int ownerId = 0;
                 if (TryEvaluateFloatChange(binding, out float value))
                 {
-                    set = domain.GetFloatStat(binding.attributeEnumKey, binding.statKey);
+                    set = owner.GetFloatStat(binding.attributeEnumKey, binding.statKey);
                     if (set != null)
                     {
                         if (!EnsureValueChangeEffectLease())
@@ -425,6 +429,10 @@ namespace ES
             if (changes == null)
                 return;
 
+            Entity owner = domain != null ? domain.MyCore : null;
+            if (owner == null)
+                return;
+
             for (int i = 0; i < changes.Count; i++)
             {
                 ESBuffPermitValueChangeBinding binding = changes[i];
@@ -434,7 +442,7 @@ namespace ES
                 if (!TryEvaluatePermitLaw(binding, out ESPermitLaw law))
                     continue;
 
-                ESPermitSet set = domain.GetPermit(binding.attributeEnumKey, binding.permitKey);
+                ESPermitSet set = owner.GetPermit(binding.attributeEnumKey, binding.permitKey);
                 if (set == null)
                     continue;
                 if (!EnsureValueChangeEffectLease())
@@ -460,6 +468,10 @@ namespace ES
 
         private void RefreshFloatChanges(bool force, ESBuffValueChangeRefreshMode trigger)
         {
+            Entity owner = domain != null ? domain.MyCore : null;
+            if (owner == null)
+                return;
+
             for (int i = 0; i < floatChanges.Count; i++)
             {
                 FloatChangeRuntime runtime = floatChanges[i];
@@ -472,7 +484,7 @@ namespace ES
 
                 if (runtime.set == null)
                 {
-                    runtime.set = domain.GetFloatStat(binding.attributeEnumKey, binding.statKey);
+                    runtime.set = owner.GetFloatStat(binding.attributeEnumKey, binding.statKey);
                     if (runtime.set == null || !EnsureValueChangeEffectLease())
                         continue;
 
@@ -638,6 +650,11 @@ namespace ES
                 return;
             }
 
+            if (type == ContextValueChangeDependencyType.Float)
+                context.LinkRCL_Float.ApplyChannelBuffers(key);
+            else
+                context.LinkRCL_Bool.ApplyChannelBuffers(key);
+
             valueChangeDependencies.Add(new ContextValueChangeDependency
             {
                 context = context,
@@ -657,11 +674,13 @@ namespace ES
                 if (dependency.type == ContextValueChangeDependencyType.Float)
                 {
                     dependency.context.LinkRCL_Float.RemoveReceiver(dependency.key, this);
+                    dependency.context.LinkRCL_Float.ApplyChannelBuffers(dependency.key);
                     dependency.context.ReleaseValueChangeFloatLink(dependency.key);
                 }
                 else
                 {
                     dependency.context.LinkRCL_Bool.RemoveReceiver(dependency.key, this);
+                    dependency.context.LinkRCL_Bool.ApplyChannelBuffers(dependency.key);
                     dependency.context.ReleaseValueChangeBoolLink(dependency.key);
                 }
             }
@@ -673,10 +692,11 @@ namespace ES
         {
             if (valueChangeEffectLease.IsValid)
                 return true;
-            if (domain == null)
+            Entity owner = domain != null ? domain.MyCore : null;
+            if (owner == null)
                 return false;
 
-            valueChangeEffectLease = domain.CreateValueChangeEffectLease(out valueChangeEffectOwnerId);
+            valueChangeEffectLease = owner.CreateValueChangeEffectLease(out valueChangeEffectOwnerId);
             return valueChangeEffectLease.IsValid;
         }
 
@@ -695,18 +715,18 @@ namespace ES
 
         /// <summary>
         /// Buff 的 Tag 采用“实例存在即拥有”的策略，不会随 StackCount 重复叠加。
-        /// 每个成功授予的 Tag 都保存独立 Lease，销毁时只撤销本 Buff 的那一次来源。
+        /// 每个成功添加的 Tag 都保存独立 Lease，销毁时只撤销本 Buff 的那一次来源。
         /// </summary>
         private void ApplyGameTags(BuffSharedData data)
         {
             Entity owner = domain != null ? domain.MyCore : null;
-            ESTagGrantConfig grants = data != null ? data.tagGrants : null;
-            if (owner == null || grants == null || grants.IsEmpty)
+            IReadOnlyList<ESTagStableReference> tags = data != null ? data.tags : null;
+            if (owner == null || tags == null || tags.Count == 0)
                 return;
 
-            if (!gameTagLeases.TryAcquire(owner.Tags, grants, this, out string error))
+            if (!gameTagLeases.TryApply(owner.Tags, tags, this, out string error))
             {
-                Debug.LogWarning($"[BuffTag] 授予 Tag 失败：{error} | Buff={definition?.name ?? "<runtime>"}");
+                Debug.LogWarning($"[BuffTag] 添加 Tag 失败：{error} | Buff={definition?.name ?? "<runtime>"}");
             }
         }
 

@@ -285,7 +285,7 @@ namespace ES
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Collider))]
-    public sealed class ESTagGrantZone : MonoBehaviour
+    public sealed class ESTagApplyZone : MonoBehaviour
     {
         private sealed class Occupant
         {
@@ -293,11 +293,11 @@ namespace ES
             public readonly ESTagLeaseSet leases = new ESTagLeaseSet();
         }
 
-        [LabelText("区域内授予")]
-        public ESTagGrantConfig tagGrants = new ESTagGrantConfig();
+        [LabelText("区域内添加")]
+        public List<ESTagStableReference> tags = new List<ESTagStableReference>();
 
         [LabelText("输出配置告警")]
-        public bool logGrantFailures = true;
+        public bool logApplyFailures = true;
 
         private readonly Dictionary<Entity, Occupant> occupants = new Dictionary<Entity, Occupant>();
         private readonly List<KeyValuePair<Entity, Occupant>> cleanupBuffer = new List<KeyValuePair<Entity, Occupant>>();
@@ -308,7 +308,7 @@ namespace ES
             Collider zoneCollider = GetComponent<Collider>();
             if (zoneCollider != null && !zoneCollider.isTrigger)
             {
-                Debug.LogWarning("[ESTagGrantZone] 区域授予依赖 Trigger Collider；请按 GameCore Layer 规则使用 TriggerZone 层。", this);
+                Debug.LogWarning("[ESTagApplyZone] 区域 Tag 依赖 Trigger Collider；请按 GameCore Layer 规则使用 TriggerZone 层。", this);
             }
         }
 #endif
@@ -316,7 +316,7 @@ namespace ES
         private void OnTriggerEnter(Collider other)
         {
             Entity entity = other != null ? other.GetComponentInParent<Entity>() : null;
-            if (entity == null || tagGrants == null || tagGrants.IsEmpty)
+            if (entity == null || tags == null || tags.Count == 0)
                 return;
 
             if (occupants.TryGetValue(entity, out Occupant occupant))
@@ -326,10 +326,10 @@ namespace ES
             }
 
             occupant = new Occupant();
-            if (!occupant.leases.TryAcquire(entity.Tags, tagGrants, this, out string error))
+            if (!occupant.leases.TryApply(entity.Tags, tags, this, out string error))
             {
-                if (logGrantFailures)
-                    Debug.LogWarning("[ESTagGrantZone] Tag 授予失败: " + error, this);
+                if (logApplyFailures)
+                    Debug.LogWarning("[ESTagApplyZone] Tag 添加失败: " + error, this);
                 occupant.leases.Dispose();
                 return;
             }

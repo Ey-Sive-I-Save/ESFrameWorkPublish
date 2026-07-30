@@ -13,6 +13,9 @@ namespace ES
         private static string schemaHash;
         private static string runtimeLayoutHash;
 
+        /// <summary>Raised after a validated Catalog becomes available to runtime owners waiting for stable Tag resolution.</summary>
+        public static event Action CatalogBound;
+
         public static bool IsBound => table != null;
         public static string SchemaHash => schemaHash ?? string.Empty;
         public static string RuntimeLayoutHash => runtimeLayoutHash ?? string.Empty;
@@ -51,6 +54,7 @@ namespace ES
             table = source;
             schemaHash = candidateSchemaHash;
             runtimeLayoutHash = candidateLayoutHash;
+            CatalogBound?.Invoke();
         }
 
         public static bool TryGetRuntimeKey(string stableKey, out int runtimeKey)

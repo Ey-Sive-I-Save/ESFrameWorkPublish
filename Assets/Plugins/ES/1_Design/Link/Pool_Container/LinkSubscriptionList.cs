@@ -6,7 +6,8 @@ namespace ES
 {
     /// <summary>
     /// Link 容器共用的主线程订阅表。
-    /// 接收者按引用身份去重；任意增删均在下一次派发开始前提交，保证本轮快照稳定。
+    /// 接收者按引用身份去重；派发期间的增删在本轮结束后提交，保证本轮快照稳定且不
+    /// 持有已释放接收者到下一次事件。
     /// </summary>
     internal sealed class LinkSubscriptionList<T> where T : class
     {
@@ -72,7 +73,8 @@ namespace ES
         {
             if (dispatchDepth <= 0)
                 throw new InvalidOperationException("LinkSubscriptionList dispatch depth is unbalanced.");
-            dispatchDepth--;
+            if (--dispatchDepth == 0)
+                ApplyPendingChanges();
         }
 
         public void Reserve(int capacity)

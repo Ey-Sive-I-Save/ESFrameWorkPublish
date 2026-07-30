@@ -25,11 +25,17 @@ namespace ES
         /// 接收者列表，使用 SafeNormalList 支持派发期间安全增删。
         /// </summary>
         private readonly LinkSubscriptionList<IReceiveLink<Link>> _receivers;
-        private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>(4);
+        private readonly List<IReceiveLink<Link>> _pendingRecycle = new List<IReceiveLink<Link>>(4);
 
         #endregion
 
         public int SubscriberCount => _receivers.Count;
+
+        /// <summary>
+        /// Optional diagnostics hook. A receiver failure is isolated and never interrupts this
+        /// dispatch or a later receiver. The hook itself is also isolated.
+        /// </summary>
+        public Action<IReceiveLink<Link>, Link, Exception> OnReceiverException { get; set; }
 
         public LinkReceiveList(int receiverCapacity = 4)
         {
@@ -48,7 +54,6 @@ namespace ES
         public void SendLink(Link link)
         {
             _receivers.BeginDispatch();
-            RecyclePending();
             try
             {
                 int count = _receivers.ValuesNow.Count;
@@ -57,16 +62,17 @@ namespace ES
                     IReceiveLink<Link> currentReceiver = _receivers.ValuesNow[i];
                     if (currentReceiver is UnityEngine.Object ob)
                     {
-                        if (ob != null) currentReceiver.OnLink(link);
+                        if (ob != null) NotifyReceiver(currentReceiver, link);
                         else _receivers.Remove(currentReceiver);
                     }
-                    else if (currentReceiver != null) currentReceiver.OnLink(link);
+                    else if (currentReceiver != null) NotifyReceiver(currentReceiver, link);
                     else _receivers.Remove(currentReceiver);
                 }
             }
             finally
             {
                 _receivers.EndDispatch();
+                RecyclePending();
             }
         }
 
@@ -89,11 +95,11 @@ namespace ES
             RecyclePending();
         }
 
-        private void ScheduleRecycle(object receiver)
+        private void ScheduleRecycle(IReceiveLink<Link> receiver)
         {
             if (receiver is IPoolableAuto poolable && !poolable.IsRecycled)
             {
-                _pendingRecycle.Add(poolable);
+                _pendingRecycle.Add(receiver);
             }
         }
 
@@ -103,13 +109,31 @@ namespace ES
             if (count == 0) return;
             for (int i = 0; i < count; i++)
             {
-                var poolable = _pendingRecycle[i];
-                if (poolable != null && !poolable.IsRecycled)
+                IReceiveLink<Link> receiver = _pendingRecycle[i];
+                if (IsCurrentlySubscribed(receiver))
+                    continue;
+
+                if (receiver is IPoolableAuto poolable && !poolable.IsRecycled)
                 {
                     poolable.TryAutoPushedToPool();
                 }
             }
             _pendingRecycle.Clear();
+        }
+
+        private bool IsCurrentlySubscribed(IReceiveLink<Link> receiver)
+        {
+            if (receiver == null)
+                return false;
+
+            List<IReceiveLink<Link>> current = _receivers.ValuesNow;
+            for (int i = 0; i < current.Count; i++)
+            {
+                if (ReferenceEquals(current[i], receiver))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -119,7 +143,15 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool AddReceiver(IReceiveLink<Link> receiver)
         {
-            return _receivers.Add(receiver);
+            if (!_receivers.Add(receiver))
+                return false;
+
+            // Outside dispatch, make the subscription effective immediately so callers can use
+            // SubscriberCount as a reliable zero-subscriber fast path. During dispatch the shared
+            // Link contract still defers the addition until the current round has completed.
+            if (!_receivers.IsDispatching)
+                _receivers.ApplyBuffers();
+            return true;
         }
 
         /// <summary>
@@ -131,7 +163,12 @@ namespace ES
         {
             if (_receivers.Remove(receiver))
             {
+                bool isDispatching = _receivers.IsDispatching;
+                if (!isDispatching)
+                    _receivers.ApplyBuffers();
                 ScheduleRecycle(receiver);
+                if (!isDispatching)
+                    RecyclePending();
                 return true;
             }
 
@@ -144,15 +181,18 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-            ApplyBuffersAndRecycle();
+            bool isDispatching = _receivers.IsDispatching;
+            if (!isDispatching)
+                _receivers.ApplyBuffers();
             for (int i = 0; i < _receivers.ValuesNow.Count; i++)
             {
-                if (_receivers.ValuesNow[i] is IPoolableAuto poolable && !poolable.IsRecycled)
-                {
-                    poolable.TryAutoPushedToPool();
-                }
+                IReceiveLink<Link> receiver = _receivers.ValuesNow[i];
+                if (receiver is IPoolableAuto poolable && !poolable.IsRecycled)
+                    _pendingRecycle.Add(receiver);
             }
             _receivers.Clear();
+            if (!isDispatching)
+                RecyclePending();
         }
 
         /// <summary>
@@ -162,6 +202,25 @@ namespace ES
         public void ApplyBuffers()
         {
             ApplyBuffersAndRecycle();
+        }
+
+        private void NotifyReceiver(IReceiveLink<Link> receiver, Link link)
+        {
+            try
+            {
+                receiver.OnLink(link);
+            }
+            catch (Exception exception)
+            {
+                try
+                {
+                    OnReceiverException?.Invoke(receiver, link, exception);
+                }
+                catch
+                {
+                    // Diagnostics must never affect the source event.
+                }
+            }
         }
 
         #endregion

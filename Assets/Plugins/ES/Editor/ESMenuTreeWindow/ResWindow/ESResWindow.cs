@@ -100,7 +100,7 @@ namespace ES
 
         private static void EnsureConsumerConfiguration()
         {
-            List<ESAssetLibraryConsumer> consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
+            List<ESAssetLibraryConsumer> consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
                 ?.Where(item => item != null)
                 .ToList() ?? new List<ESAssetLibraryConsumer>();
             bool changed = false;
@@ -113,7 +113,7 @@ namespace ES
                 consumer.IsTotalConsumer = true;
                 consumer.Channel = "default";
                 consumer.EnsureStableIdentity();
-                List<ESAssetLibrary> libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
+                List<ESAssetLibrary> libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
                 if (libraries != null)
                     consumer.ConsumerLibFolders.AddRange(libraries.Where(item => item != null && item.ContainsBuild));
 
@@ -212,7 +212,7 @@ namespace ES
             }
             public override ESWindowPageBase ES_Refresh()
             {
-                libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
+                libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
                 if (libraries != null)
                 {
                     reorderableListForLibraries = new ReorderableList(libraries, typeof(ESAssetLibrary))

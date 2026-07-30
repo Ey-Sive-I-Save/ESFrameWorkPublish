@@ -15,7 +15,7 @@ namespace ES.Editor
             Debug.Log("===== 资产收集配置测试 =====");
             
             // 查找第一个ESAssetLibrary进行测试
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
+            var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
             if (libraries == null || libraries.Count == 0)
             {
                 Debug.LogWarning("未找到任何ESAssetLibrary资产");
@@ -77,7 +77,7 @@ namespace ES.Editor
             Debug.Log("===== DefaultBook类别匹配测试 =====");
             
             // 查找所有 ESAssetLibrary 资产
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
+            var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
             if (libraries == null || libraries.Count == 0)
             {
                 Debug.LogWarning("未找到任何 ESAssetLibrary 资产");

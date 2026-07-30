@@ -1,4 +1,8 @@
-# ESVMCP Memory 使用指南
+# 历史归档：ESVMCP Memory 使用指南
+
+状态：历史归档。ESVMCP 已位于 `Assets/Plugins/ES/Obsolete/ESVMCP`；本页不得作为当前 ESFramework 的内存、存档或 AI 记忆方案依据。当前入口见 [DOCUMENTATION_CATALOG.md](DOCUMENTATION_CATALOG.md)。
+
+---
 
 ## 概述
 

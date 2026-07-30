@@ -14,6 +14,7 @@ namespace ES
         public void OnPreprocessBuild(BuildReport report)
         {
             ESKeyGovernanceAudit.RunAndThrowIfErrors("Player build");
+            ESCharacterTemplateReleaseGate.RunAndThrowIfErrors("Player build");
         }
     }
 
@@ -31,6 +32,7 @@ namespace ES
         private static void AuditBeforeResourceBake()
         {
             ESKeyGovernanceAudit.RunAndThrowIfErrors("Resource bake");
+            ESCharacterTemplateReleaseGate.RunAndThrowIfErrors("Resource bake");
         }
     }
 }

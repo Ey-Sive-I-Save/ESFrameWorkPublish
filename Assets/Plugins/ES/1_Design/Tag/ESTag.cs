@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -788,24 +789,12 @@ namespace ES
         private ESTagConditionRuntime cachedRuntime;
 
         [Tooltip("Tags that must all be present.")]
-#if UNITY_EDITOR
-        [ValueDropdown(nameof(GetTagOptions))]
-        [OnValueChanged(nameof(InvalidateRuntime), true)]
-#endif
         public List<ESTagStableReference> required = new List<ESTagStableReference>();
 
         [Tooltip("At least one of these Tags must be present.")]
-#if UNITY_EDITOR
-        [ValueDropdown(nameof(GetTagOptions))]
-        [OnValueChanged(nameof(InvalidateRuntime), true)]
-#endif
         public List<ESTagStableReference> requiredAny = new List<ESTagStableReference>();
 
         [Tooltip("Tags that must all be absent.")]
-#if UNITY_EDITOR
-        [ValueDropdown(nameof(GetTagOptions))]
-        [OnValueChanged(nameof(InvalidateRuntime), true)]
-#endif
         public List<ESTagStableReference> forbidden = new List<ESTagStableReference>();
 
         [HideInInspector] public List<ESGameTag> requiredCore = new List<ESGameTag>();
@@ -814,13 +803,6 @@ namespace ES
         [HideInInspector] public List<string> requiredExtensions = new List<string>();
         [HideInInspector] public List<string> requiredAnyExtensions = new List<string>();
         [HideInInspector] public List<string> forbiddenExtensions = new List<string>();
-
-#if UNITY_EDITOR
-        private IEnumerable<ValueDropdownItem<ESTagStableReference>> GetTagOptions()
-        {
-            return ESTagEditorCatalogCache.GetTagOptions();
-        }
-#endif
 
         public bool IsEmpty
         {
@@ -1054,8 +1036,44 @@ namespace ES
     /// <summary>Editor-only cached picker source. The project must have one formal Tag BakeTable.</summary>
     public static class ESTagEditorCatalogCache
     {
-        private static readonly List<ValueDropdownItem<ESTagStableReference>> Empty = new List<ValueDropdownItem<ESTagStableReference>>(0);
-        private static List<ValueDropdownItem<ESTagStableReference>> tagOptions;
+        public readonly struct PickerEntry
+        {
+            public readonly ESTagStableReference Reference;
+            public readonly string DisplayName;
+            public readonly string GroupPath;
+            public readonly string StringKey;
+            public readonly string StorageBadge;
+
+            internal PickerEntry(
+                ESTagStableReference reference,
+                string displayName,
+                string groupPath,
+                string stringKey,
+                string storageBadge)
+            {
+                Reference = reference;
+                DisplayName = displayName;
+                GroupPath = groupPath;
+                StringKey = stringKey;
+                StorageBadge = storageBadge;
+            }
+
+            public string FullDisplayName
+            {
+                get
+                {
+                    string result = DisplayName ?? string.Empty;
+                    if (!string.IsNullOrEmpty(StringKey))
+                        result += " · " + StringKey;
+                    if (!string.IsNullOrEmpty(StorageBadge))
+                        result += " · " + StorageBadge;
+                    return result;
+                }
+            }
+        }
+
+        private static readonly List<PickerEntry> Empty = new List<PickerEntry>(0);
+        private static List<PickerEntry> pickerEntries;
         private static bool dirty = true;
 
         [UnityEditor.InitializeOnLoadMethod]
@@ -1065,12 +1083,29 @@ namespace ES
             UnityEditor.EditorApplication.projectChanged += Invalidate;
         }
 
-        public static IEnumerable<ValueDropdownItem<ESTagStableReference>> GetTagOptions()
+        public static IReadOnlyList<PickerEntry> GetPickerEntries()
         {
             if (dirty)
                 Rebuild();
 
-            return tagOptions ?? Empty;
+            return pickerEntries ?? Empty;
+        }
+
+        public static bool TryGetPickerEntry(ESTagStableReference reference, out PickerEntry result)
+        {
+            IReadOnlyList<PickerEntry> entries = GetPickerEntries();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                PickerEntry entry = entries[i];
+                if (Matches(reference, entry.Reference))
+                {
+                    result = entry;
+                    return true;
+                }
+            }
+
+            result = default;
+            return false;
         }
 
         public static void Invalidate()
@@ -1081,7 +1116,7 @@ namespace ES
         private static void Rebuild()
         {
             dirty = false;
-            tagOptions = new List<ValueDropdownItem<ESTagStableReference>>();
+            pickerEntries = new List<PickerEntry>();
             string[] guids = UnityEditor.AssetDatabase.FindAssets("t:ESTagBakeTable");
             if (guids == null || guids.Length != 1)
                 return;
@@ -1104,11 +1139,70 @@ namespace ES
                     enumValue = entry.enumValue,
                     stringKey = entry.key
                 };
-                string displayName = reference + " [" + entry.storageTier + "]";
-                tagOptions.Add(new ValueDropdownItem<ESTagStableReference>(displayName, reference));
+                ResolveDisplay(entry, out string displayName, out string groupPath);
+                pickerEntries.Add(new PickerEntry(
+                    reference,
+                    displayName,
+                    groupPath,
+                    entry.key,
+                    entry.storageTier == ESTagStorageTier.HotSlot ? "Hot" : "Sparse"));
             }
 
-            tagOptions.Sort((left, right) => string.CompareOrdinal(left.Text, right.Text));
+            pickerEntries.Sort((left, right) => string.CompareOrdinal(left.FullDisplayName, right.FullDisplayName));
+        }
+
+        private static bool Matches(ESTagStableReference value, ESTagStableReference candidate)
+        {
+            if (value.IsEmpty)
+                return false;
+
+            if (value.HasEnumKey && candidate.HasEnumKey
+                && value.enumGroup == candidate.enumGroup && value.enumValue == candidate.enumValue)
+            {
+                return !value.HasStringKey || !candidate.HasStringKey
+                       || string.Equals(value.stringKey, candidate.stringKey, StringComparison.Ordinal);
+            }
+
+            return value.HasStringKey && candidate.HasStringKey
+                   && string.Equals(value.stringKey, candidate.stringKey, StringComparison.Ordinal);
+        }
+
+        private static void ResolveDisplay(ESTagBakeTable.Entry entry, out string displayName, out string groupPath)
+        {
+            if (entry.enumValue == ESTagId.InvalidValue)
+            {
+                groupPath = "StringKey Tag";
+                displayName = entry.key ?? string.Empty;
+                return;
+            }
+
+            Type enumType = entry.enumGroup == ESTagEnumGroup.Optional
+                ? typeof(ESGameTagOptional)
+                : typeof(ESGameTag);
+            string enumName = Enum.GetName(enumType, entry.enumValue);
+            string inspectorName = ResolveInspectorName(enumType, enumName);
+            string source = string.IsNullOrEmpty(inspectorName) ? (enumName ?? entry.key) : inspectorName;
+            int separator = source.LastIndexOf('/');
+            if (separator >= 0)
+            {
+                groupPath = source.Substring(0, separator);
+                displayName = source.Substring(separator + 1);
+            }
+            else
+            {
+                groupPath = entry.enumValue != ESTagId.InvalidValue ? "枚举 Tag" : "StringKey Tag";
+                displayName = source;
+            }
+        }
+
+        private static string ResolveInspectorName(Type enumType, string enumName)
+        {
+            if (enumType == null || string.IsNullOrEmpty(enumName))
+                return null;
+
+            FieldInfo field = enumType.GetField(enumName, BindingFlags.Public | BindingFlags.Static);
+            InspectorNameAttribute attribute = field?.GetCustomAttribute<InspectorNameAttribute>();
+            return attribute?.displayName;
         }
     }
 #endif

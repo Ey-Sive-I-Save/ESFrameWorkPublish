@@ -897,13 +897,28 @@ GameObject:
   - component: {fileID: 6399750985762248573}
   - component: {fileID: 1146158689110337743}
   - component: {fileID: 824648930152364217}
-  m_Layer: 0
+  - component: {fileID: 823746184392100111}
+  m_Layer: 6
   m_Name: "ES\u57FA\u7840\u89D2\u8272\u6A21\u677F"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &823746184392100111
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5352321968263502512}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c00f6a7e06e4b7ca48b68f6b52ba0cb, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  prefabRole: 0
+  faction: 0
 --- !u!4 &7234839686553977592
 Transform:
   m_ObjectHideFlags: 0
@@ -973,7 +988,7 @@ MonoBehaviour:
   MaxStableSlopeAngle: 50
   StableGroundLayers:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 5376
   DiscreteCollisionEvents: 0
   StepHandling: 1
   MaxStepHeight: 0.4
@@ -2821,15 +2836,15 @@ MonoBehaviour:
   aimPeekLeftLocalOffset: {x: -0.12, y: 0, z: 0}
   aimPeekRightLocalOffset: {x: 0.12, y: 0, z: 0}
   autoDetectReferencesIfMissing: 1
-  logMissingComponentHints: 0
+  logMissingComponentHints: 1
   warnWhenPoseHasWeightButNoIK: 1
-  enableBipedIK: 1
-  enableGrounderBipedIK: 1
-  enableLookAtIK: 1
-  enableAimIK: 1
-  enableFullBodyBipedIK: 1
-  enableHitReaction: 1
-  enableRecoil: 1
+  enableBipedIK: 0
+  enableGrounderBipedIK: 0
+  enableLookAtIK: 0
+  enableAimIK: 0
+  enableFullBodyBipedIK: 0
+  enableHitReaction: 0
+  enableRecoil: 0
   enableRealtimeWeightTest: 0
   realtimeLeftHandWeight: 0
   realtimeRightHandWeight: 0

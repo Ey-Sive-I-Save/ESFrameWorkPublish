@@ -1,6 +1,7 @@
 ﻿using Sirenix.OdinInspector;
 
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace ES
 {
@@ -17,7 +18,8 @@ namespace ES
         KindDataMismatch = 8,
         MissingSharedData = 9,
         MissingGameCoreKey = 10,
-        MissingWeaponConfig = 11
+        MissingWeaponConfig = 11,
+        InvalidTagDefinition = 12
     }
 
     [ESCreatePath("数据信息", "物品数据信息")]
@@ -26,6 +28,11 @@ namespace ES
         [Title("摘要")]
         [ShowInInspector, ReadOnly, LabelText("配置说明")]
         private string EditorSummary => BuildEditorSummary();
+
+        [Title("出生 Tag")]
+        [LabelText("出生时添加")]
+        [Tooltip("Item 自身出生后持续持有的事实。Item Prefab 不重复保存此列表。")]
+        public List<ESTagStableReference> tags = new List<ESTagStableReference>();
 
         [Title("基础")]
         [HideLabel]
@@ -52,6 +59,11 @@ namespace ES
         public bool EnsureActiveKindData()
         {
             bool changed = false;
+            if (tags == null)
+            {
+                tags = new List<ESTagStableReference>();
+                changed = true;
+            }
             if (baseConfig == null)
             {
                 baseConfig = new ItemBaseConfig();
@@ -101,6 +113,8 @@ namespace ES
                 return ESItemDataValidationCode.MissingKindData;
             if (!IsKindDataCompatible(kindData, baseConfig.kind))
                 return ESItemDataValidationCode.KindDataMismatch;
+            if (!ESTagLeaseSet.TryValidateTags(tags, out _))
+                return ESItemDataValidationCode.InvalidTagDefinition;
 
             switch (kindData)
             {
@@ -140,6 +154,7 @@ namespace ES
                 case ESItemDataValidationCode.MissingSharedData: return "当前类型专属配置块缺少 SharedData。";
                 case ESItemDataValidationCode.MissingGameCoreKey: return "Shot/Weapon 必须显式配置 EnumKey 或 StringKey；KeyName 仅供编辑器与策划使用。";
                 case ESItemDataValidationCode.MissingWeaponConfig: return "Weapon 缺少武器逻辑配置。";
+                case ESItemDataValidationCode.InvalidTagDefinition: return "出生 Tag 存在空引用、重复引用或冲突别名。";
                 default: return "未知 Item 配置错误。";
             }
         }

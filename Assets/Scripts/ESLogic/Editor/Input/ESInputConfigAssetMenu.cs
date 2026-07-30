@@ -88,7 +88,7 @@ namespace ES
 
         private static void AddTypedAssets(List<ESInputConfig> candidates)
         {
-            List<ESInputConfig> configs = ESEditorSO.SOS.GetNewGroupOfType<ESInputConfig>() ?? new List<ESInputConfig>(0);
+            List<ESInputConfig> configs = ESEditorSO.GetGroupOfType<ESInputConfig>() ?? new List<ESInputConfig>(0);
             for (int i = 0; i < configs.Count; i++)
             {
                 ESInputConfig config = configs[i];

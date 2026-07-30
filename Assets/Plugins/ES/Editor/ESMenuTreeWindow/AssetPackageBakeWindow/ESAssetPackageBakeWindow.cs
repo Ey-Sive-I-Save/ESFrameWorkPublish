@@ -549,7 +549,7 @@ namespace ES
 
         private static List<ESAssetPackageBakeData> FindAllBakes()
         {
-            var result = ESEditorSO.SOS.GetNewGroupOfType<ESAssetPackageBakeData>() ?? new List<ESAssetPackageBakeData>(0);
+            var result = ESEditorSO.GetGroupOfType<ESAssetPackageBakeData>() ?? new List<ESAssetPackageBakeData>(0);
 
             result.Sort((a, b) => string.Compare(a.displayName, b.displayName, StringComparison.OrdinalIgnoreCase));
             return result;

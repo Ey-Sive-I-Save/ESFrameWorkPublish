@@ -87,6 +87,7 @@ namespace ES
     /// ES场景管理器全局数据
     /// </summary>
     [CreateAssetMenu(fileName = "ESSceneGlobalData", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "场景管理器数据")]
+    [ESSOEditorPreLoad]
     public class ESSceneGlobalData : ESEditorGlobalSo<ESSceneGlobalData>
     {
         [TabGroup("场景管理")]

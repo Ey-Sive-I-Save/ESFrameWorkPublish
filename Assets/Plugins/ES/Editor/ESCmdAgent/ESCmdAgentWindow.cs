@@ -3671,7 +3671,7 @@ namespace ES
 
         private static string BuildReadWarningsPrompt()
         {
-            return "请先快速读取项目 AIWarnings，优先读取 Assets/Plugins/ES/AIWarnings/README.md、项目最高警告、CodexNotes，以及和当前任务相关的警告文件。读取后先用短列表说明你看到的关键约束，再继续处理我的请求。";
+            return "请先快速读取项目 AIWarnings，优先读取 Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md、项目最高警告、CodexNotes，以及和当前任务相关的警告文件。读取后先用短列表说明你看到的关键约束，再继续处理我的请求。";
         }
 
         private static string BuildUpdateWarningsPrompt()
@@ -3684,9 +3684,9 @@ namespace ES
             return "请以【ES 项目全局架构师】身份工作。\n\n"
                 + "目标：读取并整合当前项目的 AIWarnings、Codex 本机会话摘要、AITalk 协作记录、关键 asmdef/目录结构，生成一份高密度架构判断。\n\n"
                 + "必须先读：\n"
-                + "1. Assets/Plugins/ES/AIWarnings/README.md\n"
-                + "2. Assets/Plugins/ES/AIWarnings/项目最高警告\n"
-                + "3. Assets/Plugins/ES/AIWarnings/CodexNotes\n"
+                + "1. Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md\n"
+                + "2. Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）\n"
+                + "3. Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）\n"
                 + "4. 与当前任务相关的 Editor/CmdAgent/表格工具警告或记录\n\n"
                 + "输出格式：\n"
                 + "1. 当前架构主线\n"

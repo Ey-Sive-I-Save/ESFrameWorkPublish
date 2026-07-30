@@ -401,7 +401,7 @@ namespace ES
                 return false;
             }
 
-            var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>();
+            var allLibraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
             var validName = GetSafeFolderName(preLibFolderName._ToValidIdentName());
 
             foreach (var lib in allLibraries)

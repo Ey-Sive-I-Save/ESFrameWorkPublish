@@ -19,6 +19,7 @@ namespace ES
     /// </summary>
     [CreateAssetMenu(fileName = "ESGlobalProjectAssetGuideData", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "项目资产职责提示数据")]
     [ESOnlyEditorSO("项目资产职责提示数据只服务编辑器协作和资产说明，不应进入运行时构建或AB资源包。")]
+    [ESSOEditorPreLoad]
     public partial class ESGlobalProjectAssetGuideData : ESEditorGlobalSo<ESGlobalProjectAssetGuideData>
     {
         public const string DefaultAssetPath = "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide/ESGlobalProjectAssetGuideData.asset";
@@ -322,7 +323,7 @@ namespace ES
             if (data != null)
                 return true;
 
-            List<ESGlobalProjectAssetGuideData> indexedData = ESEditorSO.SOS.GetNewGroupOfType<ESGlobalProjectAssetGuideData>();
+            List<ESGlobalProjectAssetGuideData> indexedData = ESEditorSO.GetGroupOfType<ESGlobalProjectAssetGuideData>();
             if (indexedData != null && indexedData.Count > 0)
             {
                 data = indexedData.FirstOrDefault(item => item != null && item.HasConfirm) ?? indexedData.FirstOrDefault(item => item != null);

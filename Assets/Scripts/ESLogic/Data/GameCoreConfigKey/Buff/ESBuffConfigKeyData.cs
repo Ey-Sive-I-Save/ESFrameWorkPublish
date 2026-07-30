@@ -20,7 +20,6 @@ namespace ES
         private readonly BuffSharedData ownedDefaultSharedData = new BuffSharedData();
         private readonly BuffVariableData ownedDefaultVariableData = new BuffVariableData();
         private readonly ESBuffConfigKey ownedDefaultKey;
-        private readonly ESTagGrantConfig ownedTagGrants;
         private readonly List<ESTagStableReference> ownedGrantedTags;
         private readonly ESTagConditionConfig ownedTagCondition;
         private readonly List<ESTagStableReference> ownedRequiredTags;
@@ -38,8 +37,7 @@ namespace ES
         public ESBuffRuntimeData()
         {
             ownedDefaultKey = ownedDefaultSharedData.key;
-            ownedTagGrants = ownedDefaultSharedData.tagGrants;
-            ownedGrantedTags = ownedTagGrants.tags;
+            ownedGrantedTags = ownedDefaultSharedData.tags;
             ownedTagCondition = ownedDefaultSharedData.applyTargetTagCondition;
             ownedRequiredTags = ownedTagCondition.required;
             ownedRequiredAnyTags = ownedTagCondition.requiredAny;
@@ -86,8 +84,7 @@ namespace ES
         internal bool OwnsCompleteDefaultGraph()
         {
             return ReferenceEquals(ownedDefaultSharedData.key, ownedDefaultKey)
-                && ReferenceEquals(ownedDefaultSharedData.tagGrants, ownedTagGrants)
-                && ReferenceEquals(ownedTagGrants.tags, ownedGrantedTags)
+                && ReferenceEquals(ownedDefaultSharedData.tags, ownedGrantedTags)
                 && ReferenceEquals(ownedDefaultSharedData.applyTargetTagCondition, ownedTagCondition)
                 && ReferenceEquals(ownedTagCondition.required, ownedRequiredTags)
                 && ReferenceEquals(ownedTagCondition.requiredAny, ownedRequiredAnyTags)
@@ -117,8 +114,7 @@ namespace ES
         private void RestoreDefaultOwnership()
         {
             ownedDefaultSharedData.key = ownedDefaultKey;
-            ownedDefaultSharedData.tagGrants = ownedTagGrants;
-            ownedTagGrants.tags = ownedGrantedTags;
+            ownedDefaultSharedData.tags = ownedGrantedTags;
             ownedDefaultSharedData.applyTargetTagCondition = ownedTagCondition;
             ownedTagCondition.required = ownedRequiredTags;
             ownedTagCondition.requiredAny = ownedRequiredAnyTags;

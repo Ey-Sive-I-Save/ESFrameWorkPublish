@@ -13,7 +13,7 @@ namespace ES
         public static void SyncConsumerGameCoreAssets(ESAssetLibraryConsumer consumer)
         {
             if (consumer == null) throw new ArgumentNullException(nameof(consumer));
-            List<ESAssetLibrary> libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>()
+            List<ESAssetLibrary> libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
                 ?.Where(item => item != null).ToList() ?? new List<ESAssetLibrary>();
             List<string> errors = SyncConsumerGameCoreCatalog(consumer, libraries);
             AssetDatabase.SaveAssets();
@@ -105,7 +105,7 @@ namespace ES
             // ConfigKey 源头权威校验，避免把过期快照写进新的 Catalog。
             ESResourcePlanGameCoreExpansion.BakeAll();
             ESResourcePlanConfigKeySynchronizer.ValidateAllForBake();
-            var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>()
+            var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
                 .Where(item => item != null && item.ContainsBuild)
                 .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
                 .ToList();
@@ -156,7 +156,7 @@ namespace ES
                 : base("烘焙资产引用", "ES.ResourcePipeline", 10)
             {
                 this.libraries = libraries ?? new List<ESAssetLibrary>();
-                consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
+                consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
                     ?.Where(item => item != null).OrderBy(item => item.ConsumerId, StringComparer.Ordinal).ToList() ?? new List<ESAssetLibraryConsumer>();
             }
 
@@ -502,7 +502,7 @@ namespace ES
         private static List<string> SyncConsumerGameCoreCatalogs(IReadOnlyCollection<ESAssetLibrary> libraries)
         {
             var allErrors = new List<string>();
-            var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
+            var consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
                 ?.Where(item => item != null).ToList() ?? new List<ESAssetLibraryConsumer>();
             foreach (ESAssetLibraryConsumer consumer in consumers)
             {

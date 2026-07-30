@@ -577,7 +577,7 @@ namespace ES
                 return (null, null);
             
             // 获取所有同类型Library
-            var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<LibrarySoBase<BookBase<TPage>>>();
+            var allLibraries = ESEditorSO.GetAssignableGroupOfType<LibrarySoBase<BookBase<TPage>>>();
             if (allLibraries == null)
                 return (null, null);
             

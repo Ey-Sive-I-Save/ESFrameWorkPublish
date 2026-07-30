@@ -1,4 +1,8 @@
-# ES VMCP 命令清单
+# 历史归档：ES VMCP 命令清单
+
+状态：历史归档。该命令系统不属于当前 ESFramework 运行时与 AI 工作流；保留内容仅用于旧项目迁移和查阅。当前入口见 [DOCUMENTATION_CATALOG.md](DOCUMENTATION_CATALOG.md)。
+
+---
 
 ## 📦 可用命令总览
 

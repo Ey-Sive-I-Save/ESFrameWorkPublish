@@ -20,15 +20,23 @@
 ## 必须先读
 
 ```text
-Assets/Plugins/ES/AIWarnings/README.md
-Assets/Plugins/ES/AIWarnings/通用架构理解_跨系统纠偏_AI协作警告.md
-Assets/Plugins/ES/AIWarnings/GameCoreGlobalData与AICommands_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/通用架构理解_跨系统纠偏_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/GameCoreGlobalData与AICommands_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md
+Documentation/ESTAG_FULL_LIFECYCLE_STANDARD.md
 ```
 
 ## 执行要求
 
 ```text
 新增 GameTag。说明分组、语义、归属系统、互斥关系，优先使用 Reserved 位，不用 Tag 替代 Buff/State/Skill。
+
+P0：策划、业务代码和 Inspector 高频接触的 Tag 名称、字段、菜单与 Picker 文案必须使用直接常用词；禁止用生僻或歧义英语包装日常功能。
+
+P1：禁止为一份 Tag 列表创建无职责 Config/Data/Info 包装。写入者直接持有 `List<ESTagStableReference> tags`，运行时以 `ESTagLeaseSet` 管理自身申请的生命周期；除非新类型明确承担多字段不变量、独立生命周期、版本迁移或独立验证，否则不得新增。
+
+`ESTagGrantConfig` 已移除：禁止恢复、兼容或复制该模式。
 ```
 
 ## 交付格式

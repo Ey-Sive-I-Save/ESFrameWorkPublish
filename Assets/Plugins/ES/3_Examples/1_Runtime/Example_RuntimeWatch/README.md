@@ -32,10 +32,10 @@
 
 `Assets/Scripts/ESLogic/Samples/ESRuntimeWatchPlayground/`
 
-- `RuntimeWatchVideoCase_1_BasicTypes.cs`：基础类型、实时刷新与可写属性。
-- `RuntimeWatchVideoCase_2_Methods.cs`：无参和单参数方法调用。
-- `RuntimeWatchVideoCase_3_FilterAndNested.cs`：ShowIf、Tag 与嵌套成员筛选。
-- `RuntimeWatchVideoCase_4_UnityTypes.cs`：常用 Unity 类型和对象引用。
-- `RuntimeWatchVideoCase_5_Diagnostics.cs`：慢 Getter、读取异常与瞬时变化诊断。
+- `RuntimeWatchCase_1_BasicTypes.cs`：基础类型、实时刷新与可写属性。
+- `RuntimeWatchCase_2_Methods.cs`：无参和单参数方法调用。
+- `RuntimeWatchCase_3_FilterAndNested.cs`：ShowIf、Tag 与嵌套成员筛选。
+- `RuntimeWatchCase_4_UnityTypes.cs`：常用 Unity 类型和对象引用。
+- `RuntimeWatchCase_5_Diagnostics.cs`：慢 Getter、读取异常与瞬时变化诊断。
 
 这些案例各自只包含一个 MonoBehaviour，便于独立复制、挂载和录制。对于每帧更新的演示字段，先通过 RuntimeWatch 将“实时更新”设为关闭，再写入目标值；否则业务脚本的 Update 会在下一帧覆盖写入结果。

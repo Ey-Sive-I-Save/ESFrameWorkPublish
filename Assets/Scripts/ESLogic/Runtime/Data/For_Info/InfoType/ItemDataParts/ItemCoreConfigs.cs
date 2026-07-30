@@ -20,8 +20,6 @@ namespace ES
         [LabelText("图标")]
         public Sprite icon;
 
-        [LabelText("标签")]
-        public List<string> tags = new List<string>();
     }
 
     [Serializable]

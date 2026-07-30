@@ -40,10 +40,12 @@ namespace ES.Tests
         private sealed class ContextFloatReceiver : IReceiveChannelLink_Context_Float
         {
             public int count;
+            public Action onReceived;
 
             public void OnLink(string key, Link_ContextEvent_FloatChange link)
             {
                 count++;
+                onReceived?.Invoke();
             }
         }
 
@@ -145,13 +147,27 @@ namespace ES.Tests
             ContextFloatReceiver receiver = new ContextFloatReceiver();
             Assert.That(context.TryAcquireValueChangeFloatLink("Buff.Power"), Is.True);
             Assert.That(context.LinkRCL_Float.AddReceiver("Buff.Power", receiver), Is.True);
+            context.LinkRCL_Float.ApplyChannelBuffers("Buff.Power");
+            Assert.That(context.LinkRCL_Float.GetSubscriberCount("Buff.Power"), Is.EqualTo(1));
             context.SetFloat("Buff.Power", 2f);
             Assert.That(receiver.count, Is.EqualTo(1));
 
             Assert.That(context.LinkRCL_Float.RemoveReceiver("Buff.Power", receiver), Is.True);
+            context.LinkRCL_Float.ApplyChannelBuffers("Buff.Power");
+            Assert.That(context.LinkRCL_Float.GetSubscriberCount("Buff.Power"), Is.Zero);
             context.ReleaseValueChangeFloatLink("Buff.Power");
             context.SetFloat("Buff.Power", 3f);
             Assert.That(receiver.count, Is.EqualTo(1));
+
+            ContextFloatReceiver reentrantReceiver = new ContextFloatReceiver();
+            reentrantReceiver.onReceived = () => context.LinkRCL_Float.RemoveReceiver("Buff.Power", reentrantReceiver);
+            Assert.That(context.TryAcquireValueChangeFloatLink("Buff.Power"), Is.True);
+            Assert.That(context.LinkRCL_Float.AddReceiver("Buff.Power", reentrantReceiver), Is.True);
+            context.LinkRCL_Float.ApplyChannelBuffers("Buff.Power");
+            context.SetFloat("Buff.Power", 4f);
+            Assert.That(reentrantReceiver.count, Is.EqualTo(1));
+            Assert.That(context.LinkRCL_Float.GetSubscriberCount("Buff.Power"), Is.Zero);
+            context.ReleaseValueChangeFloatLink("Buff.Power");
 
             support.Dispose();
         }

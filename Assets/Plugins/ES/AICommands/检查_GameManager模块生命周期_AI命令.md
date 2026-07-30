@@ -20,7 +20,7 @@
 ## 必须先读
 
 ```text
-Assets/Plugins/ES/AIWarnings/GameManager_SaveSystem/架构体系_ESGameManager_SaveSystem_AI协作警告.md
+Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/GameManager与存档（GameManagerSave）/架构体系_ESGameManager_SaveSystem_AI协作警告.md
 Assets/Scripts/ESLogic/Runtime/GameManager/
 ```
 

@@ -467,7 +467,7 @@ namespace ES
             {
                 //找到全部数据组
                 var GroupType = ESSODataWindowHelper.GetGroupTypeForPackType(ESSODataWindowHelper.GetPackType(createPackType_));
-                CachingAddGroups = ESEditorSO.SOS.GetGroup<ISoDataGroup>(GroupType) ?? CachingAddGroups;
+                CachingAddGroups = ESEditorSO.GetGroup<ISoDataGroup>(GroupType) ?? CachingAddGroups;
             }
             private void OnValueChanged_ResetConfigure()
             {
@@ -538,7 +538,7 @@ namespace ES
             public void SearchAllGroup()
             {   //找到全部数据组
                 var GroupType = ESSODataWindowHelper.GetGroupTypeForPackType(pack.GetType());
-                CachingGroups = ESEditorSO.SOS.GetGroup<ISoDataGroup>(GroupType) ?? CachingGroups;
+                CachingGroups = ESEditorSO.GetGroup<ISoDataGroup>(GroupType) ?? CachingGroups;
             }
             [VerticalGroup("总组/按钮组")]
             [PropertySpace(15)]

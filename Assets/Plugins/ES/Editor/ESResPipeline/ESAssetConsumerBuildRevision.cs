@@ -10,7 +10,7 @@ namespace ES
     {
         internal static IReadOnlyList<ESAssetLibraryConsumer> IncrementAllForBuild()
         {
-            var consumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>()
+            var consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
                 .Where(item => item != null)
                 .OrderBy(item => item.ConsumerId, StringComparer.Ordinal)
                 .ToList();

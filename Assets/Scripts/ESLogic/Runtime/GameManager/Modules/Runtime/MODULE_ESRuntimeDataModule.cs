@@ -351,7 +351,7 @@ namespace ES
         public static ESAssetAutoRegisterReport RebuildEditorConfigQueryTableFromLibraries(bool rebuildAssetConfigTables = true, bool clearBeforeBuild = true)
         {
             ESAssetAutoRegisterReport report = new ESAssetAutoRegisterReport();
-            List<ESAssetLibrary> indexedLibraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>(0);
+            List<ESAssetLibrary> indexedLibraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>(0);
             List<ESAssetLibrary> libraries = new List<ESAssetLibrary>(indexedLibraries.Count);
             for (int i = 0; i < indexedLibraries.Count; i++)
             {

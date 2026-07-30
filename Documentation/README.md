@@ -1,4 +1,12 @@
-# ESVMCP 文档中心
+# 历史归档：ESVMCP 文档入口
+
+状态：历史归档，不是 ESFramework 当前文档入口。
+
+本文件保留旧链接。ESVMCP 源码现位于 `Assets/Plugins/ES/Obsolete/ESVMCP`，不得将下面的命令、路径或完成度说明当作当前项目规则。请从 [DOCUMENTATION_CATALOG.md](DOCUMENTATION_CATALOG.md) 进入现行文档。
+
+---
+
+# ESVMCP 文档中心（历史内容）
 
 欢迎使用 ESVMCP（Unity JSON 命令执行系统）！
 

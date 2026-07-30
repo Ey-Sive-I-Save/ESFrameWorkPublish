@@ -114,7 +114,7 @@ namespace ES
         public ShotBlockMode blockMode = ShotBlockMode.AnyBlocker;
         public ShotMotionConfig config = ShotMotionConfig.Straight(30f, 5f);
         [LabelText("命中层")]
-        public LayerMask hitLayers = ~0;
+        public LayerMask hitLayers = ESPhysicsLayers.ShotHitMask;
         [LabelText("命中半径")]
         public float castRadius = 0.05f;
         [LabelText("命中缓存容量")]
@@ -222,7 +222,7 @@ namespace ES
                 aimMode = ShotAimMode.MustHit;
 
             blockMode = shared.blockMode;
-            hitLayers = shared.hitLayers;
+            hitLayers = ESPhysicsLayers.ResolveShotHitMask(shared.hitLayers);
             castRadius = Mathf.Max(0f, shared.radius * variableData.radiusMultiplier);
             config = shared.ToShotMotionConfig(variableData);
         }
@@ -232,7 +232,10 @@ namespace ES
             if (itemData == null)
                 return;
 
-            ApplyShotData(itemData.shotShared, itemData.shotVariable);
+            itemData.EnsureActiveKindData();
+            ItemShotDataBlock block = itemData.kindData as ItemShotDataBlock;
+            if (block != null)
+                ApplyShotData(block.sharedData, block.initialState);
         }
 
         protected override void Update()

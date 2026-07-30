@@ -61,6 +61,36 @@ namespace ES
             percentText.text = Mathf.RoundToInt(progressFill.fillAmount * 100f) + "%";
         }
 
+        public void SetStatus(string status, string detail)
+        {
+            statusText.text = status ?? string.Empty;
+            detailText.text = detail ?? string.Empty;
+            percentText.text = "...";
+        }
+
+        public void SetTransferProgress(ESRuntimeReleaseDownloadSnapshot snapshot)
+        {
+            string status;
+            switch (snapshot.State)
+            {
+                case ESRuntimeReleaseTransferState.Discovering: status = "正在整理资源下载计划"; break;
+                case ESRuntimeReleaseTransferState.Verifying: status = "正在校验资源完整性"; break;
+                case ESRuntimeReleaseTransferState.Initializing: status = "正在初始化运行时资源"; break;
+                case ESRuntimeReleaseTransferState.Completed: status = "资源传输完成"; break;
+                default: status = "正在下载资源"; break;
+            }
+            string detail = snapshot.TotalFileCount == 0
+                ? "没有需要下载的资源文件"
+                : "文件 " + snapshot.CompletedFileCount + " / " + snapshot.TotalFileCount
+                  + "  " + FormatBytes(snapshot.CompletedBytes) + " / " + FormatBytes(snapshot.TotalBytes)
+                  + (string.IsNullOrWhiteSpace(snapshot.Subject) ? string.Empty : "  " + snapshot.Subject);
+            if (snapshot.RetryAttempt > 1) detail += "  重试 " + snapshot.RetryAttempt + "/3";
+            else if (snapshot.SpeedBytesPerSecond > 0f)
+                detail += "  " + FormatBytes((long)snapshot.SpeedBytesPerSecond) + "/s"
+                          + (snapshot.EstimatedRemainingSeconds > 0 ? "  约 " + snapshot.EstimatedRemainingSeconds + " 秒" : string.Empty);
+            SetProgress(snapshot.Progress01, status, detail);
+        }
+
         public void SetAction(Action action, string label)
         {
             actionButton.onClick.RemoveAllListeners();
@@ -144,6 +174,13 @@ namespace ES
                 ? "TMP Settings 未配置默认字体。"
                 : $"读取 TMP 默认字体失败：{failure.GetType().Name}: {failure.Message}";
             Debug.LogWarning($"[ESRes][Bootstrap][TMP] {reason} 启动流程将继续；请在启动主题中指定字体，或修复 TMP Settings。", text);
+        }
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1024L * 1024L) return (bytes / 1024f).ToString("0.0") + " KB";
+            if (bytes < 1024L * 1024L * 1024L) return (bytes / (1024f * 1024f)).ToString("0.0") + " MB";
+            return (bytes / (1024f * 1024f * 1024f)).ToString("0.00") + " GB";
         }
         private static void Stretch(RectTransform transform) => Rect(transform, Vector2.zero, Vector2.one);
         private static void Rect(RectTransform transform, Vector2 min, Vector2 max, Vector2 offsetMin = default, Vector2 offsetMax = default) { transform.anchorMin = min; transform.anchorMax = max; transform.offsetMin = offsetMin; transform.offsetMax = offsetMax; }

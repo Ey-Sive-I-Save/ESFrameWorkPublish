@@ -19,7 +19,7 @@ namespace ES
         private static readonly PrimitiveType[] Shapes = { PrimitiveType.Cube, PrimitiveType.Sphere, PrimitiveType.Cylinder };
         private static readonly string[] LevelNames = { "Level01_Blocks", "Level02_Spheres", "Level03_Cylinders" };
 
-        [MenuItem("ES/资源/生成关卡资源卸载验收集")]
+        [MenuItem("【ES】/示例与测试/资源卸载验收/生成关卡资源验收集")]
         public static void Generate()
         {
             GenerateInternal(true);
@@ -167,8 +167,6 @@ namespace ES
                 plan = ScriptableObject.CreateInstance<ESResourcePlanInfo>();
                 AssetDatabase.CreateAsset(plan, path);
             }
-            plan.targetKind = ESResourcePlanTargetKind.Level;
-            plan.targetInfoKey = LevelNames[level];
             plan.releaseOnExit = true;
             plan.releaseDelaySeconds = 0f;
             plan.prefabs.Clear();
@@ -237,7 +235,7 @@ namespace ES
                 library.Name = "关卡资源卸载验收库";
                 library.LibFolderName = "es_level_asset_validation";
                 library.ContainsBuild = true;
-                library.IsNet = true;
+                library.DeliveryMode = ESAssetDeliveryMode.Updateable;
                 AssetDatabase.CreateAsset(library, path);
             }
             var assets = new List<UnityEngine.Object>();

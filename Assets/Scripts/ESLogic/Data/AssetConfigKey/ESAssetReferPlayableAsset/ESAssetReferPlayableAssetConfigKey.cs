@@ -1,9 +1,10 @@
 using System;
+using UnityEngine;
 
 namespace ES
 {
     [ESEnumScript("Assets/Scripts/ESLogic/Data/AssetConfigKey/ESAssetReferPlayableAsset/ESAssetReferPlayableAssetConfigKey.cs")]
-    public enum ESAssetReferPlayableAssetEnumKey : ushort { None = 0, Custom = 1 }
+    public enum ESAssetReferPlayableAssetEnumKey : ushort { [InspectorName("未配置")] None = 0, [InspectorName("自定义")] Custom = 1 }
 
     [Serializable]
     public sealed class ESAssetReferPlayableAssetConfigKey : ESAssetConfigKey<ESAssetReferPlayableAssetEnumKey> { }

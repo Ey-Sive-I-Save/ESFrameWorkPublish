@@ -17,16 +17,15 @@ namespace ES
     /// - 新增监听者会立即收到一次补发回调，以同步当前状态。
     /// </summary>
     /// <typeparam name="LinkState">状态的类型，必须支持 Equals 方法进行比较。</typeparam>
-    public class LinkStateReceiveList<LinkState>
+    public sealed class LinkStateReceiveList<LinkState>
     {
         #region 字段 (Fields)
 
         /// <summary>
-        /// 接收者列表，使用 SafeNormalList 支持派发期间安全增删。
+        /// 接收者列表：引用身份去重，派发期间增删统一在下一轮生效。
         /// </summary>
-        private SafeNormalList<IReceiveStateLink<LinkState>> _receivers = new SafeNormalList<IReceiveStateLink<LinkState>>();
+        private readonly LinkSubscriptionList<IReceiveStateLink<LinkState>> _receivers;
         private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>(4);
-        private readonly List<ReceiveStateLink<LinkState>> _actionReceivers = new List<ReceiveStateLink<LinkState>>(4);
 
         /// <summary>
         /// 上一次发送的状态值，用于检测状态变化。
@@ -40,6 +39,15 @@ namespace ES
 
         #endregion
 
+        public int SubscriberCount => _receivers.Count;
+
+        public LinkStateReceiveList(int receiverCapacity = 4)
+        {
+            _receivers = new LinkSubscriptionList<IReceiveStateLink<LinkState>>(receiverCapacity);
+        }
+
+        public void ReserveReceivers(int capacity) => _receivers.Reserve(capacity);
+
         #region 初始化 (Initialization)
 
         /// <summary>
@@ -49,6 +57,7 @@ namespace ES
         public void Init(LinkState defaultFlag)
         {
             DefaultFlag = defaultFlag;
+            LastFlag = defaultFlag;
         }
 
         #endregion
@@ -62,8 +71,15 @@ namespace ES
         /// <param name="link">新的状态值。</param>
         public void SendLink(LinkState link)
         {
-            ApplyBuffersAndRecycle();
-            if (!EqualityComparer<LinkState>.Default.Equals(LastFlag, link))
+            if (EqualityComparer<LinkState>.Default.Equals(LastFlag, link))
+                return;
+
+            LinkState previous = LastFlag;
+            // 状态权威必须在任何回调前提交，回调重入时读取到的始终是新状态。
+            LastFlag = link;
+            _receivers.BeginDispatch();
+            RecyclePending();
+            try
             {
                 int count = _receivers.ValuesNow.Count;
                 for (int i = 0; i < count; i++)
@@ -71,13 +87,16 @@ namespace ES
                     IReceiveStateLink<LinkState> currentReceiver = _receivers.ValuesNow[i];
                     if (currentReceiver is UnityEngine.Object ob)
                     {
-                        if (ob != null) currentReceiver.OnLink(LastFlag, link);
+                        if (ob != null) currentReceiver.OnLink(previous, link);
                         else _receivers.Remove(currentReceiver);
                     }
-                    else if (currentReceiver != null) currentReceiver.OnLink(LastFlag, link);
+                    else if (currentReceiver != null) currentReceiver.OnLink(previous, link);
                     else _receivers.Remove(currentReceiver);
                 }
-                LastFlag = link;
+            }
+            finally
+            {
+                _receivers.EndDispatch();
             }
         }
 
@@ -126,88 +145,36 @@ namespace ES
         }
 
         /// <summary>
-        /// 添加状态接收者，并同步当前状态。
-        /// 如果当前状态与最后状态不同，会立即触发一次回调。
+        /// 添加状态接收者。重复订阅被拒绝；非派发期间注册会立即同步当前状态。
+        /// 派发期间注册仍严格在下一轮生效，不会插入当前快照。
         /// </summary>
-        /// <param name="nowFlag">当前状态的引用，会被更新为最后状态。</param>
         /// <param name="e">要添加的接收者。</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReceiver(ref LinkState nowFlag, IReceiveStateLink<LinkState> e)
+        public bool AddReceiver(IReceiveStateLink<LinkState> e)
         {
-            if (EqualityComparer<LinkState>.Default.Equals(nowFlag, LastFlag))
+            if (!_receivers.Add(e))
+                return false;
+
+            if (!_receivers.IsDispatching)
             {
-                // 状态一致，无需补发
+                _receivers.ApplyBuffers();
+                e.OnLink(DefaultFlag, LastFlag);
             }
-            else
-            {
-                e.OnLink(nowFlag, LastFlag);
-                nowFlag = LastFlag;
-            }
-            _receivers.Add(e);
+
+            return true;
         }
 
         /// <summary>
-        /// 移除状态接收者，并重置状态为默认值。
+        /// 移除状态接收者。移除不修改全局状态。
         /// </summary>
-        /// <param name="nowFlag">当前状态的引用，会被重置为默认状态。</param>
         /// <param name="e">要移除的接收者。</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveReceiver(ref LinkState nowFlag, IReceiveStateLink<LinkState> e)
+        public bool RemoveReceiver(IReceiveStateLink<LinkState> e)
         {
-            if (EqualityComparer<LinkState>.Default.Equals(nowFlag, DefaultFlag))
-            {
-                // 已是默认状态，无需重置
-            }
-            else
-            {
-                nowFlag = DefaultFlag;
-                e.OnLink(DefaultFlag);
-            }
-            _receivers.Remove(e);
+            if (!_receivers.Remove(e))
+                return false;
             ScheduleRecycle(e);
-        }
-
-        /// <summary>
-        /// 添加基于 Action 的状态接收者。
-        /// </summary>
-        /// <param name="nowFlag">当前状态的引用。</param>
-        /// <param name="e">要添加的 Action 委托。</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReceiver(ref LinkState nowFlag, Action<LinkState, LinkState> e)
-        {
-            var receiver = e.MakeReceive<LinkState>();
-            _actionReceivers.Add(receiver);
-            AddReceiver(ref nowFlag, receiver);
-        }
-
-        /// <summary>
-        /// 移除基于 Action 的状态接收者。
-        /// </summary>
-        /// <param name="nowFlag">当前状态的引用。</param>
-        /// <param name="e">要移除的 Action 委托。</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveReceiver(ref LinkState nowFlag, Action<LinkState, LinkState> e)
-        {
-            for (int i = _actionReceivers.Count - 1; i >= 0; i--)
-            {
-                var receiver = _actionReceivers[i];
-                if (receiver.action == e)
-                {
-                    _actionReceivers.RemoveAt(i);
-                    RemoveReceiver(ref nowFlag, receiver);
-                    return;
-                }
-            }
-
-            for (int i = 0; i < _receivers.ValuesNow.Count; i++)
-            {
-                var receiver = _receivers.ValuesNow[i];
-                if (receiver is ReceiveStateLink<LinkState> receiveLink && receiveLink.action == e)
-                {
-                    RemoveReceiver(ref nowFlag, receiver);
-                    return;
-                }
-            }
+            return true;
         }
 
         /// <summary>
@@ -225,7 +192,6 @@ namespace ES
                 }
             }
             _receivers.Clear();
-            _actionReceivers.Clear();
         }
 
         /// <summary>

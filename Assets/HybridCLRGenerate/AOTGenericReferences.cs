@@ -539,7 +539,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.Comparer<ushort>
 	// System.Collections.Generic.Dictionary.Enumerator<ES.ESAssetIdentity,object>
 	// System.Collections.Generic.Dictionary.Enumerator<ES.ESGameObjectPoolPrewarmScope,object>
-	// System.Collections.Generic.Dictionary.Enumerator<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>
 	// System.Collections.Generic.Dictionary.Enumerator<int,ES.ESRuntimeAssetHandle<object>>
 	// System.Collections.Generic.Dictionary.Enumerator<int,UnityEngine.Color>
 	// System.Collections.Generic.Dictionary.Enumerator<int,int>
@@ -556,7 +555,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.Dictionary.Enumerator<ushort,uint>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<ES.ESAssetIdentity,object>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<ES.ESGameObjectPoolPrewarmScope,object>
-	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<int,ES.ESRuntimeAssetHandle<object>>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<int,UnityEngine.Color>
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<int,int>
@@ -573,7 +571,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.Dictionary.KeyCollection.Enumerator<ushort,uint>
 	// System.Collections.Generic.Dictionary.KeyCollection<ES.ESAssetIdentity,object>
 	// System.Collections.Generic.Dictionary.KeyCollection<ES.ESGameObjectPoolPrewarmScope,object>
-	// System.Collections.Generic.Dictionary.KeyCollection<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>
 	// System.Collections.Generic.Dictionary.KeyCollection<int,ES.ESRuntimeAssetHandle<object>>
 	// System.Collections.Generic.Dictionary.KeyCollection<int,UnityEngine.Color>
 	// System.Collections.Generic.Dictionary.KeyCollection<int,int>
@@ -590,7 +587,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.Dictionary.KeyCollection<ushort,uint>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<ES.ESAssetIdentity,object>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<ES.ESGameObjectPoolPrewarmScope,object>
-	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<int,ES.ESRuntimeAssetHandle<object>>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<int,UnityEngine.Color>
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<int,int>
@@ -607,7 +603,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.Dictionary.ValueCollection.Enumerator<ushort,uint>
 	// System.Collections.Generic.Dictionary.ValueCollection<ES.ESAssetIdentity,object>
 	// System.Collections.Generic.Dictionary.ValueCollection<ES.ESGameObjectPoolPrewarmScope,object>
-	// System.Collections.Generic.Dictionary.ValueCollection<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>
 	// System.Collections.Generic.Dictionary.ValueCollection<int,ES.ESRuntimeAssetHandle<object>>
 	// System.Collections.Generic.Dictionary.ValueCollection<int,UnityEngine.Color>
 	// System.Collections.Generic.Dictionary.ValueCollection<int,int>
@@ -624,7 +619,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.Dictionary.ValueCollection<ushort,uint>
 	// System.Collections.Generic.Dictionary<ES.ESAssetIdentity,object>
 	// System.Collections.Generic.Dictionary<ES.ESGameObjectPoolPrewarmScope,object>
-	// System.Collections.Generic.Dictionary<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>
 	// System.Collections.Generic.Dictionary<int,ES.ESRuntimeAssetHandle<object>>
 	// System.Collections.Generic.Dictionary<int,UnityEngine.Color>
 	// System.Collections.Generic.Dictionary<int,int>
@@ -643,7 +637,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.EqualityComparer<ES.ESGameObjectPoolPrewarmScope>
 	// System.Collections.Generic.EqualityComparer<ES.ESInputVirtualControlHandle>
 	// System.Collections.Generic.EqualityComparer<ES.ESRuntimeAssetHandle<object>>
-	// System.Collections.Generic.EqualityComparer<ES.ESRuntimeAssetReferTableResolver.ReferKey>
 	// System.Collections.Generic.EqualityComparer<ES.ESRuntimeSceneHandle>
 	// System.Collections.Generic.EqualityComparer<ES.ESRuntimeUnusedAssetBundleUnloadResult>
 	// System.Collections.Generic.EqualityComparer<ES.ESTagId>
@@ -757,7 +750,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.ICollection<LinkReceiveChannelPool.ActionReceiverRecord<object,object>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<ES.ESAssetIdentity,object>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<ES.ESGameObjectPoolPrewarmScope,object>>
-	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<int,ES.ESRuntimeAssetHandle<object>>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<int,UnityEngine.Color>>
 	// System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<int,int>>
@@ -868,7 +860,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.IEnumerable<LinkReceiveChannelPool.ActionReceiverRecord<object,object>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<ES.ESAssetIdentity,object>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<ES.ESGameObjectPoolPrewarmScope,object>>
-	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<System.ValueTuple<object,int>,object>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<int,ES.ESRuntimeAssetHandle<object>>>
 	// System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<int,UnityEngine.Color>>
@@ -932,7 +923,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.IEnumerator<LinkReceiveChannelPool.ActionReceiverRecord<object,object>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<ES.ESAssetIdentity,object>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<ES.ESGameObjectPoolPrewarmScope,object>>
-	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<System.ValueTuple<object,int>,object>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<int,ES.ESRuntimeAssetHandle<object>>>
 	// System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<int,UnityEngine.Color>>
@@ -960,7 +950,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.IEnumerator<ushort>
 	// System.Collections.Generic.IEqualityComparer<ES.ESAssetIdentity>
 	// System.Collections.Generic.IEqualityComparer<ES.ESGameObjectPoolPrewarmScope>
-	// System.Collections.Generic.IEqualityComparer<ES.ESRuntimeAssetReferTableResolver.ReferKey>
 	// System.Collections.Generic.IEqualityComparer<System.ValueTuple<object,int>>
 	// System.Collections.Generic.IEqualityComparer<UnityEngine.Quaternion>
 	// System.Collections.Generic.IEqualityComparer<UnityEngine.Vector3>
@@ -1019,7 +1008,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.IReadOnlyList<object>
 	// System.Collections.Generic.KeyValuePair<ES.ESAssetIdentity,object>
 	// System.Collections.Generic.KeyValuePair<ES.ESGameObjectPoolPrewarmScope,object>
-	// System.Collections.Generic.KeyValuePair<ES.ESRuntimeAssetReferTableResolver.ReferKey,int>
 	// System.Collections.Generic.KeyValuePair<System.ValueTuple<object,int>,object>
 	// System.Collections.Generic.KeyValuePair<int,ES.ESRuntimeAssetHandle<object>>
 	// System.Collections.Generic.KeyValuePair<int,UnityEngine.Color>
@@ -1211,7 +1199,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.ObjectEqualityComparer<ES.ESGameObjectPoolPrewarmScope>
 	// System.Collections.Generic.ObjectEqualityComparer<ES.ESInputVirtualControlHandle>
 	// System.Collections.Generic.ObjectEqualityComparer<ES.ESRuntimeAssetHandle<object>>
-	// System.Collections.Generic.ObjectEqualityComparer<ES.ESRuntimeAssetReferTableResolver.ReferKey>
 	// System.Collections.Generic.ObjectEqualityComparer<ES.ESRuntimeSceneHandle>
 	// System.Collections.Generic.ObjectEqualityComparer<ES.ESRuntimeUnusedAssetBundleUnloadResult>
 	// System.Collections.Generic.ObjectEqualityComparer<ES.ESTagId>
@@ -1466,7 +1453,6 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Func<object>
 	// System.Func<ushort,byte>
 	// System.IEquatable<ES.ESGameObjectPoolPrewarmScope>
-	// System.IEquatable<ES.ESRuntimeAssetReferTableResolver.ReferKey>
 	// System.IEquatable<ES.ESTagId>
 	// System.IEquatable<ES.ESWorkHandle>
 	// System.IEquatable<ES.StableIdList.StableId<object>>

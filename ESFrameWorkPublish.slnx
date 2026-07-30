@@ -1,7 +1,7 @@
 ﻿<Solution>
+  <Project Path="ES_Logic.csproj" />
   <Project Path="EasySave3.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
-  <Project Path="ES_Logic.csproj" />
   <Project Path="Gaskellgames.csproj" />
   <Project Path="VFolders.csproj" />
   <Project Path="RootMotion.csproj" />
@@ -16,10 +16,13 @@
   <Project Path="VHierarchy.csproj" />
   <Project Path="ES_Logic.Editor.csproj" />
   <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
+  <Project Path="ES_Example_ESSearchDropdown.Editor.csproj" />
   <Project Path="KCC.csproj" />
   <Project Path="ESInstaller.csproj" />
+  <Project Path="ES_Stand.ValueChange.Tests.csproj" />
   <Project Path="KCC.Editor.csproj" />
   <Project Path="AimingRig.csproj" />
   <Project Path="ESPlayer.csproj" />
+  <Project Path="ES_Design.ConfigKey.Tests.csproj" />
   <Project Path="Sirenix.OdinInspector.Modules.UnityMathematics.csproj" />
 </Solution>

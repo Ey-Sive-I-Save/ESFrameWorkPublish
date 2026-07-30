@@ -1,3 +1,5 @@
+using System;
+
 namespace ES
 {
     public sealed partial class ESGameManager
@@ -10,6 +12,7 @@ namespace ES
         public static ESFlowDomain FlowDomain { get; private set; }
         public static ESWorldDomain WorldDomain { get; private set; }
         public static ESRuntimeModeService RuntimeMode { get; private set; } = new ESRuntimeModeService();
+        public static ESLocalControlService LocalControl { get; private set; } = new ESLocalControlService();
         public static ESCommandModule CommandModule { get; private set; }
         public static ESInputModule InputModule { get; private set; }
         public static ESRuntimeDataModule RuntimeData { get; private set; }
@@ -23,12 +26,12 @@ namespace ES
         public static ESConfigKeyTable<ESNpcRuntimeData> NpcData => ESRuntimeDataModule.NpcTable;
         public static ESConfigKeyTable<ESWeaponRuntimeData> WeaponData => ESRuntimeDataModule.WeaponTable;
         public static ESConfigKeyTable<ESSkillRuntimeData> SkillData => ESRuntimeDataModule.SkillTable;
-        public static ESConfigKeyTable<ESBuffRuntimeData> RuntimeBuffData => ESRuntimeDataGameCore.Buffs;
-        public static ESConfigKeyTable<ESShotRuntimeData> RuntimeShotData => ESRuntimeDataGameCore.Shots;
-        public static ESConfigKeyTable<ESMonsterRuntimeData> RuntimeMonsterData => ESRuntimeDataGameCore.Monsters;
-        public static ESConfigKeyTable<ESNpcRuntimeData> RuntimeNpcData => ESRuntimeDataGameCore.Npcs;
-        public static ESConfigKeyTable<ESWeaponRuntimeData> RuntimeWeaponData => ESRuntimeDataGameCore.Weapons;
-        public static ESConfigKeyTable<ESSkillRuntimeData> RuntimeSkillData => ESRuntimeDataGameCore.Skills;
+        public static ESBuffConfigKeyTable RuntimeBuffData => ESRuntimeDataGameCore.Buffs;
+        public static ESShotConfigKeyTable RuntimeShotData => ESRuntimeDataGameCore.Shots;
+        public static ESMonsterConfigKeyTable RuntimeMonsterData => ESRuntimeDataGameCore.Monsters;
+        public static ESNpcConfigKeyTable RuntimeNpcData => ESRuntimeDataGameCore.Npcs;
+        public static ESWeaponConfigKeyTable RuntimeWeaponData => ESRuntimeDataGameCore.Weapons;
+        public static ESSkillConfigKeyTable RuntimeSkillData => ESRuntimeDataGameCore.Skills;
         public static ESConfigKeyTable<ESAssetReferPrefabConfigData> RuntimePrefabAssets => ESRuntimeDataAsset.Prefabs;
         public static ESConfigKeyTable<ESAssetReferSpriteConfigData> RuntimeSpriteAssets => ESRuntimeDataAsset.Sprites;
         public static ESConfigKeyTable<ESAssetReferAudioClipConfigData> RuntimeAudioClipAssets => ESRuntimeDataAsset.AudioClips;
@@ -68,10 +71,13 @@ namespace ES
 
             if (RuntimeMode == null)
                 RuntimeMode = new ESRuntimeModeService();
+            if (LocalControl == null)
+                LocalControl = new ESLocalControlService();
             if (ResourcePlans == null)
                 ResourcePlans = new ESResourcePlanRuntimeService();
 
             RuntimeMode.Warmup(RuntimeModeWarmupModeCapacity, RuntimeModeWarmupTagCapacity);
+            LocalControl.SetRuntimeModeService(RuntimeMode);
 
             if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESCommandModule), out IModule commandModule))
                 CommandModule = commandModule as ESCommandModule;
@@ -125,6 +131,8 @@ namespace ES
             FlowDomain = null;
             WorldDomain = null;
             RuntimeMode = null;
+            LocalControl?.Dispose();
+            LocalControl = new ESLocalControlService();
             CommandModule = null;
             InputModule = null;
             RuntimeData = null;
@@ -134,6 +142,98 @@ namespace ES
             ResourcePlans?.Dispose();
             ResourcePlans = null;
             ESCommandServices.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Single authority for the locally controlled Entity. It owns the GameTag to RuntimeMode
+    /// projector so NPC facts can never alter local input or UI policy.
+    /// </summary>
+    public sealed class ESLocalControlService : IDisposable
+    {
+        private readonly ESGameTagRuntimeModeProjector projector = new ESGameTagRuntimeModeProjector();
+        private Entity controlledEntity;
+        private ESRuntimeModeService runtimeModeService;
+
+        public Entity ControlledEntity
+        {
+            get { return controlledEntity; }
+        }
+
+        public bool HasControlledEntity
+        {
+            get { return controlledEntity != null; }
+        }
+
+        public event Action<Entity, Entity> OnControlledEntityChanged;
+
+        public bool IsLocallyControlled(Entity entity)
+        {
+            return ReferenceEquals(controlledEntity, entity);
+        }
+
+        /// <summary>
+        /// Claims control only when it is unowned or already owned by the caller. Spawn and
+        /// possession flows that intentionally replace a player should call SetControlledEntity.
+        /// </summary>
+        public bool TryClaim(Entity entity, ESRuntimeModeService modeService = null)
+        {
+            if (entity == null)
+                return false;
+
+            if (controlledEntity != null && !ReferenceEquals(controlledEntity, entity))
+                return false;
+
+            SetControlledEntity(entity, modeService);
+            return true;
+        }
+
+        public bool Release(Entity entity)
+        {
+            if (!ReferenceEquals(controlledEntity, entity))
+                return false;
+
+            SetControlledEntity(null, runtimeModeService);
+            return true;
+        }
+
+        public void SetControlledEntity(Entity entity, ESRuntimeModeService modeService = null)
+        {
+            ESRuntimeModeService resolvedModeService = modeService ?? ESGameManager.RuntimeMode;
+            if (ReferenceEquals(controlledEntity, entity)
+                && ReferenceEquals(runtimeModeService, resolvedModeService)
+                && (entity == null || projector.IsBound))
+                return;
+
+            Entity previous = controlledEntity;
+            projector.Dispose();
+            controlledEntity = entity;
+            runtimeModeService = resolvedModeService;
+            if (controlledEntity != null && runtimeModeService != null)
+                projector.Bind(controlledEntity, runtimeModeService);
+
+            if (!ReferenceEquals(previous, controlledEntity))
+                OnControlledEntityChanged?.Invoke(previous, controlledEntity);
+        }
+
+        public void SetRuntimeModeService(ESRuntimeModeService modeService)
+        {
+            if (ReferenceEquals(runtimeModeService, modeService))
+                return;
+
+            runtimeModeService = modeService;
+            if (controlledEntity != null)
+                projector.Bind(controlledEntity, runtimeModeService);
+        }
+
+        public void Dispose()
+        {
+            Entity previous = controlledEntity;
+            projector.Dispose();
+            controlledEntity = null;
+            runtimeModeService = null;
+            if (previous != null)
+                OnControlledEntityChanged?.Invoke(previous, null);
         }
     }
 }

@@ -10,7 +10,7 @@ namespace ES
         private const string DefaultAssetPath = DefaultFolder + "/ESSoTableDataRule.asset";
         private const string LegacyFolder = "Assets/ESNormalAssets/Data/Legacy/SoTableRuleGroup";
 
-        [MenuItem("【ES】/玩法搭建/SO表格/迁移旧表格规则为独立资产", priority = 1200)]
+        [MenuItem("【ES】/内容制作/数据表/SO 表格/迁移旧表格规则为独立资产", priority = 1200)]
         public static void MigrateLegacyRuleToStandaloneAsset()
         {
             ESSoTableDataRule source = FindBestRule();
@@ -55,7 +55,7 @@ namespace ES
             EditorGUIUtility.PingObject(target);
         }
 
-        [MenuItem("【ES】/玩法搭建/SO表格/定位独立表格规则", priority = 1201)]
+        [MenuItem("【ES】/内容制作/数据表/SO 表格/定位独立表格规则", priority = 1201)]
         public static void PingStandaloneRule()
         {
             ESSoTableDataRule rule = AssetDatabase.LoadAssetAtPath<ESSoTableDataRule>(DefaultAssetPath);

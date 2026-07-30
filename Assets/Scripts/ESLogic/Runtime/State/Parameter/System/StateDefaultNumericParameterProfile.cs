@@ -37,7 +37,7 @@ namespace ES
     /// <summary>
     /// 状态机默认参数配置资产（Float/Int/Bool 分离枚举）。
     /// </summary>
-    [CreateAssetMenu(menuName = "ES/State/Default Parameter Profile", fileName = "StateDefaultNumericParameterProfile")]
+    [CreateAssetMenu(menuName = "【ES】/项目设置/状态机/默认数值参数配置", fileName = "StateDefaultNumericParameterProfile")]
     public class StateDefaultNumericParameterProfile : ScriptableObject
     {
         [Header("Default Float Parameters")]

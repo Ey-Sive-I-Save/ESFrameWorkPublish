@@ -5,57 +5,67 @@ namespace ES
         public const string ROOT_MENU = "\u3010ES\u3011";
         public const string ROOT_PATH = ROOT_MENU + "/";
 
-        public const string QUICK_WINDOWS = "\u5e38\u7528\u7a97\u53e3";
+        // 一级域只表达用户意图，禁止再使用“插件级”“Tools”“Runtime Data”等实现名充当分类。
+        public const string QUICK_ACCESS = "常用窗口";
+        public const string CONTENT_CREATION = "内容制作";
+        public const string RESOURCE_DELIVERY = "资源与发布";
+        public const string SCENE_OBJECTS = "场景与对象";
+        public const string RUNTIME_DIAGNOSTICS = "运行时诊断";
+        public const string PROJECT_SETTINGS = "项目设置";
+        public const string DEVELOPMENT_MAINTENANCE = "开发与维护";
+        public const string INSTALL_INTEGRATION = "安装与集成";
+        public const string SAMPLES_TESTS = "示例与测试";
+        public const string OBSOLETE = "已废弃";
 
-        public const string PLUGIN_TOOLS = "\u63d2\u4ef6\u7ea7";
-        public const string EDITOR_OPTIMIZATION = "\u7f16\u8f91\u5668\u4f18\u5316";
-        public const string EDITOR_MAINTENANCE = "\u7f16\u8f91\u5668\u7ef4\u62a4";
-        public const string GAMEPLAY_BUILDING = "\u73a9\u6cd5\u642d\u5efa";
-        public const string RUNTIME_TOOLS = "\u8fd0\u884c\u65f6";
+        public const string QUICK_ACCESS_PATH = ROOT_PATH + QUICK_ACCESS + "/";
+        public const string CONTENT_CREATION_PATH = ROOT_PATH + CONTENT_CREATION + "/";
+        public const string RESOURCE_DELIVERY_PATH = ROOT_PATH + RESOURCE_DELIVERY + "/";
+        public const string SCENE_OBJECTS_PATH = ROOT_PATH + SCENE_OBJECTS + "/";
+        public const string RUNTIME_DIAGNOSTICS_PATH = ROOT_PATH + RUNTIME_DIAGNOSTICS + "/";
+        public const string PROJECT_SETTINGS_PATH = ROOT_PATH + PROJECT_SETTINGS + "/";
+        public const string DEVELOPMENT_MAINTENANCE_PATH = ROOT_PATH + DEVELOPMENT_MAINTENANCE + "/";
+        public const string INSTALL_INTEGRATION_PATH = ROOT_PATH + INSTALL_INTEGRATION + "/";
+        public const string SAMPLES_TESTS_PATH = ROOT_PATH + SAMPLES_TESTS + "/";
+        public const string OBSOLETE_PATH = ROOT_PATH + OBSOLETE + "/";
 
-        public const string CONFIG = "\u914d\u7f6e";
-        public const string SCENE_TOOLS = "\u573a\u666f\u5de5\u5177";
-        public const string PREVIEW_CLEANUP = "\u9884\u89c8\u6e05\u7406";
-        public const string RESOURCE_PIPELINE = "\u8d44\u6e90\u7ba1\u7ebf";
-        public const string RESOURCE_WINDOW = "\u8d44\u6e90\u7ba1\u7406\u7a97\u53e3";
-        public const string PROJECT_ASSETS = "\u9879\u76ee\u8d44\u4ea7";
-        public const string ASSET_CREATION = "\u8d44\u4ea7\u521b\u5efa";
-        public const string INSTALL_DEPENDENCY = "\u5b89\u88c5\u4e0e\u4f9d\u8d56";
-        public const string TEST_TOOLS = "\u6d4b\u8bd5\u6848\u4f8b";
-        public const string DEBUG = "\u8c03\u8bd5";
-        public const string INTERACTION_RUNTIME_PANEL = "\u4ea4\u4e92\u8fd0\u884c\u65f6\u9762\u677f";
+        // “常用窗口”是独立的高频窗口入口；工具的正式归属仍由下面的业务路径表达。
+        public const string QUICK_WINDOWS_PATH = QUICK_ACCESS_PATH;
+        public const string GAMEPLAY_BUILDING_PATH = CONTENT_CREATION_PATH;
+        public const string RESOURCE_PIPELINE_PATH = RESOURCE_DELIVERY_PATH;
+        public const string SCENE_TOOLS_PATH = SCENE_OBJECTS_PATH;
+        public const string RUNTIME_TOOLS_PATH = RUNTIME_DIAGNOSTICS_PATH;
+        public const string CONFIG_PATH = PROJECT_SETTINGS_PATH + "数据管线/";
+        public const string PREVIEW_CLEANUP_PATH = SCENE_OBJECTS_PATH + "预览与清理/";
+        public const string PROJECT_ASSETS_PATH = DEVELOPMENT_MAINTENANCE_PATH + "项目资产职责/";
+        public const string RESOURCE_WINDOW_PATH = RESOURCE_DELIVERY_PATH + "资源管理/资源管理窗口";
+        public const string ASSET_CREATION_PATH = PROJECT_SETTINGS_PATH + "创建数据资产/";
+        public const string INSTALL_DEPENDENCY_PATH = INSTALL_INTEGRATION_PATH + "依赖管理/";
+        public const string TEST_TOOLS_PATH = SAMPLES_TESTS_PATH + "编辑器案例/";
+        public const string DEBUG_PATH = DEVELOPMENT_MAINTENANCE_PATH + "自检与调试/";
+        public const string INTERACTION_RUNTIME_PANEL_PATH = RUNTIME_DIAGNOSTICS_PATH + "交互系统/运行时面板";
 
-        public const string QUICK_WINDOWS_PATH = ROOT_PATH + QUICK_WINDOWS + "/";
-
-        public const string PLUGIN_TOOLS_PATH = ROOT_PATH + PLUGIN_TOOLS + "/";
-        public const string EDITOR_OPTIMIZATION_PATH = ROOT_PATH + EDITOR_OPTIMIZATION + "/";
-        public const string EDITOR_MAINTENANCE_PATH = ROOT_PATH + EDITOR_MAINTENANCE + "/";
-        public const string GAMEPLAY_BUILDING_PATH = ROOT_PATH + GAMEPLAY_BUILDING + "/";
-        public const string RUNTIME_TOOLS_PATH = ROOT_PATH + RUNTIME_TOOLS + "/";
-
-        public const string CONFIG_PATH = GAMEPLAY_BUILDING_PATH + CONFIG + "/";
-        public const string SCENE_TOOLS_PATH = EDITOR_OPTIMIZATION_PATH + SCENE_TOOLS + "/";
-        public const string PREVIEW_CLEANUP_PATH = EDITOR_MAINTENANCE_PATH + PREVIEW_CLEANUP + "/";
-        public const string PROJECT_ASSETS_PATH = PLUGIN_TOOLS_PATH + PROJECT_ASSETS + "/";
-        public const string RESOURCE_PIPELINE_PATH = PLUGIN_TOOLS_PATH + RESOURCE_PIPELINE + "/";
-        public const string RESOURCE_WINDOW_PATH = RESOURCE_PIPELINE_PATH + RESOURCE_WINDOW;
-        public const string ASSET_CREATION_PATH = PLUGIN_TOOLS_PATH + ASSET_CREATION + "/";
-        public const string INSTALL_DEPENDENCY_PATH = PLUGIN_TOOLS_PATH + INSTALL_DEPENDENCY + "/";
-        public const string TEST_TOOLS_PATH = GAMEPLAY_BUILDING_PATH + TEST_TOOLS + "/";
-        public const string DEBUG_PATH = PLUGIN_TOOLS_PATH + DEBUG + "/";
-        public const string INTERACTION_RUNTIME_PANEL_PATH = RUNTIME_TOOLS_PATH + INTERACTION_RUNTIME_PANEL;
+        // 兼容旧调用名，值已指向新的语义分类；新代码不得继续扩散这些旧名。
+        public const string QUICK_WINDOWS = QUICK_ACCESS;
+        public const string PLUGIN_TOOLS = DEVELOPMENT_MAINTENANCE;
+        public const string EDITOR_OPTIMIZATION = DEVELOPMENT_MAINTENANCE;
+        public const string EDITOR_MAINTENANCE = DEVELOPMENT_MAINTENANCE;
+        public const string GAMEPLAY_BUILDING = CONTENT_CREATION;
+        public const string RUNTIME_TOOLS = RUNTIME_DIAGNOSTICS;
+        public const string PLUGIN_TOOLS_PATH = DEVELOPMENT_MAINTENANCE_PATH;
+        public const string EDITOR_OPTIMIZATION_PATH = DEVELOPMENT_MAINTENANCE_PATH + "综合工具/";
+        public const string EDITOR_MAINTENANCE_PATH = DEVELOPMENT_MAINTENANCE_PATH;
 
         public const string ASSET_GLOBAL_SO = "\u5168\u5c40 SO";
         public const string ASSET_DEV_MANAGEMENT = "\u5f00\u53d1\u7ba1\u7406";
         public const string ASSET_DOCUMENTATION = "\u6587\u6863";
 
-        public const string ASSET_GLOBAL_SO_PATH = ASSET_CREATION_PATH + ASSET_GLOBAL_SO + "/";
-        public const string ASSET_DEV_MANAGEMENT_PATH = ASSET_CREATION_PATH + ASSET_DEV_MANAGEMENT + "/";
-        public const string ASSET_DOCUMENTATION_PATH = ASSET_CREATION_PATH + ASSET_DOCUMENTATION + "/";
+        public const string ASSET_GLOBAL_SO_PATH = PROJECT_SETTINGS_PATH + "全局配置/";
+        public const string ASSET_DEV_MANAGEMENT_PATH = DEVELOPMENT_MAINTENANCE_PATH + "维护数据/";
+        public const string ASSET_DOCUMENTATION_PATH = DEVELOPMENT_MAINTENANCE_PATH + "文档数据/";
 
-        public const string EDITOR_TOOLS = QUICK_WINDOWS;
-        public const string EDITOR_TOOLS_PATH = QUICK_WINDOWS_PATH;
+        public const string EDITOR_TOOLS = DEVELOPMENT_MAINTENANCE;
+        public const string EDITOR_TOOLS_PATH = DEVELOPMENT_MAINTENANCE_PATH + "综合工具/";
         public const string EDITOR_DOCS = "\u6587\u6863";
-        public const string EDITOR_DOCS_PATH = QUICK_WINDOWS_PATH + EDITOR_DOCS + "/";
+        public const string EDITOR_DOCS_PATH = DEVELOPMENT_MAINTENANCE_PATH + "文档工具/";
     }
 }

@@ -9,7 +9,7 @@ namespace ES
     public enum ESResBootstrapState { Created, ValidatingLocalResources, CheckingRemotePolicy, DownloadingRequiredResources, ReadyToEnter, Blocked }
 
     /// <summary>唯一启动场景入口。模式完全由 ESAssetRunMode 决定，不另设本地/远端开关。</summary>
-    public sealed class ESResManager : MonoBehaviour
+    public sealed partial class ESResManager : MonoBehaviour
     {
         public static ESResManager Instance { get; private set; }
         public ESResBootstrapState State { get; private set; } = ESResBootstrapState.Created;
@@ -76,8 +76,10 @@ namespace ES
             bootstrapCancellation?.Cancel();
             bootstrapCancellation?.Dispose();
             bootstrapCancellation = new CancellationTokenSource();
+            lastBootstrapError = string.Empty;
             SetState(ESResBootstrapState.Created);
             bootstrapView.SetVisible(true);
+            bootstrapView.SetProgress(0f, "正在准备资源启动", string.Empty);
             bootstrapView.SetAction(null, null);
             RunBootstrapFlowAsync(bootstrapCancellation.Token).Forget();
         }
@@ -96,17 +98,19 @@ namespace ES
                 SetState(runMode == ESAssetRunMode.HotUpdate
                     ? ESResBootstrapState.CheckingRemotePolicy
                     : ESResBootstrapState.ValidatingLocalResources);
-                bootstrapView.SetProgress(0.03f,
+                bootstrapView.SetStatus(
                     runMode == ESAssetRunMode.HotUpdate ? "正在检查远端资源版本" : "正在验证本地资源包",
                     runMode == ESAssetRunMode.HotUpdate ? "读取发布根清单" : "读取初始包发布清单");
 
                 releaseDownloader = new ESRuntimeReleaseDownloader(globalResSetting, runMode);
+                lastReleaseDownloader = releaseDownloader;
                 releaseDownloader.ProgressChanged += OnReleaseDownloadProgress;
+                releaseDownloader.DownloadSnapshotChanged += OnReleaseDownloadSnapshot;
                 SetState(ESResBootstrapState.DownloadingRequiredResources);
                 ESRuntimeReleaseDownloadResult result = await ESRuntimeReleaseBootstrap.InitializeAsync(globalResSetting, releaseDownloader, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                bootstrapView.SetProgress(0.93f, "正在初始化游戏资源", "注入 Catalog、资源加载器并预热 GameCore");
+                bootstrapView.SetStatus("正在初始化游戏资源", "注入 Catalog、资源加载器并预热 GameCore");
                 await ESResBootstrapRuntimeBridge.InitializeAsync(globalResSetting, result, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -117,6 +121,7 @@ namespace ES
             catch (OperationCanceledException) { }
             catch (Exception exception)
             {
+                lastBootstrapError = exception.ToString();
                 SetState(ESResBootstrapState.Blocked);
                 bootstrapView.SetProgress(0f, "资源启动失败", exception.Message);
                 bootstrapView.SetAction(RestartBootstrapFlow, "重试");
@@ -125,30 +130,36 @@ namespace ES
             finally
             {
                 if (releaseDownloader != null)
+                {
                     releaseDownloader.ProgressChanged -= OnReleaseDownloadProgress;
+                    releaseDownloader.DownloadSnapshotChanged -= OnReleaseDownloadSnapshot;
+                }
                 releaseDownloader = null;
             }
         }
 
         private void OnReleaseDownloadProgress(ESRuntimeReleaseDownloadProgress progress)
         {
-            float value;
             string status;
             switch (progress.Stage)
             {
-                case ESRuntimeReleaseDownloadStage.ReadingRelease: value = .08f; status = "读取发布根清单"; break;
-                case ESRuntimeReleaseDownloadStage.ReadingConsumer: value = .16f; status = "验证 Consumer 清单"; break;
-                case ESRuntimeReleaseDownloadStage.ReadingLibraryIdentity: value = .28f; status = "验证 Library 身份"; break;
-                case ESRuntimeReleaseDownloadStage.ReadingCatalog: value = .40f; status = "读取资源目录"; break;
-                case ESRuntimeReleaseDownloadStage.ReadingAssetBundleManifest: value = .55f; status = "读取 AssetBundle 清单"; break;
-                case ESRuntimeReleaseDownloadStage.VerifyingAssetBundle:
-                    value = progress.TotalCount > 0 ? .60f + .30f * progress.CompletedCount / progress.TotalCount : .60f;
-                    status = "下载并校验 AssetBundle";
-                    break;
-                default: value = .90f; status = "资源文件校验完成"; break;
+                case ESRuntimeReleaseDownloadStage.ReadingRelease: status = "读取发布根清单"; break;
+                case ESRuntimeReleaseDownloadStage.ReadingConsumer: status = "验证 Consumer 清单"; break;
+                case ESRuntimeReleaseDownloadStage.ReadingLibraryIdentity: status = "验证 Library 身份"; break;
+                case ESRuntimeReleaseDownloadStage.ReadingCatalog: status = "读取资源目录"; break;
+                case ESRuntimeReleaseDownloadStage.ReadingAssetBundleManifest: status = "读取 AssetBundle 清单"; break;
+                case ESRuntimeReleaseDownloadStage.PreparingTransfer: status = "正在整理资源下载计划"; break;
+                case ESRuntimeReleaseDownloadStage.InitializingRuntime: status = "正在初始化运行时资源"; break;
+                case ESRuntimeReleaseDownloadStage.Completed: status = "资源文件校验完成"; break;
+                default: status = "正在处理资源文件"; break;
             }
             string detail = string.IsNullOrWhiteSpace(progress.Subject) ? string.Empty : progress.Subject;
-            bootstrapView.SetProgress(value, status, detail);
+            bootstrapView.SetStatus(status, detail);
+        }
+
+        private void OnReleaseDownloadSnapshot(ESRuntimeReleaseDownloadSnapshot snapshot)
+        {
+            bootstrapView.SetTransferProgress(snapshot);
         }
 
         public void EnterConfiguredGameplayScene()

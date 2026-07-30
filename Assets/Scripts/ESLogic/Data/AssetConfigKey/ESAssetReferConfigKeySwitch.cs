@@ -3,6 +3,71 @@ using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// AssetLibrary 页面与 Runtime Catalog 进入分类 AssetTable 前的统一冷路径记录。
+    /// 仅携带业务键、资产身份和编辑诊断信息，不参与运行时资产寻址。
+    /// </summary>
+    internal readonly struct ESAssetConfigRecord
+    {
+        public readonly int enumKey;
+        public readonly string stringKey;
+        public readonly string assetGuid;
+        public readonly long assetLocalFileId;
+        public readonly string assetTypeName;
+        public readonly string assetPath;
+        public readonly string displayName;
+        public readonly string sourceLibrary;
+
+        public ESAssetConfigRecord(
+            int enumKey,
+            string stringKey,
+            string assetGuid,
+            long assetLocalFileId,
+            string assetTypeName,
+            string assetPath,
+            string displayName,
+            string sourceLibrary)
+        {
+            this.enumKey = enumKey;
+            this.stringKey = stringKey;
+            this.assetGuid = assetGuid;
+            this.assetLocalFileId = assetLocalFileId;
+            this.assetTypeName = assetTypeName;
+            this.assetPath = assetPath;
+            this.displayName = displayName;
+            this.sourceLibrary = sourceLibrary;
+        }
+    }
+
+    /// <summary>分类 ConfigData 对自身强类型 Key 的无反射初始化契约。</summary>
+    internal interface IESAssetConfigDataInitializer<in TKey> where TKey : class, IESConfigKey
+    {
+        void InitializeFromRecord(TKey key, in ESAssetConfigRecord record);
+    }
+
+    internal static class ESAssetConfigDataInitialization
+    {
+        public static void Initialize<TAsset, TKey>(
+            ESAssetReferConfigDataBase<TAsset> data,
+            TKey configKey,
+            in ESAssetConfigRecord record,
+            ref string keyName,
+            ref string displayName,
+            ref string sourcePackage,
+            ref string version,
+            ref TKey key)
+            where TAsset : UnityEngine.Object
+            where TKey : class, IESConfigKey
+        {
+            keyName = record.stringKey;
+            displayName = record.displayName;
+            sourcePackage = record.sourceLibrary;
+            version = string.Empty;
+            key = configKey;
+            data.SetAssetIdentity(record.assetGuid, record.assetLocalFileId);
+        }
+    }
+
     public interface IESAssetReferConfigData
     {
         UnityEngine.Object LoadedAssetObject { get; }
@@ -16,8 +81,8 @@ namespace ES
     [Serializable]
     public abstract class ESAssetReferConfigDataBase<TAsset> : IESAssetReferConfigData where TAsset : UnityEngine.Object
     {
-        [NonSerialized] public TAsset loadedAsset;
-        [NonSerialized] public bool loadedAssetReady;
+        [NonSerialized] private TAsset loadedAsset;
+        [NonSerialized] private bool loadedAssetReady;
 
         public TAsset LoadedAsset => loadedAsset;
         public UnityEngine.Object LoadedAssetObject => loadedAsset;
@@ -166,12 +231,6 @@ namespace ES
                 resKey.Path = assetPath;
             }
 #endif
-        }
-
-        [Obsolete("Use ApplyPageKeyToResKey(ESAssetPage, ESResKey) instead.")]
-        public static void ApplyPageKeyToResKey(ResPage page, ESResKey resKey)
-        {
-            ApplyPageKeyToResKey((ESAssetPage)page, resKey);
         }
 
         public static bool IsSupportedKind(ESAssetReferKind kind)

@@ -6,7 +6,7 @@ using UnityEngine;
 // 文件：StateBase.MatchTarget.cs
 // 作用：StateBase 的自定义 MatchTarget 封装。
 //       不依赖 Animator.MatchTarget（兼容 KCC applyRootMotion=false 环境），
-//       通过 KCC motor.SetPositionAndRotation 直接驱动 Entity 根节点插值到目标点。
+//       计算 Entity 根节点目标位姿，并提交给 KCC 在物理更新边界应用。
 //       支持所有 AvatarTarget 部位（Root / Body / 四肢）；非 Humanoid Rig 自动降级为根节点。
 //
 // ============================================================================
@@ -16,7 +16,8 @@ using UnityEngine;
 // 【1. 为什么不用 Animator.MatchTarget】
 //   Unity 原生 MatchTarget 依赖 Root Motion 驱动根节点。
 //   KCC 环境下 applyRootMotion=false，Animator 根本不写根节点位移，原生接口完全无效。
-//   本实现绕过动画系统，直接通过 motor.SetPositionAndRotation 写入 KCC 物理层。
+//   本实现绕过 Animator 根节点写回，但不再从普通 Update 直接争写 Motor；
+//   State 只计算目标位姿，EntityKCCData 在 BeforeCharacterUpdate 边界统一应用。
 //
 // 【2. KCC 坐标系：必须区分这两个位置】
 //   motor.TransientPosition    → KCC 物理真实位置，每次 Simulate 写入
@@ -332,6 +333,7 @@ namespace ES
 #endif
 #endif
 
+            host?.HostEntity?.kcc?.ClearMatchTargetPose();
             _matchTargetActive           = true;
             _matchTargetLastAppliedPos   = Vector3.zero;
             _matchTargetLastAppliedRot   = Quaternion.identity;
@@ -408,6 +410,7 @@ namespace ES
         /// </summary>
         public void CancelMatchTarget()
         {
+            host?.HostEntity?.kcc?.ClearMatchTargetPose();
             _matchTargetActive           = false;
             _pendingCommand              = null;
             _configMatchTargetSequenceActive = false;
@@ -854,7 +857,7 @@ namespace ES
 
         /// <summary>
         /// 由 StateMachine 在 Update 中调用处理 MatchTarget（内部接口）。<br/>
-        /// 自定义实现：通过 KCC motor 直接驱动 Entity 根节点插值到目标点，
+        /// 自定义实现：计算 Entity 根节点目标位姿并提交到 KCC 物理边界，
         /// 无需依赖 <c>Animator.MatchTarget</c>，兼容 KCC（applyRootMotion=false）环境。
         /// </summary>
         internal void ProcessMatchTarget(Animator animator)
@@ -888,10 +891,15 @@ namespace ES
 
             // ★ KCC 插值模式下，entityTrs.position 是"插值渲染位置"而非物理模拟真实位置。
             //   物理层真实位置 = motor.TransientPosition（FixedUpdate Simulate 写入，不受 LateUpdate 插值影响）。
-            //   必须用 TransientPosition 作为 MoveTowards 的起点，否则每帧从同一插值旧位置出发，
-            //   SetPositionAndRotation 的结果会被下一次 Simulate 立即覆盖，看起来"完全不动"。
-            Vector3    curPos = motor.TransientPosition;
-            Quaternion curRot = motor.TransientRotation;
+            //   若上一渲染帧已提交但物理帧尚未消费，则继续以待应用位姿为起点；否则从 TransientPosition 开始。
+            //   这样渲染帧快于物理帧时也不会反复从同一点计算而丢失推进量。
+            Vector3 curPos;
+            Quaternion curRot;
+            if (!entity.kcc.TryGetPendingMatchTargetPose(out curPos, out curRot))
+            {
+                curPos = motor.TransientPosition;
+                curRot = motor.TransientRotation;
+            }
 
             // ── 每帧实时计算骨骼→根偏移（骨骼随动画持续移动，不能在窗口入口快照）────
             // Root 部位：目标就是 entity 根节点，无需偏移。
@@ -976,7 +984,7 @@ namespace ES
                     newRot = effectiveTargetRot;
             }
 
-            motor.SetPositionAndRotation(newPos, newRot, bypassInterpolation: true);
+            entity.kcc.QueueMatchTargetPose(newPos, newRot, isEndFrame);
 
             _matchTargetLastAppliedPos = newPos;
             _matchTargetLastAppliedRot = newRot;

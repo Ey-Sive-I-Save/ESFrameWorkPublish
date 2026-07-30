@@ -10,7 +10,7 @@ namespace ES
         private const string DefaultAssetPath = DefaultFolder + "/ESInputConfig.asset";
         private const string LegacyFolder = "Assets/ESNormalAssets/Data/Legacy/InputConfigGroup";
 
-        [MenuItem("【ES】/运行时/输入/迁移旧输入配置为独立资产", priority = 1100)]
+        [MenuItem("【ES】/项目设置/输入/迁移旧输入配置为独立资产", priority = 1100)]
         public static void MigrateLegacyInputConfigToStandaloneAsset()
         {
             ESInputConfig source = FindBestInputConfig();
@@ -56,7 +56,7 @@ namespace ES
             EditorGUIUtility.PingObject(target);
         }
 
-        [MenuItem("【ES】/运行时/输入/定位独立输入配置", priority = 1101)]
+        [MenuItem("【ES】/项目设置/输入/定位独立输入配置", priority = 1101)]
         public static void PingStandaloneInputConfig()
         {
             ESInputConfig config = AssetDatabase.LoadAssetAtPath<ESInputConfig>(DefaultAssetPath);

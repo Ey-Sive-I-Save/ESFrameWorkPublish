@@ -7,6 +7,9 @@ namespace ES
     [Serializable]
     public sealed class ESInputSchemeDefine
     {
+        [LabelText("内置枚举别名")]
+        public ESInputSchemeEnumKey enumKey = ESInputSchemeEnumKey.KeyboardMouse;
+
         [LabelText("方案 ID")]
         public string schemeId = ESInputSchemeIds.KeyboardMouse;
 

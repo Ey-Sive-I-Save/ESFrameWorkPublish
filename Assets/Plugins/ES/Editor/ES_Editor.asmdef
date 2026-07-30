@@ -5,6 +5,7 @@
         "ES_Stand",
         "ES_Design",
         "ES_Logic",
+        "UniTask",
         "Unity.InputSystem",
         "Unity.TextMeshPro",
         "HybridCLR.Editor"

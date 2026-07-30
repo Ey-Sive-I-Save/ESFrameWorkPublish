@@ -15,7 +15,7 @@ namespace ES.Obsolete{
     /// </summary>
     public partial class ESDevManagementWindow_V2 : ESMenuTreeWindowAB<ESDevManagementWindow_V2>
     {
-        [MenuItem(MenuItemPathDefine.EDITOR_TOOLS_PATH + "【日志】开发管理窗口 ", false, 1)]
+        [MenuItem("【ES】/已废弃/EditorLegacy/开发管理/开发管理窗口（日志）", false, 1)]
         private static void OpenDevWindow()
         {
             OpenWindow();

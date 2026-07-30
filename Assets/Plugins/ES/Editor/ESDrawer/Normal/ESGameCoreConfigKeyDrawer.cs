@@ -16,13 +16,18 @@ namespace ES.EditorInternal
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            int lines = property.isExpanded ? 10 : 5;
+            ESGameCoreDefinitionLocator.Candidate current = ESGameCoreDefinitionLocator.FindCandidate(property, ResolveEnumType());
+            int lines = 5 + (ESGameCoreDefinitionLocator.IsStale(property, current) ? 1 : 0) + (property.isExpanded ? 3 : 0);
             return lines * Line + (lines - 1) * Gap + PanelPadding * 2f;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
+            int previousIndent = EditorGUI.indentLevel;
+            float previousLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUI.indentLevel = 0;
+            EditorGUIUtility.labelWidth = Mathf.Clamp(position.width * 0.27f, 76f, 108f);
 
             GUI.Box(position, GUIContent.none, EditorStyles.helpBox);
             EditorGUI.DrawRect(new Rect(position.x + 2f, position.y + 2f, Mathf.Max(0f, position.width - 4f), 2f), PanelAccent);
@@ -36,9 +41,10 @@ namespace ES.EditorInternal
             SerializedProperty stringKey = property.FindPropertyRelative("stringKey");
             Type enumType = ResolveEnumType();
             ESGameCoreDefinitionLocator.Candidate current = ESGameCoreDefinitionLocator.FindCandidate(property, enumType);
+            bool isStale = ESGameCoreDefinitionLocator.IsStale(property, current);
 
             Rect row = NextLine(ref position);
-            DrawHeader(row, ResolveTitle(property, label, enumType), "GameCore ConfigKey");
+            DrawHeader(row, ResolveTitle(property, label, enumType), "GameCore 配置键");
 
             row = NextLine(ref position);
             const string enumLabel = "枚举 Key";
@@ -91,20 +97,30 @@ namespace ES.EditorInternal
                     Debug.LogWarning("[ESGameCore][ConfigKey] 选择的定义资产不包含对应类型的 ConfigKey：" + selected.name, selected);
             }
 
-            string keySummary = current != null ? current.effectiveStringKey : (stringKey != null ? stringKey.stringValue : string.Empty);
+            if (isStale)
+            {
+                row = NextLine(ref position);
+                Rect syncLabel = EditorGUI.PrefixLabel(row, new GUIContent("Source Key changed", "The bound definition now has a different Key; runtime still reads this snapshot."));
+                float syncWidth = Mathf.Min(72f, syncLabel.width * 0.34f);
+                EditorGUI.HelpBox(new Rect(syncLabel.x, syncLabel.y, Mathf.Max(20f, syncLabel.width - syncWidth - Gap), syncLabel.height),
+                    ESConfigKeyMatch.Describe(enumKey.intValue, stringKey.stringValue) + " -> " + ESConfigKeyMatch.Describe(current.enumKey, current.stringKey),
+                    MessageType.Warning);
+                if (GUI.Button(new Rect(syncLabel.xMax - syncWidth, syncLabel.y, syncWidth, syncLabel.height), "Sync", EditorStyles.miniButton))
+                    ApplyCandidate(property, current);
+            }
+
             property.isExpanded = EditorGUI.Foldout(NextLine(ref position), property.isExpanded,
-                current != null ? "已同步 · " + current.asset.GetType().Name + " · " + keySummary
-                    : (string.IsNullOrEmpty(keySummary) ? "高级信息" : "仅 Key · 尚未绑定定义身份"), true, EditorStyles.foldout);
+                BuildSummary(current, enumKey, stringKey), true, EditorStyles.foldout);
 
             if (property.isExpanded)
             {
-                DrawReadOnly(ref position, "Enum Key", enumKey);
-                DrawReadOnly(ref position, "String Key", stringKey);
-                DrawReadOnly(ref position, "Definition GUID", property.FindPropertyRelative("definitionGuid"));
-                DrawReadOnly(ref position, "Local File Id", property.FindPropertyRelative("definitionLocalFileId"));
-                DrawReadOnly(ref position, "Definition Type", property.FindPropertyRelative("definitionTypeName"));
+                DrawReadOnly(ref position, "定义资产 GUID", property.FindPropertyRelative("definitionGuid"));
+                DrawReadOnly(ref position, "子资产 FileId", property.FindPropertyRelative("definitionLocalFileId"));
+                DrawReadOnly(ref position, "定义资产类型", property.FindPropertyRelative("definitionTypeName"));
             }
 
+            EditorGUIUtility.labelWidth = previousLabelWidth;
+            EditorGUI.indentLevel = previousIndent;
             EditorGUI.EndProperty();
         }
 
@@ -123,9 +139,16 @@ namespace ES.EditorInternal
         private static string ResolveTitle(SerializedProperty property, GUIContent label, Type enumType)
         {
             if (HasVisibleLabel(label)) return label.text;
-            if (property != null && !string.IsNullOrWhiteSpace(property.displayName)) return property.displayName;
-            string name = enumType != null ? enumType.Name : "GameCore";
-            return name.Replace("EnumKey", string.Empty).Replace("ES", string.Empty) + " Key";
+            if (enumType == typeof(ESBuffEnumKey)) return "Buff 身份 Key";
+            if (enumType == typeof(ESSkillEnumKey)) return "技能身份 Key";
+            if (enumType == typeof(ESMonsterEnumKey)) return "怪物身份 Key";
+            if (enumType == typeof(ESNpcEnumKey)) return "NPC 身份 Key";
+            if (enumType == typeof(ESWeaponEnumKey)) return "武器身份 Key";
+            if (enumType == typeof(ESShotEnumKey)) return "投射物身份 Key";
+            if (enumType == typeof(ESFlowTestEnumKey)) return "流程验收身份 Key";
+            return property != null && !string.IsNullOrWhiteSpace(property.displayName)
+                ? property.displayName
+                : "GameCore 身份 Key";
         }
 
         private static void DrawStringSelectionRow(Rect rect, out Rect input, out Rect select)
@@ -140,29 +163,59 @@ namespace ES.EditorInternal
             return new GUIContent(rect.width >= 40f ? "选择" : "▼", "从已有 GameCore 定义中选择字符串 Key");
         }
 
+        private static string BuildSummary(
+            ESGameCoreDefinitionLocator.Candidate current,
+            SerializedProperty enumKey,
+            SerializedProperty stringKey)
+        {
+            int enumValue = enumKey != null ? enumKey.intValue : 0;
+            string textKey = stringKey != null ? stringKey.stringValue : string.Empty;
+            if (current != null)
+            {
+                string mode = enumValue != 0 ? "枚举优先" : "字符串模式";
+                string key = string.IsNullOrWhiteSpace(current.stringKey)
+                    ? enumValue.ToString()
+                    : current.stringKey;
+                return "已解析 · " + mode + " · " + key + " · " + current.asset.name;
+            }
+
+            if (enumValue != 0)
+                return "枚举模式 · 尚未唯一解析资产 · Enum=" + enumValue;
+            if (!string.IsNullOrWhiteSpace(textKey))
+                return "字符串模式 · 尚未唯一解析资产 · " + textKey;
+            return "未配置 · 可使用枚举、字符串或拖入资产";
+        }
+
         private static void ShowStringKeyMenu(Rect position, SerializedProperty property, Type enumType)
         {
-            var menu = new GenericMenu();
-            IReadOnlyList<ESGameCoreDefinitionLocator.Candidate> candidates = ESGameCoreDefinitionLocator.GetCandidates(enumType, true);
+            IReadOnlyList<ESGameCoreDefinitionLocator.Candidate> candidates = ESGameCoreDefinitionLocator.GetCandidates(enumType);
+            var entries = new List<ESSearchDropdown.Entry>(candidates.Count);
+            string currentGuid = property.FindPropertyRelative("definitionGuid")?.stringValue ?? string.Empty;
+            long currentLocalFileId = property.FindPropertyRelative("definitionLocalFileId")?.longValue ?? 0;
             if (candidates.Count == 0)
             {
-                menu.AddDisabledItem(new GUIContent("没有可选的 GameCore 定义"));
+                entries.Add(ESSearchDropdown.Entry.Disabled("没有可选的 GameCore 定义"));
             }
             else
             {
                 foreach (ESGameCoreDefinitionLocator.Candidate item in candidates)
                 {
                     ESGameCoreDefinitionLocator.Candidate captured = item;
-                    string path = AssetDatabase.GetAssetPath(item.asset).Replace("/", " › ");
-                    string key = string.IsNullOrWhiteSpace(item.effectiveStringKey) ? "<无字符串 Key>" : item.effectiveStringKey;
-                    string menuPath = key + " · " + item.asset.name + " · " + item.asset.GetType().Name + " · " + path;
-                    menu.AddItem(
-                        new GUIContent(menuPath, AssetPreview.GetMiniThumbnail(item.asset)),
-                        false,
-                        () => ApplyCandidate(property, captured));
+                    string path = AssetDatabase.GetAssetPath(item.asset);
+                    string key = string.IsNullOrWhiteSpace(item.stringKey) ? "<无字符串 Key>" : item.stringKey;
+                    string folder = System.IO.Path.GetDirectoryName(path)?.Replace('\\', '/');
+                    entries.Add(ESSearchDropdown.Entry.Item(
+                        item.asset.name,
+                        () => ApplyCandidate(property, captured),
+                        folder,
+                        AssetPreview.GetMiniThumbnail(item.asset),
+                        subtitle: item.asset.GetType().Name + " · " + key,
+                        tooltip: path,
+                        badge: item.localFileId != 0 ? "子资产" : "主资产",
+                        selected: item.guid == currentGuid && item.localFileId == currentLocalFileId));
                 }
             }
-            menu.DropDown(position);
+            ESSearchDropdown.Open(position, "选择 GameCore 字符串 Key", entries);
         }
 
         private static bool HasVisibleLabel(GUIContent label)
@@ -196,14 +249,6 @@ namespace ES.EditorInternal
         {
             property.FindPropertyRelative("enumKey").intValue = enumValue;
             ClearDefinitionIdentity(property);
-            SerializedProperty stringKey = property.FindPropertyRelative("stringKey");
-            if (enumValue != 0 && stringKey != null && string.IsNullOrWhiteSpace(stringKey.stringValue))
-            {
-                UnityEngine.Object target = property.serializedObject.targetObject;
-                stringKey.stringValue = target is SoDataInfo info && !string.IsNullOrWhiteSpace(info.KeyName)
-                    ? info.KeyName
-                    : (target != null ? target.name : string.Empty);
-            }
             Apply(property);
             TryBindOwningDefinition(property, enumType);
         }
@@ -220,7 +265,7 @@ namespace ES.EditorInternal
         {
             property.serializedObject.Update();
             property.FindPropertyRelative("enumKey").intValue = candidate.enumKey;
-            property.FindPropertyRelative("stringKey").stringValue = candidate.effectiveStringKey ?? string.Empty;
+            property.FindPropertyRelative("stringKey").stringValue = candidate.stringKey ?? string.Empty;
             property.FindPropertyRelative("definitionGuid").stringValue = candidate.guid ?? string.Empty;
             property.FindPropertyRelative("definitionLocalFileId").longValue = candidate.localFileId;
             property.FindPropertyRelative("definitionTypeName").stringValue = candidate.assetTypeName ?? string.Empty;
@@ -267,7 +312,7 @@ namespace ES.EditorInternal
             }
 
             Selection.activeObject = target;
-            EditorGUIUtility.PingObject(target);
+            EditorGUIUtility.PingObject(target);  
         }
     }
 
@@ -277,7 +322,7 @@ namespace ES.EditorInternal
         {
             public ScriptableObject asset;
             public int enumKey;
-            public string effectiveStringKey;
+            public string stringKey;
             public string guid;
             public long localFileId;
             public string assetTypeName;
@@ -290,22 +335,32 @@ namespace ES.EditorInternal
             EditorApplication.projectChanged += CandidateCache.Clear;
         }
 
+        internal static void ClearCache()
+        {
+            CandidateCache.Clear();
+        }
+
         public static IReadOnlyList<Candidate> GetCandidates(Type enumType, bool refresh = false)
         {
             if (enumType == null) return Array.Empty<Candidate>();
             if (!refresh && CandidateCache.TryGetValue(enumType, out List<Candidate> cached)) return cached;
             var result = new List<Candidate>();
+            var identities = new HashSet<string>(StringComparer.Ordinal);
             Type assetType = ResolveAssetType(enumType);
             if (assetType != null)
-                foreach (string guid in AssetDatabase.FindAssets("t:ScriptableObject"))
+                foreach (KeyValuePair<Type, List<ESSO>> group in ESEditorSO.SOS.Groups)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(guid);
-                    foreach (UnityEngine.Object loaded in AssetDatabase.LoadAllAssetsAtPath(path))
-                        if (loaded is ScriptableObject asset && assetType.IsInstanceOfType(asset)
-                            && TryCreateCandidate(asset, enumType, out Candidate candidate))
+                    if (group.Key == null || !assetType.IsAssignableFrom(group.Key) || group.Value == null)
+                        continue;
+                    List<ESSO> assets = group.Value;
+                    for (int i = 0; i < assets.Count; i++)
+                    {
+                        if (assets[i] is ScriptableObject asset
+                            && TryCreateCandidate(asset, enumType, out Candidate candidate)
+                            && identities.Add(candidate.guid + ":" + candidate.localFileId))
                             result.Add(candidate);
+                    }
                 }
-            result = result.GroupBy(item => item.guid + ":" + item.localFileId, StringComparer.Ordinal).Select(group => group.First()).ToList();
             result.Sort((left, right) =>
             {
                 int pathCompare = string.CompareOrdinal(AssetDatabase.GetAssetPath(left.asset), AssetDatabase.GetAssetPath(right.asset));
@@ -336,8 +391,19 @@ namespace ES.EditorInternal
             List<Candidate> keyMatches = GetCandidates(enumType).Where(candidate =>
                 (enumValue != 0 && candidate.enumKey == enumValue)
                 || (enumValue == 0 && !string.IsNullOrEmpty(stringValue)
-                    && string.Equals(candidate.effectiveStringKey, stringValue, StringComparison.Ordinal))).ToList();
+                    && string.Equals(candidate.stringKey, stringValue, StringComparison.Ordinal))).ToList();
             return keyMatches.Count == 1 ? keyMatches[0] : null;
+        }
+
+        public static bool IsStale(SerializedProperty property, Candidate candidate)
+        {
+            if (property == null || candidate == null)
+                return false;
+            return !ESConfigKeyMatch.Matches(
+                property.FindPropertyRelative("enumKey").intValue,
+                property.FindPropertyRelative("stringKey").stringValue,
+                candidate.enumKey,
+                candidate.stringKey);
         }
 
         public static bool TryCreateCandidate(ScriptableObject asset, Type enumType, out Candidate candidate)
@@ -345,13 +411,15 @@ namespace ES.EditorInternal
             candidate = null;
             if (asset == null || enumType == null) return false;
             IESConfigKey key = ResolveKey(asset, enumType);
-            if (key == null || !AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string guid, out long localFileId)) return false;
-            string fallback = asset is SoDataInfo info ? info.KeyName : asset.name;
+            if (key == null
+                || !ESConfigKeyMatch.IsConfigured(key.EnumKeyInt, key.StringKey)
+                || !AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string guid, out long localFileId))
+                return false;
             candidate = new Candidate
             {
                 asset = asset,
                 enumKey = key.EnumKeyInt,
-                effectiveStringKey = string.IsNullOrEmpty(key.StringKey) ? fallback : key.StringKey,
+                stringKey = key.StringKey ?? string.Empty,
                 guid = guid,
                 localFileId = localFileId,
                 assetTypeName = asset.GetType().AssemblyQualifiedName
@@ -413,9 +481,7 @@ namespace ES.EditorInternal
             if (enumValue != 0)
                 return key.EnumKeyInt == enumValue;
 
-            string fallback = asset is SoDataInfo info ? info.KeyName : asset.name;
-            string effectiveString = string.IsNullOrEmpty(key.StringKey) ? fallback : key.StringKey;
-            return !string.IsNullOrEmpty(stringValue) && string.Equals(effectiveString, stringValue, StringComparison.Ordinal);
+            return !string.IsNullOrEmpty(stringValue) && string.Equals(key.StringKey, stringValue, StringComparison.Ordinal);
         }
 
         private static IESConfigKey ResolveKey(ScriptableObject asset, Type enumType)
@@ -427,10 +493,194 @@ namespace ES.EditorInternal
             if (asset is ESAssetGameCoreFlowTestDataInfo flowTest && enumType == typeof(ESFlowTestEnumKey)) return flowTest.testKey;
             if (asset is ItemDataInfo item && item.baseConfig != null)
             {
-                if (enumType == typeof(ESShotEnumKey) && item.baseConfig.kind == ItemKind.Shot) return item.shotKey;
-                if (enumType == typeof(ESWeaponEnumKey) && item.baseConfig.kind == ItemKind.Weapon) return item.weaponKey;
+                if (enumType == typeof(ESShotEnumKey) && item.kindData is ItemShotDataBlock shot) return shot.key;
+                if (enumType == typeof(ESWeaponEnumKey) && item.kindData is ItemWeaponDataBlock weapon) return weapon.key;
             }
             return null;
+        }
+    }
+
+    internal static class ESItemGameCoreEditorWorkflow
+    {
+        internal struct Report
+        {
+            public int scanned;
+            public int repaired;
+            public int valid;
+            public int invalid;
+            public int shotCount;
+            public int weaponCount;
+            public int injectedShotCount;
+            public int injectedWeaponCount;
+            public List<string> errors;
+
+            public bool HasErrors => errors != null && errors.Count != 0;
+
+            public override string ToString()
+            {
+                string result = "[ES Item GameCore] 扫描=" + scanned
+                    + "，修复=" + repaired
+                    + "，有效=" + valid
+                    + "，无效=" + invalid
+                    + "，Shot=" + shotCount
+                    + "，Weapon=" + weaponCount;
+                if (injectedShotCount != 0 || injectedWeaponCount != 0)
+                    result += "，已注入 Shot=" + injectedShotCount + "，Weapon=" + injectedWeaponCount;
+                if (HasErrors)
+                    result += "，错误=" + errors.Count;
+                return result;
+            }
+        }
+
+        [MenuItem("【ES】/数据/GameCore/整理并校验 Item 配置")]
+        public static void MenuRepairAndValidate()
+        {
+            Report report = Run(repair: true, rebuildTables: false);
+            Debug.Log(report.ToString());
+            LogErrors(report);
+        }
+
+        [MenuItem("【ES】/数据/GameCore/重建并验证 Item GameCore 表")]
+        public static void MenuRebuildTables()
+        {
+            Report report = Run(repair: true, rebuildTables: true);
+            Debug.Log(report.ToString());
+            LogErrors(report);
+        }
+
+        internal static Report Run(bool repair, bool rebuildTables)
+        {
+            Report report = new Report { errors = new List<string>() };
+            List<ItemDataInfo> items = FindItems();
+            report.scanned = items.Count;
+            var keyOwners = new Dictionary<string, ItemDataInfo>(StringComparer.Ordinal);
+
+            for (int i = 0; i < items.Count; i++)
+            {
+                ItemDataInfo item = items[i];
+                if (repair)
+                {
+                    Undo.RecordObject(item, "整理 Item 配置");
+                    if (item.EnsureActiveKindData())
+                    {
+                        report.repaired++;
+                        EditorUtility.SetDirty(item);
+                    }
+                }
+
+                ESItemDataValidationCode validation = item.ValidateConfiguration();
+                if (validation != ESItemDataValidationCode.Valid)
+                {
+                    report.invalid++;
+                    report.errors.Add(item.name + "：" + item.GetValidationMessage(validation));
+                    continue;
+                }
+
+                report.valid++;
+                if (!item.IsGameCoreRoot)
+                    continue;
+
+                if (item.baseConfig.kind == ItemKind.Shot) report.shotCount++;
+                if (item.baseConfig.kind == ItemKind.Weapon) report.weaponCount++;
+                if (!item.TryGetGameCoreKey(out IESConfigKey key))
+                    continue;
+
+                string signature = item.baseConfig.kind + "|" + (key.EnumKeyInt != 0
+                    ? "E:" + key.EnumKeyInt
+                    : "S:" + key.StringKey);
+                if (keyOwners.TryGetValue(signature, out ItemDataInfo owner) && owner != item)
+                    report.errors.Add("GameCore Key 重复：" + signature + "，资产为 " + Describe(owner) + " 与 " + Describe(item));
+                else
+                    keyOwners[signature] = item;
+            }
+
+            if (rebuildTables && !report.HasErrors)
+                RebuildTables(items, ref report);
+            if (repair && report.repaired != 0)
+                AssetDatabase.SaveAssets();
+            return report;
+        }
+
+        private static List<ItemDataInfo> FindItems()
+        {
+            var result = new List<ItemDataInfo>();
+            var visitedPaths = new HashSet<string>(StringComparer.Ordinal);
+            string[] guids = AssetDatabase.FindAssets("t:ScriptableObject", new[] { "Assets/ESNormalAssets/Data" });
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                if (string.IsNullOrEmpty(path) || !visitedPaths.Add(path))
+                    continue;
+
+                foreach (UnityEngine.Object loaded in AssetDatabase.LoadAllAssetsAtPath(path))
+                    if (loaded is ItemDataInfo item && !result.Contains(item))
+                        result.Add(item);
+            }
+            return result;
+        }
+
+        private static string Describe(ItemDataInfo item)
+        {
+            string path = AssetDatabase.GetAssetPath(item);
+            long localFileId = 0;
+            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(item, out _, out localFileId);
+            return item.name + " [" + path + "#" + localFileId + "]";
+        }
+
+        private static void RebuildTables(List<ItemDataInfo> items, ref Report report)
+        {
+            if (ESRuntimeDataGameCore.Shots.IsBuilding || ESRuntimeDataGameCore.Weapons.IsBuilding)
+            {
+                report.errors.Add("当前 Item GameCore 表正在构建，不能嵌套重建。");
+                return;
+            }
+
+            bool failed = false;
+            ESRuntimeDataGameCore.Shots.BeginBuild(true);
+            ESRuntimeDataGameCore.Weapons.BeginBuild(true);
+            try
+            {
+                for (int i = 0; i < items.Count; i++)
+                {
+                    ItemDataInfo item = items[i];
+                    if (!item.IsGameCoreRoot)
+                        continue;
+                    try
+                    {
+                        item.InjectGameCoreTables();
+                    }
+                    catch (Exception exception)
+                    {
+                        failed = true;
+                        report.errors.Add(item.name + " 注入失败：" + exception.Message);
+                    }
+                }
+            }
+            finally
+            {
+                ESRuntimeDataGameCore.Weapons.EndBuild();
+                ESRuntimeDataGameCore.Shots.EndBuild();
+            }
+
+            if (failed)
+            {
+                ESRuntimeDataGameCore.Shots.BeginBuild(true);
+                ESRuntimeDataGameCore.Weapons.BeginBuild(true);
+                ESRuntimeDataGameCore.Weapons.EndBuild();
+                ESRuntimeDataGameCore.Shots.EndBuild();
+                return;
+            }
+
+            report.injectedShotCount = ESRuntimeDataGameCore.Shots.Count;
+            report.injectedWeaponCount = ESRuntimeDataGameCore.Weapons.Count;
+        }
+
+        private static void LogErrors(Report report)
+        {
+            if (!report.HasErrors)
+                return;
+            for (int i = 0; i < report.errors.Count; i++)
+                Debug.LogError("[ES Item GameCore] " + report.errors[i]);
         }
     }
 
@@ -440,6 +690,8 @@ namespace ES.EditorInternal
         [NonSerialized] private UnityEditor.Editor targetEditor;
         [NonSerialized] private string targetPath;
         [NonSerialized] private string targetSubtitle;
+        [NonSerialized] private string itemWorkflowResult;
+        [NonSerialized] private MessageType itemWorkflowMessageType;
         private Vector2 scroll;
 
         public static void Open(ScriptableObject target)
@@ -463,6 +715,7 @@ namespace ES.EditorInternal
                 return;
             DestroyTargetEditor();
             target = value;
+            itemWorkflowResult = null;
             if (target != null)
             {
                 targetEditor = UnityEditor.Editor.CreateEditor(target);
@@ -522,10 +775,74 @@ namespace ES.EditorInternal
                 targetEditor = UnityEditor.Editor.CreateEditor(target);
             scroll = EditorGUILayout.BeginScrollView(scroll);
             EditorGUILayout.Space(4f);
+            if (target is ItemDataInfo item)
+                DrawItemWorkflow(item);
             using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
                 targetEditor?.OnInspectorGUI();
             EditorGUILayout.Space(8f);
             EditorGUILayout.EndScrollView();
+        }
+
+        private void DrawItemWorkflow(ItemDataInfo item)
+        {
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("Item 标准配置工作流", EditorStyles.boldLabel);
+                ItemKind kind = item.baseConfig != null ? item.baseConfig.kind : ItemKind.None;
+                string blockName = item.kindData != null ? item.kindData.GetType().Name : "<缺少类型块>";
+                EditorGUILayout.LabelField("当前类型", kind.ToString());
+                EditorGUILayout.LabelField("激活配置块", blockName);
+                EditorGUILayout.LabelField("GameCore 路由", item.GetGameCoreRouteName());
+
+                ESItemDataValidationCode validation = item.ValidateConfiguration();
+                if (validation == ESItemDataValidationCode.Valid)
+                    EditorGUILayout.HelpBox("当前 Item 配置有效，可以按上述路由注入。", MessageType.Info);
+                else
+                    EditorGUILayout.HelpBox(item.GetValidationMessage(validation), MessageType.Error);
+
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("整理当前类型块"))
+                {
+                    Undo.RecordObject(item, "整理当前 Item 类型配置");
+                    bool changed = item.EnsureActiveKindData();
+                    if (changed)
+                        EditorUtility.SetDirty(item);
+                    AssetDatabase.SaveAssets();
+                    ESItemDataValidationCode current = item.ValidateConfiguration();
+                    itemWorkflowMessageType = current == ESItemDataValidationCode.Valid ? MessageType.Info : MessageType.Error;
+                    itemWorkflowResult = changed ? "已整理当前 Item 配置。" : "当前 Item 无需整理。";
+                    if (current != ESItemDataValidationCode.Valid)
+                        itemWorkflowResult += "\n" + item.GetValidationMessage(current);
+                }
+                if (GUILayout.Button("校验全项目 Item"))
+                {
+                    ESItemGameCoreEditorWorkflow.Report report = ESItemGameCoreEditorWorkflow.Run(repair: false, rebuildTables: false);
+                    Debug.Log(report.ToString());
+                    if (report.HasErrors)
+                        for (int i = 0; i < report.errors.Count; i++) Debug.LogError("[ES Item GameCore] " + report.errors[i]);
+                    SetWorkflowResult(report);
+                }
+                if (item.IsGameCoreRoot && GUILayout.Button("重建并验证表"))
+                {
+                    ESItemGameCoreEditorWorkflow.Report report = ESItemGameCoreEditorWorkflow.Run(repair: false, rebuildTables: true);
+                    Debug.Log(report.ToString());
+                    if (report.HasErrors)
+                        for (int i = 0; i < report.errors.Count; i++) Debug.LogError("[ES Item GameCore] " + report.errors[i]);
+                    SetWorkflowResult(report);
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (!string.IsNullOrEmpty(itemWorkflowResult))
+                    EditorGUILayout.HelpBox(itemWorkflowResult, itemWorkflowMessageType);
+            }
+        }
+
+        private void SetWorkflowResult(ESItemGameCoreEditorWorkflow.Report report)
+        {
+            itemWorkflowMessageType = report.HasErrors ? MessageType.Error : MessageType.Info;
+            itemWorkflowResult = report.ToString();
+            if (report.HasErrors)
+                itemWorkflowResult += "\n" + string.Join("\n", report.errors);
         }
 
         private void OnDisable()

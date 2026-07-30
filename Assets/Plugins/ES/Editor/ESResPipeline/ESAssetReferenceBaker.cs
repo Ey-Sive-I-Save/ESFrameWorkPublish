@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using ES.EditorInternal;
 using UnityEditor;
 using UnityEngine;
 
@@ -98,6 +99,12 @@ namespace ES
         /// </summary>
         public static ESEditorLongTask Bake()
         {
+            ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
+            ESAssetPipelineIO.PurgeLegacyGeneratedArtifactsBeforeBake();
+            // 不依赖任意窗口的前置检查。菜单、脚本和 CI 都必须获得同一份
+            // ConfigKey 源头权威校验，避免把过期快照写进新的 Catalog。
+            ESResourcePlanGameCoreExpansion.BakeAll();
+            ESResourcePlanConfigKeySynchronizer.ValidateAllForBake();
             var libraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>()
                 .Where(item => item != null && item.ContainsBuild)
                 .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
@@ -525,9 +532,13 @@ namespace ES
             foreach (ESAssetReferBase refer in consumer.ManualGameCoreAssets ?? new List<ESAssetReferBase>())
                 if (refer != null && refer.IsValid)
                     AddGameCoreAsset(ResolveExactScriptableObject(refer.GUID, refer.LocalFileId), generated, identities, paths);
-            ExpandGameCoreConfigKeyClosure(generated, identities, paths);
+            var closureErrors = new List<string>();
+            ExpandGameCoreConfigKeyClosure(generated, identities, paths, closureErrors);
             consumer.GameCoreAssets = generated.GroupBy(item => item.AssetIdentity).Select(group => group.First()).ToList();
-            consumer.GameCoreValidationErrors = ValidateGameCoreDependencies(consumer, paths);
+            var validationErrors = ValidateGameCoreDependencies(consumer, paths);
+            validationErrors.AddRange(closureErrors);
+            validationErrors.AddRange(ValidateCollectedItemGameCoreDefinitions(generated));
+            consumer.GameCoreValidationErrors = validationErrors.Distinct(StringComparer.Ordinal).ToList();
             EditorUtility.SetDirty(consumer);
             return consumer.GameCoreValidationErrors;
         }
@@ -555,7 +566,11 @@ namespace ES
             destination.Add(refer);
         }
 
-        private static void ExpandGameCoreConfigKeyClosure(List<ESAssetReferBase> destination, HashSet<string> identities, HashSet<string> paths)
+        private static void ExpandGameCoreConfigKeyClosure(
+            List<ESAssetReferBase> destination,
+            HashSet<string> identities,
+            HashSet<string> paths,
+            List<string> errors)
         {
             for (int index = 0; index < destination.Count; index++)
             {
@@ -569,17 +584,120 @@ namespace ES
                 {
                     enterChildren = true;
                     if (!string.Equals(iterator.name, "definitionGuid", StringComparison.Ordinal)
-                        || iterator.propertyType != SerializedPropertyType.String
-                        || string.IsNullOrEmpty(iterator.stringValue))
+                        || iterator.propertyType != SerializedPropertyType.String)
                         continue;
 
                     string parentPath = iterator.propertyPath;
                     int separator = parentPath.LastIndexOf('.');
                     parentPath = separator >= 0 ? parentPath.Substring(0, separator + 1) : string.Empty;
+                    SerializedProperty enumKey = serializedObject.FindProperty(parentPath + "enumKey");
+                    SerializedProperty stringKey = serializedObject.FindProperty(parentPath + "stringKey");
+                    if (enumKey != null && stringKey != null
+                        && !ESConfigKeyMatch.IsConfigured(enumKey.intValue, stringKey.stringValue))
+                    {
+                        errors.Add("GameCore ConfigKey 未显式配置：" + root.name + "，属性 " + parentPath.TrimEnd('.')
+                            + "。KeyName 仅供编辑器与策划使用，不能作为运行时回退键。");
+                    }
+
+                    if (string.IsNullOrEmpty(iterator.stringValue))
+                        continue;
+
                     SerializedProperty localFileId = serializedObject.FindProperty(parentPath + "definitionLocalFileId");
                     long fileId = localFileId != null ? localFileId.longValue : 0;
-                    AddGameCoreAsset(ResolveExactScriptableObject(iterator.stringValue, fileId), destination, identities, paths);
+                    ScriptableObject dependency = ResolveExactScriptableObject(iterator.stringValue, fileId);
+                    if (dependency == null)
+                    {
+                        errors.Add("GameCore ConfigKey 引用丢失：GUID=" + iterator.stringValue + "，LocalFileId=" + fileId + "。");
+                        continue;
+                    }
+
+                    if (ESScriptableObjectClassification.GetClass(dependency) != ESScriptableObjectClass.GameCore)
+                    {
+                        errors.Add("GameCore ConfigKey 指向的资产不是 GameCore 根：" + dependency.name + "。");
+                        continue;
+                    }
+
+                    AddGameCoreAsset(dependency, destination, identities, paths);
                 }
+            }
+        }
+
+        private static List<string> ValidateCollectedItemGameCoreDefinitions(List<ESAssetReferBase> generated)
+        {
+            var errors = new List<string>();
+            var items = new List<ItemDataInfo>();
+            var visited = new HashSet<int>();
+            for (int i = 0; i < generated.Count; i++)
+            {
+                ScriptableObject root = ResolveExactScriptableObject(generated[i].GUID, generated[i].LocalFileId);
+                CollectItemDefinitions(root, items, visited);
+            }
+
+            var owners = new Dictionary<string, ItemDataInfo>(StringComparer.Ordinal);
+            for (int i = 0; i < items.Count; i++)
+            {
+                ItemDataInfo item = items[i];
+                if (!item.IsGameCoreRoot)
+                    continue;
+
+                ESItemDataValidationCode validation = item.ValidateConfiguration();
+                if (validation != ESItemDataValidationCode.Valid)
+                {
+                    errors.Add("Item GameCore 配置无效：" + item.name + "，" + item.GetValidationMessage(validation));
+                    continue;
+                }
+
+                if (!item.TryGetGameCoreKey(out IESConfigKey key))
+                {
+                    errors.Add("Item GameCore 缺少 Key：" + item.name);
+                    continue;
+                }
+
+                string identity = item.baseConfig.kind + "|" + (key.EnumKeyInt != 0
+                    ? "E:" + key.EnumKeyInt
+                    : "S:" + key.StringKey);
+                if (owners.TryGetValue(identity, out ItemDataInfo owner) && owner != item)
+                    errors.Add("Item GameCore Key 重复：" + identity + "，资产为 " + DescribeItem(owner) + " 与 " + DescribeItem(item));
+                else
+                    owners[identity] = item;
+            }
+            return errors;
+        }
+
+        private static string DescribeItem(ItemDataInfo item)
+        {
+            string path = AssetDatabase.GetAssetPath(item);
+            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(item, out _, out long localFileId);
+            return item.name + " [" + path + "#" + localFileId + "]";
+        }
+
+        private static void CollectItemDefinitions(ScriptableObject root, List<ItemDataInfo> destination, HashSet<int> visited)
+        {
+            if (root == null)
+                return;
+            if (root is ItemDataInfo item)
+            {
+                int id = item.GetInstanceID();
+                if (visited.Add(id)) destination.Add(item);
+                return;
+            }
+            if (root is ISoDataGroup group)
+            {
+                foreach (ISoDataInfo info in group.AllInfos)
+                    if (info is ItemDataInfo groupItem)
+                    {
+                        int id = groupItem.GetInstanceID();
+                        if (visited.Add(id)) destination.Add(groupItem);
+                    }
+            }
+            if (root is ISoDataPack pack && pack.AllInfos != null)
+            {
+                foreach (object value in pack.AllInfos.Values)
+                    if (value is ItemDataInfo packItem)
+                    {
+                        int id = packItem.GetInstanceID();
+                        if (visited.Add(id)) destination.Add(packItem);
+                    }
             }
         }
 

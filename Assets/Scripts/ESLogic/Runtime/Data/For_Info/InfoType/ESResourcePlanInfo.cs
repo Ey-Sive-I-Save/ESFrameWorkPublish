@@ -5,36 +5,40 @@ using UnityEngine;
 
 namespace ES
 {
-    public enum ESResourcePlanTargetKind : byte
-    {
-        [InspectorName("通用")] Global,
-        [InspectorName("关卡")] Level,
-        [InspectorName("地图")] Map,
-        [InspectorName("游戏模式")] GameMode,
-        [InspectorName("区域")] Region,
-        [InspectorName("遭遇 / Boss")] Encounter
-    }
-
     [Serializable]
     public abstract class ESResourcePlanEntryBase
     {
-        [LabelText("必须就绪")]
-        [InfoBox("必须资源失败会使整个计划失败；关闭后只记录该资源错误，不阻断其他资源。")]
+        [LabelText("必须准备成功")]
+        [InfoBox("开启：准备失败会中止本计划。关闭：记录错误，但允许其他资源继续准备。")]
         public bool required = true;
     }
 
     [Serializable]
     public sealed class ESResourcePlanPrefabEntry : ESResourcePlanEntryBase
     {
-        [LabelText("Prefab Key"), InlineProperty] public ESAssetReferPrefabConfigKey key = new ESAssetReferPrefabConfigKey();
+        [LabelText("预制体"), InlineProperty] public ESAssetReferPrefabConfigKey key = new ESAssetReferPrefabConfigKey();
     }
 
     [Serializable]
     public sealed class ESResourcePlanPrefabPrewarmEntry : ESResourcePlanEntryBase
     {
-        [LabelText("预热配置"), Required]
-        [InfoBox("预热内容、数量和对象池参数统一在 PrefabPrewarmDataInfo 中维护。Plan 只负责进入与退出生命周期。")]
+        [LabelText("对象池预热"), Required]
+        [InfoBox("预热内容、数量和对象池参数在预热配置中维护；资源计划只负责准备和释放。")]
         public PrefabPrewarmDataInfo data;
+    }
+
+    /// <summary>Editor-baked complete ConfigKey snapshot expanded from a Plan GameCore source.</summary>
+    [Serializable]
+    public sealed class ESResourcePlanBakedAssetEntry : ESResourcePlanEntryBase
+    {
+        [ReadOnly] public ESAssetReferKind kind;
+        [ReadOnly] public int enumKey;
+        [ReadOnly] public string stringKey;
+        [ReadOnly] public string guid;
+        [ReadOnly] public long localFileId;
+        [ReadOnly, TextArea(1, 2)] public string source;
+
+        public bool HasConfiguredKey => ESConfigKeyMatch.IsConfigured(enumKey, stringKey);
     }
 
     [Serializable] public sealed class ESResourcePlanSpriteEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferSpriteConfigKey key = new ESAssetReferSpriteConfigKey(); }
@@ -54,46 +58,104 @@ namespace ES
     [Serializable] public sealed class ESResourcePlanTerrainEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferTerrainDataConfigKey key = new ESAssetReferTerrainDataConfigKey(); }
 
     [ESCreatePath("数据信息", "资源计划")]
-    public sealed class ESResourcePlanInfo : SoDataInfo
+    /// <summary>
+    /// 描述一段玩法期间需要准备和持有的资源。普通业务只需直接引用本计划，
+    /// 或使用 ESResourcePlanBinder 绑定 GameObject 生命周期。
+    /// </summary>
+    public sealed class ESResourcePlanInfo : SoDataInfo, IReceiveActiveLink
     {
-        [Title("计划归属"), LabelText("服务对象")]
-        public ESResourcePlanTargetKind targetKind;
-
-        [ShowIf(nameof(NeedsTargetInfoKey)), LabelText("所属配置键")]
-        public string targetInfoKey;
-
-        [Title("Prefab"), LabelText("仅加载并持有")]
-        public List<ESResourcePlanPrefabEntry> prefabs = new List<ESResourcePlanPrefabEntry>(8);
-
-        [LabelText("对象池预热配置")]
-        public List<ESResourcePlanPrefabPrewarmEntry> prefabPrewarms = new List<ESResourcePlanPrefabPrewarmEntry>(4);
-
-        [Title("图形资源"), LabelText("Sprite")]
-        public List<ESResourcePlanSpriteEntry> sprites = new List<ESResourcePlanSpriteEntry>(8);
-        [LabelText("Material")] public List<ESResourcePlanMaterialEntry> materials = new List<ESResourcePlanMaterialEntry>(4);
-        [LabelText("Mesh")] public List<ESResourcePlanMeshEntry> meshes = new List<ESResourcePlanMeshEntry>(4);
-        [LabelText("Texture")] public List<ESResourcePlanTextureEntry> textures = new List<ESResourcePlanTextureEntry>(4);
-        [LabelText("Texture2D")] public List<ESResourcePlanTexture2DEntry> texture2Ds = new List<ESResourcePlanTexture2DEntry>(4);
-        [LabelText("SpriteAtlas")] public List<ESResourcePlanSpriteAtlasEntry> spriteAtlases = new List<ESResourcePlanSpriteAtlasEntry>(4);
-        [LabelText("Avatar")] public List<ESResourcePlanAvatarEntry> avatars = new List<ESResourcePlanAvatarEntry>(4);
-        [LabelText("TerrainData")] public List<ESResourcePlanTerrainEntry> terrainDatas = new List<ESResourcePlanTerrainEntry>(2);
-
-        [Title("声音与播放"), LabelText("AudioClip")]
-        public List<ESResourcePlanAudioEntry> audioClips = new List<ESResourcePlanAudioEntry>(8);
-        [LabelText("AnimationClip")] public List<ESResourcePlanAnimationEntry> animationClips = new List<ESResourcePlanAnimationEntry>(4);
-        [LabelText("AnimatorController")] public List<ESResourcePlanAnimatorEntry> animatorControllers = new List<ESResourcePlanAnimatorEntry>(4);
-        [LabelText("PlayableAsset")] public List<ESResourcePlanPlayableEntry> playableAssets = new List<ESResourcePlanPlayableEntry>(4);
-        [LabelText("TimelineAsset")] public List<ESResourcePlanTimelineEntry> timelineAssets = new List<ESResourcePlanTimelineEntry>(4);
-        [LabelText("VideoClip")] public List<ESResourcePlanVideoEntry> videoClips = new List<ESResourcePlanVideoEntry>(2);
-
-        [Title("数据资产"), LabelText("ScriptableObject")]
-        public List<ESResourcePlanScriptableObjectEntry> scriptableObjects = new List<ESResourcePlanScriptableObjectEntry>(4);
-
-        [Title("退出处理"), LabelText("退出时自动释放")]
+        [PropertyOrder(-100)]
+        [TitleGroup("使用与释放")]
+        [LabelText("使用结束后自动释放")]
+        [InfoBox("推荐开启。最后一个使用者离开后进入释放流程；短时间内再次使用会复用已准备的资源。")]
         public bool releaseOnExit = true;
-        [ShowIf(nameof(releaseOnExit)), LabelText("延迟释放秒数"), MinValue(0f)]
+
+        [PropertyOrder(-99)]
+        [TitleGroup("使用与释放")]
+        [LabelText("释放缓冲时间（秒）"), MinValue(0f)]
+        [InfoBox("用于避免关卡或界面快速往返时反复加载。填 0 表示不等待。")]
         public float releaseDelaySeconds = 10f;
 
-        private bool NeedsTargetInfoKey() => targetKind != ESResourcePlanTargetKind.Global;
+        [PropertyOrder(0)]
+        [TitleGroup("常用资源")]
+        [LabelText("预制体")]
+        public List<ESResourcePlanPrefabEntry> prefabs = new List<ESResourcePlanPrefabEntry>(8);
+
+        [PropertyOrder(1)]
+        [TitleGroup("常用资源")]
+        [LabelText("对象池预热")]
+        public List<ESResourcePlanPrefabPrewarmEntry> prefabPrewarms = new List<ESResourcePlanPrefabPrewarmEntry>(4);
+
+        [PropertyOrder(2)]
+        [TitleGroup("常用资源")]
+        [LabelText("图片（Sprite）")]
+        public List<ESResourcePlanSpriteEntry> sprites = new List<ESResourcePlanSpriteEntry>(8);
+        [PropertyOrder(3), TitleGroup("常用资源"), LabelText("材质")]
+        public List<ESResourcePlanMaterialEntry> materials = new List<ESResourcePlanMaterialEntry>(4);
+        [PropertyOrder(4), TitleGroup("常用资源"), LabelText("音频")]
+        public List<ESResourcePlanAudioEntry> audioClips = new List<ESResourcePlanAudioEntry>(8);
+
+        [PropertyOrder(100), FoldoutGroup("更多资源", Expanded = false), LabelText("网格")]
+        public List<ESResourcePlanMeshEntry> meshes = new List<ESResourcePlanMeshEntry>(4);
+        [PropertyOrder(101), FoldoutGroup("更多资源"), LabelText("纹理")]
+        public List<ESResourcePlanTextureEntry> textures = new List<ESResourcePlanTextureEntry>(4);
+        [PropertyOrder(102), FoldoutGroup("更多资源"), LabelText("二维纹理")]
+        public List<ESResourcePlanTexture2DEntry> texture2Ds = new List<ESResourcePlanTexture2DEntry>(4);
+        [PropertyOrder(103), FoldoutGroup("更多资源"), LabelText("精灵图集")]
+        public List<ESResourcePlanSpriteAtlasEntry> spriteAtlases = new List<ESResourcePlanSpriteAtlasEntry>(4);
+        [PropertyOrder(104), FoldoutGroup("更多资源"), LabelText("角色头像")]
+        public List<ESResourcePlanAvatarEntry> avatars = new List<ESResourcePlanAvatarEntry>(4);
+        [PropertyOrder(105), FoldoutGroup("更多资源"), LabelText("地形数据")]
+        public List<ESResourcePlanTerrainEntry> terrainDatas = new List<ESResourcePlanTerrainEntry>(2);
+        [PropertyOrder(106), FoldoutGroup("更多资源"), LabelText("动画片段")]
+        public List<ESResourcePlanAnimationEntry> animationClips = new List<ESResourcePlanAnimationEntry>(4);
+        [PropertyOrder(107), FoldoutGroup("更多资源"), LabelText("动画控制器")]
+        public List<ESResourcePlanAnimatorEntry> animatorControllers = new List<ESResourcePlanAnimatorEntry>(4);
+        [PropertyOrder(108), FoldoutGroup("更多资源"), LabelText("可播放资源")]
+        public List<ESResourcePlanPlayableEntry> playableAssets = new List<ESResourcePlanPlayableEntry>(4);
+        [PropertyOrder(109), FoldoutGroup("更多资源"), LabelText("时间轴")]
+        public List<ESResourcePlanTimelineEntry> timelineAssets = new List<ESResourcePlanTimelineEntry>(4);
+        [PropertyOrder(110), FoldoutGroup("更多资源"), LabelText("视频")]
+        public List<ESResourcePlanVideoEntry> videoClips = new List<ESResourcePlanVideoEntry>(2);
+        [PropertyOrder(111), FoldoutGroup("更多资源"), LabelText("数据资产")]
+        public List<ESResourcePlanScriptableObjectEntry> scriptableObjects = new List<ESResourcePlanScriptableObjectEntry>(4);
+
+        [PropertyOrder(200)]
+        [FoldoutGroup("GameCore 资源依赖", Expanded = false)]
+        [LabelText("依赖来源")]
+        [InfoBox("生成时会收集这些 GameCore 配置引用的资源。这里只引用配置，不会重复加载 GameCore 资产。")]
+        [AssetsOnly]
+        public List<ScriptableObject> gameCoreSources = new List<ScriptableObject>(2);
+
+        [PropertyOrder(201)]
+        [FoldoutGroup("GameCore 资源依赖")]
+        [ShowInInspector, ReadOnly, LabelText("已生成的资源清单")]
+        [ListDrawerSettings(ShowFoldout = true, IsReadOnly = true)]
+        [SerializeField] private List<ESResourcePlanBakedAssetEntry> bakedAssets = new List<ESResourcePlanBakedAssetEntry>(16);
+        [SerializeField, HideInInspector] private string bakedExpansionHash = string.Empty;
+
+        public IReadOnlyList<ESResourcePlanBakedAssetEntry> BakedAssets => bakedAssets;
+        public string BakedExpansionHash => bakedExpansionHash;
+
+        public void ReplaceBakedAssets(List<ESResourcePlanBakedAssetEntry> entries, string inputHash)
+        {
+            bakedAssets = entries ?? new List<ESResourcePlanBakedAssetEntry>();
+            bakedExpansionHash = inputHash ?? string.Empty;
+        }
+
+        /// <summary>
+        /// ActiveLinkList 的标准入口。实际 Scope、retain 与异步加载均由 GameManager 的
+        /// ResourcePlans 服务统一管理，计划 SO 本身不持有任何运行时资源状态。
+        /// </summary>
+        public void OnLinkEnable()
+        {
+            ESGameManager.ResourcePlans?.RetainFromActiveLink(this);
+        }
+
+        /// <inheritdoc />
+        public void OnLinkDisable()
+        {
+            ESGameManager.ResourcePlans?.ReleaseFromActiveLink(this);
+        }
     }
 }

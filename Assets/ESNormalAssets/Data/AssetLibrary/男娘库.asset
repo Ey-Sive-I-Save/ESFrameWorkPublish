@@ -42,7 +42,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -56,7 +55,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -70,7 +68,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -84,7 +81,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -98,7 +94,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -112,7 +107,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -126,7 +120,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -177,7 +170,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: GameObject (3)
-      RuntimeKey: 30000
       AssetGuid: 495b09c783492784e88277aa816dfdce
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab
@@ -279,7 +271,6 @@ MonoBehaviour:
       Kind: 16
       EnumKey: 0
       StringKey: "\u65B0\u5EFA\u89D2\u8272\u6570\u636E\u7EC483227"
-      RuntimeKey: 30012
       AssetGuid: b7efbde1b85ac534f8df3ded09592512
       LocalFileId: 0
       AssetPath: "Assets/ESNormalAssets/Data/Group/Actor/\u65B0\u5EFA\u89D2\u8272\u6570\u636E\u7EC483227.asset"
@@ -329,3 +320,4 @@ MonoBehaviour:
   ContainsBuild: 1
   AssetBundleCode: 
   IsNet: 0
+  _deliveryMode: 0

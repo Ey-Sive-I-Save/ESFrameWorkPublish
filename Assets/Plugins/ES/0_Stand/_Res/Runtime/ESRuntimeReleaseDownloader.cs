@@ -12,7 +12,12 @@ namespace ES
 {
     [Serializable] public sealed class ESRuntimeReleaseManifest { public int formatVersion; public string platform, releaseVersion, channel, publishedUtc, totalConsumerUrl, totalConsumerSha256, bundleIndexUrl, bundleIndexSha256; }
     [Serializable] public sealed class ESRuntimeConsumerReference { public string consumerId, consumerUrl, consumerSha256; }
-    [Serializable] public sealed class ESRuntimeConsumerLibraryReference { public string libraryName, libraryFolder, libraryIdentityUrl, libraryIdentitySha256; public bool requiredAtBoot; }
+    [Serializable] public sealed class ESRuntimeConsumerLibraryReference
+    {
+        public string libraryName, libraryFolder, libraryIdentityUrl, libraryIdentitySha256, embeddedIdentityRelativePath;
+        public ESAssetDeliveryMode deliveryMode = ESAssetDeliveryMode.Updateable;
+        public bool requiredAtBoot;
+    }
     [Serializable] public sealed class ESRuntimeConsumerCodePackageReference { public string packageKey, kind, fileName, url, sha256, notes; public long size; public bool requiredAtBoot; public int loadOrder; }
     [Serializable] public sealed class ESRuntimeConsumerGameCoreReference { public string guid; public long localFileId; public List<ESRuntimeConsumerGameCoreDependencyReference> dependencies = new List<ESRuntimeConsumerGameCoreDependencyReference>(); public bool IsValid => !string.IsNullOrEmpty(guid) && localFileId >= 0; }
     [Serializable] public sealed class ESRuntimeConsumerGameCoreDependencyReference { public string guid; public long localFileId; public bool IsValid => !string.IsNullOrEmpty(guid) && localFileId >= 0; }
@@ -29,7 +34,12 @@ namespace ES
         public List<ESRuntimeConsumerResidentAssetReference> residentAssets = new List<ESRuntimeConsumerResidentAssetReference>();
         public List<ESRuntimeConsumerCodePackageReference> codePackages = new List<ESRuntimeConsumerCodePackageReference>();
     }
-    [Serializable] public sealed class ESRuntimeLibraryIdentity { public int formatVersion; public string libraryName, libraryFolder, libraryBundleCode, platform, version, channel, catalogUrl, assetBundleManifestUrl, catalogSha256, assetBundleManifestSha256; }
+    [Serializable] public sealed class ESRuntimeLibraryIdentity
+    {
+        public int formatVersion;
+        public string libraryName, libraryFolder, libraryBundleCode, platform, version, channel, catalogUrl, assetBundleManifestUrl, catalogSha256, assetBundleManifestSha256;
+        public ESAssetDeliveryMode deliveryMode = ESAssetDeliveryMode.Updateable;
+    }
     [Serializable] public sealed class ESRuntimeCatalogIdentity { public string guid; public long localFileId; public bool IsValid => !string.IsNullOrEmpty(guid) && localFileId >= 0; }
     [Serializable] public sealed class ESRuntimeCatalogEntry
     {
@@ -43,12 +53,20 @@ namespace ES
     [Serializable] public sealed class ESRuntimeReleaseMainAssetRecord { public string guid, assetBundleKey, internalName, typeName; }
     [Serializable] public sealed class ESRuntimeReleaseSubAssetRecord { public string guid, assetBundleKey, internalName, subAssetName, typeName; public long localFileId; }
     [Serializable] public sealed class ESRuntimeBundleManifest { public int formatVersion; public string platform, libraryName; public List<ESRuntimeBundleRecord> assetBundles = new List<ESRuntimeBundleRecord>(); public List<ESRuntimeReleaseMainAssetRecord> mainAssetsByGuid = new List<ESRuntimeReleaseMainAssetRecord>(); public List<ESRuntimeReleaseSubAssetRecord> subAssetsById = new List<ESRuntimeReleaseSubAssetRecord>(); }
-    [Serializable] public sealed class ESRuntimeReleaseBundleRecord { public string libraryFolder, assetBundleKey, fileUrl, sha256, localRelativePath; public uint crc; public long size; public List<string> dependencies = new List<string>(); }
+    [Serializable] public sealed class ESRuntimeReleaseBundleRecord
+    {
+        public string libraryFolder, assetBundleKey, fileUrl, sha256, localRelativePath, embeddedRelativePath;
+        public ESAssetDeliveryMode deliveryMode = ESAssetDeliveryMode.Updateable;
+        public uint crc;
+        public long size;
+        public List<string> dependencies = new List<string>();
+    }
     [Serializable] public sealed class ESRuntimeReleaseBundleIndex { public int formatVersion; public string platform, releaseVersion; public List<ESRuntimeReleaseBundleRecord> assetBundles = new List<ESRuntimeReleaseBundleRecord>(); }
     [Serializable] internal sealed class ESRuntimeVerifiedFile { public string relativePath, sha256; public long size; }
     [Serializable] internal sealed class ESRuntimeVerifiedFileIndex { public string releaseVersion; public List<ESRuntimeVerifiedFile> files = new List<ESRuntimeVerifiedFile>(); }
 
-    public enum ESRuntimeReleaseDownloadStage { ReadingRelease, ReadingConsumer, ReadingLibraryIdentity, ReadingCatalog, ReadingAssetBundleManifest, VerifyingAssetBundle, Completed }
+    public enum ESRuntimeReleaseDownloadStage { ReadingRelease, ReadingConsumer, ReadingLibraryIdentity, ReadingCatalog, ReadingAssetBundleManifest, PreparingTransfer, DownloadingFile, VerifyingAssetBundle, InitializingRuntime, Completed }
+    public enum ESRuntimeReleaseTransferState { Discovering, Downloading, Verifying, Initializing, Completed }
     public readonly struct ESRuntimeReleaseDownloadProgress
     {
         public readonly ESRuntimeReleaseDownloadStage Stage;
@@ -61,6 +79,41 @@ namespace ES
         }
     }
 
+    /// <summary>一次发布事务的真实传输快照。字节进度只统计需要落地到缓存的物理文件。</summary>
+    public readonly struct ESRuntimeReleaseDownloadSnapshot
+    {
+        public readonly ESRuntimeReleaseTransferState State;
+        public readonly string Subject;
+        public readonly long TotalBytes;
+        public readonly long CompletedBytes;
+        public readonly long CurrentFileBytes;
+        public readonly long CurrentFileSize;
+        public readonly int CompletedFileCount;
+        public readonly int TotalFileCount;
+        public readonly int RetryAttempt;
+        public readonly float SpeedBytesPerSecond;
+        public readonly int EstimatedRemainingSeconds;
+
+        public ESRuntimeReleaseDownloadSnapshot(ESRuntimeReleaseTransferState state, string subject, long totalBytes, long completedBytes,
+            long currentFileBytes, long currentFileSize, int completedFileCount, int totalFileCount, int retryAttempt,
+            float speedBytesPerSecond, int estimatedRemainingSeconds)
+        {
+            State = state;
+            Subject = subject ?? string.Empty;
+            TotalBytes = Math.Max(0, totalBytes);
+            CompletedBytes = Math.Max(0, completedBytes);
+            CurrentFileBytes = Math.Max(0, currentFileBytes);
+            CurrentFileSize = Math.Max(0, currentFileSize);
+            CompletedFileCount = Math.Max(0, completedFileCount);
+            TotalFileCount = Math.Max(0, totalFileCount);
+            RetryAttempt = Math.Max(0, retryAttempt);
+            SpeedBytesPerSecond = Math.Max(0f, speedBytesPerSecond);
+            EstimatedRemainingSeconds = Math.Max(0, estimatedRemainingSeconds);
+        }
+
+        public float Progress01 => TotalBytes <= 0 ? (State == ESRuntimeReleaseTransferState.Completed ? 1f : 0f) : Mathf.Clamp01((float)CompletedBytes / TotalBytes);
+    }
+
     public sealed class ESRuntimeReleaseDownloadResult
     {
         public ESGlobalAssetRuntimeMap RuntimeMap { get; internal set; }
@@ -70,6 +123,77 @@ namespace ES
         public IReadOnlyList<ESRuntimeDownloadedCodePackage> DownloadedCodePackages { get; internal set; }
         public IReadOnlyList<ESRuntimeConsumerGameCoreReference> GameCoreAssets { get; internal set; }
         public IReadOnlyList<ESRuntimeConsumerResidentAssetReference> ResidentAssets { get; internal set; }
+
+        /// <summary>Combines a boot result and an on-demand Consumer/Library result from the
+        /// same release. It is intentionally the only supported way to activate a partial
+        /// download; callers never replace the active RuntimeMap with a fragment.</summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static ESRuntimeReleaseDownloadResult Merge(ESRuntimeReleaseDownloadResult current, ESRuntimeReleaseDownloadResult addition)
+        {
+            if (addition == null) throw new ArgumentNullException(nameof(addition));
+            if (current == null) return addition;
+            if (!string.Equals(current.ReleaseVersion, addition.ReleaseVersion, StringComparison.Ordinal))
+                throw new InvalidOperationException("不能合并不同发布版本的运行时内容：" + current.ReleaseVersion + " / " + addition.ReleaseVersion);
+
+            return new ESRuntimeReleaseDownloadResult
+            {
+                RuntimeMap = ESGlobalAssetRuntimeMap.Merge(current.RuntimeMap, addition.RuntimeMap),
+                ReleaseVersion = current.ReleaseVersion,
+                DownloadedLibraries = MergeStrings(current.DownloadedLibraries, addition.DownloadedLibraries),
+                Catalogs = MergeCatalogs(current.Catalogs, addition.Catalogs),
+                DownloadedCodePackages = MergeCodePackages(current.DownloadedCodePackages, addition.DownloadedCodePackages),
+                GameCoreAssets = MergeIdentities(current.GameCoreAssets, addition.GameCoreAssets),
+                ResidentAssets = MergeIdentities(current.ResidentAssets, addition.ResidentAssets)
+            };
+        }
+
+        private static IReadOnlyList<string> MergeStrings(IReadOnlyList<string> left, IReadOnlyList<string> right)
+            => (left ?? Array.Empty<string>()).Concat(right ?? Array.Empty<string>()).Where(item => !string.IsNullOrWhiteSpace(item)).Distinct(StringComparer.Ordinal).OrderBy(item => item, StringComparer.Ordinal).ToArray();
+
+        private static IReadOnlyList<ESRuntimeCatalog> MergeCatalogs(IReadOnlyList<ESRuntimeCatalog> left, IReadOnlyList<ESRuntimeCatalog> right)
+        {
+            var result = new Dictionary<string, ESRuntimeCatalog>(StringComparer.Ordinal);
+            foreach (ESRuntimeCatalog catalog in (left ?? Array.Empty<ESRuntimeCatalog>()).Concat(right ?? Array.Empty<ESRuntimeCatalog>()))
+            {
+                if (catalog == null || string.IsNullOrWhiteSpace(catalog.libraryFolder)) continue;
+                if (result.TryGetValue(catalog.libraryFolder, out ESRuntimeCatalog existing) && !ReferenceEquals(existing, catalog))
+                    continue; // Same release/library was reached by two Consumer dependency paths.
+                result[catalog.libraryFolder] = catalog;
+            }
+            return result.Values.OrderBy(item => item.libraryFolder, StringComparer.Ordinal).ToArray();
+        }
+
+        private static IReadOnlyList<ESRuntimeDownloadedCodePackage> MergeCodePackages(IReadOnlyList<ESRuntimeDownloadedCodePackage> left, IReadOnlyList<ESRuntimeDownloadedCodePackage> right)
+        {
+            var result = new Dictionary<string, ESRuntimeDownloadedCodePackage>(StringComparer.Ordinal);
+            foreach (ESRuntimeDownloadedCodePackage package in (left ?? Array.Empty<ESRuntimeDownloadedCodePackage>()).Concat(right ?? Array.Empty<ESRuntimeDownloadedCodePackage>()))
+            {
+                if (package == null || string.IsNullOrWhiteSpace(package.PackageKey)) continue;
+                if (result.TryGetValue(package.PackageKey, out ESRuntimeDownloadedCodePackage existing)
+                    && !string.Equals(existing.Sha256, package.Sha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("同一发布版本存在冲突的代码包：" + package.PackageKey);
+                result[package.PackageKey] = package;
+            }
+            return result.Values.OrderBy(item => item.LoadOrder).ThenBy(item => item.PackageKey, StringComparer.Ordinal).ToArray();
+        }
+
+        private static IReadOnlyList<T> MergeIdentities<T>(IReadOnlyList<T> left, IReadOnlyList<T> right) where T : class
+        {
+            var result = new Dictionary<ESAssetIdentity, T>();
+            foreach (T item in (left ?? Array.Empty<T>()).Concat(right ?? Array.Empty<T>()))
+            {
+                switch (item)
+                {
+                    case ESRuntimeConsumerGameCoreReference gameCore when gameCore.IsValid:
+                        result[new ESAssetIdentity(gameCore.guid, gameCore.localFileId)] = item;
+                        break;
+                    case ESRuntimeConsumerResidentAssetReference resident when resident.IsValid:
+                        result[new ESAssetIdentity(resident.guid, resident.localFileId)] = item;
+                        break;
+                }
+            }
+            return result.OrderBy(item => item.Key.Guid, StringComparer.Ordinal).ThenBy(item => item.Key.LocalFileId).Select(item => item.Value).ToArray();
+        }
     }
 
     public sealed class ESRuntimeDownloadedCodePackage
@@ -85,14 +209,23 @@ namespace ES
     }
 
     /// <summary>新版 Root → Consumer → Library → Manifest → AB 下载链；与旧 GameIdentity 管线完全独立。</summary>
-    public sealed class ESRuntimeReleaseDownloader
+    public sealed partial class ESRuntimeReleaseDownloader
     {
+        private sealed class TransferPlanFile
+        {
+            public string RelativePath;
+            public string LocalPath;
+            public string Hash;
+            public long Size;
+            public long InitialBytes;
+            public bool Completed;
+        }
         private sealed class ReleaseContext
         {
             public ESRuntimeReleaseManifest Root;
             public Dictionary<string, ESRuntimeReleaseBundleRecord> BundlesByKey;
         }
-        private const int ReleaseProtocolFormatVersion = 3;
+        private const int ReleaseProtocolFormatVersion = 5;
         private const int MaxAttempts = 3;
         private readonly ESGlobalResSetting settings;
         private readonly string platform;
@@ -100,9 +233,61 @@ namespace ES
         private readonly ESAssetRunMode runMode;
         private readonly bool useLocalReleaseSource;
         private readonly string localReleaseRoot;
+        private readonly SemaphoreSlim releaseOperationGate = new SemaphoreSlim(1, 1);
         private readonly Dictionary<string, ESRuntimeVerifiedFile> verified = new Dictionary<string, ESRuntimeVerifiedFile>(StringComparer.Ordinal);
+        // A release can request the same Consumer/Library through multiple public entry points.
+        // Materialization for one cache file must remain single-writer: both .part append and
+        // the JSON .tmp replacement protocol are otherwise unsafe under concurrent requests.
+        private readonly object cacheFileGateSync = new object();
+        private readonly Dictionary<string, CacheFileGate> cacheFileGates = new Dictionary<string, CacheFileGate>(StringComparer.Ordinal);
+        private readonly Dictionary<string, TransferPlanFile> transferPlanFiles = new Dictionary<string, TransferPlanFile>(StringComparer.Ordinal);
+        private long transferTotalBytes;
+        private long transferCompletedBytes;
+        private long transferCurrentFileBytes;
+        private long transferCurrentFileSize;
+        private long transferCurrentInitialBytes;
+        private int transferCompletedFileCount;
+        private int transferRetryAttempt;
+        private string transferCurrentSubject = string.Empty;
+        private ESRuntimeReleaseTransferState transferState = ESRuntimeReleaseTransferState.Discovering;
+        private float transferSampleTime;
+        private long transferSampleBytes;
+        private float transferSpeedBytesPerSecond;
+        private float transferLastSnapshotTime;
         private string verifiedReleaseVersion;
+        // Root is intentionally stable so it can be revalidated. Everything it points at is
+        // release-versioned locally as well; an interrupted new release therefore cannot
+        // overwrite the last known-good release's manifests or bundles.
+        private string activeReleaseCacheRoot;
         public event Action<ESRuntimeReleaseDownloadProgress> ProgressChanged;
+        public event Action<ESRuntimeReleaseDownloadSnapshot> DownloadSnapshotChanged;
+
+        private sealed class CacheFileGate
+        {
+            public readonly SemaphoreSlim Semaphore = new SemaphoreSlim(1, 1);
+            public int UserCount;
+        }
+
+        private sealed class TransferRequestProgress : IProgress<float>
+        {
+            private readonly ESRuntimeReleaseDownloader owner;
+            private readonly UnityWebRequest request;
+            private readonly string relativePath;
+            private readonly long offset;
+
+            public TransferRequestProgress(ESRuntimeReleaseDownloader owner, UnityWebRequest request, string relativePath, long offset)
+            {
+                this.owner = owner;
+                this.request = request;
+                this.relativePath = relativePath;
+                this.offset = offset;
+            }
+
+            public void Report(float value)
+            {
+                owner.ReportTransferFileBytes(relativePath, offset + (long)request.downloadedBytes);
+            }
+        }
 
         public ESRuntimeReleaseDownloader(ESGlobalResSetting globalSettings, ESAssetRunMode lockedRunMode)
         {
@@ -117,9 +302,39 @@ namespace ES
             localReleaseRoot = Application.streamingAssetsPath.TrimEnd('/', '\\') + "/" + ESGlobalResSetting.ResParentFolderName;
         }
 
+        /// <summary>Marks the already initialized release as bootable without network access.
+        /// Call only after Provider, resident assets and GameCore injection all succeeded.</summary>
+        public static bool TryCommitLastKnownGood(ESGlobalResSetting settings, string releaseVersion, out string error)
+        {
+            error = string.Empty;
+            if (settings == null || string.IsNullOrWhiteSpace(releaseVersion))
+            {
+                error = "缺少发布设置或版本号。";
+                return false;
+            }
+            try
+            {
+                string platform = ESAssetBundleUtility.GetRuntimeResourcePlatformName(settings.applyPlatform);
+                string root = Path.Combine(Application.persistentDataPath, settings.Path_Sub_DownloadRelative_, "ReleaseV2", platform);
+                string source = Path.Combine(root, "ESAssetReleaseManifest.json");
+                var manifest = JsonConvert.DeserializeObject<ESRuntimeReleaseManifest>(File.ReadAllText(source));
+                if (manifest == null || manifest.formatVersion != ReleaseProtocolFormatVersion
+                    || !string.Equals(manifest.releaseVersion, releaseVersion, StringComparison.Ordinal)
+                    || !string.Equals(manifest.platform, platform, StringComparison.Ordinal))
+                    throw new InvalidDataException("当前 Root 清单与待提交版本不一致。");
+                WriteTextAtomically(Path.Combine(root, "LastKnownGood", "ESAssetReleaseManifest.json"), File.ReadAllText(source));
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
         public UniTask<ESRuntimeReleaseDownloadResult> DownloadBootAsync(CancellationToken cancellationToken = default)
         {
-            return DownloadBootCoreAsync(false, cancellationToken);
+            return ExecuteReleaseOperationAsync(() => DownloadBootCoreAsync(false, cancellationToken), cancellationToken);
         }
 
         /// <summary>
@@ -127,6 +342,11 @@ namespace ES
         /// 这是业务侧的首选入口；不会接受调用方拼出的 URL 或 Hash。
         /// </summary>
         public async UniTask<ESRuntimeReleaseDownloadResult> DownloadConsumerAsync(string consumerId, CancellationToken cancellationToken = default)
+        {
+            return await ExecuteReleaseOperationAsync(() => DownloadConsumerCoreAsync(consumerId, cancellationToken), cancellationToken);
+        }
+
+        private async UniTask<ESRuntimeReleaseDownloadResult> DownloadConsumerCoreAsync(string consumerId, CancellationToken cancellationToken)
         {
             string requestedId = SafePathSegment(consumerId, "ConsumerId");
             ReleaseContext context = await LoadReleaseContextAsync(cancellationToken);
@@ -139,12 +359,17 @@ namespace ES
         /// <summary>独立下载并验证一个 Consumer，以及它声明的必需 Consumer、Library、GameCore 与 AB 依赖闭包。</summary>
         public async UniTask<ESRuntimeReleaseDownloadResult> DownloadConsumerAsync(ESRuntimeConsumerReference consumerReference, CancellationToken cancellationToken = default)
         {
+            return await ExecuteReleaseOperationAsync(() => DownloadConsumerCoreAsync(consumerReference, cancellationToken), cancellationToken);
+        }
+
+        private async UniTask<ESRuntimeReleaseDownloadResult> DownloadConsumerCoreAsync(ESRuntimeConsumerReference consumerReference, CancellationToken cancellationToken)
+        {
             if (consumerReference == null || string.IsNullOrWhiteSpace(consumerReference.consumerUrl) || string.IsNullOrWhiteSpace(consumerReference.consumerSha256))
                 throw new ArgumentException("Consumer 引用缺少 URL 或 SHA-256。", nameof(consumerReference));
             ReleaseContext context = await LoadReleaseContextAsync(cancellationToken);
             Report(ESRuntimeReleaseDownloadStage.ReadingConsumer, consumerReference.consumerId);
             var consumer = await DownloadJsonAsync<ESRuntimeConsumerManifest>(consumerReference.consumerUrl,
-                Path.Combine(cacheRoot, "Consumers", SafePathSegment(consumerReference.consumerId, "ConsumerId") + ".json"), consumerReference.consumerSha256, cancellationToken);
+                ReleaseCachePath("Consumers", SafePathSegment(consumerReference.consumerId, "ConsumerId") + ".json"), consumerReference.consumerSha256, cancellationToken);
             if (consumer == null || !string.Equals(consumer.consumerId, consumerReference.consumerId, StringComparison.Ordinal))
                 throw new InvalidDataException("Consumer manifest identity does not match its signed reference: " + consumerReference.consumerId);
             return await DownloadConsumerContentAsync(consumer, context, false, cancellationToken);
@@ -152,6 +377,11 @@ namespace ES
 
         /// <summary>从指定 Consumer（包括其必需 Consumer）中按 LibraryFolder 精确下载并验证一个 Library。</summary>
         public async UniTask<ESRuntimeReleaseDownloadResult> DownloadLibraryAsync(string consumerId, string libraryFolder, CancellationToken cancellationToken = default)
+        {
+            return await ExecuteReleaseOperationAsync(() => DownloadLibraryCoreAsync(consumerId, libraryFolder, cancellationToken), cancellationToken);
+        }
+
+        private async UniTask<ESRuntimeReleaseDownloadResult> DownloadLibraryCoreAsync(string consumerId, string libraryFolder, CancellationToken cancellationToken)
         {
             string requestedConsumerId = SafePathSegment(consumerId, "ConsumerId");
             string requestedLibraryFolder = SafePathSegment(libraryFolder, "Library folder");
@@ -167,6 +397,11 @@ namespace ES
         /// <summary>独立下载并验证一个 Library，以及其 AssetBundle 依赖闭包。</summary>
         public async UniTask<ESRuntimeReleaseDownloadResult> DownloadLibraryAsync(ESRuntimeConsumerLibraryReference libraryReference, CancellationToken cancellationToken = default)
         {
+            return await ExecuteReleaseOperationAsync(() => DownloadLibraryCoreAsync(libraryReference, cancellationToken), cancellationToken);
+        }
+
+        private async UniTask<ESRuntimeReleaseDownloadResult> DownloadLibraryCoreAsync(ESRuntimeConsumerLibraryReference libraryReference, CancellationToken cancellationToken)
+        {
             if (libraryReference == null) throw new ArgumentNullException(nameof(libraryReference));
             ReleaseContext context = await LoadReleaseContextAsync(cancellationToken);
             return await DownloadLibraryAsync(libraryReference, context, cancellationToken);
@@ -181,15 +416,17 @@ namespace ES
             var roots = new HashSet<string>(StringComparer.Ordinal);
             await DownloadLibraryAsync(libraryReference, context.Root.releaseVersion, context.BundlesByKey, roots, mainAssets, subAssets, catalogs, cancellationToken);
             ValidateCatalogsAgainstGlobalAssetRecords(catalogs, mainAssets, subAssets);
+            BeginTransferPlan(Array.Empty<CollectedCodePackage>(), roots, context.BundlesByKey);
             await DownloadAssetBundleClosureAsync(roots, context.BundlesByKey, records, cancellationToken);
             if (!useLocalReleaseSource) SaveVerifiedIndex();
+            CompleteTransferPlan();
             return CreateResult(context.Root.releaseVersion, new[] { libraryReference.libraryFolder }, records, mainAssets, subAssets, catalogs,
                 Array.Empty<ESRuntimeDownloadedCodePackage>(), Array.Empty<ESRuntimeConsumerGameCoreReference>(), Array.Empty<ESRuntimeConsumerResidentAssetReference>());
         }
 
         internal UniTask<ESRuntimeReleaseDownloadResult> DownloadBootAndInitializeCodeAsync(CancellationToken cancellationToken = default)
         {
-            return DownloadBootCoreAsync(true, cancellationToken);
+            return ExecuteReleaseOperationAsync(() => DownloadBootCoreAsync(true, cancellationToken), cancellationToken);
         }
 
         private async UniTask<ESRuntimeReleaseDownloadResult> DownloadBootCoreAsync(bool initializeCodePackages, CancellationToken cancellationToken)
@@ -197,13 +434,13 @@ namespace ES
             string rootUrl = useLocalReleaseSource
                 ? CombineLocalReleasePath(platform + "/ESAssetReleaseManifest.json")
                 : CombineUrl(settings.Path_Net, platform + "/ESAssetReleaseManifest.json");
-            var root = await DownloadJsonAsync<ESRuntimeReleaseManifest>(rootUrl, Path.Combine(cacheRoot, "ESAssetReleaseManifest.json"), null, cancellationToken);
+            var root = await DownloadRootOrLastKnownGoodAsync(rootUrl, cancellationToken);
             ValidateFormat(root?.formatVersion, "RootReleaseManifest");
             if (root == null || string.IsNullOrWhiteSpace(root.releaseVersion)) throw new InvalidDataException("RootReleaseManifest 缺少发布版本。");
             if (!string.Equals(root.platform, platform, StringComparison.Ordinal)) throw new InvalidDataException("RootReleaseManifest 平台不匹配：" + root.platform + " / " + platform);
-            if (!useLocalReleaseSource) PrepareVerifiedIndex(root.releaseVersion);
+            PrepareVerifiedIndex(root.releaseVersion);
             if (root == null || string.IsNullOrEmpty(root.bundleIndexUrl) || string.IsNullOrEmpty(root.bundleIndexSha256)) throw new InvalidDataException("RootReleaseManifest 缺少全局 Bundle 索引定位或 Hash。");
-            var bundleIndex = await DownloadJsonAsync<ESRuntimeReleaseBundleIndex>(root.bundleIndexUrl, Path.Combine(cacheRoot, "ESAssetReleaseBundleIndex.json"), root.bundleIndexSha256, cancellationToken);
+            var bundleIndex = await DownloadJsonAsync<ESRuntimeReleaseBundleIndex>(root.bundleIndexUrl, ReleaseCachePath("ESAssetReleaseBundleIndex.json"), root.bundleIndexSha256, cancellationToken);
             ValidateFormat(bundleIndex?.formatVersion, "GlobalAssetBundleIndex");
             var bundlesByKey = ValidateGlobalBundleIndex(root, bundleIndex);
             if (root == null || string.IsNullOrEmpty(root.totalConsumerUrl) || string.IsNullOrEmpty(root.totalConsumerSha256)) throw new InvalidDataException("RootReleaseManifest 缺少 TotalConsumer 定位或 Hash。");
@@ -221,14 +458,19 @@ namespace ES
             foreach (var library in libraries.Values.OrderBy(item => item.libraryFolder, StringComparer.Ordinal))
                 await DownloadLibraryAsync(library, root.releaseVersion, bundlesByKey, requiredAssetBundleKeys, mainAssets, subAssets, catalogs, cancellationToken);
             ValidateCatalogsAgainstGlobalAssetRecords(catalogs, mainAssets, subAssets);
+            BeginTransferPlan(codePackages.Values, requiredAssetBundleKeys, bundlesByKey);
             var downloadedCodePackages = new List<ESRuntimeDownloadedCodePackage>();
             foreach (CollectedCodePackage codePackage in codePackages.Values.OrderBy(item => item.Reference.loadOrder).ThenBy(item => item.Reference.packageKey, StringComparer.Ordinal))
                 downloadedCodePackages.Add(await DownloadCodePackageAsync(codePackage, cancellationToken));
             if (initializeCodePackages)
+            {
+                ReportRuntimeInitialization("CodePackages");
                 await ESRuntimeCodePackageBootstrap.LoadAsync(downloadedCodePackages, cancellationToken);
+            }
             await DownloadAssetBundleClosureAsync(requiredAssetBundleKeys, bundlesByKey, assetBundleRecords, cancellationToken);
             if (!useLocalReleaseSource)
                 SaveVerifiedIndex();
+            CompleteTransferPlan();
             var runtimeMap = ScriptableObject.CreateInstance<ESGlobalAssetRuntimeMap>();
             runtimeMap.SetRecords(assetBundleRecords.ToArray(), mainAssets.ToArray(), subAssets.ToArray());
             return new ESRuntimeReleaseDownloadResult
@@ -247,16 +489,55 @@ namespace ES
         {
             Report(ESRuntimeReleaseDownloadStage.ReadingRelease, "RootReleaseManifest");
             string rootUrl = useLocalReleaseSource ? CombineLocalReleasePath(platform + "/ESAssetReleaseManifest.json") : CombineUrl(settings.Path_Net, platform + "/ESAssetReleaseManifest.json");
-            var root = await DownloadJsonAsync<ESRuntimeReleaseManifest>(rootUrl, Path.Combine(cacheRoot, "ESAssetReleaseManifest.json"), null, token);
+            var root = await DownloadRootOrLastKnownGoodAsync(rootUrl, token);
             ValidateFormat(root?.formatVersion, "RootReleaseManifest");
             if (root == null || string.IsNullOrWhiteSpace(root.releaseVersion) || !string.Equals(root.platform, platform, StringComparison.Ordinal))
                 throw new InvalidDataException("RootReleaseManifest 无效或平台不匹配。");
-            if (!useLocalReleaseSource) PrepareVerifiedIndex(root.releaseVersion);
+            PrepareVerifiedIndex(root.releaseVersion);
             if (string.IsNullOrEmpty(root.bundleIndexUrl) || string.IsNullOrEmpty(root.bundleIndexSha256))
                 throw new InvalidDataException("RootReleaseManifest 缺少全局 Bundle 索引。");
-            var index = await DownloadJsonAsync<ESRuntimeReleaseBundleIndex>(root.bundleIndexUrl, Path.Combine(cacheRoot, "ESAssetReleaseBundleIndex.json"), root.bundleIndexSha256, token);
+            var index = await DownloadJsonAsync<ESRuntimeReleaseBundleIndex>(root.bundleIndexUrl, ReleaseCachePath("ESAssetReleaseBundleIndex.json"), root.bundleIndexSha256, token);
             ValidateFormat(index?.formatVersion, "GlobalAssetBundleIndex");
             return new ReleaseContext { Root = root, BundlesByKey = ValidateGlobalBundleIndex(root, index) };
+        }
+
+        private async UniTask<ESRuntimeReleaseManifest> DownloadRootOrLastKnownGoodAsync(string rootUrl, CancellationToken token)
+        {
+            try
+            {
+                return await DownloadJsonAsync<ESRuntimeReleaseManifest>(rootUrl, Path.Combine(cacheRoot, "ESAssetReleaseManifest.json"), null, token);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception remoteException) when (!useLocalReleaseSource)
+            {
+                string fallbackPath = Path.Combine(cacheRoot, "LastKnownGood", "ESAssetReleaseManifest.json");
+                if (!File.Exists(fallbackPath))
+                    throw new IOException("远端 Root 清单不可用，且不存在已成功启动过的离线发布版本。", remoteException);
+                try
+                {
+                    var fallback = JsonConvert.DeserializeObject<ESRuntimeReleaseManifest>(File.ReadAllText(fallbackPath));
+                    ValidateFormat(fallback?.formatVersion, "LastKnownGoodRootReleaseManifest");
+                    if (fallback == null || string.IsNullOrWhiteSpace(fallback.releaseVersion)
+                        || !string.Equals(fallback.platform, platform, StringComparison.Ordinal))
+                        throw new InvalidDataException("离线发布 Root 清单无效或平台不匹配。");
+                    Debug.LogWarning("[ESRes][Release] 远端 Root 不可用，回退到最近一次成功启动版本：" + fallback.releaseVersion);
+                    return fallback;
+                }
+                catch (Exception fallbackException)
+                {
+                    throw new IOException("远端 Root 清单不可用，且离线发布版本无法验证。", new AggregateException(remoteException, fallbackException));
+                }
+            }
+        }
+
+        private string ReleaseCachePath(params string[] segments)
+        {
+            if (string.IsNullOrWhiteSpace(activeReleaseCacheRoot))
+                throw new InvalidOperationException("Release 缓存目录尚未初始化；必须先验证 Root Release Manifest。");
+            string path = activeReleaseCacheRoot;
+            foreach (string segment in segments)
+                path = Path.Combine(path, segment);
+            return path;
         }
 
         private async UniTask<ESRuntimeConsumerManifest> DownloadTotalConsumerManifestAsync(ESRuntimeReleaseManifest root, CancellationToken token)
@@ -264,7 +545,7 @@ namespace ES
             if (root == null || string.IsNullOrEmpty(root.totalConsumerUrl) || string.IsNullOrEmpty(root.totalConsumerSha256))
                 throw new InvalidDataException("RootReleaseManifest is missing TotalConsumer location or hash.");
             Report(ESRuntimeReleaseDownloadStage.ReadingConsumer, "TotalConsumer");
-            var total = await DownloadJsonAsync<ESRuntimeConsumerManifest>(root.totalConsumerUrl, Path.Combine(cacheRoot, "Consumers", "total.json"), root.totalConsumerSha256, token);
+            var total = await DownloadJsonAsync<ESRuntimeConsumerManifest>(root.totalConsumerUrl, ReleaseCachePath("Consumers", "total.json"), root.totalConsumerSha256, token);
             ValidateFormat(total?.formatVersion, "TotalConsumerManifest");
             if (total == null || !total.isTotalConsumer || string.IsNullOrWhiteSpace(total.consumerId))
                 throw new InvalidDataException("TotalConsumerManifest is invalid.");
@@ -282,7 +563,7 @@ namespace ES
                     throw new InvalidDataException("Consumer dependency reference is incomplete: " + current.consumerId);
                 string childId = SafePathSegment(reference.consumerId, "ConsumerId");
                 Report(ESRuntimeReleaseDownloadStage.ReadingConsumer, childId);
-                var child = await DownloadJsonAsync<ESRuntimeConsumerManifest>(reference.consumerUrl, Path.Combine(cacheRoot, "Consumers", childId + ".json"), reference.consumerSha256, token);
+                var child = await DownloadJsonAsync<ESRuntimeConsumerManifest>(reference.consumerUrl, ReleaseCachePath("Consumers", childId + ".json"), reference.consumerSha256, token);
                 ValidateFormat(child?.formatVersion, "ConsumerManifest:" + childId);
                 if (child == null || !string.Equals(child.consumerId, childId, StringComparison.Ordinal))
                     throw new InvalidDataException("Consumer dependency manifest identity does not match its signed reference: " + childId);
@@ -305,7 +586,7 @@ namespace ES
                     throw new InvalidDataException("Consumer dependency reference is incomplete: " + current.consumerId);
                 string childId = SafePathSegment(reference.consumerId, "ConsumerId");
                 Report(ESRuntimeReleaseDownloadStage.ReadingConsumer, childId);
-                var child = await DownloadJsonAsync<ESRuntimeConsumerManifest>(reference.consumerUrl, Path.Combine(cacheRoot, "Consumers", childId + ".json"), reference.consumerSha256, token);
+                var child = await DownloadJsonAsync<ESRuntimeConsumerManifest>(reference.consumerUrl, ReleaseCachePath("Consumers", childId + ".json"), reference.consumerSha256, token);
                 ValidateFormat(child?.formatVersion, "ConsumerManifest:" + childId);
                 if (child == null || !string.Equals(child.consumerId, childId, StringComparison.Ordinal))
                     throw new InvalidDataException("Consumer dependency manifest identity does not match its signed reference: " + childId);
@@ -330,11 +611,13 @@ namespace ES
             foreach (ESRuntimeConsumerLibraryReference library in libraries.Values.OrderBy(item => item.libraryFolder, StringComparer.Ordinal))
                 await DownloadLibraryAsync(library, context.Root.releaseVersion, context.BundlesByKey, roots, mainAssets, subAssets, catalogs, token);
             ValidateCatalogsAgainstGlobalAssetRecords(catalogs, mainAssets, subAssets);
+            BeginTransferPlan(codePackages.Values, roots, context.BundlesByKey);
             await DownloadAssetBundleClosureAsync(roots, context.BundlesByKey, records, token);
             var downloadedCode = new List<ESRuntimeDownloadedCodePackage>();
             foreach (CollectedCodePackage code in codePackages.Values.OrderBy(item => item.Reference.loadOrder).ThenBy(item => item.Reference.packageKey, StringComparer.Ordinal))
                 downloadedCode.Add(await DownloadCodePackageAsync(code, token));
             if (!useLocalReleaseSource) SaveVerifiedIndex();
+            CompleteTransferPlan();
             return CreateResult(context.Root.releaseVersion, libraries.Keys.OrderBy(item => item, StringComparer.Ordinal).ToArray(), records, mainAssets, subAssets, catalogs, downloadedCode, gameCoreAssets.Values.ToArray(), residentAssets.Values.ToArray());
         }
 
@@ -357,7 +640,7 @@ namespace ES
                 if (string.IsNullOrEmpty(dependency.consumerUrl) || string.IsNullOrEmpty(dependency.consumerSha256)) throw new InvalidDataException("Consumer 依赖缺少 URL 或 Hash。");
                 string childId = SafePathSegment(dependency.consumerId, "ConsumerId");
                 Report(ESRuntimeReleaseDownloadStage.ReadingConsumer, childId);
-                var child = await DownloadJsonAsync<ESRuntimeConsumerManifest>(dependency.consumerUrl, Path.Combine(cacheRoot, "Consumers", childId + ".json"), dependency.consumerSha256, token);
+                var child = await DownloadJsonAsync<ESRuntimeConsumerManifest>(dependency.consumerUrl, ReleaseCachePath("Consumers", childId + ".json"), dependency.consumerSha256, token);
                 ValidateFormat(child?.formatVersion, "ConsumerManifest:" + childId);
                 if (child == null || !string.Equals(child.consumerId, dependency.consumerId, StringComparison.Ordinal))
                     throw new InvalidDataException("Consumer dependency manifest identity does not match its signed reference: " + dependency.consumerId);
@@ -370,7 +653,9 @@ namespace ES
                 if (requiredAtBootOnly && !library.requiredAtBoot) continue;
                 if (libraries.TryGetValue(libraryFolder, out ESRuntimeConsumerLibraryReference existing)
                     && (!string.Equals(existing.libraryIdentityUrl, library.libraryIdentityUrl, StringComparison.Ordinal)
-                        || !string.Equals(existing.libraryIdentitySha256, library.libraryIdentitySha256, StringComparison.OrdinalIgnoreCase)))
+                        || !string.Equals(existing.libraryIdentitySha256, library.libraryIdentitySha256, StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(existing.embeddedIdentityRelativePath, library.embeddedIdentityRelativePath, StringComparison.Ordinal)
+                        || existing.deliveryMode != library.deliveryMode))
                     throw new InvalidDataException("Consumer graph has conflicting signed Library references: " + libraryFolder);
                 libraries[libraryFolder] = library;
             }
@@ -418,7 +703,7 @@ namespace ES
             string ownerConsumerId = SafePathSegment(collected.OwnerConsumerId, "ConsumerId");
             string fileName = SafePathSegment(package.fileName, "启动文件名");
             string relativePath = Path.Combine("Code", ownerConsumerId, fileName).Replace('\\', '/');
-            string localPath = Path.Combine(cacheRoot, "Code", ownerConsumerId, fileName);
+            string localPath = ReleaseCachePath("Code", ownerConsumerId, fileName);
             if (useLocalReleaseSource)
             {
                 string streamingSource = ResolveLocalReleasePath(package.url);
@@ -489,23 +774,65 @@ namespace ES
             return assetBundlesPrefix + fileName;
         }
 
+        private void ValidateLibraryReference(ESRuntimeConsumerLibraryReference library, string libraryFolder)
+        {
+            if (!IsValidDeliveryMode(library.deliveryMode) || !IsSha256(library.libraryIdentitySha256))
+                throw new InvalidDataException("Library 分发方式或 Identity Hash 无效：" + libraryFolder);
+
+            bool hasEmbedded = !string.IsNullOrWhiteSpace(library.embeddedIdentityRelativePath);
+            bool hasRemote = !string.IsNullOrWhiteSpace(library.libraryIdentityUrl);
+            if (hasEmbedded != (library.deliveryMode != ESAssetDeliveryMode.Remote)
+                || hasRemote != (library.deliveryMode != ESAssetDeliveryMode.BuiltIn))
+                throw new InvalidDataException("Library Identity 来源与分发方式不匹配：" + libraryFolder);
+
+            if (hasEmbedded)
+            {
+                string expectedPath = platform + "/Embedded/Libraries/" + libraryFolder + "/ESAssetLibraryIdentity.json";
+                string normalizedPath = library.embeddedIdentityRelativePath.Replace('\\', '/');
+                if (!string.Equals(normalizedPath, expectedPath, StringComparison.Ordinal))
+                    throw new InvalidDataException("Library Embedded Identity 路径无效：" + libraryFolder);
+            }
+        }
+
+        private bool ShouldUseEmbedded(ESAssetDeliveryMode mode)
+        {
+            return mode == ESAssetDeliveryMode.BuiltIn
+                || (mode == ESAssetDeliveryMode.Updateable && useLocalReleaseSource);
+        }
+
+        private static bool IsValidDeliveryMode(ESAssetDeliveryMode mode)
+        {
+            return mode == ESAssetDeliveryMode.BuiltIn
+                || mode == ESAssetDeliveryMode.Updateable
+                || mode == ESAssetDeliveryMode.Remote;
+        }
+
         private async UniTask DownloadLibraryAsync(ESRuntimeConsumerLibraryReference library, string releaseVersion, Dictionary<string, ESRuntimeReleaseBundleRecord> bundlesByKey, HashSet<string> requiredAssetBundleKeys, List<ESRuntimeAssetRecord> mainAssets, List<ESRuntimeSubAssetRecord> subAssets, List<ESRuntimeCatalog> catalogs, CancellationToken token)
         {
             if (library == null) throw new ArgumentNullException(nameof(library));
             string libraryFolder = SafePathSegment(library.libraryFolder, "Library folder");
-            if (string.IsNullOrEmpty(library.libraryIdentityUrl) || string.IsNullOrEmpty(library.libraryIdentitySha256)) throw new InvalidDataException("Library 缺少 Identity URL 或 Hash：" + library.libraryFolder);
-            string libraryRoot = Path.Combine(cacheRoot, "Libraries", libraryFolder);
+            ValidateLibraryReference(library, libraryFolder);
+            bool useEmbedded = ShouldUseEmbedded(library.deliveryMode);
+            string identitySource = useEmbedded
+                ? CombineLocalReleasePath(library.embeddedIdentityRelativePath)
+                : library.libraryIdentityUrl;
+            string libraryRoot = ReleaseCachePath("Libraries", libraryFolder);
             Report(ESRuntimeReleaseDownloadStage.ReadingLibraryIdentity, libraryFolder);
-            var identity = await DownloadJsonAsync<ESRuntimeLibraryIdentity>(library.libraryIdentityUrl, Path.Combine(libraryRoot, "ESAssetLibraryIdentity.json"), library.libraryIdentitySha256, token);
+            var identity = await DownloadJsonAsync<ESRuntimeLibraryIdentity>(identitySource, Path.Combine(libraryRoot, "ESAssetLibraryIdentity.json"), library.libraryIdentitySha256, token, useEmbedded);
             ValidateFormat(identity?.formatVersion, "LibraryIdentity");
+            string expectedIdentityVersion = library.deliveryMode == ESAssetDeliveryMode.BuiltIn ? "embedded" : releaseVersion;
             if (identity == null || !string.Equals(identity.libraryFolder, libraryFolder, StringComparison.Ordinal)
-                || !string.Equals(identity.platform, platform, StringComparison.Ordinal) || !string.Equals(identity.version, releaseVersion, StringComparison.Ordinal))
+                || identity.deliveryMode != library.deliveryMode
+                || !string.Equals(identity.platform, platform, StringComparison.Ordinal) || !string.Equals(identity.version, expectedIdentityVersion, StringComparison.Ordinal))
                 throw new InvalidDataException("Library Identity 与当前发布不匹配：" + library.libraryFolder);
-            if (string.IsNullOrWhiteSpace(identity.catalogUrl) || string.IsNullOrWhiteSpace(identity.catalogSha256)
-                || string.IsNullOrWhiteSpace(identity.assetBundleManifestUrl) || string.IsNullOrWhiteSpace(identity.assetBundleManifestSha256))
+            if (string.IsNullOrWhiteSpace(identity.catalogSha256) || string.IsNullOrWhiteSpace(identity.assetBundleManifestSha256)
+                || (!useEmbedded && (string.IsNullOrWhiteSpace(identity.catalogUrl) || string.IsNullOrWhiteSpace(identity.assetBundleManifestUrl))))
                 throw new InvalidDataException("Library Identity 缺少索引定位或完整性信息：" + library.libraryFolder);
+            string embeddedBase = platform + "/Embedded/Libraries/" + libraryFolder + "/";
+            string catalogSource = useEmbedded ? CombineLocalReleasePath(embeddedBase + "ESAssetLibraryCatalog.json") : identity.catalogUrl;
+            string manifestSource = useEmbedded ? CombineLocalReleasePath(embeddedBase + "ESAssetBundleManifest.json") : identity.assetBundleManifestUrl;
             Report(ESRuntimeReleaseDownloadStage.ReadingCatalog, libraryFolder);
-            var catalog = await DownloadJsonAsync<ESRuntimeCatalog>(identity.catalogUrl, Path.Combine(libraryRoot, "ESAssetLibraryCatalog.json"), identity.catalogSha256, token);
+            var catalog = await DownloadJsonAsync<ESRuntimeCatalog>(catalogSource, Path.Combine(libraryRoot, "ESAssetLibraryCatalog.json"), identity.catalogSha256, token, useEmbedded);
             if (catalog == null || catalog.assets == null) throw new InvalidDataException("Catalog 解析失败：" + library.libraryFolder);
             if (catalog.formatVersion != 3) throw new InvalidDataException("Catalog 命名协议版本不匹配：" + library.libraryFolder);
             if (string.IsNullOrWhiteSpace(identity.libraryBundleCode)
@@ -524,7 +851,7 @@ namespace ES
             }
             catalogs.Add(catalog);
             Report(ESRuntimeReleaseDownloadStage.ReadingAssetBundleManifest, libraryFolder);
-            var manifest = await DownloadJsonAsync<ESRuntimeBundleManifest>(identity.assetBundleManifestUrl, Path.Combine(libraryRoot, "ESAssetBundleManifest.json"), identity.assetBundleManifestSha256, token);
+            var manifest = await DownloadJsonAsync<ESRuntimeBundleManifest>(manifestSource, Path.Combine(libraryRoot, "ESAssetBundleManifest.json"), identity.assetBundleManifestSha256, token, useEmbedded);
             ValidateFormat(manifest?.formatVersion, "LibraryAssetBundleManifest");
             if (manifest == null) throw new InvalidDataException("Library ABManifest 解析失败：" + library.libraryFolder);
             if (!string.Equals(manifest.platform, platform, StringComparison.Ordinal)) throw new InvalidDataException("Library ABManifest 平台不匹配：" + library.libraryFolder);
@@ -538,7 +865,8 @@ namespace ES
             foreach (var bundle in manifest.assetBundles ?? new List<ESRuntimeBundleRecord>())
             {
                 if (!bundlesByKey.TryGetValue(bundle.assetBundleKey, out ESRuntimeReleaseBundleRecord indexed)) throw new InvalidDataException("Global Bundle index is missing package: " + bundle.assetBundleKey);
-                if (!string.Equals(indexed.libraryFolder, libraryFolder, StringComparison.Ordinal) || indexed.size != bundle.size || indexed.crc != bundle.crc
+                if (!string.Equals(indexed.libraryFolder, libraryFolder, StringComparison.Ordinal) || indexed.deliveryMode != library.deliveryMode
+                    || indexed.size != bundle.size || indexed.crc != bundle.crc
                     || !string.Equals(NormalizeAssetBundleRelativePath(indexed.localRelativePath), NormalizeAssetBundleRelativePath(bundle.localRelativePath), StringComparison.Ordinal)
                     || !string.Equals(indexed.sha256, bundle.sha256, StringComparison.OrdinalIgnoreCase)
                     || !(indexed.dependencies ?? new List<string>()).OrderBy(item => item, StringComparer.Ordinal).SequenceEqual((bundle.dependencies ?? new List<string>()).OrderBy(item => item, StringComparer.Ordinal), StringComparer.Ordinal)) throw new InvalidDataException("Global Bundle index differs from Library Manifest: " + bundle.assetBundleKey);
@@ -592,12 +920,23 @@ namespace ES
             {
                 if (bundle == null || string.IsNullOrWhiteSpace(bundle.assetBundleKey) || !result.TryAdd(bundle.assetBundleKey, bundle))
                     throw new InvalidDataException("全局 Bundle 索引包含无效或重复 BundleKey。");
-                SafePathSegment(bundle.libraryFolder, "Bundle library folder");
-                if (string.IsNullOrWhiteSpace(bundle.fileUrl) || !IsSha256(bundle.sha256) || bundle.size <= 0)
+                string libraryFolder = SafePathSegment(bundle.libraryFolder, "Bundle library folder");
+                if (!IsValidDeliveryMode(bundle.deliveryMode) || !IsSha256(bundle.sha256) || bundle.size <= 0)
                     throw new InvalidDataException("全局 Bundle 索引记录不完整：" + bundle.assetBundleKey);
                 string normalizedPath = NormalizeAssetBundleRelativePath(bundle.localRelativePath);
                 if (!string.Equals(normalizedPath, bundle.localRelativePath, StringComparison.Ordinal))
                     throw new InvalidDataException("全局 Bundle 索引路径未规范化：" + bundle.assetBundleKey);
+                bool hasEmbedded = !string.IsNullOrWhiteSpace(bundle.embeddedRelativePath);
+                bool hasRemote = !string.IsNullOrWhiteSpace(bundle.fileUrl);
+                if (hasEmbedded != (bundle.deliveryMode != ESAssetDeliveryMode.Remote)
+                    || hasRemote != (bundle.deliveryMode != ESAssetDeliveryMode.BuiltIn))
+                    throw new InvalidDataException("全局 Bundle 来源与分发方式不匹配：" + bundle.assetBundleKey);
+                if (hasEmbedded)
+                {
+                    string expectedPath = platform + "/Embedded/Libraries/" + libraryFolder + "/" + normalizedPath;
+                    if (!string.Equals(bundle.embeddedRelativePath.Replace('\\', '/'), expectedPath, StringComparison.Ordinal))
+                        throw new InvalidDataException("全局 Bundle Embedded 路径无效：" + bundle.assetBundleKey);
+                }
                 var dependencySet = new HashSet<string>(StringComparer.Ordinal);
                 foreach (string dependency in bundle.dependencies ?? new List<string>())
                     if (string.IsNullOrWhiteSpace(dependency) || string.Equals(dependency, bundle.assetBundleKey, StringComparison.Ordinal) || !dependencySet.Add(dependency))
@@ -606,7 +945,12 @@ namespace ES
 
             foreach (ESRuntimeReleaseBundleRecord bundle in result.Values)
                 foreach (string dependency in bundle.dependencies ?? new List<string>())
-                    if (!result.ContainsKey(dependency)) throw new InvalidDataException("全局 Bundle 索引依赖缺失：" + bundle.assetBundleKey + " -> " + dependency);
+                {
+                    if (!result.TryGetValue(dependency, out ESRuntimeReleaseBundleRecord dependencyBundle))
+                        throw new InvalidDataException("全局 Bundle 索引依赖缺失：" + bundle.assetBundleKey + " -> " + dependency);
+                    if (bundle.deliveryMode != ESAssetDeliveryMode.Remote && dependencyBundle.deliveryMode == ESAssetDeliveryMode.Remote)
+                        throw new InvalidDataException("随包或更新资源不能依赖纯远端资源：" + bundle.assetBundleKey + " -> " + dependency);
+                }
             ValidateBundleGraph(result);
             return result;
         }
@@ -685,6 +1029,180 @@ namespace ES
             return !string.IsNullOrWhiteSpace(value) && value.Length == 64 && value.All(Uri.IsHexDigit);
         }
 
+        private void BeginTransferPlan(IEnumerable<CollectedCodePackage> codePackages, IEnumerable<string> roots, Dictionary<string, ESRuntimeReleaseBundleRecord> bundlesByKey)
+        {
+            transferPlanFiles.Clear();
+            transferTotalBytes = 0;
+            transferCompletedBytes = 0;
+            transferCurrentFileBytes = 0;
+            transferCurrentFileSize = 0;
+            transferCurrentInitialBytes = 0;
+            transferCompletedFileCount = 0;
+            transferRetryAttempt = 0;
+            transferCurrentSubject = string.Empty;
+            transferState = ESRuntimeReleaseTransferState.Discovering;
+
+            foreach (CollectedCodePackage collected in codePackages ?? Array.Empty<CollectedCodePackage>())
+            {
+                ESRuntimeConsumerCodePackageReference package = collected?.Reference;
+                if (package == null) continue;
+                string owner = SafePathSegment(collected.OwnerConsumerId, "ConsumerId");
+                string fileName = SafePathSegment(package.fileName, "Code package file name");
+                string relativePath = Path.Combine("Code", owner, fileName).Replace('\\', '/');
+                string localPath = ReleaseCachePath("Code", owner, fileName);
+                bool requiresCacheFile = !useLocalReleaseSource || !IsFilePath(ResolveLocalReleasePath(package.url));
+                if (requiresCacheFile)
+                    AddTransferPlanFile(relativePath, localPath, package.size, package.sha256);
+            }
+
+            var resolved = new HashSet<string>(StringComparer.Ordinal);
+            void Visit(string key)
+            {
+                if (!resolved.Add(key)) return;
+                if (!bundlesByKey.TryGetValue(key, out ESRuntimeReleaseBundleRecord bundle))
+                    throw new InvalidDataException("Global Bundle dependency is missing: " + key);
+                foreach (string dependency in bundle.dependencies ?? new List<string>()) Visit(dependency);
+                if (ShouldUseEmbedded(bundle.deliveryMode)) return;
+
+                string libraryFolder = SafePathSegment(bundle.libraryFolder, "Bundle library folder");
+                string relativeBundlePath = NormalizeAssetBundleRelativePath(bundle.localRelativePath);
+                string relativePath = Path.Combine("Libraries", libraryFolder, relativeBundlePath).Replace('\\', '/');
+                string localPath = ReleaseCachePath("Libraries", libraryFolder, relativeBundlePath.Replace('/', Path.DirectorySeparatorChar));
+                AddTransferPlanFile(relativePath, localPath, bundle.size, bundle.sha256);
+            }
+            foreach (string root in roots ?? Array.Empty<string>()) Visit(root);
+
+            transferState = ESRuntimeReleaseTransferState.Downloading;
+            transferSampleTime = Time.realtimeSinceStartup;
+            transferSampleBytes = transferCompletedBytes;
+            transferSpeedBytesPerSecond = 0f;
+            Report(ESRuntimeReleaseDownloadStage.PreparingTransfer, "TransferPlan", transferCompletedFileCount, transferPlanFiles.Count);
+            PublishTransferSnapshot(true);
+        }
+
+        private void AddTransferPlanFile(string relativePath, string localPath, long size, string hash)
+        {
+            if (size < 0 || string.IsNullOrWhiteSpace(hash))
+                throw new InvalidDataException("Transfer plan contains an invalid file: " + relativePath);
+            if (transferPlanFiles.ContainsKey(relativePath)) return;
+
+            long initialBytes = 0;
+            if (IsVerified(relativePath, localPath, size, hash))
+            {
+                initialBytes = size;
+            }
+            else
+            {
+                string partPath = localPath + ".part";
+                if (File.Exists(partPath))
+                {
+                    long partLength = new FileInfo(partPath).Length;
+                    if (partLength >= 0 && partLength < size) initialBytes = partLength;
+                }
+            }
+
+            var file = new TransferPlanFile { RelativePath = relativePath, LocalPath = localPath, Hash = hash, Size = size, InitialBytes = initialBytes, Completed = initialBytes == size };
+            transferPlanFiles.Add(relativePath, file);
+            transferTotalBytes += size;
+            transferCompletedBytes += initialBytes;
+            if (file.Completed) transferCompletedFileCount++;
+        }
+
+        private void BeginTransferFile(string relativePath, long size, int retryAttempt)
+        {
+            if (!transferPlanFiles.TryGetValue(relativePath, out TransferPlanFile file)) return;
+            transferState = ESRuntimeReleaseTransferState.Downloading;
+            transferCurrentSubject = relativePath;
+            transferCurrentFileSize = size;
+            transferCurrentInitialBytes = file.InitialBytes;
+            transferCurrentFileBytes = file.InitialBytes;
+            transferRetryAttempt = retryAttempt;
+            PublishTransferSnapshot(true);
+        }
+
+        private void ReportTransferFileBytes(string relativePath, long bytes)
+        {
+            if (!transferPlanFiles.TryGetValue(relativePath, out TransferPlanFile file)) return;
+            transferState = ESRuntimeReleaseTransferState.Downloading;
+            transferCurrentSubject = relativePath;
+            transferCurrentFileSize = file.Size;
+            transferCurrentInitialBytes = file.InitialBytes;
+            transferCurrentFileBytes = Math.Min(file.Size, Math.Max(0, bytes));
+            PublishTransferSnapshot();
+        }
+
+        private void CompleteTransferFile(string relativePath)
+        {
+            if (!transferPlanFiles.TryGetValue(relativePath, out TransferPlanFile file) || file.Completed) return;
+            file.Completed = true;
+            transferCompletedBytes += file.Size - file.InitialBytes;
+            transferCompletedFileCount++;
+            transferCurrentSubject = relativePath;
+            transferCurrentFileSize = file.Size;
+            transferCurrentFileBytes = file.Size;
+            transferCurrentInitialBytes = file.InitialBytes;
+            transferRetryAttempt = 0;
+            PublishTransferSnapshot(true);
+        }
+
+        private void ReportTransferVerification(string relativePath, long size)
+        {
+            if (!transferPlanFiles.TryGetValue(relativePath, out TransferPlanFile file)) return;
+            transferState = ESRuntimeReleaseTransferState.Verifying;
+            transferCurrentSubject = relativePath;
+            transferCurrentFileSize = size;
+            transferCurrentInitialBytes = file.InitialBytes;
+            transferCurrentFileBytes = Math.Min(size, Math.Max(file.InitialBytes, new FileInfo(file.LocalPath + ".part").Length));
+            PublishTransferSnapshot(true);
+        }
+
+        private void PublishTransferSnapshot(bool force = false)
+        {
+            long visibleBytes = transferCompletedBytes + Math.Max(0, transferCurrentFileBytes - transferCurrentInitialBytes);
+            visibleBytes = Math.Min(transferTotalBytes, visibleBytes);
+            float now = Time.realtimeSinceStartup;
+            if (!force && now - transferLastSnapshotTime < .1f)
+                return;
+            float elapsed = now - transferSampleTime;
+            if (elapsed >= .25f)
+            {
+                long delta = visibleBytes - transferSampleBytes;
+                transferSpeedBytesPerSecond = delta > 0 ? delta / elapsed : 0f;
+                transferSampleTime = now;
+                transferSampleBytes = visibleBytes;
+            }
+            int eta = transferSpeedBytesPerSecond > 0f
+                ? Mathf.CeilToInt(Math.Max(0, transferTotalBytes - visibleBytes) / transferSpeedBytesPerSecond)
+                : 0;
+            var snapshot = new ESRuntimeReleaseDownloadSnapshot(transferState, transferCurrentSubject, transferTotalBytes,
+                visibleBytes, transferCurrentFileBytes, transferCurrentFileSize, transferCompletedFileCount, transferPlanFiles.Count,
+                transferRetryAttempt, transferSpeedBytesPerSecond, eta);
+            RecordDiagnosticSnapshot(snapshot);
+            transferLastSnapshotTime = now;
+            DownloadSnapshotChanged?.Invoke(snapshot);
+        }
+
+        private void ReportRuntimeInitialization(string subject)
+        {
+            transferState = ESRuntimeReleaseTransferState.Initializing;
+            transferCurrentSubject = subject ?? string.Empty;
+            transferRetryAttempt = 0;
+            Report(ESRuntimeReleaseDownloadStage.InitializingRuntime, transferCurrentSubject, transferCompletedFileCount, transferPlanFiles.Count);
+            PublishTransferSnapshot(true);
+        }
+
+        private void CompleteTransferPlan()
+        {
+            transferState = ESRuntimeReleaseTransferState.Completed;
+            transferCurrentSubject = string.Empty;
+            transferCurrentFileBytes = 0;
+            transferCurrentFileSize = 0;
+            transferCurrentInitialBytes = 0;
+            transferRetryAttempt = 0;
+            Report(ESRuntimeReleaseDownloadStage.Completed, "TransferComplete", transferCompletedFileCount, transferPlanFiles.Count);
+            PublishTransferSnapshot(true);
+        }
+
         private async UniTask DownloadAssetBundleClosureAsync(IEnumerable<string> roots, Dictionary<string, ESRuntimeReleaseBundleRecord> bundlesByKey, List<ESRuntimeAssetBundleRecord> assetBundles, CancellationToken token)
         {
             var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -700,9 +1218,10 @@ namespace ES
                     foreach (string dependency in bundle.dependencies ?? new List<string>()) await VisitAsync(dependency);
                     string libraryFolder = SafePathSegment(bundle.libraryFolder, "Bundle library folder");
                     string assetBundleRelativePath = NormalizeAssetBundleRelativePath(bundle.localRelativePath);
-                    if (useLocalReleaseSource)
+                    bool useEmbedded = ShouldUseEmbedded(bundle.deliveryMode);
+                    if (useEmbedded)
                     {
-                        string streamingSource = ResolveLocalReleasePath(bundle.fileUrl);
+                        string streamingSource = CombineLocalReleasePath(bundle.embeddedRelativePath);
                         if (IsFilePath(streamingSource))
                         {
                             if (!File.Exists(streamingSource) || new FileInfo(streamingSource).Length != bundle.size || !ESResManifestIntegrity.VerifyFileSha256(streamingSource, bundle.sha256))
@@ -719,8 +1238,8 @@ namespace ES
                     else
                     {
                         string relativePath = Path.Combine("Libraries", libraryFolder, assetBundleRelativePath).Replace('\\', '/');
-                        string localPath = Path.Combine(cacheRoot, "Libraries", libraryFolder, assetBundleRelativePath.Replace('/', Path.DirectorySeparatorChar));
-                        await EnsureFileAsync(bundle.fileUrl, localPath, relativePath, bundle.size, bundle.sha256, token);
+                        string localPath = ReleaseCachePath("Libraries", libraryFolder, assetBundleRelativePath.Replace('/', Path.DirectorySeparatorChar));
+                        await EnsureFileAsync(bundle.fileUrl, localPath, relativePath, bundle.size, bundle.sha256, token, false);
                         assetBundles.Add(new ESRuntimeAssetBundleRecord(bundle.assetBundleKey, localPath, null, bundle.fileUrl, Hash128.Compute(bundle.sha256 ?? string.Empty).ToString(), bundle.crc, bundle.size, (bundle.dependencies ?? new List<string>()).ToArray()));
                     }
                     visited.Add(packageKey);
@@ -734,18 +1253,25 @@ namespace ES
             foreach (string root in roots.OrderBy(item => item, StringComparer.Ordinal)) await VisitAsync(root);
         }
 
-        private async UniTask<T> DownloadJsonAsync<T>(string url, string localPath, string expectedHash, CancellationToken token) where T : class
+        private async UniTask<T> DownloadJsonAsync<T>(string url, string localPath, string expectedHash, CancellationToken token, bool? localSourceOverride = null) where T : class
         {
-            string text = await DownloadTextAsync(url, localPath, expectedHash, token);
+            string text = await DownloadTextAsync(url, localPath, expectedHash, token, localSourceOverride);
             try { return JsonConvert.DeserializeObject<T>(text); }
             catch (Exception exception) { throw new InvalidDataException("JSON 解析失败：" + url, exception); }
         }
 
-        private async UniTask<string> DownloadTextAsync(string url, string localPath, string expectedHash, CancellationToken token)
+        private async UniTask<string> DownloadTextAsync(string url, string localPath, string expectedHash, CancellationToken token, bool? localSourceOverride = null)
         {
-            if (useLocalReleaseSource)
+            return await ExecuteForCacheFileAsync(localPath,
+                () => DownloadTextCoreAsync(url, localPath, expectedHash, token, localSourceOverride), token);
+        }
+
+        private async UniTask<string> DownloadTextCoreAsync(string url, string localPath, string expectedHash, CancellationToken token, bool? localSourceOverride)
+        {
+            bool localSource = localSourceOverride ?? useLocalReleaseSource;
+            if (localSource)
             {
-                string localText = await RequestTextAsync(url, token);
+                string localText = await RequestTextAsync(url, token, true);
                 if (!string.IsNullOrEmpty(expectedHash) && !string.Equals(ESResManifestIntegrity.ComputeFileSha256FromText(localText), expectedHash, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("StreamingAssets 清单 Hash 不匹配：" + url);
                 return localText;
@@ -757,24 +1283,37 @@ namespace ES
                 return File.ReadAllText(localPath);
             }
             VerboseLog("请求远端清单 | " + url);
-            string text = await RequestTextAsync(url, token);
+            string text = await RequestTextAsync(url, token, false);
             if (!string.IsNullOrEmpty(expectedHash) && !string.Equals(ESResManifestIntegrity.ComputeFileSha256FromText(text), expectedHash, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("下载文件 Hash 不匹配：" + url);
             WriteTextAtomically(localPath, text);
             VerboseLog("清单校验完成并写入缓存 | " + url);
             return text;
         }
 
-        private async UniTask EnsureFileAsync(string url, string localPath, string relativePath, long expectedSize, string expectedHash, CancellationToken token)
+        private async UniTask EnsureFileAsync(string url, string localPath, string relativePath, long expectedSize, string expectedHash, CancellationToken token, bool? localSourceOverride = null)
         {
+            await ExecuteForCacheFileAsync(localPath,
+                () => EnsureFileCoreAsync(url, localPath, relativePath, expectedSize, expectedHash, token, localSourceOverride), token);
+        }
+
+        private async UniTask EnsureFileCoreAsync(string url, string localPath, string relativePath, long expectedSize, string expectedHash, CancellationToken token, bool? localSourceOverride)
+        {
+            if (expectedSize < 0)
+                throw new ArgumentOutOfRangeException(nameof(expectedSize), expectedSize, "Expected file size cannot be negative.");
+            if (string.IsNullOrWhiteSpace(expectedHash))
+                throw new ArgumentException("Expected SHA-256 is required for release files.", nameof(expectedHash));
             if (IsVerified(relativePath, localPath, expectedSize, expectedHash))
             {
+                CompleteTransferFile(relativePath);
                 VerboseLog("复用已校验文件缓存 | " + relativePath + " | " + expectedSize + " bytes");
                 return;
             }
-            if (useLocalReleaseSource)
+            bool localSource = localSourceOverride ?? useLocalReleaseSource;
+            if (localSource)
             {
                 string sourcePath = ResolveLocalReleasePath(url);
                 Directory.CreateDirectory(Path.GetDirectoryName(localPath));
+                BeginTransferFile(relativePath, expectedSize, 1);
                 if (IsFilePath(sourcePath))
                 {
                     if (!File.Exists(sourcePath) || new FileInfo(sourcePath).Length != expectedSize || !ESResManifestIntegrity.VerifyFileSha256(sourcePath, expectedHash))
@@ -786,9 +1325,10 @@ namespace ES
                     string localSourcePartPath = localPath + ".part";
                     using (var request = UnityWebRequest.Get(sourcePath))
                     {
-                        request.downloadHandler = new DownloadHandlerFile(localSourcePartPath);
-                        await request.SendWebRequest().ToUniTask(cancellationToken: token);
+                        request.downloadHandler = CreateFileDownloadHandler(localSourcePartPath, false);
+                        await request.SendWebRequest().ToUniTask(progress: new TransferRequestProgress(this, request, relativePath, 0), cancellationToken: token);
                         if (request.result != UnityWebRequest.Result.Success) throw new IOException("Initial AssetBundle read failed: " + sourcePath + " / " + request.error);
+                        PersistBufferedFileDownload(request, localSourcePartPath, false);
                     }
                     if (new FileInfo(localSourcePartPath).Length != expectedSize || !ESResManifestIntegrity.VerifyFileSha256(localSourcePartPath, expectedHash))
                     {
@@ -799,40 +1339,201 @@ namespace ES
                     File.Move(localSourcePartPath, localPath);
                 }
                 verified[relativePath] = new ESRuntimeVerifiedFile { relativePath = relativePath, size = expectedSize, sha256 = expectedHash };
+                CompleteTransferFile(relativePath);
                 return;
             }
             string partPath = localPath + ".part";
             Directory.CreateDirectory(Path.GetDirectoryName(localPath));
+            if (TryPromoteVerifiedPart(partPath, localPath, relativePath, expectedSize, expectedHash))
+                return;
+
+            if (File.Exists(partPath) && new FileInfo(partPath).Length >= expectedSize)
+            {
+                VerboseLog("丢弃无效完整残片 | " + relativePath);
+                File.Delete(partPath);
+            }
+
             for (var attempt = 1; attempt <= MaxAttempts; attempt++)
             {
                 long length = File.Exists(partPath) ? new FileInfo(partPath).Length : 0;
+                BeginTransferFile(relativePath, expectedSize, attempt);
+                ReportTransferFileBytes(relativePath, length);
                 VerboseLog("下载资源文件 | Attempt=" + attempt + "/" + MaxAttempts + " | Resume=" + length + " | Size=" + expectedSize + " | " + url);
                 using (var request = UnityWebRequest.Get(url))
                 {
                     request.timeout = 30;
                     if (length > 0) request.SetRequestHeader("Range", "bytes=" + length + "-");
-                    request.downloadHandler = new DownloadHandlerFile(partPath, length > 0);
-                    await request.SendWebRequest().ToUniTask(cancellationToken: token);
-                    if (request.result != UnityWebRequest.Result.Success || (length > 0 && request.responseCode == 200))
+                    request.downloadHandler = CreateFileDownloadHandler(partPath, length > 0);
+                    await request.SendWebRequest().ToUniTask(progress: new TransferRequestProgress(this, request, relativePath, length), cancellationToken: token);
+                    bool rangeIgnored = length > 0 && request.responseCode == 200;
+                    bool rangeRejected = length > 0 && request.responseCode == 416;
+                    bool invalidContentRange = length > 0 && request.responseCode == 206
+                        && !HasExpectedContentRange(request, length);
+                    if (request.result == UnityWebRequest.Result.Success && !rangeIgnored && !rangeRejected && !invalidContentRange)
+                        PersistBufferedFileDownload(request, partPath, length > 0);
+                    if (rangeRejected)
+                    {
+                        if (TryPromoteVerifiedPart(partPath, localPath, relativePath, expectedSize, expectedHash))
+                            return;
+
+                        VerboseLog("Range 416 且残片无效，改为完整下载 | " + relativePath);
+                        DeleteFileIfExists(partPath);
+                    }
+                    else if (request.result != UnityWebRequest.Result.Success || rangeIgnored || invalidContentRange)
                     {
                         VerboseLog("资源下载失败，准备重试 | HTTP=" + request.responseCode + " | " + request.error + " | " + url);
-                        if (length > 0 && request.responseCode == 200 && File.Exists(partPath)) File.Delete(partPath);
-                        if (attempt == MaxAttempts) throw new IOException("资源文件下载失败：" + url + "，" + request.error);
-                        await UniTask.Delay(TimeSpan.FromSeconds(attempt), cancellationToken: token);
-                        continue;
+                        if (rangeIgnored || invalidContentRange)
+                            DeleteFileIfExists(partPath);
                     }
                 }
-                if (new FileInfo(partPath).Length == expectedSize && ESResManifestIntegrity.VerifyFileSha256(partPath, expectedHash))
+                if (TryPromoteVerifiedPart(partPath, localPath, relativePath, expectedSize, expectedHash))
                 {
-                    if (File.Exists(localPath)) File.Delete(localPath);
-                    File.Move(partPath, localPath);
-                    verified[relativePath] = new ESRuntimeVerifiedFile { relativePath = relativePath, size = expectedSize, sha256 = expectedHash };
-                    VerboseLog("资源校验完成 | " + relativePath + " | " + expectedSize + " bytes");
                     return;
                 }
-                if (File.Exists(partPath)) File.Delete(partPath);
+
+                // Network interruption may still have produced a valid prefix. Keep only a
+                // short prefix for the next Range request; a complete/oversized invalid part
+                // can never recover by appending and must be discarded.
+                if (File.Exists(partPath) && new FileInfo(partPath).Length >= expectedSize)
+                    DeleteFileIfExists(partPath);
+                if (attempt == MaxAttempts)
+                    throw new IOException("资源文件下载失败或完整性校验失败：" + url);
+                await UniTask.Delay(TimeSpan.FromSeconds(attempt), cancellationToken: token);
             }
             throw new IOException("资源文件完整性校验失败：" + url);
+        }
+
+        private bool TryPromoteVerifiedPart(string partPath, string localPath, string relativePath, long expectedSize, string expectedHash)
+        {
+            if (!File.Exists(partPath) || new FileInfo(partPath).Length != expectedSize)
+                return false;
+            ReportTransferVerification(relativePath, expectedSize);
+            if (!ESResManifestIntegrity.VerifyFileSha256(partPath, expectedHash))
+                return false;
+
+            DeleteFileIfExists(localPath);
+            File.Move(partPath, localPath);
+            verified[relativePath] = new ESRuntimeVerifiedFile { relativePath = relativePath, size = expectedSize, sha256 = expectedHash };
+            CompleteTransferFile(relativePath);
+            VerboseLog("资源校验完成 | " + relativePath + " | " + expectedSize + " bytes");
+            return true;
+        }
+
+        private static bool HasExpectedContentRange(UnityWebRequest request, long expectedStart)
+        {
+            string contentRange = request.GetResponseHeader("Content-Range");
+            return !string.IsNullOrEmpty(contentRange)
+                && contentRange.StartsWith("bytes " + expectedStart + "-", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void DeleteFileIfExists(string path)
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+
+        private static DownloadHandler CreateFileDownloadHandler(string path, bool append)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // DownloadHandlerFile is not available on every WebGL runtime. The buffer fallback
+            // trades per-file memory for a deterministic write into persistentDataPath.
+            return new DownloadHandlerBuffer();
+#else
+            return new DownloadHandlerFile(path, append);
+#endif
+        }
+
+        private static void PersistBufferedFileDownload(UnityWebRequest request, string path, bool append)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            byte[] bytes = request.downloadHandler.data;
+            if (bytes == null)
+                throw new IOException("WebGL download returned no file data: " + request.url);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            using (var stream = new FileStream(path, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None))
+                stream.Write(bytes, 0, bytes.Length);
+#endif
+        }
+
+        private async UniTask<T> ExecuteReleaseOperationAsync<T>(Func<UniTask<T>> operation, CancellationToken token)
+        {
+            await releaseOperationGate.WaitAsync(token);
+            try
+            {
+                return await operation();
+            }
+            finally
+            {
+                releaseOperationGate.Release();
+            }
+        }
+
+        private async UniTask ExecuteForCacheFileAsync(string localPath, Func<UniTask> operation, CancellationToken token)
+        {
+            CacheFileGate gate = AcquireCacheFileGate(localPath);
+            bool entered = false;
+            try
+            {
+                await gate.Semaphore.WaitAsync(token);
+                entered = true;
+                await operation();
+            }
+            finally
+            {
+                if (entered)
+                    gate.Semaphore.Release();
+                ReleaseCacheFileGate(localPath, gate);
+            }
+        }
+
+        private async UniTask<T> ExecuteForCacheFileAsync<T>(string localPath, Func<UniTask<T>> operation, CancellationToken token)
+        {
+            CacheFileGate gate = AcquireCacheFileGate(localPath);
+            bool entered = false;
+            try
+            {
+                await gate.Semaphore.WaitAsync(token);
+                entered = true;
+                return await operation();
+            }
+            finally
+            {
+                if (entered)
+                    gate.Semaphore.Release();
+                ReleaseCacheFileGate(localPath, gate);
+            }
+        }
+
+        private CacheFileGate AcquireCacheFileGate(string localPath)
+        {
+            if (string.IsNullOrWhiteSpace(localPath))
+                throw new ArgumentException("A cache file path is required.", nameof(localPath));
+
+            lock (cacheFileGateSync)
+            {
+                if (!cacheFileGates.TryGetValue(localPath, out CacheFileGate gate))
+                {
+                    gate = new CacheFileGate();
+                    cacheFileGates.Add(localPath, gate);
+                }
+                gate.UserCount++;
+                return gate;
+            }
+        }
+
+        private void ReleaseCacheFileGate(string localPath, CacheFileGate gate)
+        {
+            lock (cacheFileGateSync)
+            {
+                gate.UserCount--;
+                if (gate.UserCount != 0)
+                    return;
+
+                if (cacheFileGates.TryGetValue(localPath, out CacheFileGate current) && ReferenceEquals(current, gate))
+                    cacheFileGates.Remove(localPath);
+                gate.Semaphore.Dispose();
+            }
         }
 
         private bool IsVerified(string relativePath, string localPath, long size, string hash)
@@ -844,9 +1545,10 @@ namespace ES
             return true;
         }
 
-        private async UniTask<string> RequestTextAsync(string url, CancellationToken token)
+        private async UniTask<string> RequestTextAsync(string url, CancellationToken token, bool? localSourceOverride = null)
         {
-            if (useLocalReleaseSource)
+            bool localSource = localSourceOverride ?? useLocalReleaseSource;
+            if (localSource)
             {
                 token.ThrowIfCancellationRequested();
                 string sourcePath = ResolveLocalReleasePath(url);
@@ -866,6 +1568,13 @@ namespace ES
             using (var request = UnityWebRequest.Get(url))
             {
                 request.timeout = 30;
+                if (IsRootReleaseUrl(url))
+                {
+                    // Versioned release files are immutable; only this stable pointer must
+                    // revalidate with the CDN on every HotUpdate bootstrap.
+                    request.SetRequestHeader("Cache-Control", "no-cache");
+                    request.SetRequestHeader("Pragma", "no-cache");
+                }
                 await request.SendWebRequest().ToUniTask(cancellationToken: token);
                 if (request.result == UnityWebRequest.Result.Success) return request.downloadHandler.text;
                 if (attempt == MaxAttempts) throw new IOException("清单下载失败：" + url + "，" + request.error);
@@ -874,10 +1583,20 @@ namespace ES
             throw new InvalidOperationException();
         }
 
+        private bool IsRootReleaseUrl(string url)
+        {
+            string expected = useLocalReleaseSource
+                ? CombineLocalReleasePath(platform + "/ESAssetReleaseManifest.json")
+                : CombineUrl(settings.Path_Net, platform + "/ESAssetReleaseManifest.json");
+            return string.Equals(url, expected, StringComparison.OrdinalIgnoreCase);
+        }
+
         private void Report(ESRuntimeReleaseDownloadStage stage, string subject, int completedCount = 0, int totalCount = 0)
         {
             VerboseLog("阶段=" + stage + " | 目标=" + (subject ?? string.Empty) + " | " + completedCount + "/" + totalCount);
-            ProgressChanged?.Invoke(new ESRuntimeReleaseDownloadProgress(stage, subject, completedCount, totalCount));
+            var progress = new ESRuntimeReleaseDownloadProgress(stage, subject, completedCount, totalCount);
+            RecordDiagnosticProgress(progress);
+            ProgressChanged?.Invoke(progress);
         }
 
         private void VerboseLog(string message)
@@ -890,7 +1609,8 @@ namespace ES
         {
             verified.Clear();
             verifiedReleaseVersion = releaseVersion;
-            string path = Path.Combine(cacheRoot, "ESVerifiedFileIndex.json");
+            activeReleaseCacheRoot = Path.Combine(cacheRoot, "Releases", SafePathSegment(releaseVersion, "ReleaseVersion"));
+            string path = ReleaseCachePath("ESVerifiedFileIndex.json");
             if (!File.Exists(path)) return;
             try
             {
@@ -900,10 +1620,26 @@ namespace ES
             }
             catch { verified.Clear(); }
         }
-        private void SaveVerifiedIndex() => WriteTextAtomically(Path.Combine(cacheRoot, "ESVerifiedFileIndex.json"), JsonConvert.SerializeObject(new ESRuntimeVerifiedFileIndex { releaseVersion = verifiedReleaseVersion, files = verified.Values.OrderBy(item => item.relativePath, StringComparer.Ordinal).ToList() }, Formatting.Indented));
-        private static void WriteTextAtomically(string path, string text) { Directory.CreateDirectory(Path.GetDirectoryName(path)); string temp = path + ".tmp"; File.WriteAllText(temp, text); if (File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path); }
+        private void SaveVerifiedIndex() => WriteTextAtomically(ReleaseCachePath("ESVerifiedFileIndex.json"), JsonConvert.SerializeObject(new ESRuntimeVerifiedFileIndex { releaseVersion = verifiedReleaseVersion, files = verified.Values.OrderBy(item => item.relativePath, StringComparer.Ordinal).ToList() }, Formatting.Indented));
+        private static void WriteTextAtomically(string path, string text)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            string temp = path + ".tmp";
+            File.WriteAllText(temp, text);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // WebGL's virtual filesystem does not provide a durable File.Replace contract.
+            // The verified index is an optimization only: a crash here falls back to SHA-256.
+            DeleteFileIfExists(path);
+            File.Move(temp, path);
+#else
+            if (File.Exists(path)) File.Replace(temp, path, null);
+            else File.Move(temp, path);
+#endif
+        }
         private string ResolveLocalReleasePath(string url)
         {
+            if (!string.IsNullOrEmpty(url) && url.StartsWith(localReleaseRoot, StringComparison.OrdinalIgnoreCase))
+                return url;
             if (Path.IsPathRooted(url)) return url;
             string remoteRoot = (settings.Path_Net ?? string.Empty).TrimEnd('/', '\\');
             string relative = url ?? string.Empty;

@@ -22,8 +22,6 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: 
-  targetKind: 1
-  targetInfoKey: Level02_Spheres
   prefabs:
   - required: 1
     key:

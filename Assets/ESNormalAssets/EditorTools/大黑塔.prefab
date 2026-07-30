@@ -4948,7 +4948,7 @@ MonoBehaviour:
     rootMotionScale: 1
     rootMotionGroundOnly: 1
     moveInput: {x: 0, y: 0, z: 0}
-    lookInput: {x: 0, y: 0, z: 1}
+    lookInput: {x: 0, y: 0, z: 0}
     verticalInput: 0
     monitor:
       hasMotor: 0
@@ -4991,6 +4991,9 @@ MonoBehaviour:
           - rid: 3128556092067676160
           - rid: 3128556092067676163
           - rid: 3128556117779808274
+          - rid: 4000000000000000001
+          - rid: 4000000000000000002
+          - rid: 4000000000000000003
           MayHasAddingElement: 1
         autoEnsureFootPlacementModule: 0
         autoEnsureRuntimeWatchModule: 0
@@ -5009,6 +5012,7 @@ MonoBehaviour:
           - rid: 3128555942915604487
           - rid: 3128555942915604488
           MayHasAddingElement: 1
+        autoEnsurePlayerInputModules: 1
     - rid: 3128555942915604484
       type: {class: EntityBasicMoveRotateModule, ns: ES, asm: ES_Logic}
       data:
@@ -5178,9 +5182,10 @@ MonoBehaviour:
         totalMoveTime: 0
         avgSpeedLast1s: 0
     - rid: 3128555942915604488
-      type: {class: EntityAIInputSystemModule, ns: ES, asm: ES_Logic}
+      type: {class: EntityPlayerInputWriteModule, ns: ES, asm: ES_Logic}
       data:
         _enableSelf: 1
+        enablePlayerInput: 1
         enableInput: 1
         moveAction:
           m_UseReference: 0
@@ -6272,6 +6277,43 @@ MonoBehaviour:
         ikLastHintTarget: {fileID: 0}
         ikLastTargetMoveDistance: 0
         ikLastWriteTime: 0
+    - rid: 4000000000000000001
+      type: {class: EntityBasicFlyModule, ns: ES, asm: ES_Logic}
+      data:
+        _enableSelf: 1
+        enableFly: 1
+        flyHold: 0
+        Fly_StateName: "\u98DE\u884C"
+        applyOnEnable: 1
+        applyEveryFrame: 0
+        fly:
+          flyMaxSpeed: 10
+          flyAcceleration: 12
+          flyDrag: 0.2
+          flyGravityScale: 0.1
+        flyAscendMultiplier: 1.5
+        flyDescendMultiplier: 1
+        flyUngroundTime: 0.1
+        verticalInput: 0
+    - rid: 4000000000000000002
+      type: {class: EntityBasicSwimModule, ns: ES, asm: ES_Logic}
+      data:
+        _enableSelf: 1
+        enableSwim: 1
+        applyOnEnable: 1
+        applyEveryFrame: 0
+        swim:
+          swimMaxSpeed: 6
+          swimAcceleration: 8
+          swimDrag: 0.5
+          swimBuoyancy: 6
+        verticalInput: 0
+    - rid: 4000000000000000003
+      type: {class: EntityBasicRootMotionModule, ns: ES, asm: ES_Logic}
+      data:
+        _enableSelf: 1
+        enableRootMotion: 1
+        minDeltaTime: 0.0001
 --- !u!136 &2735239592279376377
 CapsuleCollider:
   m_ObjectHideFlags: 8

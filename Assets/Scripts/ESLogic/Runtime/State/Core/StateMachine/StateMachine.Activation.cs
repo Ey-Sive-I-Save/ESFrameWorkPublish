@@ -400,6 +400,20 @@ namespace ES
             return TryActivateState(state, layer, ignore);
         }
 
+        private bool MatchesActivationTagCondition(StateBase targetState)
+        {
+            ESTagConditionConfig condition = targetState != null && targetState.stateSharedData != null
+                ? targetState.stateSharedData.activationTagCondition
+                : null;
+            if (condition == null || condition.IsEmpty)
+                return true;
+
+            if (hostEntity == null)
+                return false;
+
+            return hostEntity.Tags.Matches(condition);
+        }
+
         public bool ExecuteStateActivation(StateBase targetState, StateLayerType layer, in StateActivationResult result)
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -409,6 +423,9 @@ namespace ES
 #else
             if (targetState == null || targetState.stateSharedData == null || targetState.stateSharedData.basicConfig == null) return false;
 #endif
+
+            if (!MatchesActivationTagCondition(targetState))
+                return false;
 
             var sharedData = targetState.stateSharedData;
             var basicConfig = sharedData.basicConfig;

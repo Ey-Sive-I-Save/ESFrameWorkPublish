@@ -47,7 +47,24 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Bind(ESFloatValueChangeSet targetSet)
         {
+            if (!TryBind(targetSet))
+                throw new InvalidOperationException("Cannot bind an ESFloatValueChangeTracker while it still owns active tokens. ReleaseAll first.");
+        }
+
+        /// <summary>
+        /// Binds a target set only when this tracker does not own modifiers in another set.
+        /// This prevents a later release from affecting an unrelated target.
+        /// </summary>
+        public bool TryBind(ESFloatValueChangeSet targetSet)
+        {
+            if (ReferenceEquals(set, targetSet))
+                return true;
+
+            if (tokens.Count != 0)
+                return false;
+
             set = targetSet;
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -59,6 +76,9 @@ namespace ES
 
         public ESValueChangeToken Add(ESFloatValueChangeOp op, float value, int priority = 0, bool enabled = true)
         {
+            if (set == null)
+                throw new InvalidOperationException("ESFloatValueChangeTracker must be bound before adding a modifier.");
+
             ESValueChangeToken token = set.Add(op, value, ownerId, sourceId, priority, enabled);
             Track(token);
             return token;
@@ -66,12 +86,17 @@ namespace ES
 
         public bool Update(ESValueChangeToken token, float value)
         {
-            return set.Update(token, value);
+            return set != null && set.Update(token, value);
+        }
+
+        public bool Update(ESValueChangeToken token, ESFloatValueChangeOp op, float value, int priority)
+        {
+            return set != null && set.Update(token, op, value, priority);
         }
 
         public bool SetEnabled(ESValueChangeToken token, bool enabled)
         {
-            return set.SetEnabled(token, enabled);
+            return set != null && set.SetEnabled(token, enabled);
         }
 
         public bool Release(ESValueChangeToken token)
@@ -80,7 +105,7 @@ namespace ES
                 return false;
 
             RemoveLocalAt(index);
-            return set.Release(token);
+            return set != null && set.Release(token);
         }
 
         public int SetAllEnabled(bool enabled)
@@ -88,7 +113,7 @@ namespace ES
             int changed = 0;
             for (int i = 0; i < tokens.Count; i++)
             {
-                if (set.SetEnabled(tokens[i], enabled))
+                if (set != null && set.SetEnabled(tokens[i], enabled))
                     changed++;
             }
 
@@ -100,7 +125,7 @@ namespace ES
             int released = 0;
             for (int i = tokens.Count - 1; i >= 0; i--)
             {
-                if (set.Release(tokens[i]))
+                if (set != null && set.Release(tokens[i]))
                     released++;
             }
 
@@ -122,6 +147,12 @@ namespace ES
 
         private void Track(ESValueChangeToken token)
         {
+            if (!token.IsValid)
+                return;
+
+            if (indexByTokenId.TryGetValue(token.tokenId, out int existingIndex))
+                RemoveLocalAt(existingIndex);
+
             indexByTokenId[token.tokenId] = tokens.Count;
             tokens.Add(token);
         }
@@ -135,7 +166,9 @@ namespace ES
             }
 
             ESValueChangeToken current = tokens[index];
-            return current.tokenId == token.tokenId && current.tokenVersion == token.tokenVersion;
+            return current.setId == token.setId
+                && current.tokenId == token.tokenId
+                && current.tokenVersion == token.tokenVersion;
         }
 
         private void RemoveLocalAt(int index)

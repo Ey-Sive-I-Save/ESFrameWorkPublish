@@ -22,19 +22,19 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: 
-  targetKind: 1
-  targetInfoKey: Level01_Blocks
+  releaseOnExit: 1
+  releaseDelaySeconds: 0
   prefabs:
   - required: 1
     key:
       enumKey: 0
       stringKey: level_validation_1_red
-      guid: 00000000000000001a9f400000000000
+      guid: 
       localFileId: 0
-      assetTypeName: UnityEngine.GameObject
+      assetTypeName: 
       address: 
       groupName: 
-      editorPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Red.prefab
+      editorPath: 
       editorOnly: 0
       alwaysLoaded: 0
   - required: 1
@@ -52,13 +52,13 @@ MonoBehaviour:
   - required: 1
     key:
       enumKey: 0
-      stringKey: level_validation_1_blue
-      guid: 00000000000000001a9f400000000002
+      stringKey: "Level01_Blocks_Blue_\u65B0\u9884\u5236\u4EF6"
+      guid: 5ce35da9235246e4e8b6045d2390e3a9
       localFileId: 0
       assetTypeName: UnityEngine.GameObject
       address: 
       groupName: 
-      editorPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue.prefab
+      editorPath: "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue_\u65B0\u9884\u5236\u4EF6.prefab"
       editorOnly: 0
       alwaysLoaded: 0
   - required: 1
@@ -99,19 +99,32 @@ MonoBehaviour:
       alwaysLoaded: 0
   prefabPrewarms: []
   sprites: []
-  materials: []
+  materials:
+  - required: 1
+    key:
+      enumKey: 0
+      stringKey: 
+      guid: 
+      localFileId: 0
+      assetTypeName: 
+      address: 
+      groupName: 
+      editorPath: 
+      editorOnly: 0
+      alwaysLoaded: 0
+  audioClips: []
   meshes: []
   textures: []
   texture2Ds: []
   spriteAtlases: []
   avatars: []
   terrainDatas: []
-  audioClips: []
   animationClips: []
   animatorControllers: []
   playableAssets: []
   timelineAssets: []
   videoClips: []
   scriptableObjects: []
-  releaseOnExit: 1
-  releaseDelaySeconds: 0
+  gameCoreSources: []
+  bakedAssets: []
+  bakedExpansionHash: 

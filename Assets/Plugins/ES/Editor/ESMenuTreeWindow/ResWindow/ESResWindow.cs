@@ -11,10 +11,17 @@ using UnityEditorInternal;
 using UnityEngine;
 namespace ES
 {
-    [InitializeOnLoad]
+    public sealed class ESResWindowEditorBridgeInitializer : EditorInvoker_Level2
+    {
+        public override void InitInvoke()
+        {
+            ESResWindow.RegisterEditorBridge();
+        }
+    }
+
     public class ESResWindow : ESMenuTreeWindowAB<ESResWindow> //OdinMenuEditorWindow
     {
-        static ESResWindow()
+        internal static void RegisterEditorBridge()
         {
             ESAssetReferEditorBridge.OpenRegistryPage = OpenAndSelectAssetPage;
         }
@@ -50,12 +57,14 @@ namespace ES
         [MenuItem(MenuItemPathDefine.RESOURCE_WINDOW_PATH, false, 0)]
         public static void TryOpenWindow()
         {
+            ESWindowCommandRegistry.RecordOpened("asset_window");
             OpenWindow();
         }
 
         [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "资产管理窗口", false, 0)]
         public static void TryOpenWindowFromQuickWindows()
         {
+            ESWindowCommandRegistry.RecordOpened("asset_window");
             OpenWindow();
         }
 

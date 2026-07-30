@@ -9,6 +9,7 @@ namespace ES
     /// 资源加载模式在本次进程初始化时冻结。运行中即使编辑器修改了 Setting，资源链也不会悄悄切换后端。
     /// Domain Reload / 新进程会自然创建下一次会话。
     /// </summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public static class ESAssetRunModeSession
     {
         private static readonly object SyncRoot = new object();
@@ -52,7 +53,7 @@ namespace ES
         }
     }
 
-    internal abstract class ESRuntimeAssetProviderBase : IESAssetRuntimeProvider
+    internal abstract class ESRuntimeAssetProviderBase : IESAssetRuntimeProvider, IESRuntimeAssetOperationTracker
     {
         private readonly ESRuntimeAssetLoader loader;
 
@@ -76,6 +77,9 @@ namespace ES
             => loader.UnloadZeroReferenceAssetBundlesAtSafePointAsync(cancellationToken);
         public void UnloadAllAtSafePoint() => loader.UnloadAllAtSafePoint();
         public void Dispose() => loader.Dispose();
+        public bool HasPendingOperations => loader.HasPendingOperations;
+        public UniTask WaitForPendingOperationsAsync(System.Threading.CancellationToken cancellationToken = default)
+            => loader.WaitForPendingOperationsAsync(cancellationToken);
     }
 
     internal sealed class ESRuntimeAssetBundleRuntimeProvider : ESRuntimeAssetProviderBase
@@ -92,6 +96,8 @@ namespace ES
     }
 #endif
 
+    /// <summary>框架装配入口。业务代码使用 ESAssetRefer 或 ResourcePlan，不直接创建 Provider。</summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public static class ESAssetRuntimeProviderFactory
     {
         public static IESAssetRuntimeProvider Create(ESGlobalAssetRuntimeMap runtimeMap, ESGlobalResSetting settings, ESRuntimeRetryPolicy retryPolicy)
@@ -118,11 +124,4 @@ namespace ES
         }
     }
 
-    /// <summary>兼容旧的新版调用点；新代码请使用 ESAssetRuntimeProviderFactory。</summary>
-    [Obsolete("Use ESAssetRuntimeProviderFactory.")]
-    public static class ESRuntimeAssetProviderFactory
-    {
-        public static IESAssetRuntimeProvider Create(ESGlobalAssetRuntimeMap runtimeMap, ESGlobalResSetting settings, ESRuntimeRetryPolicy retryPolicy)
-            => ESAssetRuntimeProviderFactory.Create(runtimeMap, settings, retryPolicy);
-    }
 }

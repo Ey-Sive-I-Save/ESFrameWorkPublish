@@ -1,9 +1,10 @@
 using System;
+using UnityEngine;
 
 namespace ES
 {
     [ESEnumScript("Assets/Scripts/ESLogic/Data/AssetConfigKey/ESAssetReferSpriteAtlas/ESAssetReferSpriteAtlasConfigKey.cs")]
-    public enum ESAssetReferSpriteAtlasEnumKey : ushort { None = 0, Custom = 1 }
+    public enum ESAssetReferSpriteAtlasEnumKey : ushort { [InspectorName("未配置")] None = 0, [InspectorName("自定义")] Custom = 1 }
 
     [Serializable]
     public sealed class ESAssetReferSpriteAtlasConfigKey : ESAssetConfigKey<ESAssetReferSpriteAtlasEnumKey> { }

@@ -11,7 +11,7 @@ namespace ES.EditorInternal
     /// </summary>
     public sealed class ESConfigKeyPriorityProcessor : OdinAttributeProcessor<IESConfigKey>
     {
-        private const double IdentityOrder = -10000d;
+        private const float IdentityOrder = -10000f;
 
         public override void ProcessSelfAttributes(InspectorProperty property, List<Attribute> attributes)
         {

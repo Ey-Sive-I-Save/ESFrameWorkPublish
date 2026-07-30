@@ -238,6 +238,62 @@ SkillSupport
 - 不要绕过 `StateSupportFlags`。飞行、游泳、攀爬、骑乘依赖它切换 KCC 分支。
 - Item/Shot 体系不要替换 Entity KCC 热路径。
 
+## P0 冻结：Entity 新运动能力扩展规范
+
+本节为最高优先级约束。后续 AI 或开发者新增飞行、滑翔、墙跑、绳索、载具等运动能力时，必须沿用现有 `Entity → BasicDomain Module → EntityKCCData → KinematicCharacterMotor` 链路，不得再造运动大根或中央类型分派。
+
+标准扩展流程：
+
+```text
+1. 在既有 Basic Domain 的合适文件中新增/扩展一个 EntityBasicXXXModule
+2. 按实际需要实现：
+   IEntityKCCBeforeMotion
+   IEntityKCCRotationMotion
+   IEntityKCCVelocityMotion
+3. Start 中以幂等方式注册：
+   if (!_motionRegistration.IsValid)
+       _motionRegistration = MyCore.kcc.RegisterMotionFeature(this, order);
+4. 每个 KCC 回调首段检查 Signal_IsActiveAndEnable、模块开关和 StateSupportFlags
+5. OnDisable 只结束本模块的运行语义、状态和持续输入；保留注册句柄供重新启用复用
+6. OnDestroy 调用 UnregisterMotionFeature(ref _motionRegistration)，并清理模块反向引用
+```
+
+权威边界：
+
+- AI Domain 只采样玩家、AI、剧情、网络等控制来源，并形成运动请求。
+- Basic Domain Module 只实现身体能力，不直接成为最终 Transform 权威。
+- StateMachine 负责运动状态、动画时序、SupportFlags 与 MatchTarget 语义。
+- `EntityKCCData` 负责调度各运动能力；`KinematicCharacterMotor` 是根位置和根旋转的最终执行权威。
+- MatchTarget 只能由 State 计算并通过 `QueueMatchTargetPose` 提交，在 KCC `BeforeCharacterUpdate` 边界应用；普通 `Update` 禁止直接写玩家根 Transform 或 Motor。
+
+生命周期硬规则：
+
+- `Start` 注册必须幂等，禁止重复注册。
+- 动态禁用后，KCC 回调必须立即失效，且不得残留飞行、攀爬、游泳、骑乘状态或持续输入。
+- 重新启用不得产生第二份调度任务。
+- `OnDestroy` 注销必须可重复调用且安全；模块销毁后调度器中不得残留任务。
+- 不允许通过反射、中央 `switch`、扫描全部 Module 或每帧重建调度表完成扩展。
+
+热路径硬规则：
+
+- `BeforeCharacterUpdate`、`UpdateRotation`、`UpdateVelocity` 和输入分发高频路径不得使用 LINQ、闭包、反射、字符串查找、每帧 `GetComponent`、每帧 `new`、可增长容器或装箱接口枚举。
+- 调度器、缓存、固定缓冲在初始化阶段预热；Profiler 必须在目标发布平台确认每个 FixedTick 的 `GC Alloc = 0 B`。
+- 调试日志与 Gizmos 必须受 Editor、Development Build 或显式调试开关保护。
+
+网络扩展原则：
+
+- 网络层传输输入命令、状态快照、Tick、序号和必要的权威纠正，不同步各模块内部对象引用。
+- 客户端预测与回滚必须复用同一套 KCC 运动求解入口；禁止额外写 Transform 的“网络运动分支”。
+- 影响逻辑的运动参数、随机种子和 MatchTarget 目标采样必须可按 Tick 重放。
+
+发布冻结前必须完成以下 PlayMode/Profiler 验收，不得仅凭静态代码判断完成：
+
+- 普通移动、跳跃、飞行、游泳、攀爬、攀上、翻越、攀爬跳跃、骑乘逐项验证进入、持续、退出和被打断。
+- MatchTarget 验证一帧多个 Update、一次渲染帧前多个 FixedTick、最终帧、状态提前退出、动态目标移动、骑乘中断与重新进入。
+- 动态切换模块 `_enableSelf`，验证禁用立即停止接管、重新启用无重复任务、移除后调度器数量恢复、重复注销安全。
+- 在目标发布平台使用 Unity Profiler 验证 KCC 每个 FixedTick 的 `GC Alloc = 0 B`；Editor 结果只能作为预检查。
+- 原型 Entity 必须通过 Basic Domain 的“检查完整运动原型”和 AI Domain 的“检查玩家输入链路”按钮。
+
 ## 当前实现状态
 
 已落地：

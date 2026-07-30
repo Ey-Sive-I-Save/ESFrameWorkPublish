@@ -113,6 +113,12 @@ namespace ES
         [InfoBox("步骤1：设置状态名、层级、优先级", InfoMessageType.Info)]
         public StateBasicConfig basicConfig = new StateBasicConfig();
 
+        [TabGroup("状态配置", "核心", Order = 0, TextColor = "@ESDesignUtility.ColorSelector.GetColor(\"雾蓝\")"), PropertyOrder(0)]
+        [BoxGroup("状态配置/核心/配置", ShowLabel = false)]
+        [LabelText("激活 Tag 条件")]
+        [Tooltip("状态机执行激活前检查宿主 Entity 的 Core + Extension Tag。为空时不限制。")]
+        public ESTagConditionConfig activationTagCondition = new ESTagConditionConfig();
+
         // ========================================
         // 动画配置
         // ========================================

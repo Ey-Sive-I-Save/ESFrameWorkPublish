@@ -3,8 +3,10 @@
     "rootNamespace": "",
     "references": [
         "ES_Logic",
+        "ES_Editor",
         "ES_Stand",
         "ES_Design",
+        "KCC",
         "Unity.InputSystem",
         "Unity.TextMeshPro"
     ],

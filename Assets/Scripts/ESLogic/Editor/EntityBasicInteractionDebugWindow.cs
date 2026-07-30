@@ -120,6 +120,8 @@ namespace ES
             EditorGUILayout.Toggle("交互中", _boundModule.isInteracting);
             EditorGUILayout.ObjectField("当前候选", _boundModule.currentCandidate, typeof(ESInteractable), true);
             EditorGUILayout.ObjectField("当前激活", _boundModule.activeInteractable, typeof(ESInteractable), true);
+            EditorGUILayout.EnumPopup("最近检查结果", _boundModule.lastCheckResult);
+            EditorGUILayout.EnumPopup("最近结束原因", _boundModule.lastEndReason);
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField("IK 写入观测", EditorStyles.boldLabel);

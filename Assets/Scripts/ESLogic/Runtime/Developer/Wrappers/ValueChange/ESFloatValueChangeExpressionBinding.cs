@@ -12,6 +12,8 @@ namespace ES
 
         [NonSerialized] private ESValueChangeToken token;
 
+        public bool IsDeterministic => value == null || value.IsDeterministic;
+
         public bool HasApplied
         {
             get { return token.IsValid; }
@@ -27,8 +29,14 @@ namespace ES
             ESRuntimeTargetPack target,
             ESOpSupport support)
         {
+            if (!IsDeterministic)
+                return token;
+
             float finalValue = value.Evaluate(target, support);
-            if (token.IsValid && tracker.Update(token, finalValue))
+            if (float.IsNaN(finalValue) || float.IsInfinity(finalValue))
+                return token;
+
+            if (token.IsValid && tracker.Update(token, op, finalValue, priority))
             {
                 tracker.SetEnabled(token, enabled);
                 return token;

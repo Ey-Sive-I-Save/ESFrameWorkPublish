@@ -73,7 +73,7 @@ namespace ES.Editor
 
             Rect addRect = new Rect(rect.xMax - 116f, rect.y + 4f, 52f, Line);
             if (GUI.Button(addRect, "添加"))
-                ShowAddMenu(commands);
+                ShowAddMenu(addRect, commands);
 
             Rect clearRect = new Rect(rect.xMax - 58f, rect.y + 4f, 52f, Line);
             using (new EditorGUI.DisabledScope(commands.arraySize == 0))
@@ -158,22 +158,33 @@ namespace ES.Editor
                 new Vector3(rect.x, rect.y));
         }
 
-        private static void ShowAddMenu(SerializedProperty commands)
+        private static void ShowAddMenu(Rect anchorRect, SerializedProperty commands)
         {
-            GenericMenu menu = new GenericMenu();
             EnsureCommandTypes();
+            var entries = new List<ESSearchDropdown.Entry>(commandTypes.Count);
 
             for (int i = 0; i < commandTypes.Count; i++)
             {
                 Type type = commandTypes[i];
                 string menuName = GetMenuName(type);
-                menu.AddItem(new GUIContent(menuName), false, AddCommand, new AddCommandData(commands, type));
+                int separator = menuName.LastIndexOf('/');
+                string groupPath = separator > 0 ? menuName.Substring(0, separator) : null;
+                string label = separator >= 0 ? menuName.Substring(separator + 1) : menuName;
+                AddCommandData data = new AddCommandData(commands, type);
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    label,
+                    () => AddCommand(data),
+                    groupPath,
+                    EditorGUIUtility.IconContent("cs Script Icon").image as Texture2D,
+                    subtitle: type.Name,
+                    tooltip: type.FullName,
+                    badge: "命令"));
             }
 
             if (commandTypes.Count == 0)
-                menu.AddDisabledItem(new GUIContent("没有可用命令"));
+                entries.Add(ESSearchDropdown.Entry.Disabled("没有可用命令"));
 
-            menu.ShowAsContext();
+            ESSearchDropdown.Open(anchorRect, "添加 ES 命令", entries);
         }
 
         private static void AddCommand(object userData)

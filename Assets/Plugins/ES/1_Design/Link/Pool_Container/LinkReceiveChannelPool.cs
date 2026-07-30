@@ -1,239 +1,134 @@
-using ES;
-using Sirenix.OdinInspector;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using ES;
 using UnityEngine;
-#if UNITY_EDITOR
-#endif
 
-/*Channel 只是一个枚举或者静态类*/
 /// <summary>
-/// LinkReceiveChannelPool
-///
-/// 多通道 Link 接收者容器，按通道分组管理接收者集合。
-/// 功能特性：
-/// - 使用 SafeKeyGroup 按通道 (Channel) 分组存储接收者；
-/// - 支持多通道并发分发，每个通道独立管理接收者列表；
-/// - 自动清理已销毁的 Unity 对象接收者；
-/// - 提供通道级别的添加/移除接收者操作；
-/// - 适用于需要按通道分类管理事件监听的复杂系统。
+/// 按 Channel 精准分发的 Link 接收池。
+/// 每个 Channel 的订阅者按引用身份去重；派发期间的增删统一在下一轮生效。
 /// </summary>
-/// <typeparam name="Channel">通道标识的类型，通常为枚举。</typeparam>
-/// <typeparam name="Link">传递的链接数据的类型。</typeparam>
-[Serializable]
-public class LinkReceiveChannelPool<Channel, Link>
+public sealed class LinkReceiveChannelPool<Channel, Link>
 {
-    #region 字段 (Fields)
+    private const int DefaultChannelCapacity = 8;
+    private const int DefaultReceiverCapacity = 4;
 
-    /// <summary>
-    /// 通道接收者分组，使用 SafeKeyGroup 按通道组织支持派发期间安全增删的接收者列表。
-    /// </summary>
-    [HideLabel]
-    private SafeKeyGroup<Channel, IReceiveChannelLink<Channel, Link>> _channelReceivers = new SafeKeyGroup<Channel, IReceiveChannelLink<Channel, Link>>();
-    private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>(4);
-    private readonly List<ActionReceiverRecord> _actionReceivers = new List<ActionReceiverRecord>(4);
+    private readonly Dictionary<Channel, LinkSubscriptionList<IReceiveChannelLink<Channel, Link>>> channelReceivers;
+    private readonly int receiverCapacity;
 
-    private struct ActionReceiverRecord
+    public int ChannelCount => channelReceivers.Count;
+
+    public LinkReceiveChannelPool(int channelCapacity = DefaultChannelCapacity, int receiverCapacity = DefaultReceiverCapacity)
     {
-        public Channel Channel;
-        public ReceiveChannelLink<Channel, Link> Receiver;
+        if (channelCapacity < 0) throw new ArgumentOutOfRangeException(nameof(channelCapacity));
+        if (receiverCapacity < 0) throw new ArgumentOutOfRangeException(nameof(receiverCapacity));
+
+        channelReceivers = new Dictionary<Channel, LinkSubscriptionList<IReceiveChannelLink<Channel, Link>>>(channelCapacity);
+        this.receiverCapacity = receiverCapacity;
     }
 
-    public LinkReceiveChannelPool()
+    /// <summary>向指定 Channel 注册接收者。重复注册返回 false。</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool AddReceiver(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
     {
-        _channelReceivers.SetAutoCreateOnAccess(false);
-    }
+        if (receiver == null)
+            return false;
 
-    #endregion
-
-    #region 核心功能 (Core Functionality)
-
-    /// <summary>
-    /// 发送指定通道的链接通知。
-    /// 通知该通道下所有有效的接收者。
-    /// </summary>
-    /// <param name="channel">目标通道。</param>
-    /// <param name="link">链接数据。</param>
-    public void SendLink(Channel channel, Link link)
-    {
-        if (!_channelReceivers.Groups.TryGetValue(channel, out var receivers))
+        if (!channelReceivers.TryGetValue(channel, out LinkSubscriptionList<IReceiveChannelLink<Channel, Link>> receivers))
         {
-            RecyclePending();
-            return;
+            receivers = new LinkSubscriptionList<IReceiveChannelLink<Channel, Link>>(receiverCapacity);
+            channelReceivers.Add(channel, receivers);
         }
 
-        receivers.ApplyBuffers();
-        RecyclePending();
-        int count = receivers.ValuesNow.Count;
-        for (int i = 0; i < count; i++)
+        return receivers.Add(receiver);
+    }
+
+    /// <summary>注销指定 Channel 的接收者。未注册时返回 false。</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool RemoveReceiver(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
+    {
+        return receiver != null
+            && channelReceivers.TryGetValue(channel, out LinkSubscriptionList<IReceiveChannelLink<Channel, Link>> receivers)
+            && receivers.Remove(receiver);
+    }
+
+    /// <summary>
+    /// 仅向指定 Channel 的当前订阅快照派发。回调异常直接向上抛出，不在热路径隔离。
+    /// </summary>
+    public void SendLink(Channel channel, Link link)
+    {
+        if (!channelReceivers.TryGetValue(channel, out LinkSubscriptionList<IReceiveChannelLink<Channel, Link>> receivers))
+            return;
+
+        receivers.BeginDispatch();
+        try
         {
-            IReceiveChannelLink<Channel, Link> currentReceiver = receivers.ValuesNow[i];
-            if (currentReceiver is UnityEngine.Object ob)
+            int count = receivers.ValuesNow.Count;
+            for (int i = 0; i < count; i++)
             {
-                if (ob != null)
+                IReceiveChannelLink<Channel, Link> receiver = receivers.ValuesNow[i];
+                if (receiver is UnityEngine.Object unityObject)
                 {
-                    currentReceiver.OnLink(channel, link);
+                    if (unityObject != null)
+                        receiver.OnLink(channel, link);
+                    else
+                        receivers.Remove(receiver);
+                }
+                else if (receiver != null)
+                {
+                    receiver.OnLink(channel, link);
                 }
                 else
                 {
-                    receivers.Remove(currentReceiver);
-                }
-            }
-            else if (currentReceiver != null)
-            {
-                currentReceiver.OnLink(channel, link);
-            }
-            else
-            {
-                receivers.Remove(currentReceiver);
-            }
-        }
-    }
-
-    #endregion
-
-    #region 接收者管理 (Receiver Management)
-
-    /// <summary>
-    /// 尝试移除指定通道的接收者（内部使用）。
-    /// </summary>
-    /// <param name="channel">通道标识。</param>
-    /// <param name="receiver">要移除的接收者。</param>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void Internal_TryRemove(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
-    {
-        RemoveReceiver(channel, receiver);
-    }
-
-    private void ScheduleRecycle(object receiver)
-    {
-        if (receiver is IPoolableAuto poolable && !poolable.IsRecycled)
-        {
-            _pendingRecycle.Add(poolable);
-        }
-    }
-
-    private void RecyclePending()
-    {
-        int count = _pendingRecycle.Count;
-        if (count == 0) return;
-        for (int i = 0; i < count; i++)
-        {
-            var poolable = _pendingRecycle[i];
-            if (poolable != null && !poolable.IsRecycled)
-            {
-                poolable.TryAutoPushedToPool();
-            }
-        }
-        _pendingRecycle.Clear();
-    }
-
-    /// <summary>
-    /// 添加指定通道的接收者。
-    /// </summary>
-    /// <param name="channel">通道标识。</param>
-    /// <param name="receiver">要添加的接收者。</param>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AddReceiver(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
-    {
-        _channelReceivers.Add(channel, receiver);
-    }
-
-    /// <summary>
-    /// 移除指定通道的接收者。
-    /// </summary>
-    /// <param name="channel">通道标识。</param>
-    /// <param name="receiver">要移除的接收者。</param>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void RemoveReceiver(Channel channel, IReceiveChannelLink<Channel, Link> receiver)
-    {
-        if (_channelReceivers.Groups.TryGetValue(channel, out var receivers))
-        {
-            receivers.Remove(receiver);
-        }
-        ScheduleRecycle(receiver);
-    }
-
-    /// <summary>
-    /// 添加基于 Action 的指定通道接收者。
-    /// </summary>
-    /// <param name="channel">通道标识。</param>
-    /// <param name="action">要添加的 Action 委托。</param>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void AddReceiver(Channel channel, Action<Channel, Link> action)
-    {
-        var receiver = action.MakeReceive();
-        _actionReceivers.Add(new ActionReceiverRecord { Channel = channel, Receiver = receiver });
-        _channelReceivers.Add(channel, receiver);
-    }
-
-    /// <summary>
-    /// 移除基于 Action 的指定通道接收者。
-    /// </summary>
-    /// <param name="channel">通道标识。</param>
-    /// <param name="action">要移除的 Action 委托。</param>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void RemoveReceiver(Channel channel, Action<Channel, Link> action)
-    {
-        for (int i = _actionReceivers.Count - 1; i >= 0; i--)
-        {
-            var record = _actionReceivers[i];
-            if (EqualityComparer<Channel>.Default.Equals(record.Channel, channel) && record.Receiver.action == action)
-            {
-                _actionReceivers.RemoveAt(i);
-                RemoveReceiver(channel, record.Receiver);
-                return;
-            }
-        }
-
-        if (_channelReceivers.Groups.TryGetValue(channel, out var receivers))
-        {
-            for (int i = 0; i < receivers.ValuesNow.Count; i++)
-            {
-                var receiver = receivers.ValuesNow[i];
-                if (receiver is ReceiveChannelLink<Channel, Link> receiveLink && receiveLink.action == action)
-                {
-                    RemoveReceiver(channel, receiver);
-                    return;
+                    receivers.Remove(receiver);
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// 清除所有通道的接收者。
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Clear()
-    {
-        _channelReceivers.ApplyBuffers();
-        RecyclePending();
-        foreach (var pair in _channelReceivers.Groups)
+        finally
         {
-            var receivers = pair.Value;
-            for (int i = 0; i < receivers.ValuesNow.Count; i++)
-            {
-                if (receivers.ValuesNow[i] is IPoolableAuto poolable && !poolable.IsRecycled)
-                {
-                    poolable.TryAutoPushedToPool();
-                }
-            }
+            receivers.EndDispatch();
         }
-        _channelReceivers.Clear();
-        _actionReceivers.Clear();
     }
 
-    /// <summary>
-    /// 手动应用缓冲区中的更改。
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    /// <summary>初始化阶段预留 Channel 字典容量，避免后续首次注册扩容。</summary>
+    public void ReserveChannels(int capacity)
+    {
+        if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+        channelReceivers.EnsureCapacity(capacity);
+    }
+
+    /// <summary>为一个已知 Channel 预建接收者表，后续该 Channel 的前 capacity 次注册不扩容。</summary>
+    public void ReserveChannel(Channel channel, int capacity)
+    {
+        if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+        if (!channelReceivers.TryGetValue(channel, out LinkSubscriptionList<IReceiveChannelLink<Channel, Link>> receivers))
+        {
+            receivers = new LinkSubscriptionList<IReceiveChannelLink<Channel, Link>>(capacity);
+            channelReceivers.Add(channel, receivers);
+            return;
+        }
+
+        receivers.Reserve(capacity);
+    }
+
+    public int GetSubscriberCount(Channel channel)
+    {
+        return channelReceivers.TryGetValue(channel, out LinkSubscriptionList<IReceiveChannelLink<Channel, Link>> receivers)
+            ? receivers.Count
+            : 0;
+    }
+
+    /// <summary>提交所有 Channel 的待变更订阅。通常无需手动调用，SendLink 会自动提交目标 Channel。</summary>
     public void ApplyBuffers()
     {
-        _channelReceivers.ApplyBuffers();
-        RecyclePending();
+        foreach (LinkSubscriptionList<IReceiveChannelLink<Channel, Link>> receivers in channelReceivers.Values)
+            receivers.ApplyBuffers();
     }
 
-    #endregion
+    /// <summary>清空所有订阅。若某个 Channel 正在派发，其清空将在下一轮生效。</summary>
+    public void Clear()
+    {
+        foreach (LinkSubscriptionList<IReceiveChannelLink<Channel, Link>> receivers in channelReceivers.Values)
+            receivers.Clear();
+    }
 }

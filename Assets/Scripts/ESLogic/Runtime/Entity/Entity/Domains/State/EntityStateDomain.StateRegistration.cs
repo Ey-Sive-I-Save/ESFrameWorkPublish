@@ -91,11 +91,11 @@ namespace ES
         }
 
         /// <summary>
-        /// 鎵归噺娉ㄥ唽鐘舵€侊紙浠嶪nfo鍒楄〃锛?
+        /// 批量注册状态（从 Info 列表）。
         /// </summary>
-        /// <param name="infos">鐘舵€両nfo闆嗗悎</param>
-        /// <param name="allowOverride">鏄惁鍏佽瑕嗙洊宸插瓨鍦ㄧ殑鐘舵€侀敭</param>
-        /// <returns>鎴愬姛娉ㄥ唽鐨勭姸鎬佹暟閲?/returns>
+        /// <param name="infos">状态 Info 集合。</param>
+        /// <param name="allowOverride">是否允许覆盖已存在的状态键。</param>
+        /// <returns>成功注册的状态数量。</returns>
         public int RegisterStatesFromInfos(IEnumerable<StateAniDataInfo> infos, bool allowOverride = false)
         {
             if (infos == null) return 0;
@@ -131,11 +131,11 @@ namespace ES
         }
 
         /// <summary>
-        /// 娉ㄥ唽鍗曚釜鐘舵€侊紙浠嶪nfo锛? 绾补濮旀墭缁橲tateMachine
+        /// 注册单个状态（从 Info），纯粹委托给 StateMachine。
         /// </summary>
-        /// <param name="info">鐘舵€両nfo</param>
-        /// <param name="allowOverride">鏄惁鍏佽瑕嗙洊宸插瓨鍦ㄧ殑鐘舵€侀敭</param>
-        /// <returns>鎴愬姛杩斿洖 StateBase锛屽け璐ヨ繑鍥?null</returns>
+        /// <param name="info">状态 Info。</param>
+        /// <param name="allowOverride">是否允许覆盖已存在的状态键。</param>
+        /// <returns>成功返回 StateBase，失败返回 null。</returns>
         public StateBase RegisterStateFromInfo(StateAniDataInfo info, bool allowOverride = false)
         {
             if (stateMachine == null)
@@ -144,10 +144,10 @@ namespace ES
                 return null;
             }
 
-            // 鐩存帴濮旀墭缁橲tateMachine澶勭悊鎵€鏈夐€昏緫锛堝垵濮嬪寲銆侀敭鍐茬獊銆佹敞鍐岋級
+            // 直接委托 StateMachine 处理全部逻辑（初始化、键冲突、注册）。
             var state = stateMachine.RegisterStateFromInfo(info, allowOverride);
 
-            // 娉ㄥ唽鎴愬姛鍚庣紦瀛業nfo锛堢敤浜嶥omain灞傜鐞嗭級
+            // 注册成功后缓存 Info，供 Domain 层管理。
             if (state != null && info != null)
             {
                 _cachedInfos.Add(info);
@@ -188,18 +188,18 @@ namespace ES
             _warnedMissingCoreForStateMachineInit = false;
             _warnedMissingAnimatorForStateMachineInit = false;
 
-            // 6. 灏濊瘯婵€娲诲垵濮嬬姸鎬?
+            // 6. 尝试激活初始状态。
             if (!string.IsNullOrEmpty(initialStateName))
             {
-                // TODO: 绛夊緟鐘舵€佽浆鎹㈤€昏緫楠岃瘉鍚庡惎鐢?
+                // TODO: 等待状态转换逻辑验证后启用。
                 // bool activated = stateMachine.TryEnterState(stateMachine.GetStateByStringKey(initialStateName));
                 // if (activated)
                 // {
-                //     Debug.Log($"[StateDomain] 婵€娲诲垵濮嬬姸鎬? {initialStateName}");
+                //     Debug.Log($"[StateDomain] 激活初始状态：{initialStateName}");
                 // }
                 // else
                 // {
-                //     Debug.LogWarning($"[StateDomain] 鏃犳硶婵€娲诲垵濮嬬姸鎬? {initialStateName}");
+                //     Debug.LogWarning($"[StateDomain] 无法激活初始状态：{initialStateName}");
                 // }
 
                 Debug.Log($"[StateDomain] Initial state configured: {initialStateName}");

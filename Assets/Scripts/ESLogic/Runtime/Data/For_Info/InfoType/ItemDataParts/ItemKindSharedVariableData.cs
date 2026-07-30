@@ -138,6 +138,16 @@ namespace ES
             cooldown = 0.2f,
             socketName = string.Empty
         };
+
+        /// <summary>把 Table 自有的运行时默认对象原位恢复为领域默认值，不产生新对象。</summary>
+        internal void ResetToDefaults()
+        {
+            weaponKind = ItemWeaponKind.None;
+            defaultShotKey = string.Empty;
+            hitRadius = 0.2f;
+            cooldown = 0.2f;
+            socketName = string.Empty;
+        }
     }
 
     [Serializable]
@@ -302,5 +312,88 @@ namespace ES
             state = 0,
             disabledTime = 0f
         };
+    }
+
+    /// <summary>
+    /// ItemDataInfo 只实例化当前 ItemKind 对应的数据块，避免每个条目同时分配全部类型配置。
+    /// 这些是 ItemDataInfo 内部配置块，不是独立 DataInfo，也不会建立独立 GameCore 表。
+    /// </summary>
+    [Serializable]
+    public abstract class ItemKindDataBlock
+    {
+        public abstract ItemKind Kind { get; }
+    }
+
+    [Serializable]
+    public sealed class ItemShotDataBlock : ItemKindDataBlock
+    {
+        public override ItemKind Kind => ItemKind.Shot;
+        [HideLabel] public ItemShotSharedData sharedData = ItemShotSharedData.Default;
+        [HideLabel, InlineProperty] public ESShotConfigKey key = new ESShotConfigKey();
+        [HideLabel] public ItemShotVariableData initialState = ItemShotVariableData.Default;
+
+        public static ItemShotDataBlock Default => new ItemShotDataBlock();
+    }
+
+    [Serializable]
+    public sealed class ItemDoorDataBlock : ItemKindDataBlock
+    {
+        public override ItemKind Kind => ItemKind.Door;
+        [HideLabel] public ItemDoorSharedData sharedData = ItemDoorSharedData.Default;
+        [HideLabel] public ItemDoorVariableData initialState = ItemDoorVariableData.Default;
+
+        public static ItemDoorDataBlock Default => new ItemDoorDataBlock();
+    }
+
+    [Serializable]
+    public sealed class ItemTrapDataBlock : ItemKindDataBlock
+    {
+        public override ItemKind Kind => ItemKind.Trap;
+        [HideLabel] public ItemTrapSharedData sharedData = ItemTrapSharedData.Default;
+        [HideLabel] public ItemTrapVariableData initialState = ItemTrapVariableData.Default;
+
+        public static ItemTrapDataBlock Default => new ItemTrapDataBlock();
+    }
+
+    [Serializable]
+    public sealed class ItemWeaponDataBlock : ItemKindDataBlock
+    {
+        public override ItemKind Kind => ItemKind.Weapon;
+        [HideLabel] public ItemWeaponSharedData sharedData = ItemWeaponSharedData.Default;
+        [HideLabel, InlineProperty] public ESWeaponConfigKey key = new ESWeaponConfigKey();
+        [HideLabel] public ItemWeaponVariableData initialState = ItemWeaponVariableData.Default;
+        [HideLabel] public ItemWeaponConfig config = new ItemWeaponConfig();
+
+        public static ItemWeaponDataBlock Default => new ItemWeaponDataBlock();
+    }
+
+    [Serializable]
+    public sealed class ItemPickupDataBlock : ItemKindDataBlock
+    {
+        public override ItemKind Kind => ItemKind.Pickup;
+        [HideLabel] public ItemPickupSharedData sharedData = ItemPickupSharedData.Default;
+        [HideLabel] public ItemPickupVariableData initialState = ItemPickupVariableData.Default;
+
+        public static ItemPickupDataBlock Default => new ItemPickupDataBlock();
+    }
+
+    [Serializable]
+    public sealed class ItemZoneDataBlock : ItemKindDataBlock
+    {
+        public override ItemKind Kind => ItemKind.Zone;
+        [HideLabel] public ItemZoneSharedData sharedData = ItemZoneSharedData.Default;
+        [HideLabel] public ItemZoneVariableData initialState = ItemZoneVariableData.Default;
+
+        public static ItemZoneDataBlock Default => new ItemZoneDataBlock();
+    }
+
+    [Serializable]
+    public sealed class ItemPropDataBlock : ItemKindDataBlock
+    {
+        public override ItemKind Kind => ItemKind.Prop;
+        [HideLabel] public ItemPropSharedData sharedData = ItemPropSharedData.Default;
+        [HideLabel] public ItemPropVariableData initialState = ItemPropVariableData.Default;
+
+        public static ItemPropDataBlock Default => new ItemPropDataBlock();
     }
 }

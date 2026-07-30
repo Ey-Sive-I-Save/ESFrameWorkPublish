@@ -58,6 +58,22 @@ namespace ES
         StateMachineTime
     }
 
+    /// <summary>
+    /// Controls how a Buff-backed ValueChange expression is refreshed after its initial application.
+    /// The default keeps the current low-cost, apply-once behaviour.
+    /// </summary>
+    public enum ESBuffValueChangeRefreshMode
+    {
+        OnApplyOnly,
+        OnStackChanged,
+        /// <summary>
+        /// Re-evaluate only after an observed expression dependency or the owning gameplay system
+        /// marks this active Buff dirty. Stable frames perform no expression evaluation.
+        /// </summary>
+        OnDirty,
+        EveryTick
+    }
+
     public static class ESBuffSourceKeyUtility
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

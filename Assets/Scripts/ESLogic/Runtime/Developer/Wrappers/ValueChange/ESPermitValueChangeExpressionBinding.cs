@@ -13,6 +13,8 @@ namespace ES
 
         [NonSerialized] private ESValueChangeToken token;
 
+        public bool IsDeterministic => condition == null || condition.IsDeterministic;
+
         public bool HasApplied
         {
             get { return token.IsValid; }
@@ -28,8 +30,11 @@ namespace ES
             ESRuntimeTargetPack target,
             ESOpSupport support)
         {
+            if (!IsDeterministic)
+                return token;
+
             ESPermitLaw finalLaw = condition.Evaluate(target, support) ? trueLaw : falseLaw;
-            if (token.IsValid && tracker.Update(token, finalLaw))
+            if (token.IsValid && tracker.Update(token, finalLaw, priority))
             {
                 tracker.SetEnabled(token, enabled);
                 return token;

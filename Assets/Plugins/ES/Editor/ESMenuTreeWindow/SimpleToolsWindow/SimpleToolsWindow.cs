@@ -22,16 +22,38 @@ namespace ES
         // container with a vertical-only one for this tool collection.
         public override bool UseScrollView => false;
 
-        [MenuItem(MenuItemPathDefine.EDITOR_OPTIMIZATION_PATH + "简单工具集", false, 0)]
+        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "综合工具/简单工具集", false, 0)]
         public static void TryOpenWindow()
         {
+            ESWindowCommandRegistry.RecordOpened("simple_tools");
             OpenWindow();
         }
 
         [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "简单工具集", false, -950)]
         public static void TryOpenWindowFromQuickWindows()
         {
+            ESWindowCommandRegistry.RecordOpened("simple_tools");
             OpenWindow();
+        }
+
+        [MenuItem(MenuItemPathDefine.RUNTIME_DIAGNOSTICS_PATH + "RuntimeWatch/打开运行时观察 %#w", false, 0)]
+        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "RuntimeWatch", false, -940)]
+        public static void OpenRuntimeWatchFromMenu()
+        {
+            ESWindowCommandRegistry.RecordOpened("runtime_watch");
+            OpenWindow();
+            EditorApplication.delayCall -= SelectRuntimeWatchPage;
+            EditorApplication.delayCall += SelectRuntimeWatchPage;
+        }
+
+        private static void SelectRuntimeWatchPage()
+        {
+            if (UsingWindow == null || !MenuItems.TryGetValue(MenuPath_RuntimeWatch, out OdinMenuItem item) || item == null)
+                return;
+
+            UsingWindow.MenuTree.Selection.Clear();
+            UsingWindow.MenuTree.Selection.Add(item);
+            UsingWindow.Repaint();
         }
 
         #region 简单重写
@@ -46,6 +68,8 @@ namespace ES
             base.ESWindow_OnOpen();
             EditorApplication.delayCall -= ApplyDefaultMenuWidth;
             EditorApplication.delayCall += ApplyDefaultMenuWidth;
+            EditorApplication.update -= TickRuntimeWatch;
+            EditorApplication.update += TickRuntimeWatch;
             if (UsingWindow.HasDelegate)
             {
                 //已经注册委托
@@ -59,6 +83,20 @@ namespace ES
         private void DelegateHandle()
         {
             HasDelegate = true;
+        }
+
+        private static void TickRuntimeWatch()
+        {
+            SimpleToolsWindow window = UsingWindow;
+            if (window == null)
+            {
+                EditorApplication.update -= TickRuntimeWatch;
+                return;
+            }
+
+            Page_RuntimeWatch runtimeWatch = window.pageRuntimeWatch;
+            if (runtimeWatch != null && runtimeWatch.TryAutoRefreshFromEditorTick())
+                window.Repaint();
         }
 
         private static void ApplyDefaultMenuWidth()

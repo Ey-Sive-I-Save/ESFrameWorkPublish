@@ -62,6 +62,11 @@ namespace ES
         [LabelText("开火状态 AniInfo")]
         public StateAniDataInfo fireStateInfo;
 
+        [Title("Tag 授予")]
+        [LabelText("手持时授予")]
+        [Tooltip("只有该武器实际手持时才持有；收枪、切枪或实体销毁会精确释放这一组 Lease。")]
+        public ESTagGrantConfig equippedTagGrants = new ESTagGrantConfig();
+
         [Title("调试")]
         [ReadOnly, ShowInInspector, LabelText("武器名")]
         public string WeaponName => gameObject.name;

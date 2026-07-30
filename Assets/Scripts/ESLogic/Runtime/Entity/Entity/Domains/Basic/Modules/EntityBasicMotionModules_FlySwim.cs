@@ -19,6 +19,7 @@ namespace ES
         private StateBase _flyState;
         private StateMachine sm;
         [NonSerialized] private StateLifecycleTracker _flyLifecycle = new StateLifecycleTracker();
+        [NonSerialized] private EntityKCCMotionRegistration _motionRegistration;
 
         [Title("应用策略")]
         [LabelText("启用时应用参数")]
@@ -121,7 +122,8 @@ namespace ES
             if (MyCore != null)
             {
                 MyCore.kcc.flyModule = this;
-                MyCore.kcc.RebuildMotionSchedulers();
+                if (!_motionRegistration.IsValid)
+                    _motionRegistration = MyCore.kcc.RegisterMotionFeature(this, EntityKCCMotionOrder.Fly);
             }
         }
 
@@ -132,6 +134,13 @@ namespace ES
             {
                 ApplyParams();
             }
+        }
+
+        protected override void OnDisable()
+        {
+            // 注册句柄保留到 OnDestroy，确保重新启用不会重复注册；这里只清理运动语义。
+            ExitFly();
+            base.OnDisable();
         }
 
         protected override void Update()
@@ -160,7 +169,7 @@ namespace ES
 
         public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, Vector3 initialPosition, float deltaTime)
         {
-            if (!enableFly || !flyHold || kcc.CurrentSupportFlags != StateSupportFlags.Flying) return false;
+            if (!Signal_IsActiveAndEnable || !enableFly || !flyHold || kcc.CurrentSupportFlags != StateSupportFlags.Flying) return false;
             if (kcc.workWorld < 20) return false;
             kcc.workWorld -= 20;
             if (flyUngroundTime > 0f)
@@ -177,7 +186,7 @@ namespace ES
 
         public bool UpdateVelocity(Entity owner, EntityKCCData kcc, Vector3 initialVelocity, ref Vector3 currentVelocity, float deltaTime)
         {
-            if (!enableFly || !flyHold || kcc.CurrentSupportFlags != StateSupportFlags.Flying) return false;
+            if (!Signal_IsActiveAndEnable || !enableFly || !flyHold || kcc.CurrentSupportFlags != StateSupportFlags.Flying) return false;
             if (kcc.workSelf < 100) return false;
             kcc.workSelf -= 100;
             kcc.workWorld -= kcc.workWorld < 40 ? kcc.workWorld : 40;
@@ -211,9 +220,11 @@ namespace ES
             ExitFly();
             _flyLifecycle.Release();
 
-            if (MyCore != null && MyCore.kcc.flyModule == this)
+            if (MyCore != null)
             {
-                MyCore.kcc.flyModule = null;
+                MyCore.kcc.UnregisterMotionFeature(ref _motionRegistration);
+                if (MyCore.kcc.flyModule == this)
+                    MyCore.kcc.flyModule = null;
             }
             base.OnDestroy();
         }
@@ -230,6 +241,8 @@ namespace ES
     [Serializable, TypeRegistryItem("基础游泳模块")]
     public class EntityBasicSwimModule : EntityBasicModuleBase, IEntityKCCBeforeMotion, IEntityKCCRotationMotion, IEntityKCCVelocityMotion
     {
+        [NonSerialized] private EntityKCCMotionRegistration _motionRegistration;
+
         [Title("开关")]
         public bool enableSwim = true;
 
@@ -259,7 +272,8 @@ namespace ES
             if (MyCore != null)
             {
                 MyCore.kcc.swimModule = this;
-                MyCore.kcc.RebuildMotionSchedulers();
+                if (!_motionRegistration.IsValid)
+                    _motionRegistration = MyCore.kcc.RegisterMotionFeature(this, EntityKCCMotionOrder.Swim);
             }
         }
 
@@ -285,6 +299,17 @@ namespace ES
             }
         }
 
+        protected override void OnDisable()
+        {
+            // Swim 没有独立状态跟踪器，禁用时必须撤销本模块写入的支撑与垂直输入。
+            if (MyCore != null && MyCore.kcc.CurrentSupportFlags == StateSupportFlags.Swimming)
+            {
+                MyCore.SetLocomotionSupportFlags(StateSupportFlags.Grounded);
+                MyCore.SetVerticalInput(0f);
+            }
+            base.OnDisable();
+        }
+
         [Button("应用参数")]
         public void ApplyParams()
         {
@@ -303,7 +328,7 @@ namespace ES
 
         public bool UpdateVelocity(Entity owner, EntityKCCData kcc, Vector3 initialVelocity, ref Vector3 currentVelocity, float deltaTime)
         {
-            if (!enableSwim || kcc.CurrentSupportFlags != StateSupportFlags.Swimming) return false;
+            if (!Signal_IsActiveAndEnable || !enableSwim || kcc.CurrentSupportFlags != StateSupportFlags.Swimming) return false;
             if (kcc.workSelf < 100) return false;
             kcc.workSelf -= 100;
             kcc.workWorld -= kcc.workWorld < 60 ? kcc.workWorld : 60;
@@ -322,9 +347,11 @@ namespace ES
 
         public override void OnDestroy()
         {
-            if (MyCore != null && MyCore.kcc.swimModule == this)
+            if (MyCore != null)
             {
-                MyCore.kcc.swimModule = null;
+                MyCore.kcc.UnregisterMotionFeature(ref _motionRegistration);
+                if (MyCore.kcc.swimModule == this)
+                    MyCore.kcc.swimModule = null;
             }
             base.OnDestroy();
         }

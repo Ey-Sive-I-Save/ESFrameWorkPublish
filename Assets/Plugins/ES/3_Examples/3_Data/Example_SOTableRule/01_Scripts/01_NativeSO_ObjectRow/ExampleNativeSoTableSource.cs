@@ -42,7 +42,7 @@ namespace ES.Samples{
         public string note = "嵌套字段测试";
     }
 
-    [CreateAssetMenu(fileName = "ExampleNativeSoTableSource", menuName = "ES/示例/SO表格规则/普通SO测试源")]
+    [CreateAssetMenu(fileName = "ExampleNativeSoTableSource", menuName = "【ES】/示例与测试/数据表/SO 表格规则/普通SO测试源")]
     public sealed class ExampleNativeSoTableSource : ScriptableObject
     {
         [LabelText("物品ID")]

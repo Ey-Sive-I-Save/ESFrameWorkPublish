@@ -1,0 +1,174 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e4c1a9d5b2f48c6a3e0d7f9b4c1e6a8, type: 3}
+  m_Name: ESTagBakeTable
+  m_EditorClassIdentifier: 
+  entries:
+  - key: ""
+    enumValue: 1
+    bakedId: 1
+    storageTier: 0
+    availability: 0
+    stableTransferScopes: 3
+  - key: ""
+    enumValue: 2
+    bakedId: 2
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 3
+    bakedId: 3
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 4
+    bakedId: 4
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 5
+    bakedId: 5
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 6
+    bakedId: 6
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 7
+    bakedId: 7
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 8
+    bakedId: 8
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 9
+    bakedId: 9
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 10
+    bakedId: 10
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 11
+    bakedId: 11
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 12
+    bakedId: 12
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 13
+    bakedId: 13
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 14
+    bakedId: 14
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 15
+    bakedId: 15
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 16
+    bakedId: 16
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 17
+    bakedId: 17
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 18
+    bakedId: 18
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 19
+    bakedId: 19
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 20
+    bakedId: 20
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 21
+    bakedId: 21
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 22
+    bakedId: 22
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 23
+    bakedId: 23
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 24
+    bakedId: 24
+    storageTier: 0
+    availability: 0
+  - key: ""
+    enumValue: 25
+    bakedId: 25
+    storageTier: 0
+    availability: 2
+  - key: ""
+    enumValue: 26
+    bakedId: 26
+    storageTier: 0
+    availability: 2
+  - key: ""
+    enumValue: 27
+    bakedId: 27
+    storageTier: 0
+    availability: 2
+  - key: ""
+    enumValue: 28
+    bakedId: 28
+    storageTier: 0
+    availability: 2
+  - key: ""
+    enumValue: 29
+    bakedId: 29
+    storageTier: 0
+    availability: 2
+  - key: ""
+    enumValue: 30
+    bakedId: 30
+    storageTier: 0
+    availability: 2
+  - key: ""
+    enumValue: 31
+    bakedId: 31
+    storageTier: 0
+    availability: 2
+  maskLevel: 255
+  stringStartId: 64
+  stringEndId: 65535

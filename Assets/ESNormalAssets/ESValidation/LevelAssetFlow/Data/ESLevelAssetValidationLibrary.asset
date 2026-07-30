@@ -44,7 +44,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_1_red
-      RuntimeKey: 30014
       AssetGuid: 00000000000000001a9f400000000000
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Red.prefab
@@ -58,7 +57,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_1_green
-      RuntimeKey: 30015
       AssetGuid: 00000000000000001a9f400000000001
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Green.prefab
@@ -72,7 +70,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_1_blue
-      RuntimeKey: 30016
       AssetGuid: 00000000000000001a9f400000000002
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue.prefab
@@ -86,7 +83,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_1_yellow
-      RuntimeKey: 30017
       AssetGuid: 00000000000000001a9f400000000003
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Yellow.prefab
@@ -100,7 +96,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_1_magenta
-      RuntimeKey: 30018
       AssetGuid: 00000000000000001a9f400000000004
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Magenta.prefab
@@ -114,7 +109,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_1_cyan
-      RuntimeKey: 30019
       AssetGuid: 00000000000000001a9f400000000005
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Cyan.prefab
@@ -128,7 +122,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_2_red
-      RuntimeKey: 30020
       AssetGuid: 00000000000000001a9f400000000010
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Red.prefab
@@ -142,7 +135,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_2_green
-      RuntimeKey: 30021
       AssetGuid: 00000000000000001a9f400000000011
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Green.prefab
@@ -156,7 +148,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_2_blue
-      RuntimeKey: 30022
       AssetGuid: 00000000000000001a9f400000000012
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Blue.prefab
@@ -170,7 +161,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_2_yellow
-      RuntimeKey: 30023
       AssetGuid: 00000000000000001a9f400000000013
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Yellow.prefab
@@ -184,7 +174,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_2_magenta
-      RuntimeKey: 30024
       AssetGuid: 00000000000000001a9f400000000014
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Magenta.prefab
@@ -198,7 +187,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_2_cyan
-      RuntimeKey: 30025
       AssetGuid: 00000000000000001a9f400000000015
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level02_Spheres/Level02_Spheres_Cyan.prefab
@@ -212,7 +200,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_3_red
-      RuntimeKey: 30026
       AssetGuid: 00000000000000001a9f400000000020
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Red.prefab
@@ -226,7 +213,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_3_green
-      RuntimeKey: 30027
       AssetGuid: 00000000000000001a9f400000000021
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Green.prefab
@@ -240,7 +226,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_3_blue
-      RuntimeKey: 30028
       AssetGuid: 00000000000000001a9f400000000022
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Blue.prefab
@@ -254,7 +239,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_3_yellow
-      RuntimeKey: 30029
       AssetGuid: 00000000000000001a9f400000000023
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Yellow.prefab
@@ -268,7 +252,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_3_magenta
-      RuntimeKey: 30030
       AssetGuid: 00000000000000001a9f400000000024
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Magenta.prefab
@@ -282,7 +265,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: level_validation_3_cyan
-      RuntimeKey: 30031
       AssetGuid: 00000000000000001a9f400000000025
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level03_Cylinders/Level03_Cylinders_Cyan.prefab
@@ -304,7 +286,6 @@ MonoBehaviour:
       Kind: 2
       EnumKey: 0
       StringKey: level_validation_scene_1
-      RuntimeKey: 30001
       AssetGuid: 00000000000000001a9f700000000000
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level01_Blocks.unity
@@ -318,7 +299,6 @@ MonoBehaviour:
       Kind: 2
       EnumKey: 0
       StringKey: level_validation_scene_2
-      RuntimeKey: 30002
       AssetGuid: 00000000000000001a9f700000000001
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level02_Spheres.unity
@@ -332,7 +312,6 @@ MonoBehaviour:
       Kind: 2
       EnumKey: 0
       StringKey: level_validation_scene_3
-      RuntimeKey: 30003
       AssetGuid: 00000000000000001a9f700000000002
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/Level03_Cylinders.unity
@@ -386,7 +365,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level01_blocks_blue
-      RuntimeKey: 30000
       AssetGuid: 00000000000000001a9f300000000002
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Blue.mat
@@ -400,7 +378,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level01_blocks_cyan
-      RuntimeKey: 30001
       AssetGuid: 00000000000000001a9f300000000005
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Cyan.mat
@@ -414,7 +391,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level01_blocks_green
-      RuntimeKey: 30002
       AssetGuid: 00000000000000001a9f300000000001
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Green.mat
@@ -428,7 +404,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level01_blocks_magenta
-      RuntimeKey: 30003
       AssetGuid: 00000000000000001a9f300000000004
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Magenta.mat
@@ -442,7 +417,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level01_blocks_red
-      RuntimeKey: 30004
       AssetGuid: 00000000000000001a9f300000000000
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Red.mat
@@ -456,7 +430,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level01_blocks_yellow
-      RuntimeKey: 30005
       AssetGuid: 00000000000000001a9f300000000003
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Yellow.mat
@@ -470,7 +443,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level02_spheres_blue
-      RuntimeKey: 30006
       AssetGuid: 00000000000000001a9f300000000012
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Blue.mat
@@ -484,7 +456,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level02_spheres_cyan
-      RuntimeKey: 30007
       AssetGuid: 00000000000000001a9f300000000015
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Cyan.mat
@@ -498,7 +469,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level02_spheres_green
-      RuntimeKey: 30008
       AssetGuid: 00000000000000001a9f300000000011
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Green.mat
@@ -512,7 +482,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level02_spheres_magenta
-      RuntimeKey: 30009
       AssetGuid: 00000000000000001a9f300000000014
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Magenta.mat
@@ -526,7 +495,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level02_spheres_red
-      RuntimeKey: 30010
       AssetGuid: 00000000000000001a9f300000000010
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Red.mat
@@ -540,7 +508,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level02_spheres_yellow
-      RuntimeKey: 30011
       AssetGuid: 00000000000000001a9f300000000013
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level02_Spheres/Level02_Spheres_Yellow.mat
@@ -554,7 +521,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level03_cylinders_blue
-      RuntimeKey: 30012
       AssetGuid: 00000000000000001a9f300000000022
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Blue.mat
@@ -568,7 +534,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level03_cylinders_cyan
-      RuntimeKey: 30013
       AssetGuid: 00000000000000001a9f300000000025
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Cyan.mat
@@ -582,7 +547,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level03_cylinders_green
-      RuntimeKey: 30014
       AssetGuid: 00000000000000001a9f300000000021
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Green.mat
@@ -596,7 +560,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level03_cylinders_magenta
-      RuntimeKey: 30015
       AssetGuid: 00000000000000001a9f300000000024
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Magenta.mat
@@ -610,7 +573,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level03_cylinders_red
-      RuntimeKey: 30016
       AssetGuid: 00000000000000001a9f300000000020
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Red.mat
@@ -624,7 +586,6 @@ MonoBehaviour:
       Kind: 7
       EnumKey: 0
       StringKey: level_validation_material_level03_cylinders_yellow
-      RuntimeKey: 30017
       AssetGuid: 00000000000000001a9f300000000023
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level03_Cylinders/Level03_Cylinders_Yellow.mat
@@ -710,7 +671,6 @@ MonoBehaviour:
       Kind: 16
       EnumKey: 0
       StringKey: ESLevelAssetValidationGameCore
-      RuntimeKey: 30013
       AssetGuid: 4ce9a317fc44b0443b2c694b934dfe41
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/ESLevelAssetValidationGameCore.asset
@@ -728,3 +688,4 @@ MonoBehaviour:
   ContainsBuild: 1
   AssetBundleCode: 
   IsNet: 1
+  _deliveryMode: 1

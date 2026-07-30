@@ -49,7 +49,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -63,7 +62,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -77,7 +75,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -91,7 +88,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -105,7 +101,6 @@ MonoBehaviour:
       Kind: 18
       EnumKey: 0
       StringKey: SingletonSeriMono
-      RuntimeKey: 30007
       AssetGuid: ef7c98344bad5a74bb6ea31e423bac35
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/0_Stand/Stand_Tools/SingletonAndOnlyOne/SingletonSeriMono.cs
@@ -119,7 +114,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -147,7 +141,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -161,7 +154,6 @@ MonoBehaviour:
       Kind: 18
       EnumKey: 0
       StringKey: AA 2
-      RuntimeKey: 30008
       AssetGuid: 0a45407b845bf9347b7b974aaca979de
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/0_Stand/TESTING/AA 2.asset
@@ -175,7 +167,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -189,7 +180,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -203,7 +193,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -217,7 +206,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -231,7 +219,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -245,7 +232,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -259,7 +245,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -273,7 +258,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -303,7 +287,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: GameObject (3)
-      RuntimeKey: 30000
       AssetGuid: 495b09c783492784e88277aa816dfdce
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab
@@ -325,7 +308,6 @@ MonoBehaviour:
       Kind: 2
       EnumKey: 0
       StringKey: es_asset_gamecore_flow_hotupdate_test
-      RuntimeKey: 30000
       AssetGuid: 8111bbc5676f4d58809f1911ee5ae65a
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetGameCoreFlowHotUpdateTest.unity
@@ -347,7 +329,6 @@ MonoBehaviour:
       Kind: 18
       EnumKey: 0
       StringKey: AA 1
-      RuntimeKey: 30009
       AssetGuid: 3db87459e9ff54d4395a96462c91be33
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/0_Stand/TESTING/AA 1.asset
@@ -393,7 +374,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -423,7 +403,6 @@ MonoBehaviour:
       Kind: 0
       EnumKey: 0
       StringKey: 
-      RuntimeKey: 0
       AssetGuid: 
       LocalFileId: 0
       AssetPath: 
@@ -437,7 +416,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: GameObject (3)
-      RuntimeKey: 30000
       AssetGuid: 495b09c783492784e88277aa816dfdce
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab
@@ -451,7 +429,6 @@ MonoBehaviour:
       Kind: 18
       EnumKey: 0
       StringKey: CircleDenpendceSamples
-      RuntimeKey: 30010
       AssetGuid: e4815b677e9fb2d4fb96a0343968a27a
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDenpendceSamples.cs
@@ -465,7 +442,6 @@ MonoBehaviour:
       Kind: 18
       EnumKey: 0
       StringKey: CircleDependenceSamplePrefabRef
-      RuntimeKey: 30011
       AssetGuid: a43b0f8f0c53eba4e8fb65148bafdd7a
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs
@@ -539,3 +515,4 @@ MonoBehaviour:
   ContainsBuild: 1
   AssetBundleCode: 
   IsNet: 1
+  _deliveryMode: 1

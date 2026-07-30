@@ -14,25 +14,36 @@ namespace ES
     public class ESEditorToolBar
     {
 
-        [InitializeOnLoad]
         public static class CustomToolbarMenu
         {
             // 缓存场景路径以提高性能
             private static List<string> cachedBuildScenes = new List<string>();
             private static List<string> cachedAllScenes = new List<string>();
             private static bool scenesCached = false;
+            private const string RecentScenesPrefsKey = "ES_Toolbar_RecentScenes";
+            private const int MaxRecentSceneCount = 8;
 
-            static CustomToolbarMenu()
+            /// <summary>
+            /// 由程序集流安装工具栏回调。重复调用时先卸载再安装，避免重复绘制。
+            /// </summary>
+            internal static void Install()
             {
+                ToolbarExtender.Initialize();
+
                 // 注册到右边工具栏
+                ToolbarExtender.RightToolbarGUI.Remove(OnSceneSelectorToolbarGUI);
+                ToolbarExtender.RightToolbarGUI.Remove(OnCustomSceneToolbarGUI);
+                ToolbarExtender.RightToolbarGUI.Remove(OnSceneSelectorSettingsToolbarGUI);
                 ToolbarExtender.RightToolbarGUI.Add(OnSceneSelectorToolbarGUI);
                 ToolbarExtender.RightToolbarGUI.Add(OnCustomSceneToolbarGUI);
                 ToolbarExtender.RightToolbarGUI.Add(OnSceneSelectorSettingsToolbarGUI);
                 //左边
+                ToolbarExtender.LeftToolbarGUI.Remove(OnQuickSelectionToolbarGUI);
+                ToolbarExtender.LeftToolbarGUI.Remove(OnAssetQuickAccessToolbarGUI);
+                ToolbarExtender.LeftToolbarGUI.Remove(OnCmdAgentToolbarGUI);
                 ToolbarExtender.LeftToolbarGUI.Add(OnQuickSelectionToolbarGUI);
                 ToolbarExtender.LeftToolbarGUI.Add(OnAssetQuickAccessToolbarGUI);
                 ToolbarExtender.LeftToolbarGUI.Add(OnCmdAgentToolbarGUI);
-                CacheScenes();
             }
 
             private static void CacheScenes()
@@ -72,52 +83,107 @@ namespace ES
 
             static void OnSceneSelectorToolbarGUI()
             {
-                // 如果缓存无效，重新缓存
-                if (!scenesCached)
-                {
-                    CacheScenes();
-                }
-
                 // 创建下拉菜单按钮
                 if (EditorGUILayout.DropdownButton(
-                    new GUIContent("Build场景", EditorGUIUtility.IconContent("d__Popup").image),
+                    new GUIContent("场景跳转", EditorGUIUtility.IconContent("d__Popup").image),
                     FocusType.Passive,
                     EditorStyles.toolbarDropDown))
                 {
-                    ShowBuildScenesMenu();
+                    ShowBuildScenesMenu(GUILayoutUtility.GetLastRect());
                 }
             }
 
             /// <summary>
             /// 显示Build Settings场景菜单
             /// </summary>
-            private static void ShowBuildScenesMenu()
+            private static void ShowBuildScenesMenu(Rect anchorRect)
             {
-                var menu = new GenericMenu();
+                EnsureScenesCached();
+                var entries = new List<ESSearchDropdown.Entry>();
+                string activeScenePath = EditorSceneManager.GetActiveScene().path;
+
+                foreach (string recentPath in GetRecentScenePaths())
+                {
+                    if (string.IsNullOrWhiteSpace(recentPath) || !File.Exists(recentPath))
+                        continue;
+
+                    entries.Add(CreateSceneEntry(recentPath, "最近打开", activeScenePath));
+                }
 
                 if (cachedBuildScenes.Count == 0)
                 {
-                    menu.AddDisabledItem(new GUIContent("无Build场景"));
+                    entries.Add(ESSearchDropdown.Entry.Disabled("无 Build 场景", "Build Settings"));
                 }
                 else
                 {
                     foreach (string scenePath in cachedBuildScenes)
+                        entries.Add(CreateSceneEntry(scenePath, "Build Settings", activeScenePath));
+                }
+
+                if (ESSceneGlobalData.Instance != null)
+                {
+                    foreach (var scene in ESSceneGlobalData.Instance.GetEnabledScenes())
                     {
-                        string displayName = Path.GetFileNameWithoutExtension(scenePath);
-                        menu.AddItem(new GUIContent(displayName), false, () =>
-                        {
-                            OpenScene(scenePath, GetAdditiveMode());
-                        });
+                        if (scene == null || string.IsNullOrWhiteSpace(scene.ScenePath))
+                            continue;
+
+                        string group = string.IsNullOrWhiteSpace(scene.Group)
+                            ? "自定义场景"
+                            : "自定义场景/" + scene.Group;
+                        string scenePath = scene.ScenePath;
+                        entries.Add(ESSearchDropdown.Entry.Item(
+                            scene.DisplayName,
+                            () => OpenScene(scenePath, GetAdditiveMode()),
+                            group,
+                            EditorGUIUtility.IconContent("SceneAsset Icon").image as Texture2D,
+                            subtitle: scenePath,
+                            badge: string.Equals(scenePath, activeScenePath, StringComparison.OrdinalIgnoreCase) ? "当前" : "自定义",
+                            selected: string.Equals(scenePath, activeScenePath, StringComparison.OrdinalIgnoreCase)));
                     }
                 }
 
-                menu.AddSeparator("");
-                menu.AddItem(new GUIContent("打开顶级工具栏管理面板"), false, () =>
+                foreach (string scenePath in cachedAllScenes.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
                 {
-                    OpenSceneManagerWindow();
-                });
+                    string folder = Path.GetDirectoryName(scenePath)?.Replace('\\', '/');
+                    string group = string.IsNullOrWhiteSpace(folder)
+                        ? "项目全部场景"
+                        : "项目全部场景/" + folder;
+                    entries.Add(CreateSceneEntry(scenePath, group, activeScenePath));
+                }
 
-                menu.ShowAsContext();
+                entries.Add(ESSearchDropdown.Entry.Separator());
+                entries.Add(ESSearchDropdown.Entry.Item("打开顶级工具栏管理面板", OpenSceneManagerWindow, "操作"));
+
+                string mode = GetAdditiveMode() ? "叠加打开" : "单场景打开";
+                ESSearchDropdown.Open(
+                    anchorRect,
+                    "场景跳转 · " + mode,
+                    entries,
+                    minimumWindowSize: new Vector2(720f, 440f));
+            }
+
+            private static void EnsureScenesCached()
+            {
+                if (!scenesCached)
+                    CacheScenes();
+            }
+
+            private static ESSearchDropdown.Entry CreateSceneEntry(string scenePath, string groupPath, string activeScenePath)
+            {
+                string displayName = Path.GetFileNameWithoutExtension(scenePath);
+                bool isActive = string.Equals(scenePath, activeScenePath, StringComparison.OrdinalIgnoreCase);
+                string normalizedGroup = groupPath ?? "项目全部场景";
+                string badge = normalizedGroup.StartsWith("最近打开", StringComparison.Ordinal) ? "最近"
+                    : normalizedGroup.StartsWith("Build Settings", StringComparison.Ordinal) ? "Build"
+                    : "项目";
+                return ESSearchDropdown.Entry.Item(
+                    displayName,
+                    () => OpenScene(scenePath, GetAdditiveMode()),
+                    normalizedGroup,
+                    EditorGUIUtility.IconContent("SceneAsset Icon").image as Texture2D,
+                    subtitle: scenePath,
+                    badge: isActive ? "当前" : badge,
+                    selected: isActive);
             }
 
             /// <summary>
@@ -130,25 +196,22 @@ namespace ES
                     FocusType.Passive,
                     EditorStyles.toolbarDropDown))
                 {
-                    ShowCustomScenesMenu();
+                    ShowCustomScenesMenu(GUILayoutUtility.GetLastRect());
                 }
             }
 
             /// <summary>
             /// 显示自定义场景菜单
             /// </summary>
-            private static void ShowCustomScenesMenu()
+            private static void ShowCustomScenesMenu(Rect anchorRect)
             {
-                var menu = new GenericMenu();
+                var entries = new List<ESSearchDropdown.Entry>();
 
                 if (ESSceneGlobalData.Instance == null)
                 {
-                    menu.AddDisabledItem(new GUIContent("顶级工具栏管理面板数据未找到"));
-                    menu.AddSeparator("");
-                    menu.AddItem(new GUIContent("打开顶级工具栏管理面板"), false, () =>
-                    {
-                        OpenSceneManagerWindow();
-                    });
+                    entries.Add(ESSearchDropdown.Entry.Disabled("顶级工具栏管理面板数据未找到"));
+                    entries.Add(ESSearchDropdown.Entry.Separator());
+                    entries.Add(ESSearchDropdown.Entry.Item("打开顶级工具栏管理面板", OpenSceneManagerWindow, "操作"));
                 }
                 else
                 {
@@ -156,7 +219,7 @@ namespace ES
 
                     if (customScenes.Count == 0)
                     {
-                        menu.AddDisabledItem(new GUIContent("无自定义场景"));
+                        entries.Add(ESSearchDropdown.Entry.Disabled("无自定义场景"));
                     }
                     else
                     {
@@ -167,27 +230,28 @@ namespace ES
                         {
                             foreach (var scene in group)
                             {
-                                string menuPath = $"{group.Key}/{scene.DisplayName}";
-                                menu.AddItem(new GUIContent(menuPath), false, () =>
-                                {
-                                    OpenScene(scene.ScenePath, GetAdditiveMode());
-                                });
+                                bool isActive = string.Equals(scene.ScenePath, EditorSceneManager.GetActiveScene().path, StringComparison.OrdinalIgnoreCase);
+                                entries.Add(ESSearchDropdown.Entry.Item(
+                                    scene.DisplayName,
+                                    () => OpenScene(scene.ScenePath, GetAdditiveMode()),
+                                    string.IsNullOrWhiteSpace(group.Key) ? "未分组" : group.Key,
+                                    EditorGUIUtility.IconContent("SceneAsset Icon").image as Texture2D,
+                                    subtitle: scene.ScenePath,
+                                    badge: isActive ? "当前" : "自定义",
+                                    selected: isActive));
                             }
                         }
                     }
 
-                    menu.AddSeparator("");
-                    menu.AddItem(new GUIContent("➕ 添加当前场景"), false, () =>
+                    entries.Add(ESSearchDropdown.Entry.Separator());
+                    entries.Add(ESSearchDropdown.Entry.Item("添加当前场景", () =>
                     {
                         AddCurrentSceneToCustom();
-                    });
-                    menu.AddItem(new GUIContent("打开顶级工具栏管理面板"), false, () =>
-                    {
-                        OpenSceneManagerWindow();
-                    });
+                    }, "操作"));
+                    entries.Add(ESSearchDropdown.Entry.Item("打开顶级工具栏管理面板", OpenSceneManagerWindow, "操作"));
                 }
 
-                menu.ShowAsContext();
+                ESSearchDropdown.Open(anchorRect, "打开自定义场景", entries);
             }
 
             static void OnSceneSelectorSettingsToolbarGUI()
@@ -263,25 +327,22 @@ namespace ES
                     FocusType.Passive,
                     EditorStyles.toolbarDropDown, GUILayout.Width(120)))
                 {
-                    ShowAssetQuickAccessMenu();
+                    ShowAssetQuickAccessMenu(GUILayoutUtility.GetLastRect());
                 }
             }
 
             /// <summary>
             /// 显示资产快捷访问菜单
             /// </summary>
-            private static void ShowAssetQuickAccessMenu()
+            private static void ShowAssetQuickAccessMenu(Rect anchorRect)
             {
-                var menu = new GenericMenu();
+                var entries = new List<ESSearchDropdown.Entry>();
 
                 if (ESSceneGlobalData.Instance == null)
                 {
-                    menu.AddDisabledItem(new GUIContent("顶级工具栏管理面板数据未找到"));
-                    menu.AddSeparator("");
-                    menu.AddItem(new GUIContent("打开顶级工具栏管理面板"), false, () =>
-                    {
-                        OpenSceneManagerWindow();
-                    });
+                    entries.Add(ESSearchDropdown.Entry.Disabled("顶级工具栏管理面板数据未找到"));
+                    entries.Add(ESSearchDropdown.Entry.Separator());
+                    entries.Add(ESSearchDropdown.Entry.Item("打开顶级工具栏管理面板", OpenSceneManagerWindow, "操作"));
                 }
                 else
                 {
@@ -289,7 +350,7 @@ namespace ES
 
                     if (customAssets.Count == 0)
                     {
-                        menu.AddDisabledItem(new GUIContent("无自定义资产"));
+                        entries.Add(ESSearchDropdown.Entry.Disabled("无自定义资产"));
                     }
                     else
                     {
@@ -300,27 +361,29 @@ namespace ES
                         {
                             foreach (var asset in group)
                             {
-                                string menuPath = $"{group.Key}/{asset.DisplayName}";
-                                menu.AddItem(new GUIContent(menuPath), false, () =>
-                                {
-                                    PingAsset(asset.Asset);
-                                });
+                                Texture2D icon = asset.Asset != null ? AssetPreview.GetMiniThumbnail(asset.Asset) : null;
+                                string assetPath = asset.Asset != null ? AssetDatabase.GetAssetPath(asset.Asset) : string.Empty;
+                                entries.Add(ESSearchDropdown.Entry.Item(
+                                    asset.DisplayName,
+                                    () => PingAsset(asset.Asset),
+                                    string.IsNullOrWhiteSpace(group.Key) ? "未分组" : group.Key,
+                                    icon,
+                                    subtitle: asset.Asset != null ? asset.Asset.GetType().Name + " · " + assetPath : "资产已丢失",
+                                    badge: asset.Asset != null ? "快捷资产" : "缺失",
+                                    selected: Selection.activeObject == asset.Asset));
                             }
                         }
                     }
 
-                    menu.AddSeparator("");
-                    menu.AddItem(new GUIContent("➕ 添加当前选中资产"), false, () =>
+                    entries.Add(ESSearchDropdown.Entry.Separator());
+                    entries.Add(ESSearchDropdown.Entry.Item("添加当前选中资产", () =>
                     {
                         AddCurrentAssetToCustom();
-                    });
-                    menu.AddItem(new GUIContent("打开顶级工具栏管理面板"), false, () =>
-                    {
-                        OpenSceneManagerWindow();
-                    });
+                    }, "操作"));
+                    entries.Add(ESSearchDropdown.Entry.Item("打开顶级工具栏管理面板", OpenSceneManagerWindow, "操作"));
                 }
 
-                menu.ShowAsContext();
+                ESSearchDropdown.Open(anchorRect, "快速访问资产", entries);
             }
 
             static void OnQuickSelectionToolbarGUI()
@@ -331,9 +394,10 @@ namespace ES
                     FocusType.Passive,
                     EditorStyles.toolbarDropDown, GUILayout.Width(100)))
                 {
-                    var menu = new GenericMenu();
+                    Rect anchorRect = GUILayoutUtility.GetLastRect();
+                    var entries = new List<ESSearchDropdown.Entry>();
 
-                    menu.AddItem(new GUIContent("玩家对象"), false, () =>
+                    entries.Add(ESSearchDropdown.Entry.Item("玩家对象", () =>
                     {
                         var player = GameObject.FindGameObjectWithTag("Player");
                         if (player != null)
@@ -345,9 +409,10 @@ namespace ES
                         {
                             Debug.LogWarning("未找到带有 'Player' 标签的对象");
                         }
-                    });
+                    }, "场景对象", EditorGUIUtility.IconContent("GameObject Icon").image as Texture2D,
+                        subtitle: "查找 Tag=Player 的当前场景对象", badge: "GameObject"));
 
-                    menu.AddSeparator("");
+                    entries.Add(ESSearchDropdown.Entry.Separator());
 
                     // 添加ESGlobalEditorLocation中的资产
                     if (ESGlobalEditorLocation.Instance != null && ESGlobalEditorLocation.Instance.Assets.Count > 0)
@@ -356,21 +421,22 @@ namespace ES
                         {
                             if (v != null)
                             {
-                                menu.AddItem(new GUIContent(k), false, () => 
+                                entries.Add(ESSearchDropdown.Entry.Item(k, () =>
                                 { 
                                     Selection.activeObject = v; 
                                     EditorGUIUtility.PingObject(v); 
-                                });
+                                }, "全局定位资产", AssetPreview.GetMiniThumbnail(v),
+                                    subtitle: v.GetType().Name + " · " + AssetDatabase.GetAssetPath(v),
+                                    selected: Selection.activeObject == v));
                             }
                         }
                     }
                     else
                     {
-                        menu.AddDisabledItem(new GUIContent("无快速定位资产"));
+                        entries.Add(ESSearchDropdown.Entry.Disabled("无快速定位资产"));
                     }
 
-                    menu.AddSeparator("");
-                    menu.ShowAsContext();
+                    ESSearchDropdown.Open(anchorRect, "快速定位", entries);
                 }
             }
 
@@ -422,6 +488,7 @@ namespace ES
                     // 打开场景
                     OpenSceneMode mode = additiveMode ? OpenSceneMode.Additive : OpenSceneMode.Single;
                     EditorSceneManager.OpenScene(scenePath, mode);
+                    RecordRecentScene(scenePath);
                     Debug.Log($"已{(additiveMode ? "叠加" : "")}打开场景: {Path.GetFileNameWithoutExtension(scenePath)}");
                 }
                 catch (Exception ex)
@@ -603,6 +670,31 @@ namespace ES
                 EditorApplication.delayCall += SelectTopToolbarPage;
             }
 
+            private static IReadOnlyList<string> GetRecentScenePaths()
+            {
+                string value = EditorPrefs.GetString(RecentScenesPrefsKey, string.Empty);
+                if (string.IsNullOrWhiteSpace(value))
+                    return Array.Empty<string>();
+
+                return value.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(MaxRecentSceneCount)
+                    .ToArray();
+            }
+
+            private static void RecordRecentScene(string scenePath)
+            {
+                if (string.IsNullOrWhiteSpace(scenePath))
+                    return;
+
+                var recent = new List<string> { scenePath };
+                recent.AddRange(GetRecentScenePaths().Where(path =>
+                    !string.Equals(path, scenePath, StringComparison.OrdinalIgnoreCase)));
+                EditorPrefs.SetString(
+                    RecentScenesPrefsKey,
+                    string.Join("\n", recent.Take(MaxRecentSceneCount)));
+            }
+
             private static void SelectTopToolbarPage()
             {
                 try
@@ -667,6 +759,18 @@ namespace ES
 
             #endregion
 
+        }
+
+        /// <summary>
+        /// ES 工具栏的唯一自动入口：通过程序集流完成轻量回调安装。
+        /// 场景资产扫描改为用户打开“场景跳转”菜单时按需执行。
+        /// </summary>
+        public sealed class ESEditorToolBarAssemblyStreamInitializer : EditorInvoker_Level2
+        {
+            public override void InitInvoke()
+            {
+                CustomToolbarMenu.Install();
+            }
         }
 
         #region 自主扩展

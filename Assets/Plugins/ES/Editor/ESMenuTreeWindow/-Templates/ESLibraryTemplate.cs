@@ -2374,29 +2374,34 @@ namespace ES
                 }
 
                 if (GUILayout.Button("添加 " + title))
-                    ShowLibraryMenu(list, undoPrefix);
+                    ShowLibraryMenu(GUILayoutUtility.GetLastRect(), list, undoPrefix);
                 SirenixEditorGUI.EndBox();
             }
 
-            private void ShowLibraryMenu(List<TLib> list, string undoPrefix)
+            private void ShowLibraryMenu(Rect anchorRect, List<TLib> list, string undoPrefix)
             {
-                var menu = new GenericMenu();
+                var entries = new List<ESSearchDropdown.Entry>();
                 var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<TLib>() ?? new List<TLib>();
-                bool hasCandidate = false;
                 foreach (TLib library in allLibraries.Where(item => item != null && !list.Contains(item)))
                 {
-                    hasCandidate = true;
                     TLib captured = library;
-                    menu.AddItem(new GUIContent(captured.Name), false, () =>
-                    {
-                        Undo.RecordObject(package, "Add " + undoPrefix + " Library");
-                        list.Add(captured);
-                        MarkPackageDirty();
-                    });
+                    string assetPath = AssetDatabase.GetAssetPath(captured);
+                    entries.Add(ESSearchDropdown.Entry.Item(
+                        captured.Name,
+                        () =>
+                        {
+                            Undo.RecordObject(package, "Add " + undoPrefix + " Library");
+                            list.Add(captured);
+                            MarkPackageDirty();
+                        },
+                        captured.GetType().Name,
+                        AssetPreview.GetMiniThumbnail(captured),
+                        subtitle: assetPath,
+                        badge: "Library"));
                 }
-                if (!hasCandidate)
-                    menu.AddDisabledItem(new GUIContent("没有可添加的 Library"));
-                menu.ShowAsContext();
+                if (entries.Count == 0)
+                    entries.Add(ESSearchDropdown.Entry.Disabled("没有可添加的 Library"));
+                ESSearchDropdown.Open(anchorRect, "添加 " + undoPrefix + " Library", entries);
             }
 
             private void DrawResourceLibraryList(string title, List<ESAssetLibrary> list, string undoPrefix)
@@ -2417,23 +2422,29 @@ namespace ES
                 }
                 if (GUILayout.Button("添加 " + title))
                 {
-                    var menu = new GenericMenu();
+                    Rect anchorRect = GUILayoutUtility.GetLastRect();
+                    var entries = new List<ESSearchDropdown.Entry>();
                     var allLibraries = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibrary>() ?? new List<ESAssetLibrary>();
-                    bool hasCandidate = false;
                     foreach (ESAssetLibrary library in allLibraries.Where(item => item != null && !list.Contains(item)))
                     {
-                        hasCandidate = true;
                         ESAssetLibrary captured = library;
-                        menu.AddItem(new GUIContent(captured.Name), false, () =>
-                        {
-                            Undo.RecordObject(package, "Add " + undoPrefix + " Library");
-                            list.Add(captured);
-                            MarkPackageDirty();
-                        });
+                        string assetPath = AssetDatabase.GetAssetPath(captured);
+                        entries.Add(ESSearchDropdown.Entry.Item(
+                            captured.Name,
+                            () =>
+                            {
+                                Undo.RecordObject(package, "Add " + undoPrefix + " Library");
+                                list.Add(captured);
+                                MarkPackageDirty();
+                            },
+                            string.IsNullOrWhiteSpace(captured.AssetBundleCode) ? "未设置短码" : captured.AssetBundleCode,
+                            AssetPreview.GetMiniThumbnail(captured),
+                            subtitle: assetPath,
+                            badge: captured.ContainsBuild ? "参与构建" : "不构建"));
                     }
-                    if (!hasCandidate)
-                        menu.AddDisabledItem(new GUIContent("没有可添加的 Library"));
-                    menu.ShowAsContext();
+                    if (entries.Count == 0)
+                        entries.Add(ESSearchDropdown.Entry.Disabled("没有可添加的 Library"));
+                    ESSearchDropdown.Open(anchorRect, "添加资源 Library", entries);
                 }
                 SirenixEditorGUI.EndBox();
             }
@@ -2456,23 +2467,29 @@ namespace ES
                 }
                 if (GUILayout.Button("添加依赖 Consumer"))
                 {
-                    var menu = new GenericMenu();
+                    Rect anchorRect = GUILayoutUtility.GetLastRect();
+                    var entries = new List<ESSearchDropdown.Entry>();
                     var allConsumers = ESEditorSO.SOS.GetNewGroupOfType<ESAssetLibraryConsumer>() ?? new List<ESAssetLibraryConsumer>();
-                    bool hasCandidate = false;
                     foreach (ESAssetLibraryConsumer consumer in allConsumers.Where(item => item != null && item != resourceConsumer && !resourceConsumer.RequiredConsumers.Contains(item)))
                     {
-                        hasCandidate = true;
                         ESAssetLibraryConsumer captured = consumer;
-                        menu.AddItem(new GUIContent(captured.Name), false, () =>
-                        {
-                            Undo.RecordObject(resourceConsumer, "Add Required Consumer");
-                            resourceConsumer.RequiredConsumers.Add(captured);
-                            MarkPackageDirty();
-                        });
+                        string assetPath = AssetDatabase.GetAssetPath(captured);
+                        entries.Add(ESSearchDropdown.Entry.Item(
+                            captured.Name,
+                            () =>
+                            {
+                                Undo.RecordObject(resourceConsumer, "Add Required Consumer");
+                                resourceConsumer.RequiredConsumers.Add(captured);
+                                MarkPackageDirty();
+                            },
+                            string.IsNullOrWhiteSpace(captured.Channel) ? "默认渠道" : captured.Channel,
+                            AssetPreview.GetMiniThumbnail(captured),
+                            subtitle: assetPath,
+                            badge: captured.IsTotalConsumer ? "总入口" : "Consumer"));
                     }
-                    if (!hasCandidate)
-                        menu.AddDisabledItem(new GUIContent("没有可添加的 Consumer"));
-                    menu.ShowAsContext();
+                    if (entries.Count == 0)
+                        entries.Add(ESSearchDropdown.Entry.Disabled("没有可添加的 Consumer"));
+                    ESSearchDropdown.Open(anchorRect, "添加依赖 Consumer", entries);
                 }
                 SirenixEditorGUI.EndBox();
             }

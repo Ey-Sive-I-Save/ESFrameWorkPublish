@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -19,6 +20,10 @@ namespace ES
         [LabelText("Max Detect Count")]
         public int detectMaxCount = 8;
 
+        [LabelText("探测间隔"), Tooltip("0=每帧。默认 0.05 秒可降低场景交互扫描成本，按键时仍会立即刷新。")]
+        [MinValue(0f)]
+        public float detectInterval = 0.05f;
+
         [LabelText("Interactable Layers")]
         public LayerMask interactableLayers = ~0;
 
@@ -28,8 +33,19 @@ namespace ES
         [LabelText("Max Facing Angle"), Range(0f, 180f)]
         public float maxFacingAngle = 75f;
 
+        [LabelText("候选黏性"), Tooltip("当前候选获得少量评分优势，避免两个物体边界处反复跳变。")]
+        [MinValue(0f)]
+        public float candidateStickiness = 0.15f;
+
         [LabelText("Require Grounded")]
         public bool requireGrounded = true;
+
+        [Title("行为许可")]
+        [LabelText("检查 Buff 许可")]
+        public bool requireEntityPermit = true;
+
+        [LabelText("许可键")]
+        public string entityPermitKey = "Entity.Interaction";
 
         [Title("State")]
         public bool overrideSupportFlag = false;
@@ -52,6 +68,12 @@ namespace ES
 
         [ShowInInspector, ReadOnly]
         public bool isInteracting;
+
+        [ShowInInspector, ReadOnly, LabelText("最近检查结果")]
+        public ESInteractionCheckResult lastCheckResult = ESInteractionCheckResult.Allowed;
+
+        [ShowInInspector, ReadOnly, LabelText("最近结束原因")]
+        public ESInteractionEndReason lastEndReason = ESInteractionEndReason.Completed;
 
         [Title("IK Debug")]
         [ShowInInspector, ReadOnly]
@@ -84,6 +106,8 @@ namespace ES
         private bool _hasOverriddenSupportFlag;
         private float _interactionStartTime = -999f;
         private Collider[] _overlapBuffer;
+        [NonSerialized] private Dictionary<int, ESInteractable> _interactableByColliderId;
+        private float _nextDetectTime;
         private bool _ikHasPrevTargetPos;
         private Vector3 _ikPrevTargetPos;
         private StateLifecycleTracker _interactionLifecycle = new StateLifecycleTracker();
@@ -110,7 +134,8 @@ namespace ES
         {
             base.Start();
             _sm = MyCore?.stateDomain?.stateMachine;
-            _overlapBuffer = new Collider[Mathf.Max(4, detectMaxCount)];
+            EnsureOverlapBuffer();
+            EnsureInteractableCache();
         }
 
         protected override void Update()
@@ -125,7 +150,12 @@ namespace ES
 
             if (autoDetect)
             {
-                currentCandidate = FindBestInteractable();
+                float now = Time.unscaledTime;
+                if (detectInterval <= 0f || now >= _nextDetectTime)
+                {
+                    _nextDetectTime = now + Mathf.Max(0f, detectInterval);
+                    currentCandidate = FindBestInteractable();
+                }
             }
         }
 
@@ -135,14 +165,14 @@ namespace ES
 
             if (isInteracting)
             {
-                CancelInteraction(false);
+                EndInteraction(false, ESInteractionEndReason.UserCancelled);
                 return;
             }
 
-            if (currentCandidate == null)
-            {
-                currentCandidate = FindBestInteractable();
-            }
+            if (!CanEntityInteract(out lastCheckResult))
+                return;
+
+            currentCandidate = FindBestInteractable();
 
             if (currentCandidate != null)
             {
@@ -152,32 +182,105 @@ namespace ES
 
         private ESInteractable FindBestInteractable()
         {
+            if (!CanEntityInteract(out lastCheckResult))
+                return null;
+
+            EnsureOverlapBuffer();
             var motor = MyCore.kcc?.motor;
             Vector3 origin = motor != null ? motor.TransientPosition : MyCore.transform.position;
 
-            int count = Physics.OverlapSphereNonAlloc(origin, detectRadius, _overlapBuffer, interactableLayers);
+            ESPhysicsQueryModule physicsQuery = ESGameManager.PhysicsQueryModule;
+            int count = physicsQuery != null
+                ? physicsQuery.OverlapSphere(origin, detectRadius, interactableLayers, _overlapBuffer, QueryTriggerInteraction.Collide)
+                : Physics.OverlapSphereNonAlloc(origin, detectRadius, _overlapBuffer, interactableLayers, QueryTriggerInteraction.Collide);
             ESInteractable best = null;
-            float bestDist = float.MaxValue;
+            int bestPriority = int.MinValue;
+            float bestScore = float.MaxValue;
             Vector3 forward = MyCore.transform.forward;
 
-            for (int i = 0; i < count; i++)
+            int safeCount = Mathf.Min(count, _overlapBuffer.Length);
+            for (int i = 0; i < safeCount; i++)
             {
                 var col = _overlapBuffer[i];
                 if (col == null) continue;
-                var interactable = col.GetComponentInParent<ESInteractable>();
+                ESInteractable interactable = ResolveInteractable(col);
                 if (interactable == null) continue;
-                if (!interactable.CanInteract(MyCore)) continue;
+                if (!interactable.CanInteract(MyCore, out _)) continue;
 
-                Vector3 targetPos = interactable.transform.position;
-                float dist = Vector3.SqrMagnitude(targetPos - origin);
-                if (dist >= bestDist) continue;
+                Vector3 targetPos = interactable.ResolveInteractionPoint(origin, col);
+                float dist = Vector3.Distance(targetPos, origin);
+                float allowedDistance = interactable.maxInteractionDistance > 0f
+                    ? Mathf.Min(detectRadius, interactable.maxInteractionDistance)
+                    : detectRadius;
+                if (dist > allowedDistance) continue;
                 if (!IsFacingTarget(forward, origin, targetPos)) continue;
 
-                bestDist = dist;
+                int priority = interactable.interactionPriority;
+                float score = dist;
+                if (interactable == currentCandidate)
+                    score -= candidateStickiness;
+
+                if (priority < bestPriority || (priority == bestPriority && score >= bestScore))
+                    continue;
+
+                bestPriority = priority;
+                bestScore = score;
                 best = interactable;
             }
 
+            lastCheckResult = best != null ? ESInteractionCheckResult.Allowed : ESInteractionCheckResult.TargetUnavailable;
             return best;
+        }
+
+        private ESInteractable ResolveInteractable(Collider collider)
+        {
+            EnsureInteractableCache();
+            int id = collider.GetInstanceID();
+            if (_interactableByColliderId.TryGetValue(id, out ESInteractable cached))
+            {
+                if (cached != null)
+                    return cached;
+
+                _interactableByColliderId.Remove(id);
+            }
+
+            ESInteractable resolved = collider.GetComponentInParent<ESInteractable>();
+            _interactableByColliderId[id] = resolved;
+            return resolved;
+        }
+
+        private void EnsureInteractableCache()
+        {
+            if (_interactableByColliderId == null)
+                _interactableByColliderId = new Dictionary<int, ESInteractable>(32);
+        }
+
+        private void EnsureOverlapBuffer()
+        {
+            int capacity = Mathf.Max(4, detectMaxCount);
+            if (_overlapBuffer == null || _overlapBuffer.Length != capacity)
+                _overlapBuffer = new Collider[capacity];
+        }
+
+        private bool CanEntityInteract(out ESInteractionCheckResult result)
+        {
+            if (MyCore == null)
+            {
+                result = ESInteractionCheckResult.TargetUnavailable;
+                return false;
+            }
+
+            if (requireEntityPermit
+                && MyCore.buffDomain != null
+                && MyCore.buffDomain.TryGetPermit(entityPermitKey, out ESPermitSet permit)
+                && !permit.Value)
+            {
+                result = ESInteractionCheckResult.EntityPermitDenied;
+                return false;
+            }
+
+            result = ESInteractionCheckResult.Allowed;
+            return true;
         }
 
         private bool IsFacingTarget(Vector3 forward, Vector3 origin, Vector3 targetPos)
@@ -192,9 +295,20 @@ namespace ES
 
         private void BeginInteraction(ESInteractable target)
         {
-            if (target == null || !target.CanInteract(MyCore)) return;
-            if (requireGrounded && !MyCore.kcc.monitor.isStableOnGround) return;
-            if (!EnsureStateMachineReady()) return;
+            if (target == null || !CanEntityInteract(out lastCheckResult)) return;
+            if (!target.TryAcquireInteraction(MyCore, out lastCheckResult)) return;
+            if (requireGrounded && !MyCore.kcc.monitor.isStableOnGround)
+            {
+                lastCheckResult = ESInteractionCheckResult.RequiresGrounded;
+                target.ReleaseInteraction(MyCore);
+                return;
+            }
+            if (!EnsureStateMachineReady())
+            {
+                lastCheckResult = ESInteractionCheckResult.StateUnavailable;
+                target.ReleaseInteraction(MyCore);
+                return;
+            }
 
             ikLastStatus = "BeginInteraction";
             ikLastTargetMoveDistance = 0f;
@@ -213,7 +327,7 @@ namespace ES
                 bool activated = _activeState.baseStatus == StateBaseStatus.Running || _sm.TryActivateState(_activeState);
                 if (!_interactionLifecycle.TryEnter(activated))
                 {
-                    EndInteraction(false);
+                    EndInteraction(false, ESInteractionEndReason.BeginRejected);
                     return;
                 }
             }
@@ -233,19 +347,25 @@ namespace ES
         {
             if (activeInteractable == null)
             {
-                EndInteraction(false);
+                EndInteraction(false, ESInteractionEndReason.TargetLost);
+                return;
+            }
+
+            if (!activeInteractable.isActiveAndEnabled || activeInteractable.InteractionOwner != MyCore)
+            {
+                EndInteraction(false, ESInteractionEndReason.TargetLost);
                 return;
             }
 
             if (_interactionLifecycle.CheckExit())
             {
-                EndInteraction(false);
+                EndInteraction(false, ESInteractionEndReason.StateExited);
                 return;
             }
 
             if (cancelOnMoveInput && MyCore.kcc.moveInput.sqrMagnitude >= cancelMoveThreshold * cancelMoveThreshold)
             {
-                CancelInteraction(false);
+                EndInteraction(false, ESInteractionEndReason.MovementCancelled);
                 return;
             }
             float elapsed = Time.time - _interactionStartTime;
@@ -257,13 +377,13 @@ namespace ES
 
             if (duration > 0f && elapsed >= duration)
             {
-                EndInteraction(true);
+                EndInteraction(true, ESInteractionEndReason.Completed);
                 return;
             }
 
             if (timeout > 0f && elapsed >= timeout)
             {
-                EndInteraction(false);
+                EndInteraction(false, ESInteractionEndReason.Timeout);
                 return;
             }
         }
@@ -331,11 +451,12 @@ namespace ES
                 target.transform.rotation);
         }
 
-        private void EndInteraction(bool success)
+        private void EndInteraction(bool success, ESInteractionEndReason reason)
         {
+            ESInteractable endingTarget = activeInteractable;
             if (activeInteractable != null)
             {
-                activeInteractable.OnInteractCompleted(MyCore, success);
+                activeInteractable.OnInteractEnded(MyCore, success, reason);
             }
 
             if (_activeState != null)
@@ -361,11 +482,9 @@ namespace ES
             activeInteractable = null;
             _activeState = null;
             _ikHasPrevTargetPos = false;
-        }
-
-        private void CancelInteraction(bool success)
-        {
-            EndInteraction(success);
+            lastEndReason = reason;
+            if (endingTarget != null)
+                endingTarget.ReleaseInteraction(MyCore);
         }
 
         private StateBase ResolveStateForInteractable(ESInteractable target)
@@ -416,8 +535,19 @@ namespace ES
 
         public override void OnDestroy()
         {
+            if (isInteracting)
+                EndInteraction(false, ESInteractionEndReason.ModuleDisabled);
             _interactionLifecycle.Release();
+            _interactableByColliderId?.Clear();
             base.OnDestroy();
+        }
+
+        protected override void OnDisable()
+        {
+            if (isInteracting)
+                EndInteraction(false, ESInteractionEndReason.ModuleDisabled);
+            currentCandidate = null;
+            base.OnDisable();
         }
     }
 }

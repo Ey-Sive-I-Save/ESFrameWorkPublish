@@ -13,7 +13,7 @@ namespace ES{
     /// 通过对象池复用，减少GC分配
     /// </summary>
     /// <typeparam name="Link">消息类型</typeparam>
-    public class ReceiveLink<Link> : IReceiveLink<Link>, IPoolableAuto
+    public sealed class ReceiveLink<Link> : IReceiveLink<Link>, IPoolableAuto
     {
         /// <summary>
         /// 📦 对象池单例 - 自动管理实例复用
@@ -106,7 +106,7 @@ namespace ES{
     /// 专门处理前后状态变化的消息
     /// </summary>
     /// <typeparam name="LinkFlag">状态类型</typeparam>
-    public class ReceiveStateLink<LinkFlag> : IReceiveStateLink<LinkFlag>, IPoolableAuto
+    public sealed class ReceiveStateLink<LinkFlag> : IReceiveStateLink<LinkFlag>, IPoolableAuto
     {
         /// <summary>
         /// 📦 对象池单例 - 自动管理实例复用
@@ -201,7 +201,7 @@ namespace ES{
     /// </summary>
     /// <typeparam name="Channel">通道类型</typeparam>
     /// <typeparam name="Link">消息类型</typeparam>
-    public class ReceiveChannelLink<Channel, Link> : IReceiveChannelLink<Channel, Link>, IPoolableAuto
+    public sealed class ReceiveChannelLink<Channel, Link> : IReceiveChannelLink<Channel, Link>, IPoolableAuto
     {
         /// <summary>
         /// 📦 对象池单例 - 自动管理实例复用
@@ -313,7 +313,7 @@ namespace ES{
     /// 将 Action 适配为 IReceiveLinkNoParam 接口
     /// 通过对象池复用，减少GC分配
     /// </summary>
-    public class ReceiveLinkNoParam : IReceiveLinkNoParam, IPoolableAuto
+    public sealed class ReceiveLinkNoParam : IReceiveLinkNoParam, IPoolableAuto
     {
         /// <summary>
         /// 📦 对象池单例 - 自动管理实例复用

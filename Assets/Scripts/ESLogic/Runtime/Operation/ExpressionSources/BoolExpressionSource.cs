@@ -29,6 +29,11 @@ namespace ES
         [SerializeReference, InlineProperty]
         public ESGetBoolExpression expression;
 
+        public override ESExpressionDeterminism Determinism =>
+            !useDirectBool && expression != null && !expression.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
+
         public BoolExpressionSource()
         {
         }

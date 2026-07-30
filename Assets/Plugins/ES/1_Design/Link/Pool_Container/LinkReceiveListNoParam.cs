@@ -16,18 +16,26 @@ namespace ES
     ///   保证在派发过程中也可以安全地添加 / 移除监听；
     /// - 适合用作简单通知事件，如心跳、状态同步等纯通知场景。
     /// </summary>
-    public class LinkReceiveListNoParam
+    public sealed class LinkReceiveListNoParam
     {
         #region 字段 (Fields)
 
         /// <summary>
         /// 接收者列表，使用 SafeNormalList 支持派发期间安全增删。
         /// </summary>
-        private SafeNormalList<IReceiveLinkNoParam> _receivers = new SafeNormalList<IReceiveLinkNoParam>();
+        private readonly LinkSubscriptionList<IReceiveLinkNoParam> _receivers;
         private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>(4);
-        private readonly List<ReceiveLinkNoParam> _actionReceivers = new List<ReceiveLinkNoParam>(4);
 
         #endregion
+
+        public int SubscriberCount => _receivers.Count;
+
+        public LinkReceiveListNoParam(int receiverCapacity = 4)
+        {
+            _receivers = new LinkSubscriptionList<IReceiveLinkNoParam>(receiverCapacity);
+        }
+
+        public void ReserveReceivers(int capacity) => _receivers.Reserve(capacity);
 
         #region 核心功能 (Core Functionality)
 
@@ -37,19 +45,26 @@ namespace ES
         /// </summary>
         public void SendLink()
         {
-            ApplyBuffersAndRecycle();
-
-            int count = _receivers.ValuesNow.Count;
-            for (int i = 0; i < count; i++)
+            _receivers.BeginDispatch();
+            RecyclePending();
+            try
             {
-                IReceiveLinkNoParam currentReceiver = _receivers.ValuesNow[i];
-                if (currentReceiver is UnityEngine.Object ob)
+                int count = _receivers.ValuesNow.Count;
+                for (int i = 0; i < count; i++)
                 {
-                    if (ob != null) currentReceiver.OnLink();
+                    IReceiveLinkNoParam currentReceiver = _receivers.ValuesNow[i];
+                    if (currentReceiver is UnityEngine.Object ob)
+                    {
+                        if (ob != null) currentReceiver.OnLink();
+                        else _receivers.Remove(currentReceiver);
+                    }
+                    else if (currentReceiver != null) currentReceiver.OnLink();
                     else _receivers.Remove(currentReceiver);
                 }
-                else if (currentReceiver != null) currentReceiver.OnLink();
-                else _receivers.Remove(currentReceiver);
+            }
+            finally
+            {
+                _receivers.EndDispatch();
             }
         }
 
@@ -101,9 +116,9 @@ namespace ES
         /// </summary>
         /// <param name="receiver">要添加的接收者。</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReceiver(IReceiveLinkNoParam receiver)
+        public bool AddReceiver(IReceiveLinkNoParam receiver)
         {
-            _receivers.Add(receiver);
+            return _receivers.Add(receiver);
         }
 
         /// <summary>
@@ -111,51 +126,15 @@ namespace ES
         /// </summary>
         /// <param name="receiver">要移除的接收者。</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveReceiver(IReceiveLinkNoParam receiver)
+        public bool RemoveReceiver(IReceiveLinkNoParam receiver)
         {
-            _receivers.Remove(receiver);
-            ScheduleRecycle(receiver);
-        }
-
-        /// <summary>
-        /// 添加基于 Action 的无参数接收者。
-        /// </summary>
-        /// <param name="action">要添加的 Action 委托。</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReceiver(Action action)
-        {
-            var receiver = action.MakeReceive();
-            _actionReceivers.Add(receiver);
-            _receivers.Add(receiver);
-        }
-
-        /// <summary>
-        /// 移除基于 Action 的无参数接收者。
-        /// </summary>
-        /// <param name="action">要移除的 Action 委托。</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveReceiver(Action action)
-        {
-            for (int i = _actionReceivers.Count - 1; i >= 0; i--)
+            if (_receivers.Remove(receiver))
             {
-                var receiver = _actionReceivers[i];
-                if (receiver.action == action)
-                {
-                    _actionReceivers.RemoveAt(i);
-                    RemoveReceiver(receiver);
-                    return;
-                }
+                ScheduleRecycle(receiver);
+                return true;
             }
 
-            for (int i = 0; i < _receivers.ValuesNow.Count; i++)
-            {
-                var receiver = _receivers.ValuesNow[i];
-                if (receiver is ReceiveLinkNoParam receiveLink && receiveLink.action == action)
-                {
-                    RemoveReceiver(receiver);
-                    return;
-                }
-            }
+            return false;
         }
 
         /// <summary>
@@ -173,7 +152,6 @@ namespace ES
                 }
             }
             _receivers.Clear();
-            _actionReceivers.Clear();
         }
 
         /// <summary>

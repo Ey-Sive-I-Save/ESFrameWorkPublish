@@ -5,7 +5,7 @@ namespace ES.Editor
 {
     public static class ESWeaponSceneTemplateCreator
     {
-        private const string MenuPath = "ES/武器/创建通用武器场景模板";
+        private const string MenuPath = "【ES】/内容制作/武器模板/创建通用武器场景模板";
 
         [MenuItem(MenuPath, priority = 1600)]
         public static void CreateTemplate()

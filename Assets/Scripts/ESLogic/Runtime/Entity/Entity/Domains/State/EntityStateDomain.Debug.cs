@@ -20,14 +20,14 @@ namespace ES
         {
             if (info == null)
             {
-                Debug.LogWarning("[StateDomain] 璇锋彁渚涙湁鏁堢殑StateAniDataInfo");
+                Debug.LogWarning("[StateDomain] 请提供有效的 StateAniDataInfo。");
                 return;
             }
 
             var state = RegisterStateFromInfo(info, allowOverride);
             if (state != null)
             {
-                Debug.Log($"[StateDomain] 鍔ㄦ€佹敞鍐屾垚鍔? {info.sharedData.basicConfig.stateName}");
+                Debug.Log($"[StateDomain] 动态注册成功：{info.sharedData.basicConfig.stateName}");
             }
         }
 
@@ -50,7 +50,7 @@ namespace ES
         {
             if (!_stateMachineInitialized)
             {
-                Debug.LogWarning("[StateDomain] 鐘舵€佹満鏈垵濮嬪寲");
+                Debug.LogWarning("[StateDomain] 状态机尚未初始化。");
                 return;
             }
 
@@ -63,18 +63,18 @@ namespace ES
             var state = stateMachine.GetStateByString(stateKey);
             if (state == null)
             {
-                Debug.LogWarning($"[StateDomain] 鏈壘鍒扮姸鎬? {stateKey}");
+                Debug.LogWarning($"[StateDomain] 未找到状态：{stateKey}");
                 return;
             }
 
             bool success = stateMachine.TryActivateState(stateKey);
             if (success)
             {
-                Debug.Log($"[StateDomain] 鎴愬姛婵€娲荤姸鎬? {stateKey} (IntKey:{state.intKey})");
+                Debug.Log($"[StateDomain] 成功激活状态：{stateKey} (IntKey:{state.intKey})");
             }
             else
             {
-                Debug.LogWarning($"[StateDomain] 婵€娲荤姸鎬佸け璐? {stateKey}");
+                Debug.LogWarning($"[StateDomain] 激活状态失败：{stateKey}");
             }
         }
 
@@ -83,25 +83,25 @@ namespace ES
         {
             if (!_stateMachineInitialized)
             {
-                Debug.LogWarning("[StateDomain] 鐘舵€佹満鏈垵濮嬪寲");
+                Debug.LogWarning("[StateDomain] 状态机尚未初始化。");
                 return;
             }
 
             var state = stateMachine.GetStateByInt(stateId);
             if (state == null)
             {
-                Debug.LogWarning($"[StateDomain] 鏈壘鍒扮姸鎬両D: {stateId}");
+                Debug.LogWarning($"[StateDomain] 未找到状态 ID：{stateId}");
                 return;
             }
 
             bool success = stateMachine.TryActivateState(stateId);
             if (success)
             {
-                Debug.Log($"[StateDomain] 鎴愬姛婵€娲荤姸鎬? {state.strKey} (IntKey:{stateId})");
+                Debug.Log($"[StateDomain] 成功激活状态：{state.strKey} (IntKey:{stateId})");
             }
             else
             {
-                Debug.LogWarning($"[StateDomain] 婵€娲荤姸鎬佸け璐? {stateId}");
+                Debug.LogWarning($"[StateDomain] 激活状态失败：{stateId}");
             }
         }
 
@@ -110,7 +110,7 @@ namespace ES
         {
             if (!_stateMachineInitialized)
             {
-                Debug.LogWarning("[StateDomain] 鐘舵€佹満鏈垵濮嬪寲");
+                Debug.LogWarning("[StateDomain] 状态机尚未初始化。");
                 return;
             }
 
@@ -123,11 +123,11 @@ namespace ES
             bool success = stateMachine.TryDeactivateState(stateKey);
             if (success)
             {
-                Debug.Log($"[StateDomain] 鎴愬姛鍏抽棴鐘舵€? {stateKey}");
+                Debug.Log($"[StateDomain] 成功关闭状态：{stateKey}");
             }
             else
             {
-                Debug.LogWarning($"[StateDomain] 鍏抽棴鐘舵€佸け璐? {stateKey}");
+                Debug.LogWarning($"[StateDomain] 关闭状态失败：{stateKey}");
             }
         }
 
@@ -136,18 +136,18 @@ namespace ES
         {
             if (!_stateMachineInitialized)
             {
-                Debug.LogWarning("[StateDomain] 鐘舵€佹満鏈垵濮嬪寲");
+                Debug.LogWarning("[StateDomain] 状态机尚未初始化。");
                 return;
             }
 
             bool success = stateMachine.TryDeactivateState(stateId);
             if (success)
             {
-                Debug.Log($"[StateDomain] 鎴愬姛鍏抽棴鐘舵€両D: {stateId}");
+                Debug.Log($"[StateDomain] 成功关闭状态 ID：{stateId}");
             }
             else
             {
-                Debug.LogWarning($"[StateDomain] 鍏抽棴鐘舵€佸け璐? {stateId}");
+                Debug.LogWarning($"[StateDomain] 关闭状态失败：{stateId}");
             }
         }
 
@@ -156,13 +156,13 @@ namespace ES
         {
             if (!_stateMachineInitialized)
             {
-                Debug.LogWarning("[StateDomain] 鐘舵€佹満鏈垵濮嬪寲");
+                Debug.LogWarning("[StateDomain] 状态机尚未初始化。");
                 return;
             }
 
-            // 鈹€鈹€ 鏋勫缓瀹屾暣鏂囨湰锛堟帶鍒跺彴 + 瀵硅瘽妗?+ 鍓创鏉垮叡鐢ㄥ悓涓€鏁版嵁婧愶級鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            // 构建完整文本：控制台、对话框和剪贴板使用同一份数据源。
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"=== 鐘舵€佹満鎵€鏈夌姸鎬?({stateMachine.RegisteredStateCount}) ===");
+            sb.AppendLine($"=== 状态机全部状态（{stateMachine.RegisteredStateCount}）===");
 
             foreach (var kvp in stateMachine.EnumerateRegisteredStatesByKey())
             {
@@ -173,18 +173,18 @@ namespace ES
                 var isFallback = state.stateSharedData?.basicConfig?.canBeFeedback ?? false;
 
                 sb.AppendLine($"  [{layerType}] {kvp.Key} (IntKey:{state.intKey}) - " +
-                              $"杩愯:{isRunning}, Fallback:{isFallback}");
+                              $"运行:{isRunning}, Fallback:{isFallback}");
             }
 
-            // 鈹€鈹€ 鎺у埗鍙拌緭鍑?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            // 控制台输出。
             Debug.Log(sb.ToString());
 
 #if UNITY_EDITOR
-            // 鈹€鈹€ 澶嶅埗鍒扮郴缁熷壀璐存澘锛堝彲鐩存帴绮樿创浣跨敤锛?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            // 复制到系统剪贴板，可直接粘贴使用。
             UnityEditor.EditorGUIUtility.systemCopyBuffer = sb.ToString();
 
-            // 鈹€鈹€ 寮瑰嚭缂栬緫鍣ㄥ璇濇棰勮锛堝唴瀹瑰凡鍦ㄥ壀璐存澘锛屽彲闅忔椂绮樿创锛?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-            // DisplayDialog 鍗曟潯 message 鏈€澶氭樉绀虹害 40 琛岋紝瓒呭嚭鏃舵埅鏂苟鎻愮ず
+            // 编辑器对话框预览；完整内容已经复制到剪贴板。
+            // DisplayDialog 单条消息最多显示约 40 行，超出时截断并提示。
             const int MaxDialogLines = 35;
             var lines = sb.ToString().Split('\n');
             string dialogBody;
@@ -196,7 +196,7 @@ namespace ES
             {
                 var truncated = new System.Text.StringBuilder();
                 for (int i = 0; i < MaxDialogLines; i++) truncated.AppendLine(lines[i]);
-                truncated.AppendLine($"... 锛堝叡 {lines.Length - 1} 琛岋紝瀹屾暣鍐呭宸插鍒跺埌鍓创鏉匡級");
+                truncated.AppendLine($"...（共 {lines.Length - 1} 行，完整内容已复制到剪贴板）");
                 dialogBody = truncated.ToString().TrimEnd();
             }
 
@@ -480,7 +480,7 @@ namespace ES
                 var layerRuntime = stateMachine.GetLayer(layerType);
                 if (layerRuntime == null)
                 {
-                    errors.Add($"杩愯鏃跺眰绾т涪澶? {layerType}");
+                    errors.Add($"运行时层级缺失：{layerType}");
                     continue;
                 }
 
@@ -534,7 +534,7 @@ namespace ES
                 var result = stateMachine.TestStateActivation(state, basic.layerType);
                 if (!result.CanActivate)
                 {
-                    warnings.Add($"婵€娲荤煩闃靛綋鍓嶆€佷笉鍙揪: State={state.strKey}, Layer={basic.layerType}, Reason={result.failureReason}");
+                    warnings.Add($"激活矩阵当前状态不可达：State={state.strKey}, Layer={basic.layerType}, Reason={result.failureReason}");
                 }
             }
         }
@@ -591,7 +591,7 @@ namespace ES
                 int layerAfter = stateMachine.GetLayerStateCount(StateLayerType.Main);
                 if (runningAfter != runningBefore || layerAfter != layerBefore)
                 {
-                    errors.Add($"婵€娲诲洖婊氫笉涓€鑷? Running {runningBefore}->{runningAfter}, MainLayer {layerBefore}->{layerAfter}");
+                    errors.Add($"激活回滚不一致：Running {runningBefore}->{runningAfter}, MainLayer {layerBefore}->{layerAfter}");
                 }
 
                 if (!stateMachine.TryGetActivationEventFromLatest(0, out var latest))
@@ -600,12 +600,12 @@ namespace ES
                 }
                 else if (latest.kind != StateMachine.ActivationEventKind.Rollback && latest.kind != StateMachine.ActivationEventKind.Failure)
                 {
-                    warnings.Add($"缁撴瀯鍖栨縺娲讳簨浠舵湭璁板綍澶辫触缁撹: LatestKind={latest.kind}");
+                    warnings.Add($"结构化激活事件未记录失败结论：LatestKind={latest.kind}");
                 }
             }
             catch (Exception ex)
             {
-                errors.Add($"婵€娲诲洖婊氭帰閽堟墽琛屽紓甯? {ex.Message}");
+                errors.Add($"激活回滚探针执行异常：{ex.Message}");
             }
             finally
             {

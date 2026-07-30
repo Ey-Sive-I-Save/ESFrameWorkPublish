@@ -46,7 +46,8 @@ namespace ES
             DateTime publishLocalTime = DateTime.Now;
             string releaseVersion = ESGlobalResSetting.Instance.Version + "." + publishLocalTime.ToString("yyyyMMddHHmmssfff");
             bool includeInitialPackage = ESGlobalResSetting.Instance.AssetRunMode == ESAssetRunMode.LocalBuild;
-            string initialRoot = includeInitialPackage ? ToAbsolutePath(ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_) : null;
+            string streamingReleaseRoot = ToAbsolutePath(ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_);
+            string initialRoot = includeInitialPackage ? streamingReleaseRoot : null;
             if (!includeInitialPackage)
                 RemoveGeneratedStreamingAssets(platform);
             string localTestRoot = Path.Combine(ESAssetPipelineIO.ProjectRoot, "ES", "Published", "LocalTest", platform);
@@ -59,45 +60,63 @@ namespace ES
             foreach (string stageFolder in stageFolders)
             {
                 var identity = ESAssetPipelineIO.ReadJson<ESAssetLibraryIdentity>(Path.Combine(stageFolder, ESAssetPipelineIO.LibraryIdentityFileName));
-                identity.version = releaseVersion;
-                identity.channel = release.channel;
                 string libraryFolder = Path.GetFileName(stageFolder);
                 // Staging 的实际规范化目录名是发布与运行时共同使用的 LibraryFolder 权威值。
                 // 同时兼容由旧 Planner 生成、Identity 中仍带前导下划线的 GameCore 暂存产物。
                 identity.libraryFolder = libraryFolder;
+                if (!ESAssetDeliveryModeEditorUtility.IsValid(identity.deliveryMode))
+                    throw new InvalidDataException("Library 分发方式无效：" + libraryFolder);
+                bool hasEmbeddedCopy = identity.deliveryMode != ESAssetDeliveryMode.Remote;
+                bool hasRemoteCopy = identity.deliveryMode != ESAssetDeliveryMode.BuiltIn;
+                identity.version = identity.deliveryMode == ESAssetDeliveryMode.BuiltIn ? "embedded" : releaseVersion;
+                identity.channel = identity.deliveryMode == ESAssetDeliveryMode.BuiltIn ? "embedded" : release.channel;
                 var manifest = ESAssetPipelineIO.ReadJson<ESAssetBundleManifest>(Path.Combine(stageFolder, ESAssetPipelineIO.BundleManifestFileName));
                 string relativeBase = ESAssetPipelineIO.ReleaseLibraryRelativeBase(platform, releaseVersion, libraryFolder);
-                identity.catalogUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + ESAssetPipelineIO.CatalogFileName);
-                identity.assetBundleManifestUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + ESAssetPipelineIO.BundleManifestFileName);
-                if (includeInitialPackage)
-                    CopyStage(stageFolder, ESAssetPipelineIO.ReleaseLibraryFolder(initialRoot, platform, releaseVersion, libraryFolder), manifest, identity);
-                CopyStage(stageFolder, ESAssetPipelineIO.ReleaseLibraryFolder(localTestRoot, string.Empty, releaseVersion, libraryFolder), manifest, identity);
-                CopyStage(stageFolder, ESAssetPipelineIO.ReleaseLibraryFolder(cdnRoot, string.Empty, releaseVersion, libraryFolder), manifest, identity);
+                identity.catalogUrl = hasRemoteCopy
+                    ? CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + ESAssetPipelineIO.CatalogFileName)
+                    : string.Empty;
+                identity.assetBundleManifestUrl = hasRemoteCopy
+                    ? CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + ESAssetPipelineIO.BundleManifestFileName)
+                    : string.Empty;
+                if (includeInitialPackage && hasEmbeddedCopy)
+                    CopyStage(stageFolder, ESAssetPipelineIO.EmbeddedLibraryFolder(initialRoot, platform, libraryFolder), manifest, identity);
+                string localTestLibraryFolder = ESAssetPipelineIO.ReleaseLibraryFolder(localTestRoot, string.Empty, releaseVersion, libraryFolder);
+                CopyStage(stageFolder, localTestLibraryFolder, manifest, identity);
+                if (hasRemoteCopy)
+                    CopyStage(stageFolder, ESAssetPipelineIO.ReleaseLibraryFolder(cdnRoot, string.Empty, releaseVersion, libraryFolder), manifest, identity);
                 release.libraries.Add(new ESAssetReleaseLibrary
                 {
                     libraryName = identity.libraryName,
-                    version = releaseVersion,
+                    version = identity.version,
+                    deliveryMode = identity.deliveryMode,
                     catalogUrl = identity.catalogUrl,
                     catalogSha256 = identity.catalogSha256,
                     assetBundleManifestUrl = identity.assetBundleManifestUrl,
                     assetBundleManifestSha256 = identity.assetBundleManifestSha256
                 });
                 string identityRelativePath = relativeBase + ESAssetPipelineIO.LibraryIdentityFileName;
-                string publishedIdentityPath = Path.Combine(ESAssetPipelineIO.ReleaseLibraryFolder(cdnRoot, string.Empty, releaseVersion, libraryFolder), ESAssetPipelineIO.LibraryIdentityFileName);
+                string embeddedRelativeBase = ESAssetPipelineIO.EmbeddedLibraryRelativeBase(platform, libraryFolder);
+                string publishedIdentityPath = Path.Combine(localTestLibraryFolder, ESAssetPipelineIO.LibraryIdentityFileName);
+                string publishedIdentitySha256 = ESResManifestIntegrity.ComputeFileSha256(publishedIdentityPath);
+                if (!includeInitialPackage && identity.deliveryMode == ESAssetDeliveryMode.BuiltIn)
+                    ValidateExistingEmbeddedLibrary(ESAssetPipelineIO.EmbeddedLibraryFolder(streamingReleaseRoot, platform, libraryFolder), manifest, publishedIdentitySha256);
                 publishedLibraries.Add(libraryFolder, new PublishedLibrary
                 {
                     identity = identity,
                     manifest = manifest,
-                    identityUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, identityRelativePath),
-                    identitySha256 = ESResManifestIntegrity.ComputeFileSha256(publishedIdentityPath)
+                    identityUrl = hasRemoteCopy ? CombineUrl(ESGlobalResSetting.Instance.Path_Net, identityRelativePath) : string.Empty,
+                    embeddedIdentityRelativePath = hasEmbeddedCopy ? embeddedRelativeBase + ESAssetPipelineIO.LibraryIdentityFileName : string.Empty,
+                    identitySha256 = publishedIdentitySha256
                 });
                 foreach (var assetBundle in manifest.assetBundles)
                     bundleIndex.assetBundles.Add(new ESAssetReleaseBundleRecord
                     {
                         libraryFolder = libraryFolder,
                         assetBundleKey = assetBundle.assetBundleKey,
-                        fileUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + assetBundle.localRelativePath),
+                        deliveryMode = identity.deliveryMode,
+                        fileUrl = hasRemoteCopy ? CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + assetBundle.localRelativePath) : string.Empty,
                         localRelativePath = assetBundle.localRelativePath,
+                        embeddedRelativePath = hasEmbeddedCopy ? embeddedRelativeBase + assetBundle.localRelativePath : string.Empty,
                         sha256 = assetBundle.sha256,
                         crc = assetBundle.crc,
                         size = assetBundle.size,
@@ -121,7 +140,7 @@ namespace ES
             release.bundleIndexUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, bundleIndexRelativePath);
             release.bundleIndexSha256 = ESResManifestIntegrity.ComputeFileSha256(cdnBundleIndexPath);
             SetPublishProgress("校验全局 Bundle 索引与依赖闭包", 0.72f);
-            ValidatePublishedBundleIndex(cdnRoot, releaseVersion, bundleIndex);
+            ValidatePublishedBundleIndex(cdnRoot, streamingReleaseRoot, includeInitialPackage, releaseVersion, bundleIndex);
 
             var totalConsumers = consumers.Where(item => item.IsTotalConsumer).ToList();
             if (totalConsumers.Count == 0)
@@ -231,7 +250,10 @@ namespace ES
                 sha256 = ESResManifestIntegrity.ComputeFileSha256(sourcePath),
                 size = new FileInfo(sourcePath).Length,
                 uploadOrder = uploadOrder,
-                uploadLast = uploadLast
+                uploadLast = uploadLast,
+                cacheControl = uploadLast
+                    ? "no-cache, max-age=0, must-revalidate"
+                    : "public, max-age=31536000, immutable"
             };
         }
 
@@ -249,6 +271,22 @@ namespace ES
                 File.Copy(sourcePath, destinationPath, true);
             }
             ESAssetPipelineIO.WriteJson(Path.Combine(destinationFolder, ESAssetPipelineIO.LibraryIdentityFileName), identity);
+        }
+
+        private static void ValidateExistingEmbeddedLibrary(string embeddedFolder, ESAssetBundleManifest manifest, string expectedIdentitySha256)
+        {
+            string identityPath = Path.Combine(embeddedFolder, ESAssetPipelineIO.LibraryIdentityFileName);
+            string catalogPath = Path.Combine(embeddedFolder, ESAssetPipelineIO.CatalogFileName);
+            string manifestPath = Path.Combine(embeddedFolder, ESAssetPipelineIO.BundleManifestFileName);
+            if (!ESResManifestIntegrity.VerifyFileSha256(identityPath, expectedIdentitySha256)
+                || !File.Exists(catalogPath) || !File.Exists(manifestPath))
+                throw new InvalidOperationException("随包 Library 与当前构建不一致，不能仅发布热更新；请切换 LocalBuild 重新生成应用首包：" + embeddedFolder);
+            foreach (ESAssetBundleRecord bundle in manifest.assetBundles ?? new List<ESAssetBundleRecord>())
+            {
+                string path = Path.Combine(embeddedFolder, bundle.localRelativePath.Replace('/', Path.DirectorySeparatorChar));
+                if (!File.Exists(path) || new FileInfo(path).Length != bundle.size || !ESResManifestIntegrity.VerifyFileSha256(path, bundle.sha256))
+                    throw new InvalidOperationException("随包 Library 的 Bundle 已变化，不能仅发布热更新；请重新生成应用首包：" + bundle.assetBundleKey);
+            }
         }
 
         private static void RecreateGeneratedDirectory(string path)
@@ -314,7 +352,16 @@ namespace ES
                 if (!libraries.TryGetValue(folder, out var published)) throw new InvalidOperationException("Consumer 引用了未构建的 Library：" + library.LibFolderName);
                 var existing = destination.FirstOrDefault(item => string.Equals(item.libraryFolder, folder, StringComparison.Ordinal));
                 if (existing != null) { existing.requiredAtBoot |= requiredAtBoot; continue; }
-                destination.Add(new ESAssetConsumerLibraryReference { libraryName = published.identity.libraryName, libraryFolder = folder, libraryIdentityUrl = published.identityUrl, libraryIdentitySha256 = published.identitySha256, requiredAtBoot = requiredAtBoot });
+                destination.Add(new ESAssetConsumerLibraryReference
+                {
+                    libraryName = published.identity.libraryName,
+                    libraryFolder = folder,
+                    deliveryMode = published.identity.deliveryMode,
+                    libraryIdentityUrl = published.identityUrl,
+                    libraryIdentitySha256 = published.identitySha256,
+                    embeddedIdentityRelativePath = published.embeddedIdentityRelativePath,
+                    requiredAtBoot = requiredAtBoot
+                });
             }
         }
 
@@ -330,8 +377,10 @@ namespace ES
             {
                 libraryName = consumer.Name + " GameCore",
                 libraryFolder = folder,
+                deliveryMode = published.identity.deliveryMode,
                 libraryIdentityUrl = published.identityUrl,
                 libraryIdentitySha256 = published.identitySha256,
+                embeddedIdentityRelativePath = published.embeddedIdentityRelativePath,
                 requiredAtBoot = true
             });
         }
@@ -411,8 +460,10 @@ namespace ES
                     {
                         libraryName = owner.Value.identity.libraryName,
                         libraryFolder = owner.Key,
+                        deliveryMode = owner.Value.identity.deliveryMode,
                         libraryIdentityUrl = owner.Value.identityUrl,
                         libraryIdentitySha256 = owner.Value.identitySha256,
+                        embeddedIdentityRelativePath = owner.Value.embeddedIdentityRelativePath,
                         requiredAtBoot = true
                     };
                     manifest.libraries.Add(libraryReference);
@@ -452,27 +503,51 @@ namespace ES
             return null;
         }
 
-        private static void ValidatePublishedBundleIndex(string cdnRoot, string releaseVersion, ESAssetReleaseBundleIndex bundleIndex)
+        private static void ValidatePublishedBundleIndex(string cdnRoot, string streamingReleaseRoot, bool includeInitialPackage, string releaseVersion, ESAssetReleaseBundleIndex bundleIndex)
         {
             var bundlesByKey = (bundleIndex.assetBundles ?? new List<ESAssetReleaseBundleRecord>()).ToDictionary(item => item.assetBundleKey, StringComparer.Ordinal);
             if (bundlesByKey.Count != (bundleIndex.assetBundles ?? new List<ESAssetReleaseBundleRecord>()).Count) throw new InvalidDataException("发布 Bundle 索引包含重复 AssetBundleKey。");
             foreach (var bundle in bundlesByKey.Values)
             {
-                if (string.IsNullOrWhiteSpace(bundle.libraryFolder) || string.IsNullOrWhiteSpace(bundle.fileUrl)
+                if (string.IsNullOrWhiteSpace(bundle.libraryFolder) || !ESAssetDeliveryModeEditorUtility.IsValid(bundle.deliveryMode)
                     || string.IsNullOrWhiteSpace(bundle.localRelativePath) || string.IsNullOrWhiteSpace(bundle.sha256)
                     || bundle.sha256.Length != 64 || !bundle.sha256.All(Uri.IsHexDigit) || bundle.size <= 0)
                     throw new InvalidDataException("发布 Bundle 索引记录不完整：" + bundle.assetBundleKey);
+                bool requiresEmbedded = bundle.deliveryMode != ESAssetDeliveryMode.Remote;
+                bool requiresRemote = bundle.deliveryMode != ESAssetDeliveryMode.BuiltIn;
+                if (requiresEmbedded != !string.IsNullOrWhiteSpace(bundle.embeddedRelativePath)
+                    || requiresRemote != !string.IsNullOrWhiteSpace(bundle.fileUrl))
+                    throw new InvalidDataException("发布 Bundle 来源与分发方式不匹配：" + bundle.assetBundleKey);
                 string normalizedPath = bundle.localRelativePath.Replace('\\', '/');
                 if (!normalizedPath.StartsWith(ESAssetPipelineIO.AssetBundlesFolderName + "/", StringComparison.Ordinal)
                     || !string.Equals(Path.GetFileName(normalizedPath), normalizedPath.Substring(ESAssetPipelineIO.AssetBundlesFolderName.Length + 1), StringComparison.Ordinal))
                     throw new InvalidDataException("发布 Bundle 索引路径无效：" + bundle.assetBundleKey);
-                string filePath = Path.Combine(ESAssetPipelineIO.ReleaseLibraryFolder(cdnRoot, string.Empty, releaseVersion, bundle.libraryFolder), bundle.localRelativePath);
-                if (!File.Exists(filePath) || new FileInfo(filePath).Length != bundle.size || !ESResManifestIntegrity.VerifyFileSha256(filePath, bundle.sha256)) throw new InvalidDataException("发布 Bundle 文件校验失败：" + bundle.assetBundleKey);
+                if (requiresRemote)
+                {
+                    string filePath = Path.Combine(ESAssetPipelineIO.ReleaseLibraryFolder(cdnRoot, string.Empty, releaseVersion, bundle.libraryFolder), bundle.localRelativePath);
+                    if (!File.Exists(filePath) || new FileInfo(filePath).Length != bundle.size || !ESResManifestIntegrity.VerifyFileSha256(filePath, bundle.sha256))
+                        throw new InvalidDataException("发布 Bundle 远端文件校验失败：" + bundle.assetBundleKey);
+                }
+                if (bundle.deliveryMode == ESAssetDeliveryMode.BuiltIn
+                    || (includeInitialPackage && bundle.deliveryMode == ESAssetDeliveryMode.Updateable))
+                {
+                    string embeddedPath = Path.Combine(streamingReleaseRoot, bundle.embeddedRelativePath.Replace('/', Path.DirectorySeparatorChar));
+                    if (!File.Exists(embeddedPath) || new FileInfo(embeddedPath).Length != bundle.size || !ESResManifestIntegrity.VerifyFileSha256(embeddedPath, bundle.sha256))
+                        throw new InvalidDataException("发布 Bundle 随包文件校验失败：" + bundle.assetBundleKey);
+                }
                 var dependencySet = new HashSet<string>(StringComparer.Ordinal);
                 foreach (string dependency in bundle.dependencies ?? new List<string>())
                     if (string.IsNullOrWhiteSpace(dependency) || string.Equals(dependency, bundle.assetBundleKey, StringComparison.Ordinal)
                         || !dependencySet.Add(dependency) || !bundlesByKey.ContainsKey(dependency))
                         throw new InvalidDataException("发布 Bundle 索引依赖无效：" + bundle.assetBundleKey + " -> " + dependency);
+            }
+
+            foreach (ESAssetReleaseBundleRecord bundle in bundlesByKey.Values)
+            foreach (string dependencyKey in bundle.dependencies ?? new List<string>())
+            {
+                ESAssetReleaseBundleRecord dependency = bundlesByKey[dependencyKey];
+                if (bundle.deliveryMode != ESAssetDeliveryMode.Remote && dependency.deliveryMode == ESAssetDeliveryMode.Remote)
+                    throw new InvalidDataException("随包或更新资源不能依赖纯远端资源：" + bundle.assetBundleKey + " -> " + dependencyKey);
             }
 
             var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -566,21 +641,34 @@ namespace ES
             string validatedRoot = resRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
             if (!platformRoot.StartsWith(validatedRoot, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("StreamingAssets 清理目标越界：" + platformRoot);
-            bool removed = false;
-            if (Directory.Exists(platformRoot))
+            if (!Directory.Exists(platformRoot)) return;
+
+            int removed = 0;
+            string embeddedFolderName = "Embedded";
+            foreach (string directory in Directory.EnumerateDirectories(platformRoot).ToArray())
             {
-                Directory.Delete(platformRoot, true);
-                removed = true;
+                if (string.Equals(Path.GetFileName(directory), embeddedFolderName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string target = Path.GetFullPath(directory);
+                string validatedPlatformRoot = platformRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                if (!target.StartsWith(validatedPlatformRoot, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("StreamingAssets 清理目标越界：" + target);
+                Directory.Delete(target, true);
+                string metaPath = target + ".meta";
+                if (File.Exists(metaPath)) File.Delete(metaPath);
+                removed++;
             }
-            string metaPath = platformRoot + ".meta";
-            if (File.Exists(metaPath))
+            foreach (string file in Directory.EnumerateFiles(platformRoot).ToArray())
             {
-                File.Delete(metaPath);
-                removed = true;
+                string fileName = Path.GetFileName(file);
+                if (string.Equals(fileName, embeddedFolderName + ".meta", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                File.Delete(file);
+                removed++;
             }
-            if (!removed) return;
+            if (removed == 0) return;
             AssetDatabase.Refresh();
-            Debug.Log("[ESRes][Cleanup] HotUpdate 模式：已清理 StreamingAssets 生成平台目录：" + platformRoot);
+            Debug.Log($"[ESRes][Cleanup] HotUpdate 模式：已清理 {removed} 项版本发布文件，并保留 Embedded 随包资源：{platformRoot}");
         }
 
         private static void PruneGeneratedReleaseVersions(string generatedRoot, string currentReleaseVersion)
@@ -626,6 +714,7 @@ namespace ES
             public ESAssetLibraryIdentity identity;
             public ESAssetBundleManifest manifest;
             public string identityUrl;
+            public string embeddedIdentityRelativePath;
             public string identitySha256;
         }
 

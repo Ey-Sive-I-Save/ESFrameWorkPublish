@@ -10,6 +10,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace ES
 {
@@ -24,60 +25,37 @@ namespace ES
         private static readonly HashSet<string> FailedOdinBoolExpressions = new HashSet<string>();
         private static readonly HashSet<string> LoggedRuntimeWatchWarnings = new HashSet<string>();
         private readonly Dictionary<string, string> inlineInputDrafts = new Dictionary<string, string>();
+        private readonly HashSet<string> manuallyEditedInlineDraftKeys = new HashSet<string>();
+        private readonly Dictionary<string, WatchSampleState> sampleStates = new Dictionary<string, WatchSampleState>();
+        private readonly HashSet<string> pinnedEntryKeys = new HashSet<string>(StringComparer.Ordinal);
         private bool defaultFoldoutExpanded = true;
+        private bool pinnedEntriesLoaded;
+        private const string PinnedEntriesPrefsKey = "ES_RuntimeWatch_PinnedEntries";
 
-        [Title("运行时观察", "收集场景中带 ESRuntimeWatch 标记的字段、属性和方法", bold: true, titleAlignment: TitleAlignments.Centered)]
-        [HorizontalGroup("Toolbar", Width = 0.42f)]
-        [ShowInInspector, LabelText("搜索")]
         private string searchText = "";
 
-        [HorizontalGroup("SearchFilters", Width = 135)]
-        [ShowInInspector, LabelText("分类"), ValueDropdown(nameof(GetRuntimeWatchCategoryOptions))]
         private string selectedCategoryFilter = "全部";
 
-        [HorizontalGroup("SearchFilters", Width = 165)]
-        [ShowInInspector, LabelText("游戏对象"), ValueDropdown(nameof(GetRuntimeWatchObjectOptions))]
         private string selectedObjectFilter = "全部";
 
-        [HorizontalGroup("SearchFilters", Width = 145)]
-        [ShowInInspector, LabelText("脚本"), ValueDropdown(nameof(GetRuntimeWatchScriptOptions))]
         private string selectedScriptFilter = "全部";
 
-        [HorizontalGroup("Toolbar", Width = 135)]
-        [ShowInInspector, LabelText("自动刷新")]
         private bool autoRefresh = true;
 
-        [HorizontalGroup("Toolbar", Width = 160)]
-        [ShowInInspector, LabelText("刷新间隔")]
-        [MinValue(0.1f)]
         private float refreshInterval = 0.25f;
 
-        [HorizontalGroup("Toolbar", Width = 145)]
-        [ShowInInspector, LabelText("编辑器扫描")]
         private bool refreshInEditMode = false;
 
-        [HorizontalGroup("Scope", Width = 165)]
-        [ShowInInspector, LabelText("只看选中对象")]
         private bool onlySelectedGameObject = false;
 
-        [HorizontalGroup("Scope", Width = 165)]
-        [ShowInInspector, LabelText("包含子对象")]
         private bool includeSelectedChildren = true;
 
-        [HorizontalGroup("Filters", Width = 160)]
-        [ShowInInspector, LabelText("启用Tag过滤")]
         private bool enableTagFilter = true;
 
-        [HorizontalGroup("Filters", Width = 165)]
-        [ShowInInspector, LabelText("启用ShowIf")]
         private bool enableShowIfFilter = true;
 
-        [HorizontalGroup("Filters", Width = 190)]
-        [ShowInInspector, LabelText("允许GetMoudle"), Tooltip("允许 RuntimeWatch 通过 Core.GetMoudle<T>() 补取模块。此开关可能创建缺失模块，默认关闭。")]
         private bool allowGetMoudleFallback = false;
 
-        [HorizontalGroup("Filters", Width = 135)]
-        [ShowInInspector, LabelText("紧凑模式")]
         private bool compactView = false;
 
         private double nextRefreshTime;
@@ -93,25 +71,61 @@ namespace ES
         private int lastShowIfFilteredCount;
         private int lastContextMissingCount;
         private int lastDuplicateSkippedCount;
+        private double lastScanDurationMs;
+        private bool showAdvancedFilters;
+        private bool showDiagnostics;
+        private bool autoRefreshPaused;
+        private bool confirmMethodActions = true;
+        private int currentPage;
+        private int pageSize = 100;
+        private RuntimeWatchViewFilter viewFilter = RuntimeWatchViewFilter.All;
+        private const double ChangeHighlightSeconds = 0.5d;
+        private const double SlowGetterThresholdMs = 2d;
 
-        [HorizontalGroup("Toolbar", Width = 110)]
-        [Button("立即刷新", ButtonHeight = 22), GUIColor(0.35f, 0.65f, 1f)]
+        private enum RuntimeWatchViewFilter
+        {
+            [InspectorName("全部")]
+            All,
+            [InspectorName("最近变化")]
+            Changed,
+            [InspectorName("读取失败")]
+            ReadFailures,
+            [InspectorName("慢 Getter")]
+            SlowGetters,
+            [InspectorName("可执行项")]
+            Actions,
+            [InspectorName("已收藏")]
+            Pinned
+        }
+
+        private enum RuntimeWatchDropdownFilter
+        {
+            Category,
+            Script,
+            SceneObject
+        }
+
         public void RefreshNow()
         {
             CollectEntries(recordResult: true);
+            nextRefreshTime = EditorApplication.timeSinceStartup + refreshInterval;
         }
 
-        [FoldoutGroup("链路诊断", Expanded = false)]
-        [HorizontalGroup("链路诊断/Buttons", Width = 140)]
-        [Button("生成链路报告", ButtonHeight = 22), GUIColor(0.75f, 0.85f, 1f)]
+        public bool TryAutoRefreshFromEditorTick()
+        {
+            if (!ShouldAutoRefresh() || EditorApplication.timeSinceStartup < nextRefreshTime)
+                return false;
+
+            CollectEntries(recordResult: false);
+            nextRefreshTime = EditorApplication.timeSinceStartup + refreshInterval;
+            return true;
+        }
+
         public void BuildChainReport()
         {
             chainReport = BuildRegistryChainReport();
         }
 
-        [FoldoutGroup("链路诊断")]
-        [HorizontalGroup("链路诊断/Buttons", Width = 140)]
-        [Button("复制链路报告", ButtonHeight = 22)]
         public void CopyChainReport()
         {
             if (string.IsNullOrEmpty(chainReport))
@@ -122,16 +136,11 @@ namespace ES
             lastResultDetail = "报告已写入系统剪贴板。";
         }
 
-        [FoldoutGroup("链路诊断")]
-        [HorizontalGroup("链路诊断/Buttons", Width = 120)]
-        [Button("清空报告", ButtonHeight = 22)]
         public void ClearChainReport()
         {
             chainReport = "";
         }
 
-        [HorizontalGroup("DebugButtons", Width = 110)]
-        [Button("全部展开", ButtonHeight = 22), GUIColor(0.35f, 0.65f, 0.45f)]
         public void ExpandAllFoldouts()
         {
             defaultFoldoutExpanded = true;
@@ -141,8 +150,6 @@ namespace ES
             lastResultDetail = "当前已清空折叠缓存，新条目将默认展开。";
         }
 
-        [HorizontalGroup("DebugButtons", Width = 110)]
-        [Button("全部收起", ButtonHeight = 22), GUIColor(0.62f, 0.48f, 0.24f)]
         public void CollapseAllFoldouts()
         {
             defaultFoldoutExpanded = false;
@@ -152,8 +159,6 @@ namespace ES
             lastResultDetail = "当前已清空折叠缓存，新条目将默认收起。";
         }
 
-        [HorizontalGroup("DebugButtons", Width = 120)]
-        [Button("重置折叠", ButtonHeight = 22)]
         public void ResetFoldouts()
         {
             defaultFoldoutExpanded = true;
@@ -161,67 +166,343 @@ namespace ES
             ownerFoldouts.Clear();
         }
 
-        [FoldoutGroup("链路诊断", Expanded = false)]
-        [ShowInInspector, ReadOnly, HideLabel, MultiLineProperty(28)]
         private string ChainReportView => string.IsNullOrEmpty(chainReport) ? "点击“生成链路报告”查看底层完整链路。" : chainReport;
 
         // Render results after the actual filters and controls, never before them.
         [OnInspectorGUI, PropertyOrder(100)]
         private void DrawRuntimeWatch()
         {
-            bool shouldAutoRefresh = autoRefresh && (EditorApplication.isPlaying || refreshInEditMode);
+            EnsurePinnedEntriesLoaded();
+            TryAutoRefreshFromEditorTick();
 
-            if (!EditorApplication.isPlaying)
-            {
-                EditorGUILayout.HelpBox("进入 Play Mode 后显示运行时观察数据。", MessageType.Info);
-                if (SimpleToolsPanelUtility.DrawCompactButton("扫描当前场景", 108, 24))
-                    CollectEntries(recordResult: true);
-            }
+            DrawPrimaryToolbar();
+            DrawSecondaryFilters();
+            int visibleCount = entries.Count(MatchesSearch);
 
-            if (shouldAutoRefresh && EditorApplication.timeSinceStartup >= nextRefreshTime)
-            {
-                CollectEntries(recordResult: false);
-                nextRefreshTime = EditorApplication.timeSinceStartup + refreshInterval;
-            }
+            if (!EditorApplication.isPlaying && !refreshInEditMode)
+                EditorGUILayout.HelpBox("当前处于 Edit Mode。启用“编辑器扫描”或点击“立即刷新”可检查当前场景实例。", MessageType.Info);
 
             if (entries.Count == 0)
             {
                 string emptyMessage = EditorApplication.isPlaying
-                    ? "当前没有找到可显示的观察项。请确认场景对象存在、字段/属性/方法已添加 ESRuntimeWatch 标记，并且搜索条件没有过滤掉结果。"
-                    : "编辑器下只显示注册信息。进入 Play Mode 后会读取场景实例；也可以点“编辑器下扫描一次”检查当前打开场景。";
+                    ? "当前没有找到观察项。请检查 ESRuntimeWatch 标记、场景实例和高级过滤条件。"
+                    : "尚未扫描到观察项。点击“立即刷新”扫描当前场景。";
                 EditorGUILayout.HelpBox(emptyMessage, MessageType.Info);
             }
 
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                GUILayout.FlexibleSpace();
-                if (GUILayout.Button(defaultFoldoutExpanded ? "默认展开" : "默认收起", EditorStyles.miniButtonLeft, GUILayout.Width(80)))
-                    defaultFoldoutExpanded = !defaultFoldoutExpanded;
-                if (GUILayout.Button("清理折叠缓存", EditorStyles.miniButtonRight, GUILayout.Width(110)))
-                {
-                    groupFoldouts.Clear();
-                    ownerFoldouts.Clear();
-                }
-            }
-
+            DrawContentToolbar(visibleCount);
             scroll = EditorGUILayout.BeginScrollView(scroll);
-            DrawEntries();
+            DrawEntries(visibleCount);
             EditorGUILayout.EndScrollView();
+            DrawDiagnosticsPanel();
 
-            if (shouldAutoRefresh && SimpleToolsWindow.UsingWindow != null)
-                SimpleToolsWindow.UsingWindow.Repaint();
         }
 
-        private void DrawEntries()
+        private bool ShouldAutoRefresh()
+        {
+            return autoRefresh
+                && !autoRefreshPaused
+                && (EditorApplication.isPlaying || refreshInEditMode);
+        }
+
+        private void DrawPrimaryToolbar()
+        {
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Label("RuntimeWatch", EditorStyles.boldLabel, GUILayout.Width(96));
+                    searchText = EditorGUILayout.TextField(searchText, GUI.skin.FindStyle("ToolbarSearchTextField") ?? EditorStyles.textField);
+                    if (GUILayout.Button("观察项 ▼", EditorStyles.miniButton, GUILayout.Width(78)))
+                        ShowQuickJumpMenu(GUILayoutUtility.GetLastRect());
+                    if (GUILayout.Button("GameObject ▼", EditorStyles.miniButton, GUILayout.Width(96)))
+                        ShowGameObjectJumpMenu(GUILayoutUtility.GetLastRect());
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    bool narrow = EditorGUIUtility.currentViewWidth < 900f;
+                    selectedCategoryFilter = DrawRuntimeWatchFilterDropdown(
+                        RuntimeWatchDropdownFilter.Category,
+                        "分类",
+                        selectedCategoryFilter,
+                        GetRuntimeWatchCategoryOptions(),
+                        narrow ? 150f : 180f);
+                    selectedScriptFilter = DrawRuntimeWatchFilterDropdown(
+                        RuntimeWatchDropdownFilter.Script,
+                        "脚本",
+                        selectedScriptFilter,
+                        GetRuntimeWatchScriptOptions(),
+                        narrow ? 185f : 220f);
+                    if (!narrow)
+                        selectedObjectFilter = DrawRuntimeWatchFilterDropdown(
+                            RuntimeWatchDropdownFilter.SceneObject,
+                            "对象",
+                            selectedObjectFilter,
+                            GetRuntimeWatchObjectOptions(),
+                            280f);
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (EditorGUIUtility.currentViewWidth < 900f)
+                        selectedObjectFilter = DrawRuntimeWatchFilterDropdown(
+                            RuntimeWatchDropdownFilter.SceneObject,
+                            "对象",
+                            selectedObjectFilter,
+                            GetRuntimeWatchObjectOptions(),
+                            Mathf.Max(260f, EditorGUIUtility.currentViewWidth - 310f));
+                    GUILayout.FlexibleSpace();
+                    string mode = EditorApplication.isPlaying ? "● Play" : "○ Edit";
+                    string pause = autoRefreshPaused ? " · 已暂停" : string.Empty;
+                    int currentVisibleCount = entries.Count(MatchesSearch);
+                    GUILayout.Label($"{mode}{pause} · {currentVisibleCount}/{entries.Count} 项 · {lastScanDurationMs:0.0} ms", EditorStyles.miniBoldLabel);
+                }
+            }
+        }
+
+        private void DrawSecondaryFilters()
+        {
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    autoRefresh = GUILayout.Toggle(autoRefresh, "自动刷新", EditorStyles.miniButton, GUILayout.Width(78));
+                    string pauseLabel = autoRefreshPaused ? "继续刷新" : "暂停刷新";
+                    if (GUILayout.Button(pauseLabel, EditorStyles.miniButton, GUILayout.Width(78)))
+                        autoRefreshPaused = !autoRefreshPaused;
+
+                    GUILayout.Label("间隔", GUILayout.Width(30));
+                    refreshInterval = Mathf.Clamp(EditorGUILayout.FloatField(refreshInterval, GUILayout.Width(52)), 0.1f, 10f);
+                    GUILayout.Label("秒", GUILayout.Width(18));
+                    onlySelectedGameObject = GUILayout.Toggle(onlySelectedGameObject, "仅选中对象", EditorStyles.miniButton, GUILayout.Width(92));
+                    using (new EditorGUI.DisabledScope(!onlySelectedGameObject))
+                        includeSelectedChildren = GUILayout.Toggle(includeSelectedChildren, "包含子对象", EditorStyles.miniButton, GUILayout.Width(92));
+                    if (GUILayout.Button("清除", EditorStyles.miniButton, GUILayout.Width(52)))
+                        ClearWatchFilters();
+                    GUILayout.FlexibleSpace();
+                    showAdvancedFilters = EditorGUILayout.Foldout(showAdvancedFilters, "高级筛选", true);
+                }
+
+                if (showAdvancedFilters)
+                {
+                    EditorGUILayout.Space(2);
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        enableTagFilter = GUILayout.Toggle(enableTagFilter, "Tag 过滤", EditorStyles.miniButton, GUILayout.Width(82));
+                        enableShowIfFilter = GUILayout.Toggle(enableShowIfFilter, "ShowIf", EditorStyles.miniButton, GUILayout.Width(72));
+                        allowGetMoudleFallback = GUILayout.Toggle(allowGetMoudleFallback, "允许 GetMoudle", EditorStyles.miniButton, GUILayout.Width(116));
+                        refreshInEditMode = GUILayout.Toggle(refreshInEditMode, "编辑器扫描", EditorStyles.miniButton, GUILayout.Width(92));
+                        compactView = GUILayout.Toggle(compactView, "紧凑模式", EditorStyles.miniButton, GUILayout.Width(82));
+                    }
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        confirmMethodActions = GUILayout.Toggle(confirmMethodActions, "方法二次确认", EditorStyles.miniButton, GUILayout.Width(106));
+                        viewFilter = (RuntimeWatchViewFilter)EditorGUILayout.EnumPopup("异常视图", viewFilter, GUILayout.MinWidth(150));
+                        GUILayout.FlexibleSpace();
+                    }
+                    if (allowGetMoudleFallback)
+                        EditorGUILayout.HelpBox("允许 GetMoudle 可能创建缺失模块，仅建议诊断时临时启用。", MessageType.Warning);
+                }
+            }
+        }
+
+        private void DrawContentToolbar(int visibleCount)
+        {
+            int pageCount = Mathf.Max(1, Mathf.CeilToInt(visibleCount / (float)Mathf.Max(1, pageSize)));
+            currentPage = Mathf.Clamp(currentPage, 0, pageCount - 1);
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+            {
+                if (GUILayout.Button("立即刷新", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                    RefreshNow();
+                if (GUILayout.Button("全部展开", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                    ExpandAllFoldouts();
+                if (GUILayout.Button("全部收起", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                    CollapseAllFoldouts();
+                if (GUILayout.Button("重置折叠", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                    ResetFoldouts();
+                GUILayout.FlexibleSpace();
+                GUILayout.Label($"显示 {visibleCount} / 收集 {entries.Count}", EditorStyles.miniLabel);
+                GUILayout.Space(8);
+                if (GUILayout.Button("‹", EditorStyles.toolbarButton, GUILayout.Width(24)))
+                    currentPage = Mathf.Max(0, currentPage - 1);
+                GUILayout.Label($"{currentPage + 1}/{pageCount}", EditorStyles.miniLabel, GUILayout.Width(48));
+                if (GUILayout.Button("›", EditorStyles.toolbarButton, GUILayout.Width(24)))
+                    currentPage = Mathf.Min(pageCount - 1, currentPage + 1);
+                pageSize = EditorGUILayout.IntPopup(pageSize, new[] { "50", "100", "200", "500" }, new[] { 50, 100, 200, 500 }, EditorStyles.toolbarPopup, GUILayout.Width(58));
+            }
+        }
+
+        private void DrawDiagnosticsPanel()
+        {
+            showDiagnostics = EditorGUILayout.Foldout(showDiagnostics, "诊断与链路报告", true);
+            if (!showDiagnostics)
+                return;
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField(
+                    $"Tag过滤 {lastTagFilteredCount} · ShowIf过滤 {lastShowIfFilteredCount} · 上下文缺失 {lastContextMissingCount} · 重复跳过 {lastDuplicateSkippedCount}",
+                    EditorStyles.miniLabel);
+                if (!string.IsNullOrWhiteSpace(lastResultSummary))
+                    EditorGUILayout.HelpBox(lastResultSummary + (string.IsNullOrWhiteSpace(lastResultDetail) ? string.Empty : "\n" + lastResultDetail), MessageType.None);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("生成链路报告", EditorStyles.miniButton, GUILayout.Width(112)))
+                        BuildChainReport();
+                    if (GUILayout.Button("复制报告", EditorStyles.miniButton, GUILayout.Width(82)))
+                        CopyChainReport();
+                    if (GUILayout.Button("清空报告", EditorStyles.miniButton, GUILayout.Width(82)))
+                        ClearChainReport();
+                }
+
+                if (!string.IsNullOrWhiteSpace(chainReport))
+                    EditorGUILayout.TextArea(chainReport, GUILayout.MinHeight(180));
+            }
+        }
+
+        private string DrawRuntimeWatchFilterDropdown(
+            RuntimeWatchDropdownFilter filter,
+            string label,
+            string current,
+            IEnumerable<string> values,
+            float width)
+        {
+            List<string> options = (values ?? Array.Empty<string>())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (!options.Contains("全部"))
+                options.Insert(0, "全部");
+
+            string normalizedCurrent = options.Contains(current) ? current : "全部";
+            const float LabelWidth = 36f;
+            GUILayout.Label(label, GUILayout.Width(LabelWidth));
+            Rect anchorRect = GUILayoutUtility.GetRect(
+                new GUIContent(normalizedCurrent + " ▼"),
+                EditorStyles.miniButton,
+                GUILayout.Width(Mathf.Max(84f, width - LabelWidth)),
+                GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            if (GUI.Button(anchorRect, new GUIContent(normalizedCurrent + " ▼", "搜索并选择" + label + "筛选"), EditorStyles.miniButton))
+                ShowRuntimeWatchFilterMenu(anchorRect, filter, label, normalizedCurrent, options);
+
+            return normalizedCurrent;
+        }
+
+        private void ShowRuntimeWatchFilterMenu(
+            Rect anchorRect,
+            RuntimeWatchDropdownFilter filter,
+            string label,
+            string current,
+            IReadOnlyList<string> options)
+        {
+            var entries = new List<ESSearchDropdown.Entry>(options.Count);
+            foreach (string option in options)
+            {
+                string captured = option;
+                int matchCount = CountRuntimeWatchFilterMatches(filter, captured);
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    captured,
+                    () => ApplyRuntimeWatchFilter(filter, captured),
+                    subtitle: matchCount + " 个观察项",
+                    keywords: captured,
+                    badge: string.Equals(captured, current, StringComparison.Ordinal) ? "当前" : null,
+                    selected: string.Equals(captured, current, StringComparison.Ordinal)));
+            }
+
+            ESSearchDropdown.Open(
+                anchorRect,
+                "选择" + label + "筛选",
+                entries,
+                minimumWindowSize: new Vector2(320f, 300f));
+        }
+
+        private int CountRuntimeWatchFilterMatches(RuntimeWatchDropdownFilter filter, string value)
+        {
+            return entries.Count(entry => MatchesRuntimeWatchFilter(entry, filter, value));
+        }
+
+        private static bool MatchesRuntimeWatchFilter(WatchEntry entry, RuntimeWatchDropdownFilter filter, string value)
+        {
+            if (entry == null || IsAllFilter(value))
+                return entry != null;
+
+            string entryValue;
+            switch (filter)
+            {
+                case RuntimeWatchDropdownFilter.Category:
+                    entryValue = string.IsNullOrWhiteSpace(entry.Category)
+                        ? ESRuntimeWatchAttribute.CategoryNone
+                        : entry.Category;
+                    break;
+                case RuntimeWatchDropdownFilter.Script:
+                    entryValue = entry.ScriptTypeName;
+                    break;
+                default:
+                    entryValue = entry.GameObjectName;
+                    break;
+            }
+
+            return string.Equals(entryValue, value, StringComparison.Ordinal);
+        }
+
+        private void ApplyRuntimeWatchFilter(RuntimeWatchDropdownFilter filter, string value)
+        {
+            string selectedValue = string.IsNullOrWhiteSpace(value) ? "全部" : value;
+            switch (filter)
+            {
+                case RuntimeWatchDropdownFilter.Category:
+                    selectedCategoryFilter = selectedValue;
+                    break;
+                case RuntimeWatchDropdownFilter.Script:
+                    selectedScriptFilter = selectedValue;
+                    break;
+                default:
+                    selectedObjectFilter = selectedValue;
+                    break;
+            }
+
+            currentPage = 0;
+            scroll.y = 0f;
+            lastResultSummary = "RuntimeWatch " + GetRuntimeWatchFilterDisplayName(filter) + "筛选：" + selectedValue;
+            lastResultDetail = "当前命中 " + entries.Count(MatchesSearch) + " 个观察项。";
+            SimpleToolsWindow.UsingWindow?.Repaint();
+        }
+
+        private static string GetRuntimeWatchFilterDisplayName(RuntimeWatchDropdownFilter filter)
+        {
+            switch (filter)
+            {
+                case RuntimeWatchDropdownFilter.Category:
+                    return "分类";
+                case RuntimeWatchDropdownFilter.Script:
+                    return "脚本";
+                default:
+                    return "对象";
+            }
+        }
+
+        private void DrawEntries(int visibleCount)
         {
             string activeGroup = null;
             string activeOwnerKey = null;
             bool groupVisible = false;
             bool ownerVisible = false;
+            int pageCount = Mathf.Max(1, Mathf.CeilToInt(visibleCount / (float)Mathf.Max(1, pageSize)));
+            currentPage = Mathf.Clamp(currentPage, 0, pageCount - 1);
+            int firstVisibleIndex = currentPage * pageSize;
+            int lastVisibleIndex = firstVisibleIndex + pageSize;
+            int filteredIndex = 0;
 
             foreach (WatchEntry entry in entries)
             {
                 if (!MatchesSearch(entry))
+                    continue;
+
+                int currentFilteredIndex = filteredIndex++;
+                if (currentFilteredIndex < firstVisibleIndex || currentFilteredIndex >= lastVisibleIndex)
                     continue;
 
                 if (activeGroup != entry.Group)
@@ -258,11 +539,11 @@ namespace ES
                             lastResultSummary = $"已定位观察对象: {entry.OwnerName}";
                             lastResultDetail = $"分组: {entry.Group}\n字段: {entry.Label}\n路径: {entry.MemberPath}\n类型: {entry.OwnerTypeName}";
                         }
-                        if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(48)))
+                        if (GUILayout.Button("复制", EditorStyles.miniButton, GUILayout.Width(48)))
                         {
                             EditorGUIUtility.systemCopyBuffer = $"{entry.OwnerName}\n{entry.MemberPath}\n{entry.ReadValue()}";
-                            lastResultSummary = $"已定位观察对象: {entry.OwnerName}";
-                            lastResultDetail = $"{entry.Group}\n{entry.Label}\n{entry.MemberPath}";
+                            lastResultSummary = $"已复制观察项: {entry.Label}";
+                            lastResultDetail = $"{entry.OwnerName}\n{entry.Group}\n{entry.MemberPath}";
                         }
                     }
 
@@ -275,17 +556,32 @@ namespace ES
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     GUILayout.Space(28);
+                    DrawPinButton(entry);
                     DrawMemberKindBadge(entry);
+                    DrawCapabilityBadge(entry);
                     using (new EditorGUILayout.VerticalScope())
                     {
                         using (new EditorGUILayout.HorizontalScope())
                         {
-                            GUILayout.Label(entry.Label, EditorStyles.label, GUILayout.MinWidth(120));
+                            DrawMemberLabel(entry);
                             GUILayout.FlexibleSpace();
-                            EditorGUILayout.SelectableLabel(BuildCompactValue(entry.ReadValue()), GUILayout.Height(EditorGUIUtility.singleLineHeight), GUILayout.Width(compactView ? 100 : 150));
+                            string value = entry.ReadValue();
+                            Color previousContentColor = GUI.contentColor;
+                            if (entry.LastReadFailed)
+                                GUI.contentColor = new Color(1f, 0.42f, 0.42f);
+                            else if (entry.IsRecentlyChanged)
+                                GUI.contentColor = new Color(1f, 0.82f, 0.28f);
+                            EditorGUILayout.SelectableLabel(
+                                BuildCompactValue(value),
+                                GUILayout.Height(EditorGUIUtility.singleLineHeight),
+                                GUILayout.Width(compactView ? 100 : 150));
+                            GUI.contentColor = previousContentColor;
                         }
 
-                        GUILayout.Label(entry.MemberSummary, RuntimeWatchPathStyle, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                        string performance = entry.LastReadDurationMs >= SlowGetterThresholdMs
+                            ? $" · 慢读取 {entry.LastReadDurationMs:0.00}ms"
+                            : string.Empty;
+                        DrawMemberSummary(entry, performance);
                     }
                     using (new EditorGUILayout.VerticalScope(GUILayout.Width(compactView ? 180 : 240)))
                     {
@@ -308,6 +604,99 @@ namespace ES
             GUI.backgroundColor = previous;
         }
 
+        private static void DrawMemberLabel(WatchEntry entry)
+        {
+            if (entry == null)
+                return;
+
+            Color previous = GUI.contentColor;
+            GUI.contentColor = entry.MemberKindColor;
+            GUILayout.Label(entry.Label, RuntimeWatchMemberNameStyle, GUILayout.MinWidth(120));
+            GUI.contentColor = previous;
+        }
+
+        private static void DrawMemberSummary(WatchEntry entry, string performance)
+        {
+            if (entry == null)
+                return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (!string.IsNullOrEmpty(entry.MemberPathPrefix))
+                    GUILayout.Label(entry.MemberPathPrefix, RuntimeWatchPathStyle);
+
+                Color previous = GUI.contentColor;
+                GUI.contentColor = entry.MemberKindColor;
+                GUILayout.Label(entry.MemberCodeName, RuntimeWatchMemberNameStyle);
+                GUI.contentColor = previous;
+
+                GUILayout.Label(entry.MemberTypeSuffix + performance, RuntimeWatchPathStyle);
+            }
+        }
+
+        private void DrawPinButton(WatchEntry entry)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.StateKey))
+                return;
+
+            bool pinned = pinnedEntryKeys.Contains(entry.StateKey);
+            Color previous = GUI.contentColor;
+            if (pinned)
+                GUI.contentColor = new Color(1f, 0.76f, 0.22f);
+            if (GUILayout.Button(pinned ? "★" : "☆", EditorStyles.miniButton, GUILayout.Width(24)))
+            {
+                if (pinned)
+                    pinnedEntryKeys.Remove(entry.StateKey);
+                else
+                    pinnedEntryKeys.Add(entry.StateKey);
+                SavePinnedEntries();
+            }
+            GUI.contentColor = previous;
+        }
+
+        private void EnsurePinnedEntriesLoaded()
+        {
+            if (pinnedEntriesLoaded)
+                return;
+
+            pinnedEntriesLoaded = true;
+            string saved = EditorPrefs.GetString(PinnedEntriesPrefsKey, string.Empty);
+            foreach (string key in saved.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                pinnedEntryKeys.Add(key);
+        }
+
+        private void SavePinnedEntries()
+        {
+            EditorPrefs.SetString(PinnedEntriesPrefsKey, string.Join("\n", pinnedEntryKeys.OrderBy(key => key, StringComparer.Ordinal)));
+        }
+
+        private static void DrawCapabilityBadge(WatchEntry entry)
+        {
+            if (entry == null)
+                return;
+
+            string label = null;
+            Color color = Color.gray;
+            if (entry.MemberInfo is MethodInfo)
+            {
+                label = "执行";
+                color = new Color(0.88f, 0.42f, 0.28f);
+            }
+            else if (TryGetEditableValueType(entry.MemberInfo, out _))
+            {
+                label = "可写";
+                color = new Color(0.85f, 0.68f, 0.22f);
+            }
+
+            if (label == null)
+                return;
+
+            Color previous = GUI.backgroundColor;
+            GUI.backgroundColor = color;
+            GUILayout.Label(label, EditorStyles.miniButton, GUILayout.Width(42));
+            GUI.backgroundColor = previous;
+        }
+
         private static string BuildCompactValue(string value)
         {
             if (string.IsNullOrEmpty(value))
@@ -317,7 +706,167 @@ namespace ES
             return value.Length <= maxLength ? value : value.Substring(0, maxLength - 1) + "…";
         }
 
+        private void ClearWatchFilters()
+        {
+            searchText = string.Empty;
+            selectedCategoryFilter = "全部";
+            selectedObjectFilter = "全部";
+            selectedScriptFilter = "全部";
+            onlySelectedGameObject = false;
+            enableTagFilter = true;
+            enableShowIfFilter = true;
+            lastResultSummary = "已清除 RuntimeWatch 筛选";
+            lastResultDetail = "已恢复全部分类、对象、脚本和文本搜索。";
+        }
+
+        private void ShowQuickJumpMenu(Rect anchorRect)
+        {
+            var candidates = entries
+                .Where(entry => entry != null)
+                .OrderBy(entry => entry.Group, StringComparer.Ordinal)
+                .ThenBy(entry => entry.OwnerName, StringComparer.Ordinal)
+                .ThenBy(entry => entry.Label, StringComparer.Ordinal)
+                .ToList();
+            var options = new List<ESSearchDropdown.Entry>(candidates.Count);
+
+            if (candidates.Count == 0)
+            {
+                options.Add(ESSearchDropdown.Entry.Disabled("当前没有已收集的观察项"));
+            }
+            else
+            {
+                foreach (WatchEntry candidate in candidates)
+                {
+                    WatchEntry captured = candidate;
+                    string group = string.IsNullOrWhiteSpace(candidate.Group) ? "未分组" : candidate.Group;
+                    string category = string.IsNullOrWhiteSpace(candidate.Category) ? "未分类" : candidate.Category;
+                    Texture2D icon = candidate.SceneObject != null
+                        ? EditorGUIUtility.ObjectContent(candidate.SceneObject, candidate.SceneObject.GetType()).image as Texture2D
+                        : null;
+                    options.Add(ESSearchDropdown.Entry.Item(
+                        candidate.Label,
+                        () => FocusWatchEntry(captured),
+                        group + "/" + category,
+                        icon,
+                        subtitle: candidate.OwnerName + " · " + candidate.ScriptTypeName + " · " + candidate.MemberPath,
+                        tooltip: candidate.GameObjectName,
+                        badge: candidate.LastReadFailed ? "读取失败" : candidate.MemberKindLabel,
+                        selected: string.Equals(searchText, candidate.MemberPath, StringComparison.Ordinal)));
+                }
+            }
+
+            ESSearchDropdown.Open(
+                anchorRect,
+                "快速跳转 RuntimeWatch 观察项",
+                options,
+                minimumWindowSize: new Vector2(480f, 400f));
+        }
+
+        private void FocusWatchEntry(WatchEntry entry)
+        {
+            if (entry == null)
+                return;
+
+            selectedCategoryFilter = string.IsNullOrWhiteSpace(entry.Category) ? "全部" : entry.Category;
+            selectedObjectFilter = string.IsNullOrWhiteSpace(entry.GameObjectName) ? "全部" : entry.GameObjectName;
+            selectedScriptFilter = string.IsNullOrWhiteSpace(entry.ScriptTypeName) ? "全部" : entry.ScriptTypeName;
+            onlySelectedGameObject = false;
+            searchText = entry.MemberPath ?? entry.Label ?? string.Empty;
+            string group = entry.Group ?? "Default";
+            string ownerKey = group + "|" + entry.OwnerKey;
+            groupFoldouts[group] = true;
+            ownerFoldouts[ownerKey] = true;
+
+            UnityEngine.Object target = entry.SceneObject != null ? entry.SceneObject : entry.Owner;
+            if (target != null)
+            {
+                Selection.activeObject = target;
+                EditorGUIUtility.PingObject(target);
+            }
+
+            lastResultSummary = "已跳转到 RuntimeWatch 观察项: " + entry.Label;
+            lastResultDetail = $"对象: {entry.OwnerName}\n分组: {entry.Group}\n路径: {entry.MemberPath}";
+        }
+
+        private void ShowGameObjectJumpMenu(Rect anchorRect)
+        {
+            var objectGroups = entries
+                .Where(entry => entry != null && entry.SceneObject != null)
+                .GroupBy(entry => entry.SceneObject.GetInstanceID())
+                .Select(group => new
+                {
+                    SceneObject = group.First().SceneObject,
+                    GameObjectPath = group.First().GameObjectName,
+                    SceneName = group.First().SceneObject.scene.IsValid()
+                        ? group.First().SceneObject.scene.name
+                        : "未加载场景",
+                    EntryCount = group.Count(),
+                    ScriptCount = group.Select(entry => entry.ScriptTypeName).Distinct().Count()
+                })
+                .OrderBy(item => item.SceneName, StringComparer.Ordinal)
+                .ThenBy(item => item.GameObjectPath, StringComparer.Ordinal)
+                .ToList();
+            var options = new List<ESSearchDropdown.Entry>(objectGroups.Count);
+
+            if (objectGroups.Count == 0)
+            {
+                options.Add(ESSearchDropdown.Entry.Disabled("当前没有包含 RuntimeWatch 的 GameObject"));
+            }
+            else
+            {
+                foreach (var item in objectGroups)
+                {
+                    GameObject capturedObject = item.SceneObject;
+                    string capturedPath = item.GameObjectPath;
+                    Texture2D icon = EditorGUIUtility.ObjectContent(capturedObject, typeof(GameObject)).image as Texture2D;
+                    options.Add(ESSearchDropdown.Entry.Item(
+                        item.GameObjectPath,
+                        () => FocusWatchGameObject(capturedObject, capturedPath),
+                        item.SceneName,
+                        icon,
+                        subtitle: item.EntryCount + " 个观察项 · " + item.ScriptCount + " 个脚本",
+                        badge: capturedObject.activeInHierarchy ? "活动" : "未激活",
+                        selected: Selection.activeGameObject == capturedObject));
+                }
+            }
+
+            ESSearchDropdown.Open(
+                anchorRect,
+                "按 GameObject 跳转 RuntimeWatch",
+                options,
+                minimumWindowSize: new Vector2(460f, 390f));
+        }
+
+        private void FocusWatchGameObject(GameObject sceneObject, string gameObjectPath)
+        {
+            if (sceneObject == null)
+                return;
+
+            searchText = string.Empty;
+            selectedCategoryFilter = "全部";
+            selectedObjectFilter = string.IsNullOrWhiteSpace(gameObjectPath) ? "全部" : gameObjectPath;
+            selectedScriptFilter = "全部";
+            onlySelectedGameObject = false;
+
+            foreach (WatchEntry entry in entries)
+            {
+                if (entry == null || entry.SceneObject != sceneObject)
+                    continue;
+
+                string group = entry.Group ?? "Default";
+                groupFoldouts[group] = true;
+                ownerFoldouts[group + "|" + entry.OwnerKey] = true;
+            }
+
+            Selection.activeGameObject = sceneObject;
+            EditorGUIUtility.PingObject(sceneObject);
+            int count = entries.Count(entry => entry != null && entry.SceneObject == sceneObject);
+            lastResultSummary = "已跳转到 RuntimeWatch GameObject: " + sceneObject.name;
+            lastResultDetail = $"路径: {gameObjectPath}\n观察项: {count}";
+        }
+
         private static GUIStyle runtimeWatchPathStyle;
+        private static GUIStyle runtimeWatchMemberNameStyle;
         private static GUIStyle RuntimeWatchPathStyle
         {
             get
@@ -335,9 +884,28 @@ namespace ES
             }
         }
 
+        private static GUIStyle RuntimeWatchMemberNameStyle
+        {
+            get
+            {
+                if (runtimeWatchMemberNameStyle == null)
+                {
+                    runtimeWatchMemberNameStyle = new GUIStyle(EditorStyles.miniBoldLabel)
+                    {
+                        clipping = TextClipping.Clip
+                    };
+                }
+
+                return runtimeWatchMemberNameStyle;
+            }
+        }
+
         private void DrawRuntimeWatchActionButton(WatchEntry entry, int width)
         {
             if (!GUILayout.Button(entry.ActionButtonLabel, EditorStyles.miniButton, GUILayout.Width(width)))
+                return;
+
+            if (!ConfirmMethodAction(entry))
                 return;
 
             string invokeResult = entry.InvokeManualAction();
@@ -346,8 +914,21 @@ namespace ES
             lastResultDetail = invokeResult;
         }
 
+        private bool ConfirmMethodAction(WatchEntry entry)
+        {
+            if (!confirmMethodActions || entry == null || !(entry.MemberInfo is MethodInfo))
+                return true;
+
+            return EditorUtility.DisplayDialog(
+                "执行 RuntimeWatch 方法",
+                $"对象：{entry.OwnerName}\n方法：{entry.MemberPath}\n\n该操作可能修改运行时状态，确定继续？",
+                "执行",
+                "取消");
+        }
+
         private void CollectEntries(bool recordResult)
         {
+            var scanStopwatch = Stopwatch.StartNew();
             entries.Clear();
             IReadOnlyList<ESRuntimeWatchRegistry.Entry> registeredEntries = ESRuntimeWatchRegistry.Entries;
             IReadOnlyList<Type> ownerTypes = ESRuntimeWatchRegistry.OwnerTypes;
@@ -413,7 +994,15 @@ namespace ES
                             continue;
                         }
 
-                        entries.Add(WatchEntry.FromRegistryEntry(behaviour, registeredEntry, allowGetMoudleFallback));
+                        WatchEntry watchEntry = WatchEntry.FromRegistryEntry(behaviour, registeredEntry, allowGetMoudleFallback);
+                        if (!sampleStates.TryGetValue(key, out WatchSampleState sampleState))
+                        {
+                            sampleState = new WatchSampleState();
+                            sampleStates.Add(key, sampleState);
+                        }
+                        watchEntry.SampleState = sampleState;
+                        watchEntry.StateKey = BuildPersistentWatchKey(behaviour, registeredEntry);
+                        entries.Add(watchEntry);
                     }
                 }
             }
@@ -425,6 +1014,15 @@ namespace ES
                 int owner = string.Compare(a.OwnerName, b.OwnerName, StringComparison.Ordinal);
                 return owner != 0 ? owner : string.Compare(a.Label, b.Label, StringComparison.Ordinal);
             });
+
+            if (sampleStates.Count > addedKeys.Count + 32)
+            {
+                foreach (string staleKey in sampleStates.Keys.Where(key => !addedKeys.Contains(key)).ToArray())
+                    sampleStates.Remove(staleKey);
+            }
+
+            scanStopwatch.Stop();
+            lastScanDurationMs = scanStopwatch.Elapsed.TotalMilliseconds;
 
             if (recordResult)
             {
@@ -513,6 +1111,22 @@ namespace ES
                 return false;
             }
 
+            // The common ShowIf forms (@this.flag, flag, !flag, and nested member paths)
+            // do not need Odin's expression compiler. Evaluate them first so their value is
+            // re-read on every RuntimeWatch tick and no cached delegate can hold stale state.
+            if (TryEvaluateSimpleBoolExpression(context, expression, out bool simpleResult, out bool simpleGetterFailed))
+            {
+                if (!simpleResult)
+                    failReason = "SimpleFalse";
+                return simpleResult;
+            }
+
+            if (simpleGetterFailed)
+            {
+                failReason = "ShowIfGetterFailed";
+                return false;
+            }
+
             string cacheKey = context.GetType().AssemblyQualifiedName + "|" + expression;
             if (!FailedOdinBoolExpressions.Contains(cacheKey))
             {
@@ -532,8 +1146,7 @@ namespace ES
                     if (func == null)
                     {
                         FailedOdinBoolExpressions.Add(cacheKey);
-                        if (!TryEvaluateSimpleBoolExpression(context, expression, out _))
-                            LogRuntimeWatchWarningOnce("ShowIfParse|" + cacheKey, $"[RuntimeWatch] Odin ShowIf 表达式解析失败，尝试简单布尔兜底: {expression}\nContext: {context.GetType().Name}\n{error}");
+                        LogRuntimeWatchWarningOnce("ShowIfParse|" + cacheKey, $"[RuntimeWatch] Odin ShowIf 表达式解析失败，简单布尔表达式也无法处理: {expression}\nContext: {context.GetType().Name}\n{error}");
                     }
                     else
                     {
@@ -560,11 +1173,17 @@ namespace ES
                 }
             }
 
-            if (TryEvaluateSimpleBoolExpression(context, expression, out bool simpleResult))
+            if (TryEvaluateSimpleBoolExpression(context, expression, out bool fallbackSimpleResult, out bool fallbackGetterFailed))
             {
-                if (!simpleResult)
+                if (!fallbackSimpleResult)
                     failReason = "SimpleFallbackFalse";
-                return simpleResult;
+                return fallbackSimpleResult;
+            }
+
+            if (fallbackGetterFailed)
+            {
+                failReason = "ShowIfGetterFailed";
+                return false;
             }
 
             failReason = FailedOdinBoolExpressions.Contains(cacheKey) ? "OdinParseFailed" : "OdinUnknownFailed";
@@ -584,9 +1203,10 @@ namespace ES
             return normalized;
         }
 
-        private static bool TryEvaluateSimpleBoolExpression(object context, string expression, out bool result)
+        private static bool TryEvaluateSimpleBoolExpression(object context, string expression, out bool result, out bool getterFailed)
         {
             result = false;
+            getterFailed = false;
             if (context == null || string.IsNullOrWhiteSpace(expression))
                 return false;
 
@@ -610,42 +1230,63 @@ namespace ES
             if (string.IsNullOrWhiteSpace(path))
                 return false;
 
-            object value = ReadSimpleMemberPath(context, path);
+            if (!TryReadSimpleMemberPath(context, path, out object value, out getterFailed))
+                return false;
+
             return TryConvertToBool(value, invert, out result);
         }
 
-        private static object ReadSimpleMemberPath(object context, string memberPath)
+        private static bool TryReadSimpleMemberPath(object context, string memberPath, out object value, out bool getterFailed)
         {
+            value = null;
+            getterFailed = false;
             object current = context;
             string[] members = memberPath.Split('.');
             for (int i = 0; i < members.Length; i++)
             {
                 if (current == null)
-                    return null;
+                    return false;
 
                 string member = members[i];
                 if (string.IsNullOrWhiteSpace(member))
-                    return null;
+                    return false;
 
                 Type currentType = current.GetType();
                 FieldInfo field = currentType.GetField(member, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 if (field != null)
                 {
-                    current = field.GetValue(current);
+                    try
+                    {
+                        current = field.GetValue(current);
+                    }
+                    catch
+                    {
+                        getterFailed = true;
+                        return false;
+                    }
                     continue;
                 }
 
                 PropertyInfo property = currentType.GetProperty(member, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 if (property != null && property.GetIndexParameters().Length == 0)
                 {
-                    current = property.GetValue(current);
+                    try
+                    {
+                        current = property.GetValue(current);
+                    }
+                    catch
+                    {
+                        getterFailed = true;
+                        return false;
+                    }
                     continue;
                 }
 
-                return null;
+                return false;
             }
 
-            return current;
+            value = current;
+            return true;
         }
 
         private static bool TryConvertToBool(object value, bool invert, out bool result)
@@ -723,6 +1364,9 @@ namespace ES
             if (!MatchesDropdownFilters(entry))
                 return false;
 
+            if (!MatchesViewFilter(entry))
+                return false;
+
             if (string.IsNullOrWhiteSpace(searchText))
                 return true;
 
@@ -735,6 +1379,37 @@ namespace ES
                    || ContainsIgnoreCase(entry.ScriptTypeName, searchText)
                    || ContainsIgnoreCase(entry.GameObjectName, searchText)
                    || ContainsIgnoreCase(entry.ActionButtonLabel, searchText);
+        }
+
+        private bool MatchesViewFilter(WatchEntry entry)
+        {
+            if (entry == null)
+                return false;
+
+            switch (viewFilter)
+            {
+                case RuntimeWatchViewFilter.Changed:
+                    return entry.IsRecentlyChanged;
+                case RuntimeWatchViewFilter.ReadFailures:
+                    return entry.LastReadFailed;
+                case RuntimeWatchViewFilter.SlowGetters:
+                    return entry.LastReadDurationMs >= SlowGetterThresholdMs;
+                case RuntimeWatchViewFilter.Actions:
+                    return entry.HasManualAction || TryGetEditableValueType(entry.MemberInfo, out _);
+                case RuntimeWatchViewFilter.Pinned:
+                    return !string.IsNullOrWhiteSpace(entry.StateKey) && pinnedEntryKeys.Contains(entry.StateKey);
+                default:
+                    return true;
+            }
+        }
+
+        private static string BuildPersistentWatchKey(MonoBehaviour owner, ESRuntimeWatchRegistry.Entry entry)
+        {
+            if (owner == null)
+                return string.Empty;
+
+            GlobalObjectId globalId = GlobalObjectId.GetGlobalObjectIdSlow(owner);
+            return globalId + "|" + entry.EntryKey;
         }
 
         private bool MatchesDropdownFilters(WatchEntry entry)
@@ -761,26 +1436,10 @@ namespace ES
 
         private IEnumerable<string> GetRuntimeWatchCategoryOptions()
         {
-            string[] common =
-            {
-                "全部",
-                "全部",
-                "全部",
-                "全部",
-                "全部",
-                "AI",
-                "全部",
-                "全部",
-                "全部",
-                "全部",
-                "全部",
-                "全部",
-                "全部",
-                "UI"
-            };
-
-            return common
-                .Concat(entries.Select(entry => string.IsNullOrWhiteSpace(entry.Category) ? "无分类" : entry.Category))
+            return new[] { "全部" }
+                .Concat(entries.Select(entry => string.IsNullOrWhiteSpace(entry.Category)
+                    ? ESRuntimeWatchAttribute.CategoryNone
+                    : entry.Category))
                 .Distinct()
                 .OrderBy(value => value == "全部" ? "" : value);
         }
@@ -830,16 +1489,19 @@ namespace ES
                     inlineInputDrafts[key] = draft;
                     if (GUILayout.Button(entry.ActionButtonLabel, EditorStyles.miniButton, GUILayout.Width(compactView ? 96 : 128)))
                     {
+                        if (!ConfirmMethodAction(entry))
+                            return true;
+
                         if (TryConvertTextToType(draft, parameters[0].ParameterType, out object parsedValue, out string parseError))
                         {
-                            string invokeResult = InvokeMethodWithArguments(entry, new object[] { parsedValue });
-                                RequestDeferredRefresh();
-                                lastResultSummary = $"已调用: {entry.Label}";
-                                lastResultDetail = invokeResult;
+                            string invokeResult = InvokeMethodWithArguments(entry, new object[] { parsedValue }, allowGetMoudleFallback);
+                            RequestDeferredRefresh();
+                            lastResultSummary = $"已调用: {entry.Label}";
+                            lastResultDetail = invokeResult;
                         }
                         else
                         {
-                            lastResultSummary = $"已调用: {entry.Label}";
+                            lastResultSummary = $"方法参数解析失败: {entry.Label}";
                             lastResultDetail = parseError;
                         }
                     }
@@ -851,18 +1513,26 @@ namespace ES
             if (TryGetEditableValueType(memberInfo, out Type editableType))
             {
                 string key = BuildInlineDraftKey(entry, "field");
-                string seed = GetCurrentValueDraft(entry, editableType);
-                string draft = GetOrCreateDraft(key, seed);
+                string draft = GetOrCreateLiveValueDraft(entry, key, editableType, allowGetMoudleFallback);
+                string draftBeforeEdit = draft;
                 DrawEditableValueField(editableType, ref draft);
                 inlineInputDrafts[key] = draft;
+                if (!string.Equals(draftBeforeEdit, draft, StringComparison.Ordinal))
+                    manuallyEditedInlineDraftKeys.Add(key);
                 if (GUILayout.Button("设值", EditorStyles.miniButton, GUILayout.Width(compactView ? 58 : 64)))
                 {
                     if (TryConvertTextToType(draft, editableType, out object parsedValue, out string parseError))
                     {
-                        string setResult = TrySetEntryValue(entry, parsedValue, out string writeMessage) ? writeMessage : BuildWriteFallback(writeMessage);
-                            RequestDeferredRefresh();
-                            lastResultSummary = $"方法参数解析失败: {entry.Label}";
-                            lastResultDetail = setResult;
+                        bool written = TrySetEntryValue(entry, parsedValue, allowGetMoudleFallback, out string writeMessage);
+                        if (written)
+                        {
+                            inlineInputDrafts[key] = FormatValueDraft(parsedValue, editableType);
+                            manuallyEditedInlineDraftKeys.Remove(key);
+                        }
+                        string setResult = written ? writeMessage : BuildWriteFallback(writeMessage);
+                        RequestDeferredRefresh();
+                        lastResultSummary = $"已设值: {entry.Label}";
+                        lastResultDetail = setResult;
                     }
                     else
                     {
@@ -899,6 +1569,18 @@ namespace ES
             }
 
             return draft;
+        }
+
+        private string GetOrCreateLiveValueDraft(WatchEntry entry, string key, Type valueType, bool allowGetMoudleFallback)
+        {
+            string seed = GetCurrentValueDraft(entry, valueType, allowGetMoudleFallback);
+            if (string.IsNullOrEmpty(key))
+                return seed;
+
+            if (!inlineInputDrafts.ContainsKey(key) || !manuallyEditedInlineDraftKeys.Contains(key))
+                inlineInputDrafts[key] = seed;
+
+            return inlineInputDrafts[key];
         }
 
         private static string BuildInlineDraftKey(WatchEntry entry, string suffix)
@@ -944,11 +1626,11 @@ namespace ES
                    || type == typeof(sbyte);
         }
 
-        private static string GetCurrentValueDraft(WatchEntry entry, Type valueType)
+        private static string GetCurrentValueDraft(WatchEntry entry, Type valueType, bool allowGetMoudleFallback)
         {
             try
             {
-                object value = entry != null ? entry.ReadRawValue() : null;
+                object value = entry != null ? entry.ReadRawValue(allowGetMoudleFallback) : null;
                 if (value == null)
                     return string.Empty;
 
@@ -963,12 +1645,22 @@ namespace ES
             }
         }
 
+        private static string FormatValueDraft(object value, Type valueType)
+        {
+            if (value == null)
+                return string.Empty;
+
+            return valueType != null && valueType.IsEnum
+                ? value.ToString()
+                : Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+
         private static string BuildWriteFallback(string message)
         {
             return string.IsNullOrWhiteSpace(message) ? "写回失败" : message;
         }
 
-        private static bool TrySetEntryValue(WatchEntry entry, object value, out string message)
+        private static bool TrySetEntryValue(WatchEntry entry, object value, bool allowGetMoudleFallback, out string message)
         {
             message = null;
             if (entry == null || entry.MemberInfo == null)
@@ -977,7 +1669,7 @@ namespace ES
                 return false;
             }
 
-            object context = WatchEntry.ResolveEntryContext(entry.Owner as MonoBehaviour, entry.RegistryEntry, true);
+            object context = WatchEntry.ResolveEntryContext(entry.Owner as MonoBehaviour, entry.RegistryEntry, allowGetMoudleFallback);
             if (context == null)
             {
                 message = "条目无效";
@@ -1012,7 +1704,7 @@ namespace ES
                         if (dirtyObject is MonoBehaviour behaviour)
                             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(behaviour.gameObject.scene);
                     }
-                    message = "字段已写回: " + entry.MemberPath;
+                    message = "属性已写回: " + entry.MemberPath;
                     return true;
                 }
             }
@@ -1032,12 +1724,12 @@ namespace ES
             return false;
         }
 
-        private static string InvokeMethodWithArguments(WatchEntry entry, object[] args)
+        private static string InvokeMethodWithArguments(WatchEntry entry, object[] args, bool allowGetMoudleFallback)
         {
             if (entry == null || !(entry.MemberInfo is MethodInfo methodInfo))
                 return "方法无效";
 
-            object context = WatchEntry.ResolveEntryContext(entry.Owner as MonoBehaviour, entry.RegistryEntry, true);
+            object context = WatchEntry.ResolveEntryContext(entry.Owner as MonoBehaviour, entry.RegistryEntry, allowGetMoudleFallback);
             if (context == null)
                 return "方法无效";
 
@@ -1275,13 +1967,17 @@ namespace ES
             var groups = new Dictionary<string, List<string>>
             {
                 { "Core链路 / Module字段", new List<string>() },
-                { "Core链路 / Module字段", new List<string>() },
-                { "Core链路 / Module字段", new List<string>() },
-                { "Core链路 / Module字段", new List<string>() },
-                { "Core链路 / Module字段", new List<string>() },
-                { "Core链路 / Module字段", new List<string>() },
-                { "Core链路 / Module字段", new List<string>() },
-                { "Core链路 / Module字段", new List<string>() },
+                { "Core链路 / Module属性", new List<string>() },
+                { "Core链路 / Module方法", new List<string>() },
+                { "Core链路 / Domain或Core嵌套字段", new List<string>() },
+                { "Core链路 / Domain或Core嵌套属性", new List<string>() },
+                { "Core链路 / Domain或Core嵌套方法", new List<string>() },
+                { "普通Mono / 嵌套字段", new List<string>() },
+                { "普通Mono / 嵌套属性", new List<string>() },
+                { "普通Mono / 嵌套方法", new List<string>() },
+                { "普通Mono / 直接字段", new List<string>() },
+                { "普通Mono / 直接属性", new List<string>() },
+                { "普通Mono / 直接方法", new List<string>() },
                 { "异常或待确认链路", new List<string>() }
             };
 
@@ -1371,7 +2067,7 @@ namespace ES
                 return "属性";
 
             if (memberInfo is MethodInfo)
-                return "属性";
+                return "方法";
 
             return "字段";
         }
@@ -1470,6 +2166,15 @@ namespace ES
             return member.MemberType + " " + declaring + "." + member.Name;
         }
 
+        private sealed class WatchSampleState
+        {
+            public bool HasValue;
+            public string LastValue;
+            public double ChangedUntil;
+            public double LastReadDurationMs;
+            public bool LastReadFailed;
+        }
+
         private class WatchEntry
         {
             public UnityEngine.Object Owner;
@@ -1486,12 +2191,21 @@ namespace ES
             public ESRuntimeWatchRegistry.Entry RegistryEntry;
             public MemberInfo MemberInfo => RegistryEntry.MemberInfo;
             public string MemberKindLabel => BuildMemberKindLabel(MemberInfo);
-            public string MemberSummary => BuildMemberSummary(this);
+            public string MemberPathPrefix => BuildMemberPathPrefix(this);
+            public string MemberCodeName => MemberInfo != null ? MemberInfo.Name : "<成员丢失>";
+            public string MemberTypeSuffix => BuildMemberTypeSuffix(MemberInfo);
             public Color MemberKindColor => BuildMemberKindColor(MemberInfo);
             public bool HasManualAction;
             public string ActionButtonLabel;
+            public string StateKey;
+            public WatchSampleState SampleState;
             private Func<string> readValue;
             private Func<string> manualAction;
+
+            public bool IsRecentlyChanged => SampleState != null
+                && SampleState.ChangedUntil > EditorApplication.timeSinceStartup;
+            public bool LastReadFailed => SampleState != null && SampleState.LastReadFailed;
+            public double LastReadDurationMs => SampleState != null ? SampleState.LastReadDurationMs : 0d;
 
             public static WatchEntry FromRegistryEntry(MonoBehaviour owner, ESRuntimeWatchRegistry.Entry entry, bool allowGetMoudleFallback)
             {
@@ -1570,49 +2284,56 @@ namespace ES
                     return "字段";
 
                 if (memberInfo is PropertyInfo)
-                    return "字段";
+                    return "属性";
 
                 if (memberInfo is MethodInfo)
-                    return "字段";
+                    return "方法";
 
-                return "属性";
+                return "成员";
             }
 
             private static Color BuildMemberKindColor(MemberInfo memberInfo)
             {
                 if (memberInfo is FieldInfo)
-                    return new Color(0.32f, 0.58f, 0.88f);
+                    return new Color(0.25f, 0.72f, 1f);
 
                 if (memberInfo is PropertyInfo)
-                    return new Color(0.30f, 0.68f, 0.48f);
+                    return new Color(0.30f, 0.88f, 0.52f);
 
                 if (memberInfo is MethodInfo)
-                    return new Color(0.82f, 0.55f, 0.24f);
+                    return new Color(1f, 0.64f, 0.22f);
 
                 return new Color(0.55f, 0.55f, 0.55f);
             }
 
-            private static string BuildMemberSummary(WatchEntry entry)
+            private static string BuildMemberPathPrefix(WatchEntry entry)
             {
                 if (entry == null || entry.MemberInfo == null)
-                    return "<成员丢失>";
+                    return string.Empty;
 
-                string name = entry.MemberInfo.Name;
+                string memberPath = entry.MemberPath ?? string.Empty;
+                string memberName = entry.MemberInfo.Name;
+                return memberPath.EndsWith(memberName, StringComparison.Ordinal)
+                    ? memberPath.Substring(0, memberPath.Length - memberName.Length)
+                    : string.Empty;
+            }
 
-                if (entry.MemberInfo is MethodInfo method)
+            private static string BuildMemberTypeSuffix(MemberInfo memberInfo)
+            {
+                if (memberInfo is MethodInfo method)
                 {
                     string parameters = string.Join(", ", method.GetParameters().Select(parameter => parameter.ParameterType.Name + " " + parameter.Name));
                     string returnType = method.ReturnType != null ? method.ReturnType.Name : "void";
-                    return $"{name}({parameters}) : {returnType}";
+                    return $"({parameters}) : {returnType}";
                 }
 
-                if (entry.MemberInfo is FieldInfo field)
-                    return $"{name} : {field.FieldType.Name}";
+                if (memberInfo is FieldInfo field)
+                    return " : " + field.FieldType.Name;
 
-                if (entry.MemberInfo is PropertyInfo property)
-                    return $"{name} : {property.PropertyType.Name}";
+                if (memberInfo is PropertyInfo property)
+                    return " : " + property.PropertyType.Name;
 
-                return name;
+                return string.Empty;
             }
 
             private static object ReadEntryValue(MonoBehaviour owner, ESRuntimeWatchRegistry.Entry entry, bool allowGetMoudleFallback)
@@ -1631,12 +2352,12 @@ namespace ES
                 return ReadMemberValue(current, entry.MemberInfo);
             }
 
-            public object ReadRawValue()
+            public object ReadRawValue(bool allowGetMoudleFallback)
             {
                 if (Owner == null || RegistryEntry.MemberInfo == null)
                     return null;
 
-                object current = ResolveEntryContext(Owner as MonoBehaviour, RegistryEntry, true);
+                object current = ResolveEntryContext(Owner as MonoBehaviour, RegistryEntry, allowGetMoudleFallback);
                 if (current == null)
                     return null;
 
@@ -1926,7 +2647,22 @@ namespace ES
 
             public string ReadValue()
             {
-                return readValue == null ? "" : readValue();
+                var stopwatch = Stopwatch.StartNew();
+                string value = readValue == null ? "" : readValue();
+                stopwatch.Stop();
+
+                if (SampleState != null)
+                {
+                    SampleState.LastReadDurationMs = stopwatch.Elapsed.TotalMilliseconds;
+                    SampleState.LastReadFailed = !string.IsNullOrEmpty(value)
+                        && value.StartsWith("<读取失败", StringComparison.Ordinal);
+                    if (SampleState.HasValue && !string.Equals(SampleState.LastValue, value, StringComparison.Ordinal))
+                        SampleState.ChangedUntil = EditorApplication.timeSinceStartup + ChangeHighlightSeconds;
+                    SampleState.LastValue = value;
+                    SampleState.HasValue = true;
+                }
+
+                return value;
             }
 
             public string InvokeManualAction()

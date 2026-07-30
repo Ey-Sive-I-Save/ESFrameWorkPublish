@@ -106,13 +106,13 @@ namespace ES.Editor
             Debug.Log("\n===== 测试完成 =====");
         }
         
-        [MenuItem("Assets/【ES】收集到推荐 Library", true)]
+        [MenuItem("Assets/【ES】/资源与发布/收集到推荐 Library", true)]
         public static bool ValidateCollectAsset()
         {
             return Selection.objects != null && Selection.objects.Length > 0;
         }
         
-        [MenuItem("Assets/【ES】收集到推荐 Library")]
+        [MenuItem("Assets/【ES】/资源与发布/收集到推荐 Library")]
         public static void CollectSelectedAsset()
         {
             var assets = Selection.objects;

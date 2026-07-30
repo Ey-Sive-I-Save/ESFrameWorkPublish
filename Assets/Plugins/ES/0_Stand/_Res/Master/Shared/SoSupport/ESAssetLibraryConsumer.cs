@@ -22,6 +22,10 @@ namespace ES
         [LabelText("发布渠道")]
         public string Channel = "default";
 
+        [LabelText("GameCore 分发方式")]
+        [Tooltip("GameCore 资源使用的分发方式：随包、更新或远端。")]
+        public ESAssetDeliveryMode GameCoreDeliveryMode = ESAssetDeliveryMode.Updateable;
+
         [LabelText("维护负责人")]
         public string Maintainer = string.Empty;
 

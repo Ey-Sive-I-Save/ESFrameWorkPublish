@@ -49,7 +49,7 @@ namespace ES.Obsolete{
     {
 
         //public override bool DrawUnityEditorPreview { get => false; set { } }
-        [UnityEditor.MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "ESMenuPro")]
+        [UnityEditor.MenuItem("【ES】/已废弃/EditorTesting/ESMenuPro")]
         public static void Open()
         {
 

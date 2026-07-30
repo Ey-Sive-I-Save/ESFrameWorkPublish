@@ -9,8 +9,15 @@ namespace ES
 {
     public static class ESAssetBundleBuilder
     {
+        /// <summary>
+        /// Project-side release gates run here before the resource pipeline mutates generated output.
+        /// Exceptions are deliberately allowed to stop the current build/batch process.
+        /// </summary>
+        public static event Action BeforeBuildValidation;
+
         public static void Build()
         {
+            BeforeBuildValidation?.Invoke();
             ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
             if (ESGlobalResSetting.Instance.AssetRunMode == ESAssetRunMode.HotUpdate)
                 ESAssetBundlePublisher.RemoveGeneratedStreamingAssets(ESAssetPipelineIO.PlatformName);
@@ -199,6 +206,7 @@ namespace ES
             ESAssetPipelineIO.WriteJson(manifestPath, manifest);
             var identity = new ESAssetLibraryIdentity { libraryName = catalog.libraryName, libraryFolder = owner, libraryBundleCode = catalog.libraryBundleCode,
                 platform = platform, version = ESGlobalResSetting.Instance.Version,
+                deliveryMode = ESAssetDeliveryModeEditorUtility.ResolveLibrary(owner),
                 channel = "staging", catalogSha256 = ESResManifestIntegrity.ComputeFileSha256(catalogDestination), assetBundleManifestSha256 = ESResManifestIntegrity.ComputeFileSha256(manifestPath),
                 assetBundles = manifest.assetBundles.Select(item => new ESAssetBundleIdentityHash { assetBundleKey = item.assetBundleKey, sha256 = item.sha256, size = item.size }).ToList() };
             ESAssetPipelineIO.WriteJson(Path.Combine(stageFolder, ESAssetPipelineIO.LibraryIdentityFileName), identity);

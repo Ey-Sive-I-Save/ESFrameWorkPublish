@@ -58,9 +58,10 @@ Assets/Plugins/ES/AICommands/GameManager模块接入_检查_AI命令.md
 Assets/Plugins/ES/AICommands/对象池预热配置_检查_AI命令.md
 Assets/Plugins/ES/AICommands/执行_新增GameCore或Asset全局索引_强约束_AI命令.md
 Assets/Plugins/ES/AICommands/执行_GameCore根SO接入_强约束_AI命令.md
+Assets/Plugins/ES/AICommands/检查_GameCoreRuntimeData重注入闭环_AI命令.md
 ```
 
-适用：搭建或评审游戏主干。包括玩家对象模板、所有生命体通用结构、角色切换、控制请求、输入过滤、运行模式、运行时命令、GameManager 模块生命周期、对象池预热。
+适用：搭建或评审游戏主干。包括玩家对象模板、所有生命体通用结构、角色切换、控制请求、输入过滤、运行模式、运行时命令、GameManager 模块生命周期、对象池预热，以及 GameCore RuntimeData 的稳定驻留、事务注入和资源重载闭环。
 
 ## P1 项目维护高频
 

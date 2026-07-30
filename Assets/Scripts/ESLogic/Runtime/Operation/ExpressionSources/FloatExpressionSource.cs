@@ -29,6 +29,11 @@ namespace ES
         [SerializeReference, InlineProperty]
         public ESGetFloatExpression expression;
 
+        public override ESExpressionDeterminism Determinism =>
+            !useDirectFloat && expression != null && !expression.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
+
         public FloatExpressionSource()
         {
         }

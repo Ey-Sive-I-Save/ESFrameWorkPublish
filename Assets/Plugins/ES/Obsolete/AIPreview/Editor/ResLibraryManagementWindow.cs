@@ -17,7 +17,7 @@ namespace ES.Obsolete.Preview.Editor
     /// </summary>
     public class ResLibraryManagementWindow : EditorWindow
     {
-        [MenuItem("ES/Res Library Management")]
+        [MenuItem("【ES】/已废弃/AIPreview/资源库管理")]
         public static void ShowWindow()
         {
             var window = GetWindow<ResLibraryManagementWindow>("Res Library Manager");

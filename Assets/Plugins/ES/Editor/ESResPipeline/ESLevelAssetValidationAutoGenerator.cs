@@ -6,8 +6,7 @@ using UnityEngine;
 
 namespace ES
 {
-    /// <summary>补偿首次无 UI 资产生成，并修复早期入口场景的临时脚本引用。</summary>
-    [InitializeOnLoad]
+    /// <summary>按需检查并修复资源验收集；禁止在域重载或程序集流期间自动写入资产。</summary>
     internal static class ESLevelAssetValidationAutoGenerator
     {
         private const string GameCorePath = "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/ESLevelAssetValidationGameCore.asset";
@@ -16,18 +15,19 @@ namespace ES
         private const string MaterialsRoot = "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials";
         private const string EntryScenePath = "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/ESLevelAssetValidation.unity";
 
-        static ESLevelAssetValidationAutoGenerator()
+        [MenuItem("【ES】/示例与测试/资源卸载验收/检查并修复关卡资源验收集", false, 1)]
+        private static void RepairIfNeededFromMenu()
         {
-            EditorApplication.delayCall += GenerateIfMissing;
+            RepairIfNeeded();
         }
 
-        private static void GenerateIfMissing()
+        private static void RepairIfNeeded()
         {
             if (EditorApplication.isCompiling) return;
             ESLevelAssetValidationGameCore gameCore = AssetDatabase.LoadAssetAtPath<ESLevelAssetValidationGameCore>(GameCorePath);
             if (gameCore == null || RequiresResourceLayoutMigration(gameCore))
             {
-                ESLevelAssetValidationGenerator.GenerateBatchMode();
+                ESLevelAssetValidationGenerator.Generate();
                 return;
             }
 
@@ -36,6 +36,8 @@ namespace ES
             if (File.Exists(EntryScenePath)
                 && !File.ReadAllText(EntryScenePath).Contains("componentTypeName: ES.ESLevelAssetValidationSceneController, ES_Logic"))
                 ESLevelAssetValidationGenerator.RebuildEntrySceneForControllerFix();
+            else
+                Debug.Log("[ESValidation] 关卡资源验收集已完整，无需修复。");
         }
 
         private static bool RequiresResourceLayoutMigration(ESLevelAssetValidationGameCore gameCore)

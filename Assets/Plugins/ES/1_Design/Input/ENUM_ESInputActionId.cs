@@ -159,6 +159,19 @@ namespace ES
         Custom
     }
 
+    /// <summary>
+    /// Stable enum aliases for the built-in input schemes. Custom schemes use a StringKey only;
+    /// that does not make them less authoritative, it only reflects that no engine-wide enum slot
+    /// has been reserved for them.
+    /// </summary>
+    public enum ESInputSchemeEnumKey : ushort
+    {
+        None = 0,
+        KeyboardMouse = 1,
+        Gamepad = 2,
+        Touch = 3
+    }
+
     public enum ESInputBindingSource
     {
         [InspectorName("InputSystem")]
@@ -172,5 +185,46 @@ namespace ES
         public const string KeyboardMouse = "KeyboardMouse";
         public const string Gamepad = "Gamepad";
         public const string Touch = "Touch";
+
+        public static bool TryGetCanonicalStringKey(ESInputSchemeEnumKey enumKey, out string schemeId)
+        {
+            switch (enumKey)
+            {
+                case ESInputSchemeEnumKey.KeyboardMouse:
+                    schemeId = KeyboardMouse;
+                    return true;
+                case ESInputSchemeEnumKey.Gamepad:
+                    schemeId = Gamepad;
+                    return true;
+                case ESInputSchemeEnumKey.Touch:
+                    schemeId = Touch;
+                    return true;
+                default:
+                    schemeId = null;
+                    return false;
+            }
+        }
+
+        public static bool TryGetBuiltInEnumKey(string schemeId, out ESInputSchemeEnumKey enumKey)
+        {
+            if (string.Equals(schemeId, KeyboardMouse, System.StringComparison.Ordinal))
+            {
+                enumKey = ESInputSchemeEnumKey.KeyboardMouse;
+                return true;
+            }
+            if (string.Equals(schemeId, Gamepad, System.StringComparison.Ordinal))
+            {
+                enumKey = ESInputSchemeEnumKey.Gamepad;
+                return true;
+            }
+            if (string.Equals(schemeId, Touch, System.StringComparison.Ordinal))
+            {
+                enumKey = ESInputSchemeEnumKey.Touch;
+                return true;
+            }
+
+            enumKey = ESInputSchemeEnumKey.None;
+            return false;
+        }
     }
 }

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace ES
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("ES/Item/Item")]
+    [AddComponentMenu("【ES】/内容制作/道具/Item")]
     public class Item : Core
     {
         [System.NonSerialized, ShowInInspector, Sirenix.OdinInspector.ReadOnly, LabelText("Item长期OpSupport")]

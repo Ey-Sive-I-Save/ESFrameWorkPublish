@@ -168,7 +168,6 @@ namespace ES
     public abstract class ESAssetRefer<T> : ESAssetReferBase where T : UnityEngine.Object
     {
         [NonSerialized] private IDisposable runtimeHandle;
-        [NonSerialized] private bool loadedFromAssetTable;
         #region 编辑器支持
         
 #if UNITY_EDITOR
@@ -613,22 +612,6 @@ namespace ES
                 : provider.LoadMainAssetAsync<T>(AssetIdentity, cancellationToken);
         }
 
-        /// <summary>底层安全入口：返回独立 Lease；业务代码通常应使用 LoadAsync(owner)。</summary>
-        internal async UniTask<ESAssetLease<T>> AcquireAsync(IESAssetRuntimeProvider provider, CancellationToken cancellationToken = default)
-        {
-            if (provider == null) throw new ArgumentNullException(nameof(provider));
-            if (!IsValid) throw new InvalidOperationException("ESAssetRefer 缺少有效 GUID/LocalFileId。");
-            IESAssetReferTableResolver tableResolver = ESAssetReferTableResolver.Current;
-            if (HasResolvedAssetTableKey && tableResolver != null && tableResolver.CanResolve(AssetKind, ResolvedEnumKey, ResolvedStringKey))
-            {
-                T asset = await tableResolver.LoadAsync<T>(AssetKind, ResolvedEnumKey, ResolvedStringKey, cancellationToken);
-                return new ESAssetLease<T>(asset, () => tableResolver.Release(AssetKind, ResolvedEnumKey, ResolvedStringKey));
-            }
-
-            ESRuntimeAssetHandle<T> handle = await LoadWithProviderAsync(provider, cancellationToken);
-            return new ESAssetLease<T>(handle.Asset, handle.Dispose);
-        }
-
         /// <summary>默认业务入口：Owner 销毁时自动释放，同一 Owner 内同一资产只持有一次。</summary>
         public UniTask<T> LoadAsync(Component owner, CancellationToken cancellationToken = default)
             => ESAssets.LoadAsync(this, owner, cancellationToken);
@@ -644,13 +627,9 @@ namespace ES
         /// </summary>
         public bool TryLoad(out T asset)
         {
-            IESAssetReferTableResolver resolver = ESAssetReferTableResolver.Current;
-            if (HasResolvedAssetTableKey && resolver != null
-                && resolver.TryGetReady(AssetKind, ResolvedEnumKey, ResolvedStringKey, out asset))
-                return true;
-
-            if (resolver?.RuntimeProvider != null && IsValid)
-                return resolver.RuntimeProvider.TryGetLoaded(AssetIdentity, out asset);
+            IESAssetRuntimeProvider provider = ESAssets.RuntimeBackend;
+            if (provider != null && IsValid)
+                return provider.TryGetLoaded(AssetIdentity, out asset);
 
             asset = null;
             return false;
@@ -662,7 +641,7 @@ namespace ES
         /// </summary>
         internal UniTask<T> LoadAsync(IESAssetRuntimeProvider provider, CancellationToken cancellationToken = default)
         {
-            if ((runtimeHandle != null || loadedFromAssetTable) && TryLoad(out T ready))
+            if (runtimeHandle != null && TryLoad(out T ready))
                 return UniTask.FromResult(ready);
             return LoadAndRetainAsync(provider, cancellationToken);
         }
@@ -670,31 +649,19 @@ namespace ES
         private async UniTask<T> LoadAndRetainAsync(IESAssetRuntimeProvider provider, CancellationToken cancellationToken)
         {
             Release();
-            IESAssetReferTableResolver tableResolver = ESAssetReferTableResolver.Current;
-            if (HasResolvedAssetTableKey && tableResolver != null && tableResolver.CanResolve(AssetKind, ResolvedEnumKey, ResolvedStringKey))
-            {
-                T tableAsset = await tableResolver.LoadAsync<T>(AssetKind, ResolvedEnumKey, ResolvedStringKey, cancellationToken);
-                loadedFromAssetTable = tableAsset != null;
-                return tableAsset;
-            }
-
             ESRuntimeAssetHandle<T> handle = await LoadWithProviderAsync(provider, cancellationToken);
             runtimeHandle = handle;
-            loadedFromAssetTable = false;
             return handle.Asset;
         }
 
-        /// <summary>默认零计数业务入口：全局驻留至显式资源安全点，不需要 Owner 或 Release。</summary>
+        /// <summary>默认无显式持有入口：全局驻留至显式资源安全点，调用者不需要 Owner、Scope 或 Release。</summary>
         public UniTask<T> LoadAsync(CancellationToken cancellationToken = default)
             => ESAssets.LoadAsync(this, cancellationToken);
 
         public override void Release()
         {
-            if (loadedFromAssetTable)
-                ESAssetReferTableResolver.Current?.Release(AssetKind, ResolvedEnumKey, ResolvedStringKey);
             runtimeHandle?.Dispose();
             runtimeHandle = null;
-            loadedFromAssetTable = false;
         }
 
         internal bool TryGetReady(IESAssetRuntimeProvider provider, out T asset)
@@ -881,22 +848,6 @@ namespace ES
     /// <summary>
     /// ES_Logic 对类型化 AssetTable 的桥接。Stand 只定义协议，避免反向程序集依赖。
     /// </summary>
-    public interface IESAssetReferTableResolver
-    {
-        IESAssetRuntimeProvider RuntimeProvider { get; }
-        bool CanResolve(ESAssetReferKind kind, int enumKey, string stringKey);
-        bool TryGetReady<T>(ESAssetReferKind kind, int enumKey, string stringKey, out T asset) where T : UnityEngine.Object;
-        UniTask<T> LoadAsync<T>(ESAssetReferKind kind, int enumKey, string stringKey, CancellationToken cancellationToken) where T : UnityEngine.Object;
-        void Release(ESAssetReferKind kind, int enumKey, string stringKey);
-    }
-
-    public static class ESAssetReferTableResolver
-    {
-        public static IESAssetReferTableResolver Current { get; private set; }
-        public static void Register(IESAssetReferTableResolver resolver) => Current = resolver;
-        public static void Clear(IESAssetReferTableResolver resolver) { if (ReferenceEquals(Current, resolver)) Current = null; }
-    }
-
     /// <summary>
     /// Avatar资源引用
     /// </summary>
@@ -1076,9 +1027,11 @@ namespace ES
             return provider.LoadSceneAsync(AssetIdentity, mode, cancellationToken);
         }
 
+        /// <summary>高级场景租约入口；仅 Level/Map 场景服务可使用，普通业务不得持有 Scene Handle。</summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public UniTask<ESRuntimeSceneHandle> LoadAsync(LoadSceneMode mode = LoadSceneMode.Single, CancellationToken cancellationToken = default)
         {
-            IESAssetRuntimeProvider provider = ESAssetReferTableResolver.Current?.RuntimeProvider;
+            IESAssetRuntimeProvider provider = ESAssets.RuntimeBackend;
             if (provider == null)
                 return UniTask.FromException<ESRuntimeSceneHandle>(new InvalidOperationException("ESAssetReferScene 尚未接入 ESRuntimeDataAssetLoadingService。"));
             return LoadWithProviderAsync(provider, mode, cancellationToken);

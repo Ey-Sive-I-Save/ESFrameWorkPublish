@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 #if UNITY_EDITOR
 using Sirenix.OdinInspector;
@@ -20,6 +21,124 @@ namespace ES
         Mask32 = 32,
         Mask64 = 64,
         Mask256 = 255
+    }
+
+    /// <summary>
+    /// Fixed Enum authoring groups. They are stable identities only; neither group implies a
+    /// runtime storage tier. StringKey declarations may be used with either storage tier too.
+    /// </summary>
+    public enum ESTagEnumGroup : byte
+    {
+        Primary = 0,
+        Optional = 1
+    }
+
+    /// <summary>
+    /// Entity runtime storage policy. This is deliberately independent from EnumKey/StringKey.
+    /// </summary>
+    public enum ESTagStorageTier : byte
+    {
+        HotSlot = 0,
+        Sparse = 1
+    }
+
+    [Obsolete("Use ESTagStorageTier. Category is a read-only migration view and must not drive new logic.")]
+    public enum ESTagCatalogCategory : byte
+    {
+        Core = 0,
+        Extension = 1
+    }
+
+    /// <summary>Declares whether a Catalog tag may participate in runtime facts and queries.</summary>
+    public enum ESTagAvailability : byte
+    {
+        Runtime = 0,
+        EditorOnly = 1,
+        Deprecated = 2
+    }
+
+    /// <summary>
+    /// Declares which stable external representations may contain a Tag. RuntimeKey values never
+    /// leave the current process; save and network snapshots use only EnumKey/StringKey plus the
+    /// Catalog SchemaHash.
+    /// </summary>
+    [Flags]
+    public enum ESTagStableTransferScope : byte
+    {
+        None = 0,
+        SaveGame = 1 << 0,
+        Network = 1 << 1
+    }
+
+    /// <summary>
+    /// A stable Tag selector used by authored conditions, grants, snapshots, and Catalog lookup.
+    /// It may carry an EnumKey, a StringKey, or both aliases for the same declaration.
+    /// </summary>
+    [Serializable]
+    public struct ESTagStableReference : IEquatable<ESTagStableReference>
+    {
+        public ESTagEnumGroup enumGroup;
+        public ushort enumValue;
+        public string stringKey;
+
+        public bool HasEnumKey => enumValue != ESTagId.InvalidValue;
+        public bool HasStringKey => !string.IsNullOrWhiteSpace(stringKey);
+        public bool IsEmpty => !HasEnumKey && !HasStringKey;
+
+        public static ESTagStableReference From(ESGameTag tag)
+        {
+            return new ESTagStableReference
+            {
+                enumGroup = ESTagEnumGroup.Primary,
+                enumValue = (ushort)tag
+            };
+        }
+
+        public static ESTagStableReference From(ESGameTagOptional tag)
+        {
+            return new ESTagStableReference
+            {
+                enumGroup = ESTagEnumGroup.Optional,
+                enumValue = (ushort)tag
+            };
+        }
+
+        public static ESTagStableReference FromString(string key)
+        {
+            return new ESTagStableReference { stringKey = key };
+        }
+
+        public bool Equals(ESTagStableReference other)
+        {
+            return enumGroup == other.enumGroup
+                   && enumValue == other.enumValue
+                   && string.Equals(stringKey, other.stringKey, StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is ESTagStableReference other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = (int)enumGroup;
+                hash = (hash * 397) ^ enumValue.GetHashCode();
+                hash = (hash * 397) ^ (stringKey != null ? StringComparer.Ordinal.GetHashCode(stringKey) : 0);
+                return hash;
+            }
+        }
+
+        public override string ToString()
+        {
+            if (HasEnumKey && HasStringKey)
+                return enumGroup + ":" + enumValue + " / " + stringKey;
+            if (HasEnumKey)
+                return enumGroup + ":" + enumValue;
+            return stringKey ?? string.Empty;
+        }
     }
 
     public static class ESTagMaskLevelUtility
@@ -46,8 +165,12 @@ namespace ES
         public const ushort Invalid = 0;
         public const ushort EnumStart = 1;
         public const ushort EnumDefaultEnd = 63;
-        public const ushort StringDefaultStart = 1;
-        public const ushort StringDefaultEnd = 63;
+        public const ushort CoreRuntimeEnd = 63;
+        public const ushort ExtensionRuntimeStart = 64;
+        public const ushort StringDefaultStart = ExtensionRuntimeStart;
+        // Sparse RuntimeKeys are Entity dictionary keys, not mask bits. Their catalog capacity is
+        // therefore independent from Mask256's explicit-query capacity.
+        public const ushort StringDefaultEnd = MaxValue;
         public const ushort Mask32End = 31;
         public const ushort Mask64End = 63;
         public const ushort Mask256End = 255;
@@ -155,6 +278,17 @@ namespace ES
             return true;
         }
 
+        /// <summary>为核心 GameTag 构造 Mask。保留位和 None 不可加入。</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Add(ESGameTag tag)
+        {
+            if (!ESGameTagCatalog.IsDefinedCore(tag))
+                return false;
+
+            bits |= 1U << (ushort)tag;
+            return true;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(ESTagId tag)
         {
@@ -163,6 +297,16 @@ namespace ES
                 return false;
 
             bits &= ~(1U << value);
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Remove(ESGameTag tag)
+        {
+            if (!ESGameTagCatalog.IsDefinedCore(tag))
+                return false;
+
+            bits &= ~(1U << (ushort)tag);
             return true;
         }
 
@@ -240,6 +384,12 @@ namespace ES
             get { return bits == 0UL; }
         }
 
+        /// <summary>Read-only diagnostic view of the active mask bits.</summary>
+        public ulong Bits
+        {
+            get { return bits; }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
@@ -257,6 +407,17 @@ namespace ES
             return true;
         }
 
+        /// <summary>为核心 GameTag 构造 Mask。保留位和 None 不可加入。</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Add(ESGameTag tag)
+        {
+            if (!ESGameTagCatalog.IsDefinedCore(tag))
+                return false;
+
+            bits |= 1UL << (ushort)tag;
+            return true;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(ESTagId tag)
         {
@@ -269,12 +430,29 @@ namespace ES
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Remove(ESGameTag tag)
+        {
+            if (!ESGameTagCatalog.IsDefinedCore(tag))
+                return false;
+
+            bits &= ~(1UL << (ushort)tag);
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(ESTagId tag)
         {
             ushort value = tag.Value;
             return value != 0
                    && value < MaxTagCount
                    && (bits & (1UL << value)) != 0UL;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Contains(ESGameTag tag)
+        {
+            return ESGameTagCatalog.IsDefinedCore(tag)
+                   && (bits & (1UL << (ushort)tag)) != 0UL;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -320,6 +498,30 @@ namespace ES
             return mask;
         }
 
+        public static ESTagMask64 From(ESGameTag tag)
+        {
+            ESTagMask64 mask = default;
+            mask.Add(tag);
+            return mask;
+        }
+
+        public static ESTagMask64 From(ESGameTag tag0, ESGameTag tag1)
+        {
+            ESTagMask64 mask = default;
+            mask.Add(tag0);
+            mask.Add(tag1);
+            return mask;
+        }
+
+        public static ESTagMask64 From(ESGameTag tag0, ESGameTag tag1, ESGameTag tag2)
+        {
+            ESTagMask64 mask = default;
+            mask.Add(tag0);
+            mask.Add(tag1);
+            mask.Add(tag2);
+            return mask;
+        }
+
         public static ESTagMask64 From(ESTagId tag0, ESTagId tag1)
         {
             ESTagMask64 mask = default;
@@ -347,6 +549,569 @@ namespace ES
             return mask;
         }
     }
+
+    /// <summary>
+    /// 可序列化的核心 GameTag 条件：必须全部满足、至少满足一个、禁止任意命中。
+    /// 仅做位运算，可用于技能、AI、交互、命中等配置入口。
+    /// </summary>
+    [Serializable]
+    public struct ESGameTagRequirement
+    {
+        [Tooltip("目标必须同时拥有的标签。")]
+        public ESTagMask64 requiredAll;
+
+        [Tooltip("目标至少拥有其中一个标签；为空时不限制。")]
+        public ESTagMask64 requiredAny;
+
+        [Tooltip("目标拥有任意一个时，条件失败。")]
+        public ESTagMask64 blockedAny;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Matches(ESTagMask64 tags)
+        {
+            if (!tags.ContainsAll(requiredAll))
+                return false;
+            if (!requiredAny.IsEmpty && !tags.Overlaps(requiredAny))
+                return false;
+
+            return blockedAny.IsEmpty || !tags.Overlaps(blockedAny);
+        }
+    }
+
+    /// <summary>
+    /// 面向配置的 GameTag 条件。Inspector 使用明确的枚举列表，运行时通过
+    /// <see cref="TryCompile"/> 编译为 <see cref="ESGameTagRequirement"/> 的无分配位掩码。
+    /// <para>配置阶段禁止 None、保留位、废弃身份/阵营位、重复项和自相矛盾条件。</para>
+    /// </summary>
+    [Serializable]
+    public sealed class ESGameTagRequirementConfig
+    {
+        [Tooltip("目标必须同时拥有的标签；为空时不限制。")]
+        public List<ESGameTag> requiredAll = new List<ESGameTag>();
+
+        [Tooltip("目标至少拥有其中一个标签；为空时不限制。")]
+        public List<ESGameTag> requiredAny = new List<ESGameTag>();
+
+        [Tooltip("目标拥有任意一个时，条件失败；为空时不限制。")]
+        public List<ESGameTag> blockedAny = new List<ESGameTag>();
+
+        public bool IsEmpty
+        {
+            get
+            {
+                return (requiredAll == null || requiredAll.Count == 0)
+                       && (requiredAny == null || requiredAny.Count == 0)
+                       && (blockedAny == null || blockedAny.Count == 0);
+            }
+        }
+
+        /// <summary>
+        /// 将编辑器友好列表编译为运行时条件。失败时必须将该配置视为不可用，不能退化为“无条件通过”。
+        /// </summary>
+        public bool TryCompile(out ESGameTagRequirement requirement, out string error)
+        {
+            requirement = default;
+            error = null;
+
+            if (!TryBuildMask(requiredAll, "requiredAll", out requirement.requiredAll, out error)
+                || !TryBuildMask(requiredAny, "requiredAny", out requirement.requiredAny, out error)
+                || !TryBuildMask(blockedAny, "blockedAny", out requirement.blockedAny, out error))
+                return false;
+
+            if (requirement.requiredAll.Overlaps(requirement.blockedAny))
+            {
+                error = "requiredAll 与 blockedAny 包含同一 Tag，条件永远无法满足。";
+                return false;
+            }
+
+            if (!requirement.requiredAny.IsEmpty && requirement.requiredAny.Overlaps(requirement.blockedAny)
+                && IsEveryAnyTagBlocked(requiredAny, blockedAny))
+            {
+                error = "requiredAny 中的全部 Tag 都同时存在于 blockedAny，条件永远无法满足。";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryBuildMask(List<ESGameTag> source, string fieldName, out ESTagMask64 mask, out string error)
+        {
+            mask = default;
+            error = null;
+            if (source == null)
+                return true;
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                ESGameTag tag = source[i];
+                if (!ESGameTagCatalog.IsUsableInNewConfiguration(tag))
+                {
+                    error = fieldName + "[" + i + "]=" + tag
+                            + " 不是可用于新配置的核心 GameTag（None、保留位和废弃身份/阵营位均不可用）。";
+                    return false;
+                }
+
+                if (mask.Contains(tag))
+                {
+                    error = fieldName + " 包含重复 Tag：" + tag + "。";
+                    return false;
+                }
+
+                mask.Add(tag);
+            }
+
+            return true;
+        }
+
+        private static bool IsEveryAnyTagBlocked(List<ESGameTag> anyTags, List<ESGameTag> blockedTags)
+        {
+            if (anyTags == null || anyTags.Count == 0 || blockedTags == null || blockedTags.Count == 0)
+                return false;
+
+            var blocked = new HashSet<ESGameTag>(blockedTags);
+            for (int i = 0; i < anyTags.Count; i++)
+            {
+                if (!blocked.Contains(anyTags[i]))
+                    return false;
+            }
+
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Baked condition for Entity Tag queries. HotSlot fields remain a branch-free 64-bit path;
+    /// sparse RuntimeKeys are consulted only when a sparse condition is present.
+    /// </summary>
+    [Serializable]
+    public struct ESTagConditionRuntime
+    {
+        public ulong RequiredHotMask;
+        public ulong RequiredAnyHotMask;
+        public ulong ForbiddenHotMask;
+        public int[] RequiredSparse;
+        public int[] RequiredAnySparse;
+        public int[] ForbiddenSparse;
+        public string SchemaHash;
+        public string RuntimeLayoutHash;
+
+        // Internal compatibility aliases keep existing consumers on the same hot/sparse runtime
+        // representation while authored configuration migrates to unified references.
+        public ulong RequiredCoreMask { get => RequiredHotMask; set => RequiredHotMask = value; }
+        public ulong RequiredAnyCoreMask { get => RequiredAnyHotMask; set => RequiredAnyHotMask = value; }
+        public ulong ForbiddenCoreMask { get => ForbiddenHotMask; set => ForbiddenHotMask = value; }
+        public int[] RequiredExtensions { get => RequiredSparse; set => RequiredSparse = value; }
+        public int[] RequiredAnyExtensions { get => RequiredAnySparse; set => RequiredAnySparse = value; }
+        public int[] ForbiddenExtensions { get => ForbiddenSparse; set => ForbiddenSparse = value; }
+        public bool HasExtensionConditions => HasSparseConditions;
+
+        public bool HasSparseConditions
+        {
+            get
+            {
+                return (RequiredSparse != null && RequiredSparse.Length > 0)
+                       || (RequiredAnySparse != null && RequiredAnySparse.Length > 0)
+                       || (ForbiddenSparse != null && ForbiddenSparse.Length > 0);
+            }
+        }
+
+        public bool IsEmpty
+        {
+            get
+            {
+                return RequiredHotMask == 0UL
+                       && RequiredAnyHotMask == 0UL
+                       && ForbiddenHotMask == 0UL
+                       && !HasSparseConditions;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool MatchesHot(ulong hotMask)
+        {
+            return (hotMask & RequiredHotMask) == RequiredHotMask
+                   && (RequiredAnyHotMask == 0UL || (hotMask & RequiredAnyHotMask) != 0UL)
+                   && (hotMask & ForbiddenHotMask) == 0UL;
+        }
+
+        public bool MatchesCore(ulong coreMask) => MatchesHot(coreMask);
+
+        /// <summary>
+        /// Extension RuntimeKeys are only meaningful under the Catalog layout that baked them.
+        /// Core-only conditions deliberately do not require a bound Catalog.
+        /// </summary>
+        public bool TryValidateActiveCatalog(out string error)
+        {
+            error = null;
+            if (IsEmpty)
+                return true;
+
+            if (!ESTagRuntimeCatalog.IsBound)
+            {
+                error = "Tag Catalog is not bound; baked Tag conditions cannot be evaluated.";
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(SchemaHash) || string.IsNullOrEmpty(RuntimeLayoutHash))
+            {
+                error = "Condition lacks the Catalog SchemaHash or RuntimeLayoutHash required for RuntimeKey evaluation.";
+                return false;
+            }
+
+            if (!string.Equals(SchemaHash, ESTagRuntimeCatalog.SchemaHash, StringComparison.Ordinal))
+            {
+                error = "Condition SchemaHash does not match the active Tag Catalog.";
+                return false;
+            }
+
+            if (!string.Equals(RuntimeLayoutHash, ESTagRuntimeCatalog.RuntimeLayoutHash, StringComparison.Ordinal))
+            {
+                error = "Condition RuntimeKey layout does not match the active Tag Catalog.";
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Editor-facing stable Tag condition. EnumKey and StringKey references are resolved through
+    /// the Catalog, then separated into HotSlot and Sparse runtime paths.
+    /// </summary>
+    [Serializable]
+    public sealed class ESTagConditionConfig
+    {
+        [NonSerialized]
+        private bool hasCachedRuntime;
+
+        [NonSerialized]
+        private ESTagConditionRuntime cachedRuntime;
+
+        [Tooltip("Tags that must all be present.")]
+#if UNITY_EDITOR
+        [ValueDropdown(nameof(GetTagOptions))]
+        [OnValueChanged(nameof(InvalidateRuntime), true)]
+#endif
+        public List<ESTagStableReference> required = new List<ESTagStableReference>();
+
+        [Tooltip("At least one of these Tags must be present.")]
+#if UNITY_EDITOR
+        [ValueDropdown(nameof(GetTagOptions))]
+        [OnValueChanged(nameof(InvalidateRuntime), true)]
+#endif
+        public List<ESTagStableReference> requiredAny = new List<ESTagStableReference>();
+
+        [Tooltip("Tags that must all be absent.")]
+#if UNITY_EDITOR
+        [ValueDropdown(nameof(GetTagOptions))]
+        [OnValueChanged(nameof(InvalidateRuntime), true)]
+#endif
+        public List<ESTagStableReference> forbidden = new List<ESTagStableReference>();
+
+        [HideInInspector] public List<ESGameTag> requiredCore = new List<ESGameTag>();
+        [HideInInspector] public List<ESGameTag> requiredAnyCore = new List<ESGameTag>();
+        [HideInInspector] public List<ESGameTag> forbiddenCore = new List<ESGameTag>();
+        [HideInInspector] public List<string> requiredExtensions = new List<string>();
+        [HideInInspector] public List<string> requiredAnyExtensions = new List<string>();
+        [HideInInspector] public List<string> forbiddenExtensions = new List<string>();
+
+#if UNITY_EDITOR
+        private IEnumerable<ValueDropdownItem<ESTagStableReference>> GetTagOptions()
+        {
+            return ESTagEditorCatalogCache.GetTagOptions();
+        }
+#endif
+
+        public bool IsEmpty
+        {
+            get
+            {
+                return IsNullOrEmpty(required)
+                       && IsNullOrEmpty(requiredAny)
+                       && IsNullOrEmpty(forbidden);
+            }
+        }
+
+        /// <summary>
+        /// Resolves this stable configuration for the active process. Normal gameplay code should
+            /// query through <c>ESTagCollection.Matches(config)</c> instead of handling RuntimeKeys directly.
+        /// </summary>
+        public bool TryGetRuntime(out ESTagConditionRuntime runtime, out string error)
+        {
+            if (hasCachedRuntime && cachedRuntime.TryValidateActiveCatalog(out _))
+            {
+                runtime = cachedRuntime;
+                error = null;
+                return true;
+            }
+
+            hasCachedRuntime = false;
+            cachedRuntime = default;
+            if (!TryCompile(out runtime, out error))
+                return false;
+
+            cachedRuntime = runtime;
+            hasCachedRuntime = true;
+            return true;
+        }
+
+        /// <summary>
+        /// Call after changing this configuration at runtime. Serialized asset edits naturally
+        /// create a new non-serialized cache when Unity reloads the object.
+        /// </summary>
+        public void InvalidateRuntime()
+        {
+            hasCachedRuntime = false;
+            cachedRuntime = default;
+        }
+
+        public bool TryCompile(out ESTagConditionRuntime runtime, out string error)
+        {
+            runtime = default;
+            error = null;
+
+            MigrateLegacyReferences();
+
+            if (!TryBakeReferences(required, "required", out runtime.RequiredHotMask, out runtime.RequiredSparse, out error)
+                || !TryBakeReferences(requiredAny, "requiredAny", out runtime.RequiredAnyHotMask, out runtime.RequiredAnySparse, out error)
+                || !TryBakeReferences(forbidden, "forbidden", out runtime.ForbiddenHotMask, out runtime.ForbiddenSparse, out error))
+                return false;
+
+            if ((runtime.RequiredHotMask & runtime.ForbiddenHotMask) != 0UL
+                || SharesRuntimeKey(runtime.RequiredSparse, runtime.ForbiddenSparse))
+            {
+                error = "required and forbidden contain the same Tag, so the condition can never match.";
+                return false;
+            }
+
+            if (runtime.RequiredAnyHotMask != 0UL
+                && (runtime.RequiredAnyHotMask & ~runtime.ForbiddenHotMask) == 0UL)
+            {
+                error = "Every requiredAny HotSlot Tag is also forbidden.";
+                return false;
+            }
+
+            if (runtime.RequiredAnySparse != null
+                && runtime.RequiredAnySparse.Length > 0
+                && SharesEveryRuntimeKey(runtime.RequiredAnySparse, runtime.ForbiddenSparse))
+            {
+                error = "Every requiredAny Sparse Tag is also forbidden.";
+                return false;
+            }
+
+            if (!runtime.IsEmpty)
+            {
+                runtime.SchemaHash = ESTagRuntimeCatalog.SchemaHash;
+                runtime.RuntimeLayoutHash = ESTagRuntimeCatalog.RuntimeLayoutHash;
+            }
+
+            return true;
+        }
+
+        private static bool IsNullOrEmpty<T>(List<T> source)
+        {
+            return source == null || source.Count == 0;
+        }
+
+        private void MigrateLegacyReferences()
+        {
+            AppendLegacy(required, requiredCore, requiredExtensions);
+            AppendLegacy(requiredAny, requiredAnyCore, requiredAnyExtensions);
+            AppendLegacy(forbidden, forbiddenCore, forbiddenExtensions);
+        }
+
+        private static void AppendLegacy(List<ESTagStableReference> target, List<ESGameTag> enumTags, List<string> stringKeys)
+        {
+            target ??= new List<ESTagStableReference>();
+            if (enumTags != null)
+            {
+                for (int i = 0; i < enumTags.Count; i++)
+                {
+                    ESTagStableReference reference = ESTagStableReference.From(enumTags[i]);
+                    if (!target.Contains(reference))
+                        target.Add(reference);
+                }
+            }
+
+            if (stringKeys != null)
+            {
+                for (int i = 0; i < stringKeys.Count; i++)
+                {
+                    ESTagStableReference reference = ESTagStableReference.FromString(stringKeys[i]);
+                    if (!target.Contains(reference))
+                        target.Add(reference);
+                }
+            }
+        }
+
+        private static bool TryBakeReferences(List<ESTagStableReference> source, string fieldName,
+            out ulong hotMask, out int[] sparseKeys, out string error)
+        {
+            hotMask = 0UL;
+            sparseKeys = Array.Empty<int>();
+            error = null;
+            if (source == null || source.Count == 0)
+                return true;
+
+            if (!ESTagRuntimeCatalog.IsBound)
+            {
+                error = fieldName + " requires an active Tag Catalog before stable identities can be baked.";
+                return false;
+            }
+
+            var runtimeKeys = new HashSet<int>();
+            var sparse = new List<int>(source.Count);
+            for (int i = 0; i < source.Count; i++)
+            {
+                ESTagStableReference reference = source[i];
+                if (reference.IsEmpty || !ESTagRuntimeCatalog.TryGetRuntimeKey(reference, out int runtimeKey))
+                {
+                    error = fieldName + "[" + i + "] is not registered by the active Tag Catalog: " + reference + ".";
+                    return false;
+                }
+
+                ESTagId tag = ESTagId.FromInt32(runtimeKey);
+                if (!ESTagRuntimeCatalog.TryGetEntry(tag, out ESTagBakeTable.Entry entry)
+                    || entry.availability != ESTagAvailability.Runtime)
+                {
+                    error = fieldName + "[" + i + "] is not a runtime-available Tag: " + reference + ".";
+                    return false;
+                }
+
+                if (!runtimeKeys.Add(runtimeKey))
+                {
+                    error = fieldName + " contains multiple aliases for RuntimeKey " + runtimeKey + ".";
+                    return false;
+                }
+
+                if (entry.storageTier == ESTagStorageTier.HotSlot)
+                {
+                    hotMask |= 1UL << runtimeKey;
+                }
+                else
+                {
+                    sparse.Add(runtimeKey);
+                }
+            }
+
+            sparse.Sort();
+            sparseKeys = sparse.ToArray();
+            return true;
+        }
+
+        private static bool SharesRuntimeKey(int[] required, int[] forbidden)
+        {
+            if (required == null || forbidden == null || required.Length == 0 || forbidden.Length == 0)
+                return false;
+
+            int requiredIndex = 0;
+            int forbiddenIndex = 0;
+            while (requiredIndex < required.Length && forbiddenIndex < forbidden.Length)
+            {
+                int requiredKey = required[requiredIndex];
+                int forbiddenKey = forbidden[forbiddenIndex];
+                if (requiredKey == forbiddenKey)
+                    return true;
+
+                if (requiredKey < forbiddenKey)
+                    requiredIndex++;
+                else
+                    forbiddenIndex++;
+            }
+
+            return false;
+        }
+
+        private static bool SharesEveryRuntimeKey(int[] requiredAny, int[] forbidden)
+        {
+            if (requiredAny == null || requiredAny.Length == 0 || forbidden == null || forbidden.Length == 0)
+                return false;
+
+            int requiredIndex = 0;
+            int forbiddenIndex = 0;
+            while (requiredIndex < requiredAny.Length && forbiddenIndex < forbidden.Length)
+            {
+                int requiredKey = requiredAny[requiredIndex];
+                int forbiddenKey = forbidden[forbiddenIndex];
+                if (requiredKey == forbiddenKey)
+                {
+                    requiredIndex++;
+                    forbiddenIndex++;
+                    continue;
+                }
+
+                if (requiredKey < forbiddenKey)
+                    return false;
+
+                forbiddenIndex++;
+            }
+
+            return requiredIndex == requiredAny.Length;
+        }
+    }
+
+#if UNITY_EDITOR
+    /// <summary>Editor-only cached picker source. The project must have one formal Tag BakeTable.</summary>
+    public static class ESTagEditorCatalogCache
+    {
+        private static readonly List<ValueDropdownItem<ESTagStableReference>> Empty = new List<ValueDropdownItem<ESTagStableReference>>(0);
+        private static List<ValueDropdownItem<ESTagStableReference>> tagOptions;
+        private static bool dirty = true;
+
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void Initialize()
+        {
+            UnityEditor.EditorApplication.projectChanged -= Invalidate;
+            UnityEditor.EditorApplication.projectChanged += Invalidate;
+        }
+
+        public static IEnumerable<ValueDropdownItem<ESTagStableReference>> GetTagOptions()
+        {
+            if (dirty)
+                Rebuild();
+
+            return tagOptions ?? Empty;
+        }
+
+        public static void Invalidate()
+        {
+            dirty = true;
+        }
+
+        private static void Rebuild()
+        {
+            dirty = false;
+            tagOptions = new List<ValueDropdownItem<ESTagStableReference>>();
+            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:ESTagBakeTable");
+            if (guids == null || guids.Length != 1)
+                return;
+
+            string assetPath = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
+            ESTagBakeTable table = UnityEditor.AssetDatabase.LoadAssetAtPath<ESTagBakeTable>(assetPath);
+            if (table == null)
+                return;
+
+            IReadOnlyList<ESTagBakeTable.Entry> entries = table.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                ESTagBakeTable.Entry entry = entries[i];
+                if (entry.availability != ESTagAvailability.Runtime)
+                    continue;
+
+                var reference = new ESTagStableReference
+                {
+                    enumGroup = entry.enumGroup,
+                    enumValue = entry.enumValue,
+                    stringKey = entry.key
+                };
+                string displayName = reference + " [" + entry.storageTier + "]";
+                tagOptions.Add(new ValueDropdownItem<ESTagStableReference>(displayName, reference));
+            }
+
+            tagOptions.Sort((left, right) => string.CompareOrdinal(left.Text, right.Text));
+        }
+    }
+#endif
 
     [Serializable]
     public struct ESTagMask256
@@ -1133,6 +1898,12 @@ namespace ES
                 Array.Clear(counts, 0, counts.Length);
         }
 
+        /// <summary>当前激活标签的只读快照；返回值是值类型，不暴露计数容器。</summary>
+        public ESTagMask64 ActiveMask
+        {
+            get { return active; }
+        }
+
         public bool Overlaps(ESTagMask64 mask)
         {
             return active.Overlaps(mask);
@@ -1238,8 +2009,8 @@ namespace ES
         }
     }
 
-    [CreateAssetMenu(menuName = "ES/Tag/Tag Bake Table", fileName = "ESTagBakeTable")]
-    public sealed class ESTagBakeTable : ScriptableObject
+    [CreateAssetMenu(menuName = "【ES】/项目设置/Tag/Tag 烘焙表", fileName = "ESTagBakeTable")]
+    public sealed partial class ESTagBakeTable : ScriptableObject
     {
         [Serializable]
         public struct Entry
@@ -1250,7 +2021,12 @@ namespace ES
             public string key;
 
 #if UNITY_EDITOR
-            [LabelText("Enum Id")]
+            [LabelText("Enum Group")]
+#endif
+            public ESTagEnumGroup enumGroup;
+
+#if UNITY_EDITOR
+            [LabelText("Enum Key")]
 #endif
             public ushort enumValue;
 
@@ -1258,10 +2034,44 @@ namespace ES
             [LabelText("Baked Id")]
 #endif
             public ushort bakedId;
+
+#if UNITY_EDITOR
+            [LabelText("Storage Tier")]
+#endif
+            [FormerlySerializedAs("category")]
+            public ESTagStorageTier storageTier;
+
+            [Obsolete("Use storageTier.")]
+            public ESTagCatalogCategory category
+            {
+                get => storageTier == ESTagStorageTier.HotSlot
+                    ? ESTagCatalogCategory.Core
+                    : ESTagCatalogCategory.Extension;
+                set => storageTier = value == ESTagCatalogCategory.Core
+                    ? ESTagStorageTier.HotSlot
+                    : ESTagStorageTier.Sparse;
+            }
+
+#if UNITY_EDITOR
+            [LabelText("Availability")]
+#endif
+            public ESTagAvailability availability;
+
+#if UNITY_EDITOR
+            [LabelText("Deprecated Replacement")]
+#endif
+            [Tooltip("Only for Deprecated entries. When set, this is the stable Tag identity an explicit data migration may map to.")]
+            public ESTagStableReference deprecatedReplacement;
+
+#if UNITY_EDITOR
+            [LabelText("Stable Transfer")]
+#endif
+            public ESTagStableTransferScope stableTransferScopes;
         }
 
 #if UNITY_EDITOR
-        [LabelText("Tag Entries")]
+        [LabelText("Tag Entries（由 GameCore 生成）")]
+        [ReadOnly]
 #endif
         [SerializeField]
         private List<Entry> entries = new List<Entry>(64);
@@ -1270,7 +2080,7 @@ namespace ES
         [LabelText("Mask Level")]
 #endif
         [SerializeField]
-        private ESTagMaskLevel maskLevel = ESTagMaskLevel.Mask64;
+        private ESTagMaskLevel maskLevel = ESTagMaskLevel.Mask256;
 
 #if UNITY_EDITOR
         [LabelText("String Start Id")]
@@ -1285,6 +2095,11 @@ namespace ES
         private ushort stringEndId = ESTagIdRange.StringDefaultEnd;
 
         [NonSerialized] private Dictionary<string, ESTagId> keyToId;
+        [NonSerialized] private Dictionary<ulong, ESTagId> enumToId;
+        [NonSerialized] private Dictionary<ushort, Entry> runtimeEntries;
+        [NonSerialized] private List<string> validationErrors;
+        [NonSerialized] private string schemaHash;
+        [NonSerialized] private string runtimeLayoutHash;
         [NonSerialized] private bool cacheReady;
 
         public IReadOnlyList<Entry> Entries
@@ -1307,6 +2122,31 @@ namespace ES
             get { return ESTagMaskLevelUtility.GetRuntimeCapacity(maskLevel); }
         }
 
+        /// <summary>Stable-key schema hash for version negotiation. Baked ids remain process-local.</summary>
+        public string SchemaHash
+        {
+            get
+            {
+                if (!cacheReady)
+                    BuildRuntimeCache();
+                return schemaHash ?? string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Process-local layout fingerprint. It includes baked RuntimeKey values and must match
+        /// before replacing a bound Catalog in the same process.
+        /// </summary>
+        public string RuntimeLayoutHash
+        {
+            get
+            {
+                if (!cacheReady)
+                    BuildRuntimeCache();
+                return runtimeLayoutHash ?? string.Empty;
+            }
+        }
+
         public void Warmup()
         {
             BuildRuntimeCache();
@@ -1316,26 +2156,102 @@ namespace ES
         {
             int count = entries != null ? entries.Count : 0;
             keyToId = new Dictionary<string, ESTagId>(count);
+            enumToId = new Dictionary<ulong, ESTagId>(count);
+            runtimeEntries = new Dictionary<ushort, Entry>(count);
+            validationErrors = new List<string>(4);
             HashSet<ushort> usedIds = new HashSet<ushort>();
 
             for (int i = 0; i < count; i++)
             {
                 Entry entry = entries[i];
-                if (string.IsNullOrEmpty(entry.key) || entry.bakedId == ESTagId.InvalidValue)
-                    continue;
-
-                if (!usedIds.Add(entry.bakedId))
+                bool hasString = !string.IsNullOrEmpty(entry.key);
+                bool hasEnum = entry.enumValue != ESTagId.InvalidValue;
+                if ((!hasString && !hasEnum) || entry.bakedId == ESTagId.InvalidValue)
                 {
-#if UNITY_EDITOR
-                    Debug.LogWarning("[ESTagBakeTable] Duplicate tag id: " + entry.bakedId + ". Please rebake or adjust enum ids.");
-#endif
+                    validationErrors.Add("Entry[" + i + "] lacks a stable key or baked runtime id.");
                     continue;
                 }
 
-                keyToId[entry.key] = new ESTagId(entry.bakedId);
+                if (!usedIds.Add(entry.bakedId))
+                {
+                    validationErrors.Add("Duplicate baked id: " + entry.bakedId + ". Each declaration must own exactly one runtime bit.");
+                    continue;
+                }
+
+                ESTagId id = new ESTagId(entry.bakedId);
+                if (entry.storageTier == ESTagStorageTier.HotSlot)
+                {
+                    if (entry.bakedId > ESTagIdRange.CoreRuntimeEnd)
+                    {
+                        validationErrors.Add("HotSlot Entry[" + i + "] RuntimeKey must be in 1-63.");
+                        continue;
+                    }
+                }
+                else if (entry.bakedId < ESTagIdRange.ExtensionRuntimeStart)
+                {
+                    validationErrors.Add("Sparse Entry[" + i + "] RuntimeKey must be outside the 64-bit HotSlot range.");
+                    continue;
+                }
+
+                if (hasEnum && !IsDefinedEnumKey(entry.enumGroup, entry.enumValue))
+                {
+                    validationErrors.Add("Entry[" + i + "] references an undefined " + entry.enumGroup + " EnumKey: " + entry.enumValue + ".");
+                    continue;
+                }
+
+                if (hasEnum && entry.enumGroup == ESTagEnumGroup.Primary)
+                {
+                    ESTagAvailability expectedAvailability = ESGameTagCatalog.IsUsableInNewConfiguration((ESGameTag)entry.enumValue)
+                        ? ESTagAvailability.Runtime
+                        : ESTagAvailability.Deprecated;
+                    if (entry.availability != expectedAvailability)
+                    {
+                        validationErrors.Add("Primary Enum Entry[" + i + "] Availability must be " + expectedAvailability + ".");
+                        continue;
+                    }
+                }
+
+                runtimeEntries.Add(entry.bakedId, entry);
+                if (hasString)
+                {
+                    if (keyToId.ContainsKey(entry.key))
+                    {
+                        validationErrors.Add("Duplicate StringKey: " + entry.key);
+                        continue;
+                    }
+                    keyToId.Add(entry.key, id);
+                }
+
+                if (hasEnum)
+                {
+                    ulong enumKey = GetEnumLookupKey(entry.enumGroup, entry.enumValue);
+                    if (enumToId.ContainsKey(enumKey))
+                    {
+                        validationErrors.Add("Duplicate EnumKey: " + entry.enumGroup + ":" + entry.enumValue);
+                        continue;
+                    }
+                    enumToId.Add(enumKey, id);
+                }
             }
 
             cacheReady = true;
+            ValidateDeprecatedMigrations();
+            schemaHash = CalculateSchemaHash(false);
+            runtimeLayoutHash = CalculateSchemaHash(true);
+        }
+
+        public bool TryValidate(out string error)
+        {
+            if (!cacheReady)
+                BuildRuntimeCache();
+            if (validationErrors == null || validationErrors.Count == 0)
+            {
+                error = null;
+                return true;
+            }
+
+            error = string.Join("\n", validationErrors);
+            return false;
         }
 
         public bool TryGetId(string key, out ESTagId id)
@@ -1347,6 +2263,130 @@ namespace ES
                 return true;
 
             id = ESTagId.Invalid;
+            return false;
+        }
+
+        public bool TryGetId(ushort enumValue, out ESTagId id)
+        {
+            return TryGetId(ESTagEnumGroup.Primary, enumValue, out id);
+        }
+
+        public bool TryGetId(ESTagEnumGroup enumGroup, ushort enumValue, out ESTagId id)
+        {
+            if (!cacheReady)
+                BuildRuntimeCache();
+
+            ulong enumKey = GetEnumLookupKey(enumGroup, enumValue);
+            if (enumToId != null && enumValue != ESTagId.InvalidValue && enumToId.TryGetValue(enumKey, out id))
+                return true;
+
+            id = ESTagId.Invalid;
+            return false;
+        }
+
+        /// <summary>Both aliases must resolve to the same baked runtime bit.</summary>
+        public bool TryGetId(ushort enumValue, string key, out ESTagId id)
+        {
+            return TryGetId(new ESTagStableReference
+            {
+                enumGroup = ESTagEnumGroup.Primary,
+                enumValue = enumValue,
+                stringKey = key
+            }, out id);
+        }
+
+        /// <summary>All supplied aliases must resolve to the same baked RuntimeKey.</summary>
+        public bool TryGetId(ESTagStableReference reference, out ESTagId id)
+        {
+            ESTagId enumId = ESTagId.Invalid;
+            ESTagId stringId = ESTagId.Invalid;
+            bool declaresEnum = reference.HasEnumKey;
+            bool declaresString = reference.HasStringKey;
+            bool hasEnum = declaresEnum && TryGetId(reference.enumGroup, reference.enumValue, out enumId);
+            bool hasString = declaresString && TryGetId(reference.stringKey, out stringId);
+            if ((!declaresEnum && !declaresString)
+                || (declaresEnum && !hasEnum)
+                || (declaresString && !hasString)
+                || (hasEnum && hasString && enumId != stringId))
+            {
+                id = ESTagId.Invalid;
+                return false;
+            }
+
+            id = hasEnum ? enumId : stringId;
+            return id.IsValid;
+        }
+
+        public bool TryGetStableReference(ESTagId id, out ESTagStableReference reference)
+        {
+            if (!TryGetEntry(id, out Entry entry))
+            {
+                reference = default;
+                return false;
+            }
+
+            reference = new ESTagStableReference
+            {
+                enumGroup = entry.enumGroup,
+                enumValue = entry.enumValue,
+                stringKey = entry.key
+            };
+            return true;
+        }
+
+        /// <summary>
+        /// Resolves a Catalog-declared replacement for an obsolete stable identity. It is an
+        /// explicit migration API; normal condition and grant resolution never silently remaps a
+        /// deprecated Tag.
+        /// </summary>
+        public bool TryGetDeprecatedReplacement(ESTagStableReference obsolete, out ESTagStableReference replacement)
+        {
+            replacement = default;
+            if (!TryGetId(obsolete, out ESTagId obsoleteId)
+                || !TryGetEntry(obsoleteId, out Entry entry)
+                || entry.availability != ESTagAvailability.Deprecated
+                || entry.deprecatedReplacement.IsEmpty)
+            {
+                return false;
+            }
+
+            replacement = entry.deprecatedReplacement;
+            return true;
+        }
+
+        public bool TryGetEntry(ESTagId id, out Entry entry)
+        {
+            if (!cacheReady)
+                BuildRuntimeCache();
+
+            if (runtimeEntries != null && runtimeEntries.TryGetValue(id.Value, out entry))
+                return true;
+
+            entry = default;
+            return false;
+        }
+
+        public bool TryGetRuntimeKey(string key, out int runtimeKey)
+        {
+            if (TryGetId(key, out ESTagId id))
+            {
+                runtimeKey = id.Value;
+                return true;
+            }
+
+            runtimeKey = 0;
+            return false;
+        }
+
+        public bool TryGetRuntimeKey(ESTagStableReference reference, out int runtimeKey)
+        {
+            if (TryGetId(reference, out ESTagId id))
+            {
+                runtimeKey = id.Value;
+                return true;
+            }
+
+            runtimeKey = 0;
             return false;
         }
 
@@ -1425,12 +2465,128 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ESTagId GetEnumId(ushort enumValue)
         {
-            return ESTagId.FromValue(enumValue);
+            return TryGetId(enumValue, out ESTagId id) ? id : ESTagId.Invalid;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ESTagId GetEnumId(ESTagEnumGroup enumGroup, ushort enumValue)
+        {
+            return TryGetId(enumGroup, enumValue, out ESTagId id) ? id : ESTagId.Invalid;
+        }
+
+        private string CalculateSchemaHash(bool includeRuntimeLayout)
+        {
+            List<Entry> ordered = entries == null ? new List<Entry>(0) : new List<Entry>(entries);
+            ordered.Sort(CompareEntries);
+
+            ulong hash = ESKeyHash.Fnv1A64(includeRuntimeLayout ? "ESTagBakeTable/Layout/v6" : "ESTagBakeTable/Schema/v6");
+            hash = ESKeyHash.Append(hash, (byte)maskLevel);
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                Entry entry = ordered[i];
+                hash = ESKeyHash.Append(hash, (byte)entry.enumGroup);
+                hash = ESKeyHash.Append(hash, entry.enumValue);
+                hash = ESKeyHash.Append(hash, entry.key);
+                hash = ESKeyHash.Append(hash, (byte)entry.storageTier);
+                hash = ESKeyHash.Append(hash, (byte)entry.availability);
+                hash = ESKeyHash.Append(hash, (byte)entry.deprecatedReplacement.enumGroup);
+                hash = ESKeyHash.Append(hash, entry.deprecatedReplacement.enumValue);
+                hash = ESKeyHash.Append(hash, entry.deprecatedReplacement.stringKey);
+                hash = ESKeyHash.Append(hash, (byte)entry.stableTransferScopes);
+                if (includeRuntimeLayout)
+                    hash = ESKeyHash.Append(hash, entry.bakedId);
+            }
+            return hash.ToString("X16");
+        }
+
+        private void ValidateDeprecatedMigrations()
+        {
+            if (entries == null)
+                return;
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                Entry entry = entries[i];
+                if (entry.deprecatedReplacement.IsEmpty)
+                    continue;
+
+                if (entry.availability != ESTagAvailability.Deprecated)
+                {
+                    validationErrors.Add("Entry[" + i + "] declares Deprecated Replacement but is not Deprecated.");
+                    continue;
+                }
+
+                if (!TryGetId(entry.deprecatedReplacement, out ESTagId replacementId)
+                    || replacementId.Value == entry.bakedId
+                    || !TryGetEntry(replacementId, out Entry replacement)
+                    || replacement.availability != ESTagAvailability.Runtime)
+                {
+                    validationErrors.Add("Entry[" + i + "] declares an invalid Deprecated Replacement: "
+                                         + entry.deprecatedReplacement + ". The replacement must be a different Runtime Tag.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Replaces the generated runtime Catalog from the authoritative GameCore declarations.
+        /// Authored callers provide stable identities and storage policy only; RuntimeKey values
+        /// are allocated here in a deterministic order.
+        /// </summary>
+        public bool TryReplaceEntriesAndBake(IEnumerable<Entry> source, out string error)
+        {
+            List<Entry> previousEntries = entries;
+            entries = source != null ? new List<Entry>(source) : new List<Entry>();
+            entries.Sort(CompareEntries);
+            int nextHotSlot = ESTagIdRange.EnumStart;
+            int nextSparseRuntimeKey = ESTagIdRange.ExtensionRuntimeStart;
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                Entry entry = entries[i];
+                if (entry.storageTier == ESTagStorageTier.HotSlot)
+                {
+                    if (nextHotSlot > ESTagIdRange.CoreRuntimeEnd)
+                    {
+                        error = "HotSlot capacity is exhausted. A maximum of 63 Tag declarations may use HotSlot.";
+                        entries = previousEntries;
+                        cacheReady = false;
+                        BuildRuntimeCache();
+                        return false;
+                    }
+
+                    entry.bakedId = (ushort)nextHotSlot++;
+                }
+                else
+                {
+                    if (nextSparseRuntimeKey > ESTagIdRange.MaxValue)
+                    {
+                        error = "Sparse RuntimeKey capacity is exhausted.";
+                        entries = previousEntries;
+                        cacheReady = false;
+                        BuildRuntimeCache();
+                        return false;
+                    }
+
+                    entry.bakedId = (ushort)nextSparseRuntimeKey++;
+                }
+                entries[i] = entry;
+            }
+
+            cacheReady = false;
+            schemaHash = null;
+            runtimeLayoutHash = null;
+            BuildRuntimeCache();
+            if (TryValidate(out error))
+                return true;
+
+            entries = previousEntries;
+            cacheReady = false;
+            BuildRuntimeCache();
+            return false;
         }
 
 
 #if UNITY_EDITOR
-        [Button("Bake Tag Ids")]
         private void EditorBakeIds()
         {
             EditorApplyMaskLevelRange();
@@ -1438,52 +2594,34 @@ namespace ES
             if (entries == null)
                 entries = new List<Entry>(64);
 
-            ushort minStringId = stringStartId < ESTagIdRange.EnumStart
-                ? ESTagIdRange.EnumStart
+            entries.Sort(CompareEntries);
+            int nextHotSlot = ESTagIdRange.EnumStart;
+            int nextSparseRuntimeKey = stringStartId < ESTagIdRange.ExtensionRuntimeStart
+                ? ESTagIdRange.ExtensionRuntimeStart
                 : stringStartId;
-            ushort maxStringId = stringEndId < minStringId
-                ? minStringId
+            int maxSparseRuntimeKey = stringEndId < nextSparseRuntimeKey
+                ? nextSparseRuntimeKey
                 : stringEndId;
-            int nextStringId = maxStringId;
-
-            HashSet<ushort> enumIds = new HashSet<ushort>();
-            for (int i = 0; i < entries.Count; i++)
-            {
-                Entry entry = entries[i];
-                if (entry.enumValue != ESTagId.InvalidValue)
-                    enumIds.Add(entry.enumValue);
-            }
 
             for (int i = 0; i < entries.Count; i++)
             {
                 Entry entry = entries[i];
-                if (entry.enumValue != ESTagId.InvalidValue)
+                if (entry.storageTier == ESTagStorageTier.HotSlot)
                 {
-                    entry.bakedId = entry.enumValue;
+                    entry.bakedId = nextHotSlot <= ESTagIdRange.CoreRuntimeEnd
+                        ? (ushort)nextHotSlot++
+                        : ESTagId.InvalidValue;
                 }
-                else if (nextStringId >= minStringId)
+                else if (nextSparseRuntimeKey <= maxSparseRuntimeKey)
                 {
-                    while (nextStringId >= minStringId && enumIds.Contains((ushort)nextStringId))
-                        nextStringId--;
-
-                    if (nextStringId < minStringId)
-                    {
-                        entry.bakedId = ESTagId.InvalidValue;
-#if UNITY_EDITOR
-                        Debug.LogWarning("[ESTagBakeTable] String tag id range is exhausted by enum/string tags. Expand range or split table.");
-#endif
-                        entries[i] = entry;
-                        continue;
-                    }
-
-                    entry.bakedId = (ushort)nextStringId;
-                    nextStringId--;
+                    entry.bakedId = (ushort)nextSparseRuntimeKey;
+                    nextSparseRuntimeKey++;
                 }
                 else
                 {
                     entry.bakedId = ESTagId.InvalidValue;
 #if UNITY_EDITOR
-                    Debug.LogWarning("[ESTagBakeTable] String tag id range is exhausted. Expand range or split table.");
+                    Debug.LogWarning("[ESTagBakeTable] Sparse RuntimeKey range is exhausted. Expand range or split table.");
 #endif
                 }
 
@@ -1491,27 +2629,16 @@ namespace ES
             }
 
             cacheReady = false;
+            schemaHash = null;
         }
 
         [Button("Apply Mask Level")]
         private void EditorApplyMaskLevelRange()
         {
-            stringStartId = ESTagIdRange.EnumStart;
-            switch (maskLevel)
-            {
-                case ESTagMaskLevel.Mask32:
-                    stringEndId = ESTagIdRange.Mask32End;
-                    break;
-                case ESTagMaskLevel.Mask64:
-                    stringEndId = ESTagIdRange.Mask64End;
-                    break;
-                case ESTagMaskLevel.Mask256:
-                    stringEndId = ESTagIdRange.Mask256End;
-                    break;
-                default:
-                    stringEndId = ESTagIdRange.Mask32End;
-                    break;
-            }
+            stringStartId = ESTagIdRange.ExtensionRuntimeStart;
+            // MaskLevel controls only optional explicit-query mask conversion APIs. Sparse Tag
+            // declarations always use the complete RuntimeKey range outside HotSlot.
+            stringEndId = ESTagIdRange.StringDefaultEnd;
         }
 
         [Button("Upgrade To 64")]
@@ -1528,5 +2655,45 @@ namespace ES
             EditorBakeIds();
         }
 #endif
+
+        private static bool IsDefinedEnumKey(ESTagEnumGroup enumGroup, ushort enumValue)
+        {
+            if (enumValue == ESTagId.InvalidValue)
+                return false;
+
+            switch (enumGroup)
+            {
+                case ESTagEnumGroup.Primary:
+                    return ESGameTagCatalog.IsDefinedCore((ESGameTag)enumValue);
+                case ESTagEnumGroup.Optional:
+                    return Enum.IsDefined(typeof(ESGameTagOptional), (ESGameTagOptional)enumValue)
+                           && enumValue != (ushort)ESGameTagOptional.None;
+                default:
+                    return false;
+            }
+        }
+
+        private static ulong GetEnumLookupKey(ESTagEnumGroup enumGroup, ushort enumValue)
+        {
+            return ((ulong)(byte)enumGroup << 16) | enumValue;
+        }
+
+        private static int CompareEntries(Entry left, Entry right)
+        {
+            bool leftHasEnum = left.enumValue != ESTagId.InvalidValue;
+            bool rightHasEnum = right.enumValue != ESTagId.InvalidValue;
+            if (leftHasEnum != rightHasEnum)
+                return leftHasEnum ? -1 : 1;
+
+            int groupCompare = left.enumGroup.CompareTo(right.enumGroup);
+            if (groupCompare != 0)
+                return groupCompare;
+
+            int enumCompare = left.enumValue.CompareTo(right.enumValue);
+            if (enumCompare != 0)
+                return enumCompare;
+
+            return string.CompareOrdinal(left.key, right.key);
+        }
     }
 }

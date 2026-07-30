@@ -110,6 +110,7 @@ namespace ES
     {
         public int formatVersion = ESAssetPipelineIO.RuntimeProtocolFormatVersion;
         public string libraryName = string.Empty, libraryFolder = string.Empty, libraryBundleCode = string.Empty, platform = string.Empty, version = string.Empty, channel = string.Empty, catalogUrl = string.Empty, assetBundleManifestUrl = string.Empty, catalogSha256 = string.Empty, assetBundleManifestSha256 = string.Empty;
+        public ESAssetDeliveryMode deliveryMode = ESAssetDeliveryMode.Updateable;
         public List<ESAssetBundleIdentityHash> assetBundles = new List<ESAssetBundleIdentityHash>();
     }
     [Serializable] public sealed class ESAssetBundleIdentityHash
@@ -126,6 +127,7 @@ namespace ES
     [Serializable] public sealed class ESAssetReleaseLibrary
     {
         public string libraryName = string.Empty, version = string.Empty, catalogUrl = string.Empty, catalogSha256 = string.Empty, assetBundleManifestUrl = string.Empty, assetBundleManifestSha256 = string.Empty;
+        public ESAssetDeliveryMode deliveryMode = ESAssetDeliveryMode.Updateable;
     }
     [Serializable] public sealed class ESAssetReleaseManifest
     {
@@ -142,19 +144,22 @@ namespace ES
     {
         public int formatVersion = 1;
         public string platform = string.Empty, releaseVersion = string.Empty, sourceRoot = string.Empty, publicBaseUrl = string.Empty, generatedUtc = string.Empty;
-        public string instruction = "按 uploadOrder 升序上传；ESAssetReleaseManifest.json 必须最后上传。";
+        public string instruction = "按 uploadOrder 升序上传；ESAssetReleaseManifest.json 必须最后上传并设置 Cache-Control: no-cache, max-age=0, must-revalidate；其余版本化文件使用 immutable 长缓存。";
         public List<ESAssetReleaseUploadPlanFile> files = new List<ESAssetReleaseUploadPlanFile>();
     }
     [Serializable] public sealed class ESAssetReleaseUploadPlanFile
     {
         public string sourcePath = string.Empty, relativePath = string.Empty, publicUrl = string.Empty, sha256 = string.Empty;
+        /// <summary>上传 Provider 必须原样应用到远端对象；它是 Root 可见性的发布契约。</summary>
+        public string cacheControl = string.Empty;
         public long size;
         public int uploadOrder;
         public bool uploadLast;
     }
     [Serializable] public sealed class ESAssetReleaseBundleRecord
     {
-        public string libraryFolder = string.Empty, assetBundleKey = string.Empty, fileUrl = string.Empty, sha256 = string.Empty, localRelativePath = string.Empty;
+        public string libraryFolder = string.Empty, assetBundleKey = string.Empty, fileUrl = string.Empty, sha256 = string.Empty, localRelativePath = string.Empty, embeddedRelativePath = string.Empty;
+        public ESAssetDeliveryMode deliveryMode = ESAssetDeliveryMode.Updateable;
         public uint crc;
         public long size;
         public List<string> dependencies = new List<string>();
@@ -167,7 +172,8 @@ namespace ES
     }
     [Serializable] public sealed class ESAssetConsumerLibraryReference
     {
-        public string libraryName = string.Empty, libraryFolder = string.Empty, libraryIdentityUrl = string.Empty, libraryIdentitySha256 = string.Empty;
+        public string libraryName = string.Empty, libraryFolder = string.Empty, libraryIdentityUrl = string.Empty, libraryIdentitySha256 = string.Empty, embeddedIdentityRelativePath = string.Empty;
+        public ESAssetDeliveryMode deliveryMode = ESAssetDeliveryMode.Updateable;
         public bool requiredAtBoot;
     }
     [Serializable] public sealed class ESAssetConsumerReference
@@ -210,7 +216,7 @@ namespace ES
     internal static class ESAssetPipelineIO
     {
         public const int ReferenceGraphFormatVersion = 1;
-        public const int RuntimeProtocolFormatVersion = 4;
+        public const int RuntimeProtocolFormatVersion = 5;
         public const string CatalogFileName = "ESAssetLibraryCatalog.json", ReferenceGraphFileName = "ESAssetReferenceGraph.json", PlanFileName = "ESAssetBundleBuildPlan.json", AssetListFileName = "ESAssetBundleAssetList.json";
         public const string BundleManifestFileName = "ESAssetBundleManifest.json", LibraryIdentityFileName = "ESAssetLibraryIdentity.json", BuildSetFileName = "ESAssetBuildSet.json", ReleaseManifestFileName = "ESAssetReleaseManifest.json", ConsumerManifestFileName = "ESAssetConsumerManifest.json", ReleaseBundleIndexFileName = "ESAssetReleaseBundleIndex.json";
         public static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;
@@ -232,12 +238,72 @@ namespace ES
                 : Path.Combine(releaseRoot, platform, releaseVersion, LibrariesFolderName, SafeSegment(libraryFolder));
         public static string ReleaseLibraryRelativeBase(string platform, string releaseVersion, string libraryFolder)
             => platform + "/" + releaseVersion + "/" + LibrariesFolderName + "/" + SafeSegment(libraryFolder) + "/";
+        public static string EmbeddedLibraryRelativeBase(string platform, string libraryFolder)
+            => platform + "/Embedded/" + LibrariesFolderName + "/" + SafeSegment(libraryFolder) + "/";
+        public static string EmbeddedLibraryFolder(string releaseRoot, string platform, string libraryFolder)
+            => Path.Combine(releaseRoot, EmbeddedLibraryRelativeBase(platform, libraryFolder).Replace('/', Path.DirectorySeparatorChar));
 
         public static void EnsureAssetBundleReleaseMode()
         {
             ESAssetRunMode mode = ESGlobalResSetting.Instance.AssetRunMode;
             if (mode != ESAssetRunMode.LocalBuild && mode != ESAssetRunMode.HotUpdate)
                 throw new InvalidOperationException($"AB 构建/发布只支持 LocalBuild 或 HotUpdate，当前模式为 {mode}。");
+        }
+
+        /// <summary>
+        /// One-time destructive boundary for the v5 release protocol. Generated v1/v3 files
+        /// cannot participate in the new pipeline, so keeping them is both misleading and a
+        /// source of accidental manual publication. This runs before Bake, never mid-pipeline.
+        /// </summary>
+        public static void PurgeLegacyGeneratedArtifactsBeforeBake()
+        {
+            string platform = PlatformName;
+            if (!HasLegacyGeneratedArtifacts(platform))
+                return;
+
+            DeleteGeneratedDirectory(BakeRoot);
+            DeleteGeneratedDirectory(PlanRoot(platform));
+            DeleteGeneratedDirectory(Path.Combine(PipelineRoot, "BuildCache", platform));
+            DeleteGeneratedDirectory(StagingRoot(platform));
+            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", "Published", "LocalTest", platform));
+            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", "Published", "ManualUploadPlans", platform));
+            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", ESGlobalResSetting.ResParentFolderName, platform));
+            DeleteGeneratedDirectory(Path.Combine(Application.streamingAssetsPath, ESGlobalResSetting.ResParentFolderName, platform));
+
+            // Pre-v5 Master output used WindowsPlayer rather than the unified BuildTarget name.
+            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", "InitialTarget", "WindowsPlayer"));
+            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", ESGlobalResSetting.ResParentFolderName, "WindowsPlayer"));
+            AssetDatabase.Refresh();
+            Debug.Log("[ESRes][Pipeline] 已清理旧协议生成物；请从烘焙开始完整执行 v5 四步发布流程。");
+        }
+
+        private static bool HasLegacyGeneratedArtifacts(string platform)
+        {
+            if (Directory.Exists(Path.Combine(ProjectRoot, "ES", "InitialTarget", "WindowsPlayer"))
+                || Directory.Exists(Path.Combine(ProjectRoot, "ES", ESGlobalResSetting.ResParentFolderName, "WindowsPlayer")))
+                return true;
+
+            return HasUnexpectedFormat<ESAssetBundleBuildPlan>(Path.Combine(PlanRoot(platform), PlanFileName), 2, value => value.formatVersion)
+                || HasUnexpectedFormat<ESAssetBundleAssetList>(Path.Combine(PlanRoot(platform), AssetListFileName), 2, value => value.formatVersion)
+                || HasUnexpectedFormat<ESAssetReleaseManifest>(Path.Combine(ProjectRoot, "ES", "Published", "LocalTest", platform, ReleaseManifestFileName), RuntimeProtocolFormatVersion, value => value.formatVersion)
+                || HasUnexpectedFormat<ESAssetReleaseManifest>(Path.Combine(ProjectRoot, "ES", ESGlobalResSetting.ResParentFolderName, platform, ReleaseManifestFileName), RuntimeProtocolFormatVersion, value => value.formatVersion);
+        }
+
+        private static bool HasUnexpectedFormat<T>(string path, int expected, Func<T, int> getFormat) where T : class
+        {
+            if (!File.Exists(path)) return false;
+            try
+            {
+                T value = ReadJson<T>(path);
+                return value == null || getFormat(value) != expected;
+            }
+            catch { return true; }
+        }
+
+        private static void DeleteGeneratedDirectory(string path)
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, true);
         }
         public static string PlatformName => ESAssetBundleBuildTargetUtility.GetBuildTarget(ESGlobalResSetting.Instance.applyPlatform).ToString();
         public static string LibraryBakeFolder(string folder) => Path.Combine(BakeRoot, SafeSegment(folder));

@@ -129,6 +129,15 @@ namespace ES
 
     public static class ESRuntimeReleaseBootstrap
     {
+        /// <summary>Internal framework bridge for an on-demand Consumer. Business code should
+        /// enter through ESRuntimeDataModule.EnsureConsumerAvailableAsync instead.</summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static UniTask InitializeAdditionalCodePackagesAsync(IEnumerable<ESRuntimeDownloadedCodePackage> packages, CancellationToken cancellationToken = default)
+        {
+            ESRuntimeCodePackageBootstrap.Register(async (items, token) => await ESCodeModuleRuntime.LoadAsync(items, token));
+            return ESRuntimeCodePackageBootstrap.LoadAsync(packages, cancellationToken);
+        }
+
         public static async UniTask<ESRuntimeReleaseDownloadResult> InitializeAsync(ESGlobalResSetting settings, CancellationToken cancellationToken = default)
         {
             ESAssetRunMode runMode = ESAssetRunModeSession.Lock(settings);

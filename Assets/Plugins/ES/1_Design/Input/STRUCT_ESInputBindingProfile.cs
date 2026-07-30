@@ -7,7 +7,7 @@ namespace ES
     [Serializable]
     public sealed class ESInputBindingProfile
     {
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         [LabelText("档案版本")]
         public int schemaVersion = CurrentSchemaVersion;
@@ -20,6 +20,18 @@ namespace ES
 
         [LabelText("当前方案")]
         public string activeSchemeId = ESInputSchemeIds.KeyboardMouse;
+
+        [LabelText("来源输入配置 Key")]
+        [ReadOnly]
+        public string sourceConfigId;
+
+        [LabelText("来源方案 Schema")]
+        [ReadOnly]
+        public string sourceSchemeSchemaHash;
+
+        [LabelText("来源动作 Schema")]
+        [ReadOnly]
+        public string sourceActionSchemaHash;
 
         [LabelText("覆盖列表")]
         [ListDrawerSettings(ShowFoldout = true, DefaultExpandedState = true)]
@@ -41,6 +53,42 @@ namespace ES
 
             if (overrides == null)
                 overrides = new List<ESInputBindingOverride>();
+        }
+
+        public bool HasAnySourceSchemaBinding
+        {
+            get
+            {
+                return !string.IsNullOrEmpty(sourceConfigId)
+                       || !string.IsNullOrEmpty(sourceSchemeSchemaHash)
+                       || !string.IsNullOrEmpty(sourceActionSchemaHash);
+            }
+        }
+
+        public bool IsBoundToInputSchema(string configId, string schemeSchemaHash, string actionSchemaHash)
+        {
+            return string.Equals(sourceConfigId, configId, StringComparison.Ordinal)
+                   && string.Equals(sourceSchemeSchemaHash, schemeSchemaHash, StringComparison.Ordinal)
+                   && string.Equals(sourceActionSchemaHash, actionSchemaHash, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Stores stable configuration identity and schema hashes in persisted profile data. It
+        /// deliberately does not store any runtime key or per-process lookup index.
+        /// </summary>
+        public void BindToInputSchema(string configId, string schemeSchemaHash, string actionSchemaHash)
+        {
+            sourceConfigId = configId ?? string.Empty;
+            sourceSchemeSchemaHash = schemeSchemaHash ?? string.Empty;
+            sourceActionSchemaHash = actionSchemaHash ?? string.Empty;
+            schemaVersion = CurrentSchemaVersion;
+        }
+
+        public void ClearSourceSchemaBinding()
+        {
+            sourceConfigId = string.Empty;
+            sourceSchemeSchemaHash = string.Empty;
+            sourceActionSchemaHash = string.Empty;
         }
 
         public ESInputBindingOverride SetPathOverride(

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -5,6 +6,9 @@ namespace ES
 {
     public partial class StateMachine
     {
+        /// <summary>Raised after the authoritative support environment changes.</summary>
+        public event Action<StateSupportFlags, StateSupportFlags> OnSupportFlagsChanged;
+
         public void SetSupportFlags(StateSupportFlags flags)
         {
 #if STATEMACHINEDEBUG
@@ -20,6 +24,7 @@ namespace ES
             {
                 RemoveUnsupportedRunningStates(currentSupportFlags);
                 MarkSupportFlagsDirty();
+                OnSupportFlagsChanged?.Invoke(beforeFlags, currentSupportFlags);
             }
         }
 

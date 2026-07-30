@@ -6,7 +6,7 @@ using System.Linq;
 
 public class FullHierarchyOverlay
 {
-    [MenuItem("ES/Obsolete/Initialize Full Hierarchy Overlay")]
+    [MenuItem("【ES】/已废弃/EditorTesting/Initialize Full Hierarchy Overlay")]
     static void InitializeOverlay()
     {
         // 获取所有已打开的 Hierarchy 窗口

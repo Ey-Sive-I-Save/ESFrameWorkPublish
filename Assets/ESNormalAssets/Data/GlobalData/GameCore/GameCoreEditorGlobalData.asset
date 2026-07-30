@@ -1,0 +1,528 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c06da9fe4544a99954fd36db03c8c8f, type: 3}
+  m_Name: GameCoreEditorGlobalData
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  HasConfirm: 1
+  description: "GameCoreEditorGlobalData \u662F\u9879\u76EE\u7684\u7F16\u8F91\u5668\u8BED\u4E49\u5165\u53E3\uFF1A\u96C6\u4E2D\u8BF4\u660E GameMode\u3001ModeTag\u3001GameTag\u3001Input \u5206\u7C7B\u3001\u7269\u7406\u5C42\u8BED\u4E49\u548C AI Command \u6A21\u677F\u3002\u4E0D\u8FDB\u5165\u8FD0\u884C\u65F6\u914D\u7F6E\u94FE\uFF0C\u4E0D\u66FF\u4EE3\u5177\u4F53\u4E1A\u52A1\u6570\u636E\u3002"
+  gameModes: []
+  gameModeTags: []
+  gameTags:
+  - tag: 0
+    group: None
+    meaning: 无标签。
+    ownerSystem: 通用
+    usagePolicy: 2
+    warning: 不要用 None 表达真实状态。
+  - tag: 1
+    group: 生命
+    meaning: 实体已死亡，不能接受常规控制、战斗或交互输入。
+    ownerSystem: 生命域
+    usagePolicy: 0
+    stableTransferScopes: 3
+    warning: 实体事实；控制玩家需要输入或 UI 投影时单向同步 RuntimeModeTag.Dead。
+  - tag: 2
+    group: 控制
+    meaning: 实体被眩晕，通常禁止移动与战斗。
+    ownerSystem: 控制/Buff域
+    usagePolicy: 0
+    warning: Buff 用 Lease 授予和撤销；不要只改动画状态或 RuntimeModeTag。
+  - tag: 3
+    group: 控制
+    meaning: 实体不能施放受沉默约束的技能。
+    ownerSystem: 控制/Buff域
+    usagePolicy: 0
+    warning: 技能系统应查询该 Tag；具体技能白名单仍由技能规则维护。
+  - tag: 4
+    group: 控制
+    meaning: 实体不能自主移动，但不必然禁止旋转、施法或交互。
+    ownerSystem: 控制/Buff域
+    usagePolicy: 0
+    warning: 不要把定身误当眩晕；对应 Permit 由 Buff 或控制域实施。
+  - tag: 5
+    group: 防御
+    meaning: 实体抵抗特定受击或控制结果。
+    ownerSystem: 战斗/控制域
+    usagePolicy: 0
+    warning: 只作为命中结算输入，实际免疫规则由 HitResolver 决定。
+  - tag: 6
+    group: 防御
+    meaning: 实体当前免疫约定范围内的伤害或命中。
+    ownerSystem: 战斗/Buff域
+    usagePolicy: 0
+    warning: 必须由 HitResolver 解释；不能用 Layer 或 Collider 开关替代。
+  - tag: 7
+    group: 感知
+    meaning: 实体处于隐身或不可被常规感知的状态。
+    ownerSystem: 感知/AI/Buff域
+    usagePolicy: 0
+    warning: AI 仍需按感知规则处理近距、真视、声音等例外。
+  - tag: 8
+    group: 状态异常
+    meaning: 实体正在承受燃烧状态。
+    ownerSystem: Buff域
+    usagePolicy: 0
+    warning: 状态存在由 Buff Lease 维护；元素伤害类型本身不是该 Tag。
+  - tag: 9
+    group: 状态异常
+    meaning: 实体正在承受冰冻状态。
+    ownerSystem: Buff域
+    usagePolicy: 0
+    warning: 控制、伤害和表现由冰冻 Buff 的具体规则实现。
+  - tag: 10
+    group: 状态异常
+    meaning: 实体正在承受中毒状态。
+    ownerSystem: Buff域
+    usagePolicy: 0
+    warning: 持续伤害与层数由 Buff 实例维护，Tag 只表达状态存在。
+  - tag: 11
+    group: 状态异常
+    meaning: 实体正在承受感电状态。
+    ownerSystem: Buff域
+    usagePolicy: 0
+    warning: 连锁、麻痹等效果由 Buff/HitResolver 决定。
+  - tag: 12
+    group: 战斗
+    meaning: 实体处于战斗语境。
+    ownerSystem: 战斗域
+    usagePolicy: 0
+    warning: 控制玩家需要 UI 或输入投影时，再同步 RuntimeModeTag.Combat。
+  - tag: 13
+    group: 战斗
+    meaning: 实体正在瞄准或锁定瞄准。
+    ownerSystem: 战斗域
+    usagePolicy: 0
+    warning: 镜头和输入表现由控制玩家 RuntimeModeTag.Aiming 管理，不能双向写入。
+  - tag: 14
+    group: 技能
+    meaning: 实体正在施放技能。
+    ownerSystem: 技能域
+    usagePolicy: 0
+    warning: 由技能实例的开始和结束路径授予与撤销。
+  - tag: 15
+    group: 技能
+    meaning: 实体正在引导持续型技能。
+    ownerSystem: 技能域
+    usagePolicy: 0
+    warning: 中断、结束或死亡必须保证撤销来源。
+  - tag: 16
+    group: 移动
+    meaning: 实体处于冲刺过程。
+    ownerSystem: 运动/技能域
+    usagePolicy: 0
+    warning: 不要用动画 State 字符串替代。
+  - tag: 17
+    group: 移动
+    meaning: 实体处于跳跃过程。
+    ownerSystem: 运动域
+    usagePolicy: 0
+    warning: KCC 落地、取消和强制位移都必须维护该事实。
+  - tag: 18
+    group: 移动
+    meaning: 实体处于下落过程。
+    ownerSystem: 运动域
+    usagePolicy: 0
+    warning: 这是实体事实，不等同 State 的动画标签。
+  - tag: 19
+    group: 移动
+    meaning: 实体处于攀爬控制权中。
+    ownerSystem: 运动域
+    usagePolicy: 0
+    warning: 控制玩家可单向投影 RuntimeModeTag.Climbing，投影句柄必须随状态结束释放。
+  - tag: 20
+    group: 移动
+    meaning: 实体处于骑乘或载具控制权中。
+    ownerSystem: 运动域
+    usagePolicy: 0
+    warning: 控制玩家可单向投影 RuntimeModeTag.Mounted，不能以 Tag 代替控制权逻辑。
+  - tag: 21
+    group: 能力
+    meaning: 目标允许进入锁定候选。
+    ownerSystem: Targeting
+    usagePolicy: 1
+    warning: 距离、阵营、遮挡和优先级仍由 Targeting 系统判断。
+  - tag: 22
+    group: 能力
+    meaning: 对象允许作为交互候选。
+    ownerSystem: Interaction
+    usagePolicy: 1
+    warning: 具体交互资格、占用和任务条件由 Interaction 系统判断。
+  - tag: 23
+    group: 能力
+    meaning: 对象允许进入常规伤害候选。
+    ownerSystem: DamageReceiver
+    usagePolicy: 1
+    warning: 无敌、阵营、自伤和部位倍率仍由 HitResolver 判断。
+  - tag: 24
+    group: 能力
+    meaning: 对象允许进入治疗候选。
+    ownerSystem: Health/HealResolver
+    usagePolicy: 1
+    warning: 治疗归属、上限和特殊规则由治疗系统判断。
+  - tag: 25
+    group: 废弃
+    meaning: 旧友方阵营标签，仅用于迁移读取。
+    ownerSystem: Faction
+    usagePolicy: 2
+    warning: 禁止为新功能写入。友敌关系是相对关系，必须使用 FactionId 加 Relation 服务。
+  - tag: 26
+    group: 废弃
+    meaning: 旧敌方阵营标签，仅用于迁移读取。
+    ownerSystem: Faction
+    usagePolicy: 2
+    warning: 禁止为新功能写入。友敌关系是相对关系，必须使用 FactionId 加 Relation 服务。
+  - tag: 27
+    group: 废弃
+    meaning: 旧中立阵营标签，仅用于迁移读取。
+    ownerSystem: Faction
+    usagePolicy: 2
+    warning: 禁止为新功能写入。友敌关系是相对关系，必须使用 FactionId 加 Relation 服务。
+  - tag: 28
+    group: 废弃
+    meaning: 旧玩家身份标签，仅用于迁移读取。
+    ownerSystem: Spawn/ActorData
+    usagePolicy: 2
+    warning: 禁止为新功能写入。玩家身份由 ActorDataKind 或 Spawn Archetype 定义。
+  - tag: 29
+    group: 废弃
+    meaning: 旧 NPC 身份标签，仅用于迁移读取。
+    ownerSystem: Spawn/Archetype
+    usagePolicy: 2
+    warning: 禁止为新功能写入。NPC 身份由 Spawn Archetype 定义。
+  - tag: 30
+    group: 废弃
+    meaning: 旧召唤物身份标签，仅用于迁移读取。
+    ownerSystem: Spawn/Archetype
+    usagePolicy: 2
+    warning: 禁止为新功能写入。召唤物归属与生命周期由 Spawn 或召唤系统定义。
+  - tag: 31
+    group: 废弃
+    meaning: 旧投射物身份标签，仅用于迁移读取。
+    ownerSystem: Item/Shot
+    usagePolicy: 2
+    warning: 禁止为新功能写入。投射物是 Item/Shot，不应伪装成 Entity 身份标签。
+  - tag: 32
+    group: 保留
+    meaning: 32 到 63 是未分配的核心位。
+    ownerSystem: GameCore
+    usagePolicy: 2
+    warning: 不能运行时写入、不能由 ESTagId 绕过；新增前必须补齐规则、验证与消费者。
+  inputCategories: []
+  physicsLayers:
+  - semanticName: Default
+    unityLayer: 0
+    owner: 通用
+    usedBy: 临时原型或第三方资源。
+    mustBeTrigger: 0
+    queryRoles: 0
+    forbiddenCollisionLayers:
+    - EntityBody
+    - EntityHurtbox
+    - Shot
+    - Interaction
+    - TriggerZone
+    - Sensor
+    rule: 正式玩法对象不得依赖 Default。
+  - semanticName: IgnoreRaycast
+    unityLayer: 2
+    owner: 表现
+    usedBy: 纯表现、装饰、特效。
+    mustBeTrigger: 0
+    queryRoles: 0
+    forbiddenCollisionLayers:
+    - Default
+    - IgnoreRaycast
+    - Water
+    - UI
+    - Ground
+    - Wall
+    - WorldDynamic
+    - EntityBody
+    - EntityHurtbox
+    - ItemBody
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 不参与任何框架玩法查询或物理碰撞。
+  - semanticName: Water
+    unityLayer: 4
+    owner: 场景
+    usedBy: 水体与游泳或涉水检测。
+    mustBeTrigger: 1
+    queryRoles: 32
+    forbiddenCollisionLayers:
+    - Default
+    - IgnoreRaycast
+    - Water
+    - UI
+    - Ground
+    - Wall
+    - WorldDynamic
+    - EntityBody
+    - EntityHurtbox
+    - Shot
+    - ItemBody
+    - Interaction
+    - TriggerZone
+    - CameraBlocker
+    - Sensor
+    rule: 使用专用 Trigger 查询，不作为地面、常规 Shot 阻挡或 Hurtbox。
+  - semanticName: UI
+    unityLayer: 5
+    owner: UI
+    usedBy: 世界空间 UI 或 UI 辅助对象。
+    mustBeTrigger: 0
+    queryRoles: 0
+    forbiddenCollisionLayers:
+    - Default
+    - IgnoreRaycast
+    - Water
+    - UI
+    - Ground
+    - Wall
+    - WorldDynamic
+    - EntityBody
+    - EntityHurtbox
+    - ItemBody
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 不得参与 3D 物理、命中、交互或相机避障。
+  - semanticName: EntityBody
+    unityLayer: 6
+    owner: Entity
+    usedBy: 角色 KCC 主身体与占位 Collider。
+    mustBeTrigger: 0
+    queryRoles: 1
+    forbiddenCollisionLayers:
+    - EntityBody
+    - EntityHurtbox
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 用于运动阻挡，不等同受击盒。默认不与其他角色身体或 Trigger 层碰撞。
+  - semanticName: Ground
+    unityLayer: 8
+    owner: 场景
+    usedBy: Terrain、地面与可站立静态面。
+    mustBeTrigger: 0
+    queryRoles: 2247
+    forbiddenCollisionLayers:
+    - EntityHurtbox
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 可作为移动、落脚、Shot 阻挡与视线遮挡，不得放 Trigger。
+  - semanticName: Wall
+    unityLayer: 9
+    owner: 场景
+    usedBy: 墙、建筑与不可站立静态阻挡。
+    mustBeTrigger: 0
+    queryRoles: 709
+    forbiddenCollisionLayers:
+    - EntityHurtbox
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 可作为移动、Shot、视线与攀爬探测候选，攀爬仍需 ClimbableSurface。
+  - semanticName: WorldDynamic
+    unityLayer: 10
+    owner: 场景
+    usedBy: 可移动阻挡物、动态门、平台。
+    mustBeTrigger: 0
+    queryRoles: 2759
+    forbiddenCollisionLayers:
+    - EntityHurtbox
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 可阻挡角色与 Shot，可破坏性由 DamageReceiver 决定。
+  - semanticName: EntityHurtbox
+    unityLayer: 11
+    owner: Entity
+    usedBy: 角色头、躯干、四肢等受击 Collider。
+    mustBeTrigger: 1
+    queryRoles: 268
+    forbiddenCollisionLayers:
+    - Default
+    - IgnoreRaycast
+    - Water
+    - UI
+    - EntityBody
+    - Ground
+    - Wall
+    - WorldDynamic
+    - EntityHurtbox
+    - ItemBody
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 只供命中与目标查询，不承担移动阻挡。阵营、自伤、无敌与部位倍率由 HitResolver 判断。
+  - semanticName: ItemBody
+    unityLayer: 12
+    owner: Item
+    usedBy: 箱子、机关、可破坏物与可阻挡道具。
+    mustBeTrigger: 0
+    queryRoles: 2255
+    forbiddenCollisionLayers:
+    - EntityHurtbox
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 可被角色与世界阻挡；需交互时额外建 Interaction 子 Collider。
+  - semanticName: Interaction
+    unityLayer: 13
+    owner: 交互
+    usedBy: 门、拾取、对话、载具与机关的交互代理 Collider。
+    mustBeTrigger: 1
+    queryRoles: 1040
+    forbiddenCollisionLayers:
+    - Default
+    - IgnoreRaycast
+    - Water
+    - UI
+    - EntityBody
+    - EntityHurtbox
+    - Ground
+    - Wall
+    - WorldDynamic
+    - ItemBody
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 只供交互与骑乘探测，不作为 Shot、近战或移动阻挡。
+  - semanticName: TriggerZone
+    unityLayer: 14
+    owner: Item/Trap
+    usedBy: 陷阱、区域、检查点与环境触发器。
+    mustBeTrigger: 1
+    queryRoles: 32
+    forbiddenCollisionLayers:
+    - Default
+    - IgnoreRaycast
+    - Water
+    - UI
+    - EntityBody
+    - EntityHurtbox
+    - Ground
+    - Wall
+    - WorldDynamic
+    - ItemBody
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 只供区域检测，不作为常规交互、Shot、近战或移动阻挡。
+  - semanticName: Shot
+    unityLayer: 15
+    owner: Item/Shot
+    usedBy: 飞行物自身的表现与逻辑根节点。
+    mustBeTrigger: 0
+    queryRoles: 0
+    forbiddenCollisionLayers:
+    - Default
+    - IgnoreRaycast
+    - Water
+    - UI
+    - EntityBody
+    - EntityHurtbox
+    - Ground
+    - Wall
+    - WorldDynamic
+    - ItemBody
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: Shot 使用主动 Raycast/SphereCast 命中，禁止依赖 OnCollision/OnTrigger，自身不可进入 ShotHitMask。
+  - semanticName: CameraBlocker
+    unityLayer: 16
+    owner: 相机
+    usedBy: 只用于第三人称相机避障的简化 Collider。
+    mustBeTrigger: 0
+    queryRoles: 64
+    forbiddenCollisionLayers:
+    - Default
+    - IgnoreRaycast
+    - Water
+    - UI
+    - EntityBody
+    - EntityHurtbox
+    - Ground
+    - Wall
+    - WorldDynamic
+    - ItemBody
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 不参与角色、Shot、交互或伤害物理，只由相机查询读取。
+  - semanticName: Sensor
+    unityLayer: 17
+    owner: AI
+    usedBy: AI 感知或警戒体积。
+    mustBeTrigger: 1
+    queryRoles: 0
+    forbiddenCollisionLayers:
+    - Default
+    - IgnoreRaycast
+    - Water
+    - UI
+    - EntityBody
+    - EntityHurtbox
+    - Ground
+    - Wall
+    - WorldDynamic
+    - ItemBody
+    - Interaction
+    - TriggerZone
+    - Shot
+    - CameraBlocker
+    - Sensor
+    rule: 仅作为传感器本体；目标采集查 EntityHurtbox，视线遮挡查世界阻挡层。
+  aiCommandTemplates:
+  - title: 新增或调整GameTag
+    category: Tag
+    commandText: "请按 GameCoreEditorGlobalData.gameTags 处理标签：先分类为 Entity RuntimeFact、能力入口或不该使用 Tag 的关系/身份数据；阵营必须是 FactionId+Relation，身份必须是 Spawn/Archetype。StringKey Extension 必须登记唯一 ESTagBakeTable；RuntimeKey 仅当前 Schema 进程可用，禁止写入配置、存档或网络。策划条件统一使用 ESTagConditionConfig 的 requiredCore、requiredAnyCore、forbiddenCore、requiredExtensions、requiredAnyExtensions、forbiddenExtensions；Extension StringKey 必须从 Picker 选择，业务通过 Entity.Tags.Matches 或 TryMatches 查询。所有写入者统一用 ESTagGrantConfig + ESTagLeaseSet：Buff、装备手持、状态环境、区域、任务等在自己的激活路径 Acquire，在切换、退出、禁用、销毁路径 Dispose；禁止 RemoveAll 或直接改计数。HitResolver 只读取 ESHitTagEligibility 决定资格，不接管物理候选、伤害、阵营、友伤或部位倍率。存档/联机只传 ESTagStableSnapshot 的 Core EnumKey、Extension StringKey 和 SchemaHash；先在 Catalog stableTransferScopes 声明 SaveGame/Network，再以明确 LeaseSet 恢复，禁止 RuntimeKey、Count、Source。State 字符串只是动画标签；控制玩家的输入/UI 投影仅由 ESGameManager.LocalControl 管理。交付时运行规则验证、Buff 验证、稳定 Key 审计和核心自检，说明写入者、消费者、Snapshot Scope 与结果。\n需求：<在此补充标签用途>"
+  - title: 修正游戏3D Layer规划
+    category: Physics
+    commandText: "请把 GameCoreEditorGlobalData.physicsLayers 作为 FPS/TPS、ARPG、开放世界、潜行、生存、平台、竞速等标准 3D 游戏的核心物理分类；Layer 只表达 Physics 碰撞/查询职责，不表达阵营、职业、阵营关系、伤害类型或业务身份。先读取既有规则和 TagManager/DynamicsManager，再实施修改。\n\n固定核心 Layer：0 Default（仅临时/第三方）、2 Ignore Raycast（纯表现）、4 Water（Trigger 专用查询）、5 UI、6 EntityBody（KCC 主身体，非 Trigger）、8 Ground（可站立静态面）、9 Wall（不可站立静态阻挡）、10 WorldDynamic（门、平台、载具主体、动态阻挡）、11 EntityHurtbox（Trigger）、12 ItemBody（箱子/机关/可破坏物）、13 Interaction（Trigger）、14 TriggerZone（Trigger）、15 Shot（主动 Cast，非 Trigger）、16 CameraBlocker、17 Sensor（Trigger）。\n\n跨游戏类型复用原则：\n1. 玩家、NPC、敌人、Boss 共用 EntityBody + EntityHurtbox；同一对象需要阻挡、受击、交互时，使用主 Collider + 受击/交互子 Trigger Collider，不合并职责。\n2. 地形/地板用 Ground，墙体/建筑用 Wall；门、移动平台、车辆物理主体用 WorldDynamic；可破坏、可阻挡道具用 ItemBody。Ragdoll 默认继承 EntityBody 与世界交互；只有确实需要 Ragdoll 间独立物理关系时，才申请扩展层。\n3. 子弹、箭、投掷物、魔法弹和近战投射体根节点都用 Shot；命中使用主动 Raycast/SphereCast，不依赖 OnCollision/OnTrigger。交互、拾取、载具入口用 Interaction；陷阱、检查点、毒圈、水体等区域用 TriggerZone/Water。\n4. Collider 的 isTrigger 必须遵循 physicsLayers.mustBeTrigger；世界/身体/ItemBody/Shot 不可为 Trigger，Hurtbox/Interaction/TriggerZone/Sensor/Water 必须为 Trigger。\n5. 主动查询只用 ESPhysicsLayers 或 ESPhysicsLayerConfig 的语义 Mask：ShotHit=Ground|Wall|WorldDynamic|EntityHurtbox|ItemBody；交互只查 Interaction；区域/水体只查 TriggerZone/Water；AI 目标查 EntityHurtbox，视线查 WorldBlocker。不得使用 ~0。\n6. 阵营、自伤、友伤、无敌、部位倍率、拾取资格和任务状态属于 HitResolver/业务规则，不能靠新 Layer 或碰撞矩阵表达。\n\n扩展政策：18–23 为项目审核后的物理扩展位。仅当新对象无法用上述“主 Collider + 玩法子 Collider”组合表达，且确实需要一套新的碰撞矩阵或查询目标时，才能占用；必须同时登记编号、用途、Trigger、QueryRole、禁止碰撞对，更新 ESPhysicsLayers/ESPhysicsLayerConfig，并同步 Unity Layer 与碰撞矩阵。2D 项目使用独立 Physics2D 规划，不复用本 3D 矩阵。\n\n交付时说明：复用或新增的 Layer、Collider Trigger 状态、使用的查询 Mask、变更的碰撞对，以及同步/验证结果。\n需求：<在此补充对象、命中/交互/移动需求>"

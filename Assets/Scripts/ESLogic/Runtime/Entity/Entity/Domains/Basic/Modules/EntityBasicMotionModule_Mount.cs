@@ -44,6 +44,7 @@ namespace ES
 
         // TryEnterMount → OnMountEnter 之间的参数桥接（避免闭包捕获堆分配）
         private EntityMountable _pendingMountable;
+        [NonSerialized] private EntityKCCMotionRegistration _motionRegistration;
 
         public override void Start()
         {
@@ -56,7 +57,8 @@ namespace ES
             if (MyCore != null)
             {
                 MyCore.kcc.mountModule = this;
-                MyCore.kcc.RebuildMotionSchedulers();
+                if (!_motionRegistration.IsValid)
+                    _motionRegistration = MyCore.kcc.RegisterMotionFeature(this, EntityKCCMotionOrder.Mount);
             }
 
             // 构造跟踪器并绑定状态（无委托，零 GC）
@@ -132,6 +134,7 @@ namespace ES
         private void OnMountExit()
         {
             mountHold = false;
+            MyCore?.kcc?.ClearMatchTargetPose();
 
             if (_mountState != null && _mountState.IsMatchTargetActive)
                 _mountState.CancelMatchTarget();
@@ -197,8 +200,8 @@ namespace ES
                 return hit.collider.GetComponentInParent<EntityMountable>();
 #endif
             }
-   if (debugMount)
-       Debug.Log($"[Mount] 射线没命中:  |)");
+            if (debugMount)
+                Debug.Log("[Mount] 射线未命中可骑乘目标");
              
             return null;
         }
@@ -222,12 +225,20 @@ namespace ES
             if (!_lifecycle.IsActive) return;
 
             mountHold = true;
-           // MyCore.SetLocomotionSupportFlags(StateSupportFlags.Mounted);
-           // currentMount.TickMounted(MyCore, MyCore.kcc.moveInput, MyCore.kcc.lookInput, Time.deltaTime);
+            if (currentMount == null)
+                return;
+
+            // 载具自身的移动仍在普通 Update 计算；Rider 根位姿只在 KCC Before 阶段同步。
+            currentMount.TickMounted(
+                MyCore,
+                MyCore.kcc.moveInput,
+                MyCore.kcc.lookInput,
+                Time.deltaTime,
+                syncRider: false);
 
             // MatchTarget 激活期间实时修正目标点（载具在移动，matchPoint 每帧都在变）
-            // MatchTarget 完成后 IsMatchTargetActive 变 false，自动停止修正，SyncRider 无缝接管
-            if (_mountState.IsMatchTargetActive && currentMount != null && currentMount.matchPoint != null)
+            // MatchTarget 完成后 IsMatchTargetActive 变 false，由 BeforeCharacterUpdate 无缝接管。
+            if (_mountState != null && _mountState.IsMatchTargetActive && currentMount.matchPoint != null)
             {
                 // MatchTarget 进行中：每帧修正目标点（载具可能在移动）
                 // ★ 改用 SetMatchTargetTargetWithConfigOffset：
@@ -238,56 +249,51 @@ namespace ES
                     currentMount.matchPoint.position,
                     currentMount.matchPoint.rotation);
             }
-            else if (!_mountState.IsMatchTargetActive && _lifecycle.IsActive && currentMount != null)
-            {
-                // MatchTarget 已完成，用 MoveTowards 柔性收尾，避免硬 snap 突变。
-                // 足够近后（<0.005m & <0.5°）再精确锁定。
-                if (currentMount.rider != null && currentMount.rider.kcc != null && currentMount.rider.kcc.motor != null)
-                {
-                    var motor = currentMount.rider.kcc.motor;
-                    Vector3    curPos = motor.TransientPosition;
-                    Quaternion curRot = motor.TransientRotation;
-                    Vector3    tgtPos = currentMount.alignRiderPosition ? currentMount.matchPoint.position : curPos;
-                    Quaternion tgtRot = currentMount.alignRiderRotation ? currentMount.matchPoint.rotation : curRot;
+        }
 
-                    float posDist = Vector3.Distance(curPos, tgtPos);
-                    float rotDist = Quaternion.Angle(curRot, tgtRot);
-
-                    const float snapPosThr = 0.005f;
-                    const float snapRotThr = 0.5f;
-
-                    if (posDist < snapPosThr && rotDist < snapRotThr)
-                    {
-                        // 误差极小，精确锁定
-                     //   motor.SetPositionAndRotation(tgtPos, tgtRot, true);
-                    }
-                    else
-                    {
-                        // 仍有残余误差，继续以高速 MoveTowards 收尾（不突变）
-                        float dt = Time.deltaTime;
-                        Vector3    newPos = Vector3.MoveTowards(curPos, tgtPos, 8f * dt);
-                        Quaternion newRot = Quaternion.RotateTowards(curRot, tgtRot, 720f * dt);
-                       // motor.SetPositionAndRotation(newPos, newRot, true);
-                    }
-                }
-            }
+        protected override void OnDisable()
+        {
+            // 只清理骑乘语义，保留调度注册供重新启用复用，避免重复注册。
+            if (_lifecycle.RequestExit())
+                OnMountExit();
+            else if (currentMount != null || mountHold)
+                OnMountExit();
+            base.OnDisable();
         }
 
         public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, Vector3 initialPosition, float deltaTime)
         {
-            if (!enableMount || !_lifecycle.IsActive || kcc.CurrentSupportFlags != StateSupportFlags.Mounted) return false;
+            if (!Signal_IsActiveAndEnable || !enableMount || !_lifecycle.IsActive || kcc.CurrentSupportFlags != StateSupportFlags.Mounted) return false;
             if (kcc.workWorld < 20) return false;
             kcc.workWorld -= 20;
             // ★ 防止 KCC Grounding 在骑乘/MatchTarget 期间与 SetPositionAndRotation 产生冲突。
             //   Climb 模块采用同样的做法：ForceUnground 告知 KCC 本帧不做稳定地面检测，
             //   避免 KCC 将角色压回地面，对抗 MatchTarget 向上对齐的位移。
             kcc.motor.ForceUnground(0.1f);
+
+            // MatchTarget 完成后，由 KCC 物理边界直接跟随载具挂点。
+            // 普通 Update 只移动载具本体，不再直接争写 Rider 的 Motor。
+            if (_mountState != null
+                && !_mountState.IsMatchTargetActive
+                && !kcc.IsMatchTargetMotionLocked
+                && currentMount != null
+                && currentMount.matchPoint != null)
+            {
+                Vector3 targetPosition = currentMount.alignRiderPosition
+                    ? currentMount.matchPoint.position
+                    : kcc.motor.TransientPosition;
+                Quaternion targetRotation = currentMount.alignRiderRotation
+                    ? currentMount.matchPoint.rotation
+                    : kcc.motor.TransientRotation;
+                kcc.motor.SetPositionAndRotation(targetPosition, targetRotation, true);
+            }
+
             return true;
         }
 
         public bool UpdateRotation(Entity owner, EntityKCCData kcc, Quaternion initialRotation, ref Quaternion currentRotation, float deltaTime)
         {
-            if (!enableMount || currentMount == null || kcc.CurrentSupportFlags != StateSupportFlags.Mounted) return false;
+            if (!Signal_IsActiveAndEnable || !enableMount || currentMount == null || kcc.CurrentSupportFlags != StateSupportFlags.Mounted) return false;
             if (kcc.workSelf < 100) return false;
             kcc.workSelf -= 100;
             return true;
@@ -295,7 +301,7 @@ namespace ES
 
         public bool UpdateVelocity(Entity owner, EntityKCCData kcc, Vector3 initialVelocity, ref Vector3 currentVelocity, float deltaTime)
         {
-            if (!enableMount || currentMount == null || kcc.CurrentSupportFlags != StateSupportFlags.Mounted) return false;
+            if (!Signal_IsActiveAndEnable || !enableMount || currentMount == null || kcc.CurrentSupportFlags != StateSupportFlags.Mounted) return false;
             if (kcc.workSelf < 100) return false;
             kcc.workSelf -= 100;
             currentVelocity = Vector3.zero;
@@ -307,9 +313,11 @@ namespace ES
             // 实体销毁时保证骑乘生命周期干净退出（幂等，多次调用安全）
             if (_lifecycle.Release()) OnMountExit();
 
-            if (MyCore != null && MyCore.kcc.mountModule == this)
+            if (MyCore != null)
             {
-                MyCore.kcc.mountModule = null;
+                MyCore.kcc.UnregisterMotionFeature(ref _motionRegistration);
+                if (MyCore.kcc.mountModule == this)
+                    MyCore.kcc.mountModule = null;
             }
             base.OnDestroy();
         }

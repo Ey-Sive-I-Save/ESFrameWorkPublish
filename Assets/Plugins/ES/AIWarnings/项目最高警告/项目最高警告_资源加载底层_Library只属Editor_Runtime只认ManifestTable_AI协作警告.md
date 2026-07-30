@@ -1,6 +1,6 @@
 # 项目最高警告：资源加载底层，Library 只属 Editor，Runtime 只认 Manifest/Table
 
-最后核对：2026-07-25
+最后核对：2026-07-29
 
 职责：这是 ESFramework 给后续 AI 的项目最高警告。当前正在搭建资源加载底层，任何资源系统、GameManager 启动流程、AssetRegistry、AssetLibrary、RuntimeKey、Manifest/Table 相关改动都必须先读本文件。
 
@@ -157,58 +157,134 @@ ESGameManager.AssetModule.Release(handle);
 
 这些都由 `RunMode + Manifest + Loader` 解决。
 
-## RuntimeKey 稳定性
+## RuntimeKey 进程内边界（P0，最高约束）
 
-RuntimeKey 是运行时查表核心，不允许在同一资产重复注入时抖动。
+`RuntimeKey` 只允许由当前进程中已经初始化的强类型 `ESConfigKeyTable<TData>` 自动生成。它只是当前类型表、当前表生命周期内的热路径加速索引，不是资产身份，也不是构建数据。
 
-禁止出现：
+只保证：
+
+- 同一个强类型表、同一次 `BeginBuild/Clear` 生命周期内，业务键解析得到一致的 RuntimeKey；
+- RuntimeKey 只能交给产生它的同一张表解释；
+- 表清理、重建、进程重启后 RuntimeKey 允许变化，调用方必须通过 EnumKey/StringKey 重新解析。
+
+注入完成后的合法获取方式：
+
+- 不需要了解 RuntimeData 的普通调用者优先使用领域表 `int runtimeKey = Table.InjectWith(...)`，允许失败时使用 `TryInjectWith(..., out int runtimeKey)`；
+- GameCore 领域 Table 和根 SO 作者必须先 `AcquireRetained`，把全部准备逻辑放入 `try`，再调用 `CommitRetained/TryCommitRetained`；准备或提交失败必须 `AbandonRetained`；
+- 既有 `Inject/TryInject/RegisterAndGetRuntimeKey` 只作为稳定 API 兼容入口继续具备提交回滚语义；新 GameCore 代码不得把它们当作事务模板，也不得手工写入 RuntimeKey；
+- 批量注入器可以在外层统一 `BeginBuild/EndBuild`，但每条 GameCore 数据仍必须独立完成 Acquire、准备、Commit/Abandon；
+- RuntimeData 的 `runtimeKey` 由 Table 在成功提交时自动写入，并保证早于 `Ready=true`；调用方只接收返回值，不得指定、恢复或持久化该字段；
+- 已持有 RuntimeData 时直接读取 `data.runtimeKey`；
+- 只持有 ConfigKey 时调用同一强类型表的 `GetRuntimeKey(configKey)`，不确定是否完成注入时使用 `TryGetRuntimeKey(configKey, out int)`；
+- 上述值只允许缓存到当前表生命周期内的运行对象，不得写回 ConfigKey 或任何持久数据。
+
+GameCore RuntimeData 的完整事务、稳定外壳、`Ready` 与载荷释放规则，以
+`项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md` 为唯一权威；本节不得被解释为允许 Upsert、换实例或只设置 `Ready=false` 而保留重量级载荷。
+
+禁止持久化到任何位置，包括但不限于：
+
+- `ESAssetPage`、`ESAssetLibrary`、Book/Page 编辑器配置；
+- Catalog、Manifest、GlobalAssetRuntimeMap、JSON、ScriptableObject 构建缓存；
+- `ESAssetConfigKey`、`ESGameCoreConfigKey` 等 ConfigKey 定义；
+- 任意 `SoDataInfo`、`SoDataGroup`、玩法配置或资源计划；
+- 玩家存档、网络协议、服务端数据、跨进程通信与跨版本数据。
+
+编辑器侧必须遵守：
+
+- 普通 Inspector、Library 页面、拖拽 Solver 和配置复制工具不得显示、编辑或写入 RuntimeKey；
+- 禁止提供“手工指定 30000+ RuntimeKey”、重绑定或恢复旧 RuntimeKey 的入口；
+- 如确需诊断，只能在运行时表已构建后，以只读高级调试信息展示，并明确标注“当前进程临时值”；
+- `ESAssetRegistry` 只镜像 EnumKey/StringKey/GUID+LocalFileId，不生成、快照、比较或冲突检查 RuntimeKey。
+
+跨进程重新解析入口只能是：类别内 EnumKey/StringKey，或资产物理身份 GUID/GUID+LocalFileId。AssetTable 将业务键解析为资产身份；GlobalAssetRuntimeMap 再将资产身份解析为当前版本的 AssetBundle 物理位置。
+
+## AssetTable 稳定外壳与资产释放边界（P0）
+
+`ESAssetConfigKeyTable<TConfigData, TAsset>` 按类别内 EnumKey/StringKey 稳定驻留的是轻量配置外壳，不是实际 Unity 资产，也不是 AssetBundle Handle。
+
+Key→稳定实例的共同机制由 ES 标准底层 `ESRetainedConfigKeyTable<TData>` 提供；AssetTable 必须继承该标准表，
+只扩展 Unity 资产、Loader、Handle 与请求合并生命周期。禁止在 AssetTable 重新声明驻留字典或复制 `AcquireRetained` 算法。
+标准底层不认识 Unity 资产和 AssetBundle，因此不得把 Loader/Handle 反向下沉到该基类。
+
+Runtime Catalog/Page 注入必须通过强类型 `IESAssetConfigDataInitializer<TKey>` 与 `ESAssetConfigRecord` 完成；
+禁止使用 `GetField`、`GetMethod`、`Invoke`、`Enum.ToObject`、表达式树或运行时生成委托写入分类 Key/Data，避免 IL2CPP 裁剪、AOT 和字段改名风险。
+
+同一轮 AssetTable 构建中，任一 EnumKey/StringKey 别名已进入活动表后，后续记录必须按冲突跳过并保留首条权威记录；
+禁止再次取得该活动外壳后先覆盖 Key、GUID、LocalFileId 或诊断字段，再依赖 Register 判重。重复项不得抛出普通业务异常、不得形成半覆盖状态。
+稳定外壳跨 Catalog 重建时，初始化器必须完整刷新所有有来源字段，并明确清空无来源的旧字段，禁止旧版本残值穿透新 Catalog。
+
+Catalog/Page 全量重建必须先经过两阶段输入预检门禁：在隔离预演表中完成全部 17 类的强类型 Key 转换、完整字段初始化、重复键判定、别名绑定与 RuntimeKey 注册；
+只有预演全部成功后，正式表才允许进入 `BeginBuild(true)`、释放旧载荷并提交新记录。禁止先清正式活动表再逐条校验输入；任一能在预检阶段发现的非法记录或初始化异常发生时，
+旧 Catalog 的稳定外壳、活动映射、RuntimeKey、Ready 状态、loadedAsset 与 Loader Handle 必须保持原样。
+
+该能力正式命名为“预检保护重建”，不得宣称为任意提交故障下可回滚的严格原子事务。当前稳定外壳允许业务缓存具体 `TConfigData` 引用，Loader Handle 又属于外部 Provider；
+在没有引入可交换 TableState、可交换 Payload 和交换后 Handle 回收协议前，正式提交阶段的 Loader.Release、再次初始化或多表顺序提交异常不具备回滚保证。
+后续 AI 禁止仅靠 `try/finally`、吞异常或复制字典宣称补齐严格原子性。
+
+普通业务只需学习业务 Key 直达 API：`TryGetReady(key, out asset)`、`GetOrLoadAsync(key, callback)`。
+`Release(key)` 的正式语义是“驱逐该 Table 槽位的共享资产缓存”，只允许 ResourcePlan、Scope 或统一内存管理服务调用；
+它不是调用者私有引用的 `Dispose`，禁止普通业务组件自行调用并影响其他消费者。
+`int runtimeKey` 重载仅供初始化后缓存的高频路径使用，不得要求普通调用者先理解、持久化或手工管理 RuntimeKey。
+
+稳定外壳保留：
+
+- 类别内业务键及其别名；
+- GUID 或 GUID + LocalFileId；
+- Catalog 烘焙得到的轻量配置；
+- 当前进程内重新注册后得到的 RuntimeKey。
+
+可释放载荷包括：
+
+- `loadedAsset` 强引用；
+- `loadedAssetReady/Ready` 状态；
+- Loader 持有的底层资源 Handle、AssetBundle 引用计数和依赖租约。
+
+强制生命周期：
 
 ```text
-同一个 guid:
-runtime=30001
-下一次注入变成 runtime=30007
+首次 Catalog 注册
+  -> 按 EnumKey/StringKey AcquireRetained 配置外壳
+  -> 注册当前表并得到进程内 RuntimeKey
+  -> Ready=false
+
+GetOrLoadAsync
+  -> Ready=true 时直接返回
+  -> Ready=false 时由 Loader 加载，同 Key 合并请求
+  -> 成功后写 loadedAsset 并置 Ready=true
+
+Release
+  -> 先断开 loadedAsset 并置 Ready=false
+  -> 再释放 Loader Handle
+  -> 不删除业务键映射，不回收或替换配置外壳
+
+下一次 GetOrLoadAsync
+  -> 使用同一配置外壳和当前 GUID 身份重新加载
+
+Provider/Catalog 重建
+  -> 在资源安全点等待请求结束
+  -> 释放实际资产和旧 Provider Handle
+  -> 清活动槽位但保留业务键对应的配置外壳
+  -> 新 Catalog 对同 Key 必须复用原外壳并覆盖当前版本配置
 ```
 
-`ESAssetRegistry` 生成 RuntimeKey 时必须遵守：
+禁止：
 
-- 如果 `enumKey != 0`，优先使用 enumKey。
-- 如果同 GUID 已有快照，并且 stringKey 没变，复用旧 runtimeKey。
-- 如果 page 自身已有有效 runtimeKey，复用它。
-- 如果当前同 AssetKind 的表已有同 stringKey，复用该类型表内 runtimeKey。
-- 最后才从 `DefaultStringRuntimeKeyStart` 开始递增分配。
+- 因 `Release` 删除 AssetTable 配置条目或换成新配置实例；
+- 仅设置 `Ready=false`，却继续保留 `loadedAsset` 或 Loader Handle；
+- 给 GameCore/Asset 定义外壳增加对象池，或把 Unity 资产、AssetBundle、Handle 放入任何定义外壳；
+- Catalog 重建时对每个既有 Key 无条件 `new TConfigData()`；
+- 把外壳驻留解释成资产永久常驻内存。
 
-看到 `RuntimeKey changed by asset self override` 时，优先怀疑 RuntimeKey 烘焙策略不稳定，而不是把 warning 当成普通噪音。
+加载尚未完成时收到 `Release`，必须在完成回调处立即释放新取得的 Handle，保持 `Ready=false`，不得把迟到结果重新写回缓存。
 
-### RuntimeKey 的持久化与边界（最高约束）
+Provider/Loader 切换时，`ResetLoader` 必须摘除所有 PendingLoad，并对每个合并请求回调一次明确的取消错误；
+禁止直接 `pendingLoads.Clear()` 导致等待方永久悬挂。旧 Loader 必须先与 Table 解绑并 Dispose，迟到结果不得恢复 Ready 或重复回调。
 
-`RuntimeKey` 可以持久化，但只属于某一份 `AssetTable/Manifest`，不属于资产的跨进程、跨版本权威身份。
+调用 `Loader.LoadAsync` 必须位于 Table 的同步异常事务边界内；若后端在返回前抛出异常，必须立即通过统一完成路径摘除 PendingLoad、
+通知全部合并请求并允许同 Key 重试。每个业务回调必须独立捕获异常，单个回调失败不得阻断后续等待者。
 
-允许写入：
-
-- `ESAssetPage`；
-- 构建产物中的 `AssetTable/Manifest`；
-- 与该表版本绑定的本地构建缓存。
-
-禁止写入或传递：
-
-- 任意 `SoDataInfo`、`SoDataGroup`、玩法配置或资源计划；
-- `ESAssetConfigKey` 等 ConfigKey 定义；
-- 玩家存档；
-- 网络协议和服务端数据；
-- 跨进程通信数据；
-- 跨版本业务配置；
-- 任何脱离 `TableVersion/ManifestVersion` 的外部数据。
-
-跨进程、跨版本或热更新数据必须使用 `(AssetKind, StringKey)`、`(EnumType, EnumKey)` 或 GUID 对应的稳定业务身份；新进程加载当前强类型 `AssetTable/Manifest` 后，再解析为该类型表内的 `RuntimeKey`。
-
-因此：
-
-- RuntimeKey 变化不代表资产身份变化；
-- RuntimeKey 只能在匹配的 AssetTable/Manifest 内查询；
-- 任何缓存的 RuntimeKey 都必须携带表版本，版本不一致时必须丢弃并重新解析；
-- 不得把 RuntimeKey 当作存档、网络或跨版本兼容键；
-- 不得由 Inspector、拖拽 Solver 或配置复制按钮写入 RuntimeKey；
-- 运行时业务层不得依赖编辑器侧 `ESAssetLibrary` 直接恢复 RuntimeKey。
+异步完成回调必须捕获本次 `PendingLoad` 实例和发起请求时的 Loader。完成时除 RuntimeKey 外还必须以 `ReferenceEquals` 校验当前 Pending
+仍是该实例；Provider 切换后旧请求与同 Key 新请求不得串代。旧请求迟到返回的资产只允许交还给旧 Loader，禁止触碰新 Pending、Ready 或新回调。
 
 ## AssetRegistry 现状
 
@@ -227,7 +303,7 @@ runtime=30001
 - 真机资源加载。
 - 热更新下载。
 - 运行时直接依赖 Library。
-- 每次刷新随机生成不稳定 RuntimeKey。
+- 生成、持久化、比较或恢复 RuntimeKey。
 
 ## 场景管理与资源系统边界
 
@@ -281,8 +357,8 @@ Library 是 Editor 编排源。
 Manifest/Table 是 Runtime 查询源。
 ESAssetReleaseBundleIndex 是 AssetBundle 物理文件定位权威。
 RunMode 决定 Loader 行为。
-RuntimeKey 必须稳定。
+RuntimeKey 仅在当前进程、当前强类型表、当前表生命周期内有效。
 旧垃圾不恢复，坏引用清序列化。
 ```
 
-任何试图让运行时直接依赖 `ESAssetLibrary`、恢复旧输入兼容壳、把 RuntimeKey 抖动 warning 当成无所谓、或在业务层手写 AssetDatabase/Bundle 路径的方案，都应停止并重审。
+任何试图让运行时直接依赖 `ESAssetLibrary`、持久化或手工指定 RuntimeKey、恢复旧输入兼容壳、或在业务层手写 AssetDatabase/Bundle 路径的方案，都应停止并重审。

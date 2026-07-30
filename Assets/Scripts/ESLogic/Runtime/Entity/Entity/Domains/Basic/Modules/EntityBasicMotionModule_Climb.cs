@@ -54,6 +54,8 @@ namespace ES
     [Serializable, TypeRegistryItem("基础攀爬模块")]
     public class EntityBasicClimbModule : EntityBasicModuleBase, IEntityKCCBeforeMotion, IEntityKCCRotationMotion, IEntityKCCVelocityMotion
     {
+        [NonSerialized] private EntityKCCMotionRegistration _motionRegistration;
+
         // ===== 开关 =====
         [Title("开关")]
         [LabelText("启用攀爬")]
@@ -458,7 +460,8 @@ namespace ES
             if (MyCore != null)
             {
                 MyCore.kcc.climbModule = this;
-                MyCore.kcc.RebuildMotionSchedulers();
+                if (!_motionRegistration.IsValid)
+                    _motionRegistration = MyCore.kcc.RegisterMotionFeature(this, EntityKCCMotionOrder.Climb);
             }
         }
 
@@ -541,6 +544,15 @@ namespace ES
                     UpdateClimbJump();
                     break;
             }
+        }
+
+        protected override void OnDisable()
+        {
+            // 不注销 KCC 句柄（Start 注册、OnDestroy 注销），仅结束当前攀爬生命周期。
+            ForceExitClimb();
+            if (MyCore != null && MyCore.kcc.CurrentSupportFlags == StateSupportFlags.Climbing)
+                MyCore.SetLocomotionSupportFlags(StateSupportFlags.Grounded);
+            base.OnDisable();
         }
 
         public void ToggleClimb()
@@ -1878,7 +1890,7 @@ namespace ES
 
         public bool BeforeCharacterUpdate(Entity owner, EntityKCCData kcc, Vector3 initialPosition, float deltaTime)
         {
-            if (!enableClimb || kcc.CurrentSupportFlags != StateSupportFlags.Climbing)
+            if (!Signal_IsActiveAndEnable || !enableClimb || kcc.CurrentSupportFlags != StateSupportFlags.Climbing)
             {
                 return false;
             }
@@ -1894,7 +1906,7 @@ namespace ES
 
         public bool UpdateRotation(Entity owner, EntityKCCData kcc, Quaternion initialRotation, ref Quaternion currentRotation, float deltaTime)
         {
-            if (!enableClimb || kcc.CurrentSupportFlags != StateSupportFlags.Climbing)
+            if (!Signal_IsActiveAndEnable || !enableClimb || kcc.CurrentSupportFlags != StateSupportFlags.Climbing)
             {
                 return false;
             }
@@ -1949,7 +1961,7 @@ namespace ES
 
         public bool UpdateVelocity(Entity owner, EntityKCCData kcc, Vector3 initialVelocity, ref Vector3 currentVelocity, float deltaTime)
         {
-            if (!enableClimb)
+            if (!Signal_IsActiveAndEnable || !enableClimb)
             {
                 return false;
             }
@@ -2052,9 +2064,11 @@ namespace ES
             {
                 ForceExitClimb();
             }
-            if (MyCore != null && MyCore.kcc.climbModule == this)
+            if (MyCore != null)
             {
-                MyCore.kcc.climbModule = null;
+                MyCore.kcc.UnregisterMotionFeature(ref _motionRegistration);
+                if (MyCore.kcc.climbModule == this)
+                    MyCore.kcc.climbModule = null;
             }
             base.OnDestroy();
         }

@@ -35,7 +35,7 @@ Wall_可选阻挡_移动到弹道中测试
 ## 脚本位置
 
 ```text
-Assets/Scripts/ESLogic/Runtime/Item/Samples/ItemShotTemplatePreview.cs
+Assets/Scripts/ESLogic/Runtime/Developer/Examples/Item/ItemShotTemplatePreview.cs
 ```
 
 脚本职责：

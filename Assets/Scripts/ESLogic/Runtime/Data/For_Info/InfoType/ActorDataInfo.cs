@@ -181,6 +181,38 @@ namespace ES
             mountSyncAfterMatchTarget = true
         };
 
+        /// <summary>把 Table 自有的运行时默认对象原位恢复为领域默认值，不产生新对象。</summary>
+        internal void ResetToDefaults()
+        {
+            enableGroundMove = true;
+            enableJump = true;
+            enableCrouch = true;
+            enableFly = false;
+            enableClimb = false;
+            enableMount = false;
+            enableGrappleMotion = false;
+            maxStableMoveSpeed = 8f;
+            stableMovementSharpness = 15f;
+            maxAirMoveSpeed = 8f;
+            airAccelerationSpeed = 5f;
+            jumpSpeed = 8f;
+            maxStableSlopeAngle = 55f;
+            steepSlopeSlideSpeed = 4f;
+            uphillSpeedMultiplier = 0.9f;
+            downhillSpeedMultiplier = 1.05f;
+            downhillInertia = 0.15f;
+            inheritMovingPlatformVelocity = true;
+            stepPolicy = EntityMotionStepPolicy.CharacterController;
+            flyControlMode = EntityFlyControlMode.CameraRelative;
+            flyMaxSpeed = 10f;
+            flySprintMultiplier = 1.5f;
+            flyHoverBrake = 8f;
+            flyDiveAcceleration = 12f;
+            mountVehicleConsumesInput = true;
+            mountLockRiderVelocity = true;
+            mountSyncAfterMatchTarget = true;
+        }
+
         public static EntityMotionSharedData ActionDemo
         {
             get

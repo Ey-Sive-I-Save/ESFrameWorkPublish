@@ -9,12 +9,12 @@ using ES;
 /// - 按 Book / Page 层级展示结构；
 /// - 仅做只读预览与简单定位，避免修改现有运行时代码。
 /// </summary>
-public class ResLibraryPreviewWindow : EditorWindow
+    public class ResLibraryPreviewWindow : EditorWindow
 {
     private Vector2 _scroll;
     private ResLibrary[] _libraries;
 
-    [MenuItem("ES/Preview/ResLibrary 预览窗口")]
+    [MenuItem("【ES】/已废弃/AIPreview/资源库预览")]
     public static void Open()
     {
         var win = GetWindow<ResLibraryPreviewWindow>(false, "ResLibrary Preview", true);
@@ -81,7 +81,7 @@ public class ResLibraryPreviewWindow : EditorWindow
 
                 EditorGUILayout.LabelField("描述", lib.Desc);
                 EditorGUILayout.LabelField("参与构建", lib.ContainsBuild ? "是" : "否");
-                EditorGUILayout.LabelField("是否远程库", lib.IsNet ? "远程" : "本体");
+                EditorGUILayout.LabelField("分发方式", GetDeliveryModeLabel(lib.DeliveryMode));
 
                 // 展示 Book / Page 层级（包含自定义Books和DefaultBooks）
                 var useableBooks = lib.GetAllUseableBooks();
@@ -129,6 +129,16 @@ public class ResLibraryPreviewWindow : EditorWindow
         }
 
         EditorGUILayout.EndScrollView();
+    }
+
+    private static string GetDeliveryModeLabel(ESAssetDeliveryMode mode)
+    {
+        switch (mode)
+        {
+            case ESAssetDeliveryMode.BuiltIn: return "随包";
+            case ESAssetDeliveryMode.Remote: return "远端";
+            default: return "更新";
+        }
     }
 }
 #endif

@@ -1,0 +1,23 @@
+{
+    "name": "ES_Design.ConfigKey.Tests",
+    "rootNamespace": "ES.Tests",
+    "references": [
+        "ES_Design",
+        "ES_Stand",
+        "ES_Logic"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

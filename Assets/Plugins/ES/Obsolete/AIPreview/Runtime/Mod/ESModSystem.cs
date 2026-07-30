@@ -8,7 +8,7 @@ namespace ES.Obsolete.AIPreview.Mod
     /// - 描述一个 Mod 的基础信息与包含的内容集合；
     /// - 内容本身通过其他 ScriptableObject（角色、物品、任务等）引用。
     /// </summary>
-    [CreateAssetMenu(menuName = "ES/Preview/Mod/ModDefinition")]
+    [CreateAssetMenu(menuName = "【ES】/已废弃/AIPreview/Mod 系统/ModDefinition")]
     public class ModDefinition : ScriptableObject
     {
         [Header("基础信息")]

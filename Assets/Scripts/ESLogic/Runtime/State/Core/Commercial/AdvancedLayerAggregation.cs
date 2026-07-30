@@ -103,7 +103,7 @@ namespace ES.Commercial
     /// <summary>
     /// 复杂层级聚合系统
     /// </summary>
-    [CreateAssetMenu(fileName = "NewAdvancedStateMachine", menuName = "ES/Animation/Advanced State Machine")]
+    [CreateAssetMenu(fileName = "NewAdvancedStateMachine", menuName = "【ES】/内容制作/状态机/高级动画状态机")]
     public class AdvancedStateMachineData : ScriptableObject
     {
         [TitleGroup("多层级配置")]

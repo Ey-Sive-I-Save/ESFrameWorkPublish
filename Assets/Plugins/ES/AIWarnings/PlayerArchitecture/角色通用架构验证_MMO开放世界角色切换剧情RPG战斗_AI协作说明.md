@@ -220,6 +220,72 @@ RuntimeGenerated
 - 哪些节点由代码运行时生成。
 - 哪些引用必须进入 `EntityTransformMapping` 或 `CharacterActor` 序列化字段。
 
+## P0 冻结：基础角色模板与派生边界
+
+项目统一采用“双模板”构建契约：
+
+```text
+ES基础角色模板.prefab
+    第一次构建前的可编辑源模板
+    保留 EditorOnly 调试区、全局占位模型和完整结构
+
+ES通用角色完整架构.prefab
+    从基础模板生成的运行时通用产物
+    只解包最外层角色模板，保留模型 Prefab/FBX 依赖复用
+    自动删除 Editor/Debug 节点
+```
+
+编辑器生成与验证入口：
+
+```text
+ES/角色模板/创建或重建首次构建基础模板
+ES/角色模板/从基础模板生成完整通用角色
+ES/角色模板/创建并验证全部角色模板
+ES/角色模板/验证全部角色模板
+```
+
+两套模板都只表达玩家、NPC、Monster 共用的“生命体身体底座”，固定包含：
+
+```text
+根节点：Entity + KinematicCharacterMotor + CapsuleCollider + EntityTransformMapping
+Animator：Controller 必须为空，由 Entity StateMachine/Playable 驱动
+占位模型与 Avatar：读取全局 StateMachineConfig.previewModel / previewAvatar
+EntityStateDomain + 默认状态包/状态机配置
+EntityBasicMoveRotateModule
+EntityAIInputDispatchModule
+StateFinalIKDriver + Humanoid 骨骼绑定
+IKTargets + MatchTargets + 稳定挂点
+检测碰撞、装备、特效音频、相机参考和 RuntimeGenerated 容器
+```
+
+基础模板禁止直接包含：
+
+- `EntityPlayerInputWriteModule`，因为本地玩家输入不是所有生命体的共性。
+- 相机控制、武器逻辑、战斗和技能；允许并要求保留对应的稳定引用容器。
+- 飞行、游泳、攀爬、骑乘和 RootMotion 等可选运动能力。
+- 只服务某个具体角色或玩法的模块。
+- 根节点 `Rigidbody`。复杂环境影响通过 KCC 能力扩展；布娃娃 Rigidbody 只能存在于子骨骼体系，并与 KCC 运行状态互斥。
+
+标准派生关系：
+
+```text
+ES基础角色模板
+├─ 玩家 Variant：增加 PlayerInput、Camera、Interaction 和所需高级运动能力
+├─ NPC Variant：增加 NPC 控制源、交互/剧情领域能力
+└─ Monster Variant：增加 Monster AI、感知、战斗领域能力
+```
+
+硬规则：
+
+- 新角色优先制作 Prefab Variant；不得复制“大黑塔”作为通用角色起点。
+- 玩家/NPC/Monster 可以共享相同业务枚举值，但各自领域配置和控制来源必须独立。
+- 派生模板可以增加能力，不能绕过 `Entity → Domain → Module → KCC/StateMachine` 权威链路。
+- KCC Motor 始终是根位姿最终执行权威；派生能力不得在普通 `Update` 直接写角色根 Transform。
+- Player/AI/Network/Cutscene 只在 `EntityAIDomain` 侧预留控制来源，最终统一写入 InputState/Intent，再由唯一 Dispatch 消费。
+- 基础模板调整后必须重新生成完整模板并运行双模板验证，确保基础移动和统一调度各一个、玩家输入为零、高级运动模块为零、Animator Controller 为空、IK/MatchTarget、状态引用与 Mapping 完整。
+- 完整模板不负责 AssetBundle 标记、AssetTable 或 AssetLibrary 注册；这些仍属于独立资源构建阶段。
+- 不得另造与 `Entity` 并列的 Character/Motion 大根来解决模板派生问题。
+
 ## 当前最大阻塞点
 
 - `EntityBasicModules.cs` 过大，混合移动、战斗、武器、相机、技能测试等职责。
@@ -253,4 +319,3 @@ RuntimeGenerated
 - 网络模拟：远端角色不能被本地输入直接控制，只接收 NetworkIntent/MotionSnapshot。
 
 如果某个设计只能跑单机主角，不能跑这些流程，就不是本次“玩家对象模型重构”的合格架构。
-

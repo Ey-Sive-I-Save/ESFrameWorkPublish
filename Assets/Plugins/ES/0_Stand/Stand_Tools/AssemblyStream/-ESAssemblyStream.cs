@@ -44,6 +44,9 @@ namespace ES
             "NewAssem"
         };
 
+        private static readonly HashSet<string> EditorValidAssemblyNameSet =
+            new(EditorValidAssemblyNames, StringComparer.Ordinal);
+
         private static readonly BindingFlags MemberFlags =
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
 
@@ -213,7 +216,23 @@ namespace ES
                 }
 
                 ValidAssemblies.Sort((a, b) => GetAssemblyOrder(a).CompareTo(GetAssemblyOrder(b)));
-                Registers.Sort((a, b) => a.Order.CompareTo(b.Order));
+                Registers.Sort((left, right) =>
+                {
+                    int compare = left.Order.CompareTo(right.Order);
+                    if (compare != 0)
+                    {
+                        return compare;
+                    }
+
+                    compare = GetAssemblyOrder(left.GetType().Assembly)
+                        .CompareTo(GetAssemblyOrder(right.GetType().Assembly));
+                    if (compare != 0)
+                    {
+                        return compare;
+                    }
+
+                    return string.CompareOrdinal(left.GetType().FullName, right.GetType().FullName);
+                });
             }
 
             private static void BuildHandlers(StringBuilder performanceReport)
@@ -362,7 +381,9 @@ namespace ES
 
                         if (hasProperty)
                         {
-                            PropertyInfo[] properties = type.GetProperties(MemberFlags);
+                            // 与 TypeCache 的候选范围和字段/方法的反射回退保持一致：
+                            // 只处理声明在当前类型上的属性，不能在每个派生类上重复处理基类属性。
+                            PropertyInfo[] properties = type.GetProperties(DeclaredMemberFlags);
                             for (int p = 0; p < properties.Length; p++)
                             {
                                 PropertyInfo property = properties[p];
@@ -549,10 +570,9 @@ namespace ES
 
                 for (int i = 0; i < handlers.Count; i++)
                 {
-                    if (handlers[i](member))
-                    {
-                        break;
-                    }
+                    // 同一成员可同时标记多种特性，也允许多个注册器处理同一种特性。
+                    // 类型注册不会在首个命中后短路，成员注册必须保持相同语义。
+                    handlers[i](member);
                 }
             }
 
@@ -799,8 +819,7 @@ namespace ES
 
             private static bool IsValidAssembly(Assembly assembly)
             {
-                string name = assembly.GetName().Name;
-                return Array.IndexOf(EditorValidAssemblyNames, name) >= 0;
+                return assembly != null && EditorValidAssemblyNameSet.Contains(assembly.GetName().Name);
             }
 
             private static int GetAssemblyOrder(Assembly assembly)

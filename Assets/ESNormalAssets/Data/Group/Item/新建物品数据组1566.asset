@@ -56,131 +56,54 @@ MonoBehaviour:
     loop: 1
     backAndForth: 1
     useGravity: 1
-  shotShared:
-    enabled: 1
-    aimMode: 0
-    blockMode: 2
-    launchDelay: 0
-    warmupTime: 0
-    speed: 30
-    acceleration: 120
-    maxSpeed: 30
-    trackingStartTime: 0
-    trackingDuration: -1
-    turnSpeed: 720
-    lifeTime: 5
-    radius: 0.05
-    hitLayers:
-      serializedVersion: 2
-      m_Bits: 887
-    useGravity: 0
-    orientToVelocity: 1
-    allowMustHit: 1
-  shotKey:
-    enumKey: 0
-    stringKey: 
-    definitionGuid: 
-    definitionLocalFileId: 0
-    definitionTypeName: 
-  shotVariable:
-    logicSeed: 0
-    speedMultiplier: 1
-    lifeTimeMultiplier: 1
-    radiusMultiplier: 1
-    forceMustHit: 0
-    overrideLaunchDelay: 0
-    launchDelay: 0
-    overrideTrackingStartTime: 0
-    trackingStartTime: 0
-    targetOffset: {x: 0, y: 0, z: 0}
-    spreadAngle: 0
-  doorShared:
-    defaultOpen: 0
-    canLock: 0
-    blocksWhenClosed: 1
-    interactDistance: 2
-    moveDuration: 0.3
-    logicTag: 
-  doorVariable:
-    isOpen: 0
-    isLocked: 0
-    disabledTime: 0
-  trapShared:
-    enabled: 1
-    oneShot: 0
-    radius: 1.5
-    checkInterval: 0.1
-    cooldown: 0.5
-    targetLayers:
-      serializedVersion: 2
-      m_Bits: 4294967295
-  trapVariable:
-    active: 1
-    cooldownLeft: 0
-    triggerCount: 0
-    logicSeed: 0
-  weaponShared:
-    weaponKind: 0
-    defaultShotKey: 
-    hitRadius: 0.2
-    cooldown: 0.2
-    socketName: 
-  weaponKey:
-    enumKey: 0
-    stringKey: 
-    definitionGuid: 
-    definitionLocalFileId: 0
-    definitionTypeName: 
-  weaponVariable:
-    durability: 1
-    cooldownLeft: 0
-    ammo: 0
-    logicSeed: 0
-  weaponConfig:
-    enabled: 0
-    weaponKind: 2
-    equipSlot: 
-    baseDamage: 10
-    attackInterval: 0.3
-    shotItem: {fileID: 0}
-    onUse:
-      rid: -2
-  pickupShared:
-    radius: 1.2
-    autoPickup: 0
-    lifeTime: 0
-    maxStack: 1
-  pickupVariable:
-    count: 1
-    lifeLeft: 0
-    reserved: 0
-  zoneShared:
-    enabled: 1
-    radius: 3
-    checkInterval: 0.2
-    duration: 0
-    targetLayers:
-      serializedVersion: 2
-      m_Bits: 4294967295
-  zoneVariable:
-    active: 1
-    durationLeft: 0
-    logicSeed: 0
-  propShared:
-    canInteract: 0
-    breakable: 0
-    blocks: 1
-    maxDurability: 1
-    logicTag: 
-  propVariable:
-    durability: 1
-    state: 0
-    disabledTime: 0
+  kindData:
+    rid: 23629145767936000
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
+    - rid: 23629145767936000
+      type: {class: ItemShotDataBlock, ns: ES, asm: ES_Logic}
+      data:
+        sharedData:
+          enabled: 1
+          aimMode: 0
+          blockMode: 2
+          launchDelay: 0
+          warmupTime: 0
+          speed: 30
+          acceleration: 120
+          maxSpeed: 30
+          trackingStartTime: 0
+          trackingDuration: -1
+          turnSpeed: 720
+          lifeTime: 5
+          radius: 0.05
+          hitLayers:
+            serializedVersion: 2
+            m_Bits: 887
+          useGravity: 0
+          orientToVelocity: 1
+          allowMustHit: 1
+        key:
+          enumKey: 0
+          stringKey:
+          definitionGuid:
+          definitionLocalFileId: 0
+          definitionTypeName:
+        initialState:
+          logicSeed: 0
+          speedMultiplier: 1
+          lifeTimeMultiplier: 1
+          radiusMultiplier: 1
+          forceMustHit: 0
+          overrideLaunchDelay: 0
+          launchDelay: 0
+          overrideTrackingStartTime: 0
+          trackingStartTime: 0
+          targetOffset: {x: 0, y: 0, z: 0}
+          spreadAngle: 0
 --- !u!114 &-882475586591429200
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -237,132 +160,55 @@ MonoBehaviour:
     loop: 1
     backAndForth: 1
     useGravity: 1
-  shotShared:
-    enabled: 1
-    aimMode: 0
-    blockMode: 2
-    launchDelay: 0
-    warmupTime: 0
-    speed: 30
-    acceleration: 120
-    maxSpeed: 30
-    trackingStartTime: 0
-    trackingDuration: -1
-    turnSpeed: 720
-    lifeTime: 5
-    radius: 0.05
-    hitLayers:
-      serializedVersion: 2
-      m_Bits: 887
-    useGravity: 0
-    orientToVelocity: 1
-    allowMustHit: 1
-  shotKey:
-    enumKey: 0
-    stringKey: "\u6570\u636E\u952E2"
-    definitionGuid: 49e26b8b9b34e454f86e2845bc836204
-    definitionLocalFileId: -882475586591429200
-    definitionTypeName: ES.ItemDataInfo, ES_Logic, Version=0.0.0.0, Culture=neutral,
-      PublicKeyToken=null
-  shotVariable:
-    logicSeed: 0
-    speedMultiplier: 1
-    lifeTimeMultiplier: 1
-    radiusMultiplier: 1
-    forceMustHit: 0
-    overrideLaunchDelay: 0
-    launchDelay: 0
-    overrideTrackingStartTime: 0
-    trackingStartTime: 0
-    targetOffset: {x: 0, y: 0, z: 0}
-    spreadAngle: 0
-  doorShared:
-    defaultOpen: 0
-    canLock: 0
-    blocksWhenClosed: 1
-    interactDistance: 2
-    moveDuration: 0.3
-    logicTag: 
-  doorVariable:
-    isOpen: 0
-    isLocked: 0
-    disabledTime: 0
-  trapShared:
-    enabled: 1
-    oneShot: 0
-    radius: 1.5
-    checkInterval: 0.1
-    cooldown: 0.5
-    targetLayers:
-      serializedVersion: 2
-      m_Bits: 4294967295
-  trapVariable:
-    active: 1
-    cooldownLeft: 0
-    triggerCount: 0
-    logicSeed: 0
-  weaponShared:
-    weaponKind: 0
-    defaultShotKey: 
-    hitRadius: 0.2
-    cooldown: 0.2
-    socketName: 
-  weaponKey:
-    enumKey: 0
-    stringKey: 
-    definitionGuid: 
-    definitionLocalFileId: 0
-    definitionTypeName: 
-  weaponVariable:
-    durability: 1
-    cooldownLeft: 0
-    ammo: 0
-    logicSeed: 0
-  weaponConfig:
-    enabled: 0
-    weaponKind: 2
-    equipSlot: 
-    baseDamage: 10
-    attackInterval: 0.3
-    shotItem: {fileID: 0}
-    onUse:
-      rid: -2
-  pickupShared:
-    radius: 1.2
-    autoPickup: 0
-    lifeTime: 0
-    maxStack: 1
-  pickupVariable:
-    count: 1
-    lifeLeft: 0
-    reserved: 0
-  zoneShared:
-    enabled: 1
-    radius: 3
-    checkInterval: 0.2
-    duration: 0
-    targetLayers:
-      serializedVersion: 2
-      m_Bits: 4294967295
-  zoneVariable:
-    active: 1
-    durationLeft: 0
-    logicSeed: 0
-  propShared:
-    canInteract: 0
-    breakable: 0
-    blocks: 1
-    maxDurability: 1
-    logicTag: 
-  propVariable:
-    durability: 1
-    state: 0
-    disabledTime: 0
+  kindData:
+    rid: 23629145767936001
   references:
     version: 2
     RefIds:
     - rid: -2
       type: {class: , ns: , asm: }
+    - rid: 23629145767936001
+      type: {class: ItemShotDataBlock, ns: ES, asm: ES_Logic}
+      data:
+        sharedData:
+          enabled: 1
+          aimMode: 0
+          blockMode: 2
+          launchDelay: 0
+          warmupTime: 0
+          speed: 30
+          acceleration: 120
+          maxSpeed: 30
+          trackingStartTime: 0
+          trackingDuration: -1
+          turnSpeed: 720
+          lifeTime: 5
+          radius: 0.05
+          hitLayers:
+            serializedVersion: 2
+            m_Bits: 887
+          useGravity: 0
+          orientToVelocity: 1
+          allowMustHit: 1
+        key:
+          enumKey: 0
+          stringKey: "\u6570\u636E\u952E2"
+          definitionGuid: 49e26b8b9b34e454f86e2845bc836204
+          definitionLocalFileId: -882475586591429200
+          definitionTypeName: ES.ItemDataInfo, ES_Logic, Version=0.0.0.0, Culture=neutral,
+            PublicKeyToken=null
+        initialState:
+          logicSeed: 0
+          speedMultiplier: 1
+          lifeTimeMultiplier: 1
+          radiusMultiplier: 1
+          forceMustHit: 0
+          overrideLaunchDelay: 0
+          launchDelay: 0
+          overrideTrackingStartTime: 0
+          trackingStartTime: 0
+          targetOffset: {x: 0, y: 0, z: 0}
+          spreadAngle: 0
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0

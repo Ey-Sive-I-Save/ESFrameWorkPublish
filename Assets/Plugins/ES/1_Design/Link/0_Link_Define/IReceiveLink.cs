@@ -52,4 +52,24 @@ namespace ES
         /// </summary>
         void OnLink();
     }
+
+    /// <summary>
+    /// ActiveLinkList 的标准接收协议。
+    ///
+    /// 一个接收者被某个 ActiveLinkList 实际激活或禁用时，分别只会收到一次对应回调。
+    /// 接收者不保存“全局是否激活”的状态：同一对象可同时被多个 ActiveLinkList 持有，
+    /// 某个列表中的状态应通过该 ActiveLinkList 的 IsActive 方法查询。
+    /// </summary>
+    public interface IReceiveActiveLink : IReceiveLink
+    {
+        /// <summary>
+        /// 当前 ActiveLinkList 首次激活此接收者后调用。
+        /// </summary>
+        void OnLinkEnable();
+
+        /// <summary>
+        /// 当前 ActiveLinkList 实际禁用此接收者后调用。
+        /// </summary>
+        void OnLinkDisable();
+    }
 }

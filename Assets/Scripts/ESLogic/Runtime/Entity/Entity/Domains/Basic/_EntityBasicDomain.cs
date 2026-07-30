@@ -81,6 +81,101 @@ namespace ES
             MyModules.ApplyBuffers(true);
         }
 
+#if UNITY_EDITOR
+        [Button("确保完整运动原型模块存在"), PropertyOrder(-7)]
+        public void EnsureMotionPrototypeModulesExist()
+        {
+            EnsurePrototypeModule<EntityBasicMoveRotateModule>();
+            EnsurePrototypeModule<EntityBasicFlyModule>();
+            EnsurePrototypeModule<EntityBasicSwimModule>();
+            EnsurePrototypeModule<EntityBasicClimbModule>();
+            EnsurePrototypeModule<EntityBasicMountModule>();
+            EnsurePrototypeModule<EntityBasicRootMotionModule>();
+            MyModules.ApplyBuffers(true);
+        }
+
+        [Button("检查完整运动原型"), PropertyOrder(-6)]
+        public void ValidateMotionPrototype()
+        {
+            int moveCount = 0;
+            int flyCount = 0;
+            int swimCount = 0;
+            int climbCount = 0;
+            int mountCount = 0;
+            int rootMotionCount = 0;
+            int expectedBeforeCount = 0;
+            int expectedRotationCount = 0;
+            int expectedVelocityCount = 0;
+
+            int count = MyModules != null && MyModules.ValuesNow != null ? MyModules.ValuesNow.Count : 0;
+            for (int i = 0; i < count; i++)
+            {
+                EntityBasicModuleBase module = MyModules.ValuesNow[i];
+                if (module is EntityBasicMoveRotateModule) moveCount++;
+                else if (module is EntityBasicFlyModule) flyCount++;
+                else if (module is EntityBasicSwimModule) swimCount++;
+                else if (module is EntityBasicClimbModule) climbCount++;
+                else if (module is EntityBasicMountModule) mountCount++;
+                else if (module is EntityBasicRootMotionModule) rootMotionCount++;
+
+                if (module is IEntityKCCBeforeMotion) expectedBeforeCount++;
+                if (module is IEntityKCCRotationMotion) expectedRotationCount++;
+                if (module is IEntityKCCVelocityMotion) expectedVelocityCount++;
+            }
+
+            bool moduleCountsValid = moveCount == 1
+                && flyCount == 1
+                && swimCount == 1
+                && climbCount == 1
+                && mountCount == 1
+                && rootMotionCount == 1;
+            bool referencesValid = MyCore != null
+                && MyCore.animator != null
+                && MyCore.kcc != null
+                && MyCore.kcc.motor != null
+                && MyCore.stateDomain != null
+                && MyCore.stateDomain.stateMachine != null;
+
+            if (!moduleCountsValid || !referencesValid)
+            {
+                Debug.LogError(
+                    $"[Entity运动原型检查] 未通过 | 引用完整={referencesValid} | " +
+                    $"Move={moveCount}, Fly={flyCount}, Swim={swimCount}, Climb={climbCount}, Mount={mountCount}, RootMotion={rootMotionCount}");
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                bool schedulerValid = MyCore.kcc.RegisteredBeforeMotionCount == expectedBeforeCount
+                    && MyCore.kcc.RegisteredRotationMotionCount == expectedRotationCount
+                    && MyCore.kcc.RegisteredVelocityMotionCount == expectedVelocityCount;
+                if (!schedulerValid)
+                {
+                    Debug.LogError(
+                        $"[Entity运动原型检查] 调度器数量异常 | " +
+                        $"Before={MyCore.kcc.RegisteredBeforeMotionCount}/{expectedBeforeCount}, " +
+                        $"Rotation={MyCore.kcc.RegisteredRotationMotionCount}/{expectedRotationCount}, " +
+                        $"Velocity={MyCore.kcc.RegisteredVelocityMotionCount}/{expectedVelocityCount}");
+                    return;
+                }
+            }
+
+            Debug.Log("[Entity运动原型检查] 通过：核心引用、六类运动模块及运行时调度器结构有效。", MyCore);
+        }
+
+        private void EnsurePrototypeModule<T>() where T : EntityBasicModuleBase, new()
+        {
+            int count = MyModules != null && MyModules.ValuesNow != null ? MyModules.ValuesNow.Count : 0;
+            for (int i = 0; i < count; i++)
+            {
+                if (MyModules.ValuesNow[i] is T)
+                    return;
+            }
+
+            MyModules.Add(new T());
+        }
+#endif
+
         private EntityBasicFootPlacementModule FindFootPlacementModule()
         {
             if (MyModules == null || MyModules.ValuesNow == null) return null;

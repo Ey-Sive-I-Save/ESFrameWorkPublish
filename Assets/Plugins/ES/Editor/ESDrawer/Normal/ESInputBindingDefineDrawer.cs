@@ -142,7 +142,7 @@ namespace ES.EditorInternal
 
                 if (GUI.Button(selectRect, "选择", EditorStyles.miniButton))
                 {
-                    ShowControlMenu(serializedObject, value.propertyPath, schemeId != null ? schemeId.stringValue : null, bindingPropertyPath);
+                    ShowControlMenu(selectRect, serializedObject, value.propertyPath, schemeId != null ? schemeId.stringValue : null, bindingPropertyPath);
                 }
 
                 if (GUI.Button(importRect, "导入", EditorStyles.miniButton))
@@ -258,33 +258,31 @@ namespace ES.EditorInternal
             return "普通绑定：一个动作直接对应一个键、鼠标键、手柄键或轴。";
         }
 
-        private static void ShowControlMenu(SerializedObject serializedObject, string propertyPath, string schemeId, string bindingPropertyPath)
+        private static void ShowControlMenu(Rect anchorRect, SerializedObject serializedObject, string propertyPath, string schemeId, string bindingPropertyPath)
         {
-            GenericMenu menu = new GenericMenu();
+            var entries = new List<ESSearchDropdown.Entry>();
             bool any = false;
             bool hasValueTypeFilter = TryGetExpectedValueType(serializedObject, bindingPropertyPath, out ESInputValueType expectedValueType);
 
             if (string.IsNullOrEmpty(schemeId) || schemeId == ESInputSchemeIds.KeyboardMouse)
             {
-                any |= AddControlOptions(menu, "键盘", ESInputControlCatalog.KeyboardOptions, serializedObject, propertyPath, hasValueTypeFilter, expectedValueType);
-                any |= AddControlOptions(menu, "鼠标", ESInputControlCatalog.MouseOptions, serializedObject, propertyPath, hasValueTypeFilter, expectedValueType);
+                any |= AddControlOptions(entries, "键盘", ESInputControlCatalog.KeyboardOptions, serializedObject, propertyPath, hasValueTypeFilter, expectedValueType);
+                any |= AddControlOptions(entries, "鼠标", ESInputControlCatalog.MouseOptions, serializedObject, propertyPath, hasValueTypeFilter, expectedValueType);
             }
 
             if (string.IsNullOrEmpty(schemeId) || schemeId == ESInputSchemeIds.Gamepad)
             {
-                any |= AddControlOptions(menu, "手柄", ESInputControlCatalog.GamepadOptions, serializedObject, propertyPath, hasValueTypeFilter, expectedValueType);
+                any |= AddControlOptions(entries, "手柄", ESInputControlCatalog.GamepadOptions, serializedObject, propertyPath, hasValueTypeFilter, expectedValueType);
             }
 
             if (!any)
-            {
-                menu.AddDisabledItem(new GUIContent("没有可选控件"));
-            }
+                entries.Add(ESSearchDropdown.Entry.Disabled("没有符合当前值类型的可选控件"));
 
-            menu.ShowAsContext();
+            ESSearchDropdown.Open(anchorRect, "选择输入控件", entries);
         }
 
         private static bool AddControlOptions(
-            GenericMenu menu,
+            List<ESSearchDropdown.Entry> entries,
             string group,
             IReadOnlyList<ESInputControlOption> options,
             SerializedObject serializedObject,
@@ -298,26 +296,24 @@ namespace ES.EditorInternal
             }
 
             bool added = false;
-            ESInputValueType currentType = (ESInputValueType)(-1);
+            serializedObject.Update();
+            string currentPath = serializedObject.FindProperty(propertyPath)?.stringValue ?? string.Empty;
             for (int i = 0; i < options.Count; i++)
             {
                 ESInputControlOption option = options[i];
                 if (hasValueTypeFilter && option.valueType != expectedValueType)
                     continue;
 
-                if (option.valueType != currentType)
-                {
-                    currentType = option.valueType;
-                    if (added)
-                    {
-                        menu.AddSeparator(group + "/");
-                    }
-                }
-
                 string typeName = GetValueTypeMenuName(option.valueType);
-                string label = group + "/" + typeName + "/" + option.displayName + "  " + option.path;
                 string selectedPath = option.path;
-                menu.AddItem(new GUIContent(label), false, () => SetStringProperty(serializedObject, propertyPath, selectedPath));
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    option.displayName,
+                    () => SetStringProperty(serializedObject, propertyPath, selectedPath),
+                    group + "/" + typeName,
+                    subtitle: option.path,
+                    tooltip: option.layoutName + "/" + option.controlName,
+                    badge: typeName,
+                    selected: string.Equals(currentPath, option.path, StringComparison.OrdinalIgnoreCase)));
                 added = true;
             }
 

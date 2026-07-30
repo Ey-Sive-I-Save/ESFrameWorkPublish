@@ -9,7 +9,7 @@ namespace ES.Obsolete.VMCP
     /// <summary>
     /// 增强的场景记忆组件 - 基于ESVMCPMemoryItem的运行时记忆
     /// </summary>
-    [AddComponentMenu("ES/VMCP/增强记忆组件")]
+    [AddComponentMenu("【ES】/已废弃/VMCP/增强记忆组件")]
     public class ESVMCPMemoryEnhanced : MonoBehaviour
     {
         [Title("增强记忆系统")]

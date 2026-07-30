@@ -7,8 +7,13 @@ namespace ES
 {
     public sealed class ESFontToolsWindow : ESMenuTreeWindowAB<ESFontToolsWindow>
     {
+        [MenuItem(MenuItemPathDefine.CONTENT_CREATION_PATH + "UI 与字体/字体资产工作台", false, 20)]
         [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "字体资产工作台", false, -945)]
-        public static void TryOpenWindow() => OpenWindow();
+        public static void TryOpenWindow()
+        {
+            ESWindowCommandRegistry.RecordOpened("font_workbench");
+            OpenWindow();
+        }
 
         [System.NonSerialized] private Page_FontBuild fontBuildPage;
 

@@ -1,0 +1,25 @@
+{
+    "name": "ES_Stand.ValueChange.Tests",
+    "rootNamespace": "ES.Tests",
+    "references": [
+        "ES_Stand",
+        "ES_Logic",
+        "ES_Design"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [
+        "Sirenix.Serialization.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

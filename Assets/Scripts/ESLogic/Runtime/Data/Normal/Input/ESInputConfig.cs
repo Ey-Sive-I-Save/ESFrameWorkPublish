@@ -4,6 +4,39 @@ using Sirenix.OdinInspector;
 
 namespace ES
 {
+    /// <summary>
+    /// Persistable identity of an input layout. It contains only stable configuration identity and
+    /// deterministic catalog hashes; RuntimeKeys are intentionally absent.
+    /// </summary>
+    public struct ESInputConfigSchemaHandshake
+    {
+        public string configId;
+        public string schemeSchemaHash;
+        public string actionSchemaHash;
+
+        public bool IsCompatibleWith(ESInputConfigSchemaHandshake peer, out string error)
+        {
+            if (!string.Equals(configId, peer.configId, System.StringComparison.Ordinal))
+            {
+                error = "Input config identity differs. Local=" + configId + ", peer=" + peer.configId + ".";
+                return false;
+            }
+            if (!string.Equals(schemeSchemaHash, peer.schemeSchemaHash, System.StringComparison.Ordinal))
+            {
+                error = "Input scheme schema differs for config " + configId + ".";
+                return false;
+            }
+            if (!string.Equals(actionSchemaHash, peer.actionSchemaHash, System.StringComparison.Ordinal))
+            {
+                error = "Input action schema differs for config " + configId + ".";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+    }
+
     public sealed class ESInputConfig : ESSO, IESInputRuntimeConfigSource
     {
         [Title("基础信息")]
@@ -104,6 +137,7 @@ namespace ES
             schemes.Clear();
             schemes.Add(new ESInputSchemeDefine
             {
+                enumKey = ESInputSchemeEnumKey.KeyboardMouse,
                 schemeId = ESInputSchemeIds.KeyboardMouse,
                 displayName = "键盘鼠标",
                 deviceKind = ESInputDeviceKind.KeyboardMouse,
@@ -111,6 +145,7 @@ namespace ES
             });
             schemes.Add(new ESInputSchemeDefine
             {
+                enumKey = ESInputSchemeEnumKey.Gamepad,
                 schemeId = ESInputSchemeIds.Gamepad,
                 displayName = "手柄",
                 deviceKind = ESInputDeviceKind.Gamepad,
@@ -118,6 +153,7 @@ namespace ES
             });
             schemes.Add(new ESInputSchemeDefine
             {
+                enumKey = ESInputSchemeEnumKey.Touch,
                 schemeId = ESInputSchemeIds.Touch,
                 displayName = "触摸/UI",
                 deviceKind = ESInputDeviceKind.Touch,
@@ -130,14 +166,123 @@ namespace ES
 
         public ESInputRuntimeBuildResult BuildRuntime(params ESInputBindingProfile[] profileLayers)
         {
-            EnsureBindingIds();
-            return ESInputUtility.BuildRuntime(this, defaultSchemeId, profileLayers);
+            return BuildRuntimeInternal(profileLayers);
         }
 
         public ESInputRuntimeBuildResult BuildRuntime(IList<ESInputBindingProfile> profileLayers)
         {
+            return BuildRuntimeInternal(profileLayers);
+        }
+
+        /// <summary>
+        /// Input profiles persist bindingId and action identity, never a RuntimeKey. The returned
+        /// handshake must be compared before a peer accepts catalog-indexed input metadata.
+        /// </summary>
+        public bool TryBuildActionCatalog(out ESInputActionCatalog catalog, out string error)
+        {
             EnsureBindingIds();
-            return ESInputUtility.BuildRuntime(this, defaultSchemeId, profileLayers);
+            if (!TryBuildSchemeCatalog(out ESInputSchemeCatalog schemeCatalog, out error))
+            {
+                catalog = null;
+                return false;
+            }
+
+            return ESInputActionCatalog.TryCreate(actions, schemeCatalog, out catalog, out error);
+        }
+
+        public bool TryBuildSchemeCatalog(out ESInputSchemeCatalog catalog, out string error)
+        {
+            EnsureSchemeEnumAliases();
+            return ESInputSchemeCatalog.TryCreate(schemes, out catalog, out error);
+        }
+
+        public ESKeyCatalogHandshake CreateActionSchemaHandshake()
+        {
+            if (!TryBuildActionCatalog(out ESInputActionCatalog catalog, out string error))
+                throw new System.InvalidOperationException("Input action catalog is invalid: " + error);
+
+            return catalog.CreateHandshake();
+        }
+
+        public ESInputConfigSchemaHandshake CreateSchemaHandshake()
+        {
+            if (!TryCreateSchemaHandshake(out ESInputConfigSchemaHandshake handshake, out string error))
+                throw new System.InvalidOperationException("Input configuration schema is invalid: " + error);
+
+            return handshake;
+        }
+
+        public bool TryCreateSchemaHandshake(out ESInputConfigSchemaHandshake handshake, out string error)
+        {
+            handshake = default;
+            if (string.IsNullOrWhiteSpace(configId))
+            {
+                error = "Input configuration has no stable StringKey configId.";
+                return false;
+            }
+
+            EnsureBindingIds();
+            if (!TryBuildSchemeCatalog(out ESInputSchemeCatalog schemeCatalog, out error))
+                return false;
+            if (!ESInputActionCatalog.TryCreate(actions, schemeCatalog, out ESInputActionCatalog actionCatalog, out error))
+                return false;
+
+            handshake = new ESInputConfigSchemaHandshake
+            {
+                configId = configId,
+                schemeSchemaHash = schemeCatalog.SchemaHash,
+                actionSchemaHash = actionCatalog.SchemaHash
+            };
+            return true;
+        }
+
+        /// <summary>
+        /// Checks a persisted binding profile before it is applied. Older unbound profiles are
+        /// migrated only when every enabled override still resolves to the exact action/binding/
+        /// scheme in this config; all other mismatches are rejected instead of being guessed.
+        /// </summary>
+        public bool TryPrepareBindingProfile(ESInputBindingProfile profile, out string error)
+        {
+            if (profile == null)
+            {
+                error = "Input binding profile is null.";
+                return false;
+            }
+            if (!TryCreateSchemaHandshake(out ESInputConfigSchemaHandshake handshake, out error))
+                return false;
+            if (!TryBuildSchemeCatalog(out ESInputSchemeCatalog schemeCatalog, out error)
+                || !ESInputActionCatalog.TryCreate(actions, schemeCatalog, out _, out error))
+                return false;
+
+            profile.Normalize();
+            if (profile.HasAnySourceSchemaBinding
+                && !profile.IsBoundToInputSchema(
+                    handshake.configId,
+                    handshake.schemeSchemaHash,
+                    handshake.actionSchemaHash))
+            {
+                error = "Input binding profile belongs to a different config or schema. Profile="
+                        + profile.sourceConfigId + ", current=" + handshake.configId + ".";
+                return false;
+            }
+            if (!TryValidateProfileReferences(profile, schemeCatalog, out error))
+                return false;
+
+            profile.BindToInputSchema(
+                handshake.configId,
+                handshake.schemeSchemaHash,
+                handshake.actionSchemaHash);
+            return true;
+        }
+
+        public ESInputBindingProfile CreateDefaultBoundProfile()
+        {
+            ESInputBindingProfile profile = ESInputUtility.CreateDefaultProfile();
+            profile.activeSchemeId = defaultSchemeId;
+            if (!TryPrepareBindingProfile(profile, out string error))
+                throw new System.InvalidOperationException("Input configuration cannot create a default profile: " + error);
+
+            return profile;
         }
 
         [Button("补齐绑定 ID")]
@@ -173,10 +318,123 @@ namespace ES
             }
         }
 
+        [Button("补齐内置方案枚举别名")]
+        public void EnsureSchemeEnumAliases()
+        {
+            if (schemes == null)
+                return;
+
+            for (int i = 0; i < schemes.Count; i++)
+            {
+                ESInputSchemeDefine scheme = schemes[i];
+                if (scheme == null || scheme.enumKey != ESInputSchemeEnumKey.None)
+                    continue;
+
+                if (ESInputSchemeIds.TryGetBuiltInEnumKey(scheme.schemeId, out ESInputSchemeEnumKey builtIn))
+                    scheme.enumKey = builtIn;
+            }
+        }
+
+        private ESInputRuntimeBuildResult BuildRuntimeInternal(IList<ESInputBindingProfile> profileLayers)
+        {
+            EnsureBindingIds();
+            EnsureSchemeEnumAliases();
+            ValidateActionCatalogOrThrow();
+
+            if (profileLayers != null)
+            {
+                for (int i = 0; i < profileLayers.Count; i++)
+                {
+                    ESInputBindingProfile profile = profileLayers[i];
+                    if (profile != null && !TryPrepareBindingProfile(profile, out string error))
+                        throw new System.InvalidOperationException("Input binding profile[" + i + "] is incompatible: " + error);
+                }
+            }
+
+            ESInputBindingProfile effectiveProfile = ESInputUtility.BakeProfiles(profileLayers);
+            if (!TryPrepareBindingProfile(effectiveProfile, out string effectiveError))
+                throw new System.InvalidOperationException("Effective input binding profile is incompatible: " + effectiveError);
+
+            return ESInputRuntimeBuilder.Build(this, effectiveProfile, defaultSchemeId);
+        }
+
+        private bool TryValidateProfileReferences(
+            ESInputBindingProfile profile,
+            ESInputSchemeCatalog schemeCatalog,
+            out string error)
+        {
+            if (!schemeCatalog.TryGetRuntimeKey(profile.activeSchemeId, out _))
+            {
+                error = "Input profile references undeclared active scheme StringKey: "
+                        + (profile.activeSchemeId ?? string.Empty) + ".";
+                return false;
+            }
+
+            Dictionary<string, ESInputBindingDefine> bindingsById = new Dictionary<string, ESInputBindingDefine>(System.StringComparer.Ordinal);
+            Dictionary<string, ESInputActionId> actionsByBindingId = new Dictionary<string, ESInputActionId>(System.StringComparer.Ordinal);
+            if (actions != null)
+            {
+                for (int i = 0; i < actions.Count; i++)
+                {
+                    ESInputActionDefine action = actions[i];
+                    if (action == null || action.bindings == null)
+                        continue;
+
+                    for (int b = 0; b < action.bindings.Count; b++)
+                    {
+                        ESInputBindingDefine binding = action.bindings[b];
+                        if (binding == null || string.IsNullOrEmpty(binding.bindingId))
+                            continue;
+
+                        bindingsById.Add(binding.bindingId, binding);
+                        actionsByBindingId.Add(binding.bindingId, action.id);
+                    }
+                }
+            }
+
+            if (profile.overrides != null)
+            {
+                for (int i = 0; i < profile.overrides.Count; i++)
+                {
+                    ESInputBindingOverride item = profile.overrides[i];
+                    if (item == null || !item.enabled)
+                        continue;
+                    if (string.IsNullOrWhiteSpace(item.bindingId)
+                        || !bindingsById.TryGetValue(item.bindingId, out ESInputBindingDefine binding)
+                        || !actionsByBindingId.TryGetValue(item.bindingId, out ESInputActionId actionId))
+                    {
+                        error = "Input profile override[" + i + "] references an unknown bindingId: "
+                                + (item.bindingId ?? string.Empty) + ".";
+                        return false;
+                    }
+                    if (item.actionId != actionId)
+                    {
+                        error = "Input profile override " + item.bindingId + " action identity does not match the current config.";
+                        return false;
+                    }
+                    if (!string.Equals(item.schemeId, binding.schemeId, System.StringComparison.Ordinal))
+                    {
+                        error = "Input profile override " + item.bindingId + " scheme identity does not match the current config.";
+                        return false;
+                    }
+                }
+            }
+
+            error = null;
+            return true;
+        }
+
+        private void ValidateActionCatalogOrThrow()
+        {
+            if (!TryBuildActionCatalog(out _, out string error))
+                throw new System.InvalidOperationException("Input configuration has invalid stable keys: " + error);
+        }
+
 #if UNITY_EDITOR
         private void OnValidate()
         {
             EnsureBindingIds();
+            EnsureSchemeEnumAliases();
         }
 #endif
 

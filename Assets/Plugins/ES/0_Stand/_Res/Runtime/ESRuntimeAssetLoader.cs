@@ -7,6 +7,9 @@ using UnityEngine.SceneManagement;
 
 namespace ES
 {
+    /// <summary>Provider 与 Scope 之间的内部一次性释放状态；不向业务层暴露 Handle。</summary>
+    internal interface IESRuntimeAssetLease : IDisposable { }
+
     public enum ESRuntimeAssetLoadState : byte { None, Resolving, LoadingDependencies, LoadingAssetBundle, LoadingAsset, Ready, Failed, Released }
 
     public readonly struct ESAssetIdentity : IEquatable<ESAssetIdentity>
@@ -75,6 +78,7 @@ namespace ES
     /// 业务层唯一依赖的资源获取接口。实现可来自 EditorDirect 或 AssetBundle 链路；
     /// AssetBundle 的下载、依赖和缓存均是实现细节。
     /// </summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public interface IESAssetRuntimeProvider : IDisposable
     {
         UniTask<ESRuntimeAssetHandle<T>> LoadMainAssetAsync<T>(ESAssetIdentity id, CancellationToken cancellationToken = default) where T : UnityEngine.Object;
@@ -94,8 +98,16 @@ namespace ES
         UniTask<Scene> LoadSceneAsync(ESAssetIdentity id, LoadSceneMode mode, CancellationToken cancellationToken);
     }
 
+    /// <summary>安全点内部使用的可选能力，不扩展公开 Provider 契约。</summary>
+    internal interface IESRuntimeAssetOperationTracker
+    {
+        bool HasPendingOperations { get; }
+        UniTask WaitForPendingOperationsAsync(CancellationToken cancellationToken = default);
+    }
+
     /// <summary>GUID/GUID+LocalFileId 到物理加载位置的运行时加载器。RuntimeKey 不参与全局寻址。</summary>
-    public sealed class ESRuntimeAssetLoader : IESAssetRuntimeProvider
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public sealed class ESRuntimeAssetLoader : IESAssetRuntimeProvider, IESRuntimeAssetOperationTracker
     {
         private sealed class AssetBundleLease
         {
@@ -116,6 +128,20 @@ namespace ES
         private bool disposed;
 
         public event Action<ESRuntimeAssetLoadStatus> StatusChanged;
+
+        public bool HasPendingOperations
+        {
+            get
+            {
+                if (loadingObjects.Count > 0) return true;
+                foreach (AssetBundleLease lease in assetBundles.Values)
+                    if (lease.InFlight != null) return true;
+                return false;
+            }
+        }
+
+        public UniTask WaitForPendingOperationsAsync(CancellationToken cancellationToken = default)
+            => UniTask.WaitUntil(() => !HasPendingOperations, cancellationToken: cancellationToken);
 
         public ESRuntimeAssetLoader(ESGlobalAssetRuntimeMap globalRuntimeMap, IESRuntimeAssetBundleProvider provider, ESRuntimeRetryPolicy retryPolicy, IESRuntimeDirectAssetProvider directProvider = null)
         {
@@ -600,25 +626,83 @@ namespace ES
         }
     }
 
-    public struct ESRuntimeAssetHandle<T> : IDisposable where T : UnityEngine.Object
+    /// <summary>
+    /// 可复制的轻量 Handle。所有副本共享同一个释放状态，因此无论 Dispose 多少次，
+    /// 底层引用计数都只会释放一次。
+    /// </summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public readonly struct ESRuntimeAssetHandle<T> : IDisposable where T : UnityEngine.Object
     {
-        private ESRuntimeAssetLoader loader;
-        private readonly ESAssetIdentity id;
-        private readonly string assetBundleKey;
-        public T Asset { get; private set; }
+        private sealed class SharedState : IESRuntimeAssetLease
+        {
+            private ESRuntimeAssetLoader loader;
+            private readonly ESAssetIdentity id;
+            private readonly string assetBundleKey;
+            public T Asset { get; private set; }
+
+            public SharedState(ESRuntimeAssetLoader owner, ESAssetIdentity assetId, string bundleKey, T asset)
+            {
+                loader = owner;
+                id = assetId;
+                assetBundleKey = bundleKey;
+                Asset = asset;
+            }
+
+            public void Dispose()
+            {
+                ESRuntimeAssetLoader owner = Interlocked.Exchange(ref loader, null);
+                if (owner == null) return;
+                owner.ReleaseLoaded(id, assetBundleKey);
+                Asset = null;
+            }
+        }
+
+        private readonly SharedState state;
+        public T Asset => state?.Asset;
+        internal IESRuntimeAssetLease Lease => state;
+
         internal ESRuntimeAssetHandle(ESRuntimeAssetLoader owner, ESAssetIdentity assetId, string assetBundle, T asset)
-        { loader = owner; id = assetId; assetBundleKey = assetBundle; Asset = asset; }
-        public void Dispose() { if (loader == null) return; loader.ReleaseLoaded(id, assetBundleKey); loader = null; Asset = null; }
+        {
+            state = new SharedState(owner, assetId, assetBundle, asset);
+        }
+
+        public void Dispose() => state?.Dispose();
     }
 
-    public struct ESRuntimeSceneHandle : IDisposable
+    /// <summary>与资产 Handle 相同，复制后仍保证底层场景租约只释放一次。</summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    public readonly struct ESRuntimeSceneHandle : IDisposable
     {
-        private ESRuntimeAssetLoader loader;
-        private readonly ESAssetIdentity id;
-        private readonly string assetBundleKey;
-        public Scene Scene { get; }
+        private sealed class SharedState
+        {
+            private ESRuntimeAssetLoader loader;
+            private readonly ESAssetIdentity id;
+            private readonly string assetBundleKey;
+            public readonly Scene Scene;
+
+            public SharedState(ESRuntimeAssetLoader owner, ESAssetIdentity sceneId, string bundleKey, Scene scene)
+            {
+                loader = owner;
+                id = sceneId;
+                assetBundleKey = bundleKey;
+                Scene = scene;
+            }
+
+            public void Dispose()
+            {
+                ESRuntimeAssetLoader owner = Interlocked.Exchange(ref loader, null);
+                if (owner != null) owner.ReleaseLoaded(id, assetBundleKey);
+            }
+        }
+
+        private readonly SharedState state;
+        public Scene Scene => state != null ? state.Scene : default;
+
         internal ESRuntimeSceneHandle(ESRuntimeAssetLoader owner, ESAssetIdentity sceneId, string bundleKey, Scene scene)
-        { loader = owner; id = sceneId; assetBundleKey = bundleKey; Scene = scene; }
-        public void Dispose() { if (loader == null) return; loader.ReleaseLoaded(id, assetBundleKey); loader = null; }
+        {
+            state = new SharedState(owner, sceneId, bundleKey, scene);
+        }
+
+        public void Dispose() => state?.Dispose();
     }
 }

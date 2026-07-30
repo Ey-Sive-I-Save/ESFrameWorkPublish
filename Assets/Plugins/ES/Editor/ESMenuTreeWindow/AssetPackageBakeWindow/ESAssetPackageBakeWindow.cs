@@ -39,7 +39,7 @@ namespace ES
         [NonSerialized] public Page_AssetPackageBakeHome homePage;
         private static ESAssetPackageBakeData selectedBake;
 
-        [MenuItem(MenuItemPathDefine.RESOURCE_PIPELINE_PATH + "资产包分离窗口", false, 20)]
+        [MenuItem(MenuItemPathDefine.RESOURCE_DELIVERY_PATH + "构建与发布/资产包分离窗口", false, 20)]
         public static void TryOpenWindow()
         {
             OpenWindow();

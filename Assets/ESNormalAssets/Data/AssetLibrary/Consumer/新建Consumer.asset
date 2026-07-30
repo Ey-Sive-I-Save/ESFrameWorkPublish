@@ -36,8 +36,10 @@ MonoBehaviour:
   OptionalLibFolders: []
   RequiredConsumers:
   - {fileID: 11400000, guid: 19b44b7027dc97546927c9efc596a799, type: 2}
-  GameCoreAssets: []
-  ManualGameCoreAssets: []
+  GameCoreAssets:
+  - rid: 78539011134012784
+  ManualGameCoreAssets:
+  - rid: 78539011134012785
   GameCoreValidationErrors: []
   ResidentAssets: []
   EnableCodeHotUpdate: 0
@@ -193,4 +195,22 @@ MonoBehaviour:
   LastBuildUtc: 2026-07-26T15:38:44.1224221Z
   references:
     version: 2
-    RefIds: []
+    RefIds:
+    - rid: 78539011134012784
+      type: {class: ESAssetReferScriptableObject, ns: ES, asm: ES_Stand}
+      data:
+        _guid: 9c2f5d8a1b4e47f6a0c3d9e2f5b8a1c4
+        _localFileId: 0
+        _assetKind: 16
+        _resolvedEnumKey: 0
+        _resolvedStringKey: ESTagCatalogGameCore
+        _inputMode: 0
+    - rid: 78539011134012785
+      type: {class: ESAssetReferScriptableObject, ns: ES, asm: ES_Stand}
+      data:
+        _guid: 9c2f5d8a1b4e47f6a0c3d9e2f5b8a1c4
+        _localFileId: 0
+        _assetKind: 16
+        _resolvedEnumKey: 0
+        _resolvedStringKey: ESTagCatalogGameCore
+        _inputMode: 0

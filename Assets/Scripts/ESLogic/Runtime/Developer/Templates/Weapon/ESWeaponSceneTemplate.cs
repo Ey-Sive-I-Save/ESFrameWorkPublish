@@ -21,7 +21,7 @@ namespace ES
     /// This component only stores hierarchy references and design notes. It does not fire, reload or apply damage.
     /// </summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("ES/武器/通用武器场景模板")]
+    [AddComponentMenu("【ES】/内容制作/武器模板/通用武器场景模板")]
     public sealed class ESWeaponSceneTemplate : MonoBehaviour
     {
         public const string RuntimeRootName = "00_运行根";

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using Sirenix.OdinInspector;
 using UnityEngine;
@@ -9,6 +10,140 @@ namespace ES
     public abstract class EntityBasicModuleBase : Module<Entity, EntityBasicDomain>
     {
         public sealed override Type TableKeyType => GetType();
+    }
+
+    /// <summary>
+    /// Projects the StateMachine's authoritative movement/support environment into leased Tags.
+    /// It never writes StateSupportFlags; motion and state systems remain their own authority.
+    /// </summary>
+    [Serializable, TypeRegistryItem("状态环境 Tag 投影模块")]
+    public sealed class EntityStateSupportTagProjectionModule : EntityBasicModuleBase
+    {
+        [Serializable]
+        public sealed class Binding
+        {
+            [LabelText("状态环境")]
+            public StateSupportFlags supportFlags;
+
+            [LabelText("环境生效时授予")]
+            public ESTagGrantConfig tagGrants = new ESTagGrantConfig();
+        }
+
+        [Title("状态环境到 Tag")]
+        [Tooltip("每项在对应 StateSupportFlags 成为当前环境时持有 Lease。常用映射是 Climbing -> 移动类/攀爬中、Mounted -> 移动类/骑乘中。")]
+        public List<Binding> bindings = new List<Binding>();
+
+        [NonSerialized] private List<ESTagLeaseSet> leaseSets;
+        [NonSerialized] private StateMachine stateMachine;
+
+        public override void Start()
+        {
+            base.Start();
+            BindStateMachine();
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+            if (stateMachine == null)
+                BindStateMachine();
+        }
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            BindStateMachine();
+        }
+
+        protected override void OnDisable()
+        {
+            UnbindStateMachine();
+            ReleaseAll();
+            base.OnDisable();
+        }
+
+        public override void OnDestroy()
+        {
+            UnbindStateMachine();
+            ReleaseAll();
+            base.OnDestroy();
+        }
+
+        private void BindStateMachine()
+        {
+            if (stateMachine != null || MyCore == null || MyCore.stateDomain == null)
+                return;
+
+            stateMachine = MyCore.stateDomain.stateMachine;
+            if (stateMachine == null)
+                return;
+
+            stateMachine.OnSupportFlagsChanged += HandleSupportFlagsChanged;
+            Refresh(stateMachine.currentSupportFlags);
+        }
+
+        private void UnbindStateMachine()
+        {
+            if (stateMachine != null)
+                stateMachine.OnSupportFlagsChanged -= HandleSupportFlagsChanged;
+            stateMachine = null;
+        }
+
+        private void HandleSupportFlagsChanged(StateSupportFlags _, StateSupportFlags current)
+        {
+            Refresh(current);
+        }
+
+        private void Refresh(StateSupportFlags current)
+        {
+            if (MyCore == null || bindings == null)
+                return;
+
+            EnsureLeaseSets();
+            for (int i = 0; i < bindings.Count; i++)
+            {
+                Binding binding = bindings[i];
+                ESTagLeaseSet leaseSet = leaseSets[i];
+                bool shouldApply = binding != null
+                                   && binding.supportFlags != StateSupportFlags.None
+                                   && (current & binding.supportFlags) != 0
+                                   && binding.tagGrants != null
+                                   && !binding.tagGrants.IsEmpty;
+                if (!shouldApply)
+                {
+                    leaseSet.ReleaseAll();
+                    continue;
+                }
+
+                if (leaseSet.Count > 0)
+                    continue;
+
+                if (!leaseSet.TryAcquire(MyCore.Tags, binding.tagGrants, this, out string error))
+                    Debug.LogWarning("[EntityStateSupportTagProjection] Tag 授予失败: " + error, MyCore);
+            }
+        }
+
+        private void EnsureLeaseSets()
+        {
+            leaseSets ??= new List<ESTagLeaseSet>(bindings != null ? bindings.Count : 0);
+            while (leaseSets.Count < bindings.Count)
+                leaseSets.Add(new ESTagLeaseSet());
+
+            for (int i = leaseSets.Count - 1; i >= bindings.Count; i--)
+            {
+                leaseSets[i].Dispose();
+                leaseSets.RemoveAt(i);
+            }
+        }
+
+        private void ReleaseAll()
+        {
+            if (leaseSets == null)
+                return;
+
+            for (int i = 0; i < leaseSets.Count; i++)
+                leaseSets[i].ReleaseAll();
+        }
     }
 
     [Serializable, TypeRegistryItem("基础移动模块")]
@@ -574,6 +709,7 @@ namespace ES
         [NonSerialized] private float _recoilBurstLastShotTime = -999f;
         [NonSerialized] private int _activeWeaponSlot = -1;
         [NonSerialized] private bool _weaponInHand;
+        [NonSerialized] private ESTagLeaseSet _equippedWeaponTagLeases;
         [NonSerialized] private float _upperBodyLayerWeightCurrent;
         [NonSerialized] private float _equipBlendCurrent;
         [NonSerialized] private float _firePulseCurrent;
@@ -782,6 +918,7 @@ namespace ES
 
             AttachWeaponToHand(index);
             _weaponInHand = true;
+            ApplyEquippedWeaponTagGrants(nextWeaponBinding);
             _lastEquipOrSwitchTime = Time.time;
 
             SetActionPhase(1);
@@ -819,6 +956,7 @@ namespace ES
 
             AttachWeaponToHand(_activeWeaponSlot);
             _weaponInHand = true;
+            ApplyEquippedWeaponTagGrants(weaponBinding);
             _lastEquipOrSwitchTime = Time.time;
             SetActionPhase(1);
             TryActivateTransitionState(
@@ -1125,6 +1263,8 @@ namespace ES
             if (_peekLifecycle.Release())
                 OnPeekExit();
 
+            ReleaseEquippedWeaponTagGrants();
+
             base.OnDestroy();
         }
 
@@ -1191,6 +1331,7 @@ namespace ES
             _actionPhase = 0;
             _weaponInHand = false;
             _activeWeaponSlot = -1;
+            ReleaseEquippedWeaponTagGrants();
 
             if (!enableWeaponFusion)
                 return;
@@ -1220,6 +1361,8 @@ namespace ES
             }
 
             _weaponInHand = startWithWeaponInHand;
+            if (_weaponInHand)
+                ApplyEquippedWeaponTagGrants(GetWeaponBinding(weaponSlots[_activeWeaponSlot]));
             _upperBodyLayerWeightCurrent = _weaponInHand ? 1f : 0f;
             _equipBlendCurrent = _weaponInHand ? 1f : 0f;
             SetActionPhase(_weaponInHand ? 1 : 2);
@@ -1495,6 +1638,7 @@ namespace ES
 
             var weaponBinding = GetWeaponBinding(currentSlot);
 
+            ReleaseEquippedWeaponTagGrants();
             AttachWeaponToHolster(_activeWeaponSlot);
             _weaponInHand = false;
             SetActionPhase(2);
@@ -1511,6 +1655,27 @@ namespace ES
             }
 
             return true;
+        }
+
+        private void ApplyEquippedWeaponTagGrants(EntityWeaponBinding binding)
+        {
+            _equippedWeaponTagLeases ??= new ESTagLeaseSet();
+            if (binding == null || binding.equippedTagGrants == null || binding.equippedTagGrants.IsEmpty)
+            {
+                _equippedWeaponTagLeases.ReleaseAll();
+                return;
+            }
+
+            if (_equippedWeaponTagLeases.TryAcquire(MyCore.Tags, binding.equippedTagGrants, this, out string error))
+                return;
+
+            if (logWeaponMountWarnings)
+                Debug.LogWarning("[EntityBasicCombatModule] 手持武器 Tag 授予失败: " + error, MyCore);
+        }
+
+        private void ReleaseEquippedWeaponTagGrants()
+        {
+            _equippedWeaponTagLeases?.ReleaseAll();
         }
 
         private void AttachWeaponToHand(int slotIndex)
@@ -3060,6 +3225,7 @@ namespace ES
         public float minDeltaTime = 0.0001f;
 
         [NonSerialized] private Animator _cachedAnimator;
+        [NonSerialized] private bool _hasSubmittedVelocity;
 
         public override void Start()
         {
@@ -3071,27 +3237,52 @@ namespace ES
 
         protected override void Update()
         {
-            if (!enableRootMotion || MyCore == null) return;
+            if (!enableRootMotion || MyCore == null)
+            {
+                ClearSubmittedVelocity();
+                return;
+            }
             if (_cachedAnimator == null)
             {
                 _cachedAnimator = MyCore.animator;
             }
-            if (_cachedAnimator == null) return;
+            if (_cachedAnimator == null)
+            {
+                ClearSubmittedVelocity();
+                return;
+            }
 
             float dt = Time.deltaTime;
-            if (dt <= minDeltaTime) return;
+            if (dt <= minDeltaTime)
+            {
+                ClearSubmittedVelocity();
+                return;
+            }
 
             Vector3 velocity = _cachedAnimator.deltaPosition / dt;
             MyCore.SetRootMotionVelocity(velocity);
+            _hasSubmittedVelocity = true;
+        }
+
+        protected override void OnDisable()
+        {
+            ClearSubmittedVelocity();
+            base.OnDisable();
         }
 
         public override void OnDestroy()
         {
-            if (MyCore != null)
-            {
-                MyCore.ClearRootMotionVelocity();
-            }
+            ClearSubmittedVelocity();
             base.OnDestroy();
+        }
+
+        private void ClearSubmittedVelocity()
+        {
+            if (!_hasSubmittedVelocity || MyCore == null)
+                return;
+
+            MyCore.ClearRootMotionVelocity();
+            _hasSubmittedVelocity = false;
         }
     }
 
@@ -3301,6 +3492,11 @@ namespace ES
         {
             prepared = new SkillRuntimePreparedValues();
             if (definition == null)
+                return false;
+
+            if (definition.casterTagCondition != null
+                && !definition.casterTagCondition.IsEmpty
+                && (MyCore == null || !MyCore.Tags.Matches(definition.casterTagCondition)))
                 return false;
 
             ESRuntimeTargetPack target = ESRuntimeTargetPack.Pool.GetInPool();

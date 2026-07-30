@@ -51,6 +51,8 @@ namespace ES
         public ESAssetReleaseUploadTarget Target { get; }
         public ESAssetReleaseUploadPlan Plan { get; }
         public ESAssetReleaseUploadPlanFile File { get; }
+        /// <summary>Provider 必须把该值写入远端对象的 Cache-Control 元数据。</summary>
+        public string CacheControl => File.cacheControl;
         /// <summary>
         /// 唯一允许用于远端存储的对象键：发布计划的平台层由框架统一补入。
         /// OSS/S3/HTTP 等 Provider 不得直接使用 File.relativePath，否则会把不同平台互相覆盖。
@@ -154,6 +156,12 @@ namespace ES
             {
                 ordered = null;
                 error = "上传计划缺少唯一的最后根发布清单。";
+                return false;
+            }
+            if (!string.Equals(rootFiles[0].cacheControl, "no-cache, max-age=0, must-revalidate", StringComparison.Ordinal))
+            {
+                ordered = null;
+                error = "根发布清单必须使用 no-cache, max-age=0, must-revalidate；请重新生成发布上传计划。";
                 return false;
             }
             ordered = files.Where(item => item != null && !item.uploadLast).OrderBy(item => item.uploadOrder).ToList();

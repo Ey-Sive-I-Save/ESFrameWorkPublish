@@ -61,7 +61,7 @@ namespace ES
 
         [ShowIf(nameof(enabled))]
         [LabelText("命中层")]
-        public LayerMask hitLayers;
+        public LayerMask hitLayers = ESPhysicsLayers.ShotHitMask;
 
         [ShowIf(nameof(enabled))]
         [LabelText("使用重力")]
@@ -74,6 +74,11 @@ namespace ES
         [ShowIf(nameof(enabled))]
         [LabelText("允许必中")]
         public bool allowMustHit;
+
+        [ShowIf(nameof(enabled)), Title("命中资格")]
+        [LabelText("HitResolver Tag 条件")]
+        [Tooltip("飞行物只生成物理候选。实际 HitResolver 读取此条件决定是否继续命中，不在这里结算伤害、阵营或部位倍率。")]
+        public ESHitTagEligibility hitTagEligibility = new ESHitTagEligibility();
 
         public static ItemShotSharedData Default => new ItemShotSharedData
         {
@@ -90,11 +95,35 @@ namespace ES
             turnSpeed = 720f,
             lifeTime = 5f,
             radius = 0.05f,
-            hitLayers = ~0,
+            hitLayers = ESPhysicsLayers.ShotHitMask,
             useGravity = false,
             orientToVelocity = true,
-            allowMustHit = true
+            allowMustHit = true,
+            hitTagEligibility = new ESHitTagEligibility()
         };
+
+        /// <summary>把 Table 自有的运行时默认对象原位恢复为领域默认值，不产生新对象。</summary>
+        internal void ResetToDefaults()
+        {
+            enabled = true;
+            aimMode = ShotAimMode.Free;
+            blockMode = ShotBlockMode.AnyBlocker;
+            launchDelay = 0f;
+            warmupTime = 0f;
+            speed = 30f;
+            acceleration = 120f;
+            maxSpeed = 30f;
+            trackingStartTime = 0f;
+            trackingDuration = -1f;
+            turnSpeed = 720f;
+            lifeTime = 5f;
+            radius = 0.05f;
+            hitLayers = ESPhysicsLayers.ShotHitMask;
+            useGravity = false;
+            orientToVelocity = true;
+            allowMustHit = true;
+            hitTagEligibility = new ESHitTagEligibility();
+        }
 
         public ShotMotionConfig ToShotMotionConfig(in ItemShotVariableData variable)
         {

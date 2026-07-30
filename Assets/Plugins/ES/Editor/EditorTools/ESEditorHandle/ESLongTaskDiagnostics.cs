@@ -9,7 +9,7 @@ namespace ES
     {
         private const string TestTaskKey = "ES.Diagnostics.LongTask.ReadSettings";
 
-        [MenuItem("ES/调试/运行长任务五秒测试")]
+        [MenuItem("【ES】/开发与维护/性能诊断/运行长任务五秒测试")]
         private static void EnqueueFiveSecondTest()
         {
             EnqueueSettingsReadTest(5d, 120);

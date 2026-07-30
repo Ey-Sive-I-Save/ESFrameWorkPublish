@@ -11,6 +11,7 @@
 ```text
 Assets/Plugins/ES/AIWarnings/README.md
 Assets/Plugins/ES/AIWarnings/项目最高警告/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md
+Assets/Plugins/ES/AIWarnings/项目最高警告/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md
 Assets/Plugins/ES/AIWarnings/项目最高警告/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md
 Assets/Plugins/ES/0_Stand/_Res/Runtime/ESScriptableObjectClassification.cs
 Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataModule.cs
@@ -29,8 +30,8 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 
 ```text
 <Category>EnumKey / <Category>ConfigKey
-<Category>RuntimeData
-<Category>RuntimeTable : ESConfigKeyTable<<Category>RuntimeData>
+<Category>RuntimeData : ESGameCoreRuntimeData
+<Category>RuntimeTable : ESGameCoreConfigKeyTable<<Category>RuntimeData>
 <Category>DataInfo : SoDataInfo, IGameCoreSO
 可选：<Category>DataGroup / <Category>DataPack
 ```
@@ -52,16 +53,20 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 8. 不得继承其他类别的 `*DataInfo`；类别相似只能复用可序列化组合数据，不能复用 DataInfo 继承层级。
 9. `*SharedData` 必须是引用类型 `class`，表示多个运行实例共享的只读定义；不得使用 `struct` 冒充共享数据。
 10. `*VariableData` 只有在字段全为值类型时才可使用 `struct`；禁止包含 `string`、数组、List、Dictionary、class、UnityEngine.Object、接口或 delegate。含引用字段时必须实现显式深拷贝。
+11. 不得直接使用 `RegisterAndGetRuntimeKey`、Upsert 或新 RuntimeData 覆盖已有稳定 Key；成功必须 `CommitRetained/TryCommitRetained`。
+12. 不得把 SO 字段复制、默认值解析、filler 或 `CreateRuntimeData` 放在 Acquire 后的 try 外；异常和 Try 提前失败必须 `AbandonRetained`。
+13. 不得让 RuntimeData 只设置 `Ready=false` 却继续强引用 SO、SharedData、Prefab、集合或其他重量级载荷；必须完整实现 `ReleaseRuntimePayload`。
 ```
 
 ## 执行步骤
 
 ```text
-1. 在新类别目录创建 Key、RuntimeData、强类型 RuntimeTable 和 DataInfo；不修改 0_Stand 或中央模块。
-2. 由 DataInfo 实现 IGameCoreSO.InjectGameCoreTables：校验根 SO 的领域枚举和对应 Key、拒绝重复，并直接注入枚举选中的强类型 Table。
-3. 可选创建 Group/Pack；抽象基类会遍历 Infos.Values，并只转发实际实现 IGameCoreSO 的 Info。
-4. 配置唯一 Consumer，确认其收集到 Info、Group 或 Pack 时不混入普通资源、Key 或嵌套数据。
-5. 编译，并验证启动期加载、注入、强类型按 Key 查询、重复 Key 失败与非 GameCore Info 跳过场景。
+1. 在新类别目录创建 Key、非池化稳定 RuntimeData、强类型驻留 RuntimeTable 和 DataInfo；不修改 0_Stand 或中央模块。
+2. RuntimeData 继承 `ESGameCoreRuntimeData` 并完整实现 `ReleaseRuntimePayload`；Table 继承 `ESGameCoreConfigKeyTable<TData>` 并设置唯一 `GameCore.<Category>` KeyScope。禁止增加 `Rent`、`ResetRuntimeData` 或池接口。
+3. 由 DataInfo 实现 IGameCoreSO.InjectGameCoreTables：校验根 SO 的领域枚举和对应 Key、拒绝重复，随后执行 `AcquireRetained → try 内复制载荷 → CommitRetained`；catch 必须 `AbandonRetained`。
+4. 可选创建 Group/Pack；抽象基类会遍历 Infos.Values，并只转发实际实现 IGameCoreSO 的 Info。
+5. 配置唯一 Consumer，确认其收集到 Info、Group 或 Pack 时不混入普通资源、Key 或嵌套数据。
+6. 编译，并验证启动期加载、强类型按 Key 查询、准备异常回滚、重复 Key 回滚、Clear/Remove 后 Ready=false 与载荷释放、同 Key 重建复用，以及非 GameCore Info 跳过场景。
 ```
 
 ## 交付格式
@@ -72,6 +77,8 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 目标 GameCoreTable：
 Consumer：
 重复 Key 策略：
+事务回滚：
+ReleaseRuntimePayload：
 验证结果：
 未处理风险：
 ```

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -112,6 +111,15 @@ namespace ES
         [LabelText("启用玩家输入写入")]
         public bool enablePlayerInput = true;
 
+        [LabelText("声明本地控制权")]
+        [Tooltip("仅显式声明的实体可绑定到全局输入/UI RuntimeMode 投影。多人或观战实体应由控制权系统调用 ESGameManager.LocalControl.SetControlledEntity。")]
+        public bool claimLocalControl;
+
+        [Title("Tag Gate")]
+        [LabelText("输入写入 Tag 条件")]
+        [Tooltip("为空时不限制。条件不匹配时清空本帧输入，避免被禁用状态残留旧输入。")]
+        public ESTagConditionConfig inputTagCondition = new ESTagConditionConfig();
+
         protected override void Update()
         {
             if (!enablePlayerInput)
@@ -121,8 +129,23 @@ namespace ES
             if (state == null || !state.enableInput)
                 return;
 
+            if (inputTagCondition != null
+                && !inputTagCondition.IsEmpty
+                && (MyCore == null || !MyCore.Tags.Matches(inputTagCondition)))
+            {
+                state.ClearAll();
+                return;
+            }
+
             ESInputModule input = ESGameManager.InputModule;
             if (input == null)
+            {
+                state.ClearAll();
+                return;
+            }
+
+            if (claimLocalControl
+                && (ESGameManager.LocalControl == null || !ESGameManager.LocalControl.TryClaim(MyCore, input.ModeService)))
             {
                 state.ClearAll();
                 return;
@@ -159,6 +182,14 @@ namespace ES
             if (input.ConsumePressed(ESInputActionId.Climb)) state.action.PulseClimbToggle(frame);
             if (input.ConsumePressed(ESInputActionId.Interact)) state.action.PulseInteract(frame);
         }
+
+        protected override void OnDisable()
+        {
+            if (claimLocalControl)
+                ESGameManager.LocalControl?.Release(MyCore);
+            MyDomain?.inputState?.ClearAll();
+            base.OnDisable();
+        }
     }
 
     // =================================================================================================
@@ -178,6 +209,11 @@ namespace ES
 
         [LabelText("移动缩放")]
         public float moveScale = 1f;
+
+        [Title("Tag Gate")]
+        [LabelText("输入调度 Tag 条件")]
+        [Tooltip("为空时不限制。条件不匹配时当前帧输入不会驱动移动、战斗、技能或交互。")]
+        public ESTagConditionConfig dispatchTagCondition = new ESTagConditionConfig();
 
         [Title("转身模式")]
         public TurnMode turnMode = TurnMode.FreeLook;
@@ -294,9 +330,19 @@ namespace ES
 
         private bool _wasClimbing;
 
+#if CINEMACHINE
+        [NonSerialized] private Transform _cachedCinemachineTransform;
+        [NonSerialized] private Cinemachine.CinemachineVirtualCameraBase _cachedCinemachineCamera;
+        [NonSerialized] private Cinemachine.CinemachineFreeLook _cachedCinemachineFreeLook;
+        [NonSerialized] private Cinemachine.CinemachinePOV _cachedCinemachinePov;
+#endif
+
+        private const int SpeedSampleCapacity = 256;
         private float _totalMoveTime;
         private float _last1sSpeedSum;
-        private readonly Queue<SpeedSample> _speedSamples = new Queue<SpeedSample>(64);
+        [NonSerialized] private SpeedSample[] _speedSamples;
+        [NonSerialized] private int _speedSampleHead;
+        [NonSerialized] private int _speedSampleCount;
         private Transform _runtimeAimTarget;
 
         [ShowInInspector, ReadOnly, LabelText("总运动时长")]
@@ -308,12 +354,26 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("最近跳跃输入帧")]
         public int lastJumpInputFrame;
 
+        public override void Start()
+        {
+            base.Start();
+            EnsureSpeedSampleBuffer();
+        }
+
         protected override void Update()
         {
             if (MyCore == null || MyDomain == null) return;
 
             var input = MyDomain.inputState;
             if (input == null || !input.enableInput) return;
+
+            if (dispatchTagCondition != null
+                && !dispatchTagCondition.IsEmpty
+                && !MyCore.Tags.Matches(dispatchTagCondition))
+            {
+                input.ClearAll();
+                return;
+            }
 
             var cam = ResolveCameraTransform();
 
@@ -481,7 +541,9 @@ namespace ES
             if (input.EyeHold)
                 return;
 
-            Vector3 targetLook = GetLookWorld(input.Look, cam, _smoothedMoveWorld, turnMode);
+            Vector3 targetLook = enableCameraLook && aimTransform != null && _aimAnglesInited
+                ? Quaternion.Euler(0f, _aimYawCurrent, 0f) * Vector3.forward
+                : GetLookWorld(input.Look, cam, _smoothedMoveWorld, turnMode);
             _lastLookWorld = SmoothLook(_lastLookWorld, targetLook, lookSmooth);
             MyCore.SetLookInput(_lastLookWorld);
         }
@@ -776,11 +838,6 @@ namespace ES
             _aimYawCurrent = Mathf.LerpAngle(_aimYawCurrent, _aimYaw, t);
             _aimPitchCurrent = Mathf.Lerp(_aimPitchCurrent, _aimPitch, t);
 
-            if (!eyeHold)
-            {
-                MyCore.transform.rotation = Quaternion.Euler(0f, _aimYawCurrent, 0f);
-            }
-
             aimTransform.localRotation = Quaternion.Euler(_aimPitchCurrent + _eyePitchOffset, _eyeYawOffset, 0f);
 
             if (debugCamera)
@@ -850,25 +907,39 @@ namespace ES
 #if CINEMACHINE
             if (camTransform == null) return false;
 
-            var vcam = camTransform.GetComponent<Cinemachine.CinemachineVirtualCameraBase>();
-            if (vcam == null) return false;
-
-            if (vcam is Cinemachine.CinemachineFreeLook freeLook)
+            if (_cachedCinemachineTransform != camTransform)
             {
-                freeLook.m_XAxis.Value += lookInput.x * cameraYawSpeed * scale * Time.deltaTime;
-                freeLook.m_YAxis.Value -= lookInput.y * cameraPitchSpeed * scale * Time.deltaTime;
-                freeLook.m_YAxis.Value = Mathf.Clamp(freeLook.m_YAxis.Value, freeLook.m_YAxis.m_MinValue, freeLook.m_YAxis.m_MaxValue);
+                _cachedCinemachineTransform = camTransform;
+                _cachedCinemachineCamera = camTransform.GetComponent<Cinemachine.CinemachineVirtualCameraBase>();
+                _cachedCinemachineFreeLook = _cachedCinemachineCamera as Cinemachine.CinemachineFreeLook;
+                _cachedCinemachinePov = _cachedCinemachineFreeLook == null && _cachedCinemachineCamera != null
+                    ? _cachedCinemachineCamera.GetCinemachineComponent<Cinemachine.CinemachinePOV>()
+                    : null;
+            }
+
+            if (_cachedCinemachineCamera == null) return false;
+
+            if (_cachedCinemachineFreeLook != null)
+            {
+                _cachedCinemachineFreeLook.m_XAxis.Value += lookInput.x * cameraYawSpeed * scale * Time.deltaTime;
+                _cachedCinemachineFreeLook.m_YAxis.Value -= lookInput.y * cameraPitchSpeed * scale * Time.deltaTime;
+                _cachedCinemachineFreeLook.m_YAxis.Value = Mathf.Clamp(
+                    _cachedCinemachineFreeLook.m_YAxis.Value,
+                    _cachedCinemachineFreeLook.m_YAxis.m_MinValue,
+                    _cachedCinemachineFreeLook.m_YAxis.m_MaxValue);
 
                 if (debugCamera) Debug.Log("[EntityAIInputDispatch] Drive Cinemachine FreeLook axes");
                 return true;
             }
 
-            var pov = vcam.GetCinemachineComponent<Cinemachine.CinemachinePOV>();
-            if (pov != null)
+            if (_cachedCinemachinePov != null)
             {
-                pov.m_HorizontalAxis.Value += lookInput.x * cameraYawSpeed * scale * Time.deltaTime;
-                pov.m_VerticalAxis.Value -= lookInput.y * cameraPitchSpeed * scale * Time.deltaTime;
-                pov.m_VerticalAxis.Value = Mathf.Clamp(pov.m_VerticalAxis.Value, cameraPitchLimit.x, cameraPitchLimit.y);
+                _cachedCinemachinePov.m_HorizontalAxis.Value += lookInput.x * cameraYawSpeed * scale * Time.deltaTime;
+                _cachedCinemachinePov.m_VerticalAxis.Value -= lookInput.y * cameraPitchSpeed * scale * Time.deltaTime;
+                _cachedCinemachinePov.m_VerticalAxis.Value = Mathf.Clamp(
+                    _cachedCinemachinePov.m_VerticalAxis.Value,
+                    cameraPitchLimit.x,
+                    cameraPitchLimit.y);
 
                 if (debugCamera) Debug.Log("[EntityAIInputDispatch] Drive Cinemachine POV axes");
                 return true;
@@ -891,16 +962,48 @@ namespace ES
             totalMoveTime = _totalMoveTime;
 
             float now = Time.time;
-            _speedSamples.Enqueue(new SpeedSample(now, speed));
-            _last1sSpeedSum += speed;
+            EnsureSpeedSampleBuffer();
 
-            while (_speedSamples.Count > 0 && now - _speedSamples.Peek().time > 1f)
+            if (_speedSampleCount == SpeedSampleCapacity)
             {
-                var s = _speedSamples.Dequeue();
-                _last1sSpeedSum -= s.speed;
+                _last1sSpeedSum -= _speedSamples[_speedSampleHead].speed;
+                AdvanceSpeedSampleHead();
+                _speedSampleCount--;
             }
 
-            avgSpeedLast1s = _speedSamples.Count > 0 ? _last1sSpeedSum / _speedSamples.Count : 0f;
+            int tail = _speedSampleHead + _speedSampleCount;
+            if (tail >= SpeedSampleCapacity)
+                tail -= SpeedSampleCapacity;
+            _speedSamples[tail] = new SpeedSample(now, speed);
+            _speedSampleCount++;
+            _last1sSpeedSum += speed;
+
+            while (_speedSampleCount > 0 && now - _speedSamples[_speedSampleHead].time > 1f)
+            {
+                _last1sSpeedSum -= _speedSamples[_speedSampleHead].speed;
+                AdvanceSpeedSampleHead();
+                _speedSampleCount--;
+            }
+
+            avgSpeedLast1s = _speedSampleCount > 0 ? _last1sSpeedSum / _speedSampleCount : 0f;
+        }
+
+        private void EnsureSpeedSampleBuffer()
+        {
+            if (_speedSamples != null && _speedSamples.Length == SpeedSampleCapacity)
+                return;
+
+            _speedSamples = new SpeedSample[SpeedSampleCapacity];
+            _speedSampleHead = 0;
+            _speedSampleCount = 0;
+            _last1sSpeedSum = 0f;
+        }
+
+        private void AdvanceSpeedSampleHead()
+        {
+            _speedSampleHead++;
+            if (_speedSampleHead == SpeedSampleCapacity)
+                _speedSampleHead = 0;
         }
 
         private Transform ResolveCameraTransform()
@@ -962,6 +1065,7 @@ namespace ES
 
         public override void OnDestroy()
         {
+            MyCore?.ResetKCCInputs();
             _cachedIKDriver = null;
             _cachedIKDriverAnimator = null;
             if (_runtimeAimTarget != null)
@@ -975,6 +1079,13 @@ namespace ES
             }
 
             base.OnDestroy();
+        }
+
+        protected override void OnDisable()
+        {
+            _smoothedMoveWorld = Vector3.zero;
+            MyCore?.ResetKCCInputs();
+            base.OnDisable();
         }
     }
 

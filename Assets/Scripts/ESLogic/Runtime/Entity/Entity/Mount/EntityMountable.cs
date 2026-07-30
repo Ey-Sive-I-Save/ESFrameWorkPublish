@@ -99,7 +99,7 @@ namespace ES
             }
         }
 
-        public void TickMounted(Entity target, Vector3 moveInput, Vector3 lookInput, float deltaTime)
+        public void TickMounted(Entity target, Vector3 moveInput, Vector3 lookInput, float deltaTime, bool syncRider = true)
         {
             if (rider != target) return;
 
@@ -133,7 +133,8 @@ namespace ES
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, turnSpeed * deltaTime);
             }
 
-            SyncRider(force: false);
+            if (syncRider)
+                SyncRider(force: false);
         }
 
         private void EnsureMatchPoint()
@@ -159,7 +160,8 @@ namespace ES
             Vector3    pos = alignRiderPosition ? matchPoint.position : motor.TransientPosition;
             Quaternion rot = alignRiderRotation ? matchPoint.rotation : motor.TransientRotation;
 
-            motor.SetPositionAndRotation(pos, rot, true);
+            // 统一提交到 Rider 的 KCC 物理边界；不在普通挂载调用栈直接争写 Motor。
+            rider.kcc.QueueMatchTargetPose(pos, rot, releaseAfterApply: true);
         }
     }
 }

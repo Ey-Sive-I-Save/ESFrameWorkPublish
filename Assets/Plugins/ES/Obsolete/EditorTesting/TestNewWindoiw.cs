@@ -7,7 +7,7 @@ namespace ES.Obsolete{
         [SerializeField]
         private VisualTreeAsset m_VisualTreeAsset = default;
 
-        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "测试窗口")]
+        [MenuItem("【ES】/已废弃/EditorTesting/测试窗口")]
         public static void ShowExample()
         {
             TestNewWindoiw wnd = GetWindow<TestNewWindoiw>();

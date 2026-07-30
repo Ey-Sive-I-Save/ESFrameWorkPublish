@@ -15,9 +15,11 @@ namespace ES
     //窗口总览
     public partial class ESSODataInfoWindow : ESMenuTreeWindowAB<ESSODataInfoWindow> //OdinMenuEditorWindow
         {
+            [MenuItem(MenuItemPathDefine.CONTENT_CREATION_PATH + "数据与配置/SO 数据窗口", false, 10)]
             [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "SO 数据窗口", false, -970)]
             public static void TryOpenWindow()
             {
+                ESWindowCommandRegistry.RecordOpened("so_data_window");
                 OpenWindow();
             }
             #region 简单重写
@@ -724,7 +726,7 @@ namespace ES
             public string createText = "--创建新信息（Info）--";
             [InfoBox("建议修改一下键名或者信息名防止重复！", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
             [InfoBox("该元素的键已经出现了！！请修改", VisibleIf = "@!(group?.NotContainsInfoKey(DataKey)??false)", InfoMessageType = InfoMessageType.Error)]
-            [OnValueChanged("Change"), ESBackGround("yellow", 0.2f), LabelText("数据信息的键")]
+            [OnValueChanged("Change"), ESBackGround("yellow", 0.2f), LabelText("策划数据键（仅编辑器索引）")]
             [VerticalGroup("总组/数据组")]
             public string DataKey = "数据键";
             [OnValueChanged("Change"), LabelText("数据信息的文件名")]
@@ -790,6 +792,7 @@ namespace ES
                     if (@object is ISoDataInfo info)
                     {
                         info.SetKey(DataKey);
+                        PrepareInfoForSave(info);
                         group._TryAddInfoToDic(DataKey, @object);
                         AssetDatabase.AddObjectToAsset(@object, groupAssetPath);
                         MarkGroupAssetDirtyAndSave(group, groupAssetPath, "新建单元信息");
@@ -827,6 +830,7 @@ namespace ES
                     if (copy is ISoDataInfo ifno)
                     {
                         ifno.SetKey(DataKey);
+                        PrepareInfoForSave(ifno);
 
                         group._TryAddInfoToDic(DataKey, copy);
                         AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
@@ -882,6 +886,7 @@ namespace ES
                         if (copy is ISoDataInfo info)
                         {
                             info.SetKey(DataKey);
+                            PrepareInfoForSave(info);
                             group._TryAddInfoToDic(DataKey, copy);
                             AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
                             MarkGroupAssetDirtyAndSave(group, groupAssetPath, "持久粘贴");
@@ -914,6 +919,12 @@ namespace ES
 
                 TryRemoveReadOnly(assetPath);
                 return true;
+            }
+
+            private static void PrepareInfoForSave(ISoDataInfo info)
+            {
+                if (info is ItemDataInfo item)
+                    item.EnsureActiveKindData();
             }
 
             private static void TryRemoveReadOnly(string assetPath)
@@ -1000,6 +1011,8 @@ namespace ES
                                 so.SetKey(i);
                                 hasChange = true;
                             }
+                            if (so is ItemDataInfo item && item.EnsureActiveKindData())
+                                hasChange = true;
                         }
                         else
                         {
@@ -1403,7 +1416,6 @@ namespace ES
 
         #region 辅助
         //数据源和辅助工具
-        [InitializeOnLoad]
         public static class ESSODataWindowHelper
         {
             public const string NormalCategoryAll = "全部";
@@ -1433,7 +1445,7 @@ namespace ES
             private static Dictionary<string, string> normalCategoryByNameCache;
             private static Dictionary<string, List<string>> normalNamesByCategoryCache;
 
-            static ESSODataWindowHelper()
+            internal static void RegisterSelectionChanged()
             {
                 Selection.selectionChanged -= ForDataWindowSelection;
                 Selection.selectionChanged += ForDataWindowSelection;
@@ -1809,6 +1821,14 @@ namespace ES
                 return true;
             }
             #endregion
+        }
+
+        public sealed class ESSODataWindowSelectionInitializer : EditorInvoker_Level2
+        {
+            public override void InitInvoke()
+            {
+                ESSODataWindowHelper.RegisterSelectionChanged();
+            }
         }
 
         public static class EditorUndoService

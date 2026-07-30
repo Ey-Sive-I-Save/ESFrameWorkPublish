@@ -31,12 +31,7 @@ public class EditorInit1 : EditorInvoker_Level1
 {
     public override void InitInvoke()
     {
-        EditorApplication.update -= Update;
-        EditorApplication.update += Update;
-    }
-
-    private void Update()
-    {
+        // 保留阶段占位，不能注册空的全局 update 回调。
     }
 }
 
@@ -44,11 +39,6 @@ public class EditorInit2 : EditorInvoker_Level2
 {
     public override void InitInvoke()
     {
-        EditorApplication.update -= Update;
-        EditorApplication.update += Update;
-    }
-
-    private void Update()
-    {
+        // 保留阶段占位，不能注册空的全局 update 回调。
     }
 }

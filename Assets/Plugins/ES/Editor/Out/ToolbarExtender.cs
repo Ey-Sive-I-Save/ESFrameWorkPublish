@@ -6,17 +6,25 @@ using UnityEngine;
 
 namespace ES
 {
-	[InitializeOnLoad]
 	public static class ToolbarExtender
 	{
 		static int m_toolCount;
 		static GUIStyle m_commandStyle = null;
+		static bool m_initialized;
 
 		public static readonly List<Action> LeftToolbarGUI = new List<Action>();
 		public static readonly List<Action> RightToolbarGUI = new List<Action>();
 
-		static ToolbarExtender()
+		/// <summary>
+		/// 由 ES 程序集流中的工具栏初始化器调用。这个类仅保留 Unity Toolbar 反射桥接，
+		/// 不再自行作为域重载入口。
+		/// </summary>
+		internal static void Initialize()
 		{
+			if (m_initialized)
+				return;
+
+			m_initialized = true;
 			Type toolbarType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.Toolbar");
 			
 #if UNITY_2019_1_OR_NEWER

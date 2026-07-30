@@ -327,9 +327,11 @@ public class ESTrackViewWindow : OdinEditorWindow
 
 
     #region 初始化核心
+    [MenuItem(MenuItemPathDefine.CONTENT_CREATION_PATH + "技能与轨道/轨道编辑器", false, 0)]
     [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "轨道编辑器", false, -1000)]
     public static void OpenWindow()
     {
+        ESWindowCommandRegistry.RecordOpened("track_editor");
         window = GetWindow<ESTrackViewWindow>();
         window.titleContent = new GUIContent("【轨道】编辑器");
         window.minSize = s_MinWindowSize;
@@ -1770,7 +1772,7 @@ public class ESTrackViewWindow : OdinEditorWindow
         ScheduleAutoValidateSequenceVisuals();
     }
 
-    [MenuItem(MenuItemPathDefine.GAMEPLAY_BUILDING_PATH + "技能轨道/临时播放当前技能序列", false, 20)]
+    [MenuItem(MenuItemPathDefine.CONTENT_CREATION_PATH + "技能与轨道/临时播放当前技能序列", false, 20)]
     public static void PlayCurrentSequenceAsTemporarySkillStateMenu()
     {
         PlayCurrentSequenceAsTemporarySkillState();

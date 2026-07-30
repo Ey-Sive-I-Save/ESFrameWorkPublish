@@ -21,7 +21,7 @@ namespace ES.Obsolete.Preview.InputSystem
     /// <summary>
     /// 输入动作定义
     /// </summary>
-    [CreateAssetMenu(menuName = "ES/Input/Input Action")]
+    [CreateAssetMenu(menuName = "【ES】/已废弃/AIPreview/输入系统/Input Action")]
     public class ESInputAction : ScriptableObject
     {
         public string actionName;
@@ -67,7 +67,7 @@ namespace ES.Obsolete.Preview.InputSystem
     /// <summary>
     /// 输入上下文（决定哪些输入处于激活状态）
     /// </summary>
-    [CreateAssetMenu(menuName = "ES/Input/Input Context")]
+    [CreateAssetMenu(menuName = "【ES】/已废弃/AIPreview/输入系统/Input Context")]
     public class ESInputContext : ScriptableObject
     {
         public string contextName;

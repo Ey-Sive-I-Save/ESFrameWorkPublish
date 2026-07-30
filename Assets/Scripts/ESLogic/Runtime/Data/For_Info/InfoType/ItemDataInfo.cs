@@ -1,7 +1,25 @@
 ﻿using Sirenix.OdinInspector;
 
+using UnityEngine;
+
 namespace ES
 {
+    public enum ESItemDataValidationCode : byte
+    {
+        Valid = 0,
+        MissingBusinessKey = 1,
+        MissingBaseConfig = 2,
+        ItemKindNotSelected = 3,
+        MissingInteractConfig = 4,
+        MissingLogicConfig = 5,
+        MissingMoveConfig = 6,
+        MissingKindData = 7,
+        KindDataMismatch = 8,
+        MissingSharedData = 9,
+        MissingGameCoreKey = 10,
+        MissingWeaponConfig = 11
+    }
+
     [ESCreatePath("数据信息", "物品数据信息")]
     public class ItemDataInfo : SoDataInfo, IGameCoreSO, IConditionalGameCoreSO
     {
@@ -26,95 +44,213 @@ namespace ES
         [HideLabel]
         public ItemMoveConfig moveConfig = new ItemMoveConfig();
 
-        [Title("Shot")]
-        [ShowIf(nameof(ShowShotConfig))]
+        [Title("类型专属配置")]
+        [SerializeReference, HideReferenceObjectPicker]
         [HideLabel]
-        public ItemShotSharedData shotShared = ItemShotSharedData.Default;
+        public ItemKindDataBlock kindData;
 
-        [ShowIf(nameof(ShowShotConfig))]
-        [HideLabel, InlineProperty]
-        public ESShotConfigKey shotKey = new ESShotConfigKey();
-
-        [ShowIf(nameof(ShowShotConfig))]
-        [HideLabel]
-        public ItemShotVariableData shotVariable = ItemShotVariableData.Default;
-
-        [Title("Door")]
-        [ShowIf(nameof(ShowDoorConfig))]
-        [HideLabel]
-        public ItemDoorSharedData doorShared = ItemDoorSharedData.Default;
-
-        [ShowIf(nameof(ShowDoorConfig))]
-        [HideLabel]
-        public ItemDoorVariableData doorVariable = ItemDoorVariableData.Default;
-
-        [Title("Trap / 陷阱")]
-        [ShowIf(nameof(ShowTrapConfig))]
-        [HideLabel]
-        public ItemTrapSharedData trapShared = ItemTrapSharedData.Default;
-
-        [ShowIf(nameof(ShowTrapConfig))]
-        [HideLabel]
-        public ItemTrapVariableData trapVariable = ItemTrapVariableData.Default;
-
-        [Title("Weapon / 武器")]
-        [ShowIf(nameof(ShowWeaponConfig))]
-        [HideLabel]
-        public ItemWeaponSharedData weaponShared = ItemWeaponSharedData.Default;
-
-        [ShowIf(nameof(ShowWeaponConfig))]
-        [HideLabel, InlineProperty]
-        public ESWeaponConfigKey weaponKey = new ESWeaponConfigKey();
-
-        [ShowIf(nameof(ShowWeaponConfig))]
-        [HideLabel]
-        public ItemWeaponVariableData weaponVariable = ItemWeaponVariableData.Default;
-
-        [ShowIf(nameof(ShowWeaponConfig))]
-        [HideLabel]
-        public ItemWeaponConfig weaponConfig = new ItemWeaponConfig();
-
-        [Title("Pickup")]
-        [ShowIf(nameof(ShowPickupConfig))]
-        [HideLabel]
-        public ItemPickupSharedData pickupShared = ItemPickupSharedData.Default;
-
-        [ShowIf(nameof(ShowPickupConfig))]
-        [HideLabel]
-        public ItemPickupVariableData pickupVariable = ItemPickupVariableData.Default;
-
-        [Title("Zone / 区域")]
-        [ShowIf(nameof(ShowZoneConfig))]
-        [HideLabel]
-        public ItemZoneSharedData zoneShared = ItemZoneSharedData.Default;
-
-        [ShowIf(nameof(ShowZoneConfig))]
-        [HideLabel]
-        public ItemZoneVariableData zoneVariable = ItemZoneVariableData.Default;
-
-        [Title("Prop")]
-        [ShowIf(nameof(ShowPropConfig))]
-        [HideLabel]
-        public ItemPropSharedData propShared = ItemPropSharedData.Default;
-
-        [ShowIf(nameof(ShowPropConfig))]
-        [HideLabel]
-        public ItemPropVariableData propVariable = ItemPropVariableData.Default;
-
-        private bool ShowShotConfig() => baseConfig != null && baseConfig.kind == ItemKind.Shot;
-        private bool ShowDoorConfig() => baseConfig != null && baseConfig.kind == ItemKind.Door;
-        private bool ShowTrapConfig() => baseConfig != null && baseConfig.kind == ItemKind.Trap;
-        private bool ShowWeaponConfig() => baseConfig != null && baseConfig.kind == ItemKind.Weapon;
-        private bool ShowPickupConfig() => baseConfig != null && baseConfig.kind == ItemKind.Pickup;
-        private bool ShowZoneConfig() => baseConfig != null && baseConfig.kind == ItemKind.Zone;
-
-        private bool ShowPropConfig()
+        public bool EnsureActiveKindData()
         {
-            return baseConfig != null
-                && (baseConfig.kind == ItemKind.Prop
-                    || baseConfig.kind == ItemKind.Tower
-                    || baseConfig.kind == ItemKind.Platform
-                    || baseConfig.kind == ItemKind.Rotator);
+            bool changed = false;
+            if (baseConfig == null)
+            {
+                baseConfig = new ItemBaseConfig();
+                changed = true;
+            }
+            if (interactConfig == null)
+            {
+                interactConfig = new ItemInteractConfig();
+                changed = true;
+            }
+            if (logicConfig == null)
+            {
+                logicConfig = new ItemLogicConfig();
+                changed = true;
+            }
+            if (moveConfig == null)
+            {
+                moveConfig = new ItemMoveConfig();
+                changed = true;
+            }
+
+            ItemKind kind = baseConfig.kind;
+            if (!IsKindDataCompatible(kindData, kind))
+            {
+                kindData = CreateKindData(kind);
+                changed = true;
+            }
+
+            return EnsureNestedData(kindData) || changed;
+        }
+
+        public ESItemDataValidationCode ValidateConfiguration(bool includeEditorMetadata = true)
+        {
+            if (includeEditorMetadata && string.IsNullOrWhiteSpace(KeyName))
+                return ESItemDataValidationCode.MissingBusinessKey;
+            if (baseConfig == null)
+                return ESItemDataValidationCode.MissingBaseConfig;
+            if (baseConfig.kind == ItemKind.None)
+                return ESItemDataValidationCode.ItemKindNotSelected;
+            if (interactConfig == null)
+                return ESItemDataValidationCode.MissingInteractConfig;
+            if (logicConfig == null)
+                return ESItemDataValidationCode.MissingLogicConfig;
+            if (ShowMoveConfig() && moveConfig == null)
+                return ESItemDataValidationCode.MissingMoveConfig;
+            if (kindData == null)
+                return ESItemDataValidationCode.MissingKindData;
+            if (!IsKindDataCompatible(kindData, baseConfig.kind))
+                return ESItemDataValidationCode.KindDataMismatch;
+
+            switch (kindData)
+            {
+                case ItemShotDataBlock shot:
+                    if (shot.sharedData == null) return ESItemDataValidationCode.MissingSharedData;
+                    if (shot.key == null || !shot.key.IsConfigured) return ESItemDataValidationCode.MissingGameCoreKey;
+                    break;
+                case ItemWeaponDataBlock weapon:
+                    if (weapon.sharedData == null) return ESItemDataValidationCode.MissingSharedData;
+                    if (weapon.key == null || !weapon.key.IsConfigured) return ESItemDataValidationCode.MissingGameCoreKey;
+                    if (weapon.config == null) return ESItemDataValidationCode.MissingWeaponConfig;
+                    break;
+                case ItemDoorDataBlock door when door.sharedData == null:
+                case ItemTrapDataBlock trap when trap.sharedData == null:
+                case ItemPickupDataBlock pickup when pickup.sharedData == null:
+                case ItemZoneDataBlock zone when zone.sharedData == null:
+                case ItemPropDataBlock prop when prop.sharedData == null:
+                    return ESItemDataValidationCode.MissingSharedData;
+            }
+
+            return ESItemDataValidationCode.Valid;
+        }
+
+        public string GetValidationMessage(ESItemDataValidationCode code)
+        {
+            switch (code)
+            {
+                case ESItemDataValidationCode.Valid: return "配置有效。";
+                case ESItemDataValidationCode.MissingBusinessKey: return "缺少 Item 业务 Key（SoDataInfo.KeyName）。";
+                case ESItemDataValidationCode.MissingBaseConfig: return "缺少基础配置 BaseConfig。";
+                case ESItemDataValidationCode.ItemKindNotSelected: return "尚未选择 ItemKind。";
+                case ESItemDataValidationCode.MissingInteractConfig: return "缺少通用交互配置。";
+                case ESItemDataValidationCode.MissingLogicConfig: return "缺少通用逻辑配置。";
+                case ESItemDataValidationCode.MissingMoveConfig: return "当前 ItemKind 需要移动配置。";
+                case ESItemDataValidationCode.MissingKindData: return "缺少当前 ItemKind 对应的类型专属配置块。";
+                case ESItemDataValidationCode.KindDataMismatch: return "ItemKind 与类型专属配置块不匹配。";
+                case ESItemDataValidationCode.MissingSharedData: return "当前类型专属配置块缺少 SharedData。";
+                case ESItemDataValidationCode.MissingGameCoreKey: return "Shot/Weapon 必须显式配置 EnumKey 或 StringKey；KeyName 仅供编辑器与策划使用。";
+                case ESItemDataValidationCode.MissingWeaponConfig: return "Weapon 缺少武器逻辑配置。";
+                default: return "未知 Item 配置错误。";
+            }
+        }
+
+        public string GetGameCoreRouteName()
+        {
+            if (baseConfig == null) return "未配置";
+            switch (baseConfig.kind)
+            {
+                case ItemKind.Shot: return "Item/Shot -> ESRuntimeDataGameCore.Shots";
+                case ItemKind.Weapon: return "Item/Weapon -> ESRuntimeDataGameCore.Weapons";
+                default: return "普通 Item（不进入 GameCore 启动表）";
+            }
+        }
+
+        public bool TryGetGameCoreKey(out IESConfigKey key)
+        {
+            if (kindData is ItemShotDataBlock shot)
+            {
+                key = shot.key;
+                return key != null;
+            }
+            if (kindData is ItemWeaponDataBlock weapon)
+            {
+                key = weapon.key;
+                return key != null;
+            }
+
+            key = null;
+            return false;
+        }
+
+        private static ItemKindDataBlock CreateKindData(ItemKind kind)
+        {
+            switch (kind)
+            {
+                case ItemKind.Shot: return ItemShotDataBlock.Default;
+                case ItemKind.Door: return ItemDoorDataBlock.Default;
+                case ItemKind.Trap: return ItemTrapDataBlock.Default;
+                case ItemKind.Weapon: return ItemWeaponDataBlock.Default;
+                case ItemKind.Pickup: return ItemPickupDataBlock.Default;
+                case ItemKind.Zone: return ItemZoneDataBlock.Default;
+                case ItemKind.Prop:
+                case ItemKind.Tower:
+                case ItemKind.Platform:
+                case ItemKind.Rotator:
+                    return ItemPropDataBlock.Default;
+                default:
+                    return null;
+            }
+        }
+
+        private static bool EnsureNestedData(ItemKindDataBlock data)
+        {
+            switch (data)
+            {
+                case ItemShotDataBlock shot:
+                {
+                    bool changed = false;
+                    if (shot.sharedData == null) { shot.sharedData = ItemShotSharedData.Default; changed = true; }
+                    if (shot.key == null) { shot.key = new ESShotConfigKey(); changed = true; }
+                    return changed;
+                }
+                case ItemDoorDataBlock door when door.sharedData == null:
+                    door.sharedData = ItemDoorSharedData.Default;
+                    return true;
+                case ItemTrapDataBlock trap when trap.sharedData == null:
+                    trap.sharedData = ItemTrapSharedData.Default;
+                    return true;
+                case ItemWeaponDataBlock weapon:
+                {
+                    bool changed = false;
+                    if (weapon.sharedData == null) { weapon.sharedData = ItemWeaponSharedData.Default; changed = true; }
+                    if (weapon.key == null) { weapon.key = new ESWeaponConfigKey(); changed = true; }
+                    if (weapon.config == null) { weapon.config = new ItemWeaponConfig(); changed = true; }
+                    return changed;
+                }
+                case ItemPickupDataBlock pickup when pickup.sharedData == null:
+                    pickup.sharedData = ItemPickupSharedData.Default;
+                    return true;
+                case ItemZoneDataBlock zone when zone.sharedData == null:
+                    zone.sharedData = ItemZoneSharedData.Default;
+                    return true;
+                case ItemPropDataBlock prop when prop.sharedData == null:
+                    prop.sharedData = ItemPropSharedData.Default;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        public static bool IsKindDataCompatible(ItemKindDataBlock data, ItemKind kind)
+        {
+            if (data == null)
+                return kind == ItemKind.None;
+
+            if (kind == ItemKind.Prop || kind == ItemKind.Tower || kind == ItemKind.Platform || kind == ItemKind.Rotator)
+                return data is ItemPropDataBlock;
+
+            return data.Kind == kind;
+        }
+
+        private void OnValidate()
+        {
+            EnsureActiveKindData();
+        }
+
+        public override void OnEditorApply()
+        {
+            base.OnEditorApply();
+            EnsureActiveKindData();
         }
 
         private bool ShowMoveConfig()
@@ -132,6 +268,14 @@ namespace ES
 
         public void InjectGameCoreTables()
         {
+            // Item Group/Pack 会按 IGameCoreSO 统一转发；条件型普通 Item 在这里安全跳过，
+            // 只有 Shot/Weapon 才是实际 GameCore 根并进入强类型表。
+            if (!IsGameCoreRoot)
+                return;
+
+            ESItemDataValidationCode validation = ValidateConfiguration(includeEditorMetadata: false);
+            if (validation != ESItemDataValidationCode.Valid)
+                throw new System.InvalidOperationException("Item GameCore 配置无效：" + name + "，" + GetValidationMessage(validation));
             ESItemGameCoreTable.Inject(this);
         }
 
@@ -145,25 +289,25 @@ namespace ES
             switch (kind)
             {
                 case ItemKind.Shot:
-                    return $"{displayName}: Shot data. Configure Shot Shared/Variable here.";
+                    return $"{displayName}：飞行物配置；在类型专属块中配置 SharedData、初始状态与 Shot Key。";
                 case ItemKind.Door:
-                    return $"{displayName}: Door data. Configure interaction, logic and blocking rules.";
+                    return $"{displayName}：门配置；组合通用交互、逻辑、移动与阻挡规则。";
                 case ItemKind.Trap:
-                    return $"{displayName}: Trap data. Configure detection, cooldown and target rules.";
+                    return $"{displayName}：陷阱配置；设置检测、冷却与目标规则。";
                 case ItemKind.Weapon:
-                    return $"{displayName}: Weapon data. Describes weapon logic and default shot.";
+                    return $"{displayName}：武器配置；设置武器逻辑、运行状态与默认飞行物。";
                 case ItemKind.Pickup:
-                    return $"{displayName}: Pickup data. Configure pickup radius, amount, owner and lifetime.";
+                    return $"{displayName}：拾取物配置；设置拾取半径、数量、归属与生命周期。";
                 case ItemKind.Zone:
-                    return $"{displayName}: Zone data. Configure enter, stay, exit and period checks.";
+                    return $"{displayName}：持续区域配置；设置进入、停留、离开与周期检测。";
                 case ItemKind.Prop:
-                    return $"{displayName}: Prop data. Basic world object definition.";
+                    return $"{displayName}：普通场景物件配置。";
                 case ItemKind.Tower:
                 case ItemKind.Platform:
                 case ItemKind.Rotator:
-                    return $"{displayName}: Legacy item subtype. Currently indexed as Prop.";
+                    return $"{displayName}：复用普通物件类型块，并保留独立 ItemKind 语义。";
                 default:
-                    return "Select an Item kind. Main kinds: Shot / Door / Trap / Weapon / Pickup / Zone / Prop.";
+                    return "请先选择 ItemKind；每条 ItemDataInfo 只保留一个对应的类型专属配置块。";
             }
         }
     }
@@ -188,7 +332,7 @@ namespace ES
     /// <summary>Shot 的强类型 GameCore 表入口；ItemDataInfo 是其按 ItemKind 分流的配置根。</summary>
     public static class ESShotGameCoreTable
     {
-        public static ESConfigKeyTable<ESShotRuntimeData> Table => ESRuntimeDataGameCore.Shots;
+        public static ESShotConfigKeyTable Table => ESRuntimeDataGameCore.Shots;
 
         public static void Inject(ItemDataInfo info)
         {
@@ -200,22 +344,33 @@ namespace ES
             if (ownsBuild) Table.BeginBuild();
             try
             {
-                info.shotShared ??= ItemShotSharedData.Default;
-                info.shotKey ??= new ESShotConfigKey();
-                if (Table.TryGet(info.shotKey, out ESShotRuntimeData existing))
+                ItemShotDataBlock block = info.kindData as ItemShotDataBlock;
+                if (block == null)
+                    throw new System.InvalidOperationException("Shot 缺少激活配置块：" + info.name);
+                if (Table.TryGet(block.key, out ESShotRuntimeData existing))
                 {
                     if (object.ReferenceEquals(existing.soSource, info)) return;
-                    throw new System.InvalidOperationException("Shot GameCore Key 重复：" + info.KeyName);
+                    throw new System.InvalidOperationException("Shot GameCore Key 重复：" + info.name);
                 }
-                var data = new ESShotRuntimeData
+                ESShotRuntimeData data = Table.AcquireRetained(block.key);
+                try
                 {
-                    keyName = info.KeyName, displayName = ESItemGameCoreDisplayName.Get(info), sourcePackage = info.name,
-                    soSource = info, sharedData = info.shotShared, defaultVariableData = info.shotVariable,
-                    prefab = info.baseConfig.prefab
-                };
-                data.runtimeKey = Table.Bake(info.shotKey, info.KeyName);
-                if (!Table.Upsert(info.shotKey, data, info.KeyName))
-                    throw new System.InvalidOperationException("Shot GameCore 注入失败：" + info.KeyName);
+                    data.keyName = ESConfigKeyMatch.Describe(block.key.EnumKeyInt, block.key.StringKey);
+                    data.displayName = ESItemGameCoreDisplayName.Get(info);
+                    data.sourcePackage = info.name;
+                    data.soSource = info;
+                    data.sharedData = block.sharedData;
+                    data.defaultVariableData = block.initialState;
+                    data.prefab = info.baseConfig.prefab;
+                    int runtimeKey = Table.CommitRetained(block.key, data, debugName: info.name);
+                    if (runtimeKey == 0)
+                        throw new System.InvalidOperationException("Shot GameCore 注入失败：" + info.name);
+                }
+                catch
+                {
+                    Table.AbandonRetained(data);
+                    throw;
+                }
             }
             finally { if (ownsBuild) Table.EndBuild(); }
         }
@@ -224,7 +379,7 @@ namespace ES
     /// <summary>Weapon 的强类型 GameCore 表入口；ItemDataInfo 是其按 ItemKind 分流的配置根。</summary>
     public static class ESWeaponGameCoreTable
     {
-        public static ESConfigKeyTable<ESWeaponRuntimeData> Table => ESRuntimeDataGameCore.Weapons;
+        public static ESWeaponConfigKeyTable Table => ESRuntimeDataGameCore.Weapons;
 
         public static void Inject(ItemDataInfo info)
         {
@@ -236,22 +391,33 @@ namespace ES
             if (ownsBuild) Table.BeginBuild();
             try
             {
-                info.weaponShared ??= ItemWeaponSharedData.Default;
-                info.weaponKey ??= new ESWeaponConfigKey();
-                if (Table.TryGet(info.weaponKey, out ESWeaponRuntimeData existing))
+                ItemWeaponDataBlock block = info.kindData as ItemWeaponDataBlock;
+                if (block == null)
+                    throw new System.InvalidOperationException("Weapon 缺少激活配置块：" + info.name);
+                if (Table.TryGet(block.key, out ESWeaponRuntimeData existing))
                 {
                     if (object.ReferenceEquals(existing.soSource, info)) return;
-                    throw new System.InvalidOperationException("Weapon GameCore Key 重复：" + info.KeyName);
+                    throw new System.InvalidOperationException("Weapon GameCore Key 重复：" + info.name);
                 }
-                var data = new ESWeaponRuntimeData
+                ESWeaponRuntimeData data = Table.AcquireRetained(block.key);
+                try
                 {
-                    keyName = info.KeyName, displayName = ESItemGameCoreDisplayName.Get(info), sourcePackage = info.name,
-                    soSource = info, sharedData = info.weaponShared, defaultVariableData = info.weaponVariable,
-                    prefab = info.baseConfig.prefab
-                };
-                data.runtimeKey = Table.Bake(info.weaponKey, info.KeyName);
-                if (!Table.Upsert(info.weaponKey, data, info.KeyName))
-                    throw new System.InvalidOperationException("Weapon GameCore 注入失败：" + info.KeyName);
+                    data.keyName = ESConfigKeyMatch.Describe(block.key.EnumKeyInt, block.key.StringKey);
+                    data.displayName = ESItemGameCoreDisplayName.Get(info);
+                    data.sourcePackage = info.name;
+                    data.soSource = info;
+                    data.sharedData = block.sharedData;
+                    data.defaultVariableData = block.initialState;
+                    data.prefab = info.baseConfig.prefab;
+                    int runtimeKey = Table.CommitRetained(block.key, data, debugName: info.name);
+                    if (runtimeKey == 0)
+                        throw new System.InvalidOperationException("Weapon GameCore 注入失败：" + info.name);
+                }
+                catch
+                {
+                    Table.AbandonRetained(data);
+                    throw;
+                }
             }
             finally { if (ownsBuild) Table.EndBuild(); }
         }
@@ -259,6 +425,6 @@ namespace ES
 
     internal static class ESItemGameCoreDisplayName
     {
-        public static string Get(ItemDataInfo info) => !string.IsNullOrWhiteSpace(info.baseConfig.displayName) ? info.baseConfig.displayName : info.KeyName;
+        public static string Get(ItemDataInfo info) => !string.IsNullOrWhiteSpace(info.baseConfig.displayName) ? info.baseConfig.displayName : info.name;
     }
 }

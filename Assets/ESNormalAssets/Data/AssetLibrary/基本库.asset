@@ -44,7 +44,6 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: GameObject (3)
-      RuntimeKey: 30000
       AssetGuid: 495b09c783492784e88277aa816dfdce
       LocalFileId: 0
       AssetPath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/GameObject (3).prefab
@@ -58,10 +57,50 @@ MonoBehaviour:
       Kind: 1
       EnumKey: 0
       StringKey: Cube
-      RuntimeKey: 30013
       AssetGuid: ced2cf8765a6a8a4ea274b78c4070e15
       LocalFileId: 0
       AssetPath: Assets/ESNormalAssets/Prefabs/Cube.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: bd6a374707a713e4eb09b6802f8fe4aa
+      SourceBook: "\u9ED8\u8BA4 \u9ED8\u8BA4\u9884\u5236\u4F53Book"
+    - Name: Level01_Blocks_Blue 1
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 108, guid: fe9d3c31d17cd5944b8ab44d7bb88a6f, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: Level01_Blocks_Blue 1
+      AssetGuid: fe9d3c31d17cd5944b8ab44d7bb88a6f
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue
+        1.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: bd6a374707a713e4eb09b6802f8fe4aa
+      SourceBook: "\u9ED8\u8BA4 \u9ED8\u8BA4\u9884\u5236\u4F53Book"
+    - Name: Level01_Blocks_Blue 2
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 108, guid: fb11bcdb17a4c8a4da4b4408ebd38dc6, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: Level01_Blocks_Blue 8
+      AssetGuid: fb11bcdb17a4c8a4da4b4408ebd38dc6
+      LocalFileId: 0
+      AssetPath: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue
+        2.prefab
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: bd6a374707a713e4eb09b6802f8fe4aa
+      SourceBook: "\u9ED8\u8BA4 \u9ED8\u8BA4\u9884\u5236\u4F53Book"
+    - Name: "Level01_Blocks_Blue_\u65B0\u9884\u5236\u4EF6"
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 108, guid: 5ce35da9235246e4e8b6045d2390e3a9, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: "Level01_Blocks_Blue_\u65B0\u9884\u5236\u4EF6"
+      AssetGuid: 5ce35da9235246e4e8b6045d2390e3a9
+      LocalFileId: 0
+      AssetPath: "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Prefabs/Level01_Blocks/Level01_Blocks_Blue_\u65B0\u9884\u5236\u4EF6.prefab"
       AssetTypeName: UnityEngine.GameObject
       SourceLibrary: bd6a374707a713e4eb09b6802f8fe4aa
       SourceBook: "\u9ED8\u8BA4 \u9ED8\u8BA4\u9884\u5236\u4F53Book"
@@ -196,3 +235,4 @@ MonoBehaviour:
   ContainsBuild: 1
   AssetBundleCode: 
   IsNet: 1
+  _deliveryMode: 1

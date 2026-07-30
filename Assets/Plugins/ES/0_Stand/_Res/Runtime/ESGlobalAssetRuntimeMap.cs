@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -8,7 +9,7 @@ namespace ES
     /// <summary>
     /// 全局运行时资产映射：只负责稳定资产身份到当前构建物理加载位置的映射。
     /// </summary>
-    [CreateAssetMenu(menuName = "ES/Resource/Global Asset Runtime Map")]
+    [CreateAssetMenu(menuName = "【ES】/资源与发布/运行时配置/全局资源运行时映射")]
     public class ESGlobalAssetRuntimeMap : ScriptableObject
     {
         [FormerlySerializedAs("packages")]
@@ -37,6 +38,78 @@ namespace ES
             subAssets = subAssetRecords ?? Array.Empty<ESRuntimeSubAssetRecord>();
             ValidateReleaseRecordsOrThrow();
             RebuildRuntimeIndex();
+        }
+
+        /// <summary>
+        /// Creates one immutable-in-practice runtime view from independently downloaded release
+        /// fragments. A fragment may repeat a shared dependency, but it may never redefine an
+        /// existing identity with different content. This keeps Consumer/Library on-demand
+        /// loading deterministic and prevents a partial result from replacing the boot map.
+        /// </summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static ESGlobalAssetRuntimeMap Merge(ESGlobalAssetRuntimeMap current, ESGlobalAssetRuntimeMap addition)
+        {
+            if (addition == null) throw new ArgumentNullException(nameof(addition));
+            if (current == null) return addition;
+
+            var bundles = new Dictionary<string, ESRuntimeAssetBundleRecord>(StringComparer.Ordinal);
+            var assets = new Dictionary<string, ESRuntimeAssetRecord>(StringComparer.Ordinal);
+            var subAssets = new Dictionary<ESSubAssetId, ESRuntimeSubAssetRecord>();
+            AddRecords(current, bundles, assets, subAssets);
+            AddRecords(addition, bundles, assets, subAssets);
+
+            var merged = CreateInstance<ESGlobalAssetRuntimeMap>();
+            merged.SetRecords(bundles.Values.OrderBy(item => item.AssetBundleKey, StringComparer.Ordinal).ToArray(),
+                assets.Values.OrderBy(item => item.Guid, StringComparer.Ordinal).ToArray(),
+                subAssets.Values.OrderBy(item => item.Guid, StringComparer.Ordinal).ThenBy(item => item.LocalFileId).ToArray());
+            return merged;
+        }
+
+        private static void AddRecords(ESGlobalAssetRuntimeMap source, Dictionary<string, ESRuntimeAssetBundleRecord> bundles,
+            Dictionary<string, ESRuntimeAssetRecord> assets, Dictionary<ESSubAssetId, ESRuntimeSubAssetRecord> subAssets)
+        {
+            foreach (ESRuntimeAssetBundleRecord record in source.assetBundles)
+                AddOrValidate(bundles, record.AssetBundleKey, record, SameBundle, "BundleKey");
+            foreach (ESRuntimeAssetRecord record in source.assets)
+                AddOrValidate(assets, record.Guid, record, SameAsset, "Asset GUID");
+            foreach (ESRuntimeSubAssetRecord record in source.subAssets)
+                AddOrValidate(subAssets, record.Id, record, SameSubAsset, "SubAsset identity");
+        }
+
+        private static void AddOrValidate<TKey, TValue>(Dictionary<TKey, TValue> records, TKey key, TValue value, Func<TValue, TValue, bool> same, string identity)
+        {
+            if (records.TryGetValue(key, out TValue existing))
+            {
+                if (!same(existing, value))
+                    throw new InvalidOperationException("[ESRes][RuntimeMap] 增量发布内容重定义了 " + identity + "：" + key);
+                return;
+            }
+            records.Add(key, value);
+        }
+
+        private static bool SameBundle(ESRuntimeAssetBundleRecord left, ESRuntimeAssetBundleRecord right)
+        {
+            return left.Size == right.Size && left.Crc == right.Crc
+                && string.Equals(left.ContentHash, right.ContentHash, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(left.LocalPath, right.LocalPath, StringComparison.Ordinal)
+                && string.Equals(left.StreamingUrl, right.StreamingUrl, StringComparison.Ordinal)
+                && string.Equals(left.RemoteUrl, right.RemoteUrl, StringComparison.Ordinal)
+                && left.Dependencies.SequenceEqual(right.Dependencies, StringComparer.Ordinal);
+        }
+
+        private static bool SameAsset(ESRuntimeAssetRecord left, ESRuntimeAssetRecord right)
+        {
+            return string.Equals(left.AssetBundleKey, right.AssetBundleKey, StringComparison.Ordinal)
+                && string.Equals(left.InternalName, right.InternalName, StringComparison.Ordinal)
+                && string.Equals(left.TypeName, right.TypeName, StringComparison.Ordinal);
+        }
+
+        private static bool SameSubAsset(ESRuntimeSubAssetRecord left, ESRuntimeSubAssetRecord right)
+        {
+            return string.Equals(left.AssetBundleKey, right.AssetBundleKey, StringComparison.Ordinal)
+                && string.Equals(left.InternalName, right.InternalName, StringComparison.Ordinal)
+                && string.Equals(left.Selector, right.Selector, StringComparison.Ordinal)
+                && string.Equals(left.TypeName, right.TypeName, StringComparison.Ordinal);
         }
 
         private void ValidateReleaseRecordsOrThrow()

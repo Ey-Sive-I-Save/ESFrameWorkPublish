@@ -118,7 +118,7 @@ namespace ES.EditorInternal
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.Label(valid ? "✓" : "×", valid ? EditorStyles.boldLabel : EditorStyles.whiteBoldLabel, GUILayout.Width(18f));
                 EditorGUILayout.LabelField(asset != null ? asset.name : "资产丢失", EditorStyles.boldLabel, GUILayout.MinWidth(90f));
-                EditorGUILayout.LabelField(type, GUILayout.Width(76f));
+                EditorGUILayout.LabelField(type, GUILayout.Width(96f));
                 EditorGUILayout.LabelField(relativePath, EditorStyles.miniLabel);
                 if (manual) GUILayout.Label("手动", EditorStyles.miniBoldLabel, GUILayout.Width(30f));
                 using (new EditorGUI.DisabledScope(!valid))
@@ -172,7 +172,7 @@ namespace ES.EditorInternal
         private static string ResolveGameCoreType(ScriptableObject asset)
         {
             if (asset is ItemDataInfo item && item.baseConfig != null)
-                return item.baseConfig.kind.ToString();
+                return "Item/" + item.baseConfig.kind;
             string name = asset.GetType().Name;
             name = name.Replace("DefinitionDataInfo", string.Empty).Replace("DataInfo", string.Empty);
             return string.IsNullOrWhiteSpace(name) ? "GameCore" : name;

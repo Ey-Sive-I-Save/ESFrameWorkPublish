@@ -18,12 +18,6 @@ namespace ES
     /// </summary>
     public partial class ESResMaster
     {
-        [NonSerialized]
-        public static Dictionary<string, DownloadedLibraryData> DownloadedLibraries = new Dictionary<string, DownloadedLibraryData>();
-
-        [NonSerialized]
-        public static Dictionary<string, DownloadedConsumerData> DownloadedConsumers = new Dictionary<string, DownloadedConsumerData>();
-
         #region 全局资源缓存
         /// <summary>
         /// 全局AssetKeys缓存：支持通过GUID或资源路径查询Asset对应的ESResKey
@@ -110,36 +104,6 @@ namespace ES
         [InspectorName("加载中")] Loading = 1,
         [InspectorName("完毕")] Ready = 2,
     }
-
-    /// <summary>
-    /// 已下载库的数据结构，持久存储整个生命周期，支持rebuild。
-    /// </summary>
-    [Serializable]
-    public class DownloadedLibraryData
-    {
-        public string LibraryName; // 库显示名
-        public string LibFolderName; // 库文件夹名
-        public string LocalPath; // 预计算本地路径
-        public string RemotePath; // 预计算远程路径
-        public bool IsRemote; // 是否远程
-        public string Version; // 版本号
-        public string Description; // 描述
-        public long TotalSize; // 库总大小（字节）
-        public int ChangeCount; // 用于rebuild检查
-    }
-
-    /// <summary>
-    /// 已下载消费者（扩展包）的数据结构，引用多个库。
-    /// </summary>
-    [Serializable]
-    public class DownloadedConsumerData
-    {
-        public string ConsumerName; // 消费者显示名
-        public string Version; // 版本号
-        public string Description; // 描述
-        public List<string> ReferencedLibFolderNames; // 引用的库文件夹名列表
-    }
-
 
 }
 

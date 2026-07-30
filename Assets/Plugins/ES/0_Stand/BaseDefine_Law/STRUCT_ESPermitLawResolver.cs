@@ -159,11 +159,36 @@ namespace ES
 
         public static bool IsHigherAuthority(ESPermitLawEntry candidate, ESPermitLawEntry currentBest)
         {
-            if (candidate.priority != currentBest.priority)
-                return candidate.priority > currentBest.priority;
+            return IsHigherAuthority(
+                candidate.decision,
+                candidate.priority,
+                candidate.stackIndex,
+                currentBest.decision,
+                currentBest.priority,
+                currentBest.stackIndex);
+        }
 
-            return candidate.stackIndex > currentBest.stackIndex;
+        /// <summary>
+        /// Single authority comparison for every Permit resolver. This overload keeps hot callers free
+        /// of temporary List/entry allocation while preserving the exact hard-rule/priority/order policy.
+        /// </summary>
+        public static bool IsHigherAuthority(
+            ESPermitLaw candidateDecision,
+            int candidatePriority,
+            int candidateStackIndex,
+            ESPermitLaw currentDecision,
+            int currentPriority,
+            int currentStackIndex)
+        {
+            bool candidateHard = ESPermitLawUtility.IsHard(candidateDecision);
+            bool currentHard = ESPermitLawUtility.IsHard(currentDecision);
+            if (candidateHard != currentHard)
+                return candidateHard;
+
+            if (candidatePriority != currentPriority)
+                return candidatePriority > currentPriority;
+
+            return candidateStackIndex > currentStackIndex;
         }
     }
 }
-

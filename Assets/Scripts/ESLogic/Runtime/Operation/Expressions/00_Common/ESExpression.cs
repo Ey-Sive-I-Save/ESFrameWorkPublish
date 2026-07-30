@@ -8,11 +8,86 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
+    /// Receives dependencies discovered while an expression is evaluated. Expression nodes only
+    /// report what they actually read; lifecycle ownership remains with the evaluation host.
+    /// </summary>
+    public interface IESExpressionDependencySink
+    {
+        void ObserveContextFloat(ContextPool context, string key);
+        void ObserveContextBool(ContextPool context, string key);
+    }
+
+    /// <summary>
+    /// Thread-local capture scope used by opt-in hosts such as Buff ValueChange OnDirty bindings.
+    /// Normal expression evaluations have no capture object and remain allocation-free.
+    /// </summary>
+    public static class ESExpressionDependencyCapture
+    {
+        [ThreadStatic] private static IESExpressionDependencySink current;
+
+        public static ESExpressionDependencyCaptureScope Begin(IESExpressionDependencySink sink)
+        {
+            IESExpressionDependencySink previous = current;
+            current = sink;
+            return new ESExpressionDependencyCaptureScope(previous);
+        }
+
+        public static void ObserveContextFloat(ContextPool context, string key)
+        {
+            if (context != null && !string.IsNullOrEmpty(key))
+                current?.ObserveContextFloat(context, key);
+        }
+
+        public static void ObserveContextBool(ContextPool context, string key)
+        {
+            if (context != null && !string.IsNullOrEmpty(key))
+                current?.ObserveContextBool(context, key);
+        }
+
+        internal static void Restore(IESExpressionDependencySink previous)
+        {
+            current = previous;
+        }
+    }
+
+    public readonly struct ESExpressionDependencyCaptureScope : IDisposable
+    {
+        private readonly IESExpressionDependencySink previous;
+
+        internal ESExpressionDependencyCaptureScope(IESExpressionDependencySink previous)
+        {
+            this.previous = previous;
+        }
+
+        public void Dispose()
+        {
+            ESExpressionDependencyCapture.Restore(previous);
+        }
+    }
+
+    public enum ESExpressionDeterminism : byte
+    {
+        Unknown,
+        Deterministic,
+        NonDeterministic
+    }
+
+    /// <summary>
     /// 运行时取值表达式基类。
     /// 表达式通过 Evaluate 从运行目标和支持环境中计算出一个值。
     /// </summary>
     public abstract class ESGetExpression<TOut>
     {
+        /// <summary>
+        /// Expressions used by lasting simulation state must be deterministic. New expression
+        /// types default to unknown and are rejected by lasting simulation state until they opt in.
+        /// Nodes that read randomness, wall-clock time, or another process-local source must opt
+        /// out explicitly.
+        /// </summary>
+        public virtual ESExpressionDeterminism Determinism => ESExpressionDeterminism.Unknown;
+
+        public bool IsDeterministic => Determinism == ESExpressionDeterminism.Deterministic;
+
         public abstract TOut Evaluate(ESRuntimeTargetPack target, ESOpSupport support);
     }
 
@@ -78,6 +153,8 @@ namespace ES
         [LabelText("值")]
         public float value;
 
+        public override ESExpressionDeterminism Determinism => ESExpressionDeterminism.Deterministic;
+
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
@@ -93,6 +170,11 @@ namespace ES
 
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetFloatExpression right;
+
+        public override ESExpressionDeterminism Determinism =>
+            left != null && !left.IsDeterministic || right != null && !right.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
 
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
@@ -112,6 +194,11 @@ namespace ES
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetFloatExpression right;
 
+        public override ESExpressionDeterminism Determinism =>
+            left != null && !left.IsDeterministic || right != null && !right.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
+
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             float leftValue = left != null ? left.Evaluate(target, support) : 0f;
@@ -128,6 +215,11 @@ namespace ES
 
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetFloatExpression right;
+
+        public override ESExpressionDeterminism Determinism =>
+            left != null && !left.IsDeterministic || right != null && !right.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
 
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
@@ -149,6 +241,11 @@ namespace ES
         public ESFloatDivideZeroMode divideZeroMode = ESFloatDivideZeroMode.ReturnZero;
 
         public ESFloatDivideExpressionFallback fallback = new ESFloatDivideExpressionFallback();
+
+        public override ESExpressionDeterminism Determinism =>
+            left != null && !left.IsDeterministic || right != null && !right.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
 
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
@@ -198,6 +295,11 @@ namespace ES
         [LabelText("最大值")]
         public float max = 1f;
 
+        public override ESExpressionDeterminism Determinism =>
+            input != null && !input.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
+
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             float value = input != null ? input.Evaluate(target, support) : 0f;
@@ -209,6 +311,8 @@ namespace ES
     public class ESRuntimeTargetFloatExpression : ESGetFloatExpression
     {
         public float defaultValue = 1f;
+
+        public override ESExpressionDeterminism Determinism => ESExpressionDeterminism.Deterministic;
 
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
@@ -225,11 +329,16 @@ namespace ES
         [LabelText("默认值")]
         public float defaultValue;
 
+        public override ESExpressionDeterminism Determinism => ESExpressionDeterminism.Deterministic;
+
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
-            return support != null && support.Context != null
-                ? support.Context.GetFloat(key, defaultValue)
-                : defaultValue;
+            ContextPool context = support != null ? support.Context : null;
+            if (context == null)
+                return defaultValue;
+
+            ESExpressionDependencyCapture.ObserveContextFloat(context, key);
+            return context.GetFloat(key, defaultValue);
         }
     }
 
@@ -238,6 +347,8 @@ namespace ES
     {
         public float min = 0f;
         public float max = 1f;
+
+        public override ESExpressionDeterminism Determinism => ESExpressionDeterminism.NonDeterministic;
 
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
@@ -249,6 +360,8 @@ namespace ES
     public class ESDistanceUserToMainTargetFloatExpression : ESGetFloatExpression
     {
         public float defaultValue;
+
+        public override ESExpressionDeterminism Determinism => ESExpressionDeterminism.Deterministic;
 
         public override float Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
@@ -272,9 +385,34 @@ namespace ES
         [LabelText("值")]
         public bool value = true;
 
+        public override ESExpressionDeterminism Determinism => ESExpressionDeterminism.Deterministic;
+
         public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
             return value;
+        }
+    }
+
+    /// <summary>Reads a Bool Context key and participates in ValueChange OnDirty dependency capture.</summary>
+    [Serializable, TypeRegistryItem("Expression/Value/Bool/Context/GetBool")]
+    public class ESContextBoolExpression : ESGetBoolExpression
+    {
+        [LabelText("Key")]
+        public string key;
+
+        [LabelText("默认值")]
+        public bool defaultValue;
+
+        public override ESExpressionDeterminism Determinism => ESExpressionDeterminism.Deterministic;
+
+        public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
+        {
+            ContextPool context = support != null ? support.Context : null;
+            if (context == null)
+                return defaultValue;
+
+            ESExpressionDependencyCapture.ObserveContextBool(context, key);
+            return context.GetBool(key, defaultValue);
         }
     }
 
@@ -287,6 +425,11 @@ namespace ES
 
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetBoolExpression right;
+
+        public override ESExpressionDeterminism Determinism =>
+            left != null && !left.IsDeterministic || right != null && !right.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
 
         public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
@@ -306,6 +449,11 @@ namespace ES
 
         [SerializeReference, InlineProperty, LabelText("右"), ESCompactEdit("右")]
         public ESGetBoolExpression right;
+
+        public override ESExpressionDeterminism Determinism =>
+            left != null && !left.IsDeterministic || right != null && !right.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
 
         public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {
@@ -336,6 +484,11 @@ namespace ES
 
         [LabelText("比较")]
         public CompareType compareType = CompareType.GreaterEqual;
+
+        public override ESExpressionDeterminism Determinism =>
+            left != null && !left.IsDeterministic || right != null && !right.IsDeterministic
+                ? ESExpressionDeterminism.NonDeterministic
+                : ESExpressionDeterminism.Deterministic;
 
         public override bool Evaluate(ESRuntimeTargetPack target, ESOpSupport support)
         {

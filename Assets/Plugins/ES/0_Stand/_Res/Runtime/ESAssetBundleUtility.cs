@@ -179,6 +179,8 @@ namespace ES
                 case RuntimePlatform.IPhonePlayer:
                 case RuntimePlatform.tvOS: return "iOS";
                 case RuntimePlatform.WebGLPlayer: return "WebGL";
+                case RuntimePlatform.OSXPlayer:
+                case RuntimePlatform.OSXEditor: return "macOS";
                 case RuntimePlatform.LinuxPlayer:
                 case RuntimePlatform.LinuxEditor: return "Linux";
                 case RuntimePlatform.PS5: return "PS5";
@@ -199,6 +201,8 @@ namespace ES
                 case RuntimePlatform.IPhonePlayer:
                 case RuntimePlatform.tvOS: return "iOS";
                 case RuntimePlatform.WebGLPlayer: return "WebGL";
+                case RuntimePlatform.OSXPlayer:
+                case RuntimePlatform.OSXEditor: return "StandaloneOSX";
                 case RuntimePlatform.LinuxPlayer:
                 case RuntimePlatform.LinuxEditor: return "StandaloneLinux64";
                 case RuntimePlatform.PS5: return "PS5";

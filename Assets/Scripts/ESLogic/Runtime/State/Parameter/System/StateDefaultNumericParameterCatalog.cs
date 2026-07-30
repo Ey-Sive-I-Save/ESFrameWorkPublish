@@ -90,16 +90,20 @@ namespace ES
         private static readonly StateDefaultIntParameterDefinition[] IntDefinitionsByIndex;
         private static readonly string[] IntNamesByIndex;
         private static readonly bool[] IntExistsByIndex;
+        private static readonly int[] IntRuntimeKeyByEnumValue;
 
         private static readonly StateDefaultBoolParameterDefinition[] BoolDefinitionsByIndex;
         private static readonly string[] BoolNamesByIndex;
         private static readonly bool[] BoolExistsByIndex;
+        private static readonly int[] BoolRuntimeKeyByEnumValue;
 
         private static readonly Dictionary<string, StateDefaultIntParameter> IntEnumByName;
         private static readonly Dictionary<string, StateDefaultBoolParameter> BoolEnumByName;
 
         public static readonly int MaxIntParameterValue;
         public static readonly int MaxBoolParameterValue;
+        public static readonly int IntRuntimeKeyCount;
+        public static readonly int BoolRuntimeKeyCount;
 
         static StateDefaultNumericParameterCatalog()
         {
@@ -138,6 +142,7 @@ namespace ES
             IntDefinitionsByIndex = new StateDefaultIntParameterDefinition[maxIntValue + 1];
             IntNamesByIndex = new string[maxIntValue + 1];
             IntExistsByIndex = new bool[maxIntValue + 1];
+            IntRuntimeKeyByEnumValue = new int[maxIntValue + 1];
             for (int i = 0; i < IntDefinitions.Length; i++)
             {
                 var def = IntDefinitions[i];
@@ -150,6 +155,7 @@ namespace ES
             BoolDefinitionsByIndex = new StateDefaultBoolParameterDefinition[maxBoolValue + 1];
             BoolNamesByIndex = new string[maxBoolValue + 1];
             BoolExistsByIndex = new bool[maxBoolValue + 1];
+            BoolRuntimeKeyByEnumValue = new int[maxBoolValue + 1];
             for (int i = 0; i < BoolDefinitions.Length; i++)
             {
                 var def = BoolDefinitions[i];
@@ -158,6 +164,9 @@ namespace ES
                 BoolNamesByIndex[index] = def.Name;
                 BoolExistsByIndex[index] = true;
             }
+
+            IntRuntimeKeyCount = BuildIntRuntimeKeys();
+            BoolRuntimeKeyCount = BuildBoolRuntimeKeys();
         }
 
         public static bool TryGetDefinition(StateDefaultIntParameter parameter, out StateDefaultIntParameterDefinition definition)
@@ -181,8 +190,13 @@ namespace ES
 
         public static bool TryGetIndex(StateDefaultIntParameter parameter, out int index)
         {
-            index = (int)parameter;
-            return (uint)index < (uint)IntExistsByIndex.Length && IntExistsByIndex[index];
+            int enumValue = (int)parameter;
+            if ((uint)enumValue < (uint)IntRuntimeKeyByEnumValue.Length
+                && (index = IntRuntimeKeyByEnumValue[enumValue]) != 0)
+                return true;
+
+            index = 0;
+            return false;
         }
 
         public static bool TryGetDefinition(StateDefaultBoolParameter parameter, out StateDefaultBoolParameterDefinition definition)
@@ -206,8 +220,13 @@ namespace ES
 
         public static bool TryGetIndex(StateDefaultBoolParameter parameter, out int index)
         {
-            index = (int)parameter;
-            return (uint)index < (uint)BoolExistsByIndex.Length && BoolExistsByIndex[index];
+            int enumValue = (int)parameter;
+            if ((uint)enumValue < (uint)BoolRuntimeKeyByEnumValue.Length
+                && (index = BoolRuntimeKeyByEnumValue[enumValue]) != 0)
+                return true;
+
+            index = 0;
+            return false;
         }
 
         public static bool TryGetName(StateDefaultIntParameter parameter, out string name)
@@ -256,6 +275,26 @@ namespace ES
             }
 
             return BoolEnumByName.TryGetValue(name, out parameter);
+        }
+
+        private static int BuildIntRuntimeKeys()
+        {
+            StateDefaultIntParameterDefinition[] ordered = (StateDefaultIntParameterDefinition[])IntDefinitions.Clone();
+            Array.Sort(ordered, (left, right) => ((int)left.Parameter).CompareTo((int)right.Parameter));
+            for (int i = 0; i < ordered.Length; i++)
+                IntRuntimeKeyByEnumValue[(int)ordered[i].Parameter] = i + 1;
+
+            return ordered.Length;
+        }
+
+        private static int BuildBoolRuntimeKeys()
+        {
+            StateDefaultBoolParameterDefinition[] ordered = (StateDefaultBoolParameterDefinition[])BoolDefinitions.Clone();
+            Array.Sort(ordered, (left, right) => ((int)left.Parameter).CompareTo((int)right.Parameter));
+            for (int i = 0; i < ordered.Length; i++)
+                BoolRuntimeKeyByEnumValue[(int)ordered[i].Parameter] = i + 1;
+
+            return ordered.Length;
         }
     }
 }

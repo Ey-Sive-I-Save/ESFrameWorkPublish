@@ -4,6 +4,100 @@ using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// 项目 3D 物理 Layer 的唯一数值定义。
+    /// 名称与碰撞矩阵规则由 GameCoreEditorGlobalData 和编辑器同步工具维护。
+    /// </summary>
+    public static class ESPhysicsLayers
+    {
+        public const int Default = 0;
+        public const int IgnoreRaycast = 2;
+        public const int Water = 4;
+        public const int UI = 5;
+        public const int EntityBody = 6;
+        public const int Ground = 8;
+        public const int Wall = 9;
+        public const int WorldDynamic = 10;
+        public const int EntityHurtbox = 11;
+        public const int ItemBody = 12;
+        public const int Interaction = 13;
+        public const int TriggerZone = 14;
+        public const int Shot = 15;
+        public const int CameraBlocker = 16;
+        public const int Sensor = 17;
+
+        public const int DefaultMask = 1 << Default;
+        public const int IgnoreRaycastMask = 1 << IgnoreRaycast;
+        public const int WaterMask = 1 << Water;
+        public const int UIMask = 1 << UI;
+        public const int EntityBodyMask = 1 << EntityBody;
+        public const int GroundMask = 1 << Ground;
+        public const int WallMask = 1 << Wall;
+        public const int WorldDynamicMask = 1 << WorldDynamic;
+        public const int EntityHurtboxMask = 1 << EntityHurtbox;
+        public const int ItemBodyMask = 1 << ItemBody;
+        public const int InteractionMask = 1 << Interaction;
+        public const int TriggerZoneMask = 1 << TriggerZone;
+        public const int ShotMask = 1 << Shot;
+        public const int CameraBlockerMask = 1 << CameraBlocker;
+        public const int SensorMask = 1 << Sensor;
+
+        public const int WorldBlockerMask = GroundMask | WallMask | WorldDynamicMask | ItemBodyMask;
+        public const int MovementMask = EntityBodyMask | WorldBlockerMask;
+        public const int GroundProbeMask = GroundMask | WorldDynamicMask | ItemBodyMask;
+        public const int ShotHitMask = GroundMask | WallMask | WorldDynamicMask | EntityHurtboxMask | ItemBodyMask;
+        public const int MeleeHitMask = EntityHurtboxMask | ItemBodyMask;
+        public const int InteractionProbeMask = InteractionMask;
+        public const int TriggerZoneProbeMask = WaterMask | TriggerZoneMask;
+        public const int CameraObstacleMask = WorldBlockerMask | CameraBlockerMask;
+        public const int AIVisibilityMask = WorldBlockerMask;
+        public const int AITargetMask = EntityHurtboxMask;
+        public const int ClimbProbeMask = WallMask | WorldDynamicMask;
+        public const int MountProbeMask = InteractionMask;
+        public const int FootIKMask = GroundMask | WorldDynamicMask | ItemBodyMask;
+
+        /// <summary>
+        /// 兼容历史数据中的 ~0：飞行物绝不能因为“全层”默认值扫描到自身、交互盒或纯表现 Collider。
+        /// 需要更窄命中范围时可在具体 Shot 数据中填写明确 LayerMask。
+        /// </summary>
+        public static LayerMask ResolveShotHitMask(LayerMask configuredMask)
+        {
+            return configuredMask.value == ~0 ? ShotHitMask : configuredMask;
+        }
+
+        public static LayerMask GetQueryMask(GameCorePhysicsQueryRole roles)
+        {
+            int mask = 0;
+
+            if ((roles & GameCorePhysicsQueryRole.Movement) != 0)
+                mask |= MovementMask;
+            if ((roles & GameCorePhysicsQueryRole.GroundProbe) != 0)
+                mask |= GroundProbeMask;
+            if ((roles & GameCorePhysicsQueryRole.ShotHit) != 0)
+                mask |= ShotHitMask;
+            if ((roles & GameCorePhysicsQueryRole.MeleeHit) != 0)
+                mask |= MeleeHitMask;
+            if ((roles & GameCorePhysicsQueryRole.InteractionProbe) != 0)
+                mask |= InteractionProbeMask;
+            if ((roles & GameCorePhysicsQueryRole.TriggerZoneProbe) != 0)
+                mask |= TriggerZoneProbeMask;
+            if ((roles & GameCorePhysicsQueryRole.CameraObstacle) != 0)
+                mask |= CameraObstacleMask;
+            if ((roles & GameCorePhysicsQueryRole.AIVisibility) != 0)
+                mask |= AIVisibilityMask;
+            if ((roles & GameCorePhysicsQueryRole.AITarget) != 0)
+                mask |= AITargetMask;
+            if ((roles & GameCorePhysicsQueryRole.ClimbProbe) != 0)
+                mask |= ClimbProbeMask;
+            if ((roles & GameCorePhysicsQueryRole.MountProbe) != 0)
+                mask |= MountProbeMask;
+            if ((roles & GameCorePhysicsQueryRole.FootIK) != 0)
+                mask |= FootIKMask;
+
+            return mask;
+        }
+    }
+
     [Serializable]
     public struct ESPhysicsQueryStats
     {
@@ -28,32 +122,59 @@ namespace ES
     {
         [Title("通用")]
         [LabelText("场景阻挡")]
-        public LayerMask worldBlockLayers = ~0;
+        public LayerMask worldBlockLayers = ESPhysicsLayers.WorldBlockerMask;
 
         [LabelText("角色身体")]
-        public LayerMask entityBodyLayers = ~0;
+        public LayerMask entityBodyLayers = ESPhysicsLayers.EntityBodyMask;
 
         [LabelText("角色受击")]
-        public LayerMask entityHurtboxLayers = ~0;
+        public LayerMask entityHurtboxLayers = ESPhysicsLayers.EntityHurtboxMask;
 
         [LabelText("Item物体")]
-        public LayerMask itemBodyLayers = ~0;
+        public LayerMask itemBodyLayers = ESPhysicsLayers.ItemBodyMask;
 
         [LabelText("交互")]
-        public LayerMask interactionLayers = ~0;
+        public LayerMask interactionLayers = ESPhysicsLayers.InteractionMask;
 
         [LabelText("陷阱/区域")]
-        public LayerMask triggerZoneLayers = ~0;
+        public LayerMask triggerZoneLayers = ESPhysicsLayers.TriggerZoneMask;
 
         [Title("组合")]
+        [LabelText("运动阻挡")]
+        public LayerMask movementLayers = ESPhysicsLayers.MovementMask;
+
+        [LabelText("地面探测")]
+        public LayerMask groundProbeLayers = ESPhysicsLayers.GroundProbeMask;
+
         [LabelText("飞行物命中")]
-        public LayerMask shotHitLayers = ~0;
+        public LayerMask shotHitLayers = ESPhysicsLayers.ShotHitMask;
 
         [LabelText("近战命中")]
-        public LayerMask meleeHitLayers = ~0;
+        public LayerMask meleeHitLayers = ESPhysicsLayers.MeleeHitMask;
 
         [LabelText("交互探测")]
-        public LayerMask interactionProbeLayers = ~0;
+        public LayerMask interactionProbeLayers = ESPhysicsLayers.InteractionProbeMask;
+
+        [LabelText("区域/水体探测")]
+        public LayerMask triggerZoneProbeLayers = ESPhysicsLayers.TriggerZoneProbeMask;
+
+        [LabelText("相机避障")]
+        public LayerMask cameraObstacleLayers = ESPhysicsLayers.CameraObstacleMask;
+
+        [LabelText("AI 视线遮挡")]
+        public LayerMask aiVisibilityLayers = ESPhysicsLayers.AIVisibilityMask;
+
+        [LabelText("AI 目标")]
+        public LayerMask aiTargetLayers = ESPhysicsLayers.AITargetMask;
+
+        [LabelText("攀爬探测")]
+        public LayerMask climbProbeLayers = ESPhysicsLayers.ClimbProbeMask;
+
+        [LabelText("骑乘探测")]
+        public LayerMask mountProbeLayers = ESPhysicsLayers.MountProbeMask;
+
+        [LabelText("脚部 IK")]
+        public LayerMask footIKLayers = ESPhysicsLayers.FootIKMask;
     }
 
     [Serializable]

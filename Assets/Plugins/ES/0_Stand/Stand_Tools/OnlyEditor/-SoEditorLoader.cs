@@ -41,15 +41,20 @@ namespace ES
             // 清空旧索引后重新注册
             ESEditorSO.SOS.Clear();
             string[] guids = AssetDatabase.FindAssets($"t:{nameof(ESSO)}");
+            var loadedPaths = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (string guid in guids)
             {
                 string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                ESSO soAsset = AssetDatabase.LoadAssetAtPath<ESSO>(assetPath);
-                if (soAsset != null)
-                {
-                    soAsset.Editor_EnsureInitializedAndRegistered();
-                }
+                if (string.IsNullOrEmpty(assetPath) || !loadedPaths.Add(assetPath))
+                    continue;
+
+                // A Group/Pack may store multiple ESSO sub-assets in one file. Register every
+                // exact object once so SOS remains the authoritative editor index for both
+                // main assets and GUID + LocalFileId sub-assets.
+                foreach (UnityEngine.Object loaded in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+                    if (loaded is ESSO soAsset)
+                        soAsset.Editor_EnsureInitializedAndRegistered();
             }
         }
     }

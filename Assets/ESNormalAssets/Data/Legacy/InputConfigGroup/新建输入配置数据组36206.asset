@@ -79,15 +79,18 @@ MonoBehaviour:
   configId: Default
   defaultSchemeId: KeyboardMouse
   schemes:
-  - schemeId: KeyboardMouse
+  - enumKey: 1
+    schemeId: KeyboardMouse
     displayName: "\u952E\u76D8\u9F20\u6807"
     deviceKind: 0
     bindingGroup: KeyboardMouse
-  - schemeId: Gamepad
+  - enumKey: 2
+    schemeId: Gamepad
     displayName: "\u624B\u67C4"
     deviceKind: 1
     bindingGroup: Gamepad
-  - schemeId: Touch
+  - enumKey: 3
+    schemeId: Touch
     displayName: "\u89E6\u6478/UI"
     deviceKind: 2
     bindingGroup: Touch

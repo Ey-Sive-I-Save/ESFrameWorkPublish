@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Sirenix.OdinInspector;
 
 namespace ES
@@ -56,7 +56,7 @@ namespace ES
     /// <summary>Monster 领域自己的强类型表入口。启动期写入，运行期直接强类型查表。</summary>
     public static class ESMonsterGameCoreTable
     {
-        public static ESConfigKeyTable<ESMonsterRuntimeData> Table => ESRuntimeDataGameCore.Monsters;
+        public static ESMonsterConfigKeyTable Table => ESRuntimeDataGameCore.Monsters;
 
         public static void Inject(MonsterDataInfo info)
         {
@@ -66,25 +66,32 @@ namespace ES
             try
             {
                 info.motionShared ??= EntityMotionSharedData.Default;
-                info.monsterKey ??= new ESMonsterConfigKey();
+                if (info.monsterKey == null || !info.monsterKey.IsConfigured)
+                    throw new InvalidOperationException("Monster 必须显式配置 EnumKey 或 StringKey；KeyName 仅供编辑器与策划使用：" + info.name);
                 if (Table.TryGet(info.monsterKey, out ESMonsterRuntimeData existing))
                 {
                     if (ReferenceEquals(existing.soSource, info)) return;
-                    throw new InvalidOperationException("Monster GameCore Key 重复：" + info.KeyName);
+                    throw new InvalidOperationException("Monster GameCore Key 重复：" + info.name);
                 }
 
-                var data = new ESMonsterRuntimeData
+                ESMonsterRuntimeData data = Table.AcquireRetained(info.monsterKey);
+                try
                 {
-                    keyName = info.KeyName,
-                    displayName = string.IsNullOrWhiteSpace(info.displayName) ? info.KeyName : info.displayName,
-                    sourcePackage = info.name,
-                    soSource = info,
-                    sharedData = info.motionShared,
-                    defaultVariableData = info.motionVariable
-                };
-                data.runtimeKey = Table.Bake(info.monsterKey, info.KeyName);
-                if (!Table.Upsert(info.monsterKey, data, info.KeyName))
-                    throw new InvalidOperationException("Monster GameCore 注入失败：" + info.KeyName);
+                    data.keyName = ESConfigKeyMatch.Describe(info.monsterKey.EnumKeyInt, info.monsterKey.StringKey);
+                    data.displayName = string.IsNullOrWhiteSpace(info.displayName) ? info.name : info.displayName;
+                    data.sourcePackage = info.name;
+                    data.soSource = info;
+                    data.sharedData = info.motionShared;
+                    data.defaultVariableData = info.motionVariable;
+                    int runtimeKey = Table.CommitRetained(info.monsterKey, data, debugName: info.name);
+                    if (runtimeKey == 0)
+                        throw new InvalidOperationException("Monster GameCore 注入失败：" + info.name);
+                }
+                catch
+                {
+                    Table.AbandonRetained(data);
+                    throw;
+                }
             }
             finally
             {
@@ -96,7 +103,7 @@ namespace ES
     /// <summary>NPC 领域自己的强类型表入口。启动期写入，运行期直接强类型查表。</summary>
     public static class ESNpcGameCoreTable
     {
-        public static ESConfigKeyTable<ESNpcRuntimeData> Table => ESRuntimeDataGameCore.Npcs;
+        public static ESNpcConfigKeyTable Table => ESRuntimeDataGameCore.Npcs;
 
         public static void Inject(NpcDataInfo info)
         {
@@ -106,25 +113,32 @@ namespace ES
             try
             {
                 info.motionShared ??= EntityMotionSharedData.Default;
-                info.npcKey ??= new ESNpcConfigKey();
+                if (info.npcKey == null || !info.npcKey.IsConfigured)
+                    throw new InvalidOperationException("NPC 必须显式配置 EnumKey 或 StringKey；KeyName 仅供编辑器与策划使用：" + info.name);
                 if (Table.TryGet(info.npcKey, out ESNpcRuntimeData existing))
                 {
                     if (ReferenceEquals(existing.soSource, info)) return;
-                    throw new InvalidOperationException("NPC GameCore Key 重复：" + info.KeyName);
+                    throw new InvalidOperationException("NPC GameCore Key 重复：" + info.name);
                 }
 
-                var data = new ESNpcRuntimeData
+                ESNpcRuntimeData data = Table.AcquireRetained(info.npcKey);
+                try
                 {
-                    keyName = info.KeyName,
-                    displayName = string.IsNullOrWhiteSpace(info.displayName) ? info.KeyName : info.displayName,
-                    sourcePackage = info.name,
-                    soSource = info,
-                    sharedData = info.motionShared,
-                    defaultVariableData = info.motionVariable
-                };
-                data.runtimeKey = Table.Bake(info.npcKey, info.KeyName);
-                if (!Table.Upsert(info.npcKey, data, info.KeyName))
-                    throw new InvalidOperationException("NPC GameCore 注入失败：" + info.KeyName);
+                    data.keyName = ESConfigKeyMatch.Describe(info.npcKey.EnumKeyInt, info.npcKey.StringKey);
+                    data.displayName = string.IsNullOrWhiteSpace(info.displayName) ? info.name : info.displayName;
+                    data.sourcePackage = info.name;
+                    data.soSource = info;
+                    data.sharedData = info.motionShared;
+                    data.defaultVariableData = info.motionVariable;
+                    int runtimeKey = Table.CommitRetained(info.npcKey, data, debugName: info.name);
+                    if (runtimeKey == 0)
+                        throw new InvalidOperationException("NPC GameCore 注入失败：" + info.name);
+                }
+                catch
+                {
+                    Table.AbandonRetained(data);
+                    throw;
+                }
             }
             finally
             {

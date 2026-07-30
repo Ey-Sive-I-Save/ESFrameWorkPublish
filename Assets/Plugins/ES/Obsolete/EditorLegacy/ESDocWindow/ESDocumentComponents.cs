@@ -11,7 +11,7 @@ namespace ES.Obsolete{
     /// <summary>
     /// 文档页面基类 - 支持丰富的文档元素
     /// </summary>
-    [CreateAssetMenu(fileName = "新文档", menuName = MenuItemPathDefine.ASSET_DOCUMENTATION_PATH + "文档页面")]
+    [CreateAssetMenu(fileName = "新文档", menuName = "【ES】/已废弃/EditorLegacy/创建资产/文档页面")]
     [ESOnlyEditorSO("旧文档页资产只服务编辑器文档窗口，不应进入运行时构建或AB资源包。")]
     public class ESDocumentPageBase : ScriptableObject
     {

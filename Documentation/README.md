@@ -6,6 +6,12 @@
 
 ## 📚 文档结构
 
+### 未来架构规划
+
+**位置**: [FuturePlans/README.md](FuturePlans/README.md)
+
+这里保存尚未立项、尚未进入当前运行时契约的未来方案。未经项目作者批准，不得依据 FuturePlans 直接修改生产代码。
+
 ### 🤖 AI 专用文档（重点）
 **位置**: `../Assets/ES/ESVMCP/AI_INTERACTION_GUIDE.md` ⭐
 

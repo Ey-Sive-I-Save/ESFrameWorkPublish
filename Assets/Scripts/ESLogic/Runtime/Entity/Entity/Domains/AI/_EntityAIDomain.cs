@@ -29,6 +29,7 @@ namespace ES
 		protected override void OnDisable()
 		{
 			inputState?.ClearAll();
+			MyCore?.ResetKCCInputs();
 			base.OnDisable();
 		}
 
@@ -39,6 +40,31 @@ namespace ES
 			EnsureModuleExists<EntityAIInputDispatchModule>();
 			MyModules.ApplyBuffers(true);
 		}
+
+#if UNITY_EDITOR
+		[Button("检查玩家输入链路"), PropertyOrder(-9)]
+		public void ValidatePlayerInputModules()
+		{
+			int writerCount = 0;
+			int dispatchCount = 0;
+			int count = MyModules != null && MyModules.ValuesNow != null ? MyModules.ValuesNow.Count : 0;
+			for (int i = 0; i < count; i++)
+			{
+				if (MyModules.ValuesNow[i] is EntityPlayerInputWriteModule) writerCount++;
+				else if (MyModules.ValuesNow[i] is EntityAIInputDispatchModule) dispatchCount++;
+			}
+
+			if (inputState == null || writerCount != 1 || dispatchCount != 1)
+			{
+				Debug.LogError(
+					$"[Entity玩家输入检查] 未通过 | InputState={(inputState != null ? "有效" : "为空")}, " +
+					$"Writer={writerCount}, Dispatch={dispatchCount}");
+				return;
+			}
+
+			Debug.Log("[Entity玩家输入检查] 通过：玩家输入写入与 AI 域调度均唯一。", MyCore);
+		}
+#endif
 
 		private void EnsureModuleExists<T>() where T : EntityAIModuleBase, new()
 		{

@@ -46,9 +46,6 @@ namespace ES
         [LabelText("字符串键")]
         public string StringKey = "";
 
-        [LabelText("运行键"), ReadOnly]
-        public int RuntimeKey;
-
         [LabelText("GUID"), ReadOnly]
         public string AssetGuid = "";
 
@@ -68,7 +65,6 @@ namespace ES
         public string SourceBook = "";
 
         public string EffectiveStringKey => ResolveEffectiveStringKey();
-        public bool HasRuntimeKey => RuntimeKey != 0;
         public bool HasAssetAuthority => !string.IsNullOrEmpty(AssetGuid) || OB != null;
         
         // 实现IAssetPage接口
@@ -89,7 +85,6 @@ namespace ES
                 dirty = true;
             }
             var pre = OB;
-            int preRuntimeKey = RuntimeKey;
             OB = EditorGUILayout.ObjectField("文件夹或资源", OB, typeof(UnityEngine.Object), allowSceneObjects: false);
             if (OB != null)
             {
@@ -124,10 +119,6 @@ namespace ES
                     dirty = true;
                 }
 
-                using (new EditorGUI.DisabledScope(EnumKey != 0))
-                    RuntimeKey = EditorGUILayout.DelayedIntField("运行键", RuntimeKey);
-                if (preRuntimeKey != RuntimeKey)
-                    dirty = true;
                 EditorGUILayout.TextField("GUID", AssetGuid);
                 EditorGUILayout.LongField("Local File ID", LocalFileId);
                 EditorGUILayout.TextField("资产类型", AssetTypeName);
@@ -183,17 +174,7 @@ namespace ES
             }
             if (dirty)
             {
-                int requestedRuntimeKey = RuntimeKey;
-                bool runtimeKeyChanged = requestedRuntimeKey != preRuntimeKey;
-                if (runtimeKeyChanged)
-                    RuntimeKey = preRuntimeKey;
-
                 ESAssetRegistry.RegisterAsset(this, SourceLibrary, SourceBook, startOrderIndex: 0);
-                if (runtimeKeyChanged && EnumKey == 0)
-                {
-                    if (!ESAssetRegistry.RenameRuntimeKey(this, requestedRuntimeKey, startOrderIndex: 0))
-                        Debug.LogWarning($"[ESAssetPage] Runtime Key {requestedRuntimeKey} 已被占用或不符合字符串运行键规则。", OB);
-                }
                 ESAssetRegistry.MarkSourceLibraryDirtyByPage(this, startOrderIndex: 0);
             }
 
@@ -225,7 +206,6 @@ namespace ES
                 Kind = Kind,
                 EnumKey = EnumKey,
                 StringKey = StringKey,
-                RuntimeKey = RuntimeKey,
                 AssetGuid = AssetGuid,
                 LocalFileId = LocalFileId,
                 AssetPath = AssetPath,
@@ -243,10 +223,9 @@ namespace ES
 
             Kind = DetermineKind(OB);
             AssetPath = AssetDatabase.GetAssetPath(OB);
-            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(OB, out string guid, out long localFileId);
+            TryGetAssetIdentityEditor(OB, out string guid, out long localFileId);
             AssetGuid = guid;
-            // Unity 对主资源也可能返回非零 LocalFileId；ES 仅让独立子资源使用 GUID + LocalFileId。
-            LocalFileId = AssetDatabase.IsSubAsset(OB) ? localFileId : 0;
+            LocalFileId = localFileId;
             AssetTypeName = OB.GetType().FullName;
             if (string.IsNullOrEmpty(Name))
                 Name = OB.name;
@@ -254,6 +233,27 @@ namespace ES
                 StringKey = ResolveEffectiveStringKey();
 #endif
             return this;
+        }
+
+        /// <summary>
+        /// ES 资产身份统一规则：主资产使用 GUID + 0，只有独立子资产保留 LocalFileId。
+        /// Unity 也会为主资产返回非零 FileId，调用方不能直接使用该原始值。
+        /// </summary>
+        public static bool TryGetAssetIdentityEditor(UnityEngine.Object asset, out string guid, out long localFileId)
+        {
+#if UNITY_EDITOR
+            guid = string.Empty;
+            localFileId = 0;
+            if (asset == null || !AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out guid, out long unityLocalFileId))
+                return false;
+
+            localFileId = AssetDatabase.IsSubAsset(asset) ? unityLocalFileId : 0;
+            return true;
+#else
+            guid = string.Empty;
+            localFileId = 0;
+            return false;
+#endif
         }
 
         public string ResolveEffectiveStringKey()
@@ -337,7 +337,7 @@ namespace ES
         {
             return ((ResPage)new ResPage()
             {
-                Name = asset != null ? asset.name : "璧勬簮椤靛悕",
+                Name = asset != null ? asset.name : "资源页名",
                 OB = asset,
                 Kind = DetermineKind(asset),
                 StringKey = asset != null ? asset.name : ""
@@ -355,7 +355,6 @@ namespace ES
                 Kind = Kind,
                 EnumKey = EnumKey,
                 StringKey = StringKey,
-                RuntimeKey = RuntimeKey,
                 AssetGuid = AssetGuid,
                 LocalFileId = LocalFileId,
                 AssetPath = AssetPath,

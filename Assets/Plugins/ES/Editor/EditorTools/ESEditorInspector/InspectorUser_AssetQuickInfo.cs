@@ -15,12 +15,6 @@ namespace ES
         private const string GUIDE_EDIT_MODE_PREF_KEY = "ES_AssetGuide_EditMode";
         private const long MaxCopyTextBytes = 1024 * 1024;
         private static readonly Color RegistryPanelColor = new Color(0.18f, 0.55f, 0.82f, 0.55f);
-        private static readonly GUIContent RuntimeKeyDerivedLabel = new GUIContent(
-            "Runtime Key",
-            "Enum Key 非 None 时，Runtime Key 由 Enum Key 自动决定。");
-        private static readonly GUIContent RuntimeKeyEditableLabel = new GUIContent(
-            "Runtime Key",
-            $"字符串资源运行键，可手动设置为不小于 {ESAssetRegistry.DefaultStringRuntimeKeyStart} 的唯一值。");
 
         private static readonly HashSet<string> TextExtensions = new HashSet<string>
         {
@@ -285,39 +279,6 @@ namespace ES
                         AssetDatabase.SaveAssets();
                 }
             }
-
-            bool runtimeKeyDerivedFromEnum = page.EnumKey != 0;
-            using (new EditorGUI.DisabledScope(runtimeKeyDerivedFromEnum))
-            {
-                GUIContent runtimeKeyLabel = runtimeKeyDerivedFromEnum
-                    ? RuntimeKeyDerivedLabel
-                    : RuntimeKeyEditableLabel;
-                int nextRuntimeKey = EditorGUILayout.DelayedIntField(runtimeKeyLabel, page.RuntimeKey);
-                if (!runtimeKeyDerivedFromEnum && nextRuntimeKey != page.RuntimeKey)
-                {
-                    if (nextRuntimeKey < ESAssetRegistry.DefaultStringRuntimeKeyStart)
-                    {
-                        Debug.LogWarning(
-                            $"[资源注册键] 字符串 Runtime Key 必须不小于 {ESAssetRegistry.DefaultStringRuntimeKeyStart}。",
-                            asset);
-                    }
-                    else
-                    {
-                        RecordSourceLibraryUndo(page, "修改资源 Runtime Key");
-                        if (ESAssetRegistry.RenameRuntimeKey(page, nextRuntimeKey))
-                        {
-                            AssetDatabase.SaveAssets();
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"[资源注册键] Runtime Key {nextRuntimeKey} 已被占用或不符合当前键规则。", asset);
-                        }
-                    }
-                }
-            }
-
-            if (runtimeKeyDerivedFromEnum)
-                EditorGUILayout.LabelField("Runtime Key 由当前 Enum Key 自动同步", EditorStyles.miniLabel);
 
             EditorGUILayout.Space(2);
             EditorGUILayout.BeginHorizontal();

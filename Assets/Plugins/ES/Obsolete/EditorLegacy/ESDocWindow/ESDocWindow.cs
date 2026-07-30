@@ -15,7 +15,7 @@ namespace ES.Obsolete{
         /// </summary>
         public class ESDocWindow : ESMenuTreeWindowAB<ESDocWindow>
         {
-            [MenuItem(MenuItemPathDefine.EDITOR_DOCS_PATH + "ES文档创建窗口")]
+            [MenuItem("【ES】/已废弃/EditorLegacy/文档工具/ES文档创建窗口")]
             public static void TryOpenWindow()
             {
                 OpenWindow();

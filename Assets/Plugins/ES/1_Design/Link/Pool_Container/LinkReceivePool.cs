@@ -1,7 +1,4 @@
-using ES;
-using Sirenix.OdinInspector;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
@@ -9,173 +6,132 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
-    /// LinkReceivePool
-    ///
-    /// 多类型 Link 接收者池，按 Link 类型分组管理接收者集合。
-    /// 功能特性：
-    /// - 继承 SafeKeyGroup<Type, IReceiveLink>，按类型 (Type) 分组存储接收者；
-    /// - 支持多类型并发分发，每个类型独立管理接收者列表；
-    /// - 自动清理已销毁的 Unity 对象接收者；
-    /// - 适用于需要按类型分类管理事件监听的复杂系统。
+    /// 按 Link 类型分组的低频扩展事件池。
+    /// 它只用于 Boot、插件和诊断等明确域的低频消息，不能替代业务主链或高频数据通道。
     /// </summary>
     [Serializable]
-    public class LinkReceivePool : SafeKeyGroup<Type, IReceiveLink> /**/
+    public sealed class LinkReceivePool
     {
-        private readonly List<IPoolableAuto> _pendingRecycle = new List<IPoolableAuto>();
-        private readonly List<IReceiveLink> _actionReceivers = new List<IReceiveLink>();
-        public override string Editor_ShowDes => "Link收发安全键组";
+        private const int DefaultTypeCapacity = 8;
+        private const int DefaultReceiverCapacity = 4;
 
-        #region 核心功能 (Core Functionality)
+        private readonly Dictionary<Type, LinkSubscriptionList<IReceiveLink>> receiversByType;
+        private readonly int receiverCapacity;
+
+        public int MessageTypeCount => receiversByType.Count;
+
+        public LinkReceivePool(int typeCapacity = DefaultTypeCapacity, int receiverCapacity = DefaultReceiverCapacity)
+        {
+            if (typeCapacity < 0) throw new ArgumentOutOfRangeException(nameof(typeCapacity));
+            if (receiverCapacity < 0) throw new ArgumentOutOfRangeException(nameof(receiverCapacity));
+
+            receiversByType = new Dictionary<Type, LinkSubscriptionList<IReceiveLink>>(typeCapacity);
+            this.receiverCapacity = receiverCapacity;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddReceiver<Link>(IReceiveLink<Link> receiver)
+        {
+            if (receiver == null)
+                return false;
+
+            Type linkType = typeof(Link);
+            if (!receiversByType.TryGetValue(linkType, out LinkSubscriptionList<IReceiveLink> receivers))
+            {
+                receivers = new LinkSubscriptionList<IReceiveLink>(receiverCapacity);
+                receiversByType.Add(linkType, receivers);
+            }
+
+            return receivers.Add(receiver);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool RemoveReceiver<Link>(IReceiveLink<Link> receiver)
+        {
+            return receiver != null
+                && receiversByType.TryGetValue(typeof(Link), out LinkSubscriptionList<IReceiveLink> receivers)
+                && receivers.Remove(receiver);
+        }
 
         /// <summary>
-        /// 发送指定类型的链接通知。
-        /// 通知该类型下所有有效的接收者。
+        /// 向指定消息类型的当前订阅快照同步派发。异常直接向上传播。
         /// </summary>
-        /// <typeparam name="Link">链接数据的类型。</typeparam>
-        /// <param name="link">链接数据。</param>
         public void SendLink<Link>(Link link)
         {
-            var links = GetGroupDirectly(typeof(Link));
-            links.ApplyBuffers();
-            RecyclePending();
-            int count = links.ValuesNow.Count;
-            for (int i = 0; i < count; i++)
+            if (!receiversByType.TryGetValue(typeof(Link), out LinkSubscriptionList<IReceiveLink> receivers))
+                return;
+
+            receivers.BeginDispatch();
+            try
             {
-                var receiver = links.ValuesNow[i];
-                if (receiver is IReceiveLink<Link> irl)
+                int count = receivers.ValuesNow.Count;
+                for (int i = 0; i < count; i++)
                 {
-                    if (irl is UnityEngine.Object ob)
+                    IReceiveLink receiver = receivers.ValuesNow[i];
+                    if (receiver is IReceiveLink<Link> typedReceiver)
                     {
-                        if (ob != null) irl.OnLink(link);
-                        else links.Remove(irl);
+                        if (typedReceiver is UnityEngine.Object unityObject)
+                        {
+                            if (unityObject != null)
+                                typedReceiver.OnLink(link);
+                            else
+                                receivers.Remove(receiver);
+                        }
+                        else
+                        {
+                            typedReceiver.OnLink(link);
+                        }
                     }
-                    else if (irl != null) irl.OnLink(link);
-                }
-                else
-                {
-                    Remove(typeof(Link), receiver);
-                    ScheduleRecycle(receiver);
-                }
-            }
-        }
-
-        private void ScheduleRecycle(object receiver)
-        {
-            if (receiver is IPoolableAuto poolable && !poolable.IsRecycled)
-            {
-                _pendingRecycle.Add(poolable);
-            }
-        }
-
-        private void RecyclePending()
-        {
-            int count = _pendingRecycle.Count;
-            if (count == 0) return;
-            for (int i = 0; i < count; i++)
-            {
-                var poolable = _pendingRecycle[i];
-                if (poolable != null && !poolable.IsRecycled)
-                {
-                    poolable.TryAutoPushedToPool();
-                }
-            }
-            _pendingRecycle.Clear();
-        }
-
-        #endregion
-
-        #region 接收者管理 (Receiver Management)
-
-        /// <summary>
-        /// 添加指定类型的接收者。
-        /// </summary>
-        /// <typeparam name="Link">链接数据的类型。</typeparam>
-        /// <param name="receiver">要添加的接收者。</param>
-        public void AddReceiver<Link>(IReceiveLink<Link> receiver)
-        {
-            Add(typeof(Link), receiver);
-        }
-
-        /// <summary>
-        /// 移除指定类型的接收者。
-        /// </summary>
-        /// <typeparam name="Link">链接数据的类型。</typeparam>
-        /// <param name="receiver">要移除的接收者。</param>
-        public void RemoveReceiver<Link>(IReceiveLink<Link> receiver)
-        {
-            Remove(typeof(Link), receiver);
-            ScheduleRecycle(receiver);
-        }
-
-        /// <summary>
-        /// 添加基于 Action 的指定类型接收者。
-        /// </summary>
-        /// <typeparam name="Link">链接数据的类型。</typeparam>
-        /// <param name="action">要添加的 Action 委托。</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddReceiver<Link>(Action<Link> action)
-        {
-            var receiver = action.MakeReceive();
-            _actionReceivers.Add(receiver);
-            Add(typeof(Link), receiver);
-        }
-
-        /// <summary>
-        /// 移除基于 Action 的指定类型接收者。
-        /// </summary>
-        /// <typeparam name="Link">链接数据的类型。</typeparam>
-        /// <param name="action">要移除的 Action 委托。</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveReceiver<Link>(Action<Link> action)
-        {
-            for (int i = _actionReceivers.Count - 1; i >= 0; i--)
-            {
-                if (_actionReceivers[i] is ReceiveLink<Link> receiveLink && receiveLink.action == action)
-                {
-                    _actionReceivers.RemoveAt(i);
-                    RemoveReceiver(receiveLink);
-                    return;
-                }
-            }
-
-            var links = GetGroupDirectly(typeof(Link));
-            for (int i = 0; i < links.ValuesNow.Count; i++)
-            {
-                var receiver = links.ValuesNow[i];
-                if (receiver is ReceiveLink<Link> receiveLink && receiveLink.action == action)
-                {
-                    RemoveReceiver(receiveLink);
-                    return;
-                }
-            }
-        }
-
-        public new void Clear()
-        {
-            ApplyBuffers();
-            RecyclePending();
-            foreach (var pair in Groups)
-            {
-                var receivers = pair.Value;
-                for (int i = 0; i < receivers.ValuesNow.Count; i++)
-                {
-                    if (receivers.ValuesNow[i] is IPoolableAuto poolable && !poolable.IsRecycled)
+                    else
                     {
-                        poolable.TryAutoPushedToPool();
+                        // 类型桶只能由 AddReceiver<Link> 写入；出现不匹配表示调用方破坏了契约。
+                        receivers.Remove(receiver);
                     }
                 }
             }
-            base.Clear();
-            _actionReceivers.Clear();
+            finally
+            {
+                receivers.EndDispatch();
+            }
         }
 
-        public new void ApplyBuffers()
+        public void ReserveMessageTypes(int capacity)
         {
-            base.ApplyBuffers();
-            RecyclePending();
+            if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+            receiversByType.EnsureCapacity(capacity);
         }
 
-        #endregion
+        /// <summary>为一个已知消息类型预建接收者表，避免首个订阅发生分配。</summary>
+        public void ReserveMessageType<Link>(int capacity)
+        {
+            if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+            Type linkType = typeof(Link);
+            if (!receiversByType.TryGetValue(linkType, out LinkSubscriptionList<IReceiveLink> receivers))
+            {
+                receiversByType.Add(linkType, new LinkSubscriptionList<IReceiveLink>(capacity));
+                return;
+            }
+
+            receivers.Reserve(capacity);
+        }
+
+        public int GetSubscriberCount<Link>()
+        {
+            return receiversByType.TryGetValue(typeof(Link), out LinkSubscriptionList<IReceiveLink> receivers)
+                ? receivers.Count
+                : 0;
+        }
+
+        public void ApplyBuffers()
+        {
+            foreach (LinkSubscriptionList<IReceiveLink> receivers in receiversByType.Values)
+                receivers.ApplyBuffers();
+        }
+
+        public void Clear()
+        {
+            foreach (LinkSubscriptionList<IReceiveLink> receivers in receiversByType.Values)
+                receivers.Clear();
+        }
     }
 }
-

@@ -58,6 +58,10 @@ namespace ES
         [SerializeReference]
         public ESGetBoolExpression castCondition;
 
+        [LabelText("施法者 Tag 条件")]
+        [Tooltip("在表达式条件之前检查施法者的 Core + Extension Tag。为空时不限制。")]
+        public ESTagConditionConfig casterTagCondition = new ESTagConditionConfig();
+
         [LabelText("Initial Target Expression")]
         [SerializeReference]
         public ESGetGameObjectExpression initialTargetExpression;
@@ -101,7 +105,7 @@ namespace ES
     /// <summary>Skill 领域强类型注册入口；根 SO 直接注入，不经过中央类别分发。</summary>
     public static class ESSkillGameCoreTable
     {
-        public static ESConfigKeyTable<ESSkillRuntimeData> Table => ESRuntimeDataGameCore.Skills;
+        public static ESSkillConfigKeyTable Table => ESRuntimeDataGameCore.Skills;
 
         public static void Inject(SkillDefinitionDataInfo info)
         {
@@ -111,25 +115,32 @@ namespace ES
             if (ownsBuild) Table.BeginBuild();
             try
             {
-                info.skillKey ??= new ESSkillConfigKey();
+                if (info.skillKey == null || !info.skillKey.IsConfigured)
+                    throw new InvalidOperationException("Skill 必须显式配置 EnumKey 或 StringKey；KeyName 仅供编辑器与策划使用：" + info.name);
                 if (Table.TryGet(info.skillKey, out ESSkillRuntimeData existing))
                 {
                     if (ReferenceEquals(existing.soSource, info)) return;
-                    throw new InvalidOperationException("Skill GameCore Key 重复：" + info.KeyName);
+                    throw new InvalidOperationException("Skill GameCore Key 重复：" + info.name);
                 }
 
-                var data = new ESSkillRuntimeData
+                ESSkillRuntimeData data = Table.AcquireRetained(info.skillKey);
+                try
                 {
-                    keyName = info.KeyName,
-                    displayName = info.KeyName,
-                    sourcePackage = info.name,
-                    soSource = info,
-                    trackProcess = info.trackProcess,
-                    baseStateInfo = info.baseStateInfo
-                };
-                data.runtimeKey = Table.Bake(info.skillKey, info.KeyName);
-                if (!Table.Upsert(info.skillKey, data, info.KeyName))
-                    throw new InvalidOperationException("Skill GameCore 注入失败：" + info.KeyName);
+                    data.keyName = ESConfigKeyMatch.Describe(info.skillKey.EnumKeyInt, info.skillKey.StringKey);
+                    data.displayName = info.name;
+                    data.sourcePackage = info.name;
+                    data.soSource = info;
+                    data.trackProcess = info.trackProcess;
+                    data.baseStateInfo = info.baseStateInfo;
+                    int runtimeKey = Table.CommitRetained(info.skillKey, data, debugName: info.name);
+                    if (runtimeKey == 0)
+                        throw new InvalidOperationException("Skill GameCore 注入失败：" + info.name);
+                }
+                catch
+                {
+                    Table.AbandonRetained(data);
+                    throw;
+                }
             }
             finally
             {

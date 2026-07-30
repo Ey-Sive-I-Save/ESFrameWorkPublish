@@ -971,9 +971,11 @@ namespace ES
                 window.EnsureTabExists();
         }
 
-        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "Cmd Agent / CMD 中转与架构师", false, -960)]
+        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "自动化/Cmd Agent（CMD 中转与架构师）", false, 10)]
+        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "Cmd Agent", false, -960)]
         public static void OpenFromMenu()
         {
+            ESWindowCommandRegistry.RecordOpened("cmd_agent");
             OpenAndResume();
         }
 
@@ -1231,7 +1233,7 @@ namespace ES
                 using (new EditorGUI.DisabledScope(!agent.enableAgent || tab.IsRunning))
                 {
                     if (DrawToolbarButton("恢复", 58, ButtonTone.Primary, true))
-                        ShowResumeSessionMenu();
+                        ShowResumeSessionMenu(GUILayoutUtility.GetLastRect());
                 }
 
                 using (new EditorGUI.DisabledScope(!agent.enableAgent || tab.IsRunning))
@@ -1493,7 +1495,7 @@ namespace ES
                 }
 
                 if (GUILayout.Button("历史", EditorStyles.toolbarButton, GUILayout.Width(48)))
-                    ShowCodexSessionIndexMenu();
+                    ShowCodexSessionIndexMenu(GUILayoutUtility.GetLastRect());
 
                 using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(tab.sessionId)))
                 {
@@ -1781,7 +1783,7 @@ namespace ES
                 }
 
                 if (GUILayout.Button("历史会话", EditorStyles.toolbarButton, GUILayout.Width(78)))
-                    ShowCodexSessionIndexMenu();
+                    ShowCodexSessionIndexMenu(GUILayoutUtility.GetLastRect());
 
                 GUILayout.FlexibleSpace();
                 using (new EditorGUI.DisabledScope(current == null || !current.IsRunning))
@@ -1815,7 +1817,7 @@ namespace ES
                     SendPromptToCurrentTab(BuildUpdateWarningsPrompt());
 
                 if (GUILayout.Button("执行预设指令", EditorStyles.toolbarButton, GUILayout.Width(104)))
-                    ShowAICommandMenu();
+                    ShowAICommandMenu(GUILayoutUtility.GetLastRect());
 
                 GUILayout.FlexibleSpace();
                 EditorGUILayout.LabelField(current != null && current.IsRunning ? "当前页可直接发送" : "未启动也可直接发送", EditorStyles.miniLabel, GUILayout.Width(150));
@@ -2637,19 +2639,19 @@ namespace ES
             Repaint();
         }
 
-        private void ShowCodexSessionIndexMenu()
+        private void ShowCodexSessionIndexMenu(Rect anchorRect)
         {
-            ShowResumeSessionMenu();
+            ShowResumeSessionMenu(anchorRect);
         }
 
-        private void ShowResumeSessionMenu()
+        private void ShowResumeSessionMenu(Rect anchorRect)
         {
-            GenericMenu menu = new GenericMenu();
+            var entries = new List<ESSearchDropdown.Entry>();
             string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex", "sessions");
             if (!Directory.Exists(root))
             {
-                menu.AddDisabledItem(new GUIContent("未找到本机 Codex 会话目录"));
-                menu.ShowAsContext();
+                entries.Add(ESSearchDropdown.Entry.Disabled("未找到本机 Codex 会话目录"));
+                ESSearchDropdown.Open(anchorRect, "选择 Codex 历史会话", entries);
                 return;
             }
 
@@ -2674,8 +2676,8 @@ namespace ES
 
             if (sessions.Count == 0)
             {
-                menu.AddDisabledItem(new GUIContent("没有匹配当前项目的历史会话"));
-                menu.ShowAsContext();
+                entries.Add(ESSearchDropdown.Entry.Disabled("没有匹配当前项目的历史会话"));
+                ESSearchDropdown.Open(anchorRect, "选择 Codex 历史会话", entries);
                 return;
             }
 
@@ -2686,24 +2688,43 @@ namespace ES
 
             FileInfo latestFile = sessions[0].file;
             string latestSessionId = sessions[0].sessionId;
-            menu.AddItem(
-                new GUIContent("恢复第一项 / " + BuildSessionMenuLabel(latestFile, latestSessionId, sessions[0].meta)),
-                false,
-                () => CreateAndResumeTab(latestSessionId));
-            menu.AddDisabledItem(new GUIContent("云端：Codex cloud list 是任务列表，不是 resume 会话列表"));
-            menu.AddSeparator("");
+            LocalSessionMetadata latestMeta = sessions[0].meta;
+            string latestAlias = latestMeta != null && !string.IsNullOrWhiteSpace(latestMeta.alias) ? latestMeta.alias.Trim() : "未命名会话";
+            entries.Add(ESSearchDropdown.Entry.Item(
+                latestAlias,
+                () => CreateAndResumeTab(latestSessionId),
+                "快速恢复",
+                EditorGUIUtility.IconContent("d_Refresh").image as Texture2D,
+                subtitle: latestFile.LastWriteTime.ToString("yyyy-MM-dd HH:mm") + " · " + ShortId(latestSessionId),
+                tooltip: latestFile.FullName,
+                badge: latestMeta != null && latestMeta.pinned ? "置顶·最新" : "最新"));
+            entries.Add(ESSearchDropdown.Entry.Disabled(
+                "云端任务列表不能作为本地 resume 会话恢复"));
 
             foreach ((FileInfo file, string sessionId, string summary, LocalSessionMetadata meta) in sessions)
             {
-                string label = BuildSessionMenuLabel(file, sessionId, meta);
-                string itemName = label + " / 选择到本页";
-                menu.AddItem(new GUIContent(itemName), false, () => ApplySessionFromIndex(sessionId, file.FullName, summary));
-
-                string resumeName = label + " / 直接恢复";
-                menu.AddItem(new GUIContent(resumeName), false, () => CreateAndResumeTab(sessionId));
+                string label = meta != null && !string.IsNullOrWhiteSpace(meta.alias) ? meta.alias.Trim() : "未命名会话";
+                string subtitle = file.LastWriteTime.ToString("yyyy-MM-dd HH:mm") + " · " + ShortId(sessionId);
+                string badge = meta != null && meta.pinned ? "置顶" : null;
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    label,
+                    () => ApplySessionFromIndex(sessionId, file.FullName, summary),
+                    "选择到当前页",
+                    EditorGUIUtility.IconContent("UnityEditor.InspectorWindow").image as Texture2D,
+                    subtitle: subtitle,
+                    tooltip: file.FullName,
+                    badge: badge));
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    label,
+                    () => CreateAndResumeTab(sessionId),
+                    "直接恢复到新页",
+                    EditorGUIUtility.IconContent("d_Toolbar Plus").image as Texture2D,
+                    subtitle: subtitle,
+                    tooltip: file.FullName,
+                    badge: badge));
             }
 
-            menu.ShowAsContext();
+            ESSearchDropdown.Open(anchorRect, "选择 Codex 历史会话", entries, minimumWindowSize: new Vector2(680f, 380f));
         }
 
         private void ApplySessionFromIndex(string sessionId, string filePath, string summary)
@@ -3508,15 +3529,15 @@ namespace ES
             StartResume(tab, tab.sessionId, prompt);
         }
 
-        private void ShowAICommandMenu()
+        private void ShowAICommandMenu(Rect anchorRect)
         {
             string root = GetProjectRelativeFullPath(AICommandsRelativePath);
-            GenericMenu menu = new GenericMenu();
+            var entries = new List<ESSearchDropdown.Entry>();
 
             if (!Directory.Exists(root))
             {
-                menu.AddDisabledItem(new GUIContent("未找到 AICommands 目录"));
-                menu.ShowAsContext();
+                entries.Add(ESSearchDropdown.Entry.Disabled("未找到 AICommands 目录"));
+                ESSearchDropdown.Open(anchorRect, "选择 AI 预设指令", entries);
                 return;
             }
 
@@ -3529,8 +3550,8 @@ namespace ES
 
             if (files.Count == 0)
             {
-                menu.AddDisabledItem(new GUIContent("没有可调用的 AICommand"));
-                menu.ShowAsContext();
+                entries.Add(ESSearchDropdown.Entry.Disabled("没有可调用的 AICommand"));
+                ESSearchDropdown.Open(anchorRect, "选择 AI 预设指令", entries);
                 return;
             }
 
@@ -3538,10 +3559,22 @@ namespace ES
             {
                 string menuName = BuildAICommandMenuName(root, file);
                 string assetPath = ToProjectRelativeAssetPath(file);
-                menu.AddItem(new GUIContent(menuName), false, () => OpenAICommandComposer(assetPath, menuName));
+                int separator = menuName.LastIndexOf('/');
+                string groupPath = separator > 0 ? menuName.Substring(0, separator) : null;
+                string label = separator >= 0 ? menuName.Substring(separator + 1) : menuName;
+                FileInfo fileInfo = new FileInfo(file);
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    label,
+                    () => OpenAICommandComposer(assetPath, menuName),
+                    groupPath,
+                    EditorGUIUtility.IconContent("TextAsset Icon").image as Texture2D,
+                    subtitle: assetPath,
+                    tooltip: file,
+                    badge: fileInfo.Name.StartsWith("方案_", StringComparison.OrdinalIgnoreCase) ? "方案" : "指令",
+                    selected: string.Equals(selectedAICommandAssetPath, assetPath, StringComparison.OrdinalIgnoreCase)));
             }
 
-            menu.ShowAsContext();
+            ESSearchDropdown.Open(anchorRect, "选择 AI 预设指令", entries, minimumWindowSize: new Vector2(680f, 420f));
         }
 
         private void OpenAICommandComposer(string assetPath, string menuName)

@@ -15,6 +15,7 @@ namespace ES
     [Serializable]
     public struct ESFloatValueChange
     {
+        public int setId;
         public int tokenId;
         public int tokenVersion;
         public int ownerId;
@@ -35,7 +36,7 @@ namespace ES
 
         public ESValueChangeToken Token
         {
-            get { return new ESValueChangeToken(tokenId, tokenVersion); }
+            get { return new ESValueChangeToken(setId, tokenId, tokenVersion); }
         }
     }
 }

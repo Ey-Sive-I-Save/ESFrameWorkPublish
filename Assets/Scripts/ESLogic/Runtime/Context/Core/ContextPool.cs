@@ -159,6 +159,16 @@ namespace ES
         [LabelText("原型值池-实时"),HideLabel, HideReferenceObjectPicker, ShowInInspector, DictionaryDrawerSettings(IsReadOnly = true,KeyLabel ="键",ValueLabel ="值"), HideInEditorMode, SerializeReference]
         protected Dictionary<string, IContextitectureValue> _ContextValues = new Dictionary<string, IContextitectureValue>();
         [NonSerialized] private List<string> _runtimeRemoveKeys = new List<string>(8);
+        [NonSerialized] private Dictionary<string, ContextValueChangeLinkLease> _floatValueChangeLinkLeases;
+        [NonSerialized] private Dictionary<string, ContextValueChangeLinkLease> _boolValueChangeLinkLeases;
+        [NonSerialized] private int _valueChangeLinkLeaseCount;
+        [NonSerialized] private bool _valueChangeLinksEnabledContext;
+
+        private struct ContextValueChangeLinkLease
+        {
+            public int count;
+            public bool restoreWillSendLink;
+        }
         
         #region 初始化和添加值
         public void Init(params object[] ps)
@@ -766,6 +776,103 @@ namespace ES
             }
         }
         #endregion
+
+        /// <summary>
+        /// Acquires a key-scoped Float change stream for a runtime ValueChange expression. The
+        /// lease restores the key's previous Link setting when the last subscriber leaves.
+        /// </summary>
+        public bool TryAcquireValueChangeFloatLink(string key)
+        {
+            return TryAcquireValueChangeLink(key, EnumCollect.ContextValueType.FloatValue, ref _floatValueChangeLinkLeases);
+        }
+
+        public void ReleaseValueChangeFloatLink(string key)
+        {
+            ReleaseValueChangeLink(key, EnumCollect.ContextValueType.FloatValue, ref _floatValueChangeLinkLeases);
+        }
+
+        /// <summary>Bool counterpart of <see cref="TryAcquireValueChangeFloatLink"/>.</summary>
+        public bool TryAcquireValueChangeBoolLink(string key)
+        {
+            return TryAcquireValueChangeLink(key, EnumCollect.ContextValueType.BoolValue, ref _boolValueChangeLinkLeases);
+        }
+
+        public void ReleaseValueChangeBoolLink(string key)
+        {
+            ReleaseValueChangeLink(key, EnumCollect.ContextValueType.BoolValue, ref _boolValueChangeLinkLeases);
+        }
+
+        private bool TryAcquireValueChangeLink(
+            string key,
+            EnumCollect.ContextValueType expectedType,
+            ref Dictionary<string, ContextValueChangeLinkLease> leases)
+        {
+            if (string.IsNullOrEmpty(key)
+                || _ContextValues == null
+                || !_ContextValues.TryGetValue(key, out IContextitectureValue value)
+                || value == null
+                || value.ContextType != expectedType)
+            {
+                return false;
+            }
+
+            if (leases == null)
+                leases = new Dictionary<string, ContextValueChangeLinkLease>(2);
+
+            if (leases.TryGetValue(key, out ContextValueChangeLinkLease lease))
+            {
+                lease.count++;
+                leases[key] = lease;
+                return true;
+            }
+
+            if (!enabled)
+            {
+                Enable();
+                _valueChangeLinksEnabledContext = true;
+            }
+
+            leases.Add(key, new ContextValueChangeLinkLease
+            {
+                count = 1,
+                restoreWillSendLink = value.WillSendLink
+            });
+            value.WillSendLink = true;
+            _valueChangeLinkLeaseCount++;
+            return true;
+        }
+
+        private void ReleaseValueChangeLink(
+            string key,
+            EnumCollect.ContextValueType expectedType,
+            ref Dictionary<string, ContextValueChangeLinkLease> leases)
+        {
+            if (string.IsNullOrEmpty(key) || leases == null || !leases.TryGetValue(key, out ContextValueChangeLinkLease lease))
+                return;
+
+            lease.count--;
+            if (lease.count > 0)
+            {
+                leases[key] = lease;
+                return;
+            }
+
+            leases.Remove(key);
+            _valueChangeLinkLeaseCount--;
+            if (_ContextValues != null
+                && _ContextValues.TryGetValue(key, out IContextitectureValue value)
+                && value != null
+                && value.ContextType == expectedType)
+            {
+                value.WillSendLink = lease.restoreWillSendLink;
+            }
+
+            if (_valueChangeLinkLeaseCount == 0 && _valueChangeLinksEnabledContext)
+            {
+                _valueChangeLinksEnabledContext = false;
+                Disable();
+            }
+        }
 
         #region 链事件
         [FoldoutGroup("事件收发"), LabelText("标签变更事件"), ReadOnly]

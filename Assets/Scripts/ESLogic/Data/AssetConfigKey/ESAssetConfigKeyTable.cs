@@ -19,31 +19,182 @@ namespace ES
     /// 资产专用的权威配置表。
     /// RuntimeKey 仍由 ESConfigKeyTable 负责查找；本类只补充 Ready 直取、同 Key 请求合并和 Loader 回填。
     /// </summary>
-    public class ESAssetConfigKeyTable<TConfigData, TAsset> : ESConfigKeyTable<TConfigData>
+    public class ESAssetConfigKeyTable<TConfigData, TAsset> : ESRetainedConfigKeyTable<TConfigData>
         where TConfigData : ESAssetReferConfigDataBase<TAsset>
         where TAsset : UnityEngine.Object
     {
+        private const string ProviderSwitchCancellationError = "Provider 已切换，资产加载已取消";
+
         private sealed class PendingLoad
         {
             public readonly List<Action<TAsset, string>> callbacks = new List<Action<TAsset, string>>(2);
+            public bool releaseRequested;
         }
 
         private readonly Dictionary<int, PendingLoad> pendingLoads;
         private IESAssetConfigTableLoader<TConfigData, TAsset> loader;
 
-        public ESAssetConfigKeyTable(int capacity = 64) : base(capacity)
+        public ESAssetConfigKeyTable(int capacity = 64, string keyScope = null) : base(capacity, keyScope)
         {
             pendingLoads = new Dictionary<int, PendingLoad>(capacity);
         }
 
         public bool HasLoader => loader != null;
+        public bool HasPendingLoads => pendingLoads.Count != 0;
 
+        /// <summary>
+        /// Catalog/Page 冷路径专用。当前活动表中任一业务别名已存在时保留首条记录，
+        /// 记录冲突并拒绝后续项，避免重复注入先修改稳定外壳再被判定冲突。
+        /// </summary>
+        internal bool TryAcquireBuildRecord(
+            IESConfigKey key,
+            Func<TConfigData> factory,
+            string incomingIdentity,
+            out TConfigData data)
+        {
+            data = null;
+            if (!IsBuilding)
+                throw new InvalidOperationException("AssetTable 构建记录只能在 BeginBuild/EndBuild 事务内注入。");
+            if (key == null || !ESConfigKeyMatch.IsConfigured(key.EnumKeyInt, key.StringKey))
+            {
+                RecordConflict(0, key?.StringKey, "Asset Catalog record has no EnumKey/StringKey. Skipped.");
+                return false;
+            }
+
+            int existingRuntimeKey = 0;
+            bool enumExists = key.EnumKeyInt != 0
+                && TryGetSlotByEnumKey(key.EnumKeyInt, out int enumSlot)
+                && TryGetRuntimeKeyBySlot(enumSlot, out existingRuntimeKey);
+            int stringRuntimeKey = 0;
+            bool stringExists = !string.IsNullOrEmpty(key.StringKey)
+                && TryGetRuntimeKey(key.StringKey, out stringRuntimeKey);
+            if (existingRuntimeKey == 0 && stringExists)
+                existingRuntimeKey = stringRuntimeKey;
+
+            if (enumExists || stringExists)
+            {
+                RecordConflict(
+                    existingRuntimeKey,
+                    key.StringKey,
+                    "Duplicate Asset Catalog business key. First registration retained; incoming identity="
+                    + (incomingIdentity ?? string.Empty) + ".");
+                return false;
+            }
+
+            if (TryAcquireRetained(key, factory, out data))
+                return true;
+
+            RecordConflict(
+                0,
+                key.StringKey,
+                "Asset Catalog EnumKey/StringKey aliases are already bound to different retained shells. Incoming identity="
+                + (incomingIdentity ?? string.Empty) + ".");
+            return false;
+        }
+
+        /// <summary>
+        /// Catalog/Page 预检保护重建专用。使用与正式资产注册完全一致的 RuntimeKey 和别名语义，
+        /// 但只作用于调用方创建的隔离表，不得用于运行时业务注入。
+        /// </summary>
+        internal int RegisterPreparedBuildRecord(IESConfigKey key, TConfigData data, string effectiveStringKey)
+        {
+            return RegisterConfiguredAndGetRuntimeKey(key, data, effectiveStringKey, effectiveStringKey);
+        }
+
+        /// <summary>
+        /// Asset Catalog 全量重建入口。clear=true 时先释放本表实际资产和 Loader Handle，
+        /// 再清活动槽位；业务键对应的轻量配置外壳继续驻留并在重新注册时复用。
+        /// </summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public new void BeginBuild(bool clear = false)
+        {
+            if (IsBuilding)
+                throw new InvalidOperationException("ESAssetConfigKeyTable is already building.");
+
+            if (clear)
+            {
+                if (pendingLoads.Count != 0)
+                    throw new InvalidOperationException("AssetTable 仍有加载请求，不能全量重建 Catalog。");
+
+                for (int slot = 0; slot < Count; slot++)
+                {
+                    if (!TryGetRuntimeKeyBySlot(slot, out int runtimeKey))
+                        continue;
+                    Release(runtimeKey);
+                }
+            }
+
+            base.BeginBuild(clear);
+        }
+
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public void SetLoader(IESAssetConfigTableLoader<TConfigData, TAsset> assetLoader)
         {
+            if (ReferenceEquals(loader, assetLoader))
+                return;
+
+            // Loader 持有底层 Runtime Handle；换 Provider/重绑表前必须先完整释放，
+            // 不能只清 ConfigData 上的 LoadedAsset 标记。
+            ResetLoader();
             loader = assetLoader;
         }
 
+        /// <summary>
+        /// 全量资源安全点或 Provider 重建时使用。释放本表所有底层 Handle、清理
+        /// 合并请求和 LoadedAsset 状态，使同一 RuntimeKey 可以在新 Loader 上再次加载。
+        /// </summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public int ResetLoader()
+        {
+            PendingLoad[] canceledLoads = null;
+            if (pendingLoads.Count != 0)
+            {
+                canceledLoads = new PendingLoad[pendingLoads.Count];
+                pendingLoads.Values.CopyTo(canceledLoads, 0);
+                for (int i = 0; i < canceledLoads.Length; i++)
+                    canceledLoads[i].releaseRequested = true;
+                pendingLoads.Clear();
+            }
+
+            IESAssetConfigTableLoader<TConfigData, TAsset> previousLoader = loader;
+            loader = null;
+
+            int cleared = 0;
+            try
+            {
+                if (previousLoader is IDisposable disposable)
+                    disposable.Dispose();
+            }
+            finally
+            {
+                for (int i = 0; i < Count; i++)
+                {
+                    if (!TryGetBySlot(i, out TConfigData configData) || !configData.HasLoadedAsset)
+                        continue;
+                    configData.ClearLoadedAsset();
+                    cleared++;
+                }
+
+                if (canceledLoads != null)
+                {
+                    for (int i = 0; i < canceledLoads.Length; i++)
+                        InvokeCallbacks(canceledLoads[i], null, ProviderSwitchCancellationError);
+                }
+            }
+            return cleared;
+        }
+
         /// <summary>热路径查询：只读取 Ready 缓存，绝不隐式触发加载。</summary>
+        public bool TryGetReady(IESConfigKey key, out TAsset asset)
+        {
+            if (TryGetRuntimeKey(key, out int runtimeKey))
+                return TryGetReady(runtimeKey, out asset);
+
+            asset = null;
+            return false;
+        }
+
+        /// <summary>RuntimeKey 热路径重载；只读取 Ready 缓存，绝不隐式触发加载。</summary>
         public bool TryGetReady(int runtimeKey, out TAsset asset)
         {
             if (TryGet(runtimeKey, out TConfigData configData) && configData.HasLoadedAsset)
@@ -65,6 +216,21 @@ namespace ES
         /// Ready 时立即回调缓存对象；未 Ready 时对同一个 RuntimeKey 合并请求，并交给当前 Loader。
         /// 回调仅发生于调用线程/Loader 完成线程；Unity Loader 必须保证在主线程回调。
         /// </summary>
+        public void GetOrLoadAsync(IESConfigKey key, Action<TAsset, string> completed)
+        {
+            if (!TryGetRuntimeKey(key, out int runtimeKey))
+            {
+                string description = key == null
+                    ? "<null>"
+                    : ESConfigKeyMatch.Describe(key.EnumKeyInt, key.StringKey);
+                completed?.Invoke(null, "AssetTable 未登记业务 Key: " + description);
+                return;
+            }
+
+            GetOrLoadAsync(runtimeKey, completed);
+        }
+
+        /// <summary>RuntimeKey 热路径重载；未 Ready 时合并请求并交给当前 Loader。</summary>
         public void GetOrLoadAsync(int runtimeKey, Action<TAsset, string> completed)
         {
             if (!TryGet(runtimeKey, out TConfigData configData))
@@ -93,17 +259,54 @@ namespace ES
 
             if (loader == null)
             {
-                CompleteLoad(runtimeKey, configData, null, "AssetTable 尚未配置 Loader");
+                CompleteLoad(runtimeKey, configData, pending, null, null, "AssetTable 尚未配置 Loader");
                 return;
             }
 
-            loader.LoadAsync(runtimeKey, configData, (asset, error) => CompleteLoad(runtimeKey, configData, asset, error));
+            IESAssetConfigTableLoader<TConfigData, TAsset> requestLoader = loader;
+            try
+            {
+                requestLoader.LoadAsync(runtimeKey, configData,
+                    (asset, error) => CompleteLoad(
+                        runtimeKey,
+                        configData,
+                        pending,
+                        requestLoader,
+                        asset,
+                        error));
+            }
+            catch (Exception exception)
+            {
+                // Loader 接口允许第三方 RunMode 后端同步失败。失败必须走同一完成事务，
+                // 否则该 RuntimeKey 会永久滞留在 pendingLoads 中并吞掉后续重试。
+                CompleteLoad(runtimeKey, configData, pending, requestLoader, null, exception.Message);
+            }
         }
 
-        /// <summary>释放本表缓存的单个资产。生命周期和依赖释放由当前 Loader 执行。</summary>
+        /// <summary>
+        /// 按业务 Key 驱逐本表共享缓存；稳定配置外壳和业务 Key 映射继续保留。
+        /// 仅供 ResourcePlan、Scope 或统一内存管理服务调用，普通业务不得把它当作调用者私有引用释放。
+        /// </summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public bool Release(IESConfigKey key)
+        {
+            return TryGetRuntimeKey(key, out int runtimeKey) && Release(runtimeKey);
+        }
+
+        /// <summary>按 RuntimeKey 驱逐共享缓存。生命周期和依赖释放由当前 Loader 执行。</summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public bool Release(int runtimeKey)
         {
-            if (!TryGet(runtimeKey, out TConfigData configData) || !configData.HasLoadedAsset)
+            if (!TryGet(runtimeKey, out TConfigData configData))
+                return false;
+
+            if (pendingLoads.TryGetValue(runtimeKey, out PendingLoad pending))
+            {
+                pending.releaseRequested = true;
+                return true;
+            }
+
+            if (!configData.HasLoadedAsset)
                 return false;
 
             TAsset asset = configData.LoadedAsset;
@@ -112,25 +315,65 @@ namespace ES
             return true;
         }
 
-        public void ClearPendingLoads()
+        internal void ClearPendingLoads()
         {
-            pendingLoads.Clear();
+            foreach (PendingLoad pending in pendingLoads.Values)
+                pending.releaseRequested = true;
         }
 
-        private void CompleteLoad(int runtimeKey, TConfigData configData, TAsset asset, string error)
+        private void CompleteLoad(
+            int runtimeKey,
+            TConfigData configData,
+            PendingLoad expectedPending,
+            IESAssetConfigTableLoader<TConfigData, TAsset> requestLoader,
+            TAsset asset,
+            string error)
         {
-            if (!pendingLoads.TryGetValue(runtimeKey, out PendingLoad pending))
+            if (!pendingLoads.TryGetValue(runtimeKey, out PendingLoad pending)
+                || !ReferenceEquals(pending, expectedPending))
+            {
+                // Provider 切换后同 Key 可能已经产生新请求。旧请求的迟到结果只能
+                // 交还给发起它的旧 Loader，绝不能完成新 Pending 或恢复 Ready。
+                if (asset != null)
+                    requestLoader?.Release(runtimeKey, configData, asset);
                 return;
+            }
 
             pendingLoads.Remove(runtimeKey);
-            if (asset != null && string.IsNullOrEmpty(error))
+            bool succeeded = asset != null && string.IsNullOrEmpty(error);
+            if (succeeded && !pending.releaseRequested)
                 configData.SetLoadedAsset(asset);
             else
                 configData.ClearLoadedAsset();
 
-            string finalError = asset != null && string.IsNullOrEmpty(error) ? null : (string.IsNullOrEmpty(error) ? "Loader 返回空资产" : error);
+            if (asset != null && (!succeeded || pending.releaseRequested))
+                requestLoader?.Release(runtimeKey, configData, asset);
+
+            string finalError = pending.releaseRequested
+                ? "资产在加载完成前已释放"
+                : succeeded ? null : (string.IsNullOrEmpty(error) ? "Loader 返回空资产" : error);
+            InvokeCallbacks(pending, pending.releaseRequested ? null : asset, finalError);
+        }
+
+        private static void InvokeCallbacks(PendingLoad pending, TAsset asset, string error)
+        {
             for (int i = 0; i < pending.callbacks.Count; i++)
-                pending.callbacks[i]?.Invoke(asset, finalError);
+            {
+                try
+                {
+                    pending.callbacks[i]?.Invoke(asset, error);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+            pending.callbacks.Clear();
+        }
+
+        protected override void OnRetainedReleased(TConfigData data)
+        {
+            data?.ClearLoadedAsset();
         }
     }
 
@@ -178,7 +421,22 @@ namespace ES
                     return;
                 }
 
-                handles.Add(runtimeKey, handle);
+                if (handle.Asset == null)
+                {
+                    handle.Dispose();
+                    completed?.Invoke(null, "Runtime Provider 返回空资产");
+                    return;
+                }
+
+                try
+                {
+                    handles.Add(runtimeKey, handle);
+                }
+                catch
+                {
+                    handle.Dispose();
+                    throw;
+                }
                 completed?.Invoke(handle.Asset, null);
             }
             catch (Exception exception)

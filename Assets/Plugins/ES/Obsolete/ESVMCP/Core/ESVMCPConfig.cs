@@ -29,7 +29,7 @@ namespace ES.Obsolete.VMCP
     /// <summary>
     /// ESVMCP配置文件
     /// </summary>
-    [CreateAssetMenu(fileName = "ESVMCPConfig", menuName = MenuItemPathDefine.VMCP_ASSET_CREATION_PATH + "配置文件")]
+    [CreateAssetMenu(fileName = "ESVMCPConfig", menuName = "【ES】/已废弃/VMCP/创建资产/配置文件")]
     [ESOnlyEditorSO("旧 VMCP 配置只服务编辑器 AI 辅助流程，不应进入运行时构建或AB资源包。")]
     public class ESVMCPConfig : ESEditorGlobalSo<ESVMCPConfig>
     {

@@ -226,7 +226,14 @@ namespace ES
 
         public void SavePlayerProfile(string filePath = null)
         {
-            ESInputUtility.SaveProfile(playerProfile ?? ESInputUtility.CreateDefaultProfile(), ResolvePlayerProfilePath(filePath));
+            EnsurePlayerProfile();
+            if (inputConfig != null && !inputConfig.TryPrepareBindingProfile(playerProfile, out string error))
+            {
+                Debug.LogError("[ESInput] 拒绝保存与当前输入配置不兼容的玩家键位档案：" + error);
+                return;
+            }
+
+            ESInputUtility.SaveProfile(playerProfile, ResolvePlayerProfilePath(filePath));
         }
 
         public void ApplyPlayerProfile(ESInputBindingProfile profile, bool saveNow = false, bool rebuildNow = true, string savePath = null)
@@ -379,11 +386,32 @@ namespace ES
             if (source == null)
                 return false;
 
+            if (inputConfig != null
+                && !inputConfig.TryCreateSchemaHandshake(out _, out string configError))
+            {
+                Debug.LogError("[ESInput] 输入配置稳定 Key/Schema 校验失败，保留现有运行时输入：" + configError);
+                return false;
+            }
+
             bool shouldEnable = inputEnabled || enableAfterBuild;
             ClearRuntimeBuild();
 
             ESInputUtility.EnsureConfigBindingIds(source);
-            effectiveProfile = BuildEffectiveProfile();
+            if (inputConfig != null && !TryPrepareProfilesForInputConfig(out string profileError))
+            {
+                Debug.LogError("[ESInput] 已拒绝不兼容的键位档案，当前输入配置将使用默认键位：" + profileError);
+                effectiveProfile = inputConfig.CreateDefaultBoundProfile();
+            }
+            else
+            {
+                effectiveProfile = BuildEffectiveProfile();
+                if (inputConfig != null && !inputConfig.TryPrepareBindingProfile(effectiveProfile, out string effectiveError))
+                {
+                    Debug.LogError("[ESInput] 有效键位档案校验失败，当前输入配置将使用默认键位：" + effectiveError);
+                    effectiveProfile = inputConfig.CreateDefaultBoundProfile();
+                }
+            }
+
             ESInputRuntimeBuildResult build = ESInputRuntimeBuilder.Build(source, effectiveProfile, GetDefaultSchemeId());
             currentBuild = build;
 
@@ -807,6 +835,37 @@ namespace ES
             return ESInputUtility.BakeProfiles(effectiveBuildLayers);
         }
 
+        private bool TryPrepareProfilesForInputConfig(out string error)
+        {
+            if (inputConfig == null)
+            {
+                error = null;
+                return true;
+            }
+
+            if (profileLayers != null)
+            {
+                for (int i = 0; i < profileLayers.Count; i++)
+                {
+                    ESInputBindingProfile profile = profileLayers[i];
+                    if (profile != null && !inputConfig.TryPrepareBindingProfile(profile, out error))
+                    {
+                        error = "覆盖档案层[" + i + "]：" + error;
+                        return false;
+                    }
+                }
+            }
+
+            if (playerProfile != null && !inputConfig.TryPrepareBindingProfile(playerProfile, out error))
+            {
+                error = "玩家档案：" + error;
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
         private string ResolvePlayerProfilePath(string filePath)
         {
             return string.IsNullOrEmpty(filePath) ? playerProfilePath : filePath;
@@ -822,7 +881,9 @@ namespace ES
         private void EnsurePlayerProfile()
         {
             if (playerProfile == null)
-                playerProfile = ESInputUtility.CreateDefaultProfile();
+                playerProfile = inputConfig != null
+                    ? inputConfig.CreateDefaultBoundProfile()
+                    : ESInputUtility.CreateDefaultProfile();
         }
 
         private void ApplyRuntimeChange(bool saveNow, bool rebuildNow)

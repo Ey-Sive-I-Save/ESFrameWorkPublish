@@ -11,18 +11,18 @@ TagManager:
   - 
   - Water
   - UI
-  - Entity
+  - EntityBody
   - 
   - Ground
   - Wall
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
+  - WorldDynamic
+  - EntityHurtbox
+  - ItemBody
+  - Interaction
+  - TriggerZone
+  - Shot
+  - CameraBlocker
+  - Sensor
   - 
   - 
   - 

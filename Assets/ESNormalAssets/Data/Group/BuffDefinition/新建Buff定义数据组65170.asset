@@ -27,9 +27,13 @@ MonoBehaviour:
       enumKey: 0
       stringKey: 
       definitionGuid: 
-      definitionLocalFileId: 0
-      definitionTypeName: 
+     definitionLocalFileId: 0
+     definitionTypeName: 
     tags: 
+    applyTargetTagRequirement:
+      requiredAll: []
+      requiredAny: []
+      blockedAny: []
     duration: 5
     buffGroup: 
     strength: 0

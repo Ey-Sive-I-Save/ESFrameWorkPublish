@@ -184,11 +184,45 @@ namespace ES
         [Tooltip("2~12 位小写字母、数字或下划线；首次烘焙自动生成并持久化。修改后会生成一套新的 BundleKey。")]
         public string AssetBundleCode = string.Empty;
 
-        [ESBoolOption("允许热更新远端发布", "仅随包本地")]
+        [HideInInspector]
+        [Obsolete("请使用 DeliveryMode；保留此字段仅用于旧资产迁移。")]
         public bool IsNet = true;
+
+        [SerializeField, HideInInspector]
+        private int _deliveryMode = -1;
+
+        [ShowInInspector]
+        [LabelText("分发方式")]
+        [Tooltip("随包：首包提供；更新：首包提供并允许远端更新；远端：首包不提供，必须联网下载。")]
+        public ESAssetDeliveryMode DeliveryMode
+        {
+            get
+            {
+                if (_deliveryMode < 0)
+#pragma warning disable CS0618
+                    return IsNet ? ESAssetDeliveryMode.Updateable : ESAssetDeliveryMode.BuiltIn;
+#pragma warning restore CS0618
+                return System.Enum.IsDefined(typeof(ESAssetDeliveryMode), _deliveryMode)
+                    ? (ESAssetDeliveryMode)_deliveryMode
+                    : ESAssetDeliveryMode.Updateable;
+            }
+            set => _deliveryMode = (int)value;
+        }
+
+        public bool HasExplicitDeliveryMode => _deliveryMode >= 0;
+
+        public void EnsureDeliveryModeMigrated()
+        {
+            if (_deliveryMode >= 0)
+                return;
+#pragma warning disable CS0618
+            _deliveryMode = IsNet ? (int)ESAssetDeliveryMode.Updateable : (int)ESAssetDeliveryMode.BuiltIn;
+#pragma warning restore CS0618
+        }
 
         public override void OnEditorApply()
         {
+            EnsureDeliveryModeMigrated();
             base.OnEditorApply();
             Refresh();
 #if UNITY_EDITOR
@@ -482,7 +516,6 @@ namespace ES
     {
         private readonly List<ESAssetPage> pages;
         private readonly Dictionary<ESAssetReferKind, List<ESAssetPage>> pagesByKind;
-        private readonly Dictionary<ESAssetKindIntKey, int> slotByRuntimeKey;
         private readonly Dictionary<ESAssetKindIntKey, int> slotByEnumKey;
         private readonly Dictionary<ESAssetKindStringKey, int> slotByStringKey;
         private readonly Dictionary<string, int> slotByGuid;
@@ -492,7 +525,6 @@ namespace ES
         {
             pages = new List<ESAssetPage>(capacity);
             pagesByKind = new Dictionary<ESAssetReferKind, List<ESAssetPage>>(32);
-            slotByRuntimeKey = new Dictionary<ESAssetKindIntKey, int>(capacity);
             slotByEnumKey = new Dictionary<ESAssetKindIntKey, int>(capacity);
             slotByStringKey = new Dictionary<ESAssetKindStringKey, int>(capacity);
             slotByGuid = new Dictionary<string, int>(capacity);
@@ -506,7 +538,6 @@ namespace ES
         {
             pages.Clear();
             pagesByKind.Clear();
-            slotByRuntimeKey.Clear();
             slotByEnumKey.Clear();
             slotByStringKey.Clear();
             slotByGuid.Clear();
@@ -527,7 +558,7 @@ namespace ES
 
         public bool Register(ESAssetPage page, bool allowOverride = true)
         {
-            if (page == null || page.RuntimeKey == 0)
+            if (page == null)
                 return false;
 
             if (TryFindSlot(page, out int slot))
@@ -545,43 +576,9 @@ namespace ES
             return true;
         }
 
-        public bool Remove(ESAssetReferKind kind, int runtimeKey)
-        {
-            if (!slotByRuntimeKey.TryGetValue(new ESAssetKindIntKey(kind, runtimeKey), out int slot))
-                return false;
-
-            pages.RemoveAt(slot);
-            RebuildIndex();
-            return true;
-        }
-
         public IReadOnlyList<ESAssetPage> GetPagesByKind(ESAssetReferKind kind)
         {
             return pagesByKind.TryGetValue(kind, out var kindPages) ? kindPages : Array.Empty<ESAssetPage>();
-        }
-
-        public bool TryGet(int runtimeKey, out ESAssetPage page)
-        {
-            if (TryGetAnyRuntime(runtimeKey, out int slot))
-            {
-                page = pages[slot];
-                return true;
-            }
-
-            page = null;
-            return false;
-        }
-
-        public bool TryGet(ESAssetReferKind kind, int runtimeKey, out ESAssetPage page)
-        {
-            if (slotByRuntimeKey.TryGetValue(new ESAssetKindIntKey(kind, runtimeKey), out int slot))
-            {
-                page = pages[slot];
-                return true;
-            }
-
-            page = null;
-            return false;
         }
 
         public bool TryGetByEnum(int enumKey, out ESAssetPage page)
@@ -675,8 +672,6 @@ namespace ES
 
             if (string.IsNullOrEmpty(page.AssetGuid))
             {
-                if (page.RuntimeKey != 0 && slotByRuntimeKey.TryGetValue(new ESAssetKindIntKey(page.Kind, page.RuntimeKey), out slot))
-                    return true;
                 if (page.EnumKey != 0 && slotByEnumKey.TryGetValue(new ESAssetKindIntKey(page.Kind, page.EnumKey), out slot))
                     return true;
                 if (!string.IsNullOrEmpty(page.EffectiveStringKey) && slotByStringKey.TryGetValue(new ESAssetKindStringKey(page.Kind, page.EffectiveStringKey), out slot))
@@ -695,7 +690,6 @@ namespace ES
 
         private void RebuildIndex()
         {
-            slotByRuntimeKey.Clear();
             slotByEnumKey.Clear();
             slotByStringKey.Clear();
             slotByGuid.Clear();
@@ -720,8 +714,6 @@ namespace ES
 
             kindPages.Add(page);
 
-            if (page.RuntimeKey != 0)
-                TryBind(slotByRuntimeKey, new ESAssetKindIntKey(page.Kind, page.RuntimeKey), slot);
             if (page.EnumKey != 0)
                 TryBind(slotByEnumKey, new ESAssetKindIntKey(page.Kind, page.EnumKey), slot);
             if (!string.IsNullOrEmpty(page.EffectiveStringKey))
@@ -737,20 +729,6 @@ namespace ES
         {
             if (!map.ContainsKey(key))
                 map.Add(key, slot);
-        }
-
-        private bool TryGetAnyRuntime(int runtimeKey, out int slot)
-        {
-            foreach (var pair in slotByRuntimeKey)
-            {
-                if (pair.Key.Value == runtimeKey)
-                {
-                    slot = pair.Value;
-                    return true;
-                }
-            }
-            slot = -1;
-            return false;
         }
 
         private bool TryGetAnyEnum(int enumKey, out int slot)
@@ -784,19 +762,15 @@ namespace ES
 
     public static class ESAssetRegistry
     {
-        public const int DefaultStringRuntimeKeyStart = 30000;
-
         private static readonly List<ESAssetPage> pages = new List<ESAssetPage>(256);
         private static readonly ESEditorConfigAssetPageTable editorConfigQueryTable = new ESEditorConfigAssetPageTable(256);
         private static readonly List<string> warnings = new List<string>(64);
         private static readonly Dictionary<string, PageKeySnapshot> snapshotsByGuid = new Dictionary<string, PageKeySnapshot>(256);
         private static readonly HashSet<string> suppressedLibraryInjectOnce = new HashSet<string>();
-        private static readonly Dictionary<ESAssetReferKind, int> nextStringRuntimeKeyByKind = new Dictionary<ESAssetReferKind, int>(32);
         private static int version;
 
         private struct PageKeySnapshot
         {
-            public int runtimeKey;
             public int enumKey;
             public string stringKey;
             public string assetPath;
@@ -816,7 +790,6 @@ namespace ES
             warnings.Clear();
             snapshotsByGuid.Clear();
             suppressedLibraryInjectOnce.Clear();
-            nextStringRuntimeKeyByKind.Clear();
             unchecked { version++; }
         }
 
@@ -850,12 +823,6 @@ namespace ES
             return count;
         }
 
-        [Obsolete("Use BuildFromAssetLibrary instead.")]
-        public static int BuildFromLibrary(ResLibrary library, bool clearBeforeBuild = false)
-        {
-            return BuildFromAssetLibrary(library, clearBeforeBuild, 0);
-        }
-
         public static int BuildFromAssetLibraries(IReadOnlyList<ESAssetLibrary> libraries, bool clearBeforeBuild = true, int startOrderIndex = 0)
         {
             if (clearBeforeBuild)
@@ -868,24 +835,6 @@ namespace ES
             for (int i = 0; i < libraries.Count; i++)
             {
                 count += BuildFromAssetLibrary(libraries[i], false, startOrderIndex);
-            }
-
-            return count;
-        }
-
-        [Obsolete("Use BuildFromAssetLibraries instead.")]
-        public static int BuildFromLibraries(IReadOnlyList<ResLibrary> libraries, bool clearBeforeBuild = true)
-        {
-            if (clearBeforeBuild)
-                Clear();
-
-            if (libraries == null)
-                return 0;
-
-            int count = 0;
-            for (int i = 0; i < libraries.Count; i++)
-            {
-                count += BuildFromAssetLibrary(libraries[i], false, 0);
             }
 
             return count;
@@ -908,7 +857,6 @@ namespace ES
                 page.SourceLibrary = libraryName;
             if (!string.IsNullOrEmpty(bookName))
                 page.SourceBook = bookName;
-            page.RuntimeKey = BakeRuntimeKey(page);
             WarnIfSnapshotChanged(page);
             UpsertPageByGuidAuthority(page);
             if (startOrderIndex > 0)
@@ -980,10 +928,9 @@ namespace ES
             if (page == null)
                 return false;
 
-            if (TryFindPageIndexByGuidOrRuntime(page, out int index))
+            if (TryFindPageIndexByIdentityOrBusinessKey(page, out int index))
             {
                 page.Name = newName;
-                page.RuntimeKey = BakeRuntimeKey(page);
                 WarnIfSnapshotChanged(page);
                 pages[index] = page;
                 RebuildEditorConfigQueryTable();
@@ -1019,11 +966,10 @@ namespace ES
             if (page == null || string.IsNullOrEmpty(newStringKey))
                 return false;
 
-            if (TryFindPageIndexByGuidOrRuntime(page, out int index))
+            if (TryFindPageIndexByIdentityOrBusinessKey(page, out int index))
             {
                 ESAssetPage oldPage = pages[index];
                 page.StringKey = newStringKey;
-                page.RuntimeKey = BakeRuntimeKey(page);
                 WarnIfKeyChanged(oldPage, page);
                 WarnIfSnapshotChanged(page);
                 pages[index] = page;
@@ -1061,11 +1007,10 @@ namespace ES
             if (page == null)
                 return false;
 
-            if (TryFindPageIndexByGuidOrRuntime(page, out int index))
+            if (TryFindPageIndexByIdentityOrBusinessKey(page, out int index))
             {
                 ESAssetPage oldPage = pages[index];
                 page.EnumKey = newEnumKey;
-                page.RuntimeKey = BakeRuntimeKey(page);
                 WarnIfKeyChanged(oldPage, page);
                 WarnIfSnapshotChanged(page);
                 pages[index] = page;
@@ -1098,57 +1043,6 @@ namespace ES
 #endif
         }
 
-        public static bool RenameRuntimeKey(ESAssetPage page, int newRuntimeKey, int startOrderIndex = 0)
-        {
-            if (page == null
-                || page.EnumKey != 0
-                || newRuntimeKey < DefaultStringRuntimeKeyStart)
-            {
-                return false;
-            }
-
-            if (!TryFindPageIndexByGuidOrRuntime(page, out int index))
-                return false;
-
-            if (editorConfigQueryTable.TryGet(page.Kind, newRuntimeKey, out ESAssetPage conflict)
-                && conflict != null
-                && !ReferenceEquals(conflict, page)
-                && (string.IsNullOrEmpty(page.AssetGuid) || conflict.AssetGuid != page.AssetGuid))
-            {
-                return false;
-            }
-
-            if (page.RuntimeKey == newRuntimeKey)
-                return true;
-
-            page.RuntimeKey = newRuntimeKey;
-            pages[index] = page;
-            EnsureNextStringRuntimeKeyAfter(page.Kind, newRuntimeKey);
-            RebuildEditorConfigQueryTable();
-            MarkSourceLibraryDirty(page, startOrderIndex + 1);
-            return true;
-        }
-
-        public static bool RenameRuntimeKey(string guid, int newRuntimeKey, int startOrderIndex = 0)
-        {
-            if (!TryGetByGuid(guid, out ESAssetPage page))
-                return false;
-
-            return RenameRuntimeKey(page, newRuntimeKey, startOrderIndex);
-        }
-
-        public static bool RenameRuntimeKey(UnityEngine.Object asset, int newRuntimeKey, int startOrderIndex = 0)
-        {
-#if UNITY_EDITOR
-            if (!TryResolvePageByAsset(asset, out ESAssetPage page))
-                return false;
-
-            return RenameRuntimeKey(page, newRuntimeKey, startOrderIndex);
-#else
-            return false;
-#endif
-        }
-
         public static bool RefreshAssetPath(ESAssetPage page, int startOrderIndex = 0)
         {
 #if UNITY_EDITOR
@@ -1156,11 +1050,10 @@ namespace ES
                 return false;
 
             bool identityChanged = page.RefreshAssetIdentityEditor(out string oldGuid, out long oldLocalFileId, out string oldPath, out string oldTypeName);
-            if (!TryFindPageIndexByGuidOrRuntime(page, out int index))
+            if (!TryFindPageIndexByIdentityOrBusinessKey(page, out int index))
                 return RegisterAsset(page);
 
             ESAssetPage oldPage = pages[index];
-            page.RuntimeKey = BakeRuntimeKey(page);
             if (identityChanged)
                 AddWarning("Asset identity refreshed by asset authority"
                     + " | oldGuid=" + oldGuid
@@ -1184,7 +1077,7 @@ namespace ES
             if (string.IsNullOrEmpty(guid) || !TryGetByGuid(guid, out ESAssetPage page))
                 return false;
 
-            if (!TryFindPageIndexByGuidOrRuntime(page, out int index))
+            if (!TryFindPageIndexByIdentityOrBusinessKey(page, out int index))
                 return false;
 
             ESAssetPage oldPage = pages[index];
@@ -1203,7 +1096,8 @@ namespace ES
             {
                 page.Kind = ESAssetPage.DetermineKind(page.OB);
                 page.AssetTypeName = page.OB.GetType().FullName;
-                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(page.OB, out _, out long localFileId);
+                if (ESAssetPage.TryGetAssetIdentityEditor(page.OB, out string refreshedGuid, out long localFileId))
+                    page.AssetGuid = refreshedGuid;
                 page.LocalFileId = localFileId;
                 if (string.IsNullOrEmpty(page.Name))
                     page.Name = page.OB.name;
@@ -1211,7 +1105,6 @@ namespace ES
                     page.StringKey = page.ResolveEffectiveStringKey();
             }
 
-            page.RuntimeKey = BakeRuntimeKey(page);
             if (oldPath != page.AssetPath)
                 AddWarning("AssetPath changed by GUID-only asset authority | oldPath=" + oldPath, oldPage, page);
 
@@ -1235,16 +1128,6 @@ namespace ES
 #else
             return false;
 #endif
-        }
-
-        public static bool TryGet(int runtimeKey, out ESAssetPage page)
-        {
-            return editorConfigQueryTable.TryGet(runtimeKey, out page);
-        }
-
-        public static bool TryGet(ESAssetReferKind kind, int runtimeKey, out ESAssetPage page)
-        {
-            return editorConfigQueryTable.TryGet(kind, runtimeKey, out page);
         }
 
         public static bool TryGetByEnum(int enumKey, out ESAssetPage page)
@@ -1298,7 +1181,7 @@ namespace ES
 
         private static void UpsertPageByGuidAuthority(ESAssetPage page)
         {
-            if (TryFindPageIndexByGuidOrRuntime(page, out int index))
+            if (TryFindPageIndexByIdentityOrBusinessKey(page, out int index))
             {
                 ESAssetPage existing = pages[index];
                 WarnIfKeyChanged(existing, page);
@@ -1312,9 +1195,24 @@ namespace ES
             RebuildEditorConfigQueryTable();
         }
 
-        private static bool TryFindPageIndexByGuidOrRuntime(ESAssetPage page, out int index)
+        private static bool TryFindPageIndexByIdentityOrBusinessKey(ESAssetPage page, out int index)
         {
-            if (page != null && !string.IsNullOrEmpty(page.AssetGuid))
+            if (page == null)
+            {
+                index = -1;
+                return false;
+            }
+
+            for (int i = 0; i < pages.Count; i++)
+            {
+                if (ReferenceEquals(pages[i], page))
+                {
+                    index = i;
+                    return true;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(page.AssetGuid))
             {
                 for (int i = 0; i < pages.Count; i++)
                 {
@@ -1329,12 +1227,28 @@ namespace ES
                 }
             }
 
-            if (page != null && page.RuntimeKey != 0)
+            if (page.EnumKey != 0)
             {
                 for (int i = 0; i < pages.Count; i++)
                 {
                     ESAssetPage existing = pages[i];
-                    if (existing != null && existing.Kind == page.Kind && existing.RuntimeKey == page.RuntimeKey && string.IsNullOrEmpty(existing.AssetGuid))
+                    if (existing != null && existing.Kind == page.Kind && existing.EnumKey == page.EnumKey)
+                    {
+                        index = i;
+                        return true;
+                    }
+                }
+            }
+
+            string stringKey = page.EffectiveStringKey;
+            if (!string.IsNullOrEmpty(stringKey))
+            {
+                for (int i = 0; i < pages.Count; i++)
+                {
+                    ESAssetPage existing = pages[i];
+                    if (existing != null
+                        && existing.Kind == page.Kind
+                        && string.Equals(existing.EffectiveStringKey, stringKey, StringComparison.Ordinal))
                     {
                         index = i;
                         return true;
@@ -1353,11 +1267,8 @@ namespace ES
             if (asset == null)
                 return false;
 
-            if (AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string guid, out long localFileId))
+            if (ESAssetPage.TryGetAssetIdentityEditor(asset, out string guid, out long localFileId))
             {
-                if (!AssetDatabase.IsSubAsset(asset))
-                    localFileId = 0;
-
                 ESAssetReferKind identityKind = ESAssetPage.DetermineKind(asset);
                 if (!string.IsNullOrEmpty(guid) && TryGetByAssetIdentity(identityKind, guid, localFileId, out page))
                     return true;
@@ -1502,8 +1413,6 @@ namespace ES
             if (oldPage == null || newPage == null)
                 return;
 
-            if (oldPage.RuntimeKey != 0 && newPage.RuntimeKey != 0 && oldPage.RuntimeKey != newPage.RuntimeKey)
-                AddWarning("RuntimeKey changed by GUID authority", oldPage, newPage);
             if (oldPage.EnumKey != 0 && newPage.EnumKey != 0 && oldPage.EnumKey != newPage.EnumKey)
                 AddWarning("EnumKey changed by GUID authority", oldPage, newPage);
             if (!string.IsNullOrEmpty(oldPage.EffectiveStringKey)
@@ -1521,8 +1430,6 @@ namespace ES
                 return;
 
             string newStringKey = page.EffectiveStringKey;
-            if (old.runtimeKey != 0 && page.RuntimeKey != 0 && old.runtimeKey != page.RuntimeKey)
-                AddWarning("RuntimeKey changed by asset self override", SnapshotToPage(page, old), page);
             if (old.enumKey != 0 && page.EnumKey != 0 && old.enumKey != page.EnumKey)
                 AddWarning("EnumKey changed by asset self override", SnapshotToPage(page, old), page);
             if (!string.IsNullOrEmpty(old.stringKey) && !string.IsNullOrEmpty(newStringKey) && old.stringKey != newStringKey)
@@ -1538,7 +1445,6 @@ namespace ES
 
             snapshotsByGuid[page.AssetGuid] = new PageKeySnapshot
             {
-                runtimeKey = page.RuntimeKey,
                 enumKey = page.EnumKey,
                 stringKey = page.EffectiveStringKey,
                 assetPath = page.AssetPath
@@ -1551,7 +1457,6 @@ namespace ES
             {
                 Name = current != null ? current.Name : string.Empty,
                 Kind = current != null ? current.Kind : ESAssetReferKind.None,
-                RuntimeKey = snapshot.runtimeKey,
                 EnumKey = snapshot.enumKey,
                 StringKey = snapshot.stringKey,
                 AssetGuid = current != null ? current.AssetGuid : string.Empty,
@@ -1576,8 +1481,6 @@ namespace ES
                 if (sameIdentity)
                     continue;
 
-                if (page.Kind == existing.Kind && page.RuntimeKey != 0 && existing.RuntimeKey == page.RuntimeKey)
-                    AddWarning("RuntimeKey conflict, GUID keeps assets separated", existing, page);
                 if (page.Kind == existing.Kind && page.EnumKey != 0 && existing.EnumKey == page.EnumKey)
                     AddWarning("EnumKey conflict, GUID keeps assets separated", existing, page);
                 if (page.Kind == existing.Kind && !string.IsNullOrEmpty(page.EffectiveStringKey) && existing.EffectiveStringKey == page.EffectiveStringKey)
@@ -1603,68 +1506,12 @@ namespace ES
                 return "<null>";
 
             return page.Kind
-                + "/runtime=" + page.RuntimeKey
                 + "/enum=" + page.EnumKey
                 + "/string=" + page.EffectiveStringKey
                 + "/guid=" + page.AssetGuid
                 + "/path=" + page.AssetPath;
         }
 
-        private static int BakeRuntimeKey(ESAssetPage page)
-        {
-            if (page == null)
-                return 0;
-
-            int enumKey = page.EnumKey;
-            string stringKey = page.EffectiveStringKey;
-
-            if (enumKey != 0)
-                return enumKey;
-
-            if (!string.IsNullOrEmpty(page.AssetGuid)
-                && snapshotsByGuid.TryGetValue(page.AssetGuid, out PageKeySnapshot snapshot)
-                && snapshot.runtimeKey >= DefaultStringRuntimeKeyStart
-                && snapshot.enumKey == enumKey
-                && string.Equals(snapshot.stringKey, stringKey, StringComparison.Ordinal))
-            {
-                EnsureNextStringRuntimeKeyAfter(page.Kind, snapshot.runtimeKey);
-                return snapshot.runtimeKey;
-            }
-
-            if (page.RuntimeKey >= DefaultStringRuntimeKeyStart)
-            {
-                EnsureNextStringRuntimeKeyAfter(page.Kind, page.RuntimeKey);
-                return page.RuntimeKey;
-            }
-
-            if (!string.IsNullOrEmpty(stringKey)
-                && editorConfigQueryTable.TryGetByString(page.Kind, stringKey, out ESAssetPage existing)
-                && existing.RuntimeKey >= DefaultStringRuntimeKeyStart)
-            {
-                EnsureNextStringRuntimeKeyAfter(page.Kind, existing.RuntimeKey);
-                return existing.RuntimeKey;
-            }
-
-            int nextRuntimeKey = GetNextStringRuntimeKey(page.Kind);
-            while (editorConfigQueryTable.TryGet(page.Kind, nextRuntimeKey, out _))
-                nextRuntimeKey++;
-            nextStringRuntimeKeyByKind[page.Kind] = nextRuntimeKey + 1;
-            return nextRuntimeKey;
-        }
-
-        private static int GetNextStringRuntimeKey(ESAssetReferKind kind)
-        {
-            return nextStringRuntimeKeyByKind.TryGetValue(kind, out int nextRuntimeKey)
-                ? nextRuntimeKey
-                : DefaultStringRuntimeKeyStart;
-        }
-
-        private static void EnsureNextStringRuntimeKeyAfter(ESAssetReferKind kind, int runtimeKey)
-        {
-            int nextRuntimeKey = GetNextStringRuntimeKey(kind);
-            if (runtimeKey >= nextRuntimeKey)
-                nextStringRuntimeKeyByKind[kind] = runtimeKey + 1;
-        }
     }
 
 }

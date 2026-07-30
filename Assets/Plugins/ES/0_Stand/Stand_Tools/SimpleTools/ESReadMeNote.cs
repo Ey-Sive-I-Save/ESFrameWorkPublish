@@ -9,7 +9,7 @@ namespace ES
     /// 只负责在 Inspector 中保存说明文字，不参与运行时逻辑。
     /// </summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("ES/Stand/ReadMe Note")]
+    [AddComponentMenu("【ES】/开发与维护/场景说明/ReadMe Note")]
     public sealed class ESReadMeNote : MonoBehaviour
     {
         [Title("ReadMe")]

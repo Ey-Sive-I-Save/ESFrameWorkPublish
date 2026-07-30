@@ -321,30 +321,6 @@ namespace ES
         #endregion
 
         #region 遗留工厂方法（已弃用，保留兼容性）
-        /// <summary>
-        /// [已弃用] 使用 ESResSourceFactory.CreateResSource() 代替
-        /// </summary>
-        [Obsolete("请使用 ESResSourceFactory.CreateResSource()")]
-        internal ESResSourceBase CreateResSource_AssetBundle(ESResKey abKey)
-        {
-            var use = PoolForESABSource.GetInPool();
-            use.Set(abKey, ESResSourceLoadType.AssetBundle);
-            use.TargetType = typeof(AssetBundle);
-            return use;
-        }
-        /// <summary>
-        /// [已弃用] 使用 ESResSourceFactory.CreateResSource() 代替
-        /// </summary>
-        [Obsolete("请使用 ESResSourceFactory.CreateResSource()")]
-        internal ESResSourceBase CreateResSource_ABAsset(ESResKey key)
-        {
-            var use = PoolForESAsset.GetInPool();
-            use.Set(key, ESResSourceLoadType.ABAsset);
-            use.TargetType = key.TargetType;
-            return use;
-        }
-
-
         #endregion
 
         #region 资源源管理（引用计数）

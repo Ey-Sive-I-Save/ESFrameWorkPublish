@@ -111,8 +111,10 @@ namespace ES
             _sharedData = new Dictionary<string, object>(32);
             _runtimeFlags = new HashSet<string>();
             
-            _defaultEnumIntValues = new int[StateDefaultNumericParameterCatalog.MaxIntParameterValue + 1];
-            _defaultEnumBoolValues = new bool[StateDefaultNumericParameterCatalog.MaxBoolParameterValue + 1];
+            // Stable enum values are intentionally sparse (1001/2001 ranges); per-machine data
+            // uses the catalog's deterministic dense RuntimeKey instead of reserving those gaps.
+            _defaultEnumIntValues = new int[StateDefaultNumericParameterCatalog.IntRuntimeKeyCount + 1];
+            _defaultEnumBoolValues = new bool[StateDefaultNumericParameterCatalog.BoolRuntimeKeyCount + 1];
         }
 
         #region Float Parameters

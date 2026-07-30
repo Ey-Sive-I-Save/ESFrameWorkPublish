@@ -17,7 +17,7 @@ using UnityEngine;
 namespace ES
 {
     [ESOnlyEditorSO("SO表格规则是编辑器导入导出工具配置，不应进入运行时构建或AB资源包。")]
-    [CreateAssetMenu(fileName = "ESSoTableDataRule", menuName = "【ES】/玩法搭建/SO表格规则")]
+    [CreateAssetMenu(fileName = "ESSoTableDataRule", menuName = "【ES】/内容制作/数据表/SO 表格规则")]
     public partial class ESSoTableDataRule : ESSO
     {
         #region Serialized State And Inspector Configuration

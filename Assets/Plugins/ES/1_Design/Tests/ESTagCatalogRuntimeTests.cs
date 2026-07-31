@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace ES.Tests
 {
@@ -691,6 +692,489 @@ namespace ES.Tests
         }
 
         [Test]
+        public void Buff_RemoveOpException_StillReleasesItsTagAndLeavesTheDomainConsistent()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.buff.remove.cleanup", 4096, ESTagAvailability.Runtime);
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffCleanup");
+            try
+            {
+                Assert.That(catalog.TryValidate(out string validationError), Is.True, validationError);
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                Assert.That(catalog.TryGetRuntimeKey("tests.buff.remove.cleanup", out int runtimeKey), Is.True);
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = -1f,
+                    onRemoveOp = new ESBuffThrowingStartOp()
+                };
+                data.tags.Add(ESTagStableReference.FromString("tests.buff.remove.cleanup"));
+
+                ESActiveBuffRuntime buff = entity.buffDomain.AddBuff(data);
+                Assert.That(buff, Is.Not.Null);
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(1));
+                Assert.That(entity.Tags.GetCount(ESTagId.FromInt32(runtimeKey)), Is.EqualTo(1));
+
+                LogAssert.ignoreFailingMessages = true;
+                Assert.That(entity.buffDomain.RemoveBuff(ESBuffEnumKey.Custom), Is.True);
+                LogAssert.ignoreFailingMessages = false;
+
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.Zero);
+                Assert.That(entity.Tags.GetCount(ESTagId.FromInt32(runtimeKey)), Is.Zero,
+                    "A throwing remove Op must not keep this Buff's Tag lease alive.");
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = false;
+                UnityEngine.Object.DestroyImmediate(entityObject);
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void Buff_ApplyOpException_RollsBackTagAndDoesNotRemainActive()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.buff.apply.rollback", 4096, ESTagAvailability.Runtime);
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffApplyRollback");
+            try
+            {
+                Assert.That(catalog.TryValidate(out string validationError), Is.True, validationError);
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                Assert.That(catalog.TryGetRuntimeKey("tests.buff.apply.rollback", out int runtimeKey), Is.True);
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = -1f,
+                    onApplyOp = new ESBuffThrowingStartOp()
+                };
+                data.tags.Add(ESTagStableReference.FromString("tests.buff.apply.rollback"));
+
+                LogAssert.ignoreFailingMessages = true;
+                Assert.That(entity.buffDomain.AddBuff(data), Is.Null);
+                LogAssert.ignoreFailingMessages = false;
+
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.Zero);
+                Assert.That(entity.Tags.GetCount(ESTagId.FromInt32(runtimeKey)), Is.Zero,
+                    "A rejected Buff application must return its own Tag lease before leaving the domain.");
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = false;
+                UnityEngine.Object.DestroyImmediate(entityObject);
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void Buff_FixedIntervalTick_CapsCatchUpAndDropsBacklog()
+        {
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffTickCap");
+            try
+            {
+                Entity entity = entityObject.AddComponent<Entity>();
+                var tickOp = new ESBuffCountingStartOp();
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = -1f,
+                    tickMode = ESBuffTickMode.FixedInterval,
+                    tickInterval = 1f,
+                    maxCatchUpTicksPerFrame = 3,
+                    onTickOp = tickOp
+                };
+
+                ESActiveBuffRuntime buff = entity.buffDomain.AddBuff(data);
+                Assert.That(buff, Is.Not.Null);
+
+                Assert.That(buff.Tick(100f), Is.False);
+                Assert.That(tickOp.StartCount, Is.EqualTo(3),
+                    "A delayed frame must execute no more than the configured catch-up cap.");
+                Assert.That(buff.VariableData.tickAccumulator, Is.LessThan(1f),
+                    "Only the sub-interval remainder may survive after capped catch-up.");
+
+                Assert.That(buff.Tick(0.9f), Is.False);
+                Assert.That(tickOp.StartCount, Is.EqualTo(3));
+                Assert.That(buff.Tick(0.2f), Is.False);
+                Assert.That(tickOp.StartCount, Is.EqualTo(4));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(entityObject);
+            }
+        }
+
+        [Test]
+        public void Buff_LifecycleLink_IsReadOnlyAndReportsApplyRefreshRemove()
+        {
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffLifecycleLink");
+            try
+            {
+                Entity entity = entityObject.AddComponent<Entity>();
+                var receiver = new BuffChangedReceiver();
+                Assert.That(entity.buffDomain.AddBuffChangedReceiver(receiver), Is.True);
+                Assert.That(entity.buffDomain.AddBuffChangedReceiver(receiver), Is.False,
+                    "Buff lifecycle observers follow the shared Link duplicate-subscription rule.");
+
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = -1f,
+                    maxStack = 3,
+                    stackMode = ESBuffStackMode.StackSameBuff
+                };
+
+                ESActiveBuffRuntime buff = entity.buffDomain.AddBuff(data);
+                Assert.That(buff, Is.Not.Null);
+                Assert.That(entity.buffDomain.AddBuff(data), Is.SameAs(buff));
+                Assert.That(entity.buffDomain.RemoveBuff(ESBuffEnumKey.Custom), Is.True);
+
+                Assert.That(receiver.Changes.Count, Is.EqualTo(3));
+                Assert.That(receiver.Changes[0].ChangeType, Is.EqualTo(ESBuffChangeType.Applied));
+                Assert.That(receiver.Changes[0].DefinitionRuntimeKey, Is.EqualTo((int)ESBuffEnumKey.Custom));
+                Assert.That(receiver.Changes[1].ChangeType, Is.EqualTo(ESBuffChangeType.Refreshed));
+                Assert.That(receiver.Changes[1].StackCount, Is.EqualTo(2));
+                Assert.That(receiver.Changes[2].ChangeType, Is.EqualTo(ESBuffChangeType.Removed));
+                Assert.That(receiver.Changes[2].StackCount, Is.EqualTo(2));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(entityObject);
+            }
+        }
+
+        [Test]
+        public void BuffFrame_ReconcilesOneOwnerWithoutStackingOrTouchingOrdinaryBuffs()
+        {
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffFrame");
+            ESBuffConfigKeyTable table = ESRuntimeDataGameCore.Buffs;
+            try
+            {
+                table.BeginBuild(clear: true);
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = 30f,
+                    maxStack = 9,
+                    stackMode = ESBuffStackMode.StackSameBuff
+                };
+                Assert.That(table.InjectWith((ESBuffConfigKey)ESBuffEnumKey.Custom, data, new BuffVariableData { level = 2 }), Is.Not.Zero);
+                table.EndBuild();
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                ESActiveBuffRuntime ordinary = entity.buffDomain.AddBuff(data);
+                Assert.That(ordinary, Is.Not.Null);
+
+                object stateOwner = new object();
+                Assert.That(entity.buffDomain.BeginBuffFrame(stateOwner), Is.True);
+                Assert.That(entity.buffDomain.SetBuff(ESBuffEnumKey.Custom), Is.True);
+                Assert.That(entity.buffDomain.SetBuff(ESBuffEnumKey.Custom), Is.True,
+                    "The latest write in one Buff frame replaces the earlier write instead of stacking it.");
+                Assert.That(entity.buffDomain.EndBuffFrame(), Is.True);
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(2));
+                Assert.That(entity.buffDomain.CountBuff(ESBuffEnumKey.Custom), Is.EqualTo(2));
+
+                Assert.That(entity.buffDomain.BeginBuffFrame(stateOwner), Is.True);
+                Assert.That(entity.buffDomain.SetBuff(ESBuffEnumKey.Custom), Is.True);
+                Assert.That(entity.buffDomain.EndBuffFrame(), Is.True);
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(2),
+                    "Reasserting the same state effect keeps its runtime ownership and does not reapply a stack.");
+
+                Assert.That(entity.buffDomain.BeginBuffFrame(stateOwner), Is.True);
+                Assert.That(entity.buffDomain.EndBuffFrame(), Is.True,
+                    "An empty completed frame is the explicit full-clear for that frame owner.");
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(1));
+                Assert.That(entity.buffDomain.CountBuff(ESBuffEnumKey.Custom), Is.EqualTo(1),
+                    "The frame must never remove a normal AddBuff lifecycle that happens to use the same Buff key.");
+            }
+            finally
+            {
+                if (table.IsBuilding)
+                    table.EndBuild();
+                table.BeginBuild(clear: true);
+                table.EndBuild();
+                UnityEngine.Object.DestroyImmediate(entityObject);
+            }
+        }
+
+        [Test]
+        public void BuffFrame_InvalidWriteKeepsThePreviousCommittedState()
+        {
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffFrameInvalid");
+            ESBuffConfigKeyTable table = ESRuntimeDataGameCore.Buffs;
+            try
+            {
+                table.BeginBuild(clear: true);
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = 30f
+                };
+                Assert.That(table.InjectWith((ESBuffConfigKey)ESBuffEnumKey.Custom, data, new BuffVariableData()), Is.Not.Zero);
+                table.EndBuild();
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                object stateOwner = new object();
+                Assert.That(entity.buffDomain.BeginBuffFrame(stateOwner), Is.True);
+                Assert.That(entity.buffDomain.SetBuff(ESBuffEnumKey.Custom), Is.True);
+                Assert.That(entity.buffDomain.EndBuffFrame(), Is.True);
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(1));
+
+                LogAssert.ignoreFailingMessages = true;
+                Assert.That(entity.buffDomain.BeginBuffFrame(stateOwner), Is.True);
+                Assert.That(entity.buffDomain.SetBuff("tests.buff.frame.missing"), Is.False);
+                Assert.That(entity.buffDomain.EndBuffFrame(), Is.False);
+                LogAssert.ignoreFailingMessages = false;
+
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(1),
+                    "An invalid full-frame write must not clear the source's already committed effects.");
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = false;
+                if (table.IsBuilding)
+                    table.EndBuild();
+                table.BeginBuild(clear: true);
+                table.EndBuild();
+                UnityEngine.Object.DestroyImmediate(entityObject);
+            }
+        }
+
+        [Test]
+        public void BuffOperation_ChangesTimeStacksAndLevelWithoutRemoveAndReadd()
+        {
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffOperation");
+            ESBuffConfigKeyTable table = ESRuntimeDataGameCore.Buffs;
+            try
+            {
+                table.BeginBuild(clear: true);
+                var levelReadingOp = new ESBuffLevelReadingStartOp();
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = 10f,
+                    maxStack = 5,
+                    maxLevel = 5,
+                    stackMode = ESBuffStackMode.StackSameBuff,
+                    onRefreshOp = levelReadingOp
+                };
+                Assert.That(table.InjectWith((ESBuffConfigKey)ESBuffEnumKey.Custom, data, new BuffVariableData { level = 2 }), Is.Not.Zero);
+                table.EndBuild();
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                ESActiveBuffRuntime initial = entity.buffDomain.AddBuff(ESBuffEnumKey.Custom);
+                Assert.That(initial, Is.Not.Null);
+                Assert.That(initial.StackCount, Is.EqualTo(1));
+                Assert.That(initial.RemainingTime, Is.EqualTo(10f));
+                Assert.That(initial.Level, Is.EqualTo(2), "A GameCore Buff uses its configured default runtime level on creation.");
+
+                ESActiveBuffRuntime changed = entity.buffDomain.ApplyBuff(
+                    ESBuffEnumKey.Custom,
+                    ESBuffOperation.Default.AddStack(2).AddDuration(3f).SetLevel(4));
+
+                Assert.That(changed, Is.SameAs(initial), "An operation must update the existing Buff instead of Remove + Add churn.");
+                Assert.That(changed.StackCount, Is.EqualTo(3));
+                Assert.That(changed.RemainingTime, Is.EqualTo(13f));
+                Assert.That(changed.Level, Is.EqualTo(4));
+                Assert.That(levelReadingOp.LastObservedLevel, Is.EqualTo(4),
+                    "A Buff refresh Op must receive the active Buff Runtime through its support scope.");
+
+                Assert.That(entity.buffDomain.ApplyBuff(ESBuffEnumKey.Custom, ESBuffOperation.Default.ResetDuration()), Is.SameAs(initial));
+                Assert.That(initial.RemainingTime, Is.EqualTo(10f));
+
+                Assert.That(entity.buffDomain.ApplyBuff(ESBuffEnumKey.Custom, ESBuffOperation.Remove), Is.Null);
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.Zero);
+            }
+            finally
+            {
+                if (table.IsBuilding)
+                    table.EndBuild();
+                table.BeginBuild(clear: true);
+                table.EndBuild();
+                UnityEngine.Object.DestroyImmediate(entityObject);
+            }
+        }
+
+        [Test]
+        public void BuffOperationOp_AppliesOneComposedOperationToTheMainTarget()
+        {
+            GameObject sourceObject = new GameObject("ESTagCatalogRuntimeTests_BuffOperationOpSource");
+            GameObject targetObject = new GameObject("ESTagCatalogRuntimeTests_BuffOperationOpTarget");
+            ESBuffConfigKeyTable table = ESRuntimeDataGameCore.Buffs;
+            ESOpSupport sourceSupport = null;
+            try
+            {
+                var key = new ESBuffConfigKey
+                {
+                    enumKey = ESBuffEnumKey.Custom,
+                    stringKey = "tests.buff.operation.op"
+                };
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey
+                    {
+                        enumKey = ESBuffEnumKey.Custom,
+                        stringKey = "tests.buff.operation.op"
+                    },
+                    duration = 10f,
+                    maxStack = 5,
+                    maxLevel = 5,
+                    stackMode = ESBuffStackMode.StackSameBuff
+                };
+
+                table.BeginBuild(clear: true);
+                Assert.That(table.InjectWith(key, data, new BuffVariableData { level = 1 }), Is.Not.Zero);
+                table.EndBuild();
+
+                Entity source = sourceObject.AddComponent<Entity>();
+                Entity target = targetObject.AddComponent<Entity>();
+                ESActiveBuffRuntime initial = target.buffDomain.AddBuff(ESBuffEnumKey.Custom);
+                Assert.That(initial, Is.Not.Null);
+                initial.variableData.remainingTime = 1f;
+
+                sourceSupport = ESOpSupport.CreateStandalone().InitializeEntityOwner(source);
+                var targetPack = new ESRuntimeTargetPack()
+                    .SetUser(source)
+                    .SetEntityMainTarget(target);
+                var op = new OpBuff_ApplyToMainTarget
+                {
+                    buff = key,
+                    operation = ESBuffOperation.Default.ResetDuration().AddStack(1).SetLevel(3)
+                };
+
+                op._TryStartOp(targetPack, sourceSupport, null);
+
+                Assert.That(target.buffDomain.ActiveBuffCount, Is.EqualTo(1));
+                Assert.That(initial.StackCount, Is.EqualTo(2));
+                Assert.That(initial.RemainingTime, Is.EqualTo(10f));
+                Assert.That(initial.Level, Is.EqualTo(3));
+            }
+            finally
+            {
+                sourceSupport?.Dispose();
+                if (table.IsBuilding)
+                    table.EndBuild();
+                table.BeginBuild(clear: true);
+                table.EndBuild();
+                UnityEngine.Object.DestroyImmediate(sourceObject);
+                UnityEngine.Object.DestroyImmediate(targetObject);
+            }
+        }
+
+        [Test]
+        public void Buff_DoesNotRetainTransientSourceSupportAfterApplication()
+        {
+            GameObject targetObject = new GameObject("ESTagCatalogRuntimeTests_BuffTarget");
+            GameObject sourceObject = new GameObject("ESTagCatalogRuntimeTests_BuffSource");
+            ESOpSupport transientSource = null;
+            try
+            {
+                Entity target = targetObject.AddComponent<Entity>();
+                Entity source = sourceObject.AddComponent<Entity>();
+                transientSource = ESOpSupport.CreateStandalone().InitializeEntityOwner(source);
+                var removeOp = new ESBuffTargetSnapshotRemoveOp();
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = -1f,
+                    onRemoveOp = removeOp
+                };
+
+                Assert.That(target.buffDomain.AddBuff(data, sourceSupport: transientSource), Is.Not.Null);
+                transientSource.Dispose();
+
+                Assert.That(target.buffDomain.RemoveBuff(ESBuffEnumKey.Custom), Is.True);
+                Assert.That(removeOp.ObservedUser, Is.SameAs(source),
+                    "A long-lived Buff must retain the source identity snapshot, not the source Support object.");
+                Assert.That(removeOp.ObservedHostSupport, Is.SameAs(target.OpSupport),
+                    "Refresh/remove operations must run under the target Buff host, never under a disposed attack Support.");
+            }
+            finally
+            {
+                transientSource?.Dispose();
+                UnityEngine.Object.DestroyImmediate(targetObject);
+                UnityEngine.Object.DestroyImmediate(sourceObject);
+            }
+        }
+
+        [Test]
+        public void BuffLogic_UsesAnIsolatedRuntimeForItsFullLifecycle()
+        {
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffLogic");
+            try
+            {
+                var logic = new CountingBuffLogic();
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = -1f,
+                    maxStack = 3,
+                    tickMode = ESBuffTickMode.EveryFrame,
+                    logic = logic
+                };
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                ESActiveBuffRuntime buff = entity.buffDomain.AddBuff(data);
+                Assert.That(buff, Is.Not.Null);
+                Assert.That(logic.LastRuntime, Is.Not.Null);
+                Assert.That(logic.LastRuntime.ApplyCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.ObservedOwner, Is.SameAs(entity));
+                Assert.That(logic.LastRuntime.ObservedTarget, Is.Not.Null);
+
+                Assert.That(entity.buffDomain.ApplyBuff(buff, ESBuffOperation.Default.AddStack(1)), Is.True);
+                Assert.That(logic.LastRuntime.RefreshCount, Is.EqualTo(1));
+
+                Assert.That(buff.Tick(0.25f), Is.False);
+                Assert.That(logic.LastRuntime.TickCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.LastTickDelta, Is.EqualTo(0.25f));
+
+                Assert.That(entity.buffDomain.RemoveBuff(ESBuffEnumKey.Custom), Is.True);
+                Assert.That(logic.LastRuntime.RemoveCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.ReleaseCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.ReturnCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.IsRecycled, Is.True);
+                Assert.That(logic.LastRuntime.Buff, Is.Null);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(entityObject);
+            }
+        }
+
+        [Test]
+        public void BuffLogic_ApplyRejectionRollsBackAndReturnsItsRuntime()
+        {
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffLogicRollback");
+            try
+            {
+                var logic = new RejectingBuffLogic();
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = 5f,
+                    logic = logic
+                };
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                Assert.That(entity.buffDomain.AddBuff(data), Is.Null);
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.Zero);
+                Assert.That(logic.LastRuntime, Is.Not.Null);
+                Assert.That(logic.LastRuntime.ApplyCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.RemoveCount, Is.Zero,
+                    "Apply rejection must not run the normal removal gameplay callback.");
+                Assert.That(logic.LastRuntime.ReleaseCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.ReturnCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.Buff, Is.Null);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(entityObject);
+            }
+        }
+
+        [Test]
         public void LeaseSet_RejectsDuplicateAliasesForOneRuntimeKey()
         {
             ESTagBakeTable catalog = CreateCatalog("tests.alias", 4096, ESTagAvailability.Runtime);
@@ -886,6 +1370,133 @@ namespace ES.Tests
             public void OnLink(ESTagPresenceChangedLink link)
             {
                 callback(link);
+            }
+        }
+
+        private sealed class ESBuffThrowingStartOp : ESOutputOp
+        {
+            protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+            {
+                throw new InvalidOperationException("Expected Buff remove-op test failure.");
+            }
+        }
+
+        private sealed class ESBuffCountingStartOp : ESOutputOp
+        {
+            public int StartCount { get; private set; }
+
+            protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+            {
+                StartCount++;
+            }
+        }
+
+        private sealed class ESBuffLevelReadingStartOp : ESOutputOp
+        {
+            public int LastObservedLevel { get; private set; }
+
+            protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+            {
+                LastObservedLevel = scopeSupport.GetOwner<ESActiveBuffRuntime>()?.Level ?? 0;
+            }
+        }
+
+        private sealed class ESBuffTargetSnapshotRemoveOp : ESOutputOp
+        {
+            public Entity ObservedUser { get; private set; }
+            public ESOpSupport ObservedHostSupport { get; private set; }
+
+            protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+            {
+                ObservedUser = target != null ? target.userEntity : null;
+                ObservedHostSupport = hostSupport;
+            }
+        }
+
+        private sealed class CountingBuffLogic : ESBuffLogic
+        {
+            public CountingBuffLogicRuntime LastRuntime { get; private set; }
+
+            public override ESBuffLogicRuntime RentRuntime()
+            {
+                LastRuntime = new CountingBuffLogicRuntime(acceptApply: true);
+                return LastRuntime;
+            }
+        }
+
+        private sealed class RejectingBuffLogic : ESBuffLogic
+        {
+            public CountingBuffLogicRuntime LastRuntime { get; private set; }
+
+            public override ESBuffLogicRuntime RentRuntime()
+            {
+                LastRuntime = new CountingBuffLogicRuntime(acceptApply: false);
+                return LastRuntime;
+            }
+        }
+
+        private sealed class CountingBuffLogicRuntime : ESBuffLogicRuntime
+        {
+            private readonly bool acceptApply;
+
+            public int ApplyCount { get; private set; }
+            public int RefreshCount { get; private set; }
+            public int TickCount { get; private set; }
+            public int RemoveCount { get; private set; }
+            public int ReleaseCount { get; private set; }
+            public int ReturnCount { get; private set; }
+            public float LastTickDelta { get; private set; }
+            public Entity ObservedOwner { get; private set; }
+            public ESRuntimeTargetPack ObservedTarget { get; private set; }
+
+            public CountingBuffLogicRuntime(bool acceptApply)
+            {
+                this.acceptApply = acceptApply;
+            }
+
+            public override bool OnApply()
+            {
+                ApplyCount++;
+                ObservedOwner = Owner;
+                ObservedTarget = Target;
+                return acceptApply;
+            }
+
+            public override void OnRefresh()
+            {
+                RefreshCount++;
+            }
+
+            public override void OnTick(float deltaTime)
+            {
+                TickCount++;
+                LastTickDelta = deltaTime;
+            }
+
+            public override void OnRemove()
+            {
+                RemoveCount++;
+            }
+
+            protected override void OnRelease()
+            {
+                ReleaseCount++;
+            }
+
+            public override void TryAutoPushedToPool()
+            {
+                ReturnCount++;
+                IsRecycled = true;
+            }
+        }
+
+        private sealed class BuffChangedReceiver : IReceiveLink<ESBuffChangedLink>
+        {
+            public readonly List<ESBuffChangedLink> Changes = new List<ESBuffChangedLink>();
+
+            public void OnLink(ESBuffChangedLink link)
+            {
+                Changes.Add(link);
             }
         }
 

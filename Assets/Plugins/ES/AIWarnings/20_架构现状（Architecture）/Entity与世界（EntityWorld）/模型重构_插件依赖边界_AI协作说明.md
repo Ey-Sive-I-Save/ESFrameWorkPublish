@@ -65,10 +65,10 @@
 ### DOTween / Demigiant
 
 - 路径：`Assets/Plugins/Demigiant/DOTween`
-- 程序集：`DOTween.Modules`
-- 使用范围：ES 工具函数、编辑器 TrackView、安装器配置；`ES_Logic.asmdef` 当前引用了 DOTween.Modules。
-- 当前耦合程度：框架可用，但角色核心不应依赖。
-- 模型重构边界：可用于 UI、镜头过渡、编辑器工具、非权威表现动画；不要用 DOTween 驱动角色根位移、KCC 位置、网络同步状态或战斗判定窗口。
+- 程序集：`DOTween.Modules`（遗留插件，迁移完成前暂存）。
+- 使用范围：历史工具、安装器配置和 Obsolete 内容；当前 `ES_Logic.asmdef` 已移除该程序集引用。
+- 当前耦合程度：新代码不得耦合；PrimeTween `1.4.11` 是项目默认 Tween 实现，迁移规则详见 `PrimeTween_DOTween_迁移_P0_AI协作警告.md`。
+- 模型重构边界：Tween 只用于 UI、镜头过渡和非权威表现动画；不要用任何 Tween 驱动角色根位移、KCC 位置、网络同步状态或战斗判定窗口。
 
 ### Easy Save 3
 

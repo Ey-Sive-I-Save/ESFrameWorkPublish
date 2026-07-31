@@ -91,7 +91,7 @@ namespace ES
         {
             if (_lifecycle.IsActive) return;
             var mountable = FindMountable();
-            if (mountable == null) return;
+            if (mountable == null || !mountable.IsReady) return;
 
             // 将激活结果直接传入，无闭包分配
             if (_lifecycle.TryEnter(sm.TryActivateState(_mountState)))
@@ -228,13 +228,11 @@ namespace ES
             if (currentMount == null)
                 return;
 
-            // 载具自身的移动仍在普通 Update 计算；Rider 根位姿只在 KCC Before 阶段同步。
-            currentMount.TickMounted(
+            // 骑手只写驾驶意图；VehicleController 在自己的固定物理/KCC阶段统一提交载具位姿。
+            currentMount.SubmitDriverInput(
                 MyCore,
                 MyCore.kcc.moveInput,
-                MyCore.kcc.lookInput,
-                Time.deltaTime,
-                syncRider: false);
+                MyCore.kcc.lookInput);
 
             // MatchTarget 激活期间实时修正目标点（载具在移动，matchPoint 每帧都在变）
             // MatchTarget 完成后 IsMatchTargetActive 变 false，由 BeforeCharacterUpdate 无缝接管。

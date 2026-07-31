@@ -88,6 +88,9 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("Buff Module Owner")]
         public EntityBuffModuleBase OwnerBuffModule { get; private set; }
 
+        [ShowInInspector, ReadOnly, LabelText("Buff Runtime Owner")]
+        public ESActiveBuffRuntime OwnerBuffRuntime { get; private set; }
+
         [ShowInInspector, ReadOnly, LabelText("父级Support")]
         public ESOpSupport Parent { get; private set; }
 
@@ -171,6 +174,7 @@ namespace ES
             OwnerItem = null;
             OwnerBuffDomain = null;
             OwnerBuffModule = null;
+            OwnerBuffRuntime = null;
             OwnerId = ownerId;
             Parent = parent;
             IsDisposed = false;
@@ -193,9 +197,9 @@ namespace ES
             return BindItem(item, ownerId, null);
         }
 
-        public ESOpSupport InitializeBuffOwner(EntityBuffDomain buffDomain, EntityBuffModuleBase buffModule = null, ESOpSupport hostSupport = null, int ownerId = 0)
+        public ESOpSupport InitializeBuffOwner(EntityBuffDomain buffDomain, EntityBuffModuleBase buffModule = null, ESOpSupport hostSupport = null, int ownerId = 0, ESActiveBuffRuntime buffRuntime = null)
         {
-            return BindBuff(buffDomain, buffModule, ownerId, hostSupport);
+            return BindBuff(buffDomain, buffModule, ownerId, hostSupport, buffRuntime);
         }
 
         public ESOpSupport BindEntity(Entity entity, int ownerId = 0, ESOpSupport parent = null)
@@ -217,12 +221,13 @@ namespace ES
             return this;
         }
 
-        public ESOpSupport BindBuff(EntityBuffDomain buffDomain, EntityBuffModuleBase buffModule = null, int ownerId = 0, ESOpSupport parent = null)
+        public ESOpSupport BindBuff(EntityBuffDomain buffDomain, EntityBuffModuleBase buffModule = null, int ownerId = 0, ESOpSupport parent = null, ESActiveBuffRuntime buffRuntime = null)
         {
             Entity entity = buffDomain != null ? buffDomain.MyCore : null;
-            Configure(ESOpSupportKind.Buff, buffModule != null ? buffModule : buffDomain, entity, ownerId, parent);
+            Configure(ESOpSupportKind.Buff, buffRuntime != null ? buffRuntime : buffModule != null ? buffModule : buffDomain, entity, ownerId, parent);
             OwnerBuffDomain = buffDomain;
             OwnerBuffModule = buffModule;
+            OwnerBuffRuntime = buffRuntime;
             return this;
         }
 
@@ -379,6 +384,7 @@ namespace ES
             OwnerItem = null;
             OwnerBuffDomain = null;
             OwnerBuffModule = null;
+            OwnerBuffRuntime = null;
             Parent = null;
         }
 

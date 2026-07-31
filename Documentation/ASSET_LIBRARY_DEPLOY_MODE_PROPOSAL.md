@@ -33,6 +33,20 @@ public bool IsNet = true;
 
 因此当前系统有“意图字段”，但还没有可执行的本地/远端 Library 分发规则。
 
+## 第五步：阿里云 OSS 远端发布
+
+资源四步构建完成后，由独立的“5. 发布到远端”窗口消费上传计划。阿里云 OSS Provider 使用原生签名和流式 `UploadHandlerFile`，不把凭据写入 Unity 资产。
+
+环境变量约定：
+
+```text
+ES_OSS_ACCESS_KEY_ID
+ES_OSS_ACCESS_KEY_SECRET
+ES_OSS_SECURITY_TOKEN       # 使用 STS 时填写
+```
+
+配置了 `credentialProfile` 后，变量名追加大写配置名，例如 `credentialProfile=Production` 时使用 `ES_OSS_PRODUCTION_ACCESS_KEY_ID`。首次接入必须先在独立 `validationPrefix`（默认 `.es-validation`）执行探针 PUT、HEAD 和 DELETE；验证通过后才允许正式上传。正式文件按版本路径使用 immutable 缓存，Root Manifest 在所有叶子文件校验通过后最后上传并使用 `no-cache`。
+
 ## 配置模型
 
 建议替换为：

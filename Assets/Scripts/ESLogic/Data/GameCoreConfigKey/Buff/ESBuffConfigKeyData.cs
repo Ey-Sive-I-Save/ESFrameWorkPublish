@@ -223,6 +223,7 @@ namespace ES
             ESBuffTimeRefreshMode? timeRefreshMode = null,
             ESBuffGroupConflictMode? groupConflictMode = null,
             int? maxStack = null,
+            int? maxLevel = null,
             ESBuffTickMode? tickMode = null,
             float? tickInterval = null,
             int? initialStackCount = null,
@@ -240,7 +241,7 @@ namespace ES
                 ResolveDefaults(
                     runtimeData, key,
                     duration, buffGroup, strength, sourceIsolationMode, stackMode, timeRefreshMode,
-                    groupConflictMode, maxStack, tickMode, tickInterval,
+                    groupConflictMode, maxStack, maxLevel, tickMode, tickInterval,
                     initialStackCount, initialRemainingTime, initialElapsedTime, initialTickAccumulator, initialSourceKey,
                     fillShared, fillVariable,
                     out BuffSharedData sharedData, out BuffVariableData defaultVariableData);
@@ -273,6 +274,7 @@ namespace ES
             ESBuffTimeRefreshMode? timeRefreshMode = null,
             ESBuffGroupConflictMode? groupConflictMode = null,
             int? maxStack = null,
+            int? maxLevel = null,
             ESBuffTickMode? tickMode = null,
             float? tickInterval = null,
             int? initialStackCount = null,
@@ -294,7 +296,7 @@ namespace ES
                 ResolveDefaults(
                     runtimeData, key,
                     duration, buffGroup, strength, sourceIsolationMode, stackMode, timeRefreshMode,
-                    groupConflictMode, maxStack, tickMode, tickInterval,
+                    groupConflictMode, maxStack, maxLevel, tickMode, tickInterval,
                     initialStackCount, initialRemainingTime, initialElapsedTime, initialTickAccumulator, initialSourceKey,
                     fillShared, fillVariable,
                     out BuffSharedData sharedData, out BuffVariableData defaultVariableData);
@@ -350,6 +352,7 @@ namespace ES
             ESBuffTimeRefreshMode? timeRefreshMode,
             ESBuffGroupConflictMode? groupConflictMode,
             int? maxStack,
+            int? maxLevel,
             ESBuffTickMode? tickMode,
             float? tickInterval,
             int? initialStackCount,
@@ -375,6 +378,7 @@ namespace ES
             if (timeRefreshMode.HasValue) resolvedShared.timeRefreshMode = timeRefreshMode.Value;
             if (groupConflictMode.HasValue) resolvedShared.groupConflictMode = groupConflictMode.Value;
             if (maxStack.HasValue) resolvedShared.maxStack = maxStack.Value;
+            if (maxLevel.HasValue) resolvedShared.maxLevel = maxLevel.Value;
             if (tickMode.HasValue) resolvedShared.tickMode = tickMode.Value;
             if (tickInterval.HasValue) resolvedShared.tickInterval = tickInterval.Value;
 

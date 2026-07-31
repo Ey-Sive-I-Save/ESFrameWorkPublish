@@ -105,6 +105,8 @@ namespace ES
     [Serializable]
     public sealed class BuffSharedData
     {
+        public const int DefaultMaxCatchUpTicksPerFrame = 4;
+
         [Title("Key")]
         [HideLabel, InlineProperty]
         public ESBuffConfigKey key = new ESBuffConfigKey();
@@ -151,6 +153,11 @@ namespace ES
         [Min(1)]
         public int maxStack = 1;
 
+        [LabelText("最大等级")]
+        [Min(1)]
+        [Tooltip("运行时 Buff 等级的上限。等级由 ESBuffOperation 修改，并可供该 Buff 的 Op/表达式通过当前 Buff Runtime 查询。")]
+        public int maxLevel = 1;
+
         [Title("Tick")]
         [LabelText("Tick模式")]
         public ESBuffTickMode tickMode = ESBuffTickMode.None;
@@ -158,6 +165,11 @@ namespace ES
         [LabelText("Tick间隔")]
         [Min(0f)]
         public float tickInterval = 1f;
+
+        [LabelText("单帧追帧上限")]
+        [Min(1)]
+        [Tooltip("仅固定间隔 Tick 生效。卡顿帧最多补执行这么多次 Tick；超出的完整 Tick 直接丢弃，只保留不足一个间隔的余量，避免单个 Buff 追帧拖垮整帧。")]
+        public int maxCatchUpTicksPerFrame = DefaultMaxCatchUpTicksPerFrame;
 
         [Title("Op")]
         [LabelText("On Apply Op")]
@@ -172,6 +184,13 @@ namespace ES
 
         [SerializeReference]
         public ESOutputOp onRemoveOp;
+
+        [Title("可选机制逻辑")]
+        [LabelText("自定义 Buff 逻辑")]
+        [Tooltip("只用于需要独立运行状态、战斗事件订阅或动态机制的复杂 Buff。普通 Tag、数值、权限和 Op 效果不要使用此项。")]
+        [SerializeReference, HideReferenceObjectPicker]
+        [ESCompactEdit("自定义 Buff 逻辑")]
+        public ESBuffLogic logic;
 
         [Title("ValueChange")]
         [LabelText("Float Changes")]
@@ -213,12 +232,15 @@ namespace ES
             timeRefreshMode = ESBuffTimeRefreshMode.ResetDuration;
             groupConflictMode = ESBuffGroupConflictMode.None;
             maxStack = 1;
+            maxLevel = 1;
             tickMode = ESBuffTickMode.None;
             tickInterval = 1f;
+            maxCatchUpTicksPerFrame = DefaultMaxCatchUpTicksPerFrame;
             onApplyOp = null;
             onRefreshOp = null;
             onTickOp = null;
             onRemoveOp = null;
+            logic = null;
 
             floatChanges ??= new List<ESBuffFloatValueChangeBinding>();
             permitChanges ??= new List<ESBuffPermitValueChangeBinding>();
@@ -268,6 +290,8 @@ namespace ES
         {
             tags ??= new List<ESTagStableReference>();
             applyTargetTagCondition ??= new ESTagConditionConfig();
+            maxStack = Mathf.Max(1, maxStack);
+            maxLevel = Mathf.Max(1, maxLevel);
             EnsureTagConditionLists(applyTargetTagCondition);
             MigrateLegacyTagGrants();
             MigrateLegacyTagRequirement();
@@ -371,6 +395,10 @@ namespace ES
         [Min(1)]
         public int stackCount = 1;
 
+        [LabelText("等级")]
+        [Min(1)]
+        public int level = 1;
+
         [LabelText("剩余时间")]
         public float remainingTime;
 
@@ -389,6 +417,7 @@ namespace ES
         internal void ResetToDefaults()
         {
             stackCount = 1;
+            level = 1;
             remainingTime = 0f;
             elapsedTime = 0f;
             tickAccumulator = 0f;
@@ -401,6 +430,7 @@ namespace ES
                 return;
 
             stackCount = t.stackCount;
+            level = t.level;
             remainingTime = t.remainingTime;
             elapsedTime = t.elapsedTime;
             tickAccumulator = t.tickAccumulator;

@@ -10,6 +10,9 @@
 - GameTag 的 `ESTagStableReference` 已统一使用 `ESSearchDropdown` Picker；`ItemDataInfo` 的旧 `ValueDropdown/GetTagOptions` 残留已移除。Tag 测试代码已按当前 NUnit / `IPoolable` 契约修正，但 Unity Test Runner 尚未实跑。
 - 输入、对象池、物理查询、Item/Shot 与 Buff 都有运行时实现，是当前较成熟的底座。
 - 资源系统已进入内部联调：资源计划 Scope 生命周期的 P6/P7/P9 和 IL2CPP Player 仍缺真实验收证据。
+- 资源窗口已增加独立的“5. 发布到远端”入口：先读取第四步上传计划并执行只读预检；手动计划 Provider 不再伪报成功，真实 OSS/S3/HTTP Provider 安装前会明确阻断。Root Manifest 仍必须最后切换。
+- 第五步窗口提供“初步验证远端隔离区”：真实 Provider 必须只在 `validationPrefix`（默认 `.es-validation`）执行探针上传、HEAD 校验与清理，不得用正式版本目录测试权限。
+- 阿里云 OSS Provider 已接入原生签名、流式文件上传、`x-oss-meta-es-sha256` HEAD 校验与隔离探针协议；凭据仅从环境变量读取，Unity 资产不保存 Secret。仍需使用真实测试 Bucket 完成一次网络实跑。
 
 ## 当前优先级
 

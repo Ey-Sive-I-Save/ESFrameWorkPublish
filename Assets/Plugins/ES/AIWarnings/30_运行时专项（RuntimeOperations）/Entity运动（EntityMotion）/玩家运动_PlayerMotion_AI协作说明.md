@@ -240,7 +240,9 @@ SkillSupport
 
 ## P0 冻结：Entity 新运动能力扩展规范
 
-本节为最高优先级约束。后续 AI 或开发者新增飞行、滑翔、墙跑、绳索、载具等运动能力时，必须沿用现有 `Entity → BasicDomain Module → EntityKCCData → KinematicCharacterMotor` 链路，不得再造运动大根或中央类型分派。
+本节为最高优先级约束。后续 AI 或开发者新增飞行、滑翔、墙跑、绳索、骑乘等**生命体自身**运动能力时，必须沿用现有 `Entity → BasicDomain Module → EntityKCCData → KinematicCharacterMotor` 链路，不得再造运动大根或中央类型分派。
+
+`VehicleController` 是唯一例外，但它不是 Entity 的新运动模块：它代表一个独立的载具体，拥有自己的 Rigidbody 或 KCC 物理后端。骑手仍按本节通过 Entity KCC 进入、退出和跟随座位；骑手输入只能经 `EntityMountable` 转交给载具，不能直接改载具 Transform 或 Motor。
 
 标准扩展流程：
 
@@ -265,6 +267,7 @@ SkillSupport
 - StateMachine 负责运动状态、动画时序、SupportFlags 与 MatchTarget 语义。
 - `EntityKCCData` 负责调度各运动能力；`KinematicCharacterMotor` 是根位置和根旋转的最终执行权威。
 - MatchTarget 只能由 State 计算并通过 `QueueMatchTargetPose` 提交，在 KCC `BeforeCharacterUpdate` 边界应用；普通 `Update` 禁止直接写玩家根 Transform 或 Motor。
+- 载具根由 `VehicleController` 负责调度和写入：Rigidbody 后端只在 `FixedUpdate` 写 Rigidbody，KCC 后端只在 KCC 回调写候选旋转/速度；挂座、武器、镜头和表现模块不得绕过它写载具 Transform、Rigidbody 或 KCC。
 
 生命周期硬规则：
 

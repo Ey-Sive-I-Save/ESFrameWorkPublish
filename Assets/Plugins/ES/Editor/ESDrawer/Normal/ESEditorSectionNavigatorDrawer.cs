@@ -10,152 +10,116 @@ using UnityEngine;
 namespace ES.EditorInternal
 {
     /// <summary>
-    /// Replaces heavy inspector tabs with a compact content directory.
-    /// Fields still use Odin's normal drawer chain; this drawer only selects
-    /// which declared section is visible.
+    /// Replaces heavy inspector tabs with an adaptive content directory.
+    /// Section names remain visible by default, wrap into multiple rows when needed,
+    /// and can be hidden per inspector session without affecting field rendering.
     /// </summary>
     public sealed class ESEditorSectionNavigatorDrawer : OdinGroupDrawer<ESEditorSectionAttribute>
     {
-        private static readonly ConditionalWeakTable<PropertyTree, NavigationContext> Contexts
-            = new ConditionalWeakTable<PropertyTree, NavigationContext>();
-        private static GUIStyle sectionContainerStyle;
-        private static GUIStyle sectionHeaderStyle;
-        private static GUIStyle sectionSubtitleStyle;
-        private static Texture2D sectionContainerTexture;
-
+        private static readonly ConditionalWeakTable<PropertyTree, NavigationContexts> Contexts
+            = new ConditionalWeakTable<PropertyTree, NavigationContexts>();
         protected override void DrawPropertyLayout(GUIContent label)
         {
-            NavigationContext context = Contexts.GetValue(Property.Tree, NavigationContext.Create);
+            NavigationContexts contexts = Contexts.GetValue(Property.Tree, NavigationContexts.Create);
+            NavigationContext context = contexts.Get(Attribute.NavigatorId);
             context.EnsureInitialized(Property.Tree);
             if (context.Register(Attribute))
                 GUI.changed = true;
 
             if (context.IsFirst(Attribute.SectionId))
-                context.DrawDirectory();
+            {
+                context.ResetDrawPass();
+                if (context.TryDrawUnifiedPanel(Property.Tree))
+                    context.MarkUnifiedPanelDrawn();
+                else
+                    context.DrawDirectory();
+            }
 
-            if (context.IsSelected(Attribute.SectionId))
-                DrawSectionChildren(context.GetSubtitle(Attribute.SectionId));
+            if (context.IsSelected(Attribute.SectionId) && !context.UnifiedPanelDrawn)
+                DrawSectionChildren(Property, Attribute, context.GetSubtitle(Attribute.SectionId));
         }
 
-        private void DrawSectionChildren(string subtitle)
+        private void DrawSectionChildren(
+            InspectorProperty sectionProperty,
+            ESEditorSectionAttribute attribute,
+            string subtitle)
         {
             using (new EditorGUILayout.VerticalScope(SectionContainerStyle))
-            {
-                GUILayout.Label(Attribute.DisplayName, SectionHeaderStyle);
-                if (!string.IsNullOrEmpty(subtitle))
-                    GUILayout.Label(subtitle, SectionSubtitleStyle);
-                Rect dividerRect = GUILayoutUtility.GetRect(0f, 1f, GUILayout.ExpandWidth(true));
-                if (Event.current.type == EventType.Repaint)
-                {
-                    Color dividerColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.30f, 0.32f, 0.35f, 1f)
-                        : new Color(0.72f, 0.74f, 0.76f, 1f);
-                    EditorGUI.DrawRect(dividerRect, dividerColor);
-                }
+                DrawSectionBody(sectionProperty, attribute, subtitle);
+        }
 
-                EditorGUILayout.Space(3f);
-                // The next group drawer owns the child layout boundary. Drawing the children
-                // directly here can interleave separate component inspectors after a reload.
-                CallNextDrawer(GUIContent.none);
+        private static void DrawSectionBody(
+            InspectorProperty sectionProperty,
+            ESEditorSectionAttribute attribute,
+            string subtitle)
+        {
+            GUILayout.Label(attribute.DisplayName, SectionHeaderStyle);
+            if (!string.IsNullOrEmpty(subtitle))
+                GUILayout.Label(subtitle, SectionSubtitleStyle);
+
+            Rect dividerRect = GUILayoutUtility.GetRect(0f, 1f, GUILayout.ExpandWidth(true));
+            if (Event.current.type == EventType.Repaint)
+            {
+                ESEditorPresentation.DrawDivider(dividerRect);
             }
+
+            EditorGUILayout.Space(3f);
+            // Draw the group's children directly. Calling the next group drawer here
+            // re-enters Odin's default group layout and creates a second foldout for every
+            // selected section. InspectorProperty.Draw keeps each child on Odin's normal
+            // drawer chain without introducing another page-level foldout.
+            for (int i = 0; i < sectionProperty.Children.Count; i++)
+                sectionProperty.Children[i].Draw(GUIContent.none);
         }
 
         private static GUIStyle SectionContainerStyle
         {
-            get
-            {
-                if (sectionContainerStyle == null)
-                {
-                    sectionContainerStyle = new GUIStyle
-                    {
-                        margin = new RectOffset(0, 0, 2, 2),
-                        padding = new RectOffset(9, 9, 7, 8),
-                        border = new RectOffset(1, 1, 1, 1)
-                    };
-                    sectionContainerStyle.normal.background = SectionContainerTexture;
-                }
-
-                return sectionContainerStyle;
-            }
+            get { return ESEditorPresentation.SurfaceStyle; }
         }
 
-        private static Texture2D SectionContainerTexture
+        private static GUIStyle SectionSurfaceStyle
         {
-            get
-            {
-                if (sectionContainerTexture == null)
-                {
-                    Color borderColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.34f, 0.37f, 0.40f, 1f)
-                        : new Color(0.58f, 0.61f, 0.64f, 1f);
-                    Color fillColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.22f, 0.23f, 0.25f, 1f)
-                        : new Color(0.91f, 0.92f, 0.93f, 1f);
-
-                    sectionContainerTexture = new Texture2D(3, 3, UnityEngine.TextureFormat.RGBA32, false)
-                    {
-                        hideFlags = HideFlags.HideAndDontSave,
-                        name = "ESEditorSectionContainer"
-                    };
-
-                    for (int y = 0; y < 3; y++)
-                    {
-                        for (int x = 0; x < 3; x++)
-                            sectionContainerTexture.SetPixel(x, y, x == 1 && y == 1 ? fillColor : borderColor);
-                    }
-
-                    sectionContainerTexture.Apply(false, true);
-                }
-
-                return sectionContainerTexture;
-            }
+            get { return ESEditorPresentation.SurfaceStyle; }
         }
 
         private static GUIStyle SectionHeaderStyle
         {
-            get
-            {
-                if (sectionHeaderStyle == null)
-                {
-                    sectionHeaderStyle = new GUIStyle(EditorStyles.boldLabel)
-                    {
-                        alignment = TextAnchor.MiddleLeft,
-                        padding = new RectOffset(0, 0, 0, 2)
-                    };
-                    sectionHeaderStyle.normal.textColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.83f, 0.85f, 0.88f, 1f)
-                        : new Color(0.16f, 0.18f, 0.21f, 1f);
-                }
-
-                return sectionHeaderStyle;
-            }
+            get { return ESEditorPresentation.HeaderStyle; }
         }
 
         private static GUIStyle SectionSubtitleStyle
         {
-            get
+            get { return ESEditorPresentation.SubtitleStyle; }
+        }
+
+        private sealed class NavigationContexts
+        {
+            private readonly Dictionary<string, NavigationContext> contexts
+                = new Dictionary<string, NavigationContext>(StringComparer.Ordinal);
+
+            public static NavigationContexts Create(PropertyTree _) => new NavigationContexts();
+
+            public NavigationContext Get(string navigatorId)
             {
-                if (sectionSubtitleStyle == null)
+                string key = string.IsNullOrWhiteSpace(navigatorId)
+                    ? ESEditorSectionAttribute.DefaultNavigatorId
+                    : navigatorId.Trim();
+                if (!contexts.TryGetValue(key, out NavigationContext context))
                 {
-                    sectionSubtitleStyle = new GUIStyle(EditorStyles.miniLabel)
-                    {
-                        alignment = TextAnchor.MiddleLeft,
-                        wordWrap = true,
-                        padding = new RectOffset(0, 0, 1, 3)
-                    };
-                    sectionSubtitleStyle.normal.textColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.61f, 0.64f, 0.68f, 1f)
-                        : new Color(0.39f, 0.42f, 0.45f, 1f);
+                    context = new NavigationContext(key);
+                    contexts.Add(key, context);
                 }
 
-                return sectionSubtitleStyle;
+                return context;
             }
         }
 
         private sealed class NavigationContext
         {
             private const string SessionKeyPrefix = "ES.EditorSectionNavigator.";
-            private const float DirectoryHeight = 30f;
+            private const float DirectoryToolbarHeight = 22f;
+            private const float DirectoryRowHeight = 24f;
+            private const float DirectoryHeight = DirectoryRowHeight;
             private const float DirectoryHorizontalInset = 4f;
             private const float SectionHorizontalPadding = 4f;
             private const float SeparatorWidth = 18f;
@@ -169,6 +133,9 @@ namespace ES.EditorInternal
             private bool initialized;
             private string selectedId;
             private string selectionKey;
+            private string visibilityKey;
+            private bool directoryVisible = true;
+            private bool unifiedPanelDrawn;
             private bool compactPointerActive;
             private bool compactPointerMoved;
             private double compactPointerStartedAt;
@@ -180,8 +147,15 @@ namespace ES.EditorInternal
             private static GUIStyle separatorStyle;
             private static GUIStyle compactArrowStyle;
             private static GUIStyle compactTitleStyle;
+            private static GUIStyle directoryCaptionStyle;
+            private static GUIStyle directoryToggleStyle;
+            private readonly string navigatorId;
+            private readonly GUIContent directoryToggleContent = new GUIContent();
 
-            public static NavigationContext Create(PropertyTree _) => new NavigationContext();
+            public NavigationContext(string navigatorId)
+            {
+                this.navigatorId = navigatorId;
+            }
 
             public void EnsureInitialized(PropertyTree tree)
             {
@@ -190,6 +164,8 @@ namespace ES.EditorInternal
 
                 initialized = true;
                 selectionKey = BuildSelectionKey(tree);
+                visibilityKey = selectionKey + ".directoryVisible";
+                directoryVisible = SessionState.GetBool(visibilityKey, true);
 
                 RegisterDeclaredSections(tree.TargetType);
 
@@ -212,25 +188,42 @@ namespace ES.EditorInternal
                 for (Type type = targetType; type != null && type != typeof(object); type = type.BaseType)
                 {
                     foreach (FieldInfo field in type.GetFields(memberFlags))
-                        RegisterAttributes(field.GetCustomAttributes(typeof(ESEditorSectionAttribute), true));
+                        RegisterSectionSyntax(field);
 
                     foreach (PropertyInfo property in type.GetProperties(memberFlags))
-                        RegisterAttributes(property.GetCustomAttributes(typeof(ESEditorSectionAttribute), true));
+                        RegisterSectionSyntax(property);
 
                     foreach (MethodInfo method in type.GetMethods(memberFlags))
-                        RegisterAttributes(method.GetCustomAttributes(typeof(ESEditorSectionAttribute), true));
+                        RegisterSectionSyntax(method);
                 }
             }
 
-            private void RegisterAttributes(object[] attributes)
+            private void RegisterSectionSyntax(MemberInfo member)
             {
+                object[] attributes = member.GetCustomAttributes(true);
                 for (int i = 0; i < attributes.Length; i++)
-                    Register(attributes[i] as ESEditorSectionAttribute);
+                {
+                    if (attributes[i] is ESEditorBeginSectionAttribute begin)
+                    {
+                        Register(new ESEditorSectionAttribute(
+                            begin.NavigatorId,
+                            begin.SectionId,
+                            begin.DisplayName,
+                            begin.Order,
+                            begin.Subtitle));
+                    }
+                    else if (attributes[i] is ESEditorSectionAttribute section && !section.IsContinuation)
+                    {
+                        Register(section);
+                    }
+                }
             }
 
             public bool Register(ESEditorSectionAttribute section)
             {
-                if (section == null || string.IsNullOrEmpty(section.SectionId))
+                if (section == null
+                    || string.IsNullOrEmpty(section.SectionId)
+                    || !string.Equals(section.NavigatorId, navigatorId, StringComparison.Ordinal))
                     return false;
 
                 int index = FindIndex(section.SectionId);
@@ -268,6 +261,18 @@ namespace ES.EditorInternal
                 return sections.Count > 0 && string.Equals(sections[0].Id, sectionId, StringComparison.Ordinal);
             }
 
+            public bool UnifiedPanelDrawn => unifiedPanelDrawn;
+
+            public void ResetDrawPass()
+            {
+                unifiedPanelDrawn = false;
+            }
+
+            public void MarkUnifiedPanelDrawn()
+            {
+                unifiedPanelDrawn = true;
+            }
+
             public bool IsSelected(string sectionId)
             {
                 return string.Equals(selectedId, sectionId, StringComparison.Ordinal);
@@ -281,19 +286,239 @@ namespace ES.EditorInternal
 
             public void DrawDirectory()
             {
-                if (sections.Count <= 1)
-                    return;
+                int selectedIndex = FindIndex(selectedId);
+                if (selectedIndex < 0)
+                    selectedIndex = 0;
+
+                DrawDirectoryContents(selectedIndex);
+                EditorGUILayout.Space(3f);
+            }
+
+            public bool TryDrawUnifiedPanel(PropertyTree tree)
+            {
+                if (tree == null || sections.Count == 0)
+                    return false;
 
                 int selectedIndex = FindIndex(selectedId);
                 if (selectedIndex < 0)
                     selectedIndex = 0;
 
+                ESEditorSectionAttribute selectedAttribute = null;
+                InspectorProperty selectedProperty = FindSectionProperty(
+                    tree.RootProperty,
+                    sections[selectedIndex].Id,
+                    navigatorId,
+                    ref selectedAttribute);
+                if (selectedProperty == null || selectedAttribute == null)
+                    return false;
+
+                using (new EditorGUILayout.VerticalScope(SectionSurfaceStyle))
+                {
+                    DrawDirectoryContents(selectedIndex);
+                    DrawDirectoryContentDivider();
+                    DrawSectionBody(
+                        selectedProperty,
+                        selectedAttribute,
+                        GetSubtitle(selectedAttribute.SectionId));
+                }
+
+                return true;
+            }
+
+            private static void DrawDirectoryContentDivider()
+            {
+                // Keep navigation and content in one surface, but give the eye a quiet
+                // transition so the selected page does not visually run into the directory.
                 EditorGUILayout.Space(3f);
-                if (RequiresCompactPicker())
-                    DrawCompactDirectory(selectedIndex);
+                Rect dividerRect = GUILayoutUtility.GetRect(0f, 1f, GUILayout.ExpandWidth(true));
+                if (Event.current.type == EventType.Repaint)
+                {
+                    Color dividerColor = ESEditorPresentation.DividerColor;
+                    dividerColor.a = EditorGUIUtility.isProSkin ? 0.72f : 0.90f;
+                    EditorGUI.DrawRect(dividerRect, dividerColor);
+                }
+
+                EditorGUILayout.Space(3f);
+            }
+
+            private void DrawDirectoryContents(int selectedIndex)
+            {
+                if (sections.Count <= 1)
+                    return;
+
+                DrawDirectoryToolbar(selectedIndex);
+                if (directoryVisible)
+                    DrawWrappedDirectory();
                 else
-                    DrawDirectoryLine(selectedIndex);
-                EditorGUILayout.Space(4f);
+                    DrawCompactDirectory(selectedIndex);
+            }
+
+            private static InspectorProperty FindSectionProperty(
+                InspectorProperty property,
+                string sectionId,
+                string navigatorId,
+                ref ESEditorSectionAttribute sectionAttribute)
+            {
+                if (property == null)
+                    return null;
+
+                ESEditorSectionAttribute candidate = property.GetAttribute<ESEditorSectionAttribute>();
+                if (candidate != null
+                    && property.Info != null
+                    && property.Info.PropertyType == PropertyType.Group
+                    && !candidate.IsContinuation
+                    && string.Equals(candidate.SectionId, sectionId, StringComparison.Ordinal)
+                    && string.Equals(candidate.NavigatorId, navigatorId, StringComparison.Ordinal))
+                {
+                    sectionAttribute = candidate;
+                    return property;
+                }
+
+                for (int i = 0; i < property.Children.Count; i++)
+                {
+                    InspectorProperty match = FindSectionProperty(
+                        property.Children[i], sectionId, navigatorId, ref sectionAttribute);
+                    if (match != null)
+                        return match;
+                }
+
+                return null;
+            }
+
+            private void DrawDirectoryToolbar(int selectedIndex)
+            {
+                Rect toolbarRect = GUILayoutUtility.GetRect(
+                    0f,
+                    DirectoryToolbarHeight,
+                    GUILayout.ExpandWidth(true));
+                Rect titleRect = new Rect(
+                    toolbarRect.x + DirectoryHorizontalInset,
+                    toolbarRect.y,
+                    Mathf.Max(80f, toolbarRect.width - 72f),
+                    toolbarRect.height);
+                Rect toggleRect = new Rect(
+                    toolbarRect.xMax - 68f,
+                    toolbarRect.y + 1f,
+                    64f,
+                    toolbarRect.height - 2f);
+
+                GUI.Label(titleRect, "配置目录", DirectoryCaptionStyle);
+
+                directoryToggleContent.text = directoryVisible ? "隐藏" : "显示";
+                directoryToggleContent.tooltip = directoryVisible
+                    ? "隐藏分区名称，保留当前分区内容"
+                    : "显示全部分区名称";
+                if (GUI.Button(toggleRect, directoryToggleContent, DirectoryToggleStyle))
+                {
+                    directoryVisible = !directoryVisible;
+                    if (!string.IsNullOrEmpty(visibilityKey))
+                        SessionState.SetBool(visibilityKey, directoryVisible);
+                    GUI.changed = true;
+                }
+
+                if (Event.current.type == EventType.Repaint)
+                {
+                    Color dividerColor = ESEditorPresentation.DividerColor;
+                    EditorGUI.DrawRect(
+                        new Rect(toolbarRect.x, toolbarRect.yMax - 1f, toolbarRect.width, 1f),
+                        dividerColor);
+                }
+            }
+
+            private void DrawWrappedDirectory()
+            {
+                float availableWidth = Mathf.Max(180f, EditorGUIUtility.currentViewWidth - 32f);
+                int rowCount = CalculateDirectoryRowCount(availableWidth);
+                float totalHeight = Mathf.Max(DirectoryRowHeight, rowCount * DirectoryRowHeight);
+                Rect directoryRect = GUILayoutUtility.GetRect(
+                    0f,
+                    totalHeight,
+                    GUILayout.ExpandWidth(true));
+
+                float rowStartX = directoryRect.x + DirectoryHorizontalInset;
+                float nextX = rowStartX;
+                float rowY = directoryRect.y;
+                int row = 0;
+                int selectedIndex = FindIndex(selectedId);
+
+                for (int i = 0; i < sections.Count; i++)
+                {
+                    SectionDescriptor section = sections[i];
+                    GUIStyle style = i == selectedIndex ? SelectedSectionStyle : SectionStyle;
+                    float itemWidth = style.CalcSize(section.Content).x + SectionHorizontalPadding * 2f;
+                    if (nextX > rowStartX && nextX + itemWidth > directoryRect.xMax - DirectoryHorizontalInset)
+                    {
+                        row++;
+                        nextX = rowStartX;
+                        rowY = directoryRect.y + row * DirectoryRowHeight;
+                    }
+
+                    Rect itemRect = new Rect(
+                        nextX,
+                        rowY,
+                        Mathf.Max(40f, Mathf.Min(itemWidth, directoryRect.xMax - nextX - DirectoryHorizontalInset)),
+                        DirectoryRowHeight - 1f);
+                    if (GUI.Button(itemRect, GUIContent.none, GUIStyle.none))
+                        Select(section.Id);
+
+                    if (Event.current.type == EventType.Repaint && i == selectedIndex)
+                    {
+                        // Keep the directory lightweight, but give the current section a
+                        // real surface area. The underline alone disappears in dark themes
+                        // and makes the content page feel disconnected from the selection.
+                        Color selectedFill = EditorGUIUtility.isProSkin
+                            ? new Color(0.18f, 0.32f, 0.46f, 0.34f)
+                            : new Color(0.72f, 0.84f, 0.96f, 0.55f);
+                        EditorGUI.DrawRect(
+                            new Rect(itemRect.x + 1f, itemRect.y + 2f,
+                                Mathf.Max(4f, itemRect.width - 2f), itemRect.height - 3f),
+                            selectedFill);
+                    }
+
+                    GUI.Label(itemRect, section.Content, style);
+
+                    if (Event.current.type == EventType.Repaint && i == selectedIndex)
+                    {
+                        Color accentColor = EditorGUIUtility.isProSkin
+                            ? new Color(0.34f, 0.68f, 0.96f, 1f)
+                            : new Color(0.08f, 0.38f, 0.72f, 1f);
+                        EditorGUI.DrawRect(
+                            new Rect(itemRect.x + SectionHorizontalPadding, itemRect.yMax - 2f,
+                                Mathf.Max(4f, itemRect.width - SectionHorizontalPadding * 2f), 3f),
+                            accentColor);
+                    }
+
+                    nextX = itemRect.xMax + SeparatorWidth;
+                    if (i < sections.Count - 1 && nextX < directoryRect.xMax - DirectoryHorizontalInset)
+                    {
+                        Rect separatorRect = new Rect(
+                            itemRect.xMax,
+                            itemRect.y,
+                            SeparatorWidth,
+                            DirectoryRowHeight - 1f);
+                        GUI.Label(separatorRect, "·", SeparatorStyle);
+                    }
+                }
+            }
+
+            private int CalculateDirectoryRowCount(float availableWidth)
+            {
+                float rowWidth = DirectoryHorizontalInset;
+                int rows = 1;
+                for (int i = 0; i < sections.Count; i++)
+                {
+                    float itemWidth = SectionStyle.CalcSize(sections[i].Content).x + SectionHorizontalPadding * 2f;
+                    if (rowWidth > DirectoryHorizontalInset
+                        && rowWidth + itemWidth > availableWidth - DirectoryHorizontalInset)
+                    {
+                        rows++;
+                        rowWidth = DirectoryHorizontalInset;
+                    }
+
+                    rowWidth += itemWidth + SeparatorWidth;
+                }
+
+                return rows;
             }
 
             private void DrawCompactDirectory(int selectedIndex)
@@ -318,7 +543,7 @@ namespace ES.EditorInternal
                     Rect hitRect = new Rect(markerRailRect.x + i * CompactMarkerHitWidth, rowRect.y,
                         CompactMarkerHitWidth, DirectoryHeight - 1f);
 
-                    GUI.Label(hitRect, new GUIContent(string.Empty, section.DisplayName), GUIStyle.none);
+                    GUI.Label(hitRect, section.HitContent, GUIStyle.none);
                     if (Event.current.type != EventType.Repaint)
                         continue;
 
@@ -336,10 +561,9 @@ namespace ES.EditorInternal
 
                 if (Event.current.type == EventType.Repaint)
                 {
-                    Color dividerColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.28f, 0.30f, 0.33f, 1f)
-                        : new Color(0.70f, 0.72f, 0.74f, 1f);
-                    EditorGUI.DrawRect(new Rect(rowRect.x, rowRect.yMax - 1f, rowRect.width, 1f), dividerColor);
+                    EditorGUI.DrawRect(
+                        new Rect(rowRect.x, rowRect.yMax - 1f, rowRect.width, 1f),
+                        ESEditorPresentation.DividerColor);
                 }
             }
 
@@ -483,14 +707,11 @@ namespace ES.EditorInternal
 
                 if (Event.current.type == EventType.Repaint)
                 {
-                    Color dividerColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.28f, 0.30f, 0.33f, 1f)
-                        : new Color(0.70f, 0.72f, 0.74f, 1f);
-                    Color accentColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.34f, 0.68f, 0.96f, 1f)
-                        : new Color(0.08f, 0.38f, 0.72f, 1f);
+                    Color accentColor = ESEditorPresentation.GetDepthAccent(0);
 
-                    EditorGUI.DrawRect(new Rect(rowRect.x, rowRect.yMax - 1f, rowRect.width, 1f), dividerColor);
+                    EditorGUI.DrawRect(
+                        new Rect(rowRect.x, rowRect.yMax - 1f, rowRect.width, 1f),
+                        ESEditorPresentation.DividerColor);
                     if (selectedRect.width > 0f)
                     {
                         EditorGUI.DrawRect(
@@ -536,14 +757,14 @@ namespace ES.EditorInternal
                 return -1;
             }
 
-            private static string BuildSelectionKey(PropertyTree tree)
+            private string BuildSelectionKey(PropertyTree tree)
             {
                 string typeName = tree.TargetType == null ? "Unknown" : tree.TargetType.FullName;
                 int targetId = 0;
                 if (tree.WeakTargets.Count == 1 && tree.WeakTargets[0] is UnityEngine.Object target)
                     targetId = target.GetInstanceID();
 
-                return SessionKeyPrefix + typeName + "." + targetId;
+                return SessionKeyPrefix + typeName + "." + targetId + "." + navigatorId;
             }
 
             private static GUIStyle SectionStyle
@@ -608,6 +829,45 @@ namespace ES.EditorInternal
                 }
             }
 
+            private static GUIStyle DirectoryCaptionStyle
+            {
+                get
+                {
+                    if (directoryCaptionStyle == null)
+                    {
+                        directoryCaptionStyle = new GUIStyle(EditorStyles.miniLabel)
+                        {
+                            alignment = TextAnchor.MiddleLeft,
+                            clipping = TextClipping.Clip,
+                            fontStyle = FontStyle.Bold,
+                            padding = new RectOffset(0, 0, 1, 1)
+                        };
+                        directoryCaptionStyle.normal.textColor = EditorGUIUtility.isProSkin
+                            ? new Color(0.58f, 0.62f, 0.68f, 1f)
+                            : new Color(0.34f, 0.37f, 0.42f, 1f);
+                    }
+
+                    return directoryCaptionStyle;
+                }
+            }
+
+            private static GUIStyle DirectoryToggleStyle
+            {
+                get
+                {
+                    if (directoryToggleStyle == null)
+                    {
+                        directoryToggleStyle = new GUIStyle(EditorStyles.miniButton)
+                        {
+                            alignment = TextAnchor.MiddleCenter,
+                            padding = new RectOffset(5, 5, 1, 1)
+                        };
+                    }
+
+                    return directoryToggleStyle;
+                }
+            }
+
             private static GUIStyle CompactArrowStyle
             {
                 get
@@ -655,6 +915,7 @@ namespace ES.EditorInternal
                 public readonly string Subtitle;
                 public readonly float Order;
                 public readonly GUIContent Content;
+                public readonly GUIContent HitContent;
 
             public SectionDescriptor(string id, string displayName, string subtitle, float order)
             {
@@ -663,6 +924,7 @@ namespace ES.EditorInternal
                 Subtitle = subtitle;
                 Order = order;
                 Content = new GUIContent(displayName, subtitle);
+                HitContent = new GUIContent(string.Empty, displayName);
             }
 
             public static int Compare(SectionDescriptor left, SectionDescriptor right)

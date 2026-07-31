@@ -73,3 +73,23 @@ new ESSearchDropdown.Entry(label, icon, callback, groupPath);
 ```
 
 现有调用方不需要迁移即可继续使用。
+
+## 顶部工具栏
+
+需要诊断、刷新目录或复制路径时，可通过 `toolbarActions` 在原生 Advanced 顶部搜索/标题工具区右侧添加小按钮；
+这些动作不会混入候选条目：
+
+```csharp
+ESSearchDropdown.Open(
+    rect,
+    "选择类型",
+    provider,
+    toolbarActions: new[]
+    {
+        new ESSearchDropdown.ToolbarAction("诊断", DumpDiagnostics, "输出当前选择器诊断信息"),
+        new ESSearchDropdown.ToolbarAction("刷新", RefreshCatalog, "刷新候选目录")
+    });
+```
+
+无论是否传入 `toolbarActions`，候选树、搜索、分组、返回和选中状态都继续使用 Unity 原生
+`AdvancedDropdown`。工具栏动作会叠加到同一个原生 Advanced 窗口顶部，不另起弹层，也不占用搜索框。

@@ -6,20 +6,75 @@
 
 这里的 `ESEditorSectionNavigator` 是一项编辑器行为，不是需要挂到 Entity 上的运行时对象。实际绘制类是 `ESEditorSectionNavigatorDrawer`；因此不会为导航再引入一个无职责的 `Config`、`Data` 或组件包装层。
 
+## 推荐：连续分区简写
+
+一段连续配置只在开始处声明名称；中间成员写无参数 `ESEditorSection`；结束成员写 `ESEditorEndSection`：
+
+```csharp
+[ESEditorBeginSection("核心配置", -100f, "角色身份与动画入口。")]
+public string characterId;
+
+[ESEditorSection]
+public Animator animator;
+
+// 默认 AfterMember：这个字段仍是“核心配置”的最后一项，然后分区关闭。
+[ESEditorEndSection]
+public bool useDefaultSpawnProfile;
+
+// 此后的成员没有分区属性，因此保持为目录外独立内容。
+public string designerNote;
+```
+
+若结束标记所在的成员本身也要留在目录外，使用 `BeforeMember`：
+
+```csharp
+[ESEditorBeginSection("身体能力")]
+public float capsuleRadius;
+
+[ESEditorEndSection(ESEditorSectionEndMode.BeforeMember)]
+public float moveSpeed; // 不属于“身体能力”
+```
+
+`Begin`、无参数 `ESEditorSection` 与 `End` 都必须直接标在某个字段、属性或 Odin 按钮方法上；它们不是可单独放在两段成员之间的语句。无参数 `ESEditorSection` 前必须存在尚未结束的分区；否则 Inspector 会给出一次警告并保持该成员未分区。
+
+同一 `navigatorId` 上再次遇到 `Begin` 会切换到新分区，旧分区不再接受后续无参数继续。若两段分区之间需要保留目录外成员，请先在上一段最后一个成员使用 `End`。
+
+普通场景也可以只写显示名，分区 ID 会自动稳定生成：
+
+```csharp
+[ESEditorSection("核心配置")]
+public string configurationName;
+```
+
+需要跨版本保持明确 ID、使用多个目录，或想把非连续成员归到同一分区时，再使用完整声明。旧写法与简写可在同一个类型中混用：
+
+```csharp
+[ESEditorSection("ai", "控制来源", 20f, "定义角色由谁控制。")]
+public ControlMode controlMode;
+
+[ESEditorSection("ai", "控制来源", 20f)]
+public bool allowAutoAttack;
+```
+
 ## Entity 案例
 
 `Entity` 是当前第一个接入对象。原先的 `TabGroup("生命体结构", ...)` 已替换为明确的业务分区：
 
 ```csharp
-[ESEditorSection("core", "核心配置", -100f)]
+[ESEditorBeginSection("core", "核心配置", -100f)]
 [LabelText("主 Animator")]
 public Animator animator;
 
-[ESEditorSection("body", "身体基础", 10f)]
+[ESEditorBeginSection("body", "身体基础", 10f)]
 [HideLabel, HideReferenceObjectPicker, SerializeReference]
 public EntityBasicDomain basicDomain = new EntityBasicDomain();
 
-[ESEditorSection("ai", "意识 AI", 20f)]
+[ESEditorSection]
+[Title("身体运动核心（KCC，高频）")]
+[HideLabel]
+public EntityKCCData kcc = new EntityKCCData();
+
+[ESEditorBeginSection("ai", "意识 AI", 20f)]
 [HideLabel, HideReferenceObjectPicker, SerializeReference]
 public EntityAIDomain aiDomain = new EntityAIDomain();
 
@@ -34,11 +89,6 @@ public ESSuperAttributeTable superAttributes;
 [ESEditorSection("state", "状态表现", 50f)]
 [HideLabel, HideReferenceObjectPicker, SerializeReference]
 public EntityStateDomain stateDomain = new EntityStateDomain();
-
-[ESEditorSection("body", "身体基础", 10f)]
-[Title("身体运动核心（KCC，高频）")]
-[HideLabel]
-public EntityKCCData kcc = new EntityKCCData();
 ```
 
 Inspector 目录的预期顺序：
@@ -48,6 +98,24 @@ Inspector 目录的预期顺序：
 ```
 
 选择“身体基础”时，`EntityBasicDomain` 与 `EntityKCCData` 一起绘制，但各自仍使用原有 Odin Drawer 和自己的内部布局。Navigator 不会把 Domain 的字段搬到 Entity，也不会复制配置。
+
+目录默认常态显示全部分区名称；窗口较窄时会自动换成多行。目录与当前分区内容属于同一个视觉面板，分区本身不再额外套一层 Odin 折叠。
+
+点击目录右侧的“隐藏”后，会切换为旧版紧凑小方格轨道：点击方格可切换分区，按住鼠标左键并横向拖动可连续切换；点击当前名称可打开完整选择菜单。再次点击“显示”可恢复全部分区名称。
+
+## 双配置目录
+
+默认写法仍属于 `default` 目录；需要同一宿主拥有两套独立大目录时，在构造器第一个参数写入 `navigatorId`：
+
+```csharp
+[ESEditorSection("authoring", "identity", "身份", -100f)]
+public string configurationName;
+
+[ESEditorSection("runtime", "execution", "执行策略", -100f)]
+public bool enableExecution;
+```
+
+这里的 `authoring` 与 `runtime` 是两套互不共享选中状态的配置目录；`identity` 与 `execution` 是各自目录内部的分区 ID。`navigatorId` 只影响编辑器 GroupId、目录索引和 SessionState，不进入序列化、Prefab、ConfigKey 或 RuntimeKey。
 
 ## 这个案例解决什么
 
@@ -95,11 +163,11 @@ Odin 为 Entity 建立 PropertyTree
 
 错误区必须解释“为什么不能继续”和“到哪里修”。例如“状态表现 !1”展开后应直接给出缺失的 Animator 或状态定义位置，而不是只把主操作禁用。
 
-## 为什么基础案例不先使用 AttributeProcessor
+## 为什么简写使用 AttributeProcessor
 
-`OdinAttributeProcessor<T>` 很适合在不修改第三方类型、生成类型或遗留类型源码时，通过 `ProcessChildMemberAttributes` 给指定成员补充 `ESEditorSectionAttribute`。例如未来某个外部 Actor 类型不能直接加 Attribute 时，可在 Editor 程序集中用 Processor 维护它的成员到分区的映射。
+简写并不在绘制阶段猜测“上一个分区”。`ESEditorSectionAttributeProcessor` 在 Odin 建立 `PropertyGroup` 前，通过 `ProcessChildMemberAttributes` 将 `Begin`、继续和 `End` 解析为真实的 `ESEditorSectionAttribute`。因此重编译、域重载与 PropertyTree 重建后，继续关系仍由声明顺序稳定决定。
 
-`Entity` 是本项目拥有的核心类型，字段所属的业务 Domain 就在声明处。这里直接标注 `ESEditorSection` 更可读，也让重命名、删除字段和代码审查保持同一权威来源。不要为了“用了 Processor”把这份明确元数据挪到一个远处的字符串映射表。
+Processor 只是 Odin 的适配层，不是远处的字段映射表。分区名称、ID 和结束边界仍和字段写在一起，所以重命名、删除字段和代码审查依然拥有单一权威来源。对于不能修改源码的第三方或生成类型，才适合另写专用 `OdinAttributeProcessor<T>` 补充完整分区属性。
 
 Processor 只负责补充 Editor 属性，不能修改字段值、建立运行时状态、扫描资产或在域重载时执行业务动作。
 
@@ -108,9 +176,10 @@ Processor 只负责补充 Editor 属性，不能修改字段值、建立运行�
 1. `sectionId` 使用稳定、简短的小写英文，例如 `body`、`state`、`diagnostics`。它只用于当前编辑器会话的导航状态，不进入存档、网络、Prefab 或 RuntimeKey。
 2. `displayName` 使用直接、中文友好的业务名称，例如“身体基础”“状态表现”。
 3. 同一个宿主对象中，同一 `sectionId` 必须使用相同显示名与排序值。
-4. 一个字段只声明一个 `ESEditorSection`。不要再同时使用 `TabGroup` 作为同层导航。
-5. `TitleGroup`、`FoldoutGroup`、`TableList` 继续用于分区内部。完整 Group 路径不能混用不同 Group 类型。
-6. 需要显示错误数或待处理数时，由宿主提供已缓存的 O(1) 结果；目录重绘不得扫描资产、场景或组件。
+4. 一个成员不要同时声明完整 `ESEditorSection`、`Begin` 与无参数继续语法；`End` 仅声明结束时机，可与开头组合成单成员分区。不要再同时使用 `TabGroup` 作为同层导航。
+5. 同一宿主的多套目录必须使用不同 `navigatorId`；同一 `navigatorId` 内的 `sectionId` 必须稳定且唯一。
+6. `TitleGroup`、`FoldoutGroup`、`TableList` 继续用于分区内部。完整 Group 路径不能混用不同 Group 类型。
+7. 需要显示错误数或待处理数时，由宿主提供已缓存的 O(1) 结果；目录重绘不得扫描资产、场景或组件。
 
 ## 窄宽度行为
 

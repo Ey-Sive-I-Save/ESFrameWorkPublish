@@ -51,6 +51,7 @@ MonoBehaviour:
     - KCC
     - Luban.Runtime
     - MemoryPack.Unity
+    - PrimeTween.Runtime
     - RootMotion
     - UniTask
     - UniTask.Addressables

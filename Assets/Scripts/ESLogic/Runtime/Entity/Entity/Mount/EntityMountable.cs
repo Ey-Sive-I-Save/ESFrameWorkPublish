@@ -5,6 +5,7 @@ using UnityEngine;
 namespace ES
 {
     [DisallowMultipleComponent]
+    [RequireComponent(typeof(VehicleController))]
     [Serializable, TypeRegistryItem("可骑乘")]
     public class EntityMountable : MonoBehaviour
     {
@@ -12,21 +13,16 @@ namespace ES
         [LabelText("Match点")]
         public Transform matchPoint;
 
+        [LabelText("载具控制器")]
+        [Required]
+        public VehicleController vehicleController;
+
         [Title("武器")]
         [LabelText("武器挂点")]
         public Transform weaponMountPoint;
 
         [LabelText("允许挂载武器")]
         public bool allowWeapon = true;
-
-        [Title("移动")]
-        public float moveSpeed = 5f;
-        public float acceleration = 10f;
-        public float turnSpeed = 180f;
-
-        [Title("重力")]
-        public bool useGravity;
-        public Vector3 gravity = new Vector3(0f, -9.81f, 0f);
 
         [Title("同步")]
         public bool alignRiderPosition = true;
@@ -41,23 +37,22 @@ namespace ES
         public event Action<Entity> OnMounted;
         public event Action<Entity> OnUnmounted;
 
-        private Vector3 _velocity;
-
         public bool IsMounted => rider != null;
+        public bool IsReady => vehicleController != null && vehicleController.IsReady;
 
         private void Reset()
         {
             matchPoint = transform;
             weaponMountPoint = transform;
+            vehicleController = GetComponent<VehicleController>();
         }
 
         private void OnValidate()
         {
             if (matchPoint == null) matchPoint = transform;
             if (weaponMountPoint == null) weaponMountPoint = matchPoint;
-            moveSpeed = Mathf.Max(0.1f, moveSpeed);
-            acceleration = Mathf.Max(0.1f, acceleration);
-            turnSpeed = Mathf.Max(1f, turnSpeed);
+            if (vehicleController == null)
+                vehicleController = GetComponent<VehicleController>();
         }
 
         /// <param name="skipImmediateSync">
@@ -66,6 +61,12 @@ namespace ES
         /// </param>
         public void Mount(Entity target, bool skipImmediateSync = false)
         {
+            if (target == null || !IsReady)
+            {
+                Debug.LogError("[EntityMountable] 骑乘失败：缺少已就绪的 VehicleController。", this);
+                return;
+            }
+
             rider = target;
             EnsureMatchPoint();
             if (!skipImmediateSync)
@@ -77,6 +78,7 @@ namespace ES
         {
             var last = rider;
             rider = null;
+            vehicleController?.ClearDriverInput();
             if (last != null)
             {
                 OnUnmounted?.Invoke(last);
@@ -99,42 +101,20 @@ namespace ES
             }
         }
 
-        public void TickMounted(Entity target, Vector3 moveInput, Vector3 lookInput, float deltaTime, bool syncRider = true)
+        /// <summary>
+        /// 将骑手的世界空间驾驶意图交给载具。座位不再直接写载具 Transform；
+        /// VehicleController 在自身 Rigidbody/KCC 阶段统一提交最终物理结果。
+        /// </summary>
+        public bool SubmitDriverInput(Entity target, Vector3 moveInput, Vector3 lookInput)
         {
-            if (rider != target) return;
+            if (rider != target || !IsReady)
+                return false;
 
             if (allowInput)
-            {
-                // moveInput is world-space; keep direction consistent with player input
-                Vector3 desired = Vector3.ProjectOnPlane(moveInput, transform.up);
-                float desiredMag = desired.magnitude;
-                if (desiredMag > 1f)
-                {
-                    desired /= desiredMag;
-                }
-                Vector3 targetVelocity = desired * moveSpeed;
-                _velocity = Vector3.Lerp(_velocity, targetVelocity, 1f - Mathf.Exp(-acceleration * deltaTime));
-            }
+                vehicleController.SetDriverInput(moveInput, lookInput);
             else
-            {
-                _velocity = Vector3.zero;
-            }
-
-            if (useGravity)
-            {
-                _velocity += gravity * deltaTime;
-            }
-
-            transform.position += _velocity * deltaTime;
-
-            if (lookInput.sqrMagnitude > 0.0001f)
-            {
-                Quaternion targetRot = Quaternion.LookRotation(lookInput.normalized, Vector3.up);
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, turnSpeed * deltaTime);
-            }
-
-            if (syncRider)
-                SyncRider(force: false);
+                vehicleController.ClearDriverInput();
+            return true;
         }
 
         private void EnsureMatchPoint()

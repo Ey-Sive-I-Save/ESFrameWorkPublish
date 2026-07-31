@@ -20,6 +20,9 @@
 - [KEY_GOVERNANCE.md](KEY_GOVERNANCE.md)：稳定 Key、Catalog、RuntimeKey、Tag 与属性的项目级规则。
 - [ESTAG_FULL_LIFECYCLE_STANDARD.md](ESTAG_FULL_LIFECYCLE_STANDARD.md)：ESTag 当前全流程标准；其中明确标出的 Unity Bake/Test Runner 项仍待验收。
 - [ES_GENERIC_LIFE.md](ES_GENERIC_LIFE.md)：根对象生命周期组织器及其 Pool 分部；Unity Test Runner 仍待验收。
+- [ES_BUFF_RUNTIME_STANDARD.md](ES_BUFF_RUNTIME_STANDARD.md)：Buff 对 GameCore、Tag、ValueChange、Op、Link 与 Pool 的统一边界；Unity Test Runner 与联机/存档验收仍待完成。
+- [CHARACTER_PREFAB_CONTRACT.md](CHARACTER_PREFAB_CONTRACT.md)：角色 Prefab 身份、组件边界和验收规则。
+- [VEHICLE_RUNTIME_CONTRACT.md](VEHICLE_RUNTIME_CONTRACT.md)：载具后端、运动调度与骑乘输入转交边界；全项目 Unity 编译与 PlayMode 仍待验收。
 
 修改这些主题时，必须同时检查 `Assets/Plugins/ES/AIWarnings` 的对应 P0 规则。
 

@@ -1,5 +1,4 @@
 
-using DG.Tweening;
 using ES;
 using System;
 using System.Collections;
@@ -369,81 +368,6 @@ namespace ES
 
             #endregion
 
-            #region 集成Dotween
-            /// <summary>
-            /// 获取Tween对象的指定回调委托。
-            /// </summary>
-            /// <param name="use">Tween对象。</param>
-            /// <param name="callBackType">回调类型。</param>
-            /// <returns>回调委托；若Tween为null则返回null。</returns>
-            public static Delegate GetCallBackFromTween(Tween use, EnumCollect.CallBackType callBackType)
-            {
-                if (use != null)
-                {
-                    switch (callBackType)
-                    {
-                        case EnumCollect.CallBackType.OnComplete:
-                            return use.onComplete;
-                        case EnumCollect.CallBackType.OnKill:
-                            return use.onKill;
-                        case EnumCollect.CallBackType.OnUpdate:
-                            return use.onUpdate;
-                        case EnumCollect.CallBackType.OnPlay:
-                            return use.onPlay;
-                        case EnumCollect.CallBackType.OnPause:
-                            return use.onPause;
-                        case EnumCollect.CallBackType.OnRewind:
-                            return use.onRewind;
-                        case EnumCollect.CallBackType.OnStepComplete:
-                            return use.onStepComplete;
-                        case EnumCollect.CallBackType.OnWayPointChange:
-                            return use.onWaypointChange;
-                    }
-                }
-                return default;
-            }
-            /// <summary>
-            /// 为Tween对象设置指定类型的回调。
-            /// </summary>
-            /// <param name="use">Tween对象。</param>
-            /// <param name="callBackType">回调类型。</param>
-            /// <param name="action">要设置的回调动作。</param>
-            public static void SetCallBackFromTween(Tween use, EnumCollect.CallBackType callBackType, TweenCallback action)
-            {
-                if (use != null)
-                {
-                    switch (callBackType)
-                    {
-                        case EnumCollect.CallBackType.OnComplete:
-                            use.OnComplete(action);
-                            break;
-                        case EnumCollect.CallBackType.OnKill:
-                            use.OnKill(action);
-                            break;
-                        case EnumCollect.CallBackType.OnUpdate:
-                            use.OnUpdate(action);
-                            break;
-                        case EnumCollect.CallBackType.OnPlay:
-                            use.OnPlay(action);
-                            break;
-                        case EnumCollect.CallBackType.OnPause:
-                            use.OnPause(action);
-                            break;
-                        case EnumCollect.CallBackType.OnRewind:
-                            use.OnRewind(action);
-                            break;
-                        case EnumCollect.CallBackType.OnStepComplete:
-                            use.OnStepComplete(action);
-                            break;
-                        case EnumCollect.CallBackType.OnWayPointChange:
-                            // Note: OnWaypointChange requires TweenCallback<int>, not TweenCallback
-                            // use.OnWaypointChange(action); // Uncomment if action is TweenCallback<int>
-                            break;
-                    }
-                }
-                return;
-            }
-            #endregion
         }
     }
 }

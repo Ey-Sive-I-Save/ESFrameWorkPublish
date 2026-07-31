@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace ES
 {
@@ -21,6 +25,7 @@ namespace ES
         {
             private readonly string title;
             private readonly List<Entry> entries = new List<Entry>();
+            private readonly List<ToolbarAction> toolbarActions = new List<ToolbarAction>();
             private Func<IEnumerable<Entry>> provider;
 
             internal Builder(string title)
@@ -54,6 +59,12 @@ namespace ES
             public Builder AddSeparator(string groupPath = null)
             {
                 entries.Add(Entry.Separator(groupPath));
+                return this;
+            }
+
+            public Builder AddToolbarAction(string label, Action onClick, string tooltip = null)
+            {
+                toolbarActions.Add(new ToolbarAction(label, onClick, tooltip));
                 return this;
             }
 
@@ -93,10 +104,34 @@ namespace ES
                 AdvancedDropdownState state = null,
                 Vector2? minimumWindowSize = null)
             {
-                Open(anchorRect, title, provider ?? (() => entries), state, minimumWindowSize);
+                Open(
+                    anchorRect,
+                    title,
+                    provider ?? (() => entries),
+                    state,
+                    minimumWindowSize,
+                    toolbarActions);
             }
 
             public IReadOnlyList<Entry> Entries => entries;
+        }
+
+        /// <summary>
+        /// Small actions rendered in the top-right utility area of the native AdvancedDropdown.
+        /// They are intentionally separate from selectable entries.
+        /// </summary>
+        public sealed class ToolbarAction
+        {
+            public readonly string Label;
+            public readonly string Tooltip;
+            public readonly Action OnClick;
+
+            public ToolbarAction(string label, Action onClick, string tooltip = null)
+            {
+                Label = string.IsNullOrWhiteSpace(label) ? "·" : label.Trim();
+                Tooltip = tooltip?.Trim();
+                OnClick = onClick;
+            }
         }
 
         public readonly struct Entry
@@ -230,9 +265,10 @@ namespace ES
             string title,
             IReadOnlyList<Entry> entries,
             AdvancedDropdownState state = null,
-            Vector2? minimumWindowSize = null)
+            Vector2? minimumWindowSize = null,
+            IReadOnlyList<ToolbarAction> toolbarActions = null)
         {
-            Open(anchorRect, title, () => entries, state, minimumWindowSize);
+            Open(anchorRect, title, () => entries, state, minimumWindowSize, toolbarActions);
         }
 
         /// <summary>延迟数据源 API：只在 Dropdown 构建时读取候选项。</summary>
@@ -241,7 +277,8 @@ namespace ES
             string title,
             Func<IEnumerable<Entry>> provider,
             AdvancedDropdownState state = null,
-            Vector2? minimumWindowSize = null)
+            Vector2? minimumWindowSize = null,
+            IReadOnlyList<ToolbarAction> toolbarActions = null)
         {
             if (provider == null)
                 provider = () => Array.Empty<Entry>();
@@ -252,6 +289,10 @@ namespace ES
                 provider,
                 minimumWindowSize ?? new Vector2(DefaultMinimumWidth, 320f));
             dropdown.Show(anchorRect);
+            // AdvancedDropdown 在 Show 内部才创建自己的 DataSource/Window/GUI。
+            // 因此必须在原生窗口完成初始化后替换 GUI；提前写入会被 Show 覆盖，且首帧永远看不到工具栏。
+            if (toolbarActions != null && toolbarActions.Count > 0)
+                AdvancedDropdownNativeToolbar.TryInstall(dropdown, toolbarActions);
         }
 
         /// <summary>
@@ -266,7 +307,8 @@ namespace ES
             Func<T, string> getGroupPath = null,
             Func<T, Texture2D> getIcon = null,
             AdvancedDropdownState state = null,
-            Vector2? minimumWindowSize = null)
+            Vector2? minimumWindowSize = null,
+            IReadOnlyList<ToolbarAction> toolbarActions = null)
         {
             Open(anchorRect, title, () =>
             {
@@ -283,7 +325,7 @@ namespace ES
                         getIcon?.Invoke(value)));
                 }
                 return entries;
-            }, state, minimumWindowSize);
+            }, state, minimumWindowSize, toolbarActions);
         }
 
         protected override AdvancedDropdownItem BuildRoot()
@@ -378,5 +420,452 @@ namespace ES
             }
             return parent;
         }
+    }
+
+    /// <summary>
+    /// Adds optional utility buttons to the native AdvancedDropdownWindow without replacing its IMGUI
+    /// renderer. The overlay lives in the same window, above the title row, and leaves the search layout intact.
+    /// </summary>
+    // 公开仅用于 Unity Mono 动态子类回调；具体状态和安装流程仍保持内部封装。
+    public static class AdvancedDropdownNativeToolbar
+    {
+        private sealed class ToolbarState
+        {
+            public readonly IReadOnlyList<ESSearchDropdown.ToolbarAction> Actions;
+            public readonly object NativeGui;
+
+            public ToolbarState(
+                IReadOnlyList<ESSearchDropdown.ToolbarAction> actions,
+                object nativeGui)
+            {
+                Actions = actions;
+                NativeGui = nativeGui;
+            }
+        }
+
+        private static readonly ConditionalWeakTable<object, ToolbarState> States
+            = new ConditionalWeakTable<object, ToolbarState>();
+
+        private static readonly ConditionalWeakTable<EditorWindow, VisualElement> OverlayStates
+            = new ConditionalWeakTable<EditorWindow, VisualElement>();
+
+        private static bool initialized;
+        private static bool available;
+        private static FieldInfo guiField;
+        private static FieldInfo windowField;
+        private static FieldInfo dataSourceField;
+        private static FieldInfo stateField;
+        private static FieldInfo windowGuiField;
+        private static FieldInfo guiDataSourceField;
+        private static FieldInfo guiStateField;
+        private static FieldInfo searchRectField;
+        private static PropertyInfo guiStateProperty;
+        private static MethodInfo drawSearchFieldControlMethod;
+        private static Type generatedGuiType;
+        private static bool failureLogged;
+
+        public static void TryInstall(
+            ESSearchDropdown dropdown,
+            IReadOnlyList<ESSearchDropdown.ToolbarAction> actions)
+        {
+            if (dropdown == null || actions == null || actions.Count == 0)
+                return;
+
+            // 叠加在原生 AdvancedDropdownWindow 的 rootVisualElement 上，独立于搜索框布局，
+            // 因而不会抢搜索框的控制 ID，也不会改变原生窗口的导航和数据源。
+            if (TryInstallWindowOverlay(dropdown, actions))
+                return;
+            // 不再回退到动态替换 AdvancedDropdownGUI：Unity Mono 对 internal 成员的访问不稳定，
+            // overlay 失败时宁可保留干净的原生下拉框，也不能破坏搜索和选择流程。
+        }
+
+        private static bool TryInstallWindowOverlay(
+            ESSearchDropdown dropdown,
+            IReadOnlyList<ESSearchDropdown.ToolbarAction> actions)
+        {
+            try
+            {
+                FieldInfo nativeWindowField = FindField(typeof(AdvancedDropdown), "m_WindowInstance");
+                EditorWindow window = nativeWindowField?.GetValue(dropdown) as EditorWindow;
+                if (window == null || window.rootVisualElement == null)
+                    return false;
+
+                if (OverlayStates.TryGetValue(window, out VisualElement existing))
+                {
+                    existing.RemoveFromHierarchy();
+                    OverlayStates.Remove(window);
+                }
+
+                float width = 4f;
+                var widths = new float[actions.Count];
+                for (int i = 0; i < actions.Count; i++)
+                {
+                    ESSearchDropdown.ToolbarAction action = actions[i];
+                    widths[i] = Mathf.Max(
+                        30f,
+                        EditorStyles.toolbarButton.CalcSize(new GUIContent(action?.Label ?? "·")).x);
+                    width += widths[i] + 2f;
+                }
+
+                var container = new IMGUIContainer
+                {
+                    name = "es-advanced-dropdown-toolbar",
+                    pickingMode = PickingMode.Position,
+                    onGUIHandler = () =>
+                    {
+                        GUILayout.BeginHorizontal(GUILayout.Width(width), GUILayout.Height(20f));
+                        for (int i = 0; i < actions.Count; i++)
+                        {
+                            ESSearchDropdown.ToolbarAction action = actions[i];
+                            if (action == null)
+                                continue;
+
+                            Rect buttonRect = GUILayoutUtility.GetRect(
+                                widths[i],
+                                18f,
+                                GUILayout.Width(widths[i]),
+                                GUILayout.Height(18f));
+                            if (GUI.Button(
+                                    buttonRect,
+                                    new GUIContent(action.Label, action.Tooltip),
+                                    EditorStyles.toolbarButton))
+                            {
+                                try
+                                {
+                                    action.OnClick?.Invoke();
+                                    GUI.changed = true;
+                                }
+                                catch (Exception exception)
+                                {
+                                    Debug.LogException(new InvalidOperationException(
+                                        "[ESSearchDropdown] AdvancedDropdown 工具栏动作执行失败：" + action.Label,
+                                        exception));
+                                }
+                            }
+
+                            GUILayout.Space(2f);
+                        }
+                        GUILayout.EndHorizontal();
+                    }
+                };
+                container.style.position = Position.Absolute;
+                container.style.top = 1f;
+                container.style.right = 2f;
+                container.style.width = width;
+                container.style.height = 20f;
+                container.style.overflow = Overflow.Visible;
+                container.style.backgroundColor = Color.clear;
+                window.rootVisualElement.Add(container);
+                OverlayStates.Add(window, container);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ESSearchDropdown] 顶部工具栏 overlay 安装失败，保留原生下拉框：" + exception.Message);
+                return false;
+            }
+        }
+
+        private static bool EnsureInitialized()
+        {
+            if (initialized)
+                return available;
+
+            initialized = true;
+            try
+            {
+                Type dropdownType = typeof(AdvancedDropdown);
+                guiField = FindGuiField(dropdownType);
+                if (guiField == null)
+                    return Fail("找不到 AdvancedDropdown.m_Gui。", logAsWarning: true);
+
+                windowField = FindField(dropdownType, "m_WindowInstance");
+                dataSourceField = FindField(dropdownType, "m_DataSource");
+                stateField = FindField(dropdownType, "m_State");
+                if (windowField == null || dataSourceField == null || stateField == null)
+                    return Fail("找不到 AdvancedDropdown 的 Window/DataSource/State 字段。", logAsWarning: true);
+
+                Type guiType = guiField.FieldType;
+                Type windowType = windowField.FieldType;
+                windowGuiField = FindField(windowType, "m_Gui");
+                if (windowGuiField == null)
+                    return Fail("找不到 AdvancedDropdownWindow.m_Gui。", logAsWarning: true);
+                searchRectField = guiType.GetField(
+                    "m_SearchRect",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                guiDataSourceField = FindField(guiType, "m_DataSource");
+                guiStateField = FindField(guiType, "<state>k__BackingField");
+                guiStateProperty = guiType.GetProperty(
+                    "state",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                drawSearchFieldControlMethod = guiType.GetMethod(
+                    "DrawSearchFieldControl",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                if (drawSearchFieldControlMethod == null || !drawSearchFieldControlMethod.IsVirtual || searchRectField == null)
+                    return Fail("AdvancedDropdownGUI 缺少可扩展的 DrawSearchFieldControl 或 m_SearchRect。", logAsWarning: true);
+
+                ConstructorInfo baseConstructor = guiType.GetConstructor(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    binder: null,
+                    types: new[] { dataSourceField.FieldType },
+                    modifiers: null);
+                if (baseConstructor == null)
+                    return Fail("找不到 AdvancedDropdownGUI(DataSource) 构造函数。", logAsWarning: true);
+
+                var assemblyName = new AssemblyName("ES.AdvancedDropdownToolbar.Dynamic");
+                AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
+                    assemblyName,
+                    AssemblyBuilderAccess.Run);
+                ConstructorInfo ignoreAccessCtor = typeof(System.Runtime.CompilerServices.IgnoresAccessChecksToAttribute)
+                    .GetConstructor(new[] { typeof(string) });
+                if (ignoreAccessCtor != null)
+                {
+                    assembly.SetCustomAttribute(new CustomAttributeBuilder(
+                        ignoreAccessCtor,
+                        new object[] { guiType.Assembly.GetName().Name }));
+                    // 动态方法还需要回调本类的内部绘制桥接函数。
+                    assembly.SetCustomAttribute(new CustomAttributeBuilder(
+                        ignoreAccessCtor,
+                        new object[] { typeof(AdvancedDropdownNativeToolbar).Assembly.GetName().Name }));
+                }
+                ModuleBuilder module = assembly.DefineDynamicModule(assemblyName.Name);
+                TypeBuilder typeBuilder = module.DefineType(
+                    "ESAdvancedDropdownToolbarGUI",
+                    TypeAttributes.Public | TypeAttributes.Class,
+                    guiType);
+
+                ConstructorBuilder constructor = typeBuilder.DefineConstructor(
+                    MethodAttributes.Public,
+                    CallingConventions.Standard,
+                    new[] { dataSourceField.FieldType });
+                ILGenerator constructorIl = constructor.GetILGenerator();
+                constructorIl.Emit(OpCodes.Ldarg_0);
+                constructorIl.Emit(OpCodes.Ldarg_1);
+                constructorIl.Emit(OpCodes.Call, baseConstructor);
+                constructorIl.Emit(OpCodes.Ret);
+
+                ParameterInfo[] parameters = drawSearchFieldControlMethod.GetParameters();
+                var parameterTypes = new Type[parameters.Length];
+                for (int i = 0; i < parameters.Length; i++)
+                    parameterTypes[i] = parameters[i].ParameterType;
+
+                MethodBuilder overrideMethod = typeBuilder.DefineMethod(
+                    drawSearchFieldControlMethod.Name,
+                    MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
+                    drawSearchFieldControlMethod.ReturnType,
+                    parameterTypes);
+                ILGenerator il = overrideMethod.GetILGenerator();
+                il.DeclareLocal(drawSearchFieldControlMethod.ReturnType);
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(
+                    OpCodes.Call,
+                    typeof(AdvancedDropdownNativeToolbar).GetMethod(
+                        nameof(InvokeNativeSearchFieldControl),
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic));
+                il.Emit(OpCodes.Stloc_0);
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(
+                    OpCodes.Call,
+                    typeof(AdvancedDropdownNativeToolbar).GetMethod(
+                        nameof(DrawHeaderButtonsInSearchRow),
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic));
+                il.Emit(OpCodes.Ldloc_0);
+                il.Emit(OpCodes.Ret);
+                typeBuilder.DefineMethodOverride(overrideMethod, drawSearchFieldControlMethod);
+
+                generatedGuiType = typeBuilder.CreateType();
+                available = generatedGuiType != null;
+                if (!available)
+                    return Fail("动态 GUI 类型创建结果为空。", logAsWarning: true);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESSearchDropdown] Unity AdvancedDropdownGUI 内部扩展不可用，已保留原生下拉框。",
+                    exception));
+                available = false;
+            }
+
+            return available;
+        }
+
+        private static void InitializeGuiInstance(
+            object gui,
+            object dataSource,
+            object state)
+        {
+            if (guiDataSourceField != null)
+                guiDataSourceField.SetValue(gui, dataSource);
+
+            if (guiStateField != null)
+            {
+                guiStateField.SetValue(gui, state);
+                return;
+            }
+
+            if (guiStateProperty != null)
+            {
+                try
+                {
+                    guiStateProperty.SetValue(gui, state, null);
+                }
+                catch (Exception stateException)
+                {
+                    Debug.LogWarning("[ESSearchDropdown] 无法复制 AdvancedDropdown 状态，工具栏仍会保留：" + stateException.Message);
+                }
+            }
+        }
+
+        // 不能让动态程序集直接 call internal DrawSearchFieldControl，Unity Mono 会在运行时拒绝。
+        // 使用一个独立的原生 GUI 实例反射调用基类方法，再把搜索矩形复制回动态 GUI。
+        public static string InvokeNativeSearchFieldControl(object generatedGui, string value)
+        {
+            if (!States.TryGetValue(generatedGui, out ToolbarState state)
+                || state.NativeGui == null
+                || drawSearchFieldControlMethod == null)
+                return value;
+
+            try
+            {
+                string result = drawSearchFieldControlMethod.Invoke(
+                    state.NativeGui,
+                    new object[] { value }) as string;
+                if (searchRectField != null)
+                    searchRectField.SetValue(generatedGui, searchRectField.GetValue(state.NativeGui));
+                return result;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESSearchDropdown] 无法调用 Unity 原生 AdvancedDropdown 搜索绘制。",
+                    exception));
+                return value;
+            }
+        }
+
+        private static FieldInfo FindGuiField(Type dropdownType)
+        {
+            for (Type type = dropdownType; type != null; type = type.BaseType)
+            {
+                FieldInfo[] fields = type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic);
+                for (int i = 0; i < fields.Length; i++)
+                {
+                    FieldInfo field = fields[i];
+                    if (field.Name.IndexOf("gui", StringComparison.OrdinalIgnoreCase) >= 0
+                        || field.FieldType.Name.IndexOf("AdvancedDropdownGUI", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return field;
+                }
+            }
+
+            return null;
+        }
+
+        private static FieldInfo FindField(Type declaringType, string name)
+        {
+            for (Type type = declaringType; type != null; type = type.BaseType)
+            {
+                FieldInfo field = type.GetField(
+                    name,
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly);
+                if (field != null)
+                    return field;
+            }
+
+            return null;
+        }
+
+        private static bool Fail(string message, bool logAsWarning)
+        {
+            if (!failureLogged)
+            {
+                failureLogged = true;
+                if (logAsWarning)
+                    Debug.LogWarning("[ESSearchDropdown] 原生 AdvancedDropdown 工具栏不可用：" + message);
+                else
+                    Debug.Log("[ESSearchDropdown] " + message);
+            }
+
+            available = false;
+            return false;
+        }
+
+        public static void DrawHeaderButtonsInSearchRow(object gui)
+        {
+            if (!States.TryGetValue(gui, out ToolbarState state)
+                || state.Actions == null
+                || state.Actions.Count == 0
+                || searchRectField == null)
+                return;
+
+            if (Event.current == null)
+                return;
+
+            if (!(searchRectField.GetValue(gui) is Rect searchRect)
+                || searchRect.width <= 0f
+                || searchRect.height <= 0f)
+                return;
+
+            float totalWidth = 4f;
+            for (int i = 0; i < state.Actions.Count; i++)
+            {
+                ESSearchDropdown.ToolbarAction action = state.Actions[i];
+                if (action == null)
+                    continue;
+                totalWidth += Mathf.Max(
+                    28f,
+                    EditorStyles.toolbarButton.CalcSize(new GUIContent(action.Label)).x);
+                totalWidth += 2f;
+            }
+
+            float x = searchRect.xMax - totalWidth;
+            for (int i = 0; i < state.Actions.Count; i++)
+            {
+                ESSearchDropdown.ToolbarAction action = state.Actions[i];
+                if (action == null)
+                    continue;
+
+                float width = Mathf.Max(
+                    28f,
+                    EditorStyles.toolbarButton.CalcSize(new GUIContent(action.Label)).x);
+                Rect buttonRect = new Rect(x, searchRect.y + 1f, width, searchRect.height - 2f);
+                if (GUI.Button(
+                        buttonRect,
+                        new GUIContent(action.Label, action.Tooltip),
+                        EditorStyles.toolbarButton))
+                {
+                    try
+                    {
+                        action.OnClick?.Invoke();
+                        GUI.changed = true;
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new InvalidOperationException(
+                            "[ESSearchDropdown] AdvancedDropdown 工具栏动作执行失败：" + action.Label,
+                            exception));
+                    }
+                }
+
+                x += width + 2f;
+            }
+        }
+    }
+
+}
+
+// Unity 2022.3 将 AdvancedDropdownGUI 声明为 internal。动态子类需要这个标准兼容属性
+// 才能在 Mono/.NET Framework 下 override 它的 internal virtual DrawItem。
+namespace System.Runtime.CompilerServices
+{
+    [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+    internal sealed class IgnoresAccessChecksToAttribute : Attribute
+    {
+        public IgnoresAccessChecksToAttribute(string assemblyName)
+        {
+            AssemblyName = assemblyName;
+        }
+
+        public string AssemblyName { get; }
     }
 }

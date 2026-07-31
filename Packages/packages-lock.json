@@ -28,6 +28,13 @@
       "dependencies": {},
       "hash": "2e993ff18f28c931602a07292df0b0804eebef99"
     },
+    "com.kyrylokuzyk.primetween": {
+      "version": "1.4.11",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://registry.npmjs.org"
+    },
     "com.unity.burst": {
       "version": "1.8.17",
       "depth": 1,

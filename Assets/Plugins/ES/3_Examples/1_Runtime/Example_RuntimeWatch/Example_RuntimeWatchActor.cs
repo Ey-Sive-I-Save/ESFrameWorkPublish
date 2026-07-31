@@ -1,4 +1,5 @@
 using Sirenix.OdinInspector;
+using PrimeTween;
 using UnityEngine;
 
 namespace ES.Samples
@@ -42,6 +43,14 @@ namespace ES.Samples
         private int comboCount;
 
         private float stateTimer;
+        private Sequence pulseSequence;
+
+        private void OnDisable()
+        {
+            // PrimeTween 动画必须跟随宿主生命周期停止，避免回池/禁用后继续写入 Transform。
+            pulseSequence.Stop();
+            pulseSequence = default;
+        }
 
         private void Update()
         {
@@ -96,6 +105,20 @@ namespace ES.Samples
         public void ToggleAutoAnimate()
         {
             autoAnimate = !autoAnimate;
+        }
+
+        [ESRuntimeWatch("战斗/操作", category: ESRuntimeWatchAttribute.CategoryScene)]
+        [Button("PrimeTween 脉冲示例")]
+        public void PlayPrimeTweenPulse()
+        {
+            if (transform == null)
+                return;
+
+            Vector3 baseScale = transform.localScale;
+            pulseSequence.Stop();
+            pulseSequence = Sequence.Create()
+                .Chain(Tween.Scale(transform, baseScale * 1.08f, 0.12f, Ease.OutQuad))
+                .Chain(Tween.Scale(transform, baseScale, 0.18f, Ease.InOutQuad));
         }
 
         [ESRuntimeWatch("战斗/AI", "战斗诊断文本", category: ESRuntimeWatchAttribute.CategoryDebug)]

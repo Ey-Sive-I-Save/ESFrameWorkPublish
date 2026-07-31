@@ -393,6 +393,18 @@ namespace ES
 
             }
 
+            [HorizontalGroup("总组/内容/操作")]
+            [OnInspectorGUI()]
+            public void Click_RemotePublish()
+            {
+                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
+                EditorGUI.BeginDisabledGroup(pipelineBusy);
+                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "5. 发布到远端", GUILayout.Height(42)))
+                    ESAssetReleaseUploadWindow.Open();
+                EditorGUI.EndDisabledGroup();
+                SirenixEditorGUI.InfoMessageBox("读取第四步上传计划；预检通过后上传版本化文件，并将 Root 清单最后切换。凭据不保存到工程资产。");
+            }
+
         }
     }
 }

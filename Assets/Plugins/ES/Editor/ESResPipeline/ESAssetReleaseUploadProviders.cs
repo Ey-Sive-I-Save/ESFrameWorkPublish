@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace ES
 {
@@ -10,10 +11,15 @@ namespace ES
     /// </summary>
     public enum ESAssetReleaseUploadMode
     {
+        [InspectorName("手动上传计划（已可用·不执行网络）")]
         ManualPlan = 0,
+        [InspectorName("阿里云 OSS 原生（已实现·待实测）")]
         AliyunOss = 1,
+        [InspectorName("S3 兼容对象存储（待实现）")]
         S3Compatible = 2,
+        [InspectorName("预签名 HTTP PUT（待实现）")]
         HttpPut = 3,
+        [InspectorName("外部 CLI / CI（待实现）")]
         ExternalCommand = 4
     }
 
@@ -23,10 +29,12 @@ namespace ES
         public string id = "default";
         public string displayName = "手动上传";
         public ESAssetReleaseUploadMode mode = ESAssetReleaseUploadMode.ManualPlan;
+        public string region = string.Empty;
         public string publicBaseUrl = string.Empty;
         public string endpoint = string.Empty;
         public string bucket = string.Empty;
         public string objectPrefix = string.Empty;
+        public string validationPrefix = ".es-validation";
         public string credentialProfile = string.Empty;
         public int maxConcurrency = 3;
         public int maxAttemptsPerFile = 3;
@@ -105,29 +113,44 @@ namespace ES
         public IReadOnlyList<string> Errors { get; internal set; } = Array.Empty<string>();
     }
 
+    /// <summary>第五步远端发布开始前的只读结果；预检不会产生网络写入。</summary>
+    public sealed class ESAssetReleaseUploadPreflightResult
+    {
+        public bool IsSuccess { get; internal set; }
+        public string Message { get; internal set; } = string.Empty;
+        public int FileCount { get; internal set; }
+        public long TotalBytes { get; internal set; }
+    }
+
     /// <summary>每种发布方式的唯一扩展点。凭据必须由独立 CredentialProvider 读取，禁止写入 Target 或发布计划。</summary>
     public interface IESAssetReleaseUploadProvider
     {
         ESAssetReleaseUploadMode Mode { get; }
         bool CanHandle(ESAssetReleaseUploadTarget target, out string reason);
+        IESAssetReleaseUploadOperation BeginValidation(ESAssetReleaseUploadTarget target);
         IESAssetReleaseUploadOperation BeginUpload(ESAssetReleaseUploadFileRequest request);
     }
 
     /// <summary>
-    /// 当前唯一可执行实现：确认计划可人工上传。OSS/S3/HTTP/命令模式先占位，
-    /// 避免在没有凭据策略和远端校验实现时误执行“伪一键上传”。
+    /// 手动计划不是远端发布 Provider。它只保留为第四步产物的人工交接格式，
+    /// 防止第五步在没有真实上传与 HEAD 校验时伪报“发布成功”。
     /// </summary>
     public sealed class ESManualReleaseUploadProvider : IESAssetReleaseUploadProvider
     {
         public ESAssetReleaseUploadMode Mode => ESAssetReleaseUploadMode.ManualPlan;
         public bool CanHandle(ESAssetReleaseUploadTarget target, out string reason)
         {
-            reason = string.Empty;
-            return target != null && target.mode == Mode;
+            reason = "当前目标为“手动上传计划”，不能执行第五步远端发布。请安装并选择 OSS、S3 或 HTTP PUT Provider。";
+            return false;
         }
         public IESAssetReleaseUploadOperation BeginUpload(ESAssetReleaseUploadFileRequest request)
         {
-            return new ESCompletedReleaseUploadOperation(true, "手动上传：" + request.RemoteObjectKey);
+            return new ESCompletedReleaseUploadOperation(false, "手动上传计划没有远端写入能力。");
+        }
+
+        public IESAssetReleaseUploadOperation BeginValidation(ESAssetReleaseUploadTarget target)
+        {
+            return new ESCompletedReleaseUploadOperation(false, "手动上传计划没有远端验证能力。");
         }
     }
 
@@ -137,14 +160,62 @@ namespace ES
     /// </summary>
     public static class ESAssetReleaseUploadCoordinator
     {
+        public static ESEditorLongTask EnqueueValidation(ESAssetReleaseUploadTarget target, Action<ESAssetReleaseUploadResult> onFinished = null)
+        {
+            if (target == null) throw new ArgumentNullException(nameof(target));
+            IESAssetReleaseUploadProvider provider = ESAssetReleaseUploadProviderFactory.Get(target.mode);
+            if (!provider.CanHandle(target, out string reason))
+                throw new InvalidOperationException("远端验证目标不可用：" + reason);
+            IESAssetReleaseUploadOperation operation = provider.BeginValidation(target);
+            if (operation == null) throw new InvalidOperationException("远端验证适配器未返回操作。");
+            return ESEditorHandle.EnqueueLongTask(new ESAssetReleaseValidationLongTask(operation, onFinished));
+        }
+
+        public static ESAssetReleaseUploadPreflightResult Preflight(ESAssetReleaseUploadRequest request)
+        {
+            var result = new ESAssetReleaseUploadPreflightResult();
+            try
+            {
+                if (request == null) throw new ArgumentNullException(nameof(request));
+                if (!TryGetOrderedFiles(request.Plan, out List<ESAssetReleaseUploadPlanFile> ordered, out string error))
+                    throw new InvalidOperationException(error);
+                IESAssetReleaseUploadProvider provider = ESAssetReleaseUploadProviderFactory.Get(request.Target.mode);
+                if (!provider.CanHandle(request.Target, out string reason))
+                    throw new InvalidOperationException("发布目标不可用：" + reason);
+
+                long totalBytes = 0;
+                for (int i = 0; i < ordered.Count; i++)
+                {
+                    ESAssetReleaseUploadPlanFile file = ordered[i];
+                    if (string.IsNullOrWhiteSpace(file.sourcePath) || !System.IO.File.Exists(file.sourcePath))
+                        throw new InvalidOperationException("上传源文件不存在：" + file.relativePath);
+                    if (new System.IO.FileInfo(file.sourcePath).Length != file.size)
+                        throw new InvalidOperationException("上传源文件大小已变化：" + file.relativePath);
+                    if (string.IsNullOrWhiteSpace(file.sha256) || !ESResManifestIntegrity.VerifyFileSha256(file.sourcePath, file.sha256))
+                        throw new InvalidOperationException("上传源文件 SHA-256 不匹配：" + file.relativePath);
+                    if (!file.uploadLast && !string.Equals(file.cacheControl, "public, max-age=31536000, immutable", StringComparison.Ordinal))
+                        throw new InvalidOperationException("版本化发布文件必须使用 immutable 长缓存：" + file.relativePath);
+                    totalBytes += file.size;
+                }
+
+                result.IsSuccess = true;
+                result.FileCount = ordered.Count;
+                result.TotalBytes = totalBytes;
+                result.Message = "预检通过：" + request.Plan.platform + " / " + request.Plan.releaseVersion + "，共 " + ordered.Count + " 个文件。根发布清单将最后上传。";
+            }
+            catch (Exception exception)
+            {
+                result.Message = exception.Message;
+            }
+            return result;
+        }
+
         public static ESEditorLongTask Enqueue(ESAssetReleaseUploadRequest request, Action<ESAssetReleaseUploadResult> onFinished = null)
         {
-            if (request == null) throw new ArgumentNullException(nameof(request));
+            ESAssetReleaseUploadPreflightResult preflight = Preflight(request);
+            if (!preflight.IsSuccess) throw new InvalidOperationException("远端发布预检失败：" + preflight.Message);
             IESAssetReleaseUploadProvider provider = ESAssetReleaseUploadProviderFactory.Get(request.Target.mode);
-            if (!provider.CanHandle(request.Target, out string reason))
-                throw new InvalidOperationException("发布目标不可用：" + reason);
-            if (!TryGetOrderedFiles(request.Plan, out List<ESAssetReleaseUploadPlanFile> ordered, out string error))
-                throw new InvalidOperationException(error);
+            TryGetOrderedFiles(request.Plan, out List<ESAssetReleaseUploadPlanFile> ordered, out _);
             return ESEditorHandle.EnqueueLongTask(new ESAssetReleaseUploadLongTask(request, provider, ordered, onFinished));
         }
 
@@ -168,6 +239,46 @@ namespace ES
             ordered.Add(rootFiles[0]);
             error = string.Empty;
             return true;
+        }
+    }
+
+    internal sealed class ESAssetReleaseValidationLongTask : ESEditorLongTask
+    {
+        private readonly IESAssetReleaseUploadOperation operation;
+        private readonly Action<ESAssetReleaseUploadResult> onFinished;
+
+        public ESAssetReleaseValidationLongTask(IESAssetReleaseUploadOperation operation, Action<ESAssetReleaseUploadResult> onFinished)
+            : base("ES 远端发布区域验证", "es-release-validation", 10)
+        {
+            this.operation = operation;
+            this.onFinished = onFinished;
+        }
+
+        public override ESEditorLongTaskStepResult ProcessStep(ESEditorLongTaskContext context)
+        {
+            SetProgress(0, 1, "验证远端隔离区 .es-validation");
+            operation.Poll();
+            if (!operation.IsCompleted) return ESEditorLongTaskStepResult.Continue;
+            if (!operation.IsSuccess)
+            {
+                SetFailure(new InvalidOperationException(operation.Message));
+                return ESEditorLongTaskStepResult.Fail;
+            }
+            return ESEditorLongTaskStepResult.Complete;
+        }
+
+        protected override void OnFinish()
+        {
+            if (Status != ESEditorLongTaskStatus.Succeeded)
+                operation.Cancel();
+            onFinished?.Invoke(new ESAssetReleaseUploadResult
+            {
+                IsSuccess = Status == ESEditorLongTaskStatus.Succeeded,
+                UploadedFileCount = 1,
+                Message = Status == ESEditorLongTaskStatus.Succeeded
+                    ? "远端隔离区验证通过；探针对象已按 Provider 约定清理。"
+                    : "远端隔离区验证失败：" + (LastError?.Message ?? operation.Message)
+            });
         }
     }
 
@@ -247,7 +358,8 @@ namespace ES
     {
         private static readonly Dictionary<ESAssetReleaseUploadMode, IESAssetReleaseUploadProvider> Providers = new Dictionary<ESAssetReleaseUploadMode, IESAssetReleaseUploadProvider>
         {
-            { ESAssetReleaseUploadMode.ManualPlan, new ESManualReleaseUploadProvider() }
+            { ESAssetReleaseUploadMode.ManualPlan, new ESManualReleaseUploadProvider() },
+            { ESAssetReleaseUploadMode.AliyunOss, new ESAliyunOssReleaseUploadProvider() }
         };
 
         public static void Register(IESAssetReleaseUploadProvider provider)

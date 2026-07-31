@@ -3,8 +3,9 @@ using System;
 namespace ES
 {
     /// <summary>
-    /// Replaces Odin's default managed-reference presentation while retaining the field's
-    /// existing SerializeReference persistence and normal Odin child drawers.
+    /// Legacy compatibility marker from the first prototype. New fields do not need this
+    /// attribute: the editor automatically detects Unity's SerializeReference backend.
+    /// Existing source using it can remain temporarily without changing serialized data.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
     public sealed class ESPolymorphicReferenceAttribute : Attribute
@@ -21,8 +22,9 @@ namespace ES
     }
 
     /// <summary>
-    /// Supplies the business wording used when a concrete managed-reference type is selected.
-    /// Types without this attribute remain selectable with a name inferred from their CLR type.
+    /// Legacy compatibility metadata from the first prototype. The automatic selector now
+    /// uses Odin's existing TypeRegistryItemAttribute for the business directory tree. Types
+    /// without TypeRegistryItem remain selectable under the "未登记类型" group.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class ESPolymorphicTypeAttribute : Attribute

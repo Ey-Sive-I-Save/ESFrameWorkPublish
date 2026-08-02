@@ -660,10 +660,20 @@ namespace ES
             public string riskLevel = "未声明";
             public string requirementTitle = "本次需求";
             public bool hasUserPlaceholder;
+            public readonly List<string> validationErrors = new List<string>();
+
+            public bool IsValid
+            {
+                get { return validationErrors.Count == 0; }
+            }
 
             public bool AllowsWrite
             {
-                get { return defaultWrite.IndexOf("是", StringComparison.OrdinalIgnoreCase) >= 0; }
+                get
+                {
+                    return defaultWrite.StartsWith("是", StringComparison.OrdinalIgnoreCase)
+                        || defaultWrite.StartsWith("允许", StringComparison.OrdinalIgnoreCase);
+                }
             }
 
             public bool IsHighRisk
@@ -1835,6 +1845,9 @@ namespace ES
                 if (GUILayout.Button("打开指令库", EditorStyles.toolbarButton, GUILayout.Width(88)))
                     RevealProjectRelativePath(AICommandsRelativePath);
 
+                if (GUILayout.Button("验证指令库", EditorStyles.toolbarButton, GUILayout.Width(88)))
+                    ValidateAllAICommands();
+
                 GUILayout.FlexibleSpace();
                 EditorGUILayout.LabelField("规则、预设指令和项目长期结论都从这里进入。", EditorStyles.miniLabel, GUILayout.MinWidth(220));
             }
@@ -1868,6 +1881,8 @@ namespace ES
                 EditorGUILayout.LabelField("补充目标、路径、报错、对象名或期望结果；留空也可以发送，但 AI 会按命令文件的默认约束执行。", EditorStyles.wordWrappedMiniLabel);
                 AICommandInfo commandInfo = ParseAICommandInfo(selectedAICommandAssetPath);
                 DrawAICommandInfoStrip(commandInfo);
+                if (!commandInfo.IsValid)
+                    EditorGUILayout.HelpBox(string.Join("\n", commandInfo.validationErrors), MessageType.Error);
 
                 EditorGUILayout.LabelField(commandInfo.requirementTitle, EditorStyles.miniBoldLabel);
                 aiCommandRequiredValue = EditorGUILayout.TextArea(aiCommandRequiredValue, GUILayout.MinHeight(42), GUILayout.MaxHeight(86));
@@ -1888,7 +1903,7 @@ namespace ES
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(selectedAICommandAssetPath)))
+                    using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(selectedAICommandAssetPath) || !commandInfo.IsValid))
                     {
                         if (GUILayout.Button("发送指令", GUILayout.Height(26), GUILayout.Width(96)))
                             SendPreparedAICommand(preview, commandInfo);
@@ -3559,6 +3574,7 @@ namespace ES
             {
                 string menuName = BuildAICommandMenuName(root, file);
                 string assetPath = ToProjectRelativeAssetPath(file);
+                AICommandInfo commandInfo = ParseAICommandInfo(assetPath);
                 int separator = menuName.LastIndexOf('/');
                 string groupPath = separator > 0 ? menuName.Substring(0, separator) : null;
                 string label = separator >= 0 ? menuName.Substring(separator + 1) : menuName;
@@ -3570,7 +3586,9 @@ namespace ES
                     EditorGUIUtility.IconContent("TextAsset Icon").image as Texture2D,
                     subtitle: assetPath,
                     tooltip: file,
-                    badge: fileInfo.Name.StartsWith("方案_", StringComparison.OrdinalIgnoreCase) ? "方案" : "指令",
+                    badge: !commandInfo.IsValid
+                        ? "无效"
+                        : fileInfo.Name.StartsWith("方案_", StringComparison.OrdinalIgnoreCase) ? "方案" : "指令",
                     selected: string.Equals(selectedAICommandAssetPath, assetPath, StringComparison.OrdinalIgnoreCase)));
             }
 
@@ -3593,11 +3611,14 @@ namespace ES
             AICommandInfo info = new AICommandInfo();
             string fullPath = GetProjectRelativeFullPath(assetPath ?? "");
             if (!File.Exists(fullPath))
+            {
+                info.validationErrors.Add("AICommand 文件不存在：" + (assetPath ?? ""));
                 return info;
+            }
 
             try
             {
-                foreach (string rawLine in File.ReadLines(fullPath, Encoding.UTF8).Take(120))
+                foreach (string rawLine in File.ReadLines(fullPath, Encoding.UTF8))
                 {
                     string line = rawLine.Trim();
                     if (line.StartsWith("命令类型：", StringComparison.OrdinalIgnoreCase))
@@ -3608,17 +3629,77 @@ namespace ES
                         info.riskLevel = line.Substring("风险等级：".Length).Trim().TrimEnd('。');
                     else if (line.IndexOf("<用户在这里补充", StringComparison.OrdinalIgnoreCase) >= 0)
                         info.hasUserPlaceholder = true;
+
+                    if (LooksLikeProjectPath(line))
+                    {
+                        string referencedPath = line.Trim('`').Trim();
+                        if (!File.Exists(GetProjectRelativeFullPath(referencedPath))
+                            && !Directory.Exists(GetProjectRelativeFullPath(referencedPath)))
+                        {
+                            info.validationErrors.Add("引用路径不存在：" + referencedPath);
+                        }
+                    }
                 }
+
+                if (string.Equals(info.commandType, "未声明", StringComparison.Ordinal))
+                    info.validationErrors.Add("缺少元数据：命令类型");
+                if (string.Equals(info.defaultWrite, "未声明", StringComparison.Ordinal))
+                    info.validationErrors.Add("缺少元数据：默认改文件");
+                if (string.Equals(info.riskLevel, "未声明", StringComparison.Ordinal))
+                    info.validationErrors.Add("缺少元数据：风险等级");
 
                 if (info.hasUserPlaceholder)
                     info.requirementTitle = "本次需求（建议必填）";
             }
-            catch
+            catch (Exception exception)
             {
-                // Keep default metadata; preview still works with the command path.
+                info.validationErrors.Add("读取 AICommand 失败：" + exception.Message);
             }
 
             return info;
+        }
+
+        private static bool LooksLikeProjectPath(string line)
+        {
+            return line.StartsWith("Assets/", StringComparison.Ordinal)
+                || line.StartsWith("Documentation/", StringComparison.Ordinal)
+                || line.StartsWith("ES/", StringComparison.Ordinal)
+                || line.StartsWith("Packages/", StringComparison.Ordinal);
+        }
+
+        private static void ValidateAllAICommands()
+        {
+            string root = GetProjectRelativeFullPath(AICommandsRelativePath);
+            if (!Directory.Exists(root))
+            {
+                EditorUtility.DisplayDialog("AICommands 验证", "未找到 AICommands 目录。", "关闭");
+                return;
+            }
+
+            List<string> files = Directory.EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var invalid = new List<string>();
+            foreach (string file in files)
+            {
+                string assetPath = ToProjectRelativeAssetPath(file);
+                AICommandInfo info = ParseAICommandInfo(assetPath);
+                if (!info.IsValid)
+                    invalid.Add(Path.GetFileName(file) + "：\n  " + string.Join("\n  ", info.validationErrors));
+            }
+
+            if (invalid.Count == 0)
+            {
+                EditorUtility.DisplayDialog(
+                    "AICommands 验证通过",
+                    $"已验证 {files.Count} 个命令文件：元数据完整，项目内引用路径均存在。",
+                    "确定");
+                return;
+            }
+
+            string report = $"共 {files.Count} 个命令文件，{invalid.Count} 个无效。\n\n" + string.Join("\n\n", invalid);
+            Debug.LogError("[ES Cmd Agent] AICommands 验证失败\n" + report);
+            EditorUtility.DisplayDialog("AICommands 验证失败", report, "关闭");
         }
 
         private static void DrawAICommandInfoStrip(AICommandInfo info)
@@ -3647,6 +3728,15 @@ namespace ES
             if (info == null)
                 info = new AICommandInfo();
 
+            if (!info.IsValid)
+            {
+                EditorUtility.DisplayDialog(
+                    "AICommand 无效",
+                    "该命令存在缺失元数据或失效路径，已禁止发送。\n\n" + string.Join("\n", info.validationErrors),
+                    "返回检查");
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(aiCommandRequiredValue) && info.hasUserPlaceholder)
             {
                 bool continueWithoutRequirement = EditorUtility.DisplayDialog(
@@ -3671,7 +3761,7 @@ namespace ES
 
         private static string BuildReadWarningsPrompt()
         {
-            return "请先快速读取项目 AIWarnings，优先读取 Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md、项目最高警告、CodexNotes，以及和当前任务相关的警告文件。读取后先用短列表说明你看到的关键约束，再继续处理我的请求。";
+            return "请先快速读取项目 AIWarnings，优先读取 Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md、当前状态（CurrentStatus）.md、规则索引（RuleIndex）.md，以及和当前任务相关的最高警告。读取后先用短列表说明你看到的关键约束，再继续处理我的请求。";
         }
 
         private static string BuildUpdateWarningsPrompt()
@@ -3684,7 +3774,7 @@ namespace ES
             return "请以【ES 项目全局架构师】身份工作。\n\n"
                 + "目标：读取并整合当前项目的 AIWarnings、Codex 本机会话摘要、AITalk 协作记录、关键 asmdef/目录结构，生成一份高密度架构判断。\n\n"
                 + "必须先读：\n"
-                + "1. Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md\n"
+                + "1. Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md\n"
                 + "2. Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）\n"
                 + "3. Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）\n"
                 + "4. 与当前任务相关的 Editor/CmdAgent/表格工具警告或记录\n\n"

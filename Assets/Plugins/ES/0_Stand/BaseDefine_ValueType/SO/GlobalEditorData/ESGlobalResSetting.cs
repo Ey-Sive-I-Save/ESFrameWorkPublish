@@ -16,6 +16,8 @@ namespace ES
         public const string ResParentFolderName = "Res";
         public const string ResConsumersExpandParentFolderName = "_ExpandConsumers";
         public const string ESOutputRootFolderName = "ES";
+        public const string ResourcePipelineFolderName = "ResourcePipeline";
+        public const string ReleasesFolderName = "Releases";
         public const string InitialTargetFolderName = "InitialTarget";
 
         [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
@@ -54,31 +56,31 @@ namespace ES
         public string Path_Net = "http....";
 
         [HideInInspector]
-        public string Path_RemoteResOutBuildPath => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResParentFolderName);
+        public string Path_RemoteResOutBuildPath => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResourcePipelineFolderName, ReleasesFolderName);
 
         [HideInInspector]
         public string Path_RemotePlatform => Path.Combine(Path_RemoteResOutBuildPath, CurrentBuildPlatformName);
 
         [HideInInspector]
-        public string Path_BuildStaging => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "BuildStaging", CurrentBuildPlatformName);
+        public string Path_BuildStaging => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResourcePipelineFolderName, "BuildStaging", CurrentBuildPlatformName);
 
         [HideInInspector]
-        public string Path_PipelineBaked => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "ResourcePipeline", "Baked");
+        public string Path_PipelineBaked => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResourcePipelineFolderName, "Baked");
 
         [HideInInspector]
-        public string Path_PipelinePlanned => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "ResourcePipeline", "Planned", CurrentBuildPlatformName);
+        public string Path_PipelinePlanned => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResourcePipelineFolderName, "Planned", CurrentBuildPlatformName);
 
         [HideInInspector]
-        public string Path_PipelineBuildCache => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "ResourcePipeline", "BuildCache", CurrentBuildPlatformName, "UnityAssetBundles");
+        public string Path_PipelineBuildCache => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResourcePipelineFolderName, "BuildCache", CurrentBuildPlatformName, "UnityAssetBundles");
 
         [HideInInspector]
-        public string Path_LocalTest => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "Published", "LocalTest", CurrentBuildPlatformName);
+        public string Path_LocalTest => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResourcePipelineFolderName, "Published", "LocalTest", CurrentBuildPlatformName);
 
         [HideInInspector]
-        public string Path_ManualUploadPlans => Path.Combine(ProjectRootPath, ESOutputRootFolderName, "Published", "ManualUploadPlans", CurrentBuildPlatformName);
+        public string Path_ManualUploadPlans => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResourcePipelineFolderName, "Published", "ManualUploadPlans", CurrentBuildPlatformName);
 
         [HideInInspector]
-        public string Path_BuildInitialTarget => Path.Combine(ProjectRootPath, ESOutputRootFolderName, InitialTargetFolderName);
+        public string Path_BuildInitialTarget => Path.Combine(ProjectRootPath, ESOutputRootFolderName, ResourcePipelineFolderName, InitialTargetFolderName);
 
         private static string ProjectRootPath => Directory.GetParent(Application.dataPath).FullName;
         private string CurrentBuildPlatformName => ESAssetBundleUtility.GetBuildPlatformName(applyPlatform);
@@ -228,7 +230,7 @@ namespace ES
 
         private void PromptLocalReleaseCleanup()
         {
-            string platform = ESResMaster.GetValidBuildTargetByRuntimePlatform(applyPlatform).ToString();
+            string platform = ESAssetBundleUtility.GetBuildPlatformName(applyPlatform);
             string platformRoot = Path.Combine(Application.streamingAssetsPath, ResParentFolderName, platform);
             string rootManifestPath = Path.Combine(platformRoot, "ESAssetReleaseManifest.json");
             if (!File.Exists(rootManifestPath))

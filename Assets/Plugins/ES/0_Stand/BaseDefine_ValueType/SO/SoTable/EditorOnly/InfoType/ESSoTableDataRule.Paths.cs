@@ -18,7 +18,7 @@ namespace ES
         #region Output Path Resolution
         private string GetOutputPath(string relativeFolder, string extension)
         {
-            string root = string.IsNullOrEmpty(GetActiveOutputRoot()) ? "SoTableConfig/Tables" : GetActiveOutputRoot();
+            string root = string.IsNullOrEmpty(GetActiveOutputRoot()) ? "ES/Config/SoTable/Tables" : GetActiveOutputRoot();
             string folder = string.IsNullOrEmpty(relativeFolder) ? string.Empty : relativeFolder;
             string file = string.IsNullOrEmpty(GetActiveFileName()) ? ruleKey : GetActiveFileName();
             if (string.IsNullOrEmpty(file))

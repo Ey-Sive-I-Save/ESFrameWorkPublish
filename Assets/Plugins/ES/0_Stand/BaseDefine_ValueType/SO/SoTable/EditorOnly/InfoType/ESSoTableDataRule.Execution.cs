@@ -209,7 +209,7 @@ namespace ES
                 file = "SoTableExample";
             file = file + "_Example";
 
-            string root = Path.Combine(Application.dataPath, "..", "SoTableConfig", "Examples");
+            string root = Path.Combine(Application.dataPath, "..", "ES", "Config", "SoTable", "Examples");
             string csvPath = Path.GetFullPath(Path.Combine(root, "csv", file + ".csv"));
             string xlsxPath = Path.GetFullPath(Path.Combine(root, "xlsx", file + ".xlsx"));
             WriteCsv(csvPath, table);
@@ -423,7 +423,7 @@ namespace ES
                 if (string.IsNullOrWhiteSpace(batch.sheetName))
                     batch.sheetName = FirstConfiguredName();
                 if (string.IsNullOrWhiteSpace(batch.outputRoot))
-                    batch.outputRoot = "SoTableConfig/Tables";
+                    batch.outputRoot = "ES/Config/SoTable/Tables";
                 if (string.IsNullOrWhiteSpace(batch.csvRelativePath))
                     batch.csvRelativePath = "csv";
                 if (string.IsNullOrWhiteSpace(batch.xlsxRelativePath))

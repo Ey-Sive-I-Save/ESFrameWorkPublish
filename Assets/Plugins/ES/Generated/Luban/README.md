@@ -1,6 +1,6 @@
 # Generated Luban Output
 
-This directory stores generated files from `LubanConfig`.
+This directory stores generated files from `ES/Config/Luban`.
 
 - `CSharp/`: generated strong typed config classes.
 - `Json/`: generated json data for Unity runtime/editor loading.

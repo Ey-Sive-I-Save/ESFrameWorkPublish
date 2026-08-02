@@ -228,7 +228,12 @@ namespace ES
         public const string LibrariesFolderName = "Libraries";
         public const string AssetBundlesFolderName = "AssetBundles";
 
-        public static string StagingRoot(string platform) => Path.Combine(ProjectRoot, "ES", "BuildStaging", platform);
+        public static string StagingRoot(string platform) => Path.Combine(PipelineRoot, "BuildStaging", platform);
+        public static string InitialTargetRoot => Path.Combine(PipelineRoot, "InitialTarget");
+        public static string PublishedRoot => Path.Combine(PipelineRoot, "Published");
+        public static string LocalTestRoot(string platform) => Path.Combine(PublishedRoot, "LocalTest", platform);
+        public static string ManualUploadPlansRoot(string platform) => Path.Combine(PublishedRoot, "ManualUploadPlans", platform);
+        public static string ReleasesRoot => Path.Combine(PipelineRoot, "Releases");
         public static string StagingLibrariesRoot(string platform) => Path.Combine(StagingRoot(platform), LibrariesFolderName);
         public static string StagingLibraryFolder(string platform, string libraryFolder) => Path.Combine(StagingLibrariesRoot(platform), SafeSegment(libraryFolder));
         public static string AssetBundleRelativePath(string fileName) => AssetBundlesFolderName + "/" + ESAssetBundleUtility.ToSafeAssetBundleFileName(fileName);
@@ -265,28 +270,28 @@ namespace ES
             DeleteGeneratedDirectory(PlanRoot(platform));
             DeleteGeneratedDirectory(Path.Combine(PipelineRoot, "BuildCache", platform));
             DeleteGeneratedDirectory(StagingRoot(platform));
-            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", "Published", "LocalTest", platform));
-            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", "Published", "ManualUploadPlans", platform));
-            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", ESGlobalResSetting.ResParentFolderName, platform));
+            DeleteGeneratedDirectory(LocalTestRoot(platform));
+            DeleteGeneratedDirectory(ManualUploadPlansRoot(platform));
+            DeleteGeneratedDirectory(Path.Combine(ReleasesRoot, platform));
             DeleteGeneratedDirectory(Path.Combine(Application.streamingAssetsPath, ESGlobalResSetting.ResParentFolderName, platform));
 
             // Pre-v5 Master output used WindowsPlayer rather than the unified BuildTarget name.
-            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", "InitialTarget", "WindowsPlayer"));
-            DeleteGeneratedDirectory(Path.Combine(ProjectRoot, "ES", ESGlobalResSetting.ResParentFolderName, "WindowsPlayer"));
+            DeleteGeneratedDirectory(Path.Combine(InitialTargetRoot, "WindowsPlayer"));
+            DeleteGeneratedDirectory(Path.Combine(ReleasesRoot, "WindowsPlayer"));
             AssetDatabase.Refresh();
             Debug.Log("[ESRes][Pipeline] 已清理旧协议生成物；请从烘焙开始完整执行 v5 四步发布流程。");
         }
 
         private static bool HasLegacyGeneratedArtifacts(string platform)
         {
-            if (Directory.Exists(Path.Combine(ProjectRoot, "ES", "InitialTarget", "WindowsPlayer"))
-                || Directory.Exists(Path.Combine(ProjectRoot, "ES", ESGlobalResSetting.ResParentFolderName, "WindowsPlayer")))
+            if (Directory.Exists(Path.Combine(InitialTargetRoot, "WindowsPlayer"))
+                || Directory.Exists(Path.Combine(ReleasesRoot, "WindowsPlayer")))
                 return true;
 
             return HasUnexpectedFormat<ESAssetBundleBuildPlan>(Path.Combine(PlanRoot(platform), PlanFileName), 2, value => value.formatVersion)
                 || HasUnexpectedFormat<ESAssetBundleAssetList>(Path.Combine(PlanRoot(platform), AssetListFileName), 2, value => value.formatVersion)
-                || HasUnexpectedFormat<ESAssetReleaseManifest>(Path.Combine(ProjectRoot, "ES", "Published", "LocalTest", platform, ReleaseManifestFileName), RuntimeProtocolFormatVersion, value => value.formatVersion)
-                || HasUnexpectedFormat<ESAssetReleaseManifest>(Path.Combine(ProjectRoot, "ES", ESGlobalResSetting.ResParentFolderName, platform, ReleaseManifestFileName), RuntimeProtocolFormatVersion, value => value.formatVersion);
+                || HasUnexpectedFormat<ESAssetReleaseManifest>(Path.Combine(LocalTestRoot(platform), ReleaseManifestFileName), RuntimeProtocolFormatVersion, value => value.formatVersion)
+                || HasUnexpectedFormat<ESAssetReleaseManifest>(Path.Combine(ReleasesRoot, platform, ReleaseManifestFileName), RuntimeProtocolFormatVersion, value => value.formatVersion);
         }
 
         private static bool HasUnexpectedFormat<T>(string path, int expected, Func<T, int> getFormat) where T : class

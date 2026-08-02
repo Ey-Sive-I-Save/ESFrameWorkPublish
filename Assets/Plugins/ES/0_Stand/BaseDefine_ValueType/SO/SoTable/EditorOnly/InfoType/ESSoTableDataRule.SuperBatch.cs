@@ -20,7 +20,7 @@ namespace ES
         public void GenerateSuperBatchTemplate(ESSoTableRuleUseBatch targetBatch)
         {
             string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string folder = Path.Combine(projectRoot, "SoTableConfig", "Examples", "super_batch");
+            string folder = Path.Combine(projectRoot, "ES", "Config", "SoTable", "Examples", "super_batch");
             Directory.CreateDirectory(folder);
 
             string baseName = string.IsNullOrWhiteSpace(ruleKey) ? "SoTableSuperBatch" : SanitizeAssetFileName(ruleKey) + "_SuperBatch";
@@ -182,7 +182,7 @@ namespace ES
                     "",
                     "Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/02_Assets",
                     "true",
-                    "SoTableConfig/Examples/super_batch/full_export.xlsx",
+                    "ES/Config/SoTable/Examples/super_batch/full_export.xlsx",
                     "Xlsx",
                     "English",
                     "MergeByKey",
@@ -206,7 +206,7 @@ namespace ES
                     "",
                     "Assets/Plugins/ES/3_Examples/3_Data/Example_SOTableRule/02_Assets",
                     "true",
-                    "SoTableConfig/Examples/super_batch/slice_001.xlsx",
+                    "ES/Config/SoTable/Examples/super_batch/slice_001.xlsx",
                     "Xlsx",
                     "English",
                     "MergeByKey",

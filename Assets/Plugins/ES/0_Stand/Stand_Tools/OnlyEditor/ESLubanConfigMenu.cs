@@ -8,13 +8,14 @@ namespace ES
 {
     public static class ESLubanConfigMenu
     {
+        private static string GetConfigRoot(string projectRoot) => Path.Combine(projectRoot, "ES", "Config", "Luban");
         private const string MenuRoot = MenuItemPathDefine.CONFIG_PATH + "Luban/";
 
         [MenuItem(MenuRoot + "\u751f\u6210 Json+CSharp", false, 0)]
         public static void GenerateJsonAndCSharp()
         {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            string scriptPath = Path.Combine(projectRoot, "LubanConfig", "gen-json.ps1");
+            string scriptPath = Path.Combine(GetConfigRoot(projectRoot), "gen-json.ps1");
 
             if (!File.Exists(scriptPath))
             {
@@ -57,7 +58,7 @@ namespace ES
         public static void OpenLubanConfigFolder()
         {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            EditorUtility.RevealInFinder(Path.Combine(projectRoot, "LubanConfig"));
+            EditorUtility.RevealInFinder(GetConfigRoot(projectRoot));
         }
     }
 }

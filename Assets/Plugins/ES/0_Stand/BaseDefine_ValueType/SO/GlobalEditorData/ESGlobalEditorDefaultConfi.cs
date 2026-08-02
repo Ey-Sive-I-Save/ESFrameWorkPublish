@@ -98,7 +98,9 @@ namespace ES
 
     [TabGroup("UnityPackage打包构建")]
     [LabelText("UnityPackage发布打包输出到"), FolderPath]
-    public string PackageOutputPathForPublish = "Assets/../ESOutput/UnityPackage";
+    public const string DefaultUnityPackageOutputPath = "Assets/../ES/Output/UnityPackages";
+
+    public string PackageOutputPathForPublish = DefaultUnityPackageOutputPath;
 
 
     [TabGroup("UnityPackage打包构建")]
@@ -135,7 +137,7 @@ namespace ES
       public string ConfigName = "新配置";
 
       [LabelText("UnityPackage输出位置"), FolderPath]
-      public string OutputPath = "Assets/../ESOutput/UnityPackage";
+      public string OutputPath = DefaultUnityPackageOutputPath;
 
       [LabelText("UnityPackage包名")]
       public string PackageName = "ESPackage_Ext_";
@@ -166,7 +168,7 @@ namespace ES
       var newConfig = new UnityPackageConfig
       {
         ConfigName = $"配置 {ExtendedPackageConfigs.Count + 1}",
-        OutputPath = "Assets/../ESOutput/UnityPackage",
+        OutputPath = DefaultUnityPackageOutputPath,
         PackageName = $"ESPackage_Ext_{ExtendedPackageConfigs.Count + 1}_",
         CollectPaths = new List<string>() { "Assets/Plugins/ES" },
         ExcludeFolders = new List<string>(),

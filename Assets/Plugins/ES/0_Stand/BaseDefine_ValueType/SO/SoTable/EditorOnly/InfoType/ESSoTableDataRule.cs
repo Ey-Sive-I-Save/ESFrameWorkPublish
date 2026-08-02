@@ -481,7 +481,7 @@ namespace ES
         #region Active Batch And Path Context
         private string GetOutputFolder(string relativeFolder)
         {
-            string root = string.IsNullOrEmpty(GetActiveOutputRoot()) ? "SoTableConfig/Tables" : GetActiveOutputRoot();
+            string root = string.IsNullOrEmpty(GetActiveOutputRoot()) ? "ES/Config/SoTable/Tables" : GetActiveOutputRoot();
             string folder = string.IsNullOrEmpty(relativeFolder) ? string.Empty : relativeFolder;
             return Path.GetFullPath(Path.Combine(Application.dataPath, "..", root, folder));
         }
@@ -584,7 +584,7 @@ namespace ES
         private string GetActiveOutputRoot()
         {
             ESSoTableRuleUseBatch batch = GetActiveUseBatch();
-            return batch != null && !string.IsNullOrEmpty(batch.outputRoot) ? batch.outputRoot : "SoTableConfig/Tables";
+            return batch != null && !string.IsNullOrEmpty(batch.outputRoot) ? batch.outputRoot : "ES/Config/SoTable/Tables";
         }
 
         private string GetActiveCsvRelativePath()

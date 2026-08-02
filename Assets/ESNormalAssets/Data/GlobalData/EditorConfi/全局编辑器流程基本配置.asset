@@ -39,7 +39,7 @@ MonoBehaviour:
   - ESTrackViewWindow
   - ESTreeMenuShower
   ExcludeHandle: ESTreeMenuShower
-  PackageOutputPathForPublish: Assets/../ESOutput/UnityPackage
+  PackageOutputPathForPublish: Assets/../ES/Output/UnityPackages
   PackageSelfPathForMain: Assets/Plugins/ES/Editor/Installer/Downloads/Main
   PackageName: ESPackage0.35_
   PackageCollectPath:

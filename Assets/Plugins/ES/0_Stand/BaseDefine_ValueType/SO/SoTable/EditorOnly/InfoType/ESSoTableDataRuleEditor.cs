@@ -905,7 +905,7 @@ namespace ES.EditorInternal
 
             SetStringChild(batch, "fileName", FirstNotEmpty(GetStringChild(batch, "fileName"), rule.ruleKey, rule.tableName, rule.name));
             SetStringChild(batch, "sheetName", FirstNotEmpty(GetStringChild(batch, "sheetName"), rule.ruleKey, rule.beanName, rule.name));
-            SetStringChild(batch, "outputRoot", FirstNotEmpty(GetStringChild(batch, "outputRoot"), "SoTableConfig/Tables"));
+            SetStringChild(batch, "outputRoot", FirstNotEmpty(GetStringChild(batch, "outputRoot"), "ES/Config/SoTable/Tables"));
             SetStringChild(batch, "csvRelativePath", FirstNotEmpty(GetStringChild(batch, "csvRelativePath"), "csv"));
             SetStringChild(batch, "xlsxRelativePath", FirstNotEmpty(GetStringChild(batch, "xlsxRelativePath"), "xlsx"));
         }
@@ -1485,7 +1485,7 @@ namespace ES.EditorInternal
             if (!string.IsNullOrWhiteSpace(Path.GetExtension(folder)))
                 folder = Path.GetDirectoryName(folder);
             if (string.IsNullOrWhiteSpace(folder))
-                folder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "SoTableConfig", "Examples", "super_batch"));
+                folder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "ES", "Config", "SoTable", "Examples", "super_batch"));
 
             Directory.CreateDirectory(folder);
             EditorUtility.OpenWithDefaultApp(folder);
@@ -1513,7 +1513,7 @@ namespace ES.EditorInternal
 
         private static void OpenBatchOutputFolder(SerializedProperty batch)
         {
-            string root = FirstNotEmpty(GetStringChild(batch, "outputRoot"), "SoTableConfig/Tables");
+            string root = FirstNotEmpty(GetStringChild(batch, "outputRoot"), "ES/Config/SoTable/Tables");
             string relativeFolder = string.Empty;
             SerializedProperty fileKind = batch != null ? batch.FindPropertyRelative("fileKind") : null;
             if (fileKind != null && fileKind.enumValueIndex == (int)ESTableFileKind.Csv)
@@ -1530,7 +1530,7 @@ namespace ES.EditorInternal
 
         private static string BuildBatchTableFullPath(SerializedProperty batch, ESSoTableDataRule rule, string extension)
         {
-            string root = FirstNotEmpty(GetStringChild(batch, "outputRoot"), "SoTableConfig/Tables");
+            string root = FirstNotEmpty(GetStringChild(batch, "outputRoot"), "ES/Config/SoTable/Tables");
             string relativeFolder = extension == ".xlsx"
                 ? FirstNotEmpty(GetStringChild(batch, "xlsxRelativePath"), "xlsx")
                 : FirstNotEmpty(GetStringChild(batch, "csvRelativePath"), "csv");
@@ -1542,7 +1542,7 @@ namespace ES.EditorInternal
         {
             string path = GetStringChild(batch, "superBatchTablePath");
             if (string.IsNullOrWhiteSpace(path))
-                return Path.GetFullPath(Path.Combine(Application.dataPath, "..", "SoTableConfig", "Examples", "super_batch"));
+                return Path.GetFullPath(Path.Combine(Application.dataPath, "..", "ES", "Config", "SoTable", "Examples", "super_batch"));
             if (Path.IsPathRooted(path))
                 return Path.GetFullPath(path);
             return Path.GetFullPath(Path.Combine(Application.dataPath, "..", path));
@@ -1814,7 +1814,7 @@ namespace ES.EditorInternal
         private static string GetOutputPath(ESSoTableDataRule rule)
         {
             ESSoTableRuleUseBatch batch = GetPrimaryBatch(rule);
-            string root = batch != null ? FirstNotEmpty(batch.outputRoot, "SoTableConfig/Tables") : "SoTableConfig/Tables";
+            string root = batch != null ? FirstNotEmpty(batch.outputRoot, "ES/Config/SoTable/Tables") : "ES/Config/SoTable/Tables";
             string file = FirstNotEmpty(GetBatchFileName(rule), rule.tableName, rule.ruleKey, rule.name);
             return root + "/" + file;
         }

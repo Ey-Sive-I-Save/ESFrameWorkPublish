@@ -3834,7 +3834,7 @@ namespace ES
     internal static class ESAssetPackageGridAnimationFrameCache
     {
         private const string CacheVersion = "PersistentGridFrames_v2_ViewAware";
-        private const string PersistentRootFolder = "ESAssetPackagePreviewFrames/AssetPackageBake";
+        private const string PersistentRootFolder = "Library/ES/AssetPackagePreviewFrames/AssetPackageBake";
         private const int ShortClipSampleRate = 24;
         private const int LongClipSampleRate = 10;
         private const float LongClipThresholdSeconds = 2.4f;

@@ -652,7 +652,7 @@ namespace ES
         [LabelText("输出根目录")]
         [PropertyTooltip("相对项目根目录的表格输出目录")]
         [FolderPath(AbsolutePath = false)]
-        public string outputRoot = "SoTableConfig/Tables";
+        public string outputRoot = "ES/Config/SoTable/Tables";
 
         [LabelText("CSV 相对路径")]
         [PropertyTooltip("CSV 相对输出根目录的子路径")]

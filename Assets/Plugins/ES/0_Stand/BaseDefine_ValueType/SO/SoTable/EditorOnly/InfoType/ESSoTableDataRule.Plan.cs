@@ -833,7 +833,7 @@ namespace ES
 
         private string WriteBatchPlanReport(ESSoTableRuleUseBatch batch, string report)
         {
-            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "SoTableConfig", "Plans"));
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "ES", "Config", "SoTable", "Plans"));
             Directory.CreateDirectory(root);
             string reportName = SanitizeAssetFileName(FirstNotEmptyLocal(batch != null ? batch.batchName : null, ruleKey, this.name, "SoTablePlan"));
             string path = Path.Combine(root, reportName + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".txt");

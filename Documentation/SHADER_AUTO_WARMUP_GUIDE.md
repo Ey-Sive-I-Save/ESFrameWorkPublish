@@ -89,11 +89,14 @@ BuildPipeline.BuildAssetBundles(...);
 
 构建后的目录结构：
 ```
-ESOutput/
-  YourLibrary/
-    shaders.ab                  ← ShaderVariantCollection的AB包
-    AssetKeys.json              ← 包含Shader资源的Key信息
-    ABMetadata.json
+ES/ResourcePipeline/BuildStaging/
+  <Platform>/
+    Libraries/
+      YourLibrary/
+        AssetBundles/
+          shaders.ab                    ← ShaderVariantCollection 的 AB 包
+        ESAssetLibraryCatalog.json      ← 包含 Shader 资源的目录信息
+        ESAssetBundleManifest.json
 ```
 
 ---

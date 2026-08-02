@@ -1,0 +1,7 @@
+interface:
+  display_name: "ES AICommand 执行"
+  short_description: "选择、校验并执行 ES 项目的 AICommand 任务协议"
+  default_prompt: "Use $es-use-ai-command to select and execute the correct ES AICommand for this task."
+
+policy:
+  allow_implicit_invocation: true

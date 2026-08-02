@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES 编辑器工具"
+  short_description: "开发窗口、Drawer、ESEditorSection 与安全编辑器工具"
+  default_prompt: "Use $es-editor-tooling to implement or audit this ES Editor tooling task."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ESCommand 构建"
+  short_description: "新增 ESCommand 并维护上下文、分类与执行边界"
+  default_prompt: "Use $es-command-authoring to add or review an ESCommand runtime command."

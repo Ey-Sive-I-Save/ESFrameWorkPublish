@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Entity 构建"
+  short_description: "按 Entity、角色 Prefab、DataInfo 和池化契约构建实体"
+  default_prompt: "Use $es-entity-authoring to author or review this ES entity or character change."

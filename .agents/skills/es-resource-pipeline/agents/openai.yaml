@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES 资源管线"
+  short_description: "处理 AssetLibrary、Scope、Provider、Manifest 与发布链路"
+  default_prompt: "Use $es-resource-pipeline to implement or audit this ES resource pipeline task."

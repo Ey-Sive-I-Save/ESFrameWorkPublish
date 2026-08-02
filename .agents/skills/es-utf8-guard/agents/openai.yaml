@@ -1,0 +1,7 @@
+interface:
+  display_name: "ES UTF-8 守卫"
+  short_description: "严格检查项目文本的 UTF-8、乱码、替换字符与补丁完整性"
+  default_prompt: "Use $es-utf8-guard to validate changed ES text files for UTF-8 safety."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,163 @@
+{
+    "schemaVersion":  2,
+    "document":  {
+                     "path":  "ES/Documentation/StaticSite/ESFrameworkPublish_技术文档.html",
+                     "sha256":  "e3f8c35d3e5c743ef2c92707f55dc4c171fa3f2a6ca8a4bd512767d5485997e8",
+                     "sizeBytes":  3467066
+                 },
+    "policy":  {
+                   "branchModel":  "single-current-branch",
+                   "excludeFromSourceSnapshot":  [
+                                                     "ES/Documentation/StaticSite/**",
+                                                     ".githooks/**"
+                                                 ],
+                   "stageOnly":  [
+                                     "ES/Documentation/StaticSite/ESFrameworkPublish_技术文档.html",
+                                     "ES/Documentation/StaticSite/DOCUMENT_SYNC.md",
+                                     "ES/Documentation/StaticSite/DOCUMENT_READER_STANDARD.md",
+                                     "ES/Documentation/StaticSite/DOCUMENT_SYNC.json",
+                                     "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.json",
+                                     "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.md",
+                                     "ES/Documentation/StaticSite/Verify-DocumentSync.ps1",
+                                     "ES/Documentation/StaticSite/Update-DocumentLocalLedgerSnapshot.ps1",
+                                     "ES/Documentation/StaticSite/Prepare-DocumentStagedBatch.ps1",
+                                     "ES/Documentation/StaticSite/Verify-DocumentStagedBatch.ps1",
+                                     ".githooks/pre-commit"
+                                 ]
+               },
+    "localUpdateLedger":  {
+                              "manifestPath":  "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.json",
+                              "summaryPath":  "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.md",
+                              "manifestSha256":  "55678e2b7435f7b0042aa09e139610b0791b727620140ef490ade0858dd20339",
+                              "batchId":  "LOCAL-2026-08-02-OPEN",
+                              "status":  "collecting",
+                              "htmlWritePolicy":  "batch-only-after-ready-for-html"
+                          },
+    "baseline":  {
+                     "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                     "capturedAt":  "2026-08-02",
+                     "sourceState":  "head-plus-dirty-worktree",
+                     "trackedWorktreePatchSha256":  "a8440b7759d684890f44b944b906945f07a0b217577ef0734ab0fcf60b2be8b5",
+                     "stagedSourcePatchSha256":  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                     "untrackedSourceManifestSha256":  "eff92b78cdb050f106f153eb2c8c540f8d523bb87a65142d4c9b4b6b0e4c5c3d",
+                     "untrackedSourceFileCount":  112
+                 },
+    "review":  {
+                   "coverage":  [
+                                    "ResourcePlan, AssetScope, Catalog, Provider, and runtime release behavior",
+                                    "SODataWindow, SO Table, stable key, Group, Pack, and batch import behavior",
+                                    "Entity input, KCC, state, tag, buff, vehicle, and character-control flow",
+                                    "Skill sequence, track clips, operations, target snapshots, support, pools, and links",
+                                    "Editor workflow, resource pipeline, preview, TrackView, GraphView, RuntimeWatch, and AIWarnings"
+                                ],
+                   "evidencePaths":  [
+                                         "Assets/Plugins/ES/0_Stand/_Res/Runtime/ESAssetScope.cs",
+                                         "Assets/Plugins/ES/0_Stand/Stand_Tools/AssemblyStream/-ESAssemblyStream.cs",
+                                         "Assets/Plugins/ES/0_Stand/Stand_Tools/OnlyEditor/MenuItemPathDefine.cs",
+                                         "Assets/Plugins/ES/1_Design/ConfigKey/ESKeyCatalog.cs",
+                                         "Assets/Plugins/ES/1_Design/Core_Domain_Module/Core.cs",
+                                         "Assets/Plugins/ES/1_Design/Core_Domain_Module/Domain.cs",
+                                         "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+                                         "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md",
+                                         "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_AssemblyStream只做Editor特性注册解耦_禁止全量扫盘_AI协作警告.md",
+                                         "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_稳定Key_Catalog烘焙与RuntimeKey进程边界_AI协作警告.md",
+                                         "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源工具链_四阶段严格隔离_AI协作警告.md",
+                                         "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/P2_编辑器菜单根必须使用【ES】_AI协作警告.md",
+                                         "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/预览与生命周期（PreviewLifecycle）/编辑器预览系统生命周期_AI协作警告.md",
+                                         "Assets/Plugins/ES/Editor/ESGraphView/Graphview-Define/ESGraphViewWindow.cs",
+                                         "Assets/Plugins/ES/Editor/ESPresentation/ESEditorHealthWindow.cs",
+                                         "Assets/Plugins/ES/Editor/ESPresentation/Reference/ESTypeCatalog.cs",
+                                         "Assets/Plugins/ES/Editor/ESResPipeline/ESResourceCollectionWorkflowWindow.cs",
+                                         "Assets/Plugins/ES/Editor/ESSoTable/ESSoTableDataRuleAssetMenu.cs",
+                                         "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs",
+                                         "Assets/Scripts/ESLogic/Editor/CharacterTemplates/ESBasicCharacterTemplateBuilder.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/EditorPreview/ESEditorPreviewCore.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/Modules/EntityBasicMotionModule_Mount.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Mount/EntityMountable.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.Domains.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.ModuleBase.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESGameObjectPoolModule.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Life/ESGenericLife.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Operation/Operations/00_Common/OpCommon_Flow.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Operation/Operations/ESOutputOp.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Operation/RuntimeServices/ESOpSupport.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Operation/Targets/ESRuntimeTargetPack.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/State/Core/StateMachine/StateMachine.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Tag/ESTagCollection.cs",
+                                         "Assets/Scripts/ESLogic/Runtime/Vehicle/VehicleController.cs",
+                                         "Documentation/DOCUMENTATION_CATALOG.md",
+                                         "Documentation/ES_BUFF_RUNTIME_STANDARD.md",
+                                         "Documentation/ES_GENERIC_LIFE.md",
+                                         "Documentation/ES_STAT_RUNTIME_STANDARD.md",
+                                         "Documentation/ESTAG_FULL_LIFECYCLE_STANDARD.md",
+                                         "Documentation/KEY_GOVERNANCE.md",
+                                         "Documentation/SKILL_OPERATION_LIFECYCLE.md",
+                                         "Documentation/VEHICLE_RUNTIME_CONTRACT.md"
+                                     ],
+                   "uncovered":  [
+                                     "P6/P7/P9 PlayMode acceptance evidence is not complete.",
+                                     "IL2CPP Player acceptance evidence is not complete.",
+                                     "Real-provider release and hot-update acceptance must not be inferred from Editor behavior."
+                                 ]
+               },
+    "validation":  {
+                       "internalAnchors":  305,
+                       "missingInternalAnchors":  0,
+                       "duplicateIds":  0,
+                       "externalCssOrJs":  0,
+                       "result":  "local-update-batch-needs-triage",
+                       "lastGateResult":  "Current source drift is captured by LOCAL-2026-08-02-OPEN, but its entries are not yet complete enough to defer HTML integration."
+                   },
+    "history":  [
+                    {
+                        "date":  "2026-08-02",
+                        "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                        "sourceState":  "head-plus-dirty-worktree",
+                        "result":  "Created the offline HTML, the authored deep sections, and the synchronization gate."
+                    },
+                    {
+                        "date":  "2026-08-02",
+                        "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                        "sourceState":  "head-plus-dirty-worktree; source baseline intentionally not advanced",
+                        "result":  "Reworked the single-file reader layout: restrained dark reader surface by default, narrower reading column, quieter reference rail, mobile navigation and theme controls. Visual-only update; source drift remains pending semantic documentation sync."
+                    },
+                    {
+                        "date":  "2026-08-02",
+                        "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                        "sourceState":  "head-plus-dirty-worktree; source baseline intentionally not advanced",
+                        "result":  "Recomposed the reader as left navigation plus a single long-form content column, removed the permanent evidence rail, and added DOCUMENT_READER_STANDARD.md. The sync gate now requires both the standard file and its in-document pointer. Visual-only update; source drift remains pending semantic documentation sync."
+                    },
+                    {
+                        "date":  "2026-08-02",
+                        "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                        "sourceState":  "head-plus-dirty-worktree; source baseline intentionally not advanced",
+                        "result":  "Rebalanced the wide reader after visual comparison: expanded the main work area for tables, restored a wide-screen source-navigation tree with actual file links, and added a functional chapter filter. The reader standard now permits only this evidence-bearing right rail. Visual-only update; source drift remains pending semantic documentation sync."
+                    },
+                    {
+                        "date":  "2026-08-02",
+                        "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                        "sourceState":  "head-plus-dirty-worktree; source baseline intentionally not advanced",
+                        "result":  "Strengthened semantic emphasis: conclusions now use weight, restrained cyan emphasis and underline; warning constraints use stronger amber emphasis; code identifiers remain visually separate. Updated the reader standard and validated dark wide/mobile rendering, anchors and offline dependencies. Visual-only update; source drift remains pending semantic documentation sync."
+                    },
+                    {
+                        "date":  "2026-08-02",
+                        "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                        "sourceState":  "head-plus-dirty-worktree; source baseline intentionally not advanced",
+                        "result":  "Reworked the developer-value matrix into a scan surface: persistent headers, role index, visually distinct ES leverage and owner responsibility columns, plus stronger conclusion emphasis. Removed global and click-triggered smooth scrolling so direct fragments and chapter navigation target immediately. Updated the reader standard. Visual-only update; source drift remains pending semantic documentation sync."
+                    },
+                    {
+                        "date":  "2026-08-02",
+                        "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                        "sourceState":  "head-plus-dirty-worktree; source baseline intentionally not advanced",
+                        "result":  "Removed 15 unresolved \u0027undefined\u0027 entries from the core-feature diagnostic column and replaced them with named diagnostic chains. Added a final-reader placeholder scan rule, with an explicit exception for verbatim source evidence. Visual/content-correctness update; source drift remains pending semantic documentation sync."
+                    },
+                    {
+                        "date":  "2026-08-02",
+                        "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                        "sourceState":  "head-plus-dirty-worktree; source baseline intentionally not advanced",
+                        "result":  "Added a two-stage local update integration workflow: a machine ledger plus human-readable summary capture completed local changes, snapshots, evidence, regression and HTML targets. The sync gate accepts deferred HTML integration only for complete snapshot-matched batches; the initial batch remains intentionally blocked pending triage."
+                    }
+                ]
+}

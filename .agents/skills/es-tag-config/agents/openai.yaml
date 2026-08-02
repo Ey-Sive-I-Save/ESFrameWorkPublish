@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Tag 与配置"
+  short_description: "维护 ESGameTag、ConfigKey、稳定身份和运行时映射"
+  default_prompt: "Use $es-tag-config to implement or review this ES tag and configuration change."

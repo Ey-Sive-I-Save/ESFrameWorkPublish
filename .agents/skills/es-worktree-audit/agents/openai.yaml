@@ -1,0 +1,7 @@
+interface:
+  display_name: "ES 工作树审计"
+  short_description: "审计 Git 修改、暂存、未跟踪文件以及当前任务影响范围"
+  default_prompt: "Use $es-worktree-audit to inspect the ES repository worktree before making changes."
+
+policy:
+  allow_implicit_invocation: true

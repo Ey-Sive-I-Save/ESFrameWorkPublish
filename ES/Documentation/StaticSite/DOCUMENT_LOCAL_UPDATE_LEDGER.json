@@ -1,0 +1,590 @@
+{
+    "schemaVersion":  1,
+    "batch":  {
+                  "id":  "LOCAL-2026-08-02-OPEN",
+                  "status":  "collecting",
+                  "startedAt":  "2026-08-02",
+                  "updatedAt":  "2026-08-03",
+                  "documentBeforeIntegration":  {
+                                                    "sha256":  "e3f8c35d3e5c743ef2c92707f55dc4c171fa3f2a6ca8a4bd512767d5485997e8",
+                                                    "sizeBytes":  3467066
+                                                },
+                  "sourceSnapshot":  {
+                                         "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                                         "trackedWorktreePatchSha256":  "4fb8530a1489992ebbc719d76bfbe3dd4f5a63505784312c3d990f998724bf8c",
+                                         "stagedSourcePatchSha256":  "008cf4d540c43c01d0f972cd4a535faa8e7f9a71f223a8a511cc5cbbe27a0bae",
+                                         "untrackedSourceManifestSha256":  "c32bd9cbaf53ca8fddd35d165112d9dddb15d5d1591be4d4ca3b42093df03edd",
+                                         "untrackedSourceFileCount":  575
+                                     }
+              },
+    "entries":  [
+                    {
+                        "id":  "INTAKE-20260802-001",
+                        "status":  "needs-triage",
+                        "summary":  "已捕获当前脏工作区的完整源码快照，但尚未按可独立回归的完成项拆分、核实和总结；该记录不能授权 HTML 更新或解除同步门禁。",
+                        "sourcePaths":  [
+
+                                        ],
+                        "evidencePaths":  [
+
+                                          ],
+                        "analysis":  {
+                                         "status":  "not-started",
+                                         "notes":  "先按功能边界拆成完成项，再补源码、AIWarnings、测试与发布契约证据。"
+                                     },
+                        "regression":  {
+                                           "status":  "not-started",
+                                           "evidence":  [
+
+                                                        ],
+                                           "knownGaps":  [
+
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "not-started",
+                                     "targets":  [
+
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260802-002",
+                        "status":  "documented",
+                        "summary":  "通过固定 Git tag 为 Unity 2022.3 项目安装 MCP for Unity 10.1.0，Unity Package Manager 已锁定并注册包，Runtime 与 Editor 程序集已生成；同时安装 uv 并由包自动配置 Codex HTTP MCP 入口。",
+                        "sourcePaths":  [
+                                            "Packages/manifest.json",
+                                            "Packages/packages-lock.json"
+                                        ],
+                        "evidencePaths":  [
+                                              "ProjectSettings/ProjectVersion.txt",
+                                              "Packages/manifest.json",
+                                              "Packages/packages-lock.json"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "官方 v10.1.0 声明最低 Unity 2021.3，兼容当前 2022.3.45f1。网络恢复后 Git 可读取 v10.1.0 tag；Unity 将包解析到 PackageCache 并生成 MCPForUnity.Runtime/Editor 程序集。Codex 配置由包写入本地 HTTP 端点，未修改 ES 运行时代码。"
+                                     },
+                        "regression":  {
+                                           "status":  "not-run",
+                                           "evidence":  [
+                                                            "Test-NetConnection github.com -Port 443 成功，git ls-remote 返回 v10.1.0 tag",
+                                                            "packages-lock.json 已登记 com.coplaydev.unity-mcp Git 依赖",
+                                                            "Library/ScriptAssemblies 已生成 MCPForUnity.Runtime.dll 与 MCPForUnity.Editor.dll",
+                                                            "codex mcp list 已识别 unityMCP HTTP 配置",
+                                                            "127.0.0.1:8080 已监听，Unity 项目通过 WebSocket 注册 35 个工具",
+                                                            "通过 MCP HTTP 实际调用 read_console、manage_asset 与 execute_code 成功"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前 Codex 会话不会热加载新增 MCP 工具，需要重启 Codex 后验证握手",
+                                                             "尚未运行 Unity Test Runner、PlayMode 或 Player 验证"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260802-003",
+                        "status":  "documented",
+                        "summary":  "修复 AICommands 全库 115 条重复前缀导致的失效规则引用，并在 ESCmdAgent 中加入元数据与路径自检、无效命令阻断、风险权限识别和 Unity 内直接使用说明，使 52 个模板形成可发现、可校验、可组合、可发送的任务闭环。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/AICommands",
+                                            "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/AICommands/README.md",
+                                              "Assets/Plugins/ES/AICommands/命令合集索引_AI命令.md",
+                                              "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/GameCoreGlobalData与AICommands_AI协作警告.md",
+                                              "Assets/Plugins/ES/AIWarnings/80_交接与复盘（Handover）/失败复盘（Retrospectives）/ESCmdAgent_失败复盘与后续禁止事项_AI协作警告.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "原 52 个 Markdown 模板的项目规则路径均包含重复的 Assets/Plugins/ES 前缀，导致 115 条必读引用全部失效。修复后所有引用均可解析；ESCmdAgent 在用户打开选择器或准备发送时按需读取模板，不增加域重载扫描。缺失元数据、缺失文件或失效路径会显示错误并禁止发送；默认改文件以明确的‘是’或‘允许’前缀识别。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "dotnet build ES_Stand.csproj --no-restore：0 warning / 0 error",
+                                                            "dotnet build ES_Editor.csproj --no-restore：0 warning / 0 error",
+                                                            "Unity manage_asset 重新导入 ESCmdAgentWindow.cs 后 Console：0 error / 0 warning",
+                                                            "Unity execute_code 调用实际解析器验证 52 个模板：invalid=0",
+                                                            "Unity execute_code 验证可写命令识别与 Prompt 路径、需求、边界组合均为 True",
+                                                            "53 个改动文本严格 UTF-8 解码通过，U+FFFD=0，重复前缀=0，git diff --check 无错误"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "尚未人工逐个点击 52 个下拉项；模板解析和生成链路已在 Unity 进程内批量执行",
+                                                             "未新增 Unity Test Runner 自动化用例，当前证据为 Unity 实际导入、Console 与运行时反射验证"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#deep-warning-16"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260802-004",
+                        "status":  "documented",
+                        "summary":  "按 OpenAI Agent Skills 官方目录规范在项目根 .agents/skills 下建立五个 ES 专用 Skill，覆盖 AICommand 执行、Unity 编译证据、单错误修复、UTF-8 守卫和 Git 工作树审计，并提供四个经过实跑的确定性 PowerShell 脚本。",
+                        "sourcePaths":  [
+                                            ".agents/skills/es-use-ai-command",
+                                            ".agents/skills/es-unity-compile",
+                                            ".agents/skills/es-fix-compile-error",
+                                            ".agents/skills/es-utf8-guard",
+                                            ".agents/skills/es-worktree-audit"
+                                        ],
+                        "evidencePaths":  [
+                                              ".agents/skills/es-use-ai-command/scripts/Test-ESAICommands.ps1",
+                                              ".agents/skills/es-unity-compile/scripts/Invoke-ESDotnetBuild.ps1",
+                                              ".agents/skills/es-utf8-guard/scripts/Test-ESUtf8.ps1",
+                                              ".agents/skills/es-worktree-audit/scripts/Get-ESWorktreeImpact.ps1"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "Skill 使用项目级官方发现路径 .agents/skills，不进入 Unity Assets，因此不会被 AssetDatabase 导入或生成 .meta。每个 Skill 只有一个明确职责；SKILL.md 保留工作流和边界，确定性检查放入 scripts，Unity 编译 Skill 通过 agents/openai.yaml 声明 unityMCP 依赖。PowerShell 脚本源码保持 ASCII，避免 Windows PowerShell 5.1 将无 BOM UTF-8 中文脚本按本地代码页解析。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "官方 skill-creator/init_skill.py 已用于初始化五个 Skill",
+                                                            "设置 PYTHONUTF8=1 后，官方 quick_validate.py 对五个 Skill 全部返回 Skill is valid",
+                                                            "Test-ESAICommands.ps1 实跑：52 commands / 0 invalid",
+                                                            "Get-ESWorktreeImpact.ps1 实跑并输出 branch、HEAD、状态分类与 .agents/skills 重叠计数",
+                                                            "Test-ESUtf8.ps1 对 14 个 Skill 文件实跑：valid=true / requiresReview=false / diffCheckExitCode=0",
+                                                            "Invoke-ESDotnetBuild.ps1 实跑 ES_Stand.csproj：succeeded=true，并明确标注仅为 dotnet-build 证据",
+                                                            "四个 PowerShell 脚本均通过 Windows PowerShell AST 语法解析"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前 Codex 窗口不会热加载新建 Skill；需从项目根启动新窗口或重启后验证技能选择器",
+                                                             "尚未用独立新会话对五个 Skill 做端到端真实任务前向测试"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-005",
+                        "status":  "documented",
+                        "summary":  "把项目级 Agent Skills 正式接入 AIWarnings 与 AICommands 的入口、任务路由和命令索引，新增三层协作边界警告，并区分当前五个可用 Skill 与尚未实现的后续能力。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md.meta",
+                                            "Assets/Plugins/ES/AICommands/README.md",
+                                            "Assets/Plugins/ES/AICommands/命令合集索引_AI命令.md"
+                                        ],
+                        "evidencePaths":  [
+                                              ".agents/skills/es-use-ai-command/SKILL.md",
+                                              ".agents/skills/es-unity-compile/SKILL.md",
+                                              ".agents/skills/es-fix-compile-error/SKILL.md",
+                                              ".agents/skills/es-utf8-guard/SKILL.md",
+                                              ".agents/skills/es-worktree-audit/SKILL.md",
+                                              ".agents/skills/es-use-ai-command/scripts/Test-ESAICommands.ps1"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "AIWarnings 继续负责长期事实与禁止事项，AICommands 负责单次任务授权，.agents/skills 负责可复用执行工作流，UnityMCP 与脚本只提供执行和证据能力。入口文档已登记五个真实存在的 Skill，并把 Unity 验收编排、领域专项 Skill、结构化验收包、上下文采集和 Plugin 分发明确标为展望，禁止当作当前实现。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "五份文档均通过严格 UTF-8 解码，U+FFFD=0",
+                                                            "五个 .agents/skills/*/SKILL.md 路径全部存在",
+                                                            "Test-ESAICommands.ps1 实跑：52 commands / 0 invalid",
+                                                            "本轮文件 scoped git diff --check 通过",
+                                                            "新增 Markdown 已按同目录 TextScriptImporter 格式补齐 .meta"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "导入时 Unity 编辑器进程退出，UnityMCP 返回插件会话断开；未读取本轮变更后的 Unity Console",
+                                                             "本条登记时领域 Skill 尚未实现；后续八个领域 Skill 的第一版已由 LOCAL-20260803-006 补齐，自动验收脚本、上下文采集和 Plugin 分发仍未实现"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification",
+                                                     "#deep-warning-16"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-006",
+                        "status":  "documented",
+                        "summary":  "新增八个 ESFramework 领域专用 Agent Skills，覆盖 GameCore、资源管线、Tag/Config、Entity、输入、ESCommand、编辑器工具与发布验收，并把 AIWarnings 和 AICommands 的当前能力清单从五个基础 Skill 更新为十三个 Skill。",
+                        "sourcePaths":  [
+                                            ".agents/skills/es-gamecore-integration",
+                                            ".agents/skills/es-resource-pipeline",
+                                            ".agents/skills/es-tag-config",
+                                            ".agents/skills/es-entity-authoring",
+                                            ".agents/skills/es-input-action",
+                                            ".agents/skills/es-command-authoring",
+                                            ".agents/skills/es-editor-tooling",
+                                            ".agents/skills/es-release-acceptance",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                                            "Assets/Plugins/ES/AICommands/README.md",
+                                            "Assets/Plugins/ES/AICommands/命令合集索引_AI命令.md"
+                                        ],
+                        "evidencePaths":  [
+                                              ".agents/skills/es-gamecore-integration/references/project-map.md",
+                                              ".agents/skills/es-resource-pipeline/references/project-map.md",
+                                              ".agents/skills/es-tag-config/references/project-map.md",
+                                              ".agents/skills/es-entity-authoring/references/project-map.md",
+                                              ".agents/skills/es-input-action/references/project-map.md",
+                                              ".agents/skills/es-command-authoring/references/project-map.md",
+                                              ".agents/skills/es-editor-tooling/references/project-map.md",
+                                              ".agents/skills/es-release-acceptance/references/evidence-matrix.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "八个领域 Skill 使用官方初始化器生成，每个 Skill 以 SKILL.md 固化触发条件、最小工作流、禁止边界和交付格式，并以单层 references 文件导航到真实 AICommand、AIWarnings、源码与测试入口。它们形成 ES 独有执行能力，但不复制框架实现、不进入 Unity Assets、不自动授权写入，也不把领域导航写成 Unity 或发布已通过。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "项目根共 13 个 Skill，全部通过官方 quick_validate.py",
+                                                            "八个新 Skill 的所有字面项目路径均通过 Test-Path 核对",
+                                                            "本轮 29 个 Skill 与协作文档文件通过严格 UTF-8、U+FFFD、疑似乱码和 scoped git diff --check",
+                                                            "Test-ESAICommands.ps1 实跑：52 commands / 0 invalid",
+                                                            "八个 openai.yaml 均由官方初始化器生成，es-release-acceptance 已声明 unityMCP 依赖"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前 Codex 窗口不会热加载本轮新 Skill，需要从项目根新开窗口或重启后验证技能选择器",
+                                                             "八个领域 Skill 当前是工作流与项目导航第一版，尚未在独立新会话中逐个完成真实任务前向测试",
+                                                             "除既有四个基础脚本外，本轮未新增自动 Unity、Profiler、Player、IL2CPP 或发布执行脚本"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification",
+                                                     "#deep-warning-16"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-007",
+                        "status":  "documented",
+                        "summary":  "在项目根 .agents 建立统一 Agent 能力目录，固定 Skills、AIWarnings、AICommands、Documentation、AI 协作历程与 ES/Documentation/StaticSite 的唯一归属，并给出 13 个 Skill 的分层简介、内部结构和新增文件放置决策。",
+                        "sourcePaths":  [
+                                            ".agents/README.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+                                            "Assets/Plugins/ES/AICommands/README.md"
+                                        ],
+                        "evidencePaths":  [
+                                              ".agents/skills",
+                                              "Assets/Plugins/ES/AIWarnings",
+                                              "Assets/Plugins/ES/AICommands",
+                                              "Documentation",
+                                              "ES/AI协作历程（Codex）",
+                                              "ES/Documentation/StaticSite"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "采用一个项目级索引加多个唯一权威路径的组织方式。.agents/README.md 统一解释项目内 AI 文件归属和 Skill 分类；Skills 保持为 .agents/skills 的直接子目录，避免分类嵌套影响发现；Unity 内规则和命令仍保留在 Assets，历程与文档台账继续隔离，不创建重复副本。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            ".agents/README.md、AIWarnings README、AICommands README 严格 UTF-8 检查通过",
+                                                            "13 个 Skill 均保持直接子目录并包含 SKILL.md 与 agents/openai.yaml",
+                                                            "目录索引列出的六个权威位置全部真实存在",
+                                                            "Test-ESAICommands.ps1 实跑：52 commands / 0 invalid",
+                                                            "本轮 scoped git diff --check 通过"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "本轮只规范项目级 AI 文件组织，没有移动项目根其他历史压缩包、临时测试文件或生成目录",
+                                                             "固定发现路径和 Unity 资产路径不能物理合并，只能通过统一索引管理",
+                                                             "当前 Codex 窗口仍需重启或新开项目窗口才能验证新 Skill 的选择器展示"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-008",
+                        "status":  "documented",
+                        "summary":  "把项目根可控的 ES 配置、文档、工具、测试、输出、发布与资源管线目录统一迁入 ES 分区，并同步更新 C# 路径合同、Unity 序列化默认值、脚本、Manifest、Git hook、忽略规则和现行文档引用。",
+                        "sourcePaths":  [
+                                            "ES/Config",
+                                            "ES/Documentation",
+                                            "ES/Tools",
+                                            "ES/Tests",
+                                            "ES/Output",
+                                            "ES/Releases",
+                                            "ES/ResourcePipeline",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/GlobalEditorData/ESGlobalResSetting.cs",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/GlobalEditorData/ESGlobalEditorDefaultConfi.cs",
+                                            "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetPipelineContracts.cs",
+                                            "Assets/ESNormalAssets/Data/GlobalData/EditorConfi/全局编辑器流程基本配置.asset",
+                                            ".gitignore",
+                                            ".githooks/pre-commit"
+                                        ],
+                        "evidencePaths":  [
+                                              "ES/README.md",
+                                              ".agents/README.md",
+                                              "ES/Config/Luban/gen-json.ps1",
+                                              "ES/ResourcePipeline/InitialTarget",
+                                              "ES/Documentation/StaticSite/DOCUMENT_SYNC.json",
+                                              "ES/Documentation/StaticSite/Verify-DocumentSync.ps1"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "迁移只覆盖明确属于 ES 且由项目直接控制的根目录内容；Unity 固定目录、第三方包、.agents/skills、AIWarnings、AICommands 与历史协作档案保持原有权威入口。代码路径构造、序列化默认输出、Luban/SoTable 脚本、资源发布路径、生成 Manifest 和文档门禁均使用新目录，避免物理目录已移动但运行时仍写回旧根目录。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "排除 ES/AI协作历程（Codex）历史事实后，代码、序列化资产、脚本、Manifest 与现行文档中的旧目录引用扫描为 0",
+                                                            "Unity Editor.log 记录 Tundra build success、程序集重载与 ESGlobalEditorDefaultConfi 序列化资产成功加载",
+                                                            "资源 InitialTarget 的八个 Manifest 绝对路径已同步到 ES/ResourcePipeline/InitialTarget",
+                                                            "DOCUMENT_SYNC、验证脚本、Git hook 和 HTML 基础设施指针已切换到 ES/Documentation/StaticSite",
+                                                            "序列化资产 PackageOutputPathForPublish 已切换到 Assets/../ES/Output/UnityPackages"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "独立 dotnet build 被工作区既有源码删除后尚未刷新的 Unity .csproj 引用阻断；该结果不能替代或否定 Unity Tundra 成功证据",
+                                                             "本轮未运行 PlayMode、Profiler、IL2CPP Player 或真实 CDN 发布",
+                                                             "项目根 NormalResources 只剩空 Sprites 目录；删除命令被当前执行策略拦截，不影响引用或 Unity 导入"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "ES_DOCUMENT_SYNC",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-009",
+                        "status":  "documented",
+                        "summary":  "为 AIWarnings 建立按任务分层加载协议，禁止普通任务递归读取全目录，并明确 P0 原文、跨系统分批摘要、历史复盘与提案的上下文边界。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                                            "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+                                              "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+                                              "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "固定 README、CurrentStatus、RuleIndex、命中 P0、领域专项、按需交接复盘和提案的加载链。字符预算只作为建议，不能截断命中的权威原文；跨系统摘要必须保留规则路径、状态、结论、禁止事项和证据入口，且不得冒充逐条复核。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "四个入口与协作边界文件均登记禁止全量递归读取",
+                                                            "README 与 RuleIndex 明确普通任务和复杂跨系统任务的建议字符预算不是硬限制",
+                                                            "AIWarnings 的 Assets 外路径逐项存在性复核通过，旧迁移路径命中为 0",
+                                                            "重复 Assets/Plugins/ES 前缀的内部规则路径已修复",
+                                                            "相关文件严格 UTF-8 与 scoped git diff --check 通过"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "字符预算是上下文治理建议，具体 token 消耗仍随模型分词、中文、代码与路径比例变化",
+                                                             "本轮只治理规则加载方式，没有把全部历史 AIWarnings 重新逐条审阅或重写"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#deep-warning-16"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-010",
+                        "status":  "documented",
+                        "summary":  "新增 UnityMCP 与 AI 工程验收代理能力路线图预备案，登记只读采证、受控验收、高风险自动化和 ES 专项切入点，但明确全部仍为未实现提案。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/UnityMCP_AI工程验收代理与自动化能力路线图_预备案提案.md",
+                                            "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/UnityMCP_AI工程验收代理与自动化能力路线图_预备案提案.md.meta"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/AIWarnings/90_提案与废止（Archive）/待验收提案（Proposals）/UnityMCP_AI工程验收代理与自动化能力路线图_预备案提案.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "预备案覆盖 Unity 验收编排、序列化审计、任务上下文、Prefab 契约、资源发布、性能、ReloadDomain、语义 Diff、安全回滚与证据追踪；文件明确不构成开发计划、用户授权、现行事实或已交付能力。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "提案位于 90_提案与废止/待验收提案，状态明确为预备案、未实现",
+                                                            "提案包含分阶段优先级、开工前置条件、禁止事项与未来验收要求",
+                                                            "Markdown 与 Unity meta 已创建并通过严格 UTF-8、GUID 唯一性和 scoped git diff --check"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "本轮未实现任何提案能力，也未新增 Skill、AICommand、Unity 工具或发布操作",
+                                                             "具体能力进入实施前仍需重新审阅当前源码、P0、AICommand 与用户授权"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-011",
+                        "status":  "documented",
+                        "summary":  "建立 ES 模块成熟度和未完成实现治理：统一未开始、骨架、实验、开发、集成、验收、稳定、废弃与归档状态，并新增只读审计 AICommand 和项目级模块生命周期 Skill。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md.meta",
+                                            "Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md",
+                                            "Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md.meta",
+                                            ".agents/skills/es-module-lifecycle/SKILL.md",
+                                            ".agents/skills/es-module-lifecycle/agents/openai.yaml",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                                            "Assets/Plugins/ES/AICommands/README.md",
+                                            "Assets/Plugins/ES/AICommands/命令合集索引_AI命令.md",
+                                            ".agents/README.md",
+                                            "ES/Documentation/StaticSite/Update-DocumentLocalLedgerSnapshot.ps1",
+                                            "ES/Documentation/StaticSite/Verify-DocumentSync.ps1"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md",
+                                              "Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md",
+                                              ".agents/skills/es-module-lifecycle/SKILL.md",
+                                              ".agents/skills/es-use-ai-command/scripts/Test-ESAICommands.ps1",
+                                              ".agents/skills/es-utf8-guard/scripts/Test-ESUtf8.ps1"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "模块状态不再使用完成百分比或目录存在判断。Proposed 只保留提案，开发中实现必须可编译、显式隔离、可失败和可退出；Stable 只对已通过的范围、平台和证据层成立。Blocked 被定义为附加结论，不能冒充成熟度状态。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "AICommands 全库实跑为 53 个命令、0 个无效引用",
+                                                            "15 个本轮 Markdown、YAML、JSON 与 PowerShell 文件通过严格 UTF-8、U+FFFD、疑似乱码和 scoped git diff --check",
+                                                            "新增 Skill 的 frontmatter、名称、默认 Prompt、简介长度和 500 行上限完成等价结构检查",
+                                                            "两个新增 Unity meta GUID 唯一，目标文件无尾随空白",
+                                                            "本地台账快照与同步验证脚本已兼容 Git 空输出或空清单，不再把空集合传给 string.Join",
+                                                            "两个脚本在自身入口显式设置 UTF-8，避免 Git GUI 或 Windows PowerShell 5.1 把中文 Git 路径解码为 U+FFFD 后误报文件不存在",
+                                                            "同步验证器已越过脚本异常并正确报告当前源码漂移与 INTAKE-20260802-001 needs-triage 门禁"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前终端找不到可运行的 Python/uv，因此新增 Skill 尚未取得官方 quick_validate.py 实跑证据",
+                                                             "当前窗口不会热加载新增 Skill，仍需从项目根新开窗口或重启后验证发现",
+                                                             "本轮建立治理规则和审计能力，没有把现有全部 ES 模块逐个分类，也没有运行 Unity、Test Runner、PlayMode、Profiler、Player 或发布验收",
+                                                             "DOCUMENT_SYNC 仍因当前 tracked/staged/untracked 源码漂移和既有 INTAKE-20260802-001 needs-triage 阻断，不能推进 HTML"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#deep-warning-16"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-012",
+                        "status":  "documented",
+                        "summary":  "把 Git pre-commit 从全工作区同步阻断改为 staged-only 语义批次门禁：只校验本次暂存源码、选定台账条目和批次指纹，未暂存与未跟踪文件不再阻断提交。",
+                        "sourcePaths":  [
+                                            ".githooks/pre-commit",
+                                            "ES/Documentation/StaticSite/Prepare-DocumentStagedBatch.ps1",
+                                            "ES/Documentation/StaticSite/Verify-DocumentStagedBatch.ps1",
+                                            "ES/Documentation/StaticSite/Update-DocumentLocalLedgerSnapshot.ps1",
+                                            "ES/Documentation/StaticSite/Verify-DocumentSync.ps1",
+                                            "ES/Documentation/StaticSite/DOCUMENT_SYNC.json",
+                                            "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.json",
+                                            "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.md"
+                                        ],
+                        "evidencePaths":  [
+                                              ".githooks/pre-commit",
+                                              "ES/Documentation/StaticSite/Prepare-DocumentStagedBatch.ps1",
+                                              "ES/Documentation/StaticSite/Verify-DocumentStagedBatch.ps1",
+                                              "ES/Documentation/StaticSite/DOCUMENT_SYNC.json"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "完整 HTML 整合验证器继续保留，用于全工作区快照、回归和 ready-for-html；pre-commit 改用独立 staged-only 验证器。每次源码提交必须先选择已完成台账条目并生成暂存补丁指纹，台账 JSON 与 DOCUMENT_SYNC.json 必须和源码同批暂存。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "新门禁只从 git diff --cached HEAD 计算源码补丁、路径清单和文件数",
+                                                            "暂存源码必须被选定条目的 sourcePaths 覆盖，条目必须 documented 且 analysis complete",
+                                                            "源码批次必须同时暂存台账 JSON 与 DOCUMENT_SYNC.json，并禁止暂存版本落后于工作副本",
+                                                            "HTML 在 collecting 状态仍禁止提前进入提交",
+                                                            "旧 Verify-DocumentSync.ps1 与 Update-DocumentLocalLedgerSnapshot.ps1 保留为完整 HTML 整合工作流",
+                                                            "替代 Git index 成功验证：1 个已覆盖源码文件与同批台账通过；准备后增加未覆盖源码会因补丁、清单、数量和路径覆盖四项变化被拒绝",
+                                                            "替代 Git index 的纯门禁文档批次在没有暂存源码时通过，真实 index 始终保持原有 1 个暂存文件"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "本轮不会自动重排、取消暂存或提交用户当前文件；实际功能批次仍需按语义选择",
+                                                             "目录迁移、API 与调用方、Prefab/Scene 与依赖资产仍必须放在能保持项目完整的同一批次",
+                                                             "门禁验证不替代 Unity 编译、Test Runner、PlayMode、Profiler、Player 或发布验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
+                    }
+                ],
+    "integration":  {
+                        "status":  "deferred",
+                        "acceptedEntryIds":  [
+
+                                             ],
+                        "htmlAfterIntegration":  null,
+                        "notes":  "只有批次状态达到 ready-for-html、全部条目完成分析与回归整合后，才允许统一更新单文件 HTML。"
+                    },
+    "commitGate":  {
+                       "mode":  "staged-only",
+                       "preparedAt":  "2026-08-03T05:38:35+08:00",
+                       "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                       "stagedSourcePatchSha256":  "adc4bc30b767ec199f93623eb7651333c98e8105357a19858ff245b626c5e606",
+                       "stagedSourceManifestSha256":  "ce699878e8856e993480178baf88f142d352ab1d0d1f62a8da4f5546bed92c14",
+                       "stagedSourceFileCount":  52,
+                       "entryIds":  [
+                                        "LOCAL-20260802-004",
+                                        "LOCAL-20260803-005",
+                                        "LOCAL-20260803-006",
+                                        "LOCAL-20260803-007",
+                                        "LOCAL-20260803-009",
+                                        "LOCAL-20260803-011",
+                                        "LOCAL-20260803-012"
+                                    ]
+                   }
+}

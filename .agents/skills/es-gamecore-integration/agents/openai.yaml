@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES GameCore 接入"
+  short_description: "接入 GameCore 根 SO、RuntimeData 与模块生命周期"
+  default_prompt: "Use $es-gamecore-integration to integrate this feature into the ES GameCore architecture."

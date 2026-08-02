@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES 模块生命周期"
+  short_description: "审计半成品模块、成熟度状态、依赖渗透与证据跃迁门禁"
+  default_prompt: "Use $es-module-lifecycle to classify this ES module, audit unfinished-code leakage, and define the smallest evidence-backed next transition."

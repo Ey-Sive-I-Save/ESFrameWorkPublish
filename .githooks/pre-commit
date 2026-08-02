@@ -1,0 +1,11 @@
+#!/bin/sh
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "ES/Documentation/StaticSite/Verify-DocumentStagedBatch.ps1" -Quiet
+status=$?
+
+if [ "$status" -ne 0 ]; then
+  echo "Commit blocked: the staged source batch is missing or no longer matches its ledger fingerprint."
+  echo "Prepare it with ES/Documentation/StaticSite/Prepare-DocumentStagedBatch.ps1 -EntryId <LOCAL-ID>."
+  echo "Then stage DOCUMENT_LOCAL_UPDATE_LEDGER.json and DOCUMENT_SYNC.json and retry the commit."
+  exit "$status"
+fi

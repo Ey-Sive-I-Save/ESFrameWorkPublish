@@ -1,0 +1,7 @@
+interface:
+  display_name: "ES 单编译错误修复"
+  short_description: "按照最小修改原则定位、修复并验证一个明确的 C# 编译错误"
+  default_prompt: "Use $es-fix-compile-error to diagnose and fix one specific ES compilation error."
+
+policy:
+  allow_implicit_invocation: true

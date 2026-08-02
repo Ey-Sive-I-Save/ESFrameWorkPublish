@@ -4,6 +4,35 @@
 
 优先级原则：P0 必须服务游戏核心搭建，不把某个工具窗口、某次故障、某个临时问题误升为 P0。工具维护类命令即使常用，也只能算 P1/P2。
 
+## Agent Skills 执行层
+
+AICommands 是任务协议，`.agents/skills` 是可复用执行层。选择命令后，可以按任务组合 Skill，但只能选择一个 AICommand 作为本次权限合同。
+
+| Skill | 适合配合的命令或任务 |
+|---|---|
+| `$es-use-ai-command` | 本索引、所有具体 AICommand、命令库路径自检 |
+| `$es-unity-compile` | 编译定位、ReloadDomain、程序集边界、Unity 验收 |
+| `$es-fix-compile-error` | `执行_修复单个编译错误_AI命令.md` |
+| `$es-utf8-guard` | `检查_中文编码风险_AI命令.md`，以及所有会改文本的命令 |
+| `$es-worktree-audit` | `检查_脏工作树影响面_AI命令.md`，以及所有修改类命令的前后检查 |
+| `$es-gamecore-integration` | GameCore 根 SO、RuntimeData 重注入、全局索引、GameManager 模块命令 |
+| `$es-resource-pipeline` | 资源治理、依赖分析、预览、导出、ResourcePlan、Manifest 与发布链路 |
+| `$es-tag-config` | `新增GameTag_AI命令.md`，以及 Tag、ConfigKey、稳定身份任务 |
+| `$es-entity-authoring` | 玩家模板、角色层级、控制请求、Item/Shot/运动与实体生命周期任务 |
+| `$es-input-action` | 新增输入动作、绑定缺失、RuntimeMode 过滤与玩家控制请求命令 |
+| `$es-command-authoring` | ESCommand 上下文与新增运行时命令 |
+| `$es-editor-tooling` | 编辑器窗口、ReloadDomain、预览、Drawer、SO 表格和 SimpleTools |
+| `$es-release-acceptance` | 编译、测试、Profiler、Player、IL2CPP、Provider 与发布证据整合 |
+| `$es-module-lifecycle` | `检查_模块成熟度与半成品影响_AI命令.md`，以及未开始、半成品、待验收、废弃模块审计 |
+
+完整边界见：
+
+```text
+Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md
+```
+
+不要为每个命令机械创建一个 Skill。只有跨任务高频复用、步骤稳定、适合脚本或工具集成的执行能力才进入 `.agents/skills`。
+
 ## 直接生效协议
 
 当用户把本文件路径发给 AI 时，AI 必须：
@@ -24,9 +53,10 @@
 ## 必须先读
 
 ```text
-Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
-Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/通用架构理解_跨系统纠偏_AI协作警告.md
-Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/GameCoreGlobalData与AICommands_AI协作警告.md
+Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/通用架构（GeneralArchitecture）/通用架构理解_跨系统纠偏_AI协作警告.md
+Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/GameCoreGlobalData与AICommands_AI协作警告.md
+Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md
 ```
 
 ## 分级规则
@@ -75,6 +105,7 @@ Assets/Plugins/ES/AICommands/检查_Obsolete误用_AI命令.md
 Assets/Plugins/ES/AICommands/检查_程序集引用边界_AI命令.md
 Assets/Plugins/ES/AICommands/检查_编辑器窗口ReloadDomain_AI命令.md
 Assets/Plugins/ES/AICommands/检查_静态缓存清理_AI命令.md
+Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md
 Assets/Plugins/ES/AICommands/检查_动画Avatar预览失败_AI命令.md
 Assets/Plugins/ES/AICommands/检查_资源导出重复链路_AI命令.md
 Assets/Plugins/ES/AICommands/State动画预览配置_检查_AI命令.md
@@ -125,6 +156,7 @@ Assets/Plugins/ES/AICommands/执行_新增AIWarning交接_AI命令.md
 3. 有报错或工具故障：用 P1，不要误当成核心 P0。
 4. 有资产包预览/导出问题：用 P1 资源治理或资产包体检命令。
 5. 要 AI 动手改：只发 P2，并补充具体目标、路径、报错或期望行为。
+6. 需要稳定执行流程：在选定一个 AICommand 后调用对应 `$skill-name`；Skill 不改变 P0/P1/P2/P3 分级。
 ```
 
 ## 不要这样用

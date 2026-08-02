@@ -1,0 +1,184 @@
+# ES Framework Publish 本地更新整合台账
+
+## 作用
+
+本文件记录已经在本地完成、但尚未统一写入 `ESFrameworkPublish_技术文档.html` 的源码与工程更新总结。机器可验证的权威清单是同目录 `DOCUMENT_LOCAL_UPDATE_LEDGER.json`；本文件是每项变更的可读说明和回归整合面。
+
+Git 提交、暂存区和工作区差异仍是源码事实的权威；本台账补足 Git 不表达的内容：改动到底改变了什么、应影响哪一章、用了哪些证据、回归覆盖了什么、哪些风险被明确保留。它不能用摘要替代源码阅读或测试。
+
+任何 AI 或开发者开始文档更新前，必须同时读取 `DOCUMENT_SYNC.md`、`DOCUMENT_SYNC.json`、本文件与 JSON 台账。不得把“本地看起来完成”直接写进 HTML；先进入本台账并通过批次整合。
+
+## 批次状态
+
+| 状态 | 含义 | 是否可写 HTML |
+| --- | --- | --- |
+| `collecting` | 正在收集已完成的本地更新；每项已具备摘要和影响范围，但回归可以尚未完成。 | 否 |
+| `ready-for-regression` | 当前源码快照冻结，条目分析完成，等待或执行回归。 | 否 |
+| `ready-for-html` | 每项均有回归结果或明确接受的缺口，章节目标已确定，可一次性更新 HTML。 | 是，且必须整个批次一起写入 |
+| `integrated` | HTML、同步记录、源码基线和台账最终状态已一起推进。 | 已完成，不能继续往此批次追加 |
+
+任何新增源码变更都会使当前批次快照失效。先把变更总结加入 JSON 和本文件，再运行 `Update-DocumentLocalLedgerSnapshot.ps1 -RefreshSnapshot`；不能把旧快照继续当作当前批次事实。
+
+## 统一整合流程
+
+1. 为每个本地完成项建立唯一 ID、摘要、源码路径、证据路径、HTML 目标和风险。摘要必须说明行为改变，不能只写类名或“已修复”。
+2. 在 `collecting` 状态继续汇集相邻更新；每次收集后刷新源码快照。同步脚本只会接受已完整登记且快照精确匹配的延迟批次。
+3. 冻结为 `ready-for-regression`，运行并记录 EditMode、PlayMode、Provider、Profiler、Player/IL2CPP 或其他适用验收。未覆盖项必须写入 `knownGaps`，不能静默省略。
+4. 全部条目进入 `ready-for-html` 后，按 HTML 目标统一撰写解释、流程、传统方案对照和验收边界；一次性更新 HTML、`DOCUMENT_SYNC.json`、本文件和阅读器标准。
+5. 只有当 HTML 通过结构/视觉校验、源码基线已真实复核且所有条目列入 `acceptedEntryIds` 时，才标记 `integrated`。历史批次只追加记录，不回写篡改。
+
+## 分批提交门禁
+
+pre-commit 只检查本次暂存区，不再要求一次清空整个工作区。未暂存和未跟踪文件可以保留给后续批次，但本次暂存源码必须由已完成台账条目覆盖。
+
+```powershell
+git add <本批源码与资产>
+
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File ES/Documentation/StaticSite/Prepare-DocumentStagedBatch.ps1 `
+  -EntryId LOCAL-YYYYMMDD-NNN
+
+git add ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.json `
+        ES/Documentation/StaticSite/DOCUMENT_SYNC.json
+
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File ES/Documentation/StaticSite/Verify-DocumentStagedBatch.ps1
+
+git commit -m "本批语义说明"
+```
+
+- `Prepare-DocumentStagedBatch.ps1` 只写台账指纹，不会自动暂存、提交或推送。
+- 新增源码、删除、重命名和二进制差异都进入 staged patch 指纹；准备后再改变暂存区会被阻断。
+- `INTAKE-20260802-001` 可以继续表示其他未暂存工作的待分类状态，不再阻断已由正式条目覆盖的当前提交。
+- `Verify-DocumentSync.ps1` 仍负责全工作区与 HTML 整合门禁，不被 staged-only 提交验证替代。
+
+## 当前开放批次
+
+- 批次：`LOCAL-2026-08-02-OPEN`
+- 状态：`collecting`，但现有条目仍为 `needs-triage`。
+- 快照：已捕获当前 `HEAD`、未暂存 diff、暂存 diff 与未跟踪源码清单；详见 JSON。
+- HTML 整合：禁止。当前工作区尚未拆分为可独立复核的完成项。
+
+| ID | 当前状态 | 本地完成更新总结 | 回归 | HTML 目标 |
+| --- | --- | --- | --- | --- |
+| `INTAKE-20260802-001` | `needs-triage` | 仅完成工作区快照捕获，尚不能声明任何源码行为已被文档化。 | 未开始 | 无；必须先拆分。 |
+| `LOCAL-20260802-002` | `documented` | 固定 Git tag 安装 MCP for Unity 10.1.0；UPM 锁定、PackageCache 注册、HTTP 服务、Unity 插件握手和实际工具调用均已确认。 | 8080 已监听，Unity 注册 35 个工具，MCP 只读与编辑器调用成功；当前 Codex 窗口仍需重启才能原生加载新增工具。 | `#editor-overview`、`#editor-verification`；批次未到 `ready-for-html`，禁止写入。 |
+| `LOCAL-20260802-003` | `documented` | 修复 AICommands 全库失效引用，并为 Cmd Agent 增加模板自检、无效阻断、风险识别和直接使用说明。 | 52 个模板在 Unity 进程内批量解析为 0 个无效；ES_Stand、ES_Editor 和 Unity Console 均无编译错误。 | `#editor-overview`、`#deep-warning-16`；批次未到 `ready-for-html`，禁止写入。 |
+| `LOCAL-20260802-004` | `documented` | 在项目根 `.agents/skills` 建立五个官方格式 ES Skills，并提供 AICommand、编译、UTF-8 和工作树确定性脚本。 | 五个 Skill 全部通过官方验证器；四个脚本完成 AST 与实际运行验证。 | `#editor-overview`、`#editor-verification`；批次未到 `ready-for-html`，禁止写入。 |
+| `LOCAL-20260803-005` | `documented` | AIWarnings 与 AICommands 正式登记五个 Agent Skills，并新增三层协作边界、任务映射与能力展望。 | 五份文档严格 UTF-8；Skill 路径全部存在；AICommands 52/0；Unity 本轮 Console 待复核。 | `#editor-overview`、`#editor-verification`、`#deep-warning-16`；批次未到 `ready-for-html`，禁止写入。 |
+| `LOCAL-20260803-006` | `documented` | 新增 GameCore、资源、Tag/Config、Entity、输入、ESCommand、编辑器工具和发布验收八个 ES 领域 Skill。 | 13 个 Skill 官方验证全部通过；29 个文件 UTF-8 通过；项目路径有效；AICommands 52/0。 | `#editor-overview`、`#editor-verification`、`#deep-warning-16`；批次未到 `ready-for-html`，禁止写入。 |
+| `LOCAL-20260803-007` | `documented` | 在 `.agents/README.md` 建立统一项目级 AI 文件归属、Skill 结构规范和 13 个 Skill 简介。 | 三个入口文档 UTF-8 通过；13 个直接子目录结构完整；六个权威路径存在；AICommands 52/0。 | `#editor-overview`、`#editor-verification`；批次未到 `ready-for-html`，禁止写入。 |
+| `LOCAL-20260803-008` | `documented` | 将明确可控的项目根 ES 配置、文档、工具、测试、输出、发布与资源管线目录统一迁入 `ES/`，并同步代码和序列化路径。 | 现行旧路径扫描为 0；Unity Tundra 编译和程序集重载成功；资源 Manifest、Git hook 与文档门禁已同步。 | `ES_DOCUMENT_SYNC`、`#editor-overview`、`#editor-verification`；仅机械同步路径，功能扩写仍延期。 |
+| `LOCAL-20260803-009` | `documented` | AIWarnings 改为按任务分层加载，禁止普通任务递归读取全目录，并固定 P0 原文、跨系统分批摘要及历史/提案边界。 | 四个入口/边界文件已同步；外部路径有效；重复内部前缀已修复；UTF-8 与 diff 检查通过。 | `#editor-overview`、`#deep-warning-16`；批次未到 `ready-for-html`，功能说明延期。 |
+| `LOCAL-20260803-010` | `documented` | 新增 UnityMCP 与 AI 工程验收代理路线图预备案，登记候选能力、阶段、边界和未来验收要求。 | 文件位于待验收提案区，明确未实现；Markdown、meta、UTF-8 与 diff 检查通过。 | `#editor-overview`、`#editor-verification`；仅备案，不写入现行能力说明。 |
+| `LOCAL-20260803-011` | `documented` | 建立模块成熟度与未完成实现治理，新增统一状态、半成品隔离门禁、只读审计命令和 `$es-module-lifecycle`。 | AICommands 53/0；15 个文本文件 UTF-8 通过；Skill 等价结构与 meta GUID 已验证；同步验证器正确保持既有门禁。 | `#editor-overview`、`#deep-warning-16`；批次未到 `ready-for-html`，禁止写入。 |
+| `LOCAL-20260803-012` | `documented` | pre-commit 改为 staged-only 语义批次门禁，未暂存和未跟踪工作不再阻断本次提交。 | 暂存补丁指纹、条目覆盖、台账同批暂存和 HTML 禁写规则已建立；不自动改暂存区或提交。 | `#editor-overview`、`#editor-verification`；功能说明延期整合。 |
+
+### LOCAL-20260802-002：UnityMCP 安装与 Codex 接入
+
+- **源码路径**：`Packages/manifest.json`、`Packages/packages-lock.json`。
+- **规范与证据**：当前项目为 Unity `2022.3.45f1`；官方 `v10.1.0` 最低要求 Unity `2021.3`。网络复测确认 GitHub 443 与 `git ls-remote` 可用；Unity Package Manager 已锁定并注册 `com.coplaydev.unity-mcp`，`Library/ScriptAssemblies` 已生成 Runtime 与 Editor DLL。
+- **完成分析**：项目使用固定 `#v10.1.0` Git URL，避免跟随 `main` 漂移；`uv 0.11.32` 已安装，UnityMCP 自动把 Codex 配置为 `http://127.0.0.1:8080/mcp`。本项只增加编辑器开发桥接，不修改 ES 运行时代码。
+- **回归状态**：UPM 安装、锁文件和 Unity 程序集编译证据成立；`127.0.0.1:8080` 已监听，Unity 项目通过 WebSocket 注册 35 个工具，并已实际执行 Console 读取、资产重新导入和 Unity 内 C# 验证调用。
+- **已知缺口**：当前 Codex 窗口不会热加载新增 MCP 工具，仍需重启后验证原生工具面；尚未运行 Unity Test Runner、PlayMode 或 Player 验证。
+- **HTML 目标**：批次达到 `ready-for-html` 后，评估在 `#editor-overview` 与 `#editor-verification` 记录外部 AI 编辑器桥接及证据等级；当前禁止提前修改 HTML。
+
+### LOCAL-20260802-003：AICommands 可用闭环
+
+- **源码路径**：`Assets/Plugins/ES/AICommands`、`Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs`。
+- **规范与证据**：读取 AIWarnings 入口、编辑器生命周期约束、GameCoreEditorGlobalData 与 AICommands 边界，以及 ESCmdAgent 失败复盘；所有模板只在用户打开选择器或准备发送时按需读取，不进入域重载自动扫盘。
+- **完成分析**：52 个模板原有 115 条规则引用都重复了 `Assets/Plugins/ES` 前缀，复制后无法读取。现已全部指向真实文件；Cmd Agent 会校验命令类型、默认改文件、风险等级和项目内引用路径，无效命令标记为“无效”并禁止发送。可写权限改为只接受明确的“是”或“允许”前缀，避免模糊字符串判断。
+- **回归状态**：`ES_Stand.csproj` 与 `ES_Editor.csproj` 均为 0 warning / 0 error；Unity 实际重新导入后 Console 为 0 error / 0 warning；Unity 内调用真实解析器得到 `files=52; invalid=0`，Prompt 路径、需求和边界组合验证通过。
+- **已知缺口**：尚未人工逐个点击 52 个下拉项，也未新增 Unity Test Runner 自动化；批量模板解析和 Prompt 生成已在当前 Unity 进程内执行。
+- **HTML 目标**：后续批次达到 `ready-for-html` 后，在 `#editor-overview` 和 `#deep-warning-16` 说明 AICommands 的发现、校验、授权和发送闭环；当前禁止提前修改 HTML。
+
+### LOCAL-20260802-004：ES Agent Skills
+
+- **源码路径**：`.agents/skills/es-use-ai-command`、`es-unity-compile`、`es-fix-compile-error`、`es-utf8-guard`、`es-worktree-audit`。
+- **规范与证据**：使用 OpenAI `skill-creator` 官方初始化器生成目录和 `agents/openai.yaml`；项目级发现路径采用 `.agents/skills`，不进入 Unity `Assets`。每个 Skill 均包含必需的 `SKILL.md`，界面元数据使用 `openai.yaml`，确定性流程放在 `scripts`。
+- **完成分析**：五个 Skill 分别负责选择并执行一个 AICommand、分层验证 Unity 编译证据、最小修复一个编译错误、守卫 UTF-8 与补丁完整性、审计脏工作树。它们读取实时 AIWarnings/AICommands，不复制 52 份命令内容，也不把 `.csproj` 编译冒充 Unity 验收。
+- **回归状态**：在 `PYTHONUTF8=1` 下运行官方 `quick_validate.py`，五个 Skill 全部有效；四个 PowerShell 脚本均通过 AST 解析并实际执行。AICommand 校验为 52/0，Skill 文件 UTF-8 检查为 14/14，ES_Stand 构建包装器成功且保留证据边界。
+- **已知缺口**：当前 Codex 窗口不会热加载新 Skill，需要从项目根启动新窗口或重启验证选择器；尚未用独立新会话完成五个真实任务的前向测试。
+- **HTML 目标**：批次达到 `ready-for-html` 后，在 `#editor-overview` 和 `#editor-verification` 说明项目级 Skills、AICommands、AIWarnings 与 UnityMCP 的协作关系；当前禁止提前修改 HTML。
+
+### LOCAL-20260803-005：Agent Skills 接入 AIWarnings / AICommands
+
+- **源码路径**：AIWarnings 开始阅读入口、规则索引、新增 `AgentSkills与AICommands协作边界_AI协作警告.md`，以及 AICommands README 与命令合集索引。
+- **规范与证据**：项目根五个 `.agents/skills/*/SKILL.md` 均真实存在；AICommand 自检脚本实跑为 `52 commands / 0 invalid`；五份文档严格 UTF-8 解码通过且不含 U+FFFD。
+- **完成分析**：现在三层职责被正式固定：AIWarnings 管长期事实和禁止事项，AICommands 管本次任务授权，Agent Skills 管可复用执行工作流；UnityMCP 和脚本只执行或采证，不自行扩大权限。文档同时给出五个当前 Skill 的触发映射，并说明 Skills 不进入 Unity `Assets`。
+- **回归状态**：路径、名称、UTF-8、AICommand 全库有效性与 scoped `git diff --check` 已验证；新增 Markdown 已补齐 Unity `.meta`。
+- **已知缺口**：导入期间 Unity 编辑器退出，UnityMCP 报告插件会话断开，因此本轮没有可引用的 Unity Console 结果。本条登记时领域 Skill 尚未实现；后续第一版由 `LOCAL-20260803-006` 补齐，自动验收脚本、上下文采集和 Plugin 分发仍未实现。
+- **HTML 目标**：批次达到 `ready-for-html` 后，再在 `#editor-overview`、`#editor-verification` 和 `#deep-warning-16` 统一解释三层协作模型；当前禁止提前修改 HTML。
+
+### LOCAL-20260803-006：八个 ES 领域专用 Agent Skills
+
+- **源码路径**：`.agents/skills` 下新增 `es-gamecore-integration`、`es-resource-pipeline`、`es-tag-config`、`es-entity-authoring`、`es-input-action`、`es-command-authoring`、`es-editor-tooling`、`es-release-acceptance`，并同步 AIWarnings/AICommands 五份协作文档。
+- **规范与证据**：八个 Skill 均由官方 `init_skill.py` 初始化，包含必需的 `SKILL.md`、`agents/openai.yaml` 和单层 `references` 导航；项目根现有 13 个 Skill 全部通过官方 `quick_validate.py`。
+- **完成分析**：领域 Skill 固化 ES 独有的源码入口、AIWarning 路由、AICommand 映射、所有权和生命周期判断、最小修改工作流及证据交付。它们不会复制框架运行时代码，不进入 Unity `Assets`，也不会因为掌握领域流程而自动扩大本次写权限。
+- **回归状态**：八个新 Skill 内所有字面项目路径均真实存在；本轮 29 个文件严格 UTF-8、无 U+FFFD 和疑似乱码，scoped `git diff --check` 通过；AICommands 实跑为 `52 commands / 0 invalid`。`es-release-acceptance` 已声明 `unityMCP` 依赖。
+- **已知缺口**：当前窗口不会热加载新 Skill，需要从项目根新开窗口或重启验证选择器；尚未在独立新会话中逐个完成八项真实任务前向测试；本轮没有新增自动 Unity、Profiler、Player、IL2CPP 或发布执行脚本。
+- **HTML 目标**：批次达到 `ready-for-html` 后，再在 `#editor-overview`、`#editor-verification` 与 `#deep-warning-16` 统一说明基础 Skill 与领域 Skill 的协作层次；当前禁止提前修改 HTML。
+
+### LOCAL-20260803-007：项目级 Agent 文件夹组织规范
+
+- **源码路径**：新增 `.agents/README.md`，并在 AIWarnings README 与 AICommands README 登记该统一入口。
+- **规范与证据**：项目内 AI 文件采用“一个索引、多个唯一权威路径”；`.agents/skills`、AIWarnings、AICommands、Documentation、AI 协作历程与 `ES/Documentation/StaticSite` 均保持真实固定位置，不复制正文。
+- **完成分析**：Skill 必须直接归属 `.agents/skills/<skill-name>`，内部只使用 `SKILL.md`、`agents/openai.yaml` 和按需创建的 `references/scripts/assets`。基础层与领域层只在目录索引中分类，不增加可能影响发现的中间文件夹。
+- **回归状态**：三个入口文件严格 UTF-8 和 scoped `git diff --check` 通过；13 个 Skill 均存在必需文件；六个目录入口真实存在；AICommands 为 `52 commands / 0 invalid`。
+- **已知缺口**：本轮只整理项目级 AI 文件归属，没有擅自移动项目根历史压缩包、临时测试文件或生成目录。Codex 与 Unity 的固定发现路径不能物理合并；当前窗口仍需重启验证新 Skill 的选择器展示。
+- **HTML 目标**：批次达到 `ready-for-html` 后，在 `#editor-overview` 和 `#editor-verification` 统一说明项目级 Agent 能力入口；当前禁止提前修改 HTML。
+
+### LOCAL-20260803-008：ES 可控目录完整迁移
+
+- **源码路径**：`ES/Config`、`ES/Documentation`、`ES/Tools`、`ES/Tests`、`ES/Output`、`ES/Releases`、`ES/ResourcePipeline`，以及资源管线、UnityPackage、Luban、SoTable 对应的路径代码和编辑器序列化配置。
+- **规范与证据**：只迁移明确属于 ES 且项目可控的路径；Unity 固定目录、第三方包、`.agents/skills`、AIWarnings、AICommands 和历史协作档案不迁移。物理目录、C# 路径合同、序列化默认值、PowerShell/Bat 脚本、资源 Manifest、Git hook、忽略规则和现行文档引用保持一致。
+- **完成分析**：资源四阶段输出统一归入 `ES/ResourcePipeline`；Luban 与 SoTable 归入 `ES/Config`；静态站点、同步规则和台账归入 `ES/Documentation/StaticSite`；项目级工具、测试夹具、输出和发布包分别进入对应 ES 分区。迁移后的代码不会继续向旧项目根目录生成同名文件夹。
+- **回归状态**：排除 `ES/AI协作历程（Codex）` 历史事实后，代码、序列化资产、脚本、Manifest 与现行文档中的旧目录引用扫描为 0。Unity `Editor.log` 显示 `Tundra build success`、程序集重载成功，并实际加载新的编辑器配置序列化资产；八个 InitialTarget Manifest 的绝对依赖路径已同步。
+- **已知缺口**：独立 `.csproj` 构建被工作区既有删除文件仍残留在 Unity 生成项目中的引用阻断，不构成本次迁移编译失败；未运行 PlayMode、Profiler、IL2CPP Player 或真实 CDN 发布。项目根 `NormalResources/Sprites` 为空，但删除操作被当前命令策略拦截。
+- **HTML 目标**：本轮只同步静态站点自身路径指针和内嵌旧路径，不扩写功能章节；行为内容仍按开放批次规则延期整合。
+
+### LOCAL-20260803-009：AIWarnings 按任务分层加载
+
+- **源码路径**：AIWarnings 的 README、CurrentStatus、RuleIndex、Agent Skills 与 AICommands 协作边界，以及一条 GameCore P0 内部引用。
+- **规范与证据**：固定 `README -> CurrentStatus -> RuleIndex -> 命中的 P0 -> 当前领域专项 -> 直接关联交接/复盘 -> 必要时历史与提案`。普通任务不得递归读取全部 AIWarnings；P0、现行状态和任务专项必须读取原文。
+- **完成分析**：普通任务约 1～2 万字符、复杂跨系统任务约 2～5 万字符只作为上下文预算建议。跨系统任务按领域分批读取，摘要必须保留规则路径、状态、结论、禁止事项和证据入口，不能冒充全部原文已复核。
+- **回归状态**：四个入口/边界文件已登记相同加载协议；AIWarnings 内 Assets 外路径均存在，旧迁移路径命中为 0；重复 `Assets/Plugins/ES` 前缀已修复；相关文件严格 UTF-8 与 scoped `git diff --check` 通过。
+- **已知缺口**：token 消耗仍取决于模型分词、中文、代码和长路径比例；本轮没有对全部历史规则重新逐条审阅。
+- **HTML 目标**：批次达到 `ready-for-html` 后，再在编辑器协作与警告治理章节说明分层加载机制；当前不提前扩写 HTML。
+
+### LOCAL-20260803-010：UnityMCP 与 AI 工程验收代理预备案
+
+- **源码路径**：`90_提案与废止（Archive）/待验收提案（Proposals）/UnityMCP_AI工程验收代理与自动化能力路线图_预备案提案.md` 及 Unity `.meta`。
+- **规范与证据**：提案登记 Unity 一键验收、序列化健康审计、任务上下文、Prefab 契约、资源发布、性能预算、ReloadDomain、语义 Diff、安全回滚和证据追踪，并按只读采证、受控验收、高风险自动化分阶段。
+- **完成分析**：文件只防止方向丢失，不是开发计划、授权合同、现行架构事实或已交付能力。任何能力开工前仍需重新读取当前规则、源码和 AICommand，并取得用户明确授权。
+- **回归状态**：文件位于待验收提案目录；状态、前置条件、禁止事项和未来验收要求完整；Markdown 与 meta 通过严格 UTF-8、GUID 唯一性和 scoped `git diff --check`。
+- **已知缺口**：本轮没有实现任何候选能力，没有新增 Skill、AICommand、Unity 自动化或发布操作。
+- **HTML 目标**：仅在未来能力真实落地并取得证据后，才允许进入现行技术文档；当前保持延期。
+
+### LOCAL-20260803-011：模块成熟度与未完成实现治理
+
+- **源码路径**：新增模块成熟度 AIWarning、`检查_模块成熟度与半成品影响_AI命令.md`、`.agents/skills/es-module-lifecycle`，同步 AIWarnings、AICommands 和 `.agents` 三组入口索引，并修复台账快照与同步验证脚本对 Git 空输出的兼容。
+- **规范与证据**：统一使用 `Proposed`、`Scaffolded`、`Experimental`、`Implementing`、`Integrating`、`Verifying`、`Stable`、`Deprecated`、`Archived`；`Blocked` 只作为附加结论。状态必须回到模块边界、默认激活、依赖方向和分层证据，不能由目录、接口、TODO 或完成百分比决定。
+- **完成分析**：未开始模块只保留提案，不创建伪实现；开发中模块必须可编译、显式隔离、明确失败并可退出；稳定模块不得静默依赖半成品。只读 AICommand 负责单次审计权限，Skill 负责复用检查流程，二者都不能扩大用户授权。
+- **回归状态**：AICommands 全库实跑为 `53 commands / 0 invalid`；本轮 15 个 Markdown、YAML、JSON 与 PowerShell 文件通过严格 UTF-8 和 scoped diff 检查；新增 Skill 的 frontmatter、名称、默认 Prompt、简介长度与行数完成等价结构检查；两个 Unity meta GUID 唯一；台账快照与同步验证脚本不再对空集合调用 `string.Join`，并在脚本入口显式设置 UTF-8，避免 Git GUI/Windows PowerShell 5.1 损坏中文 Git 路径。
+- **已知缺口**：当前终端找不到可运行的 Python/uv，新增 Skill 尚未取得官方 `quick_validate.py` 实跑证据；当前窗口不会热加载该 Skill；本轮没有对现有全部模块逐个分类，也没有运行 Unity、Test Runner、PlayMode、Profiler、Player 或发布验收；`DOCUMENT_SYNC` 仍被当前源码漂移和既有 `INTAKE-20260802-001 = needs-triage` 阻断。
+- **HTML 目标**：批次达到 `ready-for-html` 后，再在 `#editor-overview` 与 `#deep-warning-16` 解释模块状态和半成品治理；当前保持延期。
+
+### LOCAL-20260803-012：staged-only 分批提交门禁
+
+- **源码路径**：新增 `Prepare-DocumentStagedBatch.ps1` 与 `Verify-DocumentStagedBatch.ps1`，切换 `.githooks/pre-commit`，同步 DOCUMENT_SYNC 和本地台账说明。
+- **规范与证据**：pre-commit 只读取 `git diff --cached HEAD`。暂存源码必须由一个或多个 `documented` 条目覆盖，并与 HEAD、补丁 SHA-256、路径清单和文件数完全匹配；台账 JSON 与同步 JSON 必须同批暂存且不能落后于工作副本。
+- **完成分析**：其他未暂存或未跟踪文件不再阻断当前提交；`INTAKE-20260802-001` 可继续描述尚未分批的剩余工作。完整 HTML 整合仍使用原全工作区验证器，stage-only 不会放宽 HTML、回归或发布证据。
+- **回归状态**：两个新脚本使用显式 UTF-8，保持中文路径安全；真实 index 始终保持原有 1 个暂存文件。替代 index 已验证三条路径：1 个由 `LOCAL-20260803-006` 覆盖的源码文件与同批台账通过；准备后追加未覆盖源码被补丁、清单、数量和覆盖检查拒绝；只暂存门禁文档且没有源码时通过。
+- **已知缺口**：当前暂存区由用户继续控制；目录迁移、API 与调用方、Prefab/Scene 与依赖资产必须按可编译、可导入的语义批次组合。
+- **HTML 目标**：批次达到 `ready-for-html` 后，再写入 `#editor-overview` 与 `#editor-verification`；当前保持延期。
+
+## 条目模板
+
+每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。
+
+| ID | 当前状态 | 本地完成更新总结 | 证据与影响范围 | 回归与已知缺口 | HTML 目标 |
+| --- | --- | --- | --- | --- |
+| `LOCAL-YYYYMMDD-001` | `documented` | 行为、边界、受益者和失败模式。 | 源码 / AIWarnings / 测试 / 资产路径。 | 已跑证据，或明确未覆盖的环境。 | 锚点、章节、表格或流程。 |
+
+禁止使用“代码已改”“待 AI 处理”“同上”“看 diff”作为摘要。条目需要独立成立，才能在批次整合时被合并、延期或拒绝。

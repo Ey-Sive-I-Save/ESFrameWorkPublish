@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES 输入动作"
+  short_description: "维护 ES 输入动作、绑定、RuntimeMode 和玩家控制链路"
+  default_prompt: "Use $es-input-action to implement or diagnose this ES input action task."

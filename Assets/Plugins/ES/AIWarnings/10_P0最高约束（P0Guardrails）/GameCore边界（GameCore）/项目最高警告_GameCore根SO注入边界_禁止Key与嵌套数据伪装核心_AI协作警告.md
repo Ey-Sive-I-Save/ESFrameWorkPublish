@@ -60,13 +60,15 @@ bool added = ESRuntimeDataGameCore.Monsters.TryInjectWith(monsterKey, out int mo
 - `BuffDefinitionDataInfo`：注入 BuffTable。
 - `ActorDataInfo`：非 GameCore 通用角色定义，不实现 `IGameCoreSO`；Player / Rider / StoryActor 等正常由普通 Actor Group/Pack 组织。
 - `ItemDataInfo`：按 `ItemKind` 注入 Weapon / Shot 等对应 Item 领域 Table。
-- 所有承载上述 Info 的 `SoDataGroup<TInfo>` 与 `SoDataPack<TInfo>`：它们也是可被 Consumer 直接收集的启动根 SO，必须直接实现 `IGameCoreSO`。
+- 每个具体 `SoDataInfo` 类型必须有对应的具体 `SoDataGroup<TInfo>`；正式内容 Info 资产必须有唯一主 Group。详细强制规则见 `项目最高警告_P0_Info必须对应Group_Pack非默认聚合_AI协作警告.md`。
+- 承载上述 Info 的 `SoDataGroup<TInfo>` 是可被 Consumer 直接收集的标准启动聚合根，必须直接实现 `IGameCoreSO`。
+- `SoDataPack<TInfo>` 只有在通过其专门设计的准入和验收后才能作为 Consumer 启动根；它不是新领域的默认容器，也不是 ResourcePlan 或发布包。
 
-Info 是最小领域定义；Group/Pack 是聚合启动根。两者都是独立资产、可被 Consumer 作为启动 GameCore 直接加载的根定义。
+Info 是最小领域定义；Group 是默认聚合启动根。Pack 是额外、显式验证的可选聚合，不得与 Group 等价看待。
 
-## Group / Pack 的强制实现方式
+## Group 的强制实现方式与 Pack 的条件边界
 
-`SoDataGroup<TInfo>` 与 `SoDataPack<TInfo>` 的**抽象基类**直接实现 `IGameCoreSO`，不允许每个具体 Group/Pack 重复手写一套。
+`SoDataGroup<TInfo>` 的抽象基类直接实现 `IGameCoreSO`，不允许每个具体 Group 重复手写一套。现有 `SoDataPack<TInfo>` 若保留 GameCore 转发能力，也必须由抽象基类统一实现，但这不构成新 Pack 的授权。
 
 ```text
 Group.InjectGameCoreTables()
@@ -74,13 +76,13 @@ Group.InjectGameCoreTables()
   → 若当前 Info is IGameCoreSO，直接调用 InjectGameCoreTables()
   → 否则跳过
 
-Pack.InjectGameCoreTables()
+Pack.InjectGameCoreTables()（仅既有或已获准的 Pack）
   → 遍历 Infos.Values
   → 若当前 Info is IGameCoreSO，直接调用 InjectGameCoreTables()
   → 否则跳过
 ```
 
-Group/Pack 仅负责转发与聚合，不创建第二套 Key、不复制内容、不自行猜测表类别。Info 是否是 GameCore 是可选的；非 GameCore Info 正常保留，不注入即可。
+Group 仅负责转发与聚合，不创建第二套 Key、不复制内容、不自行猜测表类别。Pack 还必须满足其专门成员权威和 Consumer 归属契约；当前泛型 Pack 不得被当作资源、发布或生命周期系统。Info 是否是 GameCore 是可选的；非 GameCore Info 正常保留，不注入即可。
 
 严禁使用反射查找 `InjectGameCoreTables`、按类型名猜测注入资格，或为了统一调用强迫所有 Info 实现接口。只允许 C# 接口类型判断：`info is IGameCoreSO gameCore`。
 
@@ -227,5 +229,5 @@ catch
 修改 RuntimeData 或注入事务前，还必须读取：
 
 ```text
-Assets/Plugins/ES/Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md
+Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md
 ```

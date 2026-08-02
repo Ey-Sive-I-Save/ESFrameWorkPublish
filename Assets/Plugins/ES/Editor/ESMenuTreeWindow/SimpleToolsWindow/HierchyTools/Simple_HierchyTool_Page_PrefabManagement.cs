@@ -70,10 +70,10 @@ namespace ES
     /// 所有危险操作均带有确认对话框和Undo支持
     /// </summary>
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_PrefabManagement : ESWindowPageBase
     {
         #region UI配置
-        [Title("Prefab实例管理工具", "检查和批量处理 Prefab 实例", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         private string PanelSummary
         {
@@ -87,7 +87,7 @@ namespace ES
         }
 
         [HideInInspector]
-        [DisplayAsString(fontSize: 12), HideLabel, GUIColor(0.8f, 0.9f, 1f)]
+        [DisplayAsString(fontSize: 12), HideLabel]
         public string featureOverview =
             "🔧 批量应用/还原Prefab实例修改到原始资产\n" +
             "🔗 断开Prefab实例连接或替换为其他Prefab\n" +
@@ -96,7 +96,7 @@ namespace ES
             "🏷️ Prefab变体检测和管理";
 
         [HideInInspector]
-        [DisplayAsString(fontSize: 12), HideLabel, GUIColor(0.9f, 0.9f, 0.8f)]
+        [DisplayAsString(fontSize: 12), HideLabel]
         public string operationFlow =
             "1️⃣ 在Hierarchy中选择目标对象\n" +
             "2️⃣ 点击'分析选中对象'查看详情\n" +
@@ -104,7 +104,7 @@ namespace ES
             "4️⃣ 修改 Prefab 资产或 Override 前请先确认影响范围";
 
         [HideInInspector]
-        [DisplayAsString(fontSize: 12), HideLabel, GUIColor(0.9f, 0.8f, 0.9f)]
+        [DisplayAsString(fontSize: 12), HideLabel]
         public string usageTips =
             "💡 勾选'包含子对象'可处理嵌套Prefab\n" +
             "💡 操作前建议先分析以了解影响范围\n" +
@@ -147,26 +147,23 @@ namespace ES
             int missingCount = detectedPrefabs.Count(info => info != null && info.isMissing);
             int variantCount = detectedPrefabs.Count(info => info != null && info.isVariant);
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-            {
-                EditorGUILayout.LabelField("Prefab 实例审计台", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("用于分析场景或 Prefab Mode 中的实例状态，并安全执行应用、还原、断开、替换等高风险操作。", EditorStyles.wordWrappedMiniLabel);
-                EditorGUILayout.Space(4);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    DrawMetric("当前选择", selectedCount.ToString());
-                    DrawMetric("已分析", detectedPrefabs.Count.ToString());
-                    DrawMetric("已修改", modifiedCount.ToString());
-                    DrawMetric("丢失引用", missingCount.ToString());
-                    DrawMetric("变体", variantCount.ToString());
-                }
-            }
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "Prefab 实例审计台",
+                "用于分析场景或 Prefab Mode 中的实例状态，并安全执行应用、还原、断开、替换等高风险操作。",
+                SimpleToolsMaturity.Upgrading,
+                "应用会写入 Prefab 资产；还原、断开和替换会修改场景对象，执行前必须复核审计结果。");
+            SimpleToolsPanelUtility.DrawSummary(
+                $"当前选择: {selectedCount}",
+                $"已分析: {detectedPrefabs.Count}",
+                $"已修改: {modifiedCount}",
+                $"丢失引用: {missingCount}",
+                $"变体: {variantCount}");
         }
 
         private void DrawPrefabContext()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("当前上下文", "操作对象来自当前选择；“分析当前上下文”会覆盖当前场景或 Prefab Mode 根对象。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 DrawInfoRow("编辑环境", GetContextLabel());
                 DrawInfoRow("选中对象", BuildSelectionSummary());
@@ -181,7 +178,7 @@ namespace ES
             if (!foldoutPrefabSettings)
                 return;
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 includeChildren = EditorGUILayout.Toggle("包含子对象和嵌套实例", includeChildren);
                 targetPrefab = (GameObject)EditorGUILayout.ObjectField("替换目标 Prefab", targetPrefab, typeof(GameObject), false);
@@ -199,7 +196,7 @@ namespace ES
         private void DrawPrefabActions()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("执行操作", "先分析，再筛选复核，最后执行高风险操作。应用会写 Prefab 资产；还原/断开/替换会改场景对象。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -250,7 +247,7 @@ namespace ES
                 return;
             }
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 if (!string.IsNullOrWhiteSpace(lastResultSummary))
                     EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
@@ -269,7 +266,7 @@ namespace ES
                 return;
 
             SimpleToolsPanelUtility.DrawSectionTitle("结果筛选", "搜索会匹配对象路径、Prefab 资产路径和资产名。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -296,7 +293,7 @@ namespace ES
                 return;
 
             var rows = GetFilteredPrefabInfos(true);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField($"Prefab 实例列表  ({rows.Count}/{detectedPrefabs.Count})", EditorStyles.boldLabel);
                 if (rows.Count == 0)
@@ -393,7 +390,7 @@ namespace ES
 
         #region 统计信息
         [HideInInspector]
-        [DisplayAsString(fontSize: 12), HideLabel, GUIColor(0.7f, 1f, 0.7f)]
+        [DisplayAsString(fontSize: 12), HideLabel]
         [Tooltip("显示当前选中对象的分析结果，包括Prefab实例数量、修改状态等统计信息")]
         public string currentStats = "📌 请先在Hierarchy中选择对象，然后点击'分析选中对象'...";
 

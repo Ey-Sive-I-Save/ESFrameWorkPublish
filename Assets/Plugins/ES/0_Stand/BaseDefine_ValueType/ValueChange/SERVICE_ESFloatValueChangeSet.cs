@@ -1,17 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("ES_Logic")]
 
 namespace ES
 {
     public sealed class ESFloatValueChangeSet
     {
-        private readonly List<ESFloatValueChange> changes;
-        private readonly Dictionary<int, int> indexByTokenId;
-        private readonly Dictionary<int, List<ESValueChangeToken>> tokensByOwnerId;
-        private readonly Dictionary<int, List<ESValueChangeToken>> tokensBySourceId;
-        private readonly Stack<List<ESValueChangeToken>> recycledTokenIndexLists;
+        // A resolver is often materialized only to expose a stable host slot. Keep its expensive
+        // modifier indexes cold until the first actual modifier arrives.
+        private List<ESFloatValueChange> changes;
+        private Dictionary<int, int> indexByTokenId;
+        private Dictionary<int, List<ESValueChangeToken>> tokensByOwnerId;
+        private Dictionary<int, List<ESValueChangeToken>> tokensBySourceId;
+        private Stack<List<ESValueChangeToken>> recycledTokenIndexLists;
 
         private readonly int setId;
+        private readonly int initialCapacity;
         private int nextTokenId = 1;
         private int tokenVersion = 1;
         private int nextOrder = 1;
@@ -23,6 +29,9 @@ namespace ES
         private int mutationDepth;
         private bool notificationPending;
         private bool isNotifying;
+        private bool isResettingForReuse;
+        private object effectLeaseHost;
+        private ESValueChangeObserverList<ESFloatValueChangeSet> changedObservers;
 
         /// <summary>
         /// Increments whenever the set's inputs change. Consumers that cache <see cref="Value"/>
@@ -30,8 +39,27 @@ namespace ES
         /// </summary>
         public int Revision { get; private set; }
 
-        /// <summary>Raised after the modifier collection or its base value changes.</summary>
-        public event Action<ESFloatValueChangeSet> Changed;
+        /// <summary>
+        /// Raised after the modifier collection or its base value changes. Duplicate listeners are
+        /// ignored; subscription changes made from a callback apply after that notification.
+        /// Listener failures are isolated and logged without rolling back the completed mutation.
+        /// </summary>
+        public event Action<ESFloatValueChangeSet> Changed
+        {
+            add
+            {
+                if (value == null)
+                    return;
+
+                if (changedObservers == null)
+                    changedObservers = new ESValueChangeObserverList<ESFloatValueChangeSet>();
+                changedObservers.Add(value);
+            }
+            remove
+            {
+                changedObservers?.Remove(value);
+            }
+        }
 
         public ESFloatValueChangeSet(float baseValue = 0f, int capacity = 4)
         {
@@ -40,11 +68,7 @@ namespace ES
             if (!IsFinite(baseValue))
                 throw new ArgumentOutOfRangeException(nameof(baseValue), "ValueChange base value must be finite.");
 
-            changes = new List<ESFloatValueChange>(capacity);
-            indexByTokenId = new Dictionary<int, int>(capacity);
-            tokensByOwnerId = new Dictionary<int, List<ESValueChangeToken>>(capacity);
-            tokensBySourceId = new Dictionary<int, List<ESValueChangeToken>>(capacity);
-            recycledTokenIndexLists = new Stack<List<ESValueChangeToken>>(capacity > 1 ? capacity * 2 : 2);
+            initialCapacity = capacity;
             setId = ESValueChangeSetIdentity.Allocate();
             this.baseValue = baseValue;
             cachedValue = baseValue;
@@ -53,9 +77,29 @@ namespace ES
         /// <summary>Process-local identity used to reject tokens issued by another set.</summary>
         public int SetId => setId;
 
+        /// <summary>
+        /// Binds this resolver to the runtime host that owns its effect leases. A warmed Set may
+        /// be reused by that same host, but it must never migrate to another host.
+        /// </summary>
+        internal void BindEffectLeaseHost(object host)
+        {
+            if (host == null)
+                throw new ArgumentNullException(nameof(host));
+            if (effectLeaseHost != null && !ReferenceEquals(effectLeaseHost, host))
+                throw new InvalidOperationException("A ValueChange Set cannot move between EffectLease hosts.");
+
+            effectLeaseHost = host;
+        }
+
+        /// <summary>O(1) ownership check used only by <see cref="ESEffectLease"/> writes.</summary>
+        internal bool IsEffectLeaseHost(object host)
+        {
+            return ReferenceEquals(effectLeaseHost, host);
+        }
+
         public int Count
         {
-            get { return changes.Count; }
+            get { return changes != null ? changes.Count : 0; }
         }
 
         public float BaseValue
@@ -63,6 +107,7 @@ namespace ES
             get { return baseValue; }
             set
             {
+                ThrowIfResettingForReuse();
                 if (!IsFinite(value))
                     throw new ArgumentOutOfRangeException(nameof(value), "ValueChange base value must be finite.");
                 if (baseValue == value)
@@ -93,6 +138,7 @@ namespace ES
         /// </summary>
         public void SetBounds(float minimum, float maximum)
         {
+            ThrowIfResettingForReuse();
             if (float.IsNaN(minimum) || float.IsNaN(maximum) || minimum > maximum)
                 throw new ArgumentOutOfRangeException(nameof(minimum), "ValueChange bounds must be ordered and cannot be NaN.");
 
@@ -121,6 +167,7 @@ namespace ES
         /// </summary>
         public ESFloatValueChangeBatch BeginBatch()
         {
+            ThrowIfResettingForReuse();
             mutationDepth++;
             return new ESFloatValueChangeBatch(this);
         }
@@ -133,9 +180,11 @@ namespace ES
             int priority = 0,
             bool enabled = true)
         {
+            ThrowIfResettingForReuse();
             if (!IsFinite(value))
                 return ESValueChangeToken.Invalid;
 
+            EnsureChangeStorage();
             EnsureOrderCapacity();
 
             ESValueChangeToken token = NewToken();
@@ -168,6 +217,7 @@ namespace ES
 
         public bool Update(ESValueChangeToken token, float value)
         {
+            ThrowIfResettingForReuse();
             if (!IsFinite(value))
                 return false;
             if (!TryGetIndex(token, out int index))
@@ -180,6 +230,7 @@ namespace ES
         /// <summary>Updates every calculation field that can be changed at runtime.</summary>
         public bool Update(ESValueChangeToken token, ESFloatValueChangeOp op, float value, int priority)
         {
+            ThrowIfResettingForReuse();
             if (!IsFinite(value))
                 return false;
             if (!TryGetIndex(token, out int index))
@@ -199,6 +250,7 @@ namespace ES
 
         public bool SetEnabled(ESValueChangeToken token, bool enabled)
         {
+            ThrowIfResettingForReuse();
             if (!TryGetIndex(token, out int index))
                 return false;
 
@@ -215,6 +267,7 @@ namespace ES
 
         public bool Release(ESValueChangeToken token)
         {
+            ThrowIfResettingForReuse();
             if (!TryGetIndex(token, out int index))
                 return false;
 
@@ -225,10 +278,11 @@ namespace ES
 
         public int ReleaseAllByOwner(int ownerId)
         {
+            ThrowIfResettingForReuse();
             if (ownerId == 0)
                 return 0;
 
-            if (!tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensByOwnerId == null || !tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return 0;
 
             int removed = 0;
@@ -248,10 +302,11 @@ namespace ES
 
         public int SetOwnerEnabled(int ownerId, bool enabled)
         {
+            ThrowIfResettingForReuse();
             if (ownerId == 0)
                 return 0;
 
-            if (!tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensByOwnerId == null || !tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return 0;
 
             int changed = 0;
@@ -268,10 +323,11 @@ namespace ES
 
         public int ReleaseAllBySource(int sourceId)
         {
+            ThrowIfResettingForReuse();
             if (sourceId == 0)
                 return 0;
 
-            if (!tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensBySourceId == null || !tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return 0;
 
             int removed = 0;
@@ -291,10 +347,11 @@ namespace ES
 
         public int SetSourceEnabled(int sourceId, bool enabled)
         {
+            ThrowIfResettingForReuse();
             if (sourceId == 0)
                 return 0;
 
-            if (!tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensBySourceId == null || !tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return 0;
 
             int changed = 0;
@@ -328,17 +385,96 @@ namespace ES
 
         public ESFloatValueChange GetChangeAt(int index)
         {
+            if (changes == null)
+                throw new ArgumentOutOfRangeException(nameof(index));
             return changes[index];
+        }
+
+        /// <summary>
+        /// Resolves all calculation stages into a value-type diagnostic snapshot. This is a cold
+        /// inspection API; normal gameplay should read <see cref="Value"/> instead.
+        /// </summary>
+        public ESFloatStatSnapshot GetDebugSnapshot()
+        {
+            Evaluate(out ESFloatStatSnapshot snapshot);
+            cachedValue = snapshot.value;
+            dirty = false;
+            return snapshot;
+        }
+
+        /// <summary>
+        /// Copies modifier rows into caller-owned storage. The method itself allocates nothing;
+        /// callers that need zero allocations must retain enough List capacity.
+        /// </summary>
+        public void CopyDebugModifiersTo(List<ESFloatStatModifierSnapshot> destination)
+        {
+            if (destination == null)
+                throw new ArgumentNullException(nameof(destination));
+
+            ESFloatStatSnapshot snapshot = GetDebugSnapshot();
+            destination.Clear();
+            int changeCount = Count;
+            if (destination.Capacity < changeCount)
+                destination.Capacity = changeCount;
+
+            for (int i = 0; i < changeCount; i++)
+            {
+                ESFloatValueChange change = changes[i];
+                destination.Add(new ESFloatStatModifierSnapshot
+                {
+                    token = change.Token,
+                    ownerId = change.ownerId,
+                    sourceId = change.sourceId,
+                    priority = change.priority,
+                    order = change.order,
+                    operation = change.op,
+                    value = change.value,
+                    enabled = change.enabled != 0,
+                    isWinningOverride = snapshot.hasOverride
+                                        && change.op == ESFloatValueChangeOp.Override
+                                        && change.tokenId == snapshot.overrideToken.tokenId
+                                        && change.tokenVersion == snapshot.overrideToken.tokenVersion
+                });
+            }
         }
 
         public void Clear()
         {
-            changes.Clear();
-            indexByTokenId.Clear();
+            ThrowIfResettingForReuse();
+            ClearState();
+        }
+
+        /// <summary>
+        /// Clears values, tokens and callbacks at a pooled-host boundary while keeping allocated
+        /// storage warm. A callback from the previous renter cannot add a modifier during reset.
+        /// </summary>
+        public void ResetForReuse()
+        {
+            if (isResettingForReuse)
+                return;
+
+            isResettingForReuse = true;
+            try
+            {
+                ClearState();
+                mutationDepth = 0;
+                notificationPending = false;
+                changedObservers?.Clear();
+            }
+            finally
+            {
+                isResettingForReuse = false;
+            }
+        }
+
+        private void ClearState()
+        {
+            changes?.Clear();
+            indexByTokenId?.Clear();
             RecycleTokenIndexLists(tokensByOwnerId);
             RecycleTokenIndexLists(tokensBySourceId);
-            tokensByOwnerId.Clear();
-            tokensBySourceId.Clear();
+            tokensByOwnerId?.Clear();
+            tokensBySourceId?.Clear();
             nextTokenId = 1;
             AdvanceTokenVersion();
             nextOrder = 1;
@@ -354,6 +490,13 @@ namespace ES
 
         private void Recalculate()
         {
+            Evaluate(out ESFloatStatSnapshot snapshot);
+            cachedValue = snapshot.value;
+            dirty = false;
+        }
+
+        private void Evaluate(out ESFloatStatSnapshot snapshot)
+        {
             double addSum = 0d;
             double addPercentSum = 0d;
             double multiplyProduct = 1d;
@@ -361,16 +504,21 @@ namespace ES
             float overrideValue = 0f;
             int overridePriority = int.MinValue;
             int overrideOrder = int.MinValue;
+            ESValueChangeToken overrideToken = ESValueChangeToken.Invalid;
             bool hasMin = false;
             bool hasMax = false;
             float minValue = 0f;
             float maxValue = 0f;
+            int enabledChangeCount = 0;
 
-            for (int i = 0; i < changes.Count; i++)
+            int changeCount = Count;
+            for (int i = 0; i < changeCount; i++)
             {
                 ESFloatValueChange change = changes[i];
                 if (change.enabled == 0)
                     continue;
+
+                enabledChangeCount++;
 
                 switch (change.op)
                 {
@@ -390,6 +538,7 @@ namespace ES
                             overrideValue = change.value;
                             overridePriority = change.priority;
                             overrideOrder = change.order;
+                            overrideToken = change.Token;
                         }
                         break;
                     case ESFloatValueChangeOp.Min:
@@ -409,24 +558,52 @@ namespace ES
                 }
             }
 
-            float value = hasOverride ? overrideValue : baseValue;
-            value = ClampToFinite(value + addSum);
-            value = ClampToFinite(value * (1d + addPercentSum));
-            value = ClampToFinite(value * multiplyProduct);
+            float valueAfterOverride = hasOverride ? overrideValue : baseValue;
+            float valueAfterAdd = ClampToFinite(valueAfterOverride + addSum);
+            float valueAfterPercent = ClampToFinite(valueAfterAdd * (1d + addPercentSum));
+            float valueAfterMultiply = ClampToFinite(valueAfterPercent * multiplyProduct);
+            float valueAfterModifierBounds = valueAfterMultiply;
 
-            if (hasMin && value < minValue)
-                value = minValue;
+            if (hasMin && valueAfterModifierBounds < minValue)
+                valueAfterModifierBounds = minValue;
 
-            if (hasMax && value > maxValue)
-                value = maxValue;
+            if (hasMax && valueAfterModifierBounds > maxValue)
+                valueAfterModifierBounds = maxValue;
 
+            float value = valueAfterModifierBounds;
             if (value < minimumValue)
                 value = minimumValue;
             if (value > maximumValue)
                 value = maximumValue;
 
-            cachedValue = value;
-            dirty = false;
+            snapshot = new ESFloatStatSnapshot
+            {
+                setId = setId,
+                revision = Revision,
+                changeCount = changeCount,
+                enabledChangeCount = enabledChangeCount,
+                baseValue = baseValue,
+                additiveValue = ClampToFinite(addSum),
+                addedPercent = ClampToFinite(addPercentSum),
+                multiplyValue = ClampToFinite(multiplyProduct),
+                hasOverride = hasOverride,
+                overrideToken = overrideToken,
+                overrideValue = overrideValue,
+                overridePriority = hasOverride ? overridePriority : 0,
+                overrideOrder = hasOverride ? overrideOrder : 0,
+                hasModifierMinimum = hasMin,
+                modifierMinimum = minValue,
+                hasModifierMaximum = hasMax,
+                modifierMaximum = maxValue,
+                definitionMinimum = minimumValue,
+                definitionMaximum = maximumValue,
+                valueAfterOverride = valueAfterOverride,
+                valueAfterAdd = valueAfterAdd,
+                valueAfterPercent = valueAfterPercent,
+                valueAfterMultiply = valueAfterMultiply,
+                valueAfterModifierBounds = valueAfterModifierBounds,
+                value = value
+            };
         }
 
         private static bool IsFinite(float value)
@@ -451,6 +628,7 @@ namespace ES
         {
             if (!token.IsValid
                 || token.setId != setId
+                || indexByTokenId == null
                 || !indexByTokenId.TryGetValue(token.tokenId, out index))
             {
                 index = -1;
@@ -525,13 +703,13 @@ namespace ES
 
         private void NotifyChanged()
         {
-            if (Changed == null)
+            if (changedObservers == null || changedObservers.Count == 0)
                 return;
 
             isNotifying = true;
             try
             {
-                Changed.Invoke(this);
+                changedObservers.Notify(this);
             }
             finally
             {
@@ -547,6 +725,9 @@ namespace ES
 
         private int AddOwnerToken(int ownerId, ESValueChangeToken token)
         {
+            if (tokensByOwnerId == null)
+                tokensByOwnerId = new Dictionary<int, List<ESValueChangeToken>>(initialCapacity);
+
             if (!tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens))
             {
                 tokens = RentTokenIndexList();
@@ -560,6 +741,9 @@ namespace ES
 
         private int AddSourceToken(int sourceId, ESValueChangeToken token)
         {
+            if (tokensBySourceId == null)
+                tokensBySourceId = new Dictionary<int, List<ESValueChangeToken>>(initialCapacity);
+
             if (!tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens))
             {
                 tokens = RentTokenIndexList();
@@ -576,7 +760,7 @@ namespace ES
             if (change.ownerId == 0 || change.ownerListIndex < 0)
                 return;
 
-            if (!tokensByOwnerId.TryGetValue(change.ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensByOwnerId == null || !tokensByOwnerId.TryGetValue(change.ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return;
 
             int index = change.ownerListIndex;
@@ -615,7 +799,7 @@ namespace ES
             if (change.sourceId == 0 || change.sourceListIndex < 0)
                 return;
 
-            if (!tokensBySourceId.TryGetValue(change.sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensBySourceId == null || !tokensBySourceId.TryGetValue(change.sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return;
 
             int index = change.sourceListIndex;
@@ -651,7 +835,7 @@ namespace ES
 
         private List<ESValueChangeToken> RentTokenIndexList()
         {
-            return recycledTokenIndexLists.Count != 0
+            return recycledTokenIndexLists != null && recycledTokenIndexLists.Count != 0
                 ? recycledTokenIndexLists.Pop()
                 : new List<ESValueChangeToken>(2);
         }
@@ -662,13 +846,33 @@ namespace ES
                 return;
 
             tokens.Clear();
+            if (recycledTokenIndexLists == null)
+                recycledTokenIndexLists = new Stack<List<ESValueChangeToken>>(initialCapacity > 1 ? initialCapacity * 2 : 2);
             recycledTokenIndexLists.Push(tokens);
         }
 
         private void RecycleTokenIndexLists(Dictionary<int, List<ESValueChangeToken>> index)
         {
+            if (index == null)
+                return;
+
             foreach (List<ESValueChangeToken> tokens in index.Values)
                 RecycleTokenIndexList(tokens);
+        }
+
+        private void EnsureChangeStorage()
+        {
+            if (changes != null)
+                return;
+
+            changes = new List<ESFloatValueChange>(initialCapacity);
+            indexByTokenId = new Dictionary<int, int>(initialCapacity);
+        }
+
+        private void ThrowIfResettingForReuse()
+        {
+            if (isResettingForReuse)
+                throw new InvalidOperationException("Cannot modify a ValueChange set while its host is resetting for pool reuse.");
         }
 
         private void EnsureOrderCapacity()

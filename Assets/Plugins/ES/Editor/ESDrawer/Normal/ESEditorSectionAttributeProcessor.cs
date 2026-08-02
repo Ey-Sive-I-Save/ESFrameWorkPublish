@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using ES;
+using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
 
 namespace ES.EditorInternal
@@ -23,7 +24,14 @@ namespace ES.EditorInternal
 
         public override bool CanProcessChildMemberAttributes(InspectorProperty parent, MemberInfo member)
         {
-            return member != null && HasSectionSyntax(member);
+            if (member == null)
+                return false;
+
+            if (HasSectionSyntax(member))
+                return true;
+
+            Type hostType = parent?.Tree?.TargetType ?? member.DeclaringType;
+            return HasLayoutGroup(member) && GetResolution(hostType, member).Section != null;
         }
 
         public override void ProcessChildMemberAttributes(
@@ -40,12 +48,43 @@ namespace ES.EditorInternal
             attributes.RemoveAll(IsSectionSyntaxAttribute);
             if (resolution.Section != null)
             {
-                attributes.Add(resolution.Section.CreateAttribute());
+                ESEditorSectionAttribute sectionAttribute = resolution.Section.CreateAttribute();
+                NestLayoutGroupsInSection(sectionAttribute, attributes);
+                attributes.Add(sectionAttribute);
                 return;
             }
 
             if (!string.IsNullOrEmpty(resolution.Warning))
                 ReportWarningOnce(resolution.Warning);
+        }
+
+        /// <summary>
+        /// Odin groups a member according to GroupID paths, not its source attribute order.
+        /// A section and a horizontal/vertical group declared beside each other therefore
+        /// become siblings unless the layout group is explicitly placed under the section.
+        /// Keep page code concise (for example "Settings/Left") while making the actual
+        /// PropertyTree relation section -> row -> column deterministic.
+        /// </summary>
+        private static void NestLayoutGroupsInSection(
+            ESEditorSectionAttribute section,
+            List<Attribute> attributes)
+        {
+            if (section == null || attributes == null || string.IsNullOrEmpty(section.GroupID))
+                return;
+
+            string sectionPrefix = section.GroupID + "/";
+            for (int i = 0; i < attributes.Count; i++)
+            {
+                if (!(attributes[i] is PropertyGroupAttribute group)
+                    || group is ESEditorSectionAttribute
+                    || string.IsNullOrEmpty(group.GroupID)
+                    || group.GroupID.StartsWith(sectionPrefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                group.GroupID = sectionPrefix + group.GroupID;
+            }
         }
 
         private static bool HasSectionSyntax(MemberInfo member)
@@ -102,15 +141,16 @@ namespace ES.EditorInternal
                 // comparable within one module; sorting all base/derived members together
                 // can move an inherited Begin/End pair across the active-section boundary.
                 var declaredMembers = new List<MemberInfo>();
-                AddSectionMembers(declaredMembers, type.GetFields(flags));
-                AddSectionMembers(declaredMembers, type.GetProperties(flags));
-                AddSectionMembers(declaredMembers, type.GetMethods(flags));
+                AddRelevantMembers(declaredMembers, type.GetFields(flags));
+                AddRelevantMembers(declaredMembers, type.GetProperties(flags));
+                AddRelevantMembers(declaredMembers, type.GetMethods(flags));
                 declaredMembers.Sort(CompareMemberOrder);
                 members.AddRange(declaredMembers);
             }
 
             var activeSections = new Dictionary<string, SectionDefinition>(StringComparer.Ordinal);
             var activationOrder = new List<string>();
+            var layoutGroupSections = new Dictionary<string, SectionDefinition>(StringComparer.Ordinal);
             var results = new Dictionary<MemberKey, SectionResolution>();
 
             for (int i = 0; i < members.Count; i++)
@@ -164,8 +204,14 @@ namespace ES.EditorInternal
                     }
                 }
 
+                if (appliedSection == null && warning == null)
+                    appliedSection = ResolveLayoutGroupSection(member, layoutGroupSections);
+
                 if (appliedSection != null)
+                {
                     warning = null;
+                    RegisterLayoutGroupSection(member, appliedSection, layoutGroupSections);
+                }
 
                 results[MemberKey.From(member)] = new SectionResolution(appliedSection, warning);
 
@@ -176,13 +222,95 @@ namespace ES.EditorInternal
             return results;
         }
 
-        private static void AddSectionMembers<T>(List<MemberInfo> destination, T[] source) where T : MemberInfo
+        private static void AddRelevantMembers<T>(List<MemberInfo> destination, T[] source) where T : MemberInfo
         {
             for (int i = 0; i < source.Length; i++)
             {
-                if (HasSectionSyntax(source[i]))
+                if (HasSectionSyntax(source[i]) || HasLayoutGroup(source[i]))
                     destination.Add(source[i]);
             }
+        }
+
+        private static bool HasLayoutGroup(MemberInfo member)
+        {
+            object[] attributes = member.GetCustomAttributes(true);
+            for (int i = 0; i < attributes.Length; i++)
+            {
+                if (attributes[i] is PropertyGroupAttribute group
+                    && !(group is ESEditorSectionAttribute))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void RegisterLayoutGroupSection(
+            MemberInfo member,
+            SectionDefinition section,
+            Dictionary<string, SectionDefinition> layoutGroupSections)
+        {
+            object[] attributes = member.GetCustomAttributes(true);
+            for (int i = 0; i < attributes.Length; i++)
+            {
+                if (!(attributes[i] is PropertyGroupAttribute group)
+                    || group is ESEditorSectionAttribute
+                    || string.IsNullOrEmpty(group.GroupID))
+                {
+                    continue;
+                }
+
+                layoutGroupSections[group.GroupID] = section;
+            }
+        }
+
+        private static SectionDefinition ResolveLayoutGroupSection(
+            MemberInfo member,
+            Dictionary<string, SectionDefinition> layoutGroupSections)
+        {
+            SectionDefinition resolved = null;
+            object[] attributes = member.GetCustomAttributes(true);
+            for (int i = 0; i < attributes.Length; i++)
+            {
+                if (!(attributes[i] is PropertyGroupAttribute group)
+                    || group is ESEditorSectionAttribute
+                    || string.IsNullOrEmpty(group.GroupID))
+                {
+                    continue;
+                }
+
+                SectionDefinition candidate = FindLayoutGroupSection(group.GroupID, layoutGroupSections);
+                if (candidate == null)
+                    continue;
+
+                if (resolved != null && !resolved.Equals(candidate))
+                    return null;
+
+                resolved = candidate;
+            }
+
+            return resolved;
+        }
+
+        private static SectionDefinition FindLayoutGroupSection(
+            string groupId,
+            Dictionary<string, SectionDefinition> layoutGroupSections)
+        {
+            string candidateId = groupId;
+            while (!string.IsNullOrEmpty(candidateId))
+            {
+                if (layoutGroupSections.TryGetValue(candidateId, out SectionDefinition section))
+                    return section;
+
+                int separatorIndex = candidateId.LastIndexOf('/');
+                if (separatorIndex < 0)
+                    break;
+
+                candidateId = candidateId.Substring(0, separatorIndex);
+            }
+
+            return null;
         }
 
         private static int CompareMemberOrder(MemberInfo left, MemberInfo right)

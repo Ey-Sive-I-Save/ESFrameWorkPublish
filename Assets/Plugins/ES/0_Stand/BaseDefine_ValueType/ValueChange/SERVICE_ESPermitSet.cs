@@ -5,13 +5,16 @@ namespace ES
 {
     public sealed class ESPermitSet
     {
-        private readonly List<ESPermitValueChange> changes;
-        private readonly Dictionary<int, int> indexByTokenId;
-        private readonly Dictionary<int, List<ESValueChangeToken>> tokensByOwnerId;
-        private readonly Dictionary<int, List<ESValueChangeToken>> tokensBySourceId;
-        private readonly Stack<List<ESValueChangeToken>> recycledTokenIndexLists;
+        // A resolver can exist as a fixed host slot without ever receiving a modifier. Allocate
+        // token indexes only when an actual permit change is added.
+        private List<ESPermitValueChange> changes;
+        private Dictionary<int, int> indexByTokenId;
+        private Dictionary<int, List<ESValueChangeToken>> tokensByOwnerId;
+        private Dictionary<int, List<ESValueChangeToken>> tokensBySourceId;
+        private Stack<List<ESValueChangeToken>> recycledTokenIndexLists;
 
         private readonly int setId;
+        private readonly int initialCapacity;
         private int nextTokenId = 1;
         private int tokenVersion = 1;
         private int nextOrder = 1;
@@ -22,23 +25,40 @@ namespace ES
         private int mutationDepth;
         private bool notificationPending;
         private bool isNotifying;
+        private bool isResettingForReuse;
+        private object effectLeaseHost;
+        private ESValueChangeObserverList<ESPermitSet> changedObservers;
 
         /// <summary>Increments whenever the permit inputs or fallback change.</summary>
         public int Revision { get; private set; }
 
-        /// <summary>Raised after the permit inputs or fallback value change.</summary>
-        public event Action<ESPermitSet> Changed;
+        /// <summary>
+        /// Raised after permit inputs or fallback value changes. Duplicate listeners are ignored;
+        /// callbacks that fail are isolated so they cannot interrupt the completed mutation.
+        /// </summary>
+        public event Action<ESPermitSet> Changed
+        {
+            add
+            {
+                if (value == null)
+                    return;
+
+                if (changedObservers == null)
+                    changedObservers = new ESValueChangeObserverList<ESPermitSet>();
+                changedObservers.Add(value);
+            }
+            remove
+            {
+                changedObservers?.Remove(value);
+            }
+        }
 
         public ESPermitSet(bool fallbackValue = true, int capacity = 4)
         {
             if (capacity < 0)
                 capacity = 0;
 
-            changes = new List<ESPermitValueChange>(capacity);
-            indexByTokenId = new Dictionary<int, int>(capacity);
-            tokensByOwnerId = new Dictionary<int, List<ESValueChangeToken>>(capacity);
-            tokensBySourceId = new Dictionary<int, List<ESValueChangeToken>>(capacity);
-            recycledTokenIndexLists = new Stack<List<ESValueChangeToken>>(capacity > 1 ? capacity * 2 : 2);
+            initialCapacity = capacity;
             setId = ESValueChangeSetIdentity.Allocate();
             this.fallbackValue = fallbackValue;
             cachedValue = fallbackValue;
@@ -48,9 +68,29 @@ namespace ES
         /// <summary>Process-local identity used to reject tokens issued by another set.</summary>
         public int SetId => setId;
 
+        /// <summary>
+        /// Binds this resolver to the runtime host that owns its effect leases. A warmed Set may
+        /// be reused by that same host, but it must never migrate to another host.
+        /// </summary>
+        internal void BindEffectLeaseHost(object host)
+        {
+            if (host == null)
+                throw new ArgumentNullException(nameof(host));
+            if (effectLeaseHost != null && !ReferenceEquals(effectLeaseHost, host))
+                throw new InvalidOperationException("A Permit Set cannot move between EffectLease hosts.");
+
+            effectLeaseHost = host;
+        }
+
+        /// <summary>O(1) ownership check used only by <see cref="ESEffectLease"/> writes.</summary>
+        internal bool IsEffectLeaseHost(object host)
+        {
+            return ReferenceEquals(effectLeaseHost, host);
+        }
+
         public int Count
         {
-            get { return changes.Count; }
+            get { return changes != null ? changes.Count : 0; }
         }
 
         public bool FallbackValue
@@ -58,6 +98,7 @@ namespace ES
             get { return fallbackValue; }
             set
             {
+                ThrowIfResettingForReuse();
                 if (fallbackValue == value)
                     return;
 
@@ -96,6 +137,7 @@ namespace ES
         /// <summary>Defers Changed notification until the outermost scope is disposed.</summary>
         public ESPermitValueChangeBatch BeginBatch()
         {
+            ThrowIfResettingForReuse();
             mutationDepth++;
             return new ESPermitValueChangeBatch(this);
         }
@@ -107,6 +149,8 @@ namespace ES
             int priority = 0,
             bool enabled = true)
         {
+            ThrowIfResettingForReuse();
+            EnsureChangeStorage();
             EnsureOrderCapacity();
 
             ESValueChangeToken token = NewToken();
@@ -138,6 +182,7 @@ namespace ES
 
         public bool Update(ESValueChangeToken token, ESPermitLaw law)
         {
+            ThrowIfResettingForReuse();
             if (!TryGetIndex(token, out int index))
                 return false;
 
@@ -148,6 +193,7 @@ namespace ES
         /// <summary>Updates every resolver field that can be changed at runtime.</summary>
         public bool Update(ESValueChangeToken token, ESPermitLaw law, int priority)
         {
+            ThrowIfResettingForReuse();
             if (!TryGetIndex(token, out int index))
                 return false;
 
@@ -164,6 +210,7 @@ namespace ES
 
         public bool SetEnabled(ESValueChangeToken token, bool enabled)
         {
+            ThrowIfResettingForReuse();
             if (!TryGetIndex(token, out int index))
                 return false;
 
@@ -180,6 +227,7 @@ namespace ES
 
         public bool Release(ESValueChangeToken token)
         {
+            ThrowIfResettingForReuse();
             if (!TryGetIndex(token, out int index))
                 return false;
 
@@ -190,10 +238,11 @@ namespace ES
 
         public int ReleaseAllByOwner(int ownerId)
         {
+            ThrowIfResettingForReuse();
             if (ownerId == 0)
                 return 0;
 
-            if (!tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensByOwnerId == null || !tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return 0;
 
             int removed = 0;
@@ -213,10 +262,11 @@ namespace ES
 
         public int SetOwnerEnabled(int ownerId, bool enabled)
         {
+            ThrowIfResettingForReuse();
             if (ownerId == 0)
                 return 0;
 
-            if (!tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensByOwnerId == null || !tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return 0;
 
             int changed = 0;
@@ -233,10 +283,11 @@ namespace ES
 
         public int ReleaseAllBySource(int sourceId)
         {
+            ThrowIfResettingForReuse();
             if (sourceId == 0)
                 return 0;
 
-            if (!tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensBySourceId == null || !tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return 0;
 
             int removed = 0;
@@ -256,10 +307,11 @@ namespace ES
 
         public int SetSourceEnabled(int sourceId, bool enabled)
         {
+            ThrowIfResettingForReuse();
             if (sourceId == 0)
                 return 0;
 
-            if (!tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensBySourceId == null || !tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return 0;
 
             int changed = 0;
@@ -293,17 +345,48 @@ namespace ES
 
         public ESPermitValueChange GetChangeAt(int index)
         {
+            if (changes == null)
+                throw new ArgumentOutOfRangeException(nameof(index));
             return changes[index];
         }
 
         public void Clear()
         {
-            changes.Clear();
-            indexByTokenId.Clear();
+            ThrowIfResettingForReuse();
+            ClearState();
+        }
+
+        /// <summary>
+        /// Clears values, tokens and callbacks at a pooled-host boundary while retaining warm
+        /// storage. Reentrant writes from an old callback are rejected during this boundary.
+        /// </summary>
+        public void ResetForReuse()
+        {
+            if (isResettingForReuse)
+                return;
+
+            isResettingForReuse = true;
+            try
+            {
+                ClearState();
+                mutationDepth = 0;
+                notificationPending = false;
+                changedObservers?.Clear();
+            }
+            finally
+            {
+                isResettingForReuse = false;
+            }
+        }
+
+        private void ClearState()
+        {
+            changes?.Clear();
+            indexByTokenId?.Clear();
             RecycleTokenIndexLists(tokensByOwnerId);
             RecycleTokenIndexLists(tokensBySourceId);
-            tokensByOwnerId.Clear();
-            tokensBySourceId.Clear();
+            tokensByOwnerId?.Clear();
+            tokensBySourceId?.Clear();
             nextTokenId = 1;
             AdvanceTokenVersion();
             nextOrder = 1;
@@ -324,7 +407,8 @@ namespace ES
             int bestIndex = -1;
             ESPermitValueChange best = default;
 
-            for (int i = 0; i < changes.Count; i++)
+            int changeCount = Count;
+            for (int i = 0; i < changeCount; i++)
             {
                 ESPermitValueChange change = changes[i];
                 if (change.enabled == 0 || !ESPermitLawUtility.IsExplicit(change.law))
@@ -364,6 +448,7 @@ namespace ES
         {
             if (!token.IsValid
                 || token.setId != setId
+                || indexByTokenId == null
                 || !indexByTokenId.TryGetValue(token.tokenId, out index))
             {
                 index = -1;
@@ -438,13 +523,13 @@ namespace ES
 
         private void NotifyChanged()
         {
-            if (Changed == null)
+            if (changedObservers == null || changedObservers.Count == 0)
                 return;
 
             isNotifying = true;
             try
             {
-                Changed.Invoke(this);
+                changedObservers.Notify(this);
             }
             finally
             {
@@ -460,6 +545,9 @@ namespace ES
 
         private int AddOwnerToken(int ownerId, ESValueChangeToken token)
         {
+            if (tokensByOwnerId == null)
+                tokensByOwnerId = new Dictionary<int, List<ESValueChangeToken>>(initialCapacity);
+
             if (!tokensByOwnerId.TryGetValue(ownerId, out List<ESValueChangeToken> tokens))
             {
                 tokens = RentTokenIndexList();
@@ -473,6 +561,9 @@ namespace ES
 
         private int AddSourceToken(int sourceId, ESValueChangeToken token)
         {
+            if (tokensBySourceId == null)
+                tokensBySourceId = new Dictionary<int, List<ESValueChangeToken>>(initialCapacity);
+
             if (!tokensBySourceId.TryGetValue(sourceId, out List<ESValueChangeToken> tokens))
             {
                 tokens = RentTokenIndexList();
@@ -489,7 +580,7 @@ namespace ES
             if (change.ownerId == 0 || change.ownerListIndex < 0)
                 return;
 
-            if (!tokensByOwnerId.TryGetValue(change.ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensByOwnerId == null || !tokensByOwnerId.TryGetValue(change.ownerId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return;
 
             int index = change.ownerListIndex;
@@ -528,7 +619,7 @@ namespace ES
             if (change.sourceId == 0 || change.sourceListIndex < 0)
                 return;
 
-            if (!tokensBySourceId.TryGetValue(change.sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
+            if (tokensBySourceId == null || !tokensBySourceId.TryGetValue(change.sourceId, out List<ESValueChangeToken> tokens) || tokens == null)
                 return;
 
             int index = change.sourceListIndex;
@@ -564,7 +655,7 @@ namespace ES
 
         private List<ESValueChangeToken> RentTokenIndexList()
         {
-            return recycledTokenIndexLists.Count != 0
+            return recycledTokenIndexLists != null && recycledTokenIndexLists.Count != 0
                 ? recycledTokenIndexLists.Pop()
                 : new List<ESValueChangeToken>(2);
         }
@@ -575,13 +666,33 @@ namespace ES
                 return;
 
             tokens.Clear();
+            if (recycledTokenIndexLists == null)
+                recycledTokenIndexLists = new Stack<List<ESValueChangeToken>>(initialCapacity > 1 ? initialCapacity * 2 : 2);
             recycledTokenIndexLists.Push(tokens);
         }
 
         private void RecycleTokenIndexLists(Dictionary<int, List<ESValueChangeToken>> index)
         {
+            if (index == null)
+                return;
+
             foreach (List<ESValueChangeToken> tokens in index.Values)
                 RecycleTokenIndexList(tokens);
+        }
+
+        private void EnsureChangeStorage()
+        {
+            if (changes != null)
+                return;
+
+            changes = new List<ESPermitValueChange>(initialCapacity);
+            indexByTokenId = new Dictionary<int, int>(initialCapacity);
+        }
+
+        private void ThrowIfResettingForReuse()
+        {
+            if (isResettingForReuse)
+                throw new InvalidOperationException("Cannot modify a Permit set while its host is resetting for pool reuse.");
         }
 
         private void EnsureOrderCapacity()

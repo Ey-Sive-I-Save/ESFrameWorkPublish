@@ -136,7 +136,7 @@ namespace ES
                 },
                 new OpAudio_PlayOneShot
                 {
-                    clip = MakeAudioClipSource(audioClip),
+                    LegacyClip = MakeAudioClipSource(audioClip),
                     audioSourceObject = MakeGameObjectSource(gameObject),
                     volume = MakeFloatSource(0.75f)
                 }

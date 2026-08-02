@@ -72,16 +72,17 @@ namespace ES
         private static void VerifyModeAndTagPriority(ref int checks)
         {
             ESRuntimeModeService service = new ESRuntimeModeService();
+            object tagOwner = new object();
             service.PushMode(ESRuntimeMode.Inventory);
             Expect(!service.CurrentPolicy.allowMoveInput, "Inventory 应禁用移动输入。", ref checks);
             Expect(service.CurrentPolicy.allowUIInput, "Inventory 应允许 UI 输入。", ref checks);
 
-            ESRuntimeModeTagHandle mounted = service.AddTag(ESRuntimeModeTag.Mounted, priorityOverride: 600);
+            ESRuntimeModeTagHandle mounted = service.AddTag(ESRuntimeModeTag.Mounted, tagOwner, priorityOverride: 600);
             Expect(service.CurrentPolicy.allowMoveInput, "高优先级 Mounted Tag 应能覆盖 Inventory 的移动禁用。", ref checks);
             Expect(!service.CurrentPolicy.allowCombatInput, "Mounted Tag 应禁用战斗输入。", ref checks);
             ExpectEqual(service.CurrentTrace.moveInput.decision, ESPermitLaw.AllowEnable, "移动输入获胜规则应来自 Mounted。", ref checks);
 
-            ESRuntimeModeTagHandle stunned = service.AddTag(ESRuntimeModeTag.Stunned, priorityOverride: 600);
+            ESRuntimeModeTagHandle stunned = service.AddTag(ESRuntimeModeTag.Stunned, tagOwner, priorityOverride: 600);
             Expect(!service.CurrentPolicy.allowMoveInput, "同优先级后加入的 Stunned 应覆盖 Mounted 并禁用移动。", ref checks);
             ExpectEqual(service.CurrentTrace.moveInput.decision, ESPermitLaw.HardDisable, "移动输入获胜规则应来自 Stunned。", ref checks);
 
@@ -95,8 +96,9 @@ namespace ES
         private static void VerifyHardModeBlocksLowPriorityTag(ref int checks)
         {
             ESRuntimeModeService service = new ESRuntimeModeService();
+            object tagOwner = new object();
             ESRuntimeModeHandle loading = service.PushMode(ESRuntimeMode.Loading);
-            ESRuntimeModeTagHandle combat = service.AddTag(ESRuntimeModeTag.Combat);
+            ESRuntimeModeTagHandle combat = service.AddTag(ESRuntimeModeTag.Combat, tagOwner);
 
             Expect(!service.CurrentPolicy.allowCombatInput, "低优先级 Combat Tag 不应覆盖 Loading 的战斗禁用。", ref checks);
             Expect(service.CurrentPolicy.pauseWorld, "Loading 应强制暂停世界。", ref checks);
@@ -110,8 +112,9 @@ namespace ES
         private static void VerifyTagDuplicateCounts(ref int checks)
         {
             ESRuntimeModeService service = new ESRuntimeModeService();
-            ESRuntimeModeTagHandle first = service.AddTag(ESRuntimeModeTag.Combat);
-            ESRuntimeModeTagHandle second = service.AddTag(ESRuntimeModeTag.Combat);
+            object tagOwner = new object();
+            ESRuntimeModeTagHandle first = service.AddTag(ESRuntimeModeTag.Combat, tagOwner);
+            ESRuntimeModeTagHandle second = service.AddTag(ESRuntimeModeTag.Combat, tagOwner);
 
             Expect(service.ContainsTag(ESRuntimeModeTag.Combat), "重复添加 Combat 后应包含 Combat。", ref checks);
             ExpectEqual(service.TagCount, 2, "重复添加 Combat 后 TagCount 应为 2。", ref checks);
@@ -123,9 +126,9 @@ namespace ES
             Expect(!service.ContainsTag(ESRuntimeModeTag.Combat), "所有 Combat 移除后不应再包含 Combat。", ref checks);
 
             ESRuntimeModeTagHandle unique;
-            Expect(service.TryAddTagUnique(ESRuntimeModeTag.Aiming, out unique), "第一次 TryAddTagUnique Aiming 应成功。", ref checks);
+            Expect(service.TryAddTagUnique(ESRuntimeModeTag.Aiming, out unique, tagOwner), "第一次 TryAddTagUnique Aiming 应成功。", ref checks);
             ESRuntimeModeTagHandle duplicate;
-            Expect(!service.TryAddTagUnique(ESRuntimeModeTag.Aiming, out duplicate), "第二次 TryAddTagUnique Aiming 应失败。", ref checks);
+            Expect(!service.TryAddTagUnique(ESRuntimeModeTag.Aiming, out duplicate, tagOwner), "第二次 TryAddTagUnique Aiming 应失败。", ref checks);
             Expect(!duplicate.IsValid, "重复 TryAddTagUnique 返回的 handle 应无效。", ref checks);
         }
 
@@ -152,7 +155,7 @@ namespace ES
             {
                 ESRuntimeModeTag tag = (ESRuntimeModeTag)values.GetValue(i);
                 ESRuntimeModeService service = new ESRuntimeModeService();
-                ESRuntimeModeTagHandle handle = service.AddTag(tag);
+                ESRuntimeModeTagHandle handle = service.AddTag(tag, new object());
 
                 Expect(service.ContainsTag(tag), "Tag 计数表必须能追踪 " + tag, ref checks);
                 Expect(service.RemoveTag(handle), "移除 Tag handle 应成功: " + tag, ref checks);

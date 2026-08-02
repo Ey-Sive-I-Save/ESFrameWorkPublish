@@ -51,6 +51,78 @@ namespace ES
         public const int CurrentArchiveVersion = 1;
     }
 
+    public sealed class ESGameSaveApplyResult
+    {
+        public bool Success { get; private set; }
+        public string ErrorCode { get; private set; }
+        public string Message { get; private set; }
+
+        private ESGameSaveApplyResult(bool success, string errorCode, string message)
+        {
+            Success = success;
+            ErrorCode = errorCode ?? string.Empty;
+            Message = message ?? string.Empty;
+        }
+
+        public static ESGameSaveApplyResult Ok()
+        {
+            return new ESGameSaveApplyResult(true, string.Empty, string.Empty);
+        }
+
+        public static ESGameSaveApplyResult Fail(string errorCode, string message)
+        {
+            return new ESGameSaveApplyResult(false, errorCode, message);
+        }
+    }
+
+    public sealed class ESGameSaveCandidate
+    {
+        private readonly Dictionary<object, object> participantData = new Dictionary<object, object>();
+        internal readonly List<ESGameSaveCommittedCall> CommittedCalls = new List<ESGameSaveCommittedCall>();
+
+        internal ESGameSaveCandidate(string slotId, ESGameSaveArchive archive)
+        {
+            SlotId = slotId;
+            Archive = archive;
+        }
+
+        public string SlotId { get; private set; }
+        public ESGameSaveArchive Archive { get; private set; }
+
+        public ESGameSaveSectionPacket FindSection(string sectionKey)
+        {
+            return Archive != null ? Archive.FindSection(sectionKey) : null;
+        }
+
+        public void SetParticipantData(object participant, object data)
+        {
+            if (participant == null)
+                throw new ArgumentNullException(nameof(participant));
+            participantData[participant] = data;
+        }
+
+        public bool TryGetParticipantData<T>(object participant, out T data) where T : class
+        {
+            data = null;
+            if (participant == null || !participantData.TryGetValue(participant, out object stored))
+                return false;
+            data = stored as T;
+            return data != null;
+        }
+    }
+
+    internal struct ESGameSaveCommittedCall
+    {
+        public int participantIndex;
+        public ESGameSaveApplyPhase phase;
+    }
+
+    public delegate ESGameSaveApplyResult ESGameSaveValidateCandidateHandler(ESGameSaveCandidate candidate);
+    public delegate ESGameSaveApplyResult ESGameSavePrepareCandidateHandler(ESGameSaveCandidate candidate);
+    public delegate ESGameSaveApplyResult ESGameSaveCommitCandidateHandler(ESGameSaveCandidate candidate, ESGameSaveApplyPhase phase);
+    public delegate ESGameSaveApplyResult ESGameSaveRollbackCandidateHandler(ESGameSaveCandidate candidate, ESGameSaveApplyPhase phase);
+    public delegate ESGameSaveApplyResult ESGameSaveFinalizeCandidateHandler(ESGameSaveCandidate candidate, ESGameSaveApplyPhase phase);
+
     [Serializable]
     public sealed class ESGameSaveSlotInfo
     {

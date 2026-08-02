@@ -54,8 +54,8 @@ namespace ES
         public const string ObjectSetLocalEulerAnglesList = ESCommandCategory.ObjectTransform + "/\u6279\u91cf\u8bbe\u7f6e\u672c\u5730\u65cb\u8f6c";
         public const string ObjectSetLocalScale = ESCommandCategory.ObjectTransform + "/\u8bbe\u7f6e\u672c\u5730\u7f29\u653e";
         public const string ObjectSetLocalScaleList = ESCommandCategory.ObjectTransform + "/\u6279\u91cf\u8bbe\u7f6e\u672c\u5730\u7f29\u653e";
-        public const string AudioSourcePlay = ESCommandCategory.Audio + "/\u64ad\u653e\u97f3\u9891\u6e90";
-        public const string AudioSourceStop = ESCommandCategory.Audio + "/\u505c\u6b62\u97f3\u9891\u6e90";
+        public const string AudioEmitterPlay = ESCommandCategory.Audio + "/\u64ad\u653e\u53d7\u7ba1\u97f3\u9891\u53d1\u5c04\u5668";
+        public const string AudioEmitterStop = ESCommandCategory.Audio + "/\u505c\u6b62\u53d7\u7ba1\u97f3\u9891\u53d1\u5c04\u5668";
         public const string UICanvasGroupState = ESCommandCategory.UIElement + "/\u8bbe\u7f6e\u753b\u5e03\u7ec4";
         public const string DebugLog = ESCommandCategory.Debug + "/\u8f93\u51fa\u65e5\u5fd7";
     }

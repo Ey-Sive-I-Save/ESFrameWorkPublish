@@ -15,12 +15,12 @@ namespace ES
 
     #region 纹理精灵生成工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_TextureSpriteTool : ESWindowPageBase
     {
-        [Title("纹理精灵生成工具", "批量处理纹理并生成Sprite", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         [HideInInspector]
-        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        [DisplayAsString(fontSize: 13), HideLabel]
         public string readMe = "选中纹理或 Sprite，设置导入参数后批量处理。\n生成文件会自动避开重名，失败项会统一汇总。";
 
         [HideInInspector]
@@ -107,7 +107,7 @@ namespace ES
             int spriteCount = rows?.Count(row => row != null && row.Kind == "Sprite") ?? 0;
 
             SimpleToolsPanelUtility.DrawSectionTitle("执行操作", "导入设置只处理 Texture；Sprite 裁切只处理当前 Project 选中的 Sprite。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField($"可处理纹理: {textureCount} | 可生成 Sprite: {spriteCount} | 输出目录: {SimpleToolsSafetyUtility.NormalizeAssetPath(outputFolder)}", EditorStyles.wordWrappedMiniLabel);
 
@@ -132,7 +132,7 @@ namespace ES
         private void DrawTexturePreviewPanel(List<TexturePreviewRow> rows)
         {
             SimpleToolsPanelUtility.DrawSectionTitle("选中/文件夹资源预览", "按资源名、路径、类型和来源搜索；Project 选区与纹理文件夹会合并去重。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 string normalizedOutput = SimpleToolsSafetyUtility.NormalizeAssetPath(outputFolder);
                 string outputLabel = SimpleToolsSafetyUtility.IsAssetPath(normalizedOutput) ? normalizedOutput : "不可用，必须在 Assets 下";
@@ -172,8 +172,17 @@ namespace ES
                     GUILayout.Space(48);
                 }
 
-                foreach (var row in SimpleToolsPanelUtility.PageItems(rows, ref texturePreviewPageIndex, TexturePreviewPageSize, out _))
-                    DrawTexturePreviewRow(row);
+                int texturePreviewStart;
+                int texturePreviewEnd;
+                SimpleToolsPanelUtility.GetPageRange(
+                    rows,
+                    ref texturePreviewPageIndex,
+                    TexturePreviewPageSize,
+                    out _,
+                    out texturePreviewStart,
+                    out texturePreviewEnd);
+                for (int i = texturePreviewStart; i < texturePreviewEnd; i++)
+                    DrawTexturePreviewRow(rows[i]);
 
                 SimpleToolsPanelUtility.DrawPager(ref texturePreviewPageIndex, rows.Count, TexturePreviewPageSize);
             }

@@ -8,12 +8,14 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Linq;
+using ES.EditorInternal;
 
 
 namespace ES
 {
     #region ES集成工具 - 对象池工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_ObjectPool : ESWindowPageBase
     {
         public enum ObjectPoolToolTab
@@ -24,12 +26,10 @@ namespace ES
             PlayMode池组状态
         }
 
-        [DisplayAsString(Overflow = true, FontSize = 13), HideLabel]
+        [HideInInspector]
         public string PoolCoreInfo = "";
 
-        [Title("对象池集成工具", "ES 对象池运行时数据汇总管理", bold: true, titleAlignment: TitleAlignments.Centered)]
-        [InfoBox("汇总 Poolable-Define.cs 支持的对象池运行时统计。用于查看池数量、创建量、活跃量、回收量和丢弃量。", InfoMessageType.Info)]
-        [DisplayAsString(fontSize: 12), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        [HideInInspector]
         public string readMe = "支持 IPoolable / IPoolableAuto / Pool<T> / ESSimplePool<T> / ESSimplePoolSingleton<T> / PoolStatistics。";
 
         // 折叠状态字典
@@ -39,12 +39,22 @@ namespace ES
         private string searchText = "";
         private string prewarmSearchText = "";
         private string poolGroupSearchText = "";
+        private readonly List<PrefabPrewarmDataInfo> prewarmDataCache = new List<PrefabPrewarmDataInfo>(16);
+        private bool prewarmDataCacheReady;
 
-        [EnumToggleButtons, HideLabel]
+        [HideInInspector]
         public ObjectPoolToolTab currentTab = ObjectPoolToolTab.运行时统计;
 
-        [LabelText("目标预热数据")]
+        [HideInInspector]
         public PrefabPrewarmDataInfo targetPrewarmData;
+
+        private static readonly ESEditorSectionNavigatorItem[] PoolSections =
+        {
+            new ESEditorSectionNavigatorItem("runtime", "运行时统计", "查看通用对象池统计；不写入配置。"),
+            new ESEditorSectionNavigatorItem("prewarm", "预热配置审计", "审计 PrefabPrewarmDataInfo 配置资产，不扫描 Project Prefab。"),
+            new ESEditorSectionNavigatorItem("integration", "GameManager 接入", "把已存在的预热配置接入当前场景的 ESGameManager。"),
+            new ESEditorSectionNavigatorItem("groups", "池组状态", "Play Mode 下只读查看当前已创建池组。")
+        };
 
         // 使用状况查询结果
         private bool showUsageAnalysis = false;
@@ -55,15 +65,28 @@ namespace ES
         private float avgDiscarded;
         private string lastResultSummary = "";
         private string lastResultDetail = "";
+        private readonly List<PoolGroupRenderSnapshot> poolGroupRenderSnapshots = new List<PoolGroupRenderSnapshot>(16);
+        private int poolGroupRenderSnapshotCount;
+        private int poolGroupRenderSignature;
+        private bool poolGroupRenderSnapshotValid;
+        private bool poolGroupSearchVisible;
+        private string poolGroupSnapshotSearchText = string.Empty;
+        private bool poolUsageSnapshotHasGlobalGroup;
+        private int poolUsageSnapshotTotalPools;
+        private int poolUsageSnapshotTotalActive;
+        private int poolUsageSnapshotTotalPooled;
+        private int poolUsageSnapshotTotalDiscarded;
 
         [OnInspectorGUI, PropertyOrder(100)]
         public void DrawThisWindow()
         {
             SimpleToolsPanelUtility.DrawToolHeader(
                 "对象池与预热配置",
-                "对象池与预热配置",
+                "查看运行时池数据，审计预热配置，并把明确的配置资产接入当前场景 GameManager。",
                 SimpleToolsMaturity.Upgrading,
                 "PrefabPrewarmDataInfo 是 ESSO/SoDataInfo 资产；工具只扫描这种配置资产，不再把当前 Selection 伪装成池化入口。");
+
+            DrawPoolSectionNavigator();
 
             switch (currentTab)
             {
@@ -82,6 +105,45 @@ namespace ES
             }
         }
 
+        private void DrawPoolSectionNavigator()
+        {
+            string nextId = ESEditorSectionNavigatorIMGUI.Draw(
+                "SimpleTools.ObjectPool",
+                GetPoolSectionId(currentTab),
+                PoolSections);
+            currentTab = GetPoolTab(nextId);
+        }
+
+        private static string GetPoolSectionId(ObjectPoolToolTab tab)
+        {
+            switch (tab)
+            {
+                case ObjectPoolToolTab.PrefabPrewarmDataInfo审计:
+                    return "prewarm";
+                case ObjectPoolToolTab.GameManager接入:
+                    return "integration";
+                case ObjectPoolToolTab.PlayMode池组状态:
+                    return "groups";
+                default:
+                    return "runtime";
+            }
+        }
+
+        private static ObjectPoolToolTab GetPoolTab(string sectionId)
+        {
+            switch (sectionId)
+            {
+                case "prewarm":
+                    return ObjectPoolToolTab.PrefabPrewarmDataInfo审计;
+                case "integration":
+                    return ObjectPoolToolTab.GameManager接入;
+                case "groups":
+                    return ObjectPoolToolTab.PlayMode池组状态;
+                default:
+                    return ObjectPoolToolTab.运行时统计;
+            }
+        }
+
         private void DrawPoolUsagePanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("对象池使用情况", "查看运行时池数量、活跃量、回收量和异常丢弃。");
@@ -89,10 +151,14 @@ namespace ES
             DrawPoolActionPanel();
             SimpleToolsPanelUtility.DrawResultSummary("最近对象池分析", lastResultSummary, lastResultDetail);
 
+            // 运行时池集合可能在 Layout 与 Repaint 之间改变。整个统计区都只能
+            // 消费 Layout 时建立的快照，不能只冻结下半部分的分组行。
+            EnsurePoolUsageRenderSnapshot();
+
             // 显示分析结果
             if (showUsageAnalysis)
             {
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                using (SimpleToolsPanelUtility.BeginContentSection())
                 {
                     SimpleToolsPanelUtility.DrawSummary(
                         $"平均实时利用率: {avgRealTimeUtilization:P2}",
@@ -104,96 +170,206 @@ namespace ES
                 }
 
             }
-
-            var globalGroup = PoolStatistics.GlobalStatisticsGroup;
-            if (globalGroup == null)
+            if (!poolUsageSnapshotHasGlobalGroup)
             {
                 SimpleToolsPanelUtility.DrawEmptyState("全局统计组还没有初始化。进入 Play Mode 或触发对象池创建后，这里会显示运行时统计。");
                 return;
             }
 
-            var allStats = CollectValidStats(globalGroup);
-            int totalPools = allStats.Count;
-            int totalCreated = allStats.Sum(stat => stat.TotalCreated);
-            int totalActive = allStats.Sum(stat => stat.CurrentActive);
-            int totalPooled = allStats.Sum(stat => stat.CurrentPooled);
-            int totalDiscarded = allStats.Sum(stat => stat.DiscardedCount);
             SimpleToolsPanelUtility.DrawSummary(
+                $"池数量: {poolUsageSnapshotTotalPools}",
                 $"平均总利用率: {avgTotalUtilization:P2}",
-                $"平均总利用率: {avgTotalUtilization:P2}",
-                $"活跃: {totalActive}",
-                $"池中: {totalPooled}",
-                $"丢弃: {totalDiscarded}");
+                $"活跃: {poolUsageSnapshotTotalActive}",
+                $"池中: {poolUsageSnapshotTotalPooled}",
+                $"丢弃: {poolUsageSnapshotTotalDiscarded}");
 
-            if (totalPools == 0)
+            if (poolUsageSnapshotTotalPools == 0)
             {
                 SimpleToolsPanelUtility.DrawEmptyState("全局统计组还没有初始化。进入 Play Mode 或触发对象池创建后，这里会显示运行时统计。");
                 return;
             }
 
-            bool hasLargeGroup = globalGroup.Groups.Any(kvp => kvp.Value != null && kvp.Value.Count() >= 3);
-
-            // 如果有大组或有折叠功能，显示搜索栏。
-            if (hasLargeGroup || foldouts.Count > 0)
+            // 搜索框是否出现也使用同一份 Layout 快照，避免运行时池组变化导致
+            // Layout/Repaint 生成不同数量的 GUILayout 控件。
+            if (poolGroupSearchVisible)
             {
                 searchText = EditorGUILayout.TextField("搜索 (组或池名)", searchText);
             }
 
-            // 遍历所有分组。
-            foreach (var groupKey in globalGroup.Groups.Keys)
+            for (int snapshotIndex = 0; snapshotIndex < poolGroupRenderSnapshotCount; snapshotIndex++)
             {
-                var groupList = globalGroup.GetGroupDirectly(groupKey);
-                if (groupList == null || groupList.Count() == 0) continue;
-
-                // 过滤：如果有搜索文本，检查组名或池名是否匹配
-                bool groupMatches = string.IsNullOrEmpty(searchText) ||
-                                    ContainsIgnoreCase(groupKey, searchText);
-                bool poolMatches = false;
-                if (!groupMatches)
-                {
-                    foreach (var stat in groupList)
-                    {
-                        if (stat != null && ContainsIgnoreCase(stat.PoolDisplayName, searchText))
-                        {
-                            poolMatches = true;
-                            break;
-                        }
-                    }
-                }
-                if (!groupMatches && !poolMatches) continue;
-
+                PoolGroupRenderSnapshot groupSnapshot = poolGroupRenderSnapshots[snapshotIndex];
                 // 分组折叠
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                using (SimpleToolsPanelUtility.BeginContentSection())
                 {
-                    foldouts[groupKey] = EditorGUILayout.Foldout(foldouts[groupKey], $"分组: {groupKey} ({groupList.Count()} 个池)", true);
+                    bool nextExpanded = EditorGUILayout.Foldout(
+                        groupSnapshot.Expanded,
+                        $"分组: {groupSnapshot.GroupKey} ({groupSnapshot.PoolCount} 个池)",
+                        true);
 
-                    if (foldouts[groupKey])
+                    if (nextExpanded != groupSnapshot.Expanded)
                     {
-                        // 显示每个池的统计信息
-                        for (int i = 0; i < groupList.Count(); i++)
-                        {
-                            var stat = groupList.ValuesNow[i];
-                            if (stat == null || !stat.IsValid) continue;
+                        // 本次事件仍按 Layout 快照绘制；折叠状态在下一次 Layout
+                        // 重建后才影响子行数量，避免 MouseUp/Repaint 控件树失配。
+                        foldouts[groupSnapshot.GroupKey] = nextExpanded;
+                        poolGroupRenderSnapshotValid = false;
+                        SimpleToolsWindow.UsingWindow?.Repaint();
+                    }
 
-                            // 如果有搜索文本且不匹配组名，检查池项。
-                            if (!string.IsNullOrEmpty(searchText) && !groupMatches &&
-                                !ContainsIgnoreCase(stat.PoolDisplayName, searchText))
-                            {
-                                continue;
-                            }
-
-                            EditorGUILayout.LabelField(
-                                $"池中: {totalPooled}",
-                                EditorStyles.miniLabel);
-                        }
+                    if (groupSnapshot.Expanded)
+                    {
+                        for (int i = 0; i < groupSnapshot.PoolLines.Count; i++)
+                            EditorGUILayout.LabelField(groupSnapshot.PoolLines[i], EditorStyles.miniLabel);
                     }
                 }
             }
         }
 
+        private void EnsurePoolUsageRenderSnapshot()
+        {
+            bool isLayout = Event.current == null || Event.current.type == EventType.Layout;
+            if (!isLayout)
+                return;
+
+            JumpSafeKeyGroup<string, PoolStatistics> globalGroup = PoolStatistics.GlobalStatisticsGroup;
+            bool hasLargeGroup = globalGroup != null && globalGroup.Groups.Any(kvp => kvp.Value != null && kvp.Value.Count() >= 3);
+            int currentSignature = CalculatePoolGroupRenderSignature(globalGroup, hasLargeGroup);
+            if (poolGroupRenderSnapshotValid && currentSignature == poolGroupRenderSignature)
+                return;
+
+            poolUsageSnapshotHasGlobalGroup = globalGroup != null;
+            poolUsageSnapshotTotalPools = 0;
+            poolUsageSnapshotTotalActive = 0;
+            poolUsageSnapshotTotalPooled = 0;
+            poolUsageSnapshotTotalDiscarded = 0;
+            poolGroupSearchVisible = hasLargeGroup || foldouts.Count > 0;
+            poolGroupSnapshotSearchText = searchText ?? string.Empty;
+
+            if (globalGroup == null)
+            {
+                poolGroupRenderSnapshotCount = 0;
+                poolGroupRenderSignature = currentSignature;
+                poolGroupRenderSnapshotValid = true;
+                return;
+            }
+
+            List<PoolStatistics> allStats = CollectValidStats(globalGroup);
+            poolUsageSnapshotTotalPools = allStats.Count;
+            for (int i = 0; i < allStats.Count; i++)
+            {
+                PoolStatistics stat = allStats[i];
+                poolUsageSnapshotTotalActive += stat.CurrentActive;
+                poolUsageSnapshotTotalPooled += stat.CurrentPooled;
+                poolUsageSnapshotTotalDiscarded += stat.DiscardedCount;
+            }
+
+            RebuildPoolGroupRenderSnapshot(globalGroup);
+            poolGroupRenderSignature = currentSignature;
+            poolGroupRenderSnapshotValid = true;
+        }
+
+        private void RebuildPoolGroupRenderSnapshot(JumpSafeKeyGroup<string, PoolStatistics> globalGroup)
+        {
+            int snapshotWriteIndex = 0;
+
+            foreach (var groupKey in globalGroup.Groups.Keys.ToList())
+            {
+                var groupList = globalGroup.GetGroupDirectly(groupKey);
+                if (groupList == null || groupList.Count() == 0)
+                    continue;
+
+                bool groupMatches = string.IsNullOrEmpty(poolGroupSnapshotSearchText) ||
+                                    ContainsIgnoreCase(groupKey, poolGroupSnapshotSearchText);
+                PoolGroupRenderSnapshot snapshot = GetReusablePoolGroupSnapshot(snapshotWriteIndex);
+                snapshot.PoolLines.Clear();
+                int validCount = 0;
+                for (int i = 0; i < groupList.Count(); i++)
+                {
+                    var stat = groupList.ValuesNow[i];
+                    if (stat == null || !stat.IsValid)
+                        continue;
+
+                    validCount++;
+                    if (!groupMatches && !ContainsIgnoreCase(stat.PoolDisplayName, poolGroupSnapshotSearchText))
+                        continue;
+
+                    snapshot.PoolLines.Add($"{stat.PoolDisplayName} · 池中 {stat.CurrentPooled} · 活跃 {stat.CurrentActive} · 丢弃 {stat.DiscardedCount}");
+                }
+
+                if (validCount == 0 || (!groupMatches && snapshot.PoolLines.Count == 0))
+                    continue;
+
+                snapshot.GroupKey = groupKey;
+                snapshot.PoolCount = validCount;
+                snapshot.Expanded = foldouts[groupKey];
+                snapshotWriteIndex++;
+            }
+
+            poolGroupRenderSnapshotCount = snapshotWriteIndex;
+        }
+
+        private int CalculatePoolGroupRenderSignature(JumpSafeKeyGroup<string, PoolStatistics> globalGroup, bool hasLargeGroup)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + (hasLargeGroup ? 1 : 0);
+                hash = hash * 31 + (searchText == null ? 0 : searchText.GetHashCode());
+                hash = hash * 31 + foldouts.Count;
+                if (globalGroup == null)
+                    return hash;
+
+                foreach (var pair in globalGroup.Groups)
+                {
+                    hash = hash * 31 + (pair.Key == null ? 0 : pair.Key.GetHashCode());
+                    var groupList = pair.Value;
+                    if (groupList == null)
+                        continue;
+
+                    for (int i = 0; i < groupList.Count(); i++)
+                    {
+                        PoolStatistics stat = groupList.ValuesNow[i];
+                        if (stat == null)
+                        {
+                            hash = hash * 31;
+                            continue;
+                        }
+
+                        hash = hash * 31 + (stat.IsValid ? 1 : 0);
+                        hash = hash * 31 + (stat.PoolDisplayName == null ? 0 : stat.PoolDisplayName.GetHashCode());
+                        hash = hash * 31 + stat.CurrentPooled;
+                        hash = hash * 31 + stat.CurrentActive;
+                        hash = hash * 31 + stat.DiscardedCount;
+                    }
+                }
+
+                return hash;
+            }
+        }
+
+        private PoolGroupRenderSnapshot GetReusablePoolGroupSnapshot(int index)
+        {
+            while (poolGroupRenderSnapshots.Count <= index)
+                poolGroupRenderSnapshots.Add(new PoolGroupRenderSnapshot());
+
+            return poolGroupRenderSnapshots[index];
+        }
+
+        private sealed class PoolGroupRenderSnapshot
+        {
+            public string GroupKey;
+            public int PoolCount;
+            public bool Expanded;
+            public readonly List<string> PoolLines = new List<string>(8);
+
+            public PoolGroupRenderSnapshot()
+            {
+            }
+        }
+
         private void DrawPoolActionPanel()
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -220,8 +396,25 @@ namespace ES
         {
             var infos = FindPrewarmDataInfos();
             SimpleToolsPanelUtility.DrawSectionTitle("Prefab 预热数据", "PrefabPrewarmDataInfo 是 ESSO/SoDataInfo 配置资产，也是 ESGameObjectPoolModule 的预热配置入口。这里扫描的是配置资产，不扫描 Prefab。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (SimpleToolsPanelUtility.DrawActionButton(
+                            "刷新配置事实",
+                            "显式查询 ESSO/SoDataInfo 中的 PrefabPrewarmDataInfo；页面打开和重绘不会自动扫描。",
+                            SimpleToolsActionTone.Primary,
+                            24,
+                            GUILayout.Width(104)))
+                    {
+                        RefreshPrewarmDataCache();
+                    }
+                    EditorGUILayout.LabelField(
+                        prewarmDataCacheReady ? $"缓存 {prewarmDataCache.Count} 个配置" : "尚未刷新配置事实",
+                        EditorStyles.miniLabel);
+                    GUILayout.FlexibleSpace();
+                }
+
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("搜索", EditorStyles.miniBoldLabel, GUILayout.Width(36));
@@ -245,7 +438,10 @@ namespace ES
 
                 if (infos.Count == 0)
                 {
-                    SimpleToolsPanelUtility.DrawEmptyState("当前项目没有找到 PrefabPrewarmDataInfo。可通过 SO 数据窗口创建“Prefab预热配置”，再回到这里维护条目。");
+                    SimpleToolsPanelUtility.DrawEmptyState(
+                        prewarmDataCacheReady
+                            ? "当前项目没有找到 PrefabPrewarmDataInfo。可通过 SO 数据窗口创建“Prefab预热配置”，再回到这里维护条目。"
+                            : "尚未刷新配置事实。点击上方“刷新配置事实”后，工具才会查询已有 PrefabPrewarmDataInfo；不会扫描 Project Prefab。 ");
                     return;
                 }
 
@@ -262,13 +458,13 @@ namespace ES
             int sourceCount = pool != null && pool.prewarmSources != null ? pool.prewarmSources.Count : 0;
             bool targetLinked = pool != null && targetPrewarmData != null && pool.prewarmSources != null && pool.prewarmSources.Contains(targetPrewarmData);
 
-            SimpleToolsPanelUtility.DrawSectionTitle("Prefab 预热数据", "PrefabPrewarmDataInfo 是 ESSO/SoDataInfo 配置资产，也是 ESGameObjectPoolModule 的预热配置入口。这里扫描的是配置资产，不扫描 Prefab。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            SimpleToolsPanelUtility.DrawSectionTitle("GameManager 接入", "把已有 PrefabPrewarmDataInfo 配置资产接入当前场景的 ESGameManager；编辑模式只改配置关系，不实例化池对象。");
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 SimpleToolsPanelUtility.DrawSummary(
                     $"GameManager: {GetManagerName(manager)}",
                     $"对象池模块: {GetPoolStateText(pool)}",
-                    $"配置资产: {infos.Count}",
+                    $"配置资产: {(prewarmDataCacheReady ? infos.Count.ToString() : "未刷新")}",
                     $"目标已接入: {SimpleToolsSafetyUtility.YesNo(targetLinked)}",
                     $"运行状态: {GetRuntimeStateText()}");
 
@@ -331,7 +527,7 @@ namespace ES
                 : new List<ESGameObjectPoolStats>(0);
 
             SimpleToolsPanelUtility.DrawSectionTitle("PlayMode 池组状态", "只读查看 ESGameObjectPoolModule 当前已经创建的池组。此页不创建、不预热、不回收对象。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 SimpleToolsPanelUtility.DrawSummary(
                     $"运行状态: {GetRuntimeStateText()}",
@@ -686,17 +882,19 @@ namespace ES
 
         private List<PrefabPrewarmDataInfo> FindPrewarmDataInfos()
         {
-            var infos = ESEditorSO.GetGroupOfType<PrefabPrewarmDataInfo>() ?? new List<PrefabPrewarmDataInfo>(0);
-            var result = new List<PrefabPrewarmDataInfo>(infos.Count);
-            foreach (var info in infos)
+            if (!prewarmDataCacheReady)
+                return new List<PrefabPrewarmDataInfo>(0);
+
+            var result = new List<PrefabPrewarmDataInfo>(prewarmDataCache.Count);
+            string keyword = prewarmSearchText == null ? string.Empty : prewarmSearchText.Trim();
+            foreach (var info in prewarmDataCache)
             {
                 if (info == null)
                     continue;
 
                 string path = AssetDatabase.GetAssetPath(info);
-                if (!string.IsNullOrWhiteSpace(prewarmSearchText))
+                if (!string.IsNullOrWhiteSpace(keyword))
                 {
-                    string keyword = prewarmSearchText.Trim();
                     if (!ContainsIgnoreCase(info.name, keyword) &&
                         !ContainsIgnoreCase(info.KeyName, keyword) &&
                         !ContainsIgnoreCase(path, keyword))
@@ -706,10 +904,20 @@ namespace ES
                 result.Add(info);
             }
 
-            return result
-                .Distinct()
-                .OrderBy(info => AssetDatabase.GetAssetPath(info), StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            return result;
+        }
+
+        private void RefreshPrewarmDataCache()
+        {
+            var infos = ESEditorSO.GetGroupOfType<PrefabPrewarmDataInfo>() ?? new List<PrefabPrewarmDataInfo>(0);
+            prewarmDataCache.Clear();
+            prewarmDataCache.AddRange(
+                infos.Where(info => info != null)
+                    .Distinct()
+                    .OrderBy(info => AssetDatabase.GetAssetPath(info), StringComparer.OrdinalIgnoreCase));
+            prewarmDataCacheReady = true;
+            lastResultSummary = $"预热配置事实刷新完成: {prewarmDataCache.Count} 个配置资产";
+            lastResultDetail = "查询来源：ESSO/SoDataInfo；未扫描 Project Prefab。";
         }
 
         private void DrawPrewarmInfoRow(PrefabPrewarmDataInfo info)
@@ -723,7 +931,7 @@ namespace ES
             int missing = info.entries != null ? info.entries.Count(IsMissingPrefabKey) : 0;
             int invalid = CountInvalidPrewarmEntries(info);
             int duplicate = CountDuplicatePrewarmKeys(info);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {

@@ -155,6 +155,7 @@ namespace ES
                 case ESAssetReferKind.PlayableAsset: return ESAssetCategory.Playable;
                 case ESAssetReferKind.ScriptableObject: return ESAssetCategory.Script;
                 case ESAssetReferKind.TerrainData: return ESAssetCategory.TerrainData;
+                case ESAssetReferKind.Raw: return ESAssetCategory.Raw;
                 default: return ESAssetCategory.Other;
             }
         }
@@ -180,6 +181,7 @@ namespace ES
                 case ESAssetReferKind.PlayableAsset: return nameof(ESAssetReferPlayableAssetConfigKey);
                 case ESAssetReferKind.ScriptableObject: return nameof(ESAssetReferScriptableObjectConfigKey);
                 case ESAssetReferKind.TerrainData: return nameof(ESAssetReferTerrainDataConfigKey);
+                case ESAssetReferKind.Raw: return nameof(ESAssetReferRawConfigKey);
                 default: return string.Empty;
             }
         }
@@ -205,32 +207,9 @@ namespace ES
                 case ESAssetReferKind.PlayableAsset: return nameof(ESAssetReferPlayableAssetConfigData);
                 case ESAssetReferKind.ScriptableObject: return nameof(ESAssetReferScriptableObjectConfigData);
                 case ESAssetReferKind.TerrainData: return nameof(ESAssetReferTerrainDataConfigData);
+                case ESAssetReferKind.Raw: return nameof(ESAssetReferRawConfigData);
                 default: return string.Empty;
             }
-        }
-
-        public static void ApplyPageKeyToResKey(ESAssetPage page, ESResKey resKey)
-        {
-            if (page == null || resKey == null)
-            {
-                return;
-            }
-
-            resKey.ConfigEnumKeyInt = page.EnumKey;
-            resKey.ConfigStringKey = page.EffectiveStringKey;
-            resKey.GUID = page.AssetGuid;
-            resKey.LocalFileId = page.LocalFileId;
-            resKey.AssetTypeName = page.AssetTypeName;
-            resKey.Path = page.AssetPath;
-
-#if UNITY_EDITOR
-            if (page.OB != null)
-            {
-                string assetPath = UnityEditor.AssetDatabase.GetAssetPath(page.OB);
-                resKey.GUID = UnityEditor.AssetDatabase.AssetPathToGUID(assetPath);
-                resKey.Path = assetPath;
-            }
-#endif
         }
 
         public static bool IsSupportedKind(ESAssetReferKind kind)

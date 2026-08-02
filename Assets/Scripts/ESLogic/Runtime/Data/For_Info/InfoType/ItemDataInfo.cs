@@ -19,7 +19,8 @@ namespace ES
         MissingSharedData = 9,
         MissingGameCoreKey = 10,
         MissingWeaponConfig = 11,
-        InvalidTagDefinition = 12
+        InvalidTagDefinition = 12,
+        InvalidAttributeValues = 13
     }
 
     [ESCreatePath("数据信息", "物品数据信息")]
@@ -33,6 +34,14 @@ namespace ES
         [LabelText("出生时添加")]
         [Tooltip("Item 自身出生后持续持有的事实。Item Prefab 不重复保存此列表。")]
         public List<ESTagStableReference> tags = new List<ESTagStableReference>();
+
+        [Title("物品属性基础值")]
+        [InfoBox("属性类型、范围和 Hot/Sparse 只在 GameCore 的物品属性集中定义。这里仅填写本 Item 的基础值，不复制 Schema。")]
+        [TableList(AlwaysExpanded = true)]
+        public List<ESItemFloatValue> floatValues = new List<ESItemFloatValue>();
+
+        [TableList(AlwaysExpanded = true)]
+        public List<ESItemPermitValue> permitValues = new List<ESItemPermitValue>();
 
         [Title("基础")]
         [HideLabel]
@@ -62,6 +71,16 @@ namespace ES
             if (tags == null)
             {
                 tags = new List<ESTagStableReference>();
+                changed = true;
+            }
+            if (floatValues == null)
+            {
+                floatValues = new List<ESItemFloatValue>();
+                changed = true;
+            }
+            if (permitValues == null)
+            {
+                permitValues = new List<ESItemPermitValue>();
                 changed = true;
             }
             if (baseConfig == null)
@@ -115,6 +134,8 @@ namespace ES
                 return ESItemDataValidationCode.KindDataMismatch;
             if (!ESTagLeaseSet.TryValidateTags(tags, out _))
                 return ESItemDataValidationCode.InvalidTagDefinition;
+            if (!ESItemAttributeValues.TryValidate(floatValues, permitValues, out _))
+                return ESItemDataValidationCode.InvalidAttributeValues;
 
             switch (kindData)
             {
@@ -155,6 +176,7 @@ namespace ES
                 case ESItemDataValidationCode.MissingGameCoreKey: return "Shot/Weapon 必须显式配置 EnumKey 或 StringKey；KeyName 仅供编辑器与策划使用。";
                 case ESItemDataValidationCode.MissingWeaponConfig: return "Weapon 缺少武器逻辑配置。";
                 case ESItemDataValidationCode.InvalidTagDefinition: return "出生 Tag 存在空引用、重复引用或冲突别名。";
+                case ESItemDataValidationCode.InvalidAttributeValues: return "物品属性基础值存在空 Key、重复 Key 或同一 Key 的 Float/Permit 冲突。";
                 default: return "未知 Item 配置错误。";
             }
         }
@@ -324,6 +346,131 @@ namespace ES
                 default:
                     return "请先选择 ItemKind；每条 ItemDataInfo 只保留一个对应的类型专属配置块。";
             }
+        }
+    }
+
+    /// <summary>
+    /// A direct Item definition value: stable identity plus one base number. It deliberately does
+    /// not repeat storage policy, bounds, display text or any other GameCore schema field.
+    /// </summary>
+    [System.Serializable]
+    public struct ESItemFloatValue
+    {
+        [LabelText("EnumKey")]
+        public ushort enumKey;
+
+        [LabelText("StringKey")]
+        public string key;
+
+        [LabelText("基础值")]
+        public float value;
+    }
+
+    /// <summary>Direct Item permission default. Schema ownership remains in GameCore.</summary>
+    [System.Serializable]
+    public struct ESItemPermitValue
+    {
+        [LabelText("EnumKey")]
+        public ushort enumKey;
+
+        [LabelText("StringKey")]
+        public string key;
+
+        [LabelText("默认许可")]
+        public bool value;
+    }
+
+    /// <summary>Validation belongs to the direct Item value lists, not to a second attribute schema.</summary>
+    public static class ESItemAttributeValues
+    {
+        public static bool TryValidate(
+            List<ESItemFloatValue> floatValues,
+            List<ESItemPermitValue> permitValues,
+            out string error)
+        {
+            var enumKeys = new HashSet<ushort>();
+            var stringKeys = new HashSet<string>(System.StringComparer.Ordinal);
+            if (!TryTrackFloats(floatValues, enumKeys, stringKeys, out error)
+                || !TryTrackPermits(permitValues, enumKeys, stringKeys, out error))
+            {
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static bool TryTrackFloats(
+            List<ESItemFloatValue> values,
+            HashSet<ushort> enumKeys,
+            HashSet<string> stringKeys,
+            out string error)
+        {
+            if (values != null)
+            {
+                for (int i = 0; i < values.Count; i++)
+                {
+                    ESItemFloatValue value = values[i];
+                    if (float.IsNaN(value.value) || float.IsInfinity(value.value))
+                    {
+                        error = "Float[" + i + "] 的基础值必须是有限数值。";
+                        return false;
+                    }
+                    if (!TryTrack(value.enumKey, value.key, "Float[" + i + "]", enumKeys, stringKeys, out error))
+                        return false;
+                }
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static bool TryTrackPermits(
+            List<ESItemPermitValue> values,
+            HashSet<ushort> enumKeys,
+            HashSet<string> stringKeys,
+            out string error)
+        {
+            if (values != null)
+            {
+                for (int i = 0; i < values.Count; i++)
+                {
+                    ESItemPermitValue value = values[i];
+                    if (!TryTrack(value.enumKey, value.key, "Permit[" + i + "]", enumKeys, stringKeys, out error))
+                        return false;
+                }
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static bool TryTrack(
+            ushort enumKey,
+            string key,
+            string label,
+            HashSet<ushort> enumKeys,
+            HashSet<string> stringKeys,
+            out string error)
+        {
+            if (enumKey == 0 && string.IsNullOrEmpty(key))
+            {
+                error = label + " 缺少 EnumKey/StringKey。";
+                return false;
+            }
+            if (enumKey != 0 && !enumKeys.Add(enumKey))
+            {
+                error = label + " 的 EnumKey 重复：" + enumKey + "。";
+                return false;
+            }
+            if (!string.IsNullOrEmpty(key) && !stringKeys.Add(key))
+            {
+                error = label + " 的 StringKey 重复：" + key + "。";
+                return false;
+            }
+
+            error = null;
+            return true;
         }
     }
 

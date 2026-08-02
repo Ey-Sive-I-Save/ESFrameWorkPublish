@@ -42,6 +42,22 @@
 | P9 | Provider 重建 | 旧 Context/Scope 收尾，新表可重新 Apply | 旧回调写入新 Provider |
 | P10 | 手动常驻 | Disable 保持，显式 Release 才归还 | Disable 擅自释放或重复累加 |
 
+## 三-A、TemporaryScope / LoadAsyncLease 验收矩阵
+
+ResourcePlan 的 Scope retain 与全局 `ESAssetTemporaryScope` 的逐调用持有是两套语义，必须分别验收，不能用 Plan 的 P1-P10 替代：
+
+| 编号 | 场景 | 必须观察 | Blocker 条件 |
+| --- | --- | --- | --- |
+| T1 | 两个 `LoadAsyncLease` 交错完成、交错 Dispose | 两个独立 Token 各归还一次，任一释放不影响另一租期 | 以 AssetIdentity 幂等扣减或提前释放 |
+| T2 | Lease 值复制后重复 Dispose | 复制品共享同一 Token，底层只扣一次 | 重复 Dispose 继续减少 `LeaseCount` |
+| T3 | 等待取消后迟到完成并释放 | 取消只结束等待者；成功取得的 Lease/引用仍按自身语义归还 | 迟到回调写入新 Scope 或永久悬挂 |
+| T4 | TemporaryScope 安全点后释放旧 Lease | generation 推进，旧 Token 释放失败且不能影响新一代 | 旧 Lease 释放新一代资产 |
+| T5 | Provider 切换后释放旧 Lease | 旧 Scope/Token 只对旧代生效，Provider 重建后可重新加载 | 旧 Lease 触碰新 Provider |
+| T6 | 普通 `LoadAsync(scope)` 与严格 Lease 混用 | `ReferenceCount`、`LeaseCount` 分别归零后才释放底层资源 | 一种入口误扣另一种计数 |
+| T7 | 加载失败后重试 | 失败移除临时状态，下一次同身份加载可重新开始 | 失败状态卡死或残留计数 |
+
+每个用例都必须记录：Scope 代际、资产身份、`ReferenceCount`、`LeaseCount`、Token 是否仍有效、Provider 代际和最终底层释放次数。未完成这些证据前，不得宣称 Temporary Lease 生命周期已商业验收。
+
 ## 四、每个用例必须记录的证据
 
 每个步骤至少记录：

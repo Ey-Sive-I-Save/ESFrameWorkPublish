@@ -114,6 +114,8 @@ namespace ES
 
                 if (target.mode == ESAssetReleaseUploadMode.ManualPlan)
                     EditorGUILayout.HelpBox("“手动上传计划”只能导出交接清单，不能伪装为一键远端发布。选择真实 OSS、S3 或 HTTP PUT Provider 后才允许执行。", MessageType.Warning);
+                else
+                    EditorGUILayout.HelpBox("客户端访问根地址必须包含对象前缀、但不包含平台目录。例如对象前缀为 es-release 时填写 https://<bucket-domain>/es-release/；预检会与第四步 Manifest 严格比对。", MessageType.None);
             }
         }
 

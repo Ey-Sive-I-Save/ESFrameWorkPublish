@@ -116,8 +116,8 @@ namespace ES
             AddRenameWarnings(previousPlan, plan);
             if (plan.errors.Count > 0) throw new InvalidOperationException(string.Join("\n", plan.errors));
             ApplyManagedLabels(previousPlan, plan, editorOnlyPaths);
-            ESAssetPipelineIO.WriteJson(previousPlanPath, plan);
-            ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.AssetListFileName), assetList);
+            ESAssetPipelineIO.WriteJson(previousPlanPath, plan, true);
+            ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.AssetListFileName), assetList, true);
             AssetDatabase.SaveAssets();
             Debug.Log($"[ESAssetBundleBuildPlanner] 规划 {plan.assignments.Count} 个资产，{plan.warnings.Count} 条警告。输出：{outputFolder}");
         }

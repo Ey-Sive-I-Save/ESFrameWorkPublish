@@ -38,6 +38,8 @@ namespace ES
                 .OrderBy(item => AssetDatabase.GetAssetPath(item), StringComparer.Ordinal)
                 .ToList();
             if (consumers.Count == 0) throw new InvalidOperationException("未找到资源使用者（Consumer）。请先创建至少一个 Consumer。\n");
+            ValidateConsumerIdentities(consumers);
+            ValidatePathSegment(ESGlobalResSetting.Instance.Version, "资源发布版本");
             SetPublishProgress("生成 HybridCLR AOT 元数据与热更代码包（此阶段通常最耗时）", 0.10f);
             ESCodeModuleEditorIntegration.GenerateAndSyncAll(consumers);
             SetPublishProgress("同步 Consumer 构建修订", 0.48f);
@@ -50,7 +52,7 @@ namespace ES
             string initialRoot = includeInitialPackage ? streamingReleaseRoot : null;
             if (!includeInitialPackage)
                 RemoveGeneratedStreamingAssets(platform);
-            string localTestRoot = Path.Combine(ESAssetPipelineIO.ProjectRoot, "ES", "Published", "LocalTest", platform);
+            string localTestRoot = ESAssetPipelineIO.LocalTestRoot(platform);
             string cdnRoot = Path.Combine(ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath, platform);
             var release = new ESAssetReleaseManifest { platform = platform, releaseVersion = releaseVersion, channel = "default", publishedUtc = DateTime.UtcNow.ToString("O") };
             var publishedLibraries = new Dictionary<string, PublishedLibrary>(StringComparer.Ordinal);
@@ -144,16 +146,7 @@ namespace ES
 
             var totalConsumers = consumers.Where(item => item.IsTotalConsumer).ToList();
             if (totalConsumers.Count == 0)
-            {
-                ESAssetLibraryConsumer selected = consumers[0];
-                Undo.RecordObject(selected, "自动指定总资源使用者");
-                selected.IsTotalConsumer = true;
-                selected.EnsureStableIdentity();
-                EditorUtility.SetDirty(selected);
-                AssetDatabase.SaveAssets();
-                totalConsumers.Add(selected);
-                Debug.LogWarning("[ES资源发布] 未指定总资源使用者，已自动使用第一个资源使用者：" + selected.Name);
-            }
+                throw new InvalidOperationException("资源发布缺少总 Consumer（启动入口）。请在唯一正确的 Consumer 上勾选“总 Consumer（启动入口）”；发布器不会猜测或自动修改配置。");
             if (totalConsumers.Count != 1) throw new InvalidOperationException("资源发布只能有一个总资源使用者。请取消多余 Consumer 的“总 Consumer（启动入口）”勾选。");
             var consumerPublications = new Dictionary<string, ESAssetConsumerReference>(StringComparer.Ordinal);
             var publishStack = new HashSet<string>(StringComparer.Ordinal);
@@ -162,10 +155,6 @@ namespace ES
             release.totalConsumerUrl = totalConsumer.consumerUrl;
             release.totalConsumerSha256 = totalConsumer.consumerSha256;
 
-            // 本机副本在根清单切换前完成清理；若清理失败，远端根清单仍不会指向半完成的新版本。
-            PruneGeneratedReleaseVersions(localTestRoot, releaseVersion);
-            if (includeInitialPackage)
-                PruneGeneratedReleaseVersions(Path.Combine(initialRoot, platform), releaseVersion);
             SetPublishProgress("原子写入发布根清单并生成上传计划", 0.94f);
             if (includeInitialPackage)
                 ESAssetPipelineIO.WriteJson(Path.Combine(initialRoot, platform, ESAssetPipelineIO.ReleaseManifestFileName), release, true);
@@ -173,6 +162,11 @@ namespace ES
             ESAssetPipelineIO.WriteJson(Path.Combine(cdnRoot, ESAssetPipelineIO.ReleaseManifestFileName), release, true);
             string uploadPlanPath = WriteManualUploadPlan(cdnRoot, platform, releaseVersion);
             PruneManualUploadPlans(Path.GetDirectoryName(uploadPlanPath), 10);
+            // 只有新的本机 Root 与第五步上传计划都已完整写入，才回收旧版本。
+            // 因此清理发生异常时，Root 已经指向完整的新版本，而不会指向被删除的旧版本。
+            PruneGeneratedReleaseVersions(localTestRoot, releaseVersion);
+            if (includeInitialPackage)
+                PruneGeneratedReleaseVersions(Path.Combine(initialRoot, platform), releaseVersion);
             AssetDatabase.Refresh();
             SetPublishProgress("发布完成", 1f);
             Debug.Log($"[ESAssetBundlePublisher] 发布完成：{releaseVersion}，资源库数量 {release.libraries.Count}。根清单已最后原子写入。\n手动 OSS 上传计划：{uploadPlanPath}");
@@ -181,6 +175,44 @@ namespace ES
         private static void SetPublishProgress(string message, float progress)
         {
             EditorUtility.DisplayProgressBar("ES 资源发布", message, Mathf.Clamp01(progress));
+        }
+
+        /// <summary>
+        /// ConsumerId 同时是发布文件名、URL 路径段和运行时索引键。必须在生成任何发布副本前一次性收口，
+        /// 不能等递归发布时才让同名 Consumer 静默复用同一份清单。
+        /// </summary>
+        private static void ValidateConsumerIdentities(IReadOnlyList<ESAssetLibraryConsumer> consumers)
+        {
+            var owners = new Dictionary<string, ESAssetLibraryConsumer>(StringComparer.Ordinal);
+            foreach (ESAssetLibraryConsumer consumer in consumers)
+            {
+                string id = consumer.ConsumerId?.Trim() ?? string.Empty;
+                ValidatePathSegment(id, "Consumer 稳定 ID：" + consumer.Name);
+                if (owners.TryGetValue(id, out ESAssetLibraryConsumer existing))
+                    throw new InvalidOperationException("Consumer 稳定 ID 重复：" + id + " / " + existing.Name + " 与 " + consumer.Name);
+                owners.Add(id, consumer);
+
+                var required = consumer.RequiredConsumers ?? new List<ESAssetLibraryConsumer>();
+                var dependencyIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (ESAssetLibraryConsumer dependency in required)
+                {
+                    if (dependency == null)
+                        throw new InvalidOperationException("Consumer 依赖列表包含空引用：" + consumer.Name);
+                    string dependencyId = dependency.ConsumerId?.Trim() ?? string.Empty;
+                    if (!dependencyIds.Add(dependencyId))
+                        throw new InvalidOperationException("Consumer 依赖重复：" + consumer.Name + " -> " + dependencyId);
+                }
+            }
+        }
+
+        private static void ValidatePathSegment(string value, string fieldName)
+        {
+            string segment = value?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(segment)
+                || !string.Equals(segment, Path.GetFileName(segment), StringComparison.Ordinal)
+                || segment.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                || segment == "." || segment == "..")
+                throw new InvalidOperationException(fieldName + " 不是合法路径片段：" + value);
         }
 
         private static void ValidateAll(List<string> stageFolders)
@@ -234,7 +266,7 @@ namespace ES
             }
             plan.files.Add(CreateUploadPlanFile(rootManifestPath, ESAssetPipelineIO.ReleaseManifestFileName, ++order, true));
 
-            string planFolder = Path.Combine(ESAssetPipelineIO.ProjectRoot, "ES", "Published", "ManualUploadPlans", platform);
+            string planFolder = ESAssetPipelineIO.ManualUploadPlansRoot(platform);
             string planPath = Path.Combine(planFolder, releaseVersion + ".json");
             ESAssetPipelineIO.WriteJson(planPath, plan, true);
             return planPath;
@@ -325,6 +357,7 @@ namespace ES
                 AddLibraries(manifest.libraries, consumer.OptionalLibFolders, false, libraries);
                 AddGameCoreLibrary(manifest.libraries, consumer, libraries);
                 AddGameCoreAssets(manifest.gameCoreAssets, consumer.GameCoreAssets);
+                ValidateExtensionAssetsForConsumer(consumer, manifest);
                 AddResidentAssets(manifest, consumer, libraries);
                 PublishCodePackages(manifest.codePackages, consumer, platform, releaseVersion, initialRoot, localTestRoot, cdnRoot);
 
@@ -421,6 +454,35 @@ namespace ES
                     .OrderBy(item => item.guid, StringComparer.Ordinal)
                     .ThenBy(item => item.localFileId)
                     .ToList();
+            }
+        }
+
+        private static void ValidateExtensionAssetsForConsumer(ESAssetLibraryConsumer consumer, ESAssetConsumerManifest manifest)
+        {
+            foreach (ESAssetReferBase refer in consumer.GameCoreAssets ?? Enumerable.Empty<ESAssetReferBase>())
+            {
+                if (refer == null || !refer.IsValid) continue;
+                string path = AssetDatabase.GUIDToAssetPath(refer.GUID);
+                ESResourcePlanInfo plan = refer.LocalFileId == 0
+                    ? AssetDatabase.LoadAssetAtPath<ESResourcePlanInfo>(path)
+                    : FindSubAsset(path, refer.GUID, refer.LocalFileId) as ESResourcePlanInfo;
+                if (plan == null) continue;
+                foreach (ESResourcePlanBakedExtensionEntry extension in plan.BakedExtensions ?? Array.Empty<ESResourcePlanBakedExtensionEntry>())
+                foreach (ESResourcePlanBakedAssetEntry asset in extension?.assets ?? new List<ESResourcePlanBakedAssetEntry>())
+                {
+                    ESAssetPage page = null;
+                    bool found = false;
+                    if (asset != null)
+                    {
+                        found = asset.enumKey != 0
+                            ? ESAssetRegistry.TryGetByEnum(asset.kind, asset.enumKey, out page)
+                            : ESAssetRegistry.TryGetByString(asset.kind, asset.stringKey, out page);
+                    }
+                    if (!found || page == null) throw new InvalidOperationException("扩展资源未注册到 Catalog：" + plan.name);
+                    string libraryFolder = ESAssetPipelineIO.SafeSegment(page.SourceBook);
+                    if (!manifest.libraries.Any(item => string.Equals(item.libraryFolder, libraryFolder, StringComparison.Ordinal)))
+                        throw new InvalidOperationException("Consumer 未声明扩展资源所属 Library：Consumer=" + consumer.Name + ", Plan=" + plan.name + ", Library=" + libraryFolder);
+                }
             }
         }
 

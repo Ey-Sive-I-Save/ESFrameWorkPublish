@@ -173,6 +173,24 @@ git commit -m "本批语义说明"
 - **已知缺口**：当前暂存区由用户继续控制；目录迁移、API 与调用方、Prefab/Scene 与依赖资产必须按可编译、可导入的语义批次组合。
 - **HTML 目标**：批次达到 `ready-for-html` 后，再写入 `#editor-overview` 与 `#editor-verification`；当前保持延期。
 
+### LOCAL-20260803-013：ES 工程功能整合批次
+
+- **源码路径**：`Assets`、`Documentation` 与解决方案入口，覆盖资源运行时和发布、GameCore 数据、角色与交互、Buff/属性、技能与 Operation、载具、音频、剧情、相机、编辑器工作台、Prefab/Scene 和测试。
+- **规范与证据**：旧资源 V1 删除与 `Obsolete/ResourceV1` 归档、新资源 Scope/Provider/发布链、Group/Info 契约、运行时模块、编辑器生成器、领域 AIWarnings、规范和测试资产保持同批。
+- **完成分析**：这些改动存在类型、程序集、Unity meta 和序列化引用依赖，拆成只删旧实现、只加新实现或只提交场景资产会制造不可恢复的中间状态，因此作为一个工程级原子批次提交。
+- **回归状态**：提交前执行 staged-only 路径覆盖、补丁指纹和 `git diff --check`；批次携带 EditMode 合同测试和测试场景，但本次提交不冒充 Unity Test Runner、PlayMode、Profiler、IL2CPP Player 或真实发布通过。
+- **已知缺口**：完整运行回归需在 Unity 完成导入并稳定编译后按领域执行。
+- **HTML 目标**：后续统一整理 `#runtime-overview`、`#editor-overview` 与 `#editor-verification`，当前保持延期。
+
+### LOCAL-20260803-014：Codex 协作历程恢复档案
+
+- **源码路径**：`ES/AI协作历程（Codex）` 下 README、八份独立窗口历程和两个本地 session 恢复工具。
+- **规范与证据**：历史文件保留原档案 ID；定位工具只负责候选排序，核对路径、时间、CWD、首尾提示和档案尾部后才能恢复。
+- **完成分析**：这些文件记录外部窗口事实，不归属本窗口实现；新窗口必须建立自己的档案，不能继续追加已收尾记录。
+- **回归状态**：README、定位工具、恢复工具与独立历程文件均存在，并与功能源码分批提交。
+- **已知缺口**：其他旧格式历程不代表已经全部逐条恢复。
+- **HTML 目标**：不适用。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

@@ -414,7 +414,7 @@ namespace ES
             Pause();
             StopAllSamplers();
             if (PreviewTarget != null && !PreviewTarget.IsRecycled)
-                PreviewTarget.TryAutoPushedToPool();
+                PreviewTarget.ForcePushToPool();
         }
 
         /// <summary>

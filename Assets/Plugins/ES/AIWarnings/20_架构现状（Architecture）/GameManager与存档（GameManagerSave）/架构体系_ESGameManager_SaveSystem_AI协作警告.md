@@ -172,13 +172,14 @@ ESGameSave.Info(...);
 ESGameManager.SaveModule
 ```
 
-保存模块通过：
+模块查询与初始化必须显式区分：
 
 ```csharp
-ESGameManager.GetModuleFast<ESGameSaveModule>()
+ESGameManager.TryGetModule<ESGameSaveModule>(out var existing); // 查询，不创建
+var module = ESGameManager.GetOrCreateModule<ESGameSaveModule>(); // 初始化期显式创建
 ```
 
-由 `ESGameSave` 静态门面获取。
+`GetModuleFast<T>()` 已不是现行 API，不得恢复或写入新代码、文档。`ESGameSave` 静态门面内部按操作语义选择上述两类入口。
 
 当前语义：
 
@@ -186,6 +187,15 @@ ESGameManager.GetModuleFast<ESGameSaveModule>()
 Set/Get = 内存缓存
 Save/Load = 磁盘
 ```
+
+准确的创建语义：
+
+```text
+Get / Has / Save / Delete / Info -> 只查询既有模块，不创建
+Set / Load                    -> 明确调用 EnsureModule，允许创建
+```
+
+读取、检查、删除或展示存档信息不能因为“顺手拿模块”而创建 GameManager Module。任何新静态门面都必须先定义自己属于查询还是初始化入口。
 
 `Set()` 当前会把业务对象序列化为 Json 字符串快照后存入缓存 Archive，不是长期持有业务对象引用。不要把缓存改成直接引用玩家、背包、任务等运行时对象，否则会引入生命周期和误修改风险。
 

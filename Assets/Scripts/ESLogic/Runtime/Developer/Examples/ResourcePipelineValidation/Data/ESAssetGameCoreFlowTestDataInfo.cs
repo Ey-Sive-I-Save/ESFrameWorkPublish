@@ -97,6 +97,7 @@ namespace ES
         public ESAssetReferPlayableAsset playableAsset = new ESAssetReferPlayableAsset();
         public ESAssetReferMesh mesh = new ESAssetReferMesh();
         public ESAssetReferTerrainData terrainData = new ESAssetReferTerrainData();
+        public ESAssetReferRaw raw = new ESAssetReferRaw();
         public ESAssetReferScriptableObject scriptableObject = new ESAssetReferScriptableObject();
         public ESAssetReferUnityObject unityObject = new ESAssetReferUnityObject();
         public ESAssetReferScene scene = new ESAssetReferScene();
@@ -136,6 +137,7 @@ namespace ES
             AppendAssetConfiguration(report, "PlayableAsset", playableAsset);
             AppendAssetConfiguration(report, "Mesh", mesh);
             AppendAssetConfiguration(report, "TerrainData", terrainData);
+            AppendAssetConfiguration(report, "Raw", raw);
             AppendAssetConfiguration(report, "ScriptableObject", scriptableObject);
             AppendAssetConfiguration(report, "UnityObject", unityObject);
             AppendAssetConfiguration(report, "Scene", scene);
@@ -183,6 +185,7 @@ namespace ES
             AppendReady(report, "PlayableAsset", playableAsset);
             AppendReady(report, "Mesh", mesh);
             AppendReady(report, "TerrainData", terrainData);
+            AppendReady(report, "Raw", raw);
             AppendReady(report, "ScriptableObject", scriptableObject);
             AppendReady(report, "UnityObject", unityObject);
             PublishReport(report);
@@ -218,6 +221,7 @@ namespace ES
             await LoadAndAppend(report, "PlayableAsset", playableAsset, testScope, token);
             await LoadAndAppend(report, "Mesh", mesh, testScope, token);
             await LoadAndAppend(report, "TerrainData", terrainData, testScope, token);
+            await LoadAndAppend(report, "Raw", raw, testScope, token);
             await LoadAndAppend(report, "ScriptableObject", scriptableObject, testScope, token);
             await LoadAndAppend(report, "UnityObject", unityObject, testScope, token);
 

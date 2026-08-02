@@ -25,7 +25,7 @@ namespace ES
             #region 简单重写
             public override GUIContent ESWindow_GetWindowGUIContent()
             {
-                var content = new GUIContent("ES数据窗口", "用于创建、查询与维护SO数据（Info/Group/Pack/常规SO）");
+                var content = new GUIContent("ES数据窗口", "用于创建、查询与维护SO数据（Info/Group/高级Pack/常规SO）");
                 return content;
             }
             public override void ESWindow_OnOpen()
@@ -237,13 +237,16 @@ namespace ES
         public class Page_Root_DataScpirtCodeTool : ESWindowPageBase
         {
             [DisplayAsString(fontSize: 30), HideLabel]
-            public string readMe = "数据分为\nDataInfo(信息),\nDataGroup(组),\nDataPack(包),\n\b现在开始填表来创建新的数据类型!\b";
+            public string readMe = "默认生成 DataInfo(信息) + DataGroup(组)。\nDataPack 是高级聚合能力，必须先完成成员权威、Consumer 归属、发布边界和验证设计。\n\b现在开始填表来创建新的数据类型!\b";
             [LabelText("英文数据代码名(如\"Actor\")")]
             public string EnglishCodeName = "DataName";
             [LabelText("中文数据显示名(如\"角色\")")]
             public string ChineseDisplayName = "数据名";
             [LabelText("数据父文件夹"), FolderPath]
             public string folder = "Assets/Scripts/ESFramework/Data/DataToolScript";
+            [InfoBox("P0：Pack 不是标准三件套。只有完成成员权威、Consumer 归属、发布边界和验证设计后才可生成；它不是 ResourcePlan、资源包或发布包。", InfoMessageType.Warning)]
+            [LabelText("高级：生成 DataPack（默认关闭）")]
+            public bool createDataPack;
 
             public override ESWindowPageBase ES_Refresh()
             {
@@ -255,29 +258,38 @@ namespace ES
             public void GenerateData()
             {
 
-                if (AssetDatabase.IsValidFolder(folder))
+                if (!AssetDatabase.IsValidFolder(folder))
                 {
-                    if (ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folder, "InfoType", out var toInfo)
-                     && ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folder, "GroupType", out var toGroup)
-                     && ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folder, "PackType", out var toPack))
-                    {
-                        string infoName = (EnglishCodeName + "DataInfo")._ToValidIdentName();
-                        ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toInfo, infoName, Attribute:
-                            $"[ESCreatePath({"数据信息"._AsStringValue()}, \"{ChineseDisplayName}数据信息\")]", parent: ": SoDataInfo");
-                        ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toGroup, EnglishCodeName + "DataGroup", Attribute:
-                            $"[ESCreatePath({"数据组"._AsStringValue()}, \"{ChineseDisplayName}数据组\")]", parent: $": SoDataGroup<{infoName}>");
-                        ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toPack, EnglishCodeName + "DataPack", Attribute:
-                            $"[ESCreatePath({"数据包"._AsStringValue()}, \"{ChineseDisplayName}数据包\")]", parent: $": SoDataPack<{infoName}>");
-                        AssetDatabase.SaveAssets();
-                        AssetDatabase.Refresh();
-
-                    }
-                    else
-                    {
-                        ESDesignUtility.SafeEditor.Wrap_DisplayDialog("请选择正确的文件夹", $"默认使用【{ESGlobalEditorDefaultConfi.Instance.Path_SoInfoParent}】作为生成总路径哦", "知道了");
-                    }
+                    ESDesignUtility.SafeEditor.Wrap_DisplayDialog("请选择正确的文件夹", $"默认使用【{ESGlobalEditorDefaultConfi.Instance.Path_SoInfoParent}】作为生成总路径哦", "知道了");
+                    return;
                 }
 
+                if (!ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folder, "InfoType", out var toInfo)
+                    || !ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folder, "GroupType", out var toGroup))
+                {
+                    ESDesignUtility.SafeEditor.Wrap_DisplayDialog("创建目录失败", "无法创建 InfoType 或 GroupType，请检查目录权限和路径。", "知道了");
+                    return;
+                }
+
+                string toPack = null;
+                if (createDataPack && !ESDesignUtility.SafeEditor.Quick_TryCreateChildFolder(folder, "PackType", out toPack))
+                {
+                    ESDesignUtility.SafeEditor.Wrap_DisplayDialog("创建 Pack 目录失败", "无法创建 PackType，请检查目录权限和路径。", "知道了");
+                    return;
+                }
+
+                string infoName = (EnglishCodeName + "DataInfo")._ToValidIdentName();
+                ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toInfo, infoName, Attribute:
+                    $"[ESCreatePath({"数据信息"._AsStringValue()}, \"{ChineseDisplayName}数据信息\")]", parent: ": SoDataInfo");
+                ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toGroup, EnglishCodeName + "DataGroup", Attribute:
+                    $"[ESCreatePath({"数据组"._AsStringValue()}, \"{ChineseDisplayName}数据组\")]", parent: $": SoDataGroup<{infoName}>");
+                if (createDataPack)
+                {
+                    ESDesignUtility.SimpleScriptMaker.CreateScriptEasy(toPack, EnglishCodeName + "DataPack", Attribute:
+                        $"[ESCreatePath({"数据包"._AsStringValue()}, \"{ChineseDisplayName}数据包\")]", parent: $": SoDataPack<{infoName}>");
+                }
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
             }
         }
 
@@ -346,7 +358,7 @@ namespace ES
         [Serializable]
         public class Page_CreateNewSoPackOrSearch : ESWindowPageBase
         {
-            [Title("开始新建数据包！", "可以先选择预设类型", bold: true, titleAlignment: TitleAlignments.Centered)]
+            [Title("高级：新建数据包", "仅用于已完成 P0 聚合设计与验证的领域", bold: true, titleAlignment: TitleAlignments.Centered)]
 
             [HorizontalGroup("总组")]
             [DisplayAsString(fontSize: 30, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
@@ -357,7 +369,7 @@ namespace ES
             public List<ISoDataGroup> CachingAddGroups = new List<ISoDataGroup>();
 
 
-            [DetailedInfoBox("创建一个数据包用于引用大量数据！", "创建一个数据包！！将会支持Buff,技能,人物,物品等", infoMessageType: InfoMessageType.Info)]
+            [DetailedInfoBox("P0：DataPack 不是默认数据结构。", "新领域默认使用 Info + Group；只有已经定义成员权威、Consumer 归属、身份和发布边界，并具备验证方案时，才可在此创建 Pack。", infoMessageType: InfoMessageType.Warning)]
             [InfoBox("请修改一下文件名否则会分配随机数字后缀", VisibleIf = "@!hasChange", InfoMessageType = InfoMessageType.Warning)]
             [VerticalGroup("总组/数据"), ESBackGround("yellow", 0.2f), LabelText("文件命名"), Space(5), GUIColor("@ESDesignUtility.ColorSelector.Color_04"), OnValueChanged("OnValueChanged_ChangeHappen")]
             public string createName_ = "新建数据包";
@@ -1347,23 +1359,19 @@ namespace ES
 
             [TabGroup("概念", "关于数据组", TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel, TextArea(5, 10), DisplayAsString(alignment: TextAlignment.Left)]
             public string aboutDataGroup = "" +
-         "数据组，数据组把数个具有同特征的数据信息包含其中，作为独立的资产的最小格式！\n" +
-          "组最大的作用是分组，以一个资产包含多个子信息\n" +
-         " 通常来说不推荐直接把组用来引用至游戏，而是以后面的包来完成\n，" +
-         "其中\n******【1】数据组是一个数据信息的持久字典，并且原则上把子信息都作为子资产包含其中，推荐容纳5-10个为佳\n" +
-         " ******【2】数据组一般只有分组和编辑功能，不推荐用于游戏引用，加载和取用，这只是一个建议和规范，可以自己定\n " +
-         " ******【3】英文Group,为它的专属名词\n" +
-         " ******【#】以一个资产容纳一系列数据信息,高效分类整理，可以绑定到数据包来做到输出最新的内容";
+         "数据组是每类 DataInfo 的默认编辑器组织与 GameCore 聚合入口；每个具体 Info 类型都必须有对应的 Group。\n" +
+          "Group 负责维护 Info 的编辑器组织和启动聚合；运行时身份由显式 ConfigKey 表示，而不是 KeyName 或资产路径。\n" +
+         "其中\n******【1】一个官方 Info 资产只应有一个主 Group，避免双归属和注入重复\n" +
+         " ******【2】Group 不是 ResourcePlan、Scope、Manifest 或资源发布包，不承载资源生命周期\n " +
+         " ******【3】英文 Group 为它的专属名词\n" +
+         " ******【#】新领域默认创建 Info + Group；Pack 仅在完成独立设计与验证后才可使用";
 
             [TabGroup("概念", "关于数据包", TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel, TextArea(5, 10), DisplayAsString(alignment: TextAlignment.Left)]
             public string aboutDataPack = "" +
-           "数据包，同样以持久字典直接引用一些数据信息，跳过了数据组，一般来说一个包可以涵盖一套功能的基本结构！\n" +
-            "包并不推荐为数据信息重命名,而是一般简单地从多个数据组缓冲入数据，他主要是为了能快速收集足够有效数据\n" +
-           " 他的数据组主要有一个信息更新关系,，在游戏运行时，不推荐从包获得组再进行操作\n，" +
-           "其中\n******【1】包只是一类数据信息引用的持久字典\n" +
-           " ******【2】包可以选定和数据组建立更新链接，以便防止忘记手动载入\n " +
-           " ******【3】英文Pack,为它的专属名词\n" +
-           " ******【#】建议广泛使用包来简化游戏逻辑流程";
+           "P0：DataPack 不是默认数据结构，而是需要单独设计与验收的高级聚合。\n" +
+           "在未明确成员权威、Consumer 归属、身份边界、ResourcePlan/Manifest 边界和验证方案前，不应新建或接入 Pack。\n" +
+           "Pack 不是 ResourcePlan、Scope、Manifest、AssetBundle/Bank 或发布资源包；不要用它承载资源生命周期。\n" +
+           "已有 Pack 可继续在此维护，但新领域默认使用 Info + Group，并通过稳定 ConfigKey 进入 GameCore。";
 
             [TabGroup("概念", "关于代码生成工具", TextColor = "@ESDesignUtility.ColorSelector.Color_04"), HideLabel, TextArea(5, 10), DisplayAsString(alignment: TextAlignment.Left)]
             public string aboutCodeGen = "" +

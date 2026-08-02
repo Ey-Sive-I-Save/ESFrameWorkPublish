@@ -111,6 +111,32 @@ namespace ES
         private bool _ikHasPrevTargetPos;
         private Vector3 _ikPrevTargetPos;
         private StateLifecycleTracker _interactionLifecycle = new StateLifecycleTracker();
+        private long _nextBindingToken = 1;
+        private int _bindingGeneration;
+        private ESInteractionBinding _activeBinding;
+        private bool _isEndingInteraction;
+
+        public ESInteractionBinding ActiveBinding => _activeBinding;
+
+        public bool TryGetActiveBinding(ESInteractable target, out ESInteractionBinding binding)
+        {
+            binding = _activeBinding;
+            return isInteracting && binding.IsValid && binding.Target == target;
+        }
+
+        public bool TryEndExternalInteraction(ESInteractionBinding binding, bool success, ESInteractionEndReason reason)
+        {
+            if (_isEndingInteraction || !isInteracting || !_activeBinding.IsValid)
+                return false;
+            if (binding.Token != _activeBinding.Token
+                || binding.Generation != _activeBinding.Generation
+                || binding.Owner != _activeBinding.Owner
+                || binding.Target != _activeBinding.Target)
+                return false;
+
+            EndInteraction(success, reason);
+            return true;
+        }
 
         private bool EnsureStateMachineReady()
         {
@@ -161,7 +187,7 @@ namespace ES
 
         public void RequestInteract()
         {
-            if (!enableInteraction || MyCore == null) return;
+            if (!enableInteraction || MyCore == null || _isEndingInteraction) return;
 
             if (isInteracting)
             {
@@ -317,6 +343,8 @@ namespace ES
             activeInteractable = target;
             isInteracting = true;
             currentCandidate = target;
+            _bindingGeneration = _bindingGeneration == int.MaxValue ? 1 : _bindingGeneration + 1;
+            _activeBinding = new ESInteractionBinding(_nextBindingToken++, _bindingGeneration, MyCore, target);
 
             _activeState = ResolveStateForInteractable(target);
             if (_activeState != null)
@@ -339,7 +367,15 @@ namespace ES
             }
 
             ApplyMatchTargetIfNeeded(target);
-            target.OnInteractStarted(MyCore);
+            try
+            {
+                target.OnInteractStarted(MyCore);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                EndInteraction(false, ESInteractionEndReason.BeginRejected);
+            }
         }
 
         private void UpdateInteraction(float deltaTime)
@@ -353,6 +389,18 @@ namespace ES
             if (!activeInteractable.isActiveAndEnabled || activeInteractable.InteractionOwner != MyCore)
             {
                 EndInteraction(false, ESInteractionEndReason.TargetLost);
+                return;
+            }
+
+            Vector3 actorPosition = MyCore.kcc != null && MyCore.kcc.motor != null
+                ? MyCore.kcc.motor.TransientPosition
+                : MyCore.transform.position;
+            float allowedDistance = activeInteractable.maxInteractionDistance > 0f
+                ? Mathf.Min(detectRadius, activeInteractable.maxInteractionDistance)
+                : detectRadius;
+            if (Vector3.Distance(actorPosition, activeInteractable.ResolveInteractionPoint(actorPosition, null)) > allowedDistance)
+            {
+                EndInteraction(false, ESInteractionEndReason.ActorLeftRange);
                 return;
             }
 
@@ -372,15 +420,24 @@ namespace ES
             float timeout = activeInteractable.interactTimeout > 0f ? activeInteractable.interactTimeout : defaultInteractTimeout;
 
             ApplyIK(activeInteractable, elapsed, duration);
-            activeInteractable.OnInteractUpdate(MyCore, deltaTime);
+            try
+            {
+                activeInteractable.OnInteractUpdate(MyCore, deltaTime);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                EndInteraction(false, ESInteractionEndReason.TargetLost);
+                return;
+            }
 
-            if (duration > 0f && elapsed >= duration)
+            if (!activeInteractable.UsesExternalCompletion && duration > 0f && elapsed >= duration)
             {
                 EndInteraction(true, ESInteractionEndReason.Completed);
                 return;
             }
 
-            if (timeout > 0f && elapsed >= timeout)
+            if (!activeInteractable.UsesExternalCompletion && timeout > 0f && elapsed >= timeout)
             {
                 EndInteraction(false, ESInteractionEndReason.Timeout);
                 return;
@@ -452,38 +509,67 @@ namespace ES
 
         private void EndInteraction(bool success, ESInteractionEndReason reason)
         {
+            if (_isEndingInteraction || !isInteracting)
+                return;
+
+            _isEndingInteraction = true;
             ESInteractable endingTarget = activeInteractable;
-            if (activeInteractable != null)
-            {
-                activeInteractable.OnInteractEnded(MyCore, success, reason);
-            }
-
-            if (_activeState != null)
-            {
-                _activeState.DisableIK();
-                _activeState.CancelMatchTarget();
-
-                if (_sm != null)
-                {
-                    _interactionLifecycle.SetTarget(_sm, _activeState, ResolveInteractionStateKey(activeInteractable, _activeState));
-                    if (!_interactionLifecycle.RequestExit() && _activeState.baseStatus == StateBaseStatus.Running)
-                        _sm.TryDeactivateState(_activeState.strKey);
-                }
-            }
-
-            if (_hasOverriddenSupportFlag && _sm != null)
-            {
-                _sm.SetSupportFlags(_prevSupportFlag);
-                _hasOverriddenSupportFlag = false;
-            }
-
+            StateBase endingState = _activeState;
             isInteracting = false;
             activeInteractable = null;
-            _activeState = null;
-            _ikHasPrevTargetPos = false;
-            lastEndReason = reason;
-            if (endingTarget != null)
-                endingTarget.ReleaseInteraction(MyCore);
+            _activeBinding = default;
+            try
+            {
+                if (endingTarget != null)
+                {
+                    try
+                    {
+                        endingTarget.OnInteractEnded(MyCore, success, reason);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
+                }
+
+                if (endingState != null)
+                {
+                    RunCleanup(endingState.DisableIK);
+                    RunCleanup(endingState.CancelMatchTarget);
+
+                    if (_sm != null)
+                    {
+                        RunCleanup(() =>
+                        {
+                            _interactionLifecycle.SetTarget(_sm, endingState, ResolveInteractionStateKey(endingTarget, endingState));
+                            if (!_interactionLifecycle.RequestExit() && endingState.baseStatus == StateBaseStatus.Running)
+                                _sm.TryDeactivateState(endingState.strKey);
+                        });
+                    }
+                }
+
+                if (_hasOverriddenSupportFlag && _sm != null)
+                {
+                    RunCleanup(() => _sm.SetSupportFlags(_prevSupportFlag));
+                    _hasOverriddenSupportFlag = false;
+                }
+            }
+            finally
+            {
+                _activeState = null;
+                _ikHasPrevTargetPos = false;
+                lastEndReason = reason;
+                if (endingTarget != null)
+                    RunCleanup(() => endingTarget.ReleaseInteraction(MyCore));
+                _hasOverriddenSupportFlag = false;
+                _isEndingInteraction = false;
+            }
+        }
+
+        private static void RunCleanup(Action cleanup)
+        {
+            try { cleanup?.Invoke(); }
+            catch (Exception exception) { Debug.LogException(exception); }
         }
 
         private StateBase ResolveStateForInteractable(ESInteractable target)

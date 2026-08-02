@@ -903,4 +903,10 @@ namespace ES.EditorInternal
     {
         protected override Type ResolveEnumType() => typeof(ESFlowTestEnumKey);
     }
+
+    [CustomPropertyDrawer(typeof(ESStoryConfigKey))]
+    public sealed class ESStoryConfigKeyDrawer : ESGameCoreConfigKeyDrawerBase
+    {
+        protected override Type ResolveEnumType() => typeof(ESStoryEnumKey);
+    }
 }

@@ -11,37 +11,60 @@ namespace ES
     {
         private const string LegacyEditorDataName = "GameCoreGlobalData";
         private const string EditorDataName = "GameCoreEditorGlobalData";
+        private const string LegacyDescription = "GameCoreEditorGlobalData 是项目的编辑器语义入口：集中说明 GameMode、ModeTag、GameTag、Input 分类、物理层语义和 AI Command 模板。不进入运行时配置链，不替代具体业务数据。";
+        private const string CurrentDescription = "GameCoreEditorGlobalData 是项目的编辑期唯一配置入口：集中定义 GameMode、GameTag、角色属性与物品属性 Schema、Input 分类、物理层语义和 AI Command 模板。运行时只消费对应 Bake 产物，不直接依赖此资产。";
 
+        [ESEditorSection("overview", "概览", -100f, "GameCore 的编辑期唯一配置入口。运行时只消费 Bake 产物，绝不反向依赖此资产。")]
         [Title("说明")]
         [LabelText("用途")]
         [MultiLineProperty(3)]
-        public string description = "GameCoreEditorGlobalData 是项目的编辑器语义入口：集中说明 GameMode、ModeTag、GameTag、Input 分类、物理层语义和 AI Command 模板。不进入运行时配置链，不替代具体业务数据。";
+        public string description = CurrentDescription;
 
+        [ESEditorSection("mode", "GameMode", 0f, "项目模式及其标签语义。")]
         [Title("GameMode")]
         [ListDrawerSettings(DefaultExpandedState = false)]
         public List<GameCoreModeRule> gameModes = new List<GameCoreModeRule>();
 
+        [ESEditorSection("mode-tags", "GameModeTag", 5f, "模式投影标签，只表达当前本地控制语境。")]
         [Title("GameModeTag")]
         [ListDrawerSettings(DefaultExpandedState = false)]
         public List<GameCoreModeTagRule> gameModeTags = new List<GameCoreModeTagRule>();
 
+        [ESEditorSection("tags", "GameTag", 10f, "可组合、可查询、可撤销的运行时事实。")]
         [Title("GameTag")]
         [ListDrawerSettings(DefaultExpandedState = false)]
         public List<GameCoreTagRule> gameTags = new List<GameCoreTagRule>();
 
+        [ESEditorSection("tag-definitions", "GameTag 定义", 11f, "唯一 Tag 配置源；Bake 生成 Catalog、RuntimeKey 与 SchemaHash。")]
         [Title("GameTag定义（唯一配置源）")]
         [InfoBox("在这里声明 EnumKey/StringKey、HotSlot/Sparse、运行时可用性与稳定传输范围。BakeTable、RuntimeKey、SchemaHash 均由此列表生成，禁止手改 BakeTable。")]
         [ListDrawerSettings(DefaultExpandedState = false)]
         public List<GameCoreTagDefinition> tagDefinitions = new List<GameCoreTagDefinition>();
 
+        [ESEditorSection("character-attributes", "角色属性", 20f, "角色 Float/Permit 的唯一 Schema。HotSlot 用于固定角色热读，Sparse 用于可选扩展属性。")]
+        [Title("角色属性集（唯一 Schema）")]
+        [InfoBox("常规属性：填写身份、显示名、存储策略和默认值后，直接 Bake。")]
+        [InfoBox("固定访问名：只给角色固定 HotSlot 使用。新增、删除、改名或修改稳定身份后，先生成代码；其余修改无需生成。")]
+        [HideLabel, InlineProperty]
+        public ESSuperAttributeTable characterAttributes = ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
+
+        [ESEditorSection("item-attributes", "物品属性", 30f, "Item Float/Permit 的唯一 Schema。普通 Item 默认按 Sparse 按需创建，固定高频 Item 由 Bake 明确声明 HotSlot。")]
+        [Title("物品属性集（唯一 Schema）")]
+        [InfoBox("这里定义所有 Item 可使用的属性身份、类型、默认值和范围；具体 ItemDataInfo 只填写自己的基础值覆盖，不复制 Schema。")]
+        [HideLabel, InlineProperty]
+        public ESSuperAttributeTable itemAttributes = new ESSuperAttributeTable { catalogScope = "Attribute.Item" };
+
+        [ESEditorSection("input", "Input 分类", 40f, "输入分类与语义说明。")]
         [Title("Input分类")]
         [ListDrawerSettings(DefaultExpandedState = false)]
         public List<GameCoreInputCategoryRule> inputCategories = new List<GameCoreInputCategoryRule>();
 
+        [ESEditorSection("physics", "物理层", 50f, "物理碰撞与查询职责，不表达业务状态。")]
         [Title("物理层语义")]
         [ListDrawerSettings(DefaultExpandedState = false)]
         public List<GameCorePhysicsLayerRule> physicsLayers = new List<GameCorePhysicsLayerRule>();
 
+        [ESEditorSection("ai", "AI Command", 60f, "项目 AI 协作命令模板。")]
         [Title("AI Command模板")]
         [InfoBox("这里存放给开发者复制给 AI 的修改命令模板。目标是让开发者提出需求，AI 按项目法则改代码，而不是盲写。")]
         [ListDrawerSettings(DefaultExpandedState = false)]
@@ -55,6 +78,8 @@ namespace ES
             gameTags = GameCoreDefaultRules.CreateGameTagRules();
             tagDefinitions = new List<GameCoreTagDefinition>();
             EnsureTagDefinitions();
+            characterAttributes = ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
+            itemAttributes = CreateDefaultItemAttributeTable();
             inputCategories = GameCoreDefaultRules.CreateInputCategoryRules();
             physicsLayers = GameCoreDefaultRules.CreatePhysicsLayerRules();
             aiCommandTemplates = GameCoreDefaultRules.CreateAICommandTemplates();
@@ -135,11 +160,51 @@ namespace ES
             }
         }
 
+        [Button("补齐属性表基础结构")]
+        public void EnsureAttributeSchemas()
+        {
+            if (characterAttributes == null)
+                characterAttributes = ESCharacterAttributeCatalog.CreateDefaultSuperAttributeTable();
+            ESCharacterAttributeCatalog.EnsureCharacterScope(characterAttributes);
+
+            if (itemAttributes == null)
+                itemAttributes = CreateDefaultItemAttributeTable();
+            if (string.IsNullOrWhiteSpace(itemAttributes.catalogScope))
+                itemAttributes.catalogScope = "Attribute.Item";
+            itemAttributes.floatAttributes ??= new List<ESSuperFloatAttributeDefinition>();
+            itemAttributes.permitAttributes ??= new List<ESSuperPermitAttributeDefinition>();
+        }
+
+        [Button("验证角色与物品属性表")]
+        public bool ValidateAttributeSchemas()
+        {
+            EnsureAttributeSchemas();
+            if (!ESAttributeBakeTable.TryValidateSources(characterAttributes, itemAttributes, out string error))
+            {
+                Debug.LogError("[GameCoreAttribute] 属性表无效：" + error);
+                return false;
+            }
+
+            return true;
+        }
+
+        private static ESSuperAttributeTable CreateDefaultItemAttributeTable()
+        {
+            return new ESSuperAttributeTable
+            {
+                catalogScope = "Attribute.Item",
+                floatAttributes = new List<ESSuperFloatAttributeDefinition>(),
+                permitAttributes = new List<ESSuperPermitAttributeDefinition>()
+            };
+        }
+
         /// <summary>
         /// 兼容既有资产中的说明文本；不影响运行时数据，也不修改业务内容。
         /// </summary>
         public void MigrateLegacyEditorNaming()
         {
+            if (string.Equals(description, LegacyDescription, StringComparison.Ordinal))
+                description = CurrentDescription;
             description = ReplaceLegacyEditorDataName(description);
 
             if (gameTags != null)
@@ -175,6 +240,7 @@ namespace ES
         {
             MigrateLegacyEditorNaming();
             EnsureTagDefinitions();
+            EnsureAttributeSchemas();
         }
 #endif
     }

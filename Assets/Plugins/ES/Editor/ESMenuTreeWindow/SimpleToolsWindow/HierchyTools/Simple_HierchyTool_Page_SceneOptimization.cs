@@ -81,7 +81,7 @@ namespace ES
         [VerticalGroup("Info/Right"), LabelText("影响"), DisplayAsString, LabelWidth(40), ReadOnly]
         public int estimatedImpact; // 1-100
 
-        [HorizontalGroup("Actions"), Button("🎯 定位对象", ButtonHeight = 25), GUIColor(0.3f, 0.8f, 0.9f)]
+        [HorizontalGroup("Actions"), Button("🎯 定位对象", ButtonHeight = 25)]
         public void FocusOnObject()
         {
             if (!string.IsNullOrEmpty(targetObjectPath))
@@ -104,7 +104,7 @@ namespace ES
             }
         }
 
-        [HorizontalGroup("Actions"), Button("📋 复制路径", ButtonHeight = 25), GUIColor(0.5f, 0.9f, 0.5f)]
+        [HorizontalGroup("Actions"), Button("📋 复制路径", ButtonHeight = 25)]
         public void CopyObjectPath()
         {
             if (!string.IsNullOrEmpty(targetObjectPath))
@@ -220,10 +220,10 @@ namespace ES
 
     #region 场景优化工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_SceneOptimization : ESWindowPageBase
     {
-        [Title("场景优化系统", "性能分析与自动化优化解决方案", bold: true)]
-        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        [DisplayAsString(fontSize: 13), HideLabel]
         public string readMe = "全面分析当前场景的性能瓶颈，\n提供优化建议并支持一键自动优化，\n生成详细的优化报告以供参考";
 
         [HideInInspector]
@@ -262,7 +262,7 @@ namespace ES
         private void DrawSceneOptimizationRiskLadder()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("风险分层", "这页功能很大，先按风险判断是否应该执行。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField("低风险：分析当前场景、导出报告、刷新导入设置预览。只读或只生成文件。", EditorStyles.wordWrappedMiniLabel);
                 EditorGUILayout.LabelField("中风险：清理空对象、移除丢失脚本、标记静态、调整灯光/粒子/碰撞体。会改当前场景，依赖 Undo 和场景备份。", EditorStyles.wordWrappedMiniLabel);
@@ -273,7 +273,7 @@ namespace ES
         private void DrawSceneOptimizationActionPanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("核心流程", "先分析当前场景，再复核问题和导入设置预览，最后执行优化或导出报告。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -311,7 +311,7 @@ namespace ES
         [FoldoutGroup("配置管理"), LabelText("当前配置")]
         public OptimizationConfig currentConfig = new OptimizationConfig();
 
-        [FoldoutGroup("配置管理"), Button("保存配置", ButtonHeight = 30), GUIColor(0.5f, 0.7f, 0.9f)]
+        [FoldoutGroup("配置管理"), Button("保存配置", ButtonHeight = 30)]
         public void SaveConfig()
         {
             string path = EditorUtility.SaveFilePanel("保存优化配置", "", "OptimizationConfig.json", "json");
@@ -330,7 +330,7 @@ namespace ES
             }
         }
 
-        [FoldoutGroup("配置管理"), Button("加载配置", ButtonHeight = 30), GUIColor(0.5f, 0.7f, 0.9f)]
+        [FoldoutGroup("配置管理"), Button("加载配置", ButtonHeight = 30)]
         public void LoadConfig()
         {
             string path = EditorUtility.OpenFilePanel("加载优化配置", "", "json");
@@ -369,10 +369,10 @@ namespace ES
         [FoldoutGroup("分析结果"), ReadOnly, LabelText("预计优化收益"), TextArea(2, 5)]
         public string estimatedBenefits = "";
 
-        [FoldoutGroup("Issues"), ShowInInspector, LabelText("Issue category filter"), EnumToggleButtons, OnValueChanged("UpdateDisplayedIssues")]
+        [FoldoutGroup("Issues"), ShowInInspector, LabelText("Issue category filter"), OnValueChanged("UpdateDisplayedIssues")]
         public IssueCategory categoryFilter = IssueCategory.All;
 
-        [FoldoutGroup("Issues"), ShowInInspector, LabelText("Severity filter"), EnumToggleButtons, OnValueChanged("UpdateDisplayedIssues")]
+        [FoldoutGroup("Issues"), ShowInInspector, LabelText("Severity filter"), OnValueChanged("UpdateDisplayedIssues")]
         public SeverityFilter severityFilter = SeverityFilter.All;
 
         [FoldoutGroup("Issues"), ShowInInspector, LabelText("Minimum impact"), Range(0, 100), OnValueChanged("UpdateDisplayedIssues")]
@@ -392,14 +392,14 @@ namespace ES
         [FoldoutGroup("项目资产导入设置"), ShowInInspector, ReadOnly, LabelText("Pending import-setting changes"), ListDrawerSettings(ShowPaging = true, NumberOfItemsPerPage = 6)]
         public List<ImportSettingChangeRecord> pendingImportSettingChanges = new List<ImportSettingChangeRecord>();
 
-        [FoldoutGroup("项目资产导入设置"), Button("刷新导入设置预览", ButtonHeight = 32), GUIColor(0.35f, 0.75f, 0.9f)]
+        [FoldoutGroup("项目资产导入设置"), Button("刷新导入设置预览", ButtonHeight = 32)]
         public void RefreshImportSettingPreview()
         {
             pendingImportSettingChanges = BuildPendingImportSettingChanges();
             EditorUtility.DisplayDialog("Import-setting preview refreshed", $"This will modify {pendingImportSettingChanges.Count} project asset import settings.", "OK");
         }
 
-        [FoldoutGroup("项目资产导入设置"), Button("导出回滚JSON", ButtonHeight = 32), GUIColor(0.35f, 0.65f, 1f)]
+        [FoldoutGroup("项目资产导入设置"), Button("导出回滚JSON", ButtonHeight = 32)]
         public void ExportImportSettingRollback()
         {
             if (importSettingChanges.Count == 0)
@@ -430,7 +430,7 @@ namespace ES
             }
         }
 
-        [FoldoutGroup("项目资产导入设置"), Button("从JSON回滚导入设置", ButtonHeight = 32), GUIColor(0.95f, 0.55f, 0.35f)]
+        [FoldoutGroup("项目资产导入设置"), Button("从JSON回滚导入设置", ButtonHeight = 32)]
         public void RollbackImportSettingsFromJson()
         {
             string path = EditorUtility.OpenFilePanel("选择导入设置回滚文件", Application.dataPath, "json");
@@ -584,65 +584,61 @@ namespace ES
         #endregion
 
         #region 优化设置(精细控制)
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置", "性能检测阈值")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置"), LabelText("实时灯光阈值"), Range(0, 20)]
+        [ESEditorSection("优化阈值", subtitle: "优化设置中的高级配置。"), LabelText("实时灯光阈值"), Range(0, 20)]
         public int realtimeLightThreshold = 4;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置"), LabelText("空对象阈值"), Range(0, 500)]
+        [ESEditorSection("优化阈值", subtitle: "优化设置中的高级配置。"), LabelText("空对象阈值"), Range(0, 500)]
         public int emptyObjectThreshold = 10;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置"), LabelText("高面数阈值"), Range(1000, 100000)]
+        [ESEditorSection("优化阈值", subtitle: "优化设置中的高级配置。"), LabelText("高面数阈值"), Range(1000, 100000)]
         public int highPolyThreshold = 10000;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置"), LabelText("Texture size threshold (MB)"), Range(1, 100)]
+        [ESEditorSection("优化阈值", subtitle: "优化设置中的高级配置。"), LabelText("Texture size threshold (MB)"), Range(1, 100)]
         public int textureSizeThreshold = 10;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/阈值设置"), LabelText("粒子发射率阈值"), Range(10, 1000)]
+        [ESEditorSection("优化阈值", subtitle: "优化设置中的高级配置。"), LabelText("粒子发射率阈值"), Range(10, 1000)]
         public int particleEmissionThreshold = 100;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化", "GameObject相关优化")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("Remove empty objects")]
+        [ESEditorSection("对象优化", subtitle: "优化设置中的高级配置。"), LabelText("Remove empty objects")]
         public bool optimizeEmptyObjects = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("移除丢失脚本")]
+        [ESEditorSection("对象优化", subtitle: "优化设置中的高级配置。"), LabelText("移除丢失脚本")]
         public bool removeMissingScripts = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("Disable inactive objects")]
+        [ESEditorSection("对象优化", subtitle: "优化设置中的高级配置。"), LabelText("Disable inactive objects")]
         public bool disableInactiveObjects = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/对象优化"), LabelText("标记静态对象")]
+        [ESEditorSection("对象优化", subtitle: "优化设置中的高级配置。"), LabelText("标记静态对象")]
         public bool markStaticObjects = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/渲染优化", "渲染与材质优化")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/渲染优化"), LabelText("生成LOD系统")]
+        [ESEditorSection("渲染优化", subtitle: "优化设置中的高级配置。"), LabelText("生成LOD系统")]
         public bool generateLODs = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/渲染优化"), LabelText("LOD级别数量"), Range(2, 5), ShowIf("generateLODs")]
+        [ESEditorSection("渲染优化", subtitle: "优化设置中的高级配置。"), LabelText("LOD级别数量"), Range(2, 5), ShowIf("generateLODs")]
         public int lodLevelCount = 3;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/渲染优化"), LabelText("合并材质球")]
+        [ESEditorSection("渲染优化", subtitle: "优化设置中的高级配置。"), LabelText("合并材质球")]
         public bool mergeMaterials = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/渲染优化"), LabelText("合并网格(静态)")]
+        [ESEditorSection("渲染优化", subtitle: "优化设置中的高级配置。"), LabelText("合并网格(静态)")]
         public bool combineMeshes = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/渲染优化"), LabelText("启用静态批处理")]
+        [ESEditorSection("渲染优化", subtitle: "优化设置中的高级配置。"), LabelText("启用静态批处理")]
         public bool enableStaticBatching = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/渲染优化"), LabelText("优化阴影设置")]
+        [ESEditorSection("渲染优化", subtitle: "优化设置中的高级配置。"), LabelText("优化阴影设置")]
         public bool optimizeShadows = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化", "Texture and memory optimization")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("压缩纹理")]
+        [ESEditorSection("纹理优化", subtitle: "优化设置中的高级配置。"), LabelText("压缩纹理")]
         public bool compressTextures = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("生成Mipmap")]
+        [ESEditorSection("纹理优化", subtitle: "优化设置中的高级配置。"), LabelText("生成Mipmap")]
         public bool generateMipmaps = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("禁用纹理读写")]
+        [ESEditorSection("纹理优化", subtitle: "优化设置中的高级配置。"), LabelText("禁用纹理读写")]
         public bool disableTextureReadWrite = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/纹理优化"), LabelText("Maximum texture size"), ValueDropdown("GetTextureSizeOptions")]
+        [ESEditorSection("纹理优化", subtitle: "优化设置中的高级配置。"), LabelText("Maximum texture size"), ValueDropdown("GetTextureSizeOptions")]
         public int maxTextureSize = 2048;
 
         private IEnumerable GetTextureSizeOptions()
@@ -657,58 +653,53 @@ namespace ES
             };
         }
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/灯光优化", "光照系统优化")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/灯光优化"), LabelText("Convert to baked lights")]
+        [ESEditorSection("灯光优化", subtitle: "优化设置中的高级配置。"), LabelText("Convert to baked lights")]
         public bool convertToBakedLights = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/灯光优化"), LabelText("优化光照贴图")]
+        [ESEditorSection("灯光优化", subtitle: "优化设置中的高级配置。"), LabelText("优化光照贴图")]
         public bool optimizeLightmaps = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/灯光优化"), LabelText("优化反射探针")]
+        [ESEditorSection("灯光优化", subtitle: "优化设置中的高级配置。"), LabelText("优化反射探针")]
         public bool optimizeReflectionProbes = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/灯光优化"), LabelText("启用遮挡剔除")]
+        [ESEditorSection("灯光优化", subtitle: "优化设置中的高级配置。"), LabelText("启用遮挡剔除")]
         public bool enableOcclusionCulling = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/粒子优化", "粒子系统优化")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/粒子优化"), LabelText("优化粒子系统")]
+        [ESEditorSection("粒子优化", subtitle: "优化设置中的高级配置。"), LabelText("优化粒子系统")]
         public bool optimizeParticles = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/粒子优化"), LabelText("降低粒子数量")]
+        [ESEditorSection("粒子优化", subtitle: "优化设置中的高级配置。"), LabelText("降低粒子数量")]
         public bool reduceParticleCount = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/粒子优化"), LabelText("Disable inactive particles")]
+        [ESEditorSection("粒子优化", subtitle: "优化设置中的高级配置。"), LabelText("Disable inactive particles")]
         public bool disableInactiveParticles = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/音频优化", "音频资源优化")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/音频优化"), LabelText("压缩音频")]
+        [ESEditorSection("音频优化", subtitle: "优化设置中的高级配置。"), LabelText("压缩音频")]
         public bool compressAudio = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/音频优化"), LabelText("启用音频流式加载")]
+        [ESEditorSection("音频优化", subtitle: "优化设置中的高级配置。"), LabelText("启用音频流式加载")]
         public bool enableAudioStreaming = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化", "物理系统优化")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化"), LabelText("Optimize colliders")]
+        [ESEditorSection("物理优化", subtitle: "优化设置中的高级配置。"), LabelText("Optimize colliders")]
         public bool optimizeColliders = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化"), LabelText("简化Mesh Collider")]
+        [ESEditorSection("物理优化", subtitle: "优化设置中的高级配置。"), LabelText("简化Mesh Collider")]
         public bool simplifyMeshColliders = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/物理优化"), LabelText("移除不必要的刚体")]
+        [ESEditorSection("物理优化", subtitle: "优化设置中的高级配置。"), LabelText("移除不必要的刚体")]
         public bool removeUnnecessaryRigidbodies = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项", "高级优化选项")]
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("自动备份场景")]
+        [ESEditorSection("高级配置", subtitle: "优化设置中的高级配置。"), LabelText("自动备份场景")]
         public bool autoBackup = true;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("仅预览(不应用)")]
+        [ESEditorSection("高级配置", subtitle: "优化设置中的高级配置。"), LabelText("仅预览(不应用)")]
         public bool previewOnly = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("允许修改项目资产导入设置")]
+        [ESEditorSection("高级配置", subtitle: "优化设置中的高级配置。"), LabelText("允许修改项目资产导入设置")]
         [InfoBox("When enabled, this can change Texture/Audio importer settings across the project. Commit or back up first.", InfoMessageType.Warning)]
         public bool allowProjectAssetImportChanges = false;
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("优化级别"), ValueDropdown("GetOptimizationLevelOptions")]
+        [ESEditorSection("高级配置", subtitle: "优化设置中的高级配置。"), LabelText("优化级别"), ValueDropdown("GetOptimizationLevelOptions")]
         public string optimizationLevel = "中度";
 
         private IEnumerable GetOptimizationLevelOptions()
@@ -722,7 +713,7 @@ namespace ES
             };
         }
 
-        [FoldoutGroup("优化设置"), TitleGroup("优化设置/高级选项"), LabelText("详细日志")]
+        [ESEditorSection("高级配置", subtitle: "优化设置中的高级配置。"), LabelText("详细日志")]
         public bool verboseLogging = true;
         #endregion
 
@@ -2818,7 +2809,7 @@ namespace ES
         #endregion
 
         #region 报告导出（增强）
-        [BoxGroup("报告导出"), Button("📄 导出详细报告(TXT)", ButtonHeight = 34), GUIColor(0.5f, 0.8f, 0.5f)]
+        [BoxGroup("报告导出"), Button("📄 导出详细报告(TXT)", ButtonHeight = 34)]
         public void ExportDetailedReport()
         {
             string defaultFileName = SanitizeFileName($"SceneOptimization_{SceneManager.GetActiveScene().name}_{DateTime.Now:yyyyMMdd_HHmmss}") + ".txt";
@@ -2902,7 +2893,7 @@ namespace ES
             }
         }
 
-        [BoxGroup("报告导出"), Button("📊 导出CSV数据", ButtonHeight = 34), GUIColor(0.5f, 0.7f, 0.9f)]
+        [BoxGroup("报告导出"), Button("📊 导出CSV数据", ButtonHeight = 34)]
         public void ExportCSVData()
         {
             string defaultFileName = SanitizeFileName($"SceneOptimization_{SceneManager.GetActiveScene().name}_{DateTime.Now:yyyyMMdd_HHmmss}") + ".csv";

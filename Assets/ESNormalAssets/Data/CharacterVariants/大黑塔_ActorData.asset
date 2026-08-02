@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6564680c81fcf5a4397f4b92e3ebb0f4, type: 3}
+  m_Name: "\u5927\u9ED1\u5854_ActorData"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: player.herta
+  actorKind: 0
+  displayName: "\u5927\u9ED1\u5854"
+  description: "\u65B0\u7248\u901A\u7528\u89D2\u8272\u6A21\u677F\u751F\u6210\u7684\u6B63\u5F0F\u73A9\u5BB6\u5B9A\u4E49\u3002"
+  tags: []
+  motionShared:
+    enableGroundMove: 1
+    enableJump: 1
+    enableCrouch: 1
+    enableFly: 0
+    enableClimb: 1
+    enableMount: 1
+    enableGrappleMotion: 0
+    maxStableMoveSpeed: 8
+    stableMovementSharpness: 15
+    maxAirMoveSpeed: 8
+    airAccelerationSpeed: 5
+    jumpSpeed: 8
+    maxStableSlopeAngle: 55
+    steepSlopeSlideSpeed: 4
+    uphillSpeedMultiplier: 0.9
+    downhillSpeedMultiplier: 1.05
+    downhillInertia: 0.15
+    inheritMovingPlatformVelocity: 1
+    stepPolicy: 0
+    flyControlMode: 0
+    flyMaxSpeed: 10
+    flySprintMultiplier: 1.5
+    flyHoverBrake: 8
+    flyDiveAcceleration: 12
+    mountVehicleConsumesInput: 1
+    mountLockRiderVelocity: 1
+    mountSyncAfterMatchTarget: 1
+  motionVariable:
+    initialSupportFlag: 1
+    speedMultiplier: 1
+    speedLimit: 0
+    gravityMultiplier: 1
+    allowMoveInput: 1
+    allowLookInput: 1
+    allowJump: 1
+    allowMotionModeSwitch: 1
+    allowRootMotion: 1

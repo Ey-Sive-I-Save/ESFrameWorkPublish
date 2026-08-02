@@ -16,6 +16,7 @@ namespace ES
 
     #region 粒子系统批量调整工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_ParticleSystemAdjustment : ESWindowPageBase
     {
         private enum ParticleLookPreset
@@ -28,9 +29,8 @@ namespace ES
             Magic
         }
 
-        [Title("粒子系统批量调整工具", "批量调整粒子系统参数", bold: true, titleAlignment: TitleAlignments.Centered)]
 
-        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        [DisplayAsString(fontSize: 13), HideLabel]
         public string readMe = "选择包含 ParticleSystem 的对象，按需包含子对象。应用会修改参数；播放/停止只发送预览指令；清空会先确认。";
 
         [HideInInspector]
@@ -123,7 +123,7 @@ namespace ES
             int changedCount = targets.Count(WillParticleSettingsChange);
 
             SimpleToolsPanelUtility.DrawSectionTitle("核心流程", "先看参数变更预览，再选择写入参数或发送播放/停止指令。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 SimpleToolsPanelUtility.DrawSummary(
                     $"命中: {targets.Count}",
@@ -166,7 +166,7 @@ namespace ES
             SimpleToolsPanelUtility.DrawSectionTitle(
                 "用于批量统一粒子系统的主模块、发射速率、模拟空间，并快速播放/停止/清空选区内粒子。",
                 "应用参数和清空会直接影响场景对象；播放/停止只是发送编辑器播放指令，不代表已经预览应用后的参数效果。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -303,7 +303,7 @@ namespace ES
             SimpleToolsPanelUtility.DrawSectionTitle(
                 "SceneView 真实预览",
                 "应用参数和清空会直接影响场景对象；播放/停止只是发送编辑器播放指令，不代表已经预览应用后的参数效果。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -534,7 +534,7 @@ namespace ES
         {
             var targets = GetFilteredParticleTargets();
             SimpleToolsPanelUtility.DrawSectionTitle("参数变更预览", "按对象名、路径、模拟空间搜索；表格显示当前参数和应用后是否会变。这里不修改场景。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -564,8 +564,17 @@ namespace ES
                     GUILayout.Space(48);
                 }
 
-                foreach (var obj in SimpleToolsPanelUtility.PageItems(targets, ref particlePreviewPageIndex, ParticlePreviewPageSize, out _))
-                    DrawParticlePreviewRow(obj);
+                int particlePreviewStart;
+                int particlePreviewEnd;
+                SimpleToolsPanelUtility.GetPageRange(
+                    targets,
+                    ref particlePreviewPageIndex,
+                    ParticlePreviewPageSize,
+                    out _,
+                    out particlePreviewStart,
+                    out particlePreviewEnd);
+                for (int i = particlePreviewStart; i < particlePreviewEnd; i++)
+                    DrawParticlePreviewRow(targets[i]);
 
                 SimpleToolsPanelUtility.DrawPager(ref particlePreviewPageIndex, targets.Count, ParticlePreviewPageSize);
             }
@@ -679,7 +688,7 @@ namespace ES
         }
 
         [FoldoutGroup("旧按钮入口", Expanded = false)]
-        [Button("应用参数到选中粒子", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
+        [Button("应用参数到选中粒子", ButtonHeight = 34)]
         public void ApplyParticleSystemSettings()
         {
             if (previewStates.Count > 0)
@@ -733,7 +742,7 @@ namespace ES
         }
 
         [FoldoutGroup("旧按钮入口")]
-        [Button("播放选中粒子", ButtonHeight = 32), GUIColor(0.25f, 0.62f, 0.45f)]
+        [Button("播放选中粒子", ButtonHeight = 32)]
         public void PlayAllParticleSystems()
         {
             if (previewStates.Count > 0)
@@ -780,7 +789,7 @@ namespace ES
         }
 
         [FoldoutGroup("旧按钮入口")]
-        [Button("停止选中粒子", ButtonHeight = 32), GUIColor(0.75f, 0.58f, 0.25f)]
+        [Button("停止选中粒子", ButtonHeight = 32)]
         public void StopAllParticleSystems()
         {
             if (previewStates.Count > 0)
@@ -817,7 +826,7 @@ namespace ES
         }
 
         [FoldoutGroup("旧按钮入口")]
-        [Button("清空选中粒子", ButtonHeight = 32), GUIColor(0.82f, 0.38f, 0.30f)]
+        [Button("清空选中粒子", ButtonHeight = 32)]
         public void ClearAllParticleSystems()
         {
             if (previewStates.Count > 0)

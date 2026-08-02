@@ -24,8 +24,7 @@ namespace ES
     /// </summary>
     [Serializable, TypeRegistryItem("ES Op运行支撑")]
     public class ESOpSupport : IDisposable, IPoolableAuto,
-        IOpStoreDictionary<IOperation, DeleAndCount, OutputOperationDelegateFlag>,
-        IOpStoreKeyGroup<OutputOperationBufferFloat_TargetAndDirectInput<ESRuntimeTargetPack, ESOpSupport, ESRuntimeOpSupport_ValueEntryFloatOperation>, BufferOperationFloat, OutputOperationBufferFlag>
+        IOpStoreDictionary<IOperation, DeleAndCount, OutputOperationDelegateFlag>
     {
         public static readonly ESSimplePool<ESOpSupport> Pool = new ESSimplePool<ESOpSupport>(
             factoryMethod: () => new ESOpSupport(),
@@ -36,8 +35,9 @@ namespace ES
         );
 
         [NonSerialized] private List<ESOpSupport> children;
-        [NonSerialized] private List<ESRuntimeTargetPack> targetPacks;
+        [NonSerialized] private List<OwnedTargetPack> targetPacks;
         [NonSerialized] private List<Action> cleanupCallbacks;
+        [NonSerialized] private Dictionary<ESOutputOp, ESAudioVoiceHandle> audioVoiceHandles;
 
         [NonSerialized, HideInInspector]
         public ContextPool contextPool;
@@ -47,10 +47,6 @@ namespace ES
 
         [NonSerialized, HideInInspector]
         public SafeDictionary<IOperation, DeleAndCount> storeForDelegate = new SafeDictionary<IOperation, DeleAndCount>();
-
-        [NonSerialized, HideInInspector]
-        public SafeKeyGroup<OutputOperationBufferFloat_TargetAndDirectInput
-            <ESRuntimeTargetPack, ESOpSupport, ESRuntimeOpSupport_ValueEntryFloatOperation>, BufferOperationFloat> storeForBuffer = new();
 
         [ShowInInspector, ReadOnly, LabelText("支持类型")]
         public ESOpSupportKind Kind { get; private set; } = ESOpSupportKind.Unknown;
@@ -138,18 +134,11 @@ namespace ES
             contextPool ??= new ContextPool();
             cacherPool ??= new CacherPool();
             storeForDelegate ??= new SafeDictionary<IOperation, DeleAndCount>();
-            storeForBuffer ??= new SafeKeyGroup<OutputOperationBufferFloat_TargetAndDirectInput
-                <ESRuntimeTargetPack, ESOpSupport, ESRuntimeOpSupport_ValueEntryFloatOperation>, BufferOperationFloat>();
         }
 
         public SafeDictionary<IOperation, DeleAndCount> GetFromOpStore(OutputOperationDelegateFlag flag = OutputOperationDelegateFlag.Default)
         {
             return storeForDelegate;
-        }
-
-        public SafeKeyGroup<OutputOperationBufferFloat_TargetAndDirectInput<ESRuntimeTargetPack, ESOpSupport, ESRuntimeOpSupport_ValueEntryFloatOperation>, BufferOperationFloat> GetFromOpStore(OutputOperationBufferFlag flag = OutputOperationBufferFlag.Default)
-        {
-            return storeForBuffer;
         }
 
         public void SetCurrentSkillState(EntityState_Skill state)
@@ -292,17 +281,9 @@ namespace ES
         public ESRuntimeTargetPack RentTargetPack()
         {
             ESRuntimeTargetPack target = ESRuntimeTargetPack.Pool.GetInPool();
-            TrackTargetPack(target);
+            targetPacks ??= new List<OwnedTargetPack>(4);
+            targetPacks.Add(new OwnedTargetPack(target));
             return target;
-        }
-
-        public void TrackTargetPack(ESRuntimeTargetPack target)
-        {
-            if (target == null || target.IsRecycled)
-                return;
-
-            targetPacks ??= new List<ESRuntimeTargetPack>(4);
-            targetPacks.Add(target);
         }
 
         public void AddCleanup(Action cleanup)
@@ -312,6 +293,37 @@ namespace ES
 
             cleanupCallbacks ??= new List<Action>(4);
             cleanupCallbacks.Add(cleanup);
+        }
+
+        /// <summary>
+        /// Stores the Voice owned by one concrete Op execution. The entry is scoped to this
+        /// support and is stopped automatically when the support is cleared or recycled.
+        /// </summary>
+        public void SetAudioVoiceHandle(ESOutputOp operation, ESAudioVoiceHandle handle)
+        {
+            if (operation == null)
+                return;
+
+            if (!handle.IsValid)
+            {
+                audioVoiceHandles?.Remove(operation);
+                return;
+            }
+
+            audioVoiceHandles ??= new Dictionary<ESOutputOp, ESAudioVoiceHandle>(2);
+            audioVoiceHandles[operation] = handle;
+        }
+
+        /// <summary>Retrieves and removes the Voice owned by one concrete Op execution.</summary>
+        public bool TryTakeAudioVoiceHandle(ESOutputOp operation, out ESAudioVoiceHandle handle)
+        {
+            handle = default;
+            if (operation == null || audioVoiceHandles == null
+                || !audioVoiceHandles.TryGetValue(operation, out handle))
+                return false;
+
+            audioVoiceHandles.Remove(operation);
+            return true;
         }
 
         public void ClearRuntime()
@@ -328,12 +340,12 @@ namespace ES
         public void ClearActivationRuntime()
         {
             DisposeChildren();
+            ReleaseAudioVoices();
             RunCleanupCallbacks();
             ReleaseTargetPacks();
             contextPool?.ClearRuntimeValues();
             cacherPool?.Clear();
             storeForDelegate?.Clear();
-            storeForBuffer?.Clear();
         }
 
         public void Dispose()
@@ -419,6 +431,21 @@ namespace ES
             cleanupCallbacks.Clear();
         }
 
+        private void ReleaseAudioVoices()
+        {
+            if (audioVoiceHandles == null || audioVoiceHandles.Count == 0)
+                return;
+
+            ESAudioModule audio = ESGameManager.Audio;
+            if (audio != null)
+            {
+                foreach (ESAudioVoiceHandle handle in audioVoiceHandles.Values)
+                    audio.Stop(handle);
+            }
+
+            audioVoiceHandles.Clear();
+        }
+
         private void ReleaseTargetPacks()
         {
             if (targetPacks == null)
@@ -426,12 +453,23 @@ namespace ES
 
             for (int i = targetPacks.Count - 1; i >= 0; i--)
             {
-                ESRuntimeTargetPack target = targetPacks[i];
-                if (target != null && !target.IsRecycled)
-                    target.ForcePushToPool();
+                OwnedTargetPack owned = targetPacks[i];
+                ESRuntimeTargetPack.TryReturnOwned(owned.Target, owned.Version);
             }
 
             targetPacks.Clear();
+        }
+
+        private readonly struct OwnedTargetPack
+        {
+            public readonly ESRuntimeTargetPack Target;
+            public readonly long Version;
+
+            public OwnedTargetPack(ESRuntimeTargetPack target)
+            {
+                Target = target;
+                Version = target != null ? target.Version : 0L;
+            }
         }
 
         private string BuildOwnerSummary()

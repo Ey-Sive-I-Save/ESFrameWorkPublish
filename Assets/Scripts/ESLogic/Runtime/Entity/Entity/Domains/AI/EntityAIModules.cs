@@ -53,6 +53,7 @@ namespace ES
         public bool EyeHold => motion.eyeHold;
         public bool PeekLeftHold => motion.peekLeftHold;
         public bool PeekRightHold => motion.peekRightHold;
+        public bool BlockHeld => motion.blockHold;
         public float AimPeek => motion.AimPeek;
         public float FlyVertical => motion.flyVertical;
 
@@ -122,12 +123,17 @@ namespace ES
 
         protected override void Update()
         {
-            if (!enablePlayerInput)
+            EntityInputState state = MyDomain.inputState;
+            if (state == null)
                 return;
 
-            EntityInputState state = MyDomain.inputState;
-            if (state == null || !state.enableInput)
+            // This writer owns the local player's previous frame. Clear it when it is
+            // disabled so the dispatcher cannot keep driving the entity from stale intent.
+            if (!enablePlayerInput || !state.enableInput)
+            {
+                state.ClearAll();
                 return;
+            }
 
             if (inputTagCondition != null
                 && !inputTagCondition.IsEmpty
@@ -144,8 +150,22 @@ namespace ES
                 return;
             }
 
-            if (claimLocalControl
-                && (ESGameManager.LocalControl == null || !ESGameManager.LocalControl.TryClaim(MyCore, input.ModeService)))
+            ESLocalControlService localControl = ESGameManager.LocalControl;
+            if (localControl == null)
+            {
+                state.ClearAll();
+                return;
+            }
+
+            if (claimLocalControl && !localControl.TryClaim(MyCore, input.ModeService))
+            {
+                state.ClearAll();
+                return;
+            }
+
+            // claimLocalControl only controls whether this prefab declares control ownership during
+            // initialization. It never grants permission to read the global input stream.
+            if (!localControl.IsLocallyControlled(MyCore))
             {
                 state.ClearAll();
                 return;
@@ -155,13 +175,16 @@ namespace ES
             state.motion.move = input.ReadVector2(ESInputActionId.Move);
             state.motion.look = input.ReadVector2(ESInputActionId.Look);
             state.motion.flyVertical = input.ReadAxis(ESInputActionId.FlyVertical);
+            state.motion.blockHold = input.IsHeld(ESInputActionId.Block);
             state.motion.peekLeftHold = input.IsHeld(ESInputActionId.PeekLeft);
             state.motion.peekRightHold = input.IsHeld(ESInputActionId.PeekRight);
 
             int frame = Time.frameCount;
             if (input.ConsumePressed(ESInputActionId.Attack)) state.action.PulseAttack(frame);
             if (input.ConsumePressed(ESInputActionId.HeavyAttack)) state.action.PulseHeavyAttack(frame);
-            if (input.ConsumePressed(ESInputActionId.Block)) state.action.PulseBlock(frame);
+            // Block is a hold, not a one-frame toggle. Consume the press so it remains
+            // exclusively owned by the local player writer; the dispatcher reads blockHold.
+            input.ConsumePressed(ESInputActionId.Block);
             if (input.ConsumePressed(ESInputActionId.Slide)) state.action.PulseSlide(frame);
             if (input.ConsumePressed(ESInputActionId.SwitchWeapon)) state.action.PulseSwitchWeapon(frame);
             if (input.ConsumePressed(ESInputActionId.EquipWeapon)) state.action.PulseEquipWeapon(frame);
@@ -200,13 +223,6 @@ namespace ES
     [Serializable, TypeRegistryItem("AI输入调度模块")]
     public class EntityAIInputDispatchModule : EntityAIModuleBase
     {
-        [Title("引用")]
-        [LabelText("相机（可选）")]
-        public Transform cameraTransform;
-
-        [LabelText("主相机(可选)")]
-        public Camera mainCamera;
-
         [LabelText("移动缩放")]
         public float moveScale = 1f;
 
@@ -241,9 +257,6 @@ namespace ES
         [LabelText("启用相机上下视角")]
         public bool enableCameraLook = true;
 
-        [LabelText("驱动Cinemachine轴")]
-        public bool driveCinemachineAxes = true;
-
         [LabelText("AIM(可选)")]
         public Transform aimTransform;
 
@@ -259,9 +272,6 @@ namespace ES
 
         [LabelText("无相机时瞄准高度")]
         public float fallbackAimHeight = 1.5f;
-
-        [LabelText("相机旋转目标(可选)")]
-        public Transform cameraPivot;
 
         [LabelText("相机Yaw速率")]
         public float cameraYawSpeed = 220f;
@@ -304,18 +314,10 @@ namespace ES
         private Vector3 _smoothedMoveWorld;
         private float _freeLookYaw;
         private bool _freeLookInited;
-        private Camera _cachedMainCamera;
         // Driver is stable for the lifetime of a bound Animator. Cache the positive
         // lookup because combat input dispatch runs every frame.
         [NonSerialized] private StateFinalIKDriver _cachedIKDriver;
         [NonSerialized] private Animator _cachedIKDriverAnimator;
-        private CameraSource _lastCameraSource = CameraSource.None;
-
-        private float _cameraYaw;
-        private float _cameraPitch;
-        private float _cameraYawCurrent;
-        private float _cameraPitchCurrent;
-        private bool _cameraAnglesInited;
 
         private float _aimYaw;
         private float _aimPitch;
@@ -329,13 +331,6 @@ namespace ES
         private float _eyePitchVel;
 
         private bool _wasClimbing;
-
-#if CINEMACHINE
-        [NonSerialized] private Transform _cachedCinemachineTransform;
-        [NonSerialized] private Cinemachine.CinemachineVirtualCameraBase _cachedCinemachineCamera;
-        [NonSerialized] private Cinemachine.CinemachineFreeLook _cachedCinemachineFreeLook;
-        [NonSerialized] private Cinemachine.CinemachinePOV _cachedCinemachinePov;
-#endif
 
         private const int SpeedSampleCapacity = 256;
         private float _totalMoveTime;
@@ -365,13 +360,24 @@ namespace ES
             if (MyCore == null || MyDomain == null) return;
 
             var input = MyDomain.inputState;
-            if (input == null || !input.enableInput) return;
+            if (input == null) return;
+            if (!input.enableInput)
+            {
+                input.ClearAll();
+                ResetCharacterMotionInput();
+                ClearMountedDriverInput();
+                ClearCombatInputLatches();
+                return;
+            }
 
             if (dispatchTagCondition != null
                 && !dispatchTagCondition.IsEmpty
                 && !MyCore.Tags.Matches(dispatchTagCondition))
             {
                 input.ClearAll();
+                ResetCharacterMotionInput();
+                ClearMountedDriverInput();
+                ClearCombatInputLatches();
                 return;
             }
 
@@ -380,11 +386,30 @@ namespace ES
             bool hasClimbModule = TryGetModule(out EntityBasicClimbModule climbModule);
             bool isClimbing = hasClimbModule && climbModule.subState != ClimbSubState.None;
 
+            bool hasMountModule = TryGetModule(out global::ES.EntityBasicMountModule mountModule);
+            if (hasMountModule && input.ConsumeMountToggle())
+            {
+                if (debugMount)
+                    Debug.Log($"[EntityAIInputDispatch] MountToggle consumed | module={mountModule.GetType().Name}");
+
+                mountModule.ToggleMount();
+            }
+
             HandleClimbEnter(isClimbing);
-            DispatchCameraLook(input, cam);
-            bool hasMoveModule = DispatchGroundMove(input, cam, isClimbing);
+            DispatchCameraLook(input);
+
+            // Mounted is an input-routing boundary. The rider may still control a driver
+            // seat, but no character action can be dispatched past this point.
+            if (hasMountModule && mountModule.IsMounted)
+            {
+                DispatchMountedControl(input, cam, mountModule);
+                input.ClearOneShot();
+                _wasClimbing = false;
+                return;
+            }
+
+            DispatchGroundMove(input, cam, isClimbing);
             DispatchFly(input);
-            DispatchMount(input, cam, isClimbing, hasMoveModule);
             UpdateMoveStats(_smoothedMoveWorld);
             DispatchClimb(input, climbModule, hasClimbModule);
             DispatchInteraction(input);
@@ -406,16 +431,51 @@ namespace ES
             MyCore.SetMoveInput(Vector3.zero);
         }
 
-        private void DispatchCameraLook(EntityInputState input, Transform cam)
+        private void ResetCharacterMotionInput()
         {
-            if (enableCameraLook)
-                ApplyCameraLook(input.Look, input.EyeHold ? eyeLookScale : 1f, cam, input.EyeHold);
+            _smoothedMoveWorld = Vector3.zero;
+            MyCore?.ResetKCCInputs();
         }
 
-        private bool DispatchGroundMove(EntityInputState input, Transform cam, bool isClimbing)
+        private void ClearMountedDriverInput()
+        {
+            if (TryGetModule(out global::ES.EntityBasicMountModule mountModule))
+                mountModule.ClearDriverInput();
+        }
+
+        private void ClearCombatInputLatches()
+        {
+            if (!TryGetModule(out EntityBasicCombatModule combatModule))
+                return;
+
+            combatModule.SetBlock(false);
+            combatModule.SetSlide(false);
+        }
+
+        private void DispatchCameraLook(EntityInputState input)
+        {
+            if (!enableCameraLook)
+                return;
+
+            float scale = input.EyeHold ? eyeLookScale : 1f;
+            // 只有当前本地控制实体可以把 Look 交给 Camera 模块。普通 AI 仍可保留
+            // 自己的瞄准/骨骼意图，但绝不能参与 MainView 的输入或仲裁。
+            if (MyCore != null
+                && ESGameManager.LocalControl != null
+                && ESGameManager.LocalControl.IsLocallyControlled(MyCore))
+            {
+                MyCore.SubmitCameraLook(input.Look * scale);
+            }
+
+            // Aim 是角色骨骼/IK 意图，保留在角色域；它不拥有或驱动相机实例。
+            if (aimTransform != null)
+                ApplyAimLook(input.Look, scale, input.EyeHold);
+        }
+
+        private void DispatchGroundMove(EntityInputState input, Transform cam, bool isClimbing)
         {
             if (!TryGetModule(out EntityBasicMoveRotateModule moveModule))
-                return false;
+                return;
 
             ApplyMoveAndLook(input, cam, isClimbing);
 
@@ -428,7 +488,6 @@ namespace ES
             if (input.ConsumeCrouchToggle())
                 moveModule.ToggleCrouch();
 
-            return true;
         }
 
         private void DispatchFly(EntityInputState input)
@@ -442,25 +501,24 @@ namespace ES
             flyModule.SetVerticalInput(input.FlyVertical);
         }
 
-        private void DispatchMount(EntityInputState input, Transform cam, bool isClimbing, bool hasMoveModule)
+        private void DispatchMountedControl(EntityInputState input, Transform cam, global::ES.EntityBasicMountModule mountModule)
         {
-            if (!TryGetModule(out global::ES.EntityBasicMountModule mountModule))
-                return;
+            // Keep using the same camera-relative conversion as foot movement, but route
+            // the resolved intent only to the current driver seat.
+            ApplyMoveAndLook(input, cam, false);
+            MyCore.SetVerticalInput(input.FlyVertical);
 
-            if (!hasMoveModule)
-                ApplyMoveAndLook(input, cam, isClimbing);
-
-            if (input.ConsumeMountToggle())
+            EntityMountable mountable = mountModule.currentMount;
+            if (mountable != null)
             {
-                if (debugMount)
-                    Debug.Log($"[EntityAIInputDispatch] MountToggle consumed | module={mountModule.GetType().Name}");
+                mountable.SubmitDriverInput(
+                    MyCore,
+                    MyCore.kcc.moveInput,
+                    MyCore.kcc.lookInput,
+                    MyCore.kcc.verticalInput);
+            }
 
-                mountModule.ToggleMount();
-            }
-            else if (debugMount)
-            {
-                Debug.Log("[EntityAIInputDispatch] MountToggle not triggered");
-            }
+            ClearCombatInputLatches();
         }
 
         private void DispatchClimb(EntityInputState input, EntityBasicClimbModule climbModule, bool hasClimbModule)
@@ -482,8 +540,8 @@ namespace ES
 
             if (input.ConsumeAttack()) combatModule.TriggerAttack();
             if (input.ConsumeHeavyAttack()) combatModule.TriggerHeavyAttack();
-            if (input.ConsumeBlock()) combatModule.SetBlock(true);
-            if (input.ConsumeSlide()) combatModule.SetSlide(true);
+            combatModule.SetBlock(input.BlockHeld || input.ConsumeBlock());
+            combatModule.SetSlide(input.ConsumeSlide());
             DispatchWeaponAction(input, combatModule);
 
             if (input.ConsumeAim())
@@ -753,46 +811,6 @@ namespace ES
             return Vector3.Lerp(current, target, t);
         }
 
-        private void ApplyCameraLook(Vector2 lookInput, float scale, Transform camTransform, bool eyeHold)
-        {
-            if (aimTransform != null && MyCore != null)
-            {
-                ApplyAimLook(lookInput, scale, eyeHold);
-                return;
-            }
-
-            if (driveCinemachineAxes && TryDriveCinemachine(lookInput, scale, camTransform))
-            {
-                return;
-            }
-
-            Transform pivot = cameraPivot != null ? cameraPivot : cameraTransform;
-            if (pivot == null) return;
-
-            if (!_cameraAnglesInited)
-            {
-                Vector3 euler = pivot.rotation.eulerAngles;
-                _cameraYaw = euler.y;
-                _cameraPitch = NormalizePitch(euler.x);
-                _cameraYawCurrent = _cameraYaw;
-                _cameraPitchCurrent = _cameraPitch;
-                _cameraAnglesInited = true;
-            }
-
-            if (lookInput.sqrMagnitude > 0.0001f)
-            {
-                _cameraYaw += lookInput.x * cameraYawSpeed * yawMultiplier * scale * Time.deltaTime;
-                float pitchDelta = -lookInput.y * cameraPitchSpeed * pitchMultiplier * scale * Time.deltaTime;
-                _cameraPitch = ApplySoftPitch(_cameraPitch, pitchDelta, cameraPitchLimit, cameraPitchSoftZone, cameraPitchCorrectionSpeed);
-            }
-
-            float t = cameraLookSmooth <= 0f ? 1f : (1f - Mathf.Exp(-cameraLookSmooth * Time.deltaTime));
-            _cameraYawCurrent = Mathf.LerpAngle(_cameraYawCurrent, _cameraYaw, t);
-            _cameraPitchCurrent = Mathf.Lerp(_cameraPitchCurrent, _cameraPitch, t);
-
-            pivot.rotation = Quaternion.Euler(_cameraPitchCurrent, _cameraYawCurrent, 0f);
-        }
-
         private void ApplyAimLook(Vector2 lookInput, float scale, bool eyeHold)
         {
             if (aimTransform == null || MyCore == null) return;
@@ -902,56 +920,6 @@ namespace ES
 
         }
 
-        private bool TryDriveCinemachine(Vector2 lookInput, float scale, Transform camTransform)
-        {
-#if CINEMACHINE
-            if (camTransform == null) return false;
-
-            if (_cachedCinemachineTransform != camTransform)
-            {
-                _cachedCinemachineTransform = camTransform;
-                _cachedCinemachineCamera = camTransform.GetComponent<Cinemachine.CinemachineVirtualCameraBase>();
-                _cachedCinemachineFreeLook = _cachedCinemachineCamera as Cinemachine.CinemachineFreeLook;
-                _cachedCinemachinePov = _cachedCinemachineFreeLook == null && _cachedCinemachineCamera != null
-                    ? _cachedCinemachineCamera.GetCinemachineComponent<Cinemachine.CinemachinePOV>()
-                    : null;
-            }
-
-            if (_cachedCinemachineCamera == null) return false;
-
-            if (_cachedCinemachineFreeLook != null)
-            {
-                _cachedCinemachineFreeLook.m_XAxis.Value += lookInput.x * cameraYawSpeed * scale * Time.deltaTime;
-                _cachedCinemachineFreeLook.m_YAxis.Value -= lookInput.y * cameraPitchSpeed * scale * Time.deltaTime;
-                _cachedCinemachineFreeLook.m_YAxis.Value = Mathf.Clamp(
-                    _cachedCinemachineFreeLook.m_YAxis.Value,
-                    _cachedCinemachineFreeLook.m_YAxis.m_MinValue,
-                    _cachedCinemachineFreeLook.m_YAxis.m_MaxValue);
-
-                if (debugCamera) Debug.Log("[EntityAIInputDispatch] Drive Cinemachine FreeLook axes");
-                return true;
-            }
-
-            if (_cachedCinemachinePov != null)
-            {
-                _cachedCinemachinePov.m_HorizontalAxis.Value += lookInput.x * cameraYawSpeed * scale * Time.deltaTime;
-                _cachedCinemachinePov.m_VerticalAxis.Value -= lookInput.y * cameraPitchSpeed * scale * Time.deltaTime;
-                _cachedCinemachinePov.m_VerticalAxis.Value = Mathf.Clamp(
-                    _cachedCinemachinePov.m_VerticalAxis.Value,
-                    cameraPitchLimit.x,
-                    cameraPitchLimit.y);
-
-                if (debugCamera) Debug.Log("[EntityAIInputDispatch] Drive Cinemachine POV axes");
-                return true;
-            }
-
-            if (debugCamera) Debug.LogWarning("[EntityAIInputDispatch] Cinemachine camera found, but no POV/FreeLook to drive.");
-            return false;
-#else
-            return false;
-#endif
-        }
-
         private void UpdateMoveStats(Vector3 moveWorld)
         {
             float speed = moveWorld.magnitude;
@@ -1008,41 +976,15 @@ namespace ES
 
         private Transform ResolveCameraTransform()
         {
-            if (cameraTransform != null)
+            ESCameraModule camera = ESGameManager.Camera;
+            if (camera != null && camera.TryGetOutputTransform(ESCameraViewId.Main, out Transform output))
             {
-                LogCameraDetail("Direct", cameraTransform);
-                return cameraTransform;
+                LogCameraDetail("DirectorOutput", output);
+                return output;
             }
 
-            if (mainCamera != null)
-            {
-                LogCameraSource(CameraSource.MainCamera);
-                LogCameraDetail("MainCamera", mainCamera.transform);
-                return mainCamera.transform;
-            }
-
-            if (_cachedMainCamera == null)
-            {
-                _cachedMainCamera = Camera.main;
-            }
-
-            if (_cachedMainCamera != null)
-            {
-                LogCameraSource(CameraSource.MainCamera);
-                LogCameraDetail("MainCamera", _cachedMainCamera.transform);
-                return _cachedMainCamera.transform;
-            }
-
-            LogCameraSource(CameraSource.None);
-            LogCameraNull("MainCameraNull", null);
+            LogCameraNull("DirectorOutputUnavailable");
             return null;
-        }
-
-        private void LogCameraSource(CameraSource source)
-        {
-            if (!debugCamera || _lastCameraSource == source) return;
-            _lastCameraSource = source;
-            Debug.Log($"[EntityAIInputDispatch] CameraSource={source}");
         }
 
         private void LogCameraDetail(string stage, Transform t)
@@ -1056,11 +998,10 @@ namespace ES
             Debug.Log($"[EntityAIInputDispatch] Camera {stage}: name={t.name}, pos={t.position}, fwd={t.forward}");
         }
 
-        private void LogCameraNull(string reason, EntityBasicCameraModule module)
+        private void LogCameraNull(string reason)
         {
             if (!debugCamera) return;
-            string moduleName = module != null ? module.GetType().Name : "null";
-            Debug.LogWarning($"[EntityAIInputDispatch] Camera null reason={reason}, module={moduleName}");
+            Debug.LogWarning($"[EntityAIInputDispatch] Camera unavailable: {reason}");
         }
 
         public override void OnDestroy()
@@ -1096,13 +1037,6 @@ namespace ES
         FreeLook
     }
 
-    public enum CameraSource
-    {
-        None,
-        Module,
-        MainCamera
-    }
-
     [Serializable]
     public struct EntityMotionInputState
     {
@@ -1121,6 +1055,9 @@ namespace ES
         [LabelText("小眼睛(按住)")]
         public bool eyeHold;
 
+        [LabelText("格挡(按住)")]
+        public bool blockHold;
+
         [LabelText("左探头(按住)")]
         public bool peekLeftHold;
 
@@ -1136,6 +1073,7 @@ namespace ES
             look = Vector2.zero;
             flyVertical = 0f;
             eyeHold = false;
+            blockHold = false;
             peekLeftHold = false;
             peekRightHold = false;
         }

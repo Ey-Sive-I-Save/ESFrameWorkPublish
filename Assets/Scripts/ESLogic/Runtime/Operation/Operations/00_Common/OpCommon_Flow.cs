@@ -18,6 +18,21 @@ namespace ES
         [ESCompactEdit("操作列表")]
         public List<ESOutputOp> operations = new List<ESOutputOp>();
 
+        public override bool NeedsStop
+        {
+            get
+            {
+                if (operations == null)
+                    return false;
+
+                for (int i = 0; i < operations.Count; i++)
+                    if (operations[i] != null && operations[i].NeedsStop)
+                        return true;
+
+                return false;
+            }
+        }
+
         protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             if (operations == null)
@@ -53,6 +68,10 @@ namespace ES
 
         private ESOutputOp runningOp;
 
+        public override bool NeedsStop =>
+            (onTrue != null && onTrue.NeedsStop) ||
+            (onFalse != null && onFalse.NeedsStop);
+
         protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
             bool result = condition == null || condition.Evaluate(target, RuntimeSupport(scopeSupport, hostSupport));
@@ -85,6 +104,10 @@ namespace ES
         public ESOutputOp onFalse;
 
         private ESOutputOp runningOp;
+
+        public override bool NeedsStop =>
+            (onTrue != null && onTrue.NeedsStop) ||
+            (onFalse != null && onFalse.NeedsStop);
 
         protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {

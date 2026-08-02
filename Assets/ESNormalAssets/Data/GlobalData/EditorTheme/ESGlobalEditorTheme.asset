@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb2e691b4318403b8784e7a4db25024f, type: 3}
+  m_Name: ESGlobalEditorTheme
+  m_EditorClassIdentifier:
+  HasConfirm: 1
+  presetId: ES.Default
+  density: 1
+  showSectionSubtitle: 1
+  useCustomPalette: 1
+  darkAccentStart: {r: 0.48, g: 0.78, b: 1, a: 0.92}
+  darkAccentEnd: {r: 0.13, g: 0.42, b: 0.72, a: 0.96}
+  darkWarning: {r: 0.9, g: 0.68, b: 0.24, a: 0.96}
+  darkError: {r: 0.92, g: 0.4, b: 0.24, a: 0.96}
+  lightAccentStart: {r: 0.12, g: 0.46, b: 0.82, a: 0.92}
+  lightAccentEnd: {r: 0.04, g: 0.24, b: 0.56, a: 0.96}
+  lightWarning: {r: 0.72, g: 0.29, b: 0.05, a: 0.96}
+  lightError: {r: 0.78, g: 0.24, b: 0.1, a: 0.96}

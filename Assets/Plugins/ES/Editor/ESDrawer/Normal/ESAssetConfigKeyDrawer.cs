@@ -498,6 +498,7 @@ namespace ES.EditorInternal
                 case ESAssetReferKind.AudioClip: return typeof(AudioClip);
                 case ESAssetReferKind.VideoClip: return typeof(UnityEngine.Video.VideoClip);
                 case ESAssetReferKind.TerrainData: return typeof(TerrainData);
+                case ESAssetReferKind.Raw: return typeof(TextAsset);
                 case ESAssetReferKind.ScriptableObject: return typeof(ScriptableObject);
                 case ESAssetReferKind.PlayableAsset: return typeof(UnityEngine.Playables.PlayableAsset);
                 case ESAssetReferKind.TimelineAsset: return typeof(UnityEngine.Playables.PlayableAsset);
@@ -861,6 +862,24 @@ namespace ES.EditorInternal
         }
     }
 
+    /// <summary>跨编辑器程序集按 ConfigKey 解析资源的最小公开入口。</summary>
+    public static class ESAssetCatalogKeyResolver
+    {
+        public static bool TryResolveAsset(
+            ESAssetReferKind kind,
+            int enumKey,
+            string stringKey,
+            out UnityEngine.Object asset)
+        {
+            asset = null;
+            if (!ESAssetCatalogKeyPicker.TryFindByKey(kind, enumKey, stringKey, out ESAssetCatalogKeyPicker.Candidate candidate))
+                return false;
+
+            asset = ESAssetCatalogKeyPicker.ResolveAsset(candidate);
+            return asset != null;
+        }
+    }
+
     [CustomPropertyDrawer(typeof(ESAssetReferPrefabConfigKey))]
     public sealed class ESAssetReferPrefabConfigKeyDrawer : ESAssetConfigKeyDrawerBase { protected override Type ResolveEnumType() => typeof(ESAssetReferPrefabEnumKey); protected override ESAssetReferKind ResolveKind() => ESAssetReferKind.Prefab; }
 
@@ -878,6 +897,9 @@ namespace ES.EditorInternal
 
     [CustomPropertyDrawer(typeof(ESAssetReferTexture2DConfigKey))]
     public sealed class ESAssetReferTexture2DConfigKeyDrawer : ESAssetConfigKeyDrawerBase { protected override Type ResolveEnumType() => typeof(ESAssetReferTexture2DEnumKey); protected override ESAssetReferKind ResolveKind() => ESAssetReferKind.Texture2D; }
+
+    [CustomPropertyDrawer(typeof(ESAssetReferRawConfigKey))]
+    public sealed class ESAssetReferRawConfigKeyDrawer : ESAssetConfigKeyDrawerBase { protected override Type ResolveEnumType() => typeof(ESAssetReferRawEnumKey); protected override ESAssetReferKind ResolveKind() => ESAssetReferKind.Raw; }
 
     [CustomPropertyDrawer(typeof(ESAssetReferMaterialConfigKey))]
     public sealed class ESAssetReferMaterialConfigKeyDrawer : ESAssetConfigKeyDrawerBase { protected override Type ResolveEnumType() => typeof(ESAssetReferMaterialEnumKey); protected override ESAssetReferKind ResolveKind() => ESAssetReferKind.Material; }

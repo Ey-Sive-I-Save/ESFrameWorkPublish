@@ -5012,7 +5012,7 @@ MonoBehaviour:
           - rid: 3128555942915604487
           - rid: 3128555942915604488
           MayHasAddingElement: 1
-        autoEnsurePlayerInputModules: 1
+        autoEnsurePlayerInputModules: 0
     - rid: 3128555942915604484
       type: {class: EntityBasicMoveRotateModule, ns: ES, asm: ES_Logic}
       data:
@@ -6067,38 +6067,6 @@ MonoBehaviour:
           testLoopable: 0
         defaultStateKey: 
         initialStateName: 
-    - rid: 3128555942915604490
-      type: {class: EntityBasicCameraModule, ns: ES, asm: ES_Logic}
-      data:
-        _enableSelf: 1
-        mode: 1
-        firstPerson:
-          main:
-            virtualCamera: {fileID: 0}
-            fallbackTransform: {fileID: 0}
-          slotA:
-            virtualCamera: {fileID: 0}
-            fallbackTransform: {fileID: 0}
-          slotB:
-            virtualCamera: {fileID: 0}
-            fallbackTransform: {fileID: 0}
-          dynamicSlot:
-            virtualCamera: {fileID: 0}
-            fallbackTransform: {fileID: 0}
-        thirdPerson:
-          main:
-            virtualCamera: {fileID: 0}
-            fallbackTransform: {fileID: 0}
-          slotA:
-            virtualCamera: {fileID: 0}
-            fallbackTransform: {fileID: 0}
-          slotB:
-            virtualCamera: {fileID: 0}
-            fallbackTransform: {fileID: 0}
-          dynamicSlot:
-            virtualCamera: {fileID: 0}
-            fallbackTransform: {fileID: 0}
-        activeCameraTransform: {fileID: 0}
     - rid: 3128556031534694442
       type: {class: EntityBasicMountModule, ns: ES, asm: ES_Logic}
       data:

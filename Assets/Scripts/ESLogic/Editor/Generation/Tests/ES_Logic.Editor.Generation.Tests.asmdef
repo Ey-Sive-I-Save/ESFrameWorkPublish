@@ -1,0 +1,24 @@
+{
+    "name": "ES_Logic.Editor.Generation.Tests",
+    "rootNamespace": "ES.Tests",
+    "references": [
+        "ES_Logic.Editor",
+        "ES_Logic",
+        "ES_Stand",
+        "ES_Design"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

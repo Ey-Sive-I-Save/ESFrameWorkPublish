@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
+[assembly: InternalsVisibleTo("ES_Design.ConfigKey.Tests")]
+
 namespace ES
 {
     /// <summary>
@@ -16,7 +18,7 @@ namespace ES
         private const int MaxPoolCount = 1000;
         private const int InitPoolCount = 20;
 
-        public static readonly ESSimplePool<ESRuntimeTargetPack> Pool = new ESSimplePool<ESRuntimeTargetPack>(
+        internal static readonly ESSimplePool<ESRuntimeTargetPack> Pool = new ESSimplePool<ESRuntimeTargetPack>(
             factoryMethod: () => new ESRuntimeTargetPack(),
             resetMethod: null,
             initCount: InitPoolCount,
@@ -27,12 +29,9 @@ namespace ES
         private object[] extras;
         private int extraCount;
         private bool extrasEnabled;
-        private object recycleToken;
-        private bool recycleRequested;
-
         public bool IsRecycled { get; set; }
 
-        public int Version { get; private set; }
+        public long Version { get; private set; }
 
         /// <summary>使用者/发起者，一般是释放技能或触发效果的 Entity。</summary>
         public Entity userEntity;
@@ -68,18 +67,6 @@ namespace ES
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return extraCount; }
-        }
-
-        public bool IsRecycleRequested
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return recycleRequested; }
-        }
-
-        public object RecycleToken
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return recycleToken; }
         }
 
         public bool ExtrasEnabled
@@ -255,6 +242,11 @@ namespace ES
             return true;
         }
 
+        /// <summary>
+        /// Partial operational copy. This preserves its historic opt-in target/extra behaviour and
+        /// is not a complete long-lived snapshot: it does not copy runtimeFloat/runtimeBool and may
+        /// truncate target lists when the destination has insufficient capacity.
+        /// </summary>
         public ESRuntimeTargetPack CopyFrom(ESRuntimeTargetPack source, bool copyTargets = true, bool copyExtras = false)
         {
             if (source == null)
@@ -294,6 +286,41 @@ namespace ES
             }
 
             return this;
+        }
+
+        /// <summary>
+        /// Copies the safe, long-lived target snapshot from an active Pack. Target lists are copied
+        /// without aliasing and capacity is grown before copying. Extras are intentionally cleared:
+        /// they may contain short-lived Context or pooled objects and must be transferred explicitly.
+        /// </summary>
+        public bool TryCopySnapshotFrom(ESRuntimeTargetPack source)
+        {
+            if (IsRecycled || source == null || source.IsRecycled)
+                return false;
+
+            if (ReferenceEquals(source, this))
+                return true;
+
+            userEntity = source.userEntity;
+            entityMainTarget = source.entityMainTarget;
+            userItem = source.userItem;
+            itemMainTarget = source.itemMainTarget;
+            runtimeFloat = source.runtimeFloat;
+            runtimeBool = source.runtimeBool;
+
+            int entityCount = source.targetEntities.Count;
+            int itemCount = source.targetItems.Count;
+            EnsureListCapacity(entityCount, itemCount);
+            targetEntities.Clear();
+            targetItems.Clear();
+            for (int i = 0; i < entityCount; i++)
+                targetEntities.Add(source.targetEntities[i]);
+            for (int i = 0; i < itemCount; i++)
+                targetItems.Add(source.targetItems[i]);
+
+            ResetAllExtras();
+            extrasEnabled = false;
+            return true;
         }
 
         public ESRuntimeTargetPack CopyTo(ESRuntimeTargetPack target, bool copyTargets = true, bool copyExtras = false)
@@ -438,49 +465,45 @@ namespace ES
             ResetAllFields();
             ResetAllExtras();
             extrasEnabled = false;
-            recycleToken = null;
-            recycleRequested = false;
             Version++;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TryAutoPushedToPool()
+        void IPoolableAuto.TryAutoPushedToPool()
         {
             ForcePushToPool();
         }
 
-        public void HoldRecycle(object newRecycleToken)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool TryReturnOwned(ESRuntimeTargetPack target, long rentedVersion)
         {
-            if (IsRecycled)
-                return;
+            if (target == null || target.IsRecycled || target.Version != rentedVersion)
+                return false;
 
-            recycleRequested = true;
-            recycleToken = newRecycleToken;
+            return target.ForcePushToPool();
         }
 
-        public bool CompleteRecycle(object requestToken)
+        internal bool ForcePushToPool()
         {
             if (IsRecycled)
                 return false;
 
-            if (!recycleRequested || !ReferenceEquals(requestToken, recycleToken))
-                return false;
-
-            return PushToPoolDirectly();
-        }
-
-        public bool ForcePushToPool()
-        {
-            if (IsRecycled)
-                return false;
-
-            recycleRequested = true;
             return PushToPoolDirectly();
         }
 
         private bool PushToPoolDirectly()
         {
-            return Pool.PushToPool(this);
+            if (Pool.PushToPool(this))
+                return true;
+
+            // A full or cleared pool discards the instance before its normal reset hook. Clear
+            // retained Unity references anyway so the detached object is harmless until GC.
+            if (!IsRecycled)
+            {
+                OnResetAsPoolable();
+                IsRecycled = true;
+            }
+            return false;
         }
 
         private void ResetAllFields()

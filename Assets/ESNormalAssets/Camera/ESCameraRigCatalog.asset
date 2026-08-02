@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a920dfda1ee349c08ad53f456204ee8c, type: 3}
+  m_Name: ESCameraRigCatalog
+  m_EditorClassIdentifier: 
+  entries:
+  - rigKey: player.third_person
+    rigPrefab: {fileID: 1195995634769709707, guid: c476ffe057002cf41b90cef7bd869465,
+      type: 3}
+  - rigKey: vehicle.chase
+    rigPrefab: {fileID: 5846819819502228971, guid: ea16d50c77ca46447bf9a15d0c5a45d0,
+      type: 3}

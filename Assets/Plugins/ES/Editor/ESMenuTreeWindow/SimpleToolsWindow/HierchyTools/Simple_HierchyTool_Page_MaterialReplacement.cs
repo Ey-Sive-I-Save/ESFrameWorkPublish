@@ -14,13 +14,13 @@ namespace ES
 {
     #region 材质批量替换工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_MaterialReplacement : ESWindowPageBase
     {
         private const int PreviewDialogLimit = 14;
         private const int ReportExportLimit = 200;
 
-        [Title("材质批量替换工具", "先扫描预览，再按预览结果安全替换场景对象上的材质引用。", bold: true, titleAlignment: TitleAlignments.Centered)]
-        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        [DisplayAsString(fontSize: 13), HideLabel]
         public string readMe = "适合批量修正 Renderer、ParticleSystemRenderer 和脚本序列化字段里的材质引用。执行前会显示命中项，执行后支持 Ctrl+Z 撤销。";
 
         public enum TargetScope
@@ -73,11 +73,11 @@ namespace ES
         }
 
         [HideInInspector]
-        [LabelText("目标范围"), EnumToggleButtons]
+        [LabelText("目标范围")]
         public TargetScope targetScope = TargetScope.SelectedWithChildren;
 
         [HideInInspector]
-        [LabelText("处理组件"), EnumToggleButtons]
+        [LabelText("处理组件")]
         public ComponentType componentTypes = ComponentType.Renderer | ComponentType.ParticleSystemRenderer;
 
         [HideInInspector]
@@ -85,7 +85,7 @@ namespace ES
         public bool includeInactive = true;
 
         [HideInInspector]
-        [LabelText("扫描脚本字段"), GUIColor(0.95f, 0.78f, 0.35f)]
+        [LabelText("扫描脚本字段")]
         [ShowIf("@(this.componentTypes & ES.Page_MaterialReplacement.ComponentType.MonoBehaviour) != 0")]
         public bool scanSerializedScriptFields = false;
 
@@ -94,7 +94,7 @@ namespace ES
         public bool skipHideFlagsObjects = true;
 
         [HideInInspector]
-        [LabelText("替换模式"), EnumToggleButtons]
+        [LabelText("替换模式")]
         public ReplacementMode replacementMode = ReplacementMode.ReplaceSpecific;
 
         [HideInInspector]
@@ -337,24 +337,20 @@ namespace ES
 
         private void DrawMaterialHeader()
         {
-            int targetCount = CollectTargets().Count;
             int enabledPreview = replacementPreview.Count(item => item.Enabled);
             int writablePreview = replacementPreview.Count(item => item.Enabled && item.CanWrite);
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-            {
-                EditorGUILayout.LabelField("材质引用审计与替换台", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("先扫描材质引用，再按预览结果执行替换。场景实例和 Prefab 资产分开处理，避免资产级修改混入场景操作。", EditorStyles.wordWrappedMiniLabel);
-                EditorGUILayout.Space(4);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    DrawMetric("目标对象", targetCount.ToString());
-                    DrawMetric("预览命中", replacementPreview.Count.ToString());
-                    DrawMetric("已勾选", enabledPreview.ToString());
-                    DrawMetric("可写", writablePreview.ToString());
-                    DrawMetric("资产命中", prefabAssetPreview.Count.ToString());
-                }
-            }
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "材质引用审计与替换台",
+                "先扫描材质引用，再按预览结果执行替换；场景实例和 Prefab 资产严格分开处理。",
+                SimpleToolsMaturity.Upgrading,
+                "执行会修改场景对象或 Prefab 资产；当前页面只渲染缓存，扫描由明确按钮触发。");
+            SimpleToolsPanelUtility.DrawSummary(
+                $"目标范围: {GetEditingSourceLabel()}",
+                $"预览命中: {replacementPreview.Count}",
+                $"已勾选: {enabledPreview}",
+                $"可写: {writablePreview}",
+                $"资产命中: {prefabAssetPreview.Count}");
         }
 
         private void DrawMaterialModeTabs()
@@ -365,7 +361,7 @@ namespace ES
         private void DrawMaterialScopePanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("扫描范围", "选择扫描场景对象、当前选择，或在资产模式中扫描 Prefab 文件。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 targetScope = (TargetScope)EditorGUILayout.Popup("目标范围", (int)targetScope, TargetScopeLabels);
                 includeInactive = EditorGUILayout.Toggle("包含未激活", includeInactive);
@@ -381,7 +377,7 @@ namespace ES
         private void DrawMaterialRulePanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("匹配规则", "定义哪些材质引用会进入替换预览。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 replacementMode = (ReplacementMode)EditorGUILayout.Popup("匹配模式", (int)replacementMode, ReplacementModeLabels);
 
@@ -411,7 +407,7 @@ namespace ES
         private void DrawMaterialTargetPanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("替换目标", "所有命中的引用会被替换为这个目标材质。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 targetMaterial = (Material)EditorGUILayout.ObjectField("目标材质", targetMaterial, typeof(Material), false);
                 DrawInfoRow("目标 Shader", targetMaterial != null && targetMaterial.shader != null ? targetMaterial.shader.name : "未设置");
@@ -430,7 +426,7 @@ namespace ES
         private void DrawScenePreviewActions()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("Preview and execute", "Scene mode only processes instance references in the scene or Prefab Mode. The preview signature is checked before execution.");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 if (IsPreviewStale(replacementPreview.Count))
                     SimpleToolsPanelUtility.DrawWarning("设置已变化，当前预览可能不是最新。执行时会自动重建预览，建议先手动刷新确认。");
@@ -464,7 +460,7 @@ namespace ES
                 return;
 
             SimpleToolsPanelUtility.DrawSectionTitle("预览统计", "用于快速判断命中是否集中在某些材质、Shader、组件或 Prefab 实例。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 DrawInfoRow("材质分布", BuildMaterialSummary(rows, 6));
                 DrawInfoRow("Shader分布", BuildShaderSummary(rows, 6));
@@ -479,7 +475,7 @@ namespace ES
                 return;
 
             SimpleToolsPanelUtility.DrawSectionTitle("Result filters", "Search by object path, material, shader, component, slot, or source.");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -506,7 +502,7 @@ namespace ES
             if (replacementPreview.Count == 0)
                 return;
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField($"替换预览表  ({rows.Count}/{replacementPreview.Count})", EditorStyles.boldLabel);
                 if (rows.Count == 0)
@@ -560,7 +556,7 @@ namespace ES
         private void DrawPrefabAssetModePanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("Prefab 资产模式", "资产模式会 LoadPrefabContents 并保存 Prefab 文件，适合批量修正资源库中的预制件。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 enablePrefabAssetBatch = true;
                 useSelectedPrefabAssets = EditorGUILayout.Toggle("优先处理 Project 中选中的 Prefab 资产", useSelectedPrefabAssets);
@@ -589,7 +585,7 @@ namespace ES
 
             var rows = GetFilteredPrefabAssetRecords(false);
             SimpleToolsPanelUtility.DrawSectionTitle("资产预览统计", "按 Prefab 文件统计命中和可写引用。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 DrawInfoRow("命中资产", $"{rows.Count}/{prefabAssetPreview.Count}");
                 DrawInfoRow("引用统计", $"命中 {rows.Sum(r => r.MatchedCount)} | 可写 {rows.Sum(r => r.WritableCount)}");
@@ -603,7 +599,7 @@ namespace ES
                 return;
 
             var rows = GetFilteredPrefabAssetRecords(true);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField($"Prefab 资产预览表  ({rows.Count}/{prefabAssetPreview.Count})", EditorStyles.boldLabel);
                 if (rows.Count == 0)
@@ -654,7 +650,7 @@ namespace ES
                 return;
             }
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
                 if (!string.IsNullOrWhiteSpace(lastResultDetail))
@@ -776,7 +772,7 @@ namespace ES
             }
 
             [HorizontalGroup("Actions")]
-            [Button("Ping对象", ButtonHeight = 24), GUIColor(0.4f, 0.75f, 0.45f)]
+            [Button("Ping对象", ButtonHeight = 24)]
             public void PingObject()
             {
                 if (TargetObject == null)
@@ -787,7 +783,7 @@ namespace ES
             }
 
             [HorizontalGroup("Actions")]
-            [Button("Ping当前材质", ButtonHeight = 24), GUIColor(0.35f, 0.58f, 0.9f)]
+            [Button("Ping当前材质", ButtonHeight = 24)]
             public void PingCurrentMaterial()
             {
                 if (CurrentMaterial == null)
@@ -798,7 +794,7 @@ namespace ES
             }
 
             [HorizontalGroup("Actions")]
-            [Button("Ping目标材质", ButtonHeight = 24), GUIColor(0.75f, 0.55f, 0.25f)]
+            [Button("Ping目标材质", ButtonHeight = 24)]
             public void PingTargetMaterial()
             {
                 if (TargetMaterial == null)
@@ -838,7 +834,7 @@ namespace ES
             public Material material;
 
             [HorizontalGroup("Actions")]
-            [Button("Ping对象", ButtonHeight = 24), GUIColor(0.4f, 0.75f, 0.45f)]
+            [Button("Ping对象", ButtonHeight = 24)]
             public void FocusObject()
             {
                 if (targetObject == null)
@@ -849,7 +845,7 @@ namespace ES
             }
 
             [HorizontalGroup("Actions")]
-            [Button("Ping材质", ButtonHeight = 24), GUIColor(0.35f, 0.58f, 0.9f)]
+            [Button("Ping材质", ButtonHeight = 24)]
             public void FocusMaterial()
             {
                 if (material == null)

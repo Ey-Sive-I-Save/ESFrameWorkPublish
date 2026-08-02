@@ -385,6 +385,51 @@ namespace ES
             return true;
         }
 
+        /// <summary>
+        /// 渲染当前相机姿态，不写入 Transform。Cinemachine 等拥有相机姿态权威的编辑器
+        /// 预览必须使用此入口，不能先让 RenderGUI 的自由轨道相机覆盖它。
+        /// </summary>
+        public bool RenderCurrentCameraGUI(Rect rect, ESEditorPreviewRenderOptions options)
+        {
+            Ensure();
+            if (Camera == null || rect.width < 1f || rect.height < 1f)
+                return false;
+
+            if (Event.current == null || Event.current.type != EventType.Repaint)
+                return true;
+
+            float scale = Mathf.Clamp(EditorGUIUtility.pixelsPerPoint * options.RenderScale, 0.5f, 4f);
+            int width = Mathf.Max(1, Mathf.CeilToInt(rect.width * scale));
+            int height = Mathf.Max(1, Mathf.CeilToInt(rect.height * scale));
+            EnsureRenderTexture(width, height, options.Quality);
+            if (renderTexture == null)
+                return false;
+
+            double now = EditorApplication.timeSinceStartup;
+            if (options.MinRenderInterval > 0d && lastRenderTime > 0d && now - lastRenderTime < options.MinRenderInterval)
+            {
+                GUI.DrawTexture(rect, renderTexture, ScaleMode.StretchToFill, false);
+                return true;
+            }
+
+            RenderTexture oldTarget = Camera.targetTexture;
+            RenderTexture oldActive = RenderTexture.active;
+            try
+            {
+                Camera.targetTexture = renderTexture;
+                Camera.Render();
+                lastRenderTime = now;
+                GUI.DrawTexture(rect, renderTexture, ScaleMode.StretchToFill, false);
+            }
+            finally
+            {
+                Camera.targetTexture = oldTarget;
+                RenderTexture.active = oldActive;
+            }
+
+            return true;
+        }
+
         public Texture2D Snapshot(int width, int height, ESEditorPreviewCameraPose pose, ESEditorPreviewQuality quality, string textureName)
         {
             Ensure();

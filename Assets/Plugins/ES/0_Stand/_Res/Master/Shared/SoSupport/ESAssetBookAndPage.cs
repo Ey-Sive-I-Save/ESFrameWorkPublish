@@ -309,6 +309,7 @@ namespace ES
             if (asset is SceneAsset) return ESAssetReferKind.Scene;
             if (asset is Sprite) return ESAssetReferKind.Sprite;
             if (asset is UnityEngine.U2D.SpriteAtlas) return ESAssetReferKind.SpriteAtlas;
+            if (asset is TextAsset) return ESAssetReferKind.Raw;
             if (asset is Texture2D) return ESAssetReferKind.Texture2D;
             if (asset is Texture) return ESAssetReferKind.Texture;
             if (asset is Material) return ESAssetReferKind.Material;

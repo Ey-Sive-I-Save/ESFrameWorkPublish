@@ -40,6 +40,7 @@ namespace ES
                 case ESAssetReferKind.TimelineAsset: return TryResolveAssetIdentity(ESRuntimeDataAsset.TimelineAssets, enumKey, stringKey, out identity);
                 case ESAssetReferKind.VideoClip: return TryResolveAssetIdentity(ESRuntimeDataAsset.VideoClips, enumKey, stringKey, out identity);
                 case ESAssetReferKind.TerrainData: return TryResolveAssetIdentity(ESRuntimeDataAsset.TerrainDatas, enumKey, stringKey, out identity);
+                case ESAssetReferKind.Raw: return TryResolveAssetIdentity(ESRuntimeDataAsset.RawAssets, enumKey, stringKey, out identity);
                 default:
                     identity = default;
                     return false;

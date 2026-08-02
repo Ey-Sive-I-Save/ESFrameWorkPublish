@@ -1,7 +1,7 @@
 # ES Buff Runtime Standard
 
-状态：代码与程序集编译通过；Unity Test Runner、实际 GameCore Bake 与长时间 Player/IL2CPP 压测待验收。  
-最后验证：2026-07-31。  
+状态：代码结构与定向静态检查已完成；当前 Unity 生成的项目文件仍需刷新：`ES_Logic.csproj` 实测为 0 warning / 3 errors，原因是既有 RawConfig 源码未收录；`ESCharacterAttributeCatalog.generated.cs` 已被 ES_Logic 收录，但两个 Editor 生成器文件未被 `ES_Logic.Editor.csproj` 收录。不能宣称全工程静态构建已验收。Unity Test Runner、实际 GameCore Bake 与长时间 Player/IL2CPP 压测待验收。
+最后验证：2026-08-01。
 适用源码入口：`BuffDefinitionDataInfo`、`EntityBuffDomain`、`ESActiveBuffRuntime`。
 
 ## 目标
@@ -111,28 +111,28 @@ operation = ESBuffOperation.Default.ResetDuration().AddStack(1);
 
 同一 Key 在同一来源下若配置为多个 `IndependentInstance`，Key 无法安全猜测该改哪一个；必须保留 `AddBuff` 返回的 `ESActiveBuffRuntime`，再调用 `ApplyBuff(runtime, operation)`。等级是运行时事实，Buff 的 Op/自定义表达式可从 `scopeSupport.GetOwner<ESActiveBuffRuntime>()` 读取 `Level`；它不会凭空给数值效果加倍率，具体倍率仍由 Buff 定义表达。
 
-`sourceSupport` 只在施加瞬间用于解析来源身份和复制来源/目标信息。Buff 不保存这个 Support，也不在未来的 Refresh、Tick、Remove 中回头使用它，因为攻击和技能 Support 可以先于延时 Buff 回池。长效 Buff 后续 Op 始终使用自己的 Buff Support 与自有 TargetPack 快照；需要跨生命周期传递的数据必须放入 Buff 定义，或显式写入会被复制的 Entity/Item 目标与数值槽位，不能依赖临时 Support 的 Context、缓存或 TargetPack extras。
+`sourceSupport` 只在施加瞬间用于解析来源身份和复制来源/目标信息。Buff 不保存这个 Support，也不在未来的 Refresh、Tick、Remove 中回头使用它，因为攻击和技能 Support 可以先于延时 Buff 回池。长效 Buff 后续 Op 始终使用自己的 Buff Support 与自有 TargetPack 快照。`TryCopySnapshotFrom()` 会复制 User、主目标、实体/Item 目标列表和 `runtimeFloat/runtimeBool`，并自动扩容；它刻意清空 `Extras`。需要跨生命周期传递的数据必须放入 Buff 定义，或显式写入这些可复制的目标与数值槽位，不能依赖临时 Support 的 Context、缓存或 TargetPack extras。
 
 ### 可选自定义机制逻辑
 
 `logic` 是 `BuffSharedData` 上唯一的复杂机制扩展点。它只用于护盾吸收、受击累计、战斗事件订阅、动态目标规则等确实需要独立运行状态的 Buff；Tag、数值、权限、普通 Tick 与固定流程仍优先使用已有配置和 Op，禁止为了简单加减属性创建 Logic。
 
 ```text
-BuffDefinition.logic (ESBuffLogic, 只读配置)
+BuffDefinition.logic (ESBuffLogic, 只读配置与机制规则)
     -> 每次实际施加时 RentRuntime()
     -> ESBuffLogicRuntime (该 Active Buff 独占状态)
-    -> Apply / Refresh / Tick / Remove / Release
+    -> Logic.OnApply(runtime) / OnRefresh / OnTick / OnRemove / OnRelease
 ```
 
-`ESBuffLogic` 绝不保存目标、层数、订阅句柄、Lease、Token 或计时器。它必须从自己的池租出一个 `ESBuffLogicRuntime`；后者通过 `Buff`、`Owner`、`Target`、`Support` 访问当前实例，并在 `OnRelease()` 中归还自己建立的订阅、Lease 和 Token。框架随后调用 `TryAutoPushedToPool()`，因此多个来源或多个独立实例不会共享机制状态。
+`ESBuffLogic` 绝不保存目标、层数、订阅句柄、Lease、Token 或计时器。它从自己的池租出一个 `ESBuffLogicRuntime`，并通过各生命周期回调接收该 Runtime；规则读取自身配置，操作 Runtime 的独占状态。Runtime 通过 `Buff`、`Owner`、`Target`、`Support` 访问当前实例。`Logic.OnRelease(runtime)` 归还该 Runtime 持有的订阅、Lease 和 Token，框架随后脱离 Buff 并调用 `TryAutoPushedToPool()`，因此多个来源或多个独立实例不会共享机制状态。
 
 | 回调 | 调用时机 | 失败语义 |
 | --- | --- | --- |
-| `OnApply()` | 标准 Tag / ValueChange / Permit 已成功建立后，Apply Op 前 | 返回 `false` 或抛异常会完整回滚 Buff；不执行正常 `OnRemove()` |
-| `OnRefresh()` | 层数、时间或等级变更及相关 ValueChange 刷新后，Refresh Op 前 | 记录并隔离异常，Buff 仍保持有效 |
-| `OnTick(deltaTime)` | 复用该 Buff 的 TickMode、间隔和追帧上限，Tick Op 前 | 异常使当前 Buff 结束，不影响同 Entity 其他 Buff |
-| `OnRemove()` | 正常移除时，Remove Op 前 | 记录并隔离异常，后续清理继续执行 |
-| `OnRelease()` | 正常移除、Apply 回滚、池化清理都会执行；标准资源释放前 | 必须释放 Logic 自己资源；即使异常也仍尝试回池 |
+| `Logic.OnApply(runtime)` | 标准 Tag / ValueChange / Permit 已成功建立后，Apply Op 前 | 返回 `false` 或抛异常会完整回滚 Buff；不执行正常 `OnRemove()` |
+| `Logic.OnRefresh(runtime)` | 层数、时间或等级变更及相关 ValueChange 刷新后，Refresh Op 前 | 记录并隔离异常，Buff 仍保持有效 |
+| `Logic.OnTick(runtime, deltaTime)` | 复用该 Buff 的 TickMode、间隔和追帧上限，Tick Op 前 | 异常使当前 Buff 结束，不影响同 Entity 其他 Buff |
+| `Logic.OnRemove(runtime)` | 正常移除时，Remove Op 前 | 记录并隔离异常，后续清理继续执行 |
+| `Logic.OnRelease(runtime)` | 正常移除、Apply 回滚、池化清理都会执行；标准资源释放前 | 必须释放 Runtime 内的 Logic 资源；即使异常也仍尝试回池 |
 
 没有配置 `logic` 时，Buff 不租用运行对象、不创建集合、不注册 Link，也不产生 GC；仅保留现有生命周期中的空引用快速判断。Logic 的 `OnTick` 与其调用链属于 Buff 热路径，稳定帧必须保持 0 GC。
 
@@ -185,6 +185,8 @@ entity.buffDomain.ClearBuffFrame(state);
 | Pool | Runtime 清零后回收到 Domain 缓存或全局 Pool | 旧 Tag Lease 与 ValueChange Token 不得影响下一次复用 |
 
 这里的“完整”是所有权完整，不等于任意 `ESOutputOp` 的外部副作用可以自动回滚。具有不可逆副作用的 Op 必须自己提供幂等停止或补偿逻辑。
+
+Buff 的属性目标会在 Bake 与 Apply 阶段拒绝未配置身份、非 Character Catalog、Float/Permit 类型错误、EnumKey/StringKey 双别名不一致和缺少 `change`。表达式是否确定、以及执行结果是否为 `NaN`/无穷值，仍由运行阶段防御；这部分尚未全部提升为 Bake 错误，不能宣称所有错误配置都会在施加前被拒绝。
 
 ## 性能约束
 

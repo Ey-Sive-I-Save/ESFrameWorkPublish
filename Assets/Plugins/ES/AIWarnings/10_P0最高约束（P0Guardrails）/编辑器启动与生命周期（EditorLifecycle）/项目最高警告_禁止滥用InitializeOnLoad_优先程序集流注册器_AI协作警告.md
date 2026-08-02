@@ -89,6 +89,23 @@ public class ER_SomeAttribute : EditorRegister_FOR_FieldAttribute<SomeAttribute>
 - 域重载后无条件创建对象、扫描资源、打开窗口。
 - update 常驻但没有运行条件、退订条件、异常保护。
 
+## ESSO 编辑器预加载边界
+
+`[ESSOEditorPreLoad]` 不是“所有全局 SO 都预加载”的快捷开关。它先由程序集流在 Level0 前登记，再由 `SoEditorIniter` 消费；只有编辑器启动后立刻需要且能证明收益的 ESSO 才能标记。
+
+当前明确允许的预加载类型只有：
+
+```text
+ESSceneGlobalData
+ESGlobalProjectAssetGuideData
+ESGlobalEditorLocation
+ESGlobalEditorDefaultConfi
+```
+
+新增该标记前必须说明：为什么不能按需加载、预期资产量、是否会引入全项目扫描，以及如何验证域重载重复执行安全。普通 GameCore、资源库、示例、诊断数据和玩法 SO 不得因“方便”进入预加载集合。
+
+性能报告必须分开解释“程序集流/类型登记”与“Unity 资产反序列化”。一次实测记录为：45 个 GUID、45 条路径、86 个 ESSO 实例、总计约 376ms，其中 `AssetDatabase.LoadAllAssetsAtPath` 约 362ms。该数据表明主要耗时在 SO 资产加载，不能误写为 SoEditorIniter 的程序集注册耗时；后续报告必须保留同类分项。
+
 ## 给后续 AI 的结论
 
 ESFramework 的编辑器自动初始化统一路径是：

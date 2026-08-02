@@ -214,8 +214,8 @@ namespace ES
                             ESAssetReferenceGraph graph = graphs[library];
                             SetProgress(libraries.Count * 2 + consumers.Count + 1 + index, TotalSteps, "写入资源目录与引用图：" + catalog.libraryName);
                             string outputFolder = ESAssetPipelineIO.LibraryBakeFolder(catalog.libraryFolder);
-                            ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.CatalogFileName), catalog);
-                            ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.ReferenceGraphFileName), graph);
+                            ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.CatalogFileName), catalog, true);
+                            ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.ReferenceGraphFileName), graph, true);
                             index++;
                             return ESEditorLongTaskStepResult.Continue;
                         }

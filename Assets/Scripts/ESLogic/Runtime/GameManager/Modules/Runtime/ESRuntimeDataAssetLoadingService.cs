@@ -220,6 +220,7 @@ namespace ES
             ESRuntimeDataAsset.TimelineAssets.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTimelineAssetConfigData, UnityEngine.Object>(provider));
             ESRuntimeDataAsset.VideoClips.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip>(provider));
             ESRuntimeDataAsset.TerrainDatas.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTerrainDataConfigData, TerrainData>(provider));
+            ESRuntimeDataAsset.RawAssets.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferRawConfigData, TextAsset>(provider));
         }
     }
 }

@@ -22,7 +22,9 @@ CreateAssetMenu: 【ES】/项目设置/GameCore/编辑器全局数据
 Base: ESEditorGlobalSo<GameCoreEditorGlobalData>
 ```
 
-它集中维护编辑器可见的跨系统语义、推荐规则、GameTag 定义和 AI Command 模板，不进入运行时配置链，也不替代各领域真实 DataInfo、Catalog 或 Table。它不做代码生成。
+它集中维护编辑器可见的跨系统语义、推荐规则、GameTag 定义、角色/物品属性 Schema 和 AI Command 模板，不进入运行时配置链，也不替代各领域真实 DataInfo、Catalog 或 Table。
+
+它唯一允许的代码生成是确定性投影：`characterAttributes` 中标记 `fixedApiName` 的 Character `HotSlot` 行生成固定数组访问 API。生成文件不是第二份配置，普通 Character HotSlot、Sparse、Item 属性和 GameTag 都不会因此被强行代码化。基础值、范围、显示名、公式、迁移键和 Buff 绑定只改 GameCore 后直接 Bake；只有固定 API 的名称、类型、稳定身份或槽位结构变化才需要生成并等待 Unity 编译。
 
 ## 资产与 ES 入口
 
@@ -39,9 +41,12 @@ Assets/ESNormalAssets/Data/GlobalData/GameCore/GameCoreEditorGlobalData.asset
 【ES】/项目设置/GameCore/重置GameCore编辑器推荐规则
 【ES】/项目设置/GameCore/补齐缺失的GameTag规则
 【ES】/项目设置/GameCore/验证GameTag规则
-【ES】/项目设置/GameCore/Bake并应用GameTag Catalog
+【ES】/项目设置/GameCore/补齐角色与物品属性表
+【ES】/项目设置/GameCore/验证角色与物品属性表
+【ES】/项目设置/GameCore/生成角色固定属性代码
+【ES】/项目设置/GameCore/Bake并应用GameCore Catalog
 【ES】/项目设置/GameCore/运行GameTag核心自检
-【ES】/项目设置/GameCore/验证全部Buff的GameTag配置
+【ES】/项目设置/GameCore/验证全部Buff的Tag与属性配置
 【ES】/项目设置/GameCore/验证运行时Key Catalog Schema
 【ES】/项目设置/GameCore/审计项目稳定Key治理
 ```
@@ -56,6 +61,7 @@ Assets/ESNormalAssets/Data/GlobalData/GameCore/GameCoreEditorGlobalData.asset
 GameMode 语义
 GameModeTag 语义
 GameTag 语义和归属
+角色 / 物品 Float 与 Permit 属性 Schema
 InputActionCategory 分类规则
 物理层语义
 AI Command 模板
@@ -82,6 +88,7 @@ ESInputActionId
 ```text
 新增输入
 新增 GameTag
+新增角色 / 物品属性
 新增/调整物理层
 新增 Shot/飞行物类型
 调整 GameMode 或输入过滤
@@ -101,7 +108,7 @@ ESInputActionId
 
 `Assets/Plugins/ES/AICommands` 里是给开发者复制给 AI 的命令模板。开发者只需要补充需求，AI 应按模板先查规则、再改代码、最后编译。
 
-这不是自动代码生成器，是“规范化 AI 改代码入口”。
+AI Command 不是自动代码生成器；固定角色属性的受限代码生成只能从 GameCore Schema 菜单触发，AI 不得手改生成文件或重建手工映射。
 
 ## 禁止恢复的旧入口
 

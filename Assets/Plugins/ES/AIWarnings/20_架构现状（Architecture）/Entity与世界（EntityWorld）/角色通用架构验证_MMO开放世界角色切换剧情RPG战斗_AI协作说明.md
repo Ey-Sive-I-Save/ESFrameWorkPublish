@@ -5,6 +5,8 @@
 > 性质：基于当前代码的架构验证笔记，不是最终设计定稿。改代码前仍需回读源码和编译验证。
 >
 > 2026-07-31 现行纠偏：角色 Prefab 不新增 `CharacterActor`、`EntityCharacterComposition`、`EntityCharacterDefinitionBinding` 或同义桥接组件。当前有效入口是 `Entity + 同根 EntityCharacterProfile -> Entity.BindDefinition(DataInfo)`；正式契约见 `Documentation/CHARACTER_PREFAB_CONTRACT.md` 与同目录 `角色Prefab职责与DataInfo入口_AI协作警告.md`。本文中建议另建 `CharacterActor` 的“必须补”“推荐迁移”段仅保留为历史问题记录，不得据此实施。
+>
+> 2026-08-01 模块契约补充：角色基础能力不靠运行时自动补齐。三种 `EntityCharacterProfile` 身份的 Prefab 都必须显式保存唯一 `EntityBasicMoveRotateModule` 和唯一 `EntityAIInputDispatchModule`，并关闭 `autoEnsurePlayerInputModules`；只有阵营为 `Player` 的正式 `CharacterVariant` 才可且必须保存唯一 `EntityPlayerInputWriteModule`、`EntityBasicMountModule`、`EntityBasicClimbModule`。玩家的骑乘状态必须满足 `Mounted` 契约，攀爬、攀上和翻越状态必须满足 `Climbing` 契约；攀爬跳跃离墙后进入空中 KCC 分支，必须满足 `Grounded` 契约。使用 `【ES】/内容制作/角色模板/审计项目角色基础模块` 做全项目制作期检查，发布门禁会复验实际进入内容的正式 Variant。此规则不授权向模板增加战斗、相机、武器或高级运动组件。
 
 ## 验证目标
 
@@ -247,6 +249,7 @@ ES通用角色完整架构.prefab
 【ES】/内容制作/角色模板/从基础模板生成完整通用角色
 【ES】/内容制作/角色模板/创建并验证全部角色模板
 【ES】/内容制作/角色模板/验证全部角色模板
+【ES】/内容制作/角色模板/审计项目角色基础模块
 【ES】/内容制作/角色模板/运行完整角色运行态烟雾测试
 ```
 
@@ -291,6 +294,7 @@ ES基础角色模板
 - KCC Motor 始终是根位姿最终执行权威；派生能力不得在普通 `Update` 直接写角色根 Transform。
 - Player/AI/Network/Cutscene 只在 `EntityAIDomain` 侧预留控制来源，最终统一写入 InputState/Intent，再由唯一 Dispatch 消费。
 - 基础模板调整后必须重新生成完整模板并运行双模板验证，确保基础移动和统一调度各一个、玩家输入为零、高级运动模块为零、Animator Controller 为空、IK/MatchTarget、状态引用与 Mapping 完整。
+- 角色 Prefab 的基础能力必须显式保存在 Module 表中，`autoEnsurePlayerInputModules` 必须关闭；正式 Player Variant 再额外挂唯一且启用的 `EntityPlayerInputWriteModule`、`EntityBasicMountModule`、`EntityBasicClimbModule`，并配置通过状态契约的骑乘、攀爬、攀上和翻越状态；非玩家 Variant 不得误挂玩家输入写入。全项目制作期使用“审计项目角色基础模块”，实际发布内容再由发布门禁复验。
 - 基础模板和 GlobalPreview 的发布门禁必须开启：Player 场景与 AssetBundle 依赖闭包中一旦出现它们，构建直接失败。
 - `EntityTransformMapping` 是运行时缓存挂点服务：固定键走缓存，动态键只用于初始化/事件边界；装备、相机、特效不得在热路径重新 `Find` 层级。
 - 正式角色 Variant 必须在根 `EntityCharacterProfile` 绑定唯一的 Actor / Monster / NPC DataInfo，声明阵营，配置 EntityBody 主 Collider、EntityHurtbox Trigger 与需要时的 Interaction Trigger；通用池模板保持无定义，由租出方直接调用 `Entity.BindDefinition(...)`。

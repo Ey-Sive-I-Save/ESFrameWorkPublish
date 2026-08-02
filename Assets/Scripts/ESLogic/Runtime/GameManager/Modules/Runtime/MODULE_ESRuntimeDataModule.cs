@@ -19,18 +19,26 @@ namespace ES
         public static readonly ESNpcConfigKeyTable Npcs = new ESNpcConfigKeyTable(128);
         public static readonly ESWeaponConfigKeyTable Weapons = new ESWeaponConfigKeyTable(64);
         public static readonly ESSkillConfigKeyTable Skills = new ESSkillConfigKeyTable(128);
+        public static readonly ESAudioCueConfigKeyTable AudioCues = new ESAudioCueConfigKeyTable(128);
 
         public static void BeginBuild(bool clear)
         {
+            ESAudioGameCoreTable.NotifyCatalogBuildStarted();
             Buffs.BeginBuild(clear);
             Shots.BeginBuild(clear);
             Monsters.BeginBuild(clear);
             Npcs.BeginBuild(clear);
             Weapons.BeginBuild(clear);
             Skills.BeginBuild(clear);
+            AudioCues.BeginBuild(clear);
         }
 
         public static void EndBuild()
+        {
+            EndBuild(true);
+        }
+
+        internal static void EndBuild(bool audioCueCatalogReady)
         {
             Buffs.EndBuild();
             Shots.EndBuild();
@@ -38,6 +46,11 @@ namespace ES
             Npcs.EndBuild();
             Weapons.EndBuild();
             Skills.EndBuild();
+            AudioCues.EndBuild();
+            if (audioCueCatalogReady)
+                ESAudioGameCoreTable.NotifyCatalogBuildCompleted();
+            else
+                ESAudioGameCoreTable.NotifyCatalogUnavailable();
         }
 
         /// <summary>
@@ -47,11 +60,14 @@ namespace ES
         public static void ResetForResourceTransition()
         {
             if (Buffs.IsBuilding || Shots.IsBuilding || Monsters.IsBuilding || Npcs.IsBuilding
-                || Weapons.IsBuilding || Skills.IsBuilding)
+                || Weapons.IsBuilding || Skills.IsBuilding || AudioCues.IsBuilding)
                 throw new InvalidOperationException("[ESGameCore] 正在构建 GameCore 表，不能执行资源生命周期切换。");
 
             BeginBuild(true);
-            EndBuild();
+            // ResetForResourceTransition clears a former catalog before the next Consumer
+            // GameCore injection begins. It must not be advertised as usable merely because the
+            // empty table has finished its internal clear transaction.
+            EndBuild(false);
         }
     }
 
@@ -94,6 +110,7 @@ namespace ES
         public static readonly ESAssetConfigKeyTable<ESAssetReferTimelineAssetConfigData, UnityEngine.Object> TimelineAssets = new ESAssetConfigKeyTable<ESAssetReferTimelineAssetConfigData, UnityEngine.Object>(64, "Asset.TimelineAsset");
         public static readonly ESAssetConfigKeyTable<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip> VideoClips = new ESAssetConfigKeyTable<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip>(64, "Asset.VideoClip");
         public static readonly ESAssetConfigKeyTable<ESAssetReferTerrainDataConfigData, TerrainData> TerrainDatas = new ESAssetConfigKeyTable<ESAssetReferTerrainDataConfigData, TerrainData>(32, "Asset.TerrainData");
+        public static readonly ESAssetConfigKeyTable<ESAssetReferRawConfigData, TextAsset> RawAssets = new ESAssetConfigKeyTable<ESAssetReferRawConfigData, TextAsset>(64, "Asset.Raw");
 
         public static bool HasPendingAssetLoads =>
             Prefabs.HasPendingLoads || Sprites.HasPendingLoads || AudioClips.HasPendingLoads
@@ -101,7 +118,7 @@ namespace ES
             || Materials.HasPendingLoads || Meshes.HasPendingLoads || Scenes.HasPendingLoads
             || Textures.HasPendingLoads || Texture2Ds.HasPendingLoads || SpriteAtlases.HasPendingLoads
             || Avatars.HasPendingLoads || PlayableAssets.HasPendingLoads || ScriptableObjects.HasPendingLoads
-            || TimelineAssets.HasPendingLoads || VideoClips.HasPendingLoads || TerrainDatas.HasPendingLoads;
+            || TimelineAssets.HasPendingLoads || VideoClips.HasPendingLoads || TerrainDatas.HasPendingLoads || RawAssets.HasPendingLoads;
 
         private static bool IsAnyAssetTableBuilding =>
             Prefabs.IsBuilding || Sprites.IsBuilding || AudioClips.IsBuilding
@@ -109,7 +126,7 @@ namespace ES
             || Materials.IsBuilding || Meshes.IsBuilding || Scenes.IsBuilding
             || Textures.IsBuilding || Texture2Ds.IsBuilding || SpriteAtlases.IsBuilding
             || Avatars.IsBuilding || PlayableAssets.IsBuilding || ScriptableObjects.IsBuilding
-            || TimelineAssets.IsBuilding || VideoClips.IsBuilding || TerrainDatas.IsBuilding;
+            || TimelineAssets.IsBuilding || VideoClips.IsBuilding || TerrainDatas.IsBuilding || RawAssets.IsBuilding;
 
         public static void BeginBuild(bool clear)
         {
@@ -132,6 +149,7 @@ namespace ES
             TimelineAssets.BeginBuild(clear);
             VideoClips.BeginBuild(clear);
             TerrainDatas.BeginBuild(clear);
+            RawAssets.BeginBuild(clear);
         }
 
         private static void EnsureCanBeginBuild(bool clear)
@@ -162,6 +180,7 @@ namespace ES
             TimelineAssets.EndBuild();
             VideoClips.EndBuild();
             TerrainDatas.EndBuild();
+            RawAssets.EndBuild();
         }
 
         private sealed class AssetConfigPreflightData : ESAssetReferConfigDataBase<UnityEngine.Object>
@@ -271,6 +290,7 @@ namespace ES
             count += ClearLoadedAssets(TimelineAssets);
             count += ClearLoadedAssets(VideoClips);
             count += ClearLoadedAssets(TerrainDatas);
+            count += ClearLoadedAssets(RawAssets);
             return count;
         }
 
@@ -299,6 +319,7 @@ namespace ES
             count += TimelineAssets.ResetLoader();
             count += VideoClips.ResetLoader();
             count += TerrainDatas.ResetLoader();
+            count += RawAssets.ResetLoader();
             return count;
         }
 
@@ -321,6 +342,7 @@ namespace ES
             TimelineAssets.ClearPendingLoads();
             VideoClips.ClearPendingLoads();
             TerrainDatas.ClearPendingLoads();
+            RawAssets.ClearPendingLoads();
         }
 
         private static int ClearLoadedAssets<TData>(ESConfigKeyTable<TData> table)
@@ -480,6 +502,8 @@ namespace ES
                     return RegisterScriptableObject(CreateAssetDataFromPage<ESAssetReferScriptableObjectConfigData, ESAssetReferScriptableObjectConfigKey, ScriptableObject>(page, ScriptableObjects));
                 case ESAssetReferKind.TerrainData:
                     return RegisterTerrainData(CreateAssetDataFromPage<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey, TerrainData>(page, TerrainDatas));
+                case ESAssetReferKind.Raw:
+                    return RegisterRaw(CreateAssetDataFromPage<ESAssetReferRawConfigData, ESAssetReferRawConfigKey, TextAsset>(page, RawAssets));
                 default:
                     return false;
             }
@@ -601,6 +625,7 @@ namespace ES
                 case ESAssetReferKind.PlayableAsset: return preflight.Stage<ESAssetReferPlayableAssetConfigData, ESAssetReferPlayableAssetConfigKey, UnityEngine.Playables.PlayableAsset>(kind, in record);
                 case ESAssetReferKind.ScriptableObject: return preflight.Stage<ESAssetReferScriptableObjectConfigData, ESAssetReferScriptableObjectConfigKey, ScriptableObject>(kind, in record);
                 case ESAssetReferKind.TerrainData: return preflight.Stage<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey, TerrainData>(kind, in record);
+                case ESAssetReferKind.Raw: return preflight.Stage<ESAssetReferRawConfigData, ESAssetReferRawConfigKey, TextAsset>(kind, in record);
                 default: return false;
             }
         }
@@ -631,6 +656,7 @@ namespace ES
                 case ESAssetReferKind.PlayableAsset: return RegisterPlayableAsset(CreateAssetDataFromCatalog<ESAssetReferPlayableAssetConfigData, ESAssetReferPlayableAssetConfigKey, UnityEngine.Playables.PlayableAsset>(entry, PlayableAssets));
                 case ESAssetReferKind.ScriptableObject: return RegisterScriptableObject(CreateAssetDataFromCatalog<ESAssetReferScriptableObjectConfigData, ESAssetReferScriptableObjectConfigKey, ScriptableObject>(entry, ScriptableObjects));
                 case ESAssetReferKind.TerrainData: return RegisterTerrainData(CreateAssetDataFromCatalog<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey, TerrainData>(entry, TerrainDatas));
+                case ESAssetReferKind.Raw: return RegisterRaw(CreateAssetDataFromCatalog<ESAssetReferRawConfigData, ESAssetReferRawConfigKey, TextAsset>(entry, RawAssets));
                 default: return false;
             }
         }
@@ -714,7 +740,8 @@ namespace ES
                 + ScriptableObjects.ConflictCount
                 + TimelineAssets.ConflictCount
                 + VideoClips.ConflictCount
-                + TerrainDatas.ConflictCount;
+                + TerrainDatas.ConflictCount
+                + RawAssets.ConflictCount;
         }
 
         public static string GetAssetConflictReport()
@@ -737,6 +764,7 @@ namespace ES
             AppendConflictReport(builder, "TimelineAsset", TimelineAssets.GetConflictReport());
             AppendConflictReport(builder, "VideoClip", VideoClips.GetConflictReport());
             AppendConflictReport(builder, "TerrainData", TerrainDatas.GetConflictReport());
+            AppendConflictReport(builder, "Raw", RawAssets.GetConflictReport());
             return builder.ToString();
         }
 
@@ -902,6 +930,15 @@ namespace ES
             return data.runtimeKey != 0;
         }
 
+        public static bool RegisterRaw(ESAssetReferRawConfigData data)
+        {
+            if (data == null || data.key == null)
+                return false;
+
+            data.runtimeKey = RawAssets.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
+            return data.runtimeKey != 0;
+        }
+
     }
 
     public sealed class ESConsumerResidentAssetPreloadReport
@@ -921,6 +958,7 @@ namespace ES
         public static readonly ESNpcConfigKeyTable NpcTable = ESRuntimeDataGameCore.Npcs;
         public static readonly ESWeaponConfigKeyTable WeaponTable = ESRuntimeDataGameCore.Weapons;
         public static readonly ESSkillConfigKeyTable SkillTable = ESRuntimeDataGameCore.Skills;
+        public static readonly ESAudioCueConfigKeyTable AudioCueTable = ESRuntimeDataGameCore.AudioCues;
         public static readonly ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffInstanceIndex = new ESRuntimeInstanceIndex<ESActiveBuffRuntime>(128);
         public static readonly ESRuntimeInstanceIndex<Item> ShotInstanceIndex = new ESRuntimeInstanceIndex<Item>(128);
 
@@ -937,6 +975,8 @@ namespace ES
 
         [ShowInInspector, ReadOnly, LabelText("Weapon Table")]
         public readonly ESWeaponConfigKeyTable Weapons = WeaponTable;
+        [ShowInInspector, ReadOnly, LabelText("Audio Cue Table")]
+        public readonly ESAudioCueConfigKeyTable AudioCues = AudioCueTable;
         [ShowInInspector, ReadOnly, LabelText("\u6280\u80fd\u8868")]
         public readonly ESSkillConfigKeyTable Skills = SkillTable;
         [ShowInInspector, ReadOnly, LabelText("Buff\u5b9e\u4f8b\u7d22\u5f15")]
@@ -1219,8 +1259,18 @@ namespace ES
             consumerGameCoreAssetScope = ESAssets.CreateScope();
             var report = new ESGameCoreAssetPreloadReport();
             var identities = new HashSet<ESAssetIdentity>();
+            bool gameCoreBuildOpen = false;
             try
             {
+                if (isBuilding)
+                    throw new InvalidOperationException("Consumer GameCore 预热不能嵌套到其他 RuntimeData 表构建事务中。");
+
+                // The Consumer preload is one GameCore transaction, even though every SO owns
+                // its own InjectGameCoreTables implementation. In particular, audio emitters
+                // must not see the first Cue as a ready catalog while later Cues are still being
+                // asynchronously loaded and injected.
+                BeginBuildStatic();
+                gameCoreBuildOpen = true;
                 foreach (ESRuntimeConsumerGameCoreReference entry in OrderGameCoreAssets(assets))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -1249,6 +1299,9 @@ namespace ES
                     }
                 }
 
+                EndBuildStatic();
+                gameCoreBuildOpen = false;
+
                 // ResourcePlanInfo is an IGameCoreSO: all plans have now registered their
                 // target index. On first boot this enters Global; after a Provider replacement
                 // it restores exactly the targets that were active before the transition.
@@ -1257,6 +1310,9 @@ namespace ES
             }
             catch
             {
+                if (gameCoreBuildOpen)
+                    EndBuildStatic(false);
+
                 // 包括循环开始前的取消、依赖排序失败与任一注入失败；不能留下半张表。
                 DisposeConsumerGameCoreAssets();
                 throw;
@@ -1335,18 +1391,31 @@ namespace ES
 
         public static void EndBuildStatic()
         {
+            EndBuildStatic(true);
+        }
+
+        private static void EndBuildStatic(bool audioCueCatalogReady)
+        {
             if (!isBuilding)
                 return;
 
             try
             {
-                ESRuntimeDataGameCore.EndBuild();
+                // Finish every RuntimeData table before publishing the AudioCue-ready edge.
+                // The callback may immediately start a Cue load, so it must never observe the
+                // asset tables or the enclosing RuntimeData transaction half-built.
+                ESRuntimeDataGameCore.EndBuild(false);
                 ESRuntimeDataAsset.EndBuild();
             }
             finally
             {
                 isBuilding = false;
             }
+
+            if (audioCueCatalogReady)
+                ESAudioGameCoreTable.NotifyCatalogBuildCompleted();
+            else
+                ESAudioGameCoreTable.NotifyCatalogUnavailable();
         }
 
         public bool TryGetBuff(int runtimeKey, out ESBuffRuntimeData data) => Buffs.TryGet(runtimeKey, out data);

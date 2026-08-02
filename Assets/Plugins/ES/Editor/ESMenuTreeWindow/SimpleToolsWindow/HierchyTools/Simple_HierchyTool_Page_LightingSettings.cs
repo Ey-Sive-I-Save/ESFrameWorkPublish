@@ -17,11 +17,11 @@ namespace ES
 
     #region 灯光设置工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_LightingSettings : ESWindowPageBase
     {
-        [Title("灯光设置工具", "批量调整灯光属性", bold: true, titleAlignment: TitleAlignments.Centered)]
 
-        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        [DisplayAsString(fontSize: 13), HideLabel]
         public string readMe = "选择带有Light组件的GameObject，\n设置灯光属性，\n点击应用按钮批量修改";
 
         [HideInInspector]
@@ -103,7 +103,7 @@ namespace ES
             int shadowCount = selectedLights.Count(light => light != null && light.shadows != LightShadows.None);
 
             SimpleToolsPanelUtility.DrawSectionTitle("核心流程", "先确认选区灯光，再选择统一写入、随机化、补组件或全场景转烘焙。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 SimpleToolsPanelUtility.DrawSummary(
                     $"选区命中: {selectedLights.Count}",
@@ -133,7 +133,7 @@ namespace ES
         {
             var lights = GetFilteredSelectedLights();
             SimpleToolsPanelUtility.DrawSectionTitle("选区灯光预览", "按对象路径、灯光类型、烘焙模式搜索；大选区自动分页。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -162,8 +162,17 @@ namespace ES
                     GUILayout.Space(48);
                 }
 
-                foreach (var light in SimpleToolsPanelUtility.PageItems(lights, ref lightPreviewPageIndex, LightPreviewPageSize, out _))
-                    DrawLightPreviewRow(light);
+                int lightPreviewStart;
+                int lightPreviewEnd;
+                SimpleToolsPanelUtility.GetPageRange(
+                    lights,
+                    ref lightPreviewPageIndex,
+                    LightPreviewPageSize,
+                    out _,
+                    out lightPreviewStart,
+                    out lightPreviewEnd);
+                for (int i = lightPreviewStart; i < lightPreviewEnd; i++)
+                    DrawLightPreviewRow(lights[i]);
 
                 SimpleToolsPanelUtility.DrawPager(ref lightPreviewPageIndex, lights.Count, LightPreviewPageSize);
             }
@@ -229,7 +238,7 @@ namespace ES
         public Color randomColorMax = Color.white;
 
         [FoldoutGroup("旧按钮入口", Expanded = false)]
-        [Button("应用灯光设置", ButtonHeight = 34), GUIColor(0.28f, 0.52f, 0.85f)]
+        [Button("应用灯光设置", ButtonHeight = 34)]
         public void ApplyLightingSettings()
         {
             var selectedObjects = Selection.gameObjects;
@@ -311,7 +320,7 @@ namespace ES
         }
 
         [FoldoutGroup("旧按钮入口")]
-        [Button("应用随机灯光设置", ButtonHeight = 34), GUIColor(0.25f, 0.62f, 0.45f)]
+        [Button("应用随机灯光设置", ButtonHeight = 34)]
         public void ApplyRandomLightingSettings()
         {
             var selectedObjects = Selection.gameObjects;
@@ -397,7 +406,7 @@ namespace ES
         }
 
         [FoldoutGroup("旧按钮入口")]
-        [Button("批量添加Light组件", ButtonHeight = 34), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+        [Button("批量添加Light组件", ButtonHeight = 34)]
         public void AddLightComponents()
         {
             var selectedObjects = Selection.gameObjects;
@@ -461,7 +470,7 @@ namespace ES
         }
 
         [FoldoutGroup("旧按钮入口")]
-        [Button("将所有灯光转为烘焙", ButtonHeight = 34), GUIColor("@ESDesignUtility.ColorSelector.Color_05")]
+        [Button("将所有灯光转为烘焙", ButtonHeight = 34)]
         public void ConvertAllToBaked()
         {
             if (!ValidateNameFilter())
@@ -592,7 +601,7 @@ namespace ES
         }
 
         [FoldoutGroup("旧按钮入口")]
-        [Button("重置为默认设置", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_02")]
+        [Button("重置为默认设置", ButtonHeight = 30)]
         public void ResetToDefaults()
         {
             includeChildren = true;

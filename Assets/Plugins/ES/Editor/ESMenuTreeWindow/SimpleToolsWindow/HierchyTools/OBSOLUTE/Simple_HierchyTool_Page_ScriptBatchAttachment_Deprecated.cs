@@ -19,7 +19,6 @@ namespace ES
     [Obsolete("This tool is deprecated and will be removed in future versions.")]
     public class Page_ScriptBatchAttachment : ESWindowPageBase
     {
-        [Title("脚本批量挂载工具", "批量为GameObject添加脚本组件", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
         public string readMe = "选择GameObject，\n输入脚本类型名称，\n点击挂载按钮批量添加";

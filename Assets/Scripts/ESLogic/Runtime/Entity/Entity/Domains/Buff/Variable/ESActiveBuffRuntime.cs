@@ -32,8 +32,8 @@ namespace ES
         private StateBase stateTimeSource;
         private float lastStateTime;
         private ESEffectLease valueChangeEffectLease;
-        private int valueChangeEffectOwnerId;
         private bool valueChangesDirty;
+        private ESBuffLogic logicDefinition;
         private ESBuffLogicRuntime logicRuntime;
 
         public bool IsRecycled { get; set; }
@@ -112,7 +112,6 @@ namespace ES
             public ESBuffFloatValueChangeBinding binding;
             public ESFloatValueChangeSet set;
             public ESValueChangeToken token;
-            public int ownerId;
             public int sourceId;
         }
 
@@ -122,7 +121,6 @@ namespace ES
             public ESBuffPermitValueChangeBinding binding;
             public ESPermitSet set;
             public ESValueChangeToken token;
-            public int ownerId;
             public int sourceId;
         }
 
@@ -298,6 +296,14 @@ namespace ES
                 ReleaseGameTags();
                 ReleaseValueChangeDependencies();
                 valueChangesDirty = false;
+                string valueChangeError = null;
+                if (sharedData == null
+                    || !sharedData.TryValidateValueChangeConfiguration(ESAttributeRuntimeCatalog.Character, out valueChangeError))
+                {
+                    LogLifecycleFailure("Apply", new InvalidOperationException(
+                        "Buff ValueChange 配置无效：" + (valueChangeError ?? "缺少 SharedData。")));
+                    return AbortApply();
+                }
                 if (!TryApplyGameTags(sharedData))
                     return AbortApply();
 
@@ -450,6 +456,7 @@ namespace ES
 
         private void ResetRuntimeState()
         {
+            logicDefinition = null;
             logicRuntime = null;
             buffSupport = null;
             target = null;
@@ -486,7 +493,7 @@ namespace ES
 
         public void OnResetAsPoolable()
         {
-            if (sharedData != null || buffSupport != null || logicRuntime != null)
+            if (sharedData != null || buffSupport != null || logicDefinition != null || logicRuntime != null)
                 Deactivate(false);
         }
 
@@ -587,41 +594,27 @@ namespace ES
                 }
 
                 runtime.Attach(this);
+                logicDefinition = logic;
                 logicRuntime = runtime;
-                return runtime.OnApply();
+                return logic.OnApply(runtime);
             }
             catch (Exception exception)
             {
                 LogLifecycleFailure("Logic apply", exception);
-                bool attachedToThisBuff = runtime != null && ReferenceEquals(runtime.Buff, this);
-                if (ReferenceEquals(logicRuntime, runtime))
-                    logicRuntime = null;
-
-                if (attachedToThisBuff)
-                {
-                    try
-                    {
-                        runtime.ReleaseAndReturnToPool();
-                    }
-                    catch (Exception releaseException)
-                    {
-                        LogLifecycleFailure("Logic apply rollback", releaseException);
-                    }
-                }
-
                 return false;
             }
         }
 
         private void TryInvokeLogicRefresh()
         {
+            ESBuffLogic logic = logicDefinition;
             ESBuffLogicRuntime runtime = logicRuntime;
-            if (runtime == null)
+            if (logic == null || runtime == null)
                 return;
 
             try
             {
-                runtime.OnRefresh();
+                logic.OnRefresh(runtime);
             }
             catch (Exception exception)
             {
@@ -631,13 +624,14 @@ namespace ES
 
         private bool TryInvokeLogicTick(float deltaTime)
         {
+            ESBuffLogic logic = logicDefinition;
             ESBuffLogicRuntime runtime = logicRuntime;
-            if (runtime == null)
+            if (logic == null || runtime == null)
                 return true;
 
             try
             {
-                runtime.OnTick(deltaTime);
+                logic.OnTick(runtime, deltaTime);
                 return true;
             }
             catch (Exception exception)
@@ -649,13 +643,14 @@ namespace ES
 
         private void TryInvokeLogicRemove()
         {
+            ESBuffLogic logic = logicDefinition;
             ESBuffLogicRuntime runtime = logicRuntime;
-            if (runtime == null)
+            if (logic == null || runtime == null)
                 return;
 
             try
             {
-                runtime.OnRemove();
+                logic.OnRemove(runtime);
             }
             catch (Exception exception)
             {
@@ -665,12 +660,30 @@ namespace ES
 
         private void ReleaseLogicRuntime()
         {
+            ESBuffLogic logic = logicDefinition;
             ESBuffLogicRuntime runtime = logicRuntime;
+            logicDefinition = null;
+            logicRuntime = null;
             if (runtime == null)
                 return;
 
-            logicRuntime = null;
-            runtime.ReleaseAndReturnToPool();
+            try
+            {
+                logic?.OnRelease(runtime);
+            }
+            catch (Exception exception)
+            {
+                LogLifecycleFailure("Logic release callback", exception);
+            }
+
+            try
+            {
+                runtime.DetachAndReturnToPool();
+            }
+            catch (Exception exception)
+            {
+                LogLifecycleFailure("Logic runtime pool return", exception);
+            }
         }
 
         private bool TryTickOps(BuffSharedData sharedData, float deltaTime)
@@ -731,7 +744,6 @@ namespace ES
                 int sourceId = SourceKey != 0 ? SourceKey : DefinitionKey;
                 ESFloatValueChangeSet set = null;
                 ESValueChangeToken token = ESValueChangeToken.Invalid;
-                int ownerId = 0;
                 if (TryEvaluateFloatChange(binding, out float value))
                 {
                     set = owner.GetFloatStat(binding.attributeEnumKey, binding.statKey);
@@ -740,14 +752,14 @@ namespace ES
                         if (!EnsureValueChangeEffectLease())
                             return;
 
-                        ownerId = valueChangeEffectOwnerId;
-                        token = set.Add(
+                        valueChangeEffectLease.TryAddFloat(
+                            set,
                             binding.change.op,
                             value,
-                            ownerId,
                             sourceId,
                             binding.change.priority,
-                            binding.change.enabled);
+                            binding.change.enabled,
+                            out token);
                     }
                 }
 
@@ -755,7 +767,6 @@ namespace ES
                 {
                     binding = binding,
                     set = set,
-                    ownerId = ownerId,
                     sourceId = sourceId,
                     token = token
                 });
@@ -792,9 +803,8 @@ namespace ES
                 {
                     binding = binding,
                     set = set,
-                    ownerId = valueChangeEffectOwnerId,
                     sourceId = sourceId,
-                    token = set.Add(law, valueChangeEffectOwnerId, sourceId, binding.change.priority, binding.change.enabled)
+                    token = AddPermitByEffectLease(set, law, sourceId, binding.change.priority, binding.change.enabled)
                 });
             }
         }
@@ -827,25 +837,26 @@ namespace ES
                     if (runtime.set == null || !EnsureValueChangeEffectLease())
                         continue;
 
-                    runtime.ownerId = valueChangeEffectOwnerId;
                     runtime.sourceId = SourceKey != 0 ? SourceKey : DefinitionKey;
-                    runtime.token = runtime.set.Add(
+                    valueChangeEffectLease.TryAddFloat(
+                        runtime.set,
                         binding.change.op,
                         value,
-                        runtime.ownerId,
                         runtime.sourceId,
                         binding.change.priority,
-                        binding.change.enabled);
+                        binding.change.enabled,
+                        out runtime.token);
                 }
                 else if (!runtime.set.Update(runtime.token, binding.change.op, value, binding.change.priority))
                 {
-                    runtime.token = runtime.set.Add(
+                    valueChangeEffectLease.TryAddFloat(
+                        runtime.set,
                         binding.change.op,
                         value,
-                        runtime.ownerId,
                         runtime.sourceId,
                         binding.change.priority,
-                        binding.change.enabled);
+                        binding.change.enabled,
+                        out runtime.token);
                 }
                 else
                 {
@@ -867,7 +878,15 @@ namespace ES
                 if (!TryEvaluatePermitLaw(binding, out ESPermitLaw law))
                     continue;
                 if (!runtime.set.Update(runtime.token, law, binding.change.priority))
-                    runtime.token = runtime.set.Add(law, runtime.ownerId, runtime.sourceId, binding.change.priority, binding.change.enabled);
+                {
+                    valueChangeEffectLease.TryAddPermit(
+                        runtime.set,
+                        law,
+                        runtime.sourceId,
+                        binding.change.priority,
+                        binding.change.enabled,
+                        out runtime.token);
+                }
                 else
                     runtime.set.SetEnabled(runtime.token, binding.change.enabled);
                 permitChanges[i] = runtime;
@@ -889,6 +908,18 @@ namespace ES
                 runtime.set?.Release(runtime.token);
             }
             permitChanges.Clear();
+        }
+
+        private ESValueChangeToken AddPermitByEffectLease(
+            ESPermitSet set,
+            ESPermitLaw law,
+            int sourceId,
+            int priority,
+            bool enabled)
+        {
+            return valueChangeEffectLease.TryAddPermit(set, law, sourceId, priority, enabled, out ESValueChangeToken token)
+                ? token
+                : ESValueChangeToken.Invalid;
         }
 
         private bool TryEvaluateFloatChange(ESBuffFloatValueChangeBinding binding, out float value)
@@ -1035,7 +1066,7 @@ namespace ES
             if (owner == null)
                 return false;
 
-            valueChangeEffectLease = owner.CreateValueChangeEffectLease(out valueChangeEffectOwnerId);
+            valueChangeEffectLease = owner.CreateValueChangeEffectLease();
             return valueChangeEffectLease.IsValid;
         }
 
@@ -1047,7 +1078,6 @@ namespace ES
                 ReleaseValueChanges();
 
             valueChangeEffectLease = default;
-            valueChangeEffectOwnerId = 0;
             floatChanges.Clear();
             permitChanges.Clear();
         }
@@ -1113,17 +1143,14 @@ namespace ES
 
         private void InitializeOwnedTarget(ESRuntimeTargetPack sourceTarget, ESOpSupport sourceSupport)
         {
+            // Capture this before renting: a recycled source can otherwise be re-rented as target.
+            bool sourceTargetWasActive = sourceTarget != null && !sourceTarget.IsRecycled;
             target = buffSupport.RentTargetPack();
             if (target == null)
                 return;
 
-            if (sourceTarget != null)
-            {
-                target.EnsureListCapacity(sourceTarget.targetEntities.Count, sourceTarget.targetItems.Count);
-                target.CopyFrom(sourceTarget, copyTargets: true, copyExtras: false);
-                target.runtimeFloat = sourceTarget.runtimeFloat;
-                target.runtimeBool = sourceTarget.runtimeBool;
-            }
+            if (sourceTargetWasActive)
+                target.TryCopySnapshotFrom(sourceTarget);
 
             bool sourceIsLive = sourceSupport != null && !sourceSupport.IsDisposed && !sourceSupport.IsRecycled;
             if (target.userEntity == null && sourceIsLive && sourceSupport.CurrentEntity != null)

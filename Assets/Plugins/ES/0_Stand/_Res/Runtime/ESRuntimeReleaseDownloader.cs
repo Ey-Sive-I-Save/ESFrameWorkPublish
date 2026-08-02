@@ -338,6 +338,52 @@ namespace ES
         }
 
         /// <summary>
+        /// EditorSimulateBuild 专用入口：只读取并校验正式发布清单，不下载代码包或 AssetBundle。
+        /// 返回的 RuntimeMap 仅用于身份/依赖预检，物理加载由 EditorDirect Provider 完成。
+        /// </summary>
+        internal UniTask<ESRuntimeReleaseDownloadResult> DownloadEditorSimulationMetadataAsync(CancellationToken cancellationToken = default)
+        {
+            return ExecuteReleaseOperationAsync(() => DownloadEditorSimulationMetadataCoreAsync(cancellationToken), cancellationToken);
+        }
+
+        private async UniTask<ESRuntimeReleaseDownloadResult> DownloadEditorSimulationMetadataCoreAsync(CancellationToken cancellationToken)
+        {
+            ReleaseContext context = await LoadReleaseContextAsync(cancellationToken);
+            ESRuntimeConsumerManifest total = await DownloadTotalConsumerManifestAsync(context.Root, cancellationToken);
+            var libraries = new Dictionary<string, ESRuntimeConsumerLibraryReference>(StringComparer.Ordinal);
+            var codePackages = new Dictionary<string, CollectedCodePackage>(StringComparer.Ordinal);
+            var gameCoreAssets = new Dictionary<ESAssetIdentity, ESRuntimeConsumerGameCoreReference>();
+            var residentAssets = new Dictionary<ESAssetIdentity, ESRuntimeConsumerResidentAssetReference>();
+            await CollectConsumerContentAsync(total, libraries, codePackages, gameCoreAssets, residentAssets,
+                new HashSet<string>(StringComparer.Ordinal), false, cancellationToken);
+
+            var mainAssets = new List<ESRuntimeAssetRecord>();
+            var subAssets = new List<ESRuntimeSubAssetRecord>();
+            var catalogs = new List<ESRuntimeCatalog>();
+            var roots = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ESRuntimeConsumerLibraryReference library in libraries.Values.OrderBy(item => item.libraryFolder, StringComparer.Ordinal))
+                await DownloadLibraryAsync(library, context.Root.releaseVersion, context.BundlesByKey, roots, mainAssets, subAssets, catalogs, cancellationToken);
+            ValidateCatalogsAgainstGlobalAssetRecords(catalogs, mainAssets, subAssets);
+
+            var records = new List<ESRuntimeAssetBundleRecord>();
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            void AddBundle(string key)
+            {
+                if (!visited.Add(key)) return;
+                if (!context.BundlesByKey.TryGetValue(key, out ESRuntimeReleaseBundleRecord bundle))
+                    throw new InvalidDataException("Global Bundle dependency is missing: " + key);
+                foreach (string dependency in bundle.dependencies ?? new List<string>()) AddBundle(dependency);
+                records.Add(new ESRuntimeAssetBundleRecord(bundle.assetBundleKey, null, null, null,
+                    Hash128.Compute(bundle.sha256 ?? string.Empty).ToString(), bundle.crc, bundle.size,
+                    (bundle.dependencies ?? new List<string>()).ToArray()));
+            }
+            foreach (string root in roots.OrderBy(item => item, StringComparer.Ordinal)) AddBundle(root);
+            return CreateResult(context.Root.releaseVersion, libraries.Keys.OrderBy(item => item, StringComparer.Ordinal).ToArray(),
+                records, mainAssets, subAssets, catalogs, Array.Empty<ESRuntimeDownloadedCodePackage>(),
+                gameCoreAssets.Values.ToArray(), residentAssets.Values.ToArray());
+        }
+
+        /// <summary>
         /// 从 Root -> TotalConsumer 的受签名链中定位并下载一个 Consumer。
         /// 这是业务侧的首选入口；不会接受调用方拼出的 URL 或 Hash。
         /// </summary>

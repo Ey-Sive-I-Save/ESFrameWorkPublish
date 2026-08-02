@@ -20,9 +20,9 @@ namespace ES
 
     #region 批量静态设置工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_BatchStaticSetting : ESWindowPageBase
     {
-        [Title("批量静态设置工具", "批量设置GameObject的静态标记", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         public enum StaticApplyMode
         {
@@ -113,27 +113,27 @@ namespace ES
         private static readonly Color DisabledColor = new Color(0.8f, 0.8f, 0.8f);
 
         [Tooltip("参与全局光照和光照贴图烘焙。")]
-        [LabelText("贡献全局光照"), GUIColor("@contributeGI ? EnabledColor : DisabledColor")]
+        [LabelText("贡献全局光照")]
         public bool contributeGI = false;
 
         [Tooltip("作为遮挡剔除系统中的静态遮挡物。")]
-        [LabelText("遮挡剔除静态"), GUIColor("@occluderStatic ? EnabledColor : DisabledColor")]
+        [LabelText("遮挡剔除静态")]
         public bool occluderStatic = false;
 
         [Tooltip("作为遮挡剔除系统中的可被遮挡静态物。")]
-        [LabelText("被遮挡物静态"), GUIColor("@occludeeStatic ? EnabledColor : DisabledColor")]
+        [LabelText("被遮挡物静态")]
         public bool occludeeStatic = false;
 
         [Tooltip("允许 Unity 静态批处理减少渲染批次。")]
-        [LabelText("批处理静态"), GUIColor("@batchingStatic ? EnabledColor : DisabledColor")]
+        [LabelText("批处理静态")]
         public bool batchingStatic = false;
 
         [Tooltip("兼容旧 Unity 导航静态标记。新项目通常由 NavMesh 工作流单独管理。")]
-        [LabelText("导航静态"), GUIColor("@navigationStatic ? EnabledColor : DisabledColor")]
+        [LabelText("导航静态")]
         public bool navigationStatic = false;
 
         [Tooltip("参与反射探针烘焙和静态反射采样。")]
-        [LabelText("反射探针静态"), GUIColor("@reflectionProbeStatic ? EnabledColor : DisabledColor")]
+        [LabelText("反射探针静态")]
         public bool reflectionProbeStatic = false;
 
         [HorizontalGroup("Presets")]
@@ -229,7 +229,7 @@ namespace ES
         private void DrawStaticActionPanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("预览与执行", "刷新预览后可以勾选目标；执行时会检查预览是否仍匹配当前选区。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {

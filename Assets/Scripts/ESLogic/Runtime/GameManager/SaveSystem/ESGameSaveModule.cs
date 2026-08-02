@@ -100,6 +100,9 @@ namespace ES
         private bool isDirty;
 
         [NonSerialized]
+        private ESGameSaveCandidate currentCandidate;
+
+        [NonSerialized]
         private readonly HashSet<string> dirtySections = new HashSet<string>();
 
         [OnInspectorGUI]
@@ -136,6 +139,13 @@ namespace ES
         public void Set<T>(string sectionKey, T data)
         {
             Set(defaultSlotId, defaultSlotId, sectionKey, data);
+        }
+
+        public void SetCurrent<T>(string sectionKey, T data)
+        {
+            string slotId = GetActiveSlotOrDefault();
+            string displayName = string.IsNullOrWhiteSpace(cachedDisplayName) ? slotId : cachedDisplayName;
+            Set(slotId, displayName, sectionKey, data);
         }
 
         public void Set<T>(string slotId, string sectionKey, T data)
@@ -175,6 +185,11 @@ namespace ES
         {
             slotId = NormalizeSlotId(slotId);
             EnsureCacheForSlot(slotId, slotId, loadExisting: false);
+            if (!ESGameSave.NotifyBeforeSave())
+            {
+                LastReport = BuildReport(false, slotId, "保存前业务 Checkpoint 生成失败", 0, GetFileSize(BuildSettings(BuildSlotPath(slotId))));
+                return false;
+            }
 
             if (!isDirty)
             {
@@ -203,11 +218,58 @@ namespace ES
             if (!LoadPack(slotId, out ESGameSaveArchive archive))
                 return false;
 
+            return TryApplyCandidate(slotId, archive);
+        }
+
+        private bool TryApplyCandidate(string slotId, ESGameSaveArchive archive)
+        {
+            ESGameSaveCandidate candidate = new ESGameSaveCandidate(slotId, archive);
+            ESGameSaveApplyResult validation = ESGameSave.NotifyValidateCandidate(candidate);
+            if (!validation.Success)
+            {
+                LastReport = BuildReport(false, slotId,
+                    string.IsNullOrEmpty(validation.ErrorCode) ? validation.Message : validation.ErrorCode + ": " + validation.Message,
+                    0, GetFileSize(BuildSettings(BuildSlotPath(slotId))));
+                return false;
+            }
+
+            ESGameSaveApplyResult prepare = ESGameSave.NotifyPrepareCandidate(candidate);
+            if (!prepare.Success)
+            {
+                LastReport = BuildReport(false, slotId,
+                    string.IsNullOrEmpty(prepare.ErrorCode) ? prepare.Message : prepare.ErrorCode + ": " + prepare.Message,
+                    0, GetFileSize(BuildSettings(BuildSlotPath(slotId))));
+                return false;
+            }
+
+            ESGameSaveArchive previousArchive = cachedArchive;
+            string previousSlotId = cachedSlotId;
+            string previousDisplayName = cachedDisplayName;
+            bool previousDirty = isDirty;
+            HashSet<string> previousDirtySections = new HashSet<string>(dirtySections);
+
             cachedArchive = archive;
             cachedSlotId = slotId;
             cachedDisplayName = string.IsNullOrWhiteSpace(archive.displayName) ? slotId : archive.displayName;
             isDirty = false;
             dirtySections.Clear();
+            ESGameSaveApplyResult commit = ESGameSave.NotifyCommitCandidate(candidate);
+            if (!commit.Success)
+            {
+                cachedArchive = previousArchive;
+                cachedSlotId = previousSlotId;
+                cachedDisplayName = previousDisplayName;
+                isDirty = previousDirty;
+                dirtySections.Clear();
+                foreach (string sectionKey in previousDirtySections)
+                    dirtySections.Add(sectionKey);
+                LastReport = BuildReport(false, slotId,
+                    string.IsNullOrEmpty(commit.ErrorCode) ? commit.Message : commit.ErrorCode + ": " + commit.Message,
+                    0, GetFileSize(BuildSettings(BuildSlotPath(slotId))));
+                return false;
+            }
+            currentCandidate = candidate;
+            LastReport = BuildReport(true, slotId, "读取、验证并应用成功", 0, GetFileSize(BuildSettings(BuildSlotPath(slotId))));
             return true;
         }
 
@@ -264,6 +326,13 @@ namespace ES
             cachedDisplayName = null;
             isDirty = false;
             dirtySections.Clear();
+            currentCandidate = null;
+        }
+
+        internal bool TryGetCurrentCandidate(out ESGameSaveCandidate candidate)
+        {
+            candidate = currentCandidate;
+            return candidate != null;
         }
 
         private bool TryReadCachedSection<T>(string sectionKey, out T value)

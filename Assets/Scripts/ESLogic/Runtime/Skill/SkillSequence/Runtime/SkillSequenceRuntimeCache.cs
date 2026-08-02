@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace ES
@@ -40,6 +41,11 @@ namespace ES
     public interface ISkillRuntimeClipCompiler
     {
         ISkillRuntimeClipPlayer CreateRuntimeClipPlayer(SkillRuntimeBuildContext context);
+    }
+
+    /// <summary>Marks pooled UserData whose lifetime is exclusively owned by one skill Track or Clip instance.</summary>
+    public interface ISkillRuntimeOwnedUserData : IPoolableAuto
+    {
     }
 
     public struct SkillRuntimeTrackState
@@ -122,14 +128,17 @@ namespace ES
 
     public sealed class SkillSequenceRuntimeCache
     {
+        private const int ReleasedSequenceRetention = 3;
         private static readonly TrackRuntimeData[] EmptyTracks = new TrackRuntimeData[0];
 
         private static readonly Dictionary<ITrackSequence, SkillSequenceRuntimeCache> CacheBySequence =
-            new Dictionary<ITrackSequence, SkillSequenceRuntimeCache>(32);
+            new Dictionary<ITrackSequence, SkillSequenceRuntimeCache>(32, SequenceReferenceComparer.Instance);
+        private static readonly ITrackSequence[] RecentlyReleasedSequences =
+            new ITrackSequence[ReleasedSequenceRetention];
+        private static int recentlyReleasedCount;
 
 #if UNITY_EDITOR
-        private static readonly Dictionary<ITrackSequence, int> EditorVersions =
-            new Dictionary<ITrackSequence, int>(32);
+        private static int globalEditorVersion;
 #endif
 
         public readonly ITrackSequence Sequence;
@@ -138,14 +147,14 @@ namespace ES
         public readonly AnimationTimelineRuntimeData AnimationTimeline;
 
 #if UNITY_EDITOR
-        public readonly int EditorVersion;
+        public readonly int GlobalEditorVersion;
 #endif
 
         private SkillSequenceRuntimeCache(ITrackSequence sequence)
         {
             Sequence = sequence;
 #if UNITY_EDITOR
-            EditorVersion = GetEditorVersion(sequence);
+            GlobalEditorVersion = globalEditorVersion;
 #endif
             Tracks = BuildTracks(sequence, out Duration);
             AnimationTimeline = AnimationTimelineRuntimeData.Build(sequence);
@@ -156,10 +165,12 @@ namespace ES
             if (sequence == null)
                 return null;
 
+            RemoveFromRecentlyReleased(sequence);
+
             if (CacheBySequence.TryGetValue(sequence, out var cache) && cache != null)
             {
 #if UNITY_EDITOR
-                if (cache.EditorVersion == GetEditorVersion(sequence))
+                if (cache.GlobalEditorVersion == globalEditorVersion)
                     return cache;
 #else
                 return cache;
@@ -171,17 +182,113 @@ namespace ES
             return cache;
         }
 
+        /// <summary>
+        /// Marks a temporary sequence as no longer owned by its caller. The three most recently released
+        /// sequences remain cached for short-term reuse; adding a fourth evicts the oldest one.
+        /// </summary>
+        public static void Release(ITrackSequence sequence)
+        {
+            if (sequence == null || !CacheBySequence.ContainsKey(sequence))
+                return;
+
+            RemoveFromRecentlyReleased(sequence);
+            if (recentlyReleasedCount == ReleasedSequenceRetention)
+            {
+                ITrackSequence evicted = RecentlyReleasedSequences[0];
+                for (int i = 1; i < recentlyReleasedCount; i++)
+                    RecentlyReleasedSequences[i - 1] = RecentlyReleasedSequences[i];
+
+                recentlyReleasedCount--;
+                RecentlyReleasedSequences[recentlyReleasedCount] = null;
+                CacheBySequence.Remove(evicted);
+            }
+
+            RecentlyReleasedSequences[recentlyReleasedCount++] = sequence;
+        }
+
+        /// <summary>Immediately removes one sequence cache. Existing users keep their direct cache reference.</summary>
+        public static void Invalidate(ITrackSequence sequence)
+        {
+            if (sequence == null)
+                return;
+
+            RemoveFromRecentlyReleased(sequence);
+            CacheBySequence.Remove(sequence);
+        }
+
+        /// <summary>Clears persistent and temporary runtime compilation caches.</summary>
+        public static void ClearAll()
+        {
+            CacheBySequence.Clear();
+            ClearRecentlyReleased();
+#if UNITY_EDITOR
+            globalEditorVersion = 0;
+#endif
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnSubsystemRegistration()
+        {
+            ClearAll();
+        }
+
 #if UNITY_EDITOR
         public static void NotifySequenceChanged(ITrackSequence sequence)
         {
             if (sequence == null)
                 return;
 
-            int version = GetEditorVersion(sequence);
-            EditorVersions[sequence] = version + 1;
+            RemoveFromRecentlyReleased(sequence);
             CacheBySequence.Remove(sequence);
         }
+
+        /// <summary>Invalidates every cached sequence lazily after a global editor-side authoring change.</summary>
+        public static void MarkAllDirty()
+        {
+            unchecked
+            {
+                globalEditorVersion++;
+            }
+        }
 #endif
+
+        private static void RemoveFromRecentlyReleased(ITrackSequence sequence)
+        {
+            for (int i = 0; i < recentlyReleasedCount; i++)
+            {
+                if (!ReferenceEquals(RecentlyReleasedSequences[i], sequence))
+                    continue;
+
+                for (int move = i + 1; move < recentlyReleasedCount; move++)
+                    RecentlyReleasedSequences[move - 1] = RecentlyReleasedSequences[move];
+
+                recentlyReleasedCount--;
+                RecentlyReleasedSequences[recentlyReleasedCount] = null;
+                return;
+            }
+        }
+
+        private static void ClearRecentlyReleased()
+        {
+            for (int i = 0; i < recentlyReleasedCount; i++)
+                RecentlyReleasedSequences[i] = null;
+            recentlyReleasedCount = 0;
+        }
+
+        private sealed class SequenceReferenceComparer : IEqualityComparer<ITrackSequence>
+        {
+            public static readonly SequenceReferenceComparer Instance = new SequenceReferenceComparer();
+
+            public bool Equals(ITrackSequence x, ITrackSequence y)
+            {
+                return ReferenceEquals(x, y);
+            }
+
+            public int GetHashCode(ITrackSequence obj)
+            {
+                return RuntimeHelpers.GetHashCode(obj);
+            }
+        }
 
         private static TrackRuntimeData[] BuildTracks(ITrackSequence sequence, out float duration)
         {
@@ -207,16 +314,6 @@ namespace ES
 
             return tracks.Count > 0 ? tracks.ToArray() : EmptyTracks;
         }
-
-#if UNITY_EDITOR
-        private static int GetEditorVersion(ITrackSequence sequence)
-        {
-            if (sequence == null)
-                return 0;
-
-            return EditorVersions.TryGetValue(sequence, out int version) ? version : 0;
-        }
-#endif
 
         public sealed class TrackRuntimeData
         {

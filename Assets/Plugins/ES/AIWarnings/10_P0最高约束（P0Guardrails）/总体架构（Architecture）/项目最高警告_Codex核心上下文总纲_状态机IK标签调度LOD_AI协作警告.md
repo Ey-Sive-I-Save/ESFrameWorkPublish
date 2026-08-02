@@ -53,25 +53,34 @@ Inspector 应该：
 
 ## GameTag
 
-`ESGameTag` 是项目核心事实标签，不是 GameplayTag 的照搬。
+`ESTagCollection` 是通用运行时事实容器，不是 Entity 专属类型；当前 Entity 与 Item 都已经按需持有自己的 Collection。只有对象自身需要参与跨系统组合查询时才实际创建 Host，Buff、装备、区域等影响者默认不复制一份 Host，而是持有自己的 `ESTagLeaseSet` 写入目标 Collection。
 
-当前目标：
+稳定身份来自 GameCore Catalog：Enum-only、String-only、双别名均允许；双别名同时存在时必须解析到同一声明。Bake 后 `RuntimeKey 1..63` 路由 Hot，`>=64` 路由 Sparse。运行时热路径传递已解析 `ESTagId` 或枚举，不得每帧按字符串查 Catalog。
 
-- 64 个核心标签作为默认基准。
-- 枚举原生支持，高频 `Add/Has/Remove` 不分配。
-- 字符串 Tag 必须先注册、烘焙或缓存，不能每帧查字符串。
-- `ESTagRefCountSet64` 支持引用计数：重复添加累计，普通 Remove 只减一次。
-- 需要支持 `RemoveAll(tag)` / `SetCount(tag, 0)` 这种一次性清除。
-
-正确 API 方向：
+所有权分为三种，不能混用：
 
 ```csharp
-entity.AddGameTag(ESGameTag.控制类_眩晕);
-entity.HasGameTag(ESGameTag.控制类_眩晕);
-entity.RemoveGameTag(ESGameTag.控制类_眩晕);
+// Host 自身的幂等事实：只增加/撤销自身 0/1 贡献。
+entity.Tags.SetTag(ESGameTag.控制类_眩晕, true);
+
+// 外部生命周期的批量所有权：由 Buff、装备、区域等持有并在结束时 ReleaseAll。
+tagLeaseSet.TryApply(entity.Tags, configuredTags, source, out error);
+
+// 确实需要单独释放时的公开句柄。
+using ESTagLease lease = entity.Tags.Acquire(tag, source);
 ```
 
-旧名 `CoreTag` 容易误导，后续应统一到 `GameTag` 语义。不要把 `ESTagId.FromValue((ushort)tag)` 每次调用当作热路径方案；ID/Mask 应初始化缓存或由容器原生支持枚举。
+`SetTag(false)` 只撤销 Host 自己的贡献，不能删除任意 Buff/装备 Lease；`Has(tag)` 判断聚合 Count，`HasOwnTag(tag)` 只判断 Host 自己的 SetTag 贡献。`ESTagLeaseSet` 使用内部值类型 Token，批量配置路径不为每个 Tag 创建托管 Lease；公开 `Acquire` 的托管对象成本是显式句柄语义的一部分。
+
+事件只允许走 `ESTagCollection` 的 Count/Presence Link，不得恢复 Entity 的第二套 Tag C# event。规则：
+
+- 重复订阅必须拒绝。
+- 非派发期新增订阅立即生效；派发中增删在下一轮生效。
+- 订阅者异常必须隔离，不能回滚已提交的 Tag 状态或阻断其他订阅者。
+- 零订阅者必须跳过空派发。
+- `ResetForReuse` 清除 Host 与 Lease 贡献并推进 generation；旧 Lease/Token 的延迟释放不能影响下一租用者。
+
+不要恢复 `AddGameTag/RemoveGameTag` 一类无来源所有权 API，也不要把旧 `ESTagRefCountSet64` 当作业务主入口。`ESTagCollection` 才是 Count、条件、快照、通知与生命周期安全的唯一容器。
 
 ## RuntimeKey
 

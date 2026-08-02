@@ -4,6 +4,8 @@ using Sirenix.Serialization;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 #if UNITY_EDITOR
 #if UNITY_EDITOR
 using UnityEditor;
@@ -17,97 +19,79 @@ namespace ES.Samples{
     public class ResSamples : SerializedMonoBehaviour
     {
         [Title("资源加载示例")]
-        [InfoBox("本示例演示加载一个依赖其他AB包(如材质)的预制件。\n无需手动加载依赖，ESResLoader会自动处理。")]
+        [InfoBox("本示例通过新版 ESAssetRefer / TemporaryLease 加载预制件。Bundle 依赖、缓存和释放由新版 Provider 链路处理。")]
 
-        [LabelText("资源路径 (Assets/...)")]
-        public string AssetPath = "Assets/Gaskellgames/Audio Controller/Resources/Audio Controller/Audio Controller.prefab";
+        [LabelText("新版预制件引用")]
+        public ESAssetReferPrefab Asset;
 
-        // 独立的Loader实例，用于管理本次加载任务的生命周期
-        private ESResLoader m_Loader = new ESResLoader();
+        private ESAssetTemporaryLease<GameObject> m_Lease;
+        private CancellationTokenSource m_LoadCancellation;
+        private int m_LoadGeneration;
+        private bool m_Destroyed;
 
         [Button("1. 异步加载预制件", ButtonSizes.Large)]
-        private void LoadPrefabAsync()
+        private async void LoadPrefabAsync()
         {
-            if (string.IsNullOrEmpty(AssetPath))
+            if (Asset == null || !Asset.IsValid)
             {
-                Debug.LogError("请设置资源路径");
+                Debug.LogError("请设置有效的新版 ESAssetReferPrefab。");
                 return;
             }
 
-            // 确保没有残留任务
-            m_Loader.ReleaseAll();
-
-            Debug.Log($"[ResSamples] 开始加载: {AssetPath}");
-
-            // 添加加载任务
-            // 参数1: 资源路径 (Project视图中的完整路径)
-            // 参数2: 单个资源加载完成的回调
-            m_Loader.AddAsset2LoadByPathSourcer(AssetPath, OnResLoaded);
-
-            // 开始处理加载队列
-            // 参数: 所有任务完成后的回调
-            m_Loader.LoadAllAsync(() =>
+            m_LoadCancellation?.Cancel();
+            m_LoadCancellation?.Dispose();
+            m_LoadCancellation = new CancellationTokenSource();
+            int generation = ++m_LoadGeneration;
+            m_Lease.Dispose();
+            m_Lease = default;
+            try
             {
-                // 演示：在所有加载完成后，通过路径获取资源并实例化
-                if (ESResMaster.GlobalAssetKeys.TryGetESResKeyByPath(AssetPath, out var key))
+                ESAssetTemporaryLease<GameObject> lease = await Asset.LoadAsyncLease(m_LoadCancellation.Token);
+                if (m_Destroyed || generation != m_LoadGeneration)
                 {
-                    if (m_Loader.TryGetLoadedAsset(key, out UnityEngine.Object asset) && asset is GameObject prefab)
-                    {
-                        var go = Instantiate(prefab);
-                        go.name = prefab.name + "_AllDone";
-                        go.transform.position = Vector3.right * 2; // 错开位置
-                        Debug.Log($"[ResSamples] 全部加载完毕，实例化演示: {go.name}");
-                    }else
-                    {
-                        Debug.LogError("[ResSamples] 全部加载完毕，但未能通过路径获取资源");
-                    }
+                    lease.Dispose();
+                    return;
+                }
+
+                m_Lease = lease;
+                GameObject prefab = lease.Asset;
+                if (prefab != null)
+                {
+                    GameObject instance = Instantiate(prefab);
+                    instance.name = $"{prefab.name}_Instance";
+                    instance.transform.position = UnityEngine.Random.insideUnitSphere * 2;
+                    Debug.Log($"[ResSamples] 新版资源加载成功并实例化: {instance.name}");
                 }
                 else
-                {
-                    Debug.LogError("[ResSamples] 全部加载完毕，但未能通过路径获取资源键");
-                }
-                Debug.Log("[ResSamples] 队列中所有资源加载完毕");
-            });
-        }
-
-        private void OnResLoaded(bool success, ESResSourceBase source)
-        {
-            if (success && source.Asset != null)
-            {
-                Debug.Log($"[ResSamples] 资源加载成功: {source.ResName}");
-
-                // 实例化预制件
-                if (source.Asset is GameObject original)
-                {
-                    GameObject instance = Instantiate(original);
-                    instance.name = $"{source.ResName}_Instance";
-                    // 随机位置避免重叠
-                    instance.transform.position = UnityEngine.Random.insideUnitSphere * 2;
-                }
+                    Debug.LogError("[ResSamples] 新版资源加载完成但资产为空。");
             }
-            else
+            catch (OperationCanceledException)
             {
-                Debug.LogError($"[ResSamples] 资源加载失败: {source?.ResName ?? "Unknown"}");
+                // 新请求或对象销毁会取消旧请求；不记录为加载故障。
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
             }
         }
 
         [Button("2. 卸载资源", ButtonSizes.Medium)]
         private void UnloadResources()
         {
-            // 释放Loader持有的引用
-            // 如果引用计数降为0，底层会自动卸载AssetBundle
-            m_Loader.ReleaseAll();
-            Debug.Log("[ResSamples] 已释放Loader资源引用");
+            m_Lease.Dispose();
+            m_Lease = default;
+            Debug.Log("[ResSamples] 已释放新版 TemporaryLease。");
         }
 
         private void OnDestroy()
         {
-            // 销毁时确保释放资源，防止内存泄漏
-            if (m_Loader != null)
-            {
-                m_Loader.ReleaseAll();
-                m_Loader = null;
-            }
+            m_Destroyed = true;
+            ++m_LoadGeneration;
+            m_LoadCancellation?.Cancel();
+            m_LoadCancellation?.Dispose();
+            m_LoadCancellation = null;
+            m_Lease.Dispose();
+            m_Lease = default;
         }
     }
 

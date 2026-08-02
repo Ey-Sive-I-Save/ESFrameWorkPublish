@@ -2,11 +2,23 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using Sirenix.OdinInspector;
+using Sirenix.OdinInspector.Editor;
 using UnityEditor;
 using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// Marks a SimpleTools page for the restrained ES workbench presentation.
+    /// The marker affects editor-only rendering and never changes serialized data.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
+    public sealed class ESSimpleToolsLayoutAttribute : Attribute
+    {
+    }
+
     internal enum SimpleToolsActionTone
     {
         Neutral,
@@ -93,19 +105,59 @@ namespace ES
         public static readonly Color DangerColor = new Color(0.82f, 0.38f, 0.30f);
         public static readonly Color NeutralColor = new Color(0.48f, 0.48f, 0.48f);
         private static readonly List<string> OperationHistory = new List<string>(32);
+        private static readonly List<string> SummaryParts = new List<string>(8);
         private static readonly Dictionary<string, bool> DetailFoldoutStates = new Dictionary<string, bool>(StringComparer.Ordinal);
+        private static GUIStyle toolTitleStyle;
+        private static GUIStyle sectionTitleStyle;
+        private static GUIStyle toolSubtitleStyle;
+        private static bool stylesInitialized;
+        private static bool stylesProSkin;
+        private static int nestedToolHeaderSuppressionDepth;
+
+        /// <summary>
+        /// SimpleToolsWindow owns the first-screen page header. Legacy page methods
+        /// may still call DrawToolHeader after their Odin fields; suppress those
+        /// nested calls while the host is drawing so a page has one title only.
+        /// </summary>
+        public static IDisposable SuppressNestedToolHeaders()
+        {
+            nestedToolHeaderSuppressionDepth++;
+            return new ToolHeaderSuppressionScope();
+        }
 
         public static void DrawToolHeader(string title, string purpose, SimpleToolsMaturity maturity, string risk = null)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            if (nestedToolHeaderSuppressionDepth > 0)
+                return;
+
+            EnsureStyles();
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField(title ?? "未命名工具", toolTitleStyle);
+            if (!string.IsNullOrWhiteSpace(purpose))
+                EditorGUILayout.LabelField(purpose, toolSubtitleStyle);
+
+            DrawMaturityBadge(maturity);
+
+            if (!string.IsNullOrWhiteSpace(risk))
             {
-                EditorGUILayout.LabelField(title ?? "未命名工具", EditorStyles.boldLabel);
+                Color previous = GUI.contentColor;
+                GUI.contentColor = EditorGUIUtility.isProSkin
+                    ? new Color(0.91f, 0.74f, 0.43f)
+                    : new Color(0.60f, 0.39f, 0.08f);
+                EditorGUILayout.LabelField("注意：" + risk, toolSubtitleStyle);
+                GUI.contentColor = previous;
             }
+
+            DrawDivider();
         }
 
         public static void DrawMaturityBadge(SimpleToolsMaturity maturity)
         {
-            // Kept for source compatibility while tool pages are simplified.
+            EnsureStyles();
+            Color previous = GUI.contentColor;
+            GUI.contentColor = GetMaturityColor(maturity);
+            EditorGUILayout.LabelField("状态：" + GetMaturityText(maturity), toolSubtitleStyle);
+            GUI.contentColor = previous;
         }
 
         public static void DrawLargeListGuard(int totalCount, string itemName = "条目")
@@ -122,8 +174,22 @@ namespace ES
 
         public static void DrawSectionTitle(string title, string subtitle = null)
         {
-            EditorGUILayout.Space(6);
-            EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+            EnsureStyles();
+            EditorGUILayout.Space(10f);
+            EditorGUILayout.LabelField(title ?? "未命名分区", sectionTitleStyle);
+            if (!string.IsNullOrWhiteSpace(subtitle))
+                EditorGUILayout.LabelField(subtitle, toolSubtitleStyle);
+            DrawDivider();
+        }
+
+        /// <summary>
+        /// A section title and divider already establish hierarchy. Use this scope for
+        /// ordinary content instead of another help-box frame; warnings and errors use
+        /// DrawWarning/DrawEmptyState separately when they carry real state.
+        /// </summary>
+        public static EditorGUILayout.VerticalScope BeginContentSection()
+        {
+            return new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true));
         }
 
         public static void DrawSummary(params string[] items)
@@ -133,12 +199,21 @@ namespace ES
 
         public static void DrawSummary(IEnumerable<string> items)
         {
-            string text = string.Join("  |  ", (items ?? Enumerable.Empty<string>()).Where(item => !string.IsNullOrWhiteSpace(item)));
-            if (string.IsNullOrEmpty(text))
+            SummaryParts.Clear();
+            if (items != null)
+            {
+                foreach (string item in items)
+                {
+                    if (!string.IsNullOrWhiteSpace(item))
+                        SummaryParts.Add(item);
+                }
+            }
+
+            if (SummaryParts.Count == 0)
                 return;
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                EditorGUILayout.LabelField(CompactDisplayText(text, 220), EditorStyles.wordWrappedMiniLabel);
+            string text = string.Join("  |  ", SummaryParts);
+            EditorGUILayout.LabelField(CompactDisplayText(text, 220), EditorStyles.wordWrappedMiniLabel);
         }
 
         public static void DrawEmptyState(string message)
@@ -158,9 +233,9 @@ namespace ES
             if (string.IsNullOrWhiteSpace(summary))
                 return;
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            DrawSectionTitle(string.IsNullOrWhiteSpace(title) ? "最近结果" : title);
+            using (new EditorGUILayout.VerticalScope())
             {
-                EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(title) ? "最近结果" : title, EditorStyles.boldLabel);
                 EditorGUILayout.LabelField(summary, EditorStyles.miniLabel);
 
                 DrawDetailFoldout(title, detail);
@@ -210,9 +285,9 @@ namespace ES
                 return;
             }
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            DrawSectionTitle(string.IsNullOrWhiteSpace(report.Title) ? "最近报告" : report.Title);
+            using (new EditorGUILayout.VerticalScope())
             {
-                EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(report.Title) ? "最近报告" : report.Title, EditorStyles.boldLabel);
                 if (!string.IsNullOrWhiteSpace(report.Summary))
                     EditorGUILayout.LabelField(report.Summary, EditorStyles.wordWrappedMiniLabel);
 
@@ -251,7 +326,7 @@ namespace ES
                 return;
 
             DrawSectionTitle("操作历史", "仅保存在当前编辑器域内，用于快速复查最近工具报告。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 int count = Mathf.Min(Mathf.Max(1, previewCount), OperationHistory.Count);
                 for (int i = 0; i < count; i++)
@@ -277,23 +352,40 @@ namespace ES
             if (items.Count > visibleCount)
                 text += $"\n... 还有 {items.Count - visibleCount} 项";
 
-            EditorGUILayout.HelpBox($"{title}：{items.Count}\n{text}", type);
+            if (type == MessageType.Warning || type == MessageType.Error)
+            {
+                EditorGUILayout.HelpBox($"{title}：{items.Count}\n{text}", type);
+                return;
+            }
+
+            EditorGUILayout.LabelField($"{title}：{items.Count} · {text.Replace("\n", "  |  ")}", EditorStyles.wordWrappedMiniLabel);
         }
 
         public static List<T> PageItems<T>(IList<T> items, ref int pageIndex, int pageSize, out int totalPages)
         {
-            pageSize = Mathf.Clamp(pageSize, 1, MaxRenderRowsPerPage);
-            int count = items != null ? items.Count : 0;
-            totalPages = Mathf.Max(1, Mathf.CeilToInt(count / (float)pageSize));
-            pageIndex = Mathf.Clamp(pageIndex, 0, totalPages - 1);
-            int start = pageIndex * pageSize;
-            int end = Mathf.Min(start + pageSize, count);
+            int start;
+            int end;
+            GetPageRange(items, ref pageIndex, pageSize, out totalPages, out start, out end);
 
             List<T> result = new List<T>(Mathf.Max(0, end - start));
             for (int i = start; i < end; i++)
                 result.Add(items[i]);
 
             return result;
+        }
+
+        /// <summary>
+        /// 只计算当前页的索引范围，不创建临时集合。
+        /// 预览表在 OnGUI 的 Layout/Repaint 热路径中应优先使用此方法。
+        /// </summary>
+        public static void GetPageRange<T>(IList<T> items, ref int pageIndex, int pageSize, out int totalPages, out int start, out int end)
+        {
+            pageSize = Mathf.Clamp(pageSize, 1, MaxRenderRowsPerPage);
+            int count = items != null ? items.Count : 0;
+            totalPages = Mathf.Max(1, Mathf.CeilToInt(count / (float)pageSize));
+            pageIndex = Mathf.Clamp(pageIndex, 0, totalPages - 1);
+            start = pageIndex * pageSize;
+            end = Mathf.Min(start + pageSize, count);
         }
 
         public static void DrawPager(ref int pageIndex, int totalCount, int pageSize)
@@ -396,8 +488,13 @@ namespace ES
             Color previousContent = GUI.contentColor;
             try
             {
-                GUI.backgroundColor = GetToneColor(tone);
-                GUI.contentColor = Color.white;
+                // A page may only promote one true next step. Success/warning/danger are
+                // result states, not licenses to create more saturated primary buttons.
+                if (tone == SimpleToolsActionTone.Primary)
+                {
+                    GUI.backgroundColor = PrimaryColor;
+                    GUI.contentColor = Color.white;
+                }
                 return GUILayout.Button(new GUIContent(label, tooltip), EditorStyles.miniButton, MergeHeight(height, options));
             }
             finally
@@ -434,6 +531,86 @@ namespace ES
             }
         }
 
+        private static void DrawDivider()
+        {
+            Rect divider = GUILayoutUtility.GetRect(0f, 1f, GUILayout.ExpandWidth(true));
+            if (Event.current.type != EventType.Repaint)
+                return;
+
+            EditorGUI.DrawRect(
+                divider,
+                EditorGUIUtility.isProSkin
+                    ? new Color(1f, 1f, 1f, 0.11f)
+                    : new Color(0f, 0f, 0f, 0.11f));
+        }
+
+        private static void EnsureStyles()
+        {
+            bool proSkin = EditorGUIUtility.isProSkin;
+            if (stylesInitialized && stylesProSkin == proSkin)
+                return;
+
+            stylesInitialized = true;
+            stylesProSkin = proSkin;
+            toolTitleStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                fontSize = 18,
+                fixedHeight = 24f,
+                alignment = TextAnchor.MiddleLeft
+            };
+            sectionTitleStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                fontSize = 13,
+                fixedHeight = 20f,
+                alignment = TextAnchor.LowerLeft
+            };
+            toolSubtitleStyle = new GUIStyle(EditorStyles.wordWrappedMiniLabel)
+            {
+                richText = false
+            };
+            toolSubtitleStyle.normal.textColor = proSkin
+                ? new Color(0.67f, 0.70f, 0.75f)
+                : new Color(0.34f, 0.37f, 0.42f);
+        }
+
+        private static string GetMaturityText(SimpleToolsMaturity maturity)
+        {
+            switch (maturity)
+            {
+                case SimpleToolsMaturity.Industrial:
+                    return "稳定可用";
+                case SimpleToolsMaturity.Upgrading:
+                    return "持续升级";
+                case SimpleToolsMaturity.Legacy:
+                    return "旧版待迁移";
+                default:
+                    return "试验功能";
+            }
+        }
+
+        private static Color GetMaturityColor(SimpleToolsMaturity maturity)
+        {
+            switch (maturity)
+            {
+                case SimpleToolsMaturity.Industrial:
+                    return EditorGUIUtility.isProSkin
+                        ? new Color(0.58f, 0.80f, 0.64f)
+                        : new Color(0.18f, 0.46f, 0.24f);
+                case SimpleToolsMaturity.Legacy:
+                    return EditorGUIUtility.isProSkin
+                        ? new Color(0.78f, 0.68f, 0.48f)
+                        : new Color(0.56f, 0.38f, 0.08f);
+                case SimpleToolsMaturity.Experimental:
+                    return EditorGUIUtility.isProSkin
+                        ? new Color(0.72f, 0.62f, 0.90f)
+                        : new Color(0.39f, 0.23f, 0.60f);
+                default:
+                    return EditorGUIUtility.isProSkin
+                        ? new Color(0.63f, 0.78f, 0.96f)
+                        : new Color(0.08f, 0.38f, 0.70f);
+            }
+        }
+
         private static GUILayoutOption[] MergeHeight(int height, GUILayoutOption[] options)
         {
             if (options == null || options.Length == 0)
@@ -467,6 +644,54 @@ namespace ES
                 return text;
 
             return text.Substring(0, Mathf.Max(1, maximumCharacters)) + "...";
+        }
+
+        private readonly struct ToolHeaderSuppressionScope : IDisposable
+        {
+            public void Dispose()
+            {
+                nestedToolHeaderSuppressionDepth = Mathf.Max(0, nestedToolHeaderSuppressionDepth - 1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Legacy SimpleTools pages were composed from many Odin boxes, title groups and
+    /// per-field InfoBoxes. Remove decorative containers only; stable horizontal and
+    /// vertical field columns remain available for dense configuration. Nested result
+    /// and table models retain their deliberate table layouts.
+    /// </summary>
+    [ResolverPriority(-150000)]
+    public sealed class ESSimpleToolsLayoutAttributeProcessor : OdinAttributeProcessor
+    {
+        public override bool CanProcessChildMemberAttributes(InspectorProperty parent, MemberInfo member)
+        {
+            Type targetType = parent?.Tree?.TargetType;
+            return member != null
+                   && targetType != null
+                   && member.DeclaringType == targetType
+                   && Attribute.IsDefined(targetType, typeof(ESSimpleToolsLayoutAttribute), false);
+        }
+
+        public override void ProcessChildMemberAttributes(
+            InspectorProperty parent,
+            MemberInfo member,
+            List<Attribute> attributes)
+        {
+            if (attributes == null)
+                return;
+
+            attributes.RemoveAll(IsLegacyPageDecoration);
+
+        }
+
+        private static bool IsLegacyPageDecoration(Attribute attribute)
+        {
+            return attribute is InfoBoxAttribute
+                   || attribute is BoxGroupAttribute
+                   || attribute is TitleGroupAttribute
+                   || attribute is TabGroupAttribute
+                   || attribute is PropertySpaceAttribute;
         }
     }
 }

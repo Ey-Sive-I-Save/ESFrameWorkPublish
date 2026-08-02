@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using ES;
 using Sirenix.OdinInspector.Editor;
 using UnityEditor;
@@ -44,8 +45,15 @@ namespace ES.EditorInternal
             ESEditorSectionAttribute attribute,
             string subtitle)
         {
-            using (new EditorGUILayout.VerticalScope(SectionContainerStyle))
+            EditorGUILayout.BeginVertical(SectionContainerStyle);
+            try
+            {
                 DrawSectionBody(sectionProperty, attribute, subtitle);
+            }
+            finally
+            {
+                EditorGUILayout.EndVertical();
+            }
         }
 
         private static void DrawSectionBody(
@@ -54,7 +62,7 @@ namespace ES.EditorInternal
             string subtitle)
         {
             GUILayout.Label(attribute.DisplayName, SectionHeaderStyle);
-            if (!string.IsNullOrEmpty(subtitle))
+            if (ESEditorPresentation.ShowSectionSubtitle && !string.IsNullOrEmpty(subtitle))
                 GUILayout.Label(subtitle, SectionSubtitleStyle);
 
             Rect dividerRect = GUILayoutUtility.GetRect(0f, 1f, GUILayout.ExpandWidth(true));
@@ -141,6 +149,10 @@ namespace ES.EditorInternal
             private double compactPointerStartedAt;
             private int compactPointerControlId;
             private int compactPressedSectionIndex;
+            private string selectedPropertyCacheId;
+            private InspectorProperty selectedPropertyCache;
+            private ESEditorSectionAttribute selectedPropertyCacheAttribute;
+            private bool selectedPropertyCacheValid;
 
             private static GUIStyle sectionStyle;
             private static GUIStyle selectedSectionStyle;
@@ -149,6 +161,8 @@ namespace ES.EditorInternal
             private static GUIStyle compactTitleStyle;
             private static GUIStyle directoryCaptionStyle;
             private static GUIStyle directoryToggleStyle;
+            private static bool stylesProSkin;
+            private static bool stylesInitialized;
             private readonly string navigatorId;
             private readonly GUIContent directoryToggleContent = new GUIContent();
 
@@ -240,6 +254,7 @@ namespace ES.EditorInternal
                             current.DisplayName,
                             section.Subtitle,
                             current.Order);
+                        InvalidateSelectedPropertyCache();
                         SortSections();
                         return true;
                     }
@@ -248,6 +263,7 @@ namespace ES.EditorInternal
                 }
 
                 sections.Add(new SectionDescriptor(section.SectionId, section.DisplayName, section.Subtitle, section.Order));
+                InvalidateSelectedPropertyCache();
                 SortSections();
 
                 if (string.IsNullOrEmpty(selectedId) || FindIndex(selectedId) < 0)
@@ -303,16 +319,39 @@ namespace ES.EditorInternal
                 if (selectedIndex < 0)
                     selectedIndex = 0;
 
-                ESEditorSectionAttribute selectedAttribute = null;
-                InspectorProperty selectedProperty = FindSectionProperty(
-                    tree.RootProperty,
-                    sections[selectedIndex].Id,
-                    navigatorId,
-                    ref selectedAttribute);
+                string selectedSectionId = sections[selectedIndex].Id;
+                ESEditorSectionAttribute selectedAttribute;
+                InspectorProperty selectedProperty;
+                if (selectedPropertyCacheValid
+                    && string.Equals(selectedPropertyCacheId, selectedSectionId, StringComparison.Ordinal)
+                    && IsCachedSectionPropertyValid(
+                        selectedPropertyCache,
+                        tree,
+                        selectedSectionId,
+                        navigatorId))
+                {
+                    selectedProperty = selectedPropertyCache;
+                    selectedAttribute = selectedPropertyCacheAttribute;
+                }
+                else
+                {
+                    selectedAttribute = null;
+                    selectedProperty = FindSectionProperty(
+                        tree.RootProperty,
+                        selectedSectionId,
+                        navigatorId,
+                        ref selectedAttribute);
+                    selectedPropertyCacheId = selectedSectionId;
+                    selectedPropertyCache = selectedProperty;
+                    selectedPropertyCacheAttribute = selectedAttribute;
+                    selectedPropertyCacheValid = true;
+                }
+
                 if (selectedProperty == null || selectedAttribute == null)
                     return false;
 
-                using (new EditorGUILayout.VerticalScope(SectionSurfaceStyle))
+                EditorGUILayout.BeginVertical(SectionSurfaceStyle);
+                try
                 {
                     DrawDirectoryContents(selectedIndex);
                     DrawDirectoryContentDivider();
@@ -321,8 +360,31 @@ namespace ES.EditorInternal
                         selectedAttribute,
                         GetSubtitle(selectedAttribute.SectionId));
                 }
+                finally
+                {
+                    EditorGUILayout.EndVertical();
+                }
 
                 return true;
+            }
+
+            private static bool IsCachedSectionPropertyValid(
+                InspectorProperty property,
+                PropertyTree tree,
+                string sectionId,
+                string expectedNavigatorId)
+            {
+                if (property == null
+                    || property.Tree != tree
+                    || property.Info == null
+                    || property.Info.PropertyType != PropertyType.Group)
+                    return false;
+
+                ESEditorSectionAttribute attribute = property.GetAttribute<ESEditorSectionAttribute>();
+                return attribute != null
+                       && !attribute.IsContinuation
+                       && string.Equals(attribute.SectionId, sectionId, StringComparison.Ordinal)
+                       && string.Equals(attribute.NavigatorId, expectedNavigatorId, StringComparison.Ordinal);
             }
 
             private static void DrawDirectoryContentDivider()
@@ -334,7 +396,7 @@ namespace ES.EditorInternal
                 if (Event.current.type == EventType.Repaint)
                 {
                     Color dividerColor = ESEditorPresentation.DividerColor;
-                    dividerColor.a = EditorGUIUtility.isProSkin ? 0.72f : 0.90f;
+                    dividerColor.a = ESEditorPresentation.IsProSkin ? 0.72f : 0.90f;
                     EditorGUI.DrawRect(dividerRect, dividerColor);
                 }
 
@@ -466,9 +528,7 @@ namespace ES.EditorInternal
                         // Keep the directory lightweight, but give the current section a
                         // real surface area. The underline alone disappears in dark themes
                         // and makes the content page feel disconnected from the selection.
-                        Color selectedFill = EditorGUIUtility.isProSkin
-                            ? new Color(0.18f, 0.32f, 0.46f, 0.34f)
-                            : new Color(0.72f, 0.84f, 0.96f, 0.55f);
+                        Color selectedFill = ESEditorPresentation.SectionSelectedFill;
                         EditorGUI.DrawRect(
                             new Rect(itemRect.x + 1f, itemRect.y + 2f,
                                 Mathf.Max(4f, itemRect.width - 2f), itemRect.height - 3f),
@@ -479,9 +539,7 @@ namespace ES.EditorInternal
 
                     if (Event.current.type == EventType.Repaint && i == selectedIndex)
                     {
-                        Color accentColor = EditorGUIUtility.isProSkin
-                            ? new Color(0.34f, 0.68f, 0.96f, 1f)
-                            : new Color(0.08f, 0.38f, 0.72f, 1f);
+                        Color accentColor = ESEditorPresentation.GetDepthAccent(0);
                         EditorGUI.DrawRect(
                             new Rect(itemRect.x + SectionHorizontalPadding, itemRect.yMax - 2f,
                                 Mathf.Max(4f, itemRect.width - SectionHorizontalPadding * 2f), 3f),
@@ -549,12 +607,8 @@ namespace ES.EditorInternal
 
                     float markerSize = selected ? CompactSelectedMarkerSize : CompactMarkerSize;
                     Color markerColor = selected
-                        ? (EditorGUIUtility.isProSkin
-                            ? new Color(0.34f, 0.68f, 0.96f, 1f)
-                            : new Color(0.08f, 0.38f, 0.72f, 1f))
-                        : (EditorGUIUtility.isProSkin
-                            ? new Color(0.42f, 0.45f, 0.49f, 1f)
-                            : new Color(0.54f, 0.57f, 0.60f, 1f));
+                        ? ESEditorPresentation.GetDepthAccent(0)
+                        : ESEditorPresentation.SectionMarkerColor;
                     EditorGUI.DrawRect(new Rect(hitRect.center.x - markerSize * 0.5f,
                         hitRect.center.y - markerSize * 0.5f, markerSize, markerSize), markerColor);
                 }
@@ -738,9 +792,18 @@ namespace ES.EditorInternal
             private void Select(string sectionId)
             {
                 selectedId = sectionId;
+                InvalidateSelectedPropertyCache();
                 if (!string.IsNullOrEmpty(selectionKey))
                     SessionState.SetString(selectionKey, selectedId);
                 GUI.changed = true;
+            }
+
+            private void InvalidateSelectedPropertyCache()
+            {
+                selectedPropertyCacheId = null;
+                selectedPropertyCache = null;
+                selectedPropertyCacheAttribute = null;
+                selectedPropertyCacheValid = false;
             }
 
             private void SortSections()
@@ -760,17 +823,52 @@ namespace ES.EditorInternal
             private string BuildSelectionKey(PropertyTree tree)
             {
                 string typeName = tree.TargetType == null ? "Unknown" : tree.TargetType.FullName;
-                int targetId = 0;
-                if (tree.WeakTargets.Count == 1 && tree.WeakTargets[0] is UnityEngine.Object target)
-                    targetId = target.GetInstanceID();
+                return SessionKeyPrefix + typeName + "." + BuildTargetIdentity(tree) + "." + navigatorId;
+            }
 
-                return SessionKeyPrefix + typeName + "." + targetId + "." + navigatorId;
+            private static string BuildTargetIdentity(PropertyTree tree)
+            {
+                if (tree == null || tree.WeakTargets == null || tree.WeakTargets.Count == 0)
+                    return "NoTarget";
+
+                if (tree.WeakTargets.Count == 1)
+                {
+                    if (tree.WeakTargets[0] is UnityEngine.Object target)
+                        return "Object" + target.GetInstanceID();
+
+                    return "SingleNonUnity";
+                }
+
+                // A multi-object inspector previously used a shared "0" key. That made one
+                // selection's active section leak into every other multi-selection of the same
+                // type. Sort IDs so Unity selection order does not change the persisted state.
+                var ids = new List<int>(tree.WeakTargets.Count);
+                for (int i = 0; i < tree.WeakTargets.Count; i++)
+                {
+                    if (tree.WeakTargets[i] is UnityEngine.Object target)
+                        ids.Add(target.GetInstanceID());
+                }
+
+                if (ids.Count == 0)
+                    return "MultiNonUnity" + tree.WeakTargets.Count;
+
+                ids.Sort();
+                var builder = new StringBuilder(ids.Count * 12 + 8);
+                builder.Append("Multi");
+                for (int i = 0; i < ids.Count; i++)
+                {
+                    builder.Append('_');
+                    builder.Append(ids[i]);
+                }
+
+                return builder.ToString();
             }
 
             private static GUIStyle SectionStyle
             {
                 get
                 {
+                    EnsureStyles();
                     if (sectionStyle == null)
                     {
                         sectionStyle = new GUIStyle(EditorStyles.label)
@@ -780,9 +878,7 @@ namespace ES.EditorInternal
                             clipping = TextClipping.Clip
                         };
 
-                        sectionStyle.normal.textColor = EditorGUIUtility.isProSkin
-                            ? new Color(0.72f, 0.74f, 0.77f, 1f)
-                            : new Color(0.28f, 0.30f, 0.33f, 1f);
+                        sectionStyle.normal.textColor = ESEditorPresentation.SectionTextColor;
                     }
 
                     return sectionStyle;
@@ -793,6 +889,7 @@ namespace ES.EditorInternal
             {
                 get
                 {
+                    EnsureStyles();
                     if (selectedSectionStyle == null)
                     {
                         selectedSectionStyle = new GUIStyle(SectionStyle)
@@ -800,9 +897,7 @@ namespace ES.EditorInternal
                             fontStyle = FontStyle.Bold
                         };
 
-                        selectedSectionStyle.normal.textColor = EditorGUIUtility.isProSkin
-                            ? new Color(0.70f, 0.84f, 1f, 1f)
-                            : new Color(0.06f, 0.31f, 0.61f, 1f);
+                        selectedSectionStyle.normal.textColor = ESEditorPresentation.SectionSelectedTextColor;
                     }
 
                     return selectedSectionStyle;
@@ -813,6 +908,7 @@ namespace ES.EditorInternal
             {
                 get
                 {
+                    EnsureStyles();
                     if (separatorStyle == null)
                     {
                         separatorStyle = new GUIStyle(EditorStyles.miniLabel)
@@ -820,9 +916,7 @@ namespace ES.EditorInternal
                             alignment = TextAnchor.MiddleCenter,
                             padding = new RectOffset(0, 0, 2, 2)
                         };
-                        separatorStyle.normal.textColor = EditorGUIUtility.isProSkin
-                            ? new Color(0.42f, 0.44f, 0.48f, 1f)
-                            : new Color(0.50f, 0.52f, 0.55f, 1f);
+                        separatorStyle.normal.textColor = ESEditorPresentation.SectionMutedTextColor;
                     }
 
                     return separatorStyle;
@@ -833,6 +927,7 @@ namespace ES.EditorInternal
             {
                 get
                 {
+                    EnsureStyles();
                     if (directoryCaptionStyle == null)
                     {
                         directoryCaptionStyle = new GUIStyle(EditorStyles.miniLabel)
@@ -842,9 +937,7 @@ namespace ES.EditorInternal
                             fontStyle = FontStyle.Bold,
                             padding = new RectOffset(0, 0, 1, 1)
                         };
-                        directoryCaptionStyle.normal.textColor = EditorGUIUtility.isProSkin
-                            ? new Color(0.58f, 0.62f, 0.68f, 1f)
-                            : new Color(0.34f, 0.37f, 0.42f, 1f);
+                        directoryCaptionStyle.normal.textColor = ESEditorPresentation.MetaStyle.normal.textColor;
                     }
 
                     return directoryCaptionStyle;
@@ -855,6 +948,7 @@ namespace ES.EditorInternal
             {
                 get
                 {
+                    EnsureStyles();
                     if (directoryToggleStyle == null)
                     {
                         directoryToggleStyle = new GUIStyle(EditorStyles.miniButton)
@@ -872,6 +966,7 @@ namespace ES.EditorInternal
             {
                 get
                 {
+                    EnsureStyles();
                     if (compactArrowStyle == null)
                     {
                         compactArrowStyle = new GUIStyle(EditorStyles.miniLabel)
@@ -879,9 +974,7 @@ namespace ES.EditorInternal
                             alignment = TextAnchor.MiddleCenter,
                             padding = new RectOffset(0, 0, 1, 2)
                         };
-                        compactArrowStyle.normal.textColor = EditorGUIUtility.isProSkin
-                            ? new Color(0.62f, 0.66f, 0.70f, 1f)
-                            : new Color(0.36f, 0.39f, 0.43f, 1f);
+                        compactArrowStyle.normal.textColor = ESEditorPresentation.MetaStyle.normal.textColor;
                     }
 
                     return compactArrowStyle;
@@ -892,6 +985,7 @@ namespace ES.EditorInternal
             {
                 get
                 {
+                    EnsureStyles();
                     if (compactTitleStyle == null)
                     {
                         compactTitleStyle = new GUIStyle(SelectedSectionStyle)
@@ -905,6 +999,23 @@ namespace ES.EditorInternal
 
                     return compactTitleStyle;
                 }
+            }
+
+            private static void EnsureStyles()
+            {
+                bool proSkin = ESEditorPresentation.IsProSkin;
+                if (stylesInitialized && stylesProSkin == proSkin)
+                    return;
+
+                stylesInitialized = true;
+                stylesProSkin = proSkin;
+                sectionStyle = null;
+                selectedSectionStyle = null;
+                separatorStyle = null;
+                compactArrowStyle = null;
+                compactTitleStyle = null;
+                directoryCaptionStyle = null;
+                directoryToggleStyle = null;
             }
         }
 

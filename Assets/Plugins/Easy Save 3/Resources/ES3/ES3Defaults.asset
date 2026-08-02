@@ -50,6 +50,7 @@ MonoBehaviour:
     - HybridCLR.Runtime
     - KCC
     - Luban.Runtime
+    - MCPForUnity.Runtime
     - MemoryPack.Unity
     - PrimeTween.Runtime
     - RootMotion

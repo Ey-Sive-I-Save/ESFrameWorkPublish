@@ -15,11 +15,23 @@ using Stopwatch = System.Diagnostics.Stopwatch;
 namespace ES
 {
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_RuntimeWatch : ESWindowPageBase
     {
         private readonly Dictionary<string, bool> groupFoldouts = new Dictionary<string, bool>();
         private readonly Dictionary<string, bool> ownerFoldouts = new Dictionary<string, bool>();
         private readonly List<WatchEntry> entries = new List<WatchEntry>();
+        // 后台受控采样写 entries；IMGUI 只在 Layout 边界切换 renderEntries，
+        // 防止采样更新恰好落在 Layout/Repaint 之间时改变控件树数量。
+        private readonly List<WatchEntry> renderEntries = new List<WatchEntry>();
+        private readonly List<RuntimeWatchEvidenceRecorder.RecordedEvent> renderEvidenceEvents =
+            new List<RuntimeWatchEvidenceRecorder.RecordedEvent>(64);
+        private int entriesVersion;
+        private int renderEntriesVersion = -1;
+        private bool renderEvidenceIsRecording;
+        private bool renderEvidenceHasEvidence;
+        private int renderEvidenceEventCount;
+        private string renderEvidenceScopeLabel = string.Empty;
         private static readonly Dictionary<Type, PropertyInfo> ModulesEnumerablePropertyCache = new Dictionary<Type, PropertyInfo>();
         private static readonly Dictionary<string, Delegate> OdinBoolExpressionCache = new Dictionary<string, Delegate>();
         private static readonly HashSet<string> FailedOdinBoolExpressions = new HashSet<string>();
@@ -28,8 +40,23 @@ namespace ES
         private readonly HashSet<string> manuallyEditedInlineDraftKeys = new HashSet<string>();
         private readonly Dictionary<string, WatchSampleState> sampleStates = new Dictionary<string, WatchSampleState>();
         private readonly HashSet<string> pinnedEntryKeys = new HashSet<string>(StringComparer.Ordinal);
+        // 下拉选项随受控采样更新；OnGUI 只读取列表，避免每次 Layout/Repaint 重新 LINQ 分组和分配。
+        private readonly List<string> categoryFilterOptions = new List<string> { "全部" };
+        private readonly List<string> scriptFilterOptions = new List<string> { "全部" };
+        private readonly List<string> objectFilterOptions = new List<string> { "全部" };
+        // 证据只存在当前编辑器会话：显式开始、固定容量、不会写入场景或资产。
+        [NonSerialized]
+        private readonly RuntimeWatchEvidenceRecorder evidenceRecorder = new RuntimeWatchEvidenceRecorder();
         private bool defaultFoldoutExpanded = true;
         private bool pinnedEntriesLoaded;
+        [NonSerialized]
+        private bool showEvidenceReplay = true;
+        [NonSerialized]
+        private bool restoreAutoRefreshAfterRecording;
+        [NonSerialized]
+        private bool autoRefreshBeforeRecording;
+        [NonSerialized]
+        private bool autoRefreshPausedBeforeRecording;
         private const string PinnedEntriesPrefsKey = "ES_RuntimeWatch_PinnedEntries";
 
         private string searchText = "";
@@ -62,6 +89,10 @@ namespace ES
         private Vector2 scroll;
         private string lastResultSummary = "";
         private string lastResultDetail = "";
+        private string lastActionEntryKey = "";
+        private string lastActionFeedback = "";
+        private bool lastActionFailed;
+        private bool lastActionFeedbackVisible;
         private string chainReport = "";
         private int lastScannedOwnerTypeCount;
         private int lastFoundOwnerCount;
@@ -79,6 +110,15 @@ namespace ES
         private int currentPage;
         private int pageSize = 100;
         private RuntimeWatchViewFilter viewFilter = RuntimeWatchViewFilter.All;
+        // 观察值只能由受控刷新路径更新，绝不能在 Layout/Repaint 中重复执行 Getter。
+        private bool snapshotRequiresRefresh = true;
+        private bool foregroundRefreshPending;
+        private int sampledSelectionInstanceId;
+        private double lastRefreshAt;
+        private string lastRefreshReason = "尚未刷新";
+        private int lastReadFailureCount;
+        private int lastSlowGetterCount;
+        private int lastManualActionCount;
         private const double ChangeHighlightSeconds = 0.5d;
         private const double SlowGetterThresholdMs = 2d;
 
@@ -90,7 +130,7 @@ namespace ES
             Changed,
             [InspectorName("读取失败")]
             ReadFailures,
-            [InspectorName("慢 Getter")]
+            [InspectorName("慢读取")]
             SlowGetters,
             [InspectorName("可执行项")]
             Actions,
@@ -107,16 +147,38 @@ namespace ES
 
         public void RefreshNow()
         {
-            CollectEntries(recordResult: true);
+            CollectEntries(recordResult: true, refreshReason: "手动刷新");
             nextRefreshTime = EditorApplication.timeSinceStartup + refreshInterval;
+        }
+
+        /// <summary>
+        /// The SimpleTools host calls this only when RuntimeWatch becomes frontmost.
+        /// It schedules an immediate automatic sample without allowing background tabs
+        /// or ordinary OnGUI repaints to trigger collection.
+        /// </summary>
+        public void RequestForegroundRefresh()
+        {
+            if (!ShouldAutoRefresh())
+                return;
+
+            foregroundRefreshPending = true;
+            nextRefreshTime = 0d;
         }
 
         public bool TryAutoRefreshFromEditorTick()
         {
+            if (evidenceRecorder.IsRecording && !EditorApplication.isPlaying)
+            {
+                StopEvidenceRecording("已随 Play Mode 结束冻结");
+                return true;
+            }
+
             if (!ShouldAutoRefresh() || EditorApplication.timeSinceStartup < nextRefreshTime)
                 return false;
 
-            CollectEntries(recordResult: false);
+            string refreshReason = foregroundRefreshPending ? "前台恢复" : "自动刷新";
+            foregroundRefreshPending = false;
+            CollectEntries(recordResult: false, refreshReason: refreshReason);
             nextRefreshTime = EditorApplication.timeSinceStartup + refreshInterval;
             return true;
         }
@@ -173,20 +235,34 @@ namespace ES
         private void DrawRuntimeWatch()
         {
             EnsurePinnedEntriesLoaded();
-            TryAutoRefreshFromEditorTick();
+            PrepareRenderEntries();
+            DetectSelectedScopeChange();
+
+            // 自动刷新由 SimpleToolsWindow 的 EditorApplication.update 宿主驱动。
+            // OnGUI 只消费当前缓存，避免 Layout/Repaint 或重绘触发扫描。
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "RuntimeWatch 运行时观察",
+                "确认范围 → 刷新快照 → 观察变化或显式执行操作。界面永远只显示最近一次受控采样缓存。",
+                SimpleToolsMaturity.Upgrading,
+                "自动刷新只在 RuntimeWatch 前台执行；读取不会写入场景或资产，方法与设值必须由用户明确触发。");
+            SimpleToolsPanelUtility.DrawSummary(
+                $"范围: {BuildScopeLabel()}",
+                $"快照: {BuildSnapshotStatusLabel()}",
+                $"观察: 已收集 {renderEntries.Count} 项 · 可操作 {lastManualActionCount}",
+                $"状态: 失败 {lastReadFailureCount} · 慢读取 {lastSlowGetterCount}");
 
             DrawPrimaryToolbar();
             DrawSecondaryFilters();
-            int visibleCount = entries.Count(MatchesSearch);
+            int visibleCount = CountVisibleEntries();
 
             if (!EditorApplication.isPlaying && !refreshInEditMode)
-                EditorGUILayout.HelpBox("当前处于 Edit Mode。启用“编辑器扫描”或点击“立即刷新”可检查当前场景实例。", MessageType.Info);
+                EditorGUILayout.HelpBox("当前处于 Edit Mode：自动刷新会等待 Play Mode。仍可点击“刷新快照”执行一次明确的场景检查。", MessageType.Info);
 
-            if (entries.Count == 0)
+            if (renderEntries.Count == 0)
             {
                 string emptyMessage = EditorApplication.isPlaying
                     ? "当前没有找到观察项。请检查 ESRuntimeWatch 标记、场景实例和高级过滤条件。"
-                    : "尚未扫描到观察项。点击“立即刷新”扫描当前场景。";
+                    : "尚未扫描到观察项。点击“刷新快照”扫描当前场景。";
                 EditorGUILayout.HelpBox(emptyMessage, MessageType.Info);
             }
 
@@ -194,6 +270,7 @@ namespace ES
             scroll = EditorGUILayout.BeginScrollView(scroll);
             DrawEntries(visibleCount);
             EditorGUILayout.EndScrollView();
+            DrawEvidenceReplay();
             DrawDiagnosticsPanel();
 
         }
@@ -207,139 +284,652 @@ namespace ES
 
         private void DrawPrimaryToolbar()
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            SimpleToolsPanelUtility.DrawSectionTitle("1 · 选择范围并刷新", "范围、Tag 和 ShowIf 会影响下一次采样；搜索、分类、脚本和对象筛选只作用于当前快照。");
+            bool narrow = EditorGUIUtility.currentViewWidth < 720f;
+            if (narrow)
+            {
+                searchText = EditorGUILayout.TextField(searchText, GUI.skin.FindStyle("ToolbarSearchTextField") ?? EditorStyles.textField);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawRefreshSnapshotButton();
+                    DrawWatchQuickJumpButton();
+                    GUILayout.FlexibleSpace();
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawGameObjectQuickJumpButton();
+                    DrawEvidenceButton();
+                    GUILayout.FlexibleSpace();
+                }
+            }
+            else
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    GUILayout.Label("RuntimeWatch", EditorStyles.boldLabel, GUILayout.Width(96));
                     searchText = EditorGUILayout.TextField(searchText, GUI.skin.FindStyle("ToolbarSearchTextField") ?? EditorStyles.textField);
-                    if (GUILayout.Button("观察项 ▼", EditorStyles.miniButton, GUILayout.Width(78)))
-                        ShowQuickJumpMenu(GUILayoutUtility.GetLastRect());
-                    if (GUILayout.Button("GameObject ▼", EditorStyles.miniButton, GUILayout.Width(96)))
-                        ShowGameObjectJumpMenu(GUILayoutUtility.GetLastRect());
+                    DrawQuickJumpActions();
+                }
+            }
+
+            if (narrow)
+            {
+                float viewWidth = EditorGUIUtility.currentViewWidth;
+                if (viewWidth < 340f)
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        selectedCategoryFilter = DrawRuntimeWatchFilterDropdown(
+                            RuntimeWatchDropdownFilter.Category,
+                            "分类",
+                            selectedCategoryFilter,
+                            categoryFilterOptions,
+                            Mathf.Max(120f, viewWidth - 6f));
+                    }
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        selectedScriptFilter = DrawRuntimeWatchFilterDropdown(
+                            RuntimeWatchDropdownFilter.Script,
+                            "脚本",
+                            selectedScriptFilter,
+                            scriptFilterOptions,
+                            Mathf.Max(120f, viewWidth - 6f));
+                    }
+                }
+                else
+                {
+                    float halfWidth = Mathf.Max(132f, (viewWidth - 8f) * 0.5f);
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        selectedCategoryFilter = DrawRuntimeWatchFilterDropdown(
+                            RuntimeWatchDropdownFilter.Category,
+                            "分类",
+                            selectedCategoryFilter,
+                            categoryFilterOptions,
+                            halfWidth);
+                        selectedScriptFilter = DrawRuntimeWatchFilterDropdown(
+                            RuntimeWatchDropdownFilter.Script,
+                            "脚本",
+                            selectedScriptFilter,
+                            scriptFilterOptions,
+                            halfWidth);
+                    }
                 }
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    bool narrow = EditorGUIUtility.currentViewWidth < 900f;
+                    selectedObjectFilter = DrawRuntimeWatchFilterDropdown(
+                        RuntimeWatchDropdownFilter.SceneObject,
+                        "对象",
+                        selectedObjectFilter,
+                        objectFilterOptions,
+                        Mathf.Max(120f, viewWidth - 6f));
+                }
+            }
+            else
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
                     selectedCategoryFilter = DrawRuntimeWatchFilterDropdown(
                         RuntimeWatchDropdownFilter.Category,
                         "分类",
                         selectedCategoryFilter,
-                        GetRuntimeWatchCategoryOptions(),
-                        narrow ? 150f : 180f);
+                        categoryFilterOptions,
+                        180f);
                     selectedScriptFilter = DrawRuntimeWatchFilterDropdown(
                         RuntimeWatchDropdownFilter.Script,
                         "脚本",
                         selectedScriptFilter,
-                        GetRuntimeWatchScriptOptions(),
-                        narrow ? 185f : 220f);
-                    if (!narrow)
-                        selectedObjectFilter = DrawRuntimeWatchFilterDropdown(
-                            RuntimeWatchDropdownFilter.SceneObject,
-                            "对象",
-                            selectedObjectFilter,
-                            GetRuntimeWatchObjectOptions(),
-                            280f);
+                        scriptFilterOptions,
+                        220f);
+                    selectedObjectFilter = DrawRuntimeWatchFilterDropdown(
+                        RuntimeWatchDropdownFilter.SceneObject,
+                        "对象",
+                        selectedObjectFilter,
+                        objectFilterOptions,
+                        280f);
                 }
+            }
 
+            if (narrow)
+            {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (EditorGUIUtility.currentViewWidth < 900f)
-                        selectedObjectFilter = DrawRuntimeWatchFilterDropdown(
-                            RuntimeWatchDropdownFilter.SceneObject,
-                            "对象",
-                            selectedObjectFilter,
-                            GetRuntimeWatchObjectOptions(),
-                            Mathf.Max(260f, EditorGUIUtility.currentViewWidth - 310f));
+                    DrawScopeSelector();
+                    if (GUILayout.Button(new GUIContent("重置筛选", "恢复全部文本、分类、脚本、对象和结果视图。若范围或采样规则发生变化，会提示你刷新快照。"), EditorStyles.miniButton, GUILayout.Width(72)))
+                        ClearWatchFilters();
                     GUILayout.FlexibleSpace();
-                    string mode = EditorApplication.isPlaying ? "● Play" : "○ Edit";
-                    string pause = autoRefreshPaused ? " · 已暂停" : string.Empty;
-                    int currentVisibleCount = entries.Count(MatchesSearch);
-                    GUILayout.Label($"{mode}{pause} · {currentVisibleCount}/{entries.Count} 项 · {lastScanDurationMs:0.0} ms", EditorStyles.miniBoldLabel);
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Label(BuildRuntimeModeStatusLabel(), EditorStyles.miniBoldLabel);
+                    GUILayout.FlexibleSpace();
+                }
+            }
+            else
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawScopeSelector();
+                    if (GUILayout.Button(new GUIContent("重置筛选", "恢复全部文本、分类、脚本、对象和结果视图。若范围或采样规则发生变化，会提示你刷新快照。"), EditorStyles.miniButton, GUILayout.Width(72)))
+                        ClearWatchFilters();
+                    GUILayout.FlexibleSpace();
+                    GUILayout.Label(BuildRuntimeModeStatusLabel(), EditorStyles.miniBoldLabel);
+                }
+            }
+        }
+
+        private void DrawQuickJumpActions()
+        {
+            DrawRefreshSnapshotButton();
+            DrawWatchQuickJumpButton();
+            DrawGameObjectQuickJumpButton();
+            DrawEvidenceButton();
+        }
+
+        private void DrawRefreshSnapshotButton()
+        {
+            string refreshLabel = snapshotRequiresRefresh ? "刷新快照 ●" : "刷新快照";
+            if (SimpleToolsPanelUtility.DrawActionButton(
+                    refreshLabel,
+                    "立即按当前范围和采样规则读取一次。不会写入场景或资产。",
+                    SimpleToolsActionTone.Primary,
+                    22,
+                    GUILayout.Width(82)))
+                RefreshNow();
+        }
+
+        private void DrawWatchQuickJumpButton()
+        {
+            if (GUILayout.Button(new GUIContent("观察项 ▼", "按 RuntimeWatch 分类快速跳转。"), EditorStyles.miniButton, GUILayout.Width(78)))
+                ShowQuickJumpMenu(GUILayoutUtility.GetLastRect());
+        }
+
+        private void DrawGameObjectQuickJumpButton()
+        {
+            if (GUILayout.Button(new GUIContent("GameObject ▼", "按场景对象快速跳转。"), EditorStyles.miniButton, GUILayout.Width(96)))
+                ShowGameObjectJumpMenu(GUILayoutUtility.GetLastRect());
+        }
+
+        private void DrawScopeSelector()
+        {
+            string scopeLabel;
+            if (!onlySelectedGameObject)
+            {
+                scopeLabel = "范围 · 当前场景";
+            }
+            else
+            {
+                GameObject selected = Selection.activeGameObject;
+                string selectedName = selected != null ? selected.name : "未选择对象";
+                scopeLabel = includeSelectedChildren
+                    ? "范围 · " + selectedName + " + 子层级"
+                    : "范围 · " + selectedName;
+            }
+
+            if (!GUILayout.Button(
+                    new GUIContent(scopeLabel + " ▼", "选择本次采样范围。切换范围是明确操作，会立即刷新快照。"),
+                    EditorStyles.miniButton,
+                    GUILayout.Width(Mathf.Min(220f, Mathf.Max(132f, EditorGUIUtility.currentViewWidth * 0.36f)))))
+                return;
+
+            Rect anchor = GUILayoutUtility.GetLastRect();
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("当前场景"), !onlySelectedGameObject, () => SetObservationScope(false, true));
+
+            bool hasSelectedGameObject = Selection.activeGameObject != null;
+            if (hasSelectedGameObject)
+            {
+                menu.AddItem(
+                    new GUIContent("当前选中对象"),
+                    onlySelectedGameObject && !includeSelectedChildren,
+                    () => SetObservationScope(true, false));
+                menu.AddItem(
+                    new GUIContent("当前选中对象及子层级"),
+                    onlySelectedGameObject && includeSelectedChildren,
+                    () => SetObservationScope(true, true));
+            }
+            else
+            {
+                menu.AddDisabledItem(new GUIContent("当前选中对象（请先在 Hierarchy 选择对象）"));
+                menu.AddDisabledItem(new GUIContent("当前选中对象及子层级（请先在 Hierarchy 选择对象）"));
+            }
+
+            menu.DropDown(anchor);
+        }
+
+        private void SetObservationScope(bool useSelectedObject, bool includeChildren)
+        {
+            onlySelectedGameObject = useSelectedObject;
+            includeSelectedChildren = includeChildren;
+            currentPage = 0;
+            // 用户明确选择了采样范围，因此立即更新，而不是让 UI 短暂显示旧范围的数据。
+            RefreshNow();
+        }
+
+        private string GetAutoRefreshStatusLabel()
+        {
+            if (!autoRefresh)
+                return "手动刷新";
+
+            if (autoRefreshPaused)
+                return "自动刷新已暂停";
+
+            if (!EditorApplication.isPlaying && !refreshInEditMode)
+                return "自动刷新等待 Play";
+
+            return "自动刷新 " + refreshInterval.ToString("0.##", CultureInfo.InvariantCulture) + "s";
+        }
+
+        private string BuildRuntimeModeStatusLabel()
+        {
+            string mode = EditorApplication.isPlaying ? "● Play" : "○ Edit";
+            return mode + " · " + GetAutoRefreshStatusLabel();
+        }
+
+        private void DrawEvidenceButton()
+        {
+            string actionLabel = evidenceRecorder.IsRecording
+                ? $"■ {evidenceRecorder.ElapsedSeconds:0}s"
+                : "● 录制";
+            if (!evidenceRecorder.IsRecording && !EditorApplication.isPlaying)
+            {
+                using (new EditorGUI.DisabledScope(true))
+                {
+                    SimpleToolsPanelUtility.DrawCompactButton(
+                        "Play 后录制",
+                        "证据录制只在 Play Mode 中可用，避免编辑状态产生后台采样。",
+                        82,
+                        22);
+                }
+                return;
+            }
+
+            if (SimpleToolsPanelUtility.DrawCompactButton(
+                    actionLabel,
+                    "显式记录 RuntimeWatch 字段/属性的变化；不会执行方法，也不会写入场景或资产。",
+                    68,
+                    22))
+            {
+                if (evidenceRecorder.IsRecording)
+                {
+                    StopEvidenceRecording("用户停止");
+                }
+                else if (!EditorApplication.isPlaying)
+                {
+                    StartEvidenceRecording();
+                }
+                else
+                {
+                    if (!evidenceRecorder.HasEvidence
+                        || EditorUtility.DisplayDialog("开始新的运行证据录制", "当前会清除本次内存回放，并建立新的状态基线。场景和资产不会被修改。", "开始新录制", "保留当前回放"))
+                    {
+                        StartEvidenceRecording();
+                    }
+                }
+            }
+        }
+
+        private void StartEvidenceRecording()
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                lastResultSummary = "证据录制需要在 Play Mode 中开始";
+                lastResultDetail = "进入 Play Mode 后点击“开始证据录制”。不会自动开始，也不会扫描或写入资产。";
+                return;
+            }
+
+            // 建立一份明确的初始基线；之后只记录变化，不保留每帧完整快照。
+            CollectEntries(recordResult: false, refreshReason: "录制基线");
+            autoRefreshBeforeRecording = autoRefresh;
+            autoRefreshPausedBeforeRecording = autoRefreshPaused;
+            restoreAutoRefreshAfterRecording = true;
+            evidenceRecorder.Start(EditorApplication.timeSinceStartup, BuildScopeLabel());
+            CaptureEvidenceSample();
+            autoRefresh = true;
+            autoRefreshPaused = false;
+            nextRefreshTime = EditorApplication.timeSinceStartup + refreshInterval;
+            lastResultSummary = "已开始运行证据录制";
+            lastResultDetail = "已建立当前观察项基线。对象销毁或状态变化后，可在下方回放前后值。";
+        }
+
+        private void StopEvidenceRecording(string reason)
+        {
+            if (!evidenceRecorder.IsRecording)
+                return;
+
+            evidenceRecorder.Stop(EditorApplication.timeSinceStartup, reason);
+            if (restoreAutoRefreshAfterRecording)
+            {
+                autoRefresh = autoRefreshBeforeRecording;
+                autoRefreshPaused = autoRefreshPausedBeforeRecording;
+                restoreAutoRefreshAfterRecording = false;
+            }
+            showEvidenceReplay = true;
+            lastResultSummary = "运行证据已冻结";
+            lastResultDetail = evidenceRecorder.EventCount == 0
+                ? "录制期间没有观察到值变化。"
+                : $"已保留 {evidenceRecorder.EventCount} 条变化。它们仅存在当前编辑器会话。";
+        }
+
+        private void DrawEvidenceReplay()
+        {
+            if (!renderEvidenceIsRecording && !renderEvidenceHasEvidence)
+                return;
+
+            SimpleToolsPanelUtility.DrawSectionTitle("4 · 运行证据", "仅记录录制期间发生变化的字段与属性；方法绝不因录制而自动执行。证据只保留当前编辑器会话。");
+            showEvidenceReplay = EditorGUILayout.Foldout(
+                showEvidenceReplay,
+                renderEvidenceIsRecording
+                    ? $"运行证据 · 录制中（{renderEvidenceEventCount} 条变化）"
+                    : $"运行证据回放（{renderEvidenceEventCount} 条变化）",
+                true);
+            if (!showEvidenceReplay)
+                return;
+
+            using (SimpleToolsPanelUtility.BeginContentSection())
+            {
+                string description = renderEvidenceIsRecording
+                    ? "只追加发生变化的字段/属性；方法永不自动执行。"
+                    : "按最新变化优先显示。对象已销毁时仍保留它销毁前的最后状态。";
+                EditorGUILayout.LabelField("范围：" + renderEvidenceScopeLabel + " · " + description, EditorStyles.miniLabel);
+
+                bool narrow = EditorGUIUtility.currentViewWidth < 720f;
+                for (int i = 0; i < renderEvidenceEvents.Count; i++)
+                {
+                    RuntimeWatchEvidenceRecorder.RecordedEvent recordedEvent = renderEvidenceEvents[i];
+                    if (recordedEvent == null)
+                        continue;
+
+                    if (narrow)
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            GUILayout.Label($"{recordedEvent.ElapsedSeconds,6:0.000}s", EditorStyles.miniLabel, GUILayout.Width(58));
+                            GUILayout.Label(recordedEvent.OwnerName, EditorStyles.miniBoldLabel);
+                            using (new EditorGUI.DisabledScope(recordedEvent.Owner == null))
+                            {
+                                if (GUILayout.Button(new GUIContent("◎", "定位对象"), EditorStyles.miniButton, GUILayout.Width(28)))
+                                {
+                                    Selection.activeObject = recordedEvent.Owner;
+                                    EditorGUIUtility.PingObject(recordedEvent.Owner);
+                                }
+                            }
+                        }
+                        EditorGUILayout.LabelField(recordedEvent.Label, EditorStyles.miniLabel);
+                        EditorGUILayout.SelectableLabel(
+                            recordedEvent.Before + "  →  " + recordedEvent.After,
+                            EditorStyles.miniLabel,
+                            GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    }
+                    else
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            GUILayout.Label($"{recordedEvent.ElapsedSeconds,6:0.000}s", EditorStyles.miniLabel, GUILayout.Width(58));
+                            GUILayout.Label(recordedEvent.OwnerName, EditorStyles.miniBoldLabel, GUILayout.Width(150));
+                            GUILayout.Label(recordedEvent.Label, EditorStyles.miniLabel, GUILayout.Width(112));
+                            EditorGUILayout.SelectableLabel(
+                                recordedEvent.Before + "  →  " + recordedEvent.After,
+                                EditorStyles.miniLabel,
+                                GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                            using (new EditorGUI.DisabledScope(recordedEvent.Owner == null))
+                            {
+                                if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(42)))
+                                {
+                                    Selection.activeObject = recordedEvent.Owner;
+                                    EditorGUIUtility.PingObject(recordedEvent.Owner);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (renderEvidenceEventCount > renderEvidenceEvents.Count)
+                    EditorGUILayout.LabelField($"为保持回放紧凑，仅显示最新 {renderEvidenceEvents.Count} 条；本次共 {renderEvidenceEventCount} 条。", EditorStyles.miniLabel);
+
+                if (!renderEvidenceIsRecording
+                    && GUILayout.Button("清除本次回放", EditorStyles.miniButton, GUILayout.Width(98)))
+                {
+                    evidenceRecorder.Clear();
+                    lastResultSummary = "已清空本次运行证据";
+                    lastResultDetail = "仅清除内存中的回放记录，不会修改场景或资产。";
                 }
             }
         }
 
         private void DrawSecondaryFilters()
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            SimpleToolsPanelUtility.DrawSectionTitle("2 · 刷新与显示", "自动刷新只在前台 RuntimeWatch 执行；高级采样规则变更后会明确标记“需要刷新”。");
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
+                bool narrow = EditorGUIUtility.currentViewWidth < 720f;
                 using (new EditorGUILayout.HorizontalScope())
                 {
+                    bool previousAutoRefresh = autoRefresh;
                     autoRefresh = GUILayout.Toggle(autoRefresh, "自动刷新", EditorStyles.miniButton, GUILayout.Width(78));
-                    string pauseLabel = autoRefreshPaused ? "继续刷新" : "暂停刷新";
-                    if (GUILayout.Button(pauseLabel, EditorStyles.miniButton, GUILayout.Width(78)))
-                        autoRefreshPaused = !autoRefreshPaused;
+                    if (autoRefresh && !previousAutoRefresh && !autoRefreshPaused)
+                        nextRefreshTime = 0d;
 
-                    GUILayout.Label("间隔", GUILayout.Width(30));
-                    refreshInterval = Mathf.Clamp(EditorGUILayout.FloatField(refreshInterval, GUILayout.Width(52)), 0.1f, 10f);
-                    GUILayout.Label("秒", GUILayout.Width(18));
-                    onlySelectedGameObject = GUILayout.Toggle(onlySelectedGameObject, "仅选中对象", EditorStyles.miniButton, GUILayout.Width(92));
-                    using (new EditorGUI.DisabledScope(!onlySelectedGameObject))
-                        includeSelectedChildren = GUILayout.Toggle(includeSelectedChildren, "包含子对象", EditorStyles.miniButton, GUILayout.Width(92));
-                    if (GUILayout.Button("清除", EditorStyles.miniButton, GUILayout.Width(52)))
-                        ClearWatchFilters();
-                    GUILayout.FlexibleSpace();
-                    showAdvancedFilters = EditorGUILayout.Foldout(showAdvancedFilters, "高级筛选", true);
+                    string pauseLabel = autoRefreshPaused ? "继续刷新" : "暂停刷新";
+                    using (new EditorGUI.DisabledScope(!autoRefresh))
+                    {
+                        if (GUILayout.Button(pauseLabel, EditorStyles.miniButton, GUILayout.Width(78)))
+                            autoRefreshPaused = !autoRefreshPaused;
+                    }
+
+                    DrawRefreshIntervalSelector();
+                    if (!narrow)
+                    {
+                        GUILayout.FlexibleSpace();
+                        showAdvancedFilters = EditorGUILayout.Foldout(showAdvancedFilters, "高级采样与操作规则", true);
+                    }
                 }
 
-                if (showAdvancedFilters)
+                if (narrow)
                 {
-                    EditorGUILayout.Space(2);
                     using (new EditorGUILayout.HorizontalScope())
                     {
-                        enableTagFilter = GUILayout.Toggle(enableTagFilter, "Tag 过滤", EditorStyles.miniButton, GUILayout.Width(82));
-                        enableShowIfFilter = GUILayout.Toggle(enableShowIfFilter, "ShowIf", EditorStyles.miniButton, GUILayout.Width(72));
-                        allowGetMoudleFallback = GUILayout.Toggle(allowGetMoudleFallback, "允许 GetMoudle", EditorStyles.miniButton, GUILayout.Width(116));
-                        refreshInEditMode = GUILayout.Toggle(refreshInEditMode, "编辑器扫描", EditorStyles.miniButton, GUILayout.Width(92));
-                        compactView = GUILayout.Toggle(compactView, "紧凑模式", EditorStyles.miniButton, GUILayout.Width(82));
-                    }
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        confirmMethodActions = GUILayout.Toggle(confirmMethodActions, "方法二次确认", EditorStyles.miniButton, GUILayout.Width(106));
-                        viewFilter = (RuntimeWatchViewFilter)EditorGUILayout.EnumPopup("异常视图", viewFilter, GUILayout.MinWidth(150));
+                        showAdvancedFilters = EditorGUILayout.Foldout(showAdvancedFilters, "高级采样与操作规则", true);
                         GUILayout.FlexibleSpace();
                     }
-                    if (allowGetMoudleFallback)
-                        EditorGUILayout.HelpBox("允许 GetMoudle 可能创建缺失模块，仅建议诊断时临时启用。", MessageType.Warning);
                 }
+
+                if (!showAdvancedFilters)
+                    return;
+
+                EditorGUILayout.Space(2);
+                bool previousTagFilter = enableTagFilter;
+                bool previousShowIfFilter = enableShowIfFilter;
+                bool previousGetModuleFallback = allowGetMoudleFallback;
+                bool previousEditModeRefresh = refreshInEditMode;
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    enableTagFilter = GUILayout.Toggle(enableTagFilter, "Tag 过滤", EditorStyles.miniButton, GUILayout.Width(82));
+                    enableShowIfFilter = GUILayout.Toggle(enableShowIfFilter, "ShowIf", EditorStyles.miniButton, GUILayout.Width(72));
+                    allowGetMoudleFallback = GUILayout.Toggle(allowGetMoudleFallback, "允许 GetMoudle", EditorStyles.miniButton, GUILayout.Width(116));
+                    if (!narrow)
+                    {
+                        refreshInEditMode = GUILayout.Toggle(refreshInEditMode, "Edit Mode 自动扫描", EditorStyles.miniButton, GUILayout.Width(116));
+                        compactView = GUILayout.Toggle(compactView, "紧凑条目", EditorStyles.miniButton, GUILayout.Width(82));
+                    }
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (narrow)
+                    {
+                        refreshInEditMode = GUILayout.Toggle(refreshInEditMode, "Edit Mode 自动扫描", EditorStyles.miniButton, GUILayout.Width(116));
+                        compactView = GUILayout.Toggle(compactView, "紧凑条目", EditorStyles.miniButton, GUILayout.Width(82));
+                    }
+
+                    confirmMethodActions = GUILayout.Toggle(confirmMethodActions, "方法二次确认", EditorStyles.miniButton, GUILayout.Width(106));
+                    GUILayout.FlexibleSpace();
+                }
+
+                if (previousTagFilter != enableTagFilter
+                    || previousShowIfFilter != enableShowIfFilter
+                    || previousGetModuleFallback != allowGetMoudleFallback)
+                    MarkSnapshotStale();
+
+                if (previousEditModeRefresh != refreshInEditMode && refreshInEditMode && autoRefresh && !autoRefreshPaused)
+                    nextRefreshTime = 0d;
+
+                if (allowGetMoudleFallback)
+                    EditorGUILayout.HelpBox("允许 GetMoudle 可能创建缺失模块，仅建议诊断时临时启用；修改后请刷新快照。", MessageType.Warning);
             }
+        }
+
+        private void DrawRefreshIntervalSelector()
+        {
+            string label = "间隔 " + refreshInterval.ToString("0.##", CultureInfo.InvariantCulture) + "s ▼";
+            if (!GUILayout.Button(new GUIContent(label, "设置前台自动刷新的最小间隔。间隔越短，Getter 采样成本越高。"), EditorStyles.miniButton, GUILayout.Width(88)))
+                return;
+
+            Rect anchor = GUILayoutUtility.GetLastRect();
+            var menu = new GenericMenu();
+            AddRefreshIntervalMenuItem(menu, 0.10f, "0.10 秒 · 高频");
+            AddRefreshIntervalMenuItem(menu, 0.25f, "0.25 秒 · 推荐");
+            AddRefreshIntervalMenuItem(menu, 0.50f, "0.50 秒");
+            AddRefreshIntervalMenuItem(menu, 1.00f, "1.00 秒 · 低频");
+            menu.DropDown(anchor);
+        }
+
+        private void AddRefreshIntervalMenuItem(GenericMenu menu, float value, string label)
+        {
+            bool selected = Mathf.Approximately(refreshInterval, value);
+            menu.AddItem(new GUIContent(label), selected, () =>
+            {
+                refreshInterval = value;
+                if (autoRefresh && !autoRefreshPaused)
+                    nextRefreshTime = 0d;
+            });
         }
 
         private void DrawContentToolbar(int visibleCount)
         {
             int pageCount = Mathf.Max(1, Mathf.CeilToInt(visibleCount / (float)Mathf.Max(1, pageSize)));
             currentPage = Mathf.Clamp(currentPage, 0, pageCount - 1);
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+            SimpleToolsPanelUtility.DrawSectionTitle("3 · 观察结果与操作", "按分类 → 对象 → 成员阅读。字段/属性的设值和方法执行均为明确操作；折叠只保存当前编辑器会话。");
+            bool narrow = EditorGUIUtility.currentViewWidth < 720f;
+            using (new EditorGUILayout.VerticalScope(EditorStyles.toolbar))
             {
-                if (GUILayout.Button("立即刷新", EditorStyles.toolbarButton, GUILayout.Width(72)))
-                    RefreshNow();
-                if (GUILayout.Button("全部展开", EditorStyles.toolbarButton, GUILayout.Width(72)))
-                    ExpandAllFoldouts();
-                if (GUILayout.Button("全部收起", EditorStyles.toolbarButton, GUILayout.Width(72)))
-                    CollapseAllFoldouts();
-                if (GUILayout.Button("重置折叠", EditorStyles.toolbarButton, GUILayout.Width(72)))
-                    ResetFoldouts();
-                GUILayout.FlexibleSpace();
-                GUILayout.Label($"显示 {visibleCount} / 收集 {entries.Count}", EditorStyles.miniLabel);
-                GUILayout.Space(8);
-                if (GUILayout.Button("‹", EditorStyles.toolbarButton, GUILayout.Width(24)))
-                    currentPage = Mathf.Max(0, currentPage - 1);
-                GUILayout.Label($"{currentPage + 1}/{pageCount}", EditorStyles.miniLabel, GUILayout.Width(48));
-                if (GUILayout.Button("›", EditorStyles.toolbarButton, GUILayout.Width(24)))
-                    currentPage = Mathf.Min(pageCount - 1, currentPage + 1);
-                pageSize = EditorGUILayout.IntPopup(pageSize, new[] { "50", "100", "200", "500" }, new[] { 50, 100, 200, 500 }, EditorStyles.toolbarPopup, GUILayout.Width(58));
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawViewFilterSelector();
+                    if (GUILayout.Button("全部展开", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                        ExpandAllFoldouts();
+
+                    if (!narrow)
+                    {
+                        if (GUILayout.Button("全部收起", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                            CollapseAllFoldouts();
+                        if (GUILayout.Button("重置折叠", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                            ResetFoldouts();
+                        GUILayout.FlexibleSpace();
+                        DrawPagingControls(visibleCount, pageCount);
+                    }
+                }
+
+                if (narrow)
+                {
+                    bool veryNarrow = EditorGUIUtility.currentViewWidth < 400f;
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("全部收起", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                            CollapseAllFoldouts();
+                        if (GUILayout.Button("重置折叠", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                            ResetFoldouts();
+                        if (!veryNarrow)
+                        {
+                            GUILayout.FlexibleSpace();
+                            DrawPagingControls(visibleCount, pageCount);
+                        }
+                    }
+
+                    if (veryNarrow)
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            DrawPagingControls(visibleCount, pageCount);
+                            GUILayout.FlexibleSpace();
+                        }
+                    }
+                }
             }
+        }
+
+        private void DrawViewFilterSelector()
+        {
+            string label = "显示 · " + GetViewFilterDisplayName(viewFilter) + " ▼";
+            if (!GUILayout.Button(new GUIContent(label, "仅改变当前快照的显示方式，不会触发采样。"), EditorStyles.toolbarDropDown, GUILayout.Width(112)))
+                return;
+
+            Rect anchor = GUILayoutUtility.GetLastRect();
+            var menu = new GenericMenu();
+            Array filters = Enum.GetValues(typeof(RuntimeWatchViewFilter));
+            for (int i = 0; i < filters.Length; i++)
+            {
+                RuntimeWatchViewFilter filter = (RuntimeWatchViewFilter)filters.GetValue(i);
+                RuntimeWatchViewFilter captured = filter;
+                menu.AddItem(
+                    new GUIContent(GetViewFilterDisplayName(captured)),
+                    viewFilter == captured,
+                    () =>
+                    {
+                        viewFilter = captured;
+                        currentPage = 0;
+                    });
+            }
+
+            menu.DropDown(anchor);
+        }
+
+        private static string GetViewFilterDisplayName(RuntimeWatchViewFilter filter)
+        {
+            switch (filter)
+            {
+                case RuntimeWatchViewFilter.Changed:
+                    return "最近变化";
+                case RuntimeWatchViewFilter.ReadFailures:
+                    return "读取失败";
+                case RuntimeWatchViewFilter.SlowGetters:
+                    return "慢读取";
+                case RuntimeWatchViewFilter.Actions:
+                    return "可操作项";
+                case RuntimeWatchViewFilter.Pinned:
+                    return "已收藏";
+                default:
+                    return "全部";
+            }
+        }
+
+        private void DrawPagingControls(int visibleCount, int pageCount)
+        {
+            bool compactPager = EditorGUIUtility.currentViewWidth < 480f;
+            if (compactPager)
+                GUILayout.Label($"{visibleCount}/{renderEntries.Count}", EditorStyles.miniLabel, GUILayout.Width(42));
+            else
+            {
+                GUILayout.Label($"显示 {visibleCount} / 收集 {renderEntries.Count}", EditorStyles.miniLabel);
+                GUILayout.Space(8);
+            }
+            if (GUILayout.Button("‹", EditorStyles.toolbarButton, GUILayout.Width(24)))
+                currentPage = Mathf.Max(0, currentPage - 1);
+            GUILayout.Label($"{currentPage + 1}/{pageCount}", EditorStyles.miniLabel, GUILayout.Width(compactPager ? 36 : 48));
+            if (GUILayout.Button("›", EditorStyles.toolbarButton, GUILayout.Width(24)))
+                currentPage = Mathf.Min(pageCount - 1, currentPage + 1);
+            pageSize = EditorGUILayout.IntPopup(pageSize, new[] { "50", "100", "200", "500" }, new[] { 50, 100, 200, 500 }, EditorStyles.toolbarPopup, GUILayout.Width(compactPager ? 50 : 58));
         }
 
         private void DrawDiagnosticsPanel()
         {
+            SimpleToolsPanelUtility.DrawSectionTitle("5 · 诊断与链路报告", "仅在需要解释筛选、注册、上下文或异常时展开；不会干扰日常观察操作。");
             showDiagnostics = EditorGUILayout.Foldout(showDiagnostics, "诊断与链路报告", true);
             if (!showDiagnostics)
                 return;
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField(
                     $"Tag过滤 {lastTagFilteredCount} · ShowIf过滤 {lastShowIfFilteredCount} · 上下文缺失 {lastContextMissingCount} · 重复跳过 {lastDuplicateSkippedCount}",
@@ -366,18 +956,23 @@ namespace ES
             RuntimeWatchDropdownFilter filter,
             string label,
             string current,
-            IEnumerable<string> values,
+            IReadOnlyList<string> options,
             float width)
         {
-            List<string> options = (values ?? Array.Empty<string>())
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value.Trim())
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-            if (!options.Contains("全部"))
-                options.Insert(0, "全部");
+            bool currentIsValid = false;
+            if (options != null)
+            {
+                for (int i = 0; i < options.Count; i++)
+                {
+                    if (string.Equals(options[i], current, StringComparison.Ordinal))
+                    {
+                        currentIsValid = true;
+                        break;
+                    }
+                }
+            }
 
-            string normalizedCurrent = options.Contains(current) ? current : "全部";
+            string normalizedCurrent = currentIsValid ? current : "全部";
             const float LabelWidth = 36f;
             GUILayout.Label(label, GUILayout.Width(LabelWidth));
             Rect anchorRect = GUILayoutUtility.GetRect(
@@ -398,9 +993,11 @@ namespace ES
             string current,
             IReadOnlyList<string> options)
         {
-            var entries = new List<ESSearchDropdown.Entry>(options.Count);
-            foreach (string option in options)
+            int optionCount = options != null ? options.Count : 0;
+            var entries = new List<ESSearchDropdown.Entry>(optionCount);
+            for (int i = 0; i < optionCount; i++)
             {
+                string option = options[i];
                 string captured = option;
                 int matchCount = CountRuntimeWatchFilterMatches(filter, captured);
                 entries.Add(ESSearchDropdown.Entry.Item(
@@ -467,7 +1064,7 @@ namespace ES
             currentPage = 0;
             scroll.y = 0f;
             lastResultSummary = "RuntimeWatch " + GetRuntimeWatchFilterDisplayName(filter) + "筛选：" + selectedValue;
-            lastResultDetail = "当前命中 " + entries.Count(MatchesSearch) + " 个观察项。";
+            lastResultDetail = "当前命中 " + CountVisibleEntries() + " 个观察项。";
             SimpleToolsWindow.UsingWindow?.Repaint();
         }
 
@@ -496,7 +1093,7 @@ namespace ES
             int lastVisibleIndex = firstVisibleIndex + pageSize;
             int filteredIndex = 0;
 
-            foreach (WatchEntry entry in entries)
+            foreach (WatchEntry entry in renderEntries)
             {
                 if (!MatchesSearch(entry))
                     continue;
@@ -511,10 +1108,13 @@ namespace ES
                     if (!groupFoldouts.ContainsKey(activeGroup))
                         groupFoldouts[activeGroup] = defaultFoldoutExpanded;
 
-                    EditorGUILayout.Space(4);
-                    groupFoldouts[activeGroup] = EditorGUILayout.Foldout(groupFoldouts[activeGroup], activeGroup, true);
+                    EditorGUILayout.Space(8);
+                    groupFoldouts[activeGroup] = DrawRuntimeWatchGroupHeader(
+                        groupFoldouts[activeGroup],
+                        "分类 · " + activeGroup);
                     groupVisible = groupFoldouts[activeGroup];
                     activeOwnerKey = null;
+                    ownerVisible = false;
                 }
 
                 if (!groupVisible)
@@ -527,25 +1127,9 @@ namespace ES
                     if (!ownerFoldouts.ContainsKey(activeOwnerKey))
                         ownerFoldouts[activeOwnerKey] = defaultFoldoutExpanded;
 
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        GUILayout.Space(14);
-                        ownerFoldouts[activeOwnerKey] = EditorGUILayout.Foldout(ownerFoldouts[activeOwnerKey], entry.OwnerName, true);
-                        if (GUILayout.Button("定位", EditorStyles.miniButton, GUILayout.Width(48)))
-                        {
-                            UnityEngine.Object target = entry.SceneObject != null ? entry.SceneObject : entry.Owner;
-                            Selection.activeObject = target;
-                            EditorGUIUtility.PingObject(target);
-                            lastResultSummary = $"已定位观察对象: {entry.OwnerName}";
-                            lastResultDetail = $"分组: {entry.Group}\n字段: {entry.Label}\n路径: {entry.MemberPath}\n类型: {entry.OwnerTypeName}";
-                        }
-                        if (GUILayout.Button("复制", EditorStyles.miniButton, GUILayout.Width(48)))
-                        {
-                            EditorGUIUtility.systemCopyBuffer = $"{entry.OwnerName}\n{entry.MemberPath}\n{entry.ReadValue()}";
-                            lastResultSummary = $"已复制观察项: {entry.Label}";
-                            lastResultDetail = $"{entry.OwnerName}\n{entry.Group}\n{entry.MemberPath}";
-                        }
-                    }
+                    ownerFoldouts[activeOwnerKey] = DrawRuntimeWatchOwnerHeader(
+                        entry,
+                        ownerFoldouts[activeOwnerKey]);
 
                     ownerVisible = ownerFoldouts[activeOwnerKey];
                 }
@@ -553,44 +1137,182 @@ namespace ES
                 if (!ownerVisible)
                     continue;
 
+                DrawRuntimeWatchEntryDivider(28f);
+                DrawRuntimeWatchEntry(entry);
+            }
+        }
+
+        private bool DrawRuntimeWatchGroupHeader(bool expanded, string label)
+        {
+            Rect rect = GUILayoutUtility.GetRect(0f, 24f, GUILayout.ExpandWidth(true));
+            DrawRuntimeWatchHeaderBackground(rect, new Color(0.22f, 0.58f, 0.86f, 0.78f));
+            Rect foldoutRect = new Rect(rect.x + 9f, rect.y + 3f, Mathf.Max(40f, rect.width - 16f), rect.height - 4f);
+            return EditorGUI.Foldout(foldoutRect, expanded, label, true, RuntimeWatchGroupHeaderStyle);
+        }
+
+        private bool DrawRuntimeWatchOwnerHeader(WatchEntry entry, bool expanded)
+        {
+            Rect rect = GUILayoutUtility.GetRect(0f, 22f, GUILayout.ExpandWidth(true));
+            bool narrow = rect.width < 460f;
+            float actionWidth = narrow ? 28f : 44f;
+            const float indent = 14f;
+            DrawRuntimeWatchHeaderBackground(rect, new Color(0.56f, 0.68f, 0.78f, 0.52f));
+
+            Rect copyRect = new Rect(rect.xMax - actionWidth - 4f, rect.y + 2f, actionWidth, rect.height - 4f);
+            Rect locateRect = new Rect(copyRect.x - actionWidth - 3f, rect.y + 2f, actionWidth, rect.height - 4f);
+            Rect foldoutRect = new Rect(
+                rect.x + indent + 7f,
+                rect.y + 2f,
+                Mathf.Max(40f, locateRect.x - rect.x - indent - 12f),
+                rect.height - 3f);
+            bool nextExpanded = EditorGUI.Foldout(foldoutRect, expanded, entry.OwnerName, true, RuntimeWatchOwnerHeaderStyle);
+
+            GUIContent locateContent = narrow
+                ? new GUIContent("◎", "定位此观察对象")
+                : new GUIContent("定位", "定位此观察对象");
+            if (GUI.Button(locateRect, locateContent, EditorStyles.miniButton))
+            {
+                UnityEngine.Object target = entry.SceneObject != null ? entry.SceneObject : entry.Owner;
+                Selection.activeObject = target;
+                EditorGUIUtility.PingObject(target);
+                lastResultSummary = $"已定位观察对象: {entry.OwnerName}";
+                lastResultDetail = $"分组: {entry.Group}\n字段: {entry.Label}\n路径: {entry.MemberPath}\n类型: {entry.OwnerTypeName}";
+            }
+
+            GUIContent copyContent = narrow
+                ? new GUIContent("⧉", "复制当前观察项")
+                : new GUIContent("复制", "复制当前观察项");
+            if (GUI.Button(copyRect, copyContent, EditorStyles.miniButton))
+            {
+                EditorGUIUtility.systemCopyBuffer = $"{entry.OwnerName}\n{entry.MemberPath}\n{entry.GetCachedValue()}";
+                lastResultSummary = $"已复制观察项: {entry.Label}";
+                lastResultDetail = $"{entry.OwnerName}\n{entry.Group}\n{entry.MemberPath}";
+            }
+
+            return nextExpanded;
+        }
+
+        private void DrawRuntimeWatchEntry(WatchEntry entry)
+        {
+            bool narrow = EditorGUIUtility.currentViewWidth < 760f;
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Space(28);
+                DrawPinButton(entry);
+                DrawMemberKindBadge(entry);
+                DrawCapabilityBadge(entry);
+                using (new EditorGUILayout.VerticalScope())
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        DrawMemberLabel(entry, narrow ? 92f : 120f);
+                        GUILayout.FlexibleSpace();
+                        string value = entry.GetCachedValue();
+                        Color previousContentColor = GUI.contentColor;
+                        if (entry.LastReadFailed)
+                            GUI.contentColor = new Color(1f, 0.42f, 0.42f);
+                        else if (entry.IsRecentlyChanged)
+                            GUI.contentColor = new Color(1f, 0.82f, 0.28f);
+                        EditorGUILayout.SelectableLabel(
+                            BuildCompactValue(value),
+                            GUILayout.Height(EditorGUIUtility.singleLineHeight),
+                            GUILayout.Width(narrow || compactView ? 96 : 150));
+                        GUI.contentColor = previousContentColor;
+                    }
+
+                    DrawMemberSummary(entry);
+                }
+
+                if (!narrow && entry.IsActionable)
+                    DrawRuntimeWatchEntryAction(entry, false);
+            }
+
+            if (narrow && entry.IsActionable)
+            {
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     GUILayout.Space(28);
-                    DrawPinButton(entry);
-                    DrawMemberKindBadge(entry);
-                    DrawCapabilityBadge(entry);
-                    using (new EditorGUILayout.VerticalScope())
-                    {
-                        using (new EditorGUILayout.HorizontalScope())
-                        {
-                            DrawMemberLabel(entry);
-                            GUILayout.FlexibleSpace();
-                            string value = entry.ReadValue();
-                            Color previousContentColor = GUI.contentColor;
-                            if (entry.LastReadFailed)
-                                GUI.contentColor = new Color(1f, 0.42f, 0.42f);
-                            else if (entry.IsRecentlyChanged)
-                                GUI.contentColor = new Color(1f, 0.82f, 0.28f);
-                            EditorGUILayout.SelectableLabel(
-                                BuildCompactValue(value),
-                                GUILayout.Height(EditorGUIUtility.singleLineHeight),
-                                GUILayout.Width(compactView ? 100 : 150));
-                            GUI.contentColor = previousContentColor;
-                        }
-
-                        string performance = entry.LastReadDurationMs >= SlowGetterThresholdMs
-                            ? $" · 慢读取 {entry.LastReadDurationMs:0.00}ms"
-                            : string.Empty;
-                        DrawMemberSummary(entry, performance);
-                    }
-                    using (new EditorGUILayout.VerticalScope(GUILayout.Width(compactView ? 180 : 240)))
-                    {
-                        bool inlineHandled = DrawInlineControl(entry);
-                        if (!inlineHandled && entry.HasManualAction)
-                            DrawRuntimeWatchActionButton(entry, compactView ? 96 : 128);
-                    }
+                    DrawRuntimeWatchEntryAction(entry, true);
                 }
             }
+
+            DrawEntryOperationFeedback(entry);
+        }
+
+        private void DrawEntryOperationFeedback(WatchEntry entry)
+        {
+            if (entry == null
+                || string.IsNullOrWhiteSpace(entry.StateKey)
+                || !string.Equals(entry.StateKey, lastActionEntryKey, StringComparison.Ordinal)
+                || !lastActionFeedbackVisible
+                || string.IsNullOrWhiteSpace(lastActionFeedback))
+                return;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Space(28);
+                Color previous = GUI.contentColor;
+                GUI.contentColor = lastActionFailed
+                    ? new Color(1f, 0.42f, 0.42f)
+                    : new Color(0.44f, 0.82f, 0.58f);
+                GUILayout.Label(
+                    new GUIContent("最近操作 · " + BuildCompactOperationFeedback(lastActionFeedback), lastActionFeedback),
+                    EditorStyles.miniLabel);
+                GUI.contentColor = previous;
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button(new GUIContent("详情", "在底部“诊断与链路报告”中查看完整操作反馈。"), EditorStyles.miniButton, GUILayout.Width(42)))
+                    RequestDiagnosticsDisplay();
+            }
+        }
+
+        private static string BuildCompactOperationFeedback(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+
+            const int maxLength = 96;
+            return value.Length <= maxLength ? value : value.Substring(0, maxLength - 1) + "…";
+        }
+
+        private void DrawRuntimeWatchEntryAction(WatchEntry entry, bool fullWidth)
+        {
+            using (new EditorGUILayout.VerticalScope(fullWidth ? GUILayout.ExpandWidth(true) : GUILayout.Width(compactView ? 180f : 240f)))
+            {
+                bool inlineHandled = DrawInlineControl(entry, fullWidth);
+                if (!inlineHandled && entry.HasManualAction)
+                    DrawRuntimeWatchActionButton(entry, fullWidth ? 0 : (compactView ? 96 : 128), fullWidth);
+            }
+        }
+
+        private static void DrawRuntimeWatchEntryDivider(float indent)
+        {
+            Rect divider = GUILayoutUtility.GetRect(0f, 1f, GUILayout.ExpandWidth(true));
+            if (Event.current.type != EventType.Repaint)
+                return;
+
+            divider.xMin += Mathf.Min(indent, Mathf.Max(0f, divider.width - 8f));
+            EditorGUI.DrawRect(
+                divider,
+                EditorGUIUtility.isProSkin
+                    ? new Color(1f, 1f, 1f, 0.07f)
+                    : new Color(0f, 0f, 0f, 0.08f));
+        }
+
+        private static void DrawRuntimeWatchHeaderBackground(Rect rect, Color accent)
+        {
+            if (Event.current.type != EventType.Repaint)
+                return;
+
+            Color surface = EditorGUIUtility.isProSkin
+                ? new Color(0.18f, 0.21f, 0.25f, 0.78f)
+                : new Color(0.78f, 0.82f, 0.87f, 0.7f);
+            EditorGUI.DrawRect(rect, surface);
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), accent);
+            EditorGUI.DrawRect(
+                new Rect(rect.x, rect.yMax - 1f, rect.width, 1f),
+                EditorGUIUtility.isProSkin
+                    ? new Color(1f, 1f, 1f, 0.11f)
+                    : new Color(0f, 0f, 0f, 0.12f));
         }
 
         private static void DrawMemberKindBadge(WatchEntry entry)
@@ -604,18 +1326,18 @@ namespace ES
             GUI.backgroundColor = previous;
         }
 
-        private static void DrawMemberLabel(WatchEntry entry)
+        private static void DrawMemberLabel(WatchEntry entry, float minimumWidth)
         {
             if (entry == null)
                 return;
 
             Color previous = GUI.contentColor;
             GUI.contentColor = entry.MemberKindColor;
-            GUILayout.Label(entry.Label, RuntimeWatchMemberNameStyle, GUILayout.MinWidth(120));
+            GUILayout.Label(entry.Label, RuntimeWatchMemberNameStyle, GUILayout.MinWidth(minimumWidth));
             GUI.contentColor = previous;
         }
 
-        private static void DrawMemberSummary(WatchEntry entry, string performance)
+        private static void DrawMemberSummary(WatchEntry entry)
         {
             if (entry == null)
                 return;
@@ -630,7 +1352,24 @@ namespace ES
                 GUILayout.Label(entry.MemberCodeName, RuntimeWatchMemberNameStyle);
                 GUI.contentColor = previous;
 
-                GUILayout.Label(entry.MemberTypeSuffix + performance, RuntimeWatchPathStyle);
+                string sampleState;
+                if (entry.LastReadFailed)
+                    sampleState = " · 读取失败";
+                else if (entry.LastReadDurationMs >= SlowGetterThresholdMs)
+                    sampleState = " · 慢读取 " + entry.LastReadDurationMs.ToString("0.00", CultureInfo.InvariantCulture) + "ms";
+                else if (entry.IsRecentlyChanged)
+                    sampleState = " · 最近变化";
+                else if (entry.HasManualAction)
+                    sampleState = " · 手动执行";
+                else
+                    sampleState = string.Empty;
+
+                if (entry.LastReadFailed)
+                    GUI.contentColor = new Color(1f, 0.42f, 0.42f);
+                else if (entry.LastReadDurationMs >= SlowGetterThresholdMs)
+                    GUI.contentColor = new Color(1f, 0.73f, 0.25f);
+                GUILayout.Label(entry.MemberTypeSuffix + sampleState, RuntimeWatchPathStyle);
+                GUI.contentColor = previous;
             }
         }
 
@@ -706,6 +1445,77 @@ namespace ES
             return value.Length <= maxLength ? value : value.Substring(0, maxLength - 1) + "…";
         }
 
+        private int CountVisibleEntries()
+        {
+            int count = 0;
+            for (int i = 0; i < renderEntries.Count; i++)
+            {
+                if (MatchesSearch(renderEntries[i]))
+                    count++;
+            }
+
+            return count;
+        }
+
+        private void PrepareRenderEntries()
+        {
+            if (Event.current == null || Event.current.type != EventType.Layout)
+                return;
+
+            if (renderEntriesVersion != entriesVersion)
+            {
+                renderEntries.Clear();
+                renderEntries.AddRange(entries);
+                renderEntriesVersion = entriesVersion;
+            }
+
+            renderEvidenceIsRecording = evidenceRecorder.IsRecording;
+            renderEvidenceHasEvidence = evidenceRecorder.HasEvidence;
+            renderEvidenceEventCount = evidenceRecorder.EventCount;
+            renderEvidenceScopeLabel = evidenceRecorder.ScopeLabel;
+            renderEvidenceEvents.Clear();
+            int shownCount = Math.Min(renderEvidenceEventCount, 64);
+            for (int i = 0; i < shownCount; i++)
+            {
+                RuntimeWatchEvidenceRecorder.RecordedEvent recordedEvent = evidenceRecorder.GetNewestEvent(i);
+                if (recordedEvent != null)
+                    renderEvidenceEvents.Add(recordedEvent);
+            }
+        }
+
+        private void DetectSelectedScopeChange()
+        {
+            if (!onlySelectedGameObject)
+                return;
+
+            if (sampledSelectionInstanceId != GetCurrentSelectionInstanceId())
+                MarkSnapshotStale();
+        }
+
+        private static int GetCurrentSelectionInstanceId()
+        {
+            GameObject selected = Selection.activeGameObject;
+            return selected != null ? selected.GetInstanceID() : 0;
+        }
+
+        private void MarkSnapshotStale()
+        {
+            snapshotRequiresRefresh = true;
+        }
+
+        private string BuildSnapshotStatusLabel()
+        {
+            if (snapshotRequiresRefresh)
+                return "范围或规则已变 · 请刷新";
+
+            if (lastRefreshAt <= 0d)
+                return "尚未获取";
+
+            double elapsed = Math.Max(0d, EditorApplication.timeSinceStartup - lastRefreshAt);
+            return lastRefreshReason + " · " + elapsed.ToString("0.0", CultureInfo.InvariantCulture)
+                   + "s 前 · " + lastScanDurationMs.ToString("0.0", CultureInfo.InvariantCulture) + "ms";
+        }
+
         private void ClearWatchFilters()
         {
             searchText = string.Empty;
@@ -713,10 +1523,15 @@ namespace ES
             selectedObjectFilter = "全部";
             selectedScriptFilter = "全部";
             onlySelectedGameObject = false;
+            includeSelectedChildren = true;
             enableTagFilter = true;
             enableShowIfFilter = true;
+            allowGetMoudleFallback = false;
+            viewFilter = RuntimeWatchViewFilter.All;
+            currentPage = 0;
+            MarkSnapshotStale();
             lastResultSummary = "已清除 RuntimeWatch 筛选";
-            lastResultDetail = "已恢复全部分类、对象、脚本和文本搜索。";
+            lastResultDetail = "已恢复全部范围、分类、对象、脚本、文本和结果视图。采样规则已还原，请刷新快照。";
         }
 
         private void ShowQuickJumpMenu(Rect anchorRect)
@@ -867,6 +1682,8 @@ namespace ES
 
         private static GUIStyle runtimeWatchPathStyle;
         private static GUIStyle runtimeWatchMemberNameStyle;
+        private static GUIStyle runtimeWatchGroupHeaderStyle;
+        private static GUIStyle runtimeWatchOwnerHeaderStyle;
         private static GUIStyle RuntimeWatchPathStyle
         {
             get
@@ -900,9 +1717,49 @@ namespace ES
             }
         }
 
-        private void DrawRuntimeWatchActionButton(WatchEntry entry, int width)
+        private static GUIStyle RuntimeWatchGroupHeaderStyle
         {
-            if (!GUILayout.Button(entry.ActionButtonLabel, EditorStyles.miniButton, GUILayout.Width(width)))
+            get
+            {
+                if (runtimeWatchGroupHeaderStyle == null)
+                {
+                    runtimeWatchGroupHeaderStyle = new GUIStyle(EditorStyles.foldout)
+                    {
+                        fontStyle = FontStyle.Bold,
+                        fontSize = 12,
+                        clipping = TextClipping.Clip,
+                        alignment = TextAnchor.MiddleLeft
+                    };
+                }
+
+                return runtimeWatchGroupHeaderStyle;
+            }
+        }
+
+        private static GUIStyle RuntimeWatchOwnerHeaderStyle
+        {
+            get
+            {
+                if (runtimeWatchOwnerHeaderStyle == null)
+                {
+                    runtimeWatchOwnerHeaderStyle = new GUIStyle(EditorStyles.foldout)
+                    {
+                        fontStyle = FontStyle.Bold,
+                        clipping = TextClipping.Clip,
+                        alignment = TextAnchor.MiddleLeft
+                    };
+                }
+
+                return runtimeWatchOwnerHeaderStyle;
+            }
+        }
+
+        private void DrawRuntimeWatchActionButton(WatchEntry entry, int width, bool expandWidth)
+        {
+            bool invoked = expandWidth
+                ? GUILayout.Button(entry.ActionButtonLabel, EditorStyles.miniButton, GUILayout.ExpandWidth(true))
+                : GUILayout.Button(entry.ActionButtonLabel, EditorStyles.miniButton, GUILayout.Width(width));
+            if (!invoked)
                 return;
 
             if (!ConfirmMethodAction(entry))
@@ -910,8 +1767,43 @@ namespace ES
 
             string invokeResult = entry.InvokeManualAction();
             RequestDeferredRefresh();
-            lastResultSummary = $"已执行: {entry.Label}";
-            lastResultDetail = invokeResult;
+            SetEntryOperationResult(
+                entry,
+                $"已执行: {entry.Label}",
+                invokeResult,
+                invokeResult.StartsWith("执行失败", StringComparison.Ordinal));
+        }
+
+        private void SetEntryOperationResult(WatchEntry entry, string summary, string detail, bool failed)
+        {
+            lastActionEntryKey = entry != null ? entry.StateKey ?? string.Empty : string.Empty;
+            lastActionFeedback = string.IsNullOrWhiteSpace(detail) ? summary : detail;
+            lastActionFailed = failed;
+            // 鼠标事件发生在已有 Layout 之后时，不能立即增减 GUILayout 行。
+            // 延后一帧显示反馈，确保新的控制树先经历完整 Layout，再进入 Repaint。
+            lastActionFeedbackVisible = false;
+            EditorApplication.delayCall -= ShowDeferredActionFeedback;
+            EditorApplication.delayCall += ShowDeferredActionFeedback;
+            lastResultSummary = summary ?? string.Empty;
+            lastResultDetail = detail ?? string.Empty;
+        }
+
+        private void ShowDeferredActionFeedback()
+        {
+            lastActionFeedbackVisible = true;
+            SimpleToolsWindow.UsingWindow?.Repaint();
+        }
+
+        private void RequestDiagnosticsDisplay()
+        {
+            EditorApplication.delayCall -= ShowDeferredDiagnostics;
+            EditorApplication.delayCall += ShowDeferredDiagnostics;
+        }
+
+        private void ShowDeferredDiagnostics()
+        {
+            showDiagnostics = true;
+            SimpleToolsWindow.UsingWindow?.Repaint();
         }
 
         private bool ConfirmMethodAction(WatchEntry entry)
@@ -926,7 +1818,7 @@ namespace ES
                 "取消");
         }
 
-        private void CollectEntries(bool recordResult)
+        private void CollectEntries(bool recordResult, string refreshReason = null)
         {
             var scanStopwatch = Stopwatch.StartNew();
             entries.Clear();
@@ -1002,6 +1894,9 @@ namespace ES
                         }
                         watchEntry.SampleState = sampleState;
                         watchEntry.StateKey = BuildPersistentWatchKey(behaviour, registeredEntry);
+                        // 采样只发生在手动刷新、前台自动刷新、录制基线或显式操作后的延迟刷新。
+                        // 绘制阶段只读取 SampleState 缓存，避免 Layout/Repaint 反复执行属性和 Getter。
+                        watchEntry.RefreshSample();
                         entries.Add(watchEntry);
                     }
                 }
@@ -1014,6 +1909,8 @@ namespace ES
                 int owner = string.Compare(a.OwnerName, b.OwnerName, StringComparison.Ordinal);
                 return owner != 0 ? owner : string.Compare(a.Label, b.Label, StringComparison.Ordinal);
             });
+            RebuildFilterOptions();
+            entriesVersion++;
 
             if (sampleStates.Count > addedKeys.Count + 32)
             {
@@ -1021,8 +1918,18 @@ namespace ES
                     sampleStates.Remove(staleKey);
             }
 
+            lastReadFailureCount = entries.Count(entry => entry.LastReadFailed);
+            lastSlowGetterCount = entries.Count(entry => entry.LastReadDurationMs >= SlowGetterThresholdMs);
+            lastManualActionCount = entries.Count(entry => entry.IsActionable);
+            snapshotRequiresRefresh = false;
+            sampledSelectionInstanceId = GetCurrentSelectionInstanceId();
+            lastRefreshAt = EditorApplication.timeSinceStartup;
+            lastRefreshReason = string.IsNullOrWhiteSpace(refreshReason) ? "刷新" : refreshReason;
+
             scanStopwatch.Stop();
             lastScanDurationMs = scanStopwatch.Elapsed.TotalMilliseconds;
+
+            CaptureEvidenceSample();
 
             if (recordResult)
             {
@@ -1045,6 +1952,14 @@ namespace ES
                     $"过滤样例:\n{filterPreview}\n\n" +
                     $"显示项:\n{foundPreview}";
             }
+        }
+
+        private void CaptureEvidenceSample()
+        {
+            if (!evidenceRecorder.IsRecording)
+                return;
+
+            evidenceRecorder.Sample(entries, EditorApplication.timeSinceStartup);
         }
 
         private static int CountNoFilterEntries(IReadOnlyList<ESRuntimeWatchRegistry.Entry> ownerEntries)
@@ -1395,7 +2310,7 @@ namespace ES
                 case RuntimeWatchViewFilter.SlowGetters:
                     return entry.LastReadDurationMs >= SlowGetterThresholdMs;
                 case RuntimeWatchViewFilter.Actions:
-                    return entry.HasManualAction || TryGetEditableValueType(entry.MemberInfo, out _);
+                    return entry.IsActionable;
                 case RuntimeWatchViewFilter.Pinned:
                     return !string.IsNullOrWhiteSpace(entry.StateKey) && pinnedEntryKeys.Contains(entry.StateKey);
                 default:
@@ -1434,30 +2349,47 @@ namespace ES
             return string.IsNullOrWhiteSpace(value) || value == "全部";
         }
 
-        private IEnumerable<string> GetRuntimeWatchCategoryOptions()
+        private void RebuildFilterOptions()
         {
-            return new[] { "全部" }
-                .Concat(entries.Select(entry => string.IsNullOrWhiteSpace(entry.Category)
-                    ? ESRuntimeWatchAttribute.CategoryNone
-                    : entry.Category))
-                .Distinct()
-                .OrderBy(value => value == "全部" ? "" : value);
+            categoryFilterOptions.Clear();
+            scriptFilterOptions.Clear();
+            objectFilterOptions.Clear();
+            categoryFilterOptions.Add("全部");
+            scriptFilterOptions.Add("全部");
+            objectFilterOptions.Add("全部");
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                WatchEntry entry = entries[i];
+                if (entry == null)
+                    continue;
+
+                AddFilterOption(
+                    categoryFilterOptions,
+                    string.IsNullOrWhiteSpace(entry.Category) ? ESRuntimeWatchAttribute.CategoryNone : entry.Category);
+                AddFilterOption(scriptFilterOptions, entry.ScriptTypeName);
+                AddFilterOption(objectFilterOptions, entry.GameObjectName);
+            }
+
+            SortFilterOptions(categoryFilterOptions);
+            SortFilterOptions(scriptFilterOptions);
+            SortFilterOptions(objectFilterOptions);
         }
 
-        private IEnumerable<string> GetRuntimeWatchObjectOptions()
+        private static void AddFilterOption(List<string> destination, string value)
         {
-            return new[] { "全部" }
-                .Concat(entries.Select(entry => entry.GameObjectName).Where(value => !string.IsNullOrWhiteSpace(value)))
-                .Distinct()
-                .OrderBy(value => value == "全部" ? "" : value);
+            if (string.IsNullOrWhiteSpace(value) || destination.Contains(value))
+                return;
+
+            destination.Add(value);
         }
 
-        private IEnumerable<string> GetRuntimeWatchScriptOptions()
+        private static void SortFilterOptions(List<string> options)
         {
-            return new[] { "全部" }
-                .Concat(entries.Select(entry => entry.ScriptTypeName).Where(value => !string.IsNullOrWhiteSpace(value)))
-                .Distinct()
-                .OrderBy(value => value == "全部" ? "" : value);
+            if (options == null || options.Count <= 2)
+                return;
+
+            options.Sort(1, options.Count - 1, StringComparer.Ordinal);
         }
 
         private static bool ContainsIgnoreCase(string value, string search)
@@ -1467,7 +2399,7 @@ namespace ES
                    && value.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private bool DrawInlineControl(WatchEntry entry)
+        private bool DrawInlineControl(WatchEntry entry, bool fullWidth)
         {
             MemberInfo memberInfo = entry?.MemberInfo;
             if (memberInfo == null)
@@ -1487,7 +2419,10 @@ namespace ES
                         DrawEditableValueField(parameters[0].ParameterType, ref draft);
                     }
                     inlineInputDrafts[key] = draft;
-                    if (GUILayout.Button(entry.ActionButtonLabel, EditorStyles.miniButton, GUILayout.Width(compactView ? 96 : 128)))
+                    bool invoke = fullWidth
+                        ? GUILayout.Button(entry.ActionButtonLabel, EditorStyles.miniButton, GUILayout.ExpandWidth(true))
+                        : GUILayout.Button(entry.ActionButtonLabel, EditorStyles.miniButton, GUILayout.Width(compactView ? 96 : 128));
+                    if (invoke)
                     {
                         if (!ConfirmMethodAction(entry))
                             return true;
@@ -1496,13 +2431,15 @@ namespace ES
                         {
                             string invokeResult = InvokeMethodWithArguments(entry, new object[] { parsedValue }, allowGetMoudleFallback);
                             RequestDeferredRefresh();
-                            lastResultSummary = $"已调用: {entry.Label}";
-                            lastResultDetail = invokeResult;
+                            SetEntryOperationResult(
+                                entry,
+                                $"已调用: {entry.Label}",
+                                invokeResult,
+                                invokeResult.StartsWith("执行失败", StringComparison.Ordinal));
                         }
                         else
                         {
-                            lastResultSummary = $"方法参数解析失败: {entry.Label}";
-                            lastResultDetail = parseError;
+                            SetEntryOperationResult(entry, $"方法参数解析失败: {entry.Label}", parseError, true);
                         }
                     }
 
@@ -1531,13 +2468,15 @@ namespace ES
                         }
                         string setResult = written ? writeMessage : BuildWriteFallback(writeMessage);
                         RequestDeferredRefresh();
-                        lastResultSummary = $"已设值: {entry.Label}";
-                        lastResultDetail = setResult;
+                        SetEntryOperationResult(
+                            entry,
+                            written ? $"已设值: {entry.Label}" : $"设值失败: {entry.Label}",
+                            setResult,
+                            !written);
                     }
                     else
                     {
-                        lastResultSummary = $"字段值解析失败: {entry.Label}";
-                        lastResultDetail = parseError;
+                        SetEntryOperationResult(entry, $"字段值解析失败: {entry.Label}", parseError, true);
                     }
                 }
 
@@ -1551,7 +2490,7 @@ namespace ES
         {
             EditorApplication.delayCall += () =>
             {
-                CollectEntries(false);
+                CollectEntries(false, "操作后刷新");
                 if (SimpleToolsWindow.UsingWindow != null)
                     SimpleToolsWindow.UsingWindow.Repaint();
             };
@@ -1628,21 +2567,11 @@ namespace ES
 
         private static string GetCurrentValueDraft(WatchEntry entry, Type valueType, bool allowGetMoudleFallback)
         {
-            try
-            {
-                object value = entry != null ? entry.ReadRawValue(allowGetMoudleFallback) : null;
-                if (value == null)
-                    return string.Empty;
-
-                if (valueType != null && valueType.IsEnum)
-                    return value.ToString();
-
-                return Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
+            // 输入控件同样处于 IMGUI 重绘热路径。使用最近一次受控采样，
+            // 不能为了填充输入框在 Layout/Repaint 再次读取属性或调用 Getter。
+            return entry != null && entry.SampleState != null && entry.SampleState.HasValue
+                ? entry.GetCachedValue()
+                : string.Empty;
         }
 
         private static string FormatValueDraft(object value, Type valueType)
@@ -2166,6 +3095,256 @@ namespace ES
             return member.MemberType + " " + declaring + "." + member.Name;
         }
 
+        /// <summary>
+        /// RuntimeWatch 的录制层只保存“变化事实”，而不是逐帧值快照。
+        /// 它刻意不落盘、不会执行方法，并用固定容量防止编辑器会话长期占用内存。
+        /// </summary>
+        private sealed class RuntimeWatchEvidenceRecorder
+        {
+            private const int MaxTrackedSignals = 2048;
+            private const int MaxRecordedEvents = 512;
+            private const int MaxRecordedValueLength = 240;
+
+            private readonly Dictionary<string, TrackedSignal> signals = new Dictionary<string, TrackedSignal>(StringComparer.Ordinal);
+            private readonly HashSet<string> destroyedOwnerKeys = new HashSet<string>(StringComparer.Ordinal);
+            private readonly RecordedEvent[] events = new RecordedEvent[MaxRecordedEvents];
+            private int eventStart;
+            private int eventCount;
+            private double startedAt;
+            private double stoppedAt;
+            private string scopeLabel = string.Empty;
+            private string stopReason = string.Empty;
+
+            public bool IsRecording { get; private set; }
+            public bool HasEvidence => IsRecording || eventCount > 0 || stoppedAt > 0d;
+            public int EventCount => eventCount;
+            public string StopReason => string.IsNullOrWhiteSpace(stopReason) ? "尚未冻结" : stopReason;
+            public string ScopeLabel => string.IsNullOrWhiteSpace(scopeLabel) ? "当前场景" : scopeLabel;
+            public double ElapsedSeconds => IsRecording
+                ? Math.Max(0d, EditorApplication.timeSinceStartup - startedAt)
+                : Math.Max(0d, stoppedAt - startedAt);
+
+            public void Start(double now, string scope)
+            {
+                Clear();
+                IsRecording = true;
+                startedAt = now;
+                scopeLabel = string.IsNullOrWhiteSpace(scope) ? "当前场景" : scope;
+                stopReason = string.Empty;
+            }
+
+            public void Stop(double now, string reason)
+            {
+                if (!IsRecording)
+                    return;
+
+                IsRecording = false;
+                stoppedAt = now;
+                stopReason = string.IsNullOrWhiteSpace(reason) ? "已停止" : reason;
+            }
+
+            public void Clear()
+            {
+                signals.Clear();
+                destroyedOwnerKeys.Clear();
+                Array.Clear(events, 0, events.Length);
+                eventStart = 0;
+                eventCount = 0;
+                startedAt = 0d;
+                stoppedAt = 0d;
+                scopeLabel = string.Empty;
+                stopReason = string.Empty;
+                IsRecording = false;
+            }
+
+            public void Sample(IReadOnlyList<WatchEntry> sourceEntries, double now)
+            {
+                if (!IsRecording || sourceEntries == null)
+                    return;
+
+                foreach (TrackedSignal signal in signals.Values)
+                    signal.SeenThisSample = false;
+
+                for (int i = 0; i < sourceEntries.Count; i++)
+                {
+                    WatchEntry entry = sourceEntries[i];
+                    if (!CanRecord(entry))
+                        continue;
+
+                    string key = BuildSignalKey(entry);
+                    if (!signals.TryGetValue(key, out TrackedSignal signal))
+                    {
+                        if (signals.Count >= MaxTrackedSignals)
+                            continue;
+
+                        signal = new TrackedSignal(entry);
+                        signals.Add(key, signal);
+                    }
+
+                    signal.RefreshMetadata(entry);
+                    signal.SeenThisSample = true;
+                    // CollectEntries 已在受控刷新时采样；录制只消费同一份缓存，
+                    // 不允许为了记录证据再次执行 Getter。
+                    string currentValue = NormalizeValue(entry.GetCachedValue());
+                    if (signal.HasValue && !string.Equals(signal.LastValue, currentValue, StringComparison.Ordinal))
+                    {
+                        AddEvent(new RecordedEvent(
+                            now - startedAt,
+                            entry.Owner,
+                            entry.OwnerName,
+                            entry.Group,
+                            entry.Label,
+                            entry.MemberPath,
+                            signal.LastValue,
+                            currentValue));
+                    }
+
+                    signal.LastValue = currentValue;
+                    signal.HasValue = true;
+                }
+
+                // CollectEntries 不会再返回已销毁的 Mono，因此在这里保留一次明确的终止事实。
+                foreach (TrackedSignal signal in signals.Values)
+                {
+                    if (signal.SeenThisSample || signal.Owner != null)
+                        continue;
+
+                    signal.SeenThisSample = true;
+                    if (!destroyedOwnerKeys.Add(signal.OwnerKey))
+                        continue;
+
+                    AddEvent(new RecordedEvent(
+                        now - startedAt,
+                        null,
+                        signal.OwnerName,
+                        signal.Group,
+                        "对象已销毁",
+                        signal.MemberPath,
+                        signal.HasValue ? signal.Label + " = " + signal.LastValue : "最后状态未知",
+                        "<对象已销毁>"));
+                }
+            }
+
+            public RecordedEvent GetNewestEvent(int newestIndex)
+            {
+                if (newestIndex < 0 || newestIndex >= eventCount)
+                    return null;
+
+                int index = eventStart + eventCount - 1 - newestIndex;
+                if (index >= MaxRecordedEvents)
+                    index -= MaxRecordedEvents;
+                return events[index];
+            }
+
+            private static bool CanRecord(WatchEntry entry)
+            {
+                // 方法在 RuntimeWatch 中可能代表显式操作，录制过程绝不自动调用它们。
+                return entry != null
+                       && entry.Owner != null
+                       && !entry.HasManualAction
+                       && !(entry.MemberInfo is MethodInfo);
+            }
+
+            private static string BuildSignalKey(WatchEntry entry)
+            {
+                if (!string.IsNullOrWhiteSpace(entry.StateKey))
+                    return entry.StateKey;
+
+                return entry.OwnerKey + "|" + entry.MemberPath;
+            }
+
+            private static string NormalizeValue(string value)
+            {
+                if (string.IsNullOrEmpty(value))
+                    return "<空>";
+
+                if (value.Length <= MaxRecordedValueLength)
+                    return value;
+
+                return value.Substring(0, MaxRecordedValueLength) + "…";
+            }
+
+            private void AddEvent(RecordedEvent recordedEvent)
+            {
+                if (recordedEvent == null)
+                    return;
+
+                int writeIndex;
+                if (eventCount < MaxRecordedEvents)
+                {
+                    writeIndex = (eventStart + eventCount) % MaxRecordedEvents;
+                    eventCount++;
+                }
+                else
+                {
+                    writeIndex = eventStart;
+                    eventStart = (eventStart + 1) % MaxRecordedEvents;
+                }
+
+                events[writeIndex] = recordedEvent;
+            }
+
+            private sealed class TrackedSignal
+            {
+                public UnityEngine.Object Owner;
+                public string OwnerKey;
+                public string OwnerName;
+                public string Group;
+                public string Label;
+                public string MemberPath;
+                public string LastValue;
+                public bool HasValue;
+                public bool SeenThisSample;
+
+                public TrackedSignal(WatchEntry entry)
+                {
+                    RefreshMetadata(entry);
+                }
+
+                public void RefreshMetadata(WatchEntry entry)
+                {
+                    Owner = entry.Owner;
+                    OwnerKey = entry.OwnerKey ?? string.Empty;
+                    OwnerName = entry.OwnerName ?? "<对象>";
+                    Group = entry.Group ?? "Default";
+                    Label = entry.Label ?? entry.MemberPath ?? "<成员>";
+                    MemberPath = entry.MemberPath ?? string.Empty;
+                }
+            }
+
+            public sealed class RecordedEvent
+            {
+                public readonly double ElapsedSeconds;
+                public readonly UnityEngine.Object Owner;
+                public readonly string OwnerName;
+                public readonly string Group;
+                public readonly string Label;
+                public readonly string MemberPath;
+                public readonly string Before;
+                public readonly string After;
+
+                public RecordedEvent(
+                    double elapsedSeconds,
+                    UnityEngine.Object owner,
+                    string ownerName,
+                    string group,
+                    string label,
+                    string memberPath,
+                    string before,
+                    string after)
+                {
+                    ElapsedSeconds = Math.Max(0d, elapsedSeconds);
+                    Owner = owner;
+                    OwnerName = ownerName ?? "<对象>";
+                    Group = group ?? "Default";
+                    Label = label ?? "<成员>";
+                    MemberPath = memberPath ?? string.Empty;
+                    Before = before ?? "<空>";
+                    After = after ?? "<空>";
+                }
+            }
+        }
+
         private sealed class WatchSampleState
         {
             public bool HasValue;
@@ -2190,12 +3369,14 @@ namespace ES
             public string ScriptTypeName;
             public ESRuntimeWatchRegistry.Entry RegistryEntry;
             public MemberInfo MemberInfo => RegistryEntry.MemberInfo;
-            public string MemberKindLabel => BuildMemberKindLabel(MemberInfo);
-            public string MemberPathPrefix => BuildMemberPathPrefix(this);
-            public string MemberCodeName => MemberInfo != null ? MemberInfo.Name : "<成员丢失>";
-            public string MemberTypeSuffix => BuildMemberTypeSuffix(MemberInfo);
-            public Color MemberKindColor => BuildMemberKindColor(MemberInfo);
+            // 元数据仅随 CollectEntries 创建条目时计算；IMGUI 重绘只读取这些缓存字段。
+            public string MemberKindLabel;
+            public string MemberPathPrefix;
+            public string MemberCodeName;
+            public string MemberTypeSuffix;
+            public Color MemberKindColor;
             public bool HasManualAction;
+            public bool IsActionable;
             public string ActionButtonLabel;
             public string StateKey;
             public WatchSampleState SampleState;
@@ -2235,7 +3416,7 @@ namespace ES
 
             private static WatchEntry Create(MonoBehaviour owner, string memberPath, string displayLabel, string ownerTypeName, ESRuntimeWatchAttribute attribute, ESRuntimeWatchRegistry.Entry registryEntry, Func<object> getter, bool hasManualAction, string actionLabel, Func<object> manualInvoker)
             {
-                return new WatchEntry
+                var watchEntry = new WatchEntry
                 {
                     Owner = owner,
                     SceneObject = owner != null ? owner.gameObject : null,
@@ -2276,6 +3457,15 @@ namespace ES
                         }
                     }
                 };
+
+                watchEntry.MemberKindLabel = BuildMemberKindLabel(watchEntry.MemberInfo);
+                watchEntry.MemberPathPrefix = BuildMemberPathPrefix(watchEntry);
+                watchEntry.MemberCodeName = watchEntry.MemberInfo != null ? watchEntry.MemberInfo.Name : "<成员丢失>";
+                watchEntry.MemberTypeSuffix = BuildMemberTypeSuffix(watchEntry.MemberInfo);
+                watchEntry.MemberKindColor = BuildMemberKindColor(watchEntry.MemberInfo);
+                watchEntry.IsActionable = watchEntry.HasManualAction
+                                          || TryGetEditableValueType(watchEntry.MemberInfo, out _);
+                return watchEntry;
             }
 
             private static string BuildMemberKindLabel(MemberInfo memberInfo)
@@ -2350,27 +3540,6 @@ namespace ES
                     return "<点击按钮执行>";
 
                 return ReadMemberValue(current, entry.MemberInfo);
-            }
-
-            public object ReadRawValue(bool allowGetMoudleFallback)
-            {
-                if (Owner == null || RegistryEntry.MemberInfo == null)
-                    return null;
-
-                object current = ResolveEntryContext(Owner as MonoBehaviour, RegistryEntry, allowGetMoudleFallback);
-                if (current == null)
-                    return null;
-
-                if (RegistryEntry.MemberInfo is FieldInfo field)
-                    return field.GetValue(current);
-
-                if (RegistryEntry.MemberInfo is PropertyInfo property && property.CanRead && property.GetIndexParameters().Length == 0)
-                    return property.GetValue(current);
-
-                if (RegistryEntry.MemberInfo is MethodInfo method && method.GetParameters().Length == 0 && method.ReturnType != typeof(void))
-                    return method.Invoke(current, null);
-
-                return null;
             }
 
             private static object ReadMemberValue(object owner, MemberInfo memberInfo)
@@ -2645,7 +3814,15 @@ namespace ES
                 return string.Join(".", entry.OwnerPath.Take(length).Select(field => field.Name));
             }
 
-            public string ReadValue()
+            public string GetCachedValue()
+            {
+                if (SampleState == null || !SampleState.HasValue)
+                    return "<等待刷新>";
+
+                return SampleState.LastValue ?? string.Empty;
+            }
+
+            public string RefreshSample()
             {
                 var stopwatch = Stopwatch.StartNew();
                 string value = readValue == null ? "" : readValue();

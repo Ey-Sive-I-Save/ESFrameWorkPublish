@@ -179,7 +179,19 @@ namespace ES
                 AssetDatabase.LoadAssetAtPath<GameObject>(CompleteTemplatePath));
         }
 
-        [MenuItem("【ES】/内容制作/角色模板/运行完整角色运行态烟雾测试", false, 104)]
+        [MenuItem("【ES】/内容制作/角色模板/审计项目角色基础模块", false, 104)]
+        public static void ValidateAllCharacterPrefabModulesMenu()
+        {
+            if (!ESCharacterTemplateReleaseGate.ValidateAllCharacterPrefabModuleContracts(out string report))
+            {
+                Debug.LogError(report);
+                return;
+            }
+
+            Debug.Log(report);
+        }
+
+        [MenuItem("【ES】/内容制作/角色模板/运行完整角色运行态烟雾测试", false, 105)]
         public static void RunCharacterTemplateRuntimeSelfTestMenu()
         {
             RunCharacterTemplateRuntimeSelfTest();
@@ -492,7 +504,6 @@ namespace ES
             {
                 turnMode = TurnMode.MoveDirection,
                 enableCameraLook = false,
-                driveCinemachineAxes = false,
                 driveAimIK = false,
                 aimTransform = aimTarget,
                 debugCamera = false,

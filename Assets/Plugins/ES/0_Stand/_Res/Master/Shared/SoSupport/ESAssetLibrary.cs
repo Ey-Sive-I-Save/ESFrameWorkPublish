@@ -102,6 +102,7 @@ namespace ES
             SetupDefaultBook(DefaultPlayableAssetBook, EditorIconType.File, ESAssetCategory.Playable);
             SetupDefaultBook(DefaultScriptableObjectBook, EditorIconType.ScriptableObject, ESAssetCategory.Script);
             SetupDefaultBook(DefaultTerrainDataBook, EditorIconType.Terrain, ESAssetCategory.TerrainData);
+            SetupDefaultBook(DefaultRawBook, EditorIconType.TextAsset, ESAssetCategory.Raw);
         }
 
         private static void SetupDefaultBook(ESAssetBook book, EditorIconType icon, ESAssetCategory category)
@@ -133,6 +134,7 @@ namespace ES
             if (DefaultPlayableAssetBook != null) yield return DefaultPlayableAssetBook;
             if (DefaultScriptableObjectBook != null) yield return DefaultScriptableObjectBook;
             if (DefaultTerrainDataBook != null) yield return DefaultTerrainDataBook;
+            if (DefaultRawBook != null) yield return DefaultRawBook;
         }
 
         [ShowInInspector, NonSerialized]
@@ -176,6 +178,8 @@ namespace ES
         public ESAssetBook DefaultScriptableObjectBook = new ESAssetBook() { Name = "Default ScriptableObject Book", Desc = "ESAssetReferScriptableObject" };
         [ShowIf("ShowDefaultPrefabBook")]
         public ESAssetBook DefaultTerrainDataBook = new ESAssetBook() { Name = "Default TerrainData Book", Desc = "ESAssetReferTerrainData" };
+        [ShowIf("ShowDefaultPrefabBook")]
+        public ESAssetBook DefaultRawBook = new ESAssetBook() { Name = "Default Raw Book", Desc = "ESAssetReferRaw" };
 
         [LabelText("Can Build")]
         public bool ContainsBuild = true;
@@ -289,10 +293,46 @@ namespace ES
                 LibFolderName = IESLibrary.DefaultLibFolderName;
             }
 
-            ESResMaster.TrySetResLibFolderName(this, LibFolderName, 0);
+#if UNITY_EDITOR
+            EnsureUniqueLibraryFolderNameEditor();
+#endif
             MarkFastIndexDirty();
             base.Refresh();
         }
+
+#if UNITY_EDITOR
+        private void EnsureUniqueLibraryFolderNameEditor()
+        {
+            string validName = (LibFolderName ?? string.Empty)._ToValidIdentName();
+            if (string.IsNullOrWhiteSpace(validName))
+                validName = IESLibrary.DefaultLibFolderName;
+
+            var allLibraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
+            string candidate = validName;
+            int suffix = 0;
+            bool duplicated;
+            do
+            {
+                duplicated = false;
+                foreach (var lib in allLibraries)
+                {
+                    if (lib != this && lib != null && string.Equals(lib.LibFolderName, candidate, StringComparison.Ordinal))
+                    {
+                        duplicated = true;
+                        break;
+                    }
+                }
+                if (duplicated)
+                {
+                    suffix++;
+                    candidate = validName + "_r" + suffix;
+                }
+            } while (duplicated);
+
+            LibFolderName = candidate;
+            UnityEditor.EditorUtility.SetDirty(this);
+        }
+#endif
 
         public void MarkFastIndexDirty()
         {
@@ -320,6 +360,7 @@ namespace ES
                 case ESAssetReferKind.PlayableAsset: return DefaultPlayableAssetBook;
                 case ESAssetReferKind.ScriptableObject: return DefaultScriptableObjectBook;
                 case ESAssetReferKind.TerrainData: return DefaultTerrainDataBook;
+                case ESAssetReferKind.Raw: return DefaultRawBook;
                 default: return null;
             }
         }

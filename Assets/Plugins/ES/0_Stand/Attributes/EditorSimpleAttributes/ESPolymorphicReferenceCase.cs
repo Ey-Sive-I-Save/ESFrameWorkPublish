@@ -11,17 +11,22 @@ namespace ES
     [DisallowMultipleComponent]
     public sealed class ESPolymorphicReferenceCase : MonoBehaviour
     {
-        [Title("多态引用案例", "只使用原生 SerializeReference。案例覆盖重选、Undo、快速清除、集合和二层嵌套。", TitleAlignments.Left, true, true)]
+        [Title("ES 多态引用案例", "只使用原生 SerializeReference；Section 负责目录，Reference Drawer 负责类型编辑。", TitleAlignments.Left, true, true)]
+        [ESEditorBeginSection("single", "单体引用", -100f, "当前类型、清除、Undo 和安全重选。")]
+        [ESFieldPolicy(ESFieldRequirement.Required)]
+        [ESFieldHint("这个字段为空时，触发流程不能继续。")]
         [SerializeReference]
         [LabelText("触发效果")]
         public Effect effect = new DamageEffect();
 
-        [Title("二层嵌套", "展开 CompositeEffect，可继续编辑 primary 与 alternatives 中的多态对象。", TitleAlignments.Left, true, true)]
+        [ESEditorBeginSection("nested", "嵌套引用", 10f, "CompositeEffect 内部继续使用同一套多态绘制。")]
+        [ESFieldPolicy(ESFieldRequirement.Recommended)]
+        [ESFieldHint("推荐配置；未设置不会阻止其他字段编辑。")]
         [SerializeReference]
         [LabelText("嵌套效果（CompositeEffect）")]
         public Effect nestedEffect = new CompositeEffect();
 
-        [Title("集合与集合内嵌套", "列表元素可单独重选；CompositeEffect 元素还会继续展开第二层。", TitleAlignments.Left, true, true)]
+        [ESEditorBeginSection("collection", "效果序列", 20f, "集合元素可以独立重选，嵌套元素继续保持层级颜色。")]
         [SerializeReference]
         [ListDrawerSettings(DefaultExpandedState = true)]
         [LabelText("效果序列")]
@@ -32,6 +37,9 @@ namespace ES
             new CompositeEffect(),
         };
 
+        [ESEditorSection]
+        [ESFieldPolicy(ESFieldRequirement.Optional)]
+        [ESFieldHint("用于验证未登记类型仍可进入目录。")]
         [SerializeReference]
         [LabelText("未登记类型验证")]
         public Effect unregisteredEffect;

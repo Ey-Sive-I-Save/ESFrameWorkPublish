@@ -54,6 +54,15 @@ namespace ES
 
     public sealed partial class ESResourcePlanRuntimeService : IDisposable
     {
+        /// <summary>
+        /// Lifecycle edge for authored deferred starts. It fires only when a whole ResourcePlan
+        /// reaches Ready or finishes releasing, never once per individual asset publication.
+        /// Callers must re-check their own Cue dependency; this event grants no loading or retain
+        /// permission.
+        /// </summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static event Action PlanAvailabilityChanged;
+
         private sealed class PrewarmedPrefab
         {
             public GameObject prefab;
@@ -66,6 +75,7 @@ namespace ES
             public readonly ESAssetScope scope = ESAssets.CreateScope();
             public readonly CancellationTokenSource loadingCancellation = new CancellationTokenSource();
             public readonly List<PrewarmedPrefab> prefabs = new List<PrewarmedPrefab>(8);
+            public readonly List<IESResourcePlanExtensionLease> extensionLeases = new List<IESResourcePlanExtensionLease>(2);
             public readonly ESResourcePlanReport report = new ESResourcePlanReport();
             public readonly object poolSource = new object();
             public readonly UniTaskCompletionSource<ESResourcePlanReport> completion = new UniTaskCompletionSource<ESResourcePlanReport>();
@@ -76,6 +86,7 @@ namespace ES
             public readonly Dictionary<ESAssetScope, int> lifetimeScopeRetains = new Dictionary<ESAssetScope, int>();
             public readonly Dictionary<ESAssetScope, Action> lifetimeScopeListeners = new Dictionary<ESAssetScope, Action>();
             private HashSet<ESAssetIdentity> publishedPlanAssets;
+            private readonly Dictionary<ESAssetIdentity, UnityEngine.Object> loadedPlanAssets = new Dictionary<ESAssetIdentity, UnityEngine.Object>();
             public int retainCount;
             public int unownedRetainCount;
             public bool releaseRequested;
@@ -110,7 +121,11 @@ namespace ES
                 publishedPlanAssets ??= new HashSet<ESAssetIdentity>();
                 if (publishedPlanAssets.Add(identity))
                     ESAssets.RegisterActivePlanAsset(identity, asset);
+                loadedPlanAssets[identity] = asset;
             }
+
+            public UnityEngine.Object GetLoadedPlanAsset(ESAssetIdentity identity)
+                => loadedPlanAssets.TryGetValue(identity, out UnityEngine.Object asset) ? asset : null;
 
             public void Dispose()
             {
@@ -120,13 +135,16 @@ namespace ES
                 loadingCancellation.Dispose();
                 releaseCancellation?.Cancel();
                 releaseCancellation?.Dispose();
+                ReleaseExtensionLeases(extensionLeases);
                 if (publishedPlanAssets != null)
                 {
                     foreach (ESAssetIdentity identity in publishedPlanAssets)
                         ESAssets.UnregisterActivePlanAsset(identity);
                     publishedPlanAssets.Clear();
                 }
+                loadedPlanAssets.Clear();
                 scope.Dispose();
+                ESResourcePlanRuntimeService.NotifyPlanAvailabilityChanged();
             }
         }
 
@@ -492,6 +510,8 @@ namespace ES
                             ? ESResourcePlanState.Failed
                             : ESResourcePlanState.Ready;
                     context.completion.TrySetResult(context.report);
+                    if (context.report.State == ESResourcePlanState.Ready)
+                        NotifyPlanAvailabilityChanged();
                 }
                 catch (OperationCanceledException)
                 {
@@ -513,8 +533,14 @@ namespace ES
                 }
                 finally
                 {
+                    bool hadOptionalLoads = context.report.OptionalPendingCount > 0;
                     context.report.OptionalPendingCount = 0;
                     context.allLoadsCompletion.TrySetResult();
+                    // A Cue may intentionally be an optional prewarm entry. Notify once more at
+                    // the plan-level optional-complete edge so a waiting authored emitter can
+                    // re-check its exact Clip set without subscribing to every asset publication.
+                    if (hadOptionalLoads && !context.releaseRequested && context.report.State == ESResourcePlanState.Ready)
+                        NotifyPlanAvailabilityChanged();
                 }
             }
             catch (Exception exception)
@@ -568,7 +594,38 @@ namespace ES
             AddTasks<ESResourcePlanTimelineEntry, ESAssetReferTimelineAssetConfigKey, ESAssetReferUnityObject, UnityEngine.Object, ESAssetReferTimelineAssetEnumKey>(plan.timelineAssets, ESAssetReferKind.TimelineAsset, e => e.key, context, requiredTasks, optionalTasks, token);
             AddTasks<ESResourcePlanVideoEntry, ESAssetReferVideoClipConfigKey, ESAssetReferVideoClip, UnityEngine.Video.VideoClip, ESAssetReferVideoClipEnumKey>(plan.videoClips, ESAssetReferKind.VideoClip, e => e.key, context, requiredTasks, optionalTasks, token);
             AddTasks<ESResourcePlanTerrainEntry, ESAssetReferTerrainDataConfigKey, ESAssetReferTerrainData, TerrainData, ESAssetReferTerrainDataEnumKey>(plan.terrainDatas, ESAssetReferKind.TerrainData, e => e.key, context, requiredTasks, optionalTasks, token);
+            AddTasks<ESResourcePlanRawEntry, ESAssetReferRawConfigKey, ESAssetReferRaw, TextAsset, ESAssetReferRawEnumKey>(plan.rawAssets, ESAssetReferKind.Raw, e => e.key, context, requiredTasks, optionalTasks, token);
             AddBakedAssetTasks(plan.BakedAssets, context, requiredTasks, optionalTasks, token);
+            AddExtensionTasks(plan.BakedExtensions, plan, context, requiredTasks, optionalTasks, token);
+        }
+
+        private void AddExtensionTasks(IReadOnlyList<ESResourcePlanBakedExtensionEntry> entries, ESResourcePlanInfo plan, Context context, List<UniTask> requiredTasks, List<UniTask> optionalTasks, CancellationToken token)
+        {
+            if (entries == null) return;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                ESResourcePlanBakedExtensionEntry entry = entries[i];
+                if (entry != null) (entry.required ? requiredTasks : optionalTasks).Add(PrepareExtensionAsync(plan, entry, context, token));
+            }
+        }
+
+        private async UniTask PrepareExtensionAsync(ESResourcePlanInfo plan, ESResourcePlanBakedExtensionEntry entry, Context context, CancellationToken token)
+        {
+            try
+            {
+                int failuresBefore = context.report.FailureCount;
+                for (int i = 0; i < (entry.assets?.Count ?? 0); i++)
+                    if (entry.assets[i] != null) await LoadBakedAssetAsync(entry.assets[i], context, token);
+                if (context.report.FailureCount != failuresBefore)
+                    throw new InvalidOperationException("扩展资源未全部准备成功：" + entry.providerId);
+                var extensionContext = new ESResourcePlanExtensionContext(context.GetLoadedPlanAsset);
+                IESResourcePlanExtensionLease lease = await ESResourcePlanRuntimeExtensions.Resolve(entry.providerId, entry.schemaVersion).PrepareAsync(plan, entry, extensionContext, token);
+                if (lease == null) throw new InvalidOperationException("ResourcePlan Runtime extension 未返回 Lease：" + entry.providerId);
+                context.extensionLeases.Add(lease);
+                context.report.SuccessCount++;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception exception) { RecordFailure(context, ESAssetReferKind.None, entry.providerId, entry.required, exception); }
         }
 
         private void AddBakedAssetTasks(IReadOnlyList<ESResourcePlanBakedAssetEntry> entries, Context context, List<UniTask> requiredTasks, List<UniTask> optionalTasks, CancellationToken token)
@@ -746,6 +803,24 @@ namespace ES
             Debug.LogError($"[ESRes][Plan] 资源处理失败：Kind={kind}, Key={key}, Required={required}, Error={message}", context.report.Plan);
         }
 
+        private static void NotifyPlanAvailabilityChanged()
+        {
+            try { PlanAvailabilityChanged?.Invoke(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+        }
+
+        private static void ReleaseExtensionLeases(List<IESResourcePlanExtensionLease> leases)
+        {
+            if (leases == null || leases.Count == 0) return;
+            IESResourcePlanExtensionLease[] snapshot = leases.ToArray();
+            leases.Clear();
+            for (int i = snapshot.Length - 1; i >= 0; i--)
+            {
+                try { snapshot[i]?.Release(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
+        }
+
         private async UniTaskVoid ReleaseCoreAsync(
             ESResourcePlanInfo plan,
             Context context,
@@ -768,6 +843,7 @@ namespace ES
                         PrewarmedPrefab prefab = context.prefabs[i];
                         pool.ReleaseOwnedPrewarm(prefab.prefab, prefab.count, context.poolSource, prefab.poolKey);
                     }
+                ReleaseExtensionLeases(context.extensionLeases);
 
                 context.report.State = ESResourcePlanState.Released;
                 RemoveReleasingContext(plan, context);

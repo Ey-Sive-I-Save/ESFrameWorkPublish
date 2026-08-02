@@ -1,0 +1,491 @@
+using System;
+using System.Reflection;
+using NUnit.Framework;
+using UnityEngine.TestTools;
+
+namespace ES.Tests
+{
+    public sealed class SkillTrackLifecycleIsolationTests
+    {
+        private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+        private bool previousIgnoreFailingMessages;
+
+        [SetUp]
+        public void SetUp()
+        {
+            previousIgnoreFailingMessages = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = true;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            LogAssert.ignoreFailingMessages = previousIgnoreFailingMessages;
+        }
+
+        [Test]
+        public void TrackEnterFailure_CompensatesAndContinuesEnteringOtherTracks()
+        {
+            var failed = new ProbeTrackPlayer { ThrowOnEnter = true, ThrowOnExit = true };
+            var healthy = new ProbeTrackPlayer();
+            var failedTrackClip = new ProbeClipPlayer();
+            SkillProcessTrackSequence sequence = CreateSequence(
+                new ProbeTrack(failed, new ProbeClip(failedTrackClip, 0f, 1f)),
+                new ProbeTrack(healthy));
+
+            EntityState_Skill state = PrepareState(sequence);
+            try
+            {
+                Invoke(state, "EnterAllTracks");
+
+                Assert.That(failed.EnterCount, Is.EqualTo(1));
+                Assert.That(failed.ExitCount, Is.EqualTo(1), "Failed Track Enter must run compensation Exit exactly once.");
+                Assert.That(healthy.EnterCount, Is.EqualTo(1), "A failed Track must not block later Track Enter calls.");
+
+                Invoke(state, "TickRuntimeCore", 0f, 0f);
+                Assert.That(failed.TickCount, Is.EqualTo(0), "A failed Track must not be driven after its Enter compensation.");
+                Assert.That(failedTrackClip.EnterCount, Is.EqualTo(0), "Clips under a failed Track must remain inactive.");
+                Assert.That(healthy.TickCount, Is.EqualTo(1));
+
+                Invoke(state, "ExitAllTracks");
+                Assert.That(failed.ExitCount, Is.EqualTo(1), "Failed Track must not be exited twice.");
+                Assert.That(healthy.ExitCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                ReleaseSequence(sequence);
+            }
+        }
+
+        [Test]
+        public void ClipEnterFailure_CompensatesAndContinuesEnteringOtherClips()
+        {
+            var failed = new ProbeClipPlayer { ThrowOnEnter = true, ThrowOnExit = true };
+            var healthy = new ProbeClipPlayer();
+            var trackPlayer = new ProbeTrackPlayer();
+            SkillProcessTrackSequence sequence = CreateSequence(
+                new ProbeTrack(trackPlayer,
+                    new ProbeClip(failed, 0f, 1f),
+                    new ProbeClip(healthy, 0f, 1f)));
+
+            EntityState_Skill state = PrepareState(sequence);
+            try
+            {
+                Invoke(state, "EnterAllTracks");
+                Invoke(state, "TickRuntimeCore", 0f, 0f);
+
+                Assert.That(failed.EnterCount, Is.EqualTo(1));
+                Assert.That(failed.ExitCount, Is.EqualTo(1), "Failed Clip Enter must run compensation Exit exactly once.");
+                Assert.That(healthy.EnterCount, Is.EqualTo(1), "A failed Clip must not block later Clip Enter calls.");
+
+                Invoke(state, "ExitAllClips");
+                Assert.That(failed.ExitCount, Is.EqualTo(1), "Failed Clip must be removed from the active set after compensation.");
+                Assert.That(healthy.ExitCount, Is.EqualTo(1));
+                Invoke(state, "ExitAllTracks");
+            }
+            finally
+            {
+                ReleaseSequence(sequence);
+            }
+        }
+
+        [Test]
+        public void ClipExitFailure_DoesNotBlockOtherClipExits()
+        {
+            var orphanedUserData = new ProbePoolable();
+            var failed = new ProbeClipPlayer { ThrowOnExit = true, UserDataOnEnter = orphanedUserData };
+            var healthy = new ProbeClipPlayer();
+            SkillProcessTrackSequence sequence = CreateSequence(
+                new ProbeTrack(new ProbeTrackPlayer(),
+                    new ProbeClip(failed, 0f, 1f),
+                    new ProbeClip(healthy, 0f, 1f)));
+
+            EntityState_Skill state = PrepareState(sequence);
+            try
+            {
+                Invoke(state, "EnterAllTracks");
+                Invoke(state, "TickRuntimeCore", 0f, 0f);
+                Invoke(state, "ExitAllClips");
+
+                Assert.That(failed.ExitCount, Is.EqualTo(1));
+                Assert.That(healthy.ExitCount, Is.EqualTo(1), "A failed Clip Exit must not block later Clip Exit calls.");
+                Assert.That(orphanedUserData.IsRecycled, Is.True, "Poolable Clip UserData must be reclaimed when its Exit throws.");
+                Invoke(state, "ExitAllTracks");
+            }
+            finally
+            {
+                ReleaseSequence(sequence);
+            }
+        }
+
+        [Test]
+        public void ScheduledClipExitFailure_DoesNotBlockOtherClipExits()
+        {
+            var failed = new ProbeClipPlayer { ThrowOnExit = true };
+            var healthy = new ProbeClipPlayer();
+            SkillProcessTrackSequence sequence = CreateSequence(
+                new ProbeTrack(new ProbeTrackPlayer(),
+                    new ProbeClip(failed, 0f, 1f),
+                    new ProbeClip(healthy, 0f, 1f)));
+
+            EntityState_Skill state = PrepareState(sequence);
+            try
+            {
+                Invoke(state, "EnterAllTracks");
+                Invoke(state, "TickRuntimeCore", 0f, 0f);
+                Invoke(state, "TickRuntimeCore", 1f, 1f);
+
+                Assert.That(failed.ExitCount, Is.EqualTo(1));
+                Assert.That(healthy.ExitCount, Is.EqualTo(1), "A scheduled Clip Exit failure must not block later exit events.");
+                Invoke(state, "ExitAllTracks");
+            }
+            finally
+            {
+                ReleaseSequence(sequence);
+            }
+        }
+
+        [Test]
+        public void TrackExitFailure_DoesNotBlockOtherTrackExits()
+        {
+            var failed = new ProbeTrackPlayer { ThrowOnExit = true };
+            var healthy = new ProbeTrackPlayer();
+            SkillProcessTrackSequence sequence = CreateSequence(
+                new ProbeTrack(failed),
+                new ProbeTrack(healthy));
+
+            EntityState_Skill state = PrepareState(sequence);
+            try
+            {
+                Invoke(state, "EnterAllTracks");
+                Invoke(state, "ExitAllTracks");
+
+                Assert.That(failed.ExitCount, Is.EqualTo(1));
+                Assert.That(healthy.ExitCount, Is.EqualTo(1), "A failed Track Exit must not block later Track Exit calls.");
+            }
+            finally
+            {
+                ReleaseSequence(sequence);
+            }
+        }
+
+        [Test]
+        public void OutputOperation_StopRunsOnlyWhenNeedsStop()
+        {
+            var instant = new StopProbeOperation(false);
+            var scoped = new StopProbeOperation(true);
+
+            instant._TryStopOp(null, null, null);
+            scoped._TryStopOp(null, null, null);
+
+            Assert.That(instant.StopCount, Is.Zero);
+            Assert.That(scoped.StopCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void OperationClipStopFailure_StillRecyclesOwnedTargetAndRuntimeState()
+        {
+            var clip = new SkillTrackClip_Operation
+            {
+                op = new ThrowingStopOperation(),
+                clipTargetSourceMode = ClipRuntimeTargetSourceMode.NewEmpty
+            };
+            var player = new SkillOperationClipRuntimePlayer(clip, 0);
+            var clipState = new SkillRuntimeClipState();
+
+            player.OnClipEnter(null, ref clipState);
+            object runtimeState = clipState.UserData;
+            Assert.That(runtimeState, Is.Not.Null);
+
+            FieldInfo targetField = runtimeState.GetType().GetField("target", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.That(targetField, Is.Not.Null);
+            var target = targetField.GetValue(runtimeState) as ESRuntimeTargetPack;
+            Assert.That(target, Is.Not.Null);
+            Assert.That(target.IsRecycled, Is.False);
+
+            bool stopFailed = false;
+            try
+            {
+                player.OnClipExit(null, ref clipState);
+            }
+            catch (InvalidOperationException)
+            {
+                stopFailed = true;
+            }
+
+            Assert.That(stopFailed, Is.True);
+            Assert.That(clipState.UserData, Is.Null);
+            Assert.That(target.IsRecycled, Is.True, "Owned TargetPack must be recycled even when StopOperation throws.");
+            Assert.That(((IPoolableAuto)runtimeState).IsRecycled, Is.True, "Operation runtime state must also return to its pool.");
+        }
+
+        [Test]
+        public void TrackExitFallback_DoesNotRecycleBorrowedSkillTarget()
+        {
+            ESRuntimeTargetPack skillTarget = ESRuntimeTargetPack.Pool.GetInPool();
+            var player = new ProbeTrackPlayer { ThrowOnExit = true, UseSkillTargetAsUserData = true };
+            SkillProcessTrackSequence sequence = CreateSequence(new ProbeTrack(player));
+            EntityState_Skill state = PrepareState(sequence);
+            SetPrivateField(state, "runtimeTarget", skillTarget);
+
+            try
+            {
+                Invoke(state, "EnterAllTracks");
+                Invoke(state, "ExitAllTracks");
+
+                Assert.That(skillTarget.IsRecycled, Is.False, "Borrowed skill TargetPack must remain owned by the skill state.");
+            }
+            finally
+            {
+                if (!skillTarget.IsRecycled)
+                    skillTarget.ForcePushToPool();
+                ReleaseSequence(sequence);
+            }
+        }
+
+        [Test]
+        public void SupportCleanup_DoesNotRecyclePackFromANewerRental()
+        {
+            ESOpSupport support = ESOpSupport.Rent();
+            ESRuntimeTargetPack firstRental = support.RentTargetPack();
+            long firstVersion = firstRental.Version;
+            ESRuntimeTargetPack reused = null;
+
+            try
+            {
+                Assert.That(ESRuntimeTargetPack.TryReturnOwned(firstRental, firstVersion), Is.True);
+                reused = ESRuntimeTargetPack.Pool.GetInPool();
+                Assert.That(reused, Is.SameAs(firstRental));
+
+                support.ClearActivationRuntime();
+
+                Assert.That(reused.IsRecycled, Is.False,
+                    "A stale Support ownership record must not recycle a newer rental of the same Pack instance.");
+            }
+            finally
+            {
+                if (reused != null)
+                    ESRuntimeTargetPack.TryReturnOwned(reused, reused.Version);
+                support.TryAutoPushedToPool();
+            }
+        }
+
+        [Test]
+        public void OperationClipExit_DoesNotRecyclePackFromANewerRental()
+        {
+            var clip = new SkillTrackClip_Operation
+            {
+                op = new StopProbeOperation(false),
+                clipTargetSourceMode = ClipRuntimeTargetSourceMode.NewEmpty
+            };
+            var player = new SkillOperationClipRuntimePlayer(clip, 0);
+            var clipState = new SkillRuntimeClipState();
+            ESRuntimeTargetPack reused = null;
+
+            player.OnClipEnter(null, ref clipState);
+            object runtimeState = clipState.UserData;
+            FieldInfo targetField = runtimeState.GetType().GetField("target", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            FieldInfo versionField = runtimeState.GetType().GetField("targetVersion", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var firstRental = targetField?.GetValue(runtimeState) as ESRuntimeTargetPack;
+            long firstVersion = versionField != null ? (long)versionField.GetValue(runtimeState) : -1L;
+
+            try
+            {
+                Assert.That(firstRental, Is.Not.Null);
+                Assert.That(ESRuntimeTargetPack.TryReturnOwned(firstRental, firstVersion), Is.True);
+                reused = ESRuntimeTargetPack.Pool.GetInPool();
+                Assert.That(reused, Is.SameAs(firstRental));
+
+                player.OnClipExit(null, ref clipState);
+
+                Assert.That(reused.IsRecycled, Is.False,
+                    "A stale Clip runtime state must not recycle a newer rental of the same Pack instance.");
+            }
+            finally
+            {
+                if (reused != null)
+                    ESRuntimeTargetPack.TryReturnOwned(reused, reused.Version);
+            }
+        }
+
+        private static EntityState_Skill PrepareState(SkillProcessTrackSequence sequence)
+        {
+            var state = new EntityState_Skill();
+            state.SetSkillSequence(sequence);
+            Invoke(state, "PrepareRuntimeIfNeeded");
+            Invoke(state, "ResetRuntimeStates");
+            return state;
+        }
+
+        private static SkillProcessTrackSequence CreateSequence(params ProbeTrack[] tracks)
+        {
+            var sequence = new SkillProcessTrackSequence();
+            for (int i = 0; i < tracks.Length; i++)
+                sequence.tracks_.Add(tracks[i]);
+            return sequence;
+        }
+
+        private static void ReleaseSequence(SkillProcessTrackSequence sequence)
+        {
+            SkillSequenceRuntimeCache.Invalidate(sequence);
+        }
+
+        private static void Invoke(EntityState_Skill state, string methodName, params object[] arguments)
+        {
+            MethodInfo method = typeof(EntityState_Skill).GetMethod(methodName, PrivateInstance);
+            Assert.That(method, Is.Not.Null, "Missing lifecycle method: " + methodName);
+            method.Invoke(state, arguments);
+        }
+
+        private static void SetPrivateField(EntityState_Skill state, string fieldName, object value)
+        {
+            FieldInfo field = typeof(EntityState_Skill).GetField(fieldName, PrivateInstance);
+            Assert.That(field, Is.Not.Null, "Missing runtime field: " + fieldName);
+            field.SetValue(state, value);
+        }
+
+        private sealed class ProbeTrack : SkillTrackItem<ProbeClip>, ISkillRuntimeTrackCompiler
+        {
+            private readonly ProbeTrackPlayer player;
+
+            public ProbeTrack(ProbeTrackPlayer player, params ProbeClip[] clips)
+            {
+                this.player = player;
+                if (clips != null)
+                    this.clips.AddRange(clips);
+            }
+
+            public ISkillRuntimeTrackPlayer CreateRuntimeTrackPlayer(SkillRuntimeBuildContext context)
+            {
+                return player;
+            }
+        }
+
+        private sealed class ProbeClip : SkillTrackClip, ISkillRuntimeClipCompiler
+        {
+            private readonly ProbeClipPlayer player;
+
+            public ProbeClip(ProbeClipPlayer player, float start, float duration)
+            {
+                this.player = player;
+                startTime = start;
+                durationTime = duration;
+            }
+
+            public ISkillRuntimeClipPlayer CreateRuntimeClipPlayer(SkillRuntimeBuildContext context)
+            {
+                return player;
+            }
+        }
+
+        private sealed class ProbeTrackPlayer : ISkillRuntimeTrackPlayer
+        {
+            public bool ThrowOnEnter;
+            public bool ThrowOnExit;
+            public bool UseSkillTargetAsUserData;
+            public int EnterCount;
+            public int ExitCount;
+            public int TickCount;
+
+            public void OnSkillEnter(EntityState_Skill state, ref SkillRuntimeTrackState trackState)
+            {
+                EnterCount++;
+                if (UseSkillTargetAsUserData)
+                    trackState.UserData = state != null ? state.SkillRuntimeTarget : null;
+                if (ThrowOnEnter)
+                    throw new InvalidOperationException("Probe Track Enter failure.");
+            }
+
+            public void Tick(EntityState_Skill state, ref SkillRuntimeTrackState trackState, float time, float deltaTime)
+            {
+                TickCount++;
+            }
+
+            public void OnSkillExit(EntityState_Skill state, ref SkillRuntimeTrackState trackState)
+            {
+                ExitCount++;
+                if (ThrowOnExit)
+                    throw new InvalidOperationException("Probe Track Exit failure.");
+            }
+        }
+
+        private sealed class ProbeClipPlayer : ISkillRuntimeClipPlayer
+        {
+            public bool ThrowOnEnter;
+            public bool ThrowOnExit;
+            public IPoolableAuto UserDataOnEnter;
+            public int EnterCount;
+            public int ExitCount;
+
+            public void OnClipEnter(EntityState_Skill state, ref SkillRuntimeClipState clipState)
+            {
+                EnterCount++;
+                clipState.UserData = UserDataOnEnter;
+                if (ThrowOnEnter)
+                    throw new InvalidOperationException("Probe Clip Enter failure.");
+            }
+
+            public void Tick(EntityState_Skill state, ref SkillRuntimeClipState clipState, float time, float deltaTime)
+            {
+            }
+
+            public void OnClipExit(EntityState_Skill state, ref SkillRuntimeClipState clipState)
+            {
+                ExitCount++;
+                if (ThrowOnExit)
+                    throw new InvalidOperationException("Probe Clip Exit failure.");
+            }
+        }
+
+        private sealed class ProbePoolable : ISkillRuntimeOwnedUserData
+        {
+            public bool IsRecycled { get; set; }
+
+            public void OnResetAsPoolable()
+            {
+            }
+
+            public void TryAutoPushedToPool()
+            {
+                OnResetAsPoolable();
+                IsRecycled = true;
+            }
+        }
+
+        private sealed class ThrowingStopOperation : ESOutputOp
+        {
+            public override bool NeedsStop => true;
+
+            protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+            {
+            }
+
+            protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+            {
+                throw new InvalidOperationException("Probe Operation Stop failure.");
+            }
+        }
+
+        private sealed class StopProbeOperation : ESOutputOp
+        {
+            private readonly bool needsStop;
+
+            public StopProbeOperation(bool needsStop)
+            {
+                this.needsStop = needsStop;
+            }
+
+            public int StopCount { get; private set; }
+            public override bool NeedsStop => needsStop;
+
+            protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+            {
+            }
+
+            protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+            {
+                StopCount++;
+            }
+        }
+    }
+}

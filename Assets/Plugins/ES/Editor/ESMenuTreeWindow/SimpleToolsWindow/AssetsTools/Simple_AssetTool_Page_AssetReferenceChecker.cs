@@ -19,12 +19,12 @@ namespace ES
 {
     #region 资源引用检查工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_AssetReferenceChecker : ESWindowPageBase
     {
-        [Title("资产引用检查与清理工具", "分析资源依赖关系，标记疑似未使用资产并提供安全隔离", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         [InfoBox("分析结果用于辅助判断，不会直接永久删除资源。清理会先移动到隔离区，确认项目正常后再手动删除。", InfoMessageType.Info)]
-        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        [DisplayAsString(fontSize: 13), HideLabel]
         public string readMe = "选择检查范围，先分析引用，再人工确认。\n疑似未使用资源默认只隔离，不直接删除。";
 
         private string PanelSummary
@@ -42,52 +42,52 @@ namespace ES
         }
 
         #region 基础设置
-        [TabGroup("检查配置", "目标设置")]
+        [ESEditorSection("目标设置", subtitle: "确定扫描范围和排除规则。")]
         [LabelText("检查范围"), FolderPath, Space(5)]
         [InfoBox("选择要分析的文件夹范围。建议从Assets根目录开始以获得完整分析。")]
         public string checkFolder = "Assets";
 
-        [TabGroup("检查配置", "目标设置")]
+        [ESEditorSection("目标设置", subtitle: "确定扫描范围和排除规则。")]
         [LabelText("排除文件夹"), FolderPath(AbsolutePath = false), Space(5)]
         [InfoBox("排除不需要检查的文件夹，如ThirdParty、Plugins等。")]
         public List<string> excludeFolders = new List<string> { "Assets/Plugins", "Assets/Editor" };
 
-        [TabGroup("检查配置", "目标设置")]
+        [ESEditorSection("目标设置", subtitle: "确定扫描范围和排除规则。")]
         [LabelText("包含文件类型"), Space(5)]
         [InfoBox("指定要检查的文件类型。留空则检查所有类型。")]
         public List<string> includeExtensions = new List<string>();
 
-        [TabGroup("检查配置", "目标设置")]
+        [ESEditorSection("目标设置", subtitle: "确定扫描范围和排除规则。")]
         [LabelText("排除文件类型"), Space(5)]
         [InfoBox("排除不需要检查的文件类型，如 .meta、.cs、.txt、.md 等。")]
         public List<string> excludeExtensions = new List<string> { ".meta", ".cs", ".js", ".dll", ".txt", ".md" };
 
-        [TabGroup("检查配置", "资源包分离")]
+        [ESEditorSection("资源包分离", subtitle: "定义包根目录和已知入口，先分析再隔离。")]
         [LabelText("导入包根目录"), FolderPath(AbsolutePath = false), Space(5)]
         [InfoBox("填导入的大资源包目录，例如 Assets/ArtPack。工具只会在这个目录内部筛选候选资源。")]
         public string packageRootFolder = "Assets";
 
-        [TabGroup("检查配置", "资源包分离")]
+        [ESEditorSection("资源包分离", subtitle: "定义包根目录和已知入口，先分析再隔离。")]
         [LabelText("已使用入口路径"), Space(5)]
         [InfoBox("可手填路径。更推荐使用下面的“已使用入口资产”直接拖资源。")]
         public List<string> packageUsedEntryPaths = new List<string>();
 
-        [TabGroup("检查配置", "资源包分离")]
+        [ESEditorSection("资源包分离", subtitle: "定义包根目录和已知入口，先分析再隔离。")]
         [LabelText("已使用入口资产"), Space(5)]
         [InfoBox("拖入你确认会用的 Prefab、Scene、材质、模型、配置，或资源包里的文件夹。工具会保留入口和它们依赖到的资源。")]
         public List<UnityEngine.Object> packageUsedEntryAssets = new List<UnityEngine.Object>();
 
-        [TabGroup("检查配置", "资源包分离")]
+        [ESEditorSection("资源包分离", subtitle: "定义包根目录和已知入口，先分析再隔离。")]
         [LabelText("保护包内入口资产")]
         [InfoBox("开启后，入口路径本身一定保留，不会被列入疑似未使用。")]
         public bool packageProtectEntryAssets = true;
 
-        [TabGroup("检查配置", "安全保护")]
+        [ESEditorSection("安全保护", subtitle: "保护入口和关键路径，避免误隔离资源。")]
         [LabelText("保护入口资产"), Space(5)]
         [InfoBox("开启后，Resources、StreamingAssets、Editor Default Resources、Addressables配置、场景、Prefab、脚本等入口资产不会进入隔离候选。")]
         public bool protectEntryAssets = true;
 
-        [TabGroup("检查配置", "安全保护")]
+        [ESEditorSection("安全保护", subtitle: "保护入口和关键路径，避免误隔离资源。")]
         [LabelText("额外保护路径"), FolderPath(AbsolutePath = false), Space(5)]
         public List<string> protectedFolders = new List<string>
         {
@@ -99,51 +99,51 @@ namespace ES
         #endregion
 
         #region 高级选项
-        [TabGroup("检查配置", "高级选项")]
+        [ESEditorSection("高级选项", subtitle: "低频配置，默认后置；修改后需要重新执行分析。")]
         [LabelText("启用深度分析"), Space(5)]
         [InfoBox("深度分析模式：检查所有引用链，包括间接引用。准确但较慢。")]
         public bool deepAnalysis = true;
 
-        [TabGroup("检查配置", "高级选项")]
+        [ESEditorSection("高级选项", subtitle: "低频配置，默认后置；修改后需要重新执行分析。")]
         [LabelText("检查场景引用"), Space(5)]
         [InfoBox("分析场景文件中的引用关系。")]
         public bool checkScenes = true;
 
-        [TabGroup("检查配置", "高级选项")]
+        [ESEditorSection("高级选项", subtitle: "低频配置，默认后置；修改后需要重新执行分析。")]
         [LabelText("检查预制件引用"), Space(5)]
         [InfoBox("分析预制件文件中的引用关系。")]
         public bool checkPrefabs = true;
 
-        [TabGroup("检查配置", "高级选项")]
+        [ESEditorSection("高级选项", subtitle: "低频配置，默认后置；修改后需要重新执行分析。")]
         [LabelText("检查脚本引用"), Space(5)]
         [InfoBox("分析脚本中的资源引用（通过AssetDatabase）。")]
         public bool checkScripts = true;
 
-        [TabGroup("检查配置", "高级选项")]
+        [ESEditorSection("高级选项", subtitle: "低频配置，默认后置；修改后需要重新执行分析。")]
         [LabelText("启用缓存优化"), Space(5)]
         [InfoBox("使用缓存机制提升重复检查的性能。")]
         public bool useCache = true;
 
-        [TabGroup("检查配置", "高级选项")]
+        [ESEditorSection("高级选项", subtitle: "低频配置，默认后置；修改后需要重新执行分析。")]
         [LabelText("内存优化模式"), Space(5)]
         [InfoBox("在大项目中启用以减少内存使用，但会略微降低性能。")]
         public bool memoryOptimization = false;
         #endregion
 
         #region 结果显示
-        [TabGroup("分析结果", "疑似未使用")]
+        [ESEditorSection("疑似未使用", subtitle: "查看对应分析结果并进行复核。")]
         [HideInInspector]
         public List<AssetReferenceInfo> unusedAssets = new List<AssetReferenceInfo>();
 
         private string UnusedStats => $"总文件数: {totalFilesChecked}, 疑似未使用: {unusedAssets.Count}, 结果状态: {GetScanStateText()}";
 
-        [TabGroup("分析结果", "引用分析")]
+        [ESEditorSection("引用分析", subtitle: "查看对应分析结果并进行复核。")]
         [HideInInspector]
         public List<AssetReferenceInfo> selectedAssetReferences = new List<AssetReferenceInfo>();
 
         private string ReferenceStats => $"直接引用: {selectedAssetReferences.Count(r => !r.IsIndirect)}, 间接引用: {selectedAssetReferences.Count(r => r.IsIndirect)}";
 
-        [TabGroup("分析结果", "依赖分析")]
+        [ESEditorSection("依赖分析", subtitle: "查看对应分析结果并进行复核。")]
         [HideInInspector]
         public List<AssetReferenceInfo> selectedAssetDependencies = new List<AssetReferenceInfo>();
 
@@ -178,7 +178,7 @@ namespace ES
             [DisplayAsString, LabelWidth(90), HorizontalGroup("AssetMeta")]
             public string Reason;
 
-            [HorizontalGroup("AssetInfo", 50), Button("📂", ButtonHeight = 20), GUIColor(0.4f, 0.8f, 1f)]
+            [HorizontalGroup("AssetInfo", 50), Button("📂", ButtonHeight = 20)]
             public void JumpToAsset()
             {
                 var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AssetPath);
@@ -278,7 +278,7 @@ namespace ES
         private void DrawAssetReferenceWorkbench()
         {
             DrawWorkbenchHeader();
-            DrawQuickSettings();
+            DrawTargetSnapshot();
             DrawWorkflowActions();
             DrawResultDashboard();
             DrawResultFilters();
@@ -287,20 +287,17 @@ namespace ES
 
         private void DrawWorkbenchHeader()
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-            {
-                EditorGUILayout.LabelField("资源引用体检台", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("先确认扫描范围和当前选中资源，再执行引用、依赖、未使用或资源包分离分析。所有清理只进入隔离区，不会直接永久删除。", EditorStyles.wordWrappedMiniLabel);
-                EditorGUILayout.Space(4);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    DrawMetric("检查范围", checkFolder);
-                    DrawMetric("已检查", totalFilesChecked.ToString());
-                    DrawMetric("疑似未用", unusedAssets.Count.ToString());
-                    DrawMetric("引用/依赖", $"{selectedAssetReferences.Count}/{selectedAssetDependencies.Count}");
-                    DrawMetric("状态", lastScanCanceled ? "结果不完整" : "可用");
-                }
-            }
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "资源引用体检台",
+                "先确认扫描范围和当前选中资源，再执行引用、依赖、未使用或资源包分离分析。",
+                SimpleToolsMaturity.Upgrading,
+                "清理只进入隔离区，不会直接永久删除资源；分析结果仍需人工复核。");
+            SimpleToolsPanelUtility.DrawSummary(
+                $"检查范围: {checkFolder}",
+                $"已检查: {totalFilesChecked}",
+                $"疑似未用: {unusedAssets.Count}",
+                $"引用/依赖: {selectedAssetReferences.Count}/{selectedAssetDependencies.Count}",
+                $"结果状态: {(lastScanCanceled ? "不完整" : "可用")}");
         }
 
         private void DrawTargetSnapshot()
@@ -310,7 +307,7 @@ namespace ES
             bool hasSelectedAsset = selected != null && IsValidAssetFile(selectedPath);
 
             SimpleToolsPanelUtility.DrawSectionTitle("当前选择", "这里决定引用/依赖分析的目标，也说明未使用扫描会覆盖哪些范围。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 DrawInfoRow("扫描文件夹", checkFolder);
                 DrawInfoRow("排除文件夹", excludeFolders.Count == 0 ? "无" : string.Join(", ", excludeFolders));
@@ -335,31 +332,10 @@ namespace ES
             }
         }
 
-        private void DrawQuickSettings()
-        {
-            foldoutQuickSettings = EditorGUILayout.Foldout(foldoutQuickSettings, "常用设置", true);
-            if (!foldoutQuickSettings)
-                return;
-
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-            {
-                checkFolder = EditorGUILayout.TextField("扫描范围", checkFolder);
-                packageRootFolder = EditorGUILayout.TextField("资源包根目录", packageRootFolder);
-
-                deepAnalysis = EditorGUILayout.Toggle("深度分析", deepAnalysis);
-                protectEntryAssets = EditorGUILayout.Toggle("保护入口", protectEntryAssets);
-                useCache = EditorGUILayout.Toggle("缓存优化", useCache);
-                memoryOptimization = EditorGUILayout.Toggle("低内存", memoryOptimization);
-                checkScenes = EditorGUILayout.Toggle("检查场景", checkScenes);
-                checkPrefabs = EditorGUILayout.Toggle("检查 Prefab", checkPrefabs);
-                checkScripts = EditorGUILayout.Toggle("检查脚本", checkScripts);
-            }
-        }
-
         private void DrawWorkflowActions()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("执行分析", "四个入口对应四种明确问题：哪些没用、谁在用它、它用到了谁、导入包哪些能剥离。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField(GetNextActionText(), EditorStyles.wordWrappedMiniLabel);
                 EditorGUILayout.Space(4);
@@ -408,7 +384,7 @@ namespace ES
                 return;
             }
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 if (!string.IsNullOrWhiteSpace(lastResultSummary))
                     EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
@@ -433,7 +409,7 @@ namespace ES
                 return;
 
             SimpleToolsPanelUtility.DrawSectionTitle("结果筛选", "搜索会匹配路径、文件名、置信度和判断原因。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -479,7 +455,7 @@ namespace ES
         private bool DrawAssetTableFoldout(string title, List<AssetReferenceInfo> assetList, ref int currentPage, bool foldout, string emptyHint)
         {
             EditorGUILayout.Space(4);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 int filteredCount = CountFilteredAssets(assetList);
                 string countText = filteredCount == assetList.Count ? assetList.Count.ToString() : $"{filteredCount}/{assetList.Count}";
@@ -514,7 +490,7 @@ namespace ES
             if (candidates.Count == 0)
                 return;
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField("候选聚类", EditorStyles.boldLabel);
                 DrawInfoRow("按类型", BuildTopExtensionSummary(candidates, 6));
@@ -839,7 +815,6 @@ namespace ES
         private bool foldoutUnused = true;
         private bool foldoutReferences = true;
         private bool foldoutDependencies = true;
-        private bool foldoutQuickSettings = true;
         private int pageSize = 10;
         private int currentPageUnused = 0;
         private int currentPageReferences = 0;

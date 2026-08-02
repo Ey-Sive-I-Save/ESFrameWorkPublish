@@ -17,6 +17,7 @@ namespace ES
 
     #region 动画器批量设置工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_AnimationBatchSetting : ESWindowPageBase
     {
         [Serializable]
@@ -71,9 +72,8 @@ namespace ES
             }
         }
         #region 公共设置
-        [Title("动画器批量设置工具", "批量设置Animator属性", bold: true, titleAlignment: TitleAlignments.Centered)]
 
-        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        [DisplayAsString(fontSize: 13), HideLabel]
         public string readMe = "选择带有Animator的GameObject，\n设置动画属性，\n点击应用按钮批量修改";
 
         private string PanelSummary
@@ -198,26 +198,23 @@ namespace ES
                 return animator != null && animator.runtimeAnimatorController == null;
             });
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-            {
-                EditorGUILayout.LabelField("Animator 批量配置与资产生成台", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("用于批量添加 Animator、配置 Controller、创建 Controller/Clip，并在执行前复核对象、策略和风险。", EditorStyles.wordWrappedMiniLabel);
-                EditorGUILayout.Space(4);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    DrawMetric("目标对象", targets.Count.ToString());
-                    DrawMetric("已有Animator", animatorCount.ToString());
-                    DrawMetric("缺Animator", noAnimator.ToString());
-                    DrawMetric("空Controller", nullController.ToString());
-                    DrawMetric("新建资产", createdAssetRecords.Count.ToString());
-                }
-            }
+            SimpleToolsPanelUtility.DrawToolHeader(
+                "Animator 批量配置与资产生成台",
+                "用于批量添加 Animator、配置 Controller、创建 Controller/Clip，并在执行前复核对象、策略和风险。",
+                SimpleToolsMaturity.Upgrading,
+                "可能修改场景对象并创建 Controller/Clip 资产；必须先复核预览结果。");
+            SimpleToolsPanelUtility.DrawSummary(
+                $"目标对象: {targets.Count}",
+                $"已有 Animator: {animatorCount}",
+                $"缺 Animator: {noAnimator}",
+                $"空 Controller: {nullController}",
+                $"新建资产: {createdAssetRecords.Count}");
         }
 
         private void DrawAnimatorTargetPanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("目标范围", "从当前 Hierarchy 选中对象收集目标，可递归子对象。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 includeChildren = EditorGUILayout.Toggle("包含子对象", includeChildren);
                 addAnimatorIfMissing = EditorGUILayout.Toggle("缺少 Animator 时自动添加", addAnimatorIfMissing);
@@ -229,7 +226,7 @@ namespace ES
         private void DrawAnimatorControllerPanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("Controller 策略", "指定已有 Controller，或在目标缺失时选择创建策略。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 animatorController = (RuntimeAnimatorController)EditorGUILayout.ObjectField("指定 Controller", animatorController, typeof(RuntimeAnimatorController), false);
                 controllerNullAction = (ControllerNullAction)EditorGUILayout.Popup("缺失 Controller", (int)controllerNullAction, ControllerNullActionLabels);
@@ -240,7 +237,7 @@ namespace ES
         private void DrawAnimatorClipPanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("Controller 策略", "决定对象没有 Controller 时如何处理。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 defaultAnimationClip = (AnimationClip)EditorGUILayout.ObjectField("默认 Clip", defaultAnimationClip, typeof(AnimationClip), false);
                 clipNullAction = (ClipNullAction)EditorGUILayout.Popup("缺失 Clip", (int)clipNullAction, ClipNullActionLabels);
@@ -252,7 +249,7 @@ namespace ES
         private void DrawAnimatorPropertyPanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("Animator 属性", "仅在启用后批量修改 UpdateMode、CullingMode 和 RootMotion。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 enableApplySettings = EditorGUILayout.Toggle("启用属性批量设置", enableApplySettings);
                 GUI.enabled = enableApplySettings;
@@ -266,7 +263,7 @@ namespace ES
         private void DrawAnimatorPreviewActions()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("预览与执行", "高风险操作都先生成预览，再按当前选择执行。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -307,7 +304,7 @@ namespace ES
 
             var rows = GetFilteredAnimatorPreview(false);
             SimpleToolsPanelUtility.DrawSectionTitle("预览与执行", "高风险操作都先生成预览，再按当前选择执行。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 DrawInfoRow("Animator", $"已有 {rows.Count(r => r.HasAnimator)} | 缺少 {rows.Count(r => !r.HasAnimator)}");
                 DrawInfoRow("Controller", GetControllerCountSummary(rows));
@@ -322,7 +319,7 @@ namespace ES
                 return;
 
             SimpleToolsPanelUtility.DrawSectionTitle("结果筛选", "搜索对象路径、当前 Controller、策略和风险。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -348,7 +345,7 @@ namespace ES
                 return;
 
             var rows = GetFilteredAnimatorPreview(true);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField($"Animator 预览表  ({rows.Count}/{animatorPreview.Count})", EditorStyles.boldLabel);
                 if (rows.Count == 0)
@@ -401,7 +398,7 @@ namespace ES
                 return;
 
             SimpleToolsPanelUtility.DrawSectionTitle("资产创建记录", "记录 Controller / Clip 创建路径和来源策略。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 foreach (var record in createdAssetRecords.Take(10))
                     DrawInfoRow(record.assetType, $"{record.assetPath} | {record.source}");
@@ -417,7 +414,7 @@ namespace ES
                 return;
             }
 
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 EditorGUILayout.LabelField(lastResultSummary, EditorStyles.boldLabel);
                 if (!string.IsNullOrWhiteSpace(lastResultDetail))

@@ -50,7 +50,8 @@ namespace ES
         [InspectorName("字体")] Font,
         [InspectorName("视频")] Video,
         [InspectorName("文本")] TextAsset,
-        [InspectorName("其他")] Other
+        [InspectorName("其他")] Other,
+        [InspectorName("Raw 二进制")] Raw
     }
 
     /// <summary>
@@ -77,7 +78,8 @@ namespace ES
         [InspectorName("Playable")] PlayableAsset,
         [InspectorName("ScriptableObject")] ScriptableObject,
         [InspectorName("地形数据")] TerrainData,
-        [InspectorName("其他")] Other
+        [InspectorName("其他")] Other,
+        [InspectorName("Raw 二进制")] Raw
     }
 
     /// <summary>
@@ -250,7 +252,7 @@ namespace ES
             else if (asset is UnityEngine.Video.VideoClip)
                 return ESAssetCategory.Video;
             else if (asset is TextAsset)
-                return ESAssetCategory.TextAsset;
+                return ESAssetCategory.Raw;
 
             return ESAssetCategory.Other;
         }

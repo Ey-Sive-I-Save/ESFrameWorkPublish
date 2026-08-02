@@ -17,9 +17,12 @@ namespace ES
 
         public override void Invoke()
         {
-            ESRuntimeModeService service = ESCommandServices.RuntimeMode;
-            if (service != null)
-                service.PushMode(mode);
+            RejectLegacyCommand(CommandName);
+        }
+
+        internal static void RejectLegacyCommand(string commandName)
+        {
+            UnityEngine.Debug.LogWarning("RuntimeMode ESCommand 已冻结，拒绝执行无实例所有权的命令：" + commandName);
         }
     }
 
@@ -37,19 +40,7 @@ namespace ES
 
         public override void Invoke()
         {
-            ESRuntimeModeService service = ESCommandServices.RuntimeMode;
-            if (service == null)
-                return;
-
-            for (int i = service.ModeCount - 1; i >= 0; i--)
-            {
-                ESRuntimeModeEntry entry = service.GetModeEntryAt(i);
-                if (entry.mode == mode)
-                {
-                    service.RemoveMode(entry.handle);
-                    return;
-                }
-            }
+            ESCommand_RuntimeMode_PushMode.RejectLegacyCommand(CommandName);
         }
     }
 
@@ -64,9 +55,7 @@ namespace ES
 
         public override void Invoke()
         {
-            ESRuntimeModeService service = ESCommandServices.RuntimeMode;
-            if (service != null)
-                service.PopTopMode();
+            ESCommand_RuntimeMode_PushMode.RejectLegacyCommand(CommandName);
         }
     }
 
@@ -84,9 +73,7 @@ namespace ES
 
         public override void Invoke()
         {
-            ESRuntimeModeService service = ESCommandServices.RuntimeMode;
-            if (service != null)
-                service.AddTag(tag);
+            ESCommand_RuntimeMode_PushMode.RejectLegacyCommand(CommandName);
         }
     }
 
@@ -104,19 +91,7 @@ namespace ES
 
         public override void Invoke()
         {
-            ESRuntimeModeService service = ESCommandServices.RuntimeMode;
-            if (service == null)
-                return;
-
-            for (int i = service.TagCount - 1; i >= 0; i--)
-            {
-                ESRuntimeModeTagEntry entry = service.GetTagEntryAt(i);
-                if (entry.tag == tag)
-                {
-                    service.RemoveTag(entry.handle);
-                    return;
-                }
-            }
+            ESCommand_RuntimeMode_PushMode.RejectLegacyCommand(CommandName);
         }
     }
 
@@ -131,9 +106,7 @@ namespace ES
 
         public override void Invoke()
         {
-            ESRuntimeModeService service = ESCommandServices.RuntimeMode;
-            if (service != null)
-                service.Clear();
+            ESCommand_RuntimeMode_PushMode.RejectLegacyCommand(CommandName);
         }
     }
 }

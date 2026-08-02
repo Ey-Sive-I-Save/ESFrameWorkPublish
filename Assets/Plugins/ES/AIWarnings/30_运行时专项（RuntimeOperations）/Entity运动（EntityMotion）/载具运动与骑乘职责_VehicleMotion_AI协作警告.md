@@ -4,13 +4,13 @@
 
 ## 结论
 
-`VehicleController` 是载具根的唯一运动权威；`EntityMountable` 只是座位、骑手对齐、武器挂点和驾驶输入转交器。两者不合并，也不向角色 Prefab 固定组件表扩散。
+`VehicleController` 是可移动载具根的唯一运动权威；`EntityMountable` 只是座位、骑手对齐、武器挂点和驾驶输入转交器。乘客座与静态骑乘点不强制挂 Controller，只有驾驶座按需引用父级 Controller。两者不合并，也不向角色 Prefab 固定组件表扩散。
 
 ```text
 玩家/AI/网络控制权
   -> Entity 输入与骑乘状态
   -> EntityMountable.SubmitDriverInput
-  -> VehicleController.SetDriverInput
+  -> VehicleController.SubmitDriverInput(seat, driver, ...)
   -> 载具运动调度
   -> Rigidbody FixedUpdate 或 KCC 回调
 
@@ -21,7 +21,7 @@ Entity KCC
 ## 组件职责
 
 - `VehicleController`：选择并验证 Rigidbody/KCC 后端，保存已仲裁的驾驶意图，调度车辆能力，提交最终旋转和速度。
-- `EntityMountable`：维护单一 rider、座位 `matchPoint`、武器挂点、骑手同步和输入转交；不得计算或写入载具物理。
+- `EntityMountable`：维护单一 rider、座位 `matchPoint`、武器挂点与骑手同步；仅 `allowInput` 的驾驶座转交输入，乘客座可没有 Controller；不得计算或写入载具物理。它必须位于可命中 Collider 的同节点或祖先节点；原型的根节点持有该组件，`DriverSeat` 子节点只是匹配点。
 - `EntityBasicMountModule`：仅管理骑乘状态、MatchTarget 和玩家输入采样；其 KCC 回调只接管骑手，绝不接管载具。
 - 车辆专用能力：按需实现 `IVehicleBeforeMotion`、`IVehicleRotationMotion`、`IVehicleVelocityMotion`、`IVehicleAfterMotion`，注册到载具自身的 `ESWorkScheduler`。
 
@@ -31,7 +31,10 @@ Entity KCC
 - 车辆调度接口只传 `VehicleController` 和候选值。能力可修改候选旋转/速度，但只有 Controller 提交最终结果。
 - Rigidbody 载具在 `FixedUpdate` 写 `Rigidbody.MoveRotation` 与 `Rigidbody.velocity`；KCC 载具只在 `ICharacterController` 回调内写 `ref currentRotation` / `ref currentVelocity`。
 - 禁止座位、镜头、武器、动画事件、AI 或网络补丁直接写载具 `Transform`、`Rigidbody`、`KinematicCharacterMotor`。
-- 每个物理步只能有一个已仲裁的输入来源。`SetDriverInput` 是最终输入入口，不负责裁决多个驾驶者、AI 或网络命令的优先级。
+- 每个物理步只能有一个已仲裁的输入来源。座位输入只能经 `SubmitDriverInput(seat, driver, ...)` 进入 Controller；无来源 `SetDriverInput` 不能覆盖当前驾驶座。
+- 输入路由被禁用、Tag 条件失效或快照超过一帧未刷新时必须清空驾驶意图，禁止继续消费最后一帧方向。
+- KCC 后端在 Controller 禁用时解绑，在启用时重绑；四个 KCC 运动回调和 Rigidbody 固定步均以 `IsReady` 为前提。
+- 调度器遍历必须使用 `TryGetAlive`；单个车辆能力异常只能记录并跳过，不能阻断后续能力和本帧物理提交。
 
 ## 后端选择
 

@@ -48,6 +48,7 @@ namespace ES
             new PlanField("materials", ESAssetReferKind.Material, "Material"),
             new PlanField("meshes", ESAssetReferKind.Mesh, "Mesh"),
             new PlanField("textures", ESAssetReferKind.Texture, "Texture"),
+            new PlanField("rawAssets", ESAssetReferKind.Raw, "Raw"),
             new PlanField("texture2Ds", ESAssetReferKind.Texture2D, "Texture2D"),
             new PlanField("spriteAtlases", ESAssetReferKind.SpriteAtlas, "SpriteAtlas"),
             new PlanField("avatars", ESAssetReferKind.Avatar, "Avatar"),
@@ -428,7 +429,7 @@ namespace ES
             string planPath = Path.Combine(ESAssetPipelineIO.PlanRoot(platform), ESAssetPipelineIO.PlanFileName);
             cachedPlanReady = File.Exists(planPath);
             cachedManifestCount = CountPipelineFiles(ESAssetPipelineIO.StagingRoot(platform), ESAssetPipelineIO.BundleManifestFileName);
-            string publishedRoot = Path.Combine(ESAssetPipelineIO.ProjectRoot, "ES", "Published", "LocalTest", platform);
+            string publishedRoot = ESAssetPipelineIO.LocalTestRoot(platform);
             cachedPublished = File.Exists(Path.Combine(publishedRoot, ESAssetPipelineIO.ReleaseManifestFileName));
             stageStatusExpiresAt = now + 2d;
         }

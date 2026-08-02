@@ -119,6 +119,7 @@ namespace ES
         private readonly ESGlobalAssetRuntimeMap runtimeMap;
         private readonly IESRuntimeAssetBundleProvider assetBundleProvider;
         private readonly IESRuntimeDirectAssetProvider directAssetProvider;
+        private readonly bool requireRuntimeMapIdentity;
         private readonly ESRuntimeRetryPolicy retry;
         private readonly Dictionary<string, AssetBundleLease> assetBundles = new Dictionary<string, AssetBundleLease>(StringComparer.Ordinal);
         private readonly Dictionary<ESAssetIdentity, UnityEngine.Object> cachedObjects = new Dictionary<ESAssetIdentity, UnityEngine.Object>();
@@ -143,12 +144,13 @@ namespace ES
         public UniTask WaitForPendingOperationsAsync(CancellationToken cancellationToken = default)
             => UniTask.WaitUntil(() => !HasPendingOperations, cancellationToken: cancellationToken);
 
-        public ESRuntimeAssetLoader(ESGlobalAssetRuntimeMap globalRuntimeMap, IESRuntimeAssetBundleProvider provider, ESRuntimeRetryPolicy retryPolicy, IESRuntimeDirectAssetProvider directProvider = null)
+        public ESRuntimeAssetLoader(ESGlobalAssetRuntimeMap globalRuntimeMap, IESRuntimeAssetBundleProvider provider, ESRuntimeRetryPolicy retryPolicy, IESRuntimeDirectAssetProvider directProvider = null, bool requireRuntimeMapIdentity = false)
         {
             runtimeMap = globalRuntimeMap ? globalRuntimeMap : throw new ArgumentNullException(nameof(globalRuntimeMap), "[ESRes][RuntimeMap] Global Runtime Map 不能为空。");
             if (provider == null && directProvider == null) throw new ArgumentNullException(nameof(provider), "[ESRes][Load] AssetBundle Provider 与 Direct Provider 不能同时为空。");
             assetBundleProvider = provider;
             directAssetProvider = directProvider;
+            this.requireRuntimeMapIdentity = requireRuntimeMapIdentity;
             retry = retryPolicy.MaxAttempts > 0 ? retryPolicy : ESRuntimeRetryPolicy.Default;
             runtimeMap.RebuildRuntimeIndex();
         }
@@ -171,10 +173,15 @@ namespace ES
         public async UniTask<ESRuntimeAssetHandle<T>> LoadMainAssetAsync<T>(ESAssetIdentity id, CancellationToken cancellationToken = default) where T : UnityEngine.Object
         {
             ThrowIfDisposed();
-            if (directAssetProvider != null) return await LoadDirectAsync<T>(id, cancellationToken);
+            if (directAssetProvider != null)
+            {
+                if (requireRuntimeMapIdentity && !runtimeMap.TryGetMainAsset(id.Guid, out _))
+                    throw new KeyNotFoundException($"[ESRes][SimulateBuild] 主资产 GUID 未登记：GUID={id.Guid}");
+                return await LoadDirectAsync<T>(id, cancellationToken);
+            }
             if (id.IsSubAsset) throw new ArgumentException("[ESRes][Load] 子资产身份必须使用 LoadSubAssetAsync。", nameof(id));
             if (!runtimeMap.TryGetMainAsset(id.Guid, out var record)) throw new KeyNotFoundException($"[ESRes][Load] 主资产 GUID 未登记：GUID={id.Guid}");
-            await AcquireAssetBundleTreeAsync(record.AssetBundleKey, id, new HashSet<string>(StringComparer.Ordinal), cancellationToken);
+            await AcquireAssetBundleTreeAsync(record.AssetBundleKey, id, cancellationToken);
             try
             {
                 var asset = await GetOrLoadAssetAsync<T>(id, record.AssetBundleKey, record.InternalName, cancellationToken);
@@ -190,11 +197,16 @@ namespace ES
         {
             ThrowIfDisposed();
             if (!id.IsSubAsset) throw new ArgumentException("[ESRes][SubAsset] 主资产身份必须使用 LoadMainAssetAsync。", nameof(id));
-            if (directAssetProvider != null) return await LoadDirectAsync<T>(id, cancellationToken);
+            if (directAssetProvider != null)
+            {
+                if (requireRuntimeMapIdentity && (!runtimeMap.TryGetSubAsset(new ESSubAssetId(id.Guid, id.LocalFileId), out _)))
+                    throw new KeyNotFoundException($"[ESRes][SimulateBuild] 子资产身份未登记：GUID={id.Guid}, LocalFileId={id.LocalFileId}");
+                return await LoadDirectAsync<T>(id, cancellationToken);
+            }
             var subAssetId = new ESSubAssetId(id.Guid, id.LocalFileId);
             if (!runtimeMap.TryGetSubAsset(subAssetId, out var sub) || string.IsNullOrEmpty(sub.AssetBundleKey))
                 throw new KeyNotFoundException($"[ESRes][SubAsset] 子资产身份或 BundleKey 未登记：GUID={subAssetId.Guid}, LocalFileId={subAssetId.LocalFileId}");
-            await AcquireAssetBundleTreeAsync(sub.AssetBundleKey, id, new HashSet<string>(StringComparer.Ordinal), cancellationToken);
+            await AcquireAssetBundleTreeAsync(sub.AssetBundleKey, id, cancellationToken);
             try
             {
                 var asset = await GetOrLoadSubAssetAsync<T>(id, sub.AssetBundleKey, sub.InternalName, sub.Selector, sub.TypeName, cancellationToken);
@@ -209,11 +221,13 @@ namespace ES
             if (id.IsSubAsset) throw new ArgumentException("[ESRes][Load] Scene 不能使用子资产身份。", nameof(id));
             if (directAssetProvider != null)
             {
+                if (requireRuntimeMapIdentity && !runtimeMap.TryGetMainAsset(id.Guid, out _))
+                    throw new KeyNotFoundException($"[ESRes][SimulateBuild] 场景 GUID 未登记：GUID={id.Guid}");
                 Scene directScene = await directAssetProvider.LoadSceneAsync(id, mode, cancellationToken);
                 return new ESRuntimeSceneHandle(this, id, string.Empty, directScene);
             }
             if (!runtimeMap.TryGetMainAsset(id.Guid, out ESRuntimeAssetRecord record)) throw new KeyNotFoundException($"[ESRes][Load] Scene GUID 未登记：GUID={id.Guid}");
-            await AcquireAssetBundleTreeAsync(record.AssetBundleKey, id, new HashSet<string>(StringComparer.Ordinal), cancellationToken);
+            await AcquireAssetBundleTreeAsync(record.AssetBundleKey, id, cancellationToken);
             try
             {
                 if (!assetBundles.TryGetValue(record.AssetBundleKey, out AssetBundleLease lease) || lease.Bundle == null)
@@ -492,12 +506,12 @@ namespace ES
             }
         }
 
-        private async UniTask AcquireAssetBundleTreeAsync(string assetBundleKey, ESAssetIdentity requestId, HashSet<string> guard, CancellationToken token)
+        private async UniTask AcquireAssetBundleTreeAsync(string assetBundleKey, ESAssetIdentity requestId, CancellationToken token)
         {
             var acquired = new List<string>();
             try
             {
-                await AcquireAssetBundleTreeCoreAsync(assetBundleKey, requestId, guard, acquired, token);
+                await AcquireAssetBundleTreeCoreAsync(assetBundleKey, requestId, null, acquired, token);
             }
             catch
             {
@@ -509,17 +523,19 @@ namespace ES
 
         private async UniTask AcquireAssetBundleTreeCoreAsync(string assetBundleKey, ESAssetIdentity requestId, HashSet<string> guard, List<string> acquired, CancellationToken token)
         {
-            if (!guard.Add(assetBundleKey)) throw new InvalidOperationException($"[ESRes][Load] AssetBundle 依赖循环：BundleKey={assetBundleKey}, RequestAssetId={requestId}");
+            if (guard != null && !guard.Add(assetBundleKey)) throw new InvalidOperationException($"[ESRes][Load] AssetBundle 依赖循环：BundleKey={assetBundleKey}, RequestAssetId={requestId}");
             try
             {
                 if (!runtimeMap.TryGetAssetBundle(assetBundleKey, out var record)) throw new KeyNotFoundException($"[ESRes][RuntimeMap] RuntimeMap 缺少 AssetBundle：BundleKey={assetBundleKey}, RequestAssetId={requestId}");
                 Report(requestId, ESRuntimeAssetLoadState.LoadingDependencies, .1f, 0, assetBundleKey);
                 var deps = record.Dependencies;
-                for (var i = 0; i < deps.Count; i++) await AcquireAssetBundleTreeCoreAsync(deps[i], requestId, guard, acquired, token);
+                if (deps != null && deps.Count > 0 && guard == null)
+                    guard = new HashSet<string>(StringComparer.Ordinal) { assetBundleKey };
+                for (var i = 0; deps != null && i < deps.Count; i++) await AcquireAssetBundleTreeCoreAsync(deps[i], requestId, guard, acquired, token);
                 await AcquireAssetBundleAsync(record, requestId, token);
                 acquired.Add(assetBundleKey);
             }
-            finally { guard.Remove(assetBundleKey); }
+            finally { guard?.Remove(assetBundleKey); }
         }
 
         private async UniTask AcquireAssetBundleAsync(ESRuntimeAssetBundleRecord record, ESAssetIdentity requestId, CancellationToken token)

@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using UnityEngine;
-
 namespace ES
 {
     /// <summary>
@@ -15,11 +12,5 @@ namespace ES
     public interface IOpStoreDictionary<TOperation, TValue, TFlag> : IOpStore
     {
         SafeDictionary<TOperation, TValue> GetFromOpStore(TFlag flag = default);
-    }
-
-    /// <summary>一对多分组形式的 Operation 存储。</summary>
-    public interface IOpStoreKeyGroup<TOperation, TValue, TFlag> : IOpStore
-    {
-        SafeKeyGroup<TOperation, TValue> GetFromOpStore(TFlag flag = default);
     }
 }

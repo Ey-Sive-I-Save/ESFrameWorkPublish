@@ -592,6 +592,80 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-013",
+                        "status":  "documented",
+                        "summary":  "整合当前工作区已形成的 ES 资源运行时、GameCore 数据、角色与交互、Buff/属性、技能与 Operation、载具、音频/剧情/相机、编辑器工作台和对应测试/规范，并把旧资源 V1 实现迁入 Obsolete。",
+                        "sourcePaths":  [
+                                            "Assets",
+                                            "Documentation",
+                                            "ESFrameWorkPublish.slnx"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/0_Stand/Tests",
+                                              "Assets/Plugins/ES/1_Design/Tests",
+                                              "Assets/Scripts/ESLogic/Tests",
+                                              "Assets/Scenes/Tests",
+                                              "Assets/Plugins/ES/AIWarnings",
+                                              "Documentation/DOCUMENTATION_CATALOG.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "该批是同一脏工作区中相互引用的工程功能收口：资源 V1 删除与 Obsolete 归档、新资源 Scope/Provider/发布链、GameCore Group/Info 契约、运行时模块、编辑器生成器、Prefab/Scene 和测试资产必须保持同批，避免中间提交产生缺失类型、丢失 meta 或序列化引用断裂。"
+                                     },
+                        "regression":  {
+                                           "status":  "not-run",
+                                           "evidence":  [
+                                                            "批次包含 EditMode 合同测试、测试场景和各领域规范作为后续 Unity 验收入口",
+                                                            "提交前执行 staged-only 路径覆盖、补丁指纹和 git diff --check"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "本批提交不冒充 Unity Test Runner、PlayMode、Profiler、IL2CPP Player 或真实发布已通过",
+                                                             "完整运行回归需要在 Unity 导入并稳定编译后按领域分批执行"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-014",
+                        "status":  "documented",
+                        "summary":  "登记并提交已恢复的 Codex 协作历程、会话定位与逐轮恢复工具，保留各窗口独立档案和证据边界。",
+                        "sourcePaths":  [
+                                            "ES/AI协作历程（Codex）"
+                                        ],
+                        "evidencePaths":  [
+                                              "ES/AI协作历程（Codex）/README.md",
+                                              "ES/AI协作历程（Codex）/Tools/Find-CodexSession.ps1",
+                                              "ES/AI协作历程（Codex）/Tools/Recover-CodexSessionHistory.ps1"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "这些文件是历史事实与恢复工具，不属于本窗口实现成果；按原档案 ID 原样提交，后续窗口必须新建自己的档案，不能继续追加已收尾文件。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "README、定位工具、恢复工具与八份独立历程文件均存在",
+                                                            "历史档案和当前实现批次分开提交"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "目录内其他旧格式历程不代表已经全部逐条恢复"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "not-applicable",
+                                     "targets":  [
+
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -604,13 +678,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-03T05:48:46+08:00",
-                       "head":  "bb7d4715af4bf35d9df04008923f0b37de31161c",
-                       "stagedSourcePatchSha256":  "4d2e3db03c98158ba25270f6fcc55fc4ae894be0092261402d33f81241d5a745",
-                       "stagedSourceManifestSha256":  "d4f721a7cdee831931833c10d123d52b59723e44168ae4d09431fdd75bbcb94d",
-                       "stagedSourceFileCount":  5809,
+                       "preparedAt":  "2026-08-03T05:54:25+08:00",
+                       "head":  "66a0758283380e44c92f813ea337cbd4698257cd",
+                       "stagedSourcePatchSha256":  "24ad427f65b579221a0230278affd152ac78cdd65375c17f1174cf9305ab2f8f",
+                       "stagedSourceManifestSha256":  "5ab3e30bd81b5c40ace1b35c71458aa6a2467984b5a2c0e46c971e7c68aaf1c5",
+                       "stagedSourceFileCount":  470,
                        "entryIds":  [
-                                        "LOCAL-20260803-008"
+                                        "LOCAL-20260803-013"
                                     ]
                    }
 }

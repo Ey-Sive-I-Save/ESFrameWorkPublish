@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
+using UnityEngine;
 
 namespace ES
 {
@@ -8,34 +9,48 @@ namespace ES
     public sealed class ESSuperFloatAttributeDefinition
     {
         [LabelText("EnumKey")]
+        [TableColumnWidth(72, Resizable = false)]
         public ushort enumKey;
 
         [LabelText("Key")]
+        [TableColumnWidth(220, Resizable = true)]
         public string key;
 
         [LabelText("存储策略")]
+        [TableColumnWidth(86, Resizable = false)]
         public ESKeyStoragePolicy storagePolicy = ESKeyStoragePolicy.Sparse;
 
+        [LabelText("固定访问名")]
+        [TableColumnWidth(130, Resizable = true)]
+        [Tooltip("仅角色 HotSlot 使用。代码生成根据此名称生成 ESCharacterFloatAttributeId；留空表示普通 Catalog 属性，不生成代码 API。修改此名称、类型或稳定身份后需先生成代码。")]
+        public string fixedApiName;
+
         [LabelText("显示名")]
+        [TableColumnWidth(110, Resizable = true)]
         public string displayName;
 
         [LabelText("覆盖基础值")]
+        [TableColumnWidth(76, Resizable = false)]
         public bool overrideBaseValue;
 
         [LabelText("基础值")]
+        [TableColumnWidth(76, Resizable = false)]
         [ShowIf(nameof(overrideBaseValue))]
         public float baseValue;
 
         [LabelText("最小值")]
+        [TableColumnWidth(76, Resizable = false)]
         public float minValue = float.NegativeInfinity;
 
         [LabelText("最大值")]
+        [TableColumnWidth(76, Resizable = false)]
         public float maxValue = float.PositiveInfinity;
 
-        [LabelText("公式（当前不支持，必须为空）")]
+        [HideInInspector]
         public string formula;
 
         [LabelText("迁移Key")]
+        [TableColumnWidth(150, Resizable = true)]
         public string migrationKey;
 
         public string StringKey => key;
@@ -45,28 +60,40 @@ namespace ES
     public sealed class ESSuperPermitAttributeDefinition
     {
         [LabelText("EnumKey")]
+        [TableColumnWidth(72, Resizable = false)]
         public ushort enumKey;
 
         [LabelText("Key")]
+        [TableColumnWidth(220, Resizable = true)]
         public string key;
 
         [LabelText("存储策略")]
+        [TableColumnWidth(86, Resizable = false)]
         public ESKeyStoragePolicy storagePolicy = ESKeyStoragePolicy.Sparse;
 
+        [LabelText("固定访问名")]
+        [TableColumnWidth(130, Resizable = true)]
+        [Tooltip("仅角色 HotSlot 使用。代码生成根据此名称生成 ESCharacterPermitAttributeId；留空表示普通 Catalog 属性，不生成代码 API。修改此名称、类型或稳定身份后需先生成代码。")]
+        public string fixedApiName;
+
         [LabelText("显示名")]
+        [TableColumnWidth(110, Resizable = true)]
         public string displayName;
 
         [LabelText("覆盖默认许可")]
+        [TableColumnWidth(86, Resizable = false)]
         public bool overrideFallbackValue;
 
         [LabelText("默认许可")]
+        [TableColumnWidth(76, Resizable = false)]
         [ShowIf(nameof(overrideFallbackValue))]
         public bool fallbackValue = true;
 
-        [LabelText("公式（当前不支持，必须为空）")]
+        [HideInInspector]
         public string formula;
 
         [LabelText("迁移Key")]
+        [TableColumnWidth(150, Resizable = true)]
         public string migrationKey;
 
         public string StringKey => key;

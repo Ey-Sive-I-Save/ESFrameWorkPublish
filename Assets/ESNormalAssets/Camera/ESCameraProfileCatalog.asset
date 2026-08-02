@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ee80928fa684cddb3b4933b80c7b974, type: 3}
+  m_Name: ESCameraProfileCatalog
+  m_EditorClassIdentifier: 
+  profiles:
+  - {fileID: 11400000, guid: 3d32a95d6d34fd44db1788e400d88c5d, type: 2}
+  - {fileID: 11400000, guid: abf9fc5bfa606cd48a28755e5498c7a4, type: 2}

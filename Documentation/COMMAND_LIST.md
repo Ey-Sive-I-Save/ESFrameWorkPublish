@@ -137,7 +137,7 @@
 2. **QUICK_REFERENCE.json** - JSON模板快速参考
 3. **COMMERCIAL_FEATURES_GUIDE.md** - 商业级特性详解
 4. **REFACTORING_COMPLETE_REPORT.md** - 重构完成报告
-5. **test_commercial_features.json** - 测试示例
+5. **ES/Tests/Fixtures/test_commercial_features.json** - 测试示例
 
 ---
 

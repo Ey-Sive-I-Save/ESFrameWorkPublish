@@ -31,6 +31,17 @@ namespace ES
         [ShowIf(nameof(ShowsNpcDefinition)), LabelText("NPC 数据")]
         public NpcDataInfo npcDefinition;
 
+        [Title("默认相机意图")]
+        [ShowIf(nameof(IsFormalCharacter)), LabelText("相机 ProfileKey")]
+        [Tooltip("为空表示该角色不主动占用本地相机。玩家 Variant 应填写稳定 ProfileKey，而不是 VCam 引用。")]
+        public string defaultCameraProfileKey;
+
+        [ShowIf(nameof(IsFormalCharacter)), LabelText("相机 ViewKey")]
+        public string defaultCameraViewKey = "MainView";
+
+        [ShowIf(nameof(IsFormalCharacter)), LabelText("相机优先级")]
+        public int defaultCameraPriority;
+
         private bool IsFormalCharacter => prefabRole == EntityCharacterPrefabRole.CharacterVariant;
         private bool ShowsActorDefinition => IsFormalCharacter && definitionSource == EntityCharacterDefinitionSource.Actor;
         private bool ShowsMonsterDefinition => IsFormalCharacter && definitionSource == EntityCharacterDefinitionSource.Monster;
@@ -101,6 +112,40 @@ namespace ES
                     error = "正式角色必须选择且只能选择一个匹配的角色、怪物或 NPC 数据。";
                     return false;
             }
+        }
+
+        /// <summary>
+        /// 角色只有通过 Profile 提供默认镜头意图。它只生成纯 CameraRequest，绝不引用
+        /// Cinemachine 或场景 Rig；不存在相机配置的正式 NPC/怪物会自然返回 false。
+        /// </summary>
+        public bool TryCreateDefaultCameraRequest(
+            Entity entity,
+            EntityTransformMapping mapping,
+            out ESCameraRequest request)
+        {
+            request = default;
+            if (!IsFormalCharacter
+                || entity == null
+                || mapping == null
+                || string.IsNullOrWhiteSpace(defaultCameraProfileKey))
+            {
+                return false;
+            }
+
+            Transform follow = mapping.Resolve("CameraTarget");
+            if (follow == null)
+                follow = mapping.Resolve(DefaultTransformKey.Camera);
+            if (follow == null)
+                return false;
+
+            request = ESCameraRequest.CreateBase(
+                new ESCameraViewId(defaultCameraViewKey),
+                defaultCameraProfileKey,
+                defaultCameraPriority,
+                entity,
+                follow,
+                mapping.Resolve("CameraAimTarget"));
+            return request.IsStructurallyValid;
         }
 
 #if UNITY_EDITOR

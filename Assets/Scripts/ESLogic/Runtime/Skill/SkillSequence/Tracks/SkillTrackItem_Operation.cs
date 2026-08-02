@@ -190,23 +190,33 @@ namespace ES
 
         public void OnSkillEnter(EntityState_Skill state, ref SkillRuntimeTrackState trackState)
         {
-            ESRuntimeTargetPack target = SkillOperationRuntimeUtility.BuildTrackTarget(
-                track != null ? track.trackTargetSourceMode : TrackRuntimeTargetSourceMode.CopySkill,
-                state != null ? state.SkillRuntimeTarget : null,
-                track != null ? track.trackRuntimeTargetExpression : null,
-                state != null ? state.OpSupport : null,
-                track != null && track.addExpressionResultToTargets,
-                out bool ownsTarget);
-
             SkillOperationTrackRuntimeState runtimeState = SkillOperationTrackRuntimeState.Pool.GetInPool();
-            runtimeState.target = target;
-            runtimeState.ownsTarget = ownsTarget;
-            trackState.UserData = runtimeState;
-            trackState.IsRunning = true;
-            trackState.CurrentClipIndex = -1;
+            try
+            {
+                ESRuntimeTargetPack target = SkillOperationRuntimeUtility.BuildTrackTarget(
+                    track != null ? track.trackTargetSourceMode : TrackRuntimeTargetSourceMode.CopySkill,
+                    state != null ? state.SkillRuntimeTarget : null,
+                    track != null ? track.trackRuntimeTargetExpression : null,
+                    state != null ? state.OpSupport : null,
+                    track != null && track.addExpressionResultToTargets,
+                    out bool createdTarget);
 
-            if (state != null)
-                state.SetTrackRuntimeTarget(trackIndex, target);
+                runtimeState.target = target;
+                runtimeState.createdTarget = createdTarget;
+                runtimeState.targetVersion = createdTarget && target != null ? target.Version : 0L;
+                trackState.UserData = runtimeState;
+                trackState.IsRunning = true;
+                trackState.CurrentClipIndex = -1;
+
+                if (state != null)
+                    state.SetTrackRuntimeTarget(trackIndex, target);
+            }
+            catch
+            {
+                if (!ReferenceEquals(trackState.UserData, runtimeState) && !runtimeState.IsRecycled)
+                    runtimeState.TryAutoPushedToPool();
+                throw;
+            }
         }
 
         public void Tick(EntityState_Skill state, ref SkillRuntimeTrackState trackState, float time, float deltaTime)
@@ -215,22 +225,29 @@ namespace ES
 
         public void OnSkillExit(EntityState_Skill state, ref SkillRuntimeTrackState trackState)
         {
-            if (trackState.UserData is SkillOperationTrackRuntimeState runtimeState)
+            try
             {
-                if (runtimeState.ownsTarget && runtimeState.target != null && !runtimeState.target.IsRecycled)
-                    runtimeState.target.ForcePushToPool();
-
-                runtimeState.TryAutoPushedToPool();
+                if (trackState.UserData is SkillOperationTrackRuntimeState runtimeState)
+                {
+                    try
+                    {
+                        if (runtimeState.createdTarget)
+                            ESRuntimeTargetPack.TryReturnOwned(runtimeState.target, runtimeState.targetVersion);
+                    }
+                    finally
+                    {
+                        runtimeState.TryAutoPushedToPool();
+                    }
+                }
+                // Bare TargetPack UserData is borrowed. Only the creator-owned runtime wrapper may return a Pack.
             }
-            else if (trackState.UserData is ESRuntimeTargetPack target && target != null && !target.IsRecycled)
+            finally
             {
-                target.ForcePushToPool();
+                trackState.Reset();
+
+                if (state != null)
+                    state.SetTrackRuntimeTarget(trackIndex, null);
             }
-
-            trackState.Reset();
-
-            if (state != null)
-                state.SetTrackRuntimeTarget(trackIndex, null);
         }
     }
 
@@ -238,11 +255,13 @@ namespace ES
     {
         private readonly SkillTrackClip_Operation clip;
         private readonly int trackIndex;
+        private readonly bool needsStop;
 
         public SkillOperationClipRuntimePlayer(SkillTrackClip_Operation clip, int trackIndex)
         {
             this.clip = clip;
             this.trackIndex = trackIndex;
+            needsStop = clip != null && clip.op != null && clip.op.NeedsStop;
         }
 
         public void OnClipEnter(EntityState_Skill state, ref SkillRuntimeClipState clipState)
@@ -250,22 +269,32 @@ namespace ES
             if (clip == null || clip.op == null || !clip.conditionValue)
                 return;
 
-            ESRuntimeTargetPack target = SkillOperationRuntimeUtility.BuildClipTarget(
-                clip.clipTargetSourceMode,
-                state != null ? state.SkillRuntimeTarget : null,
-                state != null ? state.GetTrackRuntimeTarget(trackIndex) : null,
-                clip.clipTargetExpression,
-                state != null ? state.OpSupport : null,
-                clip.addExpressionResultToTargets,
-                out bool ownsTarget);
-
             SkillOperationClipRuntimeState runtimeState = SkillOperationClipRuntimeState.Pool.GetInPool();
-            runtimeState.target = target;
-            runtimeState.ownsTarget = ownsTarget;
-            clipState.UserData = runtimeState;
-            ApplyRuntimeValues(target, state);
-            WriteBackIfNeeded(state, target, RuntimeTargetWriteBackTiming.OnEnter);
-            clip.op._TryStartOp(target, state != null ? state.OpSupport : null, state != null ? state.HostOpSupport : null);
+            try
+            {
+                ESRuntimeTargetPack target = SkillOperationRuntimeUtility.BuildClipTarget(
+                    clip.clipTargetSourceMode,
+                    state != null ? state.SkillRuntimeTarget : null,
+                    state != null ? state.GetTrackRuntimeTarget(trackIndex) : null,
+                    clip.clipTargetExpression,
+                    state != null ? state.OpSupport : null,
+                    clip.addExpressionResultToTargets,
+                    out bool createdTarget);
+
+                runtimeState.target = target;
+                runtimeState.createdTarget = createdTarget;
+                runtimeState.targetVersion = createdTarget && target != null ? target.Version : 0L;
+                clipState.UserData = runtimeState;
+                ApplyRuntimeValues(target, state);
+                WriteBackIfNeeded(state, target, RuntimeTargetWriteBackTiming.OnEnter);
+                clip.op._TryStartOp(target, state != null ? state.OpSupport : null, state != null ? state.HostOpSupport : null);
+            }
+            catch
+            {
+                if (clipState.UserData == null && !runtimeState.IsRecycled)
+                    runtimeState.TryAutoPushedToPool();
+                throw;
+            }
         }
 
         public void Tick(EntityState_Skill state, ref SkillRuntimeClipState clipState, float time, float deltaTime)
@@ -276,16 +305,31 @@ namespace ES
         {
             SkillOperationClipRuntimeState runtimeState = clipState.UserData as SkillOperationClipRuntimeState;
             ESRuntimeTargetPack target = runtimeState != null ? runtimeState.target : clipState.UserData as ESRuntimeTargetPack;
-            if (clip != null && clip.op != null)
-                clip.op._TryStopOp(target, state != null ? state.OpSupport : null, state != null ? state.HostOpSupport : null);
-
-            WriteBackIfNeeded(state, target, RuntimeTargetWriteBackTiming.OnExit);
-
-            if (runtimeState != null && runtimeState.ownsTarget && target != null && !target.IsRecycled)
-                target.ForcePushToPool();
-
-            runtimeState?.TryAutoPushedToPool();
-            clipState.UserData = null;
+            try
+            {
+                if (needsStop && clip != null && clip.op != null)
+                    clip.op._TryStopOp(target, state != null ? state.OpSupport : null, state != null ? state.HostOpSupport : null);
+            }
+            finally
+            {
+                try
+                {
+                    WriteBackIfNeeded(state, target, RuntimeTargetWriteBackTiming.OnExit);
+                }
+                finally
+                {
+                    clipState.UserData = null;
+                    try
+                    {
+                        if (runtimeState != null && runtimeState.createdTarget)
+                            ESRuntimeTargetPack.TryReturnOwned(target, runtimeState.targetVersion);
+                    }
+                    finally
+                    {
+                        runtimeState?.TryAutoPushedToPool();
+                    }
+                }
+            }
         }
 
         private void WriteBackIfNeeded(EntityState_Skill state, ESRuntimeTargetPack source, RuntimeTargetWriteBackTiming timing)
@@ -306,7 +350,7 @@ namespace ES
             {
                 ESRuntimeTargetPack skillTarget = state.SkillRuntimeTarget;
                 if (skillTarget != null && skillTarget != source)
-                    source.CopyTo(skillTarget);
+                    skillTarget.TryCopySnapshotFrom(source);
             }
 
             if (clip.writeBackTarget == RuntimeTargetWriteBackTarget.Track ||
@@ -314,7 +358,7 @@ namespace ES
             {
                 ESRuntimeTargetPack trackTarget = state.GetTrackRuntimeTarget(trackIndex);
                 if (trackTarget != null && trackTarget != source)
-                    source.CopyTo(trackTarget);
+                    trackTarget.TryCopySnapshotFrom(source);
             }
         }
 
@@ -339,7 +383,7 @@ namespace ES
         }
     }
 
-    internal sealed class SkillOperationTrackRuntimeState : IPoolableAuto
+    internal sealed class SkillOperationTrackRuntimeState : ISkillRuntimeOwnedUserData
     {
         public static readonly ESSimplePool<SkillOperationTrackRuntimeState> Pool = new ESSimplePool<SkillOperationTrackRuntimeState>(
             factoryMethod: () => new SkillOperationTrackRuntimeState(),
@@ -350,12 +394,14 @@ namespace ES
 
         public bool IsRecycled { get; set; }
         public ESRuntimeTargetPack target;
-        public bool ownsTarget;
+        public bool createdTarget;
+        public long targetVersion;
 
         public void OnResetAsPoolable()
         {
             target = null;
-            ownsTarget = false;
+            createdTarget = false;
+            targetVersion = 0L;
         }
 
         public void TryAutoPushedToPool()
@@ -365,7 +411,7 @@ namespace ES
         }
     }
 
-    internal sealed class SkillOperationClipRuntimeState : IPoolableAuto
+    internal sealed class SkillOperationClipRuntimeState : ISkillRuntimeOwnedUserData
     {
         public static readonly ESSimplePool<SkillOperationClipRuntimeState> Pool = new ESSimplePool<SkillOperationClipRuntimeState>(
             factoryMethod: () => new SkillOperationClipRuntimeState(),
@@ -376,12 +422,14 @@ namespace ES
 
         public bool IsRecycled { get; set; }
         public ESRuntimeTargetPack target;
-        public bool ownsTarget;
+        public bool createdTarget;
+        public long targetVersion;
 
         public void OnResetAsPoolable()
         {
             target = null;
-            ownsTarget = false;
+            createdTarget = false;
+            targetVersion = 0L;
         }
 
         public void TryAutoPushedToPool()
@@ -399,39 +447,37 @@ namespace ES
             ESGetGameObjectExpression expression,
             ESOpSupport support,
             bool addExpressionResultToTargets,
-            out bool ownsTarget)
+            out bool createdTarget)
         {
-            ownsTarget = false;
+            createdTarget = false;
 
             switch (mode)
             {
                 case TrackRuntimeTargetSourceMode.ReferenceSkill:
-                    return skillTarget;
+                    return ResolveReferenceOrDefault(skillTarget, null, support, out createdTarget);
 
                 case TrackRuntimeTargetSourceMode.NewEmpty:
-                    ownsTarget = true;
+                    createdTarget = true;
                     return ESRuntimeTargetPack.Pool.GetInPool();
 
                 case TrackRuntimeTargetSourceMode.CopySkillAndOverrideMainTarget:
                 {
-                    ESRuntimeTargetPack target = CopyFrom(skillTarget);
-                    ownsTarget = true;
-                    ApplyExpressionTarget(target, expression, support, addExpressionResultToTargets);
-                    return target;
+                    ESRuntimeTargetPack target = CopyFrom(skillTarget, support);
+                    createdTarget = true;
+                    return ApplyExpressionTargetSafely(target, expression, support, addExpressionResultToTargets);
                 }
 
                 case TrackRuntimeTargetSourceMode.NewAndSetMainTargetByExpression:
                 {
                     ESRuntimeTargetPack target = ESRuntimeTargetPack.Pool.GetInPool();
-                    ownsTarget = true;
-                    ApplyExpressionTarget(target, expression, support, addExpressionResultToTargets);
-                    return target;
+                    createdTarget = true;
+                    return ApplyExpressionTargetSafely(target, expression, support, addExpressionResultToTargets);
                 }
 
                 case TrackRuntimeTargetSourceMode.CopySkill:
                 default:
-                    ownsTarget = true;
-                    return CopyFrom(skillTarget);
+                    createdTarget = true;
+                    return CopyFrom(skillTarget, support);
             }
         }
 
@@ -442,62 +488,156 @@ namespace ES
             ESGetGameObjectExpression expression,
             ESOpSupport support,
             bool addExpressionResultToTargets,
-            out bool ownsTarget)
+            out bool createdTarget)
         {
-            ownsTarget = false;
+            createdTarget = false;
 
             switch (mode)
             {
                 case ClipRuntimeTargetSourceMode.ReferenceSkill:
-                    return skillTarget;
+                    return ResolveReferenceOrDefault(skillTarget, null, support, out createdTarget);
 
                 case ClipRuntimeTargetSourceMode.ReferenceTrack:
-                    return trackTarget != null ? trackTarget : skillTarget;
+                    return ResolveReferenceOrDefault(trackTarget, skillTarget, support, out createdTarget);
 
                 case ClipRuntimeTargetSourceMode.CopySkill:
-                    ownsTarget = true;
-                    return CopyFrom(skillTarget);
+                    createdTarget = true;
+                    return CopyFrom(skillTarget, support);
 
                 case ClipRuntimeTargetSourceMode.NewEmpty:
-                    ownsTarget = true;
+                    createdTarget = true;
                     return ESRuntimeTargetPack.Pool.GetInPool();
 
                 case ClipRuntimeTargetSourceMode.CopyTrackAndOverrideMainTarget:
                 {
-                    ESRuntimeTargetPack target = CopyFrom(trackTarget != null ? trackTarget : skillTarget);
-                    ownsTarget = true;
-                    ApplyExpressionTarget(target, expression, support, addExpressionResultToTargets);
-                    return target;
+                    ESRuntimeTargetPack target = CopyFrom(GetActiveTarget(trackTarget) ?? skillTarget, support);
+                    createdTarget = true;
+                    return ApplyExpressionTargetSafely(target, expression, support, addExpressionResultToTargets);
                 }
 
                 case ClipRuntimeTargetSourceMode.CopySkillAndOverrideMainTarget:
                 {
-                    ESRuntimeTargetPack target = CopyFrom(skillTarget);
-                    ownsTarget = true;
-                    ApplyExpressionTarget(target, expression, support, addExpressionResultToTargets);
-                    return target;
+                    ESRuntimeTargetPack target = CopyFrom(skillTarget, support);
+                    createdTarget = true;
+                    return ApplyExpressionTargetSafely(target, expression, support, addExpressionResultToTargets);
                 }
 
                 case ClipRuntimeTargetSourceMode.NewAndSetMainTargetByExpression:
                 {
                     ESRuntimeTargetPack target = ESRuntimeTargetPack.Pool.GetInPool();
-                    ownsTarget = true;
-                    ApplyExpressionTarget(target, expression, support, addExpressionResultToTargets);
-                    return target;
+                    createdTarget = true;
+                    return ApplyExpressionTargetSafely(target, expression, support, addExpressionResultToTargets);
                 }
 
                 case ClipRuntimeTargetSourceMode.CopyTrack:
                 default:
-                    ownsTarget = true;
-                    return CopyFrom(trackTarget != null ? trackTarget : skillTarget);
+                    createdTarget = true;
+                    return CopyFrom(GetActiveTarget(trackTarget) ?? skillTarget, support);
             }
         }
 
-        private static ESRuntimeTargetPack CopyFrom(ESRuntimeTargetPack source)
+        private static ESRuntimeTargetPack ResolveReferenceOrDefault(
+            ESRuntimeTargetPack primary,
+            ESRuntimeTargetPack fallback,
+            ESOpSupport support,
+            out bool createdTarget)
+        {
+            ESRuntimeTargetPack activePrimary = GetActiveTarget(primary);
+            if (activePrimary != null)
+            {
+                createdTarget = false;
+                return activePrimary;
+            }
+
+            ESRuntimeTargetPack activeFallback = GetActiveTarget(fallback);
+            if (activeFallback != null)
+            {
+                createdTarget = false;
+                return activeFallback;
+            }
+
+            createdTarget = true;
+            return RentDefaultTarget(support);
+        }
+
+        private static ESRuntimeTargetPack CopyFrom(ESRuntimeTargetPack source, ESOpSupport support)
+        {
+            // Capture this before renting: the pool may otherwise hand the same stale object back.
+            bool sourceWasActive = source != null && !source.IsRecycled;
+            ESRuntimeTargetPack target = ESRuntimeTargetPack.Pool.GetInPool();
+            try
+            {
+                if (!sourceWasActive || !target.TryCopySnapshotFrom(source))
+                    FillDefaultTarget(target, support);
+                return target;
+            }
+            catch
+            {
+                if (!target.IsRecycled)
+                    target.ForcePushToPool();
+                throw;
+            }
+        }
+
+        private static ESRuntimeTargetPack GetActiveTarget(ESRuntimeTargetPack target)
+        {
+            return target != null && !target.IsRecycled ? target : null;
+        }
+
+        private static ESRuntimeTargetPack RentDefaultTarget(ESOpSupport support)
         {
             ESRuntimeTargetPack target = ESRuntimeTargetPack.Pool.GetInPool();
-            target.CopyFrom(source);
+            FillDefaultTarget(target, support);
             return target;
+        }
+
+        // A lost inherited Pack must not silently turn into an arbitrary target selection.
+        private static void FillDefaultTarget(ESRuntimeTargetPack target, ESOpSupport support)
+        {
+            if (target == null || target.IsRecycled)
+                return;
+
+            target.userEntity = null;
+            target.userItem = null;
+            target.SetEntityMainTarget(null);
+            target.SetItemMainTarget(null);
+            target.ClearTargets();
+            target.DisableExtras();
+            target.runtimeFloat = 1f;
+            target.runtimeBool = true;
+
+            if (support == null || support.IsDisposed || support.IsRecycled)
+                return;
+
+            Entity userEntity = support.CurrentEntity;
+            if (userEntity != null)
+            {
+                target.SetUser(userEntity);
+                return;
+            }
+
+            Item userItem = support.OwnerItem;
+            if (userItem != null)
+                target.SetUser(userItem);
+        }
+
+        private static ESRuntimeTargetPack ApplyExpressionTargetSafely(
+            ESRuntimeTargetPack target,
+            ESGetGameObjectExpression expression,
+            ESOpSupport support,
+            bool addToTargets)
+        {
+            try
+            {
+                ApplyExpressionTarget(target, expression, support, addToTargets);
+                return target;
+            }
+            catch
+            {
+                if (target != null && !target.IsRecycled)
+                    target.ForcePushToPool();
+                throw;
+            }
         }
 
         private static void ApplyExpressionTarget(ESRuntimeTargetPack target, ESGetGameObjectExpression expression, ESOpSupport support, bool addToTargets)

@@ -42,11 +42,34 @@ namespace ES
         StateExited = 5,
         ModuleDisabled = 6,
         BeginRejected = 7,
+        ActorLeftRange = 8,
+        StoryFailed = 9,
+        SceneTransition = 10,
+        ModePreempted = 11,
+    }
+
+    public readonly struct ESInteractionBinding
+    {
+        public readonly long Token;
+        public readonly int Generation;
+        public readonly Entity Owner;
+        public readonly ESInteractable Target;
+
+        public ESInteractionBinding(long token, int generation, Entity owner, ESInteractable target)
+        {
+            Token = token;
+            Generation = generation;
+            Owner = owner;
+            Target = target;
+        }
+
+        public bool IsValid => Token > 0 && Generation > 0 && Owner != null && Target != null;
     }
 
     [DisallowMultipleComponent]
     public class ESInteractable : MonoBehaviour
     {
+        public virtual bool UsesExternalCompletion => false;
         public enum IKWriteBuildResult
         {
             Success = 0,

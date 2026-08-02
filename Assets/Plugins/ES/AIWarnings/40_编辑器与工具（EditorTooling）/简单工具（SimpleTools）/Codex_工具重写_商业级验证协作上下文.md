@@ -370,3 +370,418 @@ GameManager 接入页把编辑模式写配置、PlayMode 加载运行时状态�
 ```
 
 但不要为了“更强”重新加入从 Selection 直接录入 Prefab 的入口。那是伪池化，不是 ES GameManager 根池化。
+
+## 2026-08-01：编辑器工具工作台规范与首批目录迁移
+
+完整页面规范位于：
+
+```text
+Documentation/ES_EDITOR_TOOL_WORKBENCH_STANDARD.md
+```
+
+它是 SimpleTools 后续改造的唯一排版和迁移基线。先确定用户任务、信息顺序、状态和风险，再改绘制；不要为了“统一风格”把工具行为一起重写。
+
+### 已实施但尚未完成 Unity 人工验收的范围
+
+本轮只进行了低功能风险的目录与公共排版迁移：
+
+```text
+SimpleToolsWindow
+  移除“常用工具”根分类；改为观察与诊断、场景批处理、资产与发布、ES 配置与集成、维护与修复。
+
+SimpleToolsPanelUtility
+  DrawToolHeader / DrawSectionTitle 现在必须实际显示标题、副标题、状态、风险和细分隔线。
+  普通摘要与普通结果不再默认套 helpBox；Warning / Error 仍保留明确语义。
+  只有 Primary 是视觉主操作，Success / Warning / Danger 不能仅因名字不同变成多枚高饱和彩色主按钮。
+
+ESEditorSectionNavigatorIMGUI
+  是 ESEditorSectionNavigator 的 Window/IMGUI 配套实现：内容目录始终显示、窄窗口自动换行、选中仅用文字色和细下划线、选择用 SessionState 保存。
+  它不是 Toolbar、Popup 或传统凸起 Tab；不可再把它改回 EnumToggleButtons。
+
+Page_ObjectPool
+  已移除 EnumToggleButtons 页面导航，改为运行时统计、预热配置审计、GameManager 接入、池组状态四个内容分区。
+
+Page_TopToolbar
+  已移除“管理内容”Popup 伪页面导航，改为场景快捷、资产快捷两个内容分区。
+```
+
+以上只改变导航、文案和通用绘制层，不得借机改变对象池接入、场景/资产快捷写入、Undo、确认、SaveAssets 或场景保存逻辑。
+
+### 当前仍未迁移的内容
+
+下列页面属于下一批，不得在未完成字段清点、预览签名和人工测试前粗暴替换：
+
+```text
+AssetReferenceChecker：TabGroup 配置字段要改为连续“范围 → 资源包入口 → 安全保护 → 高级”分区，不能 Hide 后漏掉入口。
+PhysicsAlign：大型高风险场景写入工具，先梳理基础对齐、智能分布、尺寸匹配、布景整理、选区审计与预览。
+MaterialReplacement：场景实例 / Prefab 资产工作区必须严格隔离；不得在 OnGUI 自动 CollectTargets 或写入。
+ObjectPool：预热配置与 GameManager 接入页仍需把多操作收成明确状态机，并把查询改为显式刷新缓存。
+```
+
+### 硬性迁移门禁
+
+```text
+禁止 TabGroup、EnumToggleButtons 页面导航、Toolbar、Popup 伪页签。
+禁止在打开页面、OnGUI、刷新或域重载时自动全盘扫描、写场景、写资产、自动发布。
+自动扫描、资产写入、发布、场景修改必须由用户明确操作触发，且风险操作位于页面后段，有确认与结果反馈。
+不要删除 legacy UI、旧菜单或数据字段，除非用户明确授权且已有迁移/回滚方案。
+每页固定优先顺序：范围 → 规则 → 预览 → 一个主操作 → 结果 → 高级/历史。
+连续配置使用 Title + 副标题 + 细分隔线 + Foldout 层级；配置目录只用于互斥的业务工作区。
+```
+
+### 验证状态
+
+已完成的静态检查：
+
+```text
+ObjectPool / TopToolbar 不再命中 TabGroup、EnumToggleButtons 或“管理内容”Popup 伪页签。
+本轮相关源码已通过 git diff --check。
+```
+
+`ES_Editor.csproj` 为 Unity 自动生成且被忽略；为进行本地编译验证，临时补入了当前工作区新建的编译单元。迁移自身的 `ESEditorSectionNavigatorItem` 缺失错误已消失。全量编译目前仍被无关的既有发布模块错误阻断：
+
+```text
+Assets/Plugins/ES/Editor/ESResPipeline/ESAssetBundlePublisher.cs(476,35)
+CS0165：使用了未赋值的局部变量 page
+```
+
+尚未完成 Unity 人工视觉验收；不得因上述静态检查或局部编译通过而宣称“0 error”或“已完成商业级验收”。
+
+### 四项硬验收的复核结论（首批样板，不是全量结论）
+
+本轮依据源码重新核对：`SimpleToolsPanelUtility`、`Page_ObjectPool`、`Page_TopToolbar` 与 `ESEditorSectionNavigatorIMGUI`。
+
+| 验收项 | 首批样板结论 | 已有证据 | 尚缺内容 |
+| --- | --- | --- | --- |
+| 风格一致 | 基础通过 | 公共标题真实显示用途、状态、风险和分隔线；两个页面共用内容目录和结果样式。 | 仍有未迁移旧页；ObjectPool 内部还有历史 `helpBox` 外框。 |
+| 符合人类习惯 | 基础通过 | TopToolbar 顺序已是当前事实 → 工作区 → 操作 → 维护 → 结果 → 撤销；写入、移除、刷新均由明确按钮和确认触发。 | 批处理页尚未统一成“范围 → 规则 → 预览 → 应用”的状态机。 |
+| 信息密度合理 | 部分通过 | 目录常显且自适应换行；摘要为单行事实；详情、结果和历史后置。 | ObjectPool 审计/接入区仍需表格化与移除无语义嵌套外框。 |
+| 上手难度低 | 基础通过 | 空状态、缺失 GameManager、无效资产、写入确认均说明下一步或影响范围；技术术语放到副标题解释。 | 尚缺 Unity 人工测试，不能只凭源码认定新用户完全无障碍。 |
+
+因此后续报告必须使用准确口径：**首批页面已建立可复用样板，整个 SimpleTools 尚未完成四项硬验收。**
+
+### 2026-08-01：ObjectPool IMGUI Layout/Repaint 崩溃修复
+
+复现异常：
+
+```text
+ArgumentException: Getting control 14's position in a group with only 14 controls when doing repaint
+Page_ObjectPool.DrawPoolUsagePanel() line 214
+```
+
+原因不是对象池业务数据本身，而是运行时统计集合可能在 Layout 与 Repaint 之间变化。原实现每个事件都直接遍历 `globalGroup.Groups`，并依据实时集合决定 `VerticalScope`、折叠组和行数，导致两阶段生成不同数量的 GUILayout 控件。
+
+修复约束：
+
+```text
+Layout 阶段建立池组、有效池条目、过滤结果和搜索框可见性的渲染快照。
+Repaint / 鼠标事件复用同一快照，不直接遍历可能变化的运行时集合。
+下一次 Layout 自动重新采样；不缓存到场景、资产或用户偏好。
+保留原有搜索、折叠、统计和分析操作，不改变对象池运行时逻辑。
+```
+
+验证：
+
+```text
+dotnet build ES_Editor.csproj --no-restore -v:minimal -p:BuildProjectReferences=false
+0 warning, 0 error
+
+### 2026-08-01：SimpleTools ES 专属风格适配批次
+
+本批完成的适配范围：
+
+```text
+RuntimeWatch
+  接入 ES 标题、成熟度、风险和事实摘要；OnGUI 不再调用 TryAutoRefreshFromEditorTick，自动刷新由窗口 EditorApplication.update 宿主驱动。
+  录制按钮去除红绿背景色，保留显式开始/停止和语义 Tooltip。
+
+AssetReferenceChecker
+  自绘体检台头部改为公共 ES 标题、风险和摘要；原 Odin TabGroup 配置分组改为 ESEditorSection。
+
+AnimationBatchSetting / MaterialReplacement / PrefabManagement
+  自绘头部改为公共 ES 标题、风险和摘要；材质头部不再为显示目标数调用 CollectTargets，避免打开页面隐式收集目标。
+  MaterialReplacement 的隐藏 EnumToggleButtons 元数据移除，工作区继续由明确 Popup/自绘流程控制。
+
+PhysicsAlign
+  原 TabGroup 分区改为 ESEditorSection，保留字段、按钮、Undo 和预览数据；修正迁移中重复分区元数据导致的编译错误。
+
+SceneOptimization
+  Issue category / Severity 过滤器移除 EnumToggleButtons，恢复普通枚举字段显示，避免把字段选择器伪装成页面导航。
+
+HierarchyTools 介绍页
+  从 Odin Title/DisplayAsString 改为 ES 标题、工具目录和风险说明；只读介绍页不扫描、不写入。
+```
+
+本批静态门禁结果：SimpleToolsWindow 目录下不再存在 `TabGroup` 或 `EnumToggleButtons` 标记；`ES_Editor.csproj` 编译为 `0 warning, 0 error`。
+
+仍未宣称全量商业级完成：ObjectPool 内部外框与显式缓存刷新、各批处理页唯一主操作、Unity 实际视觉验收和 Layout/Repaint 连续操作压力测试仍需逐页完成。
+
+### 2026-08-01：去除 SimpleTools 双标题入口
+
+所有当前活跃 SimpleTools 页面已移除类级 Odin `[Title]` 入口，并统一由 `SimpleToolsPanelUtility.DrawToolHeader` 绘制 ES 标题。这样页面不会再出现“旧 Odin 标题 + 新 ES 标题”重复堆叠。
+
+当前活跃页面逐页具备公共 ES Header：
+
+```text
+AssetReferenceChecker
+TextureSpriteTool
+UnityPackageTool
+ObjectPool
+RuntimeWatch
+TopToolbar
+SceneTextRepair
+AnimationBatchSetting
+BatchRename
+BatchStaticSetting
+HierarchyTools
+LightingSettings
+MaterialReplacement
+ParticleSystemAdjustment
+PhysicsAlign
+PrefabManagement
+SceneOptimization
+```
+
+这个改动只移除旧标题绘制入口，不删除字段、数据、执行逻辑或 Undo 链路。类级标题语义已转移到公共 Header 的标题、用途、成熟度和风险四项中。
+```
+
+### 2026-08-01：全活跃页面第一轮 ES 入口门禁
+
+对 `SimpleToolsWindow` 下当前活跃页面进行静态门禁：
+
+```text
+类级 Odin Title：0
+TabGroup：0
+EnumToggleButtons：0
+GUIColor：0
+公共 DrawToolHeader：每个活跃页面至少 1 个
+```
+
+这表示所有活跃工具已经有统一的 ES 页面入口，不再从类级 Title、TabGroup 或彩色 Odin Button 进入。仍保留的 FoldoutGroup 仅属于页面内部高级字段/历史数据承载，不代表页面导航；后续会按页面风险逐步收成 ESEditorSection 或 ES 连续分区。
+
+本门禁不等于功能完成。每个工具仍必须继续验证唯一主操作、预览签名、写入确认、Undo/恢复、结果报告、缓存刷新和 Unity 实际视觉布局。
+
+### ObjectPool 预热配置查询门禁
+
+`Page_ObjectPool` 的 `PrefabPrewarmDataInfo` 查询已改为显式刷新缓存：
+
+```text
+打开页面、切换分区、搜索和重绘不再调用 ESEditorSO 查询。
+用户点击“刷新配置事实”后，才从 ESSO/SoDataInfo 建立当前会话缓存。
+搜索只过滤缓存，不重新扫描资产。
+缓存未建立时显示“尚未刷新配置事实”，不会把空列表误报成项目没有配置。
+```
+
+这条规则适用于所有会读取 Project、场景或 ESSO 数据的 SimpleTools：查询必须由用户明确触发，页面只渲染缓存，并显示缓存是否已建立。
+
+### 第二轮性能复核：未解决项（不得误报）
+
+#### P1：RuntimeWatch 隐藏页后台自动采集
+
+`RuntimeWatch` 已不在 OnGUI 中调用 `TryAutoRefreshFromEditorTick`，但 `SimpleToolsWindow` 仍常驻注册 `EditorApplication.update`。在 Play Mode 下，默认 `autoRefresh = true` 会使 `TryAutoRefreshFromEditorTick` 约每 0.25 秒执行一次 `CollectEntries()`，即使当前没有选中 RuntimeWatch 页面。
+
+这不是一次性扫描。正确的第二轮门禁是：
+
+```text
+只有 RuntimeWatch 当前页面可见时允许自动刷新。
+证据录制期间可继续后台采样，因为这是用户明确开始的会话。
+隐藏页面不主动采集；再次切回后由用户刷新或由可见页自动刷新。
+```
+
+#### P2：ObjectPool Layout 快照的编辑器 GC
+
+ObjectPool 已通过 Layout 快照保证 Layout/Repaint 控件数量一致，但当前每个 Layout 仍创建分组快照、每组 `List<string>` 和过滤列表。这不会进入游戏运行时，也只发生在对象池统计页绘制期间；但它不是一次性分配，持续显示时会造成 Editor GC。
+
+第二轮优化方向：复用快照对象和内部 List 容量，只有数据签名、搜索条件或折叠/排序条件变化时重建；再通过 Unity Profiler 记录 Editor GC。
+
+#### 编译口径
+
+已通过的命令是：
+
+```text
+dotnet build ES_Editor.csproj --no-restore -v:minimal -p:BuildProjectReferences=false -p:UseSharedCompilation=false
+```
+
+因此 `0 warning, 0 error` 的准确含义是：**ES_Editor 的不构建项目依赖局部编译通过**。它不能代表全依赖项目构建通过；全依赖构建的当前外部阻断项必须单独记录，不得混写为本轮 SimpleTools 结果。
+
+### 2026-08-01：第二轮性能门禁完成状态修正
+
+上一节的 P1/P2 是实施前的风险记录，保留用于追溯；当前代码状态如下：
+
+#### P1：RuntimeWatch 隐藏页后台自动采集——前台焦点门禁已补齐
+
+`SimpleToolsWindow.TickRuntimeWatch()` 现在通过 `IsRuntimeWatchPageVisible()` 同时判断：RuntimeWatch 是否为当前目录页、SimpleTools 是否拥有焦点、窗口矩形是否有效，以及（可取得时）`EditorWindow.focusedWindow` 是否仍为该窗口。后台 Dock 标签不再因为仍保留菜单选中状态而采集；窗口销毁时在 `OnDestroy()` 中取消 `EditorApplication.update` 注册并清空窗口宿主引用。
+
+当前语义为：
+
+```text
+SimpleTools 未打开：零 RuntimeWatch 采集
+SimpleTools 已打开但 RuntimeWatch 未选中：零采集
+RuntimeWatch 页面选中但 SimpleTools 位于后台 Dock 标签：零采集
+RuntimeWatch 位于前台且拥有焦点：按页面设置执行自动刷新
+程序集构建/域重载：只完成类型初始化与注册，不扫描实例
+```
+
+Unity 公共 API 无法可靠判断其他窗口对其进行的像素级遮挡，因此这里的“可见”准确指“前台、拥有焦点、窗口矩形有效”。本轮没有恢复后台录制采样，避免在用户未主动使用工具时产生编辑器和 Play Mode 损耗。
+
+#### P2：ObjectPool Layout 快照编辑器 GC——代码优化已完成
+
+`Page_ObjectPool` 已复用 `PoolGroupRenderSnapshot`、分组字符串列表及其容量，并使用 `poolGroupRenderSignature` 仅在统计值、分组内容或搜索词发生变化时重建渲染快照。Layout/Repaint 使用同一份稳定快照，避免运行时集合变化造成控件数量不一致。
+
+仍需在 Unity Profiler 中对持续显示统计进行一次 Editor GC 实测；这属于验收数据，不是代码阻断项。
+
+#### P2-补充：ObjectPool 控件数异常修复
+
+此前快照只冻结了分组行；运行时 `GlobalStatisticsGroup` 在 Layout/Repaint 间变化时，统计区前置的“空状态 / 汇总 / 搜索栏”仍可能改变 GUILayout 控件数量，导致 `Getting control ... position in a group`。
+
+现已改为整个运行时统计区的 Layout 快照：
+
+```text
+统计组是否存在
+有效池总数、活跃数、池中数、丢弃数
+搜索栏是否出现及其当帧过滤文本
+每个分组的标题、行文本、展开状态
+```
+
+Repaint 不再直接读取 `GlobalStatisticsGroup`。折叠点击只写入下一帧状态并请求重绘，下一次 Layout 才改变子行数量，避免 MouseUp/Repaint 动态增减控件。
+
+该修复已通过 ES_Editor 局部编译；P2 的连续 Layout/Repaint 和 Profiler 仍需 Unity 运行证据后签收。
+
+#### P1 签收结论
+
+RuntimeWatch 的前台焦点门禁已通过代码复核和 ES_Editor 局部编译验收。接受以下明确行为：
+
+```text
+RuntimeWatch 选中且 SimpleTools 聚焦：自动刷新运行
+用户点击 Game / Scene / Inspector：自动刷新暂停
+重新聚焦 SimpleTools：若自动刷新开启且当前模式允许，立即执行一次前台续采集，随后按间隔刷新
+RuntimeWatch 仅在后台 Dock 标签可见但未聚焦：不采集
+```
+
+这属于性能保护语义，不是运行异常；Unity Dock 切换实测作为运行证据保留，不再作为静态代码阻断项。
+
+#### 本轮剩余人工验收
+
+```text
+1. 关闭 SimpleTools，进入 Play Mode，确认 RuntimeWatch 不采样。
+2. 打开 SimpleTools，切换到其他页面，确认 RuntimeWatch 不采样。
+3. 保持 RuntimeWatch 选中，把 SimpleTools 切到后台 Dock 标签，确认 RuntimeWatch 不采样。
+4. 将 SimpleTools 切回前台，确认 autoRefresh 按设置恢复，手动刷新仍可用。
+5. ObjectPool 持续显示运行时统计，连续 Layout/Repaint 不出现 GUILayout control count 异常。
+6. Unity Profiler 记录 ObjectPool 页面 Editor GC，确认快照复用符合预期。
+```
+
+### 2026-08-01：预览分页热路径降分配
+
+公共层新增 `SimpleToolsPanelUtility.GetPageRange`。TextureSprite、UnityPackage、Lighting、ParticleSystem 四个预览页改为按起止索引直接绘制，不再在每次 Layout/Repaint 通过 `PageItems` 创建临时 `List`。原 `PageItems` API 保留给非热路径调用，分页大小、页码夹取和空数据语义不变。
+
+这项优化只减少编辑器重绘分配，不改变扫描、写入、Undo 或业务结果；仍需在 Unity Profiler 中以实际页面数据确认 Editor GC 曲线。
+
+公共 Header 的 `DrawSummary` 也改为复用编辑器主线程临时缓冲，移除每次重绘的 LINQ 过滤器与闭包；摘要文本和空状态语义保持不变。
+
+### 2026-08-01：SimpleTools 工作台排版整改
+
+本轮整改目标不是再增加页面装饰，而是修正实际绘制顺序：旧页面把 `OnInspectorGUI(PropertyOrder = 100)` 中的 Header、预览和结果放在 Odin 默认字段之后，导致用户先看到零散字段/提示/旧分组，最后才看到工具用途和操作。
+
+#### 已实施的共同工作台规则
+
+```text
+右侧首屏：由 SimpleToolsWindow 根据当前目录绘制唯一工具标题、用途、成熟度与真实风险。
+页面内容：宿主绘制期间抑制旧页面内部 DrawToolHeader，避免底部标题和双标题。
+默认字段：16 个活跃工具页标记为 ESSimpleToolsLayout。
+旧 Odin 装饰：动态移除直接页面成员上的 InfoBox、BoxGroup、TitleGroup、TabGroup 和 PropertySpace。
+保留内容：HorizontalGroup / VerticalGroup 的稳定列宽、FoldoutGroup 高级层级、ESEditorSection 配置目录，以及嵌套结果表格。
+内容容器：活跃页的普通 helpBox 外框改为无边框内容作用域；真正空状态、警告和错误仍使用语义提示。
+```
+
+这意味着页面的基础顺序统一为：
+
+```text
+工具标题与风险 -> 配置/规则 -> 预览或审计 -> 主操作 -> 最近结果 -> 高级/历史
+```
+
+`Page_SceneTextRepair` 同时完成了基准迁移：默认 Odin 扫描报告字段已隐藏，页面改为“扫描与修复 -> 扫描报告 -> 最近结果”，不再让历史输出抢占操作入口。
+
+`Page_AssetReferenceChecker` 移除了目录后的重复“常用设置”编辑区：完整配置继续由“目标设置 / 资源包分离 / 安全保护 / 高级选项”目录负责，操作区改为只读的当前范围快照，再进入分析、结果和隔离动作。
+
+#### 静态复核与边界
+
+```text
+ESSimpleToolsLayout 覆盖：16 个活跃工具页
+活跃 SimpleTools 源码：无 TabGroup / EnumToggleButtons / GUIColor
+普通 EditorStyles.helpBox 容器：0（不含状态提示 HelpBox）
+ES_Editor 局部编译：0 warning / 0 error
+git diff --check：通过，仅有仓库既有的 LF/CRLF 提示
+```
+
+仍待 Unity 视觉验收，不能提前签收：窄宽度、长字段名、PhysicsAlign 的多分区目录、Material/Prefab 的大结果表、RuntimeWatch 持续刷新以及 ObjectPool 的连续 Layout/Repaint。
+
+#### PhysicsAlign 旧组路径兼容
+
+`Page_PhysicsAlign` 的旧 `HorizontalGroup` / `VerticalGroup` 使用了 `对齐/...` 路径，而其父 `TitleGroup("对齐")` 已被 `ESSimpleToolsLayout` 按公共排版规则移除。保留子路径会使 Odin 在构建 PropertyTree 时报告“expected a group with the name 对齐 to exist”，并中止页面绘制。
+
+该页已将旧路径改为简洁的本地组名，例如 `BasicSettings -> Left/Right`、`DistributionSettings -> Left/Right`、`DressingActions` 和 `AuditToolbar`。`ESEditorSectionAttributeProcessor` 会在 Odin 建 PropertyTree 前把它们重写为“当前分区 -> 本地组”的真实路径，因此横排/双列实际位于选中分区内部，而不是与分区并列。
+
+旧页面常只在一行的第一个成员声明 Section，后续列成员只写 `VerticalGroup("DressingSurface/Right")`。处理器现会从同类型、先前已经归属 Section 的布局组根回溯推导这些后续成员的分区，再同时注入 Section 与重写后的组 ID。它只处理带 Odin `PropertyGroupAttribute` 的成员，不会把普通未标注字段自动塞入分区。首屏重复的快捷按钮已移除，操作只在各自业务分区出现；选区审计使用 `ESEditorBeginSection + [ESEditorSection]` 保持连续分区。后续新增组不得再手写旧 `对齐/...` 父路径，使用本地根名即可，并做 Unity 窄宽度验收。
+
+### 2026-08-01：RuntimeWatch 前台续采集与响应式观察布局
+
+RuntimeWatch 保持“前台才采集”的性能边界：`SimpleToolsWindow` 只在 RuntimeWatch 从非前台恢复为当前聚焦页面时调用 `RequestForegroundRefresh()`。该调用仅将下一次自动采样提前到当前 Editor tick；`autoRefresh` 关闭、手动暂停、Edit Mode 未开启编辑器扫描时不采集。窗口失焦、切页、后台 Dock 和普通 OnGUI 重绘仍为零采集。
+
+观察区域采用固定信息顺序：
+
+```text
+观察范围与筛选 -> 自动刷新与高级规则 -> 观察条目工具栏 -> 分类标题 -> 对象标题 -> 成员条目 -> 证据回放 -> 诊断
+```
+
+分类和对象使用轻量标题带、左侧色标和细分隔线建立边界，不使用多层 Box。窄于约 720px 时筛选、分页和证据回放自动拆行；窄于约 760px 时成员右侧操作移至条目下方并横向扩展。不得重新引入固定 240px 右侧操作列或把完整工具栏硬塞在单行。
+
+### 2026-08-02：常见案例 ReadMe 接入规则
+
+`ESReadMeNote` 是挂在场景或 Prefab 对象上的 Inspector 说明组件，不是单独的 Markdown 文档，也不参与运行时业务逻辑。常见案例的说明必须出现在用户实际会选中的入口对象上，至少包含：用途、最短使用步骤、必须保留项、风险/性能边界、所属系统和更新时间。
+
+批量接入入口：
+
+```text
+【ES】/示例与测试/编辑器案例/接入或更新常见案例 ReadMe
+```
+
+该命令只在用户确认后更新下列指定资产：SimpleTools 基础场景、RuntimeWatch 场景、ItemMotion 场景、Asset + GameCore 热更新场景、资源引用 Prefab，并创建或更新 `ES_EditorExtension_Demo.unity`。最后一个场景为 ESEditorSection、双配置目录、ESPolymorphicReference 和多目标边界验证提供正式可打开的案例入口；四个实际案例对象各自挂有 ReadMe。
+
+严禁将这类接入放到 `InitializeOnLoad`、窗口打开、目录切换、普通 OnGUI 或域重载回调中。场景使用 Additive 模式临时打开、保存后关闭；不会替换或关闭用户当前已打开的场景。Prefab 使用 `LoadPrefabContents` / `SaveAsPrefabAsset` 作用于唯一指定路径。任何新增案例都应扩展这个显式清单，不能扫描整个 Examples 目录后擅自写入。
+
+#### 说明必须跟随测试职责对象
+
+场景根 ReadMe 只解释整体流程，不能替代测试对象自身的职责说明。下列对象必须自带 `ESReadMeNote`：
+
+```text
+RuntimeWatch：RW_01_基础类型、RW_02_方法调用、RW_03_筛选嵌套、RW_04_Unity类型
+ItemMotion：发射流程入口、命中目标、基础地面、可选弹道阻挡
+AssetFlow：ES Asset + GameCore Flow Test 控制器
+编辑器扩展案例：Section、双目录、多态引用、多目标边界四个实际案例对象
+多目标边界菜单创建的根和每个独立子对象
+```
+
+ReadMe 至少回答：**当前对象验证什么、必须保留什么、修改它会改变哪个测试条件、有哪些风险边界**。不要给 Main Camera、Directional Light、纯模型骨骼、纯装饰物和自动生成的内部节点泛滥添加 ReadMe；它们不承担用户需要独立理解的测试职责。场景结构变化导致预期对象找不到时，接入工具必须输出警告而非创建同名替代物，以免掩盖测试场景本身已经失真。
+
+### 2026-08-02：RuntimeWatch 视频发布前的快照与操作规则
+
+RuntimeWatch 的页面顺序固定为：
+
+```text
+1. 选择范围并刷新
+2. 刷新与显示
+3. 观察结果与操作
+4. 运行证据（仅录制会话存在时）
+5. 诊断与链路报告（后置）
+```
+
+首屏唯一视觉主操作是“刷新快照”。范围菜单会在用户明确切换为当前场景、选中对象或选中对象及子层级后立即刷新；搜索、分类、脚本、对象和“显示”视图只筛选当前快照，绝不能因此触发扫描。范围、Tag、ShowIf 或 GetMoudle 规则与当前采样不一致时，必须显示“范围或规则已变 · 请刷新”，不能把旧数据伪装为新结果。
+
+`WatchEntry.RefreshSample()` 只能由以下受控路径调用：手动刷新、前台 RuntimeWatch 的自动刷新、录制基线、用户明确设值/执行操作后的延迟刷新。`OnGUI`、Layout/Repaint、复制观察项、填写内联输入控件和证据回放必须只调用 `GetCachedValue()`；严禁重新执行属性、无参方法或反射 Getter。慢读取与读取失败状态因此代表一次真实采样，不会因编辑器重绘倍增。
+
+采样列表 `entries` 与 IMGUI 渲染列表 `renderEntries` 必须分离：采样可以在 Editor update 中更新 `entries`，但 `renderEntries` 只允许在下一次 `EventType.Layout` 整体替换。分组、对象 Foldout、分页和空状态一律以 `renderEntries` 为准，禁止在 Layout/Repaint 中直接遍历会变化的采样列表。这是防止 `Getting control ... position in a group` 的 RuntimeWatch 稳定性边界。
+
+同一原则适用于证据回放：证据事件、录制状态、范围文本和事件数量必须复制到渲染快照后再绘制，不能在 Layout/Repaint 直接读取会由自动采样改变的录制缓冲。用户操作后的逐条反馈应延迟到下一帧 Layout 才插入界面，避免 MouseUp 事件在旧布局树中临时增加 GUILayout 控件。
+
+方法、可写字段和可写属性仍是明确操作：按钮附近显示最近操作的成功/失败反馈，详情后置到诊断区；方法二次确认默认开启。录制按钮在 Edit Mode 必须禁用并明确标为“Play 后录制”，不得点击后才报错。窄窗口下，首屏操作、筛选、分页分别拆行；不得把右侧操作或分页控件硬挤到不可见区域。

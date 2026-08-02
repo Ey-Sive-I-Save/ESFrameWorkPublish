@@ -113,6 +113,7 @@ namespace ES.EditorInternal
             AddAssetRule<ESAssetReferTimelineAssetConfigKey>(rules, ESAssetReferKind.TimelineAsset);
             AddAssetRule<ESAssetReferVideoClipConfigKey>(rules, ESAssetReferKind.VideoClip);
             AddAssetRule<ESAssetReferTerrainDataConfigKey>(rules, ESAssetReferKind.TerrainData);
+            AddAssetRule<ESAssetReferRawConfigKey>(rules, ESAssetReferKind.Raw);
 
             foreach (KeyValuePair<string, Type> pair in GameCoreEnumTypeBySerializedType)
             {

@@ -43,6 +43,7 @@ namespace ES
         public const string TEST_TOOLS_PATH = SAMPLES_TESTS_PATH + "编辑器案例/";
         public const string DEBUG_PATH = DEVELOPMENT_MAINTENANCE_PATH + "自检与调试/";
         public const string INTERACTION_RUNTIME_PANEL_PATH = RUNTIME_DIAGNOSTICS_PATH + "交互系统/运行时面板";
+        public const string STAT_RUNTIME_PANEL_PATH = RUNTIME_DIAGNOSTICS_PATH + "属性系统/运行时面板";
 
         // 兼容旧调用名，值已指向新的语义分类；新代码不得继续扩散这些旧名。
         public const string QUICK_WINDOWS = QUICK_ACCESS;

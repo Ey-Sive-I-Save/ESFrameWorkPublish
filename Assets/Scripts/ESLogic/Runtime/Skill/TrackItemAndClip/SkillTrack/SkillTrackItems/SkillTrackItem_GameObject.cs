@@ -210,9 +210,9 @@ namespace ES
             runtimeState.activeTarget = target;
             runtimeState.originalActive = target.activeSelf;
             runtimeState.hasOriginalActive = true;
+            clipState.UserData = runtimeState;
 
             target.SetActive(clip == null || clip.Activate);
-            clipState.UserData = runtimeState;
         }
 
         public void Tick(EntityState_Skill state, ref SkillRuntimeClipState clipState, float time, float deltaTime)
@@ -223,10 +223,18 @@ namespace ES
         {
             if (clipState.UserData is GameObjectClipRuntimeState runtimeState)
             {
-                if (runtimeState.activeTarget != null && runtimeState.hasOriginalActive)
-                    runtimeState.activeTarget.SetActive(runtimeState.originalActive);
+                try
+                {
+                    if (runtimeState.activeTarget != null && runtimeState.hasOriginalActive)
+                        runtimeState.activeTarget.SetActive(runtimeState.originalActive);
+                }
+                finally
+                {
+                    clipState.UserData = null;
+                    runtimeState.TryAutoPushedToPool();
+                }
 
-                runtimeState.TryAutoPushedToPool();
+                return;
             }
 
             clipState.UserData = null;
@@ -244,7 +252,7 @@ namespace ES
         }
     }
 
-    internal sealed class GameObjectClipRuntimeState : IPoolableAuto
+    internal sealed class GameObjectClipRuntimeState : ISkillRuntimeOwnedUserData
     {
         public static readonly ESSimplePool<GameObjectClipRuntimeState> Pool = new ESSimplePool<GameObjectClipRuntimeState>(
             factoryMethod: () => new GameObjectClipRuntimeState(),

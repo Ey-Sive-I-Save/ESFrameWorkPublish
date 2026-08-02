@@ -17,9 +17,21 @@ namespace ES
         public static ESInputModule InputModule { get; private set; }
         public static ESRuntimeDataModule RuntimeData { get; private set; }
         public static ESGameObjectPoolModule PoolModule { get; private set; }
+        public static ESAudioModule Audio { get; private set; }
+        /// <summary>
+        /// Raised only when the cached audio module instance changes. It is an initialization
+        /// edge, not a frame callback: authored emitters use it to retry one pending OnEnable
+        /// request when GameCore finishes constructing its modules.
+        /// </summary>
+        public static event Action<ESAudioModule> AudioModuleAvailabilityChanged;
         public static ESResourcePlanRuntimeService ResourcePlans { get; private set; }
         public static ESPhysicsQueryModule PhysicsQueryModule { get; private set; }
         public static ESLODModule LODModule { get; private set; }
+        /// <summary>
+        /// 相机模块门面。业务经此申请/更新/释放 Lease；Director 只由模块持有，
+        /// 不允许 Entity、Skill、Vehicle 直接绕过本地观测权写入仲裁器。
+        /// </summary>
+        public static ESCameraModule Camera { get; private set; }
         public static ESConfigKeyTable<ESBuffRuntimeData> BuffData => ESRuntimeDataModule.BuffTable;
         public static ESConfigKeyTable<ESShotRuntimeData> ShotData => ESRuntimeDataModule.ShotTable;
         public static ESConfigKeyTable<ESMonsterRuntimeData> MonsterData => ESRuntimeDataModule.MonsterTable;
@@ -35,6 +47,7 @@ namespace ES
         public static ESConfigKeyTable<ESAssetReferPrefabConfigData> RuntimePrefabAssets => ESRuntimeDataAsset.Prefabs;
         public static ESConfigKeyTable<ESAssetReferSpriteConfigData> RuntimeSpriteAssets => ESRuntimeDataAsset.Sprites;
         public static ESConfigKeyTable<ESAssetReferAudioClipConfigData> RuntimeAudioClipAssets => ESRuntimeDataAsset.AudioClips;
+        public static ESAudioCueConfigKeyTable RuntimeAudioCueData => ESRuntimeDataGameCore.AudioCues;
         public static ESConfigKeyTable<ESAssetReferAnimationClipConfigData> RuntimeAnimationClipAssets => ESRuntimeDataAsset.AnimationClips;
         public static ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffRuntimeInstances => ESRuntimeDataModule.BuffInstanceIndex;
         public static ESRuntimeInstanceIndex<Item> ShotRuntimeInstances => ESRuntimeDataModule.ShotInstanceIndex;
@@ -97,7 +110,6 @@ namespace ES
                 LocalControl = new ESLocalControlService();
             if (ResourcePlans == null)
                 ResourcePlans = new ESResourcePlanRuntimeService();
-
             RuntimeMode.Warmup(RuntimeModeWarmupModeCapacity, RuntimeModeWarmupTagCapacity);
             LocalControl.SetRuntimeModeService(RuntimeMode);
 
@@ -120,6 +132,16 @@ namespace ES
                 PoolModule = poolModule as ESGameObjectPoolModule;
             else
                 PoolModule = null;
+
+            if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESAudioModule), out IModule audioModule))
+                SetAudioModule(audioModule as ESAudioModule);
+            else
+                SetAudioModule(null);
+
+            if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESCameraModule), out IModule cameraModule))
+                Camera = cameraModule as ESCameraModule;
+            else
+                Camera = null;
 
             if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESPhysicsQueryModule), out IModule physicsQueryModule))
                 PhysicsQueryModule = physicsQueryModule as ESPhysicsQueryModule;
@@ -159,11 +181,22 @@ namespace ES
             InputModule = null;
             RuntimeData = null;
             PoolModule = null;
+            SetAudioModule(null);
             PhysicsQueryModule = null;
             LODModule = null;
+            Camera = null;
             ResourcePlans?.Dispose();
             ResourcePlans = null;
             ESCommandServices.Clear();
+        }
+
+        private static void SetAudioModule(ESAudioModule module)
+        {
+            if (ReferenceEquals(Audio, module))
+                return;
+
+            Audio = module;
+            AudioModuleAvailabilityChanged?.Invoke(module);
         }
     }
 

@@ -29,4 +29,4 @@
 | --- | --- | --- |
 | [ES Asset Runtime Generation](ASSET_RUNTIME_GENERATION.md) | `Reserved` | 当前继续使用预检保护重建；只有玩法中无停顿热插拔且失败必须续玩时才立项 |
 | [ESFramework 职责收口](ESFRAMEWORK_RESPONSIBILITY_CONSOLIDATION.md) | `Reserved` | 先冻结权威边界，再按风险逐步收口；禁止为了目录整齐进行大规模搬迁 |
-
+| [ES 物品域设计与聚合方案](ES_ITEM_DOMAIN_DESIGN.md) | `Proposed` | 单一 `ESItemModule` 聚合物品实例、Container、装备、世界拾取与存档边界；尚未新增生产实现 |

@@ -3,8 +3,8 @@ using System;
 namespace ES
 {
     /// <summary>
-    /// Optional authored mechanism for a Buff definition. It is shared configuration only: never
-    /// retain per-target state here, because one definition can be active on many owners at once.
+    /// Optional authored mechanism for a Buff definition. It owns configured rules and lifecycle
+    /// decisions, but never per-target state: one definition can be active on many owners at once.
     /// </summary>
     [Serializable]
     public abstract class ESBuffLogic
@@ -14,11 +14,31 @@ namespace ES
         /// rent the returned object from their own ESSimplePool.
         /// </summary>
         public abstract ESBuffLogicRuntime RentRuntime();
+
+        /// <summary>Return false to reject application and trigger the normal Buff rollback path.</summary>
+        public virtual bool OnApply(ESBuffLogicRuntime runtime) => true;
+
+        /// <summary>Runs after stack, duration or level changes and related ValueChange refreshes.</summary>
+        public virtual void OnRefresh(ESBuffLogicRuntime runtime) { }
+
+        /// <summary>Runs on the Buff definition's existing Tick mode and interval.</summary>
+        public virtual void OnTick(ESBuffLogicRuntime runtime, float deltaTime) { }
+
+        /// <summary>Runs only for a normally removed Buff, before the configured Remove Op.</summary>
+        public virtual void OnRemove(ESBuffLogicRuntime runtime) { }
+
+        /// <summary>
+        /// Always runs while the Buff still owns its Tag, ValueChange and Support resources. Release
+        /// subscriptions, leases and tokens stored by <paramref name="runtime"/> here. It also runs
+        /// for Apply rollback and pool cleanup.
+        /// </summary>
+        public virtual void OnRelease(ESBuffLogicRuntime runtime) { }
     }
 
     /// <summary>
-    /// Per-active-Buff state for an optional <see cref="ESBuffLogic"/>. The Buff framework owns
-    /// its attach, lifecycle calls and release; custom logic owns only resources it creates.
+    /// Per-active-Buff state and resource container for an optional <see cref="ESBuffLogic"/>.
+    /// The definition owns mechanism decisions; this runtime owns only one Buff instance's mutable
+    /// state and resources.
     /// </summary>
     public abstract class ESBuffLogicRuntime : IPoolableAuto
     {
@@ -30,24 +50,6 @@ namespace ES
         public Entity Owner => Buff != null ? Buff.Owner : null;
         public ESRuntimeTargetPack Target => Buff != null ? Buff.TargetPack : null;
         public ESOpSupport Support => Buff != null ? Buff.Support : null;
-
-        /// <summary>Return false to reject application and trigger the normal Buff rollback path.</summary>
-        public virtual bool OnApply() => true;
-
-        /// <summary>Runs after stack, duration or level changes and related ValueChange refreshes.</summary>
-        public virtual void OnRefresh() { }
-
-        /// <summary>Runs on the Buff definition's existing Tick mode and interval.</summary>
-        public virtual void OnTick(float deltaTime) { }
-
-        /// <summary>Runs only for a normally removed Buff, before the configured Remove Op.</summary>
-        public virtual void OnRemove() { }
-
-        /// <summary>
-        /// Always runs while the Buff still owns its Tag, ValueChange and Support resources. Release
-        /// subscriptions, leases and tokens here; it also runs for Apply rollback and pool cleanup.
-        /// </summary>
-        protected virtual void OnRelease() { }
 
         /// <summary>Return this runtime to its concrete pool. Do not call this from a lifecycle hook.</summary>
         public abstract void TryAutoPushedToPool();
@@ -70,17 +72,10 @@ namespace ES
             Buff = buff;
         }
 
-        internal void ReleaseAndReturnToPool()
+        internal void DetachAndReturnToPool()
         {
-            try
-            {
-                OnRelease();
-            }
-            finally
-            {
-                Buff = null;
-                TryAutoPushedToPool();
-            }
+            Buff = null;
+            TryAutoPushedToPool();
         }
     }
 }

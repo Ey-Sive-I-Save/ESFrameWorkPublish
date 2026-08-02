@@ -36,7 +36,8 @@ namespace ES
         public string objectPrefix = string.Empty;
         public string validationPrefix = ".es-validation";
         public string credentialProfile = string.Empty;
-        public int maxConcurrency = 3;
+        /// <summary>当前总控为严格串行事务；叶子并发调度尚未实现前固定为 1，避免配置值与实际行为不一致。</summary>
+        public int maxConcurrency = 1;
         public int maxAttemptsPerFile = 3;
         public bool verifyRemoteAfterUpload = true;
         public bool refreshCdnAfterUpload;
@@ -179,6 +180,7 @@ namespace ES
                 if (request == null) throw new ArgumentNullException(nameof(request));
                 if (!TryGetOrderedFiles(request.Plan, out List<ESAssetReleaseUploadPlanFile> ordered, out string error))
                     throw new InvalidOperationException(error);
+                ValidateTargetPublicRoot(request.Target, request.Plan);
                 IESAssetReleaseUploadProvider provider = ESAssetReleaseUploadProviderFactory.Get(request.Target.mode);
                 if (!provider.CanHandle(request.Target, out string reason))
                     throw new InvalidOperationException("发布目标不可用：" + reason);
@@ -210,6 +212,27 @@ namespace ES
             return result;
         }
 
+        private static void ValidateTargetPublicRoot(ESAssetReleaseUploadTarget target, ESAssetReleaseUploadPlan plan)
+        {
+            if (target == null || plan == null) throw new InvalidOperationException("缺少发布目标或上传计划。");
+            if (string.IsNullOrWhiteSpace(target.publicBaseUrl))
+                throw new InvalidOperationException("远端发布目标缺少“客户端访问根地址”。它必须包含对象前缀，并与第四步 Manifest 的下载地址一致。");
+            string targetBase = EnsureTrailingSlash(target.publicBaseUrl);
+            string expectedPlanBase = targetBase + (plan.platform ?? string.Empty).Trim('/') + "/";
+            if (!string.Equals(EnsureTrailingSlash(plan.publicBaseUrl), expectedPlanBase, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "远端对象路径与客户端 Manifest 下载根不一致。目标根=" + targetBase
+                    + "，计划根=" + plan.publicBaseUrl
+                    + "。请让“客户端访问根地址 + 平台目录”严格等于第四步生成的计划根。");
+            }
+        }
+
+        private static string EnsureTrailingSlash(string value)
+        {
+            return (value ?? string.Empty).Trim().TrimEnd('/') + "/";
+        }
+
         public static ESEditorLongTask Enqueue(ESAssetReleaseUploadRequest request, Action<ESAssetReleaseUploadResult> onFinished = null)
         {
             ESAssetReleaseUploadPreflightResult preflight = Preflight(request);
@@ -222,6 +245,18 @@ namespace ES
         internal static bool TryGetOrderedFiles(ESAssetReleaseUploadPlan plan, out List<ESAssetReleaseUploadPlanFile> ordered, out string error)
         {
             List<ESAssetReleaseUploadPlanFile> files = (plan?.files ?? new List<ESAssetReleaseUploadPlanFile>()).ToList();
+            if (!IsSafePathSegment(plan?.platform) || !IsSafePathSegment(plan?.releaseVersion))
+            {
+                ordered = null;
+                error = "上传计划的平台目录或发布版本不是合法路径片段。";
+                return false;
+            }
+            if (files.Any(item => item == null))
+            {
+                ordered = null;
+                error = "上传计划包含空文件记录。";
+                return false;
+            }
             List<ESAssetReleaseUploadPlanFile> rootFiles = files.Where(item => item != null && item.uploadLast).ToList();
             if (rootFiles.Count != 1 || !string.Equals(rootFiles[0].relativePath, "ESAssetReleaseManifest.json", StringComparison.Ordinal))
             {
@@ -235,10 +270,42 @@ namespace ES
                 error = "根发布清单必须使用 no-cache, max-age=0, must-revalidate；请重新生成发布上传计划。";
                 return false;
             }
-            ordered = files.Where(item => item != null && !item.uploadLast).OrderBy(item => item.uploadOrder).ToList();
+            var paths = new HashSet<string>(StringComparer.Ordinal);
+            var orders = new HashSet<int>();
+            string releasePrefix = plan.releaseVersion.Trim() + "/";
+            foreach (ESAssetReleaseUploadPlanFile file in files.Where(item => !item.uploadLast))
+            {
+                if (file.uploadOrder <= 0 || !orders.Add(file.uploadOrder)
+                    || !IsSafeReleaseRelativePath(file.relativePath, releasePrefix)
+                    || !paths.Add(file.relativePath))
+                {
+                    ordered = null;
+                    error = "上传计划包含重复序号、重复路径或越出当前发布版本的叶子文件：" + file.relativePath;
+                    return false;
+                }
+            }
+            ordered = files.Where(item => !item.uploadLast).OrderBy(item => item.uploadOrder).ToList();
             ordered.Add(rootFiles[0]);
             error = string.Empty;
             return true;
+        }
+
+        private static bool IsSafePathSegment(string value)
+        {
+            string segment = (value ?? string.Empty).Trim();
+            return !string.IsNullOrEmpty(segment)
+                && string.Equals(segment, System.IO.Path.GetFileName(segment), StringComparison.Ordinal)
+                && segment.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) < 0
+                && segment != "." && segment != "..";
+        }
+
+        private static bool IsSafeReleaseRelativePath(string value, string releasePrefix)
+        {
+            string relative = (value ?? string.Empty).Replace('\\', '/').Trim('/');
+            if (!relative.StartsWith(releasePrefix, StringComparison.Ordinal) || relative.Length <= releasePrefix.Length)
+                return false;
+            string[] segments = relative.Split('/');
+            return segments.All(IsSafePathSegment);
         }
     }
 
@@ -291,6 +358,7 @@ namespace ES
         private IESAssetReleaseUploadOperation operation;
         private int index;
         private int attemptsStarted;
+        private bool rootUploadAttempted;
 
         public ESAssetReleaseUploadLongTask(ESAssetReleaseUploadRequest request, IESAssetReleaseUploadProvider provider, List<ESAssetReleaseUploadPlanFile> orderedFiles, Action<ESAssetReleaseUploadResult> onFinished)
             : base("ES 资源发布上传", "es-release-upload", 10)
@@ -315,7 +383,18 @@ namespace ES
 
             if (operation == null)
             {
+                // Preflight 与真正网络写入之间可能相隔多个 Editor 帧。仅比较长度无法识别
+                // “内容变化但大小相同”的文件；必须在每次尝试开始前再次确认发布计划中的 SHA-256。
+                // 这样 Provider 写入的远端元数据、上传字节和第四步清单始终对应同一份候选文件。
+                if (string.IsNullOrWhiteSpace(file.sha256)
+                    || !ESResManifestIntegrity.VerifyFileSha256(file.sourcePath, file.sha256))
+                {
+                    SetFailure(new InvalidOperationException("上传源文件 SHA-256 已变化，拒绝上传：" + file.relativePath));
+                    return ESEditorLongTaskStepResult.Fail;
+                }
                 attemptsStarted++;
+                if (file.uploadLast)
+                    rootUploadAttempted = true;
                 operation = provider.BeginUpload(new ESAssetReleaseUploadFileRequest(request.Target, request.Plan, file));
                 if (operation == null)
                 {
@@ -348,7 +427,11 @@ namespace ES
             {
                 IsSuccess = Status == ESEditorLongTaskStatus.Succeeded,
                 UploadedFileCount = index,
-                Message = Status == ESEditorLongTaskStatus.Succeeded ? "上传流程完成；根发布清单已在最后处理。" : "上传流程未完成；根发布清单没有被提前处理。",
+                Message = Status == ESEditorLongTaskStatus.Succeeded
+                    ? "上传流程完成；根发布清单已在最后处理。"
+                    : rootUploadAttempted
+                        ? "上传流程未完成；根发布清单已开始上传但最终校验未完成，远端状态未知。请先通过 HEAD 确认根清单，再决定重试或回退。"
+                        : "上传流程未完成；根发布清单没有被提前处理。",
                 Errors = LastError == null ? Array.Empty<string>() : new[] { LastError.Message }
             });
         }

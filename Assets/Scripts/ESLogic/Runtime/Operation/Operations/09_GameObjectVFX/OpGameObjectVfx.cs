@@ -124,8 +124,14 @@ namespace ES
     [Serializable, TypeRegistryItem("播放粒子", OperationTypeRegistryNames.Vfx)]
     public sealed class OpVfx_PlayParticleSystem : ESOutputOp
     {
+        public override bool NeedsStop => true;
+
         public GameObjectExpressionSource targetObject = new GameObjectExpressionSource();
         public bool withChildren = true;
+
+        [LabelText("播放配置的 VFX 音频")]
+        [InfoBox("优先使用目标根节点的 ESVfxAudioEmitterSet；若没有 Set，则只触发根节点单个 ESVfxAudioEmitter 的 OnVfxPlay。不扫描 AudioSource 子树。")]
+        public bool playConfiguredAudio = true;
 
         protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
@@ -140,6 +146,15 @@ namespace ES
 
             for (int i = 0; i < particles.Length; i++)
                 particles[i].Play(true);
+
+            if (playConfiguredAudio)
+            {
+                ESVfxAudioEmitterSet emitterSet = obj.GetComponent<ESVfxAudioEmitterSet>();
+                if (emitterSet != null)
+                    emitterSet.PlayConfiguredEmitters();
+                else
+                    obj.GetComponent<ESVfxAudioEmitter>()?.PlayFromVfx();
+            }
         }
 
         protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
@@ -155,6 +170,15 @@ namespace ES
 
             for (int i = 0; i < particles.Length; i++)
                 particles[i].Stop(true, ParticleSystemStopBehavior.StopEmitting);
+
+            if (playConfiguredAudio)
+            {
+                ESVfxAudioEmitterSet emitterSet = obj.GetComponent<ESVfxAudioEmitterSet>();
+                if (emitterSet != null)
+                    emitterSet.StopConfiguredEmitters();
+                else
+                    obj.GetComponent<ESVfxAudioEmitter>()?.StopConfigured();
+            }
         }
     }
 }

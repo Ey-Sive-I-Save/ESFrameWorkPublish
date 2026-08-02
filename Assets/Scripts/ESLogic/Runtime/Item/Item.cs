@@ -7,7 +7,7 @@ namespace ES
 {
     [DisallowMultipleComponent]
     [AddComponentMenu("【ES】/内容制作/道具/Item")]
-    public class Item : Core, IESGameObjectPoolLifecycle
+    public partial class Item : Core, IESGameObjectPoolLifecycle, IESEffectLeaseOwner
     {
         [Title("物品定义")]
         [LabelText("Prefab 物品定义")]
@@ -47,6 +47,7 @@ namespace ES
         protected override void OnBeforeAwakeRegister()
         {
             EnsureItemOpSupport();
+            EnsureItemAttributes();
             // An Item without authored or runtime Tag facts stays allocation-free here. Binding a
             // non-empty definition will create and warm its Collection only when it is applied.
             TryBindPrefabDefinition();
@@ -68,6 +69,8 @@ namespace ES
 
         protected override void OnDestroy()
         {
+            ResetItemAttributesForLifecycleEnd();
+            UnsubscribeFromAttributeCatalog();
             UnsubscribeFromTagCatalog();
             intrinsicTagLeases.ReleaseAll();
             intrinsicTags = null;
@@ -86,6 +89,9 @@ namespace ES
         /// <summary>Called before the pooled Item is deactivated; ends the current Tag lifetime.</summary>
         public void OnPoolDespawned()
         {
+            ResetItemAttributesForLifecycleEnd();
+            UnsubscribeFromAttributeCatalog();
+            itemAttributeDefinition = null;
             UnsubscribeFromTagCatalog();
             intrinsicTagLeases.ReleaseAll();
             intrinsicTags = null;
@@ -99,16 +105,24 @@ namespace ES
         public void OnPoolSpawned()
         {
             EnsureItemOpSupport();
+            EnsureItemAttributes();
             TryBindPrefabDefinition();
         }
 
         /// <summary>Binds the ItemDataInfo that is the sole authority for this Item's birth Tags.</summary>
         public bool BindDefinition(ItemDataInfo itemDefinition)
         {
+            if (!CanBindItemAttributeDefinition(itemDefinition, out string attributeError))
+            {
+                itemAttributeError = attributeError;
+                return false;
+            }
+
             bool changed = !ReferenceEquals(intrinsicTagDefinition, itemDefinition)
                            || !ReferenceEquals(intrinsicTags, itemDefinition != null ? itemDefinition.tags : null);
             intrinsicTagDefinition = itemDefinition;
             intrinsicTags = itemDefinition != null ? itemDefinition.tags : null;
+            BindItemAttributeDefinition(itemDefinition);
             if (changed && !ESTagRuntimeCatalog.IsBound)
                 intrinsicTagLeases.ReleaseAll();
 

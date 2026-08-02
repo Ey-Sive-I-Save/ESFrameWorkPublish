@@ -27,11 +27,13 @@ namespace ES
         [NonSerialized] private SkillRuntimeTrackState[] trackStates;
         [NonSerialized] private SkillRuntimeClipState[][] clipStates;
         [NonSerialized] private ESRuntimeTargetPack runtimeTarget;
+        [NonSerialized] private long runtimeTargetVersion;
         [NonSerialized] private ESOpSupport opSupport;
         [NonSerialized] private SkillDefinitionDataInfo skillDefinition;
         [NonSerialized] private SkillRuntimePreparedValues preparedValues;
         [NonSerialized] private float skillTime;
         [NonSerialized] private bool runtimePrepared;
+        [NonSerialized] private bool releaseSequenceCacheOnReset;
 
         public ESRuntimeTargetPack RuntimeTarget => runtimeTarget;
         public ESRuntimeTargetPack SkillRuntimeTarget => runtimeTarget;
@@ -45,7 +47,17 @@ namespace ES
 
         public void SetSkillSequence(ITrackSequence sequence)
         {
+            ReleaseOwnedSequenceCacheIfChanged(sequence);
             skillSequence = sequence;
+            releaseSequenceCacheOnReset = false;
+            runtimePrepared = false;
+        }
+
+        public void SetTemporarySkillSequence(ITrackSequence sequence)
+        {
+            ReleaseOwnedSequenceCacheIfChanged(sequence);
+            skillSequence = sequence;
+            releaseSequenceCacheOnReset = sequence != null;
             runtimePrepared = false;
         }
 
@@ -77,6 +89,7 @@ namespace ES
             skillTime = 0f;
             if (runtimeTarget == null || runtimeTarget.IsRecycled)
                 runtimeTarget = ESRuntimeTargetPack.Pool.GetInPool();
+            runtimeTargetVersion = runtimeTarget.Version;
 
             if (opSupport == null || opSupport.IsRecycled)
                 opSupport = ESOpSupport.Rent();
@@ -109,32 +122,75 @@ namespace ES
 
         protected override void OnStateExitLogic()
         {
-            if (runtimeTarget != null && !runtimeTarget.IsRecycled)
-                runtimeTarget.HoldRecycle(null);
-
-            ExitAllClips();
-            ExitAllTracks();
-            ReleaseTrackRuntimeTargets();
-
-            if (runtimeTarget != null && !runtimeTarget.IsRecycled)
-                runtimeTarget.CompleteRecycle(null);
-
-            if (opSupport != null)
+            try
             {
-                opSupport.SetCurrentSkillState(null);
-                opSupport.ClearActivationRuntime();
+                try
+                {
+                    ExitAllClips();
+                }
+                finally
+                {
+                    ExitAllTracks();
+                }
             }
+            finally
+            {
+                try
+                {
+                    ReleaseTrackRuntimeTargets();
+                }
+                finally
+                {
+                    try
+                    {
+                        ESRuntimeTargetPack.TryReturnOwned(runtimeTarget, runtimeTargetVersion);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogLifecycleException("Skill Target Exit", -1, -1, exception);
+                    }
+                    finally
+                    {
+                        runtimeTarget = null;
+                        runtimeTargetVersion = 0L;
+                    }
 
-            runtimeTarget = null;
-            skillTime = 0f;
+                    if (opSupport != null)
+                    {
+                        try
+                        {
+                            opSupport.SetCurrentSkillState(null);
+                        }
+                        catch (Exception exception)
+                        {
+                            LogLifecycleException("Skill Support Unbind", -1, -1, exception);
+                        }
+
+                        try
+                        {
+                            opSupport.ClearActivationRuntime();
+                        }
+                        catch (Exception exception)
+                        {
+                            LogLifecycleException("Skill Support Clear", -1, -1, exception);
+                        }
+                    }
+
+                    skillTime = 0f;
+                }
+            }
         }
 
         protected override void OnStateResetAsPoolableLogic()
         {
             ResetRuntimeStates();
+            if (releaseSequenceCacheOnReset && skillSequence != null)
+                SkillSequenceRuntimeCache.Release(skillSequence);
             skillSequence = null;
+            releaseSequenceCacheOnReset = false;
             runtimeCache = null;
             runtimeTarget = null;
+            runtimeTargetVersion = 0L;
             if (opSupport != null && !opSupport.IsRecycled)
                 opSupport.TryAutoPushedToPool();
             opSupport = null;
@@ -142,6 +198,12 @@ namespace ES
             preparedValues = null;
             skillTime = 0f;
             runtimePrepared = false;
+        }
+
+        private void ReleaseOwnedSequenceCacheIfChanged(ITrackSequence nextSequence)
+        {
+            if (releaseSequenceCacheOnReset && skillSequence != null && !ReferenceEquals(skillSequence, nextSequence))
+                SkillSequenceRuntimeCache.Release(skillSequence);
         }
 
         public ESRuntimeTargetPack GetTrackRuntimeTarget(int trackIndex)
@@ -309,7 +371,12 @@ namespace ES
                 var track = tracks[i];
                 var trackPlayer = track.Player;
                 if (trackPlayer != null)
+                {
+                    if (!trackStates[i].IsRunning)
+                        continue;
+
                     trackPlayer.Tick(this, ref trackStates[i], time, deltaTime);
+                }
 
                 TickClips(track, ref trackStates[i], clipStates[i], time, deltaTime);
             }
@@ -336,8 +403,31 @@ namespace ES
             for (int i = 0; i < tracks.Length; i++)
             {
                 var player = tracks[i].Player;
-                if (player != null)
+                if (player == null)
+                    continue;
+
+                try
+                {
                     player.OnSkillEnter(this, ref trackStates[i]);
+                    trackStates[i].IsRunning = true;
+                }
+                catch (Exception exception)
+                {
+                    LogLifecycleException("Track Enter", i, -1, exception);
+                    try
+                    {
+                        player.OnSkillExit(this, ref trackStates[i]);
+                    }
+                    catch (Exception compensationException)
+                    {
+                        LogLifecycleException("Track Enter Compensation", i, -1, compensationException);
+                    }
+                    finally
+                    {
+                        ReleaseLifecycleUserData(ref trackStates[i].UserData, "Track Enter Compensation", i, -1);
+                        trackStates[i].Reset();
+                    }
+                }
             }
         }
 
@@ -391,7 +481,32 @@ namespace ES
                 state.IsInside = true;
                 state.HasEntered = true;
                 trackState.AddActiveClipIndex(clipIndex);
-                track.Clips[clipIndex].Player?.OnClipEnter(this, ref state);
+                var player = track.Clips[clipIndex].Player;
+                if (player == null)
+                    continue;
+
+                try
+                {
+                    player.OnClipEnter(this, ref state);
+                }
+                catch (Exception exception)
+                {
+                    LogLifecycleException("Clip Enter", -1, clipIndex, exception);
+                    try
+                    {
+                        player.OnClipExit(this, ref state);
+                    }
+                    catch (Exception compensationException)
+                    {
+                        LogLifecycleException("Clip Enter Compensation", -1, clipIndex, compensationException);
+                    }
+                    finally
+                    {
+                        state.IsInside = false;
+                        trackState.RemoveActiveClipIndex(clipIndex);
+                        ReleaseLifecycleUserData(ref state.UserData, "Clip Enter Compensation", -1, clipIndex);
+                    }
+                }
             }
         }
 
@@ -415,7 +530,22 @@ namespace ES
 
                 state.IsInside = false;
                 trackState.RemoveActiveClipIndex(clipIndex);
-                track.Clips[clipIndex].Player?.OnClipExit(this, ref state);
+                var player = track.Clips[clipIndex].Player;
+                if (player == null)
+                    continue;
+
+                try
+                {
+                    player.OnClipExit(this, ref state);
+                }
+                catch (Exception exception)
+                {
+                    LogLifecycleException("Clip Exit", -1, clipIndex, exception);
+                }
+                finally
+                {
+                    ReleaseLifecycleUserData(ref state.UserData, "Clip Exit", -1, clipIndex);
+                }
             }
         }
 
@@ -439,8 +569,21 @@ namespace ES
 
                     states[c].IsInside = false;
                     var player = clips[c].Player;
-                    if (player != null)
+                    if (player == null)
+                        continue;
+
+                    try
+                    {
                         player.OnClipExit(this, ref states[c]);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogLifecycleException("Clip Exit", i, c, exception);
+                    }
+                    finally
+                    {
+                        ReleaseLifecycleUserData(ref states[c].UserData, "Clip Exit", i, c);
+                    }
                 }
             }
         }
@@ -454,9 +597,47 @@ namespace ES
             for (int i = 0; i < tracks.Length; i++)
             {
                 var player = tracks[i].Player;
-                if (player != null)
+                if (player == null || !trackStates[i].IsRunning)
+                    continue;
+
+                try
+                {
                     player.OnSkillExit(this, ref trackStates[i]);
+                }
+                catch (Exception exception)
+                {
+                    LogLifecycleException("Track Exit", i, -1, exception);
+                }
+                finally
+                {
+                    ReleaseLifecycleUserData(ref trackStates[i].UserData, "Track Exit", i, -1);
+                    trackStates[i].Reset();
+                }
             }
+        }
+
+        private void ReleaseLifecycleUserData(ref object userData, string phase, int trackIndex, int clipIndex)
+        {
+            object value = userData;
+            userData = null;
+            if (value == null)
+                return;
+
+            try
+            {
+                if (value is ISkillRuntimeOwnedUserData poolable && !poolable.IsRecycled)
+                    poolable.TryAutoPushedToPool();
+            }
+            catch (Exception exception)
+            {
+                LogLifecycleException(phase + " UserData Cleanup", trackIndex, clipIndex, exception);
+            }
+        }
+
+        private static void LogLifecycleException(string phase, int trackIndex, int clipIndex, Exception exception)
+        {
+            StateMachineDebugSettings.Instance.LogError(
+                $"[SkillTrack] {phase} failed. Track={trackIndex} Clip={clipIndex}\n{exception}");
         }
 
         private void ReleaseTrackRuntimeTargets()
@@ -466,11 +647,23 @@ namespace ES
 
             for (int i = 0; i < trackStates.Length; i++)
             {
-                ESRuntimeTargetPack target = GetTrackRuntimeTarget(i);
-                if (target != null && target != runtimeTarget && !target.IsRecycled)
-                    target.ForcePushToPool();
-
-                trackStates[i].UserData = null;
+                try
+                {
+                    if (trackStates[i].UserData is SkillOperationTrackRuntimeState operationState)
+                    {
+                        if (operationState.createdTarget)
+                            ESRuntimeTargetPack.TryReturnOwned(operationState.target, operationState.targetVersion);
+                        operationState.TryAutoPushedToPool();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    LogLifecycleException("Track Target Exit", i, -1, exception);
+                }
+                finally
+                {
+                    trackStates[i].UserData = null;
+                }
             }
         }
 

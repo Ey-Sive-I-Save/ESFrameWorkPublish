@@ -3259,10 +3259,11 @@ public class ESTrackViewWindow : OdinEditorWindow
         }
         else if (clip is SkillTrackClip_Audio audioClip)
         {
-            if (audioClip.audioClip == null)
-                AddClipWarning(warnings, clipWarnings, clip, $"轨道[{trackIndex}] {trackName} / 片段[{clipIndex}] {clipName} 未指定 AudioClip。");
-            else if (audioClip.stopOnClipExit && audioClip.DurationTime + 0.05f < audioClip.audioClip.length)
-                AddClipWarning(warnings, clipWarnings, clip, $"轨道[{trackIndex}] {trackName} / {clipName} 开启了离开片段停止音效，但片段时长({audioClip.DurationTime:F2}s)短于音频({audioClip.audioClip.length:F2}s)，可能被截断。");
+            bool hasCue = audioClip.cue != null && audioClip.cue.IsConfigured;
+            if (!hasCue && audioClip.LegacyAudioClip == null)
+                AddClipWarning(warnings, clipWarnings, clip, $"轨道[{trackIndex}] {trackName} / 片段[{clipIndex}] {clipName} 未指定 Cue。");
+            else if (!hasCue && audioClip.stopOnClipExit && audioClip.DurationTime + 0.05f < audioClip.LegacyAudioClip.length)
+                AddClipWarning(warnings, clipWarnings, clip, $"轨道[{trackIndex}] {trackName} / {clipName} 开启了离开片段停止音效，但片段时长({audioClip.DurationTime:F2}s)短于音频({audioClip.LegacyAudioClip.length:F2}s)，可能被截断。");
         }
         else if (clip is SkillTrackClip_Operation operationClip)
         {

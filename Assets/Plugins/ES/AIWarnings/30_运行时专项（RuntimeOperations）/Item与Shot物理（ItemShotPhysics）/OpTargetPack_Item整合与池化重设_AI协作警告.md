@@ -44,8 +44,6 @@ targetItems
 runtimeFloat
 runtimeBool
 extras
-recycleToken
-recycleRequested
 ```
 
 当前 `OnResetAsPoolable -> ResetAllFields / ResetAllExtras` 已覆盖 Item 字段和 Item 列表。
@@ -111,5 +109,7 @@ TargetPack = 这次 Op 要作用到谁
 
 - 不要把 Item 只放进 `extras`。
 - 不要让 TargetPack 负责对象池生成/回收，它只负责清引用。
+- 普通业务不得访问 TargetPack Pool 或直接归还 Pack。创建层保存租用版本并负责回收，Operation 只借用。
+- `IsRecycled` 不能识别对象是否已进入下一租期；长期 Owner 必须用 Pack 引用与 `Version` 联合校验。
 - 不要让高频 Shot Tick 每帧跑 Op。
 - 不要把伤害、VFX、Pool 混进 Item 目标包。

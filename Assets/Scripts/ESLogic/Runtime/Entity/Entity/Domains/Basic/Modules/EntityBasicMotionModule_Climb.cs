@@ -428,6 +428,71 @@ namespace ES
         [LabelText("退出攀爬冷却(秒)"), Tooltip("退出攀爬后多久内禁止自动重新进入")]
         public float exitClimbCooldown = 1f;
 
+        /// <summary>编辑器和构建门禁使用的公开攀爬状态契约，不依赖运行时私有缓存。</summary>
+        public static bool ValidateClimbingStateConfig(StateBasicConfig config, out string error)
+        {
+            if (config == null)
+            {
+                error = "攀爬动作缺少 StateBasicConfig。";
+                return false;
+            }
+
+            if (config.stateSupportFlag != StateSupportFlags.Climbing)
+            {
+                error = "stateSupportFlag 必须精确设为 Climbing。";
+                return false;
+            }
+
+            if (!config.resetSupportFlagOnEnter)
+            {
+                error = "resetSupportFlagOnEnter 必须开启，否则无法切换到 Climbing 环境。";
+                return false;
+            }
+
+            if (!config.deactivateOnSupportFlagSwitching)
+            {
+                error = "deactivateOnSupportFlagSwitching 必须开启，否则已运行的不兼容动作不会在攀爬入场时退出。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        /// <summary>
+        /// 攀爬跳跃会离墙进入空中 KCC 分支，不可沿用持续攀爬的 Climbing 环境。
+        /// 当前主环境回归 Grounded，由 ForceUnground 与 ClimbJump 子状态表达短暂滞空。
+        /// </summary>
+        public static bool ValidateClimbJumpStateConfig(StateBasicConfig config, out string error)
+        {
+            if (config == null)
+            {
+                error = "攀爬跳跃动作缺少 StateBasicConfig。";
+                return false;
+            }
+
+            if (config.stateSupportFlag != StateSupportFlags.Grounded)
+            {
+                error = "stateSupportFlag 必须精确设为 Grounded。";
+                return false;
+            }
+
+            if (!config.resetSupportFlagOnEnter)
+            {
+                error = "resetSupportFlagOnEnter 必须开启，否则无法从攀爬环境恢复到 Grounded。";
+                return false;
+            }
+
+            if (!config.deactivateOnSupportFlagSwitching)
+            {
+                error = "deactivateOnSupportFlagSwitching 必须开启，否则已运行的不兼容动作不会在攀爬跳跃入场时退出。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
         public override void Start()
         {
             base.Start();

@@ -1,0 +1,370 @@
+using System;
+using System.Runtime.CompilerServices;
+using UnityEngine;
+
+[assembly: InternalsVisibleTo("ES_Design.ConfigKey.Tests")]
+
+namespace ES
+{
+    // 此文件属于 ES_Logic.asmdef；保留该注释以便 AssetDatabase 对当前相机契约文本重新导入。
+    /// <summary>
+    /// 一个本地观测视口的稳定标识。当前项目默认只注册 MainView；请求与 Lease
+    /// 仍必须携带该标识，以免未来回放、观战或分屏共享错误的相机仲裁集合。
+    /// </summary>
+    [Serializable]
+    public readonly struct ESCameraViewId : IEquatable<ESCameraViewId>
+    {
+        public static readonly ESCameraViewId Main = new ESCameraViewId("MainView");
+
+        [SerializeField] private readonly string key;
+
+        public ESCameraViewId(string key)
+        {
+            this.key = key;
+        }
+
+        public string Key => key;
+        public bool IsValid => !string.IsNullOrWhiteSpace(key);
+
+        public bool Equals(ESCameraViewId other) => string.Equals(key, other.key, StringComparison.Ordinal);
+        public override bool Equals(object obj) => obj is ESCameraViewId other && Equals(other);
+        public override int GetHashCode() => key != null ? StringComparer.Ordinal.GetHashCode(key) : 0;
+        public override string ToString() => key ?? string.Empty;
+
+        public static bool operator ==(ESCameraViewId left, ESCameraViewId right) => left.Equals(right);
+        public static bool operator !=(ESCameraViewId left, ESCameraViewId right) => !left.Equals(right);
+    }
+
+    /// <summary>
+    /// Base 在同一 View 中只允许一个获胜者；Shot 使用同一仲裁面但拥有更高类型权重。
+    /// Modifier 将在 P1 以独立的字段合成契约接入，不能拿 Base 的优先级覆盖逻辑冒充实现。
+    /// </summary>
+    public enum ESCameraRequestKind : byte
+    {
+        Base = 0,
+        Shot = 1,
+        Modifier = 2,
+    }
+
+    /// <summary>Modifier 对一个字段的明确合成方式；禁止以提交先后隐式决定字段语义。</summary>
+    public enum ESCameraModifierOperation : byte
+    {
+        None = 0,
+        Override = 1,
+        Add = 2,
+        Multiply = 3,
+    }
+
+    [Serializable]
+    public struct ESCameraScalarModifier
+    {
+        public ESCameraModifierOperation operation;
+        public float value;
+
+        public bool IsValid => operation == ESCameraModifierOperation.Override
+                               || operation == ESCameraModifierOperation.Add
+                               || operation == ESCameraModifierOperation.Multiply;
+    }
+
+    [Serializable]
+    public struct ESCameraVectorModifier
+    {
+        public ESCameraModifierOperation operation;
+        public Vector3 value;
+
+        public bool IsValid => operation == ESCameraModifierOperation.Override
+                               || operation == ESCameraModifierOperation.Add;
+    }
+
+    /// <summary>
+    /// Modifier 请求的数据面。每个字段独立按 Override / Add / Multiply 合成；Override
+    /// 按 priority、再按稳定 submissionSequence 选胜者，Add/Multiply 均聚合所有兼容请求。
+    /// </summary>
+    [Serializable]
+    public struct ESCameraModifier
+    {
+        public ESCameraScalarModifier fieldOfView;
+        public ESCameraScalarModifier distanceScale;
+        public ESCameraVectorModifier shoulderOffset;
+        public ESCameraScalarModifier shakeAmplitude;
+
+        public bool IsValid => fieldOfView.IsValid
+                               || distanceScale.IsValid
+                               || shoulderOffset.IsValid
+                               || shakeAmplitude.IsValid;
+    }
+
+    /// <summary>
+    /// 只描述镜头意图，不持有 Cinemachine Virtual Camera、Rig Prefab 或任意场景实例。
+    /// profileKey 是业务与相机内容之间唯一允许使用的稳定内容键。
+    /// </summary>
+    [Serializable]
+    public struct ESCameraRequest
+    {
+        public ESCameraViewId viewId;
+
+        public ESCameraRequestKind kind;
+
+        public string profileKey;
+
+        public int priority;
+
+        public UnityEngine.Object owner;
+
+        public Transform follow;
+
+        public Transform lookAt;
+
+        /// <summary>仅 Modifier 使用；非空时只对相同 ProfileKey 的当前获胜 Base/Shot 生效。</summary>
+        public string compatibleProfileKey;
+
+        public ESCameraModifier modifier;
+
+        public bool IsStructurallyValid
+        {
+            get
+            {
+                if (!viewId.IsValid || owner == null)
+                    return false;
+
+                if (kind == ESCameraRequestKind.Modifier)
+                    return modifier.IsValid;
+
+                return (kind == ESCameraRequestKind.Base || kind == ESCameraRequestKind.Shot)
+                       && !string.IsNullOrWhiteSpace(profileKey)
+                       && follow != null;
+            }
+        }
+
+        public static ESCameraRequest CreateBase(
+            ESCameraViewId viewId,
+            string profileKey,
+            int priority,
+            UnityEngine.Object owner,
+            Transform follow,
+            Transform lookAt = null)
+        {
+            return new ESCameraRequest
+            {
+                viewId = viewId,
+                kind = ESCameraRequestKind.Base,
+                profileKey = profileKey,
+                priority = priority,
+                owner = owner,
+                follow = follow,
+                lookAt = lookAt,
+            };
+        }
+
+        public static ESCameraRequest CreateShot(
+            ESCameraViewId viewId,
+            string profileKey,
+            int priority,
+            UnityEngine.Object owner,
+            Transform follow,
+            Transform lookAt = null)
+        {
+            ESCameraRequest request = CreateBase(viewId, profileKey, priority, owner, follow, lookAt);
+            request.kind = ESCameraRequestKind.Shot;
+            return request;
+        }
+
+        public static ESCameraRequest CreateModifier(
+            ESCameraViewId viewId,
+            int priority,
+            UnityEngine.Object owner,
+            ESCameraModifier modifier,
+            string compatibleProfileKey = null)
+        {
+            return new ESCameraRequest
+            {
+                viewId = viewId,
+                kind = ESCameraRequestKind.Modifier,
+                priority = priority,
+                owner = owner,
+                modifier = modifier,
+                compatibleProfileKey = compatibleProfileKey,
+            };
+        }
+    }
+
+    /// <summary>
+    /// Slot + generation + scene epoch 的相机租约。旧 Lease 永远不能释放复用后的槽位，
+    /// 也不能跨 SceneBinding 生命周期影响新场景。
+    /// </summary>
+    [Serializable]
+    public readonly struct ESCameraLease : IEquatable<ESCameraLease>, IDisposable
+    {
+        public static readonly ESCameraLease Invalid = default;
+
+        internal readonly ESCameraViewId viewId;
+        internal readonly int sceneEpoch;
+        internal readonly int slot;
+        internal readonly int generation;
+
+        internal ESCameraLease(ESCameraViewId viewId, int sceneEpoch, int slot, int generation)
+        {
+            this.viewId = viewId;
+            this.sceneEpoch = sceneEpoch;
+            this.slot = slot;
+            this.generation = generation;
+        }
+
+        public ESCameraViewId ViewId => viewId;
+        public bool IsValid => viewId.IsValid && sceneEpoch > 0 && slot >= 0 && generation > 0;
+
+        /// <summary>
+        /// 语义化释放入口。generation/epoch 校验仍由 Camera 模块完成；旧 Lease 调用安全无效。
+        /// </summary>
+        public void Dispose()
+        {
+            ESGameManager.Camera?.Release(this);
+        }
+
+        /// <summary>仅本地观测 Owner 的有效 Lease 可以提交 Look。</summary>
+        public bool TrySetLook(Vector2 lookInput)
+        {
+            return ESGameManager.Camera != null && ESGameManager.Camera.TrySetLook(this, lookInput);
+        }
+
+        /// <summary>仅本地观测 Owner 的有效 Lease 可以更新 Follow/LookAt 目标。</summary>
+        public bool TrySetTarget(Transform follow, Transform lookAt = null)
+        {
+            return ESGameManager.Camera != null && ESGameManager.Camera.TrySetTarget(this, follow, lookAt);
+        }
+
+        public bool Equals(ESCameraLease other)
+        {
+            return viewId == other.viewId
+                   && sceneEpoch == other.sceneEpoch
+                   && slot == other.slot
+                   && generation == other.generation;
+        }
+
+        public override bool Equals(object obj) => obj is ESCameraLease other && Equals(other);
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = viewId.GetHashCode();
+                hash = (hash * 397) ^ sceneEpoch;
+                hash = (hash * 397) ^ slot;
+                return (hash * 397) ^ generation;
+            }
+        }
+        public static bool operator ==(ESCameraLease left, ESCameraLease right) => left.Equals(right);
+        public static bool operator !=(ESCameraLease left, ESCameraLease right) => !left.Equals(right);
+    }
+
+    /// <summary>Director 给执行层的单帧获胜结果。执行层不得反向仲裁或保存业务 Lease。</summary>
+    public readonly struct ESCameraResolvedView
+    {
+        public readonly bool hasWinner;
+        public readonly string profileKey;
+        public readonly Transform follow;
+        public readonly Transform lookAt;
+        public readonly UnityEngine.Object owner;
+        public readonly Vector2 lookInput;
+        public readonly bool hasLookInput;
+        public readonly ESCameraResolvedModifiers modifiers;
+
+        internal ESCameraResolvedView(
+            bool hasWinner,
+            string profileKey,
+            Transform follow,
+            Transform lookAt,
+            UnityEngine.Object owner,
+            Vector2 lookInput,
+            bool hasLookInput,
+            ESCameraResolvedModifiers modifiers)
+        {
+            this.hasWinner = hasWinner;
+            this.profileKey = profileKey;
+            this.follow = follow;
+            this.lookAt = lookAt;
+            this.owner = owner;
+            this.lookInput = lookInput;
+            this.hasLookInput = hasLookInput;
+            this.modifiers = modifiers;
+        }
+    }
+
+    /// <summary>Director 已完成仲裁的 Modifier 结果，Adapter 只执行，不可重新仲裁。</summary>
+    public readonly struct ESCameraResolvedModifiers
+    {
+        public static readonly ESCameraResolvedModifiers Identity = new ESCameraResolvedModifiers(
+            new ESCameraScalarComposition(false, 0f, 0f, 1f),
+            new ESCameraScalarComposition(false, 0f, 0f, 1f),
+            new ESCameraVectorComposition(false, Vector3.zero, Vector3.zero),
+            new ESCameraScalarComposition(false, 0f, 0f, 1f));
+
+        public readonly ESCameraScalarComposition fieldOfView;
+        public readonly ESCameraScalarComposition distanceScale;
+        public readonly ESCameraVectorComposition shoulderOffset;
+        public readonly ESCameraScalarComposition shakeAmplitude;
+
+        internal ESCameraResolvedModifiers(
+            ESCameraScalarComposition fieldOfView,
+            ESCameraScalarComposition distanceScale,
+            ESCameraVectorComposition shoulderOffset,
+            ESCameraScalarComposition shakeAmplitude)
+        {
+            this.fieldOfView = fieldOfView;
+            this.distanceScale = distanceScale;
+            this.shoulderOffset = shoulderOffset;
+            this.shakeAmplitude = shakeAmplitude;
+        }
+    }
+
+    public readonly struct ESCameraScalarComposition
+    {
+        public readonly bool hasOverride;
+        public readonly float overrideValue;
+        public readonly float additiveValue;
+        public readonly float multiplier;
+
+        internal ESCameraScalarComposition(bool hasOverride, float overrideValue, float additiveValue, float multiplier)
+        {
+            this.hasOverride = hasOverride;
+            this.overrideValue = overrideValue;
+            this.additiveValue = additiveValue;
+            this.multiplier = multiplier;
+        }
+
+        public float Apply(float baseValue)
+        {
+            return ((hasOverride ? overrideValue : baseValue) + additiveValue) * multiplier;
+        }
+    }
+
+    public readonly struct ESCameraVectorComposition
+    {
+        public readonly bool hasOverride;
+        public readonly Vector3 overrideValue;
+        public readonly Vector3 additiveValue;
+
+        internal ESCameraVectorComposition(bool hasOverride, Vector3 overrideValue, Vector3 additiveValue)
+        {
+            this.hasOverride = hasOverride;
+            this.overrideValue = overrideValue;
+            this.additiveValue = additiveValue;
+        }
+
+        public Vector3 Apply(Vector3 baseValue)
+        {
+            return (hasOverride ? overrideValue : baseValue) + additiveValue;
+        }
+    }
+
+    /// <summary>
+    /// Cinemachine 之外的纯执行边界。唯一的 CM2 写入实现位于 Cinemachine2 目录；
+    /// Core、Skill 与 Entity 均不能获得该实现的 Virtual Camera 引用。
+    /// </summary>
+    public interface IESCameraViewAdapter
+    {
+        bool IsReady { get; }
+        Transform OutputTransform { get; }
+        void Apply(in ESCameraResolvedView resolved);
+        void Clear();
+    }
+}

@@ -66,7 +66,15 @@ namespace ES
                 reason = "OSS Endpoint 必须是 HTTPS 地址，禁止通过明文传输凭据。";
                 return false;
             }
-            if (target.bucket.IndexOf('/') >= 0 || !IsSafePrefix(target.objectPrefix) || !IsSafePrefix(target.validationPrefix))
+            if (!string.Equals(endpointUri.AbsolutePath, "/", StringComparison.Ordinal)
+                || !string.IsNullOrEmpty(endpointUri.Query)
+                || !string.IsNullOrEmpty(endpointUri.Fragment))
+            {
+                reason = "OSS Endpoint 必须是服务地域根地址（例如 https://oss-cn-hangzhou.aliyuncs.com），不得包含 Bucket、路径、查询参数或片段。";
+                return false;
+            }
+            if (target.bucket.IndexOf('/') >= 0 || target.bucket.IndexOf('\\') >= 0 || target.bucket.IndexOf("..", StringComparison.Ordinal) >= 0
+                || !IsSafePrefix(target.objectPrefix) || !IsSafePrefix(target.validationPrefix))
             {
                 reason = "Bucket 不得包含路径；对象前缀不得包含 .. 或反斜杠。";
                 return false;
@@ -97,7 +105,7 @@ namespace ES
             if (request.Target.verifyRemoteAfterUpload)
             {
                 steps.Add(() => CreateHead(request.Target, request.RemoteObjectKey, credentials));
-                validators.Add(response => ValidateHead(response, request.File.size, request.File.sha256));
+                validators.Add(response => ValidateHead(response, request.File.size, request.File.sha256, request.CacheControl));
             }
             return new ESAliyunOssSequenceOperation(steps, validators);
         }
@@ -120,7 +128,7 @@ namespace ES
             var validators = new List<Func<UnityWebRequest, string>>
             {
                 ValidateSuccess,
-                response => ValidateHead(response, probe.LongLength, sha256),
+                response => ValidateHead(response, probe.LongLength, sha256, "no-cache, max-age=0"),
                 ValidateSuccess
             };
             return new ESAliyunOssSequenceOperation(steps, validators);
@@ -199,22 +207,32 @@ namespace ES
                 : "HTTP " + response.responseCode + "：" + (response.error ?? "OSS 请求失败");
         }
 
-        private static string ValidateHead(UnityWebRequest response, long expectedSize, string expectedSha256)
+        private static string ValidateHead(UnityWebRequest response, long expectedSize, string expectedSha256, string expectedCacheControl)
         {
             string success = ValidateSuccess(response);
             if (!string.IsNullOrEmpty(success)) return success;
             if (!long.TryParse(response.GetResponseHeader("Content-Length"), out long size) || size != expectedSize)
                 return "OSS HEAD Content-Length 不匹配。";
             string remoteSha256 = response.GetResponseHeader("x-oss-meta-es-sha256");
-            return string.Equals(remoteSha256, expectedSha256, StringComparison.OrdinalIgnoreCase)
+            if (!string.Equals(remoteSha256, expectedSha256, StringComparison.OrdinalIgnoreCase))
+                return "OSS HEAD x-oss-meta-es-sha256 不匹配。";
+            string remoteCacheControl = response.GetResponseHeader("Cache-Control");
+            return string.Equals(remoteCacheControl, expectedCacheControl, StringComparison.OrdinalIgnoreCase)
                 ? string.Empty
-                : "OSS HEAD x-oss-meta-es-sha256 不匹配。";
+                : "OSS HEAD Cache-Control 不匹配。";
         }
 
         private static string BuildUrl(ESAssetReleaseUploadTarget target, string key)
         {
-            string endpoint = target.endpoint.TrimEnd('/');
-            return endpoint + "/" + Uri.EscapeDataString(target.bucket.Trim('/')) + "/" + EncodeKey(key);
+            // OSS 原生 Endpoint 是服务根地址；请求必须采用 bucket.endpoint 的虚拟主机形式。
+            // 不能使用 endpoint/bucket/key：该路径形式在部分 OSS Endpoint/CDN 配置下不被识别，
+            // 还会让“上传成功”与实际客户端可访问路径脱节。
+            var endpoint = new Uri(target.endpoint.Trim());
+            var builder = new UriBuilder(endpoint.Scheme, target.bucket.Trim() + "." + endpoint.Host, endpoint.IsDefaultPort ? -1 : endpoint.Port)
+            {
+                Path = EncodeKey(key)
+            };
+            return builder.Uri.AbsoluteUri;
         }
 
         private static string EncodeKey(string key)

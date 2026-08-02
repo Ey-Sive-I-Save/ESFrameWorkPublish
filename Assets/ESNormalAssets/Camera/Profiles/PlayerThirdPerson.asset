@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2ec636e27c6c4859a44b7fa352b4b91d, type: 3}
+  m_Name: PlayerThirdPerson
+  m_EditorClassIdentifier: 
+  profileKey: player.third_person
+  rigKey: player.third_person
+  povLookSensitivity: {x: 220, y: 90}
+  freeLookSensitivity: {x: 220, y: 0.5}
+  invertVerticalLook: 0
+  baseFieldOfView: 60
+  baseDistanceScale: 1
+  baseShoulderOffset: {x: 0, y: 0, z: 0}
+  baseShakeAmplitude: 0
+  enableObstruction: 1
+  obstructionMask:
+    serializedVersion: 2
+    m_Bits: 71424
+  obstructionCameraRadius: 0.2
+  obstructionMinimumDistance: 0.25
+  obstructionMaximumEffort: 4
+  obstructionDamping: 0.12
+  obstructionDampingWhenOccluded: 0.05

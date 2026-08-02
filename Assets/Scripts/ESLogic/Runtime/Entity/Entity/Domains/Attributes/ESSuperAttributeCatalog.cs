@@ -17,12 +17,24 @@ namespace ES
         private readonly ESKeyCatalog keyCatalog;
         private readonly Dictionary<int, ESSuperFloatAttributeDefinition> floatByRuntimeKey;
         private readonly Dictionary<int, ESSuperPermitAttributeDefinition> permitByRuntimeKey;
+        private readonly IList<ESSuperFloatAttributeDefinition> floatDefinitions;
+        private readonly IList<ESSuperPermitAttributeDefinition> permitDefinitions;
+        private int[] floatHotSlotByRuntimeKey;
+        private int[] permitHotSlotByRuntimeKey;
+        private int floatHotSlotCount;
+        private int permitHotSlotCount;
 
-        private ESSuperAttributeCatalog(string scope, int capacity)
+        private ESSuperAttributeCatalog(
+            string scope,
+            int capacity,
+            IList<ESSuperFloatAttributeDefinition> floatDefinitions,
+            IList<ESSuperPermitAttributeDefinition> permitDefinitions)
         {
             keyCatalog = new ESKeyCatalog(scope + ".Catalog", scope);
             floatByRuntimeKey = new Dictionary<int, ESSuperFloatAttributeDefinition>(capacity);
             permitByRuntimeKey = new Dictionary<int, ESSuperPermitAttributeDefinition>(capacity);
+            this.floatDefinitions = floatDefinitions;
+            this.permitDefinitions = permitDefinitions;
         }
 
         public string Scope => keyCatalog.RequiredScope;
@@ -40,7 +52,7 @@ namespace ES
             scope = string.IsNullOrEmpty(scope) ? DefaultScope : scope;
             int capacity = (floatDefinitions != null ? floatDefinitions.Count : 0)
                            + (permitDefinitions != null ? permitDefinitions.Count : 0);
-            catalog = new ESSuperAttributeCatalog(scope, capacity);
+            catalog = new ESSuperAttributeCatalog(scope, capacity, floatDefinitions, permitDefinitions);
 
             if (!ValidateDefinitionIdentities(floatDefinitions, permitDefinitions, out error)
                 || !DeclareFloats(catalog.keyCatalog, scope, floatDefinitions, out error)
@@ -53,6 +65,7 @@ namespace ES
 
             AddFloatRuntimeMap(catalog, floatDefinitions);
             AddPermitRuntimeMap(catalog, permitDefinitions);
+            catalog.BuildHotSlots();
             return true;
         }
 
@@ -69,6 +82,69 @@ namespace ES
         public bool TryGetPermitDefinition(int runtimeKey, out ESSuperPermitAttributeDefinition definition)
         {
             return permitByRuntimeKey.TryGetValue(runtimeKey, out definition);
+        }
+
+        /// <summary>Cold-path inspector access. It exposes definitions without making runtime owners retain their source table.</summary>
+        public int FloatDefinitionCount => floatDefinitions != null ? floatDefinitions.Count : 0;
+        public int PermitDefinitionCount => permitDefinitions != null ? permitDefinitions.Count : 0;
+
+        public bool TryGetFloatDefinitionAt(int index, out ESSuperFloatAttributeDefinition definition)
+        {
+            if (floatDefinitions != null && (uint)index < (uint)floatDefinitions.Count)
+            {
+                definition = floatDefinitions[index];
+                return definition != null;
+            }
+
+            definition = null;
+            return false;
+        }
+
+        public bool TryGetPermitDefinitionAt(int index, out ESSuperPermitAttributeDefinition definition)
+        {
+            if (permitDefinitions != null && (uint)index < (uint)permitDefinitions.Count)
+            {
+                definition = permitDefinitions[index];
+                return definition != null;
+            }
+
+            definition = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Hot slots are catalog-owned, process-local array positions. They are rebuilt from the
+        /// current Bake schema and are never serialized or sent over the network.
+        /// </summary>
+        public int FloatHotSlotCount => floatHotSlotCount;
+        public int PermitHotSlotCount => permitHotSlotCount;
+
+        public bool TryGetFloatHotSlot(int runtimeKey, out int slot)
+        {
+            if (floatHotSlotByRuntimeKey != null
+                && (uint)runtimeKey < (uint)floatHotSlotByRuntimeKey.Length
+                && floatHotSlotByRuntimeKey[runtimeKey] >= 0)
+            {
+                slot = floatHotSlotByRuntimeKey[runtimeKey];
+                return true;
+            }
+
+            slot = -1;
+            return false;
+        }
+
+        public bool TryGetPermitHotSlot(int runtimeKey, out int slot)
+        {
+            if (permitHotSlotByRuntimeKey != null
+                && (uint)runtimeKey < (uint)permitHotSlotByRuntimeKey.Length
+                && permitHotSlotByRuntimeKey[runtimeKey] >= 0)
+            {
+                slot = permitHotSlotByRuntimeKey[runtimeKey];
+                return true;
+            }
+
+            slot = -1;
+            return false;
         }
 
         public bool TryGetEntry(int runtimeKey, out ESKeyCatalogEntry entry)
@@ -233,6 +309,7 @@ namespace ES
                                       + "|override=" + definition.overrideBaseValue
                                       + "|min=" + FormatFloat(definition.minValue)
                                       + "|max=" + FormatFloat(definition.maxValue)
+                                      + "|fixedApi=" + (definition.fixedApiName ?? string.Empty)
                                       + "|formula=" + (definition.formula ?? string.Empty)
                                       + "|migration=" + (definition.migrationKey ?? string.Empty),
                     declaredBy = typeof(ESSuperFloatAttributeDefinition).FullName
@@ -276,6 +353,7 @@ namespace ES
                     storagePolicy = definition.storagePolicy,
                     schemaSignature = "fallback=" + definition.fallbackValue
                                       + "|override=" + definition.overrideFallbackValue
+                                      + "|fixedApi=" + (definition.fixedApiName ?? string.Empty)
                                       + "|formula=" + (definition.formula ?? string.Empty)
                                       + "|migration=" + (definition.migrationKey ?? string.Empty),
                     declaredBy = typeof(ESSuperPermitAttributeDefinition).FullName
@@ -310,6 +388,36 @@ namespace ES
                 if (definition != null
                     && catalog.TryGetRuntimeKey(definition.enumKey, definition.StringKey, out int runtimeKey))
                     catalog.permitByRuntimeKey[runtimeKey] = definition;
+            }
+        }
+
+        private void BuildHotSlots()
+        {
+            int runtimeCapacity = keyCatalog.Count + 1;
+            floatHotSlotByRuntimeKey = new int[runtimeCapacity];
+            permitHotSlotByRuntimeKey = new int[runtimeCapacity];
+            for (int i = 0; i < runtimeCapacity; i++)
+            {
+                floatHotSlotByRuntimeKey[i] = -1;
+                permitHotSlotByRuntimeKey[i] = -1;
+            }
+            floatHotSlotCount = 0;
+            permitHotSlotCount = 0;
+
+            for (int runtimeKey = 1; runtimeKey < runtimeCapacity; runtimeKey++)
+            {
+                if (floatByRuntimeKey.TryGetValue(runtimeKey, out ESSuperFloatAttributeDefinition floatDefinition)
+                    && floatDefinition.storagePolicy == ESKeyStoragePolicy.HotSlot)
+                {
+                    floatHotSlotByRuntimeKey[runtimeKey] = floatHotSlotCount++;
+                    continue;
+                }
+
+                if (permitByRuntimeKey.TryGetValue(runtimeKey, out ESSuperPermitAttributeDefinition permitDefinition)
+                    && permitDefinition.storagePolicy == ESKeyStoragePolicy.HotSlot)
+                {
+                    permitHotSlotByRuntimeKey[runtimeKey] = permitHotSlotCount++;
+                }
             }
         }
     }

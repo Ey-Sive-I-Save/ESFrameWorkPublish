@@ -92,7 +92,7 @@ namespace ES
         [Obsolete("ValueChange is owned by Entity. Call Entity.ActiveValueChangeEffectCount instead.")]
         public int ActiveValueChangeEffectCount => RequireValueChangeOwner().ActiveValueChangeEffectCount;
         [Obsolete("ValueChange is owned by Entity. Call Entity.CreateValueChangeEffectLease instead.")]
-        public ESEffectLease CreateValueChangeEffectLease(out int ownerId) => RequireValueChangeOwner().CreateValueChangeEffectLease(out ownerId);
+        public ESEffectLease CreateValueChangeEffectLease() => RequireValueChangeOwner().CreateValueChangeEffectLease();
         [Obsolete("ValueChange is owned by Entity. Leases release through Entity automatically.")]
         public bool ReleaseEffect(int effectSlot, int generation) => RequireValueChangeOwner().ReleaseEffect(effectSlot, generation);
         [Obsolete("ValueChange is owned by Entity. Call Entity.GetFloatStat instead.")]

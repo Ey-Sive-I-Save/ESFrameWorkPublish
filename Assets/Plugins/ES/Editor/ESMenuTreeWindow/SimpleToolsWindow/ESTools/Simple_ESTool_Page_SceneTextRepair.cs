@@ -13,13 +13,13 @@ using UnityEngine.SceneManagement;
 namespace ES
 {
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_SceneTextRepair : ESWindowPageBase
     {
         private static readonly Regex ObjectHeaderRegex = new Regex(@"^--- !u!\d+ &(-?\d+)", RegexOptions.Compiled);
         private static readonly Regex FileIdOnlyLineRegex = new Regex(@"^\s*-\s*\{fileID:\s*(-?\d+)\}\s*$", RegexOptions.Compiled);
 
-        [Title("场景文本修复", "修复 .unity 文本中 SceneRoots 残留的无效本地 fileID 引用", bold: true, titleAlignment: TitleAlignments.Centered)]
-        [FoldoutGroup("扫描报告"), ShowInInspector, ReadOnly, LabelText("最近扫描结果"), MultiLineProperty(12)]
+        [HideInInspector]
         private string lastReport = "尚未扫描。";
 
         private string lastResultSummary = "";
@@ -34,13 +34,14 @@ namespace ES
                 SimpleToolsMaturity.Upgrading,
                 "只处理 SceneRoots 根节点列表，不扫描组件字段、Prefab Override 或资源引用。修复要求项目启用 Force Text，并会直接写入场景文件。");
             DrawSceneTextRepairActions();
+            DrawSceneTextRepairReport();
             SimpleToolsPanelUtility.DrawResultSummary("最近场景文本修复", lastResultSummary, lastResultDetail);
         }
 
         private void DrawSceneTextRepairActions()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("扫描与修复", "选中场景适合定点处理；已打开场景适合修当前工作区。修复前会再次扫描并备份。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -60,6 +61,18 @@ namespace ES
                     GUILayout.FlexibleSpace();
                 }
             }
+        }
+
+        private void DrawSceneTextRepairReport()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("扫描报告", "扫描后在这里复核损坏条目；修复会再次扫描并在写入前创建备份。");
+            if (string.IsNullOrWhiteSpace(lastReport) || lastReport == "尚未扫描。")
+            {
+                SimpleToolsPanelUtility.DrawEmptyState("尚未扫描场景。先选择一个场景资源，或使用“扫描已打开场景”。");
+                return;
+            }
+
+            SimpleToolsPanelUtility.DrawCompactDetail("场景文本修复报告", lastReport);
         }
 
         public void ScanSelectedScenes()

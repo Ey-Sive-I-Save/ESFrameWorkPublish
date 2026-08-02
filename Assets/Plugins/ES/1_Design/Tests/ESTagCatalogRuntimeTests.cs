@@ -1100,7 +1100,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void BuffLogic_UsesAnIsolatedRuntimeForItsFullLifecycle()
+        public void BuffLogic_DrivesAnIsolatedRuntimeForItsFullLifecycle()
         {
             GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffLogic");
             try
@@ -1119,20 +1119,24 @@ namespace ES.Tests
                 ESActiveBuffRuntime buff = entity.buffDomain.AddBuff(data);
                 Assert.That(buff, Is.Not.Null);
                 Assert.That(logic.LastRuntime, Is.Not.Null);
-                Assert.That(logic.LastRuntime.ApplyCount, Is.EqualTo(1));
+                Assert.That(logic.ApplyCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.ApplyStateCount, Is.EqualTo(1));
                 Assert.That(logic.LastRuntime.ObservedOwner, Is.SameAs(entity));
                 Assert.That(logic.LastRuntime.ObservedTarget, Is.Not.Null);
 
                 Assert.That(entity.buffDomain.ApplyBuff(buff, ESBuffOperation.Default.AddStack(1)), Is.True);
-                Assert.That(logic.LastRuntime.RefreshCount, Is.EqualTo(1));
+                Assert.That(logic.RefreshCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.RefreshStateCount, Is.EqualTo(1));
 
                 Assert.That(buff.Tick(0.25f), Is.False);
-                Assert.That(logic.LastRuntime.TickCount, Is.EqualTo(1));
+                Assert.That(logic.TickCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.TickStateCount, Is.EqualTo(1));
                 Assert.That(logic.LastRuntime.LastTickDelta, Is.EqualTo(0.25f));
 
                 Assert.That(entity.buffDomain.RemoveBuff(ESBuffEnumKey.Custom), Is.True);
-                Assert.That(logic.LastRuntime.RemoveCount, Is.EqualTo(1));
-                Assert.That(logic.LastRuntime.ReleaseCount, Is.EqualTo(1));
+                Assert.That(logic.RemoveCount, Is.EqualTo(1));
+                Assert.That(logic.ReleaseCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.ReleaseStateCount, Is.EqualTo(1));
                 Assert.That(logic.LastRuntime.ReturnCount, Is.EqualTo(1));
                 Assert.That(logic.LastRuntime.IsRecycled, Is.True);
                 Assert.That(logic.LastRuntime.Buff, Is.Null);
@@ -1149,7 +1153,7 @@ namespace ES.Tests
             GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffLogicRollback");
             try
             {
-                var logic = new RejectingBuffLogic();
+                var logic = new CountingBuffLogic(acceptApply: false);
                 var data = new BuffSharedData
                 {
                     key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
@@ -1161,16 +1165,227 @@ namespace ES.Tests
                 Assert.That(entity.buffDomain.AddBuff(data), Is.Null);
                 Assert.That(entity.buffDomain.ActiveBuffCount, Is.Zero);
                 Assert.That(logic.LastRuntime, Is.Not.Null);
-                Assert.That(logic.LastRuntime.ApplyCount, Is.EqualTo(1));
-                Assert.That(logic.LastRuntime.RemoveCount, Is.Zero,
+                Assert.That(logic.ApplyCount, Is.EqualTo(1));
+                Assert.That(logic.RemoveCount, Is.Zero,
                     "Apply rejection must not run the normal removal gameplay callback.");
-                Assert.That(logic.LastRuntime.ReleaseCount, Is.EqualTo(1));
+                Assert.That(logic.ReleaseCount, Is.EqualTo(1));
+                Assert.That(logic.LastRuntime.ReleaseStateCount, Is.EqualTo(1));
                 Assert.That(logic.LastRuntime.ReturnCount, Is.EqualTo(1));
                 Assert.That(logic.LastRuntime.Buff, Is.Null);
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(entityObject);
+            }
+        }
+
+        [Test]
+        public void BuffLogic_CapturesItsDefinitionForTheActiveInstanceLifetime()
+        {
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_BuffLogicDefinitionCapture");
+            try
+            {
+                var initialLogic = new CountingBuffLogic();
+                var replacementLogic = new CountingBuffLogic();
+                var data = new BuffSharedData
+                {
+                    key = new ESBuffConfigKey { enumKey = ESBuffEnumKey.Custom },
+                    duration = -1f,
+                    maxStack = 3,
+                    tickMode = ESBuffTickMode.EveryFrame,
+                    logic = initialLogic
+                };
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                ESActiveBuffRuntime buff = entity.buffDomain.AddBuff(data);
+                Assert.That(buff, Is.Not.Null);
+
+                // Authored definitions are expected to stay immutable in play, but an active Buff
+                // must still finish with the same strategy if a live authoring object is edited.
+                data.logic = replacementLogic;
+                Assert.That(entity.buffDomain.ApplyBuff(buff, ESBuffOperation.Default.AddStack(1)), Is.True);
+                Assert.That(buff.Tick(0.25f), Is.False);
+                Assert.That(entity.buffDomain.RemoveBuff(ESBuffEnumKey.Custom), Is.True);
+
+                Assert.That(initialLogic.ApplyCount, Is.EqualTo(1));
+                Assert.That(initialLogic.RefreshCount, Is.EqualTo(1));
+                Assert.That(initialLogic.TickCount, Is.EqualTo(1));
+                Assert.That(initialLogic.RemoveCount, Is.EqualTo(1));
+                Assert.That(initialLogic.ReleaseCount, Is.EqualTo(1));
+                Assert.That(replacementLogic.ApplyCount, Is.Zero);
+                Assert.That(replacementLogic.RefreshCount, Is.Zero);
+                Assert.That(replacementLogic.TickCount, Is.Zero);
+                Assert.That(replacementLogic.RemoveCount, Is.Zero);
+                Assert.That(replacementLogic.ReleaseCount, Is.Zero);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(entityObject);
+            }
+        }
+
+        [Test]
+        public void TargetPack_TryCopySnapshotFrom_CopiesSafeFieldsWithoutExtras()
+        {
+            GameObject userObject = new GameObject("ESTagCatalogRuntimeTests_TargetPackUser");
+            GameObject firstTargetObject = new GameObject("ESTagCatalogRuntimeTests_TargetPackFirstTarget");
+            GameObject secondTargetObject = new GameObject("ESTagCatalogRuntimeTests_TargetPackSecondTarget");
+            ESRuntimeTargetPack source = ESRuntimeTargetPack.Pool.GetInPool();
+            ESRuntimeTargetPack snapshot = ESRuntimeTargetPack.Pool.GetInPool();
+            try
+            {
+                Entity user = userObject.AddComponent<Entity>();
+                Entity firstTarget = firstTargetObject.AddComponent<Entity>();
+                Entity secondTarget = secondTargetObject.AddComponent<Entity>();
+                object transientExtra = new object();
+
+                source.SetUser(user).SetEntityMainTarget(firstTarget).EnsureListCapacity(12, 8);
+                source.TryAddTarget(firstTarget);
+                source.TryAddTarget(secondTarget);
+                source.runtimeFloat = 2.5f;
+                source.runtimeBool = false;
+                source.EnableExtras().AddExtra(transientExtra);
+
+                Assert.That(snapshot.TryCopySnapshotFrom(source), Is.True);
+                Assert.That(snapshot.userEntity, Is.SameAs(user));
+                Assert.That(snapshot.entityMainTarget, Is.SameAs(firstTarget));
+                Assert.That(snapshot.runtimeFloat, Is.EqualTo(2.5f));
+                Assert.That(snapshot.runtimeBool, Is.False);
+                Assert.That(snapshot.targetEntities, Is.EqualTo(new[] { firstTarget, secondTarget }));
+                Assert.That(snapshot.ExtraCount, Is.Zero);
+                Assert.That(snapshot.ExtrasEnabled, Is.False);
+
+                source.ClearEntityTargets();
+                Assert.That(snapshot.targetEntities, Is.EqualTo(new[] { firstTarget, secondTarget }),
+                    "A snapshot must own its target-list contents instead of aliasing the source list.");
+
+                source.ForcePushToPool();
+                Assert.That(snapshot.TryCopySnapshotFrom(source), Is.False,
+                    "A recycled source Pack must never be accepted as a Buff snapshot.");
+            }
+            finally
+            {
+                source.ForcePushToPool();
+                snapshot.ForcePushToPool();
+                UnityEngine.Object.DestroyImmediate(userObject);
+                UnityEngine.Object.DestroyImmediate(firstTargetObject);
+                UnityEngine.Object.DestroyImmediate(secondTargetObject);
+            }
+        }
+
+        [Test]
+        public void SkillTargetPackModes_ReferenceSharesAndCopyOwnsAnIsolatedPack()
+        {
+            ESRuntimeTargetPack skillTarget = ESRuntimeTargetPack.Pool.GetInPool();
+            ESRuntimeTargetPack copiedTrackTarget = null;
+            ESRuntimeTargetPack copiedClipTarget = null;
+            try
+            {
+                skillTarget.runtimeFloat = 2.5f;
+                skillTarget.runtimeBool = false;
+                skillTarget.EnableExtras().AddExtra(new object());
+
+                ESRuntimeTargetPack referencedTrackTarget = SkillOperationRuntimeUtility.BuildTrackTarget(
+                    TrackRuntimeTargetSourceMode.ReferenceSkill,
+                    skillTarget,
+                    null,
+                    null,
+                    false,
+                    out bool ownsReferencedTrackTarget);
+                Assert.That(referencedTrackTarget, Is.SameAs(skillTarget));
+                Assert.That(ownsReferencedTrackTarget, Is.False);
+
+                copiedTrackTarget = SkillOperationRuntimeUtility.BuildTrackTarget(
+                    TrackRuntimeTargetSourceMode.CopySkill,
+                    skillTarget,
+                    null,
+                    null,
+                    false,
+                    out bool ownsTrackCopy);
+                Assert.That(copiedTrackTarget, Is.Not.SameAs(skillTarget));
+                Assert.That(ownsTrackCopy, Is.True);
+                Assert.That(copiedTrackTarget.runtimeFloat, Is.EqualTo(2.5f));
+                Assert.That(copiedTrackTarget.runtimeBool, Is.False);
+                Assert.That(copiedTrackTarget.ExtraCount, Is.Zero);
+
+                copiedTrackTarget.runtimeFloat = 9f;
+                Assert.That(skillTarget.runtimeFloat, Is.EqualTo(2.5f),
+                    "CopySkill must not mutate the shared Skill TargetPack.");
+
+                copiedClipTarget = SkillOperationRuntimeUtility.BuildClipTarget(
+                    ClipRuntimeTargetSourceMode.CopyTrack,
+                    skillTarget,
+                    copiedTrackTarget,
+                    null,
+                    null,
+                    false,
+                    out bool ownsClipCopy);
+                Assert.That(copiedClipTarget, Is.Not.SameAs(copiedTrackTarget));
+                Assert.That(ownsClipCopy, Is.True);
+                Assert.That(copiedClipTarget.runtimeFloat, Is.EqualTo(9f));
+
+                ESRuntimeTargetPack referencedClipTarget = SkillOperationRuntimeUtility.BuildClipTarget(
+                    ClipRuntimeTargetSourceMode.ReferenceTrack,
+                    skillTarget,
+                    copiedTrackTarget,
+                    null,
+                    null,
+                    false,
+                    out bool ownsReferencedClipTarget);
+                Assert.That(referencedClipTarget, Is.SameAs(copiedTrackTarget));
+                Assert.That(ownsReferencedClipTarget, Is.False);
+            }
+            finally
+            {
+                if (copiedClipTarget != null && !copiedClipTarget.IsRecycled)
+                    copiedClipTarget.ForcePushToPool();
+                if (copiedTrackTarget != null && !copiedTrackTarget.IsRecycled)
+                    copiedTrackTarget.ForcePushToPool();
+                skillTarget.ForcePushToPool();
+            }
+        }
+
+        [Test]
+        public void SkillTargetPackModes_RecycledInheritedPackFallsBackToCasterDefaults()
+        {
+            GameObject casterObject = new GameObject("ESTagCatalogRuntimeTests_TargetPackFallbackCaster");
+            ESRuntimeTargetPack source = ESRuntimeTargetPack.Pool.GetInPool();
+            ESRuntimeTargetPack fallback = null;
+            ESOpSupport support = null;
+            try
+            {
+                Entity caster = casterObject.AddComponent<Entity>();
+                support = ESOpSupport.Rent();
+                support.InitializeEntityOwner(caster);
+                source.ForcePushToPool();
+
+                fallback = SkillOperationRuntimeUtility.BuildTrackTarget(
+                    TrackRuntimeTargetSourceMode.CopySkill,
+                    source,
+                    null,
+                    support,
+                    false,
+                    out bool ownsFallback);
+
+                Assert.That(ownsFallback, Is.True);
+                Assert.That(fallback, Is.Not.Null);
+                Assert.That(fallback.userEntity, Is.SameAs(caster));
+                Assert.That(fallback.entityMainTarget, Is.Null);
+                Assert.That(fallback.itemMainTarget, Is.Null);
+                Assert.That(fallback.targetEntities, Is.Empty);
+                Assert.That(fallback.targetItems, Is.Empty);
+                Assert.That(fallback.runtimeFloat, Is.EqualTo(1f));
+                Assert.That(fallback.runtimeBool, Is.True);
+                Assert.That(fallback.ExtraCount, Is.Zero);
+            }
+            finally
+            {
+                if (fallback != null && !fallback.IsRecycled)
+                    fallback.ForcePushToPool();
+                if (source != null && !source.IsRecycled)
+                    source.ForcePushToPool();
+                support?.TryAutoPushedToPool();
+                UnityEngine.Object.DestroyImmediate(casterObject);
             }
         }
 
@@ -1415,72 +1630,96 @@ namespace ES.Tests
 
         private sealed class CountingBuffLogic : ESBuffLogic
         {
-            public CountingBuffLogicRuntime LastRuntime { get; private set; }
-
-            public override ESBuffLogicRuntime RentRuntime()
-            {
-                LastRuntime = new CountingBuffLogicRuntime(acceptApply: true);
-                return LastRuntime;
-            }
-        }
-
-        private sealed class RejectingBuffLogic : ESBuffLogic
-        {
-            public CountingBuffLogicRuntime LastRuntime { get; private set; }
-
-            public override ESBuffLogicRuntime RentRuntime()
-            {
-                LastRuntime = new CountingBuffLogicRuntime(acceptApply: false);
-                return LastRuntime;
-            }
-        }
-
-        private sealed class CountingBuffLogicRuntime : ESBuffLogicRuntime
-        {
             private readonly bool acceptApply;
 
+            public CountingBuffLogicRuntime LastRuntime { get; private set; }
             public int ApplyCount { get; private set; }
             public int RefreshCount { get; private set; }
             public int TickCount { get; private set; }
             public int RemoveCount { get; private set; }
             public int ReleaseCount { get; private set; }
+
+            public CountingBuffLogic(bool acceptApply = true)
+            {
+                this.acceptApply = acceptApply;
+            }
+
+            public override ESBuffLogicRuntime RentRuntime()
+            {
+                LastRuntime = new CountingBuffLogicRuntime();
+                return LastRuntime;
+            }
+
+            public override bool OnApply(ESBuffLogicRuntime runtime)
+            {
+                ApplyCount++;
+                ((CountingBuffLogicRuntime)runtime).RecordApply();
+                return acceptApply;
+            }
+
+            public override void OnRefresh(ESBuffLogicRuntime runtime)
+            {
+                RefreshCount++;
+                ((CountingBuffLogicRuntime)runtime).RecordRefresh();
+            }
+
+            public override void OnTick(ESBuffLogicRuntime runtime, float deltaTime)
+            {
+                TickCount++;
+                ((CountingBuffLogicRuntime)runtime).RecordTick(deltaTime);
+            }
+
+            public override void OnRemove(ESBuffLogicRuntime runtime)
+            {
+                RemoveCount++;
+                ((CountingBuffLogicRuntime)runtime).RecordRemove();
+            }
+
+            public override void OnRelease(ESBuffLogicRuntime runtime)
+            {
+                ReleaseCount++;
+                ((CountingBuffLogicRuntime)runtime).RecordRelease();
+            }
+        }
+
+        private sealed class CountingBuffLogicRuntime : ESBuffLogicRuntime
+        {
+            public int ApplyStateCount { get; private set; }
+            public int RefreshStateCount { get; private set; }
+            public int TickStateCount { get; private set; }
+            public int RemoveStateCount { get; private set; }
+            public int ReleaseStateCount { get; private set; }
             public int ReturnCount { get; private set; }
             public float LastTickDelta { get; private set; }
             public Entity ObservedOwner { get; private set; }
             public ESRuntimeTargetPack ObservedTarget { get; private set; }
 
-            public CountingBuffLogicRuntime(bool acceptApply)
+            public void RecordApply()
             {
-                this.acceptApply = acceptApply;
-            }
-
-            public override bool OnApply()
-            {
-                ApplyCount++;
+                ApplyStateCount++;
                 ObservedOwner = Owner;
                 ObservedTarget = Target;
-                return acceptApply;
             }
 
-            public override void OnRefresh()
+            public void RecordRefresh()
             {
-                RefreshCount++;
+                RefreshStateCount++;
             }
 
-            public override void OnTick(float deltaTime)
+            public void RecordTick(float deltaTime)
             {
-                TickCount++;
+                TickStateCount++;
                 LastTickDelta = deltaTime;
             }
 
-            public override void OnRemove()
+            public void RecordRemove()
             {
-                RemoveCount++;
+                RemoveStateCount++;
             }
 
-            protected override void OnRelease()
+            public void RecordRelease()
             {
-                ReleaseCount++;
+                ReleaseStateCount++;
             }
 
             public override void TryAutoPushedToPool()

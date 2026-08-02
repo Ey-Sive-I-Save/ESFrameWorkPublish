@@ -4,7 +4,8 @@
     "references": [
         "ES_Design",
         "ES_Stand",
-        "ES_Logic"
+        "ES_Logic",
+        "KCC"
     ],
     "includePlatforms": [
         "Editor"
@@ -12,7 +13,9 @@
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
-    "precompiledReferences": [],
+    "precompiledReferences": [
+        "Sirenix.Serialization.dll"
+    ],
     "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],

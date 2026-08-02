@@ -16,8 +16,11 @@ Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/PrefabPrewarmDataInfo.cs
 ```text
 autoCreateGameObjectPoolModule = true
 ESGameManager.PoolModule
-ESGameManager.GetModuleFast<ESGameObjectPoolModule>()
+ESGameManager.TryGetModule<ESGameObjectPoolModule>(out var poolModule)
+ESGameManager.GetOrCreateModule<ESGameObjectPoolModule>() // 仅初始化期
 ```
+
+`TryGetModule<T>()` 是只查询、不创建；`GetOrCreateModule<T>()` 是明确初始化入口。旧 `GetModuleFast<T>()` 不得恢复。
 
 ## API 口径
 

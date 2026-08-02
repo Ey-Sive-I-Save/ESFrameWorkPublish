@@ -11,9 +11,9 @@ namespace ES
 {
     #region 批量重命名工具
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_BatchRename : ESWindowPageBase
     {
-        [Title("批量重命名工具", "批量重命名选中的 GameObject", bold: true, titleAlignment: TitleAlignments.Centered)]
         [HideInInspector]
         public string readMe = "选择层级中的 GameObject，设置重命名规则，刷新预览后执行。";
 
@@ -230,7 +230,7 @@ namespace ES
         private void DrawRenameActionPanel()
         {
             SimpleToolsPanelUtility.DrawSectionTitle("2. 执行", "常规流程：选对象 -> 填规则 -> 直接执行。大批量或担心冲突时先看详细预览。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -258,7 +258,7 @@ namespace ES
         {
             EnsureRenameRuleHistoryLoaded();
             SimpleToolsPanelUtility.DrawSectionTitle("3. 历史方案", "执行成功后会自动记录当前规则；点击恢复即可复用上次作业配置。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 if (renameRuleHistory.Count == 0)
                 {

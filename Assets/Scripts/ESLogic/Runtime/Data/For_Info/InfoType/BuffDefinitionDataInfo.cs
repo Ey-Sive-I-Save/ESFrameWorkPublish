@@ -285,6 +285,124 @@ namespace ES
             return true;
         }
 
+        /// <summary>
+        /// Buffs currently write only to their target Entity. Attribute bindings therefore must
+        /// resolve against the Character catalog and must keep Float/Permit kinds exact. This is
+        /// intentionally separate from Tag validation so editor Bake can validate against its
+        /// temporary source catalog before any runtime catalog exists.
+        /// </summary>
+        public bool TryValidateValueChangeConfiguration(ESSuperAttributeCatalog characterCatalog, out string error)
+        {
+            EnsureGameTagConfigurationContainers();
+            if (!TryValidateFloatChanges(characterCatalog, out error))
+                return false;
+            if (!TryValidatePermitChanges(characterCatalog, out error))
+                return false;
+
+            error = null;
+            return true;
+        }
+
+        private bool TryValidateFloatChanges(ESSuperAttributeCatalog characterCatalog, out string error)
+        {
+            if (floatChanges == null || floatChanges.Count == 0)
+            {
+                error = null;
+                return true;
+            }
+
+            if (characterCatalog == null)
+            {
+                error = "Buff 包含 Float 变化，但 Character 属性 Catalog 尚未绑定。";
+                return false;
+            }
+
+            for (int i = 0; i < floatChanges.Count; i++)
+            {
+                ESBuffFloatValueChangeBinding binding = floatChanges[i];
+                if (binding == null)
+                {
+                    error = "floatChanges[" + i + "] 为空。";
+                    return false;
+                }
+                if (!binding.IsConfigured)
+                {
+                    error = "floatChanges[" + i + "] 缺少 Attribute EnumKey 或 Stat Key。";
+                    return false;
+                }
+                if (binding.change == null)
+                {
+                    error = "floatChanges[" + i + "] 缺少变化定义。";
+                    return false;
+                }
+                if (!characterCatalog.TryGetRuntimeKey(binding.attributeEnumKey, binding.statKey, out int runtimeKey))
+                {
+                    error = "floatChanges[" + i + "] 无法解析到 Attribute.Character Float。"
+                            + "双别名必须指向同一属性：EnumKey=" + binding.attributeEnumKey
+                            + "，Key=" + (binding.statKey ?? "<null>") + "。";
+                    return false;
+                }
+                if (!characterCatalog.TryGetFloatDefinition(runtimeKey, out _))
+                {
+                    error = "floatChanges[" + i + "] 指向的不是 Attribute.Character Float。";
+                    return false;
+                }
+            }
+
+            error = null;
+            return true;
+        }
+
+        private bool TryValidatePermitChanges(ESSuperAttributeCatalog characterCatalog, out string error)
+        {
+            if (permitChanges == null || permitChanges.Count == 0)
+            {
+                error = null;
+                return true;
+            }
+
+            if (characterCatalog == null)
+            {
+                error = "Buff 包含 Permit 变化，但 Character 属性 Catalog 尚未绑定。";
+                return false;
+            }
+
+            for (int i = 0; i < permitChanges.Count; i++)
+            {
+                ESBuffPermitValueChangeBinding binding = permitChanges[i];
+                if (binding == null)
+                {
+                    error = "permitChanges[" + i + "] 为空。";
+                    return false;
+                }
+                if (!binding.IsConfigured)
+                {
+                    error = "permitChanges[" + i + "] 缺少 Attribute EnumKey 或 Permit Key。";
+                    return false;
+                }
+                if (binding.change == null)
+                {
+                    error = "permitChanges[" + i + "] 缺少变化定义。";
+                    return false;
+                }
+                if (!characterCatalog.TryGetRuntimeKey(binding.attributeEnumKey, binding.permitKey, out int runtimeKey))
+                {
+                    error = "permitChanges[" + i + "] 无法解析到 Attribute.Character Permit。"
+                            + "双别名必须指向同一属性：EnumKey=" + binding.attributeEnumKey
+                            + "，Key=" + (binding.permitKey ?? "<null>") + "。";
+                    return false;
+                }
+                if (!characterCatalog.TryGetPermitDefinition(runtimeKey, out _))
+                {
+                    error = "permitChanges[" + i + "] 指向的不是 Attribute.Character Permit。";
+                    return false;
+                }
+            }
+
+            error = null;
+            return true;
+        }
+
         /// <summary>编辑器反序列化旧 Buff 时补齐新增的配置容器，不改变既有业务语义。</summary>
         public void EnsureGameTagConfigurationContainers()
         {

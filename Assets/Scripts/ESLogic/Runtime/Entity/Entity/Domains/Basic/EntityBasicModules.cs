@@ -1101,17 +1101,10 @@ namespace ES
 
         private Transform GetActiveCameraTransform()
         {
-            if (MyCore == null)
-                return null;
-
-            if (MyCore.ModuleTables.TryGetValue(typeof(EntityBasicCameraModule), out var module))
-            {
-                var cameraModule = module as EntityBasicCameraModule;
-                if (cameraModule != null)
-                    return cameraModule.GetActiveCameraTransform();
-            }
-
-            return null;
+            return ESGameManager.Camera != null
+                   && ESGameManager.Camera.TryGetOutputTransform(ESCameraViewId.Main, out Transform output)
+                ? output
+                : null;
         }
 
         private StateFinalIKDriver ResolveIKDriver()
@@ -2741,10 +2734,6 @@ namespace ES
                 MyCore.SetSpeedLimit(effect.speedLimit);
             }
 
-            if (effect.useDynamicCamera && TryGetCameraModule(out var camModule))
-            {
-                camModule.SetDynamicCameraSlot(effect.skillCamera, effect.autoActivateCamera);
-            }
         }
 
         private void DeactivateEffect()
@@ -2756,24 +2745,8 @@ namespace ES
                 MyCore.ResetSpeedModifiers();
             }
 
-            if (_activeEffect != null && _activeEffect.useDynamicCamera && TryGetCameraModule(out var camModule))
-            {
-                camModule.ClearDynamicCamera(_activeEffect.autoActivateCamera);
-            }
-
             _activeEffect = null;
             _hasActiveEffect = false;
-        }
-
-        private bool TryGetCameraModule(out EntityBasicCameraModule module)
-        {
-            module = null;
-            if (MyCore == null) return false;
-            if (MyCore.ModuleTables.TryGetValue(typeof(EntityBasicCameraModule), out var m))
-            {
-                module = m as EntityBasicCameraModule;
-            }
-            return module != null;
         }
     }
 
@@ -2795,166 +2768,6 @@ namespace ES
         [LabelText("速度上限(<=0 不限制)")]
         public float speedLimit = 0f;
 
-        [Title("技能专属相机")]
-        [LabelText("使用动态相机")]
-        public bool useDynamicCamera = false;
-
-        [LabelText("自动启用相机组件")]
-        public bool autoActivateCamera = true;
-
-        [HideLabel]
-        public VirtualCameraSlot skillCamera = new VirtualCameraSlot();
-    }
-
-    [Serializable, TypeRegistryItem("基础相机模块")]
-    public class EntityBasicCameraModule : EntityBasicModuleBase
-    {
-        [Title("模式")]
-        public CameraMode mode = CameraMode.ThirdPerson;
-
-        [Title("第一人称")]
-        [HideLabel]
-        public CameraRig firstPerson = new CameraRig();
-
-        [Title("第三人称")]
-        [HideLabel]
-        public CameraRig thirdPerson = new CameraRig();
-
-        [Title("当前激活")]
-        [ShowInInspector, ReadOnly]
-        public Transform activeCameraTransform;
-
-        public void SetMode(CameraMode newMode)
-        {
-            mode = newMode;
-            RefreshActiveCamera();
-        }
-
-        public void SetDynamicCamera(Transform camTransform)
-        {
-            GetRig(mode).dynamicSlot.Set(camTransform);
-            RefreshActiveCamera();
-        }
-
-        public void SetDynamicCameraSlot(VirtualCameraSlot slot, bool activate = true)
-        {
-            if (slot == null)
-            {
-                ClearDynamicCamera(activate);
-                return;
-            }
-
-            var rig = GetRig(mode);
-            rig.dynamicSlot.CopyFrom(slot);
-            if (activate)
-            {
-                rig.dynamicSlot.SetActive(true);
-            }
-            RefreshActiveCamera();
-        }
-
-        public void ClearDynamicCamera(bool deactivate = true)
-        {
-            var rig = GetRig(mode);
-            if (deactivate)
-            {
-                rig.dynamicSlot.SetActive(false);
-            }
-            rig.dynamicSlot.Clear();
-            RefreshActiveCamera();
-        }
-
-        public Transform GetActiveCameraTransform()
-        {
-            RefreshActiveCamera();
-            return activeCameraTransform;
-        }
-
-        protected override void OnEnable()
-        {
-            base.OnEnable();
-            RefreshActiveCamera();
-        }
-
-        private void RefreshActiveCamera()
-        {
-            var rig = GetRig(mode);
-            activeCameraTransform = rig.GetBestTransform();
-        }
-
-        private CameraRig GetRig(CameraMode m)
-        {
-            return m == CameraMode.FirstPerson ? firstPerson : thirdPerson;
-        }
-    }
-
-    public enum CameraMode
-    {
-        FirstPerson,
-        ThirdPerson
-    }
-
-    [Serializable]
-    public class CameraRig
-    {
-        [Title("Main")]
-        [HideLabel]
-        public VirtualCameraSlot main = new VirtualCameraSlot();
-
-        [Title("扩展槽位 A")]
-        [HideLabel]
-        public VirtualCameraSlot slotA = new VirtualCameraSlot();
-
-        [Title("扩展槽位 B")]
-        [HideLabel]
-        public VirtualCameraSlot slotB = new VirtualCameraSlot();
-
-        [Title("Dynamic")]
-        [HideLabel]
-        public VirtualCameraSlot dynamicSlot = new VirtualCameraSlot();
-
-        public Transform GetBestTransform()
-        {
-            return dynamicSlot.Transform ?? main.Transform ?? slotA.Transform ?? slotB.Transform;
-        }
-    }
-
-    [Serializable]
-    public class VirtualCameraSlot
-    {
-        [LabelText("Virtual Camera")]
-        public Component virtualCamera;
-
-        [LabelText("备用 Transform")]
-        public Transform fallbackTransform;
-
-        public Transform Transform => virtualCamera != null ? virtualCamera.transform : fallbackTransform;
-
-        public void Set(Transform transform)
-        {
-            fallbackTransform = transform;
-        }
-
-        public void CopyFrom(VirtualCameraSlot other)
-        {
-            if (other == null) return;
-            virtualCamera = other.virtualCamera;
-            fallbackTransform = other.fallbackTransform;
-        }
-
-        public void Clear()
-        {
-            virtualCamera = null;
-            fallbackTransform = null;
-        }
-
-        public void SetActive(bool active)
-        {
-            if (virtualCamera is Behaviour behaviour)
-            {
-                behaviour.enabled = active;
-            }
-        }
     }
 
     /// <summary>

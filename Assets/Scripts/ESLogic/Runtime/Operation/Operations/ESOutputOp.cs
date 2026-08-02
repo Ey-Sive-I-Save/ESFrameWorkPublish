@@ -52,6 +52,12 @@ namespace ES
         [LabelText("必须触发停止")]
         public bool MustTriggerStop = false;
 
+        /// <summary>
+        /// Whether this Op owns runtime work that must be released by StopOperation.
+        /// Most Ops are one-shot commands and keep the default false value.
+        /// </summary>
+        public virtual bool NeedsStop => false;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void _TryStartOp(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
@@ -62,7 +68,7 @@ namespace ES
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void _TryStopOp(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
         {
-            if (Enabled || MustTriggerStop)
+            if (NeedsStop && (Enabled || MustTriggerStop))
                 StopOperation(target, scopeSupport, hostSupport);
         }
 

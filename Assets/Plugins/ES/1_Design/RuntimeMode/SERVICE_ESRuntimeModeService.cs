@@ -4,6 +4,13 @@ using ES.Internal;
 
 namespace ES
 {
+    public enum ESRuntimeModeOwnershipKind : byte
+    {
+        LegacyUnowned,
+        SystemOwned,
+        LeaseOwned
+    }
+
     public struct ESRuntimeModeHandle
     {
         public int id;
@@ -26,16 +33,26 @@ namespace ES
         public int priority;
         public int stackIndex;
         public object owner;
+        public ESRuntimeModeOwnershipKind ownershipKind;
     }
 
     public struct ESRuntimeModeTagHandle
     {
         public int id;
+        internal ESRuntimeModeService host;
+        internal int generation;
+        internal object owner;
+        internal ESRuntimeModeOwnershipKind ownershipKind;
 
         public bool IsValid
         {
             get { return id > 0; }
         }
+
+        public ESRuntimeModeService Host => host;
+        public int Generation => generation;
+        public object Owner => owner;
+        public ESRuntimeModeOwnershipKind OwnershipKind => ownershipKind;
 
         public static ESRuntimeModeTagHandle Invalid
         {
@@ -50,6 +67,50 @@ namespace ES
         public int priority;
         public int stackIndex;
         public object owner;
+        public ESRuntimeModeOwnershipKind ownershipKind;
+    }
+
+    /// <summary>
+    /// Generation-safe ownership boundary for one RuntimeMode request. Copying the reference shares
+    /// the same release state; repeated disposal and disposal after a service Clear are harmless.
+    /// </summary>
+    public sealed class ESRuntimeModeLease : IDisposable
+    {
+        private ESRuntimeModeService host;
+        private readonly ESRuntimeModeHandle handle;
+        private readonly int generation;
+        private readonly object owner;
+        private bool released;
+
+        internal ESRuntimeModeLease(ESRuntimeModeService host, ESRuntimeModeHandle handle, int generation, object owner)
+        {
+            this.host = host;
+            this.handle = handle;
+            this.generation = generation;
+            this.owner = owner;
+        }
+
+        public ESRuntimeModeService Host => host;
+        public int Generation => generation;
+        public object Owner => owner;
+        public bool IsReleased => released;
+        public bool IsValid => !released && host != null && host.Generation == generation && handle.IsValid;
+
+        public bool Release()
+        {
+            if (released)
+                return false;
+
+            released = true;
+            ESRuntimeModeService currentHost = host;
+            host = null;
+            return currentHost != null && currentHost.ReleaseLease(handle, generation, owner);
+        }
+
+        public void Dispose()
+        {
+            Release();
+        }
     }
 
     public sealed class ESRuntimeModeService
@@ -65,6 +126,11 @@ namespace ES
 
         private int nextHandleId = 1;
         private int nextStackIndex = 1;
+        private int generation = 1;
+        private int commitVersion;
+        private int deferCommitDepth;
+        private bool policyDirty;
+        private bool isCommitting;
         private ESRuntimeModePolicy currentPolicy;
         private ESRuntimeModePolicyTrace currentTrace;
 
@@ -93,6 +159,10 @@ namespace ES
             get { return tags.Count; }
         }
 
+        public int Generation => generation;
+        public int CommitVersion => commitVersion;
+        public bool IsPolicyDirty => policyDirty;
+
         public void Warmup(int maxModes = 16, int maxTags = 32)
         {
             if (maxModes > modeStack.Capacity)
@@ -118,6 +188,14 @@ namespace ES
 
         public ESRuntimeModeHandle PushMode(ESRuntimeMode mode, object owner = null, int? priorityOverride = null)
         {
+            ESRuntimeModeOwnershipKind ownershipKind = owner == null
+                ? ESRuntimeModeOwnershipKind.LegacyUnowned
+                : ESRuntimeModeOwnershipKind.SystemOwned;
+            return PushModeCore(mode, owner, ownershipKind, priorityOverride);
+        }
+
+        private ESRuntimeModeHandle PushModeCore(ESRuntimeMode mode, object owner, ESRuntimeModeOwnershipKind ownershipKind, int? priorityOverride)
+        {
             ESRuntimeModeHandle handle = NewModeHandle();
             modeStack.Add(new ESRuntimeModeEntry
             {
@@ -125,11 +203,20 @@ namespace ES
                 handle = handle,
                 priority = priorityOverride.HasValue ? priorityOverride.Value : ESRuntimeModeDefaults.GetModePriority(mode),
                 stackIndex = nextStackIndex++,
-                owner = owner
+                owner = owner,
+                ownershipKind = ownershipKind
             });
 
-            RebuildPolicy();
+            RequestPolicyCommit();
             return handle;
+        }
+
+        public ESRuntimeModeLease AcquireModeLease(ESRuntimeMode mode, object owner, int? priorityOverride = null)
+        {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner), "RuntimeMode Lease 必须具有实例级 Owner。");
+            ESRuntimeModeHandle handle = PushModeCore(mode, owner, ESRuntimeModeOwnershipKind.LeaseOwned, priorityOverride);
+            return new ESRuntimeModeLease(this, handle, generation, owner);
         }
 
         public bool TryPushModeUnique(ESRuntimeMode mode, out ESRuntimeModeHandle handle, object owner = null, int? priorityOverride = null)
@@ -171,8 +258,14 @@ namespace ES
                 if (modeStack[i].handle.id != handle.id)
                     continue;
 
+                if (modeStack[i].ownershipKind == ESRuntimeModeOwnershipKind.LeaseOwned)
+                {
+                    LogOwnershipRejection("RemoveMode", modeStack[i].ownershipKind);
+                    return false;
+                }
+
                 modeStack.RemoveAt(i);
-                RebuildPolicy();
+                RequestPolicyCommit();
                 return true;
             }
 
@@ -189,9 +282,18 @@ namespace ES
                 if (modeStack[i].handle.id != handle.id)
                     continue;
 
+                for (int removeIndex = i; removeIndex < modeStack.Count; removeIndex++)
+                {
+                    if (modeStack[removeIndex].ownershipKind == ESRuntimeModeOwnershipKind.LeaseOwned)
+                    {
+                        LogOwnershipRejection("RemoveModeWithAbove", modeStack[removeIndex].ownershipKind);
+                        return false;
+                    }
+                }
+
                 int removeCount = modeStack.Count - i;
                 modeStack.RemoveRange(i, removeCount);
-                RebuildPolicy();
+                RequestPolicyCommit();
                 return true;
             }
 
@@ -203,28 +305,39 @@ namespace ES
             if (modeStack.Count == 0)
                 return false;
 
+            ESRuntimeModeEntry top = modeStack[modeStack.Count - 1];
+            if (top.ownershipKind != ESRuntimeModeOwnershipKind.LegacyUnowned)
+            {
+                LogOwnershipRejection("PopTopMode", top.ownershipKind);
+                return false;
+            }
+
             modeStack.RemoveAt(modeStack.Count - 1);
-            RebuildPolicy();
+            RequestPolicyCommit();
             return true;
         }
 
         public ESRuntimeModeTagHandle AddTag(ESRuntimeModeTag tag, object owner = null, int? priorityOverride = null)
         {
-            ESRuntimeModeTagHandle handle = NewTagHandle();
+            ESRuntimeModeOwnershipKind ownershipKind = owner == null
+                ? ESRuntimeModeOwnershipKind.LegacyUnowned
+                : ESRuntimeModeOwnershipKind.SystemOwned;
+            ESRuntimeModeTagHandle handle = NewTagHandle(owner, ownershipKind);
             tags.Add(new ESRuntimeModeTagEntry
             {
                 tag = tag,
                 handle = handle,
                 priority = priorityOverride.HasValue ? priorityOverride.Value : ESRuntimeModeDefaults.GetTagPriority(tag),
                 stackIndex = nextStackIndex++,
-                owner = owner
+                owner = owner,
+                ownershipKind = ownershipKind
             });
 
             int tagIndex = (int)tag;
             if (tagIndex >= 0 && tagIndex < tagUseCounts.Length)
                 tagUseCounts[tagIndex]++;
 
-            RebuildPolicy();
+            RequestPolicyCommit();
             return handle;
         }
 
@@ -254,12 +367,22 @@ namespace ES
 
         public bool RemoveTag(ESRuntimeModeTagHandle handle)
         {
-            if (!handle.IsValid)
+            if (!handle.IsValid
+                || !ReferenceEquals(handle.host, this)
+                || handle.generation != generation
+                || handle.owner == null
+                || handle.ownershipKind == ESRuntimeModeOwnershipKind.LegacyUnowned)
+            {
+                UnityEngine.Debug.LogWarning("RuntimeMode 拒绝无授权或旧代 Tag Handle 删除。");
                 return false;
+            }
 
             for (int i = tags.Count - 1; i >= 0; i--)
             {
-                if (tags[i].handle.id != handle.id)
+                ESRuntimeModeTagEntry entry = tags[i];
+                if (entry.handle.id != handle.id
+                    || entry.ownershipKind != handle.ownershipKind
+                    || !ReferenceEquals(entry.owner, handle.owner))
                     continue;
 
                 int tagIndex = (int)tags[i].tag;
@@ -267,7 +390,7 @@ namespace ES
                     tagUseCounts[tagIndex]--;
 
                 tags.RemoveAt(i);
-                RebuildPolicy();
+                RequestPolicyCommit();
                 return true;
             }
 
@@ -322,7 +445,8 @@ namespace ES
             int removed = 0;
             for (int i = modeStack.Count - 1; i >= 0; i--)
             {
-                if (!OwnerEquals(modeStack[i].owner, owner))
+                if (modeStack[i].ownershipKind != ESRuntimeModeOwnershipKind.SystemOwned
+                    || !OwnerEquals(modeStack[i].owner, owner))
                     continue;
 
                 modeStack.RemoveAt(i);
@@ -330,7 +454,7 @@ namespace ES
             }
 
             if (removed > 0)
-                RebuildPolicy();
+                RequestPolicyCommit();
 
             return removed;
         }
@@ -340,7 +464,8 @@ namespace ES
             int removed = 0;
             for (int i = tags.Count - 1; i >= 0; i--)
             {
-                if (!OwnerEquals(tags[i].owner, owner))
+                if (tags[i].ownershipKind != ESRuntimeModeOwnershipKind.SystemOwned
+                    || !OwnerEquals(tags[i].owner, owner))
                     continue;
 
                 int tagIndex = (int)tags[i].tag;
@@ -352,7 +477,7 @@ namespace ES
             }
 
             if (removed > 0)
-                RebuildPolicy();
+                RequestPolicyCommit();
 
             return removed;
         }
@@ -364,7 +489,8 @@ namespace ES
 
             for (int i = modeStack.Count - 1; i >= 0; i--)
             {
-                if (!OwnerEquals(modeStack[i].owner, owner))
+                if (modeStack[i].ownershipKind != ESRuntimeModeOwnershipKind.SystemOwned
+                    || !OwnerEquals(modeStack[i].owner, owner))
                     continue;
 
                 modeStack.RemoveAt(i);
@@ -374,7 +500,8 @@ namespace ES
 
             for (int i = tags.Count - 1; i >= 0; i--)
             {
-                if (!OwnerEquals(tags[i].owner, owner))
+                if (tags[i].ownershipKind != ESRuntimeModeOwnershipKind.SystemOwned
+                    || !OwnerEquals(tags[i].owner, owner))
                     continue;
 
                 int tagIndex = (int)tags[i].tag;
@@ -387,7 +514,7 @@ namespace ES
             }
 
             if (changed)
-                RebuildPolicy();
+                RequestPolicyCommit();
 
             return removed;
         }
@@ -404,10 +531,80 @@ namespace ES
 
         public void Clear()
         {
+            generation = generation == int.MaxValue ? 1 : generation + 1;
             modeStack.Clear();
             tags.Clear();
             System.Array.Clear(tagUseCounts, 0, tagUseCounts.Length);
-            RebuildPolicy();
+            RequestPolicyCommit();
+        }
+
+        internal bool ReleaseLease(ESRuntimeModeHandle handle, int expectedGeneration, object expectedOwner)
+        {
+            if (expectedGeneration != generation || !handle.IsValid)
+                return false;
+
+            for (int i = modeStack.Count - 1; i >= 0; i--)
+            {
+                ESRuntimeModeEntry entry = modeStack[i];
+                if (entry.handle.id != handle.id
+                    || entry.ownershipKind != ESRuntimeModeOwnershipKind.LeaseOwned
+                    || !ReferenceEquals(entry.owner, expectedOwner))
+                    continue;
+
+                modeStack.RemoveAt(i);
+                RequestPolicyCommit();
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool RemoveMostRecentMode(ESRuntimeMode mode)
+        {
+            for (int i = modeStack.Count - 1; i >= 0; i--)
+            {
+                if (modeStack[i].mode != mode
+                    || modeStack[i].ownershipKind != ESRuntimeModeOwnershipKind.LegacyUnowned) continue;
+                modeStack.RemoveAt(i);
+                RequestPolicyCommit();
+                return true;
+            }
+            return false;
+        }
+
+        public bool RemoveMostRecentTag(ESRuntimeModeTag tag)
+        {
+            for (int i = tags.Count - 1; i >= 0; i--)
+            {
+                if (tags[i].tag != tag
+                    || tags[i].ownershipKind != ESRuntimeModeOwnershipKind.LegacyUnowned) continue;
+                int tagIndex = (int)tag;
+                if (tagIndex >= 0 && tagIndex < tagUseCounts.Length && tagUseCounts[tagIndex] > 0)
+                    tagUseCounts[tagIndex]--;
+                tags.RemoveAt(i);
+                RequestPolicyCommit();
+                return true;
+            }
+            return false;
+        }
+
+        private static void LogOwnershipRejection(string operation, ESRuntimeModeOwnershipKind ownershipKind)
+        {
+            UnityEngine.Debug.LogWarning("RuntimeMode 拒绝不安全操作 " + operation + "，目标所有权为 " + ownershipKind + "。");
+        }
+
+        public void BeginActiveSetUpdate()
+        {
+            deferCommitDepth++;
+        }
+
+        public void EndActiveSetUpdate()
+        {
+            if (deferCommitDepth <= 0)
+                throw new InvalidOperationException("RuntimeMode Active Set update scope is not active.");
+            deferCommitDepth--;
+            if (deferCommitDepth == 0)
+                CommitPolicy();
         }
 
         private ESRuntimeModeHandle NewModeHandle()
@@ -415,9 +612,13 @@ namespace ES
             return new ESRuntimeModeHandle { id = nextHandleId++ };
         }
 
-        private ESRuntimeModeTagHandle NewTagHandle()
+        private ESRuntimeModeTagHandle NewTagHandle(object owner, ESRuntimeModeOwnershipKind ownershipKind)
         {
-            return new ESRuntimeModeTagHandle { id = nextHandleId++ };
+            return new ESRuntimeModeTagHandle
+            {
+                id = nextHandleId++, host = this, generation = generation,
+                owner = owner, ownershipKind = ownershipKind
+            };
         }
 
         private static bool OwnerEquals(object a, object b)
@@ -439,7 +640,41 @@ namespace ES
             return max + 1;
         }
 
-        private void RebuildPolicy()
+        private void RequestPolicyCommit()
+        {
+            policyDirty = true;
+            if (deferCommitDepth == 0)
+                CommitPolicy();
+        }
+
+        public bool CommitPolicy()
+        {
+            if (isCommitting || deferCommitDepth > 0 || !policyDirty)
+                return false;
+
+            isCommitting = true;
+            try
+            {
+                bool committed = false;
+                int guard = 0;
+                while (policyDirty && deferCommitDepth == 0 && guard++ < 16)
+                {
+                    policyDirty = false;
+                    CommitPolicyCore();
+                    commitVersion = commitVersion == int.MaxValue ? 1 : commitVersion + 1;
+                    committed = true;
+                }
+                if (guard >= 16 && policyDirty)
+                    throw new InvalidOperationException("RuntimeMode policy commit did not stabilize after 16 passes.");
+                return committed;
+            }
+            finally
+            {
+                isCommitting = false;
+            }
+        }
+
+        private void CommitPolicyCore()
         {
             ESRuntimeModePolicy fallback = ESRuntimeModePolicy.Default;
             ESRuntimeModePolicy next = fallback;
@@ -466,8 +701,13 @@ namespace ES
 
             currentPolicy = next;
             System.Action<ESRuntimeModePolicy> callback = OnPolicyChanged;
-            if (callback != null)
-                callback(currentPolicy);
+            if (callback == null)
+                return;
+            foreach (System.Action<ESRuntimeModePolicy> handler in callback.GetInvocationList())
+            {
+                try { handler(currentPolicy); }
+                catch (Exception exception) { UnityEngine.Debug.LogException(exception); }
+            }
         }
 
         private bool Resolve(ESRuntimeModePolicyField field, bool fallback, out ESPermitLawResult result)

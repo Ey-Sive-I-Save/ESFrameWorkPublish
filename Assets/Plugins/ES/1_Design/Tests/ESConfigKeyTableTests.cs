@@ -194,6 +194,60 @@ namespace ES.Tests
         }
 
         [Test]
+        public void AssetPage_TextAsset_IsClassifiedAsRaw()
+        {
+            var asset = new TextAsset("raw-test");
+            try
+            {
+                Assert.That(ESAssetPage.DetermineKind(asset), Is.EqualTo(ESAssetReferKind.Raw));
+                Assert.That(ESGlobalResToolsSupportConfig.DetermineAssetCategory(asset), Is.EqualTo(ESAssetCategory.Raw));
+            }
+            finally
+            {
+                Object.DestroyImmediate(asset);
+            }
+        }
+
+        [Test]
+        public void RawAssetCatalog_RegisteredConfigKey_ResolvesStableIdentity()
+        {
+            const string stringKey = "tests.raw.payload";
+            const string guid = "1234567890abcdef1234567890abcdef";
+            ESAssetConfigKeyTable<ESAssetReferRawConfigData, TextAsset> table = ESRuntimeDataAsset.RawAssets;
+            var key = new ESAssetReferRawConfigKey { stringKey = stringKey };
+            var data = new ESAssetReferRawConfigData
+            {
+                key = key,
+                keyName = stringKey,
+                displayName = "Raw Test Payload"
+            };
+            data.SetAssetIdentity(guid, 0);
+
+            table.BeginBuild(clear: true);
+            try
+            {
+                Assert.That(ESRuntimeDataAsset.RegisterRaw(data), Is.True);
+            }
+            finally
+            {
+                table.EndBuild();
+            }
+
+            try
+            {
+                var catalog = new ESRuntimeAssetCatalog();
+                Assert.That(catalog.TryResolveAssetIdentity(ESAssetReferKind.Raw, 0, stringKey, out ESAssetIdentity identity), Is.True);
+                Assert.That(identity.Guid, Is.EqualTo(guid));
+                Assert.That(identity.LocalFileId, Is.Zero);
+            }
+            finally
+            {
+                table.BeginBuild(clear: true);
+                table.EndBuild();
+            }
+        }
+
+        [Test]
         public void AssetTable_ReleaseAndCatalogRebuild_ReuseStableConfigShell()
         {
             var table = new ESAssetConfigKeyTable<TestAssetConfigData, GameObject>(4, "Tests.Asset.Retained");

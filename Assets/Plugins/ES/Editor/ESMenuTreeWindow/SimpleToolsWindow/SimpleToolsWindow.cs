@@ -17,6 +17,7 @@ namespace ES
     public class SimpleToolsWindow : ESMenuTreeWindowAB<SimpleToolsWindow>
     {
         private Vector2 toolContentScrollPosition;
+        private static bool runtimeWatchWasFrontmost;
 
         // Keep Odin's normal inspectors, but replace its two-axis outer scroll
         // container with a vertical-only one for this tool collection.
@@ -94,9 +95,51 @@ namespace ES
                 return;
             }
 
+            // RuntimeWatch is an expensive diagnostic reader. The editor update hook
+            // may stay registered while this window is open, but it must never sample
+            // a hidden/background dock tab. Unity's public EditorWindow API cannot
+            // prove pixel-level occlusion, so the safe gate is selected page + focus
+            // + a valid window rect. Background sampling is intentionally disabled.
+            if (!IsRuntimeWatchPageVisible(window))
+            {
+                runtimeWatchWasFrontmost = false;
+                return;
+            }
+
             Page_RuntimeWatch runtimeWatch = window.pageRuntimeWatch;
+            if (!runtimeWatchWasFrontmost)
+            {
+                runtimeWatchWasFrontmost = true;
+                runtimeWatch?.RequestForegroundRefresh();
+            }
+
             if (runtimeWatch != null && runtimeWatch.TryAutoRefreshFromEditorTick())
                 window.Repaint();
+        }
+
+        private static bool IsRuntimeWatchPageVisible(SimpleToolsWindow window)
+        {
+            if (window == null || window.MenuTree == null)
+                return false;
+
+            if (!MenuItems.TryGetValue(MenuPath_RuntimeWatch, out OdinMenuItem runtimeWatchItem)
+                || runtimeWatchItem == null
+                || window.MenuTree.Selection == null)
+            {
+                return false;
+            }
+
+            if (!window.MenuTree.Selection.Contains(runtimeWatchItem))
+                return false;
+
+            Rect windowRect = window.position;
+            if (windowRect.width <= 0f || windowRect.height <= 0f || !window.hasFocus)
+                return false;
+
+            // focusedWindow can be null during editor focus transitions. In that
+            // short state hasFocus remains the least surprising public signal.
+            EditorWindow focusedWindow = EditorWindow.focusedWindow;
+            return focusedWindow == null || ReferenceEquals(focusedWindow, window);
         }
 
         private static void ApplyDefaultMenuWidth()
@@ -105,19 +148,26 @@ namespace ES
                 UsingWindow.MenuWidth = 245;
         }
 
+        protected override void OnDestroy()
+        {
+            EditorApplication.update -= TickRuntimeWatch;
+            runtimeWatchWasFrontmost = false;
+            if (ReferenceEquals(UsingWindow, this))
+                UsingWindow = null;
+            base.OnDestroy();
+        }
+
         #endregion
 
         #region 数据滞留与声明
         //根页面名
-        public const string PageName_CoreWorkbench = "01 常用工具";
+        public const string PageName_ObservationTools = "01 观察与诊断";
         public const string PageName_SceneBatchTools = "02 场景批处理";
         public const string PageName_AssetPublishTools = "03 资产与发布";
-        public const string PageName_DiagnosticsTools = "04 诊断与集成";
+        public const string PageName_ESIntegrationTools = "04 ES 配置与集成";
+        public const string PageName_MaintenanceTools = "05 维护与修复";
         public const string PageName_LegacyTools = "90 旧工具与待升级";
         public const string PageName_Overview = "00 工具总览";
-        public const string PageName_AssetTools = "03 资产与发布";
-        public const string PageName_HierarchyTools = "02 场景批处理";
-        public const string PageName_ESIntegrationTools = "04 诊断与集成";
         public const string PageName_ObjectPool = "对象池工具";
         public const string PageName_TopToolbar = "顶部工具栏";
         public const string PageName_SceneTextRepair = "场景文本修复";
@@ -139,22 +189,112 @@ namespace ES
         public const string PageName_LightingSettings = "灯光设置工具";
         public const string PageName_ParticleSystemAdjustment = "粒子系统批量调整工具";
 
-        private const string MenuPath_RuntimeWatch = PageName_CoreWorkbench + "/07 运行时观察";
-        private const string MenuPath_MaterialReplacement = PageName_CoreWorkbench + "/01 材质批量替换";
-        private const string MenuPath_PrefabManagement = PageName_CoreWorkbench + "/02 Prefab实例管理";
-        private const string MenuPath_PhysicsAlign = PageName_CoreWorkbench + "/03 物理对齐与布景";
-        private const string MenuPath_AnimationBatchSetting = PageName_CoreWorkbench + "/04 动画器批量设置";
-        private const string MenuPath_BatchStaticSettingCore = PageName_CoreWorkbench + "/05 批量静态设置";
-        private const string MenuPath_AssetReferenceChecker = PageName_CoreWorkbench + "/06 资源引用检查";
-        private const string MenuPath_BatchRename = PageName_SceneBatchTools + "/01 " + PageName_BatchRename;
-        private const string MenuPath_SceneOptimization = PageName_SceneBatchTools + "/02 " + PageName_SceneOptimization;
-        private const string MenuPath_LightingSettings = PageName_SceneBatchTools + "/03 " + PageName_LightingSettings;
-        private const string MenuPath_ParticleSystemAdjustment = PageName_SceneBatchTools + "/04 " + PageName_ParticleSystemAdjustment;
-        private const string MenuPath_UnityPackageTool = PageName_AssetPublishTools + "/01 " + PageName_UnityPackageTool;
-        private const string MenuPath_TextureSpriteTool = PageName_AssetPublishTools + "/02 " + PageName_TextureSpriteTool;
-        private const string MenuPath_ObjectPool = PageName_DiagnosticsTools + "/01 " + PageName_ObjectPool + "  [诊断]";
-        private const string MenuPath_TopToolbar = PageName_DiagnosticsTools + "/02 " + PageName_TopToolbar + "  [配置]";
-        private const string MenuPath_SceneTextRepair = PageName_DiagnosticsTools + "/03 " + PageName_SceneTextRepair + "  [修复]";
+        private const string MenuPath_RuntimeWatch = PageName_ObservationTools + "/01 运行时观察";
+        private const string MenuPath_MaterialReplacement = PageName_SceneBatchTools + "/01 材质批量替换";
+        private const string MenuPath_PrefabManagement = PageName_SceneBatchTools + "/02 Prefab实例管理";
+        private const string MenuPath_PhysicsAlign = PageName_SceneBatchTools + "/03 物理对齐与布景";
+        private const string MenuPath_AnimationBatchSetting = PageName_SceneBatchTools + "/04 动画器批量设置";
+        private const string MenuPath_BatchStaticSettingCore = PageName_SceneBatchTools + "/05 批量静态设置";
+        private const string MenuPath_BatchRename = PageName_SceneBatchTools + "/06 " + PageName_BatchRename;
+        private const string MenuPath_LightingSettings = PageName_SceneBatchTools + "/07 " + PageName_LightingSettings;
+        private const string MenuPath_ParticleSystemAdjustment = PageName_SceneBatchTools + "/08 " + PageName_ParticleSystemAdjustment;
+        private const string MenuPath_TextureSpriteTool = PageName_AssetPublishTools + "/01 " + PageName_TextureSpriteTool;
+        private const string MenuPath_UnityPackageTool = PageName_AssetPublishTools + "/02 " + PageName_UnityPackageTool;
+        private const string MenuPath_ObjectPool = PageName_ESIntegrationTools + "/01 " + PageName_ObjectPool;
+        private const string MenuPath_TopToolbar = PageName_ESIntegrationTools + "/02 " + PageName_TopToolbar;
+        private const string MenuPath_AssetReferenceChecker = PageName_MaintenanceTools + "/01 " + PageName_AssetReferenceChecker;
+        private const string MenuPath_SceneOptimization = PageName_MaintenanceTools + "/02 " + PageName_SceneOptimization;
+        private const string MenuPath_SceneTextRepair = PageName_MaintenanceTools + "/03 " + PageName_SceneTextRepair;
+
+        private static readonly Dictionary<string, SimpleToolsPagePresentation> PagePresentations
+            = new Dictionary<string, SimpleToolsPagePresentation>(StringComparer.Ordinal)
+            {
+                [PageName_Overview] = new SimpleToolsPagePresentation(
+                    "ES 简单工具集",
+                    "按当前工作对象选择工具：观察运行状态、批量处理场景、整理资产或维护 ES 配置。",
+                    SimpleToolsMaturity.Upgrading,
+                    "批处理页会修改场景或资产；进入页面后先确认范围与预览。"),
+                [MenuPath_RuntimeWatch] = new SimpleToolsPagePresentation(
+                    "RuntimeWatch 运行时观察",
+                    "只读查看当前场景注册对象的字段、属性和状态变化。",
+                    SimpleToolsMaturity.Upgrading,
+                    "自动刷新只在此窗口前台聚焦时运行；方法调用始终需要明确操作。"),
+                [MenuPath_MaterialReplacement] = new SimpleToolsPagePresentation(
+                    "材质批量替换",
+                    "先建立引用预览，再替换场景对象或 Prefab 资产中的材质。",
+                    SimpleToolsMaturity.Upgrading,
+                    "会写入场景或资产；必须先确认目标来源与命中数量。"),
+                [MenuPath_PrefabManagement] = new SimpleToolsPagePresentation(
+                    "Prefab 实例管理",
+                    "审计当前选区的 Prefab 实例，并执行应用、还原或断开等明确操作。",
+                    SimpleToolsMaturity.Upgrading,
+                    "会修改场景实例或 Prefab 关联，操作前需确认预览与 Undo 范围。"),
+                [MenuPath_PhysicsAlign] = new SimpleToolsPagePresentation(
+                    "物理对齐与布景",
+                    "对场景对象进行对齐、分布、落地、网格吸附和轻度随机布置。",
+                    SimpleToolsMaturity.Upgrading,
+                    "会直接修改 Transform 或 RectTransform；先审计选区再执行。"),
+                [MenuPath_AnimationBatchSetting] = new SimpleToolsPagePresentation(
+                    "动画器批量设置",
+                    "按选区规则预览 Animator 配置变更，再批量应用。",
+                    SimpleToolsMaturity.Upgrading,
+                    "会写入场景对象；需要先确认目标、缺失组件处理和预览结果。"),
+                [MenuPath_BatchStaticSettingCore] = new SimpleToolsPagePresentation(
+                    "批量静态设置",
+                    "审计当前选区的 Static Flags，并按明确规则批量应用。",
+                    SimpleToolsMaturity.Upgrading,
+                    "会修改场景对象静态标记；大范围操作前应先预览。"),
+                [MenuPath_BatchRename] = new SimpleToolsPagePresentation(
+                    "批量重命名",
+                    "为当前选区建立命名计划，确认冲突后再写入对象名称。",
+                    SimpleToolsMaturity.Upgrading,
+                    "会修改场景对象名称；预览与执行必须使用同一套规则。"),
+                [MenuPath_LightingSettings] = new SimpleToolsPagePresentation(
+                    "灯光批量设置",
+                    "按当前选区预览 Light 参数，再应用统一的灯光调整。",
+                    SimpleToolsMaturity.Upgrading,
+                    "会写入场景灯光组件；请先确认包含子对象与筛选范围。"),
+                [MenuPath_ParticleSystemAdjustment] = new SimpleToolsPagePresentation(
+                    "粒子系统批量调整",
+                    "按当前选区预览 ParticleSystem 参数，再批量应用。",
+                    SimpleToolsMaturity.Upgrading,
+                    "会修改场景粒子组件；先确认目标数、筛选条件和预览。"),
+                [MenuPath_TextureSpriteTool] = new SimpleToolsPagePresentation(
+                    "纹理与 Sprite 批处理",
+                    "批量调整 TextureImporter，或从选中 Sprite 生成独立纹理文件。",
+                    SimpleToolsMaturity.Upgrading,
+                    "会触发资产重新导入或写入新文件；执行前确认输出目录与冲突策略。"),
+                [MenuPath_UnityPackageTool] = new SimpleToolsPagePresentation(
+                    "UnityPackage 打包",
+                    "预览真实资源清单后导出 UnityPackage 或执行发布打包。",
+                    SimpleToolsMaturity.Upgrading,
+                    "导出范围由配置决定；先刷新预览，再执行唯一的发布动作。"),
+                [MenuPath_ObjectPool] = new SimpleToolsPagePresentation(
+                    "对象池与预热配置",
+                    "查看运行时池数据，审计预热配置，并将明确配置接入当前场景。",
+                    SimpleToolsMaturity.Upgrading,
+                    "运行时统计只读；配置接入会写入场景 GameManager。"),
+                [MenuPath_TopToolbar] = new SimpleToolsPagePresentation(
+                    "场景与资产快捷入口",
+                    "维护 ESSceneGlobalData 中的场景和资产快捷入口。",
+                    SimpleToolsMaturity.Upgrading,
+                    "添加、删除和分组会写入配置资产；场景切换可能触发保存确认。"),
+                [MenuPath_AssetReferenceChecker] = new SimpleToolsPagePresentation(
+                    "资源引用体检台",
+                    "检查资源引用、依赖、未使用候选与资源包外部依赖。",
+                    SimpleToolsMaturity.Upgrading,
+                    "隔离操作不会直接删除资源，但分析结论仍必须人工复核。"),
+                [MenuPath_SceneOptimization] = new SimpleToolsPagePresentation(
+                    "场景优化检查",
+                    "扫描当前场景的性能与配置问题，预览后执行可恢复的修复。",
+                    SimpleToolsMaturity.Upgrading,
+                    "修复会写入场景；风险项必须先确认影响范围。"),
+                [MenuPath_SceneTextRepair] = new SimpleToolsPagePresentation(
+                    "场景文本修复",
+                    "扫描并修复场景中的异常文本或丢失引用文本。",
+                    SimpleToolsMaturity.Upgrading,
+                    "修复会修改场景并建立备份；请先检查扫描报告。")
+            };
 
         [NonSerialized] public Page_SimpleToolsOverview pageOverview;
         [NonSerialized] public Page_UnityPackageTool pageUnityPackageTool;
@@ -212,11 +352,61 @@ namespace ES
             toolContentScrollPosition.x = 0f;
             try
             {
-                base.DrawEditors();
+                DrawCurrentPagePresentation();
+                using (SimpleToolsPanelUtility.SuppressNestedToolHeaders())
+                    base.DrawEditors();
             }
             finally
             {
                 GUILayout.EndScrollView();
+            }
+        }
+
+        private void DrawCurrentPagePresentation()
+        {
+            if (!TryGetSelectedPresentation(out SimpleToolsPagePresentation presentation))
+                return;
+
+            SimpleToolsPanelUtility.DrawToolHeader(
+                presentation.Title,
+                presentation.Purpose,
+                presentation.Maturity,
+                presentation.Risk);
+        }
+
+        private bool TryGetSelectedPresentation(out SimpleToolsPagePresentation presentation)
+        {
+            presentation = default;
+            if (MenuTree == null || MenuTree.Selection == null)
+                return false;
+
+            foreach (KeyValuePair<string, SimpleToolsPagePresentation> pair in PagePresentations)
+            {
+                if (MenuItems.TryGetValue(pair.Key, out OdinMenuItem item)
+                    && item != null
+                    && MenuTree.Selection.Contains(item))
+                {
+                    presentation = pair.Value;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private readonly struct SimpleToolsPagePresentation
+        {
+            public readonly string Title;
+            public readonly string Purpose;
+            public readonly SimpleToolsMaturity Maturity;
+            public readonly string Risk;
+
+            public SimpleToolsPagePresentation(string title, string purpose, SimpleToolsMaturity maturity, string risk)
+            {
+                Title = title;
+                Purpose = purpose;
+                Maturity = maturity;
+                Risk = risk;
             }
         }
 
@@ -257,7 +447,7 @@ namespace ES
             {
                 QuickBuildRootMenu(tree, PageName_Overview, ref pageOverview, SdfIconType.Speedometer2);
 
-                // Frequently used editor tools.
+                // Directory order follows actual working object and highest write risk.
                 QuickBuildRootMenu(tree, MenuPath_RuntimeWatch, ref pageRuntimeWatch, SdfIconType.Activity);
                 QuickBuildRootMenu(tree, MenuPath_MaterialReplacement, ref pageMaterialReplacement, SdfIconType.Palette);
                 QuickBuildRootMenu(tree, MenuPath_PrefabManagement, ref pagePrefabManagement, SdfIconType.Box);
@@ -266,17 +456,14 @@ namespace ES
                 QuickBuildRootMenu(tree, MenuPath_BatchStaticSettingCore, ref pageBatchStaticSetting, SdfIconType.ToggleOn);
                 QuickBuildRootMenu(tree, MenuPath_AssetReferenceChecker, ref pageAssetReferenceChecker, SdfIconType.Search);
 
-                // 场景批处理：仍有价值，但需要继续统一 UI 和大批量保护。
                 QuickBuildRootMenu(tree, MenuPath_BatchRename, ref pageBatchRename, SdfIconType.Pencil);
                 QuickBuildRootMenu(tree, MenuPath_SceneOptimization, ref pageSceneOptimization, SdfIconType.Speedometer);
                 QuickBuildRootMenu(tree, MenuPath_LightingSettings, ref pageLightingSettings, SdfIconType.Lightbulb);
                 QuickBuildRootMenu(tree, MenuPath_ParticleSystemAdjustment, ref pageParticleSystemAdjustment, SdfIconType.Stars);
 
-                // 资产与发布：偏资产流水线，下一阶段重点补报告导出和批处理历史。
                 QuickBuildRootMenu(tree, MenuPath_UnityPackageTool, ref pageUnityPackageTool, SdfIconType.Archive);
                 QuickBuildRootMenu(tree, MenuPath_TextureSpriteTool, ref pageTextureSpriteTool, SdfIconType.Image);
 
-                // 诊断与集成：ES 框架配套工具，不混在批量写入工具里。
                 QuickBuildRootMenu(tree, MenuPath_ObjectPool, ref pageObjectPool, SdfIconType.Droplet);
                 QuickBuildRootMenu(tree, MenuPath_TopToolbar, ref pageTopToolbar, SdfIconType.Map);
                 QuickBuildRootMenu(tree, MenuPath_SceneTextRepair, ref pageSceneTextRepair, SdfIconType.Search);
@@ -295,7 +482,7 @@ namespace ES
                 if (item == null)
                     continue;
 
-                item.Toggled = item.Name == PageName_CoreWorkbench || item.Name == PageName_SceneBatchTools;
+                item.Toggled = item.Name == PageName_ObservationTools || item.Name == PageName_SceneBatchTools;
             }
         }
 
@@ -308,10 +495,10 @@ namespace ES
 
         private void Part_BuildHierarchyTools(OdinMenuTree tree)
         {
-            QuickBuildRootMenu(tree, PageName_HierarchyTools, ref pageHierarchyTools, SdfIconType.LayerForward);
-            QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_BatchRename, ref pageBatchRename, SdfIconType.Pencil);
-            QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_PhysicsAlign, ref pagePhysicsAlign, SdfIconType.Grid);
-            QuickBuildRootMenu(tree, PageName_HierarchyTools + "/" + PageName_BatchStaticSetting, ref pageBatchStaticSetting, SdfIconType.ToggleOn);
+            QuickBuildRootMenu(tree, PageName_SceneBatchTools, ref pageHierarchyTools, SdfIconType.LayerForward);
+            QuickBuildRootMenu(tree, PageName_SceneBatchTools + "/" + PageName_BatchRename, ref pageBatchRename, SdfIconType.Pencil);
+            QuickBuildRootMenu(tree, PageName_SceneBatchTools + "/" + PageName_PhysicsAlign, ref pagePhysicsAlign, SdfIconType.Grid);
+            QuickBuildRootMenu(tree, PageName_SceneBatchTools + "/" + PageName_BatchStaticSetting, ref pageBatchStaticSetting, SdfIconType.ToggleOn);
         }
 
         private void Part_BuildTextureSpriteTool(OdinMenuTree tree)
@@ -361,22 +548,19 @@ namespace ES
             [OnInspectorGUI]
             private void DrawOverview()
             {
-                EditorGUILayout.HelpBox("选择左侧工具后再执行操作。批量修改场景或资产前，请先确认目标范围。", MessageType.Info);
-                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                {
-                    DrawQuickOpenRow(
-                        ("看运行时数据", MenuPath_RuntimeWatch, "无侵入观察字段、属性和方法。"),
-                        ("批量换材质", MenuPath_MaterialReplacement, "先预览命中，再替换场景或 Prefab 资产。"));
-                    DrawQuickOpenRow(
-                        ("整理 Prefab", MenuPath_PrefabManagement, "分析实例、应用、还原、断开连接。"),
-                        ("布景和落地", MenuPath_PhysicsAlign, "落地、归整、分布、对齐和轻随机。"));
-                    DrawQuickOpenRow(
-                        ("批量改名", MenuPath_BatchRename, "保存命名方案，快速复用上次规则。"),
-                        ("找资源引用", MenuPath_AssetReferenceChecker, "查未使用、被谁引用、依赖了谁。"));
-                    DrawQuickOpenRow(
-                        ("导出包", MenuPath_UnityPackageTool, "确认资源清单后再导出 UnityPackage。"),
-                        ("切 Sprite", MenuPath_TextureSpriteTool, "批量设置纹理导入和精灵切分。"));
-                }
+                SimpleToolsPanelUtility.DrawSectionTitle("开始工作", "按当前工作对象进入工具；进入批处理页后先确认范围与预览，再执行写入。" );
+                DrawQuickOpenRow(
+                    ("看运行时数据", MenuPath_RuntimeWatch, "无侵入观察字段、属性和方法。"),
+                    ("批量换材质", MenuPath_MaterialReplacement, "先预览命中，再替换场景或 Prefab 资产。"));
+                DrawQuickOpenRow(
+                    ("整理 Prefab", MenuPath_PrefabManagement, "分析实例、应用、还原、断开连接。"),
+                    ("布景和落地", MenuPath_PhysicsAlign, "落地、归整、分布、对齐和轻随机。"));
+                DrawQuickOpenRow(
+                    ("批量改名", MenuPath_BatchRename, "保存命名方案，快速复用上次规则。"),
+                    ("找资源引用", MenuPath_AssetReferenceChecker, "查未使用、被谁引用、依赖了谁。"));
+                DrawQuickOpenRow(
+                    ("导出包", MenuPath_UnityPackageTool, "确认资源清单后再导出 UnityPackage。"),
+                    ("切 Sprite", MenuPath_TextureSpriteTool, "批量设置纹理导入和精灵切分。"));
             }
 
             private static void DrawOverviewRow(string title, string description, SimpleToolsMaturity maturity)

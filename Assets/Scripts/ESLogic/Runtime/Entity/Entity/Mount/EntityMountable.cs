@@ -5,7 +5,6 @@ using UnityEngine;
 namespace ES
 {
     [DisallowMultipleComponent]
-    [RequireComponent(typeof(VehicleController))]
     [Serializable, TypeRegistryItem("可骑乘")]
     public class EntityMountable : MonoBehaviour
     {
@@ -13,8 +12,7 @@ namespace ES
         [LabelText("Match点")]
         public Transform matchPoint;
 
-        [LabelText("载具控制器")]
-        [Required]
+        [LabelText("载具控制器（驾驶座可选）")]
         public VehicleController vehicleController;
 
         [Title("武器")]
@@ -38,13 +36,24 @@ namespace ES
         public event Action<Entity> OnUnmounted;
 
         public bool IsMounted => rider != null;
-        public bool IsReady => vehicleController != null && vehicleController.IsReady;
+        public bool IsReady => matchPoint != null;
+        public bool CanDrive => allowInput && vehicleController != null && vehicleController.IsReady;
+
+        /// <summary>座位空闲且驾驶权可申请时才允许进入；不在状态进入后再抢占其他骑手。</summary>
+        public bool CanMount(Entity target)
+        {
+            if (target == null || !IsReady || (rider != null && rider != target))
+                return false;
+
+            return !allowInput
+                   || (CanDrive && vehicleController.CanAcquireDriver(this, target));
+        }
 
         private void Reset()
         {
             matchPoint = transform;
             weaponMountPoint = transform;
-            vehicleController = GetComponent<VehicleController>();
+            vehicleController = GetComponentInParent<VehicleController>();
         }
 
         private void OnValidate()
@@ -52,36 +61,48 @@ namespace ES
             if (matchPoint == null) matchPoint = transform;
             if (weaponMountPoint == null) weaponMountPoint = matchPoint;
             if (vehicleController == null)
-                vehicleController = GetComponent<VehicleController>();
+                vehicleController = GetComponentInParent<VehicleController>();
+        }
+
+        private void OnDisable()
+        {
+            // 载具对象池回收或座位被禁用时，不能把驾驶权遗留给下一次租用。
+            if (rider != null)
+                Unmount();
         }
 
         /// <param name="skipImmediateSync">
         /// true = 跳过立即传送（由外部 MatchTarget 负责渐近对齐，对齐完成后再调用 SyncRider）。
         /// false（默认）= 立即将 Rider 传送到 matchPoint。
         /// </param>
-        public void Mount(Entity target, bool skipImmediateSync = false)
+        public bool Mount(Entity target, bool skipImmediateSync = false)
         {
-            if (target == null || !IsReady)
+            if (!CanMount(target))
             {
-                Debug.LogError("[EntityMountable] 骑乘失败：缺少已就绪的 VehicleController。", this);
-                return;
+                Debug.LogWarning("[EntityMountable] 骑乘失败：座位不可用、已被占用或驾驶权已被其他座位持有。", this);
+                return false;
             }
 
-            rider = target;
             EnsureMatchPoint();
+            if (allowInput && !vehicleController.TryAcquireDriver(this, target))
+                return false;
+
+            rider = target;
             if (!skipImmediateSync)
                 SyncRider(force: true);
-            OnMounted?.Invoke(target);
+            InvokeRiderEvent(OnMounted, target, "OnMounted");
+            return true;
         }
 
         public void Unmount()
         {
             var last = rider;
             rider = null;
-            vehicleController?.ClearDriverInput();
+            if (allowInput && vehicleController != null)
+                vehicleController.ReleaseDriver(this, last);
             if (last != null)
             {
-                OnUnmounted?.Invoke(last);
+                InvokeRiderEvent(OnUnmounted, last, "OnUnmounted");
             }
         }
 
@@ -105,16 +126,21 @@ namespace ES
         /// 将骑手的世界空间驾驶意图交给载具。座位不再直接写载具 Transform；
         /// VehicleController 在自身 Rigidbody/KCC 阶段统一提交最终物理结果。
         /// </summary>
-        public bool SubmitDriverInput(Entity target, Vector3 moveInput, Vector3 lookInput)
+        public bool SubmitDriverInput(Entity target, Vector3 moveInput, Vector3 lookInput, float verticalInput = 0f)
         {
-            if (rider != target || !IsReady)
+            if (rider != target || !CanDrive)
                 return false;
 
-            if (allowInput)
-                vehicleController.SetDriverInput(moveInput, lookInput);
-            else
-                vehicleController.ClearDriverInput();
-            return true;
+            return vehicleController.SubmitDriverInput(this, target, moveInput, lookInput, verticalInput);
+        }
+
+        /// <summary>输入路由被禁用时只允许当前骑手清空自己座位的驾驶意图。</summary>
+        public bool ClearDriverInput(Entity target)
+        {
+            if (rider != target || vehicleController == null)
+                return false;
+
+            return vehicleController.ClearDriverInput(this, target);
         }
 
         private void EnsureMatchPoint()
@@ -126,6 +152,26 @@ namespace ES
             if (weaponMountPoint == null)
             {
                 weaponMountPoint = matchPoint;
+            }
+        }
+
+        /// <summary>单个订阅者异常只能记录，不能截断座位释放和其他订阅者的补偿逻辑。</summary>
+        private void InvokeRiderEvent(Action<Entity> callbacks, Entity target, string eventName)
+        {
+            if (callbacks == null)
+                return;
+
+            Delegate[] handlers = callbacks.GetInvocationList();
+            for (int i = 0; i < handlers.Length; i++)
+            {
+                try
+                {
+                    ((Action<Entity>)handlers[i]).Invoke(target);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new Exception("[EntityMountable] " + eventName + " subscriber failed.", exception), this);
+                }
             }
         }
 

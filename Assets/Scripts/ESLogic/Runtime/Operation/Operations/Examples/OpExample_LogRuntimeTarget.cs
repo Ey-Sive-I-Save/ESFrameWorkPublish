@@ -10,6 +10,8 @@ namespace ES
     [Serializable, TypeRegistryItem(OperationTypeRegistryNames.LogRuntimeTargetName, OperationTypeRegistryNames.DebugExamples)]
     public sealed class OpExample_LogRuntimeTarget : ESOutputOp
     {
+        public override bool NeedsStop => logOnStop;
+
         [LabelText("日志前缀")]
         public string logPrefix = "Operation链路测试";
 

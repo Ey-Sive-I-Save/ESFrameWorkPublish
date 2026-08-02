@@ -1,344 +1,186 @@
-using System.Collections.Generic;
+using System;
 
 namespace ES
 {
     /// <summary>
-    /// Fixed, high-frequency float attributes owned by a character. The explicit numeric values are
-    /// part of the runtime ABI: append new members before Count, never reorder existing members.
+    /// Character fixed-slot support that is not generated. The generated partial contains the
+    /// typed IDs and stable-key mappings projected from GameCore.
     /// </summary>
-    public enum ESCharacterFloatAttributeId : byte
+    public static partial class ESCharacterAttributeCatalog
     {
-        GroundMaxMoveSpeed = 0,
-        AirMaxMoveSpeed = 1,
-        GroundMovementSharpness = 2,
-        AirAcceleration = 3,
-        Drag = 4,
-        JumpSpeed = 5,
-        JumpSpeedMultiplier = 6,
-        JumpApexGravityMultiplier = 7,
-        JumpFallGravityMultiplier = 8,
-        CrouchSpeedMultiplier = 9,
-        OrientationSharpness = 10,
-        RootMotionScale = 11,
-        Count = 12
-    }
-
-    /// <summary>
-    /// Fixed, high-frequency permission attributes owned by a character. Append-only for the same
-    /// reason as <see cref="ESCharacterFloatAttributeId"/>.
-    /// </summary>
-    public enum ESCharacterPermitAttributeId : byte
-    {
-        Move = 0,
-        Jump = 1,
-        Rotate = 2,
-        Count = 3
-    }
-
-    /// <summary>
-    /// Stable configuration identity for the character's built-in attributes. This is distinct
-    /// from the compact float/permit HotSlot enums above: it is serialized with StringKey and
-    /// resolved by ESSuperAttributeCatalog before a runtime process assigns dense keys.
-    /// </summary>
-    public enum ESCharacterAttributeEnumKey : ushort
-    {
-        None = 0,
-        GroundMaxMoveSpeed = 1,
-        AirMaxMoveSpeed = 2,
-        GroundMovementSharpness = 3,
-        AirAcceleration = 4,
-        Drag = 5,
-        JumpSpeed = 6,
-        JumpSpeedMultiplier = 7,
-        JumpApexGravityMultiplier = 8,
-        JumpFallGravityMultiplier = 9,
-        CrouchSpeedMultiplier = 10,
-        OrientationSharpness = 11,
-        RootMotionScale = 12,
-        CanMove = 101,
-        CanJump = 102,
-        CanRotate = 103
-    }
-
-    /// <summary>Value family used by the key catalog. It prevents a Float key from becoming a Permit set by mistake.</summary>
-    public enum ESCharacterAttributeValueKind : byte
-    {
-        Float = 0,
-        Permit = 1
-    }
-
-    /// <summary>
-    /// Backward-compatible serialized keys. New runtime code should use the typed IDs above;
-    /// strings remain the data/configuration boundary and custom sparse-attribute boundary.
-    /// </summary>
-    public static class ESCharacterSuperAttributeKeys
-    {
-        public const string GroundMaxMoveSpeed = "Character.Movement.GroundMaxSpeed";
-        public const string AirMaxMoveSpeed = "Character.Movement.AirMaxSpeed";
-        public const string GroundMovementSharpness = "Character.Movement.GroundSharpness";
-        public const string AirAcceleration = "Character.Movement.AirAcceleration";
-        public const string Drag = "Character.Movement.Drag";
-        public const string JumpSpeed = "Character.Movement.JumpSpeed";
-        public const string JumpSpeedMultiplier = "Character.Movement.JumpSpeedMultiplier";
-        public const string JumpApexGravityMultiplier = "Character.Movement.JumpApexGravityMultiplier";
-        public const string JumpFallGravityMultiplier = "Character.Movement.JumpFallGravityMultiplier";
-        public const string CrouchSpeedMultiplier = "Character.Movement.CrouchSpeedMultiplier";
-        public const string OrientationSharpness = "Character.Movement.OrientationSharpness";
-        public const string RootMotionScale = "Character.Movement.RootMotionScale";
-
-        public const string CanMove = "Character.Permit.Move";
-        public const string CanJump = "Character.Permit.Jump";
-        public const string CanRotate = "Character.Permit.Rotate";
-    }
-
-    /// <summary>
-    /// The single mapping between serialized character keys and fixed runtime slots.
-    /// There is intentionally no Dictionary here: KCC and other hot callers use numeric IDs.
-    /// </summary>
-    public static class ESCharacterAttributeCatalog
-    {
-        private static readonly string[] FloatKeys =
-        {
-            ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed,
-            ESCharacterSuperAttributeKeys.AirMaxMoveSpeed,
-            ESCharacterSuperAttributeKeys.GroundMovementSharpness,
-            ESCharacterSuperAttributeKeys.AirAcceleration,
-            ESCharacterSuperAttributeKeys.Drag,
-            ESCharacterSuperAttributeKeys.JumpSpeed,
-            ESCharacterSuperAttributeKeys.JumpSpeedMultiplier,
-            ESCharacterSuperAttributeKeys.JumpApexGravityMultiplier,
-            ESCharacterSuperAttributeKeys.JumpFallGravityMultiplier,
-            ESCharacterSuperAttributeKeys.CrouchSpeedMultiplier,
-            ESCharacterSuperAttributeKeys.OrientationSharpness,
-            ESCharacterSuperAttributeKeys.RootMotionScale
-        };
-
-        private static readonly string[] PermitKeys =
-        {
-            ESCharacterSuperAttributeKeys.CanMove,
-            ESCharacterSuperAttributeKeys.CanJump,
-            ESCharacterSuperAttributeKeys.CanRotate
-        };
-
-        private static readonly ushort[] FloatEnumKeys =
-        {
-            (ushort)ESCharacterAttributeEnumKey.GroundMaxMoveSpeed,
-            (ushort)ESCharacterAttributeEnumKey.AirMaxMoveSpeed,
-            (ushort)ESCharacterAttributeEnumKey.GroundMovementSharpness,
-            (ushort)ESCharacterAttributeEnumKey.AirAcceleration,
-            (ushort)ESCharacterAttributeEnumKey.Drag,
-            (ushort)ESCharacterAttributeEnumKey.JumpSpeed,
-            (ushort)ESCharacterAttributeEnumKey.JumpSpeedMultiplier,
-            (ushort)ESCharacterAttributeEnumKey.JumpApexGravityMultiplier,
-            (ushort)ESCharacterAttributeEnumKey.JumpFallGravityMultiplier,
-            (ushort)ESCharacterAttributeEnumKey.CrouchSpeedMultiplier,
-            (ushort)ESCharacterAttributeEnumKey.OrientationSharpness,
-            (ushort)ESCharacterAttributeEnumKey.RootMotionScale
-        };
-
-        private static readonly ushort[] PermitEnumKeys =
-        {
-            (ushort)ESCharacterAttributeEnumKey.CanMove,
-            (ushort)ESCharacterAttributeEnumKey.CanJump,
-            (ushort)ESCharacterAttributeEnumKey.CanRotate
-        };
-
-        public static int FloatCount => (int)ESCharacterFloatAttributeId.Count;
-        public static int PermitCount => (int)ESCharacterPermitAttributeId.Count;
-
-        /// <summary>Migrates the former generic default scope used by serialized character data.</summary>
+        /// <summary>Migrates the former generic default scope and marks legacy fixed rows for code generation.</summary>
         public static void EnsureCharacterScope(ESSuperAttributeTable table)
         {
-            if (table == null
-                || (!string.IsNullOrEmpty(table.catalogScope)
-                    && !string.Equals(table.catalogScope, ESSuperAttributeCatalog.DefaultScope, System.StringComparison.Ordinal)))
+            if (table == null)
                 return;
 
-            table.catalogScope = "Attribute.Character";
-            table.InvalidateCache();
+            bool changed = false;
+            if (string.IsNullOrEmpty(table.catalogScope)
+                || string.Equals(table.catalogScope, ESSuperAttributeCatalog.DefaultScope, StringComparison.Ordinal))
+            {
+                table.catalogScope = ESAttributeBakeTable.CharacterScope;
+                changed = true;
+            }
+
+            if (!string.Equals(table.catalogScope, ESAttributeBakeTable.CharacterScope, StringComparison.Ordinal))
+                return;
+
+            table.floatAttributes ??= new System.Collections.Generic.List<ESSuperFloatAttributeDefinition>();
+            table.permitAttributes ??= new System.Collections.Generic.List<ESSuperPermitAttributeDefinition>();
+            if (MergeMissingFixedDefaults(table))
+                changed = true;
+
+            if (PopulateLegacyFixedApiNames(table))
+                changed = true;
+
+            if (changed)
+                table.InvalidateCache();
         }
 
         /// <summary>
-        /// 角色领域的默认属性 Schema。表本身是通用 <see cref="ESSuperAttributeTable"/>；
-        /// 只有角色消费者选择了本 Catalog，才会得到这些运动与控制键。
+        /// The compiled default projection is allowed to add a newly introduced built-in Character
+        /// attribute to an older GameCore asset. It never overwrites a row already identified by
+        /// either stable alias: authored GameCore data stays authoritative after first creation.
         /// </summary>
-        public static ESSuperAttributeTable CreateDefaultSuperAttributeTable()
+        private static bool MergeMissingFixedDefaults(ESSuperAttributeTable table)
         {
-            return new ESSuperAttributeTable
+            ESSuperAttributeTable defaults = CreateDefaultSuperAttributeTable();
+            bool changed = false;
+            if (defaults.floatAttributes != null)
             {
-                catalogScope = "Attribute.Character",
-                floatAttributes = new List<ESSuperFloatAttributeDefinition>
+                for (int i = 0; i < defaults.floatAttributes.Count; i++)
                 {
-                    Float(ESCharacterAttributeEnumKey.GroundMaxMoveSpeed, ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed, "地面最大速度"),
-                    Float(ESCharacterAttributeEnumKey.AirMaxMoveSpeed, ESCharacterSuperAttributeKeys.AirMaxMoveSpeed, "空中最大速度"),
-                    Float(ESCharacterAttributeEnumKey.GroundMovementSharpness, ESCharacterSuperAttributeKeys.GroundMovementSharpness, "地面响应"),
-                    Float(ESCharacterAttributeEnumKey.AirAcceleration, ESCharacterSuperAttributeKeys.AirAcceleration, "空中加速度"),
-                    Float(ESCharacterAttributeEnumKey.Drag, ESCharacterSuperAttributeKeys.Drag, "阻力"),
-                    Float(ESCharacterAttributeEnumKey.JumpSpeed, ESCharacterSuperAttributeKeys.JumpSpeed, "跳跃速度"),
-                    Float(ESCharacterAttributeEnumKey.JumpSpeedMultiplier, ESCharacterSuperAttributeKeys.JumpSpeedMultiplier, "跳跃倍率"),
-                    Float(ESCharacterAttributeEnumKey.JumpApexGravityMultiplier, ESCharacterSuperAttributeKeys.JumpApexGravityMultiplier, "上升重力倍率"),
-                    Float(ESCharacterAttributeEnumKey.JumpFallGravityMultiplier, ESCharacterSuperAttributeKeys.JumpFallGravityMultiplier, "下落重力倍率"),
-                    Float(ESCharacterAttributeEnumKey.CrouchSpeedMultiplier, ESCharacterSuperAttributeKeys.CrouchSpeedMultiplier, "下蹲速度倍率"),
-                    Float(ESCharacterAttributeEnumKey.OrientationSharpness, ESCharacterSuperAttributeKeys.OrientationSharpness, "转向响应"),
-                    Float(ESCharacterAttributeEnumKey.RootMotionScale, ESCharacterSuperAttributeKeys.RootMotionScale, "根运动倍率")
-                },
-                permitAttributes = new List<ESSuperPermitAttributeDefinition>
-                {
-                    Permit(ESCharacterAttributeEnumKey.CanMove, ESCharacterSuperAttributeKeys.CanMove, "允许移动"),
-                    Permit(ESCharacterAttributeEnumKey.CanJump, ESCharacterSuperAttributeKeys.CanJump, "允许跳跃"),
-                    Permit(ESCharacterAttributeEnumKey.CanRotate, ESCharacterSuperAttributeKeys.CanRotate, "允许转向")
+                    ESSuperFloatAttributeDefinition definition = defaults.floatAttributes[i];
+                    if (definition != null && !ContainsFloatIdentity(table.floatAttributes, definition))
+                    {
+                        table.floatAttributes.Add(Clone(definition));
+                        changed = true;
+                    }
                 }
-            };
-        }
+            }
 
-        public static bool IsValid(ESCharacterFloatAttributeId id)
-        {
-            return (uint)id < (uint)ESCharacterFloatAttributeId.Count;
-        }
-
-        public static bool IsValid(ESCharacterPermitAttributeId id)
-        {
-            return (uint)id < (uint)ESCharacterPermitAttributeId.Count;
-        }
-
-        public static string GetKey(ESCharacterFloatAttributeId id)
-        {
-            return IsValid(id) ? FloatKeys[(int)id] : null;
-        }
-
-        public static ushort GetEnumKey(ESCharacterFloatAttributeId id)
-        {
-            return IsValid(id) ? FloatEnumKeys[(int)id] : (ushort)0;
-        }
-
-        public static string GetKey(ESCharacterPermitAttributeId id)
-        {
-            return IsValid(id) ? PermitKeys[(int)id] : null;
-        }
-
-        public static ushort GetEnumKey(ESCharacterPermitAttributeId id)
-        {
-            return IsValid(id) ? PermitEnumKeys[(int)id] : (ushort)0;
-        }
-
-        public static bool TryGetFloatId(ushort enumKey, out ESCharacterFloatAttributeId id)
-        {
-            for (int i = 0; i < FloatEnumKeys.Length; i++)
+            if (defaults.permitAttributes != null)
             {
-                if (FloatEnumKeys[i] == enumKey)
+                for (int i = 0; i < defaults.permitAttributes.Count; i++)
                 {
-                    id = (ESCharacterFloatAttributeId)i;
+                    ESSuperPermitAttributeDefinition definition = defaults.permitAttributes[i];
+                    if (definition != null && !ContainsPermitIdentity(table.permitAttributes, definition))
+                    {
+                        table.permitAttributes.Add(Clone(definition));
+                        changed = true;
+                    }
+                }
+            }
+
+            return changed;
+        }
+
+        private static bool ContainsFloatIdentity(
+            System.Collections.Generic.List<ESSuperFloatAttributeDefinition> definitions,
+            ESSuperFloatAttributeDefinition candidate)
+        {
+            if (definitions == null)
+                return false;
+
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                ESSuperFloatAttributeDefinition existing = definitions[i];
+                if (existing != null && HasSharedStableIdentity(existing.enumKey, existing.StringKey, candidate.enumKey, candidate.StringKey))
                     return true;
-                }
             }
 
-            id = default;
             return false;
         }
 
-        public static bool TryGetPermitId(ushort enumKey, out ESCharacterPermitAttributeId id)
+        private static bool ContainsPermitIdentity(
+            System.Collections.Generic.List<ESSuperPermitAttributeDefinition> definitions,
+            ESSuperPermitAttributeDefinition candidate)
         {
-            for (int i = 0; i < PermitEnumKeys.Length; i++)
+            if (definitions == null)
+                return false;
+
+            for (int i = 0; i < definitions.Count; i++)
             {
-                if (PermitEnumKeys[i] == enumKey)
-                {
-                    id = (ESCharacterPermitAttributeId)i;
+                ESSuperPermitAttributeDefinition existing = definitions[i];
+                if (existing != null && HasSharedStableIdentity(existing.enumKey, existing.StringKey, candidate.enumKey, candidate.StringKey))
                     return true;
-                }
             }
 
-            id = default;
             return false;
         }
 
-        public static bool TryGetFloatId(string key, out ESCharacterFloatAttributeId id)
+        private static bool HasSharedStableIdentity(ushort leftEnum, string leftKey, ushort rightEnum, string rightKey)
         {
-            switch (key)
-            {
-                case ESCharacterSuperAttributeKeys.GroundMaxMoveSpeed: id = ESCharacterFloatAttributeId.GroundMaxMoveSpeed; return true;
-                case ESCharacterSuperAttributeKeys.AirMaxMoveSpeed: id = ESCharacterFloatAttributeId.AirMaxMoveSpeed; return true;
-                case ESCharacterSuperAttributeKeys.GroundMovementSharpness: id = ESCharacterFloatAttributeId.GroundMovementSharpness; return true;
-                case ESCharacterSuperAttributeKeys.AirAcceleration: id = ESCharacterFloatAttributeId.AirAcceleration; return true;
-                case ESCharacterSuperAttributeKeys.Drag: id = ESCharacterFloatAttributeId.Drag; return true;
-                case ESCharacterSuperAttributeKeys.JumpSpeed: id = ESCharacterFloatAttributeId.JumpSpeed; return true;
-                case ESCharacterSuperAttributeKeys.JumpSpeedMultiplier: id = ESCharacterFloatAttributeId.JumpSpeedMultiplier; return true;
-                case ESCharacterSuperAttributeKeys.JumpApexGravityMultiplier: id = ESCharacterFloatAttributeId.JumpApexGravityMultiplier; return true;
-                case ESCharacterSuperAttributeKeys.JumpFallGravityMultiplier: id = ESCharacterFloatAttributeId.JumpFallGravityMultiplier; return true;
-                case ESCharacterSuperAttributeKeys.CrouchSpeedMultiplier: id = ESCharacterFloatAttributeId.CrouchSpeedMultiplier; return true;
-                case ESCharacterSuperAttributeKeys.OrientationSharpness: id = ESCharacterFloatAttributeId.OrientationSharpness; return true;
-                case ESCharacterSuperAttributeKeys.RootMotionScale: id = ESCharacterFloatAttributeId.RootMotionScale; return true;
-                default: id = default; return false;
-            }
+            return (leftEnum != 0 && leftEnum == rightEnum)
+                   || (!string.IsNullOrEmpty(leftKey) && string.Equals(leftKey, rightKey, StringComparison.Ordinal));
         }
 
-        public static bool TryGetPermitId(string key, out ESCharacterPermitAttributeId id)
-        {
-            switch (key)
-            {
-                case ESCharacterSuperAttributeKeys.CanMove: id = ESCharacterPermitAttributeId.Move; return true;
-                case ESCharacterSuperAttributeKeys.CanJump: id = ESCharacterPermitAttributeId.Jump; return true;
-                case ESCharacterSuperAttributeKeys.CanRotate: id = ESCharacterPermitAttributeId.Rotate; return true;
-                default: id = default; return false;
-            }
-        }
-
-        public static bool TryGetValueKind(string key, out ESCharacterAttributeValueKind kind)
-        {
-            if (TryGetFloatId(key, out _))
-            {
-                kind = ESCharacterAttributeValueKind.Float;
-                return true;
-            }
-
-            if (TryGetPermitId(key, out _))
-            {
-                kind = ESCharacterAttributeValueKind.Permit;
-                return true;
-            }
-
-            kind = default;
-            return false;
-        }
-
-        public static bool TryGetValueKind(ushort enumKey, out ESCharacterAttributeValueKind kind)
-        {
-            if (TryGetFloatId(enumKey, out _))
-            {
-                kind = ESCharacterAttributeValueKind.Float;
-                return true;
-            }
-
-            if (TryGetPermitId(enumKey, out _))
-            {
-                kind = ESCharacterAttributeValueKind.Permit;
-                return true;
-            }
-
-            kind = default;
-            return false;
-        }
-
-        private static ESSuperFloatAttributeDefinition Float(ESCharacterAttributeEnumKey enumKey, string key, string displayName)
+        private static ESSuperFloatAttributeDefinition Clone(ESSuperFloatAttributeDefinition value)
         {
             return new ESSuperFloatAttributeDefinition
             {
-                enumKey = (ushort)enumKey,
-                key = key,
-                displayName = displayName,
-                storagePolicy = ESKeyStoragePolicy.HotSlot
+                enumKey = value.enumKey,
+                key = value.key,
+                storagePolicy = value.storagePolicy,
+                fixedApiName = value.fixedApiName,
+                displayName = value.displayName,
+                overrideBaseValue = value.overrideBaseValue,
+                baseValue = value.baseValue,
+                minValue = value.minValue,
+                maxValue = value.maxValue,
+                formula = value.formula,
+                migrationKey = value.migrationKey
             };
         }
 
-        private static ESSuperPermitAttributeDefinition Permit(ESCharacterAttributeEnumKey enumKey, string key, string displayName)
+        private static ESSuperPermitAttributeDefinition Clone(ESSuperPermitAttributeDefinition value)
         {
             return new ESSuperPermitAttributeDefinition
             {
-                enumKey = (ushort)enumKey,
-                key = key,
-                displayName = displayName,
-                fallbackValue = true,
-                storagePolicy = ESKeyStoragePolicy.HotSlot
+                enumKey = value.enumKey,
+                key = value.key,
+                storagePolicy = value.storagePolicy,
+                fixedApiName = value.fixedApiName,
+                displayName = value.displayName,
+                overrideFallbackValue = value.overrideFallbackValue,
+                fallbackValue = value.fallbackValue,
+                formula = value.formula,
+                migrationKey = value.migrationKey
             };
+        }
+
+        private static bool PopulateLegacyFixedApiNames(ESSuperAttributeTable table)
+        {
+            bool changed = false;
+            if (table.floatAttributes != null)
+            {
+                for (int i = 0; i < table.floatAttributes.Count; i++)
+                {
+                    ESSuperFloatAttributeDefinition definition = table.floatAttributes[i];
+                    if (definition == null || !string.IsNullOrWhiteSpace(definition.fixedApiName)
+                        || !TryGetFloatId(definition.enumKey, out ESCharacterFloatAttributeId id))
+                        continue;
+
+                    definition.fixedApiName = id.ToString();
+                    changed = true;
+                }
+            }
+
+            if (table.permitAttributes != null)
+            {
+                for (int i = 0; i < table.permitAttributes.Count; i++)
+                {
+                    ESSuperPermitAttributeDefinition definition = table.permitAttributes[i];
+                    if (definition == null || !string.IsNullOrWhiteSpace(definition.fixedApiName)
+                        || !TryGetPermitId(definition.enumKey, out ESCharacterPermitAttributeId id))
+                        continue;
+
+                    definition.fixedApiName = id.ToString();
+                    changed = true;
+                }
+            }
+
+            return changed;
         }
     }
 }

@@ -1,13 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
 using ES;
 using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
 using UnityEditor;
-using UnityEditor.Compilation;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 
@@ -21,6 +18,7 @@ namespace ES.EditorInternal
     [DrawerPriority(DrawerPriorityLevel.SuperPriority)]
     public sealed class ESPolymorphicReferenceDrawer : OdinValueDrawer<object>
     {
+        private const int MaxMultiEditTargets = 10;
         private const float SelectorArrowWidth = 22f;
         private const float SelectorMinimumWidth = 152f;
         private const float SelectorMaximumWidth = 248f;
@@ -28,22 +26,27 @@ namespace ES.EditorInternal
         private const float HeaderTopHeight = 25f;
         private const float ClearHitWidth = 24f;
         private const float FrameLineWidth = 1f;
-        private const string UnregisteredGroupName = "未登记类型";
-
-        private static readonly Dictionary<Type, TypeCatalog> CatalogsByBaseType
-            = new Dictionary<Type, TypeCatalog>();
-        private static readonly Dictionary<Type, TypeDescriptor> DescriptorsByType
-            = new Dictionary<Type, TypeDescriptor>();
-
+        private const int ManagedReferenceTypeCacheLimit = 256;
+        private static readonly Dictionary<string, Type> managedReferenceTypesByName
+            = new Dictionary<string, Type>(StringComparer.Ordinal);
+        private static readonly HashSet<string> unresolvedManagedReferenceTypeNames
+            = new HashSet<string>(StringComparer.Ordinal);
         private static GUIStyle titleStyle;
         private static GUIStyle selectedSelectorStyle;
         private static GUIStyle emptySelectorStyle;
         private static GUIStyle warningSelectorStyle;
+        private static GUIStyle readOnlySelectorStyle;
         private static GUIStyle selectorArrowStyle;
         private static GUIStyle clearStyle;
+        private static bool stylesInitialized;
+        private static bool stylesProSkin;
 
         private bool expandedInitialized;
         private bool expanded;
+        private int cachedNestingDepth = -1;
+        private bool collectionMembershipInitialized;
+        private bool isReferenceCollectionElement;
+        private Type cachedDeclaredBaseType;
         private AdvancedDropdownState selectorState;
         // Reused across repaints. Dynamic selector text is updated in place instead of creating
         // GUIContent instances on every IMGUI event.
@@ -55,19 +58,26 @@ namespace ES.EditorInternal
         private string presentationUnresolvedTypeName;
         private bool presentationHasValue;
         private bool presentationHasUnresolvedType;
+        private bool presentationMultiEditLimited;
+        private int presentationTargetCount;
+        private bool presentationHasMixedTargets;
         private bool presentationInitialized;
+        private bool presentationProSkin;
         private string presentationSelectorText;
         private string presentationSelectorTooltip;
         private string presentationMetaText;
+        private string presentationMissingNotice;
+        private string unresolvedRawTypeNameCache;
+        private string unresolvedFormattedTypeNameCache;
         private GUIStyle presentationSelectorStyle;
-
-        static ESPolymorphicReferenceDrawer()
-        {
-            // Domain Reload normally clears these dictionaries. This explicit invalidation also
-            // covers projects that disable Domain Reload while recompiling scripts.
-            AssemblyReloadEvents.beforeAssemblyReload += ClearTypeCaches;
-            CompilationPipeline.compilationFinished += _ => ClearTypeCaches();
-        }
+        private readonly GUIContent titleContent = new GUIContent();
+        private bool titleInitialized;
+        private Type titleValueType;
+        private string titleLabelText;
+        private int titleNestingDepth;
+        private bool titleSuppressValueType;
+        private string presentationTitleText;
+        private string presentationMultiTargetNotice;
 
         protected override bool CanDrawValueProperty(InspectorProperty property)
         {
@@ -80,24 +90,41 @@ namespace ES.EditorInternal
 
         protected override void DrawPropertyLayout(GUIContent label)
         {
+            if (!collectionMembershipInitialized)
+            {
+                isReferenceCollectionElement = IsReferenceCollectionElement(Property);
+                collectionMembershipInitialized = true;
+            }
+
+            if (isReferenceCollectionElement
+                && !ESPolymorphicReferencePreferences.UseESCollectionRenderer)
+            {
+                CallNextDrawer(label);
+                return;
+            }
+
             if (!ESPolymorphicReferencePreferences.UseESRenderer)
             {
                 CallNextDrawer(label);
                 return;
             }
 
-            Type baseType = GetBaseType(Property);
+            Type baseType = GetCachedBaseType();
             if (!IsSupportedReferenceBaseType(baseType))
             {
                 CallNextDrawer(label);
                 return;
             }
 
-            int nestingDepth = GetManagedReferenceDepth(Property);
+            int nestingDepth = GetNestingDepth();
             Rect allocatedFrameRect = GUILayoutUtility.GetRect(0f, 0f, GUILayout.ExpandWidth(true));
             Rect frameRect = ApplyNestingInset(allocatedFrameRect, nestingDepth);
             object value = null;
             string unresolvedTypeName = null;
+            ESStatusKind status = ESStatusKind.Empty;
+            int targetCount = GetTargetCount();
+            bool multiEditLimited = targetCount > MaxMultiEditTargets;
+            bool multiTargetMixed = targetCount > 1 && HasMixedMultiTargetValue();
 
             if (!expandedInitialized)
             {
@@ -109,11 +136,30 @@ namespace ES.EditorInternal
             {
                 value = ValueEntry.WeakSmartValue;
                 unresolvedTypeName = GetUnresolvedManagedReferenceTypeName(value);
-                DrawHeader(label, baseType, value, unresolvedTypeName, nestingDepth);
+                status = ResolveStatusKind(value, unresolvedTypeName, multiEditLimited, multiTargetMixed);
+                DrawHeader(
+                    label,
+                    baseType,
+                    value,
+                    unresolvedTypeName,
+                    nestingDepth,
+                    status,
+                    multiEditLimited,
+                    targetCount,
+                    multiTargetMixed);
 
                 if (!string.IsNullOrEmpty(unresolvedTypeName))
                 {
-                    DrawMissingTypeNotice(unresolvedTypeName);
+                    DrawMissingTypeNotice();
+                    return;
+                }
+
+                // Odin exposes one representative value even when multiple selected objects
+                // disagree. It must not be drawn as a common configuration: selecting a type is
+                // the only explicit operation that can normalize all targets safely.
+                if (multiTargetMixed || multiEditLimited)
+                {
+                    DrawMultiTargetNotice();
                     return;
                 }
 
@@ -154,9 +200,99 @@ namespace ES.EditorInternal
                     frameRect,
                     frameBottomRect,
                     nestingDepth,
-                    value != null,
-                    !string.IsNullOrEmpty(unresolvedTypeName));
+                    status);
             }
+        }
+
+        private int GetNestingDepth()
+        {
+            if (cachedNestingDepth < 0)
+                cachedNestingDepth = GetManagedReferenceDepth(Property);
+
+            return cachedNestingDepth;
+        }
+
+        private Type GetCachedBaseType()
+        {
+            // A drawer instance is bound to one Odin property for its lifetime. Re-reading the
+            // managed-reference field declaration every repaint performs an avoidable
+            // SerializedObject lookup, especially expensive in deep collections.
+            if (cachedDeclaredBaseType == null)
+                cachedDeclaredBaseType = GetBaseType(Property);
+
+            return cachedDeclaredBaseType;
+        }
+
+        private int GetTargetCount()
+        {
+            return Property?.Tree?.WeakTargets == null
+                ? 0
+                : Property.Tree.WeakTargets.Count;
+        }
+
+        private bool HasMixedMultiTargetValue()
+        {
+            if (ValueEntry == null || ValueEntry.WeakValues == null || ValueEntry.WeakValues.Count <= 1)
+                return false;
+
+            // A large selection is read-only by design. Avoid walking every value during IMGUI
+            // repaint when no write is permitted anyway.
+            if (ValueEntry.WeakValues.Count > MaxMultiEditTargets)
+                return false;
+
+            Type commonType = null;
+            bool hasEmptyValue = false;
+            for (int i = 0; i < ValueEntry.WeakValues.Count; i++)
+            {
+                object targetValue = ValueEntry.WeakValues[i];
+                if (targetValue == null)
+                {
+                    hasEmptyValue = true;
+                    continue;
+                }
+
+                Type targetType = targetValue.GetType();
+                if (commonType == null)
+                {
+                    commonType = targetType;
+                    continue;
+                }
+
+                if (commonType != targetType)
+                    return true;
+            }
+
+            return hasEmptyValue && commonType != null;
+        }
+
+        private ESStatusKind ResolveStatusKind(
+            object value,
+            string unresolvedTypeName,
+            bool multiEditLimited = false,
+            bool multiTargetMixed = false)
+        {
+            if (!string.IsNullOrEmpty(unresolvedTypeName))
+                return ESStatusKind.Error;
+
+            if (multiEditLimited)
+                return ESStatusKind.ReadOnly;
+
+            if (multiTargetMixed)
+                return ESStatusKind.Warning;
+
+            if (value != null)
+                return ESStatusKind.Ready;
+
+            ESFieldPolicyAttribute policy = Property?.GetAttribute<ESFieldPolicyAttribute>();
+            if (policy != null)
+            {
+                if (policy.Requirement == ESFieldRequirement.Required)
+                    return ESStatusKind.Error;
+                if (policy.Requirement == ESFieldRequirement.Recommended)
+                    return ESStatusKind.Warning;
+            }
+
+            return ESStatusKind.Empty;
         }
 
         private static bool IsUnityManagedReference(InspectorProperty property)
@@ -196,6 +332,48 @@ namespace ES.EditorInternal
             return !string.IsNullOrEmpty(property.UnityPropertyPath)
                    && (property.ValueEntry.SerializationBackend == SerializationBackend.UnityPolymorphic
                        || property.Info.SerializationBackend == SerializationBackend.UnityPolymorphic);
+        }
+
+        private static bool IsReferenceCollectionElement(InspectorProperty property)
+        {
+            InspectorProperty ancestor = property?.Parent;
+            while (ancestor != null)
+            {
+                if (ancestor.Info != null
+                    && ancestor.ValueEntry != null
+                    && ancestor.ValueEntry.WeakSmartValue is IList
+                    && IsSerializeReferenceCollection(ancestor))
+                    return true;
+
+                ancestor = ancestor.Parent;
+            }
+
+            return false;
+        }
+
+        private static bool IsSerializeReferenceCollection(InspectorProperty collectionProperty)
+        {
+            if (collectionProperty?.Tree?.UnitySerializedObject == null
+                || string.IsNullOrEmpty(collectionProperty.UnityPropertyPath))
+                return false;
+
+            try
+            {
+                SerializedProperty serializedProperty = collectionProperty.Tree.UnitySerializedObject
+                    .FindProperty(collectionProperty.UnityPropertyPath);
+                if (serializedProperty == null
+                    || !serializedProperty.isArray
+                    || serializedProperty.arraySize <= 0)
+                    return false;
+
+                SerializedProperty firstElement = serializedProperty.GetArrayElementAtIndex(0);
+                return firstElement != null
+                       && firstElement.propertyType == SerializedPropertyType.ManagedReference;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         private static Type GetBaseType(InspectorProperty property)
@@ -242,6 +420,20 @@ namespace ES.EditorInternal
             if (string.IsNullOrWhiteSpace(rawTypeName))
                 return null;
 
+            if (managedReferenceTypesByName.TryGetValue(rawTypeName, out Type cachedType))
+                return cachedType;
+
+            if (unresolvedManagedReferenceTypeNames.Contains(rawTypeName))
+                return null;
+
+            Type resolvedType = ResolveManagedReferenceTypeNameUncached(rawTypeName);
+            CacheManagedReferenceTypeName(rawTypeName, resolvedType);
+            return resolvedType;
+        }
+
+        private static Type ResolveManagedReferenceTypeNameUncached(string rawTypeName)
+        {
+
             int separator = rawTypeName.IndexOf(' ');
             if (separator <= 0 || separator >= rawTypeName.Length - 1)
                 return null;
@@ -257,6 +449,23 @@ namespace ES.EditorInternal
             }
 
             return Type.GetType(typeName + ", " + assemblyName, throwOnError: false);
+        }
+
+        private static void CacheManagedReferenceTypeName(string rawTypeName, Type resolvedType)
+        {
+            // Type names come from serialized data. Keep this defensive cache bounded so an
+            // imported asset with many malformed names cannot grow editor memory indefinitely.
+            if (managedReferenceTypesByName.Count + unresolvedManagedReferenceTypeNames.Count
+                >= ManagedReferenceTypeCacheLimit)
+            {
+                managedReferenceTypesByName.Clear();
+                unresolvedManagedReferenceTypeNames.Clear();
+            }
+
+            if (resolvedType == null)
+                unresolvedManagedReferenceTypeNames.Add(rawTypeName);
+            else
+                managedReferenceTypesByName.Add(rawTypeName, resolvedType);
         }
 
         private static bool IsSupportedReferenceBaseType(Type type)
@@ -289,13 +498,21 @@ namespace ES.EditorInternal
             Type baseType,
             object value,
             string unresolvedTypeName,
-            int nestingDepth)
+            int nestingDepth,
+            ESStatusKind status,
+            bool multiEditLimited,
+            int targetCount,
+            bool multiTargetMixed)
         {
             Rect allocatedRect = GUILayoutUtility.GetRect(0f, HeaderHeight, GUILayout.ExpandWidth(true));
             Rect headerRect = ApplyNestingInset(allocatedRect, nestingDepth);
             bool hasValue = value != null;
             bool hasUnresolvedType = !string.IsNullOrEmpty(unresolvedTypeName);
-            float clearWidth = hasValue && !hasUnresolvedType ? ClearHitWidth : 0f;
+            float clearWidth = (hasValue || multiTargetMixed)
+                               && !hasUnresolvedType
+                               && !multiEditLimited
+                ? ClearHitWidth
+                : 0f;
             float minimumSelectorWidth = headerRect.width < 300f ? 108f : SelectorMinimumWidth;
             float selectorWidth = Mathf.Min(SelectorMaximumWidth, Mathf.Max(minimumSelectorWidth, headerRect.width * 0.42f));
             Rect topRect = new Rect(headerRect.x, headerRect.y + 2f, headerRect.width, HeaderTopHeight);
@@ -322,33 +539,42 @@ namespace ES.EditorInternal
                 headerRect.xMax - titleRect.x - 8f,
                 HeaderHeight - HeaderTopHeight - 7f);
 
-            DrawHeaderBackground(headerRect, hasUnresolvedType, hasValue, nestingDepth);
+            DrawHeaderBackground(
+                headerRect,
+                status,
+                nestingDepth);
             if (GUI.Button(toggleRect, GUIContent.none, GUIStyle.none))
                 expanded = !expanded;
 
             foldoutContent.text = expanded ? "▾" : "▸";
             foldoutContent.tooltip = expanded ? "折叠当前多态配置" : "展开当前多态配置";
             GUI.Label(foldoutRect, foldoutContent, SelectorArrowStyle);
-            string title = ResolveTitle(label, value);
-            if (nestingDepth > 0)
-                title += " · 嵌套 " + nestingDepth;
-            GUI.Label(titleRect, title, TitleStyle);
+            UpdateTitlePresentation(label, value, nestingDepth, multiTargetMixed || multiEditLimited);
+            titleContent.text = presentationTitleText;
+            GUI.Label(titleRect, titleContent, TitleStyle);
 
             UpdateSelectorPresentation(
                 value == null ? null : value.GetType(),
                 unresolvedTypeName,
                 hasValue,
-                hasUnresolvedType);
+                hasUnresolvedType,
+                multiEditLimited,
+                targetCount,
+                multiTargetMixed);
             selectorContent.text = presentationSelectorText;
             selectorContent.tooltip = presentationSelectorTooltip;
 
-            if (GUI.Button(selectorRect, GUIContent.none, GUIStyle.none))
-                OpenTypePicker(selectorRect, baseType, value == null ? null : value.GetType(), unresolvedTypeName);
+            if (!multiEditLimited && GUI.Button(selectorRect, GUIContent.none, GUIStyle.none))
+                OpenTypePicker(
+                    selectorRect,
+                    baseType,
+                    multiTargetMixed || hasUnresolvedType ? null : value == null ? null : value.GetType(),
+                    unresolvedTypeName);
             DrawSelector(
                 selectorRect,
                 selectorContent,
                 presentationSelectorStyle,
-                hasValue || hasUnresolvedType,
+                hasValue || hasUnresolvedType || multiTargetMixed,
                 nestingDepth);
 
             if (clearWidth > 0f)
@@ -358,20 +584,57 @@ namespace ES.EditorInternal
                 GUI.Label(clearRect, "×", ClearStyle);
             }
 
-            GUI.Label(metaRect, presentationMetaText, MetaStyle);
+            ESFieldRow.DrawStatus(
+                metaRect,
+                status,
+                presentationMetaText,
+                MetaStyle);
+        }
+
+        private void UpdateTitlePresentation(
+            GUIContent label,
+            object value,
+            int nestingDepth,
+            bool suppressValueType)
+        {
+            string labelText = label == null ? null : label.text;
+            Type valueType = value == null ? null : value.GetType();
+            if (titleInitialized
+                && titleValueType == valueType
+                && titleNestingDepth == nestingDepth
+                && titleSuppressValueType == suppressValueType
+                && string.Equals(titleLabelText, labelText, StringComparison.Ordinal))
+                return;
+
+            titleInitialized = true;
+            titleValueType = valueType;
+            titleLabelText = labelText;
+            titleNestingDepth = nestingDepth;
+            titleSuppressValueType = suppressValueType;
+            presentationTitleText = ResolveTitle(label, value, suppressValueType);
+            if (nestingDepth > 0)
+                presentationTitleText += " · 嵌套 " + nestingDepth;
         }
 
         private void UpdateSelectorPresentation(
             Type valueType,
             string unresolvedTypeName,
             bool hasValue,
-            bool hasUnresolvedType)
+            bool hasUnresolvedType,
+            bool multiEditLimited,
+            int targetCount,
+            bool multiTargetMixed)
         {
+            bool proSkin = ESEditorPresentation.IsProSkin;
             if (presentationInitialized
                 && presentationType == valueType
                 && string.Equals(presentationUnresolvedTypeName, unresolvedTypeName, StringComparison.Ordinal)
                 && presentationHasValue == hasValue
-                && presentationHasUnresolvedType == hasUnresolvedType)
+                && presentationHasUnresolvedType == hasUnresolvedType
+                && presentationMultiEditLimited == multiEditLimited
+                && presentationTargetCount == targetCount
+                && presentationHasMixedTargets == multiTargetMixed
+                && presentationProSkin == proSkin)
                 return;
 
             presentationInitialized = true;
@@ -379,31 +642,94 @@ namespace ES.EditorInternal
             presentationUnresolvedTypeName = unresolvedTypeName;
             presentationHasValue = hasValue;
             presentationHasUnresolvedType = hasUnresolvedType;
+            presentationMultiEditLimited = multiEditLimited;
+            presentationTargetCount = targetCount;
+            presentationHasMixedTargets = multiTargetMixed;
+            presentationProSkin = proSkin;
 
-            if (hasUnresolvedType)
+            if (multiTargetMixed)
+            {
+                presentationSelectorText = "多目标不一致";
+                presentationSelectorTooltip = "已选 " + targetCount
+                                              + " 个对象；当前多态类型或空值状态不一致。"
+                                              + "\n选择新类型会明确覆盖全部已选对象。";
+                presentationSelectorStyle = WarningSelectorStyle;
+                presentationMetaText = "多目标 · " + targetCount + " 个对象 · 当前配置不一致";
+                presentationMissingNotice = null;
+                presentationMultiTargetNotice =
+                    "所选对象的多态类型或空值状态不一致，不能安全显示某一个对象的子字段。"
+                    + "请从右侧选择一个类型；确认后会为每个对象创建独立实例并统一替换。";
+            }
+            else if (hasUnresolvedType)
             {
                 presentationSelectorText = "替代类型";
                 presentationSelectorTooltip = "已保存但无法解析的类型：" + unresolvedTypeName
                                               + "\n选择类型会明确覆盖旧引用。";
                 presentationSelectorStyle = WarningSelectorStyle;
                 presentationMetaText = "类型缺失 · " + unresolvedTypeName;
+                presentationMissingNotice = "无法解析已保存的多态类型：" + unresolvedTypeName
+                                            + "。请恢复对应脚本/程序集，或通过右侧“选择替代类型”明确覆盖旧引用。"
+                                            + (multiEditLimited
+                                                ? "当前选中对象超过批量编辑上限，请先减少到 "
+                                                  + MaxMultiEditTargets + " 个以内。"
+                                                : string.Empty);
+                presentationMultiTargetNotice = null;
             }
             else if (hasValue)
             {
-                TypeDescriptor current = DescribeType(valueType);
+                ESTypeCatalog.Entry current = ESTypeCatalog.GetEntry(valueType);
                 presentationSelectorText = current.DisplayName;
                 presentationSelectorTooltip = "当前使用类型：" + current.DisplayName
                                               + "\n点击更换类型\n" + current.Tooltip;
                 presentationSelectorStyle = SelectedSelectorStyle;
                 presentationMetaText = "当前：" + BuildTypeSummary(current);
+                presentationMissingNotice = null;
+                presentationMultiTargetNotice = null;
             }
+
             else
             {
                 presentationSelectorText = "选择类型";
                 presentationSelectorTooltip = "从配置目录中创建一个具体的多态配置";
-                presentationSelectorStyle = EmptySelectorStyle;
-                presentationMetaText = "未配置 · 从目录选择一个具体类型";
+                ESFieldPolicyAttribute policy = Property?.GetAttribute<ESFieldPolicyAttribute>();
+                presentationSelectorStyle = policy != null
+                    && policy.Requirement != ESFieldRequirement.Optional
+                    ? WarningSelectorStyle
+                    : EmptySelectorStyle;
+                presentationMetaText = policy != null
+                    && policy.Requirement == ESFieldRequirement.Required
+                    ? "必填 · 请选择一个具体类型"
+                    : policy != null
+                        && policy.Requirement == ESFieldRequirement.Recommended
+                        ? "建议配置 · 从目录选择一个具体类型"
+                        : "未配置 · 从目录选择一个具体类型";
+                presentationMissingNotice = null;
+                presentationMultiTargetNotice = null;
             }
+
+            if (targetCount > 1 && !multiTargetMixed)
+                presentationMetaText = "多目标 · " + targetCount + " 个对象 · " + presentationMetaText;
+
+            if (multiEditLimited)
+            {
+                presentationSelectorStyle = ReadOnlySelectorStyle;
+                presentationSelectorTooltip = "当前选中了超过 " + MaxMultiEditTargets
+                                              + " 个对象。请减少选中对象后再编辑多态类型。";
+                presentationMetaText = presentationMetaText
+                                       + " · 批量编辑上限 " + MaxMultiEditTargets;
+                presentationMultiTargetNotice = "当前选中了 " + targetCount + " 个对象，超过多态批量编辑上限 "
+                                               + MaxMultiEditTargets
+                                               + "。为避免大量序列化写入和错误覆盖，此字段已只读；请减少选中对象后再操作。";
+            }
+
+            string hint = GetFieldHint();
+            if (!string.IsNullOrEmpty(hint))
+                presentationMetaText += " · " + hint;
+        }
+
+        private string GetFieldHint()
+        {
+            return Property?.GetAttribute<ESFieldHintAttribute>()?.Text;
         }
 
         private static Rect ApplyNestingInset(Rect rect, int nestingDepth)
@@ -422,34 +748,32 @@ namespace ES.EditorInternal
             Rect frameRect,
             Rect frameBottomRect,
             int nestingDepth,
-            bool hasValue,
-            bool hasUnresolvedType)
+            ESStatusKind status)
         {
             if (Event.current.type != EventType.Repaint)
                 return;
 
             float bottom = Mathf.Max(frameRect.y + HeaderHeight, frameBottomRect.yMax);
             Rect rect = new Rect(frameRect.x, frameRect.y, frameRect.width, bottom - frameRect.y);
-            Color line = ESEditorPresentation.GetFrameColor(nestingDepth, hasValue, hasUnresolvedType);
+            Color line = ESEditorPresentation.GetStatusFrameColor(nestingDepth, status);
             ESEditorPresentation.DrawFrame(rect, line, FrameLineWidth);
         }
 
         private static void DrawHeaderBackground(
             Rect rect,
-            bool hasUnresolvedType,
-            bool hasValue,
+            ESStatusKind status,
             int nestingDepth)
         {
             if (Event.current.type != EventType.Repaint)
                 return;
 
-            Color background = ESEditorPresentation.GetDepthBackground(nestingDepth);
-            Color line = EditorGUIUtility.isProSkin
-                ? new Color(0.30f, 0.32f, 0.35f, 1f)
-                : new Color(0.70f, 0.72f, 0.74f, 1f);
-            Color accent = hasUnresolvedType
-                ? new Color(0.86f, 0.47f, 0.20f, 1f)
-                : hasValue
+            Color background = status == ESStatusKind.Error
+                ? ESEditorPresentation.WarningBackground
+                : ESEditorPresentation.GetDepthBackground(nestingDepth);
+            Color line = ESEditorPresentation.DividerColor;
+            Color accent = status == ESStatusKind.Error
+                ? ESEditorPresentation.GetStatusAccent(nestingDepth, ESStatusKind.Error)
+                : status == ESStatusKind.Ready
                     ? GetDepthAccent(nestingDepth)
                     : line;
 
@@ -458,7 +782,7 @@ namespace ES.EditorInternal
             EditorGUI.DrawRect(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), line);
         }
 
-        private static string BuildTypeSummary(TypeDescriptor descriptor)
+        private static string BuildTypeSummary(ESTypeCatalog.Entry descriptor)
         {
             string group = string.IsNullOrWhiteSpace(descriptor.GroupPath)
                 ? string.Empty
@@ -466,7 +790,7 @@ namespace ES.EditorInternal
             return group + descriptor.DisplayName + "  ·  " + descriptor.Subtitle;
         }
 
-        private string ResolveTitle(GUIContent label, object value)
+        private string ResolveTitle(GUIContent label, object value, bool suppressValueType)
         {
             LabelTextAttribute labelAttribute = Property?.GetAttribute<LabelTextAttribute>();
             if (labelAttribute != null && !string.IsNullOrWhiteSpace(labelAttribute.Text))
@@ -474,8 +798,8 @@ namespace ES.EditorInternal
 
             // Collection elements usually arrive with a generic label such as "Element" or
             // "多态配置". Use the concrete business name there so sibling entries are readable.
-            if (value != null)
-                return DescribeType(value.GetType()).DisplayName;
+            if (!suppressValueType && value != null)
+                return ESTypeCatalog.GetDisplayName(value.GetType());
 
             if (label != null && !string.IsNullOrEmpty(label.text))
                 return label.text;
@@ -493,14 +817,10 @@ namespace ES.EditorInternal
             if (Event.current.type == EventType.Repaint)
             {
                 Color background = textStyle == WarningSelectorStyle
-                    ? (EditorGUIUtility.isProSkin
-                        ? new Color(0.33f, 0.22f, 0.16f, 0.90f)
-                        : new Color(1f, 0.92f, 0.84f, 1f))
+                    ? ESEditorPresentation.WarningBackground
                     : selected
                         ? GetSelectorBackground(nestingDepth)
-                        : (EditorGUIUtility.isProSkin
-                            ? new Color(0.25f, 0.26f, 0.28f, 0.90f)
-                            : new Color(0.88f, 0.89f, 0.90f, 1f));
+                        : ESEditorPresentation.NeutralSelectorBackground;
                 EditorGUI.DrawRect(rect, background);
             }
 
@@ -517,12 +837,10 @@ namespace ES.EditorInternal
                 return;
 
             Color underline = textStyle == WarningSelectorStyle
-                ? new Color(0.86f, 0.47f, 0.20f, 0.92f)
+                ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Warning)
                 : selected
                     ? GetDepthAccent(nestingDepth)
-                    : (EditorGUIUtility.isProSkin
-                        ? new Color(0.48f, 0.51f, 0.55f, 1f)
-                        : new Color(0.48f, 0.51f, 0.55f, 1f));
+                    : ESEditorPresentation.NeutralHoverColor;
             EditorGUI.DrawRect(new Rect(rect.x, rect.yMax - 2f, rect.width, 2f), underline);
         }
 
@@ -545,6 +863,11 @@ namespace ES.EditorInternal
                     ESPolymorphicReferencePreferences.ShowMenu,
                     "切换绘制方案（当前：" + ESPolymorphicReferencePreferences.CurrentDisplayName + "）"),
                 new ESSearchDropdown.ToolbarAction(
+                    "集合",
+                    ESPolymorphicReferencePreferences.ShowCollectionMenu,
+                    "切换集合元素绘制方案（当前："
+                    + ESPolymorphicReferencePreferences.CurrentCollectionDisplayName + "）"),
+                new ESSearchDropdown.ToolbarAction(
                     "诊断",
                     () => LogTypeCatalogDiagnostics(baseType, selectedType),
                     "输出声明基类、当前类型和候选数量到 Console"),
@@ -556,7 +879,7 @@ namespace ES.EditorInternal
 
             ESSearchDropdown.Open(
                 anchorRect,
-                "选择 " + GetDisplayName(baseType),
+                "选择 " + ESTypeCatalog.GetDisplayName(baseType),
                 () => BuildTypeEntries(baseType, selectedType, unresolvedTypeName),
                 state: selectorState ?? (selectorState = new AdvancedDropdownState()),
                 minimumWindowSize: new Vector2(420f, 320f),
@@ -568,8 +891,8 @@ namespace ES.EditorInternal
             Type selectedType,
             string unresolvedTypeName)
         {
-            TypeCatalog catalog = GetTypeCatalog(baseType);
-            var entries = new List<ESSearchDropdown.Entry>(catalog.Descriptors.Count + 1);
+            ESTypeCatalog.Catalog catalog = GetTypeCatalog(baseType);
+            var entries = new List<ESSearchDropdown.Entry>(catalog.Count + 1);
             if (!string.IsNullOrEmpty(unresolvedTypeName))
             {
                 entries.Add(ESSearchDropdown.Entry.Disabled(
@@ -577,9 +900,9 @@ namespace ES.EditorInternal
                     tooltip: "原类型：" + unresolvedTypeName));
             }
 
-            for (int i = 0; i < catalog.Descriptors.Count; i++)
+            for (int i = 0; i < catalog.Count; i++)
             {
-                TypeDescriptor descriptor = catalog.Descriptors[i];
+                ESTypeCatalog.Entry descriptor = catalog.Entries[i];
                 Type capturedType = descriptor.Type;
                 entries.Add(ESSearchDropdown.Entry.Item(
                     descriptor.DisplayName,
@@ -592,7 +915,7 @@ namespace ES.EditorInternal
                     selected: capturedType == selectedType));
             }
 
-            if (catalog.Descriptors.Count == 0)
+            if (catalog.Count == 0)
             {
                 entries.Add(ESSearchDropdown.Entry.Disabled(
                     "没有可创建的具体类型",
@@ -604,44 +927,46 @@ namespace ES.EditorInternal
 
         private static void LogTypeCatalogDiagnostics(Type baseType, Type selectedType)
         {
-            TypeCatalog catalog = GetTypeCatalog(baseType);
+            ESTypeCatalog.Catalog catalog = GetTypeCatalog(baseType);
             Debug.Log(
                 "[ESPolymorphicReference] 类型选择器诊断\n"
                 + "声明基类：" + (baseType == null ? "<null>" : baseType.FullName) + "\n"
                 + "当前类型：" + (selectedType == null ? "<null>" : selectedType.FullName) + "\n"
-                + "候选数量：" + catalog.Descriptors.Count);
+                + "候选数量：" + catalog.Count);
         }
 
         private void CreateValue(Type concreteType, string unresolvedTypeName)
         {
             object currentValue = ValueEntry.WeakSmartValue;
-            if (currentValue != null && currentValue.GetType() == concreteType)
+            int targetCount = GetTargetCount();
+            bool multiTargetMixed = targetCount > 1 && HasMixedMultiTargetValue();
+            if (!multiTargetMixed && currentValue != null && currentValue.GetType() == concreteType)
                 return;
 
-            bool replacesExistingValue = currentValue != null || !string.IsNullOrEmpty(unresolvedTypeName);
+            bool replacesExistingValue = currentValue != null
+                                         || !string.IsNullOrEmpty(unresolvedTypeName)
+                                         || multiTargetMixed;
             if (replacesExistingValue)
             {
-                string previous = currentValue == null
+                string previous = multiTargetMixed
+                    ? "已选 " + targetCount + " 个对象，当前多态配置不一致。"
+                    : currentValue == null
                     ? "无法解析的旧类型：" + unresolvedTypeName
-                    : "当前类型：" + BuildTypeSummary(DescribeType(currentValue.GetType()));
+                    : "当前类型：" + BuildTypeSummary(ESTypeCatalog.GetEntry(currentValue.GetType()));
+                string batchNotice = targetCount > 1
+                    ? "\n每个已选对象都会创建独立的新实例。"
+                    : string.Empty;
                 if (!EditorUtility.DisplayDialog(
                         "替换多态配置类型",
-                        previous + "\n\n将替换为：" + BuildTypeSummary(DescribeType(concreteType))
-                        + "\n当前对象内该多态配置的数据会被覆盖。可在保存前使用 Ctrl+Z 撤销。",
+                        previous + "\n\n将替换为：" + BuildTypeSummary(ESTypeCatalog.GetEntry(concreteType))
+                        + "\n当前对象内该多态配置的数据会被覆盖。" + batchNotice
+                        + "\n可在保存前使用 Ctrl+Z 撤销。",
                         "替换",
                         "取消"))
                     return;
             }
 
-            if (!TryCreateValue(concreteType, out object createdValue, out string error))
-            {
-                Debug.LogError("[ESPolymorphicReference] 无法创建多态类型："
-                               + concreteType.FullName + "\n" + error);
-                EditorUtility.DisplayDialog("无法创建多态类型", error, "知道了");
-                return;
-            }
-
-            if (TryAssignManagedReference(createdValue, "替换多态配置类型", out string assignError))
+            if (TryAssignManagedReferenceType(concreteType, "替换多态配置类型", out string assignError))
                 expanded = true;
             else
                 EditorUtility.DisplayDialog("无法写入多态配置", assignError, "知道了");
@@ -657,6 +982,9 @@ namespace ES.EditorInternal
 
         private bool TryAssignManagedReference(object value, string undoName, out string error)
         {
+            if (GetTargetCount() > 1)
+                return TryAssignManagedReferenceToTargets(value == null ? null : value.GetType(), undoName, out error);
+
             error = null;
             try
             {
@@ -664,6 +992,7 @@ namespace ES.EditorInternal
                 if (serializedProperty != null
                     && serializedProperty.propertyType == SerializedPropertyType.ManagedReference)
                 {
+                    RecordFallbackUndo(undoName);
                     serializedProperty.managedReferenceValue = value;
                     serializedProperty.serializedObject.ApplyModifiedProperties();
                     GUI.changed = true;
@@ -679,6 +1008,125 @@ namespace ES.EditorInternal
             {
                 error = exception.GetType().Name + "：" + exception.Message;
                 return false;
+            }
+        }
+
+        private bool TryAssignManagedReferenceType(Type concreteType, string undoName, out string error)
+        {
+            if (GetTargetCount() > 1)
+                return TryAssignManagedReferenceToTargets(concreteType, undoName, out error);
+
+            if (!TryCreateValue(concreteType, out object createdValue, out error))
+            {
+                error = "无法创建多态类型：" + concreteType.FullName + "\n" + error;
+                return false;
+            }
+
+            return TryAssignManagedReference(createdValue, undoName, out error);
+        }
+
+        private bool TryAssignManagedReferenceToTargets(
+            Type concreteType,
+            string undoName,
+            out string error)
+        {
+            error = null;
+            int targetCount = GetTargetCount();
+            if (targetCount <= 1)
+            {
+                error = "没有足够的多目标对象可写入。";
+                return false;
+            }
+
+            if (targetCount > MaxMultiEditTargets)
+            {
+                error = "批量编辑最多支持 " + MaxMultiEditTargets + " 个对象。";
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(Property.UnityPropertyPath))
+            {
+                error = "当前多态字段没有可写入的 Unity 属性路径。";
+                return false;
+            }
+
+            var assignments = new List<ManagedReferenceTargetAssignment>(targetCount);
+            var undoTargets = new List<UnityEngine.Object>(targetCount);
+            try
+            {
+                for (int i = 0; i < Property.Tree.WeakTargets.Count; i++)
+                {
+                    if (!(Property.Tree.WeakTargets[i] is UnityEngine.Object target))
+                    {
+                        error = "第 " + (i + 1) + " 个目标不是 Unity 对象，无法安全批量写入。";
+                        return false;
+                    }
+
+                    var serializedObject = new SerializedObject(target);
+                    SerializedProperty serializedProperty = serializedObject.FindProperty(Property.UnityPropertyPath);
+                    if (serializedProperty == null
+                        || serializedProperty.propertyType != SerializedPropertyType.ManagedReference)
+                    {
+                        error = "第 " + (i + 1) + " 个目标没有兼容的 SerializeReference 字段。";
+                        return false;
+                    }
+
+                    object targetValue = null;
+                    if (concreteType != null
+                        && !TryCreateValue(concreteType, out targetValue, out string createError))
+                    {
+                        error = "第 " + (i + 1) + " 个目标无法创建 "
+                                + concreteType.Name + "：" + createError;
+                        return false;
+                    }
+
+                    assignments.Add(new ManagedReferenceTargetAssignment(
+                        target,
+                        serializedObject,
+                        serializedProperty,
+                        targetValue));
+                    undoTargets.Add(target);
+                }
+
+                int undoGroup = Undo.GetCurrentGroup();
+                Undo.SetCurrentGroupName(undoName);
+                Undo.RecordObjects(undoTargets.ToArray(), undoName);
+                for (int i = 0; i < assignments.Count; i++)
+                {
+                    ManagedReferenceTargetAssignment assignment = assignments[i];
+                    assignment.Property.managedReferenceValue = assignment.Value;
+                    assignment.SerializedObject.ApplyModifiedProperties();
+                    EditorUtility.SetDirty(assignment.Target);
+                }
+
+                Undo.CollapseUndoOperations(undoGroup);
+                GUI.changed = true;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.GetType().Name + "：" + exception.Message;
+                return false;
+            }
+        }
+
+        private readonly struct ManagedReferenceTargetAssignment
+        {
+            public readonly UnityEngine.Object Target;
+            public readonly SerializedObject SerializedObject;
+            public readonly SerializedProperty Property;
+            public readonly object Value;
+
+            public ManagedReferenceTargetAssignment(
+                UnityEngine.Object target,
+                SerializedObject serializedObject,
+                SerializedProperty property,
+                object value)
+            {
+                Target = target;
+                SerializedObject = serializedObject;
+                Property = property;
+                Value = value;
             }
         }
 
@@ -721,7 +1169,13 @@ namespace ES.EditorInternal
                     || string.IsNullOrEmpty(property.managedReferenceFullTypename))
                     return null;
 
-                return FormatManagedReferenceTypeName(property.managedReferenceFullTypename);
+                string rawTypeName = property.managedReferenceFullTypename;
+                if (string.Equals(unresolvedRawTypeNameCache, rawTypeName, StringComparison.Ordinal))
+                    return unresolvedFormattedTypeNameCache;
+
+                unresolvedRawTypeNameCache = rawTypeName;
+                unresolvedFormattedTypeNameCache = FormatManagedReferenceTypeName(rawTypeName);
+                return unresolvedFormattedTypeNameCache;
             }
             catch (Exception)
             {
@@ -746,12 +1200,17 @@ namespace ES.EditorInternal
             return typeName + "（" + assemblyName + "）";
         }
 
-        private static void DrawMissingTypeNotice(string unresolvedTypeName)
+        private void DrawMissingTypeNotice()
         {
             EditorGUILayout.HelpBox(
-                "无法解析已保存的多态类型：" + unresolvedTypeName
-                + "。请恢复对应脚本/程序集，或通过右侧“选择替代类型”明确覆盖旧引用。",
+                presentationMissingNotice,
                 MessageType.Error);
+        }
+
+        private void DrawMultiTargetNotice()
+        {
+            if (!string.IsNullOrEmpty(presentationMultiTargetNotice))
+                EditorGUILayout.HelpBox(presentationMultiTargetNotice, MessageType.Warning);
         }
 
         private static bool TryCreateValue(Type type, out object value, out string error)
@@ -774,132 +1233,21 @@ namespace ES.EditorInternal
             }
         }
 
-        private static TypeCatalog GetTypeCatalog(Type baseType)
+        private static ESTypeCatalog.Catalog GetTypeCatalog(Type baseType)
         {
-            if (CatalogsByBaseType.TryGetValue(baseType, out TypeCatalog catalog))
-                return catalog;
-
-            var descriptors = new List<TypeDescriptor>();
-            var collected = new HashSet<Type>();
-            AddCandidate(baseType, collected, descriptors);
-            foreach (Type candidate in TypeCache.GetTypesDerivedFrom(baseType))
-                AddCandidate(candidate, collected, descriptors);
-
-            descriptors.Sort(TypeDescriptor.Compare);
-            catalog = new TypeCatalog(descriptors);
-            CatalogsByBaseType.Add(baseType, catalog);
-            return catalog;
-        }
-
-        private static void AddCandidate(Type candidate, HashSet<Type> collected, List<TypeDescriptor> descriptors)
-        {
-            if (!CanCreate(candidate) || !collected.Add(candidate))
-                return;
-
-            descriptors.Add(DescribeType(candidate));
-        }
-
-        private static bool CanCreate(Type type)
-        {
-            if (type == null
-                || !type.IsClass
-                || type.IsAbstract
-                || type.IsGenericTypeDefinition
-                || type.ContainsGenericParameters
-                || !type.IsSerializable
-                || typeof(UnityEngine.Object).IsAssignableFrom(type)
-                || (type.Namespace != null && type.Namespace.StartsWith("UnityEditor", StringComparison.Ordinal))
-                || type.IsDefined(typeof(ObsoleteAttribute), false))
-                return false;
-
-            return type.GetConstructor(
-                       BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                       binder: null,
-                       types: Type.EmptyTypes,
-                       modifiers: null) != null;
-        }
-
-        private static TypeDescriptor DescribeType(Type type)
-        {
-            if (DescriptorsByType.TryGetValue(type, out TypeDescriptor descriptor))
-                return descriptor;
-
-            TypeRegistryItemAttribute registryItem = type.GetCustomAttribute<TypeRegistryItemAttribute>(false);
-            string registryName = registryItem?.Name;
-            bool registered = !string.IsNullOrWhiteSpace(registryName);
-            string groupPath;
-            string displayName;
-            if (registered)
-            {
-                string normalized = registryName.Trim().Trim('/');
-                int separator = normalized.LastIndexOf('/');
-                groupPath = separator > 0 ? normalized.Substring(0, separator) : null;
-                displayName = separator >= 0 ? normalized.Substring(separator + 1) : normalized;
-                if (string.IsNullOrWhiteSpace(displayName))
-                    displayName = GetDisplayName(type);
-            }
-            else
-            {
-                groupPath = UnregisteredGroupName;
-                displayName = GetDisplayName(type);
-            }
-
-            string assemblyName = type.Assembly.GetName().Name;
-            string fullName = type.FullName ?? type.Name;
-            string subtitle = registered ? type.Name : "未使用 TypeRegistryItem 登记";
-            string tooltip = fullName + "\n程序集：" + assemblyName;
-            string keywords = (registryName ?? string.Empty) + " " + type.Name + " " + fullName;
-            descriptor = new TypeDescriptor(
-                type,
-                displayName,
-                groupPath,
-                subtitle,
-                tooltip,
-                keywords,
-                registered ? null : "未登记");
-            DescriptorsByType.Add(type, descriptor);
-            return descriptor;
-        }
-
-        private static string GetDisplayName(Type type)
-        {
-            return SplitWords(TrimCommonPrefix(type.Name));
-        }
-
-        private static string TrimCommonPrefix(string name)
-        {
-            if (name.StartsWith("ES", StringComparison.Ordinal) && name.Length > 2)
-                return name.Substring(2);
-            if (name.StartsWith("Op", StringComparison.Ordinal) && name.Length > 2)
-                return name.Substring(2);
-            return name;
-        }
-
-        private static string SplitWords(string value)
-        {
-            var builder = new StringBuilder(value.Length + 8);
-            for (int i = 0; i < value.Length; i++)
-            {
-                char current = value[i];
-                if (current == '_')
-                {
-                    if (builder.Length > 0 && builder[builder.Length - 1] != ' ')
-                        builder.Append(' ');
-                    continue;
-                }
-
-                if (i > 0 && char.IsUpper(current) && char.IsLower(value[i - 1]))
-                    builder.Append(' ');
-                builder.Append(current);
-            }
-
-            return builder.ToString().Trim();
+            return ESTypeCatalog.Get(baseType);
         }
 
         private static void ClearTypeCaches()
         {
-            CatalogsByBaseType.Clear();
-            DescriptorsByType.Clear();
+            ESTypeCatalog.Clear();
+            managedReferenceTypesByName.Clear();
+            unresolvedManagedReferenceTypeNames.Clear();
+        }
+
+        internal static void OnAssemblyStream()
+        {
+            ClearTypeCaches();
         }
 
         private static void DrawDivider()
@@ -912,6 +1260,7 @@ namespace ES.EditorInternal
         {
             get
             {
+                EnsureStyles();
                 if (titleStyle == null)
                 {
                     titleStyle = new GUIStyle(EditorStyles.boldLabel)
@@ -930,6 +1279,7 @@ namespace ES.EditorInternal
         {
             get
             {
+                EnsureStyles();
                 if (selectedSelectorStyle == null)
                 {
                     selectedSelectorStyle = new GUIStyle(EditorStyles.label)
@@ -937,9 +1287,7 @@ namespace ES.EditorInternal
                         alignment = TextAnchor.MiddleLeft,
                         clipping = TextClipping.Clip
                     };
-                    selectedSelectorStyle.normal.textColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.62f, 0.80f, 1f, 1f)
-                        : new Color(0.06f, 0.31f, 0.61f, 1f);
+                    selectedSelectorStyle.normal.textColor = ESEditorPresentation.SelectedTextColor;
                 }
 
                 return selectedSelectorStyle;
@@ -950,6 +1298,7 @@ namespace ES.EditorInternal
         {
             get
             {
+                EnsureStyles();
                 if (emptySelectorStyle == null)
                 {
                     emptySelectorStyle = new GUIStyle(EditorStyles.label)
@@ -957,9 +1306,7 @@ namespace ES.EditorInternal
                         alignment = TextAnchor.MiddleLeft,
                         clipping = TextClipping.Clip
                     };
-                    emptySelectorStyle.normal.textColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.63f, 0.66f, 0.70f, 1f)
-                        : new Color(0.38f, 0.41f, 0.45f, 1f);
+                    emptySelectorStyle.normal.textColor = ESEditorPresentation.EmptyTextColor;
                 }
 
                 return emptySelectorStyle;
@@ -970,6 +1317,7 @@ namespace ES.EditorInternal
         {
             get
             {
+                EnsureStyles();
                 if (warningSelectorStyle == null)
                 {
                     warningSelectorStyle = new GUIStyle(EditorStyles.label)
@@ -977,12 +1325,29 @@ namespace ES.EditorInternal
                         alignment = TextAnchor.MiddleLeft,
                         clipping = TextClipping.Clip
                     };
-                    warningSelectorStyle.normal.textColor = EditorGUIUtility.isProSkin
-                        ? new Color(1f, 0.66f, 0.35f, 1f)
-                        : new Color(0.72f, 0.29f, 0.05f, 1f);
+                    warningSelectorStyle.normal.textColor = ESEditorPresentation.WarningTextColor;
                 }
 
                 return warningSelectorStyle;
+            }
+        }
+
+        private static GUIStyle ReadOnlySelectorStyle
+        {
+            get
+            {
+                EnsureStyles();
+                if (readOnlySelectorStyle == null)
+                {
+                    readOnlySelectorStyle = new GUIStyle(EditorStyles.label)
+                    {
+                        alignment = TextAnchor.MiddleLeft,
+                        clipping = TextClipping.Clip
+                    };
+                    readOnlySelectorStyle.normal.textColor = ESEditorPresentation.MetaStyle.normal.textColor;
+                }
+
+                return readOnlySelectorStyle;
             }
         }
 
@@ -990,6 +1355,7 @@ namespace ES.EditorInternal
         {
             get
             {
+                EnsureStyles();
                 if (selectorArrowStyle == null)
                 {
                     selectorArrowStyle = new GUIStyle(EditorStyles.miniLabel)
@@ -998,9 +1364,7 @@ namespace ES.EditorInternal
                         fontSize = 15,
                         fontStyle = FontStyle.Bold
                     };
-                    selectorArrowStyle.normal.textColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.59f, 0.62f, 0.66f, 1f)
-                        : new Color(0.39f, 0.42f, 0.46f, 1f);
+                    selectorArrowStyle.normal.textColor = ESEditorPresentation.SelectorArrowColor;
                 }
 
                 return selectorArrowStyle;
@@ -1011,6 +1375,7 @@ namespace ES.EditorInternal
         {
             get
             {
+                EnsureStyles();
                 if (clearStyle == null)
                 {
                     clearStyle = new GUIStyle(EditorStyles.miniLabel)
@@ -1019,9 +1384,7 @@ namespace ES.EditorInternal
                         fontSize = 16,
                         fontStyle = FontStyle.Bold
                     };
-                    clearStyle.normal.textColor = EditorGUIUtility.isProSkin
-                        ? new Color(0.65f, 0.48f, 0.48f, 1f)
-                        : new Color(0.62f, 0.28f, 0.28f, 1f);
+                    clearStyle.normal.textColor = ESEditorPresentation.ClearActionColor;
                 }
 
                 return clearStyle;
@@ -1033,55 +1396,34 @@ namespace ES.EditorInternal
             get { return ESEditorPresentation.MetaStyle; }
         }
 
-        private sealed class TypeCatalog
+        private static void EnsureStyles()
         {
-            public readonly List<TypeDescriptor> Descriptors;
+            bool proSkin = ESEditorPresentation.IsProSkin;
+            if (stylesInitialized && stylesProSkin == proSkin)
+                return;
 
-            public TypeCatalog(List<TypeDescriptor> descriptors)
-            {
-                Descriptors = descriptors;
-            }
+            stylesInitialized = true;
+            stylesProSkin = proSkin;
+            titleStyle = null;
+            selectedSelectorStyle = null;
+            emptySelectorStyle = null;
+            warningSelectorStyle = null;
+            readOnlySelectorStyle = null;
+            selectorArrowStyle = null;
+            clearStyle = null;
         }
 
-        private readonly struct TypeDescriptor
+    }
+
+    /// <summary>
+    /// Uses ES's assembly stream instead of a separate InitializeOnLoad callback. The cache is
+    /// invalidated after scripts change, but stays lazy until an actual field is drawn.
+    /// </summary>
+    public sealed class ESPolymorphicReferenceDrawerAssemblyStreamInitializer : ES.EditorInvoker_Level0
+    {
+        public override void InitInvoke()
         {
-            public readonly Type Type;
-            public readonly string DisplayName;
-            public readonly string GroupPath;
-            public readonly string Subtitle;
-            public readonly string Tooltip;
-            public readonly string Keywords;
-            public readonly string Badge;
-
-            public TypeDescriptor(
-                Type type,
-                string displayName,
-                string groupPath,
-                string subtitle,
-                string tooltip,
-                string keywords,
-                string badge)
-            {
-                Type = type;
-                DisplayName = displayName;
-                GroupPath = groupPath;
-                Subtitle = subtitle;
-                Tooltip = tooltip;
-                Keywords = keywords;
-                Badge = badge;
-            }
-
-            public static int Compare(TypeDescriptor left, TypeDescriptor right)
-            {
-                int groupCompare = string.Compare(left.GroupPath, right.GroupPath, StringComparison.Ordinal);
-                if (groupCompare != 0)
-                    return groupCompare;
-
-                int nameCompare = string.Compare(left.DisplayName, right.DisplayName, StringComparison.Ordinal);
-                return nameCompare != 0
-                    ? nameCompare
-                    : string.Compare(left.Type.FullName, right.Type.FullName, StringComparison.Ordinal);
-            }
+            ESPolymorphicReferenceDrawer.OnAssemblyStream();
         }
     }
 
@@ -1094,14 +1436,23 @@ namespace ES.EditorInternal
     internal static class ESPolymorphicReferencePreferences
     {
         private const string PreferencePrefix = "ES.PolymorphicReference.DrawMode.";
+        private const string CollectionPreferencePrefix = "ES.PolymorphicReference.CollectionDrawMode.";
         private static bool drawModeInitialized;
         private static ESPolymorphicReferenceDrawMode cachedDrawMode;
+        private static bool collectionDrawModeInitialized;
+        private static ESPolymorphicReferenceDrawMode cachedCollectionDrawMode;
 
         public static bool UseESRenderer => DrawMode == ESPolymorphicReferenceDrawMode.ES;
 
         public static string CurrentDisplayName => UseESRenderer
             ? "【ES】自定义渲染"
             : "Odin 默认动态渲染";
+
+        public static bool UseESCollectionRenderer => CollectionDrawMode == ESPolymorphicReferenceDrawMode.ES;
+
+        public static string CurrentCollectionDisplayName => UseESCollectionRenderer
+            ? "【ES】集合元素绘制"
+            : "Odin 默认集合元素绘制";
 
         private static ESPolymorphicReferenceDrawMode DrawMode
         {
@@ -1126,6 +1477,31 @@ namespace ES.EditorInternal
             }
         }
 
+        private static ESPolymorphicReferenceDrawMode CollectionDrawMode
+        {
+            get
+            {
+                if (collectionDrawModeInitialized)
+                    return cachedCollectionDrawMode;
+
+                string value = EditorPrefs.GetString(
+                    GetPreferenceKey(CollectionPreferencePrefix),
+                    nameof(ESPolymorphicReferenceDrawMode.ES));
+                cachedCollectionDrawMode = Enum.TryParse(value, out ESPolymorphicReferenceDrawMode mode)
+                    ? mode
+                    : ESPolymorphicReferenceDrawMode.ES;
+                collectionDrawModeInitialized = true;
+                return cachedCollectionDrawMode;
+            }
+            set
+            {
+                cachedCollectionDrawMode = value;
+                collectionDrawModeInitialized = true;
+                EditorPrefs.SetString(GetPreferenceKey(CollectionPreferencePrefix), value.ToString());
+                RebuildInspectors();
+            }
+        }
+
         public static void ShowMenu()
         {
             var menu = new GenericMenu();
@@ -1137,6 +1513,20 @@ namespace ES.EditorInternal
                 new GUIContent("Odin 默认动态渲染"),
                 !UseESRenderer,
                 () => DrawMode = ESPolymorphicReferenceDrawMode.Odin);
+            menu.ShowAsContext();
+        }
+
+        public static void ShowCollectionMenu()
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(
+                new GUIContent("【ES】集合元素绘制"),
+                UseESCollectionRenderer,
+                () => CollectionDrawMode = ESPolymorphicReferenceDrawMode.ES);
+            menu.AddItem(
+                new GUIContent("Odin 默认集合元素绘制"),
+                !UseESCollectionRenderer,
+                () => CollectionDrawMode = ESPolymorphicReferenceDrawMode.Odin);
             menu.ShowAsContext();
         }
 
@@ -1152,10 +1542,22 @@ namespace ES.EditorInternal
             DrawMode = ESPolymorphicReferenceDrawMode.Odin;
         }
 
-        private static string GetPreferenceKey()
+        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/集合元素绘制/【ES】集合元素绘制")]
+        private static void SelectESCollectionRenderer()
+        {
+            CollectionDrawMode = ESPolymorphicReferenceDrawMode.ES;
+        }
+
+        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/集合元素绘制/Odin 默认集合元素绘制")]
+        private static void SelectOdinCollectionRenderer()
+        {
+            CollectionDrawMode = ESPolymorphicReferenceDrawMode.Odin;
+        }
+
+        private static string GetPreferenceKey(string prefix = null)
         {
             string projectPath = Application.dataPath ?? "UnknownProject";
-            return PreferencePrefix + projectPath.Replace('\\', '/');
+            return (prefix ?? PreferencePrefix) + projectPath.Replace('\\', '/');
         }
 
         private static void RebuildInspectors()

@@ -127,7 +127,7 @@ Input 侧最多做“输入读取是否可用”和“输入意图是否产生�
 
 ## 后续优先事项
 
-- 把 `Interact` 输入接到现有 `BasicInteraction -> ESInteractable` 主链路。
+- `Interact` 输入与现有 `BasicInteraction -> ESInteractable` 主链已经存在；占用、结束原因、异常清理与多人竞争的现行边界必须阅读 `交互运行时_Interactable占用生命周期与结束原因_AI协作警告.md`，不得把输入意图误当成交互成功。
 - 继续增强绑定 UI：搜索、按设备分组、显示当前 path 的中文解释。
 - 后续做动态 Action 或代码生成时，不要破坏当前 enum 快速路径。
 - 如需支持“攻击被硬直打断、瞄准被眩晕打断、交互被状态锁定”，不要先改 Input；先设计 Entity 行为许可层。

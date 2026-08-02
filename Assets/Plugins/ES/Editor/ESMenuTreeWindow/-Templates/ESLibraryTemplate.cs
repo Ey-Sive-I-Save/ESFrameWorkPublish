@@ -1402,6 +1402,7 @@ namespace ES
                     case ESAssetCategory.Shader: return "着色器";
                     case ESAssetCategory.Font: return "字体";
                     case ESAssetCategory.Video: return "视频";
+                    case ESAssetCategory.Raw: return "Raw 二进制";
                     case ESAssetCategory.Other: return "其他";
                     default: return category.ToString();
                 }

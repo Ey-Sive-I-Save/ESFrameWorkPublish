@@ -90,6 +90,7 @@ namespace ES
                 if (EntityState_Skill.Pool.PushToPool(state))
                     warmed++;
             }
+            SkillSequenceRuntimeCache.Release(sequence);
             return warmed;
         }
 
@@ -163,7 +164,7 @@ namespace ES
             if (definition != null)
                 tempState.SetSkillDefinition(definition, prepared);
             else
-                tempState.SetSkillSequence(sequence);
+                tempState.SetTemporarySkillSequence(sequence);
 
             tempState.stateSharedData = CreateTemporarySkillSharedData(tempKey, sequence, baseStateInfo, layer);
             tempState.stateVariableData = new StateVariableData();

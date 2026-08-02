@@ -17,7 +17,7 @@ public sealed class ESAssetReferExample : MonoBehaviour
         Instantiate(prefab, transform);
 
         Image image = GetComponent<Image>();
-        if (!iconSprite.TryApplyToImage(image))
+        if (!iconSprite.TryApplyToImage(image, this))
             await iconSprite.ApplyToImageAsync(image, this);
 
         AudioSource source = GetComponent<AudioSource>();
@@ -35,10 +35,12 @@ public sealed class EnemyDataConfig : ScriptableObject
     public int health = 100;
     public float speed = 5f;
 
-    public async UniTask PreloadAsync()
+    /// <summary>把这组敌人资源预热并绑定到明确的运行时 Owner，而不是放入全局 Resident。</summary>
+    public async UniTask PreloadForOwnerAsync(Component owner)
     {
-        await prefab.PreloadAsync();
-        await icon.PreloadAsync();
-        await spawnSound.PreloadAsync();
+        if (owner == null) throw new System.ArgumentNullException(nameof(owner));
+        await prefab.LoadAsync(owner);
+        await icon.LoadAsync(owner);
+        await spawnSound.LoadAsync(owner);
     }
 }

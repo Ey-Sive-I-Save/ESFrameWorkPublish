@@ -5,6 +5,17 @@ using Sirenix.OdinInspector;
 
 namespace ES
 {
+    internal static class ESConfigKeyDiagnostics
+    {
+        internal static event Action<string, string> MissingKey;
+
+        internal static void ReportMissing(string scope, string description)
+        {
+            try { MissingKey?.Invoke(scope, description); }
+            catch (Exception exception) { UnityEngine.Debug.LogException(exception); }
+        }
+    }
+
     /// <summary>
     /// 冷路径数据补值委托。必须按 ref 传递，使 class 可被替换、struct 可被原位修改；
     /// 仅用于注入前组装配置，不进入 RuntimeKey 查询热路径。
@@ -175,6 +186,7 @@ namespace ES
         public string StringKey => stringKey;
         public int EnumKeyInt => EnumToInt(enumKey);
         public bool HasEnumKey => EnumKeyInt != 0;
+        public bool IsConfigured => ESConfigKeyMatch.IsConfigured(EnumKeyInt, stringKey);
         public bool HasGuid => !string.IsNullOrEmpty(guid);
         public bool IsSubAsset => localFileId != 0;
 
@@ -208,39 +220,6 @@ namespace ES
             enumKey = ESConfigKeyEnumConverter<TEnumKey>.FromInt(runtimeEnumKey);
             stringKey = runtimeStringKey;
             SetAssetAuthority(assetGuid, assetLocalFileId, typeName, assetPath);
-        }
-
-        public void ApplyToResKey(ESResKey resKey)
-        {
-            if (resKey == null)
-                return;
-
-            resKey.ConfigEnumKeyInt = EnumKeyInt;
-            resKey.ConfigStringKey = stringKey;
-            resKey.GUID = guid;
-            resKey.LocalFileId = localFileId;
-            resKey.AssetTypeName = assetTypeName;
-            resKey.Path = editorPath;
-            resKey.Address = address;
-            resKey.GroupName = groupName;
-            resKey.EditorOnly = editorOnly;
-            resKey.AlwaysLoaded = alwaysLoaded;
-        }
-
-        public void ReadFromResKey(ESResKey resKey)
-        {
-            if (resKey == null)
-                return;
-
-            stringKey = resKey.ConfigStringKey;
-            guid = resKey.GUID;
-            localFileId = resKey.LocalFileId;
-            editorPath = resKey.Path;
-            address = resKey.Address;
-            groupName = resKey.GroupName;
-            editorOnly = resKey.EditorOnly;
-            alwaysLoaded = resKey.AlwaysLoaded;
-            assetTypeName = resKey.TargetType != null ? resKey.TargetType.FullName : resKey.AssetTypeName;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -669,6 +648,7 @@ namespace ES
                 return TryGetBySlot(slot, out data);
 
             data = null;
+            ESConfigKeyDiagnostics.ReportMissing(keyScope, "RuntimeKey=" + runtimeKey);
             return false;
         }
 
@@ -685,6 +665,7 @@ namespace ES
                 return TryGet(runtimeKey, out data);
 
             data = null;
+            ESConfigKeyDiagnostics.ReportMissing(keyScope, key.ToString());
             return false;
         }
 
@@ -701,6 +682,7 @@ namespace ES
                 return TryGet(runtimeKey, out data);
 
             data = null;
+            ESConfigKeyDiagnostics.ReportMissing(keyScope, key.ToString());
             return false;
         }
 
@@ -718,6 +700,7 @@ namespace ES
             }
 
             runtimeKey = 0;
+            ESConfigKeyDiagnostics.ReportMissing(keyScope, "StringKey=" + stringKey);
             return false;
         }
 
@@ -816,6 +799,7 @@ namespace ES
                 return TryGetBySlot(slot, out data);
 
             data = null;
+            ESConfigKeyDiagnostics.ReportMissing(keyScope, "StringKey=" + stringKey);
             return false;
         }
 

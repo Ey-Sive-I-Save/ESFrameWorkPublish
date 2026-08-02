@@ -164,6 +164,7 @@ namespace ES.EditorInternal
                 case nameof(ESAssetReferTimelineAssetConfigKey): kind = ESAssetReferKind.TimelineAsset; return true;
                 case nameof(ESAssetReferVideoClipConfigKey): kind = ESAssetReferKind.VideoClip; return true;
                 case nameof(ESAssetReferTerrainDataConfigKey): kind = ESAssetReferKind.TerrainData; return true;
+                case nameof(ESAssetReferRawConfigKey): kind = ESAssetReferKind.Raw; return true;
                 default: kind = ESAssetReferKind.None; return false;
             }
         }

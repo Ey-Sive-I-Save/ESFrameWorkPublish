@@ -41,7 +41,35 @@ namespace ES
         public bool HasConfiguredKey => ESConfigKeyMatch.IsConfigured(enumKey, stringKey);
     }
 
+    /// <summary>
+    /// Optional-module authoring input. A source is interpreted exclusively by its registered
+    /// editor extension and is never consulted by Player runtime after baking.
+    /// </summary>
+    [Serializable]
+    public sealed class ESResourcePlanExtensionSourceEntry : ESResourcePlanEntryBase
+    {
+        [LabelText("扩展配置来源"), Required, AssetsOnly]
+        public ScriptableObject source;
+    }
+
+    /// <summary>Immutable external-system recipe emitted during Bake.</summary>
+    [Serializable]
+    public sealed class ESResourcePlanBakedExtensionEntry : ESResourcePlanEntryBase
+    {
+        [ReadOnly] public string providerId;
+        [ReadOnly] public int schemaVersion;
+        [ReadOnly, TextArea(1, 2)] public string source;
+        [ReadOnly, TextArea(1, 4)] public string payload;
+        [ReadOnly] public List<ESResourcePlanBakedAssetEntry> assets = new List<ESResourcePlanBakedAssetEntry>(4);
+    }
+
     [Serializable] public sealed class ESResourcePlanSpriteEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferSpriteConfigKey key = new ESAssetReferSpriteConfigKey(); }
+    [Serializable]
+    public sealed class ESResourcePlanAudioCueEntry : ESResourcePlanEntryBase
+    {
+        [LabelText("Cue"), Required, AssetsOnly]
+        public ESAudioCueInfo cue;
+    }
     [Serializable] public sealed class ESResourcePlanAudioEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferAudioClipConfigKey key = new ESAssetReferAudioClipConfigKey(); }
     [Serializable] public sealed class ESResourcePlanAnimationEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferAnimationClipConfigKey key = new ESAssetReferAnimationClipConfigKey(); }
     [Serializable] public sealed class ESResourcePlanAnimatorEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferAnimatorControllerConfigKey key = new ESAssetReferAnimatorControllerConfigKey(); }
@@ -56,6 +84,7 @@ namespace ES
     [Serializable] public sealed class ESResourcePlanTimelineEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferTimelineAssetConfigKey key = new ESAssetReferTimelineAssetConfigKey(); }
     [Serializable] public sealed class ESResourcePlanVideoEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferVideoClipConfigKey key = new ESAssetReferVideoClipConfigKey(); }
     [Serializable] public sealed class ESResourcePlanTerrainEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferTerrainDataConfigKey key = new ESAssetReferTerrainDataConfigKey(); }
+    [Serializable] public sealed class ESResourcePlanRawEntry : ESResourcePlanEntryBase { [InlineProperty] public ESAssetReferRawConfigKey key = new ESAssetReferRawConfigKey(); }
 
     [ESCreatePath("数据信息", "资源计划")]
     /// <summary>
@@ -92,7 +121,12 @@ namespace ES
         public List<ESResourcePlanSpriteEntry> sprites = new List<ESResourcePlanSpriteEntry>(8);
         [PropertyOrder(3), TitleGroup("常用资源"), LabelText("材质")]
         public List<ESResourcePlanMaterialEntry> materials = new List<ESResourcePlanMaterialEntry>(4);
-        [PropertyOrder(4), TitleGroup("常用资源"), LabelText("音频")]
+        [PropertyOrder(4), TitleGroup("常用资源"), LabelText("音频 Cue")]
+        [InfoBox("只需选择需要预热的 Cue。资源烘焙会展开其 Unity Clip 依赖；运行时不会读取 Cue 的 Clip、Bank 或加载后端细节。")]
+        public List<ESResourcePlanAudioCueEntry> audioCues = new List<ESResourcePlanAudioCueEntry>(8);
+
+        [PropertyOrder(105), FoldoutGroup("更多资源"), LabelText("直接 AudioClip（兼容）")]
+        [InfoBox("仅保留给已有计划兼容。新计划请使用“音频 Cue”。")]
         public List<ESResourcePlanAudioEntry> audioClips = new List<ESResourcePlanAudioEntry>(8);
 
         [PropertyOrder(100), FoldoutGroup("更多资源", Expanded = false), LabelText("网格")]
@@ -119,6 +153,8 @@ namespace ES
         public List<ESResourcePlanVideoEntry> videoClips = new List<ESResourcePlanVideoEntry>(2);
         [PropertyOrder(111), FoldoutGroup("更多资源"), LabelText("数据资产")]
         public List<ESResourcePlanScriptableObjectEntry> scriptableObjects = new List<ESResourcePlanScriptableObjectEntry>(4);
+        [PropertyOrder(112), FoldoutGroup("更多资源"), LabelText("Raw 二进制")]
+        public List<ESResourcePlanRawEntry> rawAssets = new List<ESResourcePlanRawEntry>(4);
 
         [PropertyOrder(200)]
         [FoldoutGroup("GameCore 资源依赖", Expanded = false)]
@@ -132,15 +168,23 @@ namespace ES
         [ShowInInspector, ReadOnly, LabelText("已生成的资源清单")]
         [ListDrawerSettings(ShowFoldout = true, IsReadOnly = true)]
         [SerializeField] private List<ESResourcePlanBakedAssetEntry> bakedAssets = new List<ESResourcePlanBakedAssetEntry>(16);
+        [SerializeField, FoldoutGroup("扩展资源依赖"), ShowInInspector, ReadOnly, LabelText("已烘焙扩展快照")]
+        private List<ESResourcePlanBakedExtensionEntry> bakedExtensions = new List<ESResourcePlanBakedExtensionEntry>(2);
         [SerializeField, HideInInspector] private string bakedExpansionHash = string.Empty;
 
         public IReadOnlyList<ESResourcePlanBakedAssetEntry> BakedAssets => bakedAssets;
+        public IReadOnlyList<ESResourcePlanBakedExtensionEntry> BakedExtensions => bakedExtensions;
         public string BakedExpansionHash => bakedExpansionHash;
 
         public void ReplaceBakedAssets(List<ESResourcePlanBakedAssetEntry> entries, string inputHash)
         {
             bakedAssets = entries ?? new List<ESResourcePlanBakedAssetEntry>();
             bakedExpansionHash = inputHash ?? string.Empty;
+        }
+
+        public void ReplaceBakedExtensions(List<ESResourcePlanBakedExtensionEntry> entries)
+        {
+            bakedExtensions = entries ?? new List<ESResourcePlanBakedExtensionEntry>();
         }
 
         /// <summary>

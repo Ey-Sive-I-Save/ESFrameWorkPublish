@@ -12,13 +12,13 @@ namespace ES
     #region UnityPackage打包工具
 
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_UnityPackageTool : ESWindowPageBase
     {
 
-        [Title("UnityPackage打包工具", "支持多个打包配置管理", bold: true, titleAlignment: TitleAlignments.Centered)]
 
         [HideInInspector]
-        [DisplayAsString(fontSize: 13), HideLabel, GUIColor(0.72f, 0.86f, 0.86f)]
+        [DisplayAsString(fontSize: 13), HideLabel]
         public string readMe = "选择或创建打包配置，\n设置要打包的资源，\n点击打包按钮生成UnityPackage";
 
         [HideInInspector]
@@ -74,7 +74,7 @@ namespace ES
         private void DrawPackageActionPanel(int previewCount, bool configValid)
         {
             SimpleToolsPanelUtility.DrawSectionTitle("执行操作", "先刷新/确认资源清单，再选择普通导出或发布打包。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -101,7 +101,7 @@ namespace ES
         private void DrawPackagePreviewPanel(List<string> previewPaths, string configName, string outputPath, string packageName, bool includeDependencies)
         {
             SimpleToolsPanelUtility.DrawSectionTitle("导出预览", "按资源路径搜索；开始打包前先确认展开后的真实资源清单。");
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 string finalOutputPath = Path.Combine(outputPath ?? string.Empty, SanitizeFileName(packageName) + ".unitypackage").Replace("\\", "/");
                 EditorGUILayout.LabelField($"配置: {configName} | 资源: {previewPaths.Count} | 依赖: {GetDependencyInclusionText(includeDependencies)}", EditorStyles.wordWrappedMiniLabel);
@@ -130,8 +130,18 @@ namespace ES
                     return;
                 }
 
-                foreach (string path in SimpleToolsPanelUtility.PageItems(rows, ref packagePreviewPageIndex, PackagePreviewPageSize, out _))
+                int packagePreviewStart;
+                int packagePreviewEnd;
+                SimpleToolsPanelUtility.GetPageRange(
+                    rows,
+                    ref packagePreviewPageIndex,
+                    PackagePreviewPageSize,
+                    out _,
+                    out packagePreviewStart,
+                    out packagePreviewEnd);
+                for (int i = packagePreviewStart; i < packagePreviewEnd; i++)
                 {
+                    string path = rows[i];
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         EditorGUILayout.LabelField(path, EditorStyles.miniLabel);
@@ -206,7 +216,7 @@ namespace ES
         private bool ResolveCurrentPackageConfig(out List<string> selectedAssets, out string outputPath, out string packageName, out bool includeDependencies, out string configName)
         {
             selectedAssets = null;
-            outputPath = "Assets/../ESOutput/UnityPackage";
+            outputPath = ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath;
             packageName = "ESPackage";
             includeDependencies = true;
             configName = "默认配置";
@@ -218,7 +228,7 @@ namespace ES
                     return false;
 
                 selectedAssets = globalConfig.PackageCollectPath;
-                outputPath = globalConfig.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage";
+                outputPath = globalConfig.PackageSelfPathForMain ?? ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath;
                 packageName = globalConfig.PackageName ?? "ESPackage0.35_";
                 includeDependencies = globalConfig.IncludeDependencies_;
                 configName = "默认配置";
@@ -308,7 +318,7 @@ namespace ES
             return true;
         }
 
-        [HorizontalGroup("ConfigButtons", 0.5f), Button("新建配置", ButtonHeight = 25), GUIColor("@ESDesignUtility.ColorSelector.Color_04")]
+        [HorizontalGroup("ConfigButtons", 0.5f), Button("新建配置", ButtonHeight = 25)]
         public void CreateNewConfig()
         {
             var globalConfigs = GlobalPackageConfigs;
@@ -316,7 +326,7 @@ namespace ES
             var newConfig = new ESGlobalEditorDefaultConfi.UnityPackageConfig
             {
                 ConfigName = $"配置 {globalConfigs.Count + 1}",
-                OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage",
+                OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath,
                 PackageName = $"ESPackage_Ext_{globalConfigs.Count + 1}_",
                 CollectPaths = new List<string>(ESGlobalEditorDefaultConfi.Instance?.PackageCollectPath ?? new List<string>() { "Assets/Plugins/ES" }),
                 ExcludeFolders = new List<string>(),
@@ -345,7 +355,7 @@ namespace ES
 #endif
         }
 
-        [HorizontalGroup("ConfigButtons"), Button("保存配置", ButtonHeight = 25), GUIColor("@ESDesignUtility.ColorSelector.Color_05")]
+        [HorizontalGroup("ConfigButtons"), Button("保存配置", ButtonHeight = 25)]
         public void SaveCurrentConfig()
         {
             var globalConfigs = GlobalPackageConfigs;
@@ -361,7 +371,7 @@ namespace ES
             }
         }
 
-        [HorizontalGroup("ConfigButtons"), Button("删除配置", ButtonHeight = 25), GUIColor("@ESDesignUtility.ColorSelector.Color_06")]
+        [HorizontalGroup("ConfigButtons"), Button("删除配置", ButtonHeight = 25)]
         public void DeleteCurrentConfig()
         {
             var globalConfigs = GlobalPackageConfigs;
@@ -393,7 +403,7 @@ namespace ES
             }
         }
 
-        [HorizontalGroup("ConfigButtons"), Button("重命名", ButtonHeight = 25), GUIColor("@ESDesignUtility.ColorSelector.Color_05")]
+        [HorizontalGroup("ConfigButtons"), Button("重命名", ButtonHeight = 25)]
         public void RenameCurrentConfig()
         {
             var globalConfigs = GlobalPackageConfigs;
@@ -514,7 +524,7 @@ namespace ES
                 if (currentConfigIndex == -1)
                 {
                     // 使用默认配置
-                    return ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage";
+                    return ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath;
                 }
                 else
                 {
@@ -522,7 +532,7 @@ namespace ES
                     var globalConfigs = GlobalPackageConfigs;
                     if (currentConfigIndex >= 0 && currentConfigIndex < globalConfigs.Count)
                         return globalConfigs[currentConfigIndex].OutputPath;
-                    return "Assets/../ESOutput/UnityPackage";
+                    return ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath;
                 }
             }
             set
@@ -692,7 +702,7 @@ namespace ES
                 var defaultConfig = new ESGlobalEditorDefaultConfi.UnityPackageConfig
                 {
                     ConfigName = "默认配置",
-                    OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? "Assets/../ESOutput/UnityPackage",
+                    OutputPath = ESGlobalEditorDefaultConfi.Instance?.PackageSelfPathForMain ?? ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath,
                     PackageName = ESGlobalEditorDefaultConfi.Instance?.PackageName ?? "ESPackage0.35_",
                     CollectPaths = new List<string>(ESGlobalEditorDefaultConfi.Instance?.PackageCollectPath ?? new List<string>() { "Assets/Plugins/ES" }),
                     ExcludeFolders = new List<string>(),
@@ -806,7 +816,7 @@ namespace ES
                 }
 
                 // 初始化时,使用 ESGlobalEditorDefaultConfi 里的默认路径和包名（仅当用户未修改时）
-                if (string.IsNullOrWhiteSpace(currentConfig.OutputPath) || currentConfig.OutputPath == "Assets/../ESOutput/UnityPackage")
+                if (string.IsNullOrWhiteSpace(currentConfig.OutputPath) || currentConfig.OutputPath == ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath)
                 {
                     try
                     {
@@ -1041,7 +1051,7 @@ namespace ES
             var outputDir = config.PackageOutputPathForPublish;
             if (string.IsNullOrEmpty(outputDir))
             {
-                outputDir = "Assets/../ESOutput/UnityPackage";
+                outputDir = ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath;
             }
 
             // 生成包名（使用全局配置的固定包名加时间戳）。

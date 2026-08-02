@@ -32,6 +32,14 @@ namespace ES
         public bool autoCreateGameObjectPoolModule = true;
 
         [TabGroup("配置")]
+        [LabelText("自动创建音频模块")]
+        public bool autoCreateAudioModule = true;
+
+        [TabGroup("配置")]
+        [LabelText("自动创建相机模块")]
+        public bool autoCreateCameraModule = true;
+
+        [TabGroup("配置")]
         [LabelText("自动创建物理查询模块")]
         public bool autoCreatePhysicsQueryModule = true;
 
@@ -82,6 +90,12 @@ namespace ES
             if (autoCreateGameObjectPoolModule)
                 GetMoudle<ESGameObjectPoolModule>();
 
+            if (autoCreateAudioModule)
+                GetMoudle<ESAudioModule>();
+
+            if (autoCreateCameraModule)
+                GetMoudle<ESCameraModule>();
+
             if (autoCreatePhysicsQueryModule)
                 GetMoudle<ESPhysicsQueryModule>();
 
@@ -99,6 +113,23 @@ namespace ES
                 Instance = null;
                 ClearStaticReferences();
             }
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            Audio?.HandleApplicationFocus(hasFocus);
+        }
+
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            Audio?.HandleApplicationFocus(!pauseStatus);
+        }
+
+        // 所有普通相机请求都只标记脏状态；这里是本项目唯一的正常提交点。
+        // DefaultExecutionOrder(-9) 使结果在 CinemachineBrain 的 LateUpdate 前写入。
+        private void LateUpdate()
+        {
+            Camera?.LateTick();
         }
     }
 }

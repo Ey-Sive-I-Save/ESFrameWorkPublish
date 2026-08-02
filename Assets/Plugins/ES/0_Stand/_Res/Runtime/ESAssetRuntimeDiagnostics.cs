@@ -13,6 +13,7 @@ namespace ES
         public readonly int PendingScopeCount;
         public readonly int LoadedAssetCount;
         public readonly int PendingAssetCount;
+        public readonly int PooledScopeStateCount;
         public readonly bool HasResidentScope;
 
         public ESAssetRuntimeDiagnostics(
@@ -24,6 +25,7 @@ namespace ES
             int pendingScopeCount,
             int loadedAssetCount,
             int pendingAssetCount,
+            int pooledScopeStateCount,
             bool hasResidentScope)
         {
             IsReady = isReady;
@@ -34,6 +36,7 @@ namespace ES
             PendingScopeCount = pendingScopeCount;
             LoadedAssetCount = loadedAssetCount;
             PendingAssetCount = pendingAssetCount;
+            PooledScopeStateCount = pooledScopeStateCount;
             HasResidentScope = hasResidentScope;
         }
     }
@@ -74,6 +77,7 @@ namespace ES
                 pendingScopes,
                 loadedAssets,
                 pendingAssets,
+                ESAssetScope.PooledStateCount,
                 residentScope != null && !residentScope.IsDisposed);
         }
     }

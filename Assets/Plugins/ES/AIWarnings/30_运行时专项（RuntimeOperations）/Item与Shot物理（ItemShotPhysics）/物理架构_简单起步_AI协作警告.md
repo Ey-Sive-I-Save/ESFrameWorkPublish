@@ -14,8 +14,11 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESPhysicsQuery
 
 ```text
 ESGameManager.PhysicsQueryModule
-ESGameManager.GetModuleFast<ESPhysicsQueryModule>()
+ESGameManager.TryGetModule<ESPhysicsQueryModule>(out var physicsModule)
+ESGameManager.GetOrCreateModule<ESPhysicsQueryModule>() // 仅初始化期
 ```
+
+`TryGetModule<T>()` 只查询，不创建；`GetOrCreateModule<T>()` 只用于明确初始化。旧 `GetModuleFast<T>()` 已废止。
 
 GameManager 默认自动创建：
 

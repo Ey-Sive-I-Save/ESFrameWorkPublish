@@ -38,7 +38,7 @@ namespace ES
     /// 
     /// 设计原则：
     /// 1. 不创建临时 Loader，使用传入的 Loader 或全局 Loader  
-    /// 2. 不管理引用计数，交由 ESResSource 管理
+    /// 2. 不直接管理底层引用计数，交由 Scope / Lease / Provider 链路管理
     /// 3. 作为辅助工具提供便捷的编辑器体验和加载接口
     /// </summary>
     [Serializable]
@@ -77,7 +77,6 @@ namespace ES
         public bool HasResolvedAssetTableKey => _assetKind != ESAssetReferKind.None && (_resolvedEnumKey != 0 || !string.IsNullOrEmpty(_resolvedStringKey));
         public abstract Type AssetBaseType { get; }
         public bool IsValid => !string.IsNullOrEmpty(_guid) && _localFileId >= 0;
-        public abstract void Release();
         public abstract bool SupportsGameCorePreload { get; }
         public abstract UniTask PreloadAsync(CancellationToken cancellationToken = default);
 
@@ -167,7 +166,6 @@ namespace ES
     [Serializable]
     public abstract class ESAssetRefer<T> : ESAssetReferBase where T : UnityEngine.Object
     {
-        [NonSerialized] private IDisposable runtimeHandle;
         #region 编辑器支持
         
 #if UNITY_EDITOR
@@ -287,6 +285,7 @@ namespace ES
                 case ESAssetReferKind.VideoClip:
                 case ESAssetReferKind.TerrainData:
                 case ESAssetReferKind.ScriptableObject:
+                case ESAssetReferKind.Raw:
                     return true;
                 default:
                     return false;
@@ -384,6 +383,7 @@ namespace ES
             if (type == typeof(UnityEngine.Video.VideoClip)) return ESAssetReferKind.VideoClip;
             if (type == typeof(TerrainData)) return ESAssetReferKind.TerrainData;
             if (type == typeof(ScriptableObject)) return ESAssetReferKind.ScriptableObject;
+            if (type == typeof(TextAsset)) return ESAssetReferKind.Raw;
             return ESAssetReferKind.None;
         }
 
@@ -616,15 +616,39 @@ namespace ES
         public UniTask<T> LoadAsync(Component owner, CancellationToken cancellationToken = default)
             => ESAssets.LoadAsync(this, owner, cancellationToken);
 
+        /// <summary>
+        /// 临时任务入口：把本次逻辑持有交给全局高速临时域。
+        /// 完成使用后必须由同一个 scope 调用 Release(this) 归还一次。
+        /// </summary>
+        public UniTask<T> LoadAsync(ESAssetTemporaryScope scope, CancellationToken cancellationToken = default)
+            => scope == null
+                ? UniTask.FromException<T>(new ArgumentNullException(nameof(scope)))
+                : scope.LoadAsync(this, cancellationToken);
+
+        /// <summary>临时任务的严格独立租期入口；重复 Dispose 不会影响其他调用者。</summary>
+        public UniTask<ESAssetTemporaryLease<T>> LoadAsyncLease(ESAssetTemporaryScope scope, CancellationToken cancellationToken = default)
+            => scope == null
+                ? UniTask.FromException<ESAssetTemporaryLease<T>>(new ArgumentNullException(nameof(scope)))
+                : scope.LoadAsyncLease(this, cancellationToken);
+
+        /// <summary>
+        /// 临时任务的便捷入口，自动使用全局高速 TemporaryScope。
+        /// 返回的 Lease 会捕获本次实际 Scope，Provider 切换后仍能安全地完成旧租期释放。
+        /// </summary>
+        public UniTask<ESAssetTemporaryLease<T>> LoadAsyncLease(CancellationToken cancellationToken = default)
+            => ESAssets.TemporaryScope.LoadAsyncLease(this, cancellationToken);
+
         public override async UniTask PreloadAsync(CancellationToken cancellationToken = default)
         {
             await LoadAsync(cancellationToken);
         }
 
         /// <summary>
-        /// 新链同步入口：只返回已就绪缓存，绝不阻塞加载 AssetBundle 或网络请求。
-        /// AssetTable 与 Provider 缓存均为 O(1) 查找；预热后的正常命中/未命中路径不产生托管分配。
+        /// 无所有权同步观察入口：只返回 Provider 当前已就绪的缓存，绝不建立 Owner、Scope 或 Lease。
+        /// 返回值只允许用于即时诊断或同一调用栈内的短暂只读观察，不得保存到字段、组件或长期运行状态。
+        /// 需要持久使用时必须改用带 Owner 的同步重载或对应的 LoadAsync Owner 入口。
         /// </summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public bool TryLoad(out T asset)
         {
             IESAssetRuntimeProvider provider = ESAssets.RuntimeBackend;
@@ -636,40 +660,15 @@ namespace ES
         }
 
         /// <summary>
-        /// 常规业务入口：已解析业务键时优先通过类型化 AssetTable O(1) 获取；
-        /// 未收集或表未就绪时，使用完整 GUID 身份回退到 Provider。
+        /// Owner 同步热路径：仅当该 Owner 的现有 Scope 已持有本资产时返回成功。
+        /// 未命中不会创建 Scope 或发起加载；调用方应回退到 <see cref="LoadAsync(Component, CancellationToken)"/>。
         /// </summary>
-        internal UniTask<T> LoadAsync(IESAssetRuntimeProvider provider, CancellationToken cancellationToken = default)
-        {
-            if (runtimeHandle != null && TryLoad(out T ready))
-                return UniTask.FromResult(ready);
-            return LoadAndRetainAsync(provider, cancellationToken);
-        }
-
-        private async UniTask<T> LoadAndRetainAsync(IESAssetRuntimeProvider provider, CancellationToken cancellationToken)
-        {
-            Release();
-            ESRuntimeAssetHandle<T> handle = await LoadWithProviderAsync(provider, cancellationToken);
-            runtimeHandle = handle;
-            return handle.Asset;
-        }
+        public bool TryLoad(Component owner, out T asset)
+            => ESAssets.TryGetOwned(this, owner, out asset);
 
         /// <summary>默认无显式持有入口：全局驻留至显式资源安全点，调用者不需要 Owner、Scope 或 Release。</summary>
         public UniTask<T> LoadAsync(CancellationToken cancellationToken = default)
             => ESAssets.LoadAsync(this, cancellationToken);
-
-        public override void Release()
-        {
-            runtimeHandle?.Dispose();
-            runtimeHandle = null;
-        }
-
-        internal bool TryGetReady(IESAssetRuntimeProvider provider, out T asset)
-        {
-            if (provider != null && IsValid) return provider.TryGetLoaded(AssetIdentity, out asset);
-            asset = null;
-            return false;
-        }
 
         #endregion
 
@@ -774,11 +773,11 @@ namespace ES
     public class ESAssetReferSprite : ESAssetRefer<Sprite>
     {
         /// <summary>
-        /// 已就绪热路径：O(1) 查询，不创建闭包、Task、Loader 或临时集合。
+        /// Owner 已持有热路径：O(1) 查询，不创建 Scope、闭包、Task、Loader 或临时集合。
         /// </summary>
-        public bool TryApplyToImage(UnityEngine.UI.Image image)
+        public bool TryApplyToImage(UnityEngine.UI.Image image, Component owner)
         {
-            if (image == null || !TryLoad(out Sprite sprite)) return false;
+            if (image == null || owner == null || !TryLoad(owner, out Sprite sprite)) return false;
             image.sprite = sprite;
             return true;
         }
@@ -893,6 +892,12 @@ namespace ES
     /// </summary>
     [Serializable]
     public class ESAssetReferTerrainData : ESAssetRefer<TerrainData>
+    {
+    }
+
+    /// <summary>Unity 已导入的 Raw/TextAsset 二进制资源引用。</summary>
+    [Serializable]
+    public class ESAssetReferRaw : ESAssetRefer<TextAsset>
     {
     }
 
@@ -1036,9 +1041,6 @@ namespace ES
                 return UniTask.FromException<ESRuntimeSceneHandle>(new InvalidOperationException("ESAssetReferScene 尚未接入 ESRuntimeDataAssetLoadingService。"));
             return LoadWithProviderAsync(provider, mode, cancellationToken);
         }
-
-        // Scene 的卸载由调用方持有的 ESRuntimeSceneHandle 决定；此处保持统一 Refer 查询接口。
-        public override void Release() { }
 
         public override UniTask PreloadAsync(CancellationToken cancellationToken = default)
             => UniTask.CompletedTask;

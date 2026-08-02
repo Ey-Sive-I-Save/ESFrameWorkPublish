@@ -767,6 +767,7 @@ GameObject:
   - component: {fileID: 2143379613}
   - component: {fileID: 2143379615}
   - component: {fileID: 2143379614}
+  - component: {fileID: 2143379616}
   m_Layer: 0
   m_Name: GameObject
   m_TagString: Untagged
@@ -802,11 +803,93 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   effect:
-    rid: 23629202899075092
+    rid: 23629216363577365
+  nestedEffect:
+    rid: -2
+  effects:
+  - rid: 23629216363577344
+  - rid: 23629216363577345
+  - rid: 23629216363577346
+  unregisteredEffect:
+    rid: 23629216363577360
   references:
     version: 2
     RefIds:
-    - rid: 23629202899075092
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 23629216363577344
+      type: {class: ESPolymorphicReferenceCase/DamageEffect, ns: ES, asm: ES_Stand}
+      data:
+        amount: 10
+        ignoreArmor: 0
+    - rid: 23629216363577345
+      type: {class: ESPolymorphicReferenceCase/PlayAudioEffect, ns: ES, asm: ES_Stand}
+      data:
+        clip: {fileID: 0}
+        volume: 1
+    - rid: 23629216363577346
+      type: {class: ESPolymorphicReferenceCase/CompositeEffect, ns: ES, asm: ES_Stand}
+      data:
+        primary:
+          rid: 23629216363577361
+        alternatives:
+        - rid: 23629216363577348
+        - rid: 23629216363577349
+    - rid: 23629216363577348
+      type: {class: ESPolymorphicReferenceCase/DamageEffect, ns: ES, asm: ES_Stand}
+      data:
+        amount: 10
+        ignoreArmor: 0
+    - rid: 23629216363577349
+      type: {class: ESPolymorphicReferenceCase/PlayAudioEffect, ns: ES, asm: ES_Stand}
+      data:
+        clip: {fileID: 0}
+        volume: 1
+    - rid: 23629216363577360
+      type: {class: ESPolymorphicReferenceCase/PlayAudioEffect, ns: ES, asm: ES_Stand}
+      data:
+        clip: {fileID: 0}
+        volume: 1
+    - rid: 23629216363577361
+      type: {class: ESPolymorphicReferenceCase/CompositeEffect, ns: ES, asm: ES_Stand}
+      data:
+        primary:
+          rid: 23629216363577362
+        alternatives:
+        - rid: 23629216363577363
+        - rid: 23629216363577364
+    - rid: 23629216363577362
+      type: {class: ESPolymorphicReferenceCase/HealEffect, ns: ES, asm: ES_Stand}
+      data:
+        amount: 5
+    - rid: 23629216363577363
+      type: {class: ESPolymorphicReferenceCase/DamageEffect, ns: ES, asm: ES_Stand}
+      data:
+        amount: 10
+        ignoreArmor: 0
+    - rid: 23629216363577364
+      type: {class: ESPolymorphicReferenceCase/PlayAudioEffect, ns: ES, asm: ES_Stand}
+      data:
+        clip: {fileID: 0}
+        volume: 1
+    - rid: 23629216363577365
+      type: {class: ESPolymorphicReferenceCase/CompositeEffect, ns: ES, asm: ES_Stand}
+      data:
+        primary:
+          rid: 23629216363577366
+        alternatives:
+        - rid: 23629216363577367
+        - rid: 23629216363577368
+    - rid: 23629216363577366
+      type: {class: ESPolymorphicReferenceCase/HealEffect, ns: ES, asm: ES_Stand}
+      data:
+        amount: 5
+    - rid: 23629216363577367
+      type: {class: ESPolymorphicReferenceCase/DamageEffect, ns: ES, asm: ES_Stand}
+      data:
+        amount: 10
+        ignoreArmor: 0
+    - rid: 23629216363577368
       type: {class: ESPolymorphicReferenceCase/PlayAudioEffect, ns: ES, asm: ES_Stand}
       data:
         clip: {fileID: 0}
@@ -826,6 +909,8 @@ MonoBehaviour:
   ungroupedNote: "\u6B64\u5B57\u6BB5\u6CA1\u6709 ESEditorSection\uFF0C\u5E94\u59CB\u7EC8\u4FDD\u6301\u4E3A\u76EE\u5F55\u5916\u7684\u72EC\u7ACB\u5185\u5BB9\u3002"
   characterId: warrior_001
   animator: {fileID: 0}
+  useDefaultSpawnProfile: 1
+  ungroupedAfterCore: "\u6838\u5FC3\u914D\u7F6E\u5DF2\u7ED3\u675F\uFF1B\u6211\u4E0D\u5C5E\u4E8E\u4EFB\u4F55\u914D\u7F6E\u76EE\u5F55\u3002"
   capsuleRadius: 0.35
   capsuleHeight: 1.8
   moveSpeed: 4.5
@@ -843,6 +928,23 @@ MonoBehaviour:
   turnSpeed: 540
   useIndependentGroup: 0
   independentValue: 0.5
+--- !u!114 &2143379616
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2143379612}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c6325042bd9c417eb1f1344c5e5d83f3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  outsideNote: "\u8FD9\u4E2A\u5B57\u6BB5\u6CA1\u6709 ESEditorSection\uFF0C\u5E94\u59CB\u7EC8\u4FDD\u6301\u5728\u4E24\u4E2A\u76EE\u5F55\u4E4B\u5916\u3002"
+  configurationName: "\u89D2\u8272\u914D\u7F6E"
+  displayColor: {r: 1, g: 1, b: 1, a: 1}
+  enableExecution: 1
+  independentFoldout: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

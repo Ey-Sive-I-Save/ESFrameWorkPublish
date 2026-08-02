@@ -6,6 +6,7 @@
         "ES_Editor",
         "ES_Stand",
         "ES_Design",
+        "Cinemachine",
         "KCC",
         "Unity.InputSystem",
         "Unity.TextMeshPro"

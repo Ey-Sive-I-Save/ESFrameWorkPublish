@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace ES.Tests
 {
@@ -18,6 +22,40 @@ namespace ES.Tests
                 activeGeneration = 0;
                 releaseCount++;
                 return true;
+            }
+
+            public bool IsEffectActive(int effectSlot, int generation)
+            {
+                return effectSlot == 4 && generation == activeGeneration;
+            }
+
+            public bool TryAddEffectFloat(
+                int effectSlot,
+                int generation,
+                ESFloatValueChangeSet set,
+                ESFloatValueChangeOp op,
+                float value,
+                int sourceId,
+                int priority,
+                bool enabled,
+                out ESValueChangeToken token)
+            {
+                token = ESValueChangeToken.Invalid;
+                return false;
+            }
+
+            public bool TryAddEffectPermit(
+                int effectSlot,
+                int generation,
+                ESPermitSet set,
+                ESPermitLaw law,
+                int sourceId,
+                int priority,
+                bool enabled,
+                out ESValueChangeToken token)
+            {
+                token = ESValueChangeToken.Invalid;
+                return false;
             }
         }
 
@@ -358,6 +396,101 @@ namespace ES.Tests
 
             Assert.That(set.Revision, Is.EqualTo(afterAdd + 1));
             Assert.That(notificationCount, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void FloatSet_DebugSnapshot_ExplainsEveryCalculationStageAndWinningOverride()
+        {
+            ESFloatValueChangeSet set = new ESFloatValueChangeSet(10f);
+            set.SetBounds(0f, 50f);
+            set.Add(ESFloatValueChangeOp.Add, 2f, ownerId: 11, sourceId: 21);
+            set.Add(ESFloatValueChangeOp.AddPercent, 0.5f, ownerId: 12, sourceId: 22);
+            set.Add(ESFloatValueChangeOp.Multiply, 2f, ownerId: 13, sourceId: 23);
+            set.Add(ESFloatValueChangeOp.Override, 10f, priority: 1);
+            ESValueChangeToken winningOverride = set.Add(ESFloatValueChangeOp.Override, 20f, priority: 2);
+            set.Add(ESFloatValueChangeOp.Min, 70f);
+            set.Add(ESFloatValueChangeOp.Max, 80f);
+
+            ESFloatStatSnapshot snapshot = set.GetDebugSnapshot();
+
+            Assert.That(snapshot.changeCount, Is.EqualTo(7));
+            Assert.That(snapshot.enabledChangeCount, Is.EqualTo(7));
+            Assert.That(snapshot.hasOverride, Is.True);
+            Assert.That(snapshot.overrideToken, Is.EqualTo(winningOverride));
+            Assert.That(snapshot.additiveValue, Is.EqualTo(2f));
+            Assert.That(snapshot.addedPercent, Is.EqualTo(0.5f));
+            Assert.That(snapshot.multiplyValue, Is.EqualTo(2f));
+            Assert.That(snapshot.valueAfterOverride, Is.EqualTo(20f));
+            Assert.That(snapshot.valueAfterAdd, Is.EqualTo(22f));
+            Assert.That(snapshot.valueAfterPercent, Is.EqualTo(33f));
+            Assert.That(snapshot.valueAfterMultiply, Is.EqualTo(66f));
+            Assert.That(snapshot.valueAfterModifierBounds, Is.EqualTo(70f));
+            Assert.That(snapshot.value, Is.EqualTo(50f));
+
+            List<ESFloatStatModifierSnapshot> modifiers = new List<ESFloatStatModifierSnapshot>();
+            set.CopyDebugModifiersTo(modifiers);
+            Assert.That(modifiers.Count, Is.EqualTo(7));
+
+            bool foundWinner = false;
+            for (int i = 0; i < modifiers.Count; i++)
+            {
+                ESFloatStatModifierSnapshot modifier = modifiers[i];
+                if (modifier.token.Equals(winningOverride))
+                {
+                    foundWinner = true;
+                    Assert.That(modifier.isWinningOverride, Is.True);
+                    Assert.That(modifier.priority, Is.EqualTo(2));
+                }
+            }
+
+            Assert.That(foundWinner, Is.True);
+        }
+
+        [Test]
+        public void FloatSet_Changed_ContinuesAfterListenerFailureWithoutLosingState()
+        {
+            ESFloatValueChangeSet set = new ESFloatValueChangeSet();
+            int successfulListenerCount = 0;
+            set.Changed += _ => throw new InvalidOperationException("Float stat observer failure.");
+            set.Changed += _ => successfulListenerCount++;
+
+            LogAssert.Expect(LogType.Exception, new Regex("Float stat observer failure"));
+            set.Add(ESFloatValueChangeOp.Add, 3f);
+
+            Assert.That(set.Value, Is.EqualTo(3f));
+            Assert.That(set.Revision, Is.EqualTo(1));
+            Assert.That(successfulListenerCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void FloatSet_Changed_SubscriptionChangesApplyOnTheNextNotification()
+        {
+            ESFloatValueChangeSet set = new ESFloatValueChangeSet();
+            int firstCount = 0;
+            int secondCount = 0;
+            int thirdCount = 0;
+            Action<ESFloatValueChangeSet> second = _ => secondCount++;
+            Action<ESFloatValueChangeSet> third = _ => thirdCount++;
+            Action<ESFloatValueChangeSet> first = _ =>
+            {
+                firstCount++;
+                set.Changed -= second;
+                set.Changed += third;
+            };
+
+            set.Changed += first;
+            set.Changed += second;
+            set.Add(ESFloatValueChangeOp.Add, 1f);
+
+            Assert.That(firstCount, Is.EqualTo(1));
+            Assert.That(secondCount, Is.EqualTo(1));
+            Assert.That(thirdCount, Is.Zero);
+
+            set.Add(ESFloatValueChangeOp.Add, 1f);
+
+            Assert.That(firstCount, Is.EqualTo(2));
+            Assert.That(secondCount, Is.EqualTo(1));
+            Assert.That(thirdCount, Is.EqualTo(1));
         }
 
         [Test]

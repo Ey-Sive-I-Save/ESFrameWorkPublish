@@ -352,6 +352,7 @@ namespace ES
                 case ESAssetReferKind.TimelineAsset: return typeof(ESAssetReferTimelineAssetEnumKey);
                 case ESAssetReferKind.PlayableAsset: return typeof(ESAssetReferPlayableAssetEnumKey);
                 case ESAssetReferKind.TerrainData: return typeof(ESAssetReferTerrainDataEnumKey);
+                case ESAssetReferKind.Raw: return typeof(ESAssetReferRawEnumKey);
                 default: return null;
             }
         }

@@ -21,8 +21,13 @@
 - [ESTAG_FULL_LIFECYCLE_STANDARD.md](ESTAG_FULL_LIFECYCLE_STANDARD.md)：ESTag 当前全流程标准；其中明确标出的 Unity Bake/Test Runner 项仍待验收。
 - [ES_GENERIC_LIFE.md](ES_GENERIC_LIFE.md)：根对象生命周期组织器及其 Pool 分部；Unity Test Runner 仍待验收。
 - [ES_BUFF_RUNTIME_STANDARD.md](ES_BUFF_RUNTIME_STANDARD.md)：Buff 对 GameCore、Tag、ValueChange、Op、Link 与 Pool 的统一边界；Unity Test Runner 与联机/存档验收仍待完成。
+- [ES_STAT_RUNTIME_STANDARD.md](ES_STAT_RUNTIME_STANDARD.md)：Float/Permit Stat 的定义、聚合、Lease、Hot/Sparse 读取、调试快照与性能边界；Unity Test Runner、Player/IL2CPP 与 Profiler 待验收。
 - [CHARACTER_PREFAB_CONTRACT.md](CHARACTER_PREFAB_CONTRACT.md)：角色 Prefab 身份、组件边界和验收规则。
 - [VEHICLE_RUNTIME_CONTRACT.md](VEHICLE_RUNTIME_CONTRACT.md)：载具后端、运动调度与骑乘输入转交边界；全项目 Unity 编译与 PlayMode 仍待验收。
+- [ES_CAMERA_RUNTIME_STANDARD.md](ES_CAMERA_RUNTIME_STANDARD.md)：CameraDirector、View/Lease、内容 Catalog、CM2 唯一执行边界与当前验收状态。
+- [ES_SCENE_VALIDATION_GUIDE_STANDARD.md](ES_SCENE_VALIDATION_GUIDE_STANDARD.md)：测试场景导视、诊断、路线与输入说明的复用边界；Unity / PlayMode / Profiler 验收待完成。
+- [SKILL_OPERATION_LIFECYCLE.md](SKILL_OPERATION_LIFECYCLE.md)：Skill Operation 默认无 Stop、按需清理及运行时所有权规则。
+- [ES_EDITOR_TOOL_WORKBENCH_STANDARD.md](ES_EDITOR_TOOL_WORKBENCH_STANDARD.md)：SimpleTools 的目录分组、页面状态、配置目录、按钮层级、安全与迁移验收规范；每个工具迁移仍须补 Unity 视觉和真实操作验证。
 
 修改这些主题时，必须同时检查 `Assets/Plugins/ES/AIWarnings` 的对应 P0 规则。
 
@@ -40,6 +45,7 @@
 - [FuturePlans/README.md](FuturePlans/README.md)：未来方案的状态定义和使用边界。
 - [FuturePlans/ASSET_RUNTIME_GENERATION.md](FuturePlans/ASSET_RUNTIME_GENERATION.md)：`Reserved`。
 - [FuturePlans/ESFRAMEWORK_RESPONSIBILITY_CONSOLIDATION.md](FuturePlans/ESFRAMEWORK_RESPONSIBILITY_CONSOLIDATION.md)：`Reserved`。
+- [FuturePlans/ES_ITEM_DOMAIN_DESIGN.md](FuturePlans/ES_ITEM_DOMAIN_DESIGN.md)：`Proposed`；物品实例、Container、装备、拾取、存档与 ES 聚合方案，尚未实施。
 
 ## 历史归档
 

@@ -24,16 +24,19 @@ namespace ES
         public float mountDistance = 2f;
 
         [LabelText("检测层")]
-        public LayerMask mountLayerMask = ~0;
+        public LayerMask mountLayerMask = ESPhysicsLayers.MountProbeMask;
 
         [LabelText("触发器命中")]
-        public QueryTriggerInteraction mountQuery = QueryTriggerInteraction.Ignore;
+        public QueryTriggerInteraction mountQuery = QueryTriggerInteraction.Collide;
 
         [Title("骑乘目标")]
         [ReadOnly] public EntityMountable currentMount;
 
         [LabelText("骑乘状态名")]
         public string Mount_StateName = "骑乘";
+
+        /// <summary>骑乘状态机生命周期与座位占用均有效时为 true。</summary>
+        public bool IsMounted => _lifecycle.IsActive && mountHold && currentMount != null && currentMount.rider == MyCore;
 
         private StateBase _mountState;
         private StateMachine sm;
@@ -83,6 +86,12 @@ namespace ES
             else                         TryEnterMount();
         }
 
+        /// <summary>角色输入源失效时撤销当前座位的驾驶意图，不能让最后一帧方向继续驱动车辆。</summary>
+        public void ClearDriverInput()
+        {
+            currentMount?.ClearDriverInput(MyCore);
+        }
+
         // ================================================================
         // 骑乘生命周期核心（严格与状态同步，幂等由 StateLifecycleTracker 保证）
         // ================================================================
@@ -90,8 +99,14 @@ namespace ES
         private void TryEnterMount()
         {
             if (_lifecycle.IsActive) return;
+            if (!ValidateMountedStateContract(out string contractError))
+            {
+                Debug.LogError("[Mount] 骑乘状态契约不成立，已拒绝进入：" + contractError, MyCore);
+                return;
+            }
+
             var mountable = FindMountable();
-            if (mountable == null || !mountable.IsReady) return;
+            if (mountable == null || !mountable.CanMount(MyCore)) return;
 
             // 将激活结果直接传入，无闭包分配
             if (_lifecycle.TryEnter(sm.TryActivateState(_mountState)))
@@ -111,10 +126,21 @@ namespace ES
             currentMount = _pendingMountable;
             mountHold    = true;
 
+            // Do not let a buffered pre-mount jump or movement survive the transition.
+            // The input dispatcher writes the driver's intent again later in this frame.
+            MyCore?.ResetKCCInputs();
+
             // skipImmediateSync=true：不立即传送，让 MatchTarget 做渐近动画对齐；
             // 若 MatchTarget 未配置/失败，ApplyMountMatchTarget 内部 fallback 会直接 StartMatchTarget，
             // 同样需要先不传送，否则起点==终点，位移为零。
-            currentMount.Mount(MyCore, skipImmediateSync: true);
+            if (!currentMount.Mount(MyCore, skipImmediateSync: true))
+            {
+                currentMount = null;
+                mountHold = false;
+                _lifecycle.RequestExit();
+                return;
+            }
+            currentMount.OnUnmounted += HandleMountableUnmounted;
             if (debugMount)
                 Debug.Log($"[Mount] OnMountEnter 执行 | currentMount={currentMount.name} | matchPoint={(currentMount.matchPoint != null ? currentMount.matchPoint.name : "null")}");
 
@@ -125,6 +151,101 @@ namespace ES
             //   请在 Mount 状态的 Inspector basicConfig → stateSupportFlag 里配置 Mounted，让框架自动管理。
 
             ApplyMountMatchTarget(currentMount);
+        }
+
+        /// <summary>
+        /// 骑乘状态必须由状态机自身切换到 Mounted 环境。该契约保证入场时会清理不兼容动作，
+        /// 而不是由骑乘模块枚举并强停战斗、瞄准或技能模块。
+        /// </summary>
+        public bool ValidateMountedStateContract(out string error)
+        {
+            StateBase state = _mountState;
+            if (state == null)
+            {
+                error = "未找到骑乘状态 '" + Mount_StateName + "'。";
+                return false;
+            }
+
+            StateBasicConfig config = state.stateSharedData != null ? state.stateSharedData.basicConfig : null;
+            return ValidateMountedStateConfig(config, out error);
+        }
+
+        /// <summary>编辑器和构建门禁使用的公开配置契约，不依赖运行时私有缓存。</summary>
+        public static bool ValidateMountedStateConfig(StateBasicConfig config, out string error)
+        {
+            if (config == null)
+            {
+                error = "骑乘状态缺少 StateBasicConfig。";
+                return false;
+            }
+
+            if (config.stateSupportFlag != StateSupportFlags.Mounted)
+            {
+                error = "stateSupportFlag 必须精确设为 Mounted。";
+                return false;
+            }
+
+            if (!config.resetSupportFlagOnEnter)
+            {
+                error = "resetSupportFlagOnEnter 必须开启，否则不会切换到 Mounted 环境。";
+                return false;
+            }
+
+            if (!config.deactivateOnSupportFlagSwitching)
+            {
+                error = "deactivateOnSupportFlagSwitching 必须开启，否则已运行的不兼容动作不会在骑乘入场时退出。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        /// <summary>
+        /// 非 Mounted 状态在骑乘环境中必须不能重新激活，并在环境切换时自动退出。
+        /// 显式包含 Mounted 的状态视为制作方声明可在骑乘中运行。
+        /// </summary>
+        public static bool ValidateMountedActionConfig(StateBasicConfig config, out string error)
+        {
+            if (config == null)
+            {
+                error = "状态缺少 StateBasicConfig。";
+                return false;
+            }
+
+            if ((config.stateSupportFlag & StateSupportFlags.Mounted) != 0)
+            {
+                error = string.Empty;
+                return true;
+            }
+
+            string stateName = string.IsNullOrWhiteSpace(config.stateName) ? "<未命名>" : config.stateName;
+            if (config.stateSupportFlag == StateSupportFlags.None)
+            {
+                error = "状态 '" + stateName + "' 未声明环境，骑乘时无法自动退出；请声明环境或显式包含 Mounted。";
+                return false;
+            }
+
+            if (config.ignoreSupportFlag)
+            {
+                error = "状态 '" + stateName + "' 不支持 Mounted 却忽略入场环境检查，骑乘时仍可被直接重新激活。";
+                return false;
+            }
+
+            if (!config.disableActiveOnSupportFlagSwitching)
+            {
+                error = "状态 '" + stateName + "' 不支持 Mounted 且未开启 disableActiveOnSupportFlagSwitching，骑乘时仍可被直接重新激活。";
+                return false;
+            }
+
+            if (!config.deactivateOnSupportFlagSwitching)
+            {
+                error = "状态 '" + stateName + "' 不支持 Mounted 且未开启 deactivateOnSupportFlagSwitching。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
         }
 
         /// <summary>
@@ -139,11 +260,29 @@ namespace ES
             if (_mountState != null && _mountState.IsMatchTargetActive)
                 _mountState.CancelMatchTarget();
 
-            if (currentMount != null)
+            EntityMountable mountable = currentMount;
+            currentMount = null;
+            if (mountable != null)
             {
-                currentMount.Unmount();
-                currentMount = null;
+                mountable.OnUnmounted -= HandleMountableUnmounted;
+                mountable.Unmount();
             }
+        }
+
+        /// <summary>载具或座位从外部失效时，同步退出骑乘状态，不能等待下一帧输入路由兜底。</summary>
+        private void HandleMountableUnmounted(Entity unmountedRider)
+        {
+            if (unmountedRider != MyCore)
+                return;
+
+            if (_lifecycle.RequestExit())
+            {
+                OnMountExit();
+                return;
+            }
+
+            // 状态已经被外部打断时仍须释放本模块持有的匹配目标和座位引用。
+            OnMountExit();
         }
 
         // ================================================================
@@ -225,14 +364,12 @@ namespace ES
             if (!_lifecycle.IsActive) return;
 
             mountHold = true;
-            if (currentMount == null)
+            if (currentMount == null || currentMount.rider != MyCore)
+            {
+                if (_lifecycle.RequestExit())
+                    OnMountExit();
                 return;
-
-            // 骑手只写驾驶意图；VehicleController 在自己的固定物理/KCC阶段统一提交载具位姿。
-            currentMount.SubmitDriverInput(
-                MyCore,
-                MyCore.kcc.moveInput,
-                MyCore.kcc.lookInput);
+            }
 
             // MatchTarget 激活期间实时修正目标点（载具在移动，matchPoint 每帧都在变）
             // MatchTarget 完成后 IsMatchTargetActive 变 false，由 BeforeCharacterUpdate 无缝接管。

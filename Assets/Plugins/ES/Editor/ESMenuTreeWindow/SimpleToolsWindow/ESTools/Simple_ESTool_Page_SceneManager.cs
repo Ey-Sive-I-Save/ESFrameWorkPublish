@@ -7,6 +7,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using ES.EditorInternal;
 
 namespace ES
 {
@@ -14,6 +15,7 @@ namespace ES
     /// ES集成工具集-顶部工具栏管理器
     /// </summary>
     [Serializable]
+    [ESSimpleToolsLayout]
     public class Page_TopToolbar : ESWindowPageBase
     {
         // 分页设置
@@ -22,11 +24,8 @@ namespace ES
         [HideInInspector] public int selectedTab = 0;
         [HideInInspector] public const int ItemsPerPage = 10;
 
-        [Title("顶部工具栏管理器", "ES场景快捷访问与管理工具", bold: true, titleAlignment: TitleAlignments.Centered)]
-        [InfoBox("管理常用场景和资产快捷入口；配置写入 ESSceneGlobalData，支持 Undo。", InfoMessageType.Info)]
-
-        [FoldoutGroup("功能列表", expanded: false)]
         [DisplayAsString(fontSize: 12), HideLabel]
+        [HideInInspector]
         public string readMe = "功能列表:\n" +
             "● 自定义场景快捷方式\n" +
             "● 场景分组管理\n" +
@@ -41,6 +40,12 @@ namespace ES
 
         private string lastResultSummary = "";
         private string lastResultDetail = "";
+
+        private static readonly ESEditorSectionNavigatorItem[] WorkspaceSections =
+        {
+            new ESEditorSectionNavigatorItem("scene", "场景快捷", "维护场景快捷入口、分组与 Build Settings 同步。"),
+            new ESEditorSectionNavigatorItem("asset", "资产快捷", "维护资产与文件夹快捷入口及分组。")
+        };
 
         [OnInspectorGUI]
         public void DrawThisWindow()
@@ -58,33 +63,9 @@ namespace ES
                 SimpleToolsMaturity.Upgrading,
                 "场景切换可能触发保存确认；快捷数据写入 ESSceneGlobalData。添加、删除、重命名和分组修改会记录 Undo。");
 
-            EditorGUILayout.BeginVertical();
-            selectedTab = EditorGUILayout.Popup("管理内容", selectedTab, new[] { "场景管理", "资产管理" });
-            DrawSummaryAndResult(dataInstance);
+            DrawSummary(dataInstance);
 
-            SimpleToolsPanelUtility.DrawSectionTitle("编辑操作", "用于撤销或重做快捷列表配置变更。");
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("↶ 撤销 (Ctrl+Z)", GUILayout.Width(120), GUILayout.Height(25)))
-            {
-                Undo.PerformUndo();
-                // 刷新窗口显示
-                if (SimpleToolsWindow.UsingWindow != null)
-                {
-                    SimpleToolsWindow.UsingWindow.Repaint();
-                }
-            }
-            if (GUILayout.Button("↷ 重做 (Ctrl+Y)", GUILayout.Width(120), GUILayout.Height(25)))
-            {
-                Undo.PerformRedo();
-                // 刷新窗口显示
-                if (SimpleToolsWindow.UsingWindow != null)
-                {
-                    SimpleToolsWindow.UsingWindow.Repaint();
-                }
-            }
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.Space(10);
+            DrawWorkspaceNavigator();
 
             if (selectedTab == 0)
             {
@@ -97,10 +78,21 @@ namespace ES
 
             EditorGUILayout.Space(20);
             DrawQuickActionsSection();
-            EditorGUILayout.EndVertical();
+            DrawRecentResult();
+            DrawEditHistory();
         }
 
-        private void DrawSummaryAndResult(ESSceneGlobalData data)
+        private void DrawWorkspaceNavigator()
+        {
+            string currentId = selectedTab == 1 ? "asset" : "scene";
+            string nextId = ESEditorSectionNavigatorIMGUI.Draw(
+                "SimpleTools.TopToolbar",
+                currentId,
+                WorkspaceSections);
+            selectedTab = string.Equals(nextId, "asset", StringComparison.Ordinal) ? 1 : 0;
+        }
+
+        private void DrawSummary(ESSceneGlobalData data)
         {
             int sceneCount = data.GetEnabledScenes().Count;
             int assetCount = data.GetEnabledAssets().Count;
@@ -109,7 +101,30 @@ namespace ES
                 $"资产快捷: {assetCount} 个",
                 $"打开方式: {GetOpenModeText(data.UseAdditiveMode)}",
                 $"切换前保存: {GetSaveModeText(data.AutoSaveBeforeSwitch)}");
+        }
+
+        private void DrawRecentResult()
+        {
             SimpleToolsPanelUtility.DrawResultSummary("最近场景/资产操作", lastResultSummary, lastResultDetail);
+        }
+
+        private void DrawEditHistory()
+        {
+            SimpleToolsPanelUtility.DrawSectionTitle("编辑历史", "撤销或重做 ESSceneGlobalData 的快捷列表配置变更。");
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (SimpleToolsPanelUtility.DrawCompactButton("↶ 撤销 (Ctrl+Z)", 120, 25))
+                {
+                    Undo.PerformUndo();
+                    SimpleToolsWindow.UsingWindow?.Repaint();
+                }
+
+                if (SimpleToolsPanelUtility.DrawCompactButton("↷ 重做 (Ctrl+Y)", 120, 25))
+                {
+                    Undo.PerformRedo();
+                    SimpleToolsWindow.UsingWindow?.Repaint();
+                }
+            }
         }
 
         private static string GetOpenModeText(bool useAdditiveMode)
@@ -129,11 +144,10 @@ namespace ES
 
         private void DrawSceneManagementSection()
         {
-            EditorGUILayout.LabelField("场景管理", EditorStyles.boldLabel);
-            EditorGUILayout.Space(5);
+            SimpleToolsPanelUtility.DrawSectionTitle("场景快捷", "先明确场景范围，再添加、同步、分组或打开；场景切换会遵守保存策略。");
 
             // 快速添加区域
-            EditorGUILayout.LabelField("快速添加场景", EditorStyles.miniBoldLabel);
+            EditorGUILayout.LabelField("添加场景", EditorStyles.miniBoldLabel);
 
             // 拖拽区域 - 简化实现
             var dropRect = EditorGUILayout.GetControlRect(GUILayout.Height(40));
@@ -344,9 +358,7 @@ namespace ES
         /// </summary>
         private void DrawAssetManagementSection()
         {
-            EditorGUILayout.LabelField("资产快捷访问", EditorStyles.boldLabel);
-
-            EditorGUILayout.Space(5);
+            SimpleToolsPanelUtility.DrawSectionTitle("资产快捷", "维护资产和文件夹的快捷入口；此处只修改 ESSceneGlobalData 配置。");
 
             // 自定义资产列表
             var data = ESSceneGlobalData.Instance;
@@ -443,7 +455,7 @@ namespace ES
         /// </summary>
         private void DrawQuickActionsSection()
         {
-            EditorGUILayout.LabelField("快捷操作", EditorStyles.boldLabel);
+            SimpleToolsPanelUtility.DrawSectionTitle("维护与定位", "定位配置资产；刷新 AssetDatabase 仅在你需要手动同步外部文件变更时执行。");
 
             EditorGUILayout.BeginHorizontal();
 
@@ -455,8 +467,17 @@ namespace ES
                 lastResultDetail = AssetDatabase.GetAssetPath(ESSceneGlobalData.Instance);
             }
 
-            if (SimpleToolsPanelUtility.DrawCompactButton("刷新缓存", 92, 30))
+            if (SimpleToolsPanelUtility.DrawCompactButton("刷新 AssetDatabase", 118, 30))
             {
+                if (!EditorUtility.DisplayDialog(
+                        "确认刷新 AssetDatabase",
+                        "将手动刷新 Unity 资产数据库，可能触发导入与脚本更新。不会直接修改快捷入口配置。继续吗？",
+                        "刷新",
+                        "取消"))
+                {
+                    return;
+                }
+
                 AssetDatabase.Refresh();
                 lastResultSummary = "AssetDatabase 刷新完成";
                 lastResultDetail = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");

@@ -16,6 +16,7 @@
     "com.kyrylokuzyk.primetween": "1.4.11",
     "com.code-philosophy.hybridclr": "https://github.com/focus-creative-games/hybridclr_unity.git#v8.12.0",
     "com.code-philosophy.luban": "https://github.com/focus-creative-games/luban_unity.git",
+    "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v10.1.0",
     "com.whisper.unity": "https://gitcode.com/gh_mirrors/wh/whisper.unity.git?path=/Packages/com.whisper.unity",
     "com.unity.modules.ai": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",

@@ -90,7 +90,7 @@ ESFrameWorkPublish/
 
 | Skill | 简介 |
 |---|---|
-| `$es-module-lifecycle` | 分类未开始、半成品、待验收、稳定、废弃与归档模块，并审计依赖渗透和证据跃迁。 |
+| `$es-module-lifecycle` | 分类模块成熟度、审计半成品渗透与证据跃迁，并可在用户确认后写入可失效的续接检查点。 |
 
 ## 新文件放置决策
 
@@ -129,7 +129,7 @@ ESFrameWorkPublish/
 ## 当前边界
 
 - 当前 14 个 Skill 已建立项目级结构、跨系统治理和领域导航。
-- 原有 13 个 Skill 已通过官方验证；新增 `$es-module-lifecycle` 因当前终端找不到可运行的 Python/uv，当前只完成等价结构检查，仍待补跑官方 `quick_validate.py`。
+- 原有 13 个 Skill 已通过官方验证；`$es-module-lifecycle` 已补充 `audit-only`、可选 `audit+checkpoint`、`resume` 与一层续接状态契约，仍需按当前环境能力补跑官方 `quick_validate.py`。
 - 只有四个基础确定性 PowerShell 脚本已经实跑；领域 Skill 目前以工作流和真实项目路径导航为主。
 - 新 Skill 通常需要从项目根重启或新开 Codex 窗口后才会进入技能选择器。
 - Skill 存在不代表 Unity、PlayMode、Profiler、IL2CPP 或真实发布已经通过。

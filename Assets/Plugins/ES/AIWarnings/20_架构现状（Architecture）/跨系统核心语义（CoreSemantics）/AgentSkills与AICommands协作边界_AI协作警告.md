@@ -67,7 +67,7 @@ AIWarnings 在该链路中也必须按任务加载：先读取入口、当前状
 | `$es-command-authoring` | 按 ESCommand 标准维护类型、分类、Context、Player、Runner 与生命周期 | ESCommand 上下文和新增运行时命令 |
 | `$es-editor-tooling` | 开发 ReloadDomain 安全的窗口、Drawer、ESEditorSection、SO 表格和预览工具 | 编辑器窗口、序列化、预览、ReloadDomain 与 SimpleTools |
 | `$es-release-acceptance` | 建立源码、Unity、测试、Profiler、Player、IL2CPP、Provider 和发布证据矩阵 | 发布、性能、资源生命周期与外部交付复核 |
-| `$es-module-lifecycle` | 分类未开始、半成品、待验收、稳定、废弃与归档模块，审计默认激活和依赖渗透 | `检查_模块成熟度与半成品影响_AI命令.md`、模块交付争议与重构前审计 |
+| `$es-module-lifecycle` | 分类模块成熟度，审计默认激活和依赖渗透，并在用户确认后维护可失效的续接检查点 | `检查_模块成熟度与半成品影响_AI命令.md`、模块交付争议、重构前审计与跨窗口恢复 |
 
 命令与 Skill 不是一对一关系。一个命令可以组合多个 Skill，例如修复 Unity 编译错误通常依次使用：
 
@@ -84,7 +84,7 @@ $es-worktree-audit
 ## 当前已实现事实
 
 - 十四个 Skill 均包含官方格式 `SKILL.md` 与 `agents/openai.yaml`。
-- 五个基础 Skill 提供 AICommand、编译、单错误修复、UTF-8 和工作树通用能力；一个跨系统治理 Skill 负责模块成熟度与半成品影响；八个 ES 领域 Skill 提供 GameCore、资源、Tag/Config、Entity、输入、ESCommand、编辑器工具与发布验收工作流。
+- 五个基础 Skill 提供 AICommand、编译、单错误修复、UTF-8 和工作树通用能力；一个跨系统治理 Skill 负责模块成熟度、半成品影响与受控续接检查点；八个 ES 领域 Skill 提供 GameCore、资源、Tag/Config、Entity、输入、ESCommand、编辑器工具与发布验收工作流。
 - `$es-unity-compile` 与 `$es-release-acceptance` 声明 `unityMCP` 依赖，服务地址为 `http://127.0.0.1:8080/mcp`。
 - 已提供四个确定性 PowerShell 脚本：AICommand 校验、显式 `.csproj` 构建、UTF-8 守卫和工作树审计。
 - PowerShell 脚本源码保持 ASCII，避免 Windows PowerShell 5.1 将无 BOM UTF-8 中文脚本按本地代码页解析；中文说明保留在 `SKILL.md` 和项目文档中。

@@ -23,7 +23,7 @@ AICommands 是任务协议，`.agents/skills` 是可复用执行层。选择命�
 | `$es-command-authoring` | ESCommand 上下文与新增运行时命令 |
 | `$es-editor-tooling` | 编辑器窗口、ReloadDomain、预览、Drawer、SO 表格和 SimpleTools |
 | `$es-release-acceptance` | 编译、测试、Profiler、Player、IL2CPP、Provider 与发布证据整合 |
-| `$es-module-lifecycle` | `检查_模块成熟度与半成品影响_AI命令.md`，以及未开始、半成品、待验收、废弃模块审计 |
+| `$es-module-lifecycle` | `检查_模块成熟度与半成品影响_AI命令.md`，以及未开始、半成品、待验收、废弃模块审计和受控续接 |
 
 完整边界见：
 

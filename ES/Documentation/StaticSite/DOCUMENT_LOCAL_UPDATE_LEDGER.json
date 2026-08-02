@@ -15,22 +15,117 @@
                                          "stagedSourcePatchSha256":  "008cf4d540c43c01d0f972cd4a535faa8e7f9a71f223a8a511cc5cbbe27a0bae",
                                          "untrackedSourceManifestSha256":  "c32bd9cbaf53ca8fddd35d165112d9dddb15d5d1591be4d4ca3b42093df03edd",
                                          "untrackedSourceFileCount":  575
-                                     }
+                                     },
+                  "pushedCommitCache":  {
+                                            "status":  "cached-not-integrated",
+                                            "remote":  "origin",
+                                            "remoteTrackingRef":  "origin/main",
+                                            "branch":  "main",
+                                            "range":  {
+                                                          "fromExclusive":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
+                                                          "toInclusive":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed"
+                                                      },
+                                            "verification":  {
+                                                                 "checkedAt":  "2026-08-03T06:16:13+08:00",
+                                                                 "localHead":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed",
+                                                                 "remoteTrackingHead":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed",
+                                                                 "localAndRemoteTrackingMatch":  true
+                                                             },
+                                            "records":  [
+                                                            {
+                                                                "sha":  "8d739145dc216a34068287c56bcf8d8f8f9ccc10",
+                                                                "committedAt":  "2026-08-03T05:38:46+08:00",
+                                                                "subject":  "feat(agent): 添加项目级 Skills 与分批提交门禁",
+                                                                "entryIds":  [
+                                                                                 "LOCAL-20260802-003",
+                                                                                 "LOCAL-20260802-004",
+                                                                                 "LOCAL-20260803-005",
+                                                                                 "LOCAL-20260803-006",
+                                                                                 "LOCAL-20260803-007",
+                                                                                 "LOCAL-20260803-009",
+                                                                                 "LOCAL-20260803-011",
+                                                                                 "LOCAL-20260803-012"
+                                                                             ]
+                                                            },
+                                                            {
+                                                                "sha":  "24b3605eab43d9a56519a2118bc04fb54ce651f7",
+                                                                "committedAt":  "2026-08-03T05:41:50+08:00",
+                                                                "subject":  "chore(unity): 锁定 MCP for Unity 10.1.0",
+                                                                "entryIds":  [
+                                                                                 "LOCAL-20260802-002"
+                                                                             ]
+                                                            },
+                                                            {
+                                                                "sha":  "fb6b55cb7b6bb5725177c28c3e499baf9cfff8d6",
+                                                                "committedAt":  "2026-08-03T05:42:18+08:00",
+                                                                "subject":  "fix(ai-command): 修复规则引用并强化命令校验",
+                                                                "entryIds":  [
+                                                                                 "LOCAL-20260802-003"
+                                                                             ]
+                                                            },
+                                                            {
+                                                                "sha":  "bb7d4715af4bf35d9df04008923f0b37de31161c",
+                                                                "committedAt":  "2026-08-03T05:43:19+08:00",
+                                                                "subject":  "docs(ai): 备案 UnityMCP 工程验收路线图",
+                                                                "entryIds":  [
+                                                                                 "LOCAL-20260803-010"
+                                                                             ]
+                                                            },
+                                                            {
+                                                                "sha":  "66a0758283380e44c92f813ea337cbd4698257cd",
+                                                                "committedAt":  "2026-08-03T05:49:35+08:00",
+                                                                "subject":  "refactor(project): 统一迁移 ES 可控目录与路径合同",
+                                                                "entryIds":  [
+                                                                                 "LOCAL-20260803-008",
+                                                                                 "LOCAL-20260803-013"
+                                                                             ]
+                                                            },
+                                                            {
+                                                                "sha":  "12740828bea05284ec9c252b36a5d8988b575226",
+                                                                "committedAt":  "2026-08-03T05:54:29+08:00",
+                                                                "subject":  "feat(es): 整合资源运行时与核心玩法工程能力",
+                                                                "entryIds":  [
+                                                                                 "LOCAL-20260803-009",
+                                                                                 "LOCAL-20260803-013"
+                                                                             ]
+                                                            },
+                                                            {
+                                                                "sha":  "17b60133e7a997f23839d2e9f53466c7a4503d89",
+                                                                "committedAt":  "2026-08-03T05:55:48+08:00",
+                                                                "subject":  "docs(history): 提交 Codex 协作历程与恢复工具",
+                                                                "entryIds":  [
+                                                                                 "LOCAL-20260803-014"
+                                                                             ]
+                                                            },
+                                                            {
+                                                                "sha":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed",
+                                                                "committedAt":  "2026-08-03T05:57:25+08:00",
+                                                                "subject":  "docs(site): 补齐静态文档阅读与同步规则",
+                                                                "entryIds":  [
+                                                                                 "LOCAL-20260803-015"
+                                                                             ]
+                                                            }
+                                                        ]
+                                        }
               },
     "entries":  [
                     {
                         "id":  "INTAKE-20260802-001",
                         "status":  "needs-triage",
-                        "summary":  "已捕获当前脏工作区的完整源码快照，但尚未按可独立回归的完成项拆分、核实和总结；该记录不能授权 HTML 更新或解除同步门禁。",
+                        "summary":  "历史全量入口保留其 ID 以维持审计连续性；已推送的 8 个提交已按 LOCAL-20260802-002 至 LOCAL-20260803-015 分项缓存。本条现在只接管推送后仍未提交的模块生命周期 Skill 改动，尚未完成行为分诊，不能授权 HTML 更新或解除同步门禁。",
                         "sourcePaths":  [
-
+                                            ".agents/skills/es-module-lifecycle/SKILL.md",
+                                            ".agents/skills/es-module-lifecycle/agents/openai.yaml",
+                                            ".agents/skills/es-module-lifecycle/references/audit-state-contract.md"
                                         ],
                         "evidencePaths":  [
-
+                                              ".agents/skills/es-module-lifecycle/SKILL.md",
+                                              ".agents/skills/es-module-lifecycle/agents/openai.yaml",
+                                              ".agents/skills/es-module-lifecycle/references/audit-state-contract.md"
                                           ],
                         "analysis":  {
                                          "status":  "not-started",
-                                         "notes":  "先按功能边界拆成完成项，再补源码、AIWarnings、测试与发布契约证据。"
+                                         "notes":  "先确认模块生命周期 Skill 的规则、引用契约与用户可见工作流，再按功能边界拆成独立完成项；必须补 AIWarnings、测试或审计证据，不能由当前 diff 推断为已交付能力。"
                                      },
                         "regression":  {
                                            "status":  "not-started",
@@ -44,7 +139,9 @@
                         "html":  {
                                      "status":  "not-started",
                                      "targets":  [
-
+                                                     "#editor-overview",
+                                                     "#editor-verification",
+                                                     "#deep-warning-16"
                                                  ]
                                  }
                     },
@@ -700,6 +797,54 @@
                                                      "document-governance"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-016",
+                        "status":  "documented",
+                        "summary":  "强化模块成熟度审计的 AIWarnings、AICommand 与 Agent Skill 闭环，新增默认只读、用户确认后定点写入续接检查点、事实漂移失效判定和下次接手复核流程。",
+                        "sourcePaths":  [
+                                            ".agents/README.md",
+                                            ".agents/skills/es-module-lifecycle",
+                                            "Assets/Plugins/ES/AICommands/README.md",
+                                            "Assets/Plugins/ES/AICommands/命令合集索引_AI命令.md",
+                                            "Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md"
+                                        ],
+                        "evidencePaths":  [
+                                              ".agents/skills/es-module-lifecycle/SKILL.md",
+                                              ".agents/skills/es-module-lifecycle/references/audit-state-contract.md",
+                                              ".agents/skills/es-use-ai-command/scripts/Test-ESAICommands.ps1",
+                                              ".agents/skills/es-utf8-guard/scripts/Test-ESUtf8.ps1",
+                                              "Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "闭环复用现有 es-module-lifecycle，不新增重复 Skill。audit-only 默认不写；audit+checkpoint 仅在用户确认精确文件和区域后更新稳定标记块；resume 必须重新核对最新规则、branch/HEAD、相关工作树、源码、激活、依赖、消费者和证据。状态写入不授权未来实现或 Git/Unity/发布操作。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "12 个目标文本严格 UTF-8、U+FFFD 与疑似乱码检查通过",
+                                                            "AICommands 全库实跑为 53 commands / 0 invalid",
+                                                            "Skill frontmatter、名称、引用文件、500 行限制、default_prompt 和 25 字符简介完成等价结构检查",
+                                                            "目标文件范围化 git diff --check 通过"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前终端仍找不到可运行的 Python、uv 或 uvx，无法实跑官方 quick_validate.py",
+                                                             "本轮只实现审计与续接治理协议，没有替用户创建任何模块状态检查点，也没有运行 Unity、Test Runner、PlayMode、Profiler、Player 或发布验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#deep-warning-16"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -712,13 +857,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-03T05:55:46+08:00",
-                       "head":  "12740828bea05284ec9c252b36a5d8988b575226",
-                       "stagedSourcePatchSha256":  "2140a2c6bf773301b9500f2991ea18c82668509ef3c4db67f158201dbf7eaf10",
-                       "stagedSourceManifestSha256":  "160a06122c86fae9f9cd98a0f6a07ce29adec64f9969c79c1f85ebd0bf61f267",
-                       "stagedSourceFileCount":  11,
+                       "preparedAt":  "2026-08-03T06:18:13+08:00",
+                       "head":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed",
+                       "stagedSourcePatchSha256":  "cc3192bc2f6d2d770506f39df545d8a259b4428fdf232574f5cb58b6b8f01208",
+                       "stagedSourceManifestSha256":  "18f8920430daade6e5d09f00f2baae173b92c88c58cab61dd785fa08460753f9",
+                       "stagedSourceFileCount":  12,
                        "entryIds":  [
-                                        "LOCAL-20260803-014"
+                                        "LOCAL-20260803-016"
                                     ]
                    }
 }

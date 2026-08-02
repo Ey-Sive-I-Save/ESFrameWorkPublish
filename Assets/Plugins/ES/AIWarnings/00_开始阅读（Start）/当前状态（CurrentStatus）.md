@@ -1,11 +1,11 @@
 # AIWarnings 当前状态
 
-最后核对：2026-08-02。
+最后核对：2026-08-03。
 
 ## 已确认基线
 
 - AIWarnings 采用按任务分层加载：`README -> CurrentStatus -> RuleIndex -> 命中的 P0 -> 当前领域专项 -> 必要的交接/复盘或提案`。普通任务禁止递归读取全目录；P0、现行状态和任务专项必须读取原文，分批摘要只能导航，不能替代规则权威。
-- 模块成熟度治理已建立统一状态、半成品隔离规则和状态跃迁证据门禁；新增 `$es-module-lifecycle` 与只读模块状态审计 AICommand。该治理能力不代表现有全项目模块已经逐个分类，首次开发、重构、交付或争议时仍需回到目标模块源码和证据核对。
+- 模块成熟度治理已建立统一状态、半成品隔离规则和状态跃迁证据门禁；`$es-module-lifecycle` 与模块状态审计 AICommand 现支持 `audit-only`、可选 `audit+checkpoint` 和 `resume`。默认不写文件；用户确认精确文件与区域后，检查点才可记录当前状态、Git 基线、证据缺口、下一动作和失效条件。该检查点不代表全项目已分类，也不能向下次窗口授予实现权限。
 
 - `ES_Design.csproj` 最近一次核对为 `0 warning, 0 error`。
 - Camera Core 的 P0 源码骨架已补：`ESCameraModule` 持有 Director，`ESGameManager.Camera` 只暴露模块门面；当前版本只有 `LocalControl` 当前 Entity 能提交请求与 Look，根本没有外部 Owner 注册 API。回放/观战/剧情需等模块私有受信 Bridge 落地后才可申请正式 View。普通 AI/NPC、AI 驾驶载具及 AI 技能请求会在模块边界拒绝；技能相机以技能使用者而非主目标作为 Owner。`ESCameraLease` 已有 Dispose / Look / Target 语义 API，Core 及 Track/Timeline/Preview 源码均通过过一次临时全量程序集静态编译。当前 IDE 生成 `.csproj` 尚未同步新 Module、Skill Camera Track、Timeline 与 Preview 源码；它不是 Unity 编译输入，不能把其失败表述成“Unity 未收录”，也不能当作 Unity 已编译证据。

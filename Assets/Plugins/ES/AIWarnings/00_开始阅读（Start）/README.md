@@ -65,7 +65,7 @@ README
 - `ESCommandPlayerRunner.TickAll()` 只能由 `MODULE_ESCommandModule` 驱动；ESCommand 运行时、交互运行时、编辑器序列化与 GraphView 均有独立专项规则，不能用输入文档、AI Command 模板或 SimpleTools 文档替代。
 - AI 协作历程只有在用户明确要求时才能创建、更新或恢复；普通任务禁止自动落账。连续约 10 轮后 AI 只能询问一次，用户确认前不得写入或催促。获准维护时仍严格一窗口一文件；失联窗口先从本机 `history.jsonl` 模糊定位 session 候选，再人工确认归属并从 `rollout-*.jsonl` 逐轮恢复。候选分数不得直接授权合并或覆盖已有档案。
 - 当前 GraphView / NodeRunner 是阻断性历史实验实现，禁止新增任何正式业务依赖，直至数据模型、稳定身份、Undo、迁移与运行时快照完成重构验收。
-- 模块成熟度统一使用 `Proposed -> Scaffolded -> Experimental/Implementing -> Integrating -> Verifying -> Stable -> Deprecated -> Archived`；`Blocked` 只能作为附加结论。目录、接口或源码存在不等于完成，半成品不得默认注册、渗透稳定模块或进入正式发布链路。具体路由见 `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`。
+- 模块成熟度统一使用 `Proposed -> Scaffolded -> Experimental/Implementing -> Integrating -> Verifying -> Stable -> Deprecated -> Archived`；`Blocked` 只能作为附加结论。目录、接口或源码存在不等于完成，半成品不得默认注册、渗透稳定模块或进入正式发布链路。模块审计默认只读；只有用户确认精确文件与区域后，才可写入带 Git 基线和失效条件的续接检查点。检查点只用于导航，不授权下次实现。具体路由见 `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`。
 - `Documentation/DOCUMENTATION_CATALOG.md` 是文档分类唯一入口。历史归档、未来方案、生成报告和待源码复验资料不得替代现行规范或 AIWarnings。
 - 不恢复 `EntityAIInputSystemModule`、`EntityInputStateModule` 等旧输入兼容类型；应清理序列化坏引用。
 - ES 自有 Unity 菜单根统一为 `【ES】/`。

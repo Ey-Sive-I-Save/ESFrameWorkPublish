@@ -8,6 +8,25 @@ Git 提交、暂存区和工作区差异仍是源码事实的权威；本台账�
 
 任何 AI 或开发者开始文档更新前，必须同时读取 `DOCUMENT_SYNC.md`、`DOCUMENT_SYNC.json`、本文件与 JSON 台账。不得把“本地看起来完成”直接写进 HTML；先进入本台账并通过批次整合。
 
+## 已推送提交缓存
+
+本批次的 HTML 审阅基线仍是 `775cfdb`，但截至 `2026-08-03T06:16:13+08:00`，本地 `main` 与本地远端跟踪引用 `origin/main` 均为 `fc09d0a`。两者一致只证明本机已知的远端状态已对齐；它不替代下一次 `git fetch`，也不表示静态 HTML 已吸收这些提交。
+
+以下 8 个已推送提交已写入 JSON 的 `batch.pushedCommitCache`，并精确映射到已完成的本地总结条目。它们全部处于 `cached-not-integrated`：可以参加后续回归整合，当前不得直接改写 HTML。
+
+| 提交 | 推送缓存内容 | 对应台账条目 |
+| --- | --- | --- |
+| `8d73914` | Agent Skills、AIWarnings/AICommands 协作、模块成熟度治理与 staged-only 门禁 | `LOCAL-20260802-003`、`-004`、`LOCAL-20260803-005`、`-006`、`-007`、`-009`、`-011`、`-012` |
+| `24b3605` | MCP for Unity 10.1.0 锁定与接入 | `LOCAL-20260802-002` |
+| `fb6b55c` | AICommands 规则引用与 Cmd Agent 校验修复 | `LOCAL-20260802-003` |
+| `bb7d471` | UnityMCP 工程验收代理路线图预备案 | `LOCAL-20260803-010` |
+| `66a0758` | ES 可控目录迁移与路径合同 | `LOCAL-20260803-008`、`LOCAL-20260803-013` |
+| `1274082` | ES 资源运行时与核心玩法工程能力整合 | `LOCAL-20260803-009`、`LOCAL-20260803-013` |
+| `17b6013` | Codex 协作历程与恢复工具 | `LOCAL-20260803-014` |
+| `fc09d0a` | 静态站点阅读与同步规则 | `LOCAL-20260803-015` |
+
+推送后新出现的本地未提交文件仍由 `INTAKE-20260802-001` 单独承接；该历史 ID 已改为精确列出目前的三个模块生命周期 Skill 文件，状态保持 `needs-triage`。它不属于上述 8 个提交，也不能借已推送记录获得 HTML 整合资格。
+
 ## 批次状态
 
 | 状态 | 含义 | 是否可写 HTML |
@@ -17,7 +36,7 @@ Git 提交、暂存区和工作区差异仍是源码事实的权威；本台账�
 | `ready-for-html` | 每项均有回归结果或明确接受的缺口，章节目标已确定，可一次性更新 HTML。 | 是，且必须整个批次一起写入 |
 | `integrated` | HTML、同步记录、源码基线和台账最终状态已一起推进。 | 已完成，不能继续往此批次追加 |
 
-任何新增源码变更都会使当前批次快照失效。先把变更总结加入 JSON 和本文件，再运行 `Update-DocumentLocalLedgerSnapshot.ps1 -RefreshSnapshot`；不能把旧快照继续当作当前批次事实。
+任何新增源码变更都会使当前批次快照失效。先把变更总结加入 JSON 和本文件，再运行 `Update-DocumentLocalLedgerSnapshot.ps1 -RefreshSnapshot`；该脚本以 HTML 审阅基线而非当前 HEAD 生成 tracked/staged 指纹，所以已推送提交与后续本地修改会处于同一个、可复现的比较口径。不能把旧快照继续当作当前批次事实。
 
 ## 统一整合流程
 
@@ -55,13 +74,13 @@ git commit -m "本批语义说明"
 ## 当前开放批次
 
 - 批次：`LOCAL-2026-08-02-OPEN`
-- 状态：`collecting`，但现有条目仍为 `needs-triage`。
-- 快照：已捕获当前 `HEAD`、未暂存 diff、暂存 diff 与未跟踪源码清单；详见 JSON。
-- HTML 整合：禁止。当前工作区尚未拆分为可独立复核的完成项。
+- 状态：`collecting`。已推送提交范围已缓存为 `775cfdb..fc09d0a`，但当前未提交的模块生命周期 Skill 改动仍为 `needs-triage`。
+- 快照：以 HTML 审阅基线比较当前 `HEAD`、未暂存 diff、暂存 diff 与未跟踪源码清单；详见 JSON。
+- HTML 整合：禁止。已推送条目等待统一回归；推送后本地改动尚未拆分为可独立复核的完成项。
 
 | ID | 当前状态 | 本地完成更新总结 | 回归 | HTML 目标 |
 | --- | --- | --- | --- | --- |
-| `INTAKE-20260802-001` | `needs-triage` | 仅完成工作区快照捕获，尚不能声明任何源码行为已被文档化。 | 未开始 | 无；必须先拆分。 |
+| `INTAKE-20260802-001` | `needs-triage` | 历史总入口现只承接 3 个推送后未提交的模块生命周期 Skill 文件；已推送范围已另行映射至 `LOCAL-...-002` 至 `-015`。 | 未开始 | `#editor-overview`、`#editor-verification`、`#deep-warning-16`；必须先拆分。 |
 | `LOCAL-20260802-002` | `documented` | 固定 Git tag 安装 MCP for Unity 10.1.0；UPM 锁定、PackageCache 注册、HTTP 服务、Unity 插件握手和实际工具调用均已确认。 | 8080 已监听，Unity 注册 35 个工具，MCP 只读与编辑器调用成功；当前 Codex 窗口仍需重启才能原生加载新增工具。 | `#editor-overview`、`#editor-verification`；批次未到 `ready-for-html`，禁止写入。 |
 | `LOCAL-20260802-003` | `documented` | 修复 AICommands 全库失效引用，并为 Cmd Agent 增加模板自检、无效阻断、风险识别和直接使用说明。 | 52 个模板在 Unity 进程内批量解析为 0 个无效；ES_Stand、ES_Editor 和 Unity Console 均无编译错误。 | `#editor-overview`、`#deep-warning-16`；批次未到 `ready-for-html`，禁止写入。 |
 | `LOCAL-20260802-004` | `documented` | 在项目根 `.agents/skills` 建立五个官方格式 ES Skills，并提供 AICommand、编译、UTF-8 和工作树确定性脚本。 | 五个 Skill 全部通过官方验证器；四个脚本完成 AST 与实际运行验证。 | `#editor-overview`、`#editor-verification`；批次未到 `ready-for-html`，禁止写入。 |
@@ -199,6 +218,15 @@ git commit -m "本批语义说明"
 - **回归状态**：严格 UTF-8、staged-only 门禁和范围化空白检查通过。
 - **已知缺口**：HTML 仍需在批次达到 `ready-for-html` 后统一生成和验收。
 - **HTML 目标**：未来文档治理章节，当前延期。
+
+### LOCAL-20260803-016：模块审计续接状态闭环
+
+- **源码路径**：模块成熟度 AIWarning、只读审计 AICommand、`$es-module-lifecycle`、续接状态契约，以及 AIWarnings、AICommands、Skills 三组入口索引。
+- **规范与证据**：新增 `audit-only`、可选 `audit+checkpoint` 与 `resume`。默认不写；用户确认精确文件和区域后，只更新稳定标记块，并记录 Git 基线、证据、下一动作和失效条件。
+- **完成分析**：检查点只降低下次定位成本，不替代源码、Unity 证据或最新规则，也不向未来窗口授予实现、Git、Unity 或发布权限。事实漂移后必须先报告 `stale` 字段。
+- **回归状态**：12 个目标文本严格 UTF-8 通过；AICommands 为 `53 commands / 0 invalid`；Skill frontmatter、引用、行数、默认 Prompt 与简介长度完成等价结构检查；范围化 `git diff --check` 通过。
+- **已知缺口**：当前终端没有可运行的 Python/uv/uvx，官方 `quick_validate.py` 未实跑；本轮没有创建实际模块状态检查点，也没有运行 Unity 或发布验收。
+- **HTML 目标**：未来在 `#editor-overview` 与 `#deep-warning-16` 解释受控续接机制，当前延期。
 
 ## 条目模板
 

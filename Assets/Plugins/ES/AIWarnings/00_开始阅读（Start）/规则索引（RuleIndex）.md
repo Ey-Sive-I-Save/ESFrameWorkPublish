@@ -31,7 +31,7 @@
 | 修改 ESGraphView、NodeRunner 或图资产 | `40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/GraphView与NodeRunner_数据权威稳定身份与重构门禁_AI协作警告.md` |
 | 新建或改造测试场景的操作引导、验收路线、运行态诊断、键位说明或区域导视 | `50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/测试场景导视与诊断复用_AI协作警告.md`、`Documentation/ES_SCENE_VALIDATION_GUIDE_STANDARD.md`；优先复用 `ESSceneValidationGuide`，不得新建一次性 OnGUI 或污染正式 Prefab |
 | 进行发布、IL2CPP、性能或资源生命周期验收 | `50_验证与发布（ValidationRelease）`、`10_P0最高约束（P0Guardrails）/构建与IL2CPP（BuildIL2CPP）` |
-| 判断模块未开始、开发中、待集成、待验收、稳定、废弃或归档；审计半成品是否渗透正式链路 | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`；再按目标模块读取对应 P0、领域专项和当前源码 |
+| 判断模块未开始、开发中、待集成、待验收、稳定、废弃或归档；审计半成品渗透；可选写入或恢复用户指定的续接状态区域 | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`、`Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md`；再按目标模块读取对应 P0、领域专项、状态文件和当前源码 |
 | 选择、执行或维护 AICommand；新增、修改或调用 Agent Skill | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md`、`Assets/Plugins/ES/AICommands/README.md`；修改 Skill 时同时读取 UTF-8 P0，涉及 Unity 验收时再读 `50_验证与发布（ValidationRelease）` |
 | 定位 Codex session、恢复失联窗口、维护 AI 协作历程或判断窗口档案归属 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_AI协作历程与本地Session兜底恢复_AI协作警告.md`、`ES/AI协作历程（Codex）/README.md` |
 
@@ -47,7 +47,7 @@
 | ESCommand、分类、Context、Player、Runner、Start/Stop | `$es-command-authoring` |
 | EditorWindow、Drawer、ESEditorSection、SO 表格、ReloadDomain | `$es-editor-tooling` |
 | Unity 编译、测试、Profiler、Player、IL2CPP、资源发布验收 | `$es-release-acceptance` |
-| 未开始/半成品模块状态、依赖渗透、成熟度跃迁与证据缺口 | `$es-module-lifecycle` |
+| 未开始/半成品模块状态、依赖渗透、成熟度跃迁、证据缺口与可选续接检查点 | `$es-module-lifecycle` |
 
 领域 Skill 只负责执行工作流和导航，仍必须按上表读取对应 AIWarnings，并由用户要求与唯一选中的 AICommand 决定本次权限。
 

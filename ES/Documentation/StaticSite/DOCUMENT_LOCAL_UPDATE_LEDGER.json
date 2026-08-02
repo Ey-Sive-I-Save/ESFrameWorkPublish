@@ -666,6 +666,40 @@
                                                      "history-not-applicable"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-015",
+                        "status":  "documented",
+                        "summary":  "补齐静态技术文档的阅读标准与同步说明，明确源码事实、台账、HTML 产物和分层验收证据之间的边界。",
+                        "sourcePaths":  [
+                                            "ES/Documentation/StaticSite/DOCUMENT_READER_STANDARD.md",
+                                            "ES/Documentation/StaticSite/DOCUMENT_SYNC.md"
+                                        ],
+                        "evidencePaths":  [
+                                              "ES/Documentation/StaticSite/DOCUMENT_READER_STANDARD.md",
+                                              "ES/Documentation/StaticSite/DOCUMENT_SYNC.md",
+                                              "ES/Documentation/StaticSite/DOCUMENT_SYNC.json"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "两份 Markdown 是静态文档治理规则，不是生成后的 HTML；它们可以独立提交，但不能据此宣称当前 HTML 已吸收全部源码批次。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "文件严格按 UTF-8 读取",
+                                                            "staged-only 门禁和范围化空白检查通过"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "HTML 仍需在批次达到 ready-for-html 后统一生成和验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "document-governance"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {

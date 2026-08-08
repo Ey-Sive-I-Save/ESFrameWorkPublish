@@ -1,0 +1,22 @@
+{
+    "name": "ES_Logic.DynamicAtlas.PlayMode.Tests",
+    "rootNamespace": "ES.Tests.DynamicAtlas.PlayMode",
+    "references": [
+        "ES_Logic",
+        "ES_Stand",
+        "ES_Design",
+        "UniTask"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

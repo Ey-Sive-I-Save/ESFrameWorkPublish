@@ -10,21 +10,24 @@ namespace ES
     /// 域加载时安装相机轨道预览实现。Runtime 只看到 ICameraTrackPreviewFactory；所有
     /// UnityEditor、Cinemachine 编辑器预览和对象生命周期都严格留在 Editor/Camera。
     /// </summary>
-    [InitializeOnLoad]
-    public static class ESCameraTrackPreviewBootstrap
+    /// <summary>相机轨道预览只在 ES AssemblyStream 阶段安装，不占用普通 InitializeOnLoad。</summary>
+    public sealed class ESCameraTrackPreviewBootstrap : EditorInvoker_Level0
     {
-        private static readonly ESCameraTrackPreviewFactory Factory = new ESCameraTrackPreviewFactory();
+        private readonly ESCameraTrackPreviewFactory factory = new ESCameraTrackPreviewFactory();
+        private static ESCameraTrackPreviewFactory activeFactory;
 
-        static ESCameraTrackPreviewBootstrap()
+        public override void InitInvoke()
         {
-            ESCameraTrackPreviewFactoryRegistry.Install(Factory);
+            activeFactory = factory;
+            ESCameraTrackPreviewFactoryRegistry.Install(factory);
             AssemblyReloadEvents.beforeAssemblyReload -= BeforeAssemblyReload;
             AssemblyReloadEvents.beforeAssemblyReload += BeforeAssemblyReload;
         }
 
         private static void BeforeAssemblyReload()
         {
-            ESCameraTrackPreviewFactoryRegistry.Clear(Factory);
+            ESCameraTrackPreviewFactoryRegistry.Clear(activeFactory);
+            activeFactory = null;
         }
     }
 
@@ -38,7 +41,7 @@ namespace ES
 
             if (!ESCameraTrackPreviewCatalogResolver.TryResolveSharedCatalogs(
                     request.clips,
-                    out ESCameraProfileCatalog profileCatalog,
+                    out ESCameraViewDefinitionCatalog definitionCatalog,
                     out ESCameraRigCatalog rigCatalog,
                     out string error))
             {
@@ -53,7 +56,7 @@ namespace ES
                 session = new ESCameraTrackPreviewSession(
                     request.track.DisplayName,
                     request.editorTarget,
-                    profileCatalog,
+                    definitionCatalog,
                     rigCatalog);
                 if (!session.IsReady)
                     throw new InvalidOperationException("独立 Preview View 未能初始化。");
@@ -107,7 +110,7 @@ namespace ES
         internal ESCameraTrackPreviewSession(
             string trackName,
             ESRuntimeTargetPack target,
-            ESCameraProfileCatalog profileCatalog,
+            ESCameraViewDefinitionCatalog definitionCatalog,
             ESCameraRigCatalog rigCatalog)
         {
             this.target = target;
@@ -135,7 +138,7 @@ namespace ES
                 sessionId,
                 outputCamera,
                 brain,
-                profileCatalog,
+                definitionCatalog,
                 rigCatalog,
                 rigRootObject.transform);
 
@@ -176,7 +179,7 @@ namespace ES
                 : target?.GetUserEntity();
             if (entity == null)
             {
-                ReportTargetError(clip.profileKey, "预览目标为空，无法解析 CameraTarget。");
+                ReportTargetError(clip.definition.ToString(), "预览目标为空，无法解析 CameraTarget。");
                 return false;
             }
 
@@ -195,7 +198,7 @@ namespace ES
 
             request = ESCameraRequest.CreateShot(
                 previewView.ViewId,
-                clip.profileKey,
+                clip.definition,
                 clip.priority,
                 rigRootObject,
                 follow,
@@ -239,11 +242,11 @@ namespace ES
             visibleTargetInstanceIds.Clear();
         }
 
-        private void ReportTargetError(string profileKey, string detail)
+        private void ReportTargetError(string definitionKey, string detail)
         {
-            string key = string.IsNullOrWhiteSpace(profileKey) ? "<empty>" : profileKey;
+            string key = string.IsNullOrWhiteSpace(definitionKey) ? "<empty>" : definitionKey;
             if (reportedTargetErrors.Add(key))
-                Debug.LogWarning("[ESCamera Preview] Profile '" + key + "' " + detail);
+                Debug.LogWarning("[ESCamera Preview] 相机定义 '" + key + "' " + detail);
         }
 
         private void EnsureTargetLayersVisible(Entity entity)
@@ -353,11 +356,11 @@ namespace ES
     {
         public static bool TryResolveSharedCatalogs(
             IReadOnlyList<ESCameraTrackPreviewClip> clips,
-            out ESCameraProfileCatalog profileCatalog,
+            out ESCameraViewDefinitionCatalog definitionCatalog,
             out ESCameraRigCatalog rigCatalog,
             out string error)
         {
-            profileCatalog = null;
+            definitionCatalog = null;
             rigCatalog = null;
             error = string.Empty;
             if (clips == null || clips.Count == 0)
@@ -372,63 +375,65 @@ namespace ES
                 if (!clip.IsValid)
                     continue;
 
-                if (!TryResolveProfileCatalog(clip.profileKey, out ESCameraProfileCatalog currentProfileCatalog, out ESCameraProfile profile, out error)
-                    || !TryResolveRigCatalog(profile.rigKey, out ESCameraRigCatalog currentRigCatalog, out error))
+                if (!TryResolveDefinitionCatalog(clip.definition, out ESCameraViewDefinitionCatalog currentDefinitionCatalog, out ESCameraViewDefinition definition, out error)
+                    || !TryResolveRigCatalog(definition.rigKey, out ESCameraRigCatalog currentRigCatalog, out error))
                 {
                     return false;
                 }
 
-                if (profileCatalog == null)
+                if (definitionCatalog == null)
                 {
-                    profileCatalog = currentProfileCatalog;
+                    definitionCatalog = currentDefinitionCatalog;
                     rigCatalog = currentRigCatalog;
                     continue;
                 }
 
-                if (profileCatalog != currentProfileCatalog || rigCatalog != currentRigCatalog)
+                if (definitionCatalog != currentDefinitionCatalog || rigCatalog != currentRigCatalog)
                 {
-                    error = "同一相机轨道的片段必须来自同一对 ProfileCatalog/RigCatalog；请拆分轨道或统一内容目录。";
+                    error = "同一相机轨道的片段必须来自同一对 DefinitionCatalog/RigCatalog；请拆分轨道或统一内容目录。";
                     return false;
                 }
             }
 
-            if (profileCatalog != null && rigCatalog != null)
+            if (definitionCatalog != null && rigCatalog != null)
                 return true;
 
-            error = "相机轨道没有可预览的有效 ProfileKey。";
+            error = "相机轨道没有可预览的有效 Definition。";
             return false;
         }
 
-        private static bool TryResolveProfileCatalog(
-            string profileKey,
-            out ESCameraProfileCatalog resolvedCatalog,
-            out ESCameraProfile resolvedProfile,
+        private static bool TryResolveDefinitionCatalog(
+            ESCameraDefinitionReference definitionReference,
+            out ESCameraViewDefinitionCatalog resolvedCatalog,
+            out ESCameraViewDefinition resolvedDefinition,
             out string error)
         {
             resolvedCatalog = null;
-            resolvedProfile = null;
+            resolvedDefinition = null;
             error = string.Empty;
-            List<string> paths = FindAssetPaths<ESCameraProfileCatalog>();
+            List<string> paths = FindAssetPaths<ESCameraViewDefinitionCatalog>();
             for (int i = 0; i < paths.Count; i++)
             {
-                ESCameraProfileCatalog catalog = AssetDatabase.LoadAssetAtPath<ESCameraProfileCatalog>(paths[i]);
-                if (catalog == null || !catalog.TryGet(profileKey, out ESCameraProfile profile))
+                ESCameraViewDefinitionCatalog catalog = AssetDatabase.LoadAssetAtPath<ESCameraViewDefinitionCatalog>(paths[i]);
+                if (catalog == null
+                    || !catalog.TryResolve(definitionReference, out ESCameraDefinitionRuntimeHandle handle)
+                    || !catalog.TryGet(handle, out ESCameraViewDefinition definition))
                     continue;
 
                 if (resolvedCatalog != null && resolvedCatalog != catalog)
                 {
-                    error = "ProfileKey '" + profileKey + "' 同时存在于多个 ProfileCatalog，编辑器预览拒绝猜测来源。";
+                    error = "Definition '" + definitionReference + "' 同时存在于多个 DefinitionCatalog，编辑器预览拒绝猜测来源。";
                     return false;
                 }
 
                 resolvedCatalog = catalog;
-                resolvedProfile = profile;
+                resolvedDefinition = definition;
             }
 
             if (resolvedCatalog != null)
                 return true;
 
-            error = "找不到 ProfileKey '" + profileKey + "' 对应的 ESCameraProfileCatalog。";
+            error = "找不到 Definition '" + definitionReference + "' 对应的 ESCameraViewDefinitionCatalog。";
             return false;
         }
 

@@ -13,7 +13,20 @@ namespace ES
 {
     public class ESEditorTrackClip : VisualElement
     {
-        public string ClipName { get { return trackClip.DisplayName; } private set { if (trackClip.DisplayName != value) { trackClip.DisplayName = value; m_ClipNameLabel.text = value; } } }
+        public string ClipName
+        {
+            get { return trackClip != null ? trackClip.DisplayName : m_ClipNameCache; }
+            private set
+            {
+                m_ClipNameCache = value ?? string.Empty;
+                if (trackClip != null && trackClip.DisplayName != m_ClipNameCache)
+                    trackClip.DisplayName = m_ClipNameCache;
+                if (m_ClipNameLabel != null)
+                    m_ClipNameLabel.text = m_ClipNameCache;
+                if (m_ClipShortLabel != null)
+                    m_ClipShortLabel.text = BuildShortClipName(m_ClipNameCache);
+            }
+        }
         public float StartTime { get { return trackClip.StartTime; } private set { if (trackClip.StartTime != value) { trackClip.StartTime = value; } } }
         public float Duration { get { return trackClip.DurationTime; } private set { if (trackClip.DurationTime != value) { trackClip.DurationTime = value; } } }
         public object UserData { get; set; }
@@ -27,7 +40,10 @@ namespace ES
         private VisualElement popup;
         private Label popLabel;
         private VisualElement m_ClipIcon;
+        private VisualElement m_ResizeHandle;
         private Label m_ClipNameLabel;
+        private Label m_ClipShortLabel;
+        private Label m_ClipStateBadge;
         private TextField m_RenameField;
         private bool isRenaming;
         private bool m_IsSelected;
@@ -40,9 +56,13 @@ namespace ES
         private float m_LastAppliedLeft = float.NaN;
         private float m_LastAppliedWidth = float.NaN;
         private DisplayStyle m_LastAppliedDisplay = (DisplayStyle)(-1);
+        private string m_ClipNameCache = string.Empty;
         private string m_LastAppliedClipName;
         private bool m_IsActive;
         private const float StylePixelEpsilon = 0.25f;
+        private const float PointerGestureThreshold = 4f;
+        private bool m_GestureActivated;
+        private Vector2 m_PointerDownPosition;
 
         public event Action<ESEditorTrackClip> OnClipClicked;
 #pragma warning disable CS0067
@@ -131,7 +151,65 @@ namespace ES
             };
 
             m_ClipContent.Add(m_ClipNameLabel);
+
+            m_ClipShortLabel = new Label(BuildShortClipName(name))
+            {
+                style =
+                {
+                    display = DisplayStyle.None,
+                    flexGrow = 1,
+                    minWidth = 0,
+                    fontSize = 9,
+                    color = new Color(0.93f, 0.96f, 1f, 1f),
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    unityTextAlign = TextAnchor.MiddleCenter,
+                    whiteSpace = WhiteSpace.NoWrap,
+                    overflow = Overflow.Hidden,
+                    textOverflow = TextOverflow.Ellipsis
+                }
+            };
+            m_ClipContent.Add(m_ClipShortLabel);
+
+            m_ClipStateBadge = new Label()
+            {
+                style =
+                {
+                    display = DisplayStyle.None,
+                    minWidth = 16,
+                    width = 16,
+                    height = 16,
+                    marginLeft = 3,
+                    fontSize = 9,
+                    color = Color.white,
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    unityTextAlign = TextAnchor.MiddleCenter,
+                    backgroundColor = new Color(0.38f, 0.11f, 0.08f, 0.95f),
+                    borderTopLeftRadius = 3,
+                    borderTopRightRadius = 3,
+                    borderBottomLeftRadius = 3,
+                    borderBottomRightRadius = 3
+                }
+            };
+            m_ClipContent.Add(m_ClipStateBadge);
             Add(m_ClipContent);
+
+            m_ResizeHandle = new VisualElement { name = "clip-resize-handle" };
+            m_ResizeHandle.pickingMode = PickingMode.Position;
+            m_ResizeHandle.tooltip = "拖动右侧手柄调整片段时长；也支持按住 Shift 拖动片段。";
+            m_ResizeHandle.style.position = Position.Absolute;
+            m_ResizeHandle.style.right = 0;
+            m_ResizeHandle.style.top = 2;
+            m_ResizeHandle.style.bottom = 2;
+            m_ResizeHandle.style.width = 5;
+            m_ResizeHandle.style.backgroundColor = new Color(0.7f, 0.84f, 1f, 0.18f);
+            m_ResizeHandle.style.borderTopLeftRadius = 2;
+            m_ResizeHandle.style.borderBottomLeftRadius = 2;
+            m_ResizeHandle.style.cursor = new UnityEngine.UIElements.Cursor
+            {
+                texture = EditorGUIUtility.Load("Cursors/d_ResizeHorizontal") as Texture2D,
+                hotspot = new Vector2(8, 8)
+            };
+            Add(m_ResizeHandle);
             CreateSelectionFrame();
             CreateEditingFocusFrame();
             RefreshClipIcon();
@@ -175,9 +253,11 @@ namespace ES
         private bool isExpanding = false;
         private float offsetPOSDragLeft = 0f;
         private float offsetPOSForMouseX = 0f;
+        private int m_ActivePointerId = -1;
 
         public static float lastHandleTime = 0;
         private float startWidth = 0f;
+        private float startDuration = 0f;
         #region  拖动功能·
         public void BindDragEvent()
         {
@@ -222,6 +302,8 @@ namespace ES
 
             // 鼠标释放结束拖动
             this.RegisterCallback<PointerUpEvent>(OnPointerUp);
+            this.RegisterCallback<PointerCancelEvent>(OnPointerCancel);
+            this.RegisterCallback<PointerCaptureOutEvent>(OnPointerCaptureOut);
 
             // 鼠标离开时如果未按下则结束拖动
             this.RegisterCallback<PointerLeaveEvent>(OnPointerLeave);
@@ -356,6 +438,8 @@ namespace ES
                     if (m_EditingFocusFrame != null && m_EditingFocusFrame.style.display.value == DisplayStyle.Flex)
                         m_EditingFocusFrame.BringToFront();
                 }
+
+                m_ResizeHandle?.BringToFront();
             }
         }
 
@@ -388,7 +472,8 @@ namespace ES
 
             if (evt.button == 1 && evt.shiftKey)
             {
-                ESTrackViewWindowHelper.EditClip(this);
+                // Shift + 右键是“直接弹出独立编辑器”的快捷入口；普通右键仍显示上下文菜单。
+                ESTrackViewWindow.window?.EditClip(this, true);
                 evt.StopPropagation();
                 return;
             }
@@ -406,28 +491,33 @@ namespace ES
                 return;
             }
 
-            if (evt.button != 1) // 左键
+            if (evt.button == 0) // 仅左键：中键/其他按钮不得改变时序
             {
                 lastHandleTime = Time.realtimeSinceStartup;
-                if (evt.shiftKey == false) // 无Shift 拖动后
+                bool resizeGesture = evt.shiftKey || ReferenceEquals(evt.target, m_ResizeHandle);
+                if (!resizeGesture) // 默认拖动片段
                 {
                     isDragging = true;
+                    m_GestureActivated = false;
                     var mousePos = evt.position;
+                    m_PointerDownPosition = mousePos;
                     offsetPOSDragLeft = mousePos.x - this.resolvedStyle.left;
-                    ESTrackViewWindow.window?.BeginClipGroupDrag(this);
-                    this.AddToClassList("dragging");
-                    popup.style.display = DisplayStyle.Flex;
+                    popup.style.display = DisplayStyle.None;
+                    m_ActivePointerId = evt.pointerId;
                     this.CapturePointer(evt.pointerId);
                     evt.StopPropagation();
                 }
-                else if (true) //zhong键
+                else
                 {
                     isExpanding = true;
+                    m_GestureActivated = false;
                     var mousePos = evt.position;
+                    m_PointerDownPosition = mousePos;
                     offsetPOSForMouseX = mousePos.x;
                     startWidth = this.resolvedStyle.width;
-                    this.AddToClassList("expanding");
-                    popup.style.display = DisplayStyle.Flex;
+                    startDuration = Duration;
+                    popup.style.display = DisplayStyle.None;
+                    m_ActivePointerId = evt.pointerId;
                     this.CapturePointer(evt.pointerId);
                     evt.StopPropagation();
                 }
@@ -445,27 +535,78 @@ namespace ES
             if (isRenaming)
                 return;
 
+            FinishPointerInteraction(evt.pointerId);
+            evt.StopPropagation();
+        }
+
+        private void OnPointerCancel(PointerCancelEvent evt)
+        {
+            FinishPointerInteraction(evt.pointerId);
+            evt.StopPropagation();
+        }
+
+        private void OnPointerCaptureOut(PointerCaptureOutEvent evt)
+        {
+            if (isDragging || isExpanding)
+                FinishPointerInteraction(evt.pointerId);
+        }
+
+        private void FinishPointerInteraction(int pointerId)
+        {
+            if (pointerId < 0)
+                pointerId = m_ActivePointerId;
+
             if (isDragging)
             {
                 isDragging = false;
-                this.RemoveFromClassList("dragging");
+                bool committed = m_GestureActivated;
+                m_GestureActivated = false;
+                RemoveFromClassList("dragging");
                 popup.style.display = DisplayStyle.None;
-                this.ReleasePointer(evt.pointerId);
-                ESTrackViewWindow.window?.EndClipGroupDrag(this);
-                ESTrackViewWindow.window?.SyncTotalTimeFromCurrentSequence(true);
-                ESTrackViewWindow.window?.ForceRefreshClipLayoutNow();
-                evt.StopPropagation();
+                if (pointerId >= 0 && this.HasPointerCapture(pointerId))
+                    this.ReleasePointer(pointerId);
+                if (committed)
+                    ESTrackViewWindow.window?.EndClipGroupDrag(this);
             }
 
-            if (isExpanding) //中
+            if (isExpanding)
             {
                 isExpanding = false;
+                bool committed = m_GestureActivated;
+                m_GestureActivated = false;
+                RemoveFromClassList("expanding");
                 popup.style.display = DisplayStyle.None;
-                this.ReleasePointer(evt.pointerId);
-                ESTrackViewWindow.window?.SyncTotalTimeFromCurrentSequence(true);
-                ESTrackViewWindow.window?.ForceRefreshClipLayoutNow();
-                evt.StopPropagation();
+                if (pointerId >= 0 && this.HasPointerCapture(pointerId))
+                    this.ReleasePointer(pointerId);
+                if (committed)
+                    ESTrackViewWindow.window?.EndClipResize(this, startDuration);
             }
+
+            m_ActivePointerId = -1;
+        }
+
+        public void CancelPointerInteraction(bool commit)
+        {
+            if (!isDragging && !isExpanding)
+                return;
+
+            if (commit)
+            {
+                FinishPointerInteraction(m_ActivePointerId);
+                return;
+            }
+
+            int pointerId = m_ActivePointerId;
+            isDragging = false;
+            isExpanding = false;
+            m_GestureActivated = false;
+            RemoveFromClassList("dragging");
+            RemoveFromClassList("expanding");
+            if (popup != null)
+                popup.style.display = DisplayStyle.None;
+            if (pointerId >= 0 && this.HasPointerCapture(pointerId))
+                this.ReleasePointer(pointerId);
+            m_ActivePointerId = -1;
         }
 
         private void BeginRename()
@@ -477,6 +618,7 @@ namespace ES
             ESTrackViewWindow.window?.SetRenamingClip(this);
             isDragging = false;
             isExpanding = false;
+            m_GestureActivated = false;
             RemoveFromClassList("dragging");
             RemoveFromClassList("expanding");
             popup.style.display = DisplayStyle.None;
@@ -624,6 +766,17 @@ namespace ES
             //            Debug.Log("拖动位置：" + this.resolvedStyle.left + " " + evt.button + " " + evt.pointerType + evt.shiftKey);
             if (isDragging)
             {
+                if (!m_GestureActivated)
+                {
+                    Vector2 currentPosition = evt.position;
+                    if ((currentPosition - m_PointerDownPosition).sqrMagnitude < PointerGestureThreshold * PointerGestureThreshold)
+                        return;
+
+                    m_GestureActivated = true;
+                    ESTrackViewWindow.window?.BeginClipGroupDrag(this);
+                    AddToClassList("dragging");
+                    popup.style.display = DisplayStyle.Flex;
+                }
 
                 // 获取鼠标在轨道上的相对位置
                 var mousePos = evt.position;
@@ -637,6 +790,17 @@ namespace ES
             }
             else if (isExpanding)
             {
+                if (!m_GestureActivated)
+                {
+                    Vector2 currentPosition = evt.position;
+                    if ((currentPosition - m_PointerDownPosition).sqrMagnitude < PointerGestureThreshold * PointerGestureThreshold)
+                        return;
+
+                    m_GestureActivated = true;
+                    ESTrackViewWindow.window?.BeginClipResize(this);
+                    AddToClassList("expanding");
+                    popup.style.display = DisplayStyle.Flex;
+                }
 
                 // 获取鼠标在轨道上的相对位置
                 var mousePos = evt.position;
@@ -669,6 +833,7 @@ namespace ES
             ApplyWidthIfChanged(w);
             StartTime = newStartTime;
             AdjustFontToFit();
+            UpdateCompactMetadataVisibility(w);
             popLabel.text = $"[{StartTime:F2}s -- {StartTime + Duration:F2}]";
 
         }
@@ -706,6 +871,7 @@ namespace ES
                 m_ClipIcon.style.display = w >= 44f ? DisplayStyle.Flex : DisplayStyle.None;
             if (widthChanged)
                 AdjustFontToFit();
+            UpdateCompactMetadataVisibility(w);
         }
 
         public void SetTimeScaleAndStartShowCache()
@@ -816,6 +982,22 @@ namespace ES
                     ? new Color(0.93f, 0.96f, 1f, 1f)
                     : new Color(0.38f, 0.40f, 0.44f, 1f);
 
+            if (m_ClipStateBadge != null)
+            {
+                bool showBadge = !enabled || m_HasValidationWarning;
+                m_ClipStateBadge.text = m_HasValidationWarning ? "警" : "禁";
+                m_ClipStateBadge.tooltip = m_HasValidationWarning
+                    ? m_ValidationWarning
+                    : "片段已禁用";
+                m_ClipStateBadge.style.color = m_HasValidationWarning
+                    ? new Color(1f, 0.82f, 0.42f, 1f)
+                    : new Color(0.68f, 0.72f, 0.78f, 1f);
+                m_ClipStateBadge.style.backgroundColor = m_HasValidationWarning
+                    ? new Color(0.42f, 0.25f, 0.05f, 0.96f)
+                    : new Color(0.14f, 0.16f, 0.19f, 0.96f);
+                m_ClipStateBadge.style.display = showBadge ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
             if (!enabled && !m_HasValidationWarning)
             {
                 style.backgroundColor = new Color(0.012f, 0.013f, 0.016f, 1f);
@@ -826,6 +1008,7 @@ namespace ES
             }
 
             ApplyValidationVisual();
+            UpdateCompactMetadataVisibility(style.width.value.value);
         }
 
         private void ApplyValidationVisual()
@@ -836,19 +1019,19 @@ namespace ES
             bool enabled = trackClip == null || trackClip.Enabled;
             style.opacity = enabled ? 1f : 0.92f;
             style.backgroundColor = enabled
-                ? new Color(0.78f, 0.05f, 0.045f, 0.98f)
-                : new Color(0.09f, 0.006f, 0.005f, 1f);
+                ? new Color(0.48f, 0.30f, 0.06f, 0.98f)
+                : new Color(0.12f, 0.10f, 0.055f, 1f);
             style.borderLeftWidth = 4;
             style.borderRightWidth = 2;
             style.borderTopWidth = 2;
             style.borderBottomWidth = 2;
-            style.borderLeftColor = enabled ? new Color(1f, 0.18f, 0.12f, 1f) : new Color(0.45f, 0.035f, 0.025f, 1f);
-            style.borderRightColor = enabled ? new Color(1f, 0.46f, 0.34f, 0.95f) : new Color(0.22f, 0.025f, 0.02f, 1f);
-            style.borderTopColor = enabled ? new Color(1f, 0.55f, 0.42f, 0.95f) : new Color(0.30f, 0.035f, 0.028f, 0.95f);
-            style.borderBottomColor = enabled ? new Color(0.32f, 0f, 0f, 1f) : new Color(0.08f, 0f, 0f, 1f);
+            style.borderLeftColor = enabled ? new Color(1f, 0.72f, 0.18f, 1f) : new Color(0.48f, 0.36f, 0.12f, 1f);
+            style.borderRightColor = enabled ? new Color(1f, 0.86f, 0.42f, 0.95f) : new Color(0.28f, 0.22f, 0.08f, 1f);
+            style.borderTopColor = enabled ? new Color(1f, 0.9f, 0.58f, 0.95f) : new Color(0.38f, 0.29f, 0.10f, 0.95f);
+            style.borderBottomColor = enabled ? new Color(0.34f, 0.20f, 0.02f, 1f) : new Color(0.12f, 0.08f, 0.02f, 1f);
 
             if (m_ClipNameLabel != null)
-                m_ClipNameLabel.style.color = enabled ? Color.white : new Color(0.62f, 0.46f, 0.46f, 1f);
+                m_ClipNameLabel.style.color = enabled ? new Color(1f, 0.96f, 0.84f, 1f) : new Color(0.62f, 0.58f, 0.46f, 1f);
         }
 
         public void RefreshClipIcon()
@@ -922,21 +1105,45 @@ namespace ES
 
             m_LastAppliedClipName = clipName;
             m_ClipNameLabel.text = clipName;
+            if (m_ClipShortLabel != null)
+                m_ClipShortLabel.text = BuildShortClipName(clipName);
             if (!m_HasValidationWarning)
                 tooltip = clipName;
             AdjustFontToFit();
+            UpdateCompactMetadataVisibility(style.width.value.value);
         }
 
-        void AdjustFontToFit()
+        private static string BuildShortClipName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return "片";
+
+            return name.Length <= 2 ? name : name.Substring(0, 2);
+        }
+
+        private void UpdateCompactMetadataVisibility(float width)
+        {
+            bool compact = width > 0f && width < 64f;
+            if (m_ClipNameLabel != null)
+                m_ClipNameLabel.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
+            if (m_ClipShortLabel != null)
+                m_ClipShortLabel.style.display = compact ? DisplayStyle.Flex : DisplayStyle.None;
+            if (m_ClipIcon != null)
+                m_ClipIcon.style.display = width >= 30f ? DisplayStyle.Flex : DisplayStyle.None;
+            if (m_ClipStateBadge != null && width < 54f)
+                m_ClipStateBadge.style.display = DisplayStyle.None;
+        }
+
+        private void AdjustFontToFit()
         {
             float availableWidth = Mathf.Max(0f, style.width.value.value - 30f);
             if (string.IsNullOrEmpty(m_ClipNameLabel.text) || availableWidth <= 0f)
             {
-                m_ClipNameLabel.style.fontSize = 8f;
+                m_ClipNameLabel.style.fontSize = 10f;
                 return;
             }
 
-            float targetSize = Mathf.Lerp(8f, 11.5f, Mathf.InverseLerp(40f, 180f, availableWidth));
+            float targetSize = Mathf.Lerp(9f, 11.5f, Mathf.InverseLerp(64f, 180f, availableWidth));
             m_ClipNameLabel.style.fontSize = targetSize;
         }
 

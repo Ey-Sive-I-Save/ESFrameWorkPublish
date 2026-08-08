@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 [assembly: InternalsVisibleTo("ES_Design.ConfigKey.Tests")]
 
@@ -17,18 +18,34 @@ namespace ES
         public static readonly ESCameraViewId Main = new ESCameraViewId("MainView");
 
         [SerializeField] private readonly string key;
+        [NonSerialized] private readonly int runtimeHashCode;
+        [NonSerialized] private readonly bool runtimeIsValid;
 
         public ESCameraViewId(string key)
         {
             this.key = key;
+            runtimeIsValid = !string.IsNullOrWhiteSpace(key);
+            runtimeHashCode = runtimeIsValid ? StringComparer.Ordinal.GetHashCode(key) : 0;
         }
 
         public string Key => key;
-        public bool IsValid => !string.IsNullOrWhiteSpace(key);
+        public bool IsValid => runtimeIsValid || !string.IsNullOrWhiteSpace(key);
 
-        public bool Equals(ESCameraViewId other) => string.Equals(key, other.key, StringComparison.Ordinal);
+        public bool Equals(ESCameraViewId other)
+        {
+            if (ReferenceEquals(key, other.key))
+                return true;
+            if (runtimeHashCode != 0 && other.runtimeHashCode != 0 && runtimeHashCode != other.runtimeHashCode)
+                return false;
+            return string.Equals(key, other.key, StringComparison.Ordinal);
+        }
         public override bool Equals(object obj) => obj is ESCameraViewId other && Equals(other);
-        public override int GetHashCode() => key != null ? StringComparer.Ordinal.GetHashCode(key) : 0;
+        public override int GetHashCode()
+        {
+            return runtimeHashCode != 0
+                ? runtimeHashCode
+                : key != null ? StringComparer.Ordinal.GetHashCode(key) : 0;
+        }
         public override string ToString() => key ?? string.Empty;
 
         public static bool operator ==(ESCameraViewId left, ESCameraViewId right) => left.Equals(right);
@@ -96,7 +113,8 @@ namespace ES
 
     /// <summary>
     /// 只描述镜头意图，不持有 Cinemachine Virtual Camera、Rig Prefab 或任意场景实例。
-    /// profileKey 是业务与相机内容之间唯一允许使用的稳定内容键。
+    /// definition 是业务与相机内容之间唯一允许使用的稳定内容引用。Director 接收后会
+    /// 在当前 View 的唯一 Catalog 中解析为 RuntimeHandle；业务绝不构造裸 RuntimeKey。
     /// </summary>
     [Serializable]
     public struct ESCameraRequest
@@ -105,7 +123,7 @@ namespace ES
 
         public ESCameraRequestKind kind;
 
-        public string profileKey;
+        public ESCameraDefinitionReference definition;
 
         public int priority;
 
@@ -115,8 +133,11 @@ namespace ES
 
         public Transform lookAt;
 
-        /// <summary>仅 Modifier 使用；非空时只对相同 ProfileKey 的当前获胜 Base/Shot 生效。</summary>
-        public string compatibleProfileKey;
+        /// <summary>仅 Modifier 使用；非空时只对相同 Definition 的当前获胜 Base/Shot 生效。</summary>
+        public ESCameraDefinitionReference compatibleDefinition;
+
+        [NonSerialized] internal ESCameraDefinitionRuntimeHandle definitionHandle;
+        [NonSerialized] internal ESCameraDefinitionRuntimeHandle compatibleDefinitionHandle;
 
         public ESCameraModifier modifier;
 
@@ -131,14 +152,14 @@ namespace ES
                     return modifier.IsValid;
 
                 return (kind == ESCameraRequestKind.Base || kind == ESCameraRequestKind.Shot)
-                       && !string.IsNullOrWhiteSpace(profileKey)
+                       && definition.IsConfigured
                        && follow != null;
             }
         }
 
         public static ESCameraRequest CreateBase(
             ESCameraViewId viewId,
-            string profileKey,
+            ESCameraDefinitionReference definition,
             int priority,
             UnityEngine.Object owner,
             Transform follow,
@@ -148,7 +169,7 @@ namespace ES
             {
                 viewId = viewId,
                 kind = ESCameraRequestKind.Base,
-                profileKey = profileKey,
+                definition = definition,
                 priority = priority,
                 owner = owner,
                 follow = follow,
@@ -158,13 +179,13 @@ namespace ES
 
         public static ESCameraRequest CreateShot(
             ESCameraViewId viewId,
-            string profileKey,
+            ESCameraDefinitionReference definition,
             int priority,
             UnityEngine.Object owner,
             Transform follow,
             Transform lookAt = null)
         {
-            ESCameraRequest request = CreateBase(viewId, profileKey, priority, owner, follow, lookAt);
+            ESCameraRequest request = CreateBase(viewId, definition, priority, owner, follow, lookAt);
             request.kind = ESCameraRequestKind.Shot;
             return request;
         }
@@ -174,7 +195,7 @@ namespace ES
             int priority,
             UnityEngine.Object owner,
             ESCameraModifier modifier,
-            string compatibleProfileKey = null)
+            ESCameraDefinitionReference compatibleDefinition = default)
         {
             return new ESCameraRequest
             {
@@ -183,7 +204,7 @@ namespace ES
                 priority = priority,
                 owner = owner,
                 modifier = modifier,
-                compatibleProfileKey = compatibleProfileKey,
+                compatibleDefinition = compatibleDefinition,
             };
         }
     }
@@ -260,7 +281,9 @@ namespace ES
     public readonly struct ESCameraResolvedView
     {
         public readonly bool hasWinner;
-        public readonly string profileKey;
+        public readonly bool configurationChanged;
+        public readonly ESCameraDefinitionReference definition;
+        public readonly ESCameraDefinitionRuntimeHandle definitionHandle;
         public readonly Transform follow;
         public readonly Transform lookAt;
         public readonly UnityEngine.Object owner;
@@ -270,7 +293,9 @@ namespace ES
 
         internal ESCameraResolvedView(
             bool hasWinner,
-            string profileKey,
+            bool configurationChanged,
+            ESCameraDefinitionReference definition,
+            ESCameraDefinitionRuntimeHandle definitionHandle,
             Transform follow,
             Transform lookAt,
             UnityEngine.Object owner,
@@ -279,7 +304,9 @@ namespace ES
             ESCameraResolvedModifiers modifiers)
         {
             this.hasWinner = hasWinner;
-            this.profileKey = profileKey;
+            this.configurationChanged = configurationChanged;
+            this.definition = definition;
+            this.definitionHandle = definitionHandle;
             this.follow = follow;
             this.lookAt = lookAt;
             this.owner = owner;
@@ -364,7 +391,9 @@ namespace ES
     {
         bool IsReady { get; }
         Transform OutputTransform { get; }
-        void Apply(in ESCameraResolvedView resolved);
+        bool TryResolveDefinition(ESCameraDefinitionReference reference, out ESCameraDefinitionRuntimeHandle handle);
+        /// <summary>执行已仲裁视图；返回 false 表示执行层未能应用该视图。</summary>
+        bool Apply(in ESCameraResolvedView resolved);
         void Clear();
     }
 }

@@ -13,6 +13,16 @@ Button {
     color: rgb(214, 220, 228);
 }
 
+Button:disabled,
+.track-toolbar-button:disabled {
+    color: rgb(109, 118, 130);
+    background-color: rgba(24, 28, 33, 0.62);
+    border-top-color: rgba(55, 63, 73, 0.42);
+    border-right-color: rgba(18, 22, 27, 0.55);
+    border-bottom-color: rgba(18, 22, 27, 0.6);
+    border-left-color: rgba(55, 63, 73, 0.42);
+}
+
 .normalBlock {
     background-color: rgba(16, 20, 25, 0.9);
     border-top-color: rgba(70, 82, 98, 0.65);
@@ -36,6 +46,8 @@ Button {
     min-width: 480px;
     min-height: 400px;
     background-color: rgb(20, 22, 26);
+    border-top-width: 1px;
+    border-top-color: rgba(65, 77, 91, 0.58);
 }
 
 .timeline-canvas {
@@ -45,6 +57,8 @@ Button {
     bottom: 0;
     overflow: visible;
     background-color: rgb(22, 24, 28);
+    border-left-width: 1px;
+    border-left-color: rgba(57, 68, 81, 0.62);
 }
 
 .timeline-ruler {
@@ -78,7 +92,7 @@ Button {
     overflow: visible;
     background-color: rgb(18, 20, 23);
     border-right-width: 1px;
-    border-right-color: rgb(57, 64, 74);
+    border-right-color: rgb(70, 82, 98);
 }
 
 .track-panel-splitter {
@@ -100,6 +114,64 @@ Button {
     right: 15px;
     height: 18px;
     opacity: 0.8;
+}
+
+.track-empty-state-card {
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    top: 24%;
+    min-width: 220px;
+    max-width: 520px;
+    min-height: 220px;
+    padding-left: 22px;
+    padding-right: 22px;
+    padding-top: 18px;
+    padding-bottom: 18px;
+    align-items: flex-start;
+    background-color: rgba(27, 35, 45, 0.98);
+    border-left-width: 2px;
+    border-left-color: rgba(91, 145, 196, 0.95);
+    border-top-width: 1px;
+    border-top-color: rgba(91, 113, 138, 0.9);
+    border-right-width: 1px;
+    border-right-color: rgba(12, 17, 23, 0.95);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(12, 17, 23, 0.95);
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+.track-empty-state-title {
+    color: rgb(229, 237, 246);
+    font-size: 16px;
+    -unity-font-style: bold;
+    margin-bottom: 6px;
+}
+
+.track-empty-state-description,
+.track-empty-state-step {
+    color: rgb(171, 184, 199);
+    font-size: 12px;
+    margin-bottom: 4px;
+    white-space: normal;
+}
+
+.track-empty-state-step {
+    color: rgb(204, 214, 225);
+}
+
+.track-empty-state-action {
+    min-width: 112px;
+    height: 28px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: rgb(235, 243, 252);
+    background-color: rgba(39, 91, 139, 0.96);
+    border-left-color: rgba(121, 181, 233, 0.92);
+    border-top-color: rgba(121, 181, 233, 0.92);
 }
 
 .track-toolbar-button {
@@ -124,15 +196,13 @@ Button {
 
 .track-inspector-panel {
     position: absolute;
-    top: 48px;
     right: 0;
-    bottom: 20px;
     width: 320px;
     min-width: 320px;
     flex-direction: column;
     background-color: rgb(23, 26, 31);
     border-left-width: 1px;
-    border-left-color: rgb(65, 77, 91);
+    border-left-color: rgb(82, 97, 114);
     border-top-width: 1px;
     border-top-color: rgba(82, 97, 114, 0.8);
     border-bottom-width: 1px;
@@ -149,12 +219,117 @@ Button {
     border-bottom-color: rgb(56, 66, 78);
 }
 
+.track-inspector-summary {
+    flex-direction: column;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    background-color: rgba(17, 21, 26, 0.96);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(67, 80, 96, 0.82);
+}
+
+.track-inspector-summary-title-row,
+.track-inspector-summary-status-row {
+    flex-direction: row;
+    align-items: center;
+    min-width: 0;
+}
+
+.track-inspector-summary-title-row {
+    min-height: 22px;
+}
+
+.track-inspector-target {
+    flex-grow: 1;
+    min-width: 0;
+    color: rgb(226, 232, 240);
+    font-size: 12px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-inspector-type {
+    max-width: 118px;
+    min-width: 0;
+    margin-left: 8px;
+    color: rgb(145, 164, 186);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -unity-text-align: middle-right;
+}
+
+.track-inspector-summary-status-row {
+    margin-top: 4px;
+}
+
+.track-inspector-status-badge {
+    min-width: 54px;
+    height: 20px;
+    padding-left: 6px;
+    padding-right: 6px;
+    color: rgb(198, 208, 220);
+    background-color: rgba(37, 48, 61, 0.94);
+    border-left-width: 2px;
+    border-left-color: rgba(104, 142, 181, 0.88);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-top-color: rgba(104, 142, 181, 0.46);
+    border-right-color: rgba(104, 142, 181, 0.32);
+    border-bottom-color: rgba(104, 142, 181, 0.32);
+    -unity-text-align: middle-center;
+    font-size: 10px;
+}
+
+.track-inspector-hint {
+    flex-grow: 1;
+    min-width: 0;
+    margin-left: 7px;
+    color: rgb(150, 162, 177);
+    font-size: 11px;
+    white-space: normal;
+    overflow: hidden;
+    min-height: 20px;
+}
+
+.track-inspector-detail-button {
+    flex-shrink: 0;
+    min-width: 62px;
+    height: 22px;
+    margin-left: 6px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 10px;
+    color: rgb(218, 229, 241);
+    background-color: rgba(38, 57, 76, 0.96);
+    border-top-color: rgba(104, 151, 198, 0.72);
+    border-right-color: rgba(50, 76, 102, 0.84);
+    border-bottom-color: rgba(18, 28, 38, 0.96);
+    border-left-color: rgba(82, 127, 169, 0.82);
+}
+
+.track-inspector-detail-button:hover {
+    background-color: rgba(50, 77, 104, 0.98);
+    border-top-color: rgba(132, 184, 231, 0.88);
+    border-left-color: rgba(111, 165, 214, 0.92);
+}
+
 .track-inspector-title {
     flex-grow: 1;
+    min-width: 0;
     margin-left: 9px;
     color: rgb(212, 220, 229);
     font-size: 12px;
     -unity-font-style: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .track-inspector-header-button {
@@ -166,6 +341,27 @@ Button {
     font-size: 11px;
 }
 
+.track-inspector-save-button {
+    min-width: 58px;
+    height: 24px;
+    margin-right: 4px;
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 10px;
+    color: rgb(232, 245, 236);
+    background-color: rgba(28, 70, 45, 0.96);
+    border-top-color: rgba(104, 181, 132, 0.82);
+    border-right-color: rgba(39, 92, 59, 0.90);
+    border-bottom-color: rgba(14, 36, 23, 0.96);
+    border-left-color: rgba(75, 143, 101, 0.90);
+}
+
+.track-inspector-save-button:hover {
+    background-color: rgba(38, 92, 59, 0.98);
+    border-top-color: rgba(139, 220, 163, 0.92);
+    border-left-color: rgba(105, 190, 133, 0.94);
+}
+
 .track-inspector-content {
     flex-grow: 1;
     padding-left: 6px;
@@ -175,12 +371,42 @@ Button {
     overflow: hidden;
 }
 
+.track-inspector-body-caption {
+    min-height: 22px;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 5px;
+    padding-bottom: 3px;
+    color: rgb(164, 190, 218);
+    font-size: 11px;
+    -unity-font-style: bold;
+    background-color: rgba(26, 32, 40, 0.96);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(71, 87, 105, 0.72);
+}
+
 .track-inspector-toggle {
     position: absolute;
     top: 52px;
     right: 7px;
     height: 25px;
     min-width: 54px;
+    padding-left: 7px;
+    padding-right: 7px;
+    font-size: 11px;
+    background-color: rgba(36, 46, 58, 0.98);
+    border-top-color: rgba(100, 140, 182, 0.8);
+    border-right-color: rgba(48, 71, 94, 0.92);
+    border-bottom-color: rgba(21, 28, 36, 0.95);
+    border-left-color: rgba(76, 108, 142, 0.9);
+}
+
+.track-inspector-separate-toggle {
+    position: absolute;
+    top: 52px;
+    right: 68px;
+    height: 25px;
+    min-width: 82px;
     padding-left: 7px;
     padding-right: 7px;
     font-size: 11px;

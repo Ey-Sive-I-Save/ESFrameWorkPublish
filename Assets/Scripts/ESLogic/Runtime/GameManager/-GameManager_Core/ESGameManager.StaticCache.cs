@@ -27,6 +27,7 @@ namespace ES
         public static ESResourcePlanRuntimeService ResourcePlans { get; private set; }
         public static ESPhysicsQueryModule PhysicsQueryModule { get; private set; }
         public static ESLODModule LODModule { get; private set; }
+        public static ESDynamicAtlasModule DynamicAtlas { get; private set; }
         /// <summary>
         /// 相机模块门面。业务经此申请/更新/释放 Lease；Director 只由模块持有，
         /// 不允许 Entity、Skill、Vehicle 直接绕过本地观测权写入仲裁器。
@@ -44,11 +45,11 @@ namespace ES
         public static ESNpcConfigKeyTable RuntimeNpcData => ESRuntimeDataGameCore.Npcs;
         public static ESWeaponConfigKeyTable RuntimeWeaponData => ESRuntimeDataGameCore.Weapons;
         public static ESSkillConfigKeyTable RuntimeSkillData => ESRuntimeDataGameCore.Skills;
-        public static ESConfigKeyTable<ESAssetReferPrefabConfigData> RuntimePrefabAssets => ESRuntimeDataAsset.Prefabs;
-        public static ESConfigKeyTable<ESAssetReferSpriteConfigData> RuntimeSpriteAssets => ESRuntimeDataAsset.Sprites;
-        public static ESConfigKeyTable<ESAssetReferAudioClipConfigData> RuntimeAudioClipAssets => ESRuntimeDataAsset.AudioClips;
+        public static ESAssetConfigTableReader<ESAssetReferPrefabConfigData, UnityEngine.GameObject> RuntimePrefabAssets => ESRuntimeDataAsset.Prefabs;
+        public static ESAssetConfigTableReader<ESAssetReferSpriteConfigData, UnityEngine.Sprite> RuntimeSpriteAssets => ESRuntimeDataAsset.Sprites;
+        public static ESAssetConfigTableReader<ESAssetReferAudioClipConfigData, UnityEngine.AudioClip> RuntimeAudioClipAssets => ESRuntimeDataAsset.AudioClips;
         public static ESAudioCueConfigKeyTable RuntimeAudioCueData => ESRuntimeDataGameCore.AudioCues;
-        public static ESConfigKeyTable<ESAssetReferAnimationClipConfigData> RuntimeAnimationClipAssets => ESRuntimeDataAsset.AnimationClips;
+        public static ESAssetConfigTableReader<ESAssetReferAnimationClipConfigData, UnityEngine.AnimationClip> RuntimeAnimationClipAssets => ESRuntimeDataAsset.AnimationClips;
         public static ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffRuntimeInstances => ESRuntimeDataModule.BuffInstanceIndex;
         public static ESRuntimeInstanceIndex<Item> ShotRuntimeInstances => ESRuntimeDataModule.ShotInstanceIndex;
 
@@ -153,6 +154,11 @@ namespace ES
             else
                 LODModule = null;
 
+            if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESDynamicAtlasModule), out IModule dynamicAtlasModule))
+                DynamicAtlas = dynamicAtlasModule as ESDynamicAtlasModule;
+            else
+                DynamicAtlas = null;
+
             ESCommandServices.SetRuntimeMode(RuntimeMode);
             ESCommandServices.SetInputModule(InputModule);
         }
@@ -184,6 +190,7 @@ namespace ES
             SetAudioModule(null);
             PhysicsQueryModule = null;
             LODModule = null;
+            DynamicAtlas = null;
             Camera = null;
             ResourcePlans?.Dispose();
             ResourcePlans = null;

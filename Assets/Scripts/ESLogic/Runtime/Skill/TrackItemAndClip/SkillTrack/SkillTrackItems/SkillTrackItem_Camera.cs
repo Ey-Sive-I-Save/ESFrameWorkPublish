@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ES
 {
@@ -60,7 +61,7 @@ namespace ES
 
                     previewClips.Add(new ESCameraTrackPreviewClip(
                         clip,
-                        clip.profileKey,
+                        clip.definition,
                         clip.viewKey,
                         clip.priority,
                         clip.targetSource == SkillCameraTargetSource.MainTarget
@@ -97,9 +98,12 @@ namespace ES
     public sealed class SkillTrackClip_Camera : SkillTrackClip, ISkillRuntimeClipCompiler
     {
         [TitleGroup("相机片段", "进入片段申请 Shot；离开、打断或补偿清理时释放对应 Lease。")]
-        [LabelText("ProfileKey")]
-        [Tooltip("稳定相机内容键；不得填入 VCam、Rig Prefab 或场景对象。")]
-        public string profileKey;
+        [LabelText("Definition")]
+        [Tooltip("稳定相机内容引用；不得填入 VCam、Rig Prefab 或场景对象。")]
+        public ESCameraDefinitionReference definition;
+
+        [SerializeField, HideInInspector, FormerlySerializedAs("profileKey"), FormerlySerializedAs("definitionKey")]
+        private string legacyDefinitionKey;
 
         [TitleGroup("相机片段")]
         [LabelText("ViewKey")]
@@ -144,7 +148,7 @@ namespace ES
 
         public void OnClipEnter(EntityState_Skill state, ref SkillRuntimeClipState clipState)
         {
-            if (clip == null || string.IsNullOrWhiteSpace(clip.profileKey))
+            if (clip == null || !clip.definition.IsConfigured)
                 return;
 
             ESCameraModule camera = ESGameManager.Camera;
@@ -167,7 +171,7 @@ namespace ES
             {
                 ESCameraRequest request = ESCameraRequest.CreateShot(
                     new ESCameraViewId(clip.viewKey),
-                    clip.profileKey,
+                    clip.definition,
                     clip.priority,
                     cameraOwner,
                     follow,

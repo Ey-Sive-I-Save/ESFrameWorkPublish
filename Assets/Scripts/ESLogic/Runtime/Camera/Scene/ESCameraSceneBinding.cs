@@ -1,6 +1,7 @@
 using System.Threading;
 using Cinemachine;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ES
 {
@@ -10,13 +11,14 @@ namespace ES
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(-8)]
-    [AddComponentMenu("ES/Camera/Scene Binding")]
+    [AddComponentMenu("【ES】/场景与对象/相机场景绑定")]
     public sealed class ESCameraSceneBinding : MonoBehaviour
     {
         [SerializeField] private string viewKey = "MainView";
         [SerializeField] private Camera outputCamera;
         [SerializeField] private CinemachineBrain brain;
-        [SerializeField] private ESCameraProfileCatalog profileCatalog;
+        [FormerlySerializedAs("profileCatalog")]
+        [SerializeField] private ESCameraViewDefinitionCatalog definitionCatalog;
         [SerializeField] private ESCameraRigCatalog rigCatalog;
         [SerializeField] private CinemachineBlenderSettings blenderSettings;
         [SerializeField] private CinemachineBlendDefinition defaultBlend = new CinemachineBlendDefinition(
@@ -45,7 +47,7 @@ namespace ES
             string newViewKey,
             Camera newOutputCamera,
             CinemachineBrain newBrain,
-            ESCameraProfileCatalog newProfileCatalog,
+            ESCameraViewDefinitionCatalog newDefinitionCatalog,
             ESCameraRigCatalog newRigCatalog,
             CinemachineBlenderSettings newBlenderSettings,
             Transform newRigRoot)
@@ -53,7 +55,7 @@ namespace ES
             viewKey = newViewKey;
             outputCamera = newOutputCamera;
             brain = newBrain;
-            profileCatalog = newProfileCatalog;
+            definitionCatalog = newDefinitionCatalog;
             rigCatalog = newRigCatalog;
             blenderSettings = newBlenderSettings;
             rigRoot = newRigRoot;
@@ -66,8 +68,6 @@ namespace ES
                 outputCamera = GetComponent<Camera>();
             if (brain == null)
                 brain = GetComponent<CinemachineBrain>();
-            if (rigRoot == null)
-                rigRoot = transform;
 
             viewId = new ESCameraViewId(viewKey);
         }
@@ -107,8 +107,10 @@ namespace ES
             if (camera == null)
                 return false;
 
+            brain.m_UpdateMethod = CinemachineBrain.UpdateMethod.SmartUpdate;
+            brain.m_BlendUpdateMethod = CinemachineBrain.BrainUpdateMethod.LateUpdate;
             sceneEpoch = NextSceneEpoch();
-            adapter = new ESCameraCinemachine2ViewAdapter(outputCamera, brain, profileCatalog, rigCatalog, rigRoot);
+            adapter = new ESCameraCinemachine2ViewAdapter(outputCamera, brain, definitionCatalog, rigCatalog, rigRoot);
             if (!adapter.IsReady)
             {
                 adapter.Dispose();
@@ -147,9 +149,21 @@ namespace ES
                 return false;
             }
 
-            if (profileCatalog == null || rigCatalog == null || blenderSettings == null || rigRoot == null)
+            if (definitionCatalog == null || rigCatalog == null || blenderSettings == null || rigRoot == null)
             {
-                ReportConfigurationError("ProfileCatalog、RigCatalog、BlenderSettings 和 RigRoot 都是必填项。");
+                ReportConfigurationError("DefinitionCatalog、RigCatalog、BlenderSettings 和 RigRoot 都是必填项。");
+                return false;
+            }
+
+            if (!definitionCatalog.TryValidateRigDependencies(rigCatalog, out string catalogError))
+            {
+                ReportConfigurationError(catalogError);
+                return false;
+            }
+
+            if (rigRoot == outputCamera.transform || rigRoot.IsChildOf(outputCamera.transform))
+            {
+                ReportConfigurationError("RigRoot 必须是独立场景节点，不能挂在输出 Camera 的变换层级之下。");
                 return false;
             }
 

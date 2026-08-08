@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace ES
 {
     /// <summary>
-    /// 相机轨道预览的 Runtime 纯契约。它只描述轨道、目标与稳定 ProfileKey，
+    /// 相机轨道预览的 Runtime 纯契约。它只描述轨道、目标与稳定 Definition 引用，
     /// 不引用 UnityEditor、TrackView 窗口、Cinemachine Editor 或任何场景 VCam。
     /// Editor/Camera 中的 Bootstrap 在域加载时注册唯一 Factory。
     /// </summary>
@@ -23,26 +23,26 @@ namespace ES
     public readonly struct ESCameraTrackPreviewClip
     {
         public readonly ITrackClip sourceClip;
-        public readonly string profileKey;
+        public readonly ESCameraDefinitionReference definition;
         public readonly string viewKey;
         public readonly int priority;
         public readonly ESCameraTrackPreviewTargetSource targetSource;
 
         public ESCameraTrackPreviewClip(
             ITrackClip sourceClip,
-            string profileKey,
+            ESCameraDefinitionReference definition,
             string viewKey,
             int priority,
             ESCameraTrackPreviewTargetSource targetSource)
         {
             this.sourceClip = sourceClip;
-            this.profileKey = profileKey;
+            this.definition = definition;
             this.viewKey = viewKey;
             this.priority = priority;
             this.targetSource = targetSource;
         }
 
-        public bool IsValid => sourceClip != null && !string.IsNullOrWhiteSpace(profileKey);
+        public bool IsValid => sourceClip != null && definition.IsConfigured;
     }
 
     /// <summary>

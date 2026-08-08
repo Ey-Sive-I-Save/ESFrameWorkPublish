@@ -91,12 +91,12 @@ namespace ES.Tests
             return instance;
         }
 
-        private ESCameraRequest CreateRequest(UnityEngine.Object owner, string profileKey)
+        private ESCameraRequest CreateRequest(UnityEngine.Object owner, string definitionKey)
         {
-            GameObject follow = CreateObject("Follow " + profileKey);
+            GameObject follow = CreateObject("Follow " + definitionKey);
             return ESCameraRequest.CreateBase(
                 ESCameraViewId.Main,
-                profileKey,
+                new ESCameraDefinitionReference(ESCameraDefinitionEnumKey.None, definitionKey),
                 0,
                 owner,
                 follow.transform);
@@ -106,12 +106,21 @@ namespace ES.Tests
         {
             public bool IsReady => true;
             public Transform OutputTransform => null;
+
+            public bool TryResolveDefinition(ESCameraDefinitionReference reference, out ESCameraDefinitionRuntimeHandle handle)
+            {
+                handle = reference.IsConfigured
+                    ? new ESCameraDefinitionRuntimeHandle(2, 1, 1, "TEST")
+                    : default;
+                return handle.IsValid;
+            }
             public ESCameraResolvedView last;
             public int clearCount;
 
-            public void Apply(in ESCameraResolvedView resolved)
+            public bool Apply(in ESCameraResolvedView resolved)
             {
                 last = resolved;
+                return true;
             }
 
             public void Clear()

@@ -19,26 +19,37 @@ namespace ES
 
         private readonly Camera outputCamera;
         private readonly CinemachineBrain brain;
-        private readonly ESCameraProfileCatalog profiles;
+        private readonly ESCameraViewDefinitionCatalog definitionCatalog;
         private readonly ESCameraSceneRigRegistry rigs;
-        private readonly HashSet<string> reportedProfileErrors = new HashSet<string>(StringComparer.Ordinal);
+        private readonly ESInputSchemeResolver inputSchemeResolver;
+        private readonly HashSet<string> reportedDefinitionErrors = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<CinemachineVirtualCameraBase, RigModifierBaseline> modifierBaselines = new Dictionary<CinemachineVirtualCameraBase, RigModifierBaseline>(4);
 
         private CinemachineVirtualCameraBase activeRig;
-        private string activeProfileKey;
+        private CinemachinePOV activePov;
+        private CinemachineCollider activeObstruction;
+        private ESCameraViewDefinition activeDefinition;
+        private ESCameraDefinitionRuntimeHandle activeDefinitionHandle;
+        private ESCameraResolvedModifiers appliedModifiers;
+        private bool hasAppliedModifiers;
+        private bool lookInputUsesRate;
         private bool disposed;
 
         public ESCameraCinemachine2ViewAdapter(
             Camera outputCamera,
             CinemachineBrain brain,
-            ESCameraProfileCatalog profiles,
+            ESCameraViewDefinitionCatalog definitionCatalog,
             ESCameraRigCatalog rigCatalog,
             Transform rigRoot)
         {
             this.outputCamera = outputCamera;
             this.brain = brain;
-            this.profiles = profiles;
+            this.definitionCatalog = definitionCatalog;
             rigs = new ESCameraSceneRigRegistry(rigCatalog, rigRoot);
+            inputSchemeResolver = ESGameManager.InputModule?.SchemeResolver;
+            UpdateLookInputMode(inputSchemeResolver != null ? inputSchemeResolver.ActiveSchemeId : null);
+            if (inputSchemeResolver != null)
+                inputSchemeResolver.SchemeChanged += OnInputSchemeChanged;
         }
 
         public bool IsReady
@@ -49,66 +60,104 @@ namespace ES
                        && outputCamera != null
                        && brain != null
                        && brain.gameObject == outputCamera.gameObject
-                       && profiles != null
+                       && definitionCatalog != null
+                       && definitionCatalog.IsValid
                        && rigs.IsReady;
             }
         }
 
         public Transform OutputTransform => outputCamera != null ? outputCamera.transform : null;
 
-        public void Apply(in ESCameraResolvedView resolved)
+        public bool TryResolveDefinition(ESCameraDefinitionReference reference, out ESCameraDefinitionRuntimeHandle handle)
+        {
+            handle = default;
+            return IsReady && definitionCatalog.TryResolve(reference, out handle);
+        }
+
+        public bool Apply(in ESCameraResolvedView resolved)
         {
             using (ApplyMarker.Auto())
             {
             if (!IsReady || !resolved.hasWinner)
             {
                 Clear();
-                return;
+                return false;
             }
 
-            if (!profiles.TryGet(resolved.profileKey, out ESCameraProfile profile))
+            ESCameraViewDefinition definition = activeDefinition;
+            CinemachineVirtualCameraBase rig = activeRig;
+            if (resolved.configurationChanged)
             {
-                ReportProfileError(resolved.profileKey, "ProfileKey 未被当前 View 的 ProfileCatalog 收录。");
-                Clear();
-                return;
+                bool definitionChanged = activeDefinition == null
+                                      || activeDefinitionHandle != resolved.definitionHandle;
+                if (definitionChanged)
+                {
+                    if (!definitionCatalog.TryGet(resolved.definitionHandle, out definition))
+                    {
+                        ReportDefinitionError(resolved.definition.ToString(), "Definition 引用未能解析到当前 Catalog 生命周期。");
+                        Clear();
+                        return false;
+                    }
+
+                    if (!rigs.TryGetRig(definition.rigKey, out rig))
+                    {
+                        ReportDefinitionError(resolved.definition.ToString(), $"RigKey '{definition.rigKey}' 未能解析为唯一 Cinemachine Virtual Camera。");
+                        Clear();
+                        return false;
+                    }
+                }
+
+                if (activeRig != rig)
+                {
+                    Deactivate(activeRig, activeObstruction);
+                    activeRig = rig;
+                    RigModifierBaseline baseline = GetOrCreateModifierBaseline(activeRig);
+                    activePov = baseline.pov;
+                    activeObstruction = baseline.obstruction;
+                    activeRig.PreviousStateIsValid = false;
+                    activeRig.Priority = ActivePriority;
+                    hasAppliedModifiers = false;
+                }
+
+                // A Rig can be shared by several view definitions. Obstruction and input configuration are
+                // definition policy, so a winner change must refresh them even when the VCam instance is unchanged.
+                if (definitionChanged)
+                {
+                    ConfigureRigForDirector(activeRig, activePov, activeObstruction, definition);
+                    activeDefinition = definition;
+                    activeDefinitionHandle = resolved.definitionHandle;
+                    hasAppliedModifiers = false;
+                }
+
+                if (activeRig.Follow != resolved.follow)
+                    activeRig.Follow = resolved.follow;
+                if (activeRig.LookAt != resolved.lookAt)
+                    activeRig.LookAt = resolved.lookAt;
+
+                if (!hasAppliedModifiers || !ModifiersEqual(appliedModifiers, resolved.modifiers))
+                {
+                    ApplyModifiers(activeRig, definition, resolved.modifiers);
+                    appliedModifiers = resolved.modifiers;
+                    hasAppliedModifiers = true;
+                }
             }
 
-            if (!rigs.TryGetRig(profile.rigKey, out CinemachineVirtualCameraBase rig))
-            {
-                ReportProfileError(resolved.profileKey, $"RigKey '{profile.rigKey}' 未能解析为唯一 Cinemachine Virtual Camera。");
-                Clear();
-                return;
-            }
-
-            if (activeRig != rig)
-            {
-                Deactivate(activeRig);
-                activeRig = rig;
-                activeRig.Priority = ActivePriority;
-            }
-
-            // A Rig can be shared by several Profiles. Obstruction and input configuration are
-            // Profile policy, so a winner change must refresh them even when the VCam instance is unchanged.
-            if (!string.Equals(activeProfileKey, profile.profileKey, StringComparison.Ordinal))
-            {
-                ConfigureRigForDirector(activeRig, profile);
-                activeProfileKey = profile.profileKey;
-            }
-
-            activeRig.Follow = resolved.follow;
-            activeRig.LookAt = resolved.lookAt;
-            ApplyModifiers(activeRig, profile, resolved.modifiers);
-
-            if (resolved.hasLookInput)
-                ApplyLook(activeRig, resolved.lookInput, profile);
+            if (resolved.hasLookInput && activeRig != null && definition != null)
+                ApplyLook(activeRig, activePov, resolved.lookInput, definition);
+            return activeRig != null && activeDefinition != null;
             }
         }
 
         public void Clear()
         {
-            Deactivate(activeRig);
+            Deactivate(activeRig, activeObstruction);
             activeRig = null;
-            activeProfileKey = null;
+            activePov = null;
+            activeObstruction = null;
+            activeDefinition = null;
+            activeDefinitionHandle = default;
+            appliedModifiers = ESCameraResolvedModifiers.Identity;
+            hasAppliedModifiers = false;
         }
 
         public void Dispose()
@@ -117,9 +166,11 @@ namespace ES
                 return;
 
             disposed = true;
+            if (inputSchemeResolver != null)
+                inputSchemeResolver.SchemeChanged -= OnInputSchemeChanged;
             Clear();
             rigs.Dispose();
-            reportedProfileErrors.Clear();
+            reportedDefinitionErrors.Clear();
             modifierBaselines.Clear();
         }
 
@@ -142,14 +193,14 @@ namespace ES
                 GetOrCreateModifierBaseline(rig);
         }
 
-        private void ReportProfileError(string profileKey, string detail)
+        private void ReportDefinitionError(string definitionKey, string detail)
         {
-            string key = string.IsNullOrWhiteSpace(profileKey) ? "<empty>" : profileKey;
-            if (reportedProfileErrors.Add(key))
-                Debug.LogError($"[ESCamera] View '{outputCamera.name}' 无法应用 Profile '{key}'：{detail}", outputCamera);
+            string key = string.IsNullOrWhiteSpace(definitionKey) ? "<empty>" : definitionKey;
+            if (reportedDefinitionErrors.Add(key))
+                Debug.LogError($"[ESCamera] View '{outputCamera.name}' 无法应用相机定义 '{key}'：{detail}", outputCamera);
         }
 
-        private static void Deactivate(CinemachineVirtualCameraBase rig)
+        private static void Deactivate(CinemachineVirtualCameraBase rig, CinemachineCollider obstruction)
         {
             if (rig == null)
                 return;
@@ -157,35 +208,39 @@ namespace ES
             rig.Priority = StandbyPriority;
             rig.Follow = null;
             rig.LookAt = null;
-            CinemachineCollider obstruction = rig.GetComponent<CinemachineCollider>();
             if (obstruction != null)
                 obstruction.enabled = false;
         }
 
-        private static void ConfigureRigForDirector(CinemachineVirtualCameraBase rig, ESCameraProfile profile)
+        private static void ConfigureRigForDirector(
+            CinemachineVirtualCameraBase rig,
+            CinemachinePOV pov,
+            CinemachineCollider obstruction,
+            ESCameraViewDefinition definition)
         {
             if (rig is CinemachineFreeLook freeLook)
             {
                 DisableLegacyInput(ref freeLook.m_XAxis);
                 DisableLegacyInput(ref freeLook.m_YAxis);
-                ConfigureObstruction(rig, profile);
+                ConfigureObstruction(rig, obstruction, definition);
                 return;
             }
 
-            CinemachinePOV pov = rig.GetComponent<CinemachinePOV>();
             if (pov != null)
             {
                 DisableLegacyInput(ref pov.m_HorizontalAxis);
                 DisableLegacyInput(ref pov.m_VerticalAxis);
             }
 
-            ConfigureObstruction(rig, profile);
+            ConfigureObstruction(rig, obstruction, definition);
         }
 
-        private static void ConfigureObstruction(CinemachineVirtualCameraBase rig, ESCameraProfile profile)
+        private static void ConfigureObstruction(
+            CinemachineVirtualCameraBase rig,
+            CinemachineCollider obstruction,
+            ESCameraViewDefinition definition)
         {
-            CinemachineCollider obstruction = rig.GetComponent<CinemachineCollider>();
-            if (profile == null || !profile.enableObstruction)
+            if (definition == null || !definition.enableObstruction)
             {
                 if (obstruction != null)
                     obstruction.enabled = false;
@@ -195,19 +250,19 @@ namespace ES
             if (obstruction == null)
             {
                 Debug.LogError(
-                    "[ESCamera] Profile '" + profile.profileKey + "' 启用了避障，但 Rig '" + rig.name
+                    "[ESCamera] 相机定义 '" + definition.Definition + "' 启用了避障，但 Rig '" + rig.name
                     + "' 缺少 CinemachineCollider。请在制作期补齐 Rig。",
                     rig);
                 return;
             }
 
             obstruction.enabled = true;
-            obstruction.m_CollideAgainst = profile.obstructionMask;
-            obstruction.m_CameraRadius = Mathf.Max(0.01f, profile.obstructionCameraRadius);
-            obstruction.m_MinimumDistanceFromTarget = Mathf.Max(0.01f, profile.obstructionMinimumDistance);
-            obstruction.m_MaximumEffort = Mathf.Clamp(profile.obstructionMaximumEffort, 1, 8);
-            obstruction.m_Damping = Mathf.Max(0f, profile.obstructionDamping);
-            obstruction.m_DampingWhenOccluded = Mathf.Max(0f, profile.obstructionDampingWhenOccluded);
+            obstruction.m_CollideAgainst = definition.obstructionMask;
+            obstruction.m_CameraRadius = Mathf.Max(0.01f, definition.obstructionCameraRadius);
+            obstruction.m_MinimumDistanceFromTarget = Mathf.Max(0.01f, definition.obstructionMinimumDistance);
+            obstruction.m_MaximumEffort = Mathf.Clamp(definition.obstructionMaximumEffort, 1, 8);
+            obstruction.m_Damping = Mathf.Max(0f, definition.obstructionDamping);
+            obstruction.m_DampingWhenOccluded = Mathf.Max(0f, definition.obstructionDampingWhenOccluded);
         }
 
         private static void DisableLegacyInput(ref AxisState axis)
@@ -217,23 +272,67 @@ namespace ES
             axis.SetInputAxisProvider(0, null);
         }
 
-        private static void ApplyLook(CinemachineVirtualCameraBase rig, Vector2 lookInput, ESCameraProfile profile)
+        private void OnInputSchemeChanged(string _, string current)
         {
-            float deltaTime = Time.deltaTime;
-            float verticalSign = profile.invertVerticalLook ? 1f : -1f;
+            UpdateLookInputMode(current);
+        }
+
+        private void UpdateLookInputMode(string schemeId)
+        {
+            lookInputUsesRate = string.IsNullOrEmpty(schemeId)
+                                || string.Equals(schemeId, ESInputSchemeIds.Gamepad, StringComparison.Ordinal);
+        }
+
+        private void ApplyLook(
+            CinemachineVirtualCameraBase rig,
+            CinemachinePOV pov,
+            Vector2 lookInput,
+            ESCameraViewDefinition definition)
+        {
+            float inputStep = ResolveLookInputStep(definition);
+            float verticalSign = definition.invertVerticalLook ? 1f : -1f;
             if (rig is CinemachineFreeLook freeLook)
             {
-                ApplyAxisDelta(ref freeLook.m_XAxis, lookInput.x * profile.freeLookSensitivity.x * deltaTime);
-                ApplyAxisDelta(ref freeLook.m_YAxis, lookInput.y * profile.freeLookSensitivity.y * verticalSign * deltaTime);
+                ApplyAxisDelta(ref freeLook.m_XAxis, lookInput.x * definition.freeLookSensitivity.x * inputStep);
+                ApplyAxisDelta(ref freeLook.m_YAxis, lookInput.y * definition.freeLookSensitivity.y * verticalSign * inputStep);
                 return;
             }
 
-            CinemachinePOV pov = rig.GetComponent<CinemachinePOV>();
             if (pov == null)
                 return;
 
-            ApplyAxisDelta(ref pov.m_HorizontalAxis, lookInput.x * profile.povLookSensitivity.x * deltaTime);
-            ApplyAxisDelta(ref pov.m_VerticalAxis, lookInput.y * profile.povLookSensitivity.y * verticalSign * deltaTime);
+            ApplyAxisDelta(ref pov.m_HorizontalAxis, lookInput.x * definition.povLookSensitivity.x * inputStep);
+            ApplyAxisDelta(ref pov.m_VerticalAxis, lookInput.y * definition.povLookSensitivity.y * verticalSign * inputStep);
+        }
+
+        private float ResolveLookInputStep(ESCameraViewDefinition definition)
+        {
+            return lookInputUsesRate
+                ? Time.deltaTime
+                : Mathf.Max(0.0001f, definition.pointerLookScale);
+        }
+
+        private static bool ModifiersEqual(ESCameraResolvedModifiers left, ESCameraResolvedModifiers right)
+        {
+            return ScalarCompositionEqual(left.fieldOfView, right.fieldOfView)
+                   && ScalarCompositionEqual(left.distanceScale, right.distanceScale)
+                   && VectorCompositionEqual(left.shoulderOffset, right.shoulderOffset)
+                   && ScalarCompositionEqual(left.shakeAmplitude, right.shakeAmplitude);
+        }
+
+        private static bool ScalarCompositionEqual(ESCameraScalarComposition left, ESCameraScalarComposition right)
+        {
+            return left.hasOverride == right.hasOverride
+                   && left.overrideValue == right.overrideValue
+                   && left.additiveValue == right.additiveValue
+                   && left.multiplier == right.multiplier;
+        }
+
+        private static bool VectorCompositionEqual(ESCameraVectorComposition left, ESCameraVectorComposition right)
+        {
+            return left.hasOverride == right.hasOverride
+                   && left.overrideValue == right.overrideValue
+                   && left.additiveValue == right.additiveValue;
         }
 
         private static void ApplyAxisDelta(ref AxisState axis, float delta)
@@ -248,14 +347,14 @@ namespace ES
 
         private void ApplyModifiers(
             CinemachineVirtualCameraBase rig,
-            ESCameraProfile profile,
+            ESCameraViewDefinition definition,
             ESCameraResolvedModifiers modifiers)
         {
             RigModifierBaseline baseline = GetOrCreateModifierBaseline(rig);
-            float fieldOfView = Mathf.Clamp(modifiers.fieldOfView.Apply(profile.baseFieldOfView), 1f, 179f);
-            float distanceScale = Mathf.Max(0.01f, modifiers.distanceScale.Apply(profile.baseDistanceScale));
-            Vector3 shoulderOffset = modifiers.shoulderOffset.Apply(profile.baseShoulderOffset);
-            float shakeAmplitude = Mathf.Max(0f, modifiers.shakeAmplitude.Apply(profile.baseShakeAmplitude));
+            float fieldOfView = Mathf.Clamp(modifiers.fieldOfView.Apply(definition.baseFieldOfView), 1f, 179f);
+            float distanceScale = Mathf.Max(0.01f, modifiers.distanceScale.Apply(definition.baseDistanceScale));
+            Vector3 shoulderOffset = modifiers.shoulderOffset.Apply(definition.baseShoulderOffset);
+            float shakeAmplitude = Mathf.Max(0f, modifiers.shakeAmplitude.Apply(definition.baseShakeAmplitude));
 
             if (rig is CinemachineFreeLook freeLook)
             {
@@ -283,6 +382,8 @@ namespace ES
                 return baseline;
 
             baseline = new RigModifierBaseline(true);
+            baseline.pov = rig is CinemachineFreeLook ? null : rig.GetComponent<CinemachinePOV>();
+            baseline.obstruction = rig.GetComponent<CinemachineCollider>();
             baseline.cameraOffset = rig.GetComponent<CinemachineCameraOffset>();
             if (baseline.cameraOffset == null)
             {
@@ -330,6 +431,8 @@ namespace ES
 
         private struct RigModifierBaseline
         {
+            public CinemachinePOV pov;
+            public CinemachineCollider obstruction;
             public CinemachineCameraOffset cameraOffset;
             public Vector3 cameraOffsetBase;
             public CinemachineBasicMultiChannelPerlin noise;
@@ -344,6 +447,8 @@ namespace ES
 
             public RigModifierBaseline(bool initialize)
             {
+                pov = null;
+                obstruction = null;
                 cameraOffset = null;
                 cameraOffsetBase = Vector3.zero;
                 noise = null;
@@ -417,7 +522,7 @@ namespace ES
             this.rigRoot = rigRoot;
         }
 
-        public bool IsReady => !disposed && catalog != null && rigRoot != null;
+        public bool IsReady => !disposed && catalog != null && catalog.IsValid && rigRoot != null;
 
         public bool TryGetRig(string rigKey, out CinemachineVirtualCameraBase rig)
         {
@@ -434,16 +539,25 @@ namespace ES
 
             GameObject instance = UnityEngine.Object.Instantiate(prefab, rigRoot);
             instance.name = rigKey;
-            CinemachineVirtualCameraBase[] cameras = instance.GetComponentsInChildren<CinemachineVirtualCameraBase>(true);
+            // A catalog Rig is one logical VCam hosted on the prefab root.  CinemachineFreeLook
+            // internally creates Top/Middle/Bottom child rigs which also derive from
+            // CinemachineVirtualCameraBase; those implementation details must not become
+            // separate ES Camera Rigs.
+            CinemachineVirtualCameraBase[] cameras = instance.GetComponents<CinemachineVirtualCameraBase>();
             if (cameras.Length != 1 || cameras[0] == null)
             {
-                Debug.LogError($"[ESCamera] Rig '{rigKey}' 必须且只能包含一个 CinemachineVirtualCameraBase。", instance);
+                Debug.LogError(
+                    $"[ESCamera] Rig '{rigKey}' 的 Prefab 根节点必须且只能挂载一个 CinemachineVirtualCameraBase。"
+                    + "CinemachineFreeLook 的内部子 Rig 不计入此契约。",
+                    instance);
                 UnityEngine.Object.Destroy(instance);
                 return false;
             }
 
             rig = cameras[0];
             rig.Priority = 0;
+            rig.m_StandbyUpdate = CinemachineVirtualCameraBase.StandbyUpdateMode.Never;
+            rig.PreviousStateIsValid = false;
             rig.Follow = null;
             rig.LookAt = null;
             instances.Add(rigKey, rig);

@@ -38,11 +38,11 @@ namespace ES.Tests
             ESCameraLease second = director.Push(CreateRequest("shot", 10, ESCameraRequestKind.Shot));
 
             Assert.That(director.FlushNow(ESCameraViewId.Main), Is.True);
-            Assert.That(adapter.last.profileKey, Is.EqualTo("shot"));
+            Assert.That(adapter.last.definition.stringKey, Is.EqualTo("shot"));
 
             Assert.That(director.Release(first), Is.True);
             director.FlushNow(ESCameraViewId.Main);
-            Assert.That(adapter.last.profileKey, Is.EqualTo("shot"));
+            Assert.That(adapter.last.definition.stringKey, Is.EqualTo("shot"));
 
             Assert.That(director.Release(second), Is.True);
             director.FlushNow(ESCameraViewId.Main);
@@ -60,7 +60,7 @@ namespace ES.Tests
             Assert.That(director.Release(oldLease), Is.False);
 
             director.FlushNow(ESCameraViewId.Main);
-            Assert.That(adapter.last.profileKey, Is.EqualTo("second"));
+            Assert.That(adapter.last.definition.stringKey, Is.EqualTo("second"));
         }
 
         [Test]
@@ -89,7 +89,7 @@ namespace ES.Tests
 
             Assert.That(director.Release(oldLease), Is.False);
             director.FlushNow(ESCameraViewId.Main);
-            Assert.That(replacement.last.profileKey, Is.EqualTo("new"));
+            Assert.That(replacement.last.definition.stringKey, Is.EqualTo("new"));
             Assert.That(director.Release(currentLease), Is.True);
         }
 
@@ -164,7 +164,7 @@ namespace ES.Tests
             {
                 fieldOfView = new ESCameraScalarModifier { operation = ESCameraModifierOperation.Override, value = 20f },
             });
-            modifier.compatibleProfileKey = "cutscene";
+            modifier.compatibleDefinition = new ESCameraDefinitionReference(ESCameraDefinitionEnumKey.None, "cutscene");
             director.Push(modifier);
 
             director.FlushNow(ESCameraViewId.Main);
@@ -192,17 +192,32 @@ namespace ES.Tests
             Assert.That(actual, Is.SameAs(output.transform));
         }
 
-        private ESCameraRequest CreateRequest(string profileKey, int priority, ESCameraRequestKind kind = ESCameraRequestKind.Base)
+        [Test]
+        public void FailedAdapterApply_DoesNotBecomeApplied()
         {
-            GameObject owner = new GameObject("Camera Owner " + profileKey);
-            GameObject follow = new GameObject("Camera Follow " + profileKey);
+            adapter.applyResult = false;
+            ESCameraLease lease = director.Push(CreateRequest("failed", 1));
+            Assert.That(lease.IsValid, Is.True);
+
+            director.FlushNow(ESCameraViewId.Main);
+
+            Assert.That(adapter.clearCount, Is.EqualTo(1));
+            adapter.applyResult = true;
+            director.FlushNow(ESCameraViewId.Main);
+            Assert.That(adapter.last.hasWinner, Is.True);
+        }
+
+        private ESCameraRequest CreateRequest(string definitionKey, int priority, ESCameraRequestKind kind = ESCameraRequestKind.Base)
+        {
+            GameObject owner = new GameObject("Camera Owner " + definitionKey);
+            GameObject follow = new GameObject("Camera Follow " + definitionKey);
             created.Add(owner);
             created.Add(follow);
             return new ESCameraRequest
             {
                 viewId = ESCameraViewId.Main,
                 kind = kind,
-                profileKey = profileKey,
+                definition = new ESCameraDefinitionReference(ESCameraDefinitionEnumKey.None, definitionKey),
                 priority = priority,
                 owner = owner,
                 follow = follow.transform,
@@ -225,16 +240,36 @@ namespace ES.Tests
 
         private sealed class RecordingAdapter : IESCameraViewAdapter, System.IDisposable
         {
+            private readonly Dictionary<ESCameraDefinitionReference, ESCameraDefinitionRuntimeHandle> handles = new Dictionary<ESCameraDefinitionReference, ESCameraDefinitionRuntimeHandle>();
             public bool IsReady => true;
             public Transform outputTransform;
             public Transform OutputTransform => outputTransform;
             public ESCameraResolvedView last;
             public int clearCount;
             public int disposeCount;
+            public bool applyResult = true;
 
-            public void Apply(in ESCameraResolvedView resolved)
+            public bool TryResolveDefinition(ESCameraDefinitionReference reference, out ESCameraDefinitionRuntimeHandle handle)
+            {
+                if (!reference.IsConfigured)
+                {
+                    handle = default;
+                    return false;
+                }
+
+                if (!handles.TryGetValue(reference, out handle))
+                {
+                    handle = new ESCameraDefinitionRuntimeHandle(1, 1, handles.Count + 1, "TEST");
+                    handles.Add(reference, handle);
+                }
+
+                return true;
+            }
+
+            public bool Apply(in ESCameraResolvedView resolved)
             {
                 last = resolved;
+                return applyResult;
             }
 
             public void Clear()

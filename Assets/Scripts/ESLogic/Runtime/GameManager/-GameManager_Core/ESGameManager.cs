@@ -47,6 +47,10 @@ namespace ES
         [LabelText("自动创建LOD模块")]
         public bool autoCreateLODModule = true;
 
+        [TabGroup("配置")]
+        [LabelText("自动创建运行时动态图集模块")]
+        public bool autoCreateDynamicAtlasModule = false;
+
         [TabGroup("设置")]
         [LabelText("跨场景不销毁")]
         public bool dontDestroyOnLoad = true;
@@ -101,6 +105,9 @@ namespace ES
 
             if (autoCreateLODModule)
                 GetMoudle<ESLODModule>();
+
+            if (autoCreateDynamicAtlasModule)
+                GetMoudle<ESDynamicAtlasModule>();
 
             CacheStaticReferences();
         }

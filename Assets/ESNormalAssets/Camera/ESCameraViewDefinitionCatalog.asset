@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9ee80928fa684cddb3b4933b80c7b974, type: 3}
-  m_Name: ESCameraProfileCatalog
+  m_Name: ESCameraViewDefinitionCatalog
   m_EditorClassIdentifier: 
   profiles:
   - {fileID: 11400000, guid: 3d32a95d6d34fd44db1788e400d88c5d, type: 2}

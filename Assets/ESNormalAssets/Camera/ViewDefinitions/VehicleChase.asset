@@ -12,10 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ec636e27c6c4859a44b7fa352b4b91d, type: 3}
   m_Name: VehicleChase
   m_EditorClassIdentifier: 
-  profileKey: vehicle.chase
+  definition:
+    enumKey: 2
+    stringKey: vehicle.chase
+  legacyDefinitionKey: 
   rigKey: vehicle.chase
   povLookSensitivity: {x: 220, y: 90}
   freeLookSensitivity: {x: 200, y: 0.45}
+  pointerLookScale: 0.001
   invertVerticalLook: 0
   baseFieldOfView: 65
   baseDistanceScale: 1

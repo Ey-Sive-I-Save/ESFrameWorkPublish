@@ -23,7 +23,7 @@ namespace ES
             int sceneEpoch,
             Camera outputCamera,
             CinemachineBrain brain,
-            ESCameraProfileCatalog profileCatalog,
+            ESCameraViewDefinitionCatalog definitionCatalog,
             ESCameraRigCatalog rigCatalog,
             Transform rigRoot)
         {
@@ -36,7 +36,7 @@ namespace ES
             adapter = new ESCameraCinemachine2ViewAdapter(
                 outputCamera,
                 brain,
-                profileCatalog,
+                definitionCatalog,
                 rigCatalog,
                 rigRoot);
             if (adapter.IsReady && director.RegisterView(viewId, sceneEpoch, adapter))

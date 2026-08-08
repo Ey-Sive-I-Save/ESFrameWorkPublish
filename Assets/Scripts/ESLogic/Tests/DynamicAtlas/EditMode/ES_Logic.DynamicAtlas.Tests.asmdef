@@ -1,0 +1,24 @@
+{
+    "name": "ES_Logic.DynamicAtlas.Tests",
+    "rootNamespace": "ES.Tests.DynamicAtlas",
+    "references": [
+        "ES_Logic",
+        "ES_Stand",
+        "ES_Design",
+        "UniTask"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

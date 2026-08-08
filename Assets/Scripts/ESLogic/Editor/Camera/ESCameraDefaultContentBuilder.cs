@@ -7,64 +7,66 @@ namespace ES
 {
     /// <summary>
     /// 首批可直接运行的玩家第三人称与载具追逐相机内容。它是明确的内容生产工具：
-    /// 生成 Profile、Rig Prefab 与两份 Catalog；运行时绝不再创建这些资产。
+    /// 生成相机视图定义、Rig Prefab 与两份索引；运行时绝不再创建这些资产。
     /// </summary>
     public static class ESCameraDefaultContentBuilder
     {
         public const string ContentFolder = "Assets/ESNormalAssets/Camera";
-        public const string ProfileFolder = ContentFolder + "/Profiles";
+        public const string DefinitionFolder = ContentFolder + "/ViewDefinitions";
         public const string RigFolder = ContentFolder + "/Rigs";
-        public const string PlayerThirdPersonProfilePath = ProfileFolder + "/PlayerThirdPerson.asset";
+        public const string PlayerThirdPersonDefinitionPath = DefinitionFolder + "/PlayerThirdPerson.asset";
         public const string PlayerThirdPersonRigPath = RigFolder + "/PlayerThirdPersonRig.prefab";
-        public const string VehicleChaseProfilePath = ProfileFolder + "/VehicleChase.asset";
+        public const string VehicleChaseDefinitionPath = DefinitionFolder + "/VehicleChase.asset";
         public const string VehicleChaseRigPath = RigFolder + "/VehicleChaseRig.prefab";
-        public const string ProfileCatalogPath = ContentFolder + "/ESCameraProfileCatalog.asset";
+        public const string DefinitionCatalogPath = ContentFolder + "/ESCameraViewDefinitionCatalog.asset";
         public const string RigCatalogPath = ContentFolder + "/ESCameraRigCatalog.asset";
         public const string BlenderSettingsPath = ContentFolder + "/ESCameraBlenderSettings.asset";
 
-        public const string PlayerThirdPersonProfileKey = "player.third_person";
+        public const string PlayerThirdPersonDefinitionKey = "player.third_person";
         public const string PlayerThirdPersonRigKey = "player.third_person";
-        public const string VehicleChaseProfileKey = "vehicle.chase";
+        public const string VehicleChaseDefinitionKey = "vehicle.chase";
         public const string VehicleChaseRigKey = "vehicle.chase";
+        public static readonly ESCameraDefinitionReference PlayerThirdPersonDefinition = new ESCameraDefinitionReference(ESCameraDefinitionEnumKey.PlayerThirdPerson, PlayerThirdPersonDefinitionKey);
+        public static readonly ESCameraDefinitionReference VehicleChaseDefinition = new ESCameraDefinitionReference(ESCameraDefinitionEnumKey.VehicleChase, VehicleChaseDefinitionKey);
 
         [MenuItem("【ES】/内容制作/相机/创建或刷新默认玩家与载具相机内容", false, 140)]
         public static void EnsureDefaultPlayerCameraContentMenu()
         {
             EnsureDefaultPlayerCameraContent();
-            Selection.activeObject = AssetDatabase.LoadAssetAtPath<ESCameraProfileCatalog>(ProfileCatalogPath);
+            Selection.activeObject = AssetDatabase.LoadAssetAtPath<ESCameraViewDefinitionCatalog>(DefinitionCatalogPath);
             EditorGUIUtility.PingObject(Selection.activeObject);
-            Debug.Log("[ESCamera] 已创建默认玩家第三人称与载具追逐 Profile、Rig 与 Catalog。", Selection.activeObject);
+            Debug.Log("[ESCamera] 已创建默认玩家第三人称与载具追逐相机定义、Rig 与索引。", Selection.activeObject);
         }
 
         public static void EnsureDefaultPlayerCameraContent()
         {
             EnsureFolder(ContentFolder);
-            EnsureFolder(ProfileFolder);
+            EnsureFolder(DefinitionFolder);
             EnsureFolder(RigFolder);
 
-            ESCameraProfile playerProfile = LoadOrCreate<ESCameraProfile>(PlayerThirdPersonProfilePath);
-            ConfigureProfile(
-                playerProfile,
+            ESCameraViewDefinition playerDefinition = LoadOrCreate<ESCameraViewDefinition>(PlayerThirdPersonDefinitionPath);
+            ConfigureDefinition(
+                playerDefinition,
                 "PlayerThirdPerson",
-                PlayerThirdPersonProfileKey,
+                PlayerThirdPersonDefinition,
                 PlayerThirdPersonRigKey,
                 60f,
                 new Vector2(220f, 0.5f));
 
-            ESCameraProfile vehicleProfile = LoadOrCreate<ESCameraProfile>(VehicleChaseProfilePath);
-            ConfigureProfile(
-                vehicleProfile,
+            ESCameraViewDefinition vehicleDefinition = LoadOrCreate<ESCameraViewDefinition>(VehicleChaseDefinitionPath);
+            ConfigureDefinition(
+                vehicleDefinition,
                 "VehicleChase",
-                VehicleChaseProfileKey,
+                VehicleChaseDefinition,
                 VehicleChaseRigKey,
                 65f,
                 new Vector2(200f, 0.45f));
 
             GameObject playerRigPrefab = RebuildPlayerThirdPersonRig();
             GameObject vehicleRigPrefab = RebuildVehicleChaseRig();
-            ESCameraProfileCatalog profileCatalog = LoadOrCreate<ESCameraProfileCatalog>(ProfileCatalogPath);
-            profileCatalog.SetProfilesForAuthoring(new[] { playerProfile, vehicleProfile });
-            EditorUtility.SetDirty(profileCatalog);
+            ESCameraViewDefinitionCatalog definitionCatalog = LoadOrCreate<ESCameraViewDefinitionCatalog>(DefinitionCatalogPath);
+            definitionCatalog.SetDefinitionsForAuthoring(new[] { playerDefinition, vehicleDefinition });
+            EditorUtility.SetDirty(definitionCatalog);
 
             ESCameraRigCatalog rigCatalog = LoadOrCreate<ESCameraRigCatalog>(RigCatalogPath);
             rigCatalog.SetEntriesForAuthoring(new[]
@@ -104,19 +106,19 @@ namespace ES
         }
 
         public static bool TryLoadDefaultPlayerCameraContent(
-            out ESCameraProfileCatalog profileCatalog,
+            out ESCameraViewDefinitionCatalog definitionCatalog,
             out ESCameraRigCatalog rigCatalog,
             out string error)
         {
-            return TryLoadDefaultCameraContent(PlayerThirdPersonProfileKey, "默认玩家", out profileCatalog, out rigCatalog, out error);
+            return TryLoadDefaultCameraContent(PlayerThirdPersonDefinition, "默认玩家", out definitionCatalog, out rigCatalog, out error);
         }
 
         public static bool TryLoadDefaultVehicleCameraContent(
-            out ESCameraProfileCatalog profileCatalog,
+            out ESCameraViewDefinitionCatalog definitionCatalog,
             out ESCameraRigCatalog rigCatalog,
             out string error)
         {
-            return TryLoadDefaultCameraContent(VehicleChaseProfileKey, "默认载具", out profileCatalog, out rigCatalog, out error);
+            return TryLoadDefaultCameraContent(VehicleChaseDefinition, "默认载具", out definitionCatalog, out rigCatalog, out error);
         }
 
         /// <summary>
@@ -129,7 +131,7 @@ namespace ES
                 throw new ArgumentNullException(nameof(sceneRoot));
 
             if (!TryLoadDefaultPlayerCameraContent(
-                    out ESCameraProfileCatalog profileCatalog,
+                    out ESCameraViewDefinitionCatalog definitionCatalog,
                     out ESCameraRigCatalog rigCatalog,
                     out string error))
             {
@@ -147,14 +149,16 @@ namespace ES
             camera.clearFlags = CameraClearFlags.Skybox;
 
             CinemachineBrain brain = cameraObject.AddComponent<CinemachineBrain>();
+            brain.m_UpdateMethod = CinemachineBrain.UpdateMethod.SmartUpdate;
+            brain.m_BlendUpdateMethod = CinemachineBrain.BrainUpdateMethod.LateUpdate;
             Transform rigRoot = new GameObject("Runtime Rigs (Director Owned)").transform;
-            rigRoot.SetParent(cameraObject.transform, false);
+            rigRoot.SetParent(sceneRoot, false);
             ESCameraSceneBinding binding = cameraObject.AddComponent<ESCameraSceneBinding>();
             binding.ConfigureForAuthoring(
                 ESCameraViewId.Main.Key,
                 camera,
                 brain,
-                profileCatalog,
+                definitionCatalog,
                 rigCatalog,
                 AssetDatabase.LoadAssetAtPath<CinemachineBlenderSettings>(BlenderSettingsPath),
                 rigRoot);
@@ -196,6 +200,7 @@ namespace ES
                 root.AddComponent<CinemachineCameraOffset>();
                 CinemachineCollider obstruction = root.AddComponent<CinemachineCollider>();
                 freeLook.Priority = 0;
+                freeLook.m_StandbyUpdate = CinemachineVirtualCameraBase.StandbyUpdateMode.Never;
                 freeLook.m_XAxis.m_InputAxisName = string.Empty;
                 freeLook.m_YAxis.m_InputAxisName = string.Empty;
                 freeLook.m_XAxis.m_MaxSpeed = 0f;
@@ -220,55 +225,57 @@ namespace ES
             }
         }
 
-        private static void ConfigureProfile(
-            ESCameraProfile profile,
+        private static void ConfigureDefinition(
+            ESCameraViewDefinition definition,
             string name,
-            string profileKey,
+            ESCameraDefinitionReference definitionReference,
             string rigKey,
             float fieldOfView,
             Vector2 freeLookSensitivity)
         {
-            profile.name = name;
-            profile.profileKey = profileKey;
-            profile.rigKey = rigKey;
-            profile.freeLookSensitivity = freeLookSensitivity;
-            profile.povLookSensitivity = new Vector2(220f, 90f);
-            profile.invertVerticalLook = false;
-            profile.baseFieldOfView = fieldOfView;
-            profile.baseDistanceScale = 1f;
-            profile.baseShoulderOffset = Vector3.zero;
-            profile.baseShakeAmplitude = 0f;
-            profile.enableObstruction = true;
-            profile.obstructionMask = ESPhysicsLayers.CameraObstacleMask;
-            profile.obstructionCameraRadius = 0.2f;
-            profile.obstructionMinimumDistance = 0.25f;
-            profile.obstructionMaximumEffort = 4;
-            profile.obstructionDamping = 0.12f;
-            profile.obstructionDampingWhenOccluded = 0.05f;
-            EditorUtility.SetDirty(profile);
+            definition.name = name;
+            definition.SetDefinitionForAuthoring(definitionReference);
+            definition.rigKey = rigKey;
+            definition.freeLookSensitivity = freeLookSensitivity;
+            definition.povLookSensitivity = new Vector2(220f, 90f);
+            definition.pointerLookScale = 0.001f;
+            definition.invertVerticalLook = false;
+            definition.baseFieldOfView = fieldOfView;
+            definition.baseDistanceScale = 1f;
+            definition.baseShoulderOffset = Vector3.zero;
+            definition.baseShakeAmplitude = 0f;
+            definition.enableObstruction = true;
+            definition.obstructionMask = ESPhysicsLayers.CameraObstacleMask;
+            definition.obstructionCameraRadius = 0.2f;
+            definition.obstructionMinimumDistance = 0.25f;
+            definition.obstructionMaximumEffort = 4;
+            definition.obstructionDamping = 0.12f;
+            definition.obstructionDampingWhenOccluded = 0.05f;
+            EditorUtility.SetDirty(definition);
         }
 
         private static bool TryLoadDefaultCameraContent(
-            string profileKey,
+            ESCameraDefinitionReference definitionReference,
             string displayName,
-            out ESCameraProfileCatalog profileCatalog,
+            out ESCameraViewDefinitionCatalog definitionCatalog,
             out ESCameraRigCatalog rigCatalog,
             out string error)
         {
-            profileCatalog = AssetDatabase.LoadAssetAtPath<ESCameraProfileCatalog>(ProfileCatalogPath);
+            definitionCatalog = AssetDatabase.LoadAssetAtPath<ESCameraViewDefinitionCatalog>(DefinitionCatalogPath);
             rigCatalog = AssetDatabase.LoadAssetAtPath<ESCameraRigCatalog>(RigCatalogPath);
             CinemachineBlenderSettings blenderSettings = AssetDatabase.LoadAssetAtPath<CinemachineBlenderSettings>(BlenderSettingsPath);
-            if (profileCatalog == null || rigCatalog == null || blenderSettings == null)
+            if (definitionCatalog == null || rigCatalog == null || blenderSettings == null)
             {
                 error = "缺少默认相机 Catalog 或 BlenderSettings。请显式执行“创建或刷新默认玩家与载具相机内容”。";
                 return false;
             }
 
-            if (!profileCatalog.TryGet(profileKey, out ESCameraProfile profile)
-                || profile == null
-                || !rigCatalog.TryGetPrefab(profile.rigKey, out _))
+            if (!definitionCatalog.TryResolve(definitionReference, out ESCameraDefinitionRuntimeHandle handle)
+                || !definitionCatalog.TryGet(handle, out ESCameraViewDefinition definition)
+                || definition == null
+                || !rigCatalog.TryGetPrefab(definition.rigKey, out _))
             {
-                error = displayName + " Profile/Rig Catalog 不完整。请显式刷新默认玩家与载具相机内容。";
+                error = displayName + " Definition/Rig Catalog 不完整。请显式刷新默认玩家与载具相机内容。";
                 return false;
             }
 

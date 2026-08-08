@@ -20,27 +20,35 @@ namespace ES
         public Button EditSkillDataButton = new Button();
         public Button BindAndPlaySkillButton = new Button();
         public Button SelectEntityButton = new Button();
+        public Button OpenInspectorButton = new Button();
         public Button MoreButton = new Button();
 
         public Label Name = new Label();
+        public Label SaveStatusLabel = new Label();
         public VisualElement EntityStatusGroup = new VisualElement();
         public Label EntityLabel = new Label();
         public Label UserEntityLabel = new Label();
 
-        public Button Setting = new Button();
 
         private readonly VisualElement m_PlaybackGroup = new VisualElement();
         private readonly VisualElement m_ContextGroup = new VisualElement();
         private readonly VisualElement m_RightGroup = new VisualElement();
-        private const float ExpandedToolbarWidth = 650f;
-        private const float ContextToolbarWidth = 380f;
-        private const float NavigationToolbarWidth = 330f;
-        private const float PreviewToolbarWidth = 270f;
+        private readonly VisualElement m_MainRow = new VisualElement();
+        private readonly VisualElement m_CompactContextRow = new VisualElement();
+        // Unity 在高 DPI 下会让相同窗口外框承载更少的有效布局空间。
+        // 低频动作必须更早让位，保证“属性/更多”等恢复与主操作始终可见。
+        private const float ExpandedToolbarWidth = 900f;
+        private const float ContextToolbarWidth = 700f;
+        private const float NavigationToolbarWidth = 760f;
+        private const float PreviewToolbarWidth = 820f;
+        private const float CompactActionToolbarWidth = 760f;
+        private const float UltraCompactToolbarWidth = 360f;
 
         public ESTrackTimerToolbar()
         {
-            style.flexDirection = FlexDirection.Row;
-            style.alignItems = Align.Center;
+            style.flexDirection = FlexDirection.Column;
+            style.alignItems = Align.Stretch;
+            style.flexShrink = 0;
             style.color = Color.gray;
             style.backgroundColor = new Color(0.058f, 0.064f, 0.074f, 1f);
             style.borderBottomWidth = 1;
@@ -48,25 +56,53 @@ namespace ES
             style.paddingLeft = 5;
             style.paddingRight = 5;
             style.paddingTop = 2;
-            style.overflow = Overflow.Hidden;
+            // 工具栏自身不裁剪右侧高频动作；具体低频组由 ApplyResponsiveLayout 显隐，
+            // 避免窄 Dock 或高 DPI 下“弹出编辑器/更多”被静默裁掉。
+            style.overflow = Overflow.Visible;
 
             ConfigureGroup(m_PlaybackGroup, 0, 0);
             ConfigureGroup(m_ContextGroup, 1, 1);
             ConfigureGroup(m_RightGroup, 0, 0);
+            m_RightGroup.style.position = Position.Relative;
+            m_RightGroup.style.right = StyleKeyword.Auto;
+            m_RightGroup.style.top = StyleKeyword.Auto;
+            m_RightGroup.style.bottom = StyleKeyword.Auto;
+            m_RightGroup.style.height = StyleKeyword.Auto;
+            m_RightGroup.style.minHeight = StyleKeyword.Auto;
+            ConfigureGroup(m_MainRow, 0, 0);
+            m_MainRow.style.position = Position.Relative;
+            m_MainRow.style.minHeight = 28;
+            m_MainRow.style.flexShrink = 0;
+            ConfigureGroup(m_CompactContextRow, 0, 0);
+            m_CompactContextRow.style.minHeight = 26;
+            m_CompactContextRow.style.flexShrink = 0;
+            m_CompactContextRow.style.display = DisplayStyle.None;
+            m_CompactContextRow.style.borderTopWidth = 1;
+            m_CompactContextRow.style.borderTopColor = new Color(0.18f, 0.2f, 0.22f, 1f);
+            m_CompactContextRow.style.paddingLeft = 5;
+            m_CompactContextRow.style.paddingRight = 5;
             m_ContextGroup.style.marginLeft = 4;
             m_ContextGroup.style.marginRight = 4;
             m_ContextGroup.style.minWidth = 0;
 
-            Add(m_PlaybackGroup);
-            Add(m_ContextGroup);
-            Add(m_RightGroup);
+            Add(m_MainRow);
+            Add(m_CompactContextRow);
+            m_MainRow.Add(m_PlaybackGroup);
+            m_MainRow.Add(m_ContextGroup);
+            m_MainRow.Add(m_RightGroup);
 
             CreatePlaybackControls();
             CreateContextControls();
             CreateMoreControls();
             BindEvents();
             RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
-            schedule.Execute(() => ApplyResponsiveLayout(resolvedStyle.width)).StartingIn(0);
+            RegisterCallback<AttachToPanelEvent>(_ =>
+            {
+                // UXML 首次挂载时 resolvedStyle.width 可能仍为 NaN/0。
+                // 延后一帧重新计算，保证 ReloadDomain 和布局恢复后不会停留在构造期默认布局。
+                schedule.Execute(ApplyResponsiveLayoutFromResolvedWidth).StartingIn(16);
+            });
+            schedule.Execute(ApplyResponsiveLayoutFromResolvedWidth).StartingIn(0);
         }
 
         private static void ConfigureGroup(VisualElement group, float flexGrow, float flexShrink)
@@ -76,7 +112,7 @@ namespace ES
             group.style.flexGrow = flexGrow;
             group.style.flexShrink = flexShrink;
             group.style.minWidth = 0;
-            group.style.overflow = Overflow.Hidden;
+            group.style.overflow = Overflow.Visible;
         }
 
         private void CreatePlaybackControls()
@@ -86,6 +122,12 @@ namespace ES
             AddToolbarButton(m_PlaybackGroup, LastBlockButton, EditorIcons.ArrowLeft.Raw, 26, 26, "跳转到上一个片段起点");
             AddToolbarButton(m_PlaybackGroup, PlayButton, EditorIcons.Play.Raw, 28, 26, "播放或暂停当前时间轴");
             AddToolbarButton(m_PlaybackGroup, NextBlockButton, EditorIcons.ArrowRight.Raw, 26, 26, "跳转到下一个片段起点");
+
+            // 构造期先采用安全紧凑布局。待获取真实宽度后再按需展开，避免窗口首帧、
+            // ReloadDomain 或高 DPI 下低频按钮把右侧“属性/更多”挤出可视区域。
+            PreviewButton.style.display = DisplayStyle.None;
+            LastBlockButton.style.display = DisplayStyle.None;
+            NextBlockButton.style.display = DisplayStyle.None;
 
             PreviewButton.text = "预";
             PreviewButton.style.fontSize = 12;
@@ -143,6 +185,20 @@ namespace ES
             Name.AddToClassList("normalBlock");
             m_ContextGroup.Add(Name);
 
+            SaveStatusLabel.text = "未选择";
+            SaveStatusLabel.tooltip = "当前时间轴保存状态";
+            SaveStatusLabel.style.height = 22;
+            SaveStatusLabel.style.minWidth = 48;
+            SaveStatusLabel.style.maxWidth = 60;
+            SaveStatusLabel.style.marginLeft = 4;
+            SaveStatusLabel.style.paddingLeft = 4;
+            SaveStatusLabel.style.paddingRight = 4;
+            SaveStatusLabel.style.fontSize = 10;
+            SaveStatusLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            SaveStatusLabel.style.color = new Color(0.64f, 0.67f, 0.72f, 1f);
+            SaveStatusLabel.AddToClassList("normalBlock");
+            m_ContextGroup.Add(SaveStatusLabel);
+
             EntityStatusGroup.style.flexDirection = FlexDirection.Row;
             EntityStatusGroup.style.alignItems = Align.Center;
             EntityStatusGroup.style.height = 26;
@@ -180,13 +236,19 @@ namespace ES
             ConfigureActionButton(BindAndPlaySkillButton, "绑定并释放技能", "把当前技能配置绑定到预览使用者，并立即执行一次释放流程");
             ConfigureActionButton(SelectEntityButton, "选择预览使用者", "从当前场景中选择用于预览和释放测试的 Entity");
 
+            // 这是高频动作，必须在顶栏常驻，不能要求用户先打开 Inspector 或“更多”菜单。
+            ConfigureActionButton(OpenInspectorButton, "弹出编辑器", "在独立窗口中编辑当前选中的轨道或片段；也可 Shift + 右键直接弹出");
+            AddToolbarButton(m_RightGroup, OpenInspectorButton, null, 76, 26, OpenInspectorButton.tooltip);
+            OpenInspectorButton.style.minWidth = 76;
+            OpenInspectorButton.style.color = new Color(0.92f, 0.96f, 1f, 1f);
+            OpenInspectorButton.style.backgroundColor = new Color(0.12f, 0.18f, 0.25f, 1f);
+            OpenInspectorButton.style.borderLeftColor = new Color(0.34f, 0.5f, 0.68f, 0.9f);
+            OpenInspectorButton.style.borderTopColor = new Color(0.34f, 0.5f, 0.68f, 0.9f);
+
             AddToolbarButton(m_RightGroup, MoreButton, null, 42, 26, "打开时间轴低频操作菜单");
             MoreButton.text = "更多";
             MoreButton.style.fontSize = 12;
             MoreButton.style.backgroundColor = new Color(0.085f, 0.095f, 0.11f, 1f);
-
-            AddToolbarButton(m_RightGroup, Setting, EditorIcons.SettingsCog.Raw, 26, 26, "打开时间轴工具设置菜单");
-            Setting.style.backgroundColor = new Color(0.085f, 0.095f, 0.11f, 1f);
         }
 
         private static void ConfigureActionButton(Button button, string text, string tooltip)
@@ -203,8 +265,7 @@ namespace ES
         {
             PreviewButton.clicked += () =>
             {
-                ESTrackViewWindow.window?.SealRunningEntityForPlay();
-                EditorTimelinePlayer.Instance.Play();
+                ESTrackViewWindow.window?.TryStartPreview();
             };
             PlayButton.clicked += OnPlayPauseToggle;
             ReStartButton.clicked += OnStopAndReset;
@@ -214,8 +275,19 @@ namespace ES
             EditSkillDataButton.clicked += () => ESTrackSkillDataEditorActions.OpenCurrentSkillDataInfoEditor(ESTrackViewWindow.window);
             BindAndPlaySkillButton.clicked += () => ESTrackSkillDataEditorActions.BindCurrentSkillDataToEntityAndPlay(ESTrackViewWindow.window);
             SelectEntityButton.clicked += ShowEntityMenu;
+            OpenInspectorButton.clicked += () => ESTrackViewWindow.window?.OpenCurrentInspectorInSeparateWindow();
             MoreButton.clicked += ShowMoreMenu;
-            Setting.clicked += ShowMoreMenu;
+        }
+
+        internal void UpdateInspectorAction(bool enabled)
+        {
+            if (OpenInspectorButton == null)
+                return;
+
+            OpenInspectorButton.SetEnabled(enabled);
+            OpenInspectorButton.tooltip = enabled
+                ? "在独立窗口中编辑当前选中的轨道或片段；也可 Shift + 右键直接弹出。"
+                : "请先选择轨道或片段，再弹出独立编辑器。";
         }
 
         private void OnGeometryChanged(GeometryChangedEvent evt)
@@ -224,24 +296,84 @@ namespace ES
                 ApplyResponsiveLayout(evt.newRect.width);
         }
 
+        private void ApplyResponsiveLayoutFromResolvedWidth()
+        {
+            float width = resolvedStyle.width;
+            if (float.IsNaN(width) || float.IsInfinity(width) || width <= 0f)
+                return;
+
+            ApplyResponsiveLayout(width);
+        }
+
         private void ApplyResponsiveLayout(float width)
         {
-            bool showContext = width >= ContextToolbarWidth;
+            if (float.IsNaN(width) || float.IsInfinity(width) || width <= 0f)
+                return;
+
+            // 时间轴名称是当前编辑上下文，窄窗口也必须保留一个可识别的压缩入口。
+            bool showContext = width >= 250f;
+            bool showSaveStatus = width >= ContextToolbarWidth;
             bool showEntityStatus = width >= ExpandedToolbarWidth;
             bool showNavigation = width >= NavigationToolbarWidth;
             bool showPreview = width >= PreviewToolbarWidth;
             bool compactPreview = width < ExpandedToolbarWidth;
+            bool compactActions = width < CompactActionToolbarWidth;
+            bool ultraCompact = width < UltraCompactToolbarWidth;
 
-            m_ContextGroup.style.display = showContext ? DisplayStyle.Flex : DisplayStyle.None;
+            if (ultraCompact)
+            {
+                if (m_ContextGroup.parent != m_CompactContextRow)
+                {
+                    m_ContextGroup.RemoveFromHierarchy();
+                    m_CompactContextRow.Add(m_ContextGroup);
+                }
+
+                m_ContextGroup.style.display = showContext ? DisplayStyle.Flex : DisplayStyle.None;
+                m_ContextGroup.style.flexGrow = 1;
+                m_ContextGroup.style.flexShrink = 1;
+                m_ContextGroup.style.maxWidth = StyleKeyword.None;
+            }
+            else
+            {
+                if (m_ContextGroup.parent != m_MainRow)
+                {
+                    m_ContextGroup.RemoveFromHierarchy();
+                    m_MainRow.Insert(1, m_ContextGroup);
+                }
+
+                m_ContextGroup.style.display = showContext ? DisplayStyle.Flex : DisplayStyle.None;
+                m_ContextGroup.style.flexGrow = 1;
+                m_ContextGroup.style.flexShrink = 1;
+            }
+
+            m_CompactContextRow.style.display = ultraCompact && showContext ? DisplayStyle.Flex : DisplayStyle.None;
+            Name.style.minWidth = ultraCompact ? 44f : width < 520f ? 58f : 80f;
+            Name.style.maxWidth = ultraCompact ? StyleKeyword.None : compactActions ? 112f : StyleKeyword.None;
+            m_ContextGroup.style.maxWidth = ultraCompact ? StyleKeyword.None : compactActions ? 118f : StyleKeyword.None;
+            m_ContextGroup.style.marginLeft = ultraCompact ? 2f : 4f;
+            m_ContextGroup.style.marginRight = ultraCompact ? 2f : 4f;
+            SaveStatusLabel.style.display = showSaveStatus ? DisplayStyle.Flex : DisplayStyle.None;
             EntityStatusGroup.style.display = showEntityStatus ? DisplayStyle.Flex : DisplayStyle.None;
             LastBlockButton.style.display = showNavigation ? DisplayStyle.Flex : DisplayStyle.None;
             NextBlockButton.style.display = showNavigation ? DisplayStyle.Flex : DisplayStyle.None;
             PreviewButton.style.display = showPreview ? DisplayStyle.Flex : DisplayStyle.None;
+            ReStartButton.style.display = ultraCompact ? DisplayStyle.None : DisplayStyle.Flex;
             PreviewButton.style.width = compactPreview ? 28 : 46;
             PreviewButton.text = compactPreview ? "预" : "预览";
 
+            TimeLabel.style.width = ultraCompact ? 56f : 62f;
+            TimeLabel.style.marginLeft = ultraCompact ? 2f : 4f;
+
+            OpenInspectorButton.text = compactActions ? "属性" : "弹出编辑器";
+            OpenInspectorButton.style.width = ultraCompact ? 42f : compactActions ? 52f : 76f;
+            OpenInspectorButton.style.minWidth = ultraCompact ? 42f : compactActions ? 52f : 76f;
+            MoreButton.text = ultraCompact ? "⋯" : "更多";
+            MoreButton.style.width = ultraCompact ? 30f : 42f;
+            MoreButton.style.minWidth = ultraCompact ? 30f : 42f;
+
             if (showEntityStatus)
                 EntityStatusGroup.style.maxWidth = width >= 820f ? 190 : 132;
+
         }
 
         private void AddToolbarButton(VisualElement parent, Button button, Texture2D icon, float width, float height, string tooltip = null)
@@ -271,20 +403,45 @@ namespace ES
         private void ShowMoreMenu()
         {
             var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("【预览】/停止并回到时间 0"), false, OnStopAndReset);
+            menu.AddSeparator("");
             menu.AddItem(new GUIContent("【时间轴】/切换当前编辑时间轴"), false, ShowTimelineMenuFromMoreMenu);
+            if (ESTrackViewWindow.TrackContainer != null && ESTrackViewWindow.Sequence != null)
+                menu.AddItem(new GUIContent("【时间轴】/立即保存当前时间轴"), false, ESTrackViewWindowHelper.SaveContainerNow);
+            else
+                menu.AddDisabledItem(new GUIContent("【时间轴】/立即保存当前时间轴（未选择）"));
+            if (ESTrackViewWindow.window != null && ESTrackViewWindow.TrackContainer != null && ESTrackViewWindow.Sequence != null)
+                menu.AddItem(new GUIContent("【时间轴】/保存为新资产…"), false, ESTrackViewWindowHelper.SaveContainerAsNewAsset);
+            else
+                menu.AddDisabledItem(new GUIContent("【时间轴】/保存为新资产…（未选择）"));
+            if (ESTrackViewWindow.TrackContainer != null && ESTrackViewWindow.Sequence != null)
+                menu.AddItem(new GUIContent("【时间轴】/复制结构摘要"), false, ESTrackViewWindowHelper.CopyCurrentSequenceSummary);
+            else
+                menu.AddDisabledItem(new GUIContent("【时间轴】/复制结构摘要（未选择）"));
+            if (ESTrackViewWindow.window != null && ESTrackViewWindow.window.CanOpenCurrentInspectorInSeparateWindow)
+                menu.AddItem(new GUIContent("【属性】/弹出当前属性编辑器"), false, () =>
+                {
+                    ESTrackViewWindow.window?.OpenCurrentInspectorInSeparateWindow();
+                });
+            else
+                menu.AddDisabledItem(new GUIContent("【属性】/弹出当前属性编辑器（请先选择轨道或片段）"));
             menu.AddSeparator("");
             menu.AddItem(new GUIContent("【技能】/打开当前技能配置"), false, () => ESTrackSkillDataEditorActions.OpenCurrentSkillDataInfoEditor(ESTrackViewWindow.window));
             menu.AddItem(new GUIContent("【技能】/绑定到预览使用者并释放"), false, () => ESTrackSkillDataEditorActions.BindCurrentSkillDataToEntityAndPlay(ESTrackViewWindow.window));
             menu.AddSeparator("");
             menu.AddItem(new GUIContent("【预览目标】/从场景选择预览使用者"), false, ShowEntityMenu);
-            menu.AddSeparator("");
-            menu.AddDisabledItem(new GUIContent("【设置】/时间轴工具设置暂未接入"));
             menu.DropDown(MoreButton.worldBound);
         }
 
         private void ShowTimelineMenuFromButton()
         {
             IEditorTrackSupport_GetSequence.ShowDynamicMenu(SelectOtherTimeLine.worldBound, OnTimelineSelected);
+        }
+
+        internal void OpenTimelineSelectionMenu(VisualElement anchor = null)
+        {
+            VisualElement menuAnchor = anchor ?? SelectOtherTimeLine;
+            IEditorTrackSupport_GetSequence.ShowDynamicMenu(menuAnchor.worldBound, OnTimelineSelected);
         }
 
         private void ShowTimelineMenuFromMoreMenu()
@@ -343,8 +500,7 @@ namespace ES
                 return;
             }
 
-            ESTrackViewWindow.window?.SealRunningEntityForPlay();
-            player.Play();
+            ESTrackViewWindow.window?.TryStartPreview();
         }
 
         private void OnStopAndReset()
@@ -424,6 +580,7 @@ namespace ES
             if (trackWindow != null && trackWindow.Last_EditorWindowForSkillDataInfo != null)
                 trackWindow.Last_EditorWindowForSkillDataInfo.Close();
 
+            IEditorTrackSupport_GetSequence sourceContainer = ESTrackViewWindow.TrackContainer;
             var editorWindow = ESTrackSkillDataTemporaryInspectorWindow.OpenFor(
                 skillData,
                 "编辑技能 <" + skillData.name + ">",
@@ -434,7 +591,8 @@ namespace ES
                 if (trackWindow != null)
                     trackWindow.Last_EditorWindowForSkillDataInfo = null;
 
-                ESTrackViewWindowHelper.SaveContainerChanges();
+                ESTrackViewWindowHelper.SaveContainerChangesImmediately(sourceContainer);
+                AssetDatabase.SaveAssetIfDirty(skillData);
             });
 
             if (trackWindow != null)

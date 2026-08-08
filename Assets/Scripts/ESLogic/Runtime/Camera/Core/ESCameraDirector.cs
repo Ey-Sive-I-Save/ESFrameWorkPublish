@@ -53,12 +53,15 @@ namespace ES
             if (!request.IsStructurallyValid || !views.TryGetValue(request.viewId, out ViewState view) || !view.adapter.IsReady)
                 return ESCameraLease.Invalid;
 
+            if (!TryResolveRequest(view.adapter, request, out ESCameraRequest resolvedRequest))
+                return ESCameraLease.Invalid;
+
             int slotIndex = view.AcquireSlot();
             RequestSlot slot = view.slots[slotIndex];
             slot.active = true;
             slot.generation = NextGeneration(slot.generation);
             slot.submissionSequence = ++nextSubmissionSequence;
-            slot.request = request;
+            slot.request = resolvedRequest;
             view.slots[slotIndex] = slot;
             view.dirty = true;
 
@@ -75,7 +78,10 @@ namespace ES
             }
 
             // Update preserves the original submission serial so a parameter refresh never changes a tie-break.
-            slot.request = request;
+            if (!TryResolveRequest(view.adapter, request, out ESCameraRequest resolvedRequest))
+                return false;
+
+            slot.request = resolvedRequest;
             view.slots[lease.slot] = slot;
             view.dirty = true;
             return true;
@@ -270,17 +276,20 @@ namespace ES
                 if (needsApply || hasLookInput || !view.hasApplied)
                 {
                     ESCameraRequest request = view.winner.request;
-                    TryApplyAdapter(view.adapter, new ESCameraResolvedView(
+                    bool applied = TryApplyAdapter(view.adapter, new ESCameraResolvedView(
                         true,
-                        request.profileKey,
+                        needsApply || !view.hasApplied,
+                        request.definition,
+                        request.definitionHandle,
                         request.follow,
                         request.lookAt,
                         request.owner,
                         view.pendingLookInput,
                         hasLookInput,
                         view.modifiers));
-                    // 适配器异常已隔离到当前 Commit；不在每帧无限重试同一坏请求。
-                    view.hasApplied = true;
+                    view.hasApplied = applied;
+                    if (!applied)
+                        TryClearAdapter(view.adapter);
                 }
             }
             else if (view.hasApplied)
@@ -312,8 +321,24 @@ namespace ES
 
         private static bool IsRequestAlive(in ESCameraRequest request)
         {
-            if (!request.IsStructurallyValid)
+            // Push/Update/TrySetTarget 已完成结构校验；LateUpdate 只处理运行中对象失效，
+            // 避免在每个活动请求上重复读取 DefinitionKey 字符串。
+            if (request.owner == null)
                 return false;
+
+            if (request.kind == ESCameraRequestKind.Modifier)
+            {
+                if (!request.modifier.IsValid)
+                    return false;
+            }
+            else
+            {
+                if (request.kind != ESCameraRequestKind.Base && request.kind != ESCameraRequestKind.Shot)
+                    return false;
+
+                if (request.follow == null)
+                    return false;
+            }
 
             if (request.owner is Component component && !component.gameObject.activeInHierarchy)
                 return false;
@@ -352,7 +377,7 @@ namespace ES
                 return;
             }
 
-            string winningProfileKey = view.winner.request.profileKey;
+            ESCameraDefinitionRuntimeHandle winningDefinition = view.winner.request.definitionHandle;
             ScalarAccumulator fieldOfView = new ScalarAccumulator();
             ScalarAccumulator distanceScale = new ScalarAccumulator();
             VectorAccumulator shoulderOffset = new VectorAccumulator();
@@ -364,8 +389,8 @@ namespace ES
                 ESCameraRequest request = slot.request;
                 if (!slot.active
                     || request.kind != ESCameraRequestKind.Modifier
-                    || (!string.IsNullOrWhiteSpace(request.compatibleProfileKey)
-                        && !string.Equals(request.compatibleProfileKey, winningProfileKey, StringComparison.Ordinal)))
+                    || (request.compatibleDefinition.IsConfigured
+                        && request.compatibleDefinitionHandle != winningDefinition))
                 {
                     continue;
                 }
@@ -402,16 +427,31 @@ namespace ES
             return kind == ESCameraRequestKind.Shot ? 2 : 1;
         }
 
-        private static void TryApplyAdapter(IESCameraViewAdapter adapter, in ESCameraResolvedView resolved)
+        private static bool TryApplyAdapter(IESCameraViewAdapter adapter, in ESCameraResolvedView resolved)
         {
             try
             {
-                adapter.Apply(resolved);
+                return adapter.IsReady && adapter.Apply(resolved);
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
+                return false;
             }
+        }
+
+        private static bool TryResolveRequest(IESCameraViewAdapter adapter, in ESCameraRequest request, out ESCameraRequest resolved)
+        {
+            resolved = request;
+            if (request.kind == ESCameraRequestKind.Modifier)
+            {
+                if (!request.compatibleDefinition.IsConfigured)
+                    return true;
+
+                return adapter.TryResolveDefinition(request.compatibleDefinition, out resolved.compatibleDefinitionHandle);
+            }
+
+            return adapter.TryResolveDefinition(request.definition, out resolved.definitionHandle);
         }
 
         private static void TryClearAdapter(IESCameraViewAdapter adapter)

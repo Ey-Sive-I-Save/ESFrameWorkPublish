@@ -1,10 +1,11 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ES
 {
     /// <summary>
-    /// Timeline 相机镜头的纯数据描述。Timeline 集成层只能持有 ProfileKey 与目标 Transform，
+    /// Timeline 相机镜头的纯数据描述。Timeline 集成层只能持有稳定 Definition 引用与目标 Transform，
     /// 不能取得 VCam、CinemachineBrain 或 Priority。它最终仍是 Director 活跃集合中的 Shot，
     /// 不存在绕过仲裁的“Timeline 特权通道”。
     /// </summary>
@@ -12,25 +13,27 @@ namespace ES
     public struct ESCameraTimelineShot
     {
         public ESCameraViewId viewId;
-        public string profileKey;
+        [SerializeField, HideInInspector, FormerlySerializedAs("profileKey"), FormerlySerializedAs("definitionKey")]
+        private string legacyDefinitionKey;
+        public ESCameraDefinitionReference definition;
         public int priority;
         public UnityEngine.Object owner;
         public Transform follow;
         public Transform lookAt;
 
-        public bool IsValid => !string.IsNullOrWhiteSpace(profileKey)
+        public bool IsValid => definition.IsConfigured
                                && owner != null
                                && follow != null
                                && viewId.IsValid;
 
         public ESCameraRequest ToRequest()
         {
-            return ESCameraRequest.CreateShot(viewId, profileKey, priority, owner, follow, lookAt);
+            return ESCameraRequest.CreateShot(viewId, definition, priority, owner, follow, lookAt);
         }
 
         public static ESCameraTimelineShot Create(
             ESCameraViewId viewId,
-            string profileKey,
+            ESCameraDefinitionReference definition,
             int priority,
             UnityEngine.Object owner,
             Transform follow,
@@ -39,7 +42,7 @@ namespace ES
             return new ESCameraTimelineShot
             {
                 viewId = viewId,
-                profileKey = profileKey,
+                definition = definition,
                 priority = priority,
                 owner = owner,
                 follow = follow,

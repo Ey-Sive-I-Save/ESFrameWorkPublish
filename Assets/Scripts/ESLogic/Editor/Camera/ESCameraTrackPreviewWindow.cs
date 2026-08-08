@@ -65,7 +65,7 @@ namespace ES
 
             Rect rect = GUILayoutUtility.GetRect(16f, Mathf.Max(160f, position.height - 45f), GUILayout.ExpandWidth(true));
             if (!session.RenderGUI(rect, ESEditorPreviewRenderOptions.Balanced))
-                EditorGUI.HelpBox(rect, "相机预览渲染失败。请检查 ProfileKey、RigCatalog 与预览目标 Mapping。", MessageType.Warning);
+                EditorGUI.HelpBox(rect, "相机预览渲染失败。请检查 DefinitionKey、RigCatalog 与预览目标 Mapping。", MessageType.Warning);
         }
 
         private void OnEditorUpdate()

@@ -28,6 +28,7 @@ namespace ES
         private VisualElement m_Icon;
         private VisualElement m_AccentBar;
         private Label m_TrackNameLabel;
+        private Label m_TrackStateBadge;
         private TextField m_RenameField;
         private VisualElement m_TrackClipsContainer;
         private bool m_IsSortDragging;
@@ -85,6 +86,17 @@ namespace ES
         public void UpdateWhenEdit()
         {
             UpdateTrackMessage();
+        }
+
+        internal void RefreshProjectionAfterUndoRedo()
+        {
+            if (item == null)
+                return;
+
+            UpdateTrackMessage();
+            UpdateTrackColor();
+            UpdateBasicTrackStyle();
+            UpdateNodeMatchAndForeachUpdate(true);
         }
         private void UpdateTrackMessage()
         {
@@ -298,11 +310,37 @@ namespace ES
             };
             m_Header.Add(m_TrackNameLabel);
 
+            m_TrackStateBadge = new Label("正常")
+            {
+                style =
+                {
+                    minWidth = 32,
+                    width = 32,
+                    height = 18,
+                    marginLeft = 5,
+                    fontSize = 9,
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    unityTextAlign = TextAnchor.MiddleCenter,
+                    borderTopLeftRadius = 3,
+                    borderTopRightRadius = 3,
+                    borderBottomLeftRadius = 3,
+                    borderBottomRightRadius = 3
+                }
+            };
+            m_Header.Add(m_TrackStateBadge);
+
             m_LeftPanel.Add(m_Header);
 
             m_LeftPanel.RegisterCallback<ContextClickEvent>(evt =>
             {
                 recordLocalClipsMousePos = new Vector2(0f, evt.localMousePosition.y);
+                if (evt.shiftKey)
+                {
+                    ESTrackViewWindow.window?.EditTrack(this, true);
+                    evt.StopPropagation();
+                    return;
+                }
+
                 ESTrackViewWindow.window?.ShowMenu_SelectTrackAndAddTrack(this);
                 evt.StopPropagation();
             });
@@ -417,17 +455,31 @@ namespace ES
                     : "当前轨道已禁用。点击后重新启用。";
                 m_EnableButton.style.color = enabled
                     ? new Color(0.78f, 1f, 0.78f, 1f)
-                    : new Color(1f, 0.72f, 0.52f, 1f);
+                    : new Color(0.68f, 0.72f, 0.78f, 1f);
                 m_EnableButton.style.backgroundColor = enabled
                     ? new Color(0.08f, 0.18f, 0.12f, 0.92f)
-                    : new Color(0.2f, 0.105f, 0.075f, 0.95f);
+                    : new Color(0.14f, 0.16f, 0.19f, 0.96f);
                 Color borderColor = enabled
                     ? new Color(0.25f, 0.62f, 0.34f, 0.9f)
-                    : new Color(0.72f, 0.35f, 0.2f, 0.95f);
+                    : new Color(0.42f, 0.47f, 0.54f, 0.82f);
                 m_EnableButton.style.borderTopColor = borderColor;
                 m_EnableButton.style.borderRightColor = borderColor;
                 m_EnableButton.style.borderBottomColor = borderColor;
                 m_EnableButton.style.borderLeftColor = borderColor;
+            }
+
+            if (m_TrackStateBadge != null)
+            {
+                m_TrackStateBadge.text = enabled ? "正常" : "停用";
+                m_TrackStateBadge.tooltip = enabled
+                    ? "轨道已启用"
+                    : "轨道已禁用，预览与运行时会跳过此轨道";
+                m_TrackStateBadge.style.color = enabled
+                    ? new Color(0.68f, 0.95f, 0.76f, 1f)
+                    : new Color(0.68f, 0.72f, 0.78f, 1f);
+                m_TrackStateBadge.style.backgroundColor = enabled
+                    ? new Color(0.08f, 0.2f, 0.13f, 0.92f)
+                    : new Color(0.14f, 0.16f, 0.19f, 0.95f);
             }
 
             if (m_TrackNameLabel != null)

@@ -12,10 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ec636e27c6c4859a44b7fa352b4b91d, type: 3}
   m_Name: PlayerThirdPerson
   m_EditorClassIdentifier: 
-  profileKey: player.third_person
+  definition:
+    enumKey: 1
+    stringKey: player.third_person
+  legacyDefinitionKey: 
   rigKey: player.third_person
   povLookSensitivity: {x: 220, y: 90}
   freeLookSensitivity: {x: 220, y: 0.5}
+  pointerLookScale: 0.001
   invertVerticalLook: 0
   baseFieldOfView: 60
   baseDistanceScale: 1

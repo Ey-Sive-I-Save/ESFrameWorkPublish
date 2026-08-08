@@ -1143,6 +1143,79 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260808-006",
+                        "status":  "documented",
+                        "summary":  "提交相机定义迁移、通用 Profile、动态图集、轨道预览及其运行时、Editor、测试场景和序列化资产。",
+                        "sourcePaths":  [
+                                            "Assets/ESNormalAssets/Camera",
+                                            "Assets/InitTestScene639217367572362856.unity",
+                                            "Assets/InitTestScene639217367572362856.unity.meta",
+                                            "Assets/InitTestScene639217618548923744.unity",
+                                            "Assets/InitTestScene639217618548923744.unity.meta",
+                                            "Assets/InitTestScene639217628662454932.unity",
+                                            "Assets/InitTestScene639217628662454932.unity.meta",
+                                            "Assets/InitTestScene639217647083667795.unity",
+                                            "Assets/InitTestScene639217647083667795.unity.meta",
+                                            "Assets/Plugins/ES/1_Design/Input/SERVICE_ESInputProfileIO.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESCameraDefinitionCatalogTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESCameraDefinitionCatalogTests.cs.meta",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESCameraDirectorTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESCameraModuleAuthorizationTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESGenericProfileTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESGenericProfileTests.cs.meta",
+                                            "Assets/Plugins/ES/Editor/ESProfileWorkbench",
+                                            "Assets/Plugins/ES/Editor/ESProfileWorkbench.meta",
+                                            "Assets/Plugins/ES/Editor/ESTrackView",
+                                            "Assets/Scripts/ESLogic/Editor/Camera",
+                                            "Assets/Scripts/ESLogic/Editor/DynamicAtlas",
+                                            "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESCameraDefinitionMigrationToolTests.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Camera",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.StaticCache.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESDynamicAtlasModule.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESDynamicAtlasModule.cs.meta",
+                                            "Assets/Scripts/ESLogic/Runtime/Graphics",
+                                            "Assets/Scripts/ESLogic/Runtime/Graphics.meta",
+                                            "Assets/Scripts/ESLogic/Runtime/Profile",
+                                            "Assets/Scripts/ESLogic/Runtime/Profile.meta",
+                                            "Assets/Scripts/ESLogic/Runtime/Skill/TrackItemAndClip/SkillTrack/SkillTrackItems/SkillTrackItem_Camera.cs",
+                                            "Assets/Scripts/ESLogic/Tests/DynamicAtlas",
+                                            "Assets/Scripts/ESLogic/Tests/DynamicAtlas.meta",
+                                            "Assets/Scripts/ESLogic/Tests.meta",
+                                            "Documentation/ES_CAMERA_RUNTIME_STANDARD.md",
+                                            "Documentation/ES_UI_AUTHORING_WORKFLOW.md"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Scripts/ESLogic/Runtime/Camera/Core/ESCameraDirector.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/Graphics/DynamicAtlas/ESDynamicAtlasRuntime.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/Graphics/DynamicAtlas/ESDynamicAtlasGraphic.cs",
+                                              "Assets/Scripts/ESLogic/Tests/DynamicAtlas/EditMode/ESDynamicAtlasContractTests.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/ESCameraDirectorTests.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "相机资产由旧 Profile 迁移到定义目录，运行时导演、轨道预览、通用 Profile 和动态图集共同接入 ESGameManager。资产、迁移工具、模块和测试必须同批，避免序列化引用指向已删除类型。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "批次包含相机、Profile 和动态图集 EditMode/PlayMode 测试入口",
+                                                            "提交前由 staged-only 门禁核对路径清单和补丁指纹"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "实际场景加载、GPU 图集、窄屏 UI 与 Player/IL2CPP 行为仍需 Unity 运行验收",
+                                                             "迁移后的旧资产引用仍需在目标项目数据上复核"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1155,13 +1228,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-08T19:01:19+08:00",
-                       "head":  "fd8a1a7a6e1b49d1daa4a0524a1e53bc329fb2ee",
-                       "stagedSourcePatchSha256":  "cff7a1b852b5de2ead39c4ad942b59af8112b505744b6754413584f816f3f9c9",
-                       "stagedSourceManifestSha256":  "b43ef712ca1f12d53f8a1899c35c98d68d87c54d51898a832f4e195695e28a6b",
-                       "stagedSourceFileCount":  42,
+                       "preparedAt":  "2026-08-08T19:03:08+08:00",
+                       "head":  "cb3986913f987ff6253d38a44619764fe34d6726",
+                       "stagedSourcePatchSha256":  "051a84875cfb1fd678214d392cfe09353a8a47aaecfe0a27e8aba6e1d1cd4945",
+                       "stagedSourceManifestSha256":  "63440e9b95def85dac900f4a2f7064a8221a856f47ac3585f5f618bb7c00b2ec",
+                       "stagedSourceFileCount":  121,
                        "entryIds":  [
-                                        "LOCAL-20260808-005"
+                                        "LOCAL-20260808-006"
                                     ]
                    }
 }

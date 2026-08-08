@@ -12,8 +12,7 @@ namespace ES.Internal
 
         public static ESInputBindingProfile LoadOrCreateDefault(string filePath = null)
         {
-            if (string.IsNullOrEmpty(filePath))
-                filePath = GetDefaultProfilePath();
+            filePath = ResolveProfilePath(filePath);
 
             if (!File.Exists(filePath))
                 return CreateDefaultProfile();
@@ -32,15 +31,10 @@ namespace ES.Internal
 
             profile.Normalize();
 
-            if (string.IsNullOrEmpty(filePath))
-                filePath = GetDefaultProfilePath();
-
-            string directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                Directory.CreateDirectory(directory);
+            filePath = ResolveProfilePath(filePath);
 
             string json = ToJson(profile, true);
-            File.WriteAllText(filePath, json, Encoding.UTF8);
+            ESManagedFileIO.WriteTextAtomic(filePath, json, Encoding.UTF8, Application.persistentDataPath);
         }
 
         public static string ToJson(ESInputBindingProfile profile, bool prettyPrint = false)
@@ -88,6 +82,77 @@ namespace ES.Internal
         public static string GetDefaultProfilePath()
         {
             return Path.Combine(Application.persistentDataPath, DefaultFolderName, DefaultFileName);
+        }
+
+        private static string ResolveProfilePath(string filePath)
+        {
+            string root = Path.GetFullPath(Application.persistentDataPath);
+            if (string.IsNullOrWhiteSpace(filePath))
+                return GetDefaultProfilePath();
+
+            string input = filePath.Trim();
+            if (input.Contains("://") || input.StartsWith("jar:", System.StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.LogWarning("输入档案路径不能使用 URI，已回退到默认路径。");
+                return GetDefaultProfilePath();
+            }
+
+            string candidate;
+            try
+            {
+                candidate = Path.IsPathRooted(input)
+                    ? Path.GetFullPath(input)
+                    : Path.GetFullPath(Path.Combine(root, input.Replace('\\', Path.DirectorySeparatorChar)));
+            }
+            catch (System.Exception)
+            {
+                Debug.LogWarning("输入档案路径格式无效，已回退到默认路径：" + filePath);
+                return GetDefaultProfilePath();
+            }
+
+            if (!IsPathWithinRoot(root, candidate))
+            {
+                Debug.LogWarning("输入档案路径必须位于 persistentDataPath 内，已回退到默认路径：" + filePath);
+                return GetDefaultProfilePath();
+            }
+
+            if (ContainsExistingReparsePoint(root, candidate))
+            {
+                Debug.LogWarning("输入档案路径不能穿过 junction/symlink，已回退到默认路径：" + filePath);
+                return GetDefaultProfilePath();
+            }
+
+            return candidate;
+        }
+
+        private static bool IsPathWithinRoot(string root, string candidate)
+        {
+            string normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            string normalizedCandidate = candidate.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            return normalizedCandidate.StartsWith(normalizedRoot, System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    candidate.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ContainsExistingReparsePoint(string root, string candidate)
+        {
+            string rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string current = rootFull;
+            string relative = candidate.Substring(rootFull.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string[] segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            for (int i = 0; i < segments.Length; i++)
+            {
+                if (string.IsNullOrEmpty(segments[i])) continue;
+                current = Path.Combine(current, segments[i]);
+                if (!File.Exists(current) && !Directory.Exists(current)) break;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return true;
+            }
+
+            return false;
         }
     }
 }

@@ -45,6 +45,14 @@
       "dependencies": {},
       "hash": "2e993ff18f28c931602a07292df0b0804eebef99"
     },
+    "com.esframework.aitest": {
+      "version": "file:com.esframework.aitest",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "1.0.0"
+      }
+    },
     "com.kyrylokuzyk.primetween": {
       "version": "1.4.11",
       "depth": 0,

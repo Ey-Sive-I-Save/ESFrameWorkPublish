@@ -1102,6 +1102,47 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260808-005",
+                        "status":  "documented",
+                        "summary":  "提交独立 AITest Package、协议与执行运行时，并接入 ESLogic 的业务能力注册、输入和场景验证提供者。",
+                        "sourcePaths":  [
+                                            "Assets/Scripts/ESLogic/Editor/Developer",
+                                            "Assets/Scripts/ESLogic/Runtime/Developer/AITest",
+                                            "Assets/Scripts/ESLogic/Runtime/Developer/AITest.meta",
+                                            "Packages/com.esframework.aitest",
+                                            "Packages/packages-lock.json"
+                                        ],
+                        "evidencePaths":  [
+                                              "Packages/com.esframework.aitest/Runtime/AITestRuntime.cs",
+                                              "Packages/com.esframework.aitest/Runtime/AITestProtocol.cs",
+                                              "Packages/com.esframework.aitest/Runtime/AITestUGUIProvider.cs",
+                                              "Assets/Scripts/ESLogic/Editor/Developer/AITest/ESAITestAttributedCapabilityRegistry.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/Developer/AITest/ESAITestSceneValidationProvider.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "AITest 的 Package 协议、Player Bootstrap、UI 观察执行和 ESLogic 能力提供者以程序集引用连接。它们与 packages-lock 同批提交，确保 Unity 能以嵌入式 Package 解析正确依赖。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "Package asmdef、协议、能力注册和报告收集器均位于同一提交范围",
+                                                            "提交前由 staged-only 门禁核对路径清单和补丁指纹"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "独立 Player 中的完整 AI Observe-Plan-Act-Verify 闭环仍需真实运行验收",
+                                                             "源码和 Package 锁不替代 Test Runner、IL2CPP 或网络环境证据"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1114,13 +1155,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-08T18:58:18+08:00",
-                       "head":  "893466f646b5ff871d6595b4ef52f9ef25cfacab",
-                       "stagedSourcePatchSha256":  "bd3d75c296eddd11bfac83f2757980228e535b524b87eb4d00705ad36b098811",
-                       "stagedSourceManifestSha256":  "ab2d38a2536911f9a784d778f3e3c467d5af715015b5eefff405ec8e687aabd2",
-                       "stagedSourceFileCount":  34,
+                       "preparedAt":  "2026-08-08T19:01:19+08:00",
+                       "head":  "fd8a1a7a6e1b49d1daa4a0524a1e53bc329fb2ee",
+                       "stagedSourcePatchSha256":  "cff7a1b852b5de2ead39c4ad942b59af8112b505744b6754413584f816f3f9c9",
+                       "stagedSourceManifestSha256":  "b43ef712ca1f12d53f8a1899c35c98d68d87c54d51898a832f4e195695e28a6b",
+                       "stagedSourceFileCount":  42,
                        "entryIds":  [
-                                        "LOCAL-20260808-004"
+                                        "LOCAL-20260808-005"
                                     ]
                    }
 }

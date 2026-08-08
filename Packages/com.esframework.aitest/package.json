@@ -1,0 +1,10 @@
+{
+  "name": "com.esframework.aitest",
+  "version": "0.1.0",
+  "displayName": "ESFramework AI Test Runtime",
+  "description": "Deterministic Player-side execution, capability registration, and evidence reporting for AI-assisted end-to-end acceptance.",
+  "unity": "2022.3",
+  "dependencies": {
+    "com.unity.ugui": "1.0.0"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/python-runtime/v1",
+  "title": "ES Automation Managed Python Runtime Lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "runtimeId", "pythonVersion", "interpreterRelativePath", "interpreterSha256", "runtimeContentSha256", "requirementsLockRelativePath", "requirementsLockSha256"],
+  "properties": {
+    "protocolVersion": { "type": "integer", "const": 1 },
+    "runtimeId": { "type": "string", "minLength": 1 },
+    "pythonVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$" },
+    "interpreterRelativePath": { "type": "string", "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+python\\.exe$" },
+    "interpreterSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "runtimeContentSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "requirementsLockRelativePath": { "type": "string" },
+    "requirementsLockSha256": { "type": "string", "pattern": "^(?:|[a-fA-F0-9]{64})$" }
+  }
+}

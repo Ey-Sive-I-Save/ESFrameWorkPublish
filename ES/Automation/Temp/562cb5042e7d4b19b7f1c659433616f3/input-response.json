@@ -1,0 +1,13 @@
+{
+  "protocolVersion": 1,
+  "runId": "562cb5042e7d4b19b7f1c659433616f3",
+  "requestGeneration": 0,
+  "stepId": "scene-scan.report-options",
+  "schemaHash": "4bbaa61e9bf8a2e2664d3b9cf98944711aa26d5c714e911044298193f08a14cb",
+  "accepted": true,
+  "values": {
+    "includeInactive": false,
+    "detailMode": "summary",
+    "topComponentCount": 10
+  }
+}

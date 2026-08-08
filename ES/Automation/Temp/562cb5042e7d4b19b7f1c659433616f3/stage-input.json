@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 1,
+  "runId": "562cb5042e7d4b19b7f1c659433616f3",
+  "generation": 1,
+  "taskId": "es.scene.scan",
+  "taskVersion": 1,
+  "workerType": "Python",
+  "workerId": "es.scene.scan.python",
+  "workerVersion": "0.1.0",
+  "entrypointHash": "fdfcd66352572015c05f69380ba0c12403b5917b06e29db333031ca133557d19",
+  "stepId": "scene-scan.report-options",
+  "optionsSchemaHash": "4bbaa61e9bf8a2e2664d3b9cf98944711aa26d5c714e911044298193f08a14cb",
+  "dryRun": false,
+  "sceneSnapshotPath": "F:\\aaProject\\ESFrameWorkPublish\\ES\\Automation\\Temp\\562cb5042e7d4b19b7f1c659433616f3\\scene-snapshot.json",
+  "sceneSnapshotHash": "684b313826e68ad8c9e6fa79a29728981a701696d95e611834f0d4127b7e8820",
+  "inputResponsePath": "F:\\aaProject\\ESFrameWorkPublish\\ES\\Automation\\Temp\\562cb5042e7d4b19b7f1c659433616f3\\input-response.json",
+  "workerOutputDirectory": "F:\\aaProject\\ESFrameWorkPublish\\ES\\Automation\\Temp\\562cb5042e7d4b19b7f1c659433616f3\\WorkerOutput"
+}

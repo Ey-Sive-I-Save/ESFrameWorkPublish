@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/ai-response/v1",
+  "title": "ESAutomation AI Bridge Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "requestId", "action", "status", "message", "runId", "receiptId", "data"],
+  "properties": {
+    "protocolVersion": { "type": "integer", "const": 1 },
+    "requestId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
+    "action": { "type": "string" },
+    "status": { "type": "string", "enum": ["Accepted", "Completed", "Blocked", "Cancelled", "Rejected", "Failed", "NotFound"] },
+    "message": { "type": "string" },
+    "runId": { "type": "string" },
+    "receiptId": { "type": "string" },
+    "data": { "type": "object" }
+  }
+}

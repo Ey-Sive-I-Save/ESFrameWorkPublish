@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/input-response/v1",
+  "title": "ESAutomationCenter Canonical Input Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "runId", "requestGeneration", "stepId", "schemaHash", "accepted", "values"],
+  "properties": {
+    "protocolVersion": { "type": "integer", "const": 1 },
+    "runId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
+    "requestGeneration": { "type": "integer", "minimum": 0 },
+    "stepId": { "type": "string", "minLength": 1 },
+    "schemaHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "accepted": { "type": "boolean" },
+    "values": { "type": "object" }
+  }
+}

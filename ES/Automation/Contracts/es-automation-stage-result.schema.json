@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/stage-result/v1",
+  "title": "ESAutomationCenter Staged Worker Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "runId", "generation", "taskId", "taskVersion", "workerType", "workerId", "workerVersion", "entrypointHash", "status", "exitCode", "startedAtUtc", "finishedAtUtc", "stepId", "schemaHash", "errors"],
+  "properties": {
+    "protocolVersion": { "type": "integer", "const": 1 },
+    "runId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
+    "generation": { "type": "integer", "minimum": 0 },
+    "taskId": { "type": "string", "minLength": 1 },
+    "taskVersion": { "type": "integer", "minimum": 1 },
+    "workerType": { "type": "string", "enum": ["Python", "PowerShell", "DotNet", "Other"] },
+    "workerId": { "type": "string", "minLength": 1 },
+    "workerVersion": { "type": "string", "minLength": 1 },
+    "entrypointHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "status": { "type": "string", "enum": ["NeedsInput", "Completed", "Failed", "Cancelled"] },
+    "exitCode": { "type": "integer" },
+    "startedAtUtc": { "type": "string", "format": "date-time" },
+    "finishedAtUtc": { "type": "string", "format": "date-time" },
+    "stepId": { "type": "string", "minLength": 1 },
+    "schemaHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

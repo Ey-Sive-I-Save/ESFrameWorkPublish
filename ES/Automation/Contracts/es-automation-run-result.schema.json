@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/run-result/v1",
+  "title": "ESAutomationCenter Run Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "taskId", "taskVersion", "runId", "workerType", "workerId", "workerVersion", "entrypointHash", "status", "exitCode", "startedAtUtc", "finishedAtUtc", "inputManifestHash", "outputs", "outputHashes", "findings", "errors"],
+  "properties": {
+    "protocolVersion": { "type": "integer", "const": 1 },
+    "taskId": { "type": "string", "minLength": 1 },
+    "taskVersion": { "type": "integer", "minimum": 1 },
+    "runId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
+    "workerType": { "type": "string", "enum": ["Python", "PowerShell", "DotNet", "Other"] },
+    "workerId": { "type": "string", "minLength": 1 },
+    "workerVersion": { "type": "string", "minLength": 1 },
+    "entrypointHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "status": { "type": "string", "enum": ["Passed", "Failed", "Blocked", "Cancelled", "DryRun"] },
+    "exitCode": { "type": "integer" },
+    "startedAtUtc": { "type": "string", "format": "date-time" },
+    "finishedAtUtc": { "type": "string", "format": "date-time" },
+    "inputManifestHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "outputs": { "type": "array", "items": { "type": "string" } },
+    "outputHashes": { "type": "array", "items": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" } },
+    "findings": { "type": "array", "items": { "type": "string" } },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

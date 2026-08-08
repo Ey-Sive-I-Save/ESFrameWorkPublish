@@ -1,0 +1,21 @@
+{
+  "protocolVersion": 1,
+  "runId": "562cb5042e7d4b19b7f1c659433616f3",
+  "taskId": "es.scene.scan",
+  "taskVersion": 1,
+  "workerType": "Python",
+  "workerId": "es.scene.scan.python",
+  "workerVersion": "0.1.0",
+  "entrypointHash": "fdfcd66352572015c05f69380ba0c12403b5917b06e29db333031ca133557d19",
+  "optionsSchemaHash": "4bbaa61e9bf8a2e2664d3b9cf98944711aa26d5c714e911044298193f08a14cb",
+  "dryRun": false,
+  "expectedGeneration": 1,
+  "phase": "Completed",
+  "snapshotPath": "F:\\aaProject\\ESFrameWorkPublish\\ES\\Automation\\Temp\\562cb5042e7d4b19b7f1c659433616f3\\scene-snapshot.json",
+  "stageInputPath": "F:\\aaProject\\ESFrameWorkPublish\\ES\\Automation\\Temp\\562cb5042e7d4b19b7f1c659433616f3\\stage-input.json",
+  "stageResultPath": "F:\\aaProject\\ESFrameWorkPublish\\ES\\Automation\\Temp\\562cb5042e7d4b19b7f1c659433616f3\\stage-result.json",
+  "inputResponsePath": "F:\\aaProject\\ESFrameWorkPublish\\ES\\Automation\\Temp\\562cb5042e7d4b19b7f1c659433616f3\\input-response.json",
+  "workerOutputDirectory": "F:\\aaProject\\ESFrameWorkPublish\\ES\\Automation\\Temp\\562cb5042e7d4b19b7f1c659433616f3\\WorkerOutput",
+  "createdAtUtc": "08/06/2026 16:06:23",
+  "updatedAtUtc": "2026-08-06T08:06:33.8314683+00:00"
+}

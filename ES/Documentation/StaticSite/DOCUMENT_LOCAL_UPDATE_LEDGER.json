@@ -953,6 +953,52 @@
                                                      "#deep-warning-16"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260808-002",
+                        "status":  "documented",
+                        "summary":  "提交受管 Python 自动化、AI Bridge、场景扫描、通用高级输入对话框及对应运行记录、契约和验证资料。",
+                        "sourcePaths":  [
+                                            "Assets/ESNormalAssets/Data/GlobalData/CmdAgent/ESCmdAgent.asset",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESAutomationAiBridgeTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESAutomationAiBridgeTests.cs.meta",
+                                            "Assets/Plugins/ES/Editor/ESCmdAgent",
+                                            "Assets/Plugins/ES/Editor/ESAutomation",
+                                            "Assets/Plugins/ES/Editor/ESAutomation.meta",
+                                            "Assets/Plugins/ES/Editor/EditorTools/ESAdvancedDialog",
+                                            "Assets/Plugins/ES/Editor/EditorTools/ESAdvancedDialog.meta",
+                                            "Documentation/ES_AUTOMATION_CENTER_STANDARD.md",
+                                            "ES/Automation"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                                              "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/ESAutomationAiBridgeTests.cs",
+                                              "ES/Automation/Contracts/es-automation-task-contract.schema.json",
+                                              "ES/Automation/Environments/Python/python-runtime.lock.json"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "Editor 入口、AI 收件箱协议、Python 受管运行时、Worker、输入对话框和真实场景扫描记录必须保持同批，才能保留从请求、执行到报告的可追溯链路。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "批次包含 Unity 编译与 ReloadDomain 相关记录、受管运行时锁和 EditMode 测试入口",
+                                                            "提交前由 staged-only 门禁核对完整路径清单和补丁指纹"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "生产环境的 Python 安装、端到端 Inbox 投递和 PlayMode 仍需按运行环境复核",
+                                                             "运行记录是证据快照，不等同于对未来运行的保证"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -965,13 +1011,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-08T18:53:30+08:00",
-                       "head":  "bc4d755e248b0e6106e2c9313bc559da88a70c28",
-                       "stagedSourcePatchSha256":  "94ef9a8ec307c7ef2210cd2c63fdb2615b7a0e69f5f6793d0dff97114c9a8d28",
-                       "stagedSourceManifestSha256":  "056485d83562853f6fbd96f79e4e6f37da9d28ed4ede67a9ea8d2979c3634820",
-                       "stagedSourceFileCount":  115,
+                       "preparedAt":  "2026-08-08T18:55:31+08:00",
+                       "head":  "eac62fcfc45cd002e57638472aa3b4007c1038e4",
+                       "stagedSourcePatchSha256":  "85987733b6e023b70d16a4b9697f64d910b305929b3da48a11d16380fa33afdd",
+                       "stagedSourceManifestSha256":  "c5e49a461314efabdaac64dfc802782bf66cf1af520249c54700040eae28ad26",
+                       "stagedSourceFileCount":  98,
                        "entryIds":  [
-                                        "LOCAL-20260808-001"
+                                        "LOCAL-20260808-002"
                                     ]
                    }
 }

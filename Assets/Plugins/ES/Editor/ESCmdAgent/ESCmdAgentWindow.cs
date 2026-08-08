@@ -13,6 +13,39 @@ using Debug = UnityEngine.Debug;
 
 namespace ES
 {
+    public enum ESCmdAgentPromptDispatchState : byte
+    {
+        Rejected = 0,
+        Sent = 1,
+        Starting = 2,
+        HeldForUser = 3
+    }
+
+    public readonly struct ESCmdAgentPromptDispatchResult
+    {
+        public ESCmdAgentPromptDispatchState State { get; }
+        public string Message { get; }
+        public bool IsDispatched => State == ESCmdAgentPromptDispatchState.Sent
+            || State == ESCmdAgentPromptDispatchState.Starting;
+        public bool Accepted => IsDispatched;
+
+        public ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState state, string message)
+        {
+            State = state;
+            Message = message ?? string.Empty;
+        }
+    }
+
+#if UNITY_INCLUDE_TESTS
+    public enum ESCmdAgentSynchronousFailureKind : byte
+    {
+        None = 0,
+        ProcessStartRejected = 1,
+        ProcessStartException = 2,
+        ConPtyStartException = 3
+    }
+#endif
+
     public sealed class ESCmdAgentWindow : EditorWindow
     {
         private const string DefaultAgentAssetPath = "Assets/ESNormalAssets/Data/GlobalData/CmdAgent/ESCmdAgent.asset";
@@ -29,6 +62,10 @@ namespace ES
         private const string LocalSessionMetadataKey = "ES.CmdAgent.LocalSessionMetadata";
         private static readonly Vector2 DefaultWindowSize = new Vector2(980, 680);
         private static readonly Vector2 MinimumWindowSize = new Vector2(860, 600);
+#if UNITY_INCLUDE_TESTS
+        private static Func<Process, bool> processStarterOverrideForTests = null;
+        private static Func<Exception> conPtyStartFailureOverrideForTests = null;
+#endif
 
         [SerializeField] private List<AgentSessionTab> tabs = new List<AgentSessionTab>();
         [SerializeField] private int selectedTabIndex;
@@ -793,13 +830,21 @@ namespace ES
                 return session;
             }
 
-            public void WriteLine(string text)
+            public bool WriteLine(string text)
             {
-                if (disposed)
-                    return;
-
-                writer.Write(text ?? "");
-                writer.Write("\r\n");
+                if (disposed || !IsRunning)
+                    return false;
+                try
+                {
+                    writer.Write(text ?? "");
+                    writer.Write("\r\n");
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    outputQueue.Enqueue("[ES Cmd Agent] 后台伪终端写入失败: " + exception.Message + "\n");
+                    return false;
+                }
             }
 
             public void WriteRaw(string text)
@@ -981,13 +1026,84 @@ namespace ES
                 window.EnsureTabExists();
         }
 
-        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "自动化/Cmd Agent（CMD 中转与架构师）", false, 10)]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "Cmd Agent（CMD 中转与架构师）", false, 10)]
         [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "Cmd Agent", false, -960)]
         public static void OpenFromMenu()
         {
             ESWindowCommandRegistry.RecordOpened("cmd_agent");
             OpenAndResume();
         }
+
+        /// <summary>供受控编辑器工具复用当前 Codex 会话；调用方仍负责候选隔离、校验与人工批准。</summary>
+        public static void OpenAndSendPrompt(string prompt)
+        {
+            OpenAndSendPromptWithReceipt(prompt);
+        }
+
+        public static ESCmdAgentPromptDispatchResult OpenAndSendPromptWithReceipt(string prompt)
+        {
+            if (string.IsNullOrWhiteSpace(prompt))
+                return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.Rejected, "提示内容为空。");
+            ESCmdAgentWindow window = GetWindow<ESCmdAgentWindow>();
+            window.titleContent = new GUIContent("ES Cmd Agent");
+            window.minSize = MinimumWindowSize;
+            window.EnsureReasonableWindowSize();
+            window.Show();
+            window.Focus();
+            window.EnsureAgent();
+            window.EnsureTabExists();
+            ESCmdAgentPromptDispatchResult result = window.DispatchPromptToCurrentTab(prompt);
+            window.Repaint();
+            return result;
+        }
+
+#if UNITY_INCLUDE_TESTS
+        public static ESCmdAgentPromptDispatchResult DispatchStartForTests(ESCmdAgent testAgent,
+            ESCmdAgentSynchronousFailureKind failureKind, string prompt, out string retainedInput)
+        {
+            retainedInput = string.Empty;
+            if (testAgent == null)
+                return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.Rejected,
+                    "测试 Agent 为空。");
+            if (failureKind == ESCmdAgentSynchronousFailureKind.None && testAgent.enableAgent
+                && Directory.Exists(testAgent.GetWorkspacePath()))
+                throw new ArgumentException("有效配置必须注入同步启动故障，禁止测试误启动真实 Cmd Agent。",
+                    nameof(failureKind));
+
+            Func<Process, bool> previousProcessStarter = processStarterOverrideForTests;
+            Func<Exception> previousConPtyFailure = conPtyStartFailureOverrideForTests;
+            ESCmdAgentWindow window = CreateInstance<ESCmdAgentWindow>();
+            try
+            {
+                processStarterOverrideForTests = failureKind == ESCmdAgentSynchronousFailureKind.ProcessStartRejected
+                    ? new Func<Process, bool>(_ => false)
+                    : failureKind == ESCmdAgentSynchronousFailureKind.ProcessStartException
+                        ? new Func<Process, bool>(_ => throw new InvalidOperationException("测试进程启动异常"))
+                        : null;
+                conPtyStartFailureOverrideForTests = failureKind == ESCmdAgentSynchronousFailureKind.ConPtyStartException
+                    ? new Func<Exception>(() => new InvalidOperationException("测试 ConPTY 启动异常"))
+                    : null;
+                testAgent.preferExternalTerminal = failureKind == ESCmdAgentSynchronousFailureKind.ConPtyStartException;
+                window.agent = testAgent;
+                window.tabs = new List<AgentSessionTab>();
+                AgentSessionTab tab = window.CreateTab(string.Empty);
+                tab.EnsureRuntime();
+                tab.inputText = prompt ?? string.Empty;
+                window.tabs.Add(tab);
+                ESCmdAgentPromptDispatchResult result = window.SendInput(tab);
+                retainedInput = tab.inputText ?? string.Empty;
+                return result;
+            }
+            finally
+            {
+                processStarterOverrideForTests = previousProcessStarter;
+                conPtyStartFailureOverrideForTests = previousConPtyFailure;
+                window.agent = null;
+                window.tabs = new List<AgentSessionTab>();
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+#endif
 
         private void OnEnable()
         {
@@ -2195,13 +2311,16 @@ namespace ES
                 string fileName = "Clipboard_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + ".png";
                 assetPath = ClipboardImageRelativeFolder + "/" + fileName;
                 string fullPath = Path.Combine(ProjectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar));
+                string assetsRoot = Path.Combine(ProjectRoot, "Assets");
+                ESManagedFileIO.EnsurePath(fullPath, false, assetsRoot);
+                string temporaryPath = fullPath + ".tmp-" + Guid.NewGuid().ToString("N");
 
                 string script = "$ErrorActionPreference='Stop';"
                     + "Add-Type -AssemblyName System.Windows.Forms;"
                     + "Add-Type -AssemblyName System.Drawing;"
                     + "$img=[System.Windows.Forms.Clipboard]::GetImage();"
                     + "if($null -eq $img){exit 2};"
-                    + "$img.Save(" + QuotePowerShellString(fullPath) + ", [System.Drawing.Imaging.ImageFormat]::Png);";
+                    + "$img.Save(" + QuotePowerShellString(temporaryPath) + ", [System.Drawing.Imaging.ImageFormat]::Png);";
 
                 var process = new Process
                 {
@@ -2222,15 +2341,21 @@ namespace ES
                 if (!process.WaitForExit(5000))
                 {
                     process.Kill();
+                    if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
                     error = "读取剪贴板超时。请确认剪贴板里是图片，再重试。";
                     return false;
                 }
 
-                if (process.ExitCode != 0 || !File.Exists(fullPath))
+                if (process.ExitCode != 0 || !File.Exists(temporaryPath))
                 {
+                    if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
                     error = "剪贴板里没有可读取的图片，或系统阻止了读取。";
                     return false;
                 }
+
+                ESManagedFileIO.CopyFileAtomic(temporaryPath, fullPath, assetsRoot);
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+                process.Dispose();
 
                 AssetDatabase.ImportAsset(assetPath);
                 AssetDatabase.Refresh();
@@ -3146,11 +3271,11 @@ namespace ES
             return tabs[selectedTabIndex];
         }
 
-        private void StartResume(AgentSessionTab tab, string sessionId = "", string prompt = "")
+        private ESCmdAgentPromptDispatchResult StartResume(AgentSessionTab tab, string sessionId = "", string prompt = "")
         {
             EnsureAgent();
             if (agent == null || tab == null)
-                return;
+                return Reject(tab, agent == null ? "Cmd Agent 配置不可用。" : "没有可用的 Cmd Agent 页签。");
 
             tab.EnsureRuntime();
 
@@ -3158,13 +3283,15 @@ namespace ES
             {
                 AppendOutput(tab, "[ES Cmd Agent] Agent 未启用。\n");
                 tab.summary = "未启用";
-                return;
+                SetStatusNotice(tab, "未启用：请先启用 ESCmdAgent。", 2);
+                return Reject(tab, "Agent 未启用。请先在 Cmd Agent 设置中启用。", false);
             }
 
             if (tab.IsRunning)
             {
                 AppendOutput(tab, "[ES Cmd Agent] 当前页签已有进程在运行。\n");
-                return;
+                return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.HeldForUser,
+                    "当前页签已有任务在运行；提示尚未发送。");
             }
 
             string cleanSessionId = string.IsNullOrWhiteSpace(sessionId) ? "" : sessionId.Trim();
@@ -3184,18 +3311,18 @@ namespace ES
                 tab.summary = "工作目录无效";
                 AppendOutput(tab, "[ES Cmd Agent] 启动失败：工作目录不存在。\n");
                 AppendOutput(tab, "建议：打开高级设置，确认“工作目录”指向 Unity 项目根目录。\n");
-                return;
+                return Reject(tab, "工作目录不存在：" + (workspace ?? string.Empty), false);
             }
 
             if (GetPreferExternalTerminal(agent))
             {
-                StartHiddenCodexTerminal(tab, codex, workspace, cleanSessionId, prompt);
-                return;
+                return StartHiddenCodexTerminal(tab, codex, workspace, cleanSessionId, promptToSend);
             }
 
+            Process processToStart = null;
             try
             {
-                Process processToStart = new Process
+                processToStart = new Process
                 {
                     StartInfo =
                     {
@@ -3219,7 +3346,8 @@ namespace ES
                 processToStart.Exited += OnProcessExited;
 
                 tab.process = processToStart;
-                processToStart.Start();
+                if (!StartProcess(processToStart))
+                    throw new InvalidOperationException("系统拒绝创建 Cmd Agent 进程。");
                 processToStart.StandardInput.WriteLine(promptToSend);
                 processToStart.StandardInput.Close();
                 processToStart.BeginOutputReadLine();
@@ -3247,14 +3375,18 @@ namespace ES
                 AppendOutput(tab, "[ES Cmd Agent] 已启动非交互任务。\n");
                 AppendOutput(tab, "[ES Cmd Agent] 命令: " + command + "\n");
                 AppendOutput(tab, "你：" + promptToSend + "\n");
+                return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.Starting,
+                    "Cmd Agent 进程已创建，提示已排队，正在等待任务启动。");
             }
             catch (Exception ex)
             {
+                CleanupFailedProcessStart(tab, processToStart);
                 Debug.LogException(ex);
                 tab.summary = "启动失败";
                 SetStatusNotice(tab, "启动失败：" + ex.Message, 2);
                 AppendOutput(tab, "[ES Cmd Agent] 启动失败: " + ex.Message + "\n");
                 AppendOutput(tab, BuildStartFailureAdvice(codex, workspace));
+                return Reject(tab, "Cmd Agent 进程启动或提示排队失败：" + ex.Message, false);
             }
         }
 
@@ -3411,7 +3543,53 @@ namespace ES
             return builder.ToString();
         }
 
-        private void StartHiddenCodexTerminal(AgentSessionTab tab, string codex, string workspace, string sessionId, string prompt)
+        private ESCmdAgentPromptDispatchResult Reject(AgentSessionTab tab, string message, bool append = true)
+        {
+            string resolved = string.IsNullOrWhiteSpace(message) ? "Cmd Agent 拒绝接收提示。" : message.Trim();
+            if (append && tab != null)
+                AppendOutput(tab, "[ES Cmd Agent] " + resolved + "\n");
+            return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.Rejected, resolved);
+        }
+
+        private static bool StartProcess(Process process)
+        {
+#if UNITY_INCLUDE_TESTS
+            if (processStarterOverrideForTests != null)
+                return processStarterOverrideForTests(process);
+#endif
+            return process != null && process.Start();
+        }
+
+        private static ConPtySession StartConPty(string command, string workspace,
+            ConcurrentQueue<string> output)
+        {
+#if UNITY_INCLUDE_TESTS
+            Exception simulatedFailure = conPtyStartFailureOverrideForTests?.Invoke();
+            if (simulatedFailure != null)
+                throw simulatedFailure;
+#endif
+            return ConPtySession.Start(command, workspace, output);
+        }
+
+        private void CleanupFailedProcessStart(AgentSessionTab tab, Process process)
+        {
+            if (process != null)
+            {
+                try { UnregisterProcessEvents(process); } catch { }
+                try
+                {
+                    if (!process.HasExited)
+                        process.Kill();
+                }
+                catch { }
+                try { process.Dispose(); } catch { }
+            }
+            if (tab != null && ReferenceEquals(tab.process, process))
+                tab.process = null;
+        }
+
+        private ESCmdAgentPromptDispatchResult StartHiddenCodexTerminal(AgentSessionTab tab, string codex,
+            string workspace, string sessionId, string prompt)
         {
             string resumeArg = string.IsNullOrWhiteSpace(sessionId) ? "--last" : Quote(sessionId.Trim());
             string command = $"cmd.exe /k chcp 65001 >nul && cd /d {Quote(workspace)} && {codex} resume {resumeArg} -C {Quote(workspace)} --no-alt-screen";
@@ -3419,7 +3597,9 @@ namespace ES
             try
             {
                 tab.EnsureRuntime();
-                tab.conPty = ConPtySession.Start(command, workspace, tab.pendingOutput);
+                tab.conPty = StartConPty(command, workspace, tab.pendingOutput);
+                if (tab.conPty == null || !tab.conPty.IsRunning)
+                    throw new InvalidOperationException("后台 CMD/ConPTY 未进入运行状态。");
 
                 string now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 tab.lastStartTime = now;
@@ -3444,43 +3624,62 @@ namespace ES
                 AppendOutput(tab, "[ES Cmd Agent] 命令: " + command + "\n");
                 if (!string.IsNullOrWhiteSpace(prompt))
                 {
-                    tab.conPty.WriteLine(prompt.Trim());
+                    if (!tab.conPty.WriteLine(prompt.Trim()))
+                    {
+                        tab.inputText = prompt.Trim();
+                        tab.summary = "提示写入失败";
+                        SetStatusNotice(tab, "终端已创建，但提示未能写入；内容已保留在输入框。", 2);
+                        return Reject(tab, "后台终端已创建，但提示写入失败；提示仅保留在输入框。", false);
+                    }
                     AppendOutput(tab, "你：" + prompt.Trim() + "\n");
                 }
+                return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.Starting,
+                    "后台 Cmd Agent 终端已创建，提示已排队，正在等待任务启动。");
             }
             catch (Exception ex)
             {
+                if (tab.conPty != null)
+                {
+                    try { tab.conPty.Dispose(); } catch { }
+                    tab.conPty = null;
+                }
                 tab.summary = "后台 CMD 启动失败";
                 SetStatusNotice(tab, "后台 CMD 启动失败：" + ex.Message, 2);
                 AppendOutput(tab, "[ES Cmd Agent] 后台 CMD/ConPTY 启动失败: " + ex.Message + "\n");
                 AppendOutput(tab, "建议：确认系统是 Windows 10 1809+；如果仍失败，可临时关闭“优先后台 CMD 中转交互”，使用非交互 exec 模式。\n");
                 AppendOutput(tab, BuildStartFailureAdvice(codex, workspace));
+                return Reject(tab, "后台 Cmd Agent 终端启动失败：" + ex.Message, false);
             }
         }
 
-        private void SendInput(AgentSessionTab tab)
+        private ESCmdAgentPromptDispatchResult SendInput(AgentSessionTab tab)
         {
             if (tab == null || string.IsNullOrWhiteSpace(tab.inputText))
-                return;
+                return Reject(tab, tab == null ? "没有可用的 Cmd Agent 页签。" : "提示内容为空。");
 
             if (tab.conPty != null && tab.conPty.IsRunning)
             {
                 string input = tab.inputText;
+                if (!tab.conPty.WriteLine(input))
+                    return Reject(tab, "提示写入后台 Cmd Agent 终端失败，内容仍保留在输入框。", false);
                 tab.inputText = "";
-                tab.conPty.WriteLine(input);
                 AppendOutput(tab, "你：" + input + "\n");
-                return;
+                return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.Sent,
+                    "提示已写入当前 Cmd Agent 终端。");
             }
 
             if (tab.IsRunning)
             {
                 AppendOutput(tab, "[ES Cmd Agent] 当前任务仍在运行，请等待完成后再发送。\n");
-                return;
+                return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.HeldForUser,
+                    "当前任务仍在运行；提示仅保留在输入框，尚未发送。");
             }
 
             string prompt = tab.inputText;
-            tab.inputText = "";
-            StartResume(tab, tab.sessionId, prompt);
+            ESCmdAgentPromptDispatchResult result = StartResume(tab, tab.sessionId, prompt);
+            if (result.IsDispatched)
+                tab.inputText = "";
+            return result;
         }
 
         private void SendRawConPtyLine(AgentSessionTab tab, string text)
@@ -3523,25 +3722,31 @@ namespace ES
 
         private void SendPromptToCurrentTab(string prompt)
         {
+            DispatchPromptToCurrentTab(prompt);
+        }
+
+        private ESCmdAgentPromptDispatchResult DispatchPromptToCurrentTab(string prompt)
+        {
             AgentSessionTab tab = GetCurrentTab();
             if (tab == null || string.IsNullOrWhiteSpace(prompt))
-                return;
+                return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.Rejected,
+                    tab == null ? "没有可用的 Cmd Agent 页签。" : "提示内容为空。");
 
             if (tab.conPty != null && tab.conPty.IsRunning)
             {
                 tab.inputText = prompt.Trim();
-                SendInput(tab);
-                return;
+                return SendInput(tab);
             }
 
             if (tab.IsRunning)
             {
                 tab.inputText = prompt.Trim();
                 AppendOutput(tab, "[ES Cmd Agent] 当前任务仍在运行，指令已保留在输入框。\n");
-                return;
+                return new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.HeldForUser,
+                    "当前任务仍在运行；提示仅保留在输入框，尚未发送。");
             }
 
-            StartResume(tab, tab.sessionId, prompt);
+            return StartResume(tab, tab.sessionId, prompt);
         }
 
         private void ShowAICommandMenu(Rect anchorRect)
@@ -3556,7 +3761,7 @@ namespace ES
                 return;
             }
 
-            List<string> files = Directory.EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
+            List<string> files = ESManagedFileIO.EnumerateFilesSafely(root, "*.md")
                 .Where(path => !path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
                 .Take(200)
                 .OrderByDescending(path => Path.GetFileName(path).StartsWith("方案_", StringComparison.OrdinalIgnoreCase))
@@ -3676,7 +3881,7 @@ namespace ES
                 return;
             }
 
-            List<string> files = Directory.EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
+            List<string> files = ESManagedFileIO.EnumerateFilesSafely(root, "*.md")
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var invalid = new List<string>();
@@ -4561,7 +4766,7 @@ namespace ES
 
             AddArchitectCategory("AIWarnings", "长期架构结论", "长期沉淀的项目规则、禁止事项和跨系统纠偏。", root, new Color(0.74f, 0.48f, 0.22f));
 
-            foreach (string file in Directory.EnumerateFiles(root, "*.md", SearchOption.AllDirectories).Take(architectMaxFilesPerFolder))
+            foreach (string file in ESManagedFileIO.EnumerateFilesSafely(root, "*.md").Take(architectMaxFilesPerFolder))
             {
                 string title = ReadArchitectTitle(file);
                 string summary = ReadArchitectSummary(file);
@@ -4983,6 +5188,11 @@ namespace ES
         private void ExportArchitectMarkdown()
         {
             string folder = Path.Combine(ProjectRoot, "Assets/Plugins/ES/AIWarnings/ArchitectReports".Replace('/', Path.DirectorySeparatorChar));
+            if (!IsSafeProjectOutput(folder))
+            {
+                Debug.LogError("[ES Cmd Agent] 架构报告目录不在项目受管范围或穿过 junction/symlink：" + folder);
+                return;
+            }
             if (!Directory.Exists(folder))
                 Directory.CreateDirectory(folder);
 
@@ -5013,9 +5223,53 @@ namespace ES
                 builder.AppendLine($"- {architectNodes[edge.from].title} -> {architectNodes[edge.to].title}：{edge.label}");
             }
 
-            File.WriteAllText(path, builder.ToString(), new UTF8Encoding(false));
+            WriteProjectTextAtomic(path, builder.ToString());
             AssetDatabase.Refresh();
             EditorUtility.RevealInFinder(path);
+        }
+
+        private static bool IsSafeProjectOutput(string path)
+        {
+            string root = Path.GetFullPath(ProjectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string candidate = Path.GetFullPath(path);
+            if (!candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                return false;
+            string current = root;
+            string relative = candidate.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (string segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            {
+                if (string.IsNullOrEmpty(segment)) continue;
+                current = Path.Combine(current, segment);
+                if (!Directory.Exists(current) && !File.Exists(current)) break;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return false;
+            }
+            return true;
+        }
+
+        private static void WriteProjectTextAtomic(string path, string text)
+        {
+            if (!IsSafeProjectOutput(path))
+                throw new UnauthorizedAccessException("项目报告写入路径不安全：" + path);
+            string directory = Path.GetDirectoryName(path);
+            if (string.IsNullOrEmpty(directory)) throw new InvalidDataException("项目报告目录无效：" + path);
+            Directory.CreateDirectory(directory);
+            string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                File.WriteAllText(temporary, text ?? string.Empty, new UTF8Encoding(false));
+                if (File.Exists(path))
+                {
+                    try { File.Replace(temporary, path, null); }
+                    catch (PlatformNotSupportedException) { File.Copy(temporary, path, true); }
+                    catch (IOException) { File.Copy(temporary, path, true); }
+                    catch (UnauthorizedAccessException) { File.Copy(temporary, path, true); }
+                }
+                else File.Move(temporary, path);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
         }
 
         private static void RevealArchitectSource(string sourcePath)

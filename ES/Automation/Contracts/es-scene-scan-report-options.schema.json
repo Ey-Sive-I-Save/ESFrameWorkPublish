@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/scene-scan-report-options/v1",
+  "title": "ES Scene Scan Report Options",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["includeInactive", "detailMode", "topComponentCount"],
+  "properties": {
+    "includeInactive": { "type": "boolean" },
+    "detailMode": { "type": "string", "enum": ["summary", "detailed"] },
+    "topComponentCount": { "type": "integer", "minimum": 1, "maximum": 50 }
+  }
+}

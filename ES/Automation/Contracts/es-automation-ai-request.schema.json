@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/ai-request/v1",
+  "title": "ESAutomation AI Bridge Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "requestId", "actorId", "action", "payload"],
+  "properties": {
+    "protocolVersion": { "type": "integer", "const": 1 },
+    "requestId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
+    "actorId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "action": {
+      "type": "string",
+      "enum": [
+        "listTasks",
+        "runTask",
+        "getRun",
+        "submitInput",
+        "submitContentProposal",
+        "getUnityCompilationState",
+        "setUnityAutoCompilation",
+        "triggerUnityCompilation",
+        "modifyActiveScene"
+      ]
+    },
+    "payload": { "type": "object" }
+  }
+}

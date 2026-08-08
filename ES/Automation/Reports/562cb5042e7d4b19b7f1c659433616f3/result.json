@@ -1,0 +1,27 @@
+{
+  "protocolVersion": 1,
+  "taskId": "es.scene.scan",
+  "taskVersion": 1,
+  "runId": "562cb5042e7d4b19b7f1c659433616f3",
+  "workerType": "Python",
+  "workerId": "es.scene.scan.python",
+  "workerVersion": "0.1.0",
+  "entrypointHash": "fdfcd66352572015c05f69380ba0c12403b5917b06e29db333031ca133557d19",
+  "status": "Passed",
+  "exitCode": 0,
+  "startedAtUtc": "08/06/2026 16:06:23",
+  "finishedAtUtc": "2026-08-06T08:06:33.8212156+00:00",
+  "inputManifestHash": "88e714253c44a5e1d018c2ceaf46279c4ecdcb4776a50490310af33db63cd553",
+  "outputs": [
+    "scene-scan.json",
+    "scene-scan.md"
+  ],
+  "outputHashes": [
+    "fa2d4794633532fbf2f9a84d7b0dfff5cf46fa77645a412dd6df599e8daf9738",
+    "f20234f0d5d120c777c0403dcef0d59b113b85fe363582ebea0a91665920f275"
+  ],
+  "findings": [
+    "场景扫描报告已由 C# 校验后提升。"
+  ],
+  "errors": []
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-contract/v1",
+  "title": "ESAutomationCenter Task Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "taskId", "version", "worker", "inputs", "readRoots", "writeRoots", "capabilities", "timeoutSeconds", "supportsDryRun", "outputs"],
+  "properties": {
+    "protocolVersion": { "type": "integer", "const": 1 },
+    "taskId": { "type": "string", "pattern": "^es\\.[a-z0-9]+(?:\\.[a-z0-9-]+)+$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "workerId", "version", "entrypointHash"],
+      "properties": {
+        "type": { "type": "string", "enum": ["Python", "PowerShell", "DotNet", "Other"] },
+        "workerId": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "entrypointHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+      }
+    },
+    "inputs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "readRoots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "writeRoots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["ReadArtifacts", "WriteReports", "WriteTemp", "WriteAssets", "Delete", "Upload", "Publish"] }
+    },
+    "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 7200 },
+    "supportsDryRun": { "type": "boolean" },
+    "outputs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  }
+}

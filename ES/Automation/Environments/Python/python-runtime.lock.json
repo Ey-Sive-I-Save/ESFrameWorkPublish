@@ -1,0 +1,10 @@
+{
+  "protocolVersion": 1,
+  "runtimeId": "cpython-3.12.10-embed-amd64",
+  "pythonVersion": "3.12.10",
+  "interpreterRelativePath": "Runtime/python.exe",
+  "interpreterSha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a",
+  "runtimeContentSha256": "a138fee79f8975f0e4d73c0bfc6f28a61a86e7041ed9d7d0688bfa7d7815e39c",
+  "requirementsLockRelativePath": "",
+  "requirementsLockSha256": ""
+}

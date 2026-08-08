@@ -10,11 +10,15 @@
                                                     "sizeBytes":  3467066
                                                 },
                   "sourceSnapshot":  {
-                                         "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
-                                         "trackedWorktreePatchSha256":  "4fb8530a1489992ebbc719d76bfbe3dd4f5a63505784312c3d990f998724bf8c",
-                                         "stagedSourcePatchSha256":  "008cf4d540c43c01d0f972cd4a535faa8e7f9a71f223a8a511cc5cbbe27a0bae",
-                                         "untrackedSourceManifestSha256":  "c32bd9cbaf53ca8fddd35d165112d9dddb15d5d1591be4d4ca3b42093df03edd",
-                                         "untrackedSourceFileCount":  575
+                                         "head":  "33a2862571d3fd2a18562f51034524a00846c29e",
+                                         "trackedWorktreePatchSha256":  "2723387558cbc1ba1aae4ca6472d0e886b70626da762367ed5549e1778d6f090",
+                                         "stagedSourcePatchSha256":  "740640cfd10c89a859c11af365a242ecb881d62af3009d865adcabeb6ad0af01",
+                                         "untrackedSourceManifestSha256":  "e37d1b88a6322ee32a25b4b1ef4009e9fa2008850d1c2d35149111f3b3f62a78",
+                                         "untrackedSourceFileCount":  1,
+                                         "basis":  {
+                                                       "comparison":  "document-baseline-to-current-worktree",
+                                                       "baselineHead":  "775cfdb57dd49ac96075fb6f4c49039ee11996be"
+                                                   }
                                      },
                   "pushedCommitCache":  {
                                             "status":  "cached-not-integrated",
@@ -26,10 +30,10 @@
                                                           "toInclusive":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed"
                                                       },
                                             "verification":  {
-                                                                 "checkedAt":  "2026-08-03T06:16:13+08:00",
-                                                                 "localHead":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed",
+                                                                 "checkedAt":  "2026-08-03T06:20:00+08:00",
+                                                                 "localHead":  "33a2862571d3fd2a18562f51034524a00846c29e",
                                                                  "remoteTrackingHead":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed",
-                                                                 "localAndRemoteTrackingMatch":  true
+                                                                 "localAndRemoteTrackingMatch":  false
                                                              },
                                             "records":  [
                                                             {
@@ -106,26 +110,37 @@
                                                                              ]
                                                             }
                                                         ]
-                                        }
+                                        },
+                  "localCommittedCache":  {
+                                              "status":  "committed-not-pushed",
+                                              "remoteTrackingHead":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed",
+                                              "localHead":  "33a2862571d3fd2a18562f51034524a00846c29e",
+                                              "records":  [
+                                                              {
+                                                                  "sha":  "33a2862571d3fd2a18562f51034524a00846c29e",
+                                                                  "committedAt":  "2026-08-03T06:18:25+08:00",
+                                                                  "subject":  "feat(ai-audit): 强化模块审计续接状态闭环",
+                                                                  "entryId":  "LOCAL-20260803-016"
+                                                              }
+                                                          ]
+                                          }
               },
     "entries":  [
                     {
                         "id":  "INTAKE-20260802-001",
                         "status":  "needs-triage",
-                        "summary":  "历史全量入口保留其 ID 以维持审计连续性；已推送的 8 个提交已按 LOCAL-20260802-002 至 LOCAL-20260803-015 分项缓存。本条现在只接管推送后仍未提交的模块生命周期 Skill 改动，尚未完成行为分诊，不能授权 HTML 更新或解除同步门禁。",
+                        "summary":  "历史全量入口保留其 ID 以维持审计连续性；已推送的 8 个提交已按 LOCAL-20260802-002 至 LOCAL-20260803-015 分项缓存，本地已提交但未推送的模块审计续接能力已记入 LOCAL-20260803-016。本条现在接管当前未提交的 Project Asset Guide 展开状态与未跟踪的 Documentation/Output 产物，二者均尚未完成行为分诊，不能授权 HTML 更新或解除同步门禁。",
                         "sourcePaths":  [
-                                            ".agents/skills/es-module-lifecycle/SKILL.md",
-                                            ".agents/skills/es-module-lifecycle/agents/openai.yaml",
-                                            ".agents/skills/es-module-lifecycle/references/audit-state-contract.md"
+                                            "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide/ESGlobalProjectAssetGuideData.asset",
+                                            "ES/Documentation/Output/index.html"
                                         ],
                         "evidencePaths":  [
-                                              ".agents/skills/es-module-lifecycle/SKILL.md",
-                                              ".agents/skills/es-module-lifecycle/agents/openai.yaml",
-                                              ".agents/skills/es-module-lifecycle/references/audit-state-contract.md"
+                                              "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide/ESGlobalProjectAssetGuideData.asset",
+                                              "ES/Documentation/Output/index.html"
                                           ],
                         "analysis":  {
                                          "status":  "not-started",
-                                         "notes":  "先确认模块生命周期 Skill 的规则、引用契约与用户可见工作流，再按功能边界拆成独立完成项；必须补 AIWarnings、测试或审计证据，不能由当前 diff 推断为已交付能力。"
+                                         "notes":  "先确认 Project Asset Guide 的序列化展开状态是否应进入版本控制，以及未跟踪 Output/index.html 是生成交付物、候选替代文档还是临时产物；不得将编辑器会话状态、生成文件或当前 diff 自动认定为产品能力。"
                                      },
                         "regression":  {
                                            "status":  "not-started",
@@ -845,6 +860,99 @@
                                                      "#deep-warning-16"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260803-017",
+                        "status":  "documented",
+                        "summary":  "将模块审计续接状态固定到唯一项目路径，并把“审计”“审计并记录”“继续审计”建立为直接触发协议，减少重复询问且保持写权限边界。",
+                        "sourcePaths":  [
+                                            ".agents/README.md",
+                                            ".agents/skills/es-module-lifecycle",
+                                            "Assets/Plugins/ES/AICommands/README.md",
+                                            "Assets/Plugins/ES/AICommands/命令合集索引_AI命令.md",
+                                            "Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md",
+                                            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md",
+                                            "ES/Documentation/Status/MODULE_AUDIT_STATE.md"
+                                        ],
+                        "evidencePaths":  [
+                                              ".agents/skills/es-module-lifecycle/SKILL.md",
+                                              ".agents/skills/es-module-lifecycle/references/audit-state-contract.md",
+                                              "Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md",
+                                              "ES/Documentation/Status/MODULE_AUDIT_STATE.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "普通“审计”保持只读并最多询问一次；“审计并记录”只授权固定文件中的目标模块块；“继续审计”从固定文件导航但必须复核事实。稳定模块键隔离记录，状态文件不替代模块权威、源码事实、Unity 证据或未来授权。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "固定路径与三个触发词已同步到 Skill、AICommand、AIWarning 和入口索引",
+                                                            "目标文本执行严格 UTF-8、AICommand 全库与范围化 diff 检查"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前环境没有可运行的 Python/uv/uvx，官方 quick_validate.py 仍无法实跑",
+                                                             "本轮未运行 Unity、Test Runner、PlayMode、Profiler、Player、IL2CPP 或发布验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#deep-warning-16"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260808-001",
+                        "status":  "documented",
+                        "summary":  "提交 AI 协作治理、项目级 Skill、会话启动与恢复基础设施、AICommands/AIWarnings 路由规则，以及独立的 Codex 历程档案。",
+                        "sourcePaths":  [
+                                            ".agents",
+                                            ".codex",
+                                            "AGENTS.md",
+                                            ".agents.zip",
+                                            "Assets/Plugins/ES/AICommands",
+                                            "Assets/Plugins/ES/AICommands.zip",
+                                            "Assets/Plugins/ES/AICommands.zip.meta",
+                                            "Assets/Plugins/ES/AITalk.zip",
+                                            "Assets/Plugins/ES/AITalk.zip.meta",
+                                            "Assets/Plugins/ES/AIWarnings",
+                                            "Assets/Plugins/ES/AIWarnings.zip",
+                                            "Assets/Plugins/ES/AIWarnings.zip.meta",
+                                            "ES/AI协作历程（Codex）",
+                                            "ES/AI协作历程（Codex）.zip"
+                                        ],
+                        "evidencePaths":  [
+                                              ".agents/skills/es-codex-session-bootstrap/SKILL.md",
+                                              ".agents/skills/es-module-lifecycle/SKILL.md",
+                                              "Assets/Plugins/ES/AICommands/命令合集索引_AI命令.md",
+                                              "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+                                              "ES/AI协作历程（Codex）/README.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "该提交集中治理 AI 的语义路由、会话上下文验证、生命周期审计边界与 P0 规则入口。历史档案和压缩副本与其恢复工具同批保留，避免单独提交造成索引、规则或档案缺失。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "AI 命令、规则、Skill 与历程文件均已纳入暂存范围",
+                                                            "提交前由 staged-only 门禁生成补丁和路径指纹"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "本提交不宣称 Unity、Test Runner、PlayMode、Player 或发布验收已经完成",
+                                                             "Skill 工作流不扩大后续源码、Git、Unity 或发布权限"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#deep-warning-16"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -857,13 +965,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-03T06:18:13+08:00",
-                       "head":  "fc09d0a9c8ed72c04c7681f6a35c9c0d0d1b13ed",
-                       "stagedSourcePatchSha256":  "cc3192bc2f6d2d770506f39df545d8a259b4428fdf232574f5cb58b6b8f01208",
-                       "stagedSourceManifestSha256":  "18f8920430daade6e5d09f00f2baae173b92c88c58cab61dd785fa08460753f9",
-                       "stagedSourceFileCount":  12,
+                       "preparedAt":  "2026-08-08T18:53:30+08:00",
+                       "head":  "bc4d755e248b0e6106e2c9313bc559da88a70c28",
+                       "stagedSourcePatchSha256":  "94ef9a8ec307c7ef2210cd2c63fdb2615b7a0e69f5f6793d0dff97114c9a8d28",
+                       "stagedSourceManifestSha256":  "056485d83562853f6fbd96f79e4e6f37da9d28ed4ede67a9ea8d2979c3634820",
+                       "stagedSourceFileCount":  115,
                        "entryIds":  [
-                                        "LOCAL-20260803-016"
+                                        "LOCAL-20260808-001"
                                     ]
                    }
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Codex 会话启动"
+  short_description: "管理 ES 会话、页签、职责、消息 Hook、状态与安全恢复"
+  default_prompt: "Use $es-codex-session-bootstrap to manage ESFramework Codex sessions. Require an exact SessionId for managed Resume/Fork, and require contextAccepted plus the exact receipt before reporting initialization or task delivery."

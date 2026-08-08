@@ -1,6 +1,6 @@
 ---
 name: es-module-lifecycle
-description: Classify and govern ESFramework modules that are proposed, scaffolded, experimental, partially implemented, integrating, awaiting verification, stable, deprecated, or archived. Use when auditing unfinished modules, deciding whether a feature is truly usable, preventing experimental code from leaking into stable systems, defining readiness gates, recording an optional user-approved continuation checkpoint, or resuming implementation from a previously recorded audit state.
+description: Classify and govern ESFramework modules that are proposed, scaffolded, experimental, partially implemented, integrating, awaiting verification, stable, deprecated, or archived. Use only when the current user explicitly requests a formal module audit, audit recording, audit continuation, a maturity matrix, or an audit checkpoint. Do not trigger for ordinary technical review questions such as "合理吗", "商业级吗", "需要修改吗", or "评价这份结论"; handle those as review-only unless formal audit intent is explicit.
 ---
 
 # Govern ES Module Lifecycle
@@ -19,9 +19,14 @@ Classify the module from current implementation and evidence. Never infer comple
 8. Build an evidence matrix without upgrading `.csproj`, Console, Test Runner, PlayMode, Profiler, Player, IL2CPP, provider, or release evidence into another layer.
 9. Recommend the smallest reversible action that satisfies the next transition gate. Do not implement, delete, migrate, stage, or publish without matching user and AICommand authority.
 10. If authorized changes are made, preserve unrelated work, run `$es-utf8-guard`, and invoke `$es-unity-compile` or `$es-release-acceptance` only for evidence actually required by the target state.
-11. After delivering the audit, enter `audit+checkpoint` only when the user already authorized a state write or explicitly accepts one concise checkpoint question. Otherwise remain `audit-only` and write nothing.
-12. For a checkpoint, require an exact target file and region. Read [references/audit-state-contract.md](references/audit-state-contract.md), inspect overlap, and update only the authorized block. Never create a second authority when the module already has one.
-13. On resume, treat the checkpoint as navigation rather than current truth. Recheck branch, HEAD, relevant worktree paths, latest AIWarnings, authority entry, activation, dependencies, and evidence before continuing.
+11. Establish `currentUserExplicitlyRequestedFormalAudit` from the current user message before loading this Skill. It is true only for explicit requests such as “审计”, “审计并记录”, “继续审计”, “输出模块成熟度矩阵”, or “写入/恢复审计检查点”. A review, explanation, feasibility judgment, or critique is never formal audit intent by itself.
+12. Treat ordinary review-only requests (“合理吗”, “商业级吗”, “需要修改吗”, “评价这份结论”, “还缺什么”) as technical review. In review-only mode do not write audit state, do not emit C0–C3 governance grades, do not create or refresh checkpoints, do not ask about handoff, and do not trigger any session-operation Skill.
+13. Interpret an explicit “审计” as `audit-only` when the target module is clear. Deliver the full maturity/evidence matrix, but do not write state or ask to record it unless the user explicitly says “审计并记录” or separately authorizes a checkpoint.
+14. Interpret “审计并记录” as authorization to update the target module block in `ES/Documentation/Status/MODULE_AUDIT_STATE.md`; do not ask for a path or region. Interpret “继续审计” as `resume` from that same file. Ask only for the module scope when context and stored blocks cannot identify it.
+15. For a checkpoint, derive a stable module key, read [references/audit-state-contract.md](references/audit-state-contract.md), inspect overlap, and update only that module block. Never write audit continuation state elsewhere.
+16. On resume, treat the checkpoint as navigation rather than current truth. Recheck branch, HEAD, relevant worktree paths, latest AIWarnings, authority entry, activation, dependencies, and evidence before continuing.
+17. For a completed full audit workflow, evaluate the collaboration workflow against `AI协作历程与模块审计_商业可行性验收标准.md`. Do not call it commercially viable from source or one successful audit alone.
+18. Offer handoff only when `currentUserExplicitlyRequestedFormalAudit=true` and the complete audit matrix has actually been delivered. Append the standard handoff offer exactly once. A Skill-trigger decision, long answer, maturity state, blocked item, or suggested next step never satisfies this gate. If the user accepts, generate a directly copyable new-AI prompt; do not generate it automatically.
 
 ## Decision rules
 
@@ -37,10 +42,11 @@ Classify the module from current implementation and evidence. Never infer comple
 
 ## Continuation modes
 
-- `audit-only`: return findings and the next action; do not ask repeatedly and do not write a state file.
-- `audit+checkpoint`: after the audit, ask at most once when useful. Write only after the user confirms the target file and region, unless both were already explicitly provided.
-- `resume`: read the named checkpoint, report stale fields, refresh facts from source, then continue only within the current user and AICommand authority.
+- `review-only`: answer the technical question only; no audit state, maturity matrix, checkpoint, handoff offer, or session operation.
+- `audit-only` / explicit “审计”: return the full findings and evidence matrix; write nothing and do not ask about recording unless separately authorized.
+- `audit+checkpoint` / “审计并记录”: write the fixed state file's target module block without asking for a path.
+- `resume` / “继续审计”: read the fixed state file, report stale fields, refresh facts from source, then continue only within the current user and AICommand authority.
 
 ## Required output
 
-Return the module boundary, maturity state, blocked reason, committed scope, authority entry, activation mode, upstream dependencies, downstream consumers, unfinished-code leakage, evidence matrix, smallest next transition action, checkpoint status (`not-requested`, `offered`, `written`, `stale`, or `refused`), and the exact resume entry when one exists.
+Return the module boundary, maturity state, blocked reason, committed scope, authority entry, activation mode, upstream dependencies, downstream consumers, unfinished-code leakage, evidence matrix, smallest next transition action, checkpoint status (`not-requested`, `offered`, `written`, `stale`, or `refused`), commercial-feasibility level/evidence, and the exact resume entry when one exists. When the full workflow is complete, end with the one-time handoff offer.

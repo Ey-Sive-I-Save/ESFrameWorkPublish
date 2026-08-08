@@ -1,6 +1,6 @@
 # 项目最高警告：资源加载底层，Library 只属 Editor，Runtime 只认 Manifest/Table
 
-最后核对：2026-08-03
+最后核对：2026-08-05
 
 职责：这是 ESFramework 给后续 AI 的项目最高警告。当前正在搭建资源加载底层，任何资源系统、GameManager 启动流程、AssetRegistry、AssetLibrary、RuntimeKey、Manifest/Table 相关改动都必须先读本文件。
 
@@ -90,9 +90,9 @@ ESAssetManifest / ESAssetTable
 `EditorSimulateBuild`
 
 - 中文名：编辑器模拟发布模式。
-- 机制：`(AssetKind, runtimeKey) -> Typed Manifest/Table -> 模拟构建后地址规则`。
-- 用途：在 Editor 中提前验证发布版 key、路径、依赖、包规则。
-- 限制：仍不是真机加载，但可以暴露大部分发布链路错误。
+- 机制：读取并校验 LocalBuild 或 HotUpdate/Net 的正式发布元数据，构建同一 RuntimeMap/Catalog；GUID、LocalFileId、类型、BundleKey 与依赖通过预检后，物理对象仍由 AssetDatabase 加载。
+- 用途：在 Editor 中验证发布身份、Consumer/Library、Catalog、GameCore 与依赖规则，同时避免下载、解包和读取 AssetBundle。
+- 限制：不验证 AssetBundle 文件、StreamingAssets、真实下载、缓存、解压、Player 内存和设备行为；这些必须由 LocalBuild/HotUpdate 的实际运行验收覆盖。
 
 `LocalBuild`
 
@@ -141,7 +141,7 @@ BootScene
 业务层按实际所有权选择入口，不得把共享缓存驱逐、引用计数和独立租期混为同一套 `Release`：
 
 ```csharp
-// 无显式所有权：Resident Scope 常驻到统一安全点，业务不 Release。
+// 默认业务域：首次加载自动创建并复用 GameSession。
 var prefab = await ESAssets.LoadAsync(prefabRefer);
 
 // Unity Owner：Owner 销毁时结束自己的 Scope。
@@ -149,7 +149,7 @@ var clip = await ESAssets.LoadAsync(clipRefer, owner);
 
 // 短期独立租期：仅这个 Lease 的 Dispose 生效一次。
 using ESAssetTemporaryLease<TextAsset> lease =
-    await ESAssets.TemporaryScope.LoadAsyncLease(rawRefer);
+    await ESAssets.LoadTemporaryAsync(rawRefer);
 ```
 
 业务层不应该关心：
@@ -169,7 +169,9 @@ using ESAssetTemporaryLease<TextAsset> lease =
 
 | 入口 | 所有权 | Active Plan 命中规则 | 释放规则 |
 | --- | --- | --- | --- |
-| `ESAssets.LoadAsync(refer)` | 无独立 Owner；Resident/统一安全点语义 | 可以只读借用活动 Plan；未命中才进入 Resident Scope | 业务不调用 `Release()`；统一资源安全点才允许卸载。 |
+| `ESAssets.LoadAsync(refer)` | 自动创建/复用的 `GameSession` Registry Scope | 禁止把活动 Plan 借用伪装成当前域所有权；域 Scope 自己取得 Provider Lease | 对应 GameFlow 调用 `ReleaseScope(GameSession)` 逻辑关闭并统一释放。 |
+| `ESAssets.LoadAsync(refer, domain/stringKey)` | 自动创建/复用的枚举或合法 StringKey Registry Scope | Scope 自己取得 Provider Lease；自动创建只降低调用成本，不替代释放责任 | 对应流程管理器调用 `ReleaseScope`；父域释放时子域先释放。 |
+| `ESAssets.LoadResidentAsync(refer)` / `PreloadAsync()` | 框架会话基础资源 Resident | 仅用于 GameCore、启动预热和全局基础资源 | 由资源安全点、Provider Transition 或会话结束统一释放。 |
 | `ESAssets.LoadAsync(refer, owner)` | `owner` 对应的独立 Scope | 禁止只读借用；必须由 Owner Scope 自己取得 Provider Lease | Owner 销毁时由 `ESAssetOwnerTracker` 自动释放。 |
 | `refer.TryLoad(owner, out asset)` / `ESAssets.TryGetOwned(...)` | 只观察该 Owner 现有 Scope 已持有的资产 | 禁止查询 Provider 全局缓存或活动 Plan | 未命中不得创建 Tracker、Scope 或加载；命中资产继续服从该 Owner Scope。 |
 | `ESAssetTemporaryScope.LoadAsync(refer)` | Temporary Scope 的一次引用计数 | 禁止借用；必须保留独立 Temporary 持有 | 每次成功调用都必须同一 Scope、同一 identity 调用一次 `Release(refer)`；它不是“本次调用幂等”。 |
@@ -182,7 +184,68 @@ using ESAssetTemporaryLease<TextAsset> lease =
 - 同一普通 `ESAssetScope` 内，同一 identity 最多持有一次；它是 Owner 聚合，不是 Temporary Scope 的逐调用引用计数器。
 - 安全点与 Provider 切换会推进 Temporary Lease generation 并清空旧 Token；旧 Lease 不得影响新一代 Scope 或新 Provider。
 - Provider 切换期间新请求必须被阻止，旧 Scope 与旧 Provider 的迟到结果不得写回新状态。
-- `ESAssets.TemporaryScope` 是全局框架域。业务可以取得它完成短期请求，但不得自行 `Dispose()`；生命周期服务才有权切换、失效或销毁它。
+- `ESAssets.TemporaryScope` 是公开的全局共享临时域。普通任务优先通过 `LoadTemporaryAsync` 取得独立 Lease；高级调用方可以整体 `Dispose()`，但必须理解这是全域清理，会推进 generation、释放全部剩余持有并使其他旧 Lease 一并失效。
+- 枚举/StringKey Registry Scope 在首次显式 Domain/Key 加载时允许自动创建；`CreateScope` 只保留给提前登记、父子绑定、测试和生命周期管理器。枚举域使用保留诊断命名空间 `@domain:*`；业务 StringKey 禁止使用保留前缀或与枚举同名，且必须带稳定业务前缀，推荐 `scene:*`、`ui:*`、`feature:*`、`presentation:*`。
+- `ReleaseScope(key)` 表示同步完成逻辑关闭和 Scope Dispose，不保证底层已合并 Provider 请求已经物理终结；迟到 Handle 仍由已 Dispose Scope 自动归还。需要等待完全静默时必须使用独立的异步门闩/未来 `ReleaseScopeAsync`，不得把同步返回误报为物理请求全部完成。
+- Registry 父子关系只负责生命周期级联：父级关闭时子级先关闭；它不转移 Provider Lease、不改变 ResourcePlan 私有 Scope，也不允许外部注入或替换 Plan Scope。
+
+### ESAssetDomain 权威语义
+
+本节是默认枚举 Scope 的唯一权威。枚举表示少量、稳定、全局约定的生命周期高度；它不是任意实例 ID，也不能替代 StringKey。所有枚举均允许 Registry 在首次加载时自动创建，但自动创建不改变其唯一释放责任。
+
+| Domain | 唯一语义 | 创建/释放权威 | 禁止事项 |
+| --- | --- | --- | --- |
+| `GameInternal` | 框架运行时子系统在当前资源会话中的内部动态资源；与业务资源隔离 | 只能由框架资源会话、RuntimeData 或受信基础模块使用；Provider Transition/资源会话结束时释放 | 普通业务不得加载或主动 `ReleaseScope(GameInternal)`；不得把它当 Resident 或万能全局缓存 |
+| `ApplicationSession` | 跨越多个 GameSession、但仍属于当前应用/产品会话的业务共享资源，例如登录壳、全局大厅壳或跨局共享展示 | 应用流程根唯一负责；应用会话结束或 Provider 重建时释放/重建 | 不得放入框架启动必需资产；不得因“可能复用”把场景、单局或临时展示资源常驻于此 |
+| `GameSession` | 一次明确游戏流程、对局、关卡运行或玩法会话的默认业务资源域 | GameFlow/Session 管理器唯一负责；默认无域 `LoadAsync` 自动进入此域，游戏会话结束时释放 | 不得跨多个独立 GameSession 永久保存；不得由多个系统分别释放 |
+| `Presentation` | 启动 MV、匹配炫耀、称号特效等有明确开始/结束点的短时大内存展示 | Presentation/播放流程唯一负责；展示对象、Video/VFX/RenderTexture 使用结束后释放 Scope，并在安全点观察实际回收 | 不得进入 Resident、ApplicationSession 或 GameSession 长期持有；`ReleaseScope` 不等于 GPU 内存当帧归还 |
+| `Scene` | 框架约定的单一当前 Scene 共享生命周期域 | Scene 流程唯一负责，场景退出或替换时释放 | 多个 Additive Scene 不得共享该枚举；必须使用 `scene:<stable-id>` |
+| `UI` | 框架约定的单一 UI World/UI Root 共享生命周期域 | UI Root 唯一负责，UI World 关闭时释放 | 普通面板不应随意共享全局 UI 域；并行 UI World/玩家 UI 使用 `ui:<stable-id>` 或 Owner |
+| `Feature` | 框架约定的单一共享功能激活周期 | Feature 管理器唯一负责，功能停用时释放 | 多实例玩法、多个并行功能实例不得共享该枚举；必须使用 `feature:<stable-id>` |
+
+与其他所有权的分界：
+
+- Resident 只保存资源会话启动和全局基础设施必需资产；它不是 `GameInternal` 或 `ApplicationSession` 的别名。
+- Owner Scope 绑定具体 Unity Owner；单对象、单面板、单实体优先使用 Owner，而不是扩大枚举域。
+- ResourcePlan 继续使用私有 Scope；Domain 只能触发或承载业务流程，不能注入、替换或窃取 Plan Scope。
+- Temporary Lease 用于一次短租任务；它不能因为调用方便而改用 Presentation 或 GameSession。
+- 并行实例、同类多开和需要稳定实例身份的流程必须使用带前缀 StringKey，不能扩充大量枚举成员。
+
+当前实现边界：Registry 已统一实现自动创建、Closing、Generation 与释放，但源码尚未限制普通业务调用 `GameInternal`，也尚未把每个枚举自动绑定到对应流程管理器。故上述表是新代码与 AI 的强制设计权威，不得把“已有枚举名称”写成“权限和自动释放已经运行时强制”。在权限门禁与流程接线落地并通过 Unity 测试前，此项保持 P1 实施缺口。
+
+### P0/P1：Scope Registry 自动创建与生命周期门禁
+
+自动创建解决的是调用成本，不是生命周期归属。正式控制流必须是：
+
+```text
+LoadAsync(refer, domain/key)
+  -> Registry 查找
+  -> 不存在则先登记 Creating
+  -> 创建一次性 ESAssetScope
+  -> Active 后加载
+  -> 对应流程唯一负责 ReleaseScope
+```
+
+P0 硬约束：
+
+- Provider Transition 时禁止创建或进入 Registry Scope。
+- `Creating` 必须先进入 Registry，再创建 Scope；同 Key 重入不得生成第二个 Scope。
+- `Closing` 状态拒绝新请求，不得进入旧 Scope；Registry 的 Closing 占位必须保持到旧 Scope Dispose 及其同步生命周期回调完成，禁止在回调中按同 Key 提前创建新代。
+- TransitionStarting 之后，已捕获的旧 Scope、TemporaryScope 和 Scene 入口也必须拒绝新请求；不能只封 Registry/静态门面，而让持有旧对象的回调继续进入旧 Provider。
+- Scope 外壳 Dispose 后永久失效；旧 Pending 的迟到结果只能归还旧 Handle，不得写入同名新代 Scope。
+- 同名 Scope 重建必须使用框架内部 Generation 隔离；Generation、scopeId 和真实 Scope 不向普通业务暴露。
+- 自动创建失败不得回退 Resident，也不得创建无法诊断的备用 Scope。
+- ResourcePlan 继续使用 Coordinator 私有 Scope，禁止进入 Registry 或接受外部 Scope 注入。
+- 默认无参数 `LoadAsync(refer)` 只能路由自动创建/复用的 GameSession，禁止恢复隐式 Resident。
+- Registry Scope、Owner Scope、Resident、ResourcePlan 与 Temporary/Lease 必须保持独立所有权，释放一侧不得误释放其他侧。
+
+P1 工程约束：
+
+- StringKey 必须使用常量、稳定 ID 或统一生成器，并带小写业务前缀；禁止热路径动态拼接。
+- 同一 Scope 的 `ReleaseScope` 责任必须唯一，禁止多个无关系统共同关闭一个共享域。
+- Development/Debug 构建应报告隐式创建、长期未释放和活动 Scope 数量异常；Runtime Monitor/诊断快照至少公开 Registry 总数、隐式创建数和 Closing 数，不暴露可变 Scope 集合。
+- 所有默认枚举必须服从上方“ESAssetDomain 权威语义”；Scene、UI、Feature 只代表框架约定的单一共享域，并行实例必须使用 `scene:*`、`ui:*`、`feature:*` 等实例化 StringKey。
+- `Presentation` 用于 MV、匹配炫耀、称号特效等短时大内存展示；允许首次加载自动创建，播放系统结束实例和渲染资源后负责 `ReleaseScope(Presentation)`。
 - `ESAssetScope.CreateScope`、Scope 生命周期与底层 `Release` 是 ResourcePlan/框架高级边界；普通业务优先使用无 Owner、Owner 或 Lease 三种入口。
 - 不同 Owner 对同一 Identity 可以拥有不同的 Owner Scope 持有；这表达不同生命周期所有权，不是把每次函数调用转换成引用计数。同一 Owner Scope 内重复请求同一 Identity 仍只持有一次。
 - Owner 命中 Provider 已缓存资产时允许复用同一个 Unity 对象和底层加载结果，但必须取得属于该 Owner Scope 的独立 Provider Lease；缓存命中不等于借用活动 Plan。
@@ -191,7 +254,7 @@ using ESAssetTemporaryLease<TextAsset> lease =
 - Owner 的同步热路径只能查询该 Owner 自己已经存在的 Scope；不得为了同步查询命中率退回 Provider 全局缓存，也不得在未命中时偷偷创建 Scope 或发起异步加载。
 - `ESAssetRefer<T>` 只保存稳定资产身份与编辑器配置，不得自行保存运行时 Handle、充当隐式 Owner 或提供“Refer.Release() 释放资源”的新版语义。运行时持有必须落在 Resident、Owner Scope、ResourcePlan 或 Temporary/Lease 四类正式边界之一。
 
-错误做法：把 `LoadAsyncLease` 当作普通计数入口、给 Resident 资源手工 Release、在 Provider 切换后继续使用旧 Scope/Lease、或为了“方便”销毁全局 `TemporaryScope`。
+错误做法：把 `LoadAsyncLease` 当作普通计数入口、给 Resident 资源手工 Release、在 Provider 切换后继续使用旧 Scope/Lease，或在不接受“全部临时 Lease 同时失效”语义时销毁全局 `TemporaryScope`。
 
 P2 记录：Lease Token 使用递增 `long` 并规避当前活动 Token 碰撞，实际回绕概率极低；它不是已证明的无限身份空间。极限回绕仍应保留为底层测试项，不得据此弱化 generation 校验或改回可复用公开 Handle。
 
@@ -495,7 +558,7 @@ ESGameManager.Asset.ReleaseScope(sceneScope);
 正确处理：
 
 - 清理场景/Prefab 上的 SerializeReference 坏引用。
-- 使用当前链路：`EntityAIDomain.inputState + EntityPlayerInputWriteModule + EntityAIInputDispatchModule`。
+- 使用当前链路：`EntityPlayerInputWriteModule -> EntityAIDomain.inputState -> EntityAIDomain`；控制门禁和输入执行均由 AI 域收口。
 - 如果 Unity 报 `serialized array of [SerializeReference] objects is missing entry`，通过打开场景、移除坏引用、重新保存解决，不通过恢复旧代码解决。
 
 ## 管理员权限警告

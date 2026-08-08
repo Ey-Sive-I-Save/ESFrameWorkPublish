@@ -33,6 +33,10 @@ AICommand 决定“这次任务允许做什么”，Skill 决定“这类任务�
 | 修复一个明确编译错误 | `$es-fix-compile-error` |
 | 中文文本、UTF-8、乱码和补丁检查 | `$es-utf8-guard` |
 | 修改前后检查脏工作树和路径重叠 | `$es-worktree-audit` |
+| 打开新 Codex、恢复/分叉会话或初始化项目接手上下文 | `$es-codex-session-bootstrap` |
+| 从 Agent Authoring Graph 生成 AICommand/Agent Skill 候选 | `$es-generate-agent-artifacts` |
+| 直接启动、监控或安全中断 ESAITest/ESTEST | `$es-start-estest` |
+| “你快告诉测试AI……”或向运行中的测试 AI 快速发送一次性提示 | `$es-publish-aitest-prompt` |
 | GameCore 根 SO、RuntimeData、全局索引或模块接入 | `$es-gamecore-integration` |
 | 资源库、计划、Manifest、Provider、Scope 或发布资源链路 | `$es-resource-pipeline` |
 | ESGameTag、ESTag、ConfigKey、Catalog 与稳定身份 | `$es-tag-config` |
@@ -41,9 +45,11 @@ AICommand 决定“这次任务允许做什么”，Skill 决定“这类任务�
 | ESCommand、分类、Context、Player 与 Runner | `$es-command-authoring` |
 | EditorWindow、Drawer、ESEditorSection、SO 表格和 ReloadDomain | `$es-editor-tooling` |
 | 编译到 IL2CPP、资源 Provider 与真实发布的证据矩阵 | `$es-release-acceptance` |
-| 未开始、开发中、待验收、稳定或废弃模块的成熟度、半成品影响与可选续接检查点 | `$es-module-lifecycle` |
+| “审计”“审计并记录”“继续审计”，以及模块成熟度、半成品影响与固定续接检查点 | `$es-module-lifecycle` |
 
 从项目根启动 Codex 后，可以显式输入 `$skill-name`；也可以让 Codex 根据任务自动匹配。当前窗口未显示新 Skill 时，应新开项目窗口或重启，不要把未热加载误判为文件不存在。
+
+模块范围明确时，用户只说“审计”即可启动只读成熟度审计；“审计并记录”会更新 `ES/Documentation/Status/MODULE_AUDIT_STATE.md` 的对应模块块；“继续审计”从该固定入口恢复并重新核对事实。
 
 ## 直接生效协议
 

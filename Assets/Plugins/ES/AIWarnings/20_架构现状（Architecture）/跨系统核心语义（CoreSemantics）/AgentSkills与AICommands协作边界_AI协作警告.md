@@ -10,6 +10,7 @@ ESFramework 已采用项目级 Agent Skills：
 
 ```text
 .agents/skills/
+├── es-codex-session-bootstrap/
 ├── es-command-authoring/
 ├── es-editor-tooling/
 ├── es-entity-authoring/
@@ -54,6 +55,7 @@ AIWarnings 在该链路中也必须按任务加载：先读取入口、当前状
 
 | Skill | 当前能力 | 典型 AICommand 或任务 |
 |---|---|---|
+| `$es-codex-session-bootstrap` | 从固定项目根启动新 Codex、恢复或分叉已保存会话，并注入最小只读初始化提示 | 打开新 Codex、开启新对话、恢复对话、分叉会话、初始化 Codex、接手项目 |
 | `$es-use-ai-command` | 校验 53 个命令的 UTF-8、元数据和项目路径；选择并执行一个命令 | 用户发送 AICommand 路径、要求选择命令、进入项目任务 |
 | `$es-unity-compile` | 区分 `.csproj`、Unity Console、Domain Reload、Test Runner、PlayMode、Profiler、IL2CPP 和发布证据 | `检查_编译错误定位`、`编译与ReloadDomain内存_检查`、程序集或 Unity 验收 |
 | `$es-fix-compile-error` | 只定位、最小修复并验证一个明确编译错误 | `执行_修复单个编译错误_AI命令.md` |
@@ -88,7 +90,7 @@ $es-worktree-audit
 - `$es-unity-compile` 与 `$es-release-acceptance` 声明 `unityMCP` 依赖，服务地址为 `http://127.0.0.1:8080/mcp`。
 - 已提供四个确定性 PowerShell 脚本：AICommand 校验、显式 `.csproj` 构建、UTF-8 守卫和工作树审计。
 - PowerShell 脚本源码保持 ASCII，避免 Windows PowerShell 5.1 将无 BOM UTF-8 中文脚本按本地代码页解析；中文说明保留在 `SKILL.md` 和项目文档中。
-- 原有十三个 Skill 已通过官方 `quick_validate.py`；新增 `$es-module-lifecycle` 已完成官方格式等价结构检查，但当前终端找不到可运行的 Python/uv，尚未取得 `quick_validate.py` 实跑证据。四个既有脚本已完成语法解析和实际运行。
+- 原有十三个 Skill 已通过官方 `quick_validate.py`；`$es-module-lifecycle` 与 `$es-codex-session-bootstrap` 已完成官方格式等价结构检查，但当前终端找不到可运行的 Python/uv，尚未取得 `quick_validate.py` 实跑证据。会话启动脚本已在 Windows PowerShell 5.1 下完成 New、Resume、Fork 与 Validate 四种 dry-run；未在验证时弹出真实交互窗口。
 - AICommand 校验最近实跑结果为 53 个命令、0 个无效引用。
 
 八个领域 Skill 和一个跨系统治理 Skill 当前提供的是正式可发现的项目导航、工作流、边界与交付协议，不等于其涉及的 Unity、Player、Profiler、IL2CPP 或发布流程已经自动化，也不等于十四个 Skill 已完成所有真实场景前向测试。每次任务仍需读取当前 Skill、当前 AICommand、最新 AIWarnings 和源码。

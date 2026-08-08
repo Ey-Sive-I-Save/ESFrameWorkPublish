@@ -4,9 +4,9 @@
 > 职责：给后续 AI 说明“玩家对象模型重构”必须按通用角色体系验证，不要只围绕单机本地主角做窄实现。  
 > 性质：基于当前代码的架构验证笔记，不是最终设计定稿。改代码前仍需回读源码和编译验证。
 >
-> 2026-07-31 现行纠偏：角色 Prefab 不新增 `CharacterActor`、`EntityCharacterComposition`、`EntityCharacterDefinitionBinding` 或同义桥接组件。当前有效入口是 `Entity + 同根 EntityCharacterProfile -> Entity.BindDefinition(DataInfo)`；正式契约见 `Documentation/CHARACTER_PREFAB_CONTRACT.md` 与同目录 `角色Prefab职责与DataInfo入口_AI协作警告.md`。本文中建议另建 `CharacterActor` 的“必须补”“推荐迁移”段仅保留为历史问题记录，不得据此实施。
+> 2026-07-31 现行纠偏：角色 Prefab 不新增 `CharacterActor`、`EntityCharacterComposition`、`EntityCharacterDefinitionBinding` 或同义桥接组件。当前有效入口是 `Entity + 同根 EntityCharacterIdentity -> Entity.BindDefinition(DataInfo)`；正式契约见 `Documentation/CHARACTER_PREFAB_CONTRACT.md` 与同目录 `角色Prefab职责与DataInfo入口_AI协作警告.md`。本文中建议另建 `CharacterActor` 的“必须补”“推荐迁移”段仅保留为历史问题记录，不得据此实施。
 >
-> 2026-08-01 模块契约补充：角色基础能力不靠运行时自动补齐。三种 `EntityCharacterProfile` 身份的 Prefab 都必须显式保存唯一 `EntityBasicMoveRotateModule` 和唯一 `EntityAIInputDispatchModule`，并关闭 `autoEnsurePlayerInputModules`；只有阵营为 `Player` 的正式 `CharacterVariant` 才可且必须保存唯一 `EntityPlayerInputWriteModule`、`EntityBasicMountModule`、`EntityBasicClimbModule`。玩家的骑乘状态必须满足 `Mounted` 契约，攀爬、攀上和翻越状态必须满足 `Climbing` 契约；攀爬跳跃离墙后进入空中 KCC 分支，必须满足 `Grounded` 契约。使用 `【ES】/内容制作/角色模板/审计项目角色基础模块` 做全项目制作期检查，发布门禁会复验实际进入内容的正式 Variant。此规则不授权向模板增加战斗、相机、武器或高级运动组件。
+> 2026-08-01 模块契约补充：角色基础能力不靠运行时自动补齐，自动补玩家输入模块的入口已删除。三种 `EntityCharacterIdentity` 身份的 Prefab 都必须显式保存唯一 `EntityBasicMoveRotateModule`，并由 `EntityAIDomain` 持有输入执行配置和统一执行入口；只有阵营为 `Player` 的正式 `CharacterVariant` 才可且必须保存唯一 `EntityPlayerInputWriteModule`、`EntityBasicMountModule`、`EntityBasicClimbModule`。玩家的骑乘状态必须满足 `Mounted` 契约，攀爬、攀上和翻越状态必须满足 `Climbing` 契约；攀爬跳跃离墙后进入空中 KCC 分支，必须满足 `Grounded` 契约。使用 `【ES】/内容制作/角色模板/审计项目角色基础模块` 做全项目制作期检查，发布门禁会复验实际进入内容的正式 Variant。此规则不授权向模板增加战斗、相机、武器或高级运动组件。
 
 ## 验证目标
 
@@ -127,7 +127,7 @@ ESGameManager.WorldDomain
 
 ### 4. Party / Switch Character 层
 
-角色切换不是简单启用另一个 `EntityAIInputDispatchModule`。
+角色切换不是简单启用另一个实体的输入执行；必须通过 `EntityAIDomain` 的控制门禁和输入状态边界完成切换。
 
 需要显式处理：
 
@@ -261,7 +261,7 @@ Animator：Controller 必须为空，由 Entity StateMachine/Playable 驱动
 占位模型与 Avatar：读取全局 StateMachineConfig.previewModel / previewAvatar
 EntityStateDomain + 默认状态包/状态机配置
 EntityBasicMoveRotateModule
-EntityAIInputDispatchModule
+EntityAIDomain（纯运行时输入状态、控制门禁与统一输入执行）
 StateFinalIKDriver + Humanoid 骨骼绑定
 IKTargets + MatchTargets + 稳定挂点
 检测碰撞、装备、特效音频、相机参考和 RuntimeGenerated 容器
@@ -292,12 +292,12 @@ ES基础角色模板
 - 玩家/NPC/Monster 可以共享相同业务枚举值，但各自领域配置和控制来源必须独立。
 - 派生模板可以增加能力，不能绕过 `Entity → Domain → Module → KCC/StateMachine` 权威链路。
 - KCC Motor 始终是根位姿最终执行权威；派生能力不得在普通 `Update` 直接写角色根 Transform。
-- Player/AI/Network/Cutscene 只在 `EntityAIDomain` 侧预留控制来源，最终统一写入 InputState/Intent，再由唯一 Dispatch 消费。
-- 基础模板调整后必须重新生成完整模板并运行双模板验证，确保基础移动和统一调度各一个、玩家输入为零、高级运动模块为零、Animator Controller 为空、IK/MatchTarget、状态引用与 Mapping 完整。
-- 角色 Prefab 的基础能力必须显式保存在 Module 表中，`autoEnsurePlayerInputModules` 必须关闭；正式 Player Variant 再额外挂唯一且启用的 `EntityPlayerInputWriteModule`、`EntityBasicMountModule`、`EntityBasicClimbModule`，并配置通过状态契约的骑乘、攀爬、攀上和翻越状态；非玩家 Variant 不得误挂玩家输入写入。全项目制作期使用“审计项目角色基础模块”，实际发布内容再由发布门禁复验。
+- Player/AI/Network/Cutscene 只在 `EntityAIDomain` 侧预留控制来源，最终统一写入 InputState/Intent，再由 AI 域级执行入口消费。
+- 基础模板调整后必须重新生成完整模板并运行双模板验证，确保唯一基础移动 Module 和 AI 域输入执行器、玩家输入为零、高级运动模块为零、Animator Controller 为空、IK/MatchTarget、状态引用与 Mapping 完整。
+- 角色 Prefab 的基础能力必须显式保存唯一 `EntityBasicMoveRotateModule`，输入执行配置由 `EntityAIDomain` 持有；运行时自动补玩家输入模块的入口已删除。正式 Player Variant 再额外挂唯一且启用的 `EntityPlayerInputWriteModule`、`EntityBasicMountModule`、`EntityBasicClimbModule`，并配置通过状态契约的骑乘、攀爬、攀上和翻越状态；非玩家 Variant 不得误挂玩家输入写入。全项目制作期使用“审计项目角色基础模块”，实际发布内容再由发布门禁复验。
 - 基础模板和 GlobalPreview 的发布门禁必须开启：Player 场景与 AssetBundle 依赖闭包中一旦出现它们，构建直接失败。
 - `EntityTransformMapping` 是运行时缓存挂点服务：固定键走缓存，动态键只用于初始化/事件边界；装备、相机、特效不得在热路径重新 `Find` 层级。
-- 正式角色 Variant 必须在根 `EntityCharacterProfile` 绑定唯一的 Actor / Monster / NPC DataInfo，声明阵营，配置 EntityBody 主 Collider、EntityHurtbox Trigger 与需要时的 Interaction Trigger；通用池模板保持无定义，由租出方直接调用 `Entity.BindDefinition(...)`。
+- 正式角色 Variant 必须在根 `EntityCharacterIdentity` 绑定唯一的 Actor / Monster / NPC DataInfo，声明阵营，配置 EntityBody 主 Collider、EntityHurtbox Trigger 与需要时的 Interaction Trigger；通用池模板保持无定义，由租出方直接调用 `Entity.BindDefinition(...)`。
 - `WeaponSocket` 是武器业务挂点；Humanoid RightHand 只保留骨骼语义。双手武器的副手目标和局部偏移必须由 WeaponBinding 明确声明。
 - 完整模板不负责 AssetBundle 标记、AssetTable 或 AssetLibrary 注册；这些仍属于独立资源构建阶段。
 - 不得另造与 `Entity` 并列的 Character/Motion 大根来解决模板派生问题。
@@ -318,7 +318,7 @@ ES基础角色模板
 2. 增加 `CharacterIntent`，让本地输入、AI、剧情都能输出同一种意图。
 3. 增加 `CharacterActor`，引用现有 `Entity`，承接身份、控制权、挂点、控制器集合。
 4. 增加 `CharacterWorldModule`，放在 `ESWorldDomain`，管理实体注册、队伍、当前操控角色。
-5. 让旧 `EntityAIInputDispatchModule` 逐步变成一种 `PlayerInputControllerSource` 或废弃适配器。
+5. 独立输入调度模块已移除；玩家、AI、剧情、网络和回放的输入意图统一进入 `EntityAIDomain`，由域级控制门禁和执行入口收口。
 6. 把 `EntityBasicCombatModule` 里的武器、瞄准、开火拆成 Combat/Weapon/Aim 三条控制器。
 7. 在现有 BuffDomain 上补对象池、固有 Tag、外部 Lease 与持久化验收，并建立到 StateMachine Buff 表现层的明确桥接；禁止另造第二套 Buff 运行时。
 8. 最后再拆 `EntityBasicModules.cs` 文件和旧模块职责，避免一开始破坏现有场景。

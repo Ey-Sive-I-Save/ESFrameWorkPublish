@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES 发送测试 AI 提示"
+  short_description: "将自然语言快速发布到运行中的 ESAITest AI"
+  default_prompt: "Use $es-publish-aitest-prompt to quickly send this message to the running ESAITest AI."

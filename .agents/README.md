@@ -16,6 +16,7 @@ ESFrameWorkPublish/
 └── ES/
     ├── AI协作历程（Codex）/               # 用户明确授权后维护的逐轮会话档案
     ├── Config/                           # Luban、SoTable 等项目级 ES 配置
+    ├── Documentation/Status/             # 模块审计续接状态唯一固定入口
     ├── Documentation/StaticSite/         # HTML 文档、同步规则和本地更新台账
     ├── ResourcePipeline/                 # ES 资源管线外部产物
     ├── Tools/ 与 Tests/                  # 项目级工具、样例与夹具
@@ -33,6 +34,7 @@ ESFrameWorkPublish/
 | `Assets/Plugins/ES/AICommands` | ESCmdAgent 在 Unity 内发现、校验和发送命令的来源 |
 | `ES/AI协作历程（Codex）` | 一窗口一文件的会话档案边界，与执行能力隔离 |
 | `ES/Documentation/StaticSite` | 文档哈希、台账和 HTML 延迟整合门禁 |
+| `ES/Documentation/Status/MODULE_AUDIT_STATE.md` | 模块审计跨窗口续接的唯一导航状态文件 |
 
 统一管理采用“一个索引、多个唯一权威位置”，不采用“复制多份再人工同步”。
 
@@ -72,6 +74,10 @@ ESFrameWorkPublish/
 | `$es-fix-compile-error` | 定位、最小修复并验证一个明确的 C# 或 Unity 编译错误。 |
 | `$es-utf8-guard` | 检查严格 UTF-8、U+FFFD、疑似乱码和补丁完整性。 |
 | `$es-worktree-audit` | 审计 staged、unstaged、untracked、删除、重命名和目标路径重叠。 |
+| `$es-codex-session-bootstrap` | 从项目根启动、恢复或分叉 Codex 会话，并加载最小权威初始化上下文。 |
+| `$es-generate-agent-artifacts` | 按 Agent Authoring Graph 请求生成隔离的 AICommand 与 Agent Skill 候选包。 |
+| `$es-start-estest` | 通过 Unity 菜单、Player 参数或公开 API 直接启动、监控和安全中断 ESTEST。 |
+| `$es-publish-aitest-prompt` | 响应“你快告诉测试AI……”等自然语言，把一次性 P0–P4 提示快速投递到运行中的 ESTEST。 |
 
 ### ES 领域层
 
@@ -90,7 +96,7 @@ ESFrameWorkPublish/
 
 | Skill | 简介 |
 |---|---|
-| `$es-module-lifecycle` | 分类模块成熟度、审计半成品渗透与证据跃迁，并可在用户确认后写入可失效的续接检查点。 |
+| `$es-module-lifecycle` | 响应“审计”“审计并记录”“继续审计”，分类模块成熟度并管理固定续接检查点。 |
 
 ## 新文件放置决策
 
@@ -128,8 +134,8 @@ ESFrameWorkPublish/
 
 ## 当前边界
 
-- 当前 14 个 Skill 已建立项目级结构、跨系统治理和领域导航。
-- 原有 13 个 Skill 已通过官方验证；`$es-module-lifecycle` 已补充 `audit-only`、可选 `audit+checkpoint`、`resume` 与一层续接状态契约，仍需按当前环境能力补跑官方 `quick_validate.py`。
-- 只有四个基础确定性 PowerShell 脚本已经实跑；领域 Skill 目前以工作流和真实项目路径导航为主。
+- 当前 17 个 Skill 已建立项目级结构、会话启动、Agent Artifact 候选生成、ESTEST 快速提示、跨系统治理和领域导航。
+- 原有 13 个 Skill 已通过官方验证；`$es-module-lifecycle` 已补充“审计”“审计并记录”“继续审计”、固定状态入口与一层续接状态契约，仍需按当前环境能力补跑官方 `quick_validate.py`。
+- `$es-publish-aitest-prompt` 的确定性投递脚本已完成 PowerShell 语法、原子 JSON 和严格 UTF-8 代表性实跑；其他领域 Skill 目前以工作流和真实项目路径导航为主。
 - 新 Skill 通常需要从项目根重启或新开 Codex 窗口后才会进入技能选择器。
 - Skill 存在不代表 Unity、PlayMode、Profiler、IL2CPP 或真实发布已经通过。

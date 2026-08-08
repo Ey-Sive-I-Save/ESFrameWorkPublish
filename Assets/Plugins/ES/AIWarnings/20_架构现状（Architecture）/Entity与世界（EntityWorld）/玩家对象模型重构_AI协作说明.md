@@ -39,8 +39,8 @@ This note is for AI agents working on the player-object/model architecture rebui
 
 - `Entity.cs` combines generic entity hosting, KCC motion callbacks, state-machine bridging, IK driver lookup, and gameplay-facing motion API. Treat it as a high-risk file.
 - `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityBasicModules.cs` is very large and mixes movement, combat, weapon handling, camera, quick stop, root motion, skill test code, and shared structs. Avoid adding more player-specific behavior there unless explicitly migrating.
-- `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/EntityAIModules.cs` contains both input collection and input dispatch. It is not purely AI.
-- 当前输入主链是 `ESInputModule -> ESInputService -> EntityPlayerInputWriteModule / EntityAIInputDispatchModule`。不要在新玩家代码中直接绑定 Unity `InputActionProperty`，也不要恢复已删除的旧实体输入类型。
+- `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/EntityAIModules.cs` contains input collection modules and the partial implementation of the `EntityAIDomain` input executor. It is not purely AI.
+- 当前输入主链是 `ESInputModule -> ESInputService -> EntityPlayerInputWriteModule -> EntityAIDomain.inputState -> EntityAIDomain`。`inputState` 是 Awake 时创建的纯运行态，不进入 Prefab/Scene 序列化。不要在新玩家代码中直接绑定 Unity `InputActionProperty`，也不要恢复已删除的旧实体输入类型。
 - `EntityBasicCombatModule` contains weapon mounting, aim/peek, firing, and animation parameter duties. It is not only "combat".
 - Buff 域已有运行时实例、叠层、ValueChange、Permit 和 OpSupport 链路；但仍需按当前源码确认具体能力，不能把它误当作已经完成全部商业 Buff 功能。
 

@@ -1,0 +1,32 @@
+{
+  "description": "ESFramework cooperative Codex message delivery at supported turn boundaries.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"F:/aaProject/ESFrameWorkPublish/.agents/skills/es-codex-session-bootstrap/scripts/Receive-ESCodexSessionMessageHook.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"F:\\aaProject\\ESFrameWorkPublish\\.agents\\skills\\es-codex-session-bootstrap\\scripts\\Receive-ESCodexSessionMessageHook.ps1\"",
+            "timeout": 5,
+            "statusMessage": "Checking ES collaboration messages",
+            "additionalContextLimit": 2000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"F:/aaProject/ESFrameWorkPublish/.agents/skills/es-codex-session-bootstrap/scripts/Receive-ESCodexSessionMessageHook.ps1\"",
+            "commandWindows": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"F:\\aaProject\\ESFrameWorkPublish\\.agents\\skills\\es-codex-session-bootstrap\\scripts\\Receive-ESCodexSessionMessageHook.ps1\"",
+            "timeout": 5,
+            "statusMessage": "Checking ES collaboration messages"
+          }
+        ]
+      }
+    ]
+  }
+}

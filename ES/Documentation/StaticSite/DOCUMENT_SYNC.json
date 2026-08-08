@@ -28,7 +28,7 @@
     "localUpdateLedger":  {
                               "manifestPath":  "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.json",
                               "summaryPath":  "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.md",
-                              "manifestSha256":  "76b0acdea4ca12175d4cdd97247c457fbc3bf6f830b0db5caf9a65923a046482",
+                              "manifestSha256":  "fe1f92125b796a6f70e09e69b8ec7faf8b3eab867f081aac195b56ae755b72b2",
                               "batchId":  "LOCAL-2026-08-02-OPEN",
                               "status":  "collecting",
                               "htmlWritePolicy":  "batch-only-after-ready-for-html"
@@ -108,7 +108,7 @@
                        "duplicateIds":  0,
                        "externalCssOrJs":  0,
                        "result":  "local-update-batch-needs-triage",
-                       "lastGateResult":  "Current source drift is captured by LOCAL-2026-08-02-OPEN, but its entries are not yet complete enough to defer HTML integration."
+                       "lastGateResult":  "The pushed range 775cfdb..fc09d0a is cached, local commit 33a2862 is recorded separately as not pushed, and HTML integration remains deferred while the Project Asset Guide and Output/index.html intake is needs-triage."
                    },
     "history":  [
                     {
@@ -158,6 +158,12 @@
                         "head":  "775cfdb57dd49ac96075fb6f4c49039ee11996be",
                         "sourceState":  "head-plus-dirty-worktree; source baseline intentionally not advanced",
                         "result":  "Added a two-stage local update integration workflow: a machine ledger plus human-readable summary capture completed local changes, snapshots, evidence, regression and HTML targets. The sync gate accepts deferred HTML integration only for complete snapshot-matched batches; the initial batch remains intentionally blocked pending triage."
+                    },
+                    {
+                        "date":  "2026-08-03",
+                        "head":  "33a2862571d3fd2a18562f51034524a00846c29e",
+                        "sourceState":  "pushed range cached against the 775cfdb document baseline; local commit 33a2862 is separately recorded as not pushed; Project Asset Guide worktree state and the untracked Output/index.html remain needs-triage",
+                        "result":  "Recorded the eight pushed origin/main commits with immutable SHA-to-ledger mappings, isolated the later local-only module-audit commit, and aligned local snapshot generation with the document baseline. The offline HTML was intentionally not changed."
                     }
                 ]
 }

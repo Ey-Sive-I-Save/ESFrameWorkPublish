@@ -33,6 +33,7 @@ function Protect-SensitiveText([string]$text) {
 
     $value = $text -replace '(?i)((?:access[_ -]?key(?:id|secret)?|secret(?:access)?key|api[_ -]?key|authorization|password)\s*[:=]\s*)[^\s,;]+', '$1<REDACTED>'
     $value = $value -replace '(?i)(bearer\s+)[A-Za-z0-9._~+/=-]{12,}', '$1<REDACTED>'
+    $value = $value.Replace([string][char]0xFFFD, '<U+FFFD>')
     return $value
 }
 
@@ -176,8 +177,18 @@ $toolOutputs = ($turns | Measure-Object -Property ToolOutputs -Sum).Sum
 $patchEvents = ($turns | Measure-Object -Property PatchEvents -Sum).Sum
 
 $oldText = if (Test-Path -LiteralPath $HistoryPath) { Get-Content -LiteralPath $HistoryPath -Encoding UTF8 -Raw } else { '' }
-$summaryStart = $oldText.IndexOf('## 一、')
-$oldSummary = if ($summaryStart -ge 0) { $oldText.Substring($summaryStart).Trim() } else { $oldText.Trim() }
+$preservedHeader = '## 原阶段总结（保留，不替代时间线）'
+$preservedStart = $oldText.IndexOf($preservedHeader)
+if ($preservedStart -ge 0) {
+    $oldSummary = $oldText.Substring($preservedStart + $preservedHeader.Length).Trim()
+}
+else {
+    $summaryStart = $oldText.IndexOf('## 一、')
+    $oldSummary = if ($summaryStart -ge 0) { $oldText.Substring($summaryStart).Trim() } else { $oldText.Trim() }
+}
+
+# 历史摘要中的旧 T 标题只能作为导航，不能再次被覆盖校验器识别为正式时间线节点。
+$oldSummary = $oldSummary -replace '(?m)^### T(\d{3})', '#### 旧节点 T$1'
 
 $builder = [Text.StringBuilder]::new()
 $null = $builder.AppendLine('# ' + $Title)
@@ -200,13 +211,21 @@ $null = $builder.AppendLine('- 权威来源：`' + $SessionPath + '`。')
 $null = $builder.AppendLine('- 快照：' + $sessionFile.Length.ToString('N0') + ' 字节、' + $lines.Count + ' 行，最后修改于 ' + $sessionFile.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss.fff zzz') + '。')
 $null = $builder.AppendLine('- 结构统计：' + $userOrdinal + ' 条用户消息、' + $turns.Count + ' 次任务开始、' + $completedTurns + ' 次完成、' + $abortedTurns + ' 次中止、' + $incompleteTurns + ' 次未闭合、' + $compactionCount + ' 次上下文压缩、' + $toolCalls + ' 次工具调用、' + $toolOutputs + ' 次工具输出、' + $patchEvents + ' 次补丁结束事件。')
 $null = $builder.AppendLine('- 解析结果：' + $parseErrors + ' 条 JSON 错误，' + $unknownEvents + ' 条未知业务事件。内部 JSONL 仅按本机观察结构解析。')
-$null = $builder.AppendLine('- 归属依据：现有档案的资源计划、发布管线、Raw、TemporaryLease、Tag、GameManager 与 ESSO 主题和该 session 高度连续；原档案正是在该窗口末期创建，但采用旧式阶段总结。因此保留原永久 ID 并在同一文件内重建，不新建重复窗口。')
+$null = $builder.AppendLine('- 归属依据：调用方已在运行恢复器前核对 session ID、时间、CWD、首尾提示与档案尾部连续性；恢复器只重建显式传入的档案路径，不自行授予或推断写入归属。')
 $null = $builder.AppendLine('- 脱敏边界：不写入系统/开发者提示、world state、reasoning 原文及完整工具输出；凭据字段自动替换为 `<REDACTED>`。')
 $null = $builder.AppendLine()
 $null = $builder.AppendLine('## 完整任务时间线')
 $null = $builder.AppendLine()
 
+$stageOrdinal = 0
 foreach ($turn in $turns) {
+    $stageOrdinal++
+    $stageStatus = $turn.Status
+    $null = $builder.AppendLine('### Stage S' + $stageOrdinal.ToString('000') + ': 执行轮 `' + $turn.Id + '` (' + $stageStatus + ')')
+    $null = $builder.AppendLine()
+    $null = $builder.AppendLine('- **阶段边界**：本阶段只表示同一执行轮的容器，不得替代其下独立任务节点。')
+    $null = $builder.AppendLine('- **阶段内用户消息数**：' + $turn.Users.Count + '。每条消息必须保留为独立 T 节点。')
+    $null = $builder.AppendLine()
     $messageCount = $turn.Users.Count
     for ($i = 0; $i -lt $messageCount; $i++) {
         $user = $turn.Users[$i]
@@ -230,6 +249,7 @@ foreach ($turn in $turns) {
         else {
             $null = $builder.AppendLine('- **当时结果**：未找到完成或中止事件，状态保持未闭合。')
         }
+        $null = $builder.AppendLine('- **剩余项**：恢复器不替代当时的技术判断；请依据该节点答复、工具证据和当前源码重新核对未完成项。')
         $null = $builder.AppendLine()
     }
 }
@@ -238,7 +258,7 @@ $null = $builder.AppendLine('## 覆盖审计')
 $null = $builder.AppendLine()
 $null = $builder.AppendLine('- 可见用户消息：' + $userOrdinal + '。')
 $null = $builder.AppendLine('- 独立或补充/纠正节点：' + $userOrdinal + '；排除用户消息：0。')
-$null = $builder.AppendLine('- 实际时间线节点：' + $userOrdinal + '，编号 T001-T' + $userOrdinal.ToString('000') + ' 连续。')
+$null = $builder.AppendLine('- 阶段数：' + $stageOrdinal + '；实际时间线节点：' + $userOrdinal + '，编号 T001-T' + $userOrdinal.ToString('000') + ' 连续。')
 $null = $builder.AppendLine('- task start 数与节点数差异：' + $turns.Count + ' 个 turn 承载 ' + $userOrdinal + ' 条用户消息，多出的 ' + ($userOrdinal - $turns.Count) + ' 条是同一执行轮中的补充或纠正，仍独立成节点。')
 $null = $builder.AppendLine('- 完成/中止/未闭合：' + $completedTurns + '/' + $abortedTurns + '/' + $incompleteTurns + '，合计等于 task start 数。')
 $null = $builder.AppendLine()

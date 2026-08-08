@@ -28,4 +28,18 @@ Keep editor tools explicit, user-driven, serialized-property safe, and resilient
 
 ## Delivery
 
-Report the tool category, state model, serialization and Undo behavior, scan trigger, cleanup path, ReloadDomain evidence, and interaction gaps.
+Report the tool category, state model, serialization and Undo behavior, scan trigger, cleanup path, ReloadDomain evidence, interaction gaps, and information-density/layout risks. Keep the first view focused on status, conclusion, and next action; progressively disclose logs, hashes, stack traces, and raw JSON. Every generated report, log, snapshot, handoff, or other user-facing artifact must include a stable project path plus a guarded quick-open, project-locate, open-report, or copy-path action when the host has UI. If the host cannot provide such an action, state that limitation explicitly and give the shortest machine-readable or manual path; printing a path alone is not complete delivery for a user-facing main result.
+
+For user-visible windows, inspectors, dialogs, and diagnostic panels, record whether the first view shows status/conclusion/main action without scrolling, whether critical actions avoid horizontal scrolling, whether long values can be copied in full, and whether failure views include cause/impact/recovery. Validate narrow-window and high-DPI layouts with screenshots when Unity visual evidence is required; source inspection alone is not visual acceptance.
+
+## 受管场景修改入口
+
+AI 或 UnityMCP 如需修改并保存场景，只能调用 ESAutomation Bridge 的 `modifyActiveScene`：
+
+- 目标必须是当前已加载的 Active Scene；
+- 请求必须携带精确 `scenePath`、白名单 `operations`、`dryRun` 和 `save`；
+- 当前白名单仅为 `setActive`、`setName`、`setTag`、`setLayer`；
+- 真实修改必须经过 Undo、Dirty 标记，并由 C# Editor 调用 `EditorSceneManager.SaveScene`；
+- PlayMode、任意脚本、任意资产路径和直接编辑 `.unity` YAML 均禁止。
+
+Bridge 响应只证明 Editor 主线程完成了操作；场景重新加载、Prefab 覆盖、运行时行为和发布结果仍需单独验收。

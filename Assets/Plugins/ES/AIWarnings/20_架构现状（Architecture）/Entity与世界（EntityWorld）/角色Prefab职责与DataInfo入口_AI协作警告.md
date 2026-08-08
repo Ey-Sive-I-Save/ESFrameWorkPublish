@@ -5,7 +5,7 @@
 
 ## 负责范围
 
-本规则约束 `Entity` 根、`EntityCharacterProfile`、三种角色 Prefab 身份、挂点、FinalIK、武器根和角色制作验证。它不把 AI、Buff、战斗或对象池变成新的角色 MonoBehaviour 体系。
+本规则约束 `Entity` 根、`EntityCharacterIdentity`、三种角色 Prefab 身份、挂点、FinalIK、武器根和角色制作验证。它不把 AI、Buff、战斗或对象池变成新的角色 MonoBehaviour 体系。
 
 正式说明见：`Documentation/CHARACTER_PREFAB_CONTRACT.md`。
 
@@ -13,13 +13,13 @@
 
 ```text
 Entity 生命周期
-  -> 同根 EntityCharacterProfile
+  -> 同根 EntityCharacterIdentity
   -> Entity.BindDefinition(唯一 DataInfo)
 ```
 
 - `Entity` 是唯一的定义绑定执行者；Profile 只保存 Prefab 静态身份、阵营和正式 Variant 的唯一 DataInfo。
 - `BuildInput` 无定义，禁止直接发布；`RuntimePoolTemplate` 无定义，由租出方直接 `Entity.BindDefinition(...)`；`CharacterVariant` 自动绑定 Profile 中唯一的 Actor、Monster 或 Npc DataInfo。
-- 角色根固定为 `Entity + KinematicCharacterMotor + CapsuleCollider + EntityCharacterProfile + EntityTransformMapping`；模型固定承载一个 Animator。
+- 角色根固定为 `Entity + KinematicCharacterMotor + CapsuleCollider + EntityCharacterIdentity + EntityTransformMapping`；模型固定承载一个 Animator。
 - AI、Buff、战斗和状态能力留在 Entity 的 Domain / Module。`EntityBuffDomain` 已有 Buff 实例、叠层、持续时间、ValueChange / Permit、Op 与 Tag Lease 的运行时底座，不是空域，也不等于完整玩法已经验收。
 - `StateFinalIKDriver` 是状态到 IK 的表现桥。模板使用无 Solver、全部能力关闭的轻量基线；正式 Variant 仅在对应 Solver/前置依赖齐全后启用能力。
 - `EntityWeaponBinding` 只按需挂在每个实际武器根；无武器角色不挂空组件。手持优先级为显式 `handMount -> WeaponSocket -> Combat 回退`，双手副手目标和偏移归武器 Binding。
@@ -45,7 +45,7 @@ Entity 生命周期
 
 ```text
 Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
-Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityCharacterProfile.cs
+Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityCharacterIdentity.cs
 Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityTransformMapping.cs
 Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityWeaponBinding.cs
 Assets/Scripts/ESLogic/Runtime/State/IK/StateFinalIKDriver_/StateFinalIKDriver.AuthoringContract.cs

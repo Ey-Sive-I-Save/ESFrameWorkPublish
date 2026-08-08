@@ -53,7 +53,7 @@ README
 - RuntimeKey 仅在当前进程、当前强类型表生命周期内有效，禁止持久化。
 - Tag 使用 `ESTagCollection` 的 Host SetTag 与 Lease/LeaseSet 所有权模型；禁止恢复无来源 Add/Remove API、第二套 Tag event 或旧 Tag 容器。
 - 运行时不依赖 `ESAssetLibrary`；正式寻址以 Manifest/Table 和发布 Bundle Index 为准。
-- 资源加载必须区分 Resident、Owner Scope、Temporary 引用计数与独立 Lease；业务不得销毁全局 `TemporaryScope`。
+- 资源加载必须区分 Resident、Owner Scope、ResourcePlan、枚举/StringKey Registry Scope、Temporary 引用计数与独立 Lease。`TemporaryScope.Dispose()` 是公开的全域清理高级入口，调用后会使其他临时 Lease 一并失效；普通短期任务优先只释放自己的 Lease。
 - 查询 GameManager Module 使用 `TryGetModule<T>()`，仅明确初始化时使用 `GetOrCreateModule<T>()`；旧 `GetModuleFast<T>()` 不得恢复。
 - GameCore 只能被内容层引用，禁止反向直接引用 Prefab、GameObject 或场景内容。
 - 普通编辑器初始化优先 AssemblyStream；禁止在域重载路径中做全盘扫描和重资源操作。
@@ -65,12 +65,12 @@ README
 - `ESCommandPlayerRunner.TickAll()` 只能由 `MODULE_ESCommandModule` 驱动；ESCommand 运行时、交互运行时、编辑器序列化与 GraphView 均有独立专项规则，不能用输入文档、AI Command 模板或 SimpleTools 文档替代。
 - AI 协作历程只有在用户明确要求时才能创建、更新或恢复；普通任务禁止自动落账。连续约 10 轮后 AI 只能询问一次，用户确认前不得写入或催促。获准维护时仍严格一窗口一文件；失联窗口先从本机 `history.jsonl` 模糊定位 session 候选，再人工确认归属并从 `rollout-*.jsonl` 逐轮恢复。候选分数不得直接授权合并或覆盖已有档案。
 - 当前 GraphView / NodeRunner 是阻断性历史实验实现，禁止新增任何正式业务依赖，直至数据模型、稳定身份、Undo、迁移与运行时快照完成重构验收。
-- 模块成熟度统一使用 `Proposed -> Scaffolded -> Experimental/Implementing -> Integrating -> Verifying -> Stable -> Deprecated -> Archived`；`Blocked` 只能作为附加结论。目录、接口或源码存在不等于完成，半成品不得默认注册、渗透稳定模块或进入正式发布链路。模块审计默认只读；只有用户确认精确文件与区域后，才可写入带 Git 基线和失效条件的续接检查点。检查点只用于导航，不授权下次实现。具体路由见 `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`。
+- 模块成熟度统一使用 `Proposed -> Scaffolded -> Experimental/Implementing -> Integrating -> Verifying -> Stable -> Deprecated -> Archived`；`Blocked` 只能作为附加结论。目录、接口或源码存在不等于完成，半成品不得默认注册、渗透稳定模块或进入正式发布链路。说“审计”默认只读并最多询问一次是否记录；说“审计并记录”更新 `ES/Documentation/Status/MODULE_AUDIT_STATE.md` 的目标模块块；说“继续审计”从该固定入口恢复并复核事实。检查点只用于导航，不授权下次实现。具体路由见 `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`。
 - `Documentation/DOCUMENTATION_CATALOG.md` 是文档分类唯一入口。历史归档、未来方案、生成报告和待源码复验资料不得替代现行规范或 AIWarnings。
 - 不恢复 `EntityAIInputSystemModule`、`EntityInputStateModule` 等旧输入兼容类型；应清理序列化坏引用。
 - ES 自有 Unity 菜单根统一为 `【ES】/`。
-- 项目级 Agent Skills 位于 `.agents/skills`。当前基础层包含 `es-use-ai-command`、`es-unity-compile`、`es-fix-compile-error`、`es-utf8-guard`、`es-worktree-audit`；跨系统治理层包含 `es-module-lifecycle`；ES 领域层包含 `es-gamecore-integration`、`es-resource-pipeline`、`es-tag-config`、`es-entity-authoring`、`es-input-action`、`es-command-authoring`、`es-editor-tooling`、`es-release-acceptance`。Skill 不进入 Unity `Assets`，不生成 `.meta`，不属于运行时或发布内容。
-- 项目级 AI 文件夹归属、Skill 内部结构和 14 个 Skill 的简介统一见 `.agents/README.md`；不得在其他目录另建重复 Skill 清单。
+- 项目级 Agent Skills 位于 `.agents/skills`。当前基础层包含 `es-codex-session-bootstrap`、`es-use-ai-command`、`es-unity-compile`、`es-fix-compile-error`、`es-utf8-guard`、`es-worktree-audit`；跨系统治理层包含 `es-module-lifecycle`；ES 领域层包含 `es-gamecore-integration`、`es-resource-pipeline`、`es-tag-config`、`es-entity-authoring`、`es-input-action`、`es-command-authoring`、`es-editor-tooling`、`es-release-acceptance`。Skill 不进入 Unity `Assets`，不生成 `.meta`，不属于运行时或发布内容。
+- 项目级 AI 文件夹归属、Skill 内部结构和 15 个 Skill 的简介统一见 `.agents/README.md`；不得在其他目录另建重复 Skill 清单。
 
 ## 协作边界
 

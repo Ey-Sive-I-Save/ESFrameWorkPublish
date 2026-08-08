@@ -1,0 +1,15 @@
+interface:
+  display_name: "ES ESTEST 启动与中断"
+  short_description: "直接启动、监控或安全中断 ESAITest/ESTEST Run"
+  default_prompt: "Use $es-start-estest to start and monitor the ESFramework ESTEST runtime."
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "unityMCP"
+      description: "Invoke the ESTEST Unity Editor menu and observe the intended project instance."
+      transport: "streamable_http"
+      url: "http://127.0.0.1:8080/mcp"

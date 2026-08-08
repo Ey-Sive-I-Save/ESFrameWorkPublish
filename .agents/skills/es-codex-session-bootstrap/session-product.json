@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "product": "ES Codex Session Bootstrap",
+  "version": "2.0.0-beta.1",
+  "stateSchemaVersion": 2,
+  "launchEnvelopeSchemaVersion": 2,
+  "messageSchemaVersion": 1,
+  "minimumPowerShellVersion": "5.1",
+  "testedCodexCliVersion": "0.145.0",
+  "supportedPlatforms": [
+    "Win32NT"
+  ],
+  "commercialDeliveryProfile": "cooperative-mailbox",
+  "managedDirectDeliveryProfile": "app-server-managed"
+}

@@ -13,6 +13,7 @@
 
 ## 多态引用和类型目录
 
+- Drawer 可以消费 `0_Stand/BaseDefine_Law` 中的公共协议，但不得为了绘制方便，在 Editor、Drawer 或 Attributes 文件中临时定义 Runtime/Editor 共用协议。新增或迁移此类契约必须同时遵守 P0 `项目最高警告_P0_公共协议与元数据声明分层_AI协作警告.md`。
 - `ESPolymorphicReferenceDrawer` 的选择器只可从 `ESTypeCatalog` 提供的合法、可序列化、可解析具体类型中选择；目录用于候选筛选，不替代序列化类型身份。
 - 缺失 `SerializeReference` 类型必须显示原始类型信息并要求用户明确恢复脚本/程序集或选择替代类型。禁止自动置空、自动换成首个候选或静默丢弃旧数据。
 - 已存在的 Drawer 会处理多目标不一致、批量编辑上限和 Undo；新增功能必须沿用同一条显式批量赋值路径，不能只改代表对象而声称所有目标已同步。

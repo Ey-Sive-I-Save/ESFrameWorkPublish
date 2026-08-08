@@ -58,6 +58,26 @@ ResourcePlan 的 Scope retain 与全局 `ESAssetTemporaryScope` 的逐调用持�
 
 每个用例都必须记录：Scope 代际、资产身份、`ReferenceCount`、`LeaseCount`、Token 是否仍有效、Provider 代际和最终底层释放次数。未完成这些证据前，不得宣称 Temporary Lease 生命周期已商业验收。
 
+## 三-B、枚举/StringKey Scope Registry 验收矩阵
+
+Registry Scope 是普通业务流程域，不属于 ResourcePlan 私有 Scope，也不替代 Owner 或 Temporary Lease。当前源码第一版存在不等于完成运行验收：
+
+| 编号 | 场景 | 必须观察 | Blocker 条件 |
+| --- | --- | --- | --- |
+| R1 | 首次默认 `LoadAsync` | 原子创建一次 GameSession，后续请求复用；不进入 Resident | 创建多个 Scope、回退 Resident 或无诊断备用域 |
+| R2 | 同 Key 并发/重入首次加载 | `Creating` 先登记，只产生一个 Scope；重入明确失败或复用同一创建事务 | 重复创建或覆盖原 Scope |
+| R3 | StringKey 使用枚举名或 `@domain:` | 明确拒绝并提示业务前缀 | 出现看似同名的两个域 |
+| R4 | 父级释放 | 所有子级先关闭，父级最后关闭 | 子级继续接受请求或父级先释放 |
+| R5 | 子级提前释放 | 从父级关系移除，父级后续释放不重复处理 | 重复 Dispose 或残留子级 |
+| R6 | Scope 有 Pending 时同步 `ReleaseScope` | 立即逻辑关闭；迟到 Handle 自动归还 | 同步返回被误报为物理请求全部完成、迟到写回 |
+| R7 | Provider Transition | TransitionStarting 后 Registry、已捕获旧 Scope、TemporaryScope 与 Scene 新请求全部拒绝；Registry 清空，旧 Scope 永久失效 | 任一旧入口仍把新请求送入旧 Provider，或旧 Registry 节点复活 |
+| R8 | Resident/Owner/Plan/Temporary 与 Registry 同资产 | 每种正式所有权保持独立，Provider 可复用物理对象但引用不串线 | Registry 借用 Plan 冒充自身持有或误释放其他域 |
+| R9 | 同名 Scope 释放后立即重建 | Closing 占位保持到 Dispose 同步回调完成；之后新 Generation 使用新 Scope，旧 Pending 迟到完成只归还旧 Handle | Dispose 回调提前重建同 Key、旧请求写入新 Scope 或同一 Key 存在多个释放责任方 |
+| R10 | Presentation 大型展示域 | 首次加载自动创建；展示实例、RenderTexture/VFX/Video 状态先结束，再逻辑释放并在安全点观察回收资格 | 进入 Resident、忘记释放或把逻辑关闭伪报为 GPU 内存已归还 |
+| R11 | 默认 Domain 权限与流程接线 | GameInternal 仅受信框架可用；ApplicationSession/GameSession/Presentation/Scene/UI/Feature 分别只有一个流程释放权威；多实例改用 StringKey | 普通业务使用或释放 GameInternal、多个系统共同释放同一枚举域、流程结束后 Domain 仍存活 |
+
+至少需要 Unity Test Runner 覆盖 R1-R11，并在关闭 Domain Reload 的重复 PlayMode 中验证静态 Registry 清理。Profiler 需要确认普通枚举加载只有 Registry 查询与既有 Scope 热路径，没有每帧轮询、LINQ、反射或父子集合分配。
+
 ## 四、每个用例必须记录的证据
 
 每个步骤至少记录：

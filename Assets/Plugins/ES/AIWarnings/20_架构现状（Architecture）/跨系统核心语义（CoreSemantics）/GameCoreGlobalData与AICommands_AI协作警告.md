@@ -81,6 +81,28 @@ ESInputActionId
 
 不要把 `StateMachineConfig` 挂进 `GameCoreEditorGlobalData`。状态机全局配置仍由 `StateMachineConfig` 自己管理，GameCore 编辑器数据只管跨系统核心语义。
 
+## 行为扩展边界
+
+“角色、Item、载具根据配置获得稳定行为”是可行方向，但当前仍是待实施设计，不能把 `GameCoreEditorGlobalData` 误做成运行时策略容器或万能依赖注入表。
+
+推荐边界：
+
+```text
+GameCoreEditorGlobalData：编辑器可见的语义、推荐行为名、稳定 Key 校验与制作提示
+领域 BehaviorProfile：声明该角色 / Item / Vehicle 实际选择的行为 Key 和参数
+Domain Module：拥有生命周期、调度、缓存与最终写入权
+Policy / Strategy：单一可替换算法；只计算，不接管生命周期或跨领域事务
+StateMachine：当前互斥动作与表现环境
+```
+
+必须遵守：
+
+- 配置只保存稳定 Key、版本与参数；禁止保存 `System.Type`、程序集限定名、委托、RuntimeKey 或场景实例。
+- 运行时在创建、绑定或从对象池租出时解析并缓存；热路径禁止字符串查表、反射或按帧创建策略对象。
+- 只有“同一职责下二选一或多选一的算法”才适合 Policy / Strategy，例如移动方式、目标筛选、命中求解、背包布局和 AI 决策方式。
+- 状态、装备事实、伤害事务、对象池、输入仲裁、相机请求与跨领域编排仍归原有权威模块；禁止以“策略”名义另建万能总系统。
+- 增加运行时行为 Catalog 前，必须明确所属 Domain、Stable Key、Bake/校验、缺 Key 失败策略、池化重绑和发布证据；未实施前只能标注为提案。
+
 ## AI 修改规则
 
 遇到以下需求，先看 `GameCoreEditorGlobalData`、对应领域源码和 `Assets/Plugins/ES/AICommands`：

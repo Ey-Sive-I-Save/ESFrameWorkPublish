@@ -1,0 +1,4 @@
+interface:
+  display_name: "Generate ES Agent Artifacts"
+  short_description: "Generate review-only AICommand and Agent Skill candidates"
+  default_prompt: "Use $es-generate-agent-artifacts to turn the current Agent Authoring request into an isolated candidate package."

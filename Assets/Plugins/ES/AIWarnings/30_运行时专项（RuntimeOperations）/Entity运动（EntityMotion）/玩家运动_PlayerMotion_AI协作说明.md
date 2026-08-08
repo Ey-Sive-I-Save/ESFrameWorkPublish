@@ -108,11 +108,13 @@ AnyBlocker // 任意阻挡体可阻挡
 
 ## 层级管理
 
-不要只依赖 Unity `LayerMask`。推荐分两层：
+Unity `LayerMask` 只负责物理粗过滤；它不是阵营、归属或玩法身份系统。不要据此再创建一个名为 `Game Layer` 的平行运行时服务。
 
 ```text
-Unity Layer：物理粗过滤
-Game Layer：阵营、归属、目标类型、可命中规则
+Unity Layer：物理粗过滤；必须复用 ESPhysicsLayers 的 Ground、Wall、WorldDynamic、EntityHurtbox、ItemBody、Shot 等语义 Mask
+FactionId + Relation：友军、敌军、中立、自伤与友伤关系
+Actor / Spawn Archetype：玩家、NPC、怪物、召唤物等身份
+GameTag + HitResolver：可命中、无敌、部位倍率、技能或任务条件
 ```
 
 飞行物可以读取轻量目标接口，例如：
@@ -124,7 +126,7 @@ Side
 Kind
 ```
 
-但不要让飞行物直接理解完整阵营/仇恨/战斗系统。它只输出候选，上层系统最终裁决。
+但不要让飞行物直接理解完整阵营/仇恨/战斗系统。它只输出候选，上层系统最终裁决。不得把本节旧称的“Game Layer”误读成应新增第二套 Layer、枚举或全局管理器。
 
 ## 随机性与网络
 
@@ -238,6 +240,51 @@ SkillSupport
 - 不要绕过 `StateSupportFlags`。飞行、游泳、攀爬、骑乘依赖它切换 KCC 分支。
 - Item/Shot 体系不要替换 Entity KCC 热路径。
 
+## 玩家手感参数权威与写入边界
+
+玩家手感参数必须先确认“作者值”和“最终运行值”是否为同一条链，不能只看某个
+Prefab、DataInfo 或 Attribute 表中的数字。
+
+当前运动执行链为：
+
+```text
+EntityKCCData
+  -> EntityKCCData.UpdateRotation / UpdateVelocity
+  -> Entity.GetCharacterFloatStatValue
+  -> KinematicCharacterMotor
+```
+
+当前规则：
+
+- `EntityKCCData` 的 `stableMovementSharpness`、`orientationSharpness` 是当前 Prefab
+  运行基线；原 `EntityBasicDomain.groundedDefaults` 转发层已移除，不得恢复第二套地面
+  调参入口。
+- `ESCharacterAttributeCatalog` 的 ValueChange/Permit 是运行时覆盖层；一旦存在有效
+  覆盖，KCC 序列化值不是最终值。验收必须读取最终解析值，而不是只检查 Inspector。
+- `ActorDataInfo.motionShared` 现在由 `Entity.BindDefinition(...)` 写入 KCC 的作者默认
+  值，包含地面/空中速度、地面响应、朝向响应和跳跃参数；`ClearDefinition`/回池会恢复
+  Prefab 基线。`speedMultiplier` 缺省零值按旧序列化兼容规则回退为 `1`，禁止因数据缺字段
+  让玩家角色静默失去移动。它仍不是最高优先级：有效 Character Attribute/ValueChange
+  覆盖会取代该作者默认值，验收必须读取最终解析值。
+- `motionShared` 中的能力开关（例如 `enableClimb`、`enableMount`）以及
+  `motionVariable` 中的 `allowMoveInput`、`allowLookInput`、`allowJump`、
+  `gravityMultiplier` 等字段目前不是 `Entity.BindDefinition(...)` 的 KCC 直接写入项；
+  它们只有在对应 Basic Module/State/Permit 消费者明确接线后才代表运行时行为。当前不得
+  把 DataInfo 中“有字段”表述成“已经启用或已经限制”。
+- 同一角色的 GroundSharpness、OrientationSharpness、最大速度、空中响应和跳跃参数，
+  必须在生成器、正式 Prefab、作者 DataInfo 和运行时诊断中形成可追踪的一致记录；任一
+  来源不一致都应标记为 `Verifying`，不得写成 Stable。
+
+大黑塔当前作者基线为：
+
+```text
+GroundMovementSharpness = 20
+OrientationSharpness    = 18
+```
+
+这组数字已同步生成器、正式 Prefab KCC 与 ActorData；仍需 Unity PlayMode 实测确认
+最终解析值及起步 T90、松手停止距离、180°反向完成时间。
+
 ## P0 冻结：Entity 新运动能力扩展规范
 
 本节为最高优先级约束。后续 AI 或开发者新增飞行、滑翔、墙跑、绳索、骑乘等**生命体自身**运动能力时，必须沿用现有 `Entity → BasicDomain Module → EntityKCCData → KinematicCharacterMotor` 链路，不得再造运动大根或中央类型分派。
@@ -308,12 +355,14 @@ SkillSupport
 - `ShotMotionSolver`
 - `ShotMotionTypes`
 
-已验证：
+历史静态证据（已过期，不可替代当前验收）：
 
 ```text
 dotnet build ES_Logic.csproj --no-restore -v:minimal
 0 warning, 0 error
 ```
+
+上述记录对应本文件早期阶段。当前生成的 `.csproj` 可能因 Unity 尚未刷新而包含陈旧路径或漏收录；是否已通过，必须以当次命令输出、Unity Editor 域重载、Unity Test Runner、PlayMode 和目标平台 Profiler 分层判断。不得引用这一历史 `0/0` 结论来签收当前 Character、Item/Shot、Vehicle 或 Camera 改动。
 
 尚未落地但方向明确：
 

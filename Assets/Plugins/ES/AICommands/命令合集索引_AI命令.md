@@ -15,6 +15,9 @@ AICommands 是任务协议，`.agents/skills` 是可复用执行层。选择命�
 | `$es-fix-compile-error` | `执行_修复单个编译错误_AI命令.md` |
 | `$es-utf8-guard` | `检查_中文编码风险_AI命令.md`，以及所有会改文本的命令 |
 | `$es-worktree-audit` | `检查_脏工作树影响面_AI命令.md`，以及所有修改类命令的前后检查 |
+| `$es-codex-session-bootstrap` | 从固定项目根启动新 Codex、打开官方恢复/分叉选择器或按已确认 session ID 接手 |
+| `$es-generate-agent-artifacts` | `生成_AgentArtifact候选_AI命令.md`；只写隔离候选目录，等待 Diff Review 与人工批准 |
+| `$es-start-estest` | `ESAITest_直接启动ESTEST_AI命令.md`；通过既有 Unity 菜单、Player 参数或 API 启动和安全取消 ESTEST |
 | `$es-gamecore-integration` | GameCore 根 SO、RuntimeData 重注入、全局索引、GameManager 模块命令 |
 | `$es-resource-pipeline` | 资源治理、依赖分析、预览、导出、ResourcePlan、Manifest 与发布链路 |
 | `$es-tag-config` | `新增GameTag_AI命令.md`，以及 Tag、ConfigKey、稳定身份任务 |
@@ -23,7 +26,7 @@ AICommands 是任务协议，`.agents/skills` 是可复用执行层。选择命�
 | `$es-command-authoring` | ESCommand 上下文与新增运行时命令 |
 | `$es-editor-tooling` | 编辑器窗口、ReloadDomain、预览、Drawer、SO 表格和 SimpleTools |
 | `$es-release-acceptance` | 编译、测试、Profiler、Player、IL2CPP、Provider 与发布证据整合 |
-| `$es-module-lifecycle` | `检查_模块成熟度与半成品影响_AI命令.md`，以及未开始、半成品、待验收、废弃模块审计和受控续接 |
+| `$es-module-lifecycle` | `检查_模块成熟度与半成品影响_AI命令.md`；“审计”只读、“审计并记录”写固定检查点、“继续审计”复核后续接 |
 
 完整边界见：
 
@@ -32,6 +35,8 @@ Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心�
 ```
 
 不要为每个命令机械创建一个 Skill。只有跨任务高频复用、步骤稳定、适合脚本或工具集成的执行能力才进入 `.agents/skills`。
+
+模块范围明确时，上述三个短语可直接触发 `$es-module-lifecycle`。唯一续接状态入口为 `ES/Documentation/Status/MODULE_AUDIT_STATE.md`，无需用户另行选择路径或区域。
 
 ## 直接生效协议
 
@@ -116,6 +121,7 @@ Assets/Plugins/ES/AICommands/检查_对象池运行时GC_AI命令.md
 Assets/Plugins/ES/AICommands/OpTargetPack与Item运动_检查_AI命令.md
 Assets/Plugins/ES/AICommands/检查_Item每发变量污染_AI命令.md
 Assets/Plugins/ES/AICommands/资源依赖与未使用资产_分析_AI命令.md
+Assets/Plugins/ES/AICommands/ESAITest_直接启动ESTEST_AI命令.md
 ```
 
 适用：编译、内存、编辑器窗口、静态缓存、编码、程序集、资产依赖、动画预览等维护问题。重要，但不是游戏核心主干。
@@ -130,6 +136,7 @@ Assets/Plugins/ES/AICommands/新增输入动作_AI命令.md
 Assets/Plugins/ES/AICommands/执行_新增输入动作_强约束_AI命令.md
 Assets/Plugins/ES/AICommands/ESCommand新增运行时命令_AI命令.md
 Assets/Plugins/ES/AICommands/执行_新增ESCommand运行时命令_强约束_AI命令.md
+Assets/Plugins/ES/AICommands/生成_AgentArtifact候选_AI命令.md
 Assets/Plugins/ES/AICommands/新增GameTag_AI命令.md
 Assets/Plugins/ES/AICommands/新增物理层语义_AI命令.md
 Assets/Plugins/ES/AICommands/新增飞行物类型_AI命令.md

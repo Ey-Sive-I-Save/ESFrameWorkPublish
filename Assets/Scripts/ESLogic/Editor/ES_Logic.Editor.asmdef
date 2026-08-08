@@ -9,7 +9,8 @@
         "Cinemachine",
         "KCC",
         "Unity.InputSystem",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "ESFramework.AITest"
     ],
     "includePlatforms": [
         "Editor"

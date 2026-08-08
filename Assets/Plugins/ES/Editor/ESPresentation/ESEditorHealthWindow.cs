@@ -34,7 +34,18 @@ namespace ES.EditorInternal
 
         private void OnEnable()
         {
+            ESEditorPresentation.BindWindow(this);
             RefreshChecks();
+        }
+
+        private void OnDestroy()
+        {
+            ESEditorPresentation.UnbindWindow(this);
+        }
+
+        private void OnDisable()
+        {
+            ESEditorPresentation.UnbindWindow(this);
         }
 
         private void OnFocus()
@@ -71,6 +82,8 @@ namespace ES.EditorInternal
             {
                 EditorGUI.DrawRect(titleRect, ESEditorPresentation.GetDepthBackground(0));
                 ESEditorPresentation.DrawFrame(titleRect, ESEditorPresentation.GetDepthAccent(0));
+                EditorGUI.DrawRect(new Rect(titleRect.x, titleRect.y, 3f, titleRect.height), ESEditorPresentation.LogicSteelBlue);
+                EditorGUI.DrawRect(new Rect(titleRect.x + 3f, titleRect.yMax - 1f, titleRect.width - 3f, 1f), ESEditorPresentation.LogicGold);
             }
 
             GUI.Label(
@@ -275,10 +288,10 @@ namespace ES.EditorInternal
                 "多态引用绘制方案",
                 usesESRenderer ? ESStatusKind.Ready : ESStatusKind.Info,
                 "单体：" + renderer + " · 集合：" + collectionRenderer,
-                "方案是个人 EditorPrefs 偏好，不写入项目配置；切换会强制重建 Inspector。",
-                "可在这里切换，或在类型选择器顶部“方案 / 集合”工具中调整。",
-                "切换方案",
-                ESPolymorphicReferencePreferences.ShowMenu));
+                "方案是个人 EditorPrefs 项目默认值；字段可用 ESCollectionDrawStyle 做局部覆盖，均不写入资产。",
+                "局部覆盖优先于项目默认；集合增删、拖拽、序列化、Undo 和运行时数据不受影响。",
+                "切换集合方案",
+                ESPolymorphicReferencePreferences.ShowCollectionMenu));
         }
 
         private void AddSectionNavigatorCheck()

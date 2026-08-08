@@ -117,6 +117,7 @@ namespace ES
             Register(new ESWindowCommand { Id = "runtime_watch", DisplayName = "RuntimeWatch", Category = "运行时诊断", MenuPath = MenuItemPathDefine.RUNTIME_DIAGNOSTICS_PATH + "RuntimeWatch/打开运行时观察", Shortcut = "Ctrl+Shift+W", Keywords = "运行时 观察 监控 调试" });
             Register(new ESWindowCommand { Id = "es_presentation_boundary", DisplayName = "ES 多态边界测试", Category = "示例与测试", MenuPath = MenuItemPathDefine.TEST_TOOLS_PATH + "ES 编辑器扩展/创建多态边界测试层级", Keywords = "ESEditorSection SerializeReference 多目标 嵌套 数组 Profiler" });
             Register(new ESWindowCommand { Id = "track_editor", DisplayName = "轨道编辑器", Category = "内容制作", MenuPath = MenuItemPathDefine.CONTENT_CREATION_PATH + "技能与轨道/轨道编辑器", Keywords = "技能 Timeline Clip" });
+            Register(new ESWindowCommand { Id = "stable_graph_v2", DisplayName = "稳定图编辑器 V2", Category = "常用窗口", MenuPath = MenuItemPathDefine.QUICK_WINDOWS_PATH + "稳定图编辑器 V2", Keywords = "Graph 流程 行为树 AICommand Agent Skill" });
             Register(new ESWindowCommand { Id = "font_workbench", DisplayName = "字体资产工作台", Category = "内容制作", MenuPath = MenuItemPathDefine.CONTENT_CREATION_PATH + "UI 与字体/字体资产工作台", Keywords = "TMP 字符集 Fallback" });
             Register(new ESWindowCommand { Id = "cmd_agent", DisplayName = "Cmd Agent", Category = "开发与维护", MenuPath = MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "自动化/Cmd Agent（CMD 中转与架构师）", Keywords = "命令 AI Codex 自动化" });
         }
@@ -182,8 +183,14 @@ namespace ES
 
         private void OnGUI()
         {
+            ES.EditorInternal.ESEditorPresentation.BindWindow(this);
             DrawToolbar();
             DrawSections();
+        }
+
+        private void OnDestroy()
+        {
+            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this);
         }
 
         private void DrawToolbar()

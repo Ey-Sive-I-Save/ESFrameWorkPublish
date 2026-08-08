@@ -767,10 +767,11 @@ namespace ES
         /// </summary>
         public sealed class ESEditorToolBarAssemblyStreamInitializer : EditorInvoker_Level2
         {
-            public override void InitInvoke()
-            {
-                CustomToolbarMenu.Install();
-            }
+        public override void InitInvoke()
+        {
+            CustomToolbarMenu.Install();
+            ES.EditorInternal.ESEditorPresentation.InstallGlobalEditorAdapters();
+        }
         }
 
         #region 自主扩展

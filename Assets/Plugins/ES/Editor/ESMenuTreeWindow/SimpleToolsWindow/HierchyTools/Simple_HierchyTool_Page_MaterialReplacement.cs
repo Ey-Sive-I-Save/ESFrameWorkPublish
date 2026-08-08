@@ -697,9 +697,11 @@ namespace ES
             string fileName = $"MaterialReplacement_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
             string assetPath = $"{reportFolder}/{fileName}";
             string fullPath = SimpleToolsSafetyUtility.AssetPathToFullPath(assetPath);
-            File.WriteAllText(fullPath, string.IsNullOrWhiteSpace(lastResultDetail)
+            ESManagedFileIO.WriteTextAtomic(fullPath, string.IsNullOrWhiteSpace(lastResultDetail)
                 ? lastResultSummary
-                : lastResultSummary + Environment.NewLine + Environment.NewLine + lastResultDetail);
+                : lastResultSummary + Environment.NewLine + Environment.NewLine + lastResultDetail,
+                new System.Text.UTF8Encoding(false),
+                Application.dataPath);
             AssetDatabase.Refresh();
             EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath));
             EditorUtility.DisplayDialog("导出完成", $"报告已导出到 {assetPath}", "完成");

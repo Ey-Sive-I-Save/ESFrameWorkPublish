@@ -1,6 +1,6 @@
 # Documentation 分类总表
 
-状态：现行分类。最后核对：2026-07-31。
+状态：现行分类。最后核对：2026-08-07。
 
 本文是 `Documentation` 的唯一阅读入口。它不替代源码、`AIWarnings` 或 Unity 验证；分类的目标是避免历史资料、提案和生成报告被误用为现行架构规则。
 
@@ -80,6 +80,7 @@
 
 ### 资源、加载与编辑器工具
 
+- `ES_RESOURCE_SYSTEM_PRODUCT_BRIEF_DRAFT.md`：资源系统证据分级宣传草案；当前仅允许宣传源码级边界，Unity/Player/真实发布证据完成前不得升级为商业生产结论。
 - `ASSET_COLLECTION_GUIDE.md`
 - `ESASSETREFER_GUIDE.md`
 - `ESASSETREFER_README.md`
@@ -89,6 +90,10 @@
 - `LOADTYPE_README.md`
 - `SHADER_AUTO_WARMUP_GUIDE.md`
 - `用户文档/PhysicsAlign_CommercialFeatures.md`
+
+### UI 与动态图集
+
+- `ES_UI_AUTHORING_WORKFLOW.md`：UI 组件选择、资源/输入/生命周期权威链、动态图集最短用法和 UI 风险专项计划；已通过 Unity BatchMode 脚本编译与 EditMode 10/10，仍待 PlayMode、Frame Debugger、Profiler、Player/IL2CPP 与目标平台复验。
 
 ### 运动与其他运行时主题
 

@@ -13,6 +13,7 @@ namespace ES.EditorInternal
         private Vector2 scroll;
         private ESGlobalEditorTheme theme;
         private SerializedObject serializedTheme;
+        private double previewFeedbackStartedAt;
 
         [MenuItem(WindowMenuPath, false, 20)]
         private static void Open()
@@ -25,7 +26,19 @@ namespace ES.EditorInternal
 
         private void OnEnable()
         {
+            ESEditorPresentation.BindWindow(this);
+            previewFeedbackStartedAt = EditorApplication.timeSinceStartup;
             RefreshTheme();
+        }
+
+        private void OnDestroy()
+        {
+            ESEditorPresentation.UnbindWindow(this);
+        }
+
+        private void OnDisable()
+        {
+            ESEditorPresentation.UnbindWindow(this);
         }
 
         private void OnFocus()
@@ -65,6 +78,8 @@ namespace ES.EditorInternal
             {
                 EditorGUI.DrawRect(rect, ESEditorPresentation.GetDepthBackground(0));
                 ESEditorPresentation.DrawFrame(rect, ESEditorPresentation.GetDepthAccent(0));
+                EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), ESEditorPresentation.LogicSteelBlue);
+                EditorGUI.DrawRect(new Rect(rect.x + 3f, rect.yMax - 1f, rect.width - 3f, 1f), ESEditorPresentation.LogicGold);
             }
 
             GUI.Label(
@@ -108,6 +123,10 @@ namespace ES.EditorInternal
                 DrawPreviewRow(readyRect, ESStatusKind.Ready, "已就绪 · 当前配置可直接编辑");
                 DrawPreviewRow(warningRect, ESStatusKind.Warning, "需要关注 · 请确认当前配置");
                 DrawPreviewRow(errorRect, ESStatusKind.Error, "无法继续 · 请修复缺失数据");
+
+                if (ESEditorPresentation.MotionEnabled
+                    && ESEditorPresentation.EvaluatePulse(previewFeedbackStartedAt, 1.20f) > 0f)
+                    Repaint();
             }
             finally
             {
@@ -115,13 +134,15 @@ namespace ES.EditorInternal
             }
         }
 
-        private static void DrawPreviewRow(Rect rect, ESStatusKind status, string text)
+        private void DrawPreviewRow(Rect rect, ESStatusKind status, string text)
         {
             if (Event.current.type == EventType.Repaint)
             {
+                Color accent = ESEditorPresentation.GetStatusAccent(0, status);
                 EditorGUI.DrawRect(rect, ESEditorPresentation.GetDepthBackground(0));
-                EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), ESEditorPresentation.GetStatusAccent(0, status));
+                EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), accent);
                 EditorGUI.DrawRect(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), ESEditorPresentation.GetStatusFrameColor(0, status));
+                ESEditorPresentation.DrawFeedbackSweep(rect, accent, previewFeedbackStartedAt, 1.20f, 0.16f);
             }
 
             ESFieldRow.DrawStatus(
@@ -146,6 +167,9 @@ namespace ES.EditorInternal
                 DrawProperty("density");
                 DrawProperty("showSectionSubtitle");
                 DrawProperty("useCustomPalette");
+                DrawProperty("enableGlobalEditorShell");
+                DrawProperty("enableMotion");
+                DrawProperty("motionIntensity");
 
                 EditorGUILayout.Space(5f);
                 GUILayout.Label("深色皮肤", ESEditorPresentation.SubtitleStyle);
@@ -170,6 +194,8 @@ namespace ES.EditorInternal
             {
                 serializedTheme.ApplyModifiedProperties();
                 EditorUtility.SetDirty(theme);
+                previewFeedbackStartedAt = EditorApplication.timeSinceStartup;
+                ESEditorPresentation.PulseWindow(this, ESStatusKind.Modified);
                 ESEditorPresentation.InvalidateTheme();
                 RepaintAllESViews();
             }
@@ -205,8 +231,34 @@ namespace ES.EditorInternal
                     Undo.RecordObject(theme, "恢复 ES 默认编辑器主题");
                     theme.RestoreDefault();
                     EditorUtility.SetDirty(theme);
+                    ESEditorPresentation.PulseWindow(this, ESStatusKind.Modified);
                     ESEditorPresentation.InvalidateTheme();
                     RepaintAllESViews();
+                }
+            }
+            finally
+            {
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.BeginHorizontal();
+            try
+            {
+                if (!ESGlobalEditorSkinExperiment.IsApplied)
+                {
+                    if (GUILayout.Button("试用 ES 深度皮肤（实验）", GUILayout.Height(26f)))
+                    {
+                        if (ESGlobalEditorSkinExperiment.TryApply(out string message))
+                            EditorUtility.DisplayDialog("ES 深度皮肤", message, "知道了");
+                        else
+                            EditorUtility.DisplayDialog("ES 深度皮肤未启用", message, "知道了");
+                    }
+                }
+                else if (GUILayout.Button("恢复 Unity 原生样式", GUILayout.Height(26f)))
+                {
+                    ESGlobalEditorSkinExperiment.Restore();
+                    ESEditorPresentation.PulseWindow(this, ESStatusKind.Modified);
                 }
             }
             finally

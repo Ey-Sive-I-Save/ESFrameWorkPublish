@@ -1248,11 +1248,9 @@ public class AOTGenericReferences : UnityEngine.MonoBehaviour
 	// System.Collections.Generic.ObjectEqualityComparer<object>
 	// System.Collections.Generic.ObjectEqualityComparer<uint>
 	// System.Collections.Generic.ObjectEqualityComparer<ushort>
-	// System.Collections.Generic.Queue.Enumerator<ES.SpeedSample>
 	// System.Collections.Generic.Queue.Enumerator<UnityEngine.Quaternion>
 	// System.Collections.Generic.Queue.Enumerator<UnityEngine.Vector3>
 	// System.Collections.Generic.Queue.Enumerator<object>
-	// System.Collections.Generic.Queue<ES.SpeedSample>
 	// System.Collections.Generic.Queue<UnityEngine.Quaternion>
 	// System.Collections.Generic.Queue<UnityEngine.Vector3>
 	// System.Collections.Generic.Queue<object>

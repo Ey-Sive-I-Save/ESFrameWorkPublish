@@ -1274,6 +1274,61 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260808-008",
+                        "status":  "documented",
+                        "summary":  "提交 Editor 交付体验、绘制与工具窗口、项目导航与主题资产、程序集/Unity 设置、文档台账和遗留 Unity meta 收口。",
+                        "sourcePaths":  [
+                                            "Assets/ESNormalAssets/Data/AgentAuthoring.meta",
+                                            "Assets/ESNormalAssets/Data/GlobalData/EditorTheme",
+                                            "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide",
+                                            "Assets/HybridCLRGenerate/AOTGenericReferences.cs",
+                                            "Assets/Plugins/ES/1_Design/Graph.meta",
+                                            "Assets/Plugins/ES/Editor",
+                                            "Assets/Plugins/ES/Obsolete/ResourceV1.meta",
+                                            "Assets/Scripts/ESLogic/Editor",
+                                            "Documentation/DOCUMENTATION_CATALOG.md",
+                                            "Documentation/ES_ADVANCED_DIALOG_STANDARD.md",
+                                            "Documentation/KEY_AUDIT_REPORT.md",
+                                            "ES/Documentation/StaticSite.zip",
+                                            "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.md",
+                                            "ES/Documentation/StaticSite/DOCUMENT_SYNC.md",
+                                            "ES/Documentation/StaticSite/Update-DocumentLocalLedgerSnapshot.ps1",
+                                            "ES/Documentation/Status",
+                                            "ESFrameWorkPublish.slnx",
+                                            "ProjectSettings/EditorSettings.asset",
+                                            "ProjectSettings/ProjectSettings.asset"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/Editor/ESPresentation/ESEditorHealthWindow.cs",
+                                              "Assets/Plugins/ES/Editor/EditorTools/ESWindowLauncher.cs",
+                                              "Assets/Scripts/ESLogic/Editor/UI/ESUIRiskAuditWindow.cs",
+                                              "Documentation/ES_ADVANCED_DIALOG_STANDARD.md",
+                                              "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "该批收口用户可见的 Editor 窗口、绘制器、导航、主题、风险提示、项目装配信息和与其同步的文档台账。遗漏 Unity meta 会破坏 GUID 身份，因此与对应目录变更一并提交。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "提交前由 staged-only 门禁核对路径清单和补丁指纹",
+                                                            "Editor 可读性、快速定位和下一步可发现性规则已纳入本批文档与工具变更"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "真实 Editor 窄窗口、高 DPI、视觉层级和交互验收仍需 Unity 实机检查",
+                                                             "未跟踪的静态 HTML 输出仍受开放批次 ready-for-html 门禁阻断，未在本提交中绕过该门禁"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1286,13 +1341,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-08T19:05:19+08:00",
-                       "head":  "cfcf65fe7a2cb9f57e85626405d01fea8ee90900",
-                       "stagedSourcePatchSha256":  "6129b1a48f8dd195b5abe2560d5c77b18eed691955ac858d41d3e42cd8dba253",
-                       "stagedSourceManifestSha256":  "2f95a202377527ba026d7b076a2fd55a74f6be841e9fcd80584750bd01c35da7",
-                       "stagedSourceFileCount":  59,
+                       "preparedAt":  "2026-08-08T19:06:53+08:00",
+                       "head":  "672c0e6bbea9e7e8f0cd0762791ec7fb6871a76c",
+                       "stagedSourcePatchSha256":  "18ae657e4fff3db34d1f20bfe468007ceed62fa28813207f8bc314d288334804",
+                       "stagedSourceManifestSha256":  "0c0a51427edf122a7e45be5dd7998d1ab3861ad9bf7047308e24744c16ed21d0",
+                       "stagedSourceFileCount":  44,
                        "entryIds":  [
-                                        "LOCAL-20260808-007"
+                                        "LOCAL-20260808-008"
                                     ]
                    }
 }

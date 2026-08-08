@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 using UnityEditor.SceneManagement;
@@ -826,7 +827,8 @@ namespace ES
 
             try
             {
-                using (var writer = new StreamWriter(reportPath, false, System.Text.Encoding.UTF8))
+                var reportBuilder = new StringBuilder(16 * 1024);
+                using (var writer = new StringWriter(reportBuilder))
                 {
                     var rows = GetFilteredPrefabInfos(true);
                     writer.WriteLine("=== ES Prefab 实例审计报告 ===");
@@ -845,6 +847,7 @@ namespace ES
                         writer.WriteLine($"{GetPrefabStatusText(info)}\t{GetObjectPath(info.instance)}\t{info.prefabPath}");
                 }
 
+                ESManagedFileIO.WriteTextAtUserSelectedPath(reportPath, reportBuilder.ToString(), Encoding.UTF8);
                 EditorUtility.RevealInFinder(reportPath);
                 lastResultSummary = "Prefab 审计报告已导出";
                 lastResultDetail = reportPath;

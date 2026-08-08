@@ -113,6 +113,23 @@ namespace ES
                     toolbarActions);
             }
 
+            /// <summary>UI Toolkit 入口：自动把 VisualElement 锚点转换为 AdvancedDropdown 所需的宿主窗口局部坐标。</summary>
+            public void Show(
+                VisualElement anchor,
+                EditorWindow hostWindow = null,
+                AdvancedDropdownState state = null,
+                Vector2? minimumWindowSize = null)
+            {
+                Open(
+                    anchor,
+                    hostWindow,
+                    title,
+                    provider ?? (() => entries),
+                    state,
+                    minimumWindowSize,
+                    toolbarActions);
+            }
+
             public IReadOnlyList<Entry> Entries => entries;
         }
 
@@ -271,6 +288,31 @@ namespace ES
             Open(anchorRect, title, () => entries, state, minimumWindowSize, toolbarActions);
         }
 
+        /// <summary>UI Toolkit 兼容入口：直接传入候选项，并自动定位所属 EditorWindow。</summary>
+        public static void Open(
+            VisualElement anchor,
+            string title,
+            IReadOnlyList<Entry> entries,
+            AdvancedDropdownState state = null,
+            Vector2? minimumWindowSize = null,
+            IReadOnlyList<ToolbarAction> toolbarActions = null)
+        {
+            Open(anchor, null, title, () => entries, state, minimumWindowSize, toolbarActions);
+        }
+
+        /// <summary>UI Toolkit 兼容入口：使用明确的宿主窗口，避免多窗口停靠时锚点漂移。</summary>
+        public static void Open(
+            VisualElement anchor,
+            EditorWindow hostWindow,
+            string title,
+            IReadOnlyList<Entry> entries,
+            AdvancedDropdownState state = null,
+            Vector2? minimumWindowSize = null,
+            IReadOnlyList<ToolbarAction> toolbarActions = null)
+        {
+            Open(anchor, hostWindow, title, () => entries, state, minimumWindowSize, toolbarActions);
+        }
+
         /// <summary>延迟数据源 API：只在 Dropdown 构建时读取候选项。</summary>
         public static void Open(
             Rect anchorRect,
@@ -293,6 +335,101 @@ namespace ES
             // 因此必须在原生窗口完成初始化后替换 GUI；提前写入会被 Show 覆盖，且首帧永远看不到工具栏。
             if (toolbarActions != null && toolbarActions.Count > 0)
                 AdvancedDropdownNativeToolbar.TryInstall(dropdown, toolbarActions);
+        }
+
+        /// <summary>UI Toolkit 延迟数据源入口：自动定位所属 EditorWindow。</summary>
+        public static void Open(
+            VisualElement anchor,
+            string title,
+            Func<IEnumerable<Entry>> provider,
+            AdvancedDropdownState state = null,
+            Vector2? minimumWindowSize = null,
+            IReadOnlyList<ToolbarAction> toolbarActions = null)
+        {
+            Open(anchor, null, title, provider, state, minimumWindowSize, toolbarActions);
+        }
+
+        /// <summary>
+        /// UI Toolkit 延迟数据源入口。AdvancedDropdown 内部会执行 GUIToScreenRect，
+        /// 因此这里传入的是宿主窗口面板局部坐标，不是屏幕坐标。
+        /// </summary>
+        public static void Open(
+            VisualElement anchor,
+            EditorWindow hostWindow,
+            string title,
+            Func<IEnumerable<Entry>> provider,
+            AdvancedDropdownState state = null,
+            Vector2? minimumWindowSize = null,
+            IReadOnlyList<ToolbarAction> toolbarActions = null)
+        {
+            if (!TryGetGuiAnchorRect(anchor, hostWindow, out Rect anchorRect))
+            {
+                Debug.LogWarning("[ESSearchDropdown] 无法打开选择器：锚点尚未加入有效的 EditorWindow 面板。");
+                return;
+            }
+
+            Open(anchorRect, title, provider, state, minimumWindowSize, toolbarActions);
+        }
+
+        private static bool TryGetGuiAnchorRect(VisualElement anchor, EditorWindow preferredHost,
+            out Rect anchorRect)
+        {
+            anchorRect = default;
+            if (anchor == null || anchor.panel == null)
+                return false;
+
+            EditorWindow host = preferredHost ?? FindHostWindow(anchor);
+            VisualElement hostRoot = host != null ? host.rootVisualElement : null;
+            if (hostRoot == null || hostRoot.panel == null || !ReferenceEquals(hostRoot.panel, anchor.panel))
+                return false;
+
+            Rect worldRect = anchor.worldBound;
+            Rect rootWorldRect = hostRoot.worldBound;
+            Vector2 localPosition = worldRect.position - rootWorldRect.position;
+            if (!IsFinite(localPosition.x) || !IsFinite(localPosition.y)
+                || !IsFinite(worldRect.width) || !IsFinite(worldRect.height))
+                return false;
+
+            // ToolbarMenu 的回调可能来自另一个临时 GUIView。先算出宿主窗口中的真实屏幕位置，
+            // 再转换回“当前 GUIView”的局部坐标，保证 AdvancedDropdown 内部二次 GUIToScreenRect 后仍落在锚点下方。
+            Vector2 screenPosition = host.position.position + localPosition;
+            Vector2 guiPosition = GUIUtility.ScreenToGUIPoint(screenPosition);
+            anchorRect = new Rect(
+                guiPosition,
+                new Vector2(Mathf.Max(1f, worldRect.width), Mathf.Max(1f, worldRect.height)));
+            return true;
+        }
+
+        private static EditorWindow FindHostWindow(VisualElement anchor)
+        {
+            if (anchor == null || anchor.panel == null)
+                return null;
+
+            EditorWindow focused = EditorWindow.focusedWindow;
+            if (IsHostWindow(focused, anchor))
+                return focused;
+
+            EditorWindow mouseOver = EditorWindow.mouseOverWindow;
+            if (IsHostWindow(mouseOver, anchor))
+                return mouseOver;
+
+            EditorWindow[] windows = Resources.FindObjectsOfTypeAll<EditorWindow>();
+            for (int i = 0; i < windows.Length; i++)
+                if (IsHostWindow(windows[i], anchor))
+                    return windows[i];
+            return null;
+        }
+
+        private static bool IsHostWindow(EditorWindow window, VisualElement anchor)
+        {
+            return window != null
+                   && window.rootVisualElement != null
+                   && ReferenceEquals(window.rootVisualElement.panel, anchor.panel);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         /// <summary>
@@ -385,7 +522,9 @@ namespace ES
             try
             {
                 var result = provider();
-                return result == null ? Array.Empty<Entry>() : new List<Entry>(result);
+                if (result == null)
+                    return Array.Empty<Entry>();
+                return new List<Entry>(result);
             }
             catch (Exception exception)
             {

@@ -17,6 +17,9 @@ MonoBehaviour:
   density: 1
   showSectionSubtitle: 1
   useCustomPalette: 1
+  enableGlobalEditorShell: 1
+  enableMotion: 1
+  motionIntensity: 0.78
   darkAccentStart: {r: 0.48, g: 0.78, b: 1, a: 0.92}
   darkAccentEnd: {r: 0.13, g: 0.42, b: 0.72, a: 0.96}
   darkWarning: {r: 0.9, g: 0.68, b: 0.24, a: 0.96}

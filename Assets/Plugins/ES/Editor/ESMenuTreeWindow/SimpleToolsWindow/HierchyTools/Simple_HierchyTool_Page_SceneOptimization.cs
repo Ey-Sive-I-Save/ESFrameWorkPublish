@@ -320,8 +320,9 @@ namespace ES
                 try
                 {
                     string json = JsonUtility.ToJson(currentConfig, true);
-                    File.WriteAllText(path, json, Encoding.UTF8);
-                    EditorUtility.DisplayDialog("成功", "配置已保存！", "确定");
+                    ESManagedFileIO.WriteTextAtUserSelectedPath(path, json, Encoding.UTF8);
+                    if (EditorUtility.DisplayDialog("配置已保存", path, "打开所在文件夹", "关闭"))
+                        EditorUtility.RevealInFinder(path);
                 }
                 catch (Exception ex)
                 {
@@ -421,8 +422,9 @@ namespace ES
 
             try
             {
-                File.WriteAllText(path, JsonUtility.ToJson(data, true), Encoding.UTF8);
-                EditorUtility.DisplayDialog("Rollback file exported", $"Exported {importSettingChanges.Count} import-setting changes.", "OK");
+                ESManagedFileIO.WriteTextAtUserSelectedPath(path, JsonUtility.ToJson(data, true), Encoding.UTF8);
+                if (EditorUtility.DisplayDialog("Rollback file exported", path, "Open containing folder", "Close"))
+                    EditorUtility.RevealInFinder(path);
             }
             catch (Exception ex)
             {
@@ -793,7 +795,12 @@ namespace ES
             if (!string.IsNullOrEmpty(scene.path))
             {
                 string backupPath = scene.path.Replace(".unity", $"_backup_{DateTime.Now:yyyyMMdd_HHmmss}.unity");
-                AssetDatabase.CopyAsset(scene.path, backupPath);
+                backupPath = AssetDatabase.GenerateUniqueAssetPath(backupPath);
+                if (!AssetDatabase.CopyAsset(scene.path, backupPath))
+                {
+                    UnityEngine.Debug.LogError("场景备份失败，已中止优化：" + scene.path);
+                    return;
+                }
                 if (verboseLogging)
                     UnityEngine.Debug.Log($"场景已备份到: {backupPath}");
             }
@@ -2877,7 +2884,7 @@ namespace ES
 
                 try
                 {
-                    File.WriteAllText(path, report.ToString(), Encoding.UTF8);
+                    ESManagedFileIO.WriteTextAtUserSelectedPath(path, report.ToString(), Encoding.UTF8);
                     EditorUtility.DisplayDialog("成功", $"详细报告已导出到:\n{path}", "确定");
                 }
                 catch (Exception ex)
@@ -2920,8 +2927,9 @@ namespace ES
 
                 try
                 {
-                    File.WriteAllText(path, csv.ToString(), Encoding.UTF8);
-                    EditorUtility.DisplayDialog("成功", $"CSV数据已导出到:\n{path}", "确定");
+                    ESManagedFileIO.WriteTextAtUserSelectedPath(path, csv.ToString(), Encoding.UTF8);
+                    if (EditorUtility.DisplayDialog("CSV数据已导出", path, "打开所在文件夹", "关闭"))
+                        EditorUtility.RevealInFinder(path);
                 }
                 catch (Exception ex)
                 {

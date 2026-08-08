@@ -1442,7 +1442,7 @@ namespace ES
                 { "ESSceneGlobalData", "玩法搭建/场景配置" },
                 { "StateMachineConfig", "玩法搭建/状态机" },
                 { "StateMachineDebugSettings", "玩法搭建/状态机" },
-                { "StateDefaultNumericParameterProfile", "玩法搭建/状态机" },
+                { "StateDefaultNumericParameterConfig", "玩法搭建/状态机" },
                 { "AdvancedStateMachineData", "玩法搭建/状态机" },
                 { "VisualGUIDrawerSO", "编辑器支持/界面绘制" },
                 { "ESGlobalEditorDefaultConfi", "插件级/全局设置" },

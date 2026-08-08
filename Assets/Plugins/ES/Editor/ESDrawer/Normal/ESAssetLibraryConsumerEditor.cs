@@ -72,7 +72,7 @@ namespace ES.EditorInternal
                     if (GUILayout.Button("添加", GUILayout.Width(48f)))
                     {
                         Undo.RecordObject(consumer, "Add Manual GameCore");
-                        if (!ESAssetReferenceBaker.TryAddManualGameCoreAsset(consumer, pendingManualGameCore))
+                        if (!ESAssetConsumerReferenceAuthoring.TryAddManualGameCoreAsset(consumer, pendingManualGameCore))
                             Debug.LogWarning("[ESRes][Consumer] 只能添加有效的 IGameCoreSO 资产。", pendingManualGameCore);
                         else
                         {
@@ -145,7 +145,7 @@ namespace ES.EditorInternal
             try
             {
                 Undo.RecordObject(consumer, "Sync Consumer GameCore");
-                ESAssetReferenceBaker.SyncConsumerGameCoreAssets(consumer);
+                ESAssetConsumerReferenceAuthoring.SyncConsumerGameCoreAssets(consumer);
                 EditorUtility.SetDirty(consumer);
                 Debug.Log("[ESRes][Consumer] GameCore 已重新同步：" + consumer.Name, consumer);
             }

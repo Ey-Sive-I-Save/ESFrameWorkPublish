@@ -625,7 +625,7 @@ namespace ES.EditorInternal
             }
 
             if (Directory.Exists(ESAssetPipelineIO.BakeRoot))
-            foreach (string path in Directory.GetFiles(ESAssetPipelineIO.BakeRoot, ESAssetPipelineIO.CatalogFileName, SearchOption.AllDirectories))
+            foreach (string path in ESManagedFileIO.EnumerateFilesSafely(ESAssetPipelineIO.BakeRoot, ESAssetPipelineIO.CatalogFileName))
             {
                 ESAssetLibraryCatalog catalog;
                 try { catalog = ESAssetPipelineIO.ReadJson<ESAssetLibraryCatalog>(path); }

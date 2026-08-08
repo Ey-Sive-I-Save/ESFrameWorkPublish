@@ -46,8 +46,15 @@ namespace ES.EditorInternal
         private int cachedNestingDepth = -1;
         private bool collectionMembershipInitialized;
         private bool isReferenceCollectionElement;
+        private ESCollectionDrawMode collectionDrawModeOverride;
         private Type cachedDeclaredBaseType;
         private AdvancedDropdownState selectorState;
+        private ESCollectionDrawStyleAttributeDrawer collectionOwner;
+        private int collectionIndex = -1;
+        private string feelListMetaBaseText;
+        private string feelListMetaText;
+        private int feelListMetaDefaultOrder;
+        private bool feelListMetaHasDefaultOrder;
         // Reused across repaints. Dynamic selector text is updated in place instead of creating
         // GUIContent instances on every IMGUI event.
         private readonly GUIContent foldoutContent = new GUIContent();
@@ -74,6 +81,7 @@ namespace ES.EditorInternal
         private bool titleInitialized;
         private Type titleValueType;
         private string titleLabelText;
+        private string titleNameTitle;
         private int titleNestingDepth;
         private bool titleSuppressValueType;
         private string presentationTitleText;
@@ -92,18 +100,34 @@ namespace ES.EditorInternal
         {
             if (!collectionMembershipInitialized)
             {
-                isReferenceCollectionElement = IsReferenceCollectionElement(Property);
+                isReferenceCollectionElement = TryGetReferenceCollectionContext(
+                    Property,
+                    out collectionDrawModeOverride);
                 collectionMembershipInitialized = true;
             }
 
+            if (ESCollectionElementDrawScope.TryGet(
+                    Property.UnityPropertyPath,
+                    out ESCollectionElementDrawContext collectionContext))
+            {
+                collectionOwner = collectionContext.Owner;
+                collectionIndex = collectionContext.Index;
+            }
+            else
+            {
+                collectionOwner = null;
+                collectionIndex = -1;
+            }
+
             if (isReferenceCollectionElement
-                && !ESPolymorphicReferencePreferences.UseESCollectionRenderer)
+                && !ShouldUseCustomCollectionRenderer())
             {
                 CallNextDrawer(label);
                 return;
             }
 
-            if (!ESPolymorphicReferencePreferences.UseESRenderer)
+            if (!isReferenceCollectionElement
+                && !ESPolymorphicReferencePreferences.UseESRenderer)
             {
                 CallNextDrawer(label);
                 return;
@@ -117,6 +141,11 @@ namespace ES.EditorInternal
             }
 
             int nestingDepth = GetNestingDepth();
+            bool useCompactCollectionCard = isReferenceCollectionElement
+                                            && ShouldUseFeelCollectionRenderer();
+            float activeHeaderHeight = useCompactCollectionCard
+                ? ESEditorPresentation.CompactCollectionHeaderHeight
+                : HeaderHeight;
             Rect allocatedFrameRect = GUILayoutUtility.GetRect(0f, 0f, GUILayout.ExpandWidth(true));
             Rect frameRect = ApplyNestingInset(allocatedFrameRect, nestingDepth);
             object value = null;
@@ -128,7 +157,9 @@ namespace ES.EditorInternal
 
             if (!expandedInitialized)
             {
-                expanded = true;
+                // The compact collection mode starts folded so large extension lists remain
+                // scannable and do not eagerly draw every child field after an Inspector rebuild.
+                expanded = !useCompactCollectionCard;
                 expandedInitialized = true;
             }
 
@@ -137,16 +168,32 @@ namespace ES.EditorInternal
                 value = ValueEntry.WeakSmartValue;
                 unresolvedTypeName = GetUnresolvedManagedReferenceTypeName(value);
                 status = ResolveStatusKind(value, unresolvedTypeName, multiEditLimited, multiTargetMixed);
-                DrawHeader(
-                    label,
-                    baseType,
-                    value,
-                    unresolvedTypeName,
-                    nestingDepth,
-                    status,
-                    multiEditLimited,
-                    targetCount,
-                    multiTargetMixed);
+                if (useCompactCollectionCard)
+                {
+                    DrawCompactCollectionHeader(
+                        label,
+                        baseType,
+                        value,
+                        unresolvedTypeName,
+                        nestingDepth,
+                        status,
+                        multiEditLimited,
+                        targetCount,
+                        multiTargetMixed);
+                }
+                else
+                {
+                    DrawHeader(
+                        label,
+                        baseType,
+                        value,
+                        unresolvedTypeName,
+                        nestingDepth,
+                        status,
+                        multiEditLimited,
+                        targetCount,
+                        multiTargetMixed);
+                }
 
                 if (!string.IsNullOrEmpty(unresolvedTypeName))
                 {
@@ -166,13 +213,20 @@ namespace ES.EditorInternal
                 if (value == null || !expanded)
                     return;
 
-                EditorGUILayout.Space(2f);
+                EditorGUILayout.Space(useCompactCollectionCard ? 0f : 2f);
                 bool nestedBody = nestingDepth > 0;
                 if (nestedBody)
                 {
                     EditorGUILayout.BeginHorizontal();
                     GUILayout.Space(8f + (nestingDepth - 1) * 6f);
-                    EditorGUILayout.BeginVertical();
+                    EditorGUILayout.BeginVertical(
+                        useCompactCollectionCard
+                            ? ESEditorPresentation.CompactCollectionBodyStyle
+                            : GUIStyle.none);
+                }
+                else if (useCompactCollectionCard)
+                {
+                    EditorGUILayout.BeginVertical(ESEditorPresentation.CompactCollectionBodyStyle);
                 }
 
                 EditorGUI.indentLevel += nestedBody ? 1 : 0;
@@ -189,6 +243,10 @@ namespace ES.EditorInternal
                         EditorGUILayout.EndVertical();
                         EditorGUILayout.EndHorizontal();
                     }
+                    else if (useCompactCollectionCard)
+                    {
+                        EditorGUILayout.EndVertical();
+                    }
                 }
             }
             finally
@@ -200,7 +258,8 @@ namespace ES.EditorInternal
                     frameRect,
                     frameBottomRect,
                     nestingDepth,
-                    status);
+                    status,
+                    activeHeaderHeight);
             }
         }
 
@@ -334,8 +393,11 @@ namespace ES.EditorInternal
                        || property.Info.SerializationBackend == SerializationBackend.UnityPolymorphic);
         }
 
-        private static bool IsReferenceCollectionElement(InspectorProperty property)
+        private static bool TryGetReferenceCollectionContext(
+            InspectorProperty property,
+            out ESCollectionDrawMode drawModeOverride)
         {
+            drawModeOverride = ESCollectionDrawMode.ProjectDefault;
             InspectorProperty ancestor = property?.Parent;
             while (ancestor != null)
             {
@@ -343,12 +405,45 @@ namespace ES.EditorInternal
                     && ancestor.ValueEntry != null
                     && ancestor.ValueEntry.WeakSmartValue is IList
                     && IsSerializeReferenceCollection(ancestor))
+                {
+                    ESCollectionDrawStyleAttribute style =
+                        ancestor.GetAttribute<ESCollectionDrawStyleAttribute>();
+                    if (style != null)
+                        drawModeOverride = style.Mode;
                     return true;
+                }
 
                 ancestor = ancestor.Parent;
             }
 
             return false;
+        }
+
+        private bool ShouldUseCustomCollectionRenderer()
+        {
+            if (collectionDrawModeOverride == ESCollectionDrawMode.DefaultDrawer)
+                return false;
+
+            if (collectionDrawModeOverride == ESCollectionDrawMode.StandardCard
+                || collectionDrawModeOverride == ESCollectionDrawMode.FeelCard
+                || collectionDrawModeOverride == ESCollectionDrawMode.FeelList
+                || collectionDrawModeOverride == ESCollectionDrawMode.SectionList)
+                return true;
+
+            return ESPolymorphicReferencePreferences.UseESRenderer
+                   && ESPolymorphicReferencePreferences.UseCustomCollectionRenderer;
+        }
+
+        private bool ShouldUseFeelCollectionRenderer()
+        {
+            if (collectionDrawModeOverride == ESCollectionDrawMode.FeelCard
+                || collectionDrawModeOverride == ESCollectionDrawMode.FeelList)
+                return true;
+
+            if (collectionDrawModeOverride != ESCollectionDrawMode.ProjectDefault)
+                return false;
+
+            return ESPolymorphicReferencePreferences.UseFeelCollectionRenderer;
         }
 
         private static bool IsSerializeReferenceCollection(InspectorProperty collectionProperty)
@@ -508,9 +603,12 @@ namespace ES.EditorInternal
             Rect headerRect = ApplyNestingInset(allocatedRect, nestingDepth);
             bool hasValue = value != null;
             bool hasUnresolvedType = !string.IsNullOrEmpty(unresolvedTypeName);
+            bool collectionOwnsRemoval = collectionDrawModeOverride == ESCollectionDrawMode.FeelList
+                                         || collectionDrawModeOverride == ESCollectionDrawMode.SectionList;
             float clearWidth = (hasValue || multiTargetMixed)
                                && !hasUnresolvedType
                                && !multiEditLimited
+                               && !collectionOwnsRemoval
                 ? ClearHitWidth
                 : 0f;
             float minimumSelectorWidth = headerRect.width < 300f ? 108f : SelectorMinimumWidth;
@@ -591,6 +689,360 @@ namespace ES.EditorInternal
                 MetaStyle);
         }
 
+        private void DrawCompactCollectionHeader(
+            GUIContent label,
+            Type baseType,
+            object value,
+            string unresolvedTypeName,
+            int nestingDepth,
+            ESStatusKind status,
+            bool multiEditLimited,
+            int targetCount,
+            bool multiTargetMixed)
+        {
+            if (ESCollectionElementDrawScope.TryGet(
+                    Property.UnityPropertyPath,
+                    out ESCollectionElementDrawContext feelContext))
+            {
+                DrawIntegratedFeelListHeader(
+                    label,
+                    baseType,
+                    value,
+                    unresolvedTypeName,
+                    nestingDepth,
+                    status,
+                    multiEditLimited,
+                    targetCount,
+                    multiTargetMixed,
+                    feelContext);
+                return;
+            }
+
+            float headerHeight = ESEditorPresentation.CompactCollectionHeaderHeight;
+            Rect allocatedRect = GUILayoutUtility.GetRect(0f, headerHeight, GUILayout.ExpandWidth(true));
+            Rect headerRect = ApplyNestingInset(allocatedRect, nestingDepth);
+            bool hasValue = value != null;
+            bool hasUnresolvedType = !string.IsNullOrEmpty(unresolvedTypeName);
+            float clearWidth = (hasValue || multiTargetMixed)
+                               && !hasUnresolvedType
+                               && !multiEditLimited
+                ? ClearHitWidth
+                : 0f;
+            if (headerRect.width < 100f)
+                clearWidth = 0f;
+
+            float desiredSelectorWidth = Mathf.Min(
+                196f,
+                Mathf.Max(headerRect.width < 320f ? 104f : 132f, headerRect.width * 0.34f));
+            float selectorWidth = Mathf.Min(
+                desiredSelectorWidth,
+                Mathf.Max(42f, headerRect.width - clearWidth - 36f));
+            float contentTop = headerRect.y + Mathf.Max(3f, (headerHeight - 28f) * 0.5f);
+            Rect foldoutRect = new Rect(headerRect.x + 8f, contentTop + 1f, 18f, 26f);
+            Rect selectorRect = new Rect(
+                headerRect.xMax - selectorWidth - clearWidth - 5f,
+                contentTop + 1f,
+                selectorWidth,
+                24f);
+            Rect clearRect = new Rect(selectorRect.xMax + 3f, contentTop + 1f, clearWidth - 3f, 24f);
+            float titleWidth = Mathf.Max(0f, selectorRect.x - foldoutRect.xMax - 9f);
+            Rect titleRect = new Rect(foldoutRect.xMax + 4f, contentTop - 2f, titleWidth, 17f);
+            Rect metaRect = new Rect(foldoutRect.xMax + 4f, contentTop + 13f, titleWidth, 14f);
+            Rect toggleRect = new Rect(
+                headerRect.x,
+                headerRect.y,
+                Mathf.Max(0f, selectorRect.x - headerRect.x - 5f),
+                headerHeight);
+
+            ESEditorPresentation.DrawCompactCollectionHeaderBackground(
+                headerRect,
+                nestingDepth,
+                status,
+                expanded);
+            if (GUI.Button(toggleRect, GUIContent.none, GUIStyle.none))
+                expanded = !expanded;
+
+            foldoutContent.text = expanded ? "▾" : "▸";
+            foldoutContent.tooltip = expanded ? "折叠当前集合配置" : "展开当前集合配置";
+            GUI.Label(foldoutRect, foldoutContent, SelectorArrowStyle);
+
+            UpdateTitlePresentation(label, value, nestingDepth, multiTargetMixed || multiEditLimited);
+            titleContent.text = presentationTitleText;
+            if (titleWidth >= 18f)
+                GUI.Label(titleRect, titleContent, ESEditorPresentation.CompactCollectionTitleStyle);
+
+            UpdateSelectorPresentation(
+                value == null ? null : value.GetType(),
+                unresolvedTypeName,
+                hasValue,
+                hasUnresolvedType,
+                multiEditLimited,
+                targetCount,
+                multiTargetMixed);
+            selectorContent.text = presentationSelectorText;
+            selectorContent.tooltip = presentationSelectorTooltip;
+
+            if (!multiEditLimited && GUI.Button(selectorRect, GUIContent.none, GUIStyle.none))
+                OpenTypePicker(
+                    selectorRect,
+                    baseType,
+                    multiTargetMixed || hasUnresolvedType ? null : value == null ? null : value.GetType(),
+                    unresolvedTypeName);
+            DrawSelector(
+                selectorRect,
+                selectorContent,
+                presentationSelectorStyle,
+                hasValue || hasUnresolvedType || multiTargetMixed,
+                nestingDepth);
+
+            if (clearWidth > 0f)
+            {
+                if (GUI.Button(clearRect, clearContent, GUIStyle.none))
+                    ClearValue();
+                GUI.Label(clearRect, "×", ClearStyle);
+            }
+
+            if (titleWidth >= 18f)
+            {
+                ESFieldRow.DrawStatus(
+                    metaRect,
+                    status,
+                    presentationMetaText,
+                    ESEditorPresentation.CompactCollectionMetaStyle);
+            }
+        }
+
+        private void DrawIntegratedFeelListHeader(
+            GUIContent label,
+            Type baseType,
+            object value,
+            string unresolvedTypeName,
+            int nestingDepth,
+            ESStatusKind status,
+            bool multiEditLimited,
+            int targetCount,
+            bool multiTargetMixed,
+            ESCollectionElementDrawContext context)
+        {
+            float headerHeight = ESEditorPresentation.CompactCollectionHeaderHeight;
+            Rect allocatedRect = GUILayoutUtility.GetRect(0f, headerHeight, GUILayout.ExpandWidth(true));
+            Rect headerRect = ApplyNestingInset(allocatedRect, nestingDepth);
+            bool hasValue = value != null;
+            bool hasUnresolvedType = !string.IsNullOrEmpty(unresolvedTypeName);
+            bool canEdit = context.CanEdit && !multiEditLimited;
+
+            float contentTop = headerRect.y + Mathf.Max(3f, (headerHeight - 26f) * 0.5f);
+            float actionWidth = 23f;
+            float gap = 2f;
+            Rect deleteRect = new Rect(
+                headerRect.xMax - actionWidth - 4f,
+                contentTop,
+                actionWidth,
+                24f);
+            Rect menuRect = new Rect(
+                deleteRect.x - actionWidth - gap,
+                contentTop,
+                actionWidth,
+                24f);
+            bool showDirectCopy = context.Owner.AllowDuplicateItems && headerRect.width >= 500f;
+            Rect copyRect = showDirectCopy
+                ? new Rect(menuRect.x - actionWidth - gap, contentTop, actionWidth, 24f)
+                : Rect.zero;
+            float actionsLeft = showDirectCopy ? copyRect.x : menuRect.x;
+            float selectorWidth = Mathf.Clamp(
+                headerRect.width * 0.27f,
+                headerRect.width < 360f ? 86f : 108f,
+                168f);
+            Rect selectorRect = new Rect(
+                actionsLeft - selectorWidth - 5f,
+                contentTop,
+                selectorWidth,
+                24f);
+
+            Rect dragRect = new Rect(headerRect.x + 6f, contentTop, 16f, 24f);
+            float left = dragRect.xMax + 2f;
+            Rect enabledRect = Rect.zero;
+            if (context.Enabled.Available)
+            {
+                enabledRect = new Rect(left, contentTop + 2f, 18f, 20f);
+                left = enabledRect.xMax + 1f;
+            }
+
+            Rect foldoutRect = new Rect(left, contentTop, 17f, 24f);
+            left = foldoutRect.xMax + 3f;
+            float titleWidth = Mathf.Max(0f, selectorRect.x - left - 5f);
+            Rect titleRect = new Rect(left, contentTop - 2f, titleWidth, 16f);
+            Rect metaRect = new Rect(left, contentTop + 12f, titleWidth, 13f);
+            Rect foldoutHitRect = new Rect(
+                foldoutRect.x,
+                headerRect.y,
+                Mathf.Max(0f, selectorRect.x - foldoutRect.x - 4f),
+                headerHeight);
+
+            string typeIdentity = value?.GetType().FullName
+                                  ?? unresolvedTypeName
+                                  ?? "<empty>";
+            Color typeColor = ESCollectionDrawStyleAttributeDrawer.GetStableTypeColor(typeIdentity);
+            ESEditorPresentation.DrawCompactCollectionHeaderBackground(
+                headerRect,
+                nestingDepth,
+                status,
+                expanded);
+            if (Event.current.type == EventType.Repaint)
+            {
+                EditorGUI.DrawRect(new Rect(headerRect.x, headerRect.y, 4f, headerRect.height), typeColor);
+                Color swatch = typeColor;
+                swatch.a = context.Enabled.Available && !context.Enabled.Value ? 0.48f : 1f;
+                EditorGUI.DrawRect(new Rect(titleRect.x, titleRect.y + 4f, 6f, 6f), swatch);
+            }
+
+            context.Owner.ProcessFeelDragHandle(
+                context.Index,
+                dragRect,
+                headerRect,
+                canEdit);
+            EditorGUIUtility.AddCursorRect(dragRect, MouseCursor.Pan);
+            GUI.Label(
+                dragRect,
+                new GUIContent("≡", "按住拖拽重排；DefaultOrder 不允许被破坏"),
+                SelectorArrowStyle);
+
+            if (context.Enabled.Available)
+            {
+                bool previousEnabled = GUI.enabled;
+                bool previousMixed = EditorGUI.showMixedValue;
+                GUI.enabled = previousEnabled && canEdit;
+                EditorGUI.showMixedValue = context.Enabled.Mixed;
+                EditorGUI.BeginChangeCheck();
+                bool enabled = GUI.Toggle(
+                    enabledRect,
+                    context.Enabled.Value,
+                    new GUIContent(string.Empty, "启用或停用当前扩展"));
+                if (EditorGUI.EndChangeCheck())
+                    context.Owner.ExecuteSetElementEnabled(context.Index, enabled);
+                EditorGUI.showMixedValue = previousMixed;
+                GUI.enabled = previousEnabled;
+            }
+
+            if (GUI.Button(foldoutHitRect, GUIContent.none, GUIStyle.none))
+                expanded = !expanded;
+            foldoutContent.text = expanded ? "▾" : "▸";
+            foldoutContent.tooltip = expanded ? "折叠当前扩展" : "展开当前扩展";
+            GUI.Label(foldoutRect, foldoutContent, SelectorArrowStyle);
+
+            UpdateTitlePresentation(label, value, nestingDepth, multiTargetMixed || multiEditLimited);
+            titleContent.text = presentationTitleText;
+            Color previousColor = GUI.color;
+            if (context.Enabled.Available && !context.Enabled.Value && !context.Enabled.Mixed)
+                GUI.color = new Color(previousColor.r, previousColor.g, previousColor.b, previousColor.a * 0.56f);
+            if (titleWidth >= 18f)
+            {
+                Rect textRect = titleRect;
+                textRect.x += 10f;
+                textRect.width = Mathf.Max(0f, textRect.width - 10f);
+                GUI.Label(textRect, titleContent, ESEditorPresentation.CompactCollectionTitleStyle);
+            }
+
+            UpdateSelectorPresentation(
+                value == null ? null : value.GetType(),
+                unresolvedTypeName,
+                hasValue,
+                hasUnresolvedType,
+                multiEditLimited,
+                targetCount,
+                multiTargetMixed);
+            string metaText = GetFeelListMetaText(value);
+            if (titleWidth >= 18f)
+            {
+                ESFieldRow.DrawStatus(
+                    metaRect,
+                    status,
+                    metaText,
+                    ESEditorPresentation.CompactCollectionMetaStyle);
+            }
+            GUI.color = previousColor;
+
+            selectorContent.text = presentationSelectorText;
+            selectorContent.tooltip = presentationSelectorTooltip;
+            bool previousGuiEnabled = GUI.enabled;
+            GUI.enabled = previousGuiEnabled && canEdit;
+            if (GUI.Button(selectorRect, GUIContent.none, GUIStyle.none))
+            {
+                OpenTypePicker(
+                    selectorRect,
+                    baseType,
+                    multiTargetMixed || hasUnresolvedType
+                        ? null
+                        : value == null
+                            ? null
+                            : value.GetType(),
+                    unresolvedTypeName);
+            }
+            GUI.enabled = previousGuiEnabled;
+            DrawSelector(
+                selectorRect,
+                selectorContent,
+                presentationSelectorStyle,
+                hasValue || hasUnresolvedType || multiTargetMixed,
+                nestingDepth);
+
+            if (showDirectCopy)
+            {
+                GUI.enabled = previousGuiEnabled && canEdit;
+                if (GUI.Button(
+                        copyRect,
+                        new GUIContent("⧉", "复制当前元素为独立深拷贝"),
+                        EditorStyles.miniButton))
+                {
+                    context.Owner.ExecuteDuplicateElement(context.Index, exitGui: true);
+                }
+                GUI.enabled = previousGuiEnabled;
+            }
+
+            GUI.enabled = previousGuiEnabled && canEdit;
+            if (GUI.Button(
+                    menuRect,
+                    new GUIContent("⋮", "复制、默认归位、精确移动和删除"),
+                    EditorStyles.miniButton))
+            {
+                context.Owner.ShowFeelElementMenu(context.Index, menuRect);
+            }
+
+            if (GUI.Button(
+                    deleteRect,
+                    new GUIContent("×", "删除当前 List 元素，可使用 Ctrl+Z 撤销"),
+                    EditorStyles.miniButton))
+            {
+                context.Owner.ExecuteDeleteElement(context.Index, exitGui: true);
+            }
+            GUI.enabled = previousGuiEnabled;
+        }
+
+        private string GetFeelListMetaText(object value)
+        {
+            bool hasDefaultOrder = value is IESCollectionDefaultOrder;
+            int defaultOrder = hasDefaultOrder
+                ? ((IESCollectionDefaultOrder)value).DefaultOrder
+                : 0;
+            if (string.Equals(
+                    feelListMetaBaseText,
+                    presentationMetaText,
+                    StringComparison.Ordinal)
+                && feelListMetaHasDefaultOrder == hasDefaultOrder
+                && (!hasDefaultOrder || feelListMetaDefaultOrder == defaultOrder))
+            {
+                return feelListMetaText;
+            }
+
+            feelListMetaBaseText = presentationMetaText;
+            feelListMetaHasDefaultOrder = hasDefaultOrder;
+            feelListMetaDefaultOrder = defaultOrder;
+            feelListMetaText = hasDefaultOrder
+                ? presentationMetaText + " · DefaultOrder " + defaultOrder
+                : presentationMetaText;
+            return feelListMetaText;
+        }
+
         private void UpdateTitlePresentation(
             GUIContent label,
             object value,
@@ -599,16 +1051,19 @@ namespace ES.EditorInternal
         {
             string labelText = label == null ? null : label.text;
             Type valueType = value == null ? null : value.GetType();
+            string nameTitle = ResolveNameTitle(value, suppressValueType);
             if (titleInitialized
                 && titleValueType == valueType
                 && titleNestingDepth == nestingDepth
                 && titleSuppressValueType == suppressValueType
+                && string.Equals(titleNameTitle, nameTitle, StringComparison.Ordinal)
                 && string.Equals(titleLabelText, labelText, StringComparison.Ordinal))
                 return;
 
             titleInitialized = true;
             titleValueType = valueType;
             titleLabelText = labelText;
+            titleNameTitle = nameTitle;
             titleNestingDepth = nestingDepth;
             titleSuppressValueType = suppressValueType;
             presentationTitleText = ResolveTitle(label, value, suppressValueType);
@@ -748,12 +1203,13 @@ namespace ES.EditorInternal
             Rect frameRect,
             Rect frameBottomRect,
             int nestingDepth,
-            ESStatusKind status)
+            ESStatusKind status,
+            float headerHeight)
         {
             if (Event.current.type != EventType.Repaint)
                 return;
 
-            float bottom = Mathf.Max(frameRect.y + HeaderHeight, frameBottomRect.yMax);
+            float bottom = Mathf.Max(frameRect.y + headerHeight, frameBottomRect.yMax);
             Rect rect = new Rect(frameRect.x, frameRect.y, frameRect.width, bottom - frameRect.y);
             Color line = ESEditorPresentation.GetStatusFrameColor(nestingDepth, status);
             ESEditorPresentation.DrawFrame(rect, line, FrameLineWidth);
@@ -792,6 +1248,10 @@ namespace ES.EditorInternal
 
         private string ResolveTitle(GUIContent label, object value, bool suppressValueType)
         {
+            string nameTitle = ResolveNameTitle(value, suppressValueType);
+            if (!string.IsNullOrEmpty(nameTitle))
+                return nameTitle;
+
             LabelTextAttribute labelAttribute = Property?.GetAttribute<LabelTextAttribute>();
             if (labelAttribute != null && !string.IsNullOrWhiteSpace(labelAttribute.Text))
                 return labelAttribute.Text;
@@ -805,6 +1265,17 @@ namespace ES.EditorInternal
                 return label.text;
 
             return Property?.NiceName ?? "多态配置";
+        }
+
+        private string ResolveNameTitle(object value, bool suppressValueType)
+        {
+            if (suppressValueType
+                || !isReferenceCollectionElement
+                || !(value is IESNameTitle named))
+                return null;
+
+            string nameTitle = named.NameTitle;
+            return string.IsNullOrWhiteSpace(nameTitle) ? null : nameTitle;
         }
 
         private static void DrawSelector(
@@ -863,10 +1334,11 @@ namespace ES.EditorInternal
                     ESPolymorphicReferencePreferences.ShowMenu,
                     "切换绘制方案（当前：" + ESPolymorphicReferencePreferences.CurrentDisplayName + "）"),
                 new ESSearchDropdown.ToolbarAction(
-                    "集合",
+                    collectionDrawModeOverride == ESCollectionDrawMode.ProjectDefault
+                        ? "集合"
+                        : "项目默认",
                     ESPolymorphicReferencePreferences.ShowCollectionMenu,
-                    "切换集合元素绘制方案（当前："
-                    + ESPolymorphicReferencePreferences.CurrentCollectionDisplayName + "）"),
+                    GetCollectionToolbarTooltip()),
                 new ESSearchDropdown.ToolbarAction(
                     "诊断",
                     () => LogTypeCatalogDiagnostics(baseType, selectedType),
@@ -884,6 +1356,27 @@ namespace ES.EditorInternal
                 state: selectorState ?? (selectorState = new AdvancedDropdownState()),
                 minimumWindowSize: new Vector2(420f, 320f),
                 toolbarActions: toolbarActions);
+        }
+
+        private string GetCollectionToolbarTooltip()
+        {
+            if (collectionDrawModeOverride == ESCollectionDrawMode.ProjectDefault)
+            {
+                return "切换未声明局部覆盖的集合绘制方案（当前："
+                       + ESPolymorphicReferencePreferences.CurrentCollectionDisplayName + "）";
+            }
+
+            string localStyle = collectionDrawModeOverride == ESCollectionDrawMode.SectionList
+                ? "【ES】Section 风格完整集合"
+                : collectionDrawModeOverride == ESCollectionDrawMode.FeelList
+                    ? "【ES】Feel 风格完整集合"
+                    : collectionDrawModeOverride == ESCollectionDrawMode.FeelCard
+                    ? "【ES】Feel 风格卡片"
+                : collectionDrawModeOverride == ESCollectionDrawMode.StandardCard
+                    ? "【ES】标准集合卡片"
+                    : "默认 Drawer";
+            return "当前字段由 ESCollectionDrawStyle 固定为“" + localStyle
+                   + "”；项目默认方案只影响没有局部覆盖的其他集合。";
         }
 
         private List<ESSearchDropdown.Entry> BuildTypeEntries(
@@ -904,6 +1397,19 @@ namespace ES.EditorInternal
             {
                 ESTypeCatalog.Entry descriptor = catalog.Entries[i];
                 Type capturedType = descriptor.Type;
+                if (collectionOwner != null
+                    && !collectionOwner.CanUseConcreteTypeAtIndex(
+                        collectionIndex,
+                        capturedType,
+                        out string duplicateReason))
+                {
+                    entries.Add(ESSearchDropdown.Entry.Disabled(
+                        descriptor.DisplayName,
+                        descriptor.GroupPath,
+                        duplicateReason));
+                    continue;
+                }
+
                 entries.Add(ESSearchDropdown.Entry.Item(
                     descriptor.DisplayName,
                     () => CreateValue(capturedType, unresolvedTypeName),
@@ -967,7 +1473,11 @@ namespace ES.EditorInternal
             }
 
             if (TryAssignManagedReferenceType(concreteType, "替换多态配置类型", out string assignError))
+            {
                 expanded = true;
+                if (collectionOwner != null && collectionIndex >= 0)
+                    collectionOwner.ExecuteRestoreElementDefaultOrder(collectionIndex, exitGui: false);
+            }
             else
                 EditorUtility.DisplayDialog("无法写入多态配置", assignError, "知道了");
         }
@@ -1433,6 +1943,13 @@ namespace ES.EditorInternal
         Odin
     }
 
+    internal enum ESPolymorphicReferenceCollectionDrawMode
+    {
+        ES,
+        Feel,
+        Odin
+    }
+
     internal static class ESPolymorphicReferencePreferences
     {
         private const string PreferencePrefix = "ES.PolymorphicReference.DrawMode.";
@@ -1440,7 +1957,7 @@ namespace ES.EditorInternal
         private static bool drawModeInitialized;
         private static ESPolymorphicReferenceDrawMode cachedDrawMode;
         private static bool collectionDrawModeInitialized;
-        private static ESPolymorphicReferenceDrawMode cachedCollectionDrawMode;
+        private static ESPolymorphicReferenceCollectionDrawMode cachedCollectionDrawMode;
 
         public static bool UseESRenderer => DrawMode == ESPolymorphicReferenceDrawMode.ES;
 
@@ -1448,11 +1965,20 @@ namespace ES.EditorInternal
             ? "【ES】自定义渲染"
             : "Odin 默认动态渲染";
 
-        public static bool UseESCollectionRenderer => CollectionDrawMode == ESPolymorphicReferenceDrawMode.ES;
+        public static bool UseCustomCollectionRenderer =>
+            CollectionDrawMode != ESPolymorphicReferenceCollectionDrawMode.Odin;
 
-        public static string CurrentCollectionDisplayName => UseESCollectionRenderer
-            ? "【ES】集合元素绘制"
-            : "Odin 默认集合元素绘制";
+        public static bool UseESCollectionRenderer =>
+            CollectionDrawMode == ESPolymorphicReferenceCollectionDrawMode.ES;
+
+        public static bool UseFeelCollectionRenderer =>
+            CollectionDrawMode == ESPolymorphicReferenceCollectionDrawMode.Feel;
+
+        public static string CurrentCollectionDisplayName => UseFeelCollectionRenderer
+            ? "项目默认：【ES】Feel 风格卡片"
+            : UseESCollectionRenderer
+                ? "项目默认：【ES】标准集合卡片"
+                : "项目默认：Odin 默认集合元素绘制";
 
         private static ESPolymorphicReferenceDrawMode DrawMode
         {
@@ -1477,7 +2003,7 @@ namespace ES.EditorInternal
             }
         }
 
-        private static ESPolymorphicReferenceDrawMode CollectionDrawMode
+        private static ESPolymorphicReferenceCollectionDrawMode CollectionDrawMode
         {
             get
             {
@@ -1486,10 +2012,12 @@ namespace ES.EditorInternal
 
                 string value = EditorPrefs.GetString(
                     GetPreferenceKey(CollectionPreferencePrefix),
-                    nameof(ESPolymorphicReferenceDrawMode.ES));
-                cachedCollectionDrawMode = Enum.TryParse(value, out ESPolymorphicReferenceDrawMode mode)
+                    nameof(ESPolymorphicReferenceCollectionDrawMode.ES));
+                cachedCollectionDrawMode = Enum.TryParse(
+                    value,
+                    out ESPolymorphicReferenceCollectionDrawMode mode)
                     ? mode
-                    : ESPolymorphicReferenceDrawMode.ES;
+                    : ESPolymorphicReferenceCollectionDrawMode.ES;
                 collectionDrawModeInitialized = true;
                 return cachedCollectionDrawMode;
             }
@@ -1520,13 +2048,17 @@ namespace ES.EditorInternal
         {
             var menu = new GenericMenu();
             menu.AddItem(
-                new GUIContent("【ES】集合元素绘制"),
+                new GUIContent("项目默认/【ES】标准集合卡片"),
                 UseESCollectionRenderer,
-                () => CollectionDrawMode = ESPolymorphicReferenceDrawMode.ES);
+                () => SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode.ES));
             menu.AddItem(
-                new GUIContent("Odin 默认集合元素绘制"),
-                !UseESCollectionRenderer,
-                () => CollectionDrawMode = ESPolymorphicReferenceDrawMode.Odin);
+                new GUIContent("项目默认/【ES】Feel 风格卡片"),
+                UseFeelCollectionRenderer,
+                () => SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode.Feel));
+            menu.AddItem(
+                new GUIContent("项目默认/Odin 默认集合元素绘制"),
+                CollectionDrawMode == ESPolymorphicReferenceCollectionDrawMode.Odin,
+                () => SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode.Odin));
             menu.ShowAsContext();
         }
 
@@ -1542,16 +2074,38 @@ namespace ES.EditorInternal
             DrawMode = ESPolymorphicReferenceDrawMode.Odin;
         }
 
-        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/集合元素绘制/【ES】集合元素绘制")]
+        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/项目默认集合绘制/【ES】标准集合卡片")]
         private static void SelectESCollectionRenderer()
         {
-            CollectionDrawMode = ESPolymorphicReferenceDrawMode.ES;
+            SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode.ES);
         }
 
-        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/集合元素绘制/Odin 默认集合元素绘制")]
+        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/项目默认集合绘制/【ES】Feel 风格卡片")]
+        private static void SelectFeelCollectionRenderer()
+        {
+            SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode.Feel);
+        }
+
+        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/项目默认集合绘制/Odin 默认集合元素绘制")]
         private static void SelectOdinCollectionRenderer()
         {
-            CollectionDrawMode = ESPolymorphicReferenceDrawMode.Odin;
+            SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode.Odin);
+        }
+
+        private static void SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode mode)
+        {
+            cachedCollectionDrawMode = mode;
+            collectionDrawModeInitialized = true;
+            EditorPrefs.SetString(GetPreferenceKey(CollectionPreferencePrefix), mode.ToString());
+
+            if (mode != ESPolymorphicReferenceCollectionDrawMode.Odin)
+            {
+                cachedDrawMode = ESPolymorphicReferenceDrawMode.ES;
+                drawModeInitialized = true;
+                EditorPrefs.SetString(GetPreferenceKey(), cachedDrawMode.ToString());
+            }
+
+            RebuildInspectors();
         }
 
         private static string GetPreferenceKey(string prefix = null)

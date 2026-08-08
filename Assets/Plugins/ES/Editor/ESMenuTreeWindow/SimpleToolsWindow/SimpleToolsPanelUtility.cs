@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
 using UnityEditor;
@@ -451,7 +452,7 @@ namespace ES
         {
             try
             {
-                File.WriteAllText(path, text ?? string.Empty);
+                ESManagedFileIO.WriteTextAtUserSelectedPath(path, text ?? string.Empty, new UTF8Encoding(false));
                 EditorUtility.RevealInFinder(path);
                 return true;
             }

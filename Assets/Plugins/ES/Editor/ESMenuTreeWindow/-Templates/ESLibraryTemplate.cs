@@ -232,6 +232,7 @@ namespace ES
                 if (library is ESAssetLibrary assetLibrary)
                 {
                     string previousBundleCode = assetLibrary.AssetBundleCode;
+                    EditorGUILayout.BeginHorizontal();
                     string nextBundleCode = EditorGUILayout.TextField("AB 短码", previousBundleCode);
                     if (!string.Equals(nextBundleCode, previousBundleCode, StringComparison.Ordinal))
                     {
@@ -239,8 +240,22 @@ namespace ES
                         assetLibrary.AssetBundleCode = nextBundleCode.Trim().ToLowerInvariant();
                         MarkDirtyDeferred();
                     }
+                    if (string.IsNullOrWhiteSpace(assetLibrary.AssetBundleCode)
+                        && GUILayout.Button("显式生成", GUILayout.Width(72f)))
+                    {
+                        string libraryGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(assetLibrary));
+                        if (string.IsNullOrWhiteSpace(libraryGuid))
+                            Debug.LogError("Library 缺少稳定 Asset GUID，无法生成 AB 短码。", assetLibrary);
+                        else
+                        {
+                            Undo.RecordObject(assetLibrary, "Generate AssetBundle Code");
+                            assetLibrary.AssetBundleCode = ESAssetBundleUtility.CreateAutomaticLibraryCode(assetLibrary.Name, libraryGuid);
+                            MarkDirtyDeferred();
+                        }
+                    }
+                    EditorGUILayout.EndHorizontal();
                     if (string.IsNullOrWhiteSpace(assetLibrary.AssetBundleCode))
-                        EditorGUILayout.HelpBox("首次烘焙会自动生成并固化 AB 短码。", MessageType.Info);
+                        EditorGUILayout.HelpBox("正式烘焙不会自动修改 Library；请先显式生成或填写 AB 短码。", MessageType.Warning);
                     else if (!ESAssetBundleUtility.IsValidLibraryCode(assetLibrary.AssetBundleCode))
                         EditorGUILayout.HelpBox("AB 短码必须为 2~12 位，只能包含 a-z、0-9、_。", MessageType.Error);
                     else
@@ -1976,7 +1991,7 @@ namespace ES
                     try
                     {
                         Undo.RecordObject(consumer, "Sync Consumer GameCore Assets");
-                        ESAssetReferenceBaker.SyncConsumerGameCoreAssets(consumer);
+                        ESAssetConsumerReferenceAuthoring.SyncConsumerGameCoreAssets(consumer);
                         MarkPackageDirty();
                     }
                     catch (Exception exception)
@@ -2005,7 +2020,7 @@ namespace ES
                     DragAndDrop.AcceptDrag();
                     Undo.RecordObject(consumer, "Add Manual GameCore Assets");
                     foreach (UnityEngine.Object asset in DragAndDrop.objectReferences)
-                        if (!ESAssetReferenceBaker.TryAddManualGameCoreAsset(consumer, asset))
+                        if (!ESAssetConsumerReferenceAuthoring.TryAddManualGameCoreAsset(consumer, asset))
                             Debug.LogWarning("[ESRes] 仅允许拖入实现 IGameCoreSO 的 ScriptableObject：" + asset.name);
                     MarkPackageDirty();
                     current.Use();
@@ -2052,7 +2067,7 @@ namespace ES
                     DragAndDrop.AcceptDrag();
                     Undo.RecordObject(consumer, "Add Consumer Resident Assets");
                     foreach (UnityEngine.Object asset in DragAndDrop.objectReferences)
-                        if (!ESAssetReferenceBaker.TryAddResidentAsset(consumer, asset, out string error))
+                        if (!ESAssetConsumerReferenceAuthoring.TryAddResidentAsset(consumer, asset, out string error))
                             Debug.LogWarning("[ESRes][Resident] " + asset.name + "：" + error, asset);
                     MarkPackageDirty();
                     current.Use();

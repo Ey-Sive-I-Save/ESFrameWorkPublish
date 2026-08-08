@@ -1241,10 +1241,11 @@ namespace ES
                 try
                 {
                     string json = JsonUtility.ToJson(settings, true);
-                    File.WriteAllText(path, json, Encoding.UTF8);
+                    ESManagedFileIO.WriteTextAtUserSelectedPath(path, json, Encoding.UTF8);
                     lastResultSummary = "Animator 设置导出完成";
                     lastResultDetail = path;
-                    EditorUtility.DisplayDialog("成功", "设置已导出！", "确定");
+                    if (EditorUtility.DisplayDialog("设置已导出", path, "打开所在文件夹", "关闭"))
+                        EditorUtility.RevealInFinder(path);
                 }
                 catch (Exception ex)
                 {

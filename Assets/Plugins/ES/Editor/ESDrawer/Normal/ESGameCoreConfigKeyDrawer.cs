@@ -535,7 +535,7 @@ namespace ES.EditorInternal
             }
         }
 
-        [MenuItem("【ES】/数据/GameCore/整理并校验 Item 配置")]
+        [MenuItem("【ES】/项目设置/GameCore/整理并校验 Item 配置")]
         public static void MenuRepairAndValidate()
         {
             Report report = Run(repair: true, rebuildTables: false);
@@ -543,7 +543,7 @@ namespace ES.EditorInternal
             LogErrors(report);
         }
 
-        [MenuItem("【ES】/数据/GameCore/重建并验证 Item GameCore 表")]
+        [MenuItem("【ES】/项目设置/GameCore/重建并验证 Item GameCore 表")]
         public static void MenuRebuildTables()
         {
             Report report = Run(repair: true, rebuildTables: true);

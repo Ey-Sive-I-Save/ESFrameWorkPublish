@@ -10,7 +10,7 @@ Git 提交、暂存区和工作区差异仍是源码事实的权威；本台账�
 
 ## 已推送提交缓存
 
-本批次的 HTML 审阅基线仍是 `775cfdb`，但截至 `2026-08-03T06:16:13+08:00`，本地 `main` 与本地远端跟踪引用 `origin/main` 均为 `fc09d0a`。两者一致只证明本机已知的远端状态已对齐；它不替代下一次 `git fetch`，也不表示静态 HTML 已吸收这些提交。
+本批次的 HTML 审阅基线仍是 `775cfdb`。截至 `2026-08-03T06:20:00+08:00`，本地远端跟踪引用 `origin/main` 为 `fc09d0a`，本地 `main` 已前进到 `33a2862`；因此下表的 8 个提交是已推送缓存，`33a2862` 是独立的本地已提交、待推送记录。远端跟踪引用只证明本机已知的远端状态，不替代下一次 `git fetch`，更不表示静态 HTML 已吸收任何提交。
 
 以下 8 个已推送提交已写入 JSON 的 `batch.pushedCommitCache`，并精确映射到已完成的本地总结条目。它们全部处于 `cached-not-integrated`：可以参加后续回归整合，当前不得直接改写 HTML。
 
@@ -25,7 +25,7 @@ Git 提交、暂存区和工作区差异仍是源码事实的权威；本台账�
 | `17b6013` | Codex 协作历程与恢复工具 | `LOCAL-20260803-014` |
 | `fc09d0a` | 静态站点阅读与同步规则 | `LOCAL-20260803-015` |
 
-推送后新出现的本地未提交文件仍由 `INTAKE-20260802-001` 单独承接；该历史 ID 已改为精确列出目前的三个模块生命周期 Skill 文件，状态保持 `needs-triage`。它不属于上述 8 个提交，也不能借已推送记录获得 HTML 整合资格。
+`33a2862`（`feat(ai-audit): 强化模块审计续接状态闭环`）已记录在 JSON 的 `batch.localCommittedCache`，并映射至 `LOCAL-20260803-016`。它尚未 push，不属于上述 8 个已推送提交，也不得提前进入 HTML。当前未提交的 Project Asset Guide 展开状态与未跟踪的 `ES/Documentation/Output/index.html` 由 `INTAKE-20260802-001` 单独承接，继续保持 `needs-triage`。
 
 ## 批次状态
 
@@ -74,13 +74,13 @@ git commit -m "本批语义说明"
 ## 当前开放批次
 
 - 批次：`LOCAL-2026-08-02-OPEN`
-- 状态：`collecting`。已推送提交范围已缓存为 `775cfdb..fc09d0a`，但当前未提交的模块生命周期 Skill 改动仍为 `needs-triage`。
+- 状态：`collecting`。已推送提交范围缓存为 `775cfdb..fc09d0a`；本地已提交待推送的 `33a2862` 已独立登记；当前未提交的 Project Asset Guide 展开状态和 Output 产物仍为 `needs-triage`。
 - 快照：以 HTML 审阅基线比较当前 `HEAD`、未暂存 diff、暂存 diff 与未跟踪源码清单；详见 JSON。
 - HTML 整合：禁止。已推送条目等待统一回归；推送后本地改动尚未拆分为可独立复核的完成项。
 
 | ID | 当前状态 | 本地完成更新总结 | 回归 | HTML 目标 |
 | --- | --- | --- | --- | --- |
-| `INTAKE-20260802-001` | `needs-triage` | 历史总入口现只承接 3 个推送后未提交的模块生命周期 Skill 文件；已推送范围已另行映射至 `LOCAL-...-002` 至 `-015`。 | 未开始 | `#editor-overview`、`#editor-verification`、`#deep-warning-16`；必须先拆分。 |
+| `INTAKE-20260802-001` | `needs-triage` | 历史总入口现承接未提交的 Project Asset Guide 展开状态和未跟踪 Output 产物；已推送范围与本地已提交待推送范围均已分项登记。 | 未开始 | `#editor-overview`、`#editor-verification`、`#deep-warning-16`；必须先拆分。 |
 | `LOCAL-20260802-002` | `documented` | 固定 Git tag 安装 MCP for Unity 10.1.0；UPM 锁定、PackageCache 注册、HTTP 服务、Unity 插件握手和实际工具调用均已确认。 | 8080 已监听，Unity 注册 35 个工具，MCP 只读与编辑器调用成功；当前 Codex 窗口仍需重启才能原生加载新增工具。 | `#editor-overview`、`#editor-verification`；批次未到 `ready-for-html`，禁止写入。 |
 | `LOCAL-20260802-003` | `documented` | 修复 AICommands 全库失效引用，并为 Cmd Agent 增加模板自检、无效阻断、风险识别和直接使用说明。 | 52 个模板在 Unity 进程内批量解析为 0 个无效；ES_Stand、ES_Editor 和 Unity Console 均无编译错误。 | `#editor-overview`、`#deep-warning-16`；批次未到 `ready-for-html`，禁止写入。 |
 | `LOCAL-20260802-004` | `documented` | 在项目根 `.agents/skills` 建立五个官方格式 ES Skills，并提供 AICommand、编译、UTF-8 和工作树确定性脚本。 | 五个 Skill 全部通过官方验证器；四个脚本完成 AST 与实际运行验证。 | `#editor-overview`、`#editor-verification`；批次未到 `ready-for-html`，禁止写入。 |
@@ -92,6 +92,11 @@ git commit -m "本批语义说明"
 | `LOCAL-20260803-010` | `documented` | 新增 UnityMCP 与 AI 工程验收代理路线图预备案，登记候选能力、阶段、边界和未来验收要求。 | 文件位于待验收提案区，明确未实现；Markdown、meta、UTF-8 与 diff 检查通过。 | `#editor-overview`、`#editor-verification`；仅备案，不写入现行能力说明。 |
 | `LOCAL-20260803-011` | `documented` | 建立模块成熟度与未完成实现治理，新增统一状态、半成品隔离门禁、只读审计命令和 `$es-module-lifecycle`。 | AICommands 53/0；15 个文本文件 UTF-8 通过；Skill 等价结构与 meta GUID 已验证；同步验证器正确保持既有门禁。 | `#editor-overview`、`#deep-warning-16`；批次未到 `ready-for-html`，禁止写入。 |
 | `LOCAL-20260803-012` | `documented` | pre-commit 改为 staged-only 语义批次门禁，未暂存和未跟踪工作不再阻断本次提交。 | 暂存补丁指纹、条目覆盖、台账同批暂存和 HTML 禁写规则已建立；不自动改暂存区或提交。 | `#editor-overview`、`#editor-verification`；功能说明延期整合。 |
+| `LOCAL-20260803-013` | `documented` | 以工程级原子批次整合资源运行时、GameCore、角色、技能、载具、编辑器工作台与相关测试/规范。 | 已记录编译、导入与领域验收边界；完整运行回归仍待 Unity 稳定后执行。 | `#runtime-overview`、`#editor-overview`、`#editor-verification`；禁止拆散提前写入。 |
+| `LOCAL-20260803-014` | `documented` | 恢复 Codex 协作历程、定位与会话恢复工具，保持历史档案和当前实现分离。 | 文件、工具和独立档案存在；其他旧格式记录未逐一复核。 | 不适用。 |
+| `LOCAL-20260803-015` | `documented` | 补齐静态站点阅读和同步治理规则，明确 Git、台账、HTML 与验收证据的边界。 | UTF-8、staged-only 门禁与范围化空白检查通过。 | 文档治理章节；当前 HTML 仍不提前改写。 |
+| `LOCAL-20260803-016` | `documented`，本地已提交待推送 | 模块审计增加受控续接检查点：默认只读、精确区域授权、事实漂移失效与恢复前重新核对。 | AICommands 53/0、文本编码与结构检查通过；未运行 Unity 或官方 Python 验证器。 | `#editor-overview`、`#deep-warning-16`；先 push 与统一回归，后续才可整合。 |
+| `LOCAL-20260803-017` | `documented` | 固定模块审计状态路径，并建立“审计”“审计并记录”“继续审计”三个直接触发协议。 | 固定路径和触发词已同步至 Skill、AICommand、AIWarning 与入口索引；不扩大源码、Git、Unity 或发布权限。 | `#editor-overview`、`#deep-warning-16`；当前延期。 |
 
 ### LOCAL-20260802-002：UnityMCP 安装与 Codex 接入
 
@@ -227,6 +232,87 @@ git commit -m "本批语义说明"
 - **回归状态**：12 个目标文本严格 UTF-8 通过；AICommands 为 `53 commands / 0 invalid`；Skill frontmatter、引用、行数、默认 Prompt 与简介长度完成等价结构检查；范围化 `git diff --check` 通过。
 - **已知缺口**：当前终端没有可运行的 Python/uv/uvx，官方 `quick_validate.py` 未实跑；本轮没有创建实际模块状态检查点，也没有运行 Unity 或发布验收。
 - **HTML 目标**：未来在 `#editor-overview` 与 `#deep-warning-16` 解释受控续接机制，当前延期。
+
+### LOCAL-20260803-017：模块审计固定入口与短语触发
+
+- **源码路径**：`ES/Documentation/Status/MODULE_AUDIT_STATE.md`、`$es-module-lifecycle`、模块成熟度 AICommand/AIWarning，以及 AIWarnings、AICommands、Skills 三组入口索引。
+- **规范与证据**：唯一续接状态路径固定为 `ES/Documentation/Status/MODULE_AUDIT_STATE.md`；“审计”默认只读，“审计并记录”更新目标模块块，“继续审计”读取固定文件并重新核对事实。
+- **完成分析**：用户不再提供文件路径和区域。稳定模块键隔离各模块记录；普通审计不会自动写文件，记录权限也不扩大为源码、Git、Unity 或发布授权。
+- **回归状态**：固定路径和三个触发词已在 Skill、AICommand、AIWarning 与入口索引中统一；执行严格 UTF-8、AICommand 全库和范围化 diff 检查。
+- **已知缺口**：当前环境没有可运行的 Python/uv/uvx，官方 `quick_validate.py` 仍无法实跑；本轮未运行 Unity 或发布验收。
+- **HTML 目标**：未来在 `#editor-overview` 与 `#deep-warning-16` 解释固定续接入口，当前延期。
+
+### LOCAL-20260808-001：AI 协作治理与会话恢复
+
+- **源码路径**：`.agents`、`.codex`、`AGENTS.md`、AICommands、AIWarnings、Codex 历程目录及其受管压缩副本。
+- **规范与证据**：项目 Skill 定义会话启动、上下文验证、审计路由和权限边界；AICommands 与 AIWarnings 提供用户可见的规则入口；历程目录保留独立会话事实与恢复工具。
+- **完成分析**：这组文件共同约束 AI 的发现、执行和恢复流程，拆开会使规则入口、会话协议或历史档案处于不完整状态，因此作为治理批次提交。
+- **回归状态**：提交前执行 staged-only 范围覆盖、路径清单和补丁指纹校验；本批不宣称 Unity、Test Runner、PlayMode、Player 或发布验收已完成。
+- **已知缺口**：Skill 和规则不扩大后续源码、Git、Unity 或发布权限。
+- **HTML 目标**：后续在 `#editor-overview` 与 `#deep-warning-16` 汇总，当前延期。
+
+### LOCAL-20260808-002：受管自动化与编辑器输入
+
+- **源码路径**：Automation Editor 入口、CmdAgent、通用 ESAdvancedDialog、Automation 合约/Worker/受管 Python 运行时、验证资产和场景扫描记录。
+- **规范与证据**：AI Bridge 通过 JSON 契约和 Inbox 进入 Unity 主线程；受管运行时锁定解释器；通用对话框只收集输入，不执行命令或业务副作用。
+- **完成分析**：请求、运行时、Worker、报告和 Editor 门面相互引用，必须同批保持以避免缺少协议、实现或证据。
+- **回归状态**：批次携带 Unity 编译与 ReloadDomain 记录、测试入口与受管运行时锁；提交前执行 staged-only 指纹门禁。
+- **已知缺口**：生产环境、端到端 Inbox 与 PlayMode 仍需按实际环境复核；运行记录只代表已发生的证据快照。
+- **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 汇总，当前延期。
+
+### LOCAL-20260808-003：资源发布与受管 IO
+
+- **源码路径**：资源运行时、受管 IO、Bundle 发布/安装器、资源计划、旧资源归档、相关资产和定向测试。
+- **规范与证据**：受管路径、唯一暂存、哈希复核、冲突拒绝和最佳努力恢复统一约束发布与安装链。
+- **完成分析**：资源加载、文件写入、发布和安装存在同一数据边界，必须与调用方和验证资产一并提交，避免保留绕过保护的中间状态。
+- **回归状态**：批次包含受管 IO 与信任边界 EditMode 测试入口；提交前执行 staged-only 指纹门禁。
+- **已知缺口**：生产公钥、真实签名包和供应链轮换仍需环境验收；源码提交不替代 Unity 故障注入。
+- **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 汇总，当前延期。
+
+### LOCAL-20260808-004：Graph V2 与 Agent Authoring
+
+- **源码路径**：Graph V2 数据与编辑器、Agent Authoring 资产、旧 NodeRunner 隔离代码和定向测试。
+- **规范与证据**：图资产的稳定身份、保存/回滚保护和 legacy scope 共同约束创作入口。
+- **完成分析**：数据模型、编辑器和资产引用必须同批，避免中间提交产生不可打开资产或失效的回滚语义。
+- **回归状态**：批次包含 Graph 合同和 Agent Authoring 测试入口；提交前执行 staged-only 指纹门禁。
+- **已知缺口**：真实 Undo/Redo、域重载、外部修改故障注入及旧 NodeRunner 的完整迁移仍待 Unity Editor 验收。
+- **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 汇总，当前延期。
+
+### LOCAL-20260808-005：AITest Package 与业务能力接入
+
+- **源码路径**：嵌入式 AITest Package、ESLogic Editor/Runtime 能力提供者和 Package 锁。
+- **规范与证据**：协议、运行时、UGUI 观察执行、能力注册、输入及场景验证通过 asmdef 与 Package 依赖协同。
+- **完成分析**：Package 和 ESLogic 桥接必须随锁文件同批，避免 Unity 无法解析嵌入式依赖或能力发现缺失。
+- **回归状态**：提交前执行 staged-only 指纹门禁；程序集、协议和提供者保持同一可追溯范围。
+- **已知缺口**：独立 Player 的完整 AI 闭环、Test Runner、IL2CPP 和网络环境仍需真实验收。
+- **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 汇总，当前延期。
+
+### LOCAL-20260808-006：相机、Profile 与动态图集
+
+- **源码路径**：相机定义资产、迁移工具、运行时导演、轨道预览、通用 Profile、动态图集、GameManager 接入和测试。
+- **规范与证据**：新定义资产取代旧 Profile 资产；动态图集通过受管资源临时 Lease 上传，并由模块与 Graphic 生命周期管理。
+- **完成分析**：资产迁移、模块接入与运行时/Editor 代码不可拆分，否则会留下已删除类型引用或缺失图集模块。
+- **回归状态**：批次携带相机、Profile、动态图集 EditMode/PlayMode 测试入口；提交前执行 staged-only 指纹门禁。
+- **已知缺口**：真实场景、GPU、窄屏 UI、Player/IL2CPP 和目标项目旧资产迁移仍需 Unity 验收。
+- **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-overview` 汇总，当前延期。
+
+### LOCAL-20260808-007：角色与玩法运行时
+
+- **源码路径**：角色、载具、音频、状态、标签与 GameCore 的运行时代码、模板构建入口、测试场景和序列化资产。
+- **规范与证据**：实体领域和运行时模块由角色/载具资产、状态配置与测试场景共同驱动。
+- **完成分析**：模型代码、生成入口和预制体/资产引用不能独立提交，否则容易出现缺失类型或绑定中断。
+- **回归状态**：批次携带领域测试、运行时契约和 Unity 测试场景；提交前执行 staged-only 指纹门禁。
+- **已知缺口**：完整角色、载具、音频和存档流程及所有序列化资产仍需 PlayMode/Player 实测。
+- **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 汇总，当前延期。
+
+### LOCAL-20260808-008：Editor 交付体验与项目收口
+
+- **源码路径**：Editor 绘制器、窗口、工具栏、主题和项目导航资产、Unity meta、程序集/项目设置、文档台账及归档文件。
+- **规范与证据**：用户可见的状态、下一步、定位入口和排版规则与 Editor 工具共同维护；Unity meta 与对应目录同批保留 GUID 身份。
+- **完成分析**：Editor UI、项目设置和文档台账在交付侧共同约束可发现性和可追溯性，单独提交会让入口或元数据缺失。
+- **回归状态**：提交前执行 staged-only 指纹门禁；规则与工具已纳入同一可追溯范围。
+- **已知缺口**：真实窄窗口、高 DPI、视觉和交互仍需 Unity 实机检查。未跟踪静态 HTML 仍被开放批次的 `ready-for-html` 门禁阻断，未绕过。
+- **HTML 目标**：后续统一整合，当前延期。
 
 ## 条目模板
 

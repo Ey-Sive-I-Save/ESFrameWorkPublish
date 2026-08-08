@@ -285,7 +285,7 @@ namespace ES
         {
             string text = File.ReadAllText(report.FullPath, Encoding.UTF8);
             string backupPath = report.FullPath + "." + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".bak";
-            File.WriteAllText(backupPath, text, new UTF8Encoding(false));
+            ESManagedFileIO.WriteTextAtomic(backupPath, text, new UTF8Encoding(false), Application.dataPath);
 
             string newline = text.Contains("\r\n") ? "\r\n" : "\n";
             string[] lines = SplitLines(text);
@@ -302,7 +302,7 @@ namespace ES
                     output.Add(lines[i]);
             }
 
-            File.WriteAllText(report.FullPath, string.Join(newline, output), new UTF8Encoding(false));
+            ESManagedFileIO.WriteTextAtomic(report.FullPath, string.Join(newline, output), new UTF8Encoding(false), Application.dataPath);
             return report.MissingRootFileIds.Count;
         }
 

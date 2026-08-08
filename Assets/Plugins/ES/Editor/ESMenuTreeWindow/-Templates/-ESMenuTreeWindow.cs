@@ -183,7 +183,14 @@ namespace ES {
             {
                 UsingWindow = this as This;
             }
+            ES.EditorInternal.ESEditorPresentation.BindWindow(this);
             base.OnImGUI();
+        }
+
+        protected override void OnDisable()
+        {
+            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this);
+            base.OnDisable();
         }
         public static void ES_RefreshWindow()
         {
@@ -210,6 +217,7 @@ namespace ES {
         /// </summary>
         protected override void OnDestroy()
         {
+            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this);
             // Debug.Log($"[ESMenuTreeWindow] 窗口销毁，开始调用 {registeredPages.Count} 个页面的OnPageDisable");
             
             int callCount = 0;

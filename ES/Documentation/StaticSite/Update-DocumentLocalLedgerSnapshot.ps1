@@ -40,8 +40,15 @@ $sync = Get-Content -LiteralPath $syncPath -Raw -Encoding UTF8 | ConvertFrom-Jso
 $ledger = Get-Content -LiteralPath $ledgerPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $excludePathspecs = @($sync.policy.excludeFromSourceSnapshot | ForEach-Object { ':(exclude)' + $_ })
 $head = (Get-GitText @('rev-parse', 'HEAD')).Trim()
-$trackedPatch = Get-GitText (@('-c', 'core.safecrlf=false', 'diff', '--binary', $head, '--', '.') + $excludePathspecs)
-$stagedPatch = Get-GitText (@('-c', 'core.safecrlf=false', 'diff', '--cached', '--binary', $head, '--', '.') + $excludePathspecs)
+$baselineHead = [string]$sync.baseline.head
+if ([string]::IsNullOrWhiteSpace($baselineHead)) {
+    throw 'DOCUMENT_SYNC.json baseline.head is required to refresh the local update snapshot.'
+}
+
+# The verifier compares source state with the document baseline, not with HEAD.
+# Keep this helper on that same comparison basis so pushed commits can be deferred safely.
+$trackedPatch = Get-GitText (@('-c', 'core.safecrlf=false', 'diff', '--binary', $baselineHead, '--', '.') + $excludePathspecs)
+$stagedPatch = Get-GitText (@('-c', 'core.safecrlf=false', 'diff', '--cached', '--binary', $baselineHead, '--', '.') + $excludePathspecs)
 $untrackedLines = @(& git -C $repository -c core.quotePath=false ls-files --others --exclude-standard | Where-Object {
     $_ -and $_ -notlike 'ES/Documentation/StaticSite/*' -and $_ -notlike '.githooks/*'
 })
@@ -55,6 +62,11 @@ $manifest = foreach ($relativePath in $untrackedLines) {
 }
 
 $ledger.batch.sourceSnapshot.head = $head
+$snapshotBasis = [ordered]@{
+    comparison = 'document-baseline-to-current-worktree'
+    baselineHead = $baselineHead
+}
+$ledger.batch.sourceSnapshot | Add-Member -NotePropertyName 'basis' -NotePropertyValue $snapshotBasis -Force
 $ledger.batch.sourceSnapshot.trackedWorktreePatchSha256 = Get-TextSha256 $trackedPatch
 $ledger.batch.sourceSnapshot.stagedSourcePatchSha256 = Get-TextSha256 $stagedPatch
 $ledger.batch.sourceSnapshot.untrackedSourceManifestSha256 = Get-TextSha256 ($manifest -join "`n")
